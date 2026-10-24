@@ -21,6 +21,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     NodeFieldValue,
     PruneResult,
     QueueItemDeliveryResult,
+    QueueItemLineage,
     QueueItemOwner,
     RetryItemsResult,
     SessionQueueCountsByDestination,
@@ -54,9 +55,11 @@ class SessionQueueBase(ABC):
 
     @abstractmethod
     def enqueue_batch(
-        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system"
+        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system", *, all_or_none: bool = False
     ) -> Coroutine[Any, Any, EnqueueBatchResult]:
-        """Enqueues all permutations of a batch for execution for a specific user."""
+        """Enqueues all permutations of a batch for execution for a specific user. A queue without room for all of
+        them takes as many as fit, or with `all_or_none` none of them. A repeat with the batch's idempotency key
+        returns the key's settled receipt as it is: `all_or_none` is not part of the payload the receipt matches."""
         pass
 
     @abstractmethod
@@ -288,6 +291,33 @@ class SessionQueueBase(ABC):
         If owner_id is provided, only returns items for that user. If limit is provided, returns only the first
         `limit` ids of that order. total_count is the number of ids in item_ids, which equals the number of
         matching items only when no limit is given."""
+        pass
+
+    @abstractmethod
+    def get_queue_item_lineage(self, queue_id: str, origin_prefix: str) -> list[QueueItemLineage]:
+        """The status, origin and retry source of every item whose origin starts with `origin_prefix` (ignoring
+        case), in no order."""
+        pass
+
+    @abstractmethod
+    def get_unfinished_origins(self, queue_id: str, origin_prefix: str) -> set[str]:
+        """The origins of the items pending, in progress or waiting whose origin starts with `origin_prefix` (ignoring
+        case). Found through the items' status: it costs the queue's unfinished items, not its history."""
+        pass
+
+    @abstractmethod
+    def get_origins_since(
+        self, queue_id: str, after_item_id: Optional[int], origin_prefix: str
+    ) -> tuple[Optional[int], set[str]]:
+        """The id of the newest item in any queue (None while there is none), and the origins of the queue's items
+        queued after `after_item_id` up to it whose origin starts with `origin_prefix` (ignoring case); none without
+        `after_item_id`. Read by id: it costs the items queued since, not the history.
+
+        A caller passing the id it got last sees each new item once. That relies on ids committing in the order they
+        are assigned, which holds because every insert into the queue (an enqueue, a retry, and a workflow call's
+        children, enqueued at once or one by one) takes the `SESSION_QUEUE_ADMISSION` lock, and the newest id and the
+        items are read in one transaction. An insert path that skipped the lock could commit a lower id after a caller
+        moved past it."""
         pass
 
     @abstractmethod

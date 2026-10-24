@@ -225,8 +225,8 @@ test('the HTTP reset contract selects profiles explicitly and restores the start
   }
 });
 
-const withRepresentativeBackend = async (run) => {
-  const backend = await startMockBackend(0, { profile: 'representative' });
+const withRepresentativeBackend = async (run, options = {}) => {
+  const backend = await startMockBackend(0, { ...options, profile: 'representative' });
 
   try {
     await run(backend);
@@ -1208,6 +1208,209 @@ test('workflow thumbnails round-trip their bytes and refresh the listed URL on e
 
     await getJson(backend, path, { method: 'DELETE' });
     assert.equal(await listedUrl(), null);
+  });
+});
+
+test('working-memory calibration: a run per request, replayed by its key, advanced by summary reads', async () => {
+  let now = 0;
+
+  await withRepresentativeBackend(
+    async (backend) => {
+      const base = '/api/v2/models/i/fixture-model-001/working_memory';
+      const plan = await getJson(backend, `${base}/plan`);
+      const request = (key, attempt = { attempt_id: 'attempt-1', attempt_steps: 2 }) => ({
+        body: JSON.stringify({
+          ...attempt,
+          data: [],
+          graph: { edges: [], id: plan.cases[0].id, nodes: {} },
+          idempotency_key: key,
+        }),
+        method: 'POST',
+      });
+      const post = (key) => getJson(backend, `${base}/calibrate`, request(key));
+      const refusal = async (key, attempt) =>
+        (await fetch(`${backend.origin}${base}/calibrate`, request(key, attempt))).status;
+
+      assert.equal(plan.supported, true);
+      assert.deepEqual((await getJson(backend, `${base}/summary`)).runs, []);
+
+      // The attempt id and its step count come together, and every run of an attempt names the same count.
+      assert.equal(await refusal('lone-id', { attempt_id: 'attempt-2' }), 422);
+      assert.equal(await refusal('lone-steps', { attempt_steps: 2 }), 422);
+      assert.equal(await refusal('too-many', { attempt_id: 'attempt-2', attempt_steps: 257 }), 422);
+
+      const first = await post('attempt:0');
+      assert.deepEqual(await post('attempt:0'), first);
+      assert.equal(await refusal('attempt:1', { attempt_id: 'attempt-1', attempt_steps: 3 }), 409);
+      const second = await post('attempt:1');
+      assert.notEqual(second.run_id, first.run_id);
+
+      // A read a second after the last step finishes the running item and starts the next one.
+      const statuses = async () => {
+        now += 1_050;
+        return (await getJson(backend, `${base}/summary`)).runs.map((run) => run.status);
+      };
+      assert.deepEqual(await statuses(), ['running', 'running']);
+      const summary = await getJson(backend, `${base}/summary`);
+      assert.deepEqual(
+        summary.runs.map((run) => [run.attempt_id, run.attempt_steps, run.held_back]),
+        [
+          ['attempt-1', 2, 'running'],
+          ['attempt-1', 2, 'running'],
+        ]
+      );
+      assert.equal(summary.measurement_verified, true);
+      const badAttempt = await fetch(`${backend.origin}${base}/calibrate`, {
+        body: JSON.stringify({ attempt_id: 'has space', graph: { edges: [], id: 'x', nodes: {} } }),
+        method: 'POST',
+      });
+      assert.equal(badAttempt.status, 422);
+      assert.deepEqual(await statuses(), ['completed', 'running']);
+
+      const origin = encodeURIComponent(`invokeai:wm-calibration:${second.run_id}`);
+      assert.deepEqual(
+        await getJson(backend, `/api/v1/queue/default/cancel_all?origin_prefix=${origin}`, { method: 'PUT' }),
+        {
+          canceled: 1,
+        }
+      );
+      assert.deepEqual(await statuses(), ['completed', 'canceled']);
+
+      // The canceled run aborts its attempt: the window the first run measured never counts.
+      const aborted = await getJson(backend, `${base}/summary`);
+      assert.deepEqual(
+        aborted.runs.map((run) => run.held_back),
+        ['aborted_attempt', 'aborted_attempt']
+      );
+      // As the server stores them: the second run was canceled during its decode, which left an invalid window.
+      assert.deepEqual(
+        aborted.runs.map((run) => [run.status, run.point_count]),
+        [
+          ['completed', 1],
+          ['canceled', 1],
+        ]
+      );
+      const [line] = aborted.lines;
+      assert.equal(line.state, 'insufficient');
+      assert.match(line.problem, /^Stop or an interrupted submission discarded the measurements of this line/);
+      assert.deepEqual(
+        line.sizes.map((size) => [size.counted, size.excluded_reason]),
+        [[false, 'aborted_attempt']]
+      );
+      assert.equal(
+        (await getJson(backend, '/api/v2/models/working_memory/status')).device_classes[0].runs.find(
+          (run) => run.run_id === first.run_id
+        ).attempt_steps,
+        2
+      );
+
+      assert.deepEqual(await getJson(backend, base, { method: 'DELETE' }), { points_removed: 1, runs_removed: 2 });
+      assert.deepEqual((await getJson(backend, `${base}/summary`)).lines, []);
+      // Calibration items never join the fixture queue.
+      assert.equal((await getJson(backend, '/api/v1/queue/default/item_ids')).total_count, 500);
+    },
+    { clock: () => now }
+  );
+});
+
+test('working-memory calibration: seeded model states and device scenarios', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const summaryOf = (key) => getJson(backend, `/api/v2/models/i/${key}/working_memory/summary`);
+    const states = async (key) => (await summaryOf(key)).lines.map((line) => line.state);
+
+    assert.deepEqual(await states('fixture-model-006'), ['in_use', 'in_use']);
+    assert.deepEqual(await states('fixture-model-011'), ['stale', 'stale']);
+    assert.deepEqual(await states('fixture-model-016'), ['unusable', 'unusable']);
+    assert.deepEqual(await states('fixture-model-036'), ['insufficient']);
+    assert.ok((await summaryOf('fixture-model-021')).runs.some((run) => run.status === 'running'));
+    const failed = await summaryOf('fixture-model-026');
+    // The failed decode left an invalid window, which point_count counts like the server's.
+    assert.deepEqual(
+      failed.runs.filter((run) => run.status === 'failed').map((run) => run.point_count),
+      [1]
+    );
+    assert.ok(failed.runs.every((run) => run.held_back === null));
+    assert.deepEqual(
+      failed.lines.map((line) => line.state),
+      ['in_use', 'in_use']
+    );
+    assert.equal((await getJson(backend, '/api/v2/models/i/fixture-model-031/working_memory/plan')).supported, false);
+
+    // A model never calibrated itself shows the lines another model measured, which name both sides.
+    const shared = (await summaryOf('fixture-model-041')).lines;
+    assert.deepEqual(
+      shared.map((line) => [line.state, line.own_windows, line.measured_by.map((entry) => entry.model_key)]),
+      [
+        ['in_use', 0, ['fixture-model-006']],
+        ['in_use', 0, ['fixture-model-006']],
+      ]
+    );
+    const carrier = (await summaryOf('fixture-model-006')).lines[0];
+    assert.equal(carrier.own_windows, 9);
+    assert.deepEqual(carrier.measured_by, [{ model_key: 'fixture-model-006', name: 'Fixture Model 006', windows: 9 }]);
+    assert.equal((await fetch(`${backend.origin}/api/v2/models/i/no-such-model/working_memory/summary`)).status, 404);
+
+    // A warm 9060 XT: the largest fp32 size measured fragmentation and is left out of the fit and its range; an fp16
+    // size with one clean window among partially resident ones still counts, on that window alone.
+    const [fp16, fp32] = (await summaryOf('fixture-model-046')).lines;
+    const sizesOf = (line) => line.sizes.map((size) => [size.width, size.counted, size.excluded_reason, size.windows]);
+    assert.deepEqual(sizesOf(fp32), [
+      [576, true, null, 3],
+      [832, true, null, 3],
+      [1216, false, 'fragmented', 3],
+    ]);
+    assert.deepEqual(fp32.measured_range, { max_pixels: 832 * 832, min_pixels: 576 * 576 });
+    // Above that range the server prices the larger of the user line and the shipped value; here the line is lower.
+    const [, within, above] = fp32.sizes;
+    assert.equal(above.user_bytes, above.shipped_bytes);
+    assert.ok(within.user_bytes < within.shipped_bytes);
+    assert.equal(fp32.own_windows, 6);
+    assert.equal(fp32.state, 'in_use');
+    assert.deepEqual(sizesOf(fp16), [
+      [576, true, null, 3],
+      [832, true, null, 1],
+      [1216, true, null, 3],
+    ]);
+    assert.equal(fp16.own_windows, 7);
+
+    // Opt in: a model whose attempt Stop aborted after four steps, whose windows never count.
+    await getJson(backend, '/__faults', {
+      body: JSON.stringify({ stoppedCalibration: 'fixture-model-051' }),
+      method: 'POST',
+    });
+    const stopped = await summaryOf('fixture-model-051');
+    assert.ok(stopped.runs.every((run) => run.held_back === 'aborted_attempt'));
+    assert.equal(stopped.runs.filter((run) => run.point_count > 0).length, 4);
+    assert.deepEqual(
+      stopped.lines.map((line) => [line.state, line.sizes.map((size) => size.excluded_reason)]),
+      [['insufficient', ['aborted_attempt', 'aborted_attempt']]]
+    );
+    const notMain = await fetch(`${backend.origin}/__faults`, {
+      body: JSON.stringify({ stoppedCalibration: 'no-such-model' }),
+      method: 'POST',
+    });
+    assert.equal(notMain.status, 400);
+
+    await getJson(backend, '/__faults', { body: JSON.stringify({ workingMemory: 'notVerified' }), method: 'POST' });
+    assert.equal((await summaryOf('fixture-model-006')).measurement_verified, false);
+
+    await getJson(backend, '/__faults', { body: JSON.stringify({ workingMemory: 'multiGpu' }), method: 'POST' });
+    const status = await getJson(backend, '/api/v2/models/working_memory/status');
+    assert.equal(status.available, false);
+    assert.match(status.unavailable_reason, /exactly one generation device/);
+    assert.equal(
+      (await fetch(`${backend.origin}/api/v2/models/i/fixture-model-001/working_memory/summary`)).status,
+      409
+    );
+
+    await getJson(backend, '/__faults', { body: JSON.stringify({ workingMemory: 'error' }), method: 'POST' });
+    assert.equal((await fetch(`${backend.origin}/api/v2/models/i/fixture-model-001/working_memory/plan`)).status, 503);
+
+    const unknown = await fetch(`${backend.origin}/__faults`, {
+      body: JSON.stringify({ workingMemory: 'sideways' }),
+      method: 'POST',
+    });
+    assert.equal(unknown.status, 400);
   });
 });
 
