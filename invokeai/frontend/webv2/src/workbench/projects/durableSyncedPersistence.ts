@@ -1463,11 +1463,13 @@ export const createDurableSyncedWorkbenchPersistence = (
         });
       }
       if (keepsWhole && base) {
+        const raisedFloor = getRaisedCanvasSchemaFloor(document, base.minimumCanvasSchemaVersion);
         const updated = await api.updateProject(
           project.id,
           {
             data: document as unknown as Record<string, unknown>,
             expected_revision: base.revision,
+            ...(raisedFloor === undefined ? {} : { minimum_canvas_schema_version: raisedFloor }),
             name: project.name,
           },
           owner.signal

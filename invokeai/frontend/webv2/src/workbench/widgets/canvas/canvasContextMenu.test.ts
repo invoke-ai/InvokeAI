@@ -145,6 +145,19 @@ describe('cropAllLayersToFrame', () => {
     ]);
   });
 
+  it('names the layer whose adjustments prevented the crop', async () => {
+    const result = await notices({
+      ownerId: 'haze',
+      ownerName: 'Haze',
+      reason: 'too-large',
+      status: 'adjustment-refused',
+    });
+    expect(result.error).toHaveLength(1);
+    expect(result.error[0]?.[1]).toContain('Haze');
+    expect(result.info).toEqual([]);
+    expect(result.success).toEqual([]);
+  });
+
   it('explains refusals and a rejected crop with the shared layer notice', async () => {
     expect((await notices({ status: 'over-budget' })).error).toEqual([
       [i18n.t('widgets.layers.actions.actionFailed'), i18n.t('widgets.layers.actions.overBudget')],

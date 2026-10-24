@@ -100,6 +100,9 @@ export const cropAllLayersToFrame = async (
       }
       return;
     }
+    case 'adjustment-refused':
+      reportLayerOperation(result, notify.error, t);
+      return;
     default:
       reportLayerOperation(result.status, notify.error, t);
   }

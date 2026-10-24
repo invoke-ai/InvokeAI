@@ -287,6 +287,19 @@ describe('createSelectObjectSession', () => {
     notReady.setCurrentGuard(null);
     await expect(notReady.session.process()).resolves.toBe('error');
     expect(notReady.session.getSnapshot().error).toEqual({ code: 'not-ready' });
+
+    const refused = createHarness({
+      exportSource: vi.fn(() =>
+        Promise.resolve({
+          ownerId: 'layer',
+          ownerName: 'Layer',
+          reason: 'too-large',
+          status: 'adjustment-refused',
+        } as const)
+      ),
+    });
+    await expect(refused.session.process()).resolves.toBe('error');
+    expect(refused.session.getSnapshot().error).toEqual({ code: 'adjustment-too-large' });
   });
 
   it('maps output dimensions and decode failures to typed errors', async () => {

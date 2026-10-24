@@ -74,6 +74,9 @@ const SAM_STATUS_TRANSLATION_KEYS: Record<SamSessionSnapshot['status'], string> 
 };
 
 const SAM_ERROR_TRANSLATION_KEYS: Record<SamSessionErrorCode, string> = {
+  'adjustment-error': 'widgets.layers.selectObject.errorAdjustment',
+  'adjustment-over-budget': 'widgets.layers.selectObject.errorAdjustmentOverBudget',
+  'adjustment-too-large': 'widgets.layers.selectObject.errorAdjustmentTooLarge',
   decode: 'widgets.layers.selectObject.errorDecode',
   empty: 'widgets.layers.selectObject.errorEmpty',
   invalid: 'widgets.layers.selectObject.errorInvalid',

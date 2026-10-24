@@ -4,6 +4,7 @@ import type {
   CanvasLayerContract,
   CanvasLayerSourceContract,
 } from '@workbench/canvas-engine/contracts';
+import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
@@ -29,7 +30,8 @@ import {
 export type CropLayerResult =
   | { status: 'cropped' }
   | { status: 'missing' | 'locked' | 'unsupported' | 'empty' | LayerEditRefusal }
-  | { status: 'failed'; message: string };
+  | { status: 'failed'; message: string }
+  | AdjustmentRefusal;
 
 /**
  * `skippedLocked` counts locked leaves (own or ancestor lock) whose content reaches past the frame. `nothing` when
@@ -38,11 +40,13 @@ export type CropLayerResult =
 export type CropAllLayersResult =
   | { status: 'cropped'; cropped: number; skippedLocked: number }
   | { status: 'nothing'; skippedLocked: number }
-  | { status: 'stale' | 'failed' | LayerEditRefusal };
+  | { status: 'stale' | 'failed' | LayerEditRefusal }
+  | AdjustmentRefusal;
 
 type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
-  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' };
+  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | AdjustmentRefusal;
 
 export interface CropLayerControllerOptions {
   readonly ctx: Pick<
@@ -142,6 +146,9 @@ export class CropLayerController {
     }
     try {
       const exported = await this.deps.exportBaked(layerId);
+      if (exported.status === 'adjustment-refused') {
+        return exported;
+      }
       if (exported.status !== 'ok') {
         return { status: exported.status === 'disabled' ? 'not-ready' : exported.status };
       }
@@ -259,6 +266,9 @@ export class CropLayerController {
     try {
       for (const layer of candidates) {
         const exported = await this.deps.exportBaked(layer.id);
+        if (exported.status === 'adjustment-refused') {
+          return exported;
+        }
         if (exported.status === 'missing') {
           return { status: 'stale' };
         }

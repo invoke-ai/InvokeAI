@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 802380,
+        "brotliBytes": 804953,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 801520,
+        "gzipBytes": 804296,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2066324,
+        "initialRawBytes": 2074195,
         "largestAssetRawBytes": 752422,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 101787,
+        "ownedRawBytes": 103111,
         "requestCount": 35,
         "scriptRequestCount": 19,
         "sourceOwners": [
@@ -350,15 +350,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1201065,
+        "brotliBytes": 1213758,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1194189,
+        "gzipBytes": 1206518,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3306361,
+        "initialRawBytes": 3341503,
         "largestAssetRawBytes": 752422,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 155629,
+        "ownedRawBytes": 156608,
         "requestCount": 71,
         "scriptRequestCount": 55,
         "sourceOwners": [
@@ -855,10 +855,12 @@
           "source:src/workbench/canvas-engine/render/adjustments.ts",
           "source:src/workbench/canvas-engine/render/compositor.ts",
           "source:src/workbench/canvas-engine/render/controlTransparency.ts",
+          "source:src/workbench/canvas-engine/render/exactAdjustments.ts",
           "source:src/workbench/canvas-engine/render/groupCompositeScopes.ts",
           "source:src/workbench/canvas-engine/render/maskFill.ts",
           "source:src/workbench/canvas-engine/render/rasterComposite.ts",
           "source:src/workbench/canvas-engine/render/rasterizers/textRasterizer.ts",
+          "source:src/workbench/canvas-engine/render/thumbnail.ts",
           "source:src/workbench/canvas-engine/transform/transformMath.ts",
           "source:src/workbench/canvasDimsSync.ts",
           "source:src/workbench/canvasLayerContent.ts",
@@ -1111,7 +1113,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-10-20",
+  "capturedAt": "2026-10-23",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

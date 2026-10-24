@@ -32,9 +32,13 @@ import {
   CropIcon,
   DropletIcon,
   EyeIcon,
+  FilmIcon,
+  FingerprintPatternIcon,
+  FocusIcon,
   EyeOffIcon,
   FolderPlusIcon,
   GaugeIcon,
+  HazeIcon,
   ImageIcon,
   ImagePlusIcon,
   LockIcon,
@@ -71,6 +75,10 @@ export type LayerContextActionId =
   | 'add-hsl'
   | 'add-hue'
   | 'add-invert'
+  | 'add-texture'
+  | 'add-clarity'
+  | 'add-dehaze'
+  | 'add-noise-adjustment'
   | 'merge-selected'
   | 'merge-masks'
   | 'move-to-front'
@@ -166,15 +174,15 @@ export interface LayerContextActionEffects {
   extractMaskedArea(): Promise<void>;
   booleanMerge(operation: BooleanRasterOperation): Promise<void>;
   copyTo(target: LayerType): void | Promise<void>;
-  rasterize(): void;
-  convertTo(target: LayerType): void;
+  rasterize(): Promise<void>;
+  convertTo(target: LayerType): void | Promise<void>;
   patchConfig(kind: LayerConfigPatchKind): void;
   addReferenceImage(): void;
   addMaskModifier(field: 'noise' | 'denoise'): void;
   addAdjustment(type: CanvasAdjustmentEntry['type']): void;
   addLayerRegion(): void;
   setColorLabel(label: CanvasColorLabel | null): void;
-  mergeDown(): void;
+  mergeDown(): Promise<void>;
   toggleVisibility(): void;
   toggleHidden(): void;
   toggleLock(): void;
@@ -253,13 +261,15 @@ export interface LayerContextAction {
 export type LayerConfigPatchKind = 'control-transparency-effect' | 'regional-auto-negative';
 
 const ALL_LAYER_TYPES = ['raster', 'control', 'inpaint_mask', 'regional_guidance'] as const;
-/** The one add-adjustment catalog; the leaf action registry and the group menu both render from it. */
-export const ADJUSTMENT_ADD_ITEMS: readonly {
+type AdjustmentAddItem = {
   readonly defaultLabel: string;
   readonly icon: LucideIcon;
   readonly labelKey: string;
   readonly type: CanvasAdjustmentEntry['type'];
-}[] = [
+};
+
+/** The one add-adjustment catalog; the leaf action registry and the group menu both render from it. */
+export const ADJUSTMENT_ADD_ITEMS: readonly AdjustmentAddItem[] = [
   {
     defaultLabel: 'Brightness/Contrast',
     icon: SunMediumIcon,
@@ -272,7 +282,21 @@ export const ADJUSTMENT_ADD_ITEMS: readonly {
   { defaultLabel: 'Saturation', icon: DropletIcon, labelKey: 'widgets.layers.adjustments.saturation', type: 'hsl' },
   { defaultLabel: 'Hue', icon: RainbowIcon, labelKey: 'widgets.layers.adjustments.hue', type: 'hue' },
   { defaultLabel: 'Invert', icon: ContrastIcon, labelKey: 'widgets.layers.adjustments.invert', type: 'invert' },
+  // Detail adjustments, finest scale first.
+  {
+    defaultLabel: 'Texture',
+    icon: FingerprintPatternIcon,
+    labelKey: 'widgets.layers.adjustments.texture',
+    type: 'texture',
+  },
+  { defaultLabel: 'Clarity', icon: FocusIcon, labelKey: 'widgets.layers.adjustments.clarity', type: 'clarity' },
+  { defaultLabel: 'Dehaze', icon: HazeIcon, labelKey: 'widgets.layers.adjustments.dehaze', type: 'dehaze' },
+  { defaultLabel: 'Noise', icon: FilmIcon, labelKey: 'widgets.layers.adjustments.noise', type: 'noise' },
 ];
+
+/** An add-adjustment item's action id; noise is suffixed because `add-noise` is the inpaint mask's modifier. */
+export const adjustmentAddActionId = (item: AdjustmentAddItem): LayerContextActionId =>
+  item.type === 'noise' ? 'add-noise-adjustment' : (`add-${item.type}` as LayerContextActionId);
 
 const RASTER_ONLY = ['raster'] as const;
 const CONTROL_ONLY = ['control'] as const;
@@ -512,7 +536,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     defaultLabel: item.defaultLabel,
     handler: ({ effects }) => effects.addAdjustment(item.type),
     icon: item.icon,
-    id: `add-${item.type}` as LayerContextActionId,
+    id: adjustmentAddActionId(item),
     isEnabled: isLayerMutable,
     isVisible: alwaysVisible,
     labelKey: item.labelKey,

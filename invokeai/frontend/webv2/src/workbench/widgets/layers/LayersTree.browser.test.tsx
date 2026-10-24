@@ -40,6 +40,8 @@ import { userEvent } from 'vitest/browser';
 import type { ProjectedChildRow } from './layerChildRows';
 import type { LayerRowCommands } from './layerRowCommands';
 
+import { ADJUSTMENT_SPINNER_DELAY_MS } from './AdjustmentStatusIcon';
+import { createFakeAdjustmentStatus } from './AdjustmentStatusIcon.testing';
 import { clearLayerChildSelection, getLayerChildSelection } from './layerChildSelection';
 import { getLayerRowCommits, resetLayerRowCommits } from './layerPanelDiagnostics';
 import { LAYER_PANEL_DEGRADE_THRESHOLD, LAYER_ROW_HEIGHT_PX } from './layerPanelRows';
@@ -190,6 +192,7 @@ const withOperations = (engine: LayersTreeEngine): LayersTreeEngine => {
   attachCanvasOperations(engine, operationHarness as never);
   return engine;
 };
+const adjustmentStatus = createFakeAdjustmentStatus();
 // The real engine handle is stable across document changes; this one reads the harness's latest document.
 let harnessDocument = createEmptyCanvasDocument();
 const engine = withOperations({
@@ -206,7 +209,7 @@ const engine = withOperations({
     },
   },
   exports: { exportBakedLayerBlob: exportBakedLayerBlob, hasExportableLayerContent: () => false },
-  interaction: { get: () => false },
+  interaction: { get: () => false, ...adjustmentStatus.interaction },
   layers: {
     commitPrepared: (_label: string, edit: PreparedDocumentEdit) => {
       committedEdits.push(edit);
@@ -485,6 +488,54 @@ describe('LayersTree keyboard and accessibility', () => {
     expect(group).toHaveAttribute('aria-setsize', '3');
     expect(group).toHaveAttribute('aria-expanded', 'false');
     expect(group).toHaveAttribute('aria-selected', 'false');
+  });
+
+  it('shows a delayed spinner while adjustments compute and a described warning when they cannot run', async () => {
+    await renderTree(nested());
+    const top = treeitem('Top');
+    const statusIcon = (row: HTMLElement, key: string): HTMLElement | null =>
+      row.querySelector<HTMLElement>(`[role="img"][aria-label="widgets.layers.adjustments.status.${key}"]`);
+    const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms));
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      // A job that ends before the delay never shows the spinner.
+      await act(() => adjustmentStatus.set('top', 'computing'));
+      await advance(ADJUSTMENT_SPINNER_DELAY_MS - 1);
+      expect(statusIcon(top, 'computing')).toBeNull();
+      await act(() => adjustmentStatus.set('top', 'idle'));
+      await advance(ADJUSTMENT_SPINNER_DELAY_MS);
+      expect(statusIcon(top, 'computing')).toBeNull();
+
+      await act(() => adjustmentStatus.set('top', 'computing'));
+      await advance(ADJUSTMENT_SPINNER_DELAY_MS - 1);
+      expect(statusIcon(top, 'computing')).toBeNull();
+      await advance(1);
+      expect(statusIcon(top, 'computing')).not.toBeNull();
+      expect(top).not.toHaveAttribute('aria-describedby');
+    } finally {
+      vi.useRealTimers();
+    }
+
+    await act(() => adjustmentStatus.set('top', 'too-large'));
+    expect(statusIcon(top, 'computing')).toBeNull();
+    const warning = statusIcon(top, 'tooLarge')!;
+    expect(warning).not.toBeNull();
+    // The icon is pointer-only, so focusing the row is how the keyboard reaches the explanation.
+    expect(top.getAttribute('aria-describedby')).toBe(warning.id);
+    expect(tabStops()).toHaveLength(1);
+
+    // A group reports through the same store, by its own id; other rows stay clear.
+    await act(() => adjustmentStatus.set('g', 'over-budget'));
+    expect(statusIcon(treeitem('Group'), 'overBudget')).not.toBeNull();
+    expect(treeitem('Bottom').querySelector('[role="img"]')).toBeNull();
+
+    await act(() => {
+      adjustmentStatus.set('top', 'idle');
+      adjustmentStatus.set('g', 'idle');
+    });
+    expect(top.querySelector('[role="img"]')).toBeNull();
+    expect(top).not.toHaveAttribute('aria-describedby');
   });
 
   it('walks rows with the arrow keys, opens and enters groups, climbs to the parent, and jumps with End', async () => {

@@ -1,4 +1,5 @@
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { Rect } from '@workbench/canvas-engine/types';
 
 import {
@@ -133,7 +134,13 @@ const lockedPaint = (id: string, locked = true) =>
     },
   } as Partial<CanvasLayerContract>);
 
-const createCropAllHarness = (options: { historyBytes?: number; onExport?: (layerId: string) => void } = {}) => {
+const createCropAllHarness = (
+  options: {
+    historyBytes?: number;
+    onExport?: (layerId: string) => void;
+    refusal?: AdjustmentRefusal;
+  } = {}
+) => {
   const document: CanvasDocumentContractV3 = {
     background: 'transparent',
     bbox: FRAME,
@@ -178,6 +185,9 @@ const createCropAllHarness = (options: { historyBytes?: number; onExport?: (laye
     exportBaked: (layerId) => {
       exported.push(layerId);
       options.onExport?.(layerId);
+      if (options.refusal?.ownerId === layerId) {
+        return Promise.resolve(options.refusal);
+      }
       const entry = h.layers.get(layerId)!;
       const reservation = h.ctx.reserveRaster(bytes(entry.rect));
       reservedAtExport.push(h.reservedBytes());
@@ -199,6 +209,27 @@ const createCropAllHarness = (options: { historyBytes?: number; onExport?: (laye
 };
 
 describe('CropLayerController: crop all layers', () => {
+  it.each(['too-large', 'over-budget', 'error'] as const)(
+    'refuses the whole crop on a %s adjustment, releasing earlier copies',
+    async (reason) => {
+      const refusal: AdjustmentRefusal = {
+        ownerId: 'control',
+        ownerName: 'Control',
+        reason,
+        status: 'adjustment-refused',
+      };
+      const h = createCropAllHarness({ refusal });
+
+      await expect(h.controller.cropAll()).resolves.toEqual(refusal);
+      expect(h.exported).toEqual(['mask', 'region', 'control']);
+      expect(h.released).toEqual(['mask', 'region']);
+      expect(h.document()).toBe(h.original);
+      expect(h.dispatched).toEqual([]);
+      expect(h.history.canUndo()).toBe(false);
+      expect(h.reservedBytes()).toBe(0);
+    }
+  );
+
   it('crops every unlocked leaf that reaches past the frame in one entry, and replays it as one', async () => {
     const h = createCropAllHarness();
 

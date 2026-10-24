@@ -4155,6 +4155,9 @@
         "replace": "Replace",
         "resetSettings": "Reset settings",
         "running": "Running filter…",
+        "sourceAdjustmentError": "Clarity, Texture or Dehaze failed on this layer, so it was not filtered. Change a setting or disable them, then try again.",
+        "sourceAdjustmentOverBudget": "Not enough canvas memory to apply this layer’s Clarity, Texture or Dehaze before filtering it. Delete layers you no longer need, then try again.",
+        "sourceAdjustmentTooLarge": "Clarity, Texture and Dehaze can’t run on this layer: its content is larger than 16.8 megapixels (4096 × 4096 px). Disable or remove them, or crop the layer, then try again.",
         "sourceOverBudget": "Not enough memory is free to read this layer for the filter.",
         "statusCommitting": "Applying filter…",
         "statusError": "Filter needs attention.",
@@ -4172,6 +4175,9 @@
         "errorInvalid": "Add an object prompt, point, or box before processing.",
         "errorLocked": "Select Object cannot finish while canvas editing is locked.",
         "errorNoOutput": "Select Object finished without producing an image.",
+        "errorAdjustment": "Clarity, Texture or Dehaze failed on this layer, so it was not used as the source. Change a setting or disable them, then try again.",
+        "errorAdjustmentOverBudget": "Not enough canvas memory to apply this layer’s Clarity, Texture or Dehaze to the source. Delete layers you no longer need, then try again.",
+        "errorAdjustmentTooLarge": "Clarity, Texture and Dehaze can’t run on this layer: its content is larger than 16.8 megapixels (4096 × 4096 px). Disable or remove them, or crop the layer, then try again.",
         "errorNotReady": "The layer source is not ready. Try again when it finishes loading.",
         "errorOutputDimension": "The Select Object result dimensions do not match the layer source.",
         "errorQueue": "Select Object processing failed on the backend.",
@@ -4250,7 +4256,9 @@
       },
       "addLayer": "Add layer",
       "adjustments": {
+        "amount": "Amount",
         "brightness": "Brightness",
+        "clarity": "Clarity",
         "channel": "Channel",
         "channels": {
           "rgb": "RGB",
@@ -4260,6 +4268,8 @@
         },
         "contrast": "Contrast",
         "curves": "Curves",
+        "dehaze": "Dehaze",
+        "dehazeHint": "An aesthetic contrast and color adjustment, not physical haze removal.",
         "exposure": "Exposure",
         "curvesHint": "Drag points to bend the curve. Double-click empty space to add a point; double-click a point to remove it.",
         "levels": "Levels",
@@ -4273,7 +4283,42 @@
         "hue": "Hue",
         "invert": "Invert",
         "invertHint": "Inverts the layer’s colors. This adjustment has no options.",
+        "noise": "Noise",
+        "noiseAmount": "Amount",
+        "noiseDistribution": "Distribution",
+        "noiseDistributions": {
+          "gaussian": "Gaussian",
+          "uniform": "Uniform"
+        },
+        "noiseGrain": "Grain",
+        "noiseGrains": {
+          "monochrome": "Mono",
+          "color": "Color",
+          "chroma": "Chroma"
+        },
+        "noiseResponse": "Tonal response",
+        "noiseResponses": {
+          "midtones": "Midtones",
+          "flat": "Even"
+        },
+        "noiseSize": "Size",
+        "newNoisePattern": "New pattern",
+        "refusal": {
+          "error": "Clarity, Texture or Dehaze failed on “{{name}}”. Change a setting or disable them, then try again.",
+          "overBudget": "Not enough canvas memory to apply Clarity, Texture or Dehaze to “{{name}}”. Delete layers you no longer need, then try again.",
+          "tooLarge": "Clarity, Texture and Dehaze can’t run on “{{name}}”: its content is larger than 16.8 megapixels (4096 × 4096 px). Disable or remove them, or crop the content, then try again."
+        },
         "saturation": "Saturation",
+        "size": "Size",
+        "sizeHintGroup": "In canvas pixels.",
+        "sizeHintLayer": "In the layer’s own pixels, before it is scaled.",
+        "status": {
+          "computing": "Applying Clarity, Texture or Dehaze…",
+          "error": "Clarity, Texture or Dehaze failed, so the canvas leaves them out, and generating or exporting with them is refused. Change a setting to try again, or disable them.",
+          "overBudget": "Not enough canvas memory for Clarity, Texture or Dehaze, so the canvas leaves them out, and generating or exporting with them is refused. Delete layers you no longer need, then change a setting to try again.",
+          "tooLarge": "Clarity, Texture and Dehaze can’t run on content larger than 16.8 megapixels (4096 × 4096 px), so the canvas leaves them out, and generating or exporting with them is refused. Disable or remove them, or crop the content."
+        },
+        "texture": "Texture",
         "transparencyLock": "Lock transparency"
       },
       "blendModes": {
@@ -5219,6 +5264,11 @@
     "openProjectChanged": "The project changed while \"{{name}}\" was loading; nothing was added.",
     "openProjectWorkflowHint": "Makes it the active workflow",
     "previewGraph": "Preview graph",
+    "private": "Private",
+    "public": "Public",
+    "publicVisibilityHelp": "Visible to users of this InvokeAI instance.",
+    "publicVisibilityPartial": "The template was saved, but its public visibility could not be confirmed ({{message}}). Retry to make it public.",
+    "publicWorkflow": "Public workflow",
     "projectWorkflowCount_one": "{{count}} workflow in this project",
     "projectWorkflowCount_other": "{{count}} workflows in this project",
     "remove": "Remove",
@@ -5265,6 +5315,7 @@
     "savedCreatedBody": "Saved \"{{name}}\" to the library.",
     "savedUpdatedBody": "Updated \"{{name}}\" in the library.",
     "searchPlaceholder": "Search names, tags, or descriptions",
+    "shared": "Shared",
     "sourceBundled": "From a bundled template (read-only)",
     "sourceNone": "Not linked to a library template",
     "sourceRevision": "Linked to library template at revision {{revision}}",
@@ -5282,6 +5333,9 @@
     "thumbnailUpdateFailed": "Failed to update thumbnail",
     "thumbnailUpdated": "Thumbnail updated",
     "thumbnailUpdating": "Updating thumbnail…",
+    "visibility": "Visibility",
+    "visibilityUpdateFailed": "Failed to update workflow visibility",
+    "visibilityUnknown": "Visibility unknown",
     "title": "Workflows",
     "unavailableBundledBody": "\"{{name}}\" came from a bundled template, which cannot be changed. Save it as a new template instead.",
     "unavailableForbiddenBody": "The library template behind \"{{name}}\" belongs to someone else. Save it as a new template instead.",
