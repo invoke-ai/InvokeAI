@@ -14,6 +14,7 @@ import re
 import tempfile
 import urllib.parse
 import zipfile
+from collections.abc import Iterable
 from pathlib import Path, PureWindowsPath
 from typing import Any, NamedTuple
 
@@ -36,7 +37,7 @@ from scripts.family_e2e.records import (
     load_run_info,
 )
 from scripts.family_e2e.references import REFERENCE_FILE, load_reference
-from scripts.family_e2e.report import DIFF_DIR, REPORT_FILE, SUMMARY_FILE, render_report
+from scripts.family_e2e.report import DIFF_DIR, REPORT_FILE, SUMMARY_FILE, previous_runs, render_report
 from scripts.family_e2e.runner import EXPORT_DIR, now_iso
 
 BUNDLE_FILE = "bundle.json"
@@ -100,7 +101,9 @@ class Root(NamedTuple):
 class Sanitizer:
     """Removes this machine's paths, credentials and process names from what goes into a bundle.
 
-    `text` applies, in this order: the value of a credential-named variable in `env` becomes `<VARIABLE>`; an http(s)
+    `env` holds (name, value) pairs: one name can come with several values, e.g. a token rotated between the run
+    and its reference. `text` applies, in this order: each value of a credential-named variable in `env` becomes
+    `<VARIABLE>`; an http(s)
     URL loses its credentials, `;params`, query and fragment, and a host of the local network becomes `<local host>`;
     a path below a root becomes the root's placeholder,
     followed by the rest of the path, or by its last component only where the root does not keep subpaths (either
@@ -108,15 +111,14 @@ class Sanitizer:
     path of two or more components except the server's `/api/` and `/ws/` paths, keeps only its last component.
     """
 
-    def __init__(self, roots: list[Root], env: dict[str, str]) -> None:
-        self._secrets = sorted(
-            (
-                (value, f"<{name}>")
-                for name, value in env.items()
-                if CREDENTIAL_NAME.search(name) and len(value) >= MIN_SECRET_LENGTH
-            ),
-            key=lambda item: -len(item[0]),
-        )
+    def __init__(self, roots: list[Root], env: Iterable[tuple[str, str]]) -> None:
+        placeholders: dict[str, str] = {}
+        # Sorted, so a value under two names always gets the same one.
+        for name, value in sorted(set(env)):
+            if CREDENTIAL_NAME.search(name) and len(value) >= MIN_SECRET_LENGTH:
+                placeholders.setdefault(value, f"<{name}>")
+        # The longest first: a value that contains another goes whole.
+        self._secrets = sorted(placeholders.items(), key=lambda item: -len(item[0]))
         self._roots: dict[str, Root] = {}
         for root in roots:
             key = _normalized(root.path)
@@ -295,10 +297,10 @@ def _model_roots(run_dir: Path) -> list[Root]:
     return roots
 
 
-def _references(data_dir: Path, info: RunInfo, records: list[Record]) -> dict[str, Reference]:
+def _references(data_dir: Path, info: RunInfo, case_keys: list[str]) -> dict[str, Reference]:
     """The accepted references of the run's cases, loaded as the report loads them; unreadable ones are left out."""
     references = {}
-    for case_key in dict.fromkeys([step.case_key for step in info.plan] + [record.case_key for record in records]):
+    for case_key in case_keys:
         try:
             loaded = load_reference(data_dir, info.profile, case_key)
         except (OSError, ValueError):
@@ -309,10 +311,11 @@ def _references(data_dir: Path, info: RunInfo, records: list[Record]) -> dict[st
 
 
 def _sanitizer(
-    data_dir: Path, run_dir: Path, info: RunInfo, references: list[Reference], manifest_path: Path | None
+    data_dir: Path, run_dir: Path, info: RunInfo, earlier: list[Environment], manifest_path: Path | None
 ) -> Sanitizer:
-    # A reference's environment comes from an earlier run and may hold other paths and credentials.
-    environments = [*info.environments.values(), *(reference.environment for reference in references)]
+    """`earlier`: the environments of the references and previous runs the report compares with. They come from
+    other runs, may hold other paths and credentials, and the report prints facts of them."""
+    environments = [*info.environments.values(), *earlier]
     roots = [Root("<run_dir>", str(run_dir), True), Root("<data_dir>", str(data_dir), True)]
     roots += [Root("<code_dir>", environment.code_dir, True) for environment in environments]
     try:
@@ -322,7 +325,7 @@ def _sanitizer(
     else:
         roots.append(Root("<template_root>", str(manifest.server.template_root), True))
     roots.append(Root("<home>", str(Path.home()), False))
-    env = {name: value for environment in environments for name, value in environment.extra_env.items()}
+    env = [(name, value) for environment in environments for name, value in environment.extra_env.items()]
     return Sanitizer(roots + _model_roots(run_dir), env)
 
 
@@ -334,8 +337,11 @@ def write_bundle(data_dir: Path, run_dir: Path, output: Path, manifest_path: Pat
     """
     info = load_run_info(run_dir)
     run_records = load_records(run_dir)
-    references = _references(data_dir, info, run_records)
-    sanitizer = _sanitizer(data_dir, run_dir, info, list(references.values()), manifest_path)
+    case_keys = list(dict.fromkeys([step.case_key for step in info.plan] + [record.case_key for record in run_records]))
+    references = _references(data_dir, info, case_keys)
+    earlier = [reference.environment for reference in references.values()]
+    earlier += [env for run in previous_runs(data_dir, info, case_keys) for env in run.environments.values()]
+    sanitizer = _sanitizer(data_dir, run_dir, info, earlier, manifest_path)
     bundled_info = sanitizer.run_info(info)
     records = [sanitizer.record(record) for record in run_records]
     with tempfile.TemporaryDirectory(prefix="family-e2e-bundle-") as staging:

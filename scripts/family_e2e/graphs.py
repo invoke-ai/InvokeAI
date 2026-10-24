@@ -116,6 +116,7 @@ def run_pnpm_exporter(request: dict[str, Any], work_dir: Path) -> dict[str, Any]
     except subprocess.TimeoutExpired:
         raise ExportError(f"pnpm graphs:export did not finish within {EXPORT_TIMEOUT_S}s") from None
     finally:
+        # A finished communicate() has reaped pnpm already; children it left behind still hold its group's id.
         terminate(process, job)
     if process.returncode != 0 or not response_path.is_file():
         output = (stderr or stdout).decode("utf-8", errors="replace")
