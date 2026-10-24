@@ -26,6 +26,7 @@ from invokeai.app.invocations.flux2.flux2_control import Flux2ControlField, Flux
 from invokeai.app.invocations.flux2.flux2_denoise import Flux2DenoiseInvocation
 from invokeai.app.invocations.model import ModelIdentifierField, VAEField
 from invokeai.app.invocations.vae.flux2_vae_encode import Flux2VaeEncodeInvocation
+from invokeai.backend.flux2.denoise_working_memory import estimate_flux2_denoise_working_memory
 from invokeai.backend.fun_controlnet.flux2 import FLUX2_FUN_CONTROL_IN_DIM, Flux2FunControlBranch
 from invokeai.backend.fun_controlnet.hooks import FunControlHooks
 from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux2VariantType, ModelFormat, ModelType
@@ -304,16 +305,20 @@ def test_with_control_and_a_reference_image_the_hints_are_reserved_over_the_whol
     with pytest.raises(_Stop):
         node._run_diffusion(context)
 
-    without_control = node._estimate_working_memory(
+    without_control = estimate_flux2_denoise_working_memory(
+        transformer_info.model,
+        hidden_size=DEV_HIDDEN,
         image_seq_len=IMAGE_TOKENS,
         ref_image_seq_len=REFERENCE_TOKENS,
         text_seq_len=TEXT_TOKENS,
-        num_loras=0,
-        hidden_size=DEV_HIDDEN,
+        batch_size=1,
+        lora_count=0,
         device=torch.device("cpu"),
+        dtype=torch.bfloat16,
     )
     hints = (NUM_CONTROL_BLOCKS + 4) * (IMAGE_TOKENS + REFERENCE_TOKENS) * DEV_HIDDEN * torch.bfloat16.itemsize
-    assert transformer_info.model_on_device.call_args.kwargs["working_mem_bytes"] == without_control + hints
+    working_memory = transformer_info.model_on_device.call_args.kwargs["working_memory"]
+    assert working_memory.reservation_bytes == without_control.reservation_bytes + hints
     # The control image and the masked inpaint image went through the VAE before the transformer was locked.
     vae_info = context.models.load(VAEField(vae=_model(ModelType.VAE)).vae)
     encodes = [call for call in vae_info.model_on_device.call_args_list if "working_memory" in call.kwargs]
@@ -362,8 +367,9 @@ def test_the_branch_is_locked_with_the_same_reservation_and_hooked_inside_the_ex
     with pytest.raises(_Stop):
         _denoise()._run_diffusion(context)
 
-    reserved = transformer_info.model_on_device.call_args.kwargs["working_mem_bytes"]
-    assert control_info.model_on_device.call_args.kwargs["working_mem_bytes"] == reserved
+    # A plain reservation: a second estimate would open a calibration window nested in the transformer's.
+    reserved = transformer_info.model_on_device.call_args.kwargs["working_memory"].reservation_bytes
+    assert control_info.model_on_device.call_args.kwargs == {"working_mem_bytes": reserved}
     assert hooks_at_patching == [1 + NUM_CONTROL_BLOCKS]
     assert _hook_count(transformer) == 0
 
