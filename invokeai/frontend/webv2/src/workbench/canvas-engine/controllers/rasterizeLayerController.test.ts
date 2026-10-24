@@ -19,13 +19,13 @@ const shapeLayer: CanvasLayerContract = {
   type: 'raster',
 };
 
-const createHarness = (historyBytes?: number) => {
+const createHarness = (historyBytes?: number, layer: CanvasLayerContract = shapeLayer) => {
   const document: CanvasDocumentContractV3 = {
     background: 'transparent',
     bbox: { height: 100, width: 100, x: 0, y: 0 },
     height: 100,
     selectedLayerId: 'shape',
-    stacks: stacksFrom([shapeLayer]),
+    stacks: stacksFrom([layer]),
     version: 3,
     width: 100,
   };
@@ -88,6 +88,37 @@ describe('RasterizeLayerController', () => {
     expect(h.controller.rasterize('shape')).toBe('failed');
     expect(h.installed).toEqual([]);
     expect(h.history.canUndo()).toBe(false);
+  });
+
+  it('keeps a color-only stack on the paint contract', () => {
+    const adjustments = [{ id: 'invert', isEnabled: true, type: 'invert' }] as const;
+    const h = createHarness(undefined, { ...shapeLayer, adjustments });
+
+    expect(h.controller.rasterize('shape')).toBe('rasterized');
+    expect(getDocumentLayer(h.document(), 'shape')).toMatchObject({ adjustments, source: { type: 'paint' } });
+  });
+
+  it('reserves the readback that bakes a noisy stack', () => {
+    const noise = {
+      amount: 0.2,
+      distribution: 'uniform',
+      grain: 'monochrome',
+      id: 'grain',
+      isEnabled: true,
+      response: 'flat',
+      seed: 1,
+      size: 1,
+      type: 'noise',
+    } as const;
+    const h = createHarness(undefined, { ...shapeLayer, adjustments: [noise] });
+    // The 60×40 source render, plus the 120×40 baked pixels and their prepared replacement.
+    h.state.rasterBytes = (60 * 40 + 120 * 40 * 2) * 4;
+
+    expect(h.controller.rasterize('shape')).toBe('over-budget');
+    expect(h.dispatched).toEqual([]);
+    h.state.rasterBytes += 60 * 40 * 4;
+    expect(h.controller.rasterize('shape')).toBe('rasterized');
+    expect(getDocumentLayer(h.document(), 'shape')).not.toHaveProperty('adjustments');
   });
 
   it('refuses missing, locked and already-painted layers', () => {

@@ -1,8 +1,10 @@
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
+import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { describe, expect, it } from 'vitest';
 
 import { createLayerOperationHarness } from './layerOperationHarness.testing';
@@ -24,9 +26,15 @@ const UPPER_RECT: Rect = { height: 10, width: 10, x: 0, y: 0 };
 const LOWER_RECT: Rect = { height: 10, width: 10, x: 5, y: 5 };
 const MERGED_RECT: Rect = { height: 15, width: 15, x: 0, y: 0 };
 
-const createHarness = (historyBytes?: number) => {
+const createHarness = (
+  historyBytes?: number,
+  { lowerAdjusted = false, displayed = null }: { lowerAdjusted?: boolean; displayed?: RasterSurface | null } = {}
+) => {
   const upper = paintLayer('upper');
-  const lower = paintLayer('lower');
+  const lower: CanvasLayerContract = {
+    ...paintLayer('lower'),
+    ...(lowerAdjusted ? { adjustments: [{ id: 'invert', isEnabled: true, type: 'invert' }] } : {}),
+  };
   const document: CanvasDocumentContractV3 = {
     background: 'transparent',
     bbox: { height: 100, width: 100, x: 0, y: 0 },
@@ -47,6 +55,7 @@ const createHarness = (historyBytes?: number) => {
     isCacheReady: () => true,
     layers: h.layers,
     needsPixelPersistence: () => true,
+    peekAdjustedSurface: () => displayed,
     publishSelectedLayerIds: () => undefined,
   });
   // The reducer's own contracts, which merge and undo must restore by identity.
@@ -121,6 +130,23 @@ describe('MergeLayerController: merge down', () => {
     expect(h.controller.mergeDown('upper')).toBe('over-budget');
     expect(h.dispatched).toEqual([]);
     expect(h.history.canUndo()).toBe(false);
+  });
+
+  it('reserves a layer-local adjusted copy only when the display has no current one', () => {
+    // Raw undo snapshots plus the merged pixels and their prepared replacement; a copy adds a surface and ImageData.
+    const baseBytes = (100 + 100) * 4 + 225 * 4 * 2;
+    const copying = createHarness(undefined, { lowerAdjusted: true });
+    copying.state.rasterBytes = baseBytes;
+    expect(copying.controller.mergeDown('upper')).toBe('over-budget');
+    copying.state.rasterBytes = baseBytes + 100 * 4 * 2;
+    expect(copying.controller.mergeDown('upper')).toBe('merged');
+
+    const displayed = createHarness(undefined, {
+      displayed: createTestStubRasterBackend().createSurface(10, 10),
+      lowerAdjusted: true,
+    });
+    displayed.state.rasterBytes = baseBytes;
+    expect(displayed.controller.mergeDown('upper')).toBe('merged');
   });
 
   it('refuses the bottom-most layer and a busy canvas', () => {

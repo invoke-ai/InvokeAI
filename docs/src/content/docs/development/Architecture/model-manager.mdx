@@ -996,7 +996,7 @@ The optional second argument, `subtype` is a `SubModelType` string enum, such as
 
 The optional third argument, `context` can be provided by an invocation to trigger model load event reporting. See below for details.
 
-If the model has to be built (it is not in the calling device's cache) and its record was edited in a way that changes how it loads (for example its `cpu_only` or `fp8_storage` setting) after the caller read `model_config`, `load_model()` does not cache a model built from the superseded record: it reads the record again and loads that instead. The same applies when the model's files are missing because it was moved and its record updated to the new path. If the record changes again during that retry, it raises `StaleModelConfigError`. Code that writes load-affecting fields of a model record must do so inside `ModelLoadService.record_edit(key)` (see its docstring).
+If the model has to be built (it is not in the calling device's cache) and its record was edited in a way that changes how it loads (for example its `cpu_only` or `fp8_storage` setting) after the caller read `model_config`, `load_model()` does not cache a model built from the superseded record: it reads the record again and loads that instead. The same applies when the model's files are missing because it was moved and its record updated to the new path. If the record changes again during that retry, it raises `StaleModelConfigError`. Code that writes a model record in a way that may change how it loads must do so through `ModelLoadService.apply_record_change(key, write)`: it brackets the write so overlapping loads are re-checked, compares the record before and after the same way the load check does, and when they differ drops the model's entries from each device cache under `MODEL_LOAD_LOCK`. A write that raises an `Exception` may have committed first, so the record as stored is read back and judged the same way before the exception propagates; if it cannot be read back, the change counts as load-affecting. An interrupt such as `KeyboardInterrupt` propagates without the read-back or any drop; loads that overlapped the write are still re-checked. `ModelManagerService.update_model_record()` and `ModelManagerService.reidentify_model()` write records this way.
 
 The returned `LoadedModel` object contains a copy of the configuration record returned by the model record`get_model()` method, as well as the in-memory loaded model:
 
@@ -1293,6 +1293,14 @@ assert len(configs) > 0
 
 loaded_model = mm.load.load_model(configs[0])
 ```
+
+### mm.update_model_record(key, changes) -> AnyModelConfig
+
+Applies a `ModelRecordChanges` to the model's record, allowing its config class to change, and returns the stored result. When the change affects how the model loads (for example its path, format, `cpu_only` or `fp8_storage`), every cached instance of the model is dropped so its next load rebuilds. Raises `UnknownModelException` for an unknown key and `ValueError` for a change the record cannot take. Use this rather than `mm.store.update_model()` for changes that may affect loading.
+
+### mm.reidentify_model(key) -> AnyModelConfig
+
+Identifies the model's files again and replaces its record with the result, keeping the name, description, cover image, trigger phrases, install source and CPU/FP8 preferences. The install source and an IP-Adapter's `image_encoder_model_id` are passed to identification, since the files alone may not name them. Cached instances are dropped as for `update_model_record()`. Raises `UnknownModelException` for an unknown key and `InvalidModelException` when the files are not identified as any model.
 
 The model manager also offers a few convenience shortcuts for loading models:
 

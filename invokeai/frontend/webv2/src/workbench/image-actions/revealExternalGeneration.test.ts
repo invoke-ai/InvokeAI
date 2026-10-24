@@ -1,3 +1,4 @@
+import type { GalleryItemRef } from '@features/gallery/contracts';
 import type { GalleryItem } from '@features/gallery/core/items';
 import type { QueueItem } from '@features/queue/contracts';
 import type { QueryClient } from '@tanstack/react-query';
@@ -15,11 +16,11 @@ import { attachExternalGenerationReveal } from './recallParametersBridge';
 
 const mocks = vi.hoisted(() => ({
   fetchVerifiedPage: vi.fn(),
-  readLastSavedImageName: vi.fn<(itemId: number, signal?: AbortSignal) => Promise<string | null>>(),
+  readLastSavedOutput: vi.fn<(itemId: number, signal?: AbortSignal) => Promise<GalleryItemRef | null>>(),
   resolve: vi.fn(),
 }));
 
-vi.mock('@features/queue/queries', () => ({ readQueueItemLastSavedImageName: mocks.readLastSavedImageName }));
+vi.mock('@features/queue/queries', () => ({ readQueueItemLastSavedOutput: mocks.readLastSavedOutput }));
 vi.mock('@features/gallery', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   galleryItems: { resolve: mocks.resolve },
@@ -29,22 +30,27 @@ vi.mock('@features/gallery/queries', async (importOriginal) => ({
   fetchVerifiedGalleryItemPage: (...args: unknown[]) => mocks.fetchVerifiedPage(...args),
 }));
 
-const createItem = (name: string): GalleryItem => ({
-  boardId: 'board-1',
-  category: 'general',
-  createdAt: '2026-10-15T12:00:00Z',
-  fullUrl: `/images/${name}`,
-  height: 64,
-  isIntermediate: false,
-  kind: 'image',
-  name,
-  starred: false,
-  thumbnailUrl: `/thumbs/${name}`,
-  width: 64,
-});
+const createItem = ({ kind, name }: GalleryItemRef): GalleryItem => {
+  const base = {
+    boardId: 'board-1',
+    category: 'general',
+    createdAt: '2026-10-15T12:00:00Z',
+    fullUrl: `/${kind}s/${name}`,
+    height: 64,
+    isIntermediate: false,
+    name,
+    starred: false,
+    thumbnailUrl: `/thumbs/${name}`,
+    width: 64,
+  } as const;
 
-const verifiedPage = (name: string) =>
-  Promise.resolve({ index: 0, offset: 0, page: { items: [createItem(name)], total: 1 }, total: 1 });
+  return kind === 'video' ? { ...base, durationSeconds: 4, kind } : { ...base, kind };
+};
+
+const lastImage: GalleryItemRef = { kind: 'image', name: 'last.png' };
+
+const verifiedPage = (ref: GalleryItemRef) =>
+  Promise.resolve({ index: 0, offset: 0, page: { items: [createItem(ref)], total: 1 }, total: 1 });
 
 /** A promise the test settles; lets a test act while the reveal waits on the backend. */
 const deferred = <T>() => {
@@ -144,11 +150,11 @@ beforeEach(() => {
     gallery: { selectBoard: vi.fn(), selectItem: vi.fn(), setPage: vi.fn(), setView: vi.fn() },
     widgets: { patchValues: vi.fn() },
   };
-  mocks.readLastSavedImageName.mockReset().mockResolvedValue('last.png');
-  mocks.resolve.mockReset().mockImplementation(({ name }: { name: string }) => Promise.resolve(createItem(name)));
+  mocks.readLastSavedOutput.mockReset().mockResolvedValue(lastImage);
+  mocks.resolve.mockReset().mockImplementation((ref: GalleryItemRef) => Promise.resolve(createItem(ref)));
   mocks.fetchVerifiedPage
     .mockReset()
-    .mockImplementation((_client: unknown, _filter: unknown, ref: { name: string }) => verifiedPage(ref.name));
+    .mockImplementation((_client: unknown, _filter: unknown, ref: GalleryItemRef) => verifiedPage(ref));
 });
 
 afterEach(() => accountLifecycle.invalidate());
@@ -157,13 +163,27 @@ describe('external generation reveal', () => {
   it("lands the Gallery on the item's last saved image and its board", async () => {
     await reveal(42);
 
-    expect(mocks.readLastSavedImageName).toHaveBeenCalledWith(42, expect.any(AbortSignal));
+    expect(mocks.readLastSavedOutput).toHaveBeenCalledWith(42, expect.any(AbortSignal));
     expect(commands.gallery.selectBoard).toHaveBeenCalledWith('board-1');
     expect(revealed()).toEqual(['last.png']);
     expect(getGalleryRevealRequest()).toMatchObject({
       announcement: 'external-generation',
       itemKey: 'image:last.png',
     });
+  });
+
+  it('lands on a saved video, showing both kinds when the media filter hides videos', async () => {
+    galleryValues = { ...galleryValues, mediaFilter: 'image' };
+    mocks.readLastSavedOutput.mockResolvedValue({ kind: 'video', name: 'clip.mp4' });
+
+    await reveal();
+
+    expect(commands.widgets.patchValues).toHaveBeenCalledWith(
+      'gallery',
+      expect.objectContaining({ mediaFilter: 'all' })
+    );
+    expect(revealed()).toEqual(['clip.mp4']);
+    expect(getGalleryRevealRequest()).toMatchObject({ itemKey: 'video:clip.mp4' });
   });
 
   it.each([
@@ -184,7 +204,7 @@ describe('external generation reveal', () => {
 
     await reveal();
 
-    expect(mocks.readLastSavedImageName).not.toHaveBeenCalled();
+    expect(mocks.readLastSavedOutput).not.toHaveBeenCalled();
     expect(revealed()).toEqual([]);
   });
 
@@ -206,9 +226,9 @@ describe('external generation reveal', () => {
     ['starts a run of their own', () => (queueItems = [{ status: 'pending' }])],
     ['switches projects', () => (activeProjectId = 'project-2')],
   ])('makes no Gallery change when the user %s while the result is read', async (_, act) => {
-    mocks.readLastSavedImageName.mockImplementation(() => {
+    mocks.readLastSavedOutput.mockImplementation(() => {
       act();
-      return Promise.resolve('last.png');
+      return Promise.resolve(lastImage);
     });
 
     await reveal();
@@ -223,9 +243,9 @@ describe('external generation reveal', () => {
     ['starts typing', () => (editingText = true)],
     ['starts a run of their own', () => (queueItems = [{ status: 'pending' }])],
   ])('makes no Gallery change when the user %s while the item is located', async (_, act) => {
-    mocks.fetchVerifiedPage.mockImplementation((_client: unknown, _filter: unknown, ref: { name: string }) => {
+    mocks.fetchVerifiedPage.mockImplementation((_client: unknown, _filter: unknown, ref: GalleryItemRef) => {
       act();
-      return verifiedPage(ref.name);
+      return verifiedPage(ref);
     });
 
     await reveal();
@@ -237,9 +257,9 @@ describe('external generation reveal', () => {
   });
 
   it('does not reveal once the account that received the completion is gone', async () => {
-    mocks.readLastSavedImageName.mockImplementation(() => {
+    mocks.readLastSavedOutput.mockImplementation(() => {
       accountLifecycle.invalidate();
-      return Promise.resolve('last.png');
+      return Promise.resolve(lastImage);
     });
 
     await reveal();
@@ -248,7 +268,7 @@ describe('external generation reveal', () => {
   });
 
   it('reveals nothing for an item without a saved image, such as a workflow-call child', async () => {
-    mocks.readLastSavedImageName.mockResolvedValue(null);
+    mocks.readLastSavedOutput.mockResolvedValue(null);
 
     await reveal();
 
@@ -257,19 +277,19 @@ describe('external generation reveal', () => {
 
   it('lets only the newest of a burst of completions reveal, even when an older read finishes last', async () => {
     const reads = new Map([
-      [1, deferred<string | null>()],
-      [2, deferred<string | null>()],
+      [1, deferred<GalleryItemRef | null>()],
+      [2, deferred<GalleryItemRef | null>()],
     ]);
-    mocks.readLastSavedImageName.mockImplementation((itemId) => reads.get(itemId)!.promise);
+    mocks.readLastSavedOutput.mockImplementation((itemId) => reads.get(itemId)!.promise);
     const { revealer, settle } = attach();
 
     revealer.request(1);
-    await vi.waitFor(() => expect(mocks.readLastSavedImageName).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(mocks.readLastSavedOutput).toHaveBeenCalledTimes(1));
     revealer.request(2);
-    await vi.waitFor(() => expect(mocks.readLastSavedImageName).toHaveBeenCalledTimes(2));
-    reads.get(2)!.resolve('newest.png');
+    await vi.waitFor(() => expect(mocks.readLastSavedOutput).toHaveBeenCalledTimes(2));
+    reads.get(2)!.resolve({ kind: 'image', name: 'newest.png' });
     await vi.waitFor(() => expect(revealed()).toEqual(['newest.png']));
-    reads.get(1)!.resolve('older.png');
+    reads.get(1)!.resolve({ kind: 'image', name: 'older.png' });
     await settle(2);
 
     expect(revealed()).toEqual(['newest.png']);
@@ -283,22 +303,22 @@ describe('external generation reveal', () => {
     revealer.request(2);
     await settle(2);
 
-    expect(mocks.readLastSavedImageName.mock.calls.map(([itemId]) => itemId)).toEqual([2]);
+    expect(mocks.readLastSavedOutput.mock.calls.map(([itemId]) => itemId)).toEqual([2]);
     revealer.dispose();
   });
 
   it('drops a reveal still in flight when the runtime is disposed', async () => {
-    const read = deferred<string | null>();
-    mocks.readLastSavedImageName.mockReturnValue(read.promise);
+    const read = deferred<GalleryItemRef | null>();
+    mocks.readLastSavedOutput.mockReturnValue(read.promise);
     const { revealer, settle } = attach();
 
     revealer.request(42);
-    await vi.waitFor(() => expect(mocks.readLastSavedImageName).toHaveBeenCalled());
+    await vi.waitFor(() => expect(mocks.readLastSavedOutput).toHaveBeenCalled());
     revealer.dispose();
-    read.resolve('last.png');
+    read.resolve(lastImage);
     await settle(1);
 
-    expect(mocks.readLastSavedImageName.mock.calls[0]![1]!.aborted).toBe(true);
+    expect(mocks.readLastSavedOutput.mock.calls[0]![1]!.aborted).toBe(true);
     expect(revealed()).toEqual([]);
   });
 
@@ -323,7 +343,7 @@ describe('external generation reveal', () => {
     loading.resolve();
     await settle(1);
 
-    expect(mocks.readLastSavedImageName).not.toHaveBeenCalled();
+    expect(mocks.readLastSavedOutput).not.toHaveBeenCalled();
     expect(revealed()).toEqual([]);
     revealer.dispose();
   });
@@ -339,9 +359,9 @@ describe('external generation reveal', () => {
     ['semanticSearchText', ''],
     ['starredOnly', true],
   ])('treats a change to %s after arrival as the user navigating', async (key, value) => {
-    mocks.readLastSavedImageName.mockImplementation(() => {
+    mocks.readLastSavedOutput.mockImplementation(() => {
       galleryValues = { ...galleryValues, [key]: value };
-      return Promise.resolve('last.png');
+      return Promise.resolve(lastImage);
     });
 
     await reveal();
@@ -357,7 +377,7 @@ describe('external generation reveal', () => {
       revealer.request(42);
       await settle(1);
 
-      expect(mocks.readLastSavedImageName).not.toHaveBeenCalled();
+      expect(mocks.readLastSavedOutput).not.toHaveBeenCalled();
 
       setVisible(true);
       await settle(2);
@@ -367,9 +387,9 @@ describe('external generation reveal', () => {
     });
 
     it('resumes a reveal the tab hid while its item was being located', async () => {
-      mocks.fetchVerifiedPage.mockImplementationOnce((_client: unknown, _filter: unknown, ref: { name: string }) => {
+      mocks.fetchVerifiedPage.mockImplementationOnce((_client: unknown, _filter: unknown, ref: GalleryItemRef) => {
         visible = false;
-        return verifiedPage(ref.name);
+        return verifiedPage(ref);
       });
       const { revealer, settle } = attach();
 
@@ -395,7 +415,7 @@ describe('external generation reveal', () => {
       setVisible(true);
       await settle(3);
 
-      expect(mocks.readLastSavedImageName.mock.calls.map(([itemId]) => itemId)).toEqual([2]);
+      expect(mocks.readLastSavedOutput.mock.calls.map(([itemId]) => itemId)).toEqual([2]);
       revealer.dispose();
     });
 
@@ -422,7 +442,7 @@ describe('external generation reveal', () => {
       revealer.dispose();
 
       expect(visibilityListeners.size).toBe(0);
-      expect(mocks.readLastSavedImageName).not.toHaveBeenCalled();
+      expect(mocks.readLastSavedOutput).not.toHaveBeenCalled();
     });
   });
 });

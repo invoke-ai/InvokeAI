@@ -39,6 +39,17 @@ const initialEntries = (): CanvasAdjustmentEntry[] => [
   { curves: {}, id: 'cv1', isEnabled: true, type: 'curves' },
   { id: 'hue1', isEnabled: true, rotation: 0, type: 'hue' },
   { gamma: 1, id: 'lv1', inBlack: 0, inWhite: 255, isEnabled: true, outBlack: 0, outWhite: 255, type: 'levels' },
+  {
+    amount: 0.1,
+    distribution: 'gaussian',
+    grain: 'monochrome',
+    id: 'nz1',
+    isEnabled: true,
+    response: 'midtones',
+    seed: 42,
+    size: 1,
+    type: 'noise',
+  },
 ];
 
 type Owner = 'raster' | 'group';
@@ -70,9 +81,15 @@ const landConcurrentEdit = (update: (adjustments: readonly CanvasAdjustmentEntry
     expect(outcome).toEqual({ status: 'committed' });
   });
 
-const Harness = ({ entryId }: { entryId: string }) => {
+const Harness = ({ entryId, withEngine }: { entryId: string; withEngine: boolean }) => {
   const layer = useSyncExternalStore(stub.subscribe, documentOwner);
-  return <AdjustmentSettings engine={stub.engine as unknown as AdjustmentsEngine} entryId={entryId} layer={layer} />;
+  return (
+    <AdjustmentSettings
+      engine={withEngine ? (stub.engine as unknown as AdjustmentsEngine) : null}
+      entryId={entryId}
+      layer={layer}
+    />
+  );
 };
 
 const settle = (action: () => void): Promise<void> =>
@@ -83,7 +100,7 @@ const settle = (action: () => void): Promise<void> =>
     });
   });
 
-const render = async (entryId = 'cv1', owner: Owner = 'raster', adjustments = initialEntries()) => {
+const render = async (entryId = 'cv1', owner: Owner = 'raster', adjustments = initialEntries(), withEngine = true) => {
   applyThemeToRoot('classic');
   host = document.createElement('div');
   host.style.width = '260px';
@@ -102,7 +119,7 @@ const render = async (entryId = 'cv1', owner: Owner = 'raster', adjustments = in
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
-          <Harness entryId={entryId} />
+          <Harness entryId={entryId} withEngine={withEngine} />
         </ChakraProvider>
       </I18nextProvider>
     );
@@ -332,6 +349,157 @@ describe('scalar and levels editors', () => {
     expect(entry).toMatchObject({ gamma: 1, id: 'lv1', inWhite: 255, outBlack: 0, outWhite: 255 });
     expect(entry.inBlack).toBeGreaterThan(50);
     expect(entry.inBlack).toBeLessThan(80);
+  });
+});
+
+type NoiseEntry = Extract<CanvasAdjustmentEntry, { type: 'noise' }>;
+const NOISE_INDEX = 4;
+
+/** The segmented-control item whose label reads `label`. */
+const segment = (label: string): HTMLElement => {
+  const item = [...host!.querySelectorAll<HTMLElement>('[data-scope="segment-group"][data-part="item"]')].find(
+    (candidate) => candidate.textContent?.trim() === label
+  );
+  if (!item) {
+    throw new Error(`No segment labelled ${label}`);
+  }
+  return item;
+};
+const newPatternButton = (): HTMLButtonElement =>
+  host!.querySelector<HTMLButtonElement>('button[aria-label="widgets.layers.adjustments.newNoisePattern"]')!;
+
+describe('noise editor', () => {
+  it("shows the entry's choices and commits a distribution change as one undoable patch", async () => {
+    await render('nz1');
+    expect(host!.querySelector('[aria-label="widgets.layers.adjustments.noiseDistribution"]')).not.toBeNull();
+    expect(segment('widgets.layers.adjustments.noiseDistributions.gaussian').dataset.state).toBe('checked');
+    expect(segment('widgets.layers.adjustments.noiseGrains.monochrome').dataset.state).toBe('checked');
+    expect(segment('widgets.layers.adjustments.noiseResponses.midtones').dataset.state).toBe('checked');
+    expect(host!.querySelector('[aria-label="widgets.layers.adjustments.noiseResponse"]')).not.toBeNull();
+
+    await settle(() => segment('widgets.layers.adjustments.noiseDistributions.uniform').click());
+
+    expect(commits()).toHaveLength(1);
+    expect(forwardEntries(commits()[0]!)[NOISE_INDEX]).toEqual({
+      ...initialEntries()[NOISE_INDEX],
+      distribution: 'uniform',
+    });
+    expect(inverseEntries(commits()[0]!)).toEqual(initialEntries());
+    await stub.engine.history.undo();
+    expect(latestAdjustments()).toEqual(initialEntries());
+  });
+
+  it('commits the grain, and nothing when the current choice is picked again', async () => {
+    await render('nz1');
+    await settle(() => segment('widgets.layers.adjustments.noiseGrains.monochrome').click());
+    expect(commits()).toHaveLength(0);
+
+    await settle(() => segment('widgets.layers.adjustments.noiseGrains.chroma').click());
+    expect(commits()).toHaveLength(1);
+    expect(forwardEntries(commits()[0]!)[NOISE_INDEX]).toEqual({ ...initialEntries()[NOISE_INDEX], grain: 'chroma' });
+    expect(segment('widgets.layers.adjustments.noiseGrains.chroma').dataset.state).toBe('checked');
+  });
+
+  it('commits the tonal response as one undoable patch', async () => {
+    await render('nz1');
+    await settle(() => segment('widgets.layers.adjustments.noiseResponses.flat').click());
+
+    expect(commits()).toHaveLength(1);
+    expect(forwardEntries(commits()[0]!)[NOISE_INDEX]).toEqual({ ...initialEntries()[NOISE_INDEX], response: 'flat' });
+    await stub.engine.history.undo();
+    expect(latestAdjustments()).toEqual(initialEntries());
+  });
+
+  it('edits the grain size in tenths of a pixel from the keyboard as one step, Shift stepping whole pixels', async () => {
+    await render('nz1');
+    const slider = scrubber('widgets.layers.adjustments.noiseSize').querySelector<HTMLElement>('[role="slider"]')!;
+    expect(slider.getAttribute('aria-valuetext')).toBe('1.0 px');
+
+    await act(async () => {
+      slider.focus();
+      await userEvent.keyboard('{ArrowRight>3/}');
+    });
+    expect(commits()).toHaveLength(1);
+    expect((forwardEntries(commits()[0]!)[NOISE_INDEX] as NoiseEntry).size).toBe(1.3);
+
+    await act(async () => {
+      await userEvent.keyboard('{Shift>}{ArrowRight}{/Shift}');
+    });
+    expect(commits()).toHaveLength(2);
+    expect((latestAdjustments()[NOISE_INDEX] as NoiseEntry).size).toBe(2.3);
+
+    await act(async () => {
+      await userEvent.keyboard('{End}');
+    });
+    expect((latestAdjustments()[NOISE_INDEX] as NoiseEntry).size).toBe(8);
+    await act(async () => {
+      await userEvent.keyboard('{ArrowRight}');
+    });
+    expect((latestAdjustments()[NOISE_INDEX] as NoiseEntry).size).toBe(8);
+    expect(latestAdjustments()[NOISE_INDEX]).toMatchObject({ amount: 0.1, grain: 'monochrome', seed: 42 });
+  });
+
+  it('rounds a typed grain size to tenths of a pixel and clamps it to 8 px', async () => {
+    await render('nz1');
+    const frame = scrubber('widgets.layers.adjustments.noiseSize');
+    const type = async (text: string) => {
+      await act(async () => {
+        frame.querySelector<HTMLElement>('[role="slider"]')!.focus();
+        await userEvent.keyboard(`${text}{Enter}`);
+      });
+    };
+
+    await type('2.37');
+    expect((latestAdjustments()[NOISE_INDEX] as NoiseEntry).size).toBe(2.4);
+    await type('20');
+    expect((latestAdjustments()[NOISE_INDEX] as NoiseEntry).size).toBe(8);
+    expect(commits()).toHaveLength(2);
+  });
+
+  it('edits the amount in percent from the keyboard as one step', async () => {
+    await render('nz1');
+    const slider = scrubber('widgets.layers.adjustments.noiseAmount').querySelector<HTMLElement>('[role="slider"]')!;
+
+    await act(async () => {
+      slider.focus();
+      await userEvent.keyboard('{ArrowRight>3/}');
+    });
+
+    expect(commits()).toHaveLength(1);
+    const entry = forwardEntries(commits()[0]!)[NOISE_INDEX] as NoiseEntry;
+    expect(entry.amount).toBeCloseTo(0.13, 10);
+    expect(entry).toMatchObject({ distribution: 'gaussian', grain: 'monochrome', seed: 42, size: 1 });
+  });
+
+  it('re-rolls the seed from the keyboard-reachable new-pattern button as one undoable step', async () => {
+    await render('nz1');
+    const button = newPatternButton();
+    expect(button).not.toBeNull();
+
+    await act(async () => {
+      button.focus();
+      await userEvent.keyboard('{Enter}');
+    });
+
+    expect(commits()).toHaveLength(1);
+    const entry = forwardEntries(commits()[0]!)[NOISE_INDEX] as NoiseEntry;
+    expect(entry).toMatchObject({ amount: 0.1, distribution: 'gaussian', grain: 'monochrome', id: 'nz1' });
+    expect(Number.isInteger(entry.seed) && entry.seed >= 0 && entry.seed <= 0xffffffff).toBe(true);
+    expect(entry.seed).not.toBe(42);
+    expect(latestAdjustments()[NOISE_INDEX]).toMatchObject({ seed: entry.seed });
+
+    await stub.engine.history.undo();
+    expect(latestAdjustments()).toEqual(initialEntries());
+  });
+
+  it('disables every control without an engine', async () => {
+    await render('nz1', 'raster', initialEntries(), false);
+    expect(newPatternButton().disabled).toBe(true);
+    const radios = [...host!.querySelectorAll<HTMLInputElement>('[data-scope="segment-group"] input')];
+    expect(radios).toHaveLength(7);
+    expect(radios.every((radio) => radio.disabled)).toBe(true);
+    expect(scrubber('widgets.layers.adjustments.noiseAmount').dataset.disabled).toBeDefined();
+    expect(scrubber('widgets.layers.adjustments.noiseSize').dataset.disabled).toBeDefined();
   });
 });
 

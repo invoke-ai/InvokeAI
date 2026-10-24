@@ -11,9 +11,13 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 
 import { chakra, createListCollection, HStack, Stack, Text } from '@chakra-ui/react';
 import { Field, Select, Slider } from '@platform/ui';
+import { IconButton } from '@platform/ui/Button';
 import { ScrubberField } from '@platform/ui/ScrubberField';
+import { SegmentedControl } from '@platform/ui/SegmentedControl';
+import { Tooltip } from '@platform/ui/Tooltip';
 import { buildCurveLut } from '@workbench/canvas-engine/api';
 import { baselineConfig, useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
+import { DicesIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -25,6 +29,7 @@ import {
   finishCurveDragResult,
   getCurveGridCoordinates,
 } from './curveEditorMath';
+import { createNoiseSeed, DEFAULT_NOISE_AMOUNT, DEFAULT_NOISE_SIZE } from './layerOps';
 
 /**
  * Edit adjustment subrows through whole-stack patch-config. Preview gestures live and commit once; tree rows own
@@ -160,6 +165,10 @@ const AdjustmentEntryEditor = ({
     (patch: Partial<LevelsEntry>) => commitEntry(t('widgets.layers.adjustments.levels'), patch),
     [commitEntry, t]
   );
+  const handleNoiseCommit = useCallback(
+    (patch: Partial<NoiseEntry>) => commitEntry(t('widgets.layers.adjustments.noise'), patch),
+    [commitEntry, t]
+  );
   const handleCurvesLive = useCallback((curves: CanvasAdjustmentCurves) => patchLive({ curves }), [patchLive]);
   const handleCurvesCommit = useCallback(
     (curves: CanvasAdjustmentCurves) => commitEntry(t('widgets.layers.adjustments.curves'), { curves }),
@@ -214,6 +223,8 @@ const AdjustmentEntryEditor = ({
           {t('widgets.layers.adjustments.invertHint')}
         </Text>
       );
+    case 'noise':
+      return <NoiseEditor disabled={engine === null} entry={entry} onCommit={handleNoiseCommit} onLive={patchLive} />;
     case 'curves':
       return (
         <CurvesEditor
@@ -228,6 +239,7 @@ const AdjustmentEntryEditor = ({
 
 type ScalarField = 'brightness' | 'contrast' | 'saturation' | 'rotation' | 'stops';
 type LevelsEntry = Extract<CanvasAdjustmentEntry, { type: 'levels' }>;
+type NoiseEntry = Extract<CanvasAdjustmentEntry, { type: 'noise' }>;
 
 const formatSigned = (value: number): string => `${value > 0 ? '+' : ''}${value}`;
 const formatDegrees = (value: number): string => `${Math.round(value)}°`;
@@ -442,6 +454,150 @@ const LevelsEditor = ({
           onValueChangeEnd={handleOutputCommit}
         />
       </Field>
+    </Stack>
+  );
+};
+
+const NOISE_DISTRIBUTIONS = ['gaussian', 'uniform'] as const;
+const NOISE_GRAINS = ['monochrome', 'color', 'chroma'] as const;
+const NOISE_RESPONSES = ['flat', 'midtones'] as const;
+const NOISE_MIN_SIZE = 1;
+const NOISE_MAX_SIZE = 8;
+
+const formatPercent = (value: number): string => `${value}%`;
+const formatPixels = (value: number): string => `${value.toFixed(1)} px`;
+/** Typed sizes keep their decimals (the field only clamps them); tenths of a pixel match the slider's grid. */
+const toNoiseSize = (value: number): number => Math.round(value * 10) / 10;
+
+/** One labelled segmented choice of the noise editor; picking the current option commits nothing. */
+const NoiseChoice = <Value extends string>({
+  disabled,
+  label,
+  labelKey,
+  onCommit,
+  options,
+  value,
+}: {
+  disabled: boolean;
+  label: string;
+  /** The i18n key prefix of each option's label. */
+  labelKey: string;
+  onCommit: (value: Value) => void;
+  options: readonly Value[];
+  value: Value;
+}) => {
+  const { t } = useTranslation();
+  const items = useMemo(
+    () => options.map((option) => ({ label: t(`${labelKey}.${option}`), value: option })),
+    [labelKey, options, t]
+  );
+  const handleChange = useCallback(
+    (next: string) => {
+      if (next !== value) {
+        onCommit(next as Value);
+      }
+    },
+    [onCommit, value]
+  );
+  return (
+    <Field disabled={disabled} label={label}>
+      <SegmentedControl ariaLabel={label} disabled={disabled} options={items} value={value} onChange={handleChange} />
+    </Field>
+  );
+};
+
+/** Distribution, grain, tonal response and size choices, an amount scrubber in percent, and a seed re-roll. */
+const NoiseEditor = ({
+  disabled,
+  entry,
+  onCommit,
+  onLive,
+}: {
+  disabled: boolean;
+  entry: NoiseEntry;
+  onLive: (patch: Partial<NoiseEntry>) => void;
+  onCommit: (patch: Partial<NoiseEntry>) => void;
+}) => {
+  const { t } = useTranslation();
+  const handleDistributionCommit = useCallback(
+    (distribution: NoiseEntry['distribution']) => onCommit({ distribution }),
+    [onCommit]
+  );
+  const handleGrainCommit = useCallback((grain: NoiseEntry['grain']) => onCommit({ grain }), [onCommit]);
+  const handleResponseCommit = useCallback((response: NoiseEntry['response']) => onCommit({ response }), [onCommit]);
+  const handleSizeChange = useCallback((size: number) => onLive({ size: toNoiseSize(size) }), [onLive]);
+  const handleSizeCommit = useCallback((size: number) => onCommit({ size: toNoiseSize(size) }), [onCommit]);
+  const handleAmountChange = useCallback((percent: number) => onLive({ amount: percent / 100 }), [onLive]);
+  const handleAmountCommit = useCallback((percent: number) => onCommit({ amount: percent / 100 }), [onCommit]);
+  const handleNewPattern = useCallback(() => onCommit({ seed: createNoiseSeed() }), [onCommit]);
+  const newPatternLabel = t('widgets.layers.adjustments.newNoisePattern');
+
+  return (
+    <Stack gap="3">
+      <NoiseChoice
+        disabled={disabled}
+        label={t('widgets.layers.adjustments.noiseDistribution')}
+        labelKey="widgets.layers.adjustments.noiseDistributions"
+        options={NOISE_DISTRIBUTIONS}
+        value={entry.distribution}
+        onCommit={handleDistributionCommit}
+      />
+      <NoiseChoice
+        disabled={disabled}
+        label={t('widgets.layers.adjustments.noiseGrain')}
+        labelKey="widgets.layers.adjustments.noiseGrains"
+        options={NOISE_GRAINS}
+        value={entry.grain}
+        onCommit={handleGrainCommit}
+      />
+      <NoiseChoice
+        disabled={disabled}
+        label={t('widgets.layers.adjustments.noiseResponse')}
+        labelKey="widgets.layers.adjustments.noiseResponses"
+        options={NOISE_RESPONSES}
+        value={entry.response}
+        onCommit={handleResponseCommit}
+      />
+      <ScrubberField
+        defaultValue={DEFAULT_NOISE_SIZE}
+        disabled={disabled}
+        formatValue={formatPixels}
+        label={t('widgets.layers.adjustments.noiseSize')}
+        max={NOISE_MAX_SIZE}
+        min={NOISE_MIN_SIZE}
+        step={0.1}
+        value={entry.size}
+        onChange={handleSizeChange}
+        onChangeEnd={handleSizeCommit}
+      />
+      <HStack gap="1">
+        <ScrubberField
+          defaultValue={Math.round(DEFAULT_NOISE_AMOUNT * 100)}
+          disabled={disabled}
+          flex="1"
+          formatValue={formatPercent}
+          label={t('widgets.layers.adjustments.noiseAmount')}
+          max={100}
+          min={0}
+          minW="0"
+          step={1}
+          value={Math.round(entry.amount * 100)}
+          onChange={handleAmountChange}
+          onChangeEnd={handleAmountCommit}
+        />
+        <Tooltip content={newPatternLabel}>
+          <IconButton
+            aria-label={newPatternLabel}
+            color="fg.muted"
+            disabled={disabled}
+            flexShrink={0}
+            variant="outline"
+            onClick={handleNewPattern}
+          >
+            <DicesIcon />
+          </IconButton>
+        </Tooltip>
+      </HStack>
     </Stack>
   );
 };

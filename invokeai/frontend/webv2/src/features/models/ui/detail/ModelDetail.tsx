@@ -4,6 +4,10 @@ import type { ReactNode } from 'react';
 
 import { chakra, DataList, HStack, Icon, Menu, Portal, Separator, Stack, Text } from '@chakra-ui/react';
 import { isConvertibleToDiffusers } from '@features/models/core/baseIdentity';
+import {
+  supportsExternalModelSettings,
+  type ExternalModelSettingsModel,
+} from '@features/models/core/externalModelFields';
 import { isLinkableType } from '@features/models/core/relationships';
 import { isAbsoluteModelPath, resolveModelAbsolutePath } from '@features/models/core/schemas';
 import { getModelSourceHref, getUnrecordedModelFact } from '@features/models/core/taxonomy';
@@ -30,6 +34,7 @@ import { useTranslation } from 'react-i18next';
 import { CpuOnlySetting, supportsCpuOnlySetting } from './CpuOnlySetting';
 import { supportsDefaultSettings, type DefaultSettingsModel } from './defaultSettingsFields';
 import { DefaultSettingsSection } from './DefaultSettingsSection';
+import { ExternalModelSection } from './ExternalModelSection';
 import { MissingFileBadge, ModelBaseBadge, ModelFormatBadge } from './ModelBadges';
 import { ModelEditForm } from './ModelEditForm';
 import { ModelImageUpload } from './ModelImageUpload';
@@ -132,6 +137,23 @@ const selectDefaultSettingsModel = (snapshot: ModelsSnapshot, modelKey: string):
     : null;
 };
 
+const selectExternalModel = (snapshot: ModelsSnapshot, modelKey: string): ExternalModelSettingsModel | null => {
+  const model = findModel(snapshot, modelKey);
+
+  return model
+    ? {
+        capabilities: model.capabilities,
+        default_settings: model.default_settings,
+        key: model.key,
+        name: model.name,
+        provider_id: model.provider_id,
+        provider_model_id: model.provider_model_id,
+        source: model.source,
+        type: model.type,
+      }
+    : null;
+};
+
 const selectTriggerPhrasesModel = (snapshot: ModelsSnapshot, modelKey: string): TriggerPhrasesModel | null => {
   const model = findModel(snapshot, modelKey);
 
@@ -182,6 +204,13 @@ export const ModelDetail = ({
         <>
           <Separator borderColor="border.subtle" />
           <CpuOnlySettingContainer modelKey={model.key} />
+        </>
+      ) : null}
+
+      {supportsExternalModelSettings(model) ? (
+        <>
+          <Separator borderColor="border.subtle" />
+          <ExternalModelSectionContainer modelKey={model.key} />
         </>
       ) : null}
 
@@ -387,6 +416,24 @@ const DefaultSettingsSectionContainer = memo(function DefaultSettingsSectionCont
       model={model}
       onError={(message) => notify.error(t('models.defaultSettings'), message)}
       onSaved={() => notify.success(t('models.defaultSettingsSaved'))}
+    />
+  );
+});
+
+const ExternalModelSectionContainer = memo(function ExternalModelSectionContainer({ modelKey }: { modelKey: string }) {
+  const notify = useNotify();
+  const { t } = useTranslation();
+  const model = useModelsSelector((snapshot) => selectExternalModel(snapshot, modelKey));
+
+  if (!model || !supportsExternalModelSettings(model)) {
+    return null;
+  }
+
+  return (
+    <ExternalModelSection
+      model={model}
+      onError={(message) => notify.error(t('models.externalProvider'), message)}
+      onSaved={() => notify.success(t('models.externalSettingsSaved'))}
     />
   );
 });
