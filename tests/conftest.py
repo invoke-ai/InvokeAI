@@ -2,7 +2,7 @@
 # without needing to explicitly import them. (https://docs.pytest.org/en/6.2.x/fixture.html)
 
 
-# We import the model_installer and torch_device fixtures here so that they can be used by all tests. Flake8 does not
+# We import the torch_device fixture here so that it can be used by all tests. Flake8 does not
 # play well with fixtures (F401 and F811), so this is cleaner than importing in all files that use these fixtures.
 import logging
 import shutil
@@ -46,6 +46,7 @@ from invokeai.app.services.workflow_records.workflow_records_default import Work
 from invokeai.backend.util.devices import install_cuda_stream_capture_shim
 from invokeai.backend.util.host_platform import is_windows_arm64
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.test_utils import torch_device  # noqa: F401
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa: F403
 from tests.fixtures.database import (  # noqa: F401
     _external_application_schema,
