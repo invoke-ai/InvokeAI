@@ -3,11 +3,13 @@
 import type { CanvasDocumentContractV3, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 
+import { RasterMemoryBudgetController } from '@workbench/canvas-engine/controllers/rasterMemoryBudgetController';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { fromTRS } from '@workbench/canvas-engine/math/mat2d';
 import { createAdjustedSurfaceCache } from '@workbench/canvas-engine/render/adjustedSurfaceCache';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
+import { createSpatialAdjustmentService } from '@workbench/canvas-engine/render/spatial/spatialAdjustmentService';
 import { describe, expect, it, vi } from 'vitest';
 
 import { RasterExportController } from './rasterExportController';
@@ -116,5 +118,106 @@ describe('baked raster export', () => {
     const world = width * height * 4;
     expect(reserve.mock.calls).toEqual(peekDisplayed ? [[world]] : [[40 * 30 * 8], [world]]);
     baked.release();
+  });
+});
+
+describe('baked raster export with a spatial stack', () => {
+  it("bakes a rotated, downscaled layer's settled display, evaluated in the spatial worker", async () => {
+    const backend = createDomRasterBackend();
+    const layers = createLayerCacheStore(backend);
+    const entry = layers.growToRect('layer', { height: 30, width: 40, x: -6, y: -4 });
+    for (let x = 0; x < 40; x += 1) {
+      entry.surface.ctx.fillStyle = `rgb(${60 + x * 3}, ${x % 5 === 0 ? 20 : 128}, ${200 - x * 3})`;
+      entry.surface.ctx.fillRect(x, 2, 1, 26);
+    }
+    layers.publishPixels('layer');
+    const layer: CanvasRasterLayerContractV2 = {
+      adjustments: [
+        { amount: 90, id: 'clarity', isEnabled: true, size: 8, type: 'clarity' },
+        { amount: 50, id: 'dehaze', isEnabled: true, type: 'dehaze' },
+      ],
+      blendMode: 'normal',
+      id: 'layer',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Layer',
+      opacity: 1,
+      source: { bitmap: { height: 30, imageName: 'layer.png', width: 40 }, offset: { x: -6, y: -4 }, type: 'paint' },
+      transform: TRANSFORM,
+      type: 'raster',
+    };
+    const document: CanvasDocumentContractV3 = {
+      background: 'transparent',
+      bbox: { height: 64, width: 64, x: 0, y: 0 },
+      height: 64,
+      stacks: stacksFrom([layer]),
+      selectedLayerId: null,
+      version: 3,
+      width: 64,
+    };
+    const memory = new RasterMemoryBudgetController({ budgetBytes: 64 * 1024 * 1024 });
+    const service = createSpatialAdjustmentService({
+      reserve: (bytes) => memory.reserveOperation(bytes, { purpose: 'spatial-adjustment' }),
+    });
+    try {
+      const display = createAdjustedSurfaceCache(backend, undefined, {
+        spatial: { run: (request) => service.run(request) },
+      });
+      await vi.waitFor(
+        () => {
+          display.get('layer', entry, layer.adjustments);
+          expect(display.peek('layer', entry, layer.adjustments)).not.toBeNull();
+        },
+        { interval: 20, timeout: 10_000 }
+      );
+      const controller = new RasterExportController({
+        backend,
+        captureGuard: (captured) => ({
+          cacheVersion: 1,
+          documentGeneration: 1,
+          layer: captured,
+          layerId: captured.id,
+          projectId: 'p',
+        }),
+        getDocument: () => document,
+        getOrStartRasterization: () => Promise.resolve('published'),
+        isGuardCurrent: () => true,
+        isRasterizing: () => false,
+        isSupportedSource: () => true,
+        layers,
+        pin: () => ({ release: () => undefined }),
+        runSpatial: (request) => service.run(request),
+      });
+
+      const baked = await controller.baked('layer');
+
+      expect(baked.status).toBe('ok');
+      if (baked.status !== 'ok') {
+        return;
+      }
+      const { height, width } = baked.rect;
+      const reference = backend.createSurface(width, height);
+      const matrix = fromTRS(
+        { x: TRANSFORM.x, y: TRANSFORM.y },
+        TRANSFORM.rotation,
+        TRANSFORM.scaleX,
+        TRANSFORM.scaleY
+      );
+      reference.ctx.setTransform(
+        matrix.a,
+        matrix.b,
+        matrix.c,
+        matrix.d,
+        matrix.e - baked.rect.x,
+        matrix.f - baked.rect.y
+      );
+      reference.ctx.drawImage(display.peek('layer', entry, layer.adjustments)!.canvas, -6, -4);
+      expect([...baked.surface.ctx.getImageData(0, 0, width, height).data]).toEqual([
+        ...reference.ctx.getImageData(0, 0, width, height).data,
+      ]);
+      baked.release();
+    } finally {
+      service.dispose();
+    }
   });
 });

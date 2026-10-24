@@ -11,7 +11,12 @@ import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { toaster } from '@platform/ui';
 import { Scrollable } from '@platform/ui/Scrollable';
-import { getDocumentIndex, getDocumentNode, lookupDocumentNodeState } from '@workbench/canvas-engine/api';
+import {
+  getDocumentIndex,
+  getDocumentNode,
+  isAdjustmentRefusal,
+  lookupDocumentNodeState,
+} from '@workbench/canvas-engine/api';
 import {
   publishLayerPanelSelection,
   readLayerPanelState,
@@ -22,7 +27,7 @@ import {
   toggleLayerStackCollapsed,
 } from '@workbench/layerPanelState';
 import { useCanvasOperation } from '@workbench/widgets/canvas/engineStoreHooks';
-import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
+import { describeAdjustmentRefusal, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useCallback, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { defaultRangeExtractor, useVirtualizer, type Range } from 'react-hook-tanstack-virtual';
 import { useTranslation } from 'react-i18next';
@@ -504,9 +509,16 @@ export const LayersTree = ({
           event.preventDefault();
           const { engine: currentEngine } = latest.current;
           if (currentEngine) {
-            void copyLayerToClipboard(key, { exportLayer: currentEngine.exports.exportBakedLayerBlob })
-              .then((status) => status === 'ok' || Promise.reject(new Error(status)))
-              .catch(() => toaster.create({ title: t('widgets.layers.actions.copyFailed'), type: 'warning' }));
+            const copyFailed = (description?: string) =>
+              toaster.create({ description, title: t('widgets.layers.actions.copyFailed'), type: 'warning' });
+            void copyLayerToClipboard(key, { exportLayer: currentEngine.exports.exportBakedLayerBlob }).then(
+              (status) => {
+                if (status !== 'ok') {
+                  copyFailed(isAdjustmentRefusal(status) ? describeAdjustmentRefusal(status, t) : undefined);
+                }
+              },
+              () => copyFailed()
+            );
           }
           return;
         }
