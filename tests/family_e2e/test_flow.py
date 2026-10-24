@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 import shutil
 import socket
 import sqlite3
@@ -200,7 +201,9 @@ def test_run_survives_a_server_crash_retries_foreign_load_and_resumes(
     # The crashed step has its error record; the new server is warmed up again before the step is repeated.
     crashed = records.pop(1)
     assert crashed.status == "error"
-    assert crashed.invalid_reasons[0].startswith("server crashed (exit code 3)"), crashed.invalid_reasons
+    # Without os.waitid (macOS) the code of the unreaped server is not to be had before it is reaped.
+    code = "3" if sys.platform == "win32" or hasattr(os, "waitid") else "unknown"
+    assert crashed.invalid_reasons[0].startswith(f"server crashed (exit code {code})"), crashed.invalid_reasons
     assert len(requests) == 2  # each server's uploads need their own export
     # Foreign GPU load spoils time and memory but not the image, and the step is repeated.
     spoiled = records.pop(2)
