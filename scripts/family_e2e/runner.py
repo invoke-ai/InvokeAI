@@ -83,6 +83,7 @@ from scripts.family_e2e.server import (
     build_scratch_root,
     free_port,
     git_state,
+    kill_group,
     launch_server,
     pending_installs,
     read_template_settings,
@@ -292,7 +293,9 @@ def kill_identified(identity: list[float] | None) -> bool:
     """Kills the process named by [pid, create time] and its descendants, if that process still runs.
 
     Descendants come from psutil, which drops processes older than their supposed parent; a raw parent-pid walk
-    (taskkill /T) can follow a reused pid into an unrelated tree.
+    (taskkill /T) can follow a reused pid into an unrelated tree. On POSIX the groups that processes of the tree lead
+    are killed too (the runner and the server launcher each lead one): a descendant whose parent died is in no tree
+    any more, but still in its group. A leader found in the tree lives, so its group id is its own.
     """
     if not identity:
         return False
@@ -303,6 +306,14 @@ def kill_identified(identity: list[float] | None) -> bool:
         tree = [root, *root.children(recursive=True)]
     except psutil.Error:
         return False
+    if sys.platform != "win32":
+        for process in tree:
+            try:
+                # is_running() checks the create time too, so a pid reused since the tree was captured is left alone.
+                if process.is_running() and os.getpgid(process.pid) == process.pid:
+                    kill_group(process.pid)
+            except OSError:
+                pass  # gone, or its group id not visible to this process
     for process in tree:
         try:
             process.kill()
@@ -874,7 +885,7 @@ class _Session:
             except Exception as e:
                 if server.alive():
                     raise
-                reason = f"{SERVER_CRASHED} (exit code {server.process.poll()}): {type(e).__name__}: {e}"
+                reason = f"{SERVER_CRASHED} ({server.end_status()}): {type(e).__name__}: {e}"
                 fields = self.base_record(step, attempt, graph.graph_hash, fp8)
                 fields.update(error=reason, invalid_reasons=[reason])
                 self.store(Record(**fields))
@@ -940,7 +951,7 @@ class _Session:
         def watch() -> None:
             # Checked before every HTTP poll: a dead server's port refuses connections only after seconds on Windows.
             if not server.alive():
-                raise ServerError(f"the server process exited with code {server.process.poll()}")
+                raise ServerError(f"the server process exited ({server.end_status()})")
             self.tick()
 
         if not wait_for_idle_queue(client, QUEUE_DRAIN_TIMEOUT_S, watch):
