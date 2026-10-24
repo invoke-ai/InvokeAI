@@ -14,7 +14,12 @@ import type {
 
 import { getControlAdapterMinWeight } from '@features/generation/graph';
 import { createItemId } from '@platform/browser/randomUuid';
-import { CANVAS_MAX_NODE_COUNT, CANVAS_MAX_NODE_DEPTH, LAYER_STACK_ORDER } from '@workbench/canvas-engine/api';
+import {
+  CANVAS_MAX_NODE_COUNT,
+  CANVAS_MAX_NODE_DEPTH,
+  CONTROL_TYPES,
+  LAYER_STACK_ORDER,
+} from '@workbench/canvas-engine/api';
 import { repairSelectedLayerId } from '@workbench/canvas-engine/document/selectionRepair';
 import { z } from 'zod';
 
@@ -42,6 +47,8 @@ const zPaintSource = z.object({
   offset: zCoordinate.optional(),
   type: z.literal('paint'),
 });
+const zImageSource = z.object({ image: zImageRef, type: z.literal('image') });
+const zPixelSource = z.discriminatedUnion('type', [zPaintSource, zImageSource]);
 const zTextFontRef = z.object({
   contentHash: z.string().regex(/^[a-f0-9]{64}$/u),
   family: z.string(),
@@ -50,7 +57,7 @@ const zTextFontRef = z.object({
 });
 const zLayerSource = z.discriminatedUnion('type', [
   zPaintSource,
-  z.object({ image: zImageRef, type: z.literal('image') }),
+  zImageSource,
   z.object({
     align: z.enum(['left', 'center', 'right']),
     color: z.string(),
@@ -255,7 +262,12 @@ const zCanvasLayer = z.discriminatedUnion('type', [
   }),
   zLayerBase.extend({
     adapter: zControlAdapter,
+    // An unknown type refuses the document like an unknown adapter kind; detector strings stay open.
+    controlType: z.enum(CONTROL_TYPES).optional(),
+    detection: zFilter.nullable().optional(),
     filter: zFilter.optional(),
+    original: zPixelSource.optional(),
+    originalTransform: zTransform.optional(),
     // Missing display-only visibility means visible for older documents; only overlay types carry it.
     isHidden: z.boolean().optional(),
     source: zLayerSource,
@@ -404,12 +416,21 @@ const hasV5Adjustment = (node: Record<string, unknown>): boolean =>
   Array.isArray(node.adjustments) &&
   node.adjustments.some((entry) => isRecord(entry) && V5_ADJUSTMENT_TYPES.has(entry.type));
 
-/** v4: custom-font typography. v5: a noise or spatial adjustment, enabled or not, which a v4 reader would drop. */
+/** The control derivation fields a v4 reader would strip on load, losing the kept original on its next save. */
+const CONTROL_DERIVATION_KEYS = ['controlType', 'detection', 'original', 'originalTransform'] as const;
+
+const controlLayerRequiresV5 = (node: Record<string, unknown>): boolean =>
+  node.type === 'control' && CONTROL_DERIVATION_KEYS.some((key) => node[key] !== undefined);
+
+/**
+ * v4: custom-font typography. v5: a noise or spatial adjustment, enabled or not, which a v4 reader would drop, or a
+ * control layer carrying any derivation field.
+ */
 const nodeSchemaRequirement = (node: unknown): CanvasSchemaVersion => {
   if (!isRecord(node)) {
     return 3;
   }
-  if (hasV5Adjustment(node)) {
+  if (hasV5Adjustment(node) || controlLayerRequiresV5(node)) {
     return 5;
   }
   let required: CanvasSchemaVersion = textSourceRequiresV4(node.source) ? 4 : 3;
@@ -572,15 +593,47 @@ interface ParseContext {
   count: number;
 }
 
+const isPixelSourceWithPixels = (source: unknown): boolean =>
+  isRecord(source) && (source.type === 'image' || (source.type === 'paint' && isRecord(source.bitmap)));
+
+/**
+ * Restores the control derivation invariants (see `CanvasControlLayerContract`) on a fresh leaf copy instead of
+ * refusing the document: each repair keeps the pixels generation uses and drops only bookkeeping that no longer holds.
+ */
+const repairControlDerivation = (layer: Record<string, unknown>): Record<string, unknown> => {
+  if (layer.controlType === null) {
+    delete layer.controlType;
+  }
+  if (layer.controlType === undefined) {
+    delete layer.detection;
+    delete layer.original;
+    delete layer.originalTransform;
+    return layer;
+  }
+  if (layer.original !== undefined && !isPixelSourceWithPixels(layer.original)) {
+    delete layer.original;
+    if (layer.detection !== undefined) {
+      layer.detection = null;
+    }
+  }
+  if (layer.original !== undefined && !isRecord(layer.detection)) {
+    delete layer.original;
+  }
+  if (layer.original === undefined) {
+    delete layer.originalTransform;
+  }
+  return layer;
+};
+
 /** Fills the known optional defaults on a leaf, then validates it strictly. */
 const parseLeaf = (value: Record<string, unknown>, path: string, context: ParseContext): CanvasLayerContract | null => {
   let candidate: Record<string, unknown> = value;
   if (value.type === 'control') {
-    candidate = {
+    candidate = repairControlDerivation({
       ...value,
       adapter: normalizeControlAdapter(value.adapter),
       withTransparencyEffect: value.withTransparencyEffect === undefined ? true : value.withTransparencyEffect,
-    };
+    });
   } else if (value.type === 'regional_guidance') {
     candidate = {
       ...value,

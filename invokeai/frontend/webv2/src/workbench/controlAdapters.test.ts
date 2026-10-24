@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CONTROL_ADAPTER_DEFAULTS,
   createDefaultControlAdapter,
+  deriveControlKind,
   getDefaultControlAdapterKind,
   normalizeControlAdapter,
 } from './controlAdapters';
@@ -106,5 +107,22 @@ describe('default control adapters', () => {
     const adapter = createDefaultControlAdapter('anima');
     adapter.beginEndStepPct[0] = 0.5;
     expect(CONTROL_ADAPTER_DEFAULTS.anima_lllite.beginEndStepPct).toEqual([0, 1]);
+  });
+});
+
+describe('deriveControlKind', () => {
+  it.each([
+    [{ base: 'sdxl', type: 'controlnet' }, 'controlnet'],
+    [{ base: 'flux', type: 'controlnet' }, 'controlnet'],
+    [{ base: 'sdxl', type: 't2i_adapter' }, 't2i_adapter'],
+    [{ base: 'flux', type: 'control_lora' }, 'control_lora'],
+    [{ base: 'z-image', type: 'controlnet' }, 'z_image_control'],
+    [{ base: 'qwen-image', type: 'controlnet' }, 'qwen_image_control'],
+    [{ base: 'flux2', type: 'controlnet' }, 'flux2_control'],
+    [{ base: 'anima', type: 'controlnet' }, 'anima_lllite'],
+    [{ base: 'sdxl', type: 'main' }, null],
+    [{ base: 'sdxl', type: 'ip_adapter' }, null],
+  ] as const)('runs %j as %s', (model, kind) => {
+    expect(deriveControlKind(model)).toBe(kind);
   });
 });

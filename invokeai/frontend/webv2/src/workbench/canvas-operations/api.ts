@@ -15,7 +15,7 @@ export {
   type GalleryCanvasImportDestination,
   type ImportGalleryImagesResult,
 } from './importGalleryImages';
-export { getCanvasImportNotice } from './canvasImportNotice';
+export { getCanvasImportNotice, getSendAsControlNotice, type CanvasImportNotice } from './canvasImportNotice';
 export { createCanvasFromImages, type CreateCanvasFromImagesResult } from './createCanvasFromImages';
 export {
   createFromBbox,
@@ -24,9 +24,22 @@ export {
   type CreateFromBboxResult,
 } from './createFromBbox';
 export { getCreateFromBboxNotice, type CreateFromBboxNotice } from './createFromBboxNotice';
+export {
+  fillControlFromBbox,
+  sendGalleryImageAsControl,
+  type FillControlFromBboxResult,
+  type SendGalleryImageAsControlResult,
+} from './controlSourceActions';
+export type { CanvasCompositeExportEngine } from './exportCanvasComposite';
 export type {
+  ControlDetectionError,
+  ControlDetectionErrorCode,
+  ControlDetectionStatus,
+  ControlLayerIntent,
+  ControlLayerIntentResult,
   FilterOperationSessionState,
   FilterSessionErrorCode,
+  RetryControlDetectionResult,
   SamInput,
   SamModel,
   SamSessionError,
@@ -34,6 +47,7 @@ export type {
   SamSessionSnapshot,
 } from './operationTypes';
 export { getCanvasOperations } from './operationAccess';
+export { IDLE_CONTROL_DETECTION_STATUS } from './controlDetectionStatusStore';
 export { getCanvasEngine } from './engineRegistry';
 export { saveCanvasToGallery, type CanvasGallerySaveRegion } from './saveCanvasToGallery';
 export {
@@ -66,5 +80,4 @@ export {
   type FilterParamSpec,
 } from './filterGraphs';
 export { readLastUsedFilterType, recordLastUsedFilterType } from './filterPreferences';
-export { resolveDefaultFilterForModel } from './controlRecommendations';
 export { buildSamGraph, documentToExportLocalSamInput, isSamDocumentInputValid, isSamInputValid } from './samGraph';

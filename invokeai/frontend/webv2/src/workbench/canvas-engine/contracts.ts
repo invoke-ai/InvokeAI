@@ -170,6 +170,9 @@ export type CanvasLayerSourceContract =
       span?: number;
     };
 
+/** The pixel-backed sources: an uploaded image or a paint bitmap. */
+export type CanvasPixelSourceContract = Extract<CanvasLayerSourceContract, { type: 'image' | 'paint' }>;
+
 /** Photoshop's layer-color palette; also the PSD `layerColor` vocabulary. */
 export const CANVAS_COLOR_LABELS = ['red', 'orange', 'yellow', 'green', 'blue', 'violet', 'gray'] as const;
 export type CanvasColorLabel = (typeof CANVAS_COLOR_LABELS)[number];
@@ -343,17 +346,46 @@ export interface CanvasRasterLayerContractV2 extends CanvasLayerBaseContract {
   filter?: { type: string; settings: Record<string, unknown> };
 }
 
+/** What a control layer's image should control; a closed set, so an unknown value refuses the document. */
+export const CONTROL_TYPES = ['pose', 'depth', 'edges', 'softedge', 'lineart', 'sketch', 'color', 'tile'] as const;
+export type ControlType = (typeof CONTROL_TYPES)[number];
+
+/** A detector (filter node type) and its settings; the type string stays open so newer detectors survive a load. */
+export interface CanvasControlDetectionContract {
+  type: string;
+  settings: Record<string, unknown>;
+}
+
+/**
+ * Control layers may derive their map from a kept original. Invariants (`document/controlDerivation.ts`):
+ * I1 no `controlType` ⇒ no `detection`, `original` or `originalTransform`;
+ * I2 `detection === null` ⇒ no `original`: `source` is used as-is;
+ * I3 `original` present ⇒ `detection` is an object and `source` is the map derived from it;
+ * I4 the map is current when `detection` is null or absent, or an `original` is kept and `filter` structurally equals
+ * `detection`;
+ * I5 detection runs on `original ?? (filter ? null : source)`, so map-only layers cannot re-detect.
+ */
 export interface CanvasControlLayerContract extends CanvasLayerBaseContract {
   type: 'control';
+  /** The pixels generation uses: the derived map once detection ran. */
   source: CanvasLayerSourceContract;
   adapter: CanvasControlAdapterContract;
   withTransparencyEffect: boolean;
-  filter?: { type: string; settings: Record<string, unknown> };
+  /** The filter that produced `source`'s pixels; absent when they are not a filter result. */
+  filter?: CanvasControlDetectionContract;
   /**
    * Display-only visibility for overlay layers; generation is unchanged. Absence means visible. Raster layers
    * instead use `isEnabled` for both visibility and participation.
    */
   isHidden?: boolean;
+  /** What the image controls. Absent means no type chosen (legacy or new); never written as null. */
+  controlType?: ControlType;
+  /** The detector for `controlType`. `null` means "None: use the image as-is"; absent means legacy (no choice). */
+  detection?: CanvasControlDetectionContract | null;
+  /** The pre-detection pixels, kept so detection can re-run; a persisted image reference like `source`. */
+  original?: CanvasPixelSourceContract;
+  /** Maps `original`'s local frame into the layer-local frame of `source`; absent means identity. */
+  originalTransform?: CanvasLayerBaseContract['transform'];
 }
 
 export interface CanvasRegionalGuidanceLayerContract extends CanvasLayerBaseContract {
@@ -447,9 +479,10 @@ export const CANVAS_MAX_NODE_COUNT = 10_000;
 export interface CanvasDocumentContractV3 {
   /**
    * Schema this document needs: 3 for plain content, 4 for custom-font typography, 5 for noise or spatial
-   * (clarity, texture, dehaze) adjustments. Each document mutation raises it to the newer of its content's need and
-   * the canvas state's version. A restored snapshot's document keeps its own, possibly lower, version until the next
-   * mutation; the state's version and the project's compatibility floor stay put meanwhile.
+   * (clarity, texture, dehaze) adjustments or control-layer derivation fields. Each document mutation raises it to the
+   * newer of its content's need and the canvas state's version. A restored snapshot's document keeps its own, possibly
+   * lower, version until the next mutation; the state's version and the project's compatibility floor stay put
+   * meanwhile.
    */
   version: 3 | 4 | 5;
   width: number;
@@ -475,8 +508,8 @@ export interface CanvasStagingAreaContractV2 extends CanvasStagingAreaContract {
 export interface CanvasStateContractV3 {
   /**
    * Newest schema the state needs: the newest of its previous version, the live document's and every snapshot's
-   * (3 plain, 4 custom-font typography, 5 noise or spatial adjustments). Sticky: removing that content never lowers
-   * it.
+   * (3 plain, 4 custom-font typography, 5 noise or spatial adjustments or control-layer derivation fields). Sticky:
+   * removing that content never lowers it.
    */
   version: 3 | 4 | 5;
   document: CanvasDocumentContractV3;
