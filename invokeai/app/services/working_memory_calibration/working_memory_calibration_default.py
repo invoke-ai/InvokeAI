@@ -857,10 +857,11 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         try:
             current = self._services.session_queue.get_queue_item(queue_item.item_id)
         except SessionQueueItemNotFoundError:
-            # A row that still exists has the last word. Without one: what the runner saw the queue settle before a
-            # prune or clear removed the item; or the runner's own failure; or the item was removed before it finished
-            # (Clear Queue, a deleted item).
-            if finished is not None and finished.status in ("completed", "failed"):
+            # A row that still exists has the last word. Without one: what the runner saw the queue settle (completed,
+            # failed or canceled) before a prune or clear removed the item, which an error raised after that does not
+            # undo; or the runner's own failure; or the item was removed before it finished (Clear Queue, a deleted
+            # item).
+            if finished is not None and finished.status not in _RUNNING:
                 status, error_message = finished.status, finished.error_message
             elif error is not None:
                 status, error_message = "failed", f"{type(error).__name__}: {error}"

@@ -1,3 +1,5 @@
+import errno
+import os
 import shutil
 import socket
 import sqlite3
@@ -305,6 +307,109 @@ def test_stop_kills_the_server_tree_and_never_a_process_by_its_recorded_pid(tmp_
     finally:
         unrelated.kill()
         unrelated.wait()
+
+
+def _gone(process: psutil.Process) -> bool:
+    try:
+        return process.status() == psutil.STATUS_ZOMBIE
+    except psutil.NoSuchProcess:
+        return True
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX process groups; on Windows the job object holds the tree")
+@pytest.mark.parametrize("reaped", [False, True], ids=["leader-exited", "leader-reaped"])
+def test_terminate_kills_the_group_even_after_its_leader_exited(tmp_path: Path, reaped: bool) -> None:
+    # A launcher whose child outlives it: the child is in no tree any more, but still in the launcher's group.
+    pid_file = tmp_path / "child.txt"
+    script = tmp_path / "launcher.py"
+    script.write_text(
+        "import os, subprocess, sys\n"
+        "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])\n"
+        f"tmp = {str(pid_file) + '.tmp'!r}\n"
+        "with open(tmp, 'w') as f:\n"
+        "    f.write(str(child.pid))\n"
+        f"os.replace(tmp, {str(pid_file)!r})\n"
+    )
+    process, job = spawn_in_job([sys.executable, str(script)])
+    leader = psutil.Process(process.pid)
+    deadline = time.monotonic() + CHILD_TIMEOUT_S
+    # Exited but not reaped, as the runner first meets a crashed launcher.
+    while leader.status() != psutil.STATUS_ZOMBIE:
+        assert time.monotonic() < deadline
+        time.sleep(CHILD_POLL_S)
+    child = psutil.Process(int(pid_file.read_text()))
+    if reaped:  # as ServerProcess.alive() or Popen.communicate() may have done before
+        assert process.poll() is not None
+    try:
+        server.terminate(process, job)
+        _, alive = psutil.wait_procs([child], timeout=CHILD_TIMEOUT_S)
+        assert alive == []
+    finally:
+        if not _gone(child):
+            child.kill()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX zombies; Windows does not reap")
+@pytest.mark.parametrize("waitid", [True, False], ids=["waitid", "no-waitid"])
+def test_a_dead_server_reads_as_dead_but_stays_unreaped_until_terminate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, waitid: bool
+) -> None:
+    # Its pid is its group's id: reaped before terminate() killed the group, the id could pass to another group.
+    if waitid and not hasattr(os, "waitid"):
+        pytest.skip("this platform has no os.waitid (macOS)")
+    if not waitid:
+        monkeypatch.delattr(os, "waitid", raising=False)  # as on macOS, also where it exists
+    process, job = spawn_in_job([sys.executable, "-c", "import sys; sys.exit(3)"])
+    leader = psutil.Process(process.pid)
+    deadline = time.monotonic() + CHILD_TIMEOUT_S
+    while leader.status() != psutil.STATUS_ZOMBIE:
+        assert time.monotonic() < deadline
+        time.sleep(CHILD_POLL_S)
+    dead = ServerProcess(
+        process=process,
+        console=(tmp_path / "console.log").open("ab"),
+        log_path=tmp_path / "server.log",
+        base_url="http://127.0.0.1:1",
+        serving=leader,
+        cmd=[],
+        invokeai_file="",
+        job=job,
+    )
+
+    assert not dead.alive()
+    # Without waitid the code of an unreaped process is not to be had.
+    assert dead.end_status() == ("exit code 3" if waitid else "exit code unknown")
+    assert leader.status() == psutil.STATUS_ZOMBIE
+
+    dead.stop()
+    assert not leader.is_running()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX process groups")
+@pytest.mark.parametrize("member", ["zombie", "living"])
+def test_a_refused_group_kill_fails_only_while_a_member_lives(monkeypatch: pytest.MonkeyPatch, member: str) -> None:
+    # macOS refuses (EPERM) to signal a group whose only member is a zombie; then there is nothing to kill.
+    code = "pass" if member == "zombie" else "import time; time.sleep(60)"
+    process, _ = spawn_in_job([sys.executable, "-c", code])  # it leads a group of its own
+    leader = psutil.Process(process.pid)
+    try:
+        deadline = time.monotonic() + CHILD_TIMEOUT_S
+        while member == "zombie" and leader.status() != psutil.STATUS_ZOMBIE:
+            assert time.monotonic() < deadline
+            time.sleep(CHILD_POLL_S)
+
+        def refuse(pgid: int, sig: int) -> None:
+            raise PermissionError(errno.EPERM, "Operation not permitted")
+
+        monkeypatch.setattr(os, "killpg", refuse)
+        if member == "zombie":
+            server.kill_group(process.pid)
+        else:
+            with pytest.raises(PermissionError):
+                server.kill_group(process.pid)
+    finally:
+        process.kill()
+        process.wait()
 
 
 def test_terminate_waits_until_the_tree_released_the_scratch_root(

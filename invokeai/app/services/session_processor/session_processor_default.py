@@ -278,20 +278,27 @@ class DefaultSessionRunner(SessionRunnerBase):
             self._settle(queue_item.item_id, lambda: self._services.session_queue.cancel_queue_item(queue_item.item_id))
         return True
 
-    def _settle(self, item_id: int, transition: Callable[[], SessionQueueItem]) -> SessionQueueItem:
+    def _settle(
+        self,
+        item_id: int,
+        transition: Callable[[], SessionQueueItem],
+        *,
+        queue_item: Optional[SessionQueueItem] = None,
+    ) -> SessionQueueItem:
         """Run a terminal queue transition of the item and keep the item it returned in `_settled_item`: a calibration
         item's outcome, should the queue prune or clear the item before the runner records it. The queue announces a
-        transition after committing it, so one that raises may have committed: the row is read back then, while it
-        still exists."""
+        transition after committing it and updating a supplied `queue_item`. Keep that snapshot if the announcement
+        raises, even if the row was pruned meanwhile; without one, read the row back while it still exists."""
         try:
             settled = transition()
-        except SessionQueueItemNotFoundError:
-            raise
-        except Exception:
-            with suppress(Exception):
-                current = self._services.session_queue.get_queue_item(item_id)
-                if current.status in ("completed", "failed", "canceled"):
-                    self._settled_item = current
+        except Exception as error:
+            if queue_item is not None and queue_item.status in ("completed", "failed", "canceled"):
+                self._settled_item = queue_item
+            elif not isinstance(error, SessionQueueItemNotFoundError):
+                with suppress(Exception):
+                    current = self._services.session_queue.get_queue_item(item_id)
+                    if current.status in ("completed", "failed", "canceled"):
+                        self._settled_item = current
             raise
         self._settled_item = settled
         return settled
@@ -331,7 +338,8 @@ class DefaultSessionRunner(SessionRunnerBase):
         service = self._services.working_memory_calibration
         raised: Optional[BaseException] = None
         # The item as the queue left it after the session (`_settled_item`): once the item is gone, only the runner can
-        # tell a prune of a finished item (completed or failed) from a clear that removed it before it finished.
+        # tell a prune of a finished item (completed, failed or canceled) from a clear that removed it before it
+        # finished.
         self._settled_item = None
         try:
             try:
@@ -712,6 +720,7 @@ class DefaultSessionRunner(SessionRunnerBase):
                 queue_item = self._settle(
                     completing.item_id,
                     lambda: self._services.session_queue.complete_queue_item(completing.item_id, queue_item=completing),
+                    queue_item=completing,
                 )
             self._settled_item = queue_item
 
