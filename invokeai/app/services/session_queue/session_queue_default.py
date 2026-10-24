@@ -3,7 +3,7 @@ import hashlib
 import json
 import math
 from datetime import datetime, timedelta, timezone
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, cast
 
 from pydantic_core import to_jsonable_python
 
@@ -32,6 +32,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     NodeFieldValue,
     PruneResult,
     QueueItemDeliveryResult,
+    QueueItemLineage,
     QueueItemOwner,
     RetriedQueueItem,
     RetryItemsResult,
@@ -144,11 +145,11 @@ class SessionQueue(SessionQueueBase):
         return self._queries.session_queue.prune(queue_id, user_id=None, keep=keep)
 
     async def enqueue_batch(
-        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system"
+        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system", *, all_or_none: bool = False
     ) -> EnqueueBatchResult:
         # The route awaits this method, but every operation below is synchronous database/CPU work. Keep the
         # complete enqueue in one worker operation, off the event loop.
-        return await asyncio.to_thread(self._enqueue_batch, queue_id, batch, prepend, user_id)
+        return await asyncio.to_thread(self._enqueue_batch, queue_id, batch, prepend, user_id, all_or_none)
 
     def acknowledge_enqueue(self, queue_id: str, idempotency_key: str, user_id: str = "system") -> None:
         self._queries.session_queue.acknowledge_receipt(queue_id, user_id, idempotency_key)
@@ -159,7 +160,9 @@ class SessionQueue(SessionQueueBase):
         receipt = self._queries.session_queue.enqueue_receipt(queue_id, user_id, idempotency_key)
         return _decode_enqueue_receipt(*receipt) if receipt is not None else None
 
-    def _enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool, user_id: str) -> EnqueueBatchResult:
+    def _enqueue_batch(
+        self, queue_id: str, batch: Batch, prepend: bool, user_id: str, all_or_none: bool = False
+    ) -> EnqueueBatchResult:
         requested_count = calc_session_count(batch=batch)
         payload_hash = (
             hashlib.sha256(
@@ -208,11 +211,12 @@ class SessionQueue(SessionQueueBase):
 
         # Preparing the values is CPU work, done outside a transaction; admission below takes what still fits.
         max_queue_size = self.__invoker.services.configuration.max_queue_size
+        room = max(0, max_queue_size - surveyed)
         prepared_values = prepare_values_to_insert(
             queue_id=queue_id,
             batch=batch,
             priority=0,
-            max_new_queue_items=max(0, max_queue_size - surveyed),
+            max_new_queue_items=0 if all_or_none and requested_count > room else room,
             user_id=user_id,
         )
 
@@ -225,6 +229,9 @@ class SessionQueue(SessionQueueBase):
             require_project(q)
 
             max_new_queue_items = max(0, max_queue_size - q.session_queue.pending_count(queue_id))
+            # Checked under the admission lock: the room the survey saw may have been taken meanwhile.
+            if all_or_none and min(len(prepared_values), max_new_queue_items) < requested_count:
+                max_new_queue_items = 0
             priority = q.session_queue.top_pending_priority(queue_id) + 1 if prepend else 0
             values_to_insert = prepared_values[:max_new_queue_items]
             if priority != 0:
@@ -1036,6 +1043,14 @@ class SessionQueue(SessionQueueBase):
 
     def has_active_queue_work(self) -> bool:
         return self._queries.session_queue.has_active_work()
+
+    def get_queue_item_lineage(self, queue_id: str, origin_prefix: str) -> list[QueueItemLineage]:
+        return [
+            QueueItemLineage(item_id, cast(QUEUE_ITEM_STATUS, status), origin, retried_from_item_id)
+            for item_id, status, origin, retried_from_item_id in self._queries.session_queue.lineage(
+                queue_id, origin_prefix
+            )
+        ]
 
     def get_queue_item_summaries_by_ids(self, queue_id: str, item_ids: list[int]) -> list[SessionQueueItemSummary]:
         if not item_ids:
