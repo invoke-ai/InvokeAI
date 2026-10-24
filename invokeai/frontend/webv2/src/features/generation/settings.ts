@@ -122,6 +122,7 @@ export {
   DYNAMIC_PROMPTS_MIN_PROMPTS,
   hasDynamicPromptSyntax,
   isDynamicPromptsSeedBehaviour,
+  planGenerateSubmission,
   sanitizeDynamicPromptsConfig,
   sanitizeMaxPrompts,
   sanitizeSampleSeed,
