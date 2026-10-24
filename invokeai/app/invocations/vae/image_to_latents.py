@@ -26,7 +26,6 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.stable_diffusion.vae_tiling import patch_vae_tiling_params
-from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.vae_working_memory import (
     SD_VAE_TILE_OVERLAP_FACTOR,
     estimate_vae_working_memory_sd15_sdxl,
@@ -125,8 +124,9 @@ class ImageToLatentsInvocation(BaseInvocation):
                     tile_overlap_factor=SD_VAE_TILE_OVERLAP_FACTOR,
                 )
 
-            # non_noised_latents_from_image
-            image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae.dtype)
+            # The VAE's intended compute device, as in `l2i`: a cpu_only VAE is not on the session device, and the
+            # current parameter residency is not it either under partial loading (see #9373).
+            image_tensor = image_tensor.to(device=vae_info.compute_device, dtype=vae.dtype)
             with torch.inference_mode(), tiling_context:
                 latents = ImageToLatentsInvocation._encode_to_tensor(vae, image_tensor)
 
