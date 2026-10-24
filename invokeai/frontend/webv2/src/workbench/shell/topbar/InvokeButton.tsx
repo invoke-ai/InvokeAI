@@ -2,7 +2,7 @@ import type { FocusEvent, MouseEvent } from 'react';
 
 import { Box, HStack, Icon, Kbd, ProgressCircle, Separator, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getDeterminateProgressFraction } from '@features/queue/contracts';
-import { Button } from '@platform/ui/Button';
+import { Button, useUnavailableControl } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getDestinationLabel } from '@workbench/invocation';
 import { useActiveQueueProgress } from '@workbench/queue-integration/useActiveQueueProgress';
@@ -76,6 +76,15 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
     [invoke]
   );
   const canInvoke = isValid && !isPreparing;
+  // The visible text names the button; why it cannot run now is its description.
+  const unavailable = useUnavailableControl(
+    canInvoke
+      ? undefined
+      : isPreparing
+        ? t('topbar.invoke.preparing')
+        : t('topbar.invoke.unavailable', { reason: blockingReasons[0] ?? t('topbar.invoke.unrunnable') }),
+    undefined
+  );
 
   const iconMode = isPreparing
     ? ({ mode: 'progress', value: null } as const)
@@ -88,17 +97,8 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   return (
     <Tooltip content={tooltipContent} contentProps={TOOLTIP_CONTENT_PROPS} openDelay={200} showArrow>
       <Button
-        aria-disabled={!canInvoke}
+        {...unavailable?.props}
         aria-keyshortcuts={ariaKeyShortcuts}
-        aria-label={
-          canInvoke
-            ? t('topbar.invoke.invoke')
-            : isPreparing
-              ? t('topbar.invoke.preparing')
-              : t('topbar.invoke.unavailable', {
-                  reason: blockingReasons[0] ?? t('topbar.invoke.unrunnable'),
-                })
-        }
         colorPalette="brand"
         css={INVOKE_BUTTON_CSS}
         cursor={canInvoke ? undefined : 'not-allowed'}
@@ -112,7 +112,8 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
         onPointerLeave={handlePointerLeave}
         zIndex="2"
       >
-        <Box alignItems="center" boxSize="3.5" display="flex" justifyContent="center" position="relative">
+        {/* Decorative: the queue's progress has its own status surfaces, and it must not change the button's name. */}
+        <Box aria-hidden alignItems="center" boxSize="3.5" display="flex" justifyContent="center" position="relative">
           {iconMode.mode === 'play' ? (
             <Icon as={PlayIcon} boxSize="3.5" />
           ) : iconMode.value === null ? (
@@ -128,8 +129,10 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
           )}
         </Box>
         {t('topbar.invoke.invoke')}
+        {unavailable?.description}
         {shortcutParts ? (
-          <Kbd css={HIDE_BELOW_HINT_WIDTH} variant="outline" borderColor={SHORTCUT_BORDER} color="inherit">
+          // Out of the name, which stays "Invoke" at every width; aria-keyshortcuts announces the binding.
+          <Kbd aria-hidden css={HIDE_BELOW_HINT_WIDTH} variant="outline" borderColor={SHORTCUT_BORDER} color="inherit">
             <TopbarShortcutKeys parts={shortcutParts} />
           </Kbd>
         ) : null}

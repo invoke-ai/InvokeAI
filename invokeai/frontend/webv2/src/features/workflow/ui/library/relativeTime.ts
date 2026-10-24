@@ -32,3 +32,12 @@ export const formatRelativeTime = (timestamp: string, now: Date): string => {
 
   return '';
 };
+
+/**
+ * Caption for a past event (last run, last update), read against a clock snapshot the component takes once per mount:
+ * the React Compiler memoizes render output, so reading the clock during render would be stale anyway. A timestamp
+ * newer than the snapshot is either server clock skew or an event since mount; both mean "just happened", so it reads
+ * as "now" rather than "in X". Use `formatRelativeTime` directly where future times are meaningful.
+ */
+export const formatTimeSince = (timestamp: string, snapshot: Date): string =>
+  formatRelativeTime(timestamp, new Date(Math.max(snapshot.getTime(), Date.parse(timestamp))));
