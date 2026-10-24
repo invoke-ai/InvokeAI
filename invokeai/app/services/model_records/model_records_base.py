@@ -189,7 +189,8 @@ class ModelRecordServiceBase(ABC):
         Update the model, returning the updated version.
 
         :param key: Unique key for the model to be updated.
-        :param changes: A set of changes to apply to this model. Changes are validated before being written.
+        :param changes: A set of changes to apply to this model. Changes are validated before being written. A
+        model's key cannot change: `changes.key`, if set, must equal `key`, or ValueError is raised.
         :param allow_class_change: If True, allows changes that would change the model config class. For example,
         changing a LoRA into a Main model. This does not disable validation, so the changes must still be valid.
         """

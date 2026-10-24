@@ -3,6 +3,8 @@ import type {
   CalibrationActivity,
   CalibrationBlocker,
   CalibrationCoverage,
+  CalibrationGraph,
+  CalibrationGraphCompiler,
   CalibrationOutcome,
   WorkingMemoryPlan,
   WorkingMemoryStatus,
@@ -11,6 +13,7 @@ import type {
 
 import { Alert, Collapsible, HStack, Progress, Skeleton, Stack, Text } from '@chakra-ui/react';
 import {
+  changesCalibration,
   deriveCalibrationProgress,
   describeCoverage,
   getCalibrationBlocker,
@@ -20,6 +23,7 @@ import {
 import { useModelsSelector } from '@features/models/data/modelsStore';
 import {
   attachWorkingMemoryRealtime,
+  compileWorkingMemoryPlan,
   fetchCurrentWorkingMemoryPlan,
   refreshWorkingMemoryPlan,
   resetCalibration,
@@ -43,6 +47,7 @@ import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronRightIcon } from 'lucide-react';
 import { useId, useRef, useState, type RefObject } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import { WorkingMemoryCalibrateDialog } from './WorkingMemoryCalibrateDialog';
@@ -227,6 +232,16 @@ const WorkingMemoryBody = ({
   const stopRef = useRef<HTMLButtonElement>(null);
   const [isCalibrateOpen, setIsCalibrateOpen] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
+  // How often a confirmation found the plan changed in this dialog; each change is announced anew.
+  const [planChanges, setPlanChanges] = useState(0);
+  // Why the plan read last could not compile; shown as the reason Calibrate opened nothing.
+  const [compileError, setCompileError] = useState<string | null>(null);
+  // The confirmation under way; closing the dialog aborts it, which takes it back.
+  const confirmation = useRef<AbortController | null>(null);
+  // The graphs compiled for this dialog, by the cases they were compiled for.
+  const compiled = useRef<{ cases: string; graphs: CalibrationGraph[] } | null>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
   const [isStopOpen, setIsStopOpen] = useState(false);
   const [isResetOpen, setIsResetOpen] = useState(false);
   const calibrateDialog = useExitPresence(isCalibrateOpen);
@@ -246,6 +261,10 @@ const WorkingMemoryBody = ({
         ? t('models.workingMemory.recalibrate')
         : t('models.workingMemory.calibrate');
   const blockerText = useBlockerText(blocker);
+  // A plan that does not compile leaves Calibrate enabled: installing what is missing is fixed outside this section,
+  // and the next click checks again.
+  const reasonText =
+    blockerText ?? (compileError ? t('models.workingMemory.blockedCompile', { problem: compileError }) : null);
 
   // The opener of a confirmation can disappear or be disabled once it is done; the section's toggle stays.
   const getFinalFocus = () =>
@@ -253,30 +272,120 @@ const WorkingMemoryBody = ({
   // Starting records the attempt synchronously, so Stop has rendered by the time the closing dialog restores focus.
   const getCalibrateFinalFocus = () => stopRef.current ?? getFinalFocus();
 
-  // The plan shown so far may be minutes old: its sizes follow the GPU's free memory and the stored measurements. Read
-  // it again; the section then renders the plan read, which the dialog shows and the start runs. Only a plan that still
-  // holds opens the dialog; otherwise the section shows the new reason, or the read's error with a retry.
-  const prepareCalibration = async () => {
-    setIsPreparing(true);
+  // Reads the plan as the server builds it now (its sizes follow the GPU's free memory and the stored measurements) and
+  // compiles its cases, reusing the graphs this dialog already compiled for the same cases. The section renders the plan
+  // read. A plan that no longer holds is `unavailable`: the section shows the new reason, or the read's error with a
+  // retry. A plan the server supports can still fail to compile here, say for a text encoder that is not installed.
+  const readCalibration = async (
+    compiler: CalibrationGraphCompiler,
+    signal?: AbortSignal
+  ): Promise<
+    | { kind: 'unavailable' }
+    | { kind: 'uncompilable'; message: string }
+    | { graphs: CalibrationGraph[]; kind: 'ready'; plan: WorkingMemoryPlan }
+  > => {
+    const current = await fetchCurrentWorkingMemoryPlan(queryClient, modelKey).catch(() => null);
+
+    if (current === null || getCalibrationBlocker({ isRunning, plan: current, status, summary }) !== null) {
+      return { kind: 'unavailable' };
+    }
+
+    // Both reads come from the same route, so the same cases serialize alike.
+    const cases = JSON.stringify(current.cases);
+
+    if (compiled.current?.cases === cases) {
+      return { graphs: compiled.current.graphs, kind: 'ready', plan: current };
+    }
 
     try {
-      const current = await fetchCurrentWorkingMemoryPlan(queryClient, modelKey);
+      const graphs = await compileWorkingMemoryPlan(compiler, current, signal);
 
-      if (getCalibrationBlocker({ isRunning, plan: current, status, summary }) === null) {
-        setIsCalibrateOpen(true);
-      }
-    } catch {
-      // The plan query holds the error, which the section shows with a retry.
-    } finally {
-      setIsPreparing(false);
+      compiled.current = { cases, graphs };
+      return { graphs, kind: 'ready', plan: current };
+    } catch (error) {
+      return { kind: 'uncompilable', message: getApiErrorMessage(error, t('common.unknownError')) };
     }
   };
 
-  const confirmCalibration = () => {
+  // The plan shown so far may be minutes old. Only a plan that still holds and compiles opens the dialog.
+  const prepareCalibration = async () => {
+    if (!compile) {
+      return;
+    }
+
+    setIsPreparing(true);
+    setCompileError(null);
+    // Models may have changed since the last opening: compile afresh.
+    compiled.current = null;
+    const readiness = await readCalibration(compile);
+
+    if (readiness.kind === 'ready') {
+      setIsPreparing(false);
+      setPlanChanges(0);
+      setIsCalibrateOpen(true);
+      return;
+    }
+
+    // The busy Calibrate dropped focus and no dialog takes it, so return it unless it moved on meanwhile: to Calibrate,
+    // enabled again, beside a compile error; else to the section's toggle, since the plan read is about to disable
+    // Calibrate for its reason, or replace this panel with its error (the query tells the section a tick later).
+    flushSync(() => {
+      setIsPreparing(false);
+      setCompileError(readiness.kind === 'uncompilable' ? readiness.message : null);
+    });
+    if (document.activeElement === document.body) {
+      (readiness.kind === 'uncompilable' ? primaryRef.current : focusFallbackRef.current)?.focus();
+    }
+  };
+
+  const closeCalibrate = () => {
+    confirmation.current?.abort();
+    confirmation.current = null;
+    setIsConfirming(false);
+    setIsCalibrateOpen(false);
+  };
+
+  // The dialog may have stood open while the GPU's free memory or the stored measurements moved: read the plan once
+  // more, and start what that read returns. A plan that no longer holds or compiles closes the dialog for the
+  // section's reason. One that changes what was confirmed (`changesCalibration`) starts nothing: the dialog shows it,
+  // flagged, to be confirmed again. New sizes alone start: a running generation moves them, and the dialog says sizes
+  // follow free memory. An unmount meanwhile does not take the confirmation back; only closing the dialog does.
+  const confirmCalibration = async () => {
+    if (!compile || confirmation.current) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const confirmed = plan;
+    confirmation.current = controller;
+    setIsConfirming(true);
+    const readiness = await readCalibration(compile, controller.signal);
+
+    if (confirmation.current !== controller) {
+      return;
+    }
+
+    confirmation.current = null;
+
+    if (readiness.kind === 'ready' && changesCalibration(confirmed, readiness.plan)) {
+      // The busy Calibrate dropped focus: enable it first, then return focus to it unless focus moved on meanwhile.
+      flushSync(() => {
+        setIsConfirming(false);
+        setPlanChanges((count) => count + 1);
+      });
+      if (document.activeElement === document.body) {
+        confirmRef.current?.focus();
+      }
+      return;
+    }
+
+    setIsConfirming(false);
     setIsCalibrateOpen(false);
 
-    if (compile) {
-      void startCalibration({ compile, modelKey, plan, queryClient });
+    if (readiness.kind === 'uncompilable') {
+      setCompileError(readiness.message);
+    } else if (readiness.kind === 'ready') {
+      void startCalibration({ graphs: readiness.graphs, modelKey, plan: readiness.plan, queryClient });
     }
   };
 
@@ -310,7 +419,7 @@ const WorkingMemoryBody = ({
           ) : null}
           <Button
             ref={primaryRef}
-            aria-describedby={blockerText ? reasonId : undefined}
+            aria-describedby={reasonText ? reasonId : undefined}
             disabled={blocker !== null}
             loading={isPreparing}
             variant="solid"
@@ -324,6 +433,11 @@ const WorkingMemoryBody = ({
       {blockerText ? (
         <Text color="fg.muted" fontSize="xs" id={reasonId}>
           {blockerText}
+        </Text>
+      ) : reasonText ? (
+        // Announced: the click that asked for the dialog opened nothing.
+        <Text color="fg.error" fontSize="xs" id={reasonId} overflowWrap="anywhere" role="alert">
+          {reasonText}
         </Text>
       ) : null}
 
@@ -373,12 +487,15 @@ const WorkingMemoryBody = ({
         <WorkingMemoryCalibrateDialog
           key={calibrateDialog.generation}
           calibratedThroughName={throughName}
+          confirmRef={confirmRef}
           deviceName={deviceName}
           getFinalFocus={getCalibrateFinalFocus}
+          isConfirming={isConfirming}
           isOpen={calibrateDialog.isOpen}
           plan={plan}
-          onClose={() => setIsCalibrateOpen(false)}
-          onConfirm={confirmCalibration}
+          planChanges={planChanges}
+          onClose={closeCalibrate}
+          onConfirm={() => void confirmCalibration()}
           onExitComplete={calibrateDialog.release}
         />
       ) : null}

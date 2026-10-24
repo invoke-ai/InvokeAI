@@ -1052,6 +1052,9 @@ class SessionQueue(SessionQueueBase):
             )
         ]
 
+    def get_unfinished_origins(self, queue_id: str, origin_prefix: str) -> set[str]:
+        return set(self._queries.session_queue.unfinished_origins(queue_id, origin_prefix))
+
     def get_queue_item_summaries_by_ids(self, queue_id: str, item_ids: list[int]) -> list[SessionQueueItemSummary]:
         if not item_ids:
             return []
