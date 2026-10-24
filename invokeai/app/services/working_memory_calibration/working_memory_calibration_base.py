@@ -53,8 +53,8 @@ class WorkingMemoryCalibrationServiceBase(ABC):
         """Record the item's queue status in its run, after the session runner is done with it. `error` is what the
         runner raised, which fails an item the queue still has as running. `finished` is the item as the queue left
         it after the session, as the runner saw it. An item the queue no longer has keeps the outcome `finished` shows
-        when that one is final (completed or failed: a prune or a clear removed it since); otherwise it failed with
-        `error`, or counts as canceled."""
+        when that one is final (completed, failed or canceled: a prune or a clear removed it since), even with an
+        `error` raised after it; otherwise it failed with `error`, or counts as canceled."""
 
     @abstractmethod
     def get_status(self) -> WorkingMemoryCalibrationStatus:

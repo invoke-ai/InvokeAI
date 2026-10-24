@@ -571,31 +571,42 @@ def test_a_runner_failure_after_the_queue_lost_the_item_is_recorded_as_failed(
     assert (run.status, run.error) == ("failed", "RuntimeError: database is locked")
 
 
-def test_a_completed_item_keeps_its_outcome_when_a_session_callback_raises_and_the_queue_prunes_it(
-    service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(("behaviour", "outcome"), [("complete", "completed"), ("cancel", "canceled")])
+def test_a_settled_item_keeps_its_outcome_when_a_session_callback_raises_and_the_queue_prunes_it(
+    tmp_path: Path,
+    service: WorkingMemoryCalibrationService,
+    queue: SessionQueue,
+    runner,
+    monkeypatch: pytest.MonkeyPatch,
+    behaviour: str,
+    outcome: str,
 ) -> None:
-    """The queue completed the item before the callback raised: the runner's error does not undo that."""
-    session_runner, _ = runner
-    run_id, _ = _create(service, "system", "complete")
+    """The queue completed or canceled the item before the callback raised: the runner's error does not undo that."""
+    session_runner, cancel_event = runner
+    run_id, item_id = _create(service, "system", behaviour)
+
+    def cancel() -> None:
+        queue.cancel_queue_item(item_id)
+        cancel_event.set()
+
+    _ON_CANCEL.append(cancel)
 
     def broken_callback(queue_item: SessionQueueItem) -> None:
         raise RuntimeError("a callback failed")
 
     monkeypatch.setattr(session_runner, "_on_after_run_session_callbacks", [broken_callback])
-    observe = service.observe
-
-    def pruned_first(*args, **kwargs) -> None:
-        queue.prune("default")
-        observe(*args, **kwargs)
-
-    monkeypatch.setattr(service, "observe", pruned_first)
+    _prune_before_the_final_record(service, queue, monkeypatch)
     item = queue.dequeue()
     assert item is not None
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="a callback failed"):
         session_runner.run(item)
 
+    assert queue.get_queue_item_ids("default").item_ids == []
+    [stored] = json.loads((tmp_path / "working_memory" / f"{GPU_CLASS.id}.json").read_bytes())["runs"]
+    observed = stored["observed"][str(item_id)]
+    assert (observed["status"], observed.get("error_message")) == (outcome, None)
     [run] = service.get_status().device_classes[0].runs
-    assert (run.run_id, run.status) == (run_id, "completed")
+    assert (run.run_id, run.status, run.error) == (run_id, outcome, None)
 
 
 def test_a_runner_failure_outside_the_nodes_is_recorded_as_failed(

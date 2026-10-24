@@ -325,7 +325,8 @@ class DefaultSessionRunner(SessionRunnerBase):
         service = self._services.working_memory_calibration
         raised: Optional[BaseException] = None
         # The item as the queue left it after the session (`_settled_item`): once the item is gone, only the runner can
-        # tell a prune of a finished item (completed or failed) from a clear that removed it before it finished.
+        # tell a prune of a finished item (completed, failed or canceled) from a clear that removed it before it
+        # finished.
         self._settled_item = None
         try:
             try:
