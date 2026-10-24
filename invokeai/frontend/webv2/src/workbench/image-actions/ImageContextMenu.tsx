@@ -28,6 +28,7 @@ import {
   ClapperboardIcon,
   AsteriskIcon,
   AudioLinesIcon,
+  BoxIcon,
   ChevronRightIcon,
   CopyIcon,
   CrosshairIcon,
@@ -770,6 +771,7 @@ const SingleImageMenuItems = ({
   const handleSavePromptAsTemplate = useCallback(() => void actions.savePromptAsTemplate(image), [actions, image]);
   const handleUseAsReferenceImage = useUseAsReferenceImageHandler(actions, image);
   const handleLoadWorkflow = useCallback(() => void actions.loadImageWorkflow(image), [actions, image]);
+  const handleGeneratePbrMaps = useCallback(() => void actions.generatePbrMaps(image), [actions, image]);
   const { generation, widgets } = useWorkbenchCommands();
   const openWidget = useOpenWorkbenchWidget();
   const handleSendToUpscale = useCallback(() => {
@@ -881,6 +883,12 @@ const SingleImageMenuItems = ({
         label="Select for Compare"
         value="select-for-compare"
         onClick={handleSelectForCompare}
+      />
+      <ContextMenuItem
+        icon={BoxIcon}
+        label="Generate PBR Maps"
+        value="generate-pbr-maps"
+        onClick={handleGeneratePbrMaps}
       />
       <Menu.Separator borderColor="border.subtle" />
       <FindInGalleryMenuItem itemRef={imageItemRef} />

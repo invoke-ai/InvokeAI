@@ -106,6 +106,7 @@ const createActions = (deleteItems: ImageActions['deleteItems']): ImageActions =
   downloadItems: vi.fn(() => Promise.resolve()),
   downloadImage: vi.fn(() => Promise.resolve()),
   downloadImages: vi.fn(() => Promise.resolve()),
+  generatePbrMaps: vi.fn(() => Promise.resolve()),
   getImageRecallCapabilities: vi.fn(() => Promise.resolve(EMPTY_IMAGE_RECALL_CAPABILITIES)),
   loadImageWorkflow: vi.fn(() => Promise.resolve()),
   moveItemsToBoard: vi.fn(() => Promise.resolve()),
@@ -338,6 +339,25 @@ describe('ImageContextMenu load workflow', () => {
     await vi.waitFor(() => expect(actions.getImageRecallCapabilities).toHaveBeenCalled());
     expect(getMenuItem(LOAD_WORKFLOW).getAttribute('aria-disabled')).toBe('true');
     expect(actions.loadImageWorkflow).not.toHaveBeenCalled();
+  });
+});
+
+describe('ImageContextMenu PBR maps', () => {
+  it('hands a single image to the PBR maps action', async () => {
+    const actions = createActions(vi.fn());
+    await renderMenu(actions, [image('texture.png')]);
+
+    await interact(() => getMenuItem('Generate PBR Maps').click());
+
+    expect(actions.generatePbrMaps).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ imageName: 'texture.png' })
+    );
+  });
+
+  it('is absent from bulk menus, which queue nothing per image', async () => {
+    await renderMenu(createActions(vi.fn()), [image('a.png'), image('b.png')]);
+
+    expect(document.body.textContent).not.toContain('Generate PBR Maps');
   });
 });
 

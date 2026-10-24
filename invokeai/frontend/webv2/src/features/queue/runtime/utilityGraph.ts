@@ -11,7 +11,7 @@ import { buildUtilityQueueItemOrigin } from '@features/queue/data/events';
 import { cancelQueueItems, getQueueItem } from '@features/queue/data/serverApi';
 import { enqueueUtility } from '@features/queue/data/submissionApi';
 import { createUuid } from '@platform/browser/randomUuid';
-import { ApiError } from '@platform/transport/http';
+import { ApiError, getApiErrorMessage } from '@platform/transport/http';
 
 /** The default time a utility graph may run before it is abandoned. */
 export const DEFAULT_UTILITY_QUEUE_TIMEOUT_MS = 120_000;
@@ -19,9 +19,18 @@ export const DEFAULT_UTILITY_QUEUE_TIMEOUT_MS = 120_000;
 /** Bounded retries for transient completed-item reconciliation failures. */
 export const DEFAULT_UTILITY_RECONCILE_RETRY_POLICY = { delayMs: 100, maxAttempts: 3 } as const;
 
-/** Thrown when a utility graph fails, is canceled, times out, or is aborted. */
+/** Thrown when a utility graph fails, is canceled, times out, is removed from the queue, or is aborted. */
 export class UtilityQueueError extends Error {
-  readonly reason: 'failed' | 'canceled' | 'timeout' | 'aborted' | 'no-output' | 'enqueue' | 'reconcile' | 'setup';
+  readonly reason:
+    | 'failed'
+    | 'canceled'
+    | 'timeout'
+    | 'aborted'
+    | 'removed'
+    | 'no-output'
+    | 'enqueue'
+    | 'reconcile'
+    | 'setup';
 
   constructor(reason: UtilityQueueError['reason'], message: string, cause?: unknown) {
     super(message, cause === undefined ? undefined : { cause });
@@ -34,6 +43,7 @@ export class UtilityQueueError extends Error {
 export type UtilityEnqueue = (request: {
   graph: QueueBackendGraph;
   origin: string;
+  prepend?: boolean;
 }) => Promise<{ itemIds: number[]; enqueued: number }>;
 
 /** The cancellation seam: best-effort cancels accepted backend item ids. */
@@ -187,6 +197,278 @@ export const reconcileUtilityCompletedOutput: UtilityCompletedOutputReconciler =
     }
   }
   return null;
+};
+
+/**
+ * How long a submitted utility graph goes unheard from before its item is read again; the first run may download
+ * models. An item still open at the read re-arms it, so the watch itself never gives up.
+ */
+export const DEFAULT_UTILITY_RECONCILE_INTERVAL_MS = 30 * 60_000;
+
+/**
+ * The outcome a terminal queue status means for a utility item: `null` for completion, the error for failure or
+ * cancellation, and `undefined` while the item is still open.
+ */
+const toTerminalUtilityOutcome = (
+  status: QueueItemStatusChangedEvent['status'],
+  errorMessage: unknown,
+  errorType: unknown
+): UtilityQueueError | null | undefined => {
+  if (status === 'completed') {
+    return null;
+  }
+  if (status === 'failed') {
+    const message = typeof errorMessage === 'string' ? errorMessage.trim() : '';
+    const type = typeof errorType === 'string' ? errorType.trim() : '';
+    return new UtilityQueueError('failed', message || type || 'The utility graph failed.');
+  }
+  if (status === 'canceled') {
+    return new UtilityQueueError('canceled', 'The utility graph was canceled.');
+  }
+  return undefined;
+};
+
+/** Watches status changes for one utility origin; `onTerminal` gets the outcome of each terminal event. */
+const watchUtilityOrigin = (
+  hub: Pick<SocketHub, 'on'>,
+  origin: string,
+  onTerminal: (error: UtilityQueueError | null) => void
+): (() => void) =>
+  hub.on('queue_item_status_changed', (event: QueueItemStatusChangedEvent) => {
+    if (event.origin !== origin) {
+      return;
+    }
+    const outcome = toTerminalUtilityOutcome(event.status, event.error_message, event.error_type);
+    if (outcome !== undefined) {
+      onTerminal(outcome);
+    }
+  });
+
+/** Reads one accepted item's status when a socket event may have been missed; rejects with a 404 once it is gone. */
+export type UtilityItemStatusReader = (
+  itemId: number,
+  signal?: AbortSignal
+) => Promise<{ status: QueueItemStatusChangedEvent['status']; error_message?: unknown; error_type?: unknown }>;
+
+const readUtilityItemStatus: UtilityItemStatusReader = async (itemId, signal) => {
+  const item = await getQueueItem(itemId, signal);
+  return { error_message: item.error_message, error_type: item.error_type, status: item.status };
+};
+
+/** Dependencies for {@link submitUtilityGraph}. */
+export interface SubmitUtilityGraphOptions {
+  /** The graph to enqueue; its outputs stay wherever the graph sends them (a board, intermediates). */
+  graph: QueueBackendGraph;
+  /**
+   * The socket hub. A queue clear and, when observable, a reconnect re-read the item in case its settlement was
+   * missed or it was deleted without a terminal event.
+   */
+  hub: Pick<SocketHub, 'on'> & Partial<Pick<SocketHub, 'onConnectionChange'>>;
+  /** Put the item ahead of queued generations. */
+  prepend?: boolean;
+  /** Enqueue seam (defaults to the real utility enqueue API). */
+  enqueue?: UtilityEnqueue;
+  /** Cancellation seam for items an inconsistent enqueue response still accepted (defaults to the queue API). */
+  cancel?: UtilityCancel;
+  /** Item status seam for reconciliation (defaults to the queue item API). */
+  readItemStatus?: UtilityItemStatusReader;
+  /** Injectable id source (defaults to `createUuid`). */
+  createId?: () => string;
+  /**
+   * Ends the watch (listener and timer) with an `aborted` settlement, for example when the account changes. The
+   * backend item is never canceled: the caller only asked to stop watching.
+   */
+  signal?: AbortSignal;
+  /**
+   * After this many ms without a settlement (default {@link DEFAULT_UTILITY_RECONCILE_INTERVAL_MS}; `0` disables)
+   * the item is read again; an item still open re-arms the read. The watch ends only on a terminal status, the
+   * item's removal, or an abort.
+   */
+  reconcileIntervalMs?: number;
+}
+
+/** An accepted utility submission whose results are not returned, only awaited. */
+export interface UtilityGraphSubmission {
+  /** The accepted backend item ids. */
+  itemIds: number[];
+  /** The origin used, for diagnostics/tests. */
+  origin: string;
+  /**
+   * Resolves once the backend completes the item; rejects with {@link UtilityQueueError} when it fails, is
+   * canceled, is removed from the queue (`removed`), or the watch is aborted.
+   */
+  settled: Promise<void>;
+}
+
+/**
+ * Enqueue a utility graph whose results land where the graph sends them (such as a gallery board) rather than
+ * being returned. Resolves when the backend accepts it; `settled` tracks the item afterwards. Rejects as
+ * {@link UtilityQueueError} when the enqueue fails or its response is inconsistent.
+ */
+export const submitUtilityGraph = async (options: SubmitUtilityGraphOptions): Promise<UtilityGraphSubmission> => {
+  const { graph, hub, prepend, signal } = options;
+  const enqueue = options.enqueue ?? enqueueUtility;
+  const cancel = options.cancel ?? cancelQueueItems;
+  const readItemStatus = options.readItemStatus ?? readUtilityItemStatus;
+  const reconcileIntervalMs = options.reconcileIntervalMs ?? DEFAULT_UTILITY_RECONCILE_INTERVAL_MS;
+  let origin: string;
+  try {
+    origin = buildUtilityQueueItemOrigin((options.createId ?? createUuid)());
+  } catch (cause) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    throw new UtilityQueueError('setup', `Failed to initialize utility graph submission: ${detail}`, cause);
+  }
+
+  let settleResolve!: () => void;
+  let settleReject!: (error: UtilityQueueError) => void;
+  const settled = new Promise<void>((resolve, reject) => {
+    settleResolve = resolve;
+    settleReject = reject;
+  });
+  // The watch can settle (abort, a fast terminal event) before the caller holds `settled`, and an enqueue failure
+  // never hands it over at all; callers still observe the rejection through their own handlers.
+  settled.catch(() => {});
+  let isSettled = false;
+  let itemIds: number[] = [];
+  let reconcileRequestedBeforeAccept = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const detachers: Array<() => void> = [];
+
+  const finish = (error: UtilityQueueError | null): void => {
+    if (isSettled) {
+      return;
+    }
+    isSettled = true;
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    for (const detach of detachers) {
+      try {
+        detach();
+      } catch {
+        // Settlement must not depend on the listeners detaching cleanly.
+      }
+    }
+    detachers.length = 0;
+    if (error) {
+      settleReject(error);
+    } else {
+      settleResolve();
+    }
+  };
+
+  const onAbort = (): void => finish(new UtilityQueueError('aborted', 'The utility graph watch was aborted.'));
+
+  const armReconcileTimer = (): void => {
+    if (isSettled || reconcileIntervalMs <= 0) {
+      return;
+    }
+    timer = setTimeout(() => {
+      timer = null;
+      void reconcile(true);
+    }, reconcileIntervalMs);
+  };
+
+  /**
+   * A terminal status read from the item settles the watch, and a 404 means the item is gone without an event (a
+   * queue clear deletes pending items silently). An item still open after the periodic read re-arms that read.
+   */
+  const reconcile = async (rearm: boolean): Promise<void> => {
+    for (const itemId of itemIds) {
+      if (isSettled) {
+        return;
+      }
+      try {
+        const item = await readItemStatus(itemId, signal);
+        const outcome = toTerminalUtilityOutcome(item.status, item.error_message, item.error_type);
+        if (outcome !== undefined) {
+          finish(outcome);
+          return;
+        }
+      } catch (cause) {
+        if (cause instanceof ApiError && cause.status === 404) {
+          finish(new UtilityQueueError('removed', 'The utility graph item was removed from the queue.', cause));
+          return;
+        }
+        // Unreadable now; the socket or the next reconciliation can still settle it.
+      }
+    }
+    if (rearm) {
+      armReconcileTimer();
+    }
+  };
+
+  const reconcileAcceptedItems = (): void => {
+    if (itemIds.length === 0) {
+      // The clear or reconnect raced the enqueue; read the item once its id is known.
+      reconcileRequestedBeforeAccept = true;
+      return;
+    }
+    void reconcile(false);
+  };
+
+  const fail = (error: UtilityQueueError): never => {
+    finish(error);
+    throw error;
+  };
+
+  // Attach before enqueue so a very fast completion is not missed.
+  try {
+    detachers.push(watchUtilityOrigin(hub, origin, finish));
+    detachers.push(hub.on('queue_cleared', reconcileAcceptedItems));
+    if (hub.onConnectionChange) {
+      let wasDisconnected = false;
+      detachers.push(
+        hub.onConnectionChange((status) => {
+          if (status === 'disconnected') {
+            wasDisconnected = true;
+          } else if (status === 'connected' && wasDisconnected) {
+            wasDisconnected = false;
+            reconcileAcceptedItems();
+          }
+        })
+      );
+    }
+    if (signal) {
+      if (signal.aborted) {
+        fail(new UtilityQueueError('aborted', 'The utility graph watch was aborted.'));
+      }
+      signal.addEventListener('abort', onAbort);
+      detachers.push(() => signal.removeEventListener('abort', onAbort));
+    }
+  } catch (cause) {
+    if (cause instanceof UtilityQueueError) {
+      throw cause;
+    }
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    fail(new UtilityQueueError('setup', `Failed to attach utility graph listeners: ${detail}`, cause));
+  }
+
+  let result: Awaited<ReturnType<UtilityEnqueue>>;
+  try {
+    result = await enqueue({ graph, origin, prepend });
+  } catch (cause) {
+    fail(new UtilityQueueError('enqueue', getApiErrorMessage(cause, 'Failed to enqueue utility graph.'), cause));
+  }
+
+  const inspected = inspectUtilityEnqueueResult(result!);
+  if (!inspected.result) {
+    if (inspected.itemIds.length > 0) {
+      // Whatever the backend did accept must not run unwatched; cancellation is best-effort.
+      void cancel(inspected.itemIds).catch(() => {});
+    }
+    fail(new UtilityQueueError('enqueue', 'The backend returned an inconsistent utility enqueue response.'));
+  }
+  itemIds = inspected.result!.itemIds;
+
+  if (reconcileRequestedBeforeAccept && !isSettled) {
+    reconcileRequestedBeforeAccept = false;
+    void reconcile(false);
+  }
+  armReconcileTimer();
+
+  return { itemIds, origin, settled };
 };
 
 /**
@@ -423,20 +705,13 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
       );
 
       detachers.push(
-        hub.on('queue_item_status_changed', (event: QueueItemStatusChangedEvent) => {
-          if (event.origin !== origin) {
+        watchUtilityOrigin(hub, origin, (error) => {
+          if (error) {
+            settleReject(error);
             return;
           }
-          if (event.status === 'completed') {
-            completionReceived = true;
-            reconcileCompletion();
-          } else if (event.status === 'failed') {
-            const errorMessage = typeof event.error_message === 'string' ? event.error_message.trim() : '';
-            const errorType = typeof event.error_type === 'string' ? event.error_type.trim() : '';
-            settleReject(new UtilityQueueError('failed', errorMessage || errorType || 'The utility graph failed.'));
-          } else if (event.status === 'canceled') {
-            settleReject(new UtilityQueueError('canceled', 'The utility graph was canceled.'));
-          }
+          completionReceived = true;
+          reconcileCompletion();
         })
       );
     } catch (cause) {

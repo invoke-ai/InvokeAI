@@ -202,7 +202,7 @@ test('the HTTP reset contract selects profiles explicitly and restores the start
     );
     assert.equal(projects.length, 40);
     assert.deepEqual(runtimeConfig, {
-      config: { generation_devices: 'auto', max_queue_history: null },
+      config: { generation_devices: 'auto', image_subfolder_strategy: 'flat', max_queue_history: null },
       set_fields: [],
     });
 
@@ -1211,6 +1211,214 @@ test('workflow thumbnails round-trip their bytes and refresh the listed URL on e
   });
 });
 
+test('image storage: the layout is patched alone and the move count follows it', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    assert.deepEqual(await getJson(backend, '/api/v1/image_moves/status'), {
+      active_job_id: null,
+      is_running: false,
+      last_error: null,
+      latest_job: null,
+      needs_move_count: 0,
+      operation: null,
+    });
+
+    const patched = await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ image_subfolder_strategy: 'date' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+
+    assert.deepEqual(patched, {
+      config: { generation_devices: 'auto', image_subfolder_strategy: 'date', max_queue_history: null },
+      set_fields: ['image_subfolder_strategy'],
+    });
+    assert.equal((await getJson(backend, '/api/v1/image_moves/status')).needs_move_count, 1_000);
+
+    const invalid = await fetch(`${backend.origin}/api/v1/app/runtime_config`, {
+      body: JSON.stringify({ image_subfolder_strategy: 'by_user' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+
+    assert.equal(invalid.status, 422);
+  });
+});
+
+test('image storage: a move runs across status polls, commits, and refuses to overlap', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ image_subfolder_strategy: 'hash' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+
+    const accepted = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
+
+    assert.equal(accepted.status, 202);
+    assert.deepEqual(await accepted.json(), {
+      active_job_id: 1,
+      is_running: true,
+      last_error: null,
+      latest_job: { error_message: null, id: 1, state: 'moving' },
+      needs_move_count: 1_000,
+      operation: 'move_all',
+    });
+
+    const overlapping = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
+
+    assert.equal(overlapping.status, 409);
+
+    const inProgress = await getJson(backend, '/api/v1/image_moves/status');
+
+    assert.equal(inProgress.is_running, true);
+    assert.equal(inProgress.operation, 'move_all');
+
+    // Like the real maintenance guard: image files and media mutations refuse while the move runs, listings do not.
+    const listed = await getJson(backend, '/api/v1/images/?limit=1&offset=0');
+    const imageName = listed.items[0].image_name;
+    const thumbnail = await fetch(`${backend.origin}/api/v1/images/i/${imageName}/thumbnail`);
+
+    assert.equal(thumbnail.status, 409);
+    assert.deepEqual(await thumbnail.json(), { detail: 'Image storage maintenance is active' });
+    assert.equal((await fetch(`${backend.origin}/api/v1/images/i/${imageName}`)).status, 200);
+    assert.equal(
+      (
+        await fetch(`${backend.origin}/api/v1/images/star`, {
+          body: JSON.stringify({ image_names: [imageName] }),
+          headers: { 'content-type': 'application/json' },
+          method: 'POST',
+        })
+      ).status,
+      409
+    );
+    assert.equal((await fetch(`${backend.origin}/api/v1/board_images/`)).status, 409);
+    assert.equal((await fetch(`${backend.origin}/api/v1/boards/?all=true`)).status, 200);
+
+    assert.deepEqual(await getJson(backend, '/api/v1/image_moves/status'), {
+      active_job_id: null,
+      is_running: false,
+      last_error: null,
+      latest_job: { error_message: null, id: 1, state: 'committed' },
+      needs_move_count: 0,
+      operation: null,
+    });
+    assert.equal((await fetch(`${backend.origin}/api/v1/images/i/${imageName}/thumbnail`)).status, 200);
+  });
+});
+
+test('image storage: an instant move commits inside the POST, and a failed job counts as finished', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ image_subfolder_strategy: 'type' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+    await getJson(backend, '/__faults?imageMoves=instant', { method: 'POST' });
+
+    const accepted = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
+
+    assert.equal(accepted.status, 202);
+    assert.deepEqual(await accepted.json(), {
+      active_job_id: null,
+      is_running: false,
+      last_error: null,
+      latest_job: { error_message: null, id: 1, state: 'committed' },
+      needs_move_count: 0,
+      operation: null,
+    });
+
+    await getJson(backend, '/__faults?imageMoves=failed', { method: 'POST' });
+
+    const failed = await getJson(backend, '/api/v1/image_moves/status');
+
+    assert.equal(failed.active_job_id, null);
+    assert.equal(failed.is_running, false);
+    assert.equal(failed.latest_job.state, 'error');
+    assert.equal(failed.latest_job.error_message, 'Disk full while moving images');
+    assert.equal(failed.last_error, 'Disk full while moving images');
+    // A finished job needs no recovery, so another move may start.
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' })).status, 202);
+  });
+});
+
+test('image storage: faults seed an interrupted job for recovery, a busy queue, and a non-admin caller', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/__faults?imageMoves=needs-recovery', { method: 'POST' });
+
+    const interrupted = await getJson(backend, '/api/v1/image_moves/status');
+
+    assert.equal(interrupted.active_job_id, 1);
+    assert.equal(interrupted.is_running, false);
+    assert.equal(interrupted.last_error, 'Server stopped during an image move');
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' })).status, 409);
+
+    const recovering = await fetch(`${backend.origin}/api/v1/image_moves/recover`, { method: 'POST' });
+
+    assert.equal(recovering.status, 202);
+    assert.equal((await recovering.json()).operation, 'recovery');
+    await getJson(backend, '/api/v1/image_moves/status');
+
+    const recovered = await getJson(backend, '/api/v1/image_moves/status');
+
+    assert.equal(recovered.active_job_id, null);
+    assert.equal(recovered.is_running, false);
+    assert.equal(recovered.last_error, null);
+    assert.equal(recovered.latest_job.state, 'committed');
+
+    await getJson(backend, '/__faults?imageMoves=queue-active', { method: 'POST' });
+
+    const refused = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
+
+    assert.equal(refused.status, 409);
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/recover`, { method: 'POST' })).status, 202);
+
+    await getJson(backend, '/__faults?intermediatesCaller=user', { method: 'POST' });
+
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/status`)).status, 403);
+    assert.equal(
+      (
+        await fetch(`${backend.origin}/api/v1/app/runtime_config`, {
+          body: JSON.stringify({ image_subfolder_strategy: 'date' }),
+          headers: { 'content-type': 'application/json' },
+          method: 'PATCH',
+        })
+      ).status,
+      403
+    );
+
+    await getJson(backend, '/__reset', { method: 'POST' });
+
+    assert.equal((await getJson(backend, '/api/v1/image_moves/status')).active_job_id, null);
+  });
+});
+
+test('enqueue_batch accepts a utility graph as pending queue items with its origin', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const before = (await getJson(backend, '/api/v1/queue/default/item_ids')).total_count;
+    const response = await fetch(`${backend.origin}/api/v1/queue/default/enqueue_batch`, {
+      body: JSON.stringify({
+        batch: { graph: { edges: [], id: 'pbr', nodes: {} }, origin: 'utility:pbr-1', runs: 1 },
+        prepend: false,
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+
+    assert.equal(response.status, 201);
+
+    const enqueued = await response.json();
+
+    assert.equal(enqueued.enqueued, 1);
+    assert.equal(enqueued.item_ids.length, 1);
+
+    const item = await getJson(backend, `/api/v1/queue/default/i/${String(enqueued.item_ids[0])}`);
+
+    assert.equal(item.origin, 'utility:pbr-1');
+    assert.equal(item.status, 'pending');
+    assert.equal((await getJson(backend, '/api/v1/queue/default/item_ids')).total_count, before + 1);
+  });
+});
+
 test('shared boards answer as the backend role table does', async () => {
   const backend = await startMockBackend(0, { profile: 'representative' });
   const call = (path, init) =>
@@ -1442,10 +1650,10 @@ test('model seed sets are opt-in, and re-identify fills what the probe would rec
   });
 });
 
-test('runtime config PATCH keeps the other writable field and validates the queue history limit', async () => {
+test('runtime config PATCH preserves other writable fields and validates the queue history limit', async () => {
   await withRepresentativeBackend(async (backend) => {
     await getJson(backend, '/api/v1/app/runtime_config', {
-      body: JSON.stringify({ generation_devices: ['cpu'] }),
+      body: JSON.stringify({ generation_devices: ['cpu'], image_subfolder_strategy: 'date' }),
       method: 'PATCH',
     });
     const withHistory = await getJson(backend, '/api/v1/app/runtime_config', {
@@ -1453,7 +1661,11 @@ test('runtime config PATCH keeps the other writable field and validates the queu
       method: 'PATCH',
     });
 
-    assert.deepEqual(withHistory.config, { generation_devices: ['cpu'], max_queue_history: 0 });
+    assert.deepEqual(withHistory.config, {
+      generation_devices: ['cpu'],
+      image_subfolder_strategy: 'date',
+      max_queue_history: 0,
+    });
 
     const invalid = await fetch(`${backend.origin}/api/v1/app/runtime_config`, {
       body: JSON.stringify({ max_queue_history: -1 }),

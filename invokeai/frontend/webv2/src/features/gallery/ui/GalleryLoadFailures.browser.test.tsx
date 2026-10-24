@@ -10,11 +10,11 @@ import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
-import { act, useMemo, useState, type ReactNode } from 'react';
+import { act, StrictMode, useMemo, useState, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { commands, userEvent } from 'vitest/browser';
 
 import { GalleryWidgetView } from './GalleryWidgetView';
 
@@ -91,6 +91,11 @@ const image = (name: string, boardId: string, day = 1): GalleryItem => ({
 });
 const page = (items: GalleryItem[], total = items.length): Promise<GalleryItemsPage> =>
   Promise.resolve({ items, total });
+const thumbnailRouteCommands = commands as typeof commands & {
+  getThumbnailRequests: () => Promise<{ statuses: number[]; urls: string[] }>;
+  startThumbnailRoute: (pathname: string, options?: { failures?: number; status?: number }) => Promise<void>;
+  stopThumbnailRoute: () => Promise<void>;
+};
 const fail = (): Promise<never> => Promise.reject(new Error('Service Unavailable'));
 
 /** A just-generated image on another board, the kind the old fallback showed in place of a failed listing. */
@@ -211,23 +216,24 @@ const PROGRESS_SESSION: QueueProgressSession = {
 const renderGallery = async (
   values: Record<string, unknown> = {},
   region: 'bottom' | 'center' = 'center',
-  progressSessions = NO_SESSIONS
+  progressSessions = NO_SESSIONS,
+  { strict = false }: { strict?: boolean } = {}
 ) => {
-  await act(() =>
-    root?.render(
-      <I18nextProvider i18n={i18n}>
-        <ChakraProvider value={system}>
-          <QueryClientProvider client={queryClient!}>
-            <Harness
-              initialValues={{ selectedBoardId: 'dogs', ...values }}
-              progressSessions={progressSessions}
-              region={region}
-            />
-          </QueryClientProvider>
-        </ChakraProvider>
-      </I18nextProvider>
-    )
+  const tree = (
+    <I18nextProvider i18n={i18n}>
+      <ChakraProvider value={system}>
+        <QueryClientProvider client={queryClient!}>
+          <Harness
+            initialValues={{ selectedBoardId: 'dogs', ...values }}
+            progressSessions={progressSessions}
+            region={region}
+          />
+        </QueryClientProvider>
+      </ChakraProvider>
+    </I18nextProvider>
   );
+
+  await act(() => root?.render(strict ? <StrictMode>{tree}</StrictMode> : tree));
 };
 
 const listing = () => host?.querySelector('[role="list"][aria-label="Gallery items"]') ?? null;
@@ -361,6 +367,44 @@ describe('Gallery listing failures', () => {
     // Focus went to the grid that replaced the Retry, not the document body.
     await waitFor(() => expect(host?.contains(document.activeElement)).toBe(true));
   });
+
+  it('reloads a thumbnail the move refused by itself, without any user action', async () => {
+    // The real guard answers thumbnail reads with 409 while the files move; nothing tells this tab when it ends.
+    const thumbnailPath = '/api/v1/images/i/dog-moving.png/thumbnail';
+    await thumbnailRouteCommands.startThumbnailRoute(thumbnailPath, { failures: 1, status: 409 });
+    transport.listItems.mockImplementation(() =>
+      page([{ ...image('dog-moving.png', 'dogs', 3), thumbnailUrl: thumbnailPath }, ...DOG_ITEMS.slice(1)])
+    );
+
+    try {
+      // StrictMode rehearses the tile's unmount; the retry must survive it as it does in the app.
+      await renderGallery({}, 'center', NO_SESSIONS, { strict: true });
+      await waitFor(() => expect(thumbnailNames()).toHaveLength(3));
+      const thumbnail = host!.querySelector<HTMLImageElement>('img[alt="dog-moving.png"]')!;
+      await expect.poll(() => thumbnail.complete).toBe(true);
+      expect(thumbnail.naturalWidth).toBe(0);
+      expect((await thumbnailRouteCommands.getThumbnailRequests()).statuses).toEqual([409]);
+
+      // The first retry, after ~3 s, succeeds.
+      await expect
+        .poll(async () => (await thumbnailRouteCommands.getThumbnailRequests()).statuses, { timeout: 10_000 })
+        .toEqual([409, 200]);
+      await expect.poll(() => thumbnail.complete && thumbnail.naturalWidth > 0).toBe(true);
+      const { urls } = await thumbnailRouteCommands.getThumbnailRequests();
+      expect(urls[1]).not.toBe(urls[0]);
+      expect(urls[1]).toContain('gallery_thumbnail_revision=');
+      // A loaded image stays put: no further request after success.
+      await act(
+        () =>
+          new Promise<void>((resolve) => {
+            setTimeout(resolve, 500);
+          })
+      );
+      expect((await thumbnailRouteCommands.getThumbnailRequests()).urls).toHaveLength(2);
+    } finally {
+      await thumbnailRouteCommands.stopThumbnailRoute();
+    }
+  }, 20_000);
 
   it('shows an anchored window that failed as failed, never the unfiltered recents', async () => {
     transport.listItems.mockImplementation(fail);
