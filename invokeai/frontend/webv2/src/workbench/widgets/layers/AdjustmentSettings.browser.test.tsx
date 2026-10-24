@@ -1,4 +1,9 @@
-import type { CanvasAdjustmentEntry, CanvasNodeContract, PreparedDocumentEdit } from '@workbench/canvas-engine/api';
+import type {
+  CanvasAdjustmentEntry,
+  CanvasGroupContract,
+  CanvasNodeContract,
+  PreparedDocumentEdit,
+} from '@workbench/canvas-engine/api';
 import type { StructuralEngineStub } from '@workbench/canvas-engine/controllers/structuralEngine.testStub';
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 
@@ -10,14 +15,16 @@ import { groupContract, layerContract } from '@workbench/canvas-engine/document-
 import { getDocumentIndex } from '@workbench/canvas-engine/document/documentIndex';
 import { commitPreparedEdit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { createInstance } from 'i18next';
-import { act, useSyncExternalStore } from 'react';
+import { act, type ReactElement, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
 import { type AdjustmentOwner, type AdjustmentsEngine, AdjustmentSettings } from './AdjustmentSettings';
+import { createFakeAdjustmentStatus } from './AdjustmentStatusIcon.testing';
 import { CURVE_SIZE } from './curveEditorMath';
+import { LayerGroupContextMenu, type LayerGroupContextMenuEngine } from './LayerGroupContextMenu';
 
 const i18n = createInstance();
 void i18n.use(initReactI18next).init({ fallbackLng: 'en', initAsync: false, lng: 'en', resources: {} });
@@ -28,6 +35,12 @@ vi.mock('@workbench/useCanvasProjectMutationDispatch', () => ({
 }));
 const notify = vi.hoisted(() => ({ error: vi.fn(), info: vi.fn(), success: vi.fn() }));
 vi.mock('@workbench/useNotify', () => ({ useNotify: () => notify }));
+// The group menu reads the active project's document; here that is the stub engine's.
+vi.mock('@workbench/WorkbenchContext', () => ({
+  useActiveProjectId: () => 'project-1',
+  useActiveProjectSelector: <T,>(select: (project: { canvas: { document: unknown } }) => T): T =>
+    select({ canvas: { document: stub.document() } }),
+}));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -62,6 +75,7 @@ const ownerNode = (owner: Owner, adjustments: CanvasAdjustmentEntry[]): CanvasNo
 
 /** The structural engine over the real reducer and history; previews flush synchronously, as a settled frame would. */
 let stub: StructuralEngineStub;
+let adjustmentStatus = createFakeAdjustmentStatus();
 let ownerId = OWNER_ID.raster;
 const documentOwner = (): AdjustmentOwner =>
   getDocumentIndex(stub.document()).byId.get(ownerId)!.node as unknown as AdjustmentOwner;
@@ -100,12 +114,8 @@ const settle = (action: () => void): Promise<void> =>
     });
   });
 
-const render = async (entryId = 'cv1', owner: Owner = 'raster', adjustments = initialEntries(), withEngine = true) => {
-  applyThemeToRoot('classic');
-  host = document.createElement('div');
-  host.style.width = '260px';
-  document.body.append(host);
-  root = createRoot(host);
+/** A fresh stub engine over one owner, reporting spatial status from a fake store the test drives. */
+const setUp = (owner: Owner, adjustments: CanvasAdjustmentEntry[]): void => {
   ownerId = OWNER_ID[owner];
   stub = createStructuralEngineStub({
     layers: [ownerNode(owner, adjustments)],
@@ -114,18 +124,29 @@ const render = async (entryId = 'cv1', owner: Owner = 'raster', adjustments = in
       return () => undefined;
     },
   });
+  adjustmentStatus = createFakeAdjustmentStatus();
+  Object.assign(stub.engine, { interaction: adjustmentStatus.interaction });
+};
 
+const mount = async (element: ReactElement): Promise<void> => {
+  applyThemeToRoot('classic');
+  host = document.createElement('div');
+  host.style.width = '260px';
+  document.body.append(host);
+  root = createRoot(host);
   await settle(() => {
     root?.render(
       <I18nextProvider i18n={i18n}>
-        <ChakraProvider value={system}>
-          <Harness entryId={entryId} withEngine={withEngine} />
-        </ChakraProvider>
+        <ChakraProvider value={system}>{element}</ChakraProvider>
       </I18nextProvider>
     );
   });
+};
 
-  return host.querySelector<SVGSVGElement>(`svg[viewBox="0 0 ${CURVE_SIZE} ${CURVE_SIZE}"]`)!;
+const render = async (entryId = 'cv1', owner: Owner = 'raster', adjustments = initialEntries(), withEngine = true) => {
+  setUp(owner, adjustments);
+  await mount(<Harness entryId={entryId} withEngine={withEngine} />);
+  return host!.querySelector<SVGSVGElement>(`svg[viewBox="0 0 ${CURVE_SIZE} ${CURVE_SIZE}"]`)!;
 };
 
 const handles = (svg: SVGSVGElement): SVGCircleElement[] => Array.from(svg.querySelectorAll('circle'));
@@ -575,5 +596,109 @@ describe('curves entry editor', () => {
     expect(handles(svg)).toHaveLength(3);
     const added = centreOf(handles(svg)[1]!);
     expect(added.x).toBeCloseTo(targetX, 0);
+  });
+});
+
+const MENU_ANCHOR = { height: 1, width: 1, x: 300, y: 10 };
+const closeMenu = (): void => undefined;
+
+describe('spatial adjustment editors', () => {
+  type SpatialEntry = Extract<CanvasAdjustmentEntry, { type: 'clarity' | 'texture' | 'dehaze' }>;
+
+  /** The group's menu over the editor of whichever entry the group's stack ends with. */
+  const MenuHarness = () => {
+    const owner = useSyncExternalStore(stub.subscribe, documentOwner);
+    const last = owner.adjustments?.at(-1);
+    return (
+      <>
+        <LayerGroupContextMenu
+          anchor={MENU_ANCHOR}
+          editingLocked={false}
+          engine={stub.engine as unknown as LayerGroupContextMenuEngine}
+          group={owner as unknown as CanvasGroupContract}
+          stack="raster"
+          onClose={closeMenu}
+        />
+        {last ? (
+          <AdjustmentSettings engine={stub.engine as unknown as AdjustmentsEngine} entryId={last.id} layer={owner} />
+        ) : null}
+      </>
+    );
+  };
+
+  const sliderOf = (label: string): HTMLElement => scrubber(label).querySelector<HTMLElement>('[role="slider"]')!;
+
+  it('adds Clarity from the menu at identity, then scrubs and resets its amount as undoable steps', async () => {
+    setUp('group', []);
+    await mount(<MenuHarness />);
+
+    const trigger = document.querySelector<HTMLElement>('[aria-label="widgets.layers.menu.addAdjustment"]')!;
+    await act(() => userEvent.click(trigger));
+    const clarityItem = () => document.querySelector<HTMLElement>('[role="menuitem"][data-value="add-clarity"]');
+    await expect.poll(clarityItem).not.toBeNull();
+    const clarity = clarityItem()!;
+    expect(clarity.textContent).toBe('widgets.layers.adjustments.clarity');
+    await act(() => userEvent.click(clarity));
+    await settle(() => undefined);
+
+    expect(commits()).toHaveLength(1);
+    const [added] = latestAdjustments() as SpatialEntry[];
+    expect(added).toEqual({ amount: 0, id: expect.any(String), isEnabled: true, size: 40, type: 'clarity' });
+    expect(sliderOf('widgets.layers.adjustments.amount').getAttribute('aria-valuetext')).toBe('0');
+    expect(sliderOf('widgets.layers.adjustments.size').getAttribute('aria-valuetext')).toBe('40 px');
+
+    await scrub(scrubber('widgets.layers.adjustments.amount'), [0.1, 0.25]);
+    expect(commits()).toHaveLength(2);
+    expect(latestAdjustments()).toEqual([{ ...added, amount: 100 }]);
+    expect(sliderOf('widgets.layers.adjustments.amount').getAttribute('aria-valuetext')).toBe('+100');
+
+    // Backspace restores the default, recorded like any other edit.
+    await act(async () => {
+      sliderOf('widgets.layers.adjustments.amount').focus();
+      await userEvent.keyboard('{Backspace}');
+    });
+    expect(commits()).toHaveLength(3);
+    expect(latestAdjustments()).toEqual([added]);
+
+    await stub.engine.history.undo();
+    expect(latestAdjustments()).toEqual([{ ...added, amount: 100 }]);
+  });
+
+  it("sizes Texture in the layer's whole pixels on a log track, keeping the amount", async () => {
+    await render('tx1', 'raster', [{ amount: -30, id: 'tx1', isEnabled: true, size: 8, type: 'texture' }]);
+    expect(host!.textContent).toContain('widgets.layers.adjustments.sizeHintLayer');
+    expect(sliderOf('widgets.layers.adjustments.amount').getAttribute('aria-valuetext')).toBe('-30');
+
+    await act(async () => {
+      sliderOf('widgets.layers.adjustments.size').focus();
+      await userEvent.keyboard('2.6{Enter}');
+    });
+    expect(latestAdjustments()).toEqual([{ amount: -30, id: 'tx1', isEnabled: true, size: 3, type: 'texture' }]);
+
+    await act(async () => {
+      await userEvent.keyboard('{End}');
+    });
+    expect((latestAdjustments()[0] as SpatialEntry & { size: number }).size).toBe(100);
+    expect(commits()).toHaveLength(2);
+  });
+
+  it('gives Dehaze only an amount, says it approximates, and explains when the canvas cannot apply it', async () => {
+    await render('dh1', 'group', [{ amount: 50, id: 'dh1', isEnabled: true, type: 'dehaze' }]);
+    expect(() => scrubber('widgets.layers.adjustments.size')).toThrow();
+    expect(host!.textContent).toContain('widgets.layers.adjustments.dehazeHint');
+    // One live region stays mounted, so a warning that appears in it is announced.
+    const region = host!.querySelector('[role="status"]')!;
+    expect(region.textContent).toBe('');
+
+    await settle(() => adjustmentStatus.set('group-1', 'computing'));
+    expect(region.textContent).toBe('');
+
+    await settle(() => adjustmentStatus.set('group-1', 'too-large'));
+    expect(host!.querySelector('[role="status"]')).toBe(region);
+    expect(region.textContent).toBe('widgets.layers.adjustments.status.tooLarge');
+
+    await settle(() => adjustmentStatus.set('group-1', 'idle'));
+    expect([...host!.querySelectorAll('[role="status"]')]).toEqual([region]);
+    expect(region.textContent).toBe('');
   });
 });

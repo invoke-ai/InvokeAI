@@ -14,7 +14,14 @@ import { getDocumentLayer } from '@workbench/canvas-engine/document/documentInde
 import { getSourceContentRect, isEmptyPolygonShape } from '@workbench/canvas-engine/document/sources';
 import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
 import { roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
-import { applyAdjustments, isPositionDependentAdjustments } from '@workbench/canvas-engine/render/adjustments';
+import { hasSpatialAdjustments, isPositionDependentAdjustments } from '@workbench/canvas-engine/render/adjustments';
+import {
+  type AdjustmentRefusal,
+  adjustExactly,
+  adjustmentRefusal,
+  imageDataOf,
+  type SpatialRunner,
+} from '@workbench/canvas-engine/render/exactAdjustments';
 import { rasterizeSource } from '@workbench/canvas-engine/render/rasterizers';
 import { bakeMatrix } from '@workbench/canvas-engine/transform/transformMath';
 
@@ -32,14 +39,17 @@ export type RasterizeLayerResult =
   | 'rasterized'
   | SubsetOf<CanvasCommandRefusal, 'missing' | 'locked' | 'unsupported'>
   | LayerEditRefusal
-  | 'failed';
+  | 'failed'
+  | AdjustmentRefusal;
 
 export interface RasterizeLayerControllerOptions {
   readonly ctx: Pick<
     CanvasMutationContext,
-    'applyStep' | 'begin' | 'getDocument' | 'installPrepared' | 'preparePixels' | 'reserveRaster'
+    'applyStep' | 'begin' | 'getDocument' | 'getEditRevision' | 'installPrepared' | 'preparePixels' | 'reserveRaster'
   >;
   readonly backend: RasterBackend;
+  /** Evaluates spatial adjustment runs; without it a spatial stack refuses `error`. */
+  readonly runSpatial?: SpatialRunner;
   readonly rasterizeDeps: (document: CanvasDocumentContractV3) => RasterizeDeps;
 }
 
@@ -53,11 +63,13 @@ export class RasterizeLayerController {
    * Bakes the layer's source and transform into paint pixels as one undo step. Undo restores the parametric
    * contract, which rerasterizes from its source; redo reinstalls the baked pixels, never a rerender.
    *
-   * A position-dependent stack (noise) is baked too, on the layer-local render before the transform resamples it as
-   * the display does, and leaves the contract: kept, it would place its grain on the baked pixel grid. A color-only
-   * stack stays on the contract and keeps applying to the baked pixels.
+   * A position-dependent stack (noise) or a spatial one (clarity, texture, dehaze) is baked too, all of it, on the
+   * layer-local render before the transform resamples it as the display does, and leaves the contract: kept, it would
+   * place its grain on, or measure its detail in, the baked pixel grid. A color-only stack stays on the contract and
+   * keeps applying to the baked pixels. A spatial bake runs in the worker; the result lands only if no edit landed
+   * meanwhile, and a stack that cannot run refuses.
    */
-  rasterize(layerId: string): RasterizeLayerResult {
+  async rasterize(layerId: string): Promise<RasterizeLayerResult> {
     const { ctx } = this.deps;
     if (this.disposed) {
       return 'not-ready';
@@ -81,7 +93,9 @@ export class RasterizeLayerController {
       return 'unsupported';
     }
     const contentRect = getSourceContentRect(layer, document);
-    const bakesAdjustments = isPositionDependentAdjustments(layer.adjustments);
+    const bakesAdjustments =
+      isPositionDependentAdjustments(layer.adjustments) || hasSpatialAdjustments(layer.adjustments);
+    const revision = ctx.getEditRevision();
     const matrix = bakeMatrix(layer.transform);
     const bakedRect = roundOut(transformBounds(matrix, contentRect));
     const txn = ctx.begin({ historyBytes: rgbaBytes(bakedRect) + HISTORY_ENTRY_OVERHEAD_BYTES });
@@ -103,8 +117,18 @@ export class RasterizeLayerController {
           return 'over-budget';
         }
         const imageData = scratch.ctx.getImageData(0, 0, width, height);
-        applyAdjustments(imageData, layer.adjustments, contentRect);
-        scratch.ctx.putImageData(imageData, 0, 0);
+        const adjusted = await adjustExactly(imageData, layer.adjustments, contentRect, { run: this.deps.runSpatial });
+        if (adjusted.status !== 'ok') {
+          return adjusted.status === 'aborted' ? 'not-ready' : adjustmentRefusal(document, layerId, adjusted.status);
+        }
+        if (this.disposed || !txn.isCurrent() || ctx.getEditRevision() !== revision) {
+          return 'not-ready';
+        }
+        scratch.ctx.putImageData(
+          adjusted.data === imageData.data ? imageData : imageDataOf(adjusted.data, width, height),
+          0,
+          0
+        );
       }
       const baked = this.deps.backend.createSurface(bakedRect.width, bakedRect.height);
       baked.ctx.setTransform(1, 0, 0, 1, 0, 0);
