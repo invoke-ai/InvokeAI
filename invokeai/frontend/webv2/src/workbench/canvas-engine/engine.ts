@@ -2861,7 +2861,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       captureCache: captureLayerCache,
       ctx: mutationContext,
       discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
-      exportBaked: (layerId) => exportBakedLayerPixelsForStructural(layerId, { includeDisabled: true }),
+      exportBaked: (layerId, options) =>
+        exportBakedLayerPixelsForStructural(layerId, { ...options, includeDisabled: true }),
       isGuardCurrent: isLayerExportGuardCurrent,
       isSupportedSource: isSupportedExportSource,
     },

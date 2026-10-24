@@ -1,4 +1,4 @@
-import type { LayerExportGuard } from '@workbench/canvas-engine/capabilities';
+import type { ExportBakedLayerPixelsOptions, LayerExportGuard } from '@workbench/canvas-engine/capabilities';
 import type {
   CanvasDocumentContractV3,
   CanvasLayerContract,
@@ -13,6 +13,7 @@ import { getDocumentLayer } from '@workbench/canvas-engine/document/documentInde
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
 import { intersect, isEmpty, roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
+import { isIdentityAdjustments } from '@workbench/canvas-engine/render/adjustments';
 
 import type { CanvasMutationContext, EditStep } from './mutationContext';
 
@@ -63,7 +64,10 @@ export interface CropLayerControllerOptions {
   >;
   readonly backend: RasterBackend;
   readonly isSupportedSource: (source: CanvasLayerSourceContract) => boolean;
-  readonly exportBaked: (layerId: string) => Promise<ExportResult>;
+  readonly exportBaked: (
+    layerId: string,
+    options?: Pick<ExportBakedLayerPixelsOptions, 'applyAdjustments'>
+  ) => Promise<ExportResult>;
   readonly isGuardCurrent: (guard: LayerExportGuard) => boolean;
   readonly captureCache: (
     layer: CanvasLayerContract,
@@ -265,19 +269,12 @@ export class CropLayerController {
     const cropped: CroppedLeaf[] = [];
     try {
       for (const layer of candidates) {
-        const exported = await this.deps.exportBaked(layer.id);
-        if (exported.status === 'adjustment-refused') {
-          return exported;
-        }
-        if (exported.status === 'missing') {
-          return { status: 'stale' };
-        }
-        if (exported.status === 'not-ready' || exported.status === 'over-budget') {
-          return { status: exported.status };
+        const exported = await this.exportForCrop(layer, frame);
+        if (exported.status === 'skip') {
+          continue;
         }
         if (exported.status !== 'ok') {
-          // Empty, disabled-only or unsupported content has nothing to crop.
-          continue;
+          return exported;
         }
         try {
           guards.push(exported.guard);
@@ -325,6 +322,42 @@ export class CropLayerController {
         leaf.reservation.release();
       }
     }
+  }
+
+  /**
+   * A leaf's baked pixels for crop all, or `skip` when it has nothing to crop. A leaf with its own adjustment stack is
+   * first exported raw: adjustments never move pixels, so the raw rect is the baked one, and a leaf already inside the
+   * frame never runs its stack (a spatial job that could refuse the whole crop). Its guard still joins the staleness
+   * check, as every read leaf's does.
+   */
+  private async exportForCrop(
+    layer: CanvasLayerContract,
+    frame: Rect
+  ): Promise<Extract<ExportResult, { status: 'ok' }> | { status: 'skip' } | CropAllLayersResult> {
+    const settle = (
+      exported: ExportResult
+    ): Extract<ExportResult, { status: 'ok' }> | { status: 'skip' } | CropAllLayersResult => {
+      if (exported.status === 'ok' || exported.status === 'adjustment-refused') {
+        return exported;
+      }
+      if (exported.status === 'missing') {
+        return { status: 'stale' };
+      }
+      if (exported.status === 'not-ready' || exported.status === 'over-budget') {
+        return { status: exported.status };
+      }
+      // Empty, disabled-only or unsupported content has nothing to crop.
+      return { status: 'skip' };
+    };
+    if (layer.type !== 'raster' || isIdentityAdjustments(layer.adjustments)) {
+      return settle(await this.deps.exportBaked(layer.id));
+    }
+    const raw = settle(await this.deps.exportBaked(layer.id, { applyAdjustments: false }));
+    if (raw.status !== 'ok' || !cropRectFor(raw.rect, frame)) {
+      return raw;
+    }
+    raw.release();
+    return settle(await this.deps.exportBaked(layer.id));
   }
 
   private publishAll(

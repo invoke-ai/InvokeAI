@@ -1,4 +1,8 @@
-import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type {
+  CanvasAdjustmentsContract,
+  CanvasDocumentContractV3,
+  CanvasLayerContract,
+} from '@workbench/canvas-engine/contracts';
 import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { Rect } from '@workbench/canvas-engine/types';
 
@@ -134,21 +138,32 @@ const lockedPaint = (id: string, locked = true) =>
     },
   } as Partial<CanvasLayerContract>);
 
+const CLARITY: CanvasAdjustmentsContract = [{ amount: 90, id: 'clarity', isEnabled: true, size: 8, type: 'clarity' }];
+
 const createCropAllHarness = (
   options: {
+    /** Raster leaves carrying a Clarity stack. */
+    adjusted?: readonly string[];
     historyBytes?: number;
     onExport?: (layerId: string) => void;
+    /** Refuses the owner's bake; its raw export still succeeds. */
     refusal?: AdjustmentRefusal;
   } = {}
 ) => {
+  const raster = (id: string) =>
+    layerContract(
+      id,
+      'raster',
+      options.adjusted?.includes(id) ? ({ adjustments: CLARITY } as Partial<CanvasLayerContract>) : {}
+    );
   const document: CanvasDocumentContractV3 = {
     background: 'transparent',
     bbox: FRAME,
     height: 100,
     selectedLayerId: 'raster',
     stacks: stacksFrom([
-      layerContract('inside'),
-      layerContract('raster'),
+      raster('inside'),
+      raster('raster'),
       lockedPaint('locked'),
       lockedPaint('lockedInside'),
       groupContract('lockedGroup', [lockedPaint('lockedByGroup', false)], { isLocked: true }),
@@ -163,6 +178,7 @@ const createCropAllHarness = (
   for (const [id, rect] of Object.entries(CACHE_RECTS)) {
     h.layers.getOrCreateRect(id, rect);
   }
+  // Raw reads of adjusted leaves are recorded as `<id>:raw`.
   const exported: string[] = [];
   const released: string[] = [];
   // Reserved raster bytes when each export is read; every export holds its own reservation until released.
@@ -182,10 +198,11 @@ const createCropAllHarness = (
     },
     ctx: h.ctx,
     discardPersisted,
-    exportBaked: (layerId) => {
-      exported.push(layerId);
+    exportBaked: (layerId, exportOptions) => {
+      const read = exportOptions?.applyAdjustments === false ? `${layerId}:raw` : layerId;
+      exported.push(read);
       options.onExport?.(layerId);
-      if (options.refusal?.ownerId === layerId) {
+      if (options.refusal?.ownerId === layerId && read === layerId) {
         return Promise.resolve(options.refusal);
       }
       const entry = h.layers.get(layerId)!;
@@ -196,7 +213,7 @@ const createCropAllHarness = (
         rect: { ...entry.rect },
         release: () => {
           reservation?.release();
-          released.push(layerId);
+          released.push(read);
         },
         status: 'ok' as const,
         surface: entry.surface,
@@ -210,25 +227,56 @@ const createCropAllHarness = (
 
 describe('CropLayerController: crop all layers', () => {
   it.each(['too-large', 'over-budget', 'error'] as const)(
-    'refuses the whole crop on a %s adjustment, releasing earlier copies',
+    'refuses the whole crop on a %s adjustment of a leaf it must crop, releasing earlier copies',
     async (reason) => {
       const refusal: AdjustmentRefusal = {
-        ownerId: 'control',
-        ownerName: 'Control',
+        ownerId: 'raster',
+        ownerName: 'Raster',
         reason,
         status: 'adjustment-refused',
       };
-      const h = createCropAllHarness({ refusal });
+      const h = createCropAllHarness({ adjusted: ['raster'], refusal });
 
       await expect(h.controller.cropAll()).resolves.toEqual(refusal);
-      expect(h.exported).toEqual(['mask', 'region', 'control']);
-      expect(h.released).toEqual(['mask', 'region']);
+      // The raw read shows the leaf reaches past the frame, so its stack must run.
+      expect(h.exported).toEqual(['mask', 'region', 'control', 'inside', 'raster:raw', 'raster']);
+      expect(h.released).toEqual(['mask', 'region', 'control', 'inside', 'raster:raw']);
       expect(h.document()).toBe(h.original);
       expect(h.dispatched).toEqual([]);
       expect(h.history.canUndo()).toBe(false);
       expect(h.reservedBytes()).toBe(0);
     }
   );
+
+  it('never runs the stack of an adjusted leaf already inside the frame', async () => {
+    const refusal: AdjustmentRefusal = {
+      ownerId: 'inside',
+      ownerName: 'Inside',
+      reason: 'too-large',
+      status: 'adjustment-refused',
+    };
+    const h = createCropAllHarness({ adjusted: ['inside'], refusal });
+
+    await expect(h.controller.cropAll()).resolves.toEqual({ cropped: 4, skippedLocked: 2, status: 'cropped' });
+    expect(h.exported).toEqual(['mask', 'region', 'control', 'inside:raw', 'raster']);
+    expect(getDocumentLayer(h.document(), 'inside')).toBe(getDocumentLayer(h.original, 'inside'));
+    expect(h.layers.get('raster')?.rect).toEqual(FRAME);
+    expect(h.reservedBytes()).toBe(0);
+  });
+
+  it('bakes an adjusted leaf it must crop, after releasing its raw read', async () => {
+    const h = createCropAllHarness({ adjusted: ['raster'] });
+
+    await expect(h.controller.cropAll()).resolves.toEqual({ cropped: 4, skippedLocked: 2, status: 'cropped' });
+    expect(h.exported).toEqual(['mask', 'region', 'control', 'inside', 'raster:raw', 'raster']);
+    // The raw read is released before the bake reserves, so the peak stays one export.
+    const croppedRegion = bytes({ height: 10, width: 5, x: 0, y: 0 });
+    const croppedControl = bytes({ height: 10, width: 15, x: 0, y: 0 });
+    expect(h.reservedAtExport.at(-1)).toBe(croppedRegion + croppedControl + bytes(CACHE_RECTS.raster!));
+    expect(getDocumentLayer(h.document(), 'raster')).not.toHaveProperty('adjustments');
+    expect(h.layers.get('raster')?.rect).toEqual(FRAME);
+    expect(h.reservedBytes()).toBe(0);
+  });
 
   it('crops every unlocked leaf that reaches past the frame in one entry, and replays it as one', async () => {
     const h = createCropAllHarness();

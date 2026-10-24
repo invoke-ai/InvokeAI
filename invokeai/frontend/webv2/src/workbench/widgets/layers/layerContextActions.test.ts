@@ -111,7 +111,7 @@ const makeEffects = (): LayerContextActionEffects => ({
   fitToBbox: vi.fn(),
   group: vi.fn(),
   mergeDown: vi.fn(() => Promise.resolve()),
-  mergeMasks: vi.fn(),
+  mergeMasks: vi.fn(() => Promise.resolve()),
   mergeSelected: vi.fn(),
   openProperties: vi.fn(),
   openRename: vi.fn(),

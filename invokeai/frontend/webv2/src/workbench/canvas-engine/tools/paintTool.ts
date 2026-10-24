@@ -126,7 +126,9 @@ const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget
   const imageCache = imageSelected ? ctx.layers.peek(selected.id) : undefined;
   if (imageSelected && isLeafPaintable(leaf) && imageCache && !imageCache.stale) {
     // The brush paints a paintable, rasterized image in place the same way, under its transparency lock; a locked,
-    // disabled or unready image keeps the brush's auto-created paint layer below.
+    // disabled or not yet rasterized image keeps the brush's auto-created paint layer below. A rasterized image whose
+    // spatial adjustments have not landed refuses `not-ready` (or names the stack that cannot run) and drops the
+    // stroke with a notice, as the eraser does.
     const transparencyLocked = isLayerTransparencyLocked(selected);
     const transaction = ctx.beginPixelEdit?.(selected.id) ?? null;
     // No transform on purpose: materialization BAKES the layer's placement

@@ -158,7 +158,7 @@ export interface LayerContextActionEffects {
   reorder(kind: LayerStackMoveKind, actionId: LayerContextActionId): void;
   duplicate(): void;
   mergeSelected(): void;
-  mergeMasks(): void;
+  mergeMasks(): Promise<void>;
   group(): void;
   removeFromGroup(): void;
   openRename(): void;
