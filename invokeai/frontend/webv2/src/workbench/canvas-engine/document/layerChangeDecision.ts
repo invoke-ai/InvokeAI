@@ -5,6 +5,14 @@ import { getLayerThumbnailDisplayKey } from '@workbench/canvas-engine/render/thu
 /** The display token given to a thumbnail whose appearance changed without its pixels. */
 const FIRST_DISPLAY_TOKEN = -1;
 
+/**
+ * The thumbnail version to publish when a layer's appearance changed without a cache publication. Cache versions
+ * are positive, so a negative display token can never collide with the next cache publication and suppress its
+ * redraw. Each further change steps further negative rather than resetting.
+ */
+export const nextThumbnailDisplayToken = (current: number | undefined): number =>
+  current !== undefined && current < 0 ? current - 1 : FIRST_DISPLAY_TOKEN;
+
 export interface LayerChangeInput {
   /** The layer as it now stands, or `undefined` when it is no longer in the document. */
   readonly layer: CanvasLayerContract | undefined;
@@ -61,16 +69,9 @@ export const decideLayerChange = (input: LayerChangeInput): LayerChangeDecision 
     if (key === input.currentThumbnailKey) {
       return { kind: 'appearance-only', thumbnailDisplay: null };
     }
-    // Cache versions are positive, so a negative display token can never collide
-    // with the next cache publication and suppress its redraw. Each further
-    // appearance change steps further negative rather than resetting.
-    const current = input.currentThumbnailVersion;
     return {
       kind: 'appearance-only',
-      thumbnailDisplay: {
-        key,
-        version: current !== undefined && current < 0 ? current - 1 : FIRST_DISPLAY_TOKEN,
-      },
+      thumbnailDisplay: { key, version: nextThumbnailDisplayToken(input.currentThumbnailVersion) },
     };
   }
 

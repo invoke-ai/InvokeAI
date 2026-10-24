@@ -1,5 +1,6 @@
 import type { LayerExportGuard } from './capabilities';
 import type { CanvasStateContractV3 } from './contracts';
+import type { SpatialRunner } from './render/exactAdjustments';
 import type { RasterSurface } from './render/raster';
 import type { Rect } from './types';
 
@@ -43,4 +44,6 @@ export interface CanvasCompositeExecutorDeps {
     | { status: 'ok'; lease: { release(): void } }
     | { status: 'over-budget'; requestedBytes: number; availableBytes: number };
   uploadImage(blob: Blob): Promise<{ imageName: string; width: number; height: number }>;
+  /** Evaluates spatial adjustment runs exactly for the composites (`SpatialAdjustmentService.run`). */
+  runSpatial?: SpatialRunner;
 }

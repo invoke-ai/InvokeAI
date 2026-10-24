@@ -4,9 +4,9 @@
 
 An export is a device class's calibration store as `GET /api/v2/models/working_memory/export` returns it; a family E2E
 calibration run saves one per server lifetime under `runs/<run_id>/calibration/`. Every valid, fit-eligible window
-becomes a `probe_demand` point: per card, estimator, version, platform and features, the largest `demand_bytes` of
-the windows, so repetitions and several exports of one card merge. The platform is what `platform_for` gives on the
-machine the export came from (`platform.platform_for_environment`).
+becomes a `probe_demand` point: per card (device class), estimator, version, platform and features, the largest
+`demand_bytes` of the windows, so repetitions and several exports of one card merge. The platform is what
+`platform_for` gives on the machine the export came from (`platform.platform_for_environment`).
 
 A point file is what a calibration script such as `scripts/calibrate_z_image_working_memory.py` writes: one JSON
 object per line, a `MeasuredPoint`'s fields and any other keys, which are ignored. Its points are fresh-process
@@ -213,6 +213,9 @@ def build_points(
         store = _load_export(path)
         envs = {env.id: env for env in store.envs}
         attempts = {run.run_id: run.attempt_id or run.run_id for run in store.runs}
+        # A point's card is its device class. One name can stand for several (another memory size, say); the id
+        # tells them apart, in the groups and in the points written.
+        device = f"{store.device_class.name} ({store.device_class.id})"
         for window in store.points:
             # The same store saved twice (an export and a copy of its file, one file named twice) counts once.
             identity = window.model_dump_json()
@@ -251,16 +254,10 @@ def build_points(
                     "entries for it first"
                 )
             keys = point_platform(platform, entries)
-            group = (
-                store.device_class.name,
-                window.estimator,
-                window.version,
-                _canonical(keys),
-                _canonical(window.features),
-            )
+            group = (device, window.estimator, window.version, _canonical(keys), _canonical(window.features))
             platforms[group] = keys
             attempt = attempts.get(window.run_id, window.run_id)
-            groups.setdefault(group, []).append(_Window(window, env, store.device_class.name, path, attempt))
+            groups.setdefault(group, []).append(_Window(window, env, device, path, attempt))
 
     order = {path: index for index, path in enumerate(exports)}
     ordered = {

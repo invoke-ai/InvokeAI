@@ -141,6 +141,43 @@ def test_stop_saves_the_calibration_store_its_killed_server_left(tmp_path: Path)
     assert not store_dir.exists()
 
 
+def test_a_stop_that_cannot_save_the_store_marks_the_run_stopped_and_keeps_the_root(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    run_id = "20261017-000000-box"
+    run_dir = tmp_path / "data" / "runs" / run_id
+    run_dir.mkdir(parents=True)
+    write_run_info(
+        run_dir,
+        make_run_info(run_id, profile="box", status="running", arms=("default", "patched")).model_copy(
+            update={"calibrate": True}
+        ),
+    )
+    roots = tmp_path / "data" / "scratch-roots"
+    kept_root = roots / f"{run_id}-default"
+    store_file = kept_root / "databases" / "working_memory" / "0123456789abcdef.json"
+    store_file.parent.mkdir(parents=True)
+    store = b'{"schema_version": 1, "points": ["window"]}'
+    store_file.write_bytes(store)
+    # The other arm's server had recorded no store yet; with nothing to save, its root goes.
+    (roots / f"{run_id}-patched" / "databases").mkdir(parents=True)
+    # A file where the run's calibration/ directory goes: the copy raises, as on a full disk.
+    (run_dir / "calibration").write_text("")
+
+    assert main(["stop", str(run_dir)]) == 2
+
+    info = load_run_info(run_dir)
+    assert (info.status, info.calibration_exports) == ("stopped", [])
+    assert info.finished_at is not None
+    captured = capsys.readouterr()
+    assert f"{run_id} stopped; continue with" in captured.out
+    assert "could not save the calibration store" in captured.err
+    assert f"kept the scratch root {kept_root} with it" in captured.err
+    # The only copy of the lifetime's windows, for `resume` to save.
+    assert store_file.read_bytes() == store
+    assert not (roots / f"{run_id}-patched").exists()
+
+
 @pytest.mark.platform_independent
 def test_the_tool_imports_neither_torch_nor_invokeai() -> None:
     # A CUDA context in the client would land on the GPU it measures. In-process checks prove nothing here: the

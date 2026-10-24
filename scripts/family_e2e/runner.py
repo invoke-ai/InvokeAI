@@ -316,14 +316,6 @@ def scratch_root(data_dir: Path, run_id: str, arm: str) -> Path:
     return data_dir / "scratch-roots" / f"{run_id}-{arm}"
 
 
-def remove_scratch_roots(data_dir: Path, info: RunInfo) -> list[str]:
-    """Deletes the scratch roots of the run's arms; returns the paths that could not be deleted."""
-    leftovers: list[str] = []
-    for arm in sorted({DEFAULT_ARM, *info.environments}):
-        leftovers.extend(remove_tree(scratch_root(data_dir, info.run_id, arm)))
-    return leftovers
-
-
 def read_heartbeat(run_dir: Path) -> dict[str, Any]:
     try:
         return json.loads((run_dir / HEARTBEAT_FILE).read_text(encoding="utf-8"))
