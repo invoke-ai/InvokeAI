@@ -3,7 +3,6 @@ import torch
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_only_full_load import (
     CachedModelOnlyFullLoad,
 )
-from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 from tests.backend.model_manager.load.model_cache.cached_model.utils import (
     DummyModule,
     TiedWeightsModule,
@@ -105,37 +104,6 @@ def test_a_tied_weight_survives_a_device_round_trip(device: str, keep_ram_copy: 
 
     assert model.head.weight.device.type == "cpu"
     assert model.head.weight.data_ptr() == model.embed.weight.data_ptr()
-
-
-def _resident_bytes(model: torch.nn.Module) -> int:
-    """The bytes the model's weights hold, each storage once however many names share it."""
-    return sum({t.data_ptr(): calc_tensor_size(t) for t in model.state_dict().values()}.values())
-
-
-@parameterize_keep_ram_copy
-def test_an_offload_returns_weights_cast_in_place_to_the_dtype_the_cache_counts(keep_ram_copy: bool):
-    """The SD VAE nodes cast the cached VAE in place, fp16 to fp32 for an upcast decode. The cache counts the model at
-    the size it was added with, so an offload has to leave it at that size: otherwise the next load puts more on the
-    device than the cache made room for, and the VAE estimate, seeing fp32 weights, reserves nothing for the cast.
-
-    The compute device is the CPU here so this runs on any machine; the offload path is the same.
-    """
-    model = TiedWeightsModule().to(torch.float16)
-    total_bytes = _resident_bytes(model)
-    cached_model = CachedModelOnlyFullLoad(
-        model=model, compute_device=torch.device("cpu"), total_bytes=total_bytes, keep_ram_copy=keep_ram_copy
-    )
-    cached_model.full_load_to_vram()
-    model.to(dtype=torch.float32)
-
-    cached_model.full_unload_from_vram()
-
-    assert {p.dtype for p in model.parameters()} == {torch.float16}
-    assert _resident_bytes(model) == cached_model.total_bytes()
-    assert model.head.weight.data_ptr() == model.embed.weight.data_ptr()
-
-    cached_model.full_load_to_vram()
-    assert _resident_bytes(model) == cached_model.cur_vram_bytes()
 
 
 @parameterize_mps_and_cuda

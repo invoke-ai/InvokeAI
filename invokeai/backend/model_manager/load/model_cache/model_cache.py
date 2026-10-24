@@ -1998,7 +1998,11 @@ class ModelCache:
     @synchronized
     @record_activity
     def unlock(self, cache_entry: CacheRecord) -> None:
-        """Unlock a model."""
+        """Unlock a model.
+
+        The last unlock returns weights a holder cast in place to the dtypes the cache counts them in (see
+        `_restore_counted_dtypes`).
+        """
         if cache_entry.key not in self._cached_models:
             self._logger.info(
                 f"Unlocking model cache entry {cache_entry.key} "
@@ -2008,6 +2012,8 @@ class ModelCache:
             )
         # cache_entry = self._cached_models[key]
         cache_entry.unlock()
+        if not cache_entry.is_locked:
+            self._restore_counted_dtypes(cache_entry)
         self._logger.debug(
             f"Unlocked model {cache_entry.key} (Type: {cache_entry.cached_model.model.__class__.__name__})"
         )
@@ -2052,6 +2058,27 @@ class ModelCache:
         # hook perform the eviction.
         if self._ram_budget is not None and self._ram_budget.available() < 0:
             self._budget_reconcile_pending.set()
+
+    def _restore_counted_dtypes(self, cache_entry: CacheRecord) -> None:
+        """Return the weights the entry's holders cast in place to the dtypes the cache counts them in.
+
+        The SD VAE nodes cast the cached VAE to the dtype they run, fp16 to fp32 for an upcast. The cache counts every
+        weight in the dtype it was cached with, and the next decode's estimate prices its upcast from the dtype the VAE
+        holds before its lock, so a VAE left in fp32 holds more than the cache charges and gets nothing reserved for the
+        next cast. Only the last unlock restores: until then another holder may be running the model in its cast dtype.
+        The passes do not restore on purpose; only an offload with a RAM copy puts the RAM copy back for the weights it
+        moves, and with it their counted dtype, even while the model is held, as it always has.
+        """
+        try:
+            cache_entry.cached_model.restore_counted_dtypes()
+        except Exception as e:
+            # As after a failed move: partly restored, the model no longer matches its counts, and dropping it contains
+            # that. Not raised: the unlock runs in the `finally` of a finished run, whose result is not saved yet.
+            self._logger.warning(
+                f"Could not return the weights of '{cache_entry.key}' to the dtypes the cache counts them in ({e}); "
+                "dropped it from the cache."
+            )
+            self._delete_cache_entry(cache_entry)
 
     def _load_locked_model(
         self,

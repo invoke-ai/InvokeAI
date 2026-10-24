@@ -68,14 +68,8 @@ def analyze_state_dict(state_dict: dict[str, torch.Tensor]) -> StateDictAliases:
     return StateDictAliases(bytes_by_key=bytes_by_key, groups=groups)
 
 
-def move_shared(
-    tensor: torch.Tensor,
-    device: torch.device,
-    moved: dict[StorageKey, torch.Tensor],
-    dtype: torch.dtype | None = None,
-) -> torch.Tensor:
-    """Move `tensor` to `device`, and to `dtype` if one is given, reusing the result for every other entry that is the
-    same memory.
+def move_shared(tensor: torch.Tensor, device: torch.device, moved: dict[StorageKey, torch.Tensor]) -> torch.Tensor:
+    """Move `tensor` to `device`, reusing the result for every other entry that is the same memory.
 
     `moved` accumulates across one conversion pass, so the tensors stay tied on the target device instead of becoming
     independent copies.
@@ -83,6 +77,6 @@ def move_shared(
     key = storage_key(tensor)
     already_moved = moved.get(key)
     if already_moved is None:
-        already_moved = tensor.to(device) if dtype is None or dtype == tensor.dtype else tensor.to(device, dtype)
+        already_moved = tensor.to(device)
         moved[key] = already_moved
     return already_moved

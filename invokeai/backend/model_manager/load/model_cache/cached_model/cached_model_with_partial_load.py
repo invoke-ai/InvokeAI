@@ -4,6 +4,7 @@ from typing import Iterator
 
 import torch
 
+from invokeai.backend.model_manager.load.model_cache.counted_dtypes import return_to_counted_dtypes
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
 from invokeai.backend.model_manager.load.model_cache.tensor_aliases import (
     StorageKey,
@@ -65,9 +66,9 @@ class CachedModelWithPartialLoad:
         self._aliases = aliases.groups
         self._state_dict_bytes = aliases.bytes_by_key
         self._total_bytes = sum(self._state_dict_bytes.values())
-        # The dtype each of those byte counts is in. A caller may cast weights in place while the model is cached (the
-        # SD VAE nodes upcast the VAE to fp32). An offload without a RAM copy casts such weights back to these dtypes,
-        # as reloading the RAM copy does, so the byte counts stay true.
+        # The dtype each of those byte counts is in. A holder may cast weights in place (the SD VAE nodes upcast the
+        # VAE to fp32); the last unlock returns them to these dtypes (see `restore_counted_dtypes`), so between locks
+        # the bytes on each device are what `cur_vram_bytes()` and `total_bytes()` report.
         self._state_dict_dtypes = {key: tensor.dtype for key, tensor in model_state_dict.items()}
         self._cur_vram_bytes: int | None = None
         self._modules_that_support_autocast = self._find_modules_that_support_autocast()
@@ -295,6 +296,14 @@ class CachedModelWithPartialLoad:
                 self._cur_vram_bytes = None
         return repaired_required_tensors
 
+    def restore_counted_dtypes(self) -> None:
+        """Return every weight a holder cast in place to the dtype `cur_vram_bytes()` and `total_bytes()` count it in.
+
+        `ModelCache.unlock` calls this when the last lock ends; see `return_to_counted_dtypes`. No weight changes device,
+        so a VRAM count already taken stays true.
+        """
+        return_to_counted_dtypes(self._model, self._state_dict_dtypes, self._aliases, self._cpu_state_dict)
+
     def _load_state_dict_with_device_conversion(
         self, state_dict: dict[str, torch.Tensor], keys_to_convert: set[str], target_device: torch.device
     ):
@@ -340,12 +349,7 @@ class CachedModelWithPartialLoad:
                 if key in keys_to_convert:
                     # It is important that we overwrite `state_dict[key]` to avoid keeping two copies of the same
                     # parameter.
-                    state_dict[key] = move_shared(
-                        state_dict[key],
-                        target_device,
-                        moved,
-                        self._state_dict_dtypes[key] if target_device.type == "cpu" else None,
-                    )
+                    state_dict[key] = move_shared(state_dict[key], target_device, moved)
                 # Note that we keep parameters that have not been moved to a new device in case the module implements
                 # weird custom state dict loading logic that requires all parameters to be present.
                 module_state_dict[key[prefix_len:]] = state_dict[key]
