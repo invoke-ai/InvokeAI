@@ -2,14 +2,16 @@
 
 One server lifetime: preflight -> scratch root and server -> environment -> models and capabilities -> input uploads
 -> graph export -> per family: empty the model cache, then per case key the warm-ups and measures -> stop the server.
-The GPU lock is held throughout and the report is written at the end. Every new server lifetime (a resumed run, or a
-restart after the server crashed in a step) skips steps that already have a final record and repeats the last
-warm-up of every case key with measures left, because the new server starts with a cold model cache.
+The GPU lock is held throughout and the report is written at the end. A runner first stops a server that an earlier
+runner of the run left running (`stop_surviving_server`). Every new server lifetime (a resumed run, or a restart
+after the server crashed in a step) skips steps that already have a final record and repeats the last warm-up of
+every case key with measures left, because the new server starts with a cold model cache.
 
 A calibration run also checks that the server can calibrate, submits each step through the working-memory calibrate
 route, and saves the lifetime's calibration store before the scratch root goes (`calibration.py`). A store that cannot
 be saved fails the run (or leaves a stop a stop) and keeps the root that holds it; the next `resume` saves a store an
-earlier runner left in a root before anything rebuilds it, and refuses to go on when that save fails.
+earlier runner left in a root before anything rebuilds it, once that runner's server is stopped (it may still write
+the store), and refuses to go on when that save fails.
 """
 
 from __future__ import annotations
@@ -85,6 +87,7 @@ from scripts.family_e2e.server import (
     git_state,
     kill_group,
     launch_server,
+    living_members,
     pending_installs,
     read_template_settings,
     remove_tree,
@@ -94,6 +97,9 @@ from scripts.family_e2e.server import (
 logger = logging.getLogger("family_e2e")
 
 HEARTBEAT_FILE = "heartbeat.json"
+# The heartbeat entries that identify the server's processes. The launcher (the process the runner started, which
+# leads the server's process group on POSIX) comes first: its tree and group take the serving process along.
+SERVER_ROLES = ("server_launcher", "server")
 EXPORT_DIR = "export"
 """The graph exporter's work directory in the run directory."""
 HEARTBEAT_INTERVAL_S = 30.0
@@ -106,6 +112,7 @@ MAX_SERVER_CRASHES = 2
 WSL_KERNEL_RELEASE = Path("/proc/sys/kernel/osrelease")
 QUEUE_DRAIN_TIMEOUT_S = 600.0
 KILL_WAIT_S = 30.0
+KILL_POLL_S = 0.02
 MIB = 2**20
 GIB = 2**30
 # Thresholds on the per-process dedicated usage of process_usage (PDH on Windows, NVML on Linux); never mixed with
@@ -280,46 +287,88 @@ def process_identity(pid: int) -> list[float] | None:
         return None
 
 
-def is_alive(identity: list[float] | None) -> bool:
+def _identified(identity: list[float] | None) -> psutil.Process | None:
+    """The process named by [pid, create time], also one that exited and is not reaped yet (a zombie)."""
     if not identity:
-        return False
+        return None
     try:
-        return abs(psutil.Process(int(identity[0])).create_time() - identity[1]) < 1.0
+        process = psutil.Process(int(identity[0]))
+        return process if abs(process.create_time() - identity[1]) < 1.0 else None
+    except psutil.Error:
+        return None
+
+
+def _running(process: psutil.Process) -> bool:
+    """Whether a process still runs: a zombie has exited and holds no memory, files or port any more."""
+    try:
+        return process.is_running() and process.status() != psutil.STATUS_ZOMBIE
     except psutil.Error:
         return False
 
 
+def is_alive(identity: list[float] | None) -> bool:
+    process = _identified(identity)
+    return process is not None and _running(process)
+
+
+def _led_group(process: psutil.Process) -> list[int]:
+    """The living members of the process group that a captured process leads (POSIX); none when it leads none.
+
+    Until it is reaped a process holds its pid, so a group of that id can only be one it created. That holds for a
+    zombie too, whose group can still have living members (macOS does not even tell a zombie's group id).
+    is_running() checks the create time, so a pid reused since the process was captured is left alone.
+    """
+    if sys.platform == "win32" or not process.is_running():
+        return []
+    return living_members(process.pid)
+
+
+def _still_running(identity: list[float] | None) -> list[int]:
+    """The pids that still run of the process named by `identity`: itself unless it is a zombie, and the living
+    members of the group it leads."""
+    process = _identified(identity)
+    if process is None:
+        return []
+    return sorted({*([process.pid] if _running(process) else []), *_led_group(process)})
+
+
 def kill_identified(identity: list[float] | None) -> bool:
-    """Kills the process named by [pid, create time] and its descendants, if that process still runs.
+    """Kills what still runs of the process named by [pid, create time] and its descendants, and waits until it has
+    exited. Returns whether anything ran.
 
     Descendants come from psutil, which drops processes older than their supposed parent; a raw parent-pid walk
     (taskkill /T) can follow a reused pid into an unrelated tree. On POSIX the groups that processes of the tree lead
     are killed too (the runner and the server launcher each lead one): a descendant whose parent died is in no tree
-    any more, but still in its group. A leader found in the tree lives, so its group id is its own.
+    any more, but still in its group. A zombie still matches its identity and still leads its group, so orphaned
+    members of a zombie leader's group are killed; the zombie itself has nothing left to kill.
     """
-    if not identity:
+    root = _identified(identity)
+    if root is None:
         return False
     try:
-        root = psutil.Process(int(identity[0]))
-        if abs(root.create_time() - identity[1]) >= 1.0:
-            return False
         tree = [root, *root.children(recursive=True)]
     except psutil.Error:
         return False
-    if sys.platform != "win32":
-        for process in tree:
-            try:
-                # is_running() checks the create time too, so a pid reused since the tree was captured is left alone.
-                if process.is_running() and os.getpgid(process.pid) == process.pid:
-                    kill_group(process.pid)
-            except OSError:
-                pass  # gone, or its group id not visible to this process
-    for process in tree:
+    groups = [process.pid for process in tree if _led_group(process)]
+    processes = [process for process in tree if _running(process)]
+    if not groups and not processes:
+        return False
+    for pgid in groups:
+        try:
+            kill_group(pgid)
+        except PermissionError:
+            pass  # a living member refused the signal; it shows as still running
+    for process in processes:
         try:
             process.kill()
         except psutil.NoSuchProcess:
             pass
-    psutil.wait_procs(tree, timeout=KILL_WAIT_S)
+    # Polled rather than psutil.wait_procs, which takes a zombie for running until its parent reaps it.
+    deadline = time.monotonic() + KILL_WAIT_S
+    while time.monotonic() < deadline and (
+        any(_running(process) for process in processes) or any(living_members(pgid) for pgid in groups)
+    ):
+        time.sleep(KILL_POLL_S)
     return True
 
 
@@ -332,6 +381,39 @@ def read_heartbeat(run_dir: Path) -> dict[str, Any]:
         return json.loads((run_dir / HEARTBEAT_FILE).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
+
+
+def stop_surviving_server(run_dir: Path) -> None:
+    """Stops a server that an earlier runner of the run left running, before anything replaces what identifies it.
+
+    On POSIX the server runs in a session of its own and survives a runner killed with SIGKILL; on Windows the
+    runner's job object ends it with the runner. The heartbeat's identities are all `stop` finds that server by, so
+    while a recorded server process cannot be stopped this refuses, before the heartbeat or a scratch root changes.
+    Call it under the GPU lock: a live runner of the run would hold it, so the recorded server is no live runner's.
+    """
+    heartbeat = read_heartbeat(run_dir)
+    survivors = {
+        int(heartbeat[role][0]): heartbeat[role] for role in SERVER_ROLES if _still_running(heartbeat.get(role))
+    }
+    refused: dict[int, str] = {}
+    for pid, identity in survivors.items():
+        running = ", ".join(str(p) for p in _still_running(identity))
+        logger.warning("an earlier runner of this run left its server running (pid %d: %s); stopping it", pid, running)
+        try:
+            kill_identified(identity)
+        except psutil.Error as e:
+            refused[pid] = f"the kill was refused: {type(e).__name__} {e}"
+    left = {pid: running for pid, identity in survivors.items() if (running := _still_running(identity))}
+    if left:
+        waited = f"{KILL_WAIT_S:g}s after the kill"
+        details = ", ".join(
+            f"pid {pid} ({refused.get(pid, waited)}; still running: {', '.join(str(p) for p in running)})"
+            for pid, running in left.items()
+        )
+        raise RunnerError(
+            f"the server an earlier runner left running cannot be stopped: {details}. heartbeat.json and the scratch "
+            f"roots stay as they are; end it, e.g. with `python -m scripts.family_e2e stop {run_dir}`, then resume"
+        )
 
 
 def _process_name(pid: int) -> str | None:
@@ -522,6 +604,7 @@ def run(run_dir: Path, gpu_factory: Callable[[str], Gpu] = open_gpu, export: Exp
     try:
         gpu = gpu_factory(manifest.gpu)
         with gpu_lock(gpu.adapter):
+            stop_surviving_server(run_dir)
             _Session(run_dir, manifest, gpu, export).run()
     except BaseException as e:
         _set_status(run_dir, "stopped" if isinstance(e, KeyboardInterrupt) else "failed")
