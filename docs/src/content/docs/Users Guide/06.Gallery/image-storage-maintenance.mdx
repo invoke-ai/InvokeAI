@@ -9,15 +9,21 @@ This operation changes where image files and thumbnails are stored on disk. It d
 
 ## Access
 
-Open **Settings → Server → Image storage**. The **Folder layout for new images** select changes `image_subfolder_strategy` immediately for images saved from then on. Below it, **Move existing images** shows how many images are stored outside the current layout, the state of the last move job, and the **Start Move** and **Recover** buttons; each asks for confirmation before it starts. While a job runs, the status refreshes every few seconds and the controls are unavailable until it finishes.
+Open **Settings → Server → Image storage**. The **Folder layout for new images** select changes `image_subfolder_strategy` immediately for images saved from then on. Below it, **Move existing images** shows how many images are stored outside the current layout, the state of the last move job, and the **Start Move** and **Recover** buttons; each asks for confirmation before it starts.
+
+- **Start Move** is available when images are stored outside the current layout and no interrupted job is waiting for recovery. The server still refuses it while any queue item is pending or in progress.
+- **Recover** is available only when a move was interrupted and still needs finishing.
+- Both buttons are unavailable while a job runs or a layout change is being saved. The status line or a note below the buttons says why a button is unavailable.
+
+While a job runs and the Image storage setting is open, the status refreshes every few seconds and the folder layout cannot be changed. Closing Settings stops the refresh; reopen it to see the current state.
 
 Administrators can start image moves, force recovery, and inspect the current move status. If multi-user mode is disabled, the single local user has the same access. Non-admin users in multi-user mode do not see the Server section and cannot run or inspect image move status.
 
 ## Maintenance Mode
 
-Image moves run as a maintenance operation. Before a move starts, InvokeAI checks that no queue work is active. While the move is running, InvokeAI prevents image reads, uploads, deletes, generation jobs, and gallery mutations from racing with the filesystem move.
+Image moves run as a maintenance operation. Before a move starts, InvokeAI checks that no queue work is active. While the move is running, or an interrupted move is waiting for recovery, InvokeAI prevents image reads, uploads, deletes, generation jobs, and gallery mutations from racing with the filesystem move.
 
-The UI shows the move or recovery state until the job is complete or requires manual attention. Gallery images and thumbnails may be unavailable while maintenance is active.
+The UI shows the move or recovery state until the job is complete or requires manual attention. Gallery images and thumbnails may be unavailable while maintenance is active; an open gallery keeps checking periodically while its tab is visible and reloads them on its own shortly after maintenance ends, so you do not need to refresh the page.
 
 ## Crash Recovery
 
@@ -25,7 +31,7 @@ The move process is crash-recoverable. InvokeAI records each move job in its dat
 
 If InvokeAI stops during a move, recovery resumes incomplete jobs. If recovery finds an ambiguous filesystem state, such as both the old and new full-size image files existing or neither file existing, it halts that item for manual repair instead of blindly updating the database. Other items in the same job are still finalized, and the maintenance lock is released when the job is recorded as failed.
 
-Recovery finalizes jobs that were already recorded before the stop. Images that had not yet been planned into a move job are not moved by recovery itself. The Image storage setting reports how many images still need moving; run **Start Move** again to continue. While a job is interrupted, **Start Move** stays unavailable and the status names the job that **Recover** will finish.
+Recovery finalizes jobs that were already recorded before the stop. Images that had not yet been planned into a move job are not moved by recovery itself. The Image storage setting reports how many images still need moving; run **Start Move** again to continue. While a job is interrupted, **Start Move** stays unavailable and the status asks you to run **Recover** first.
 
 Missing intermediate image files are treated as already cleaned up and do not halt the move. Missing non-intermediate image files, unreadable images, and truncated images are recorded as failed items. When the full-size file is still at its original path, recovery leaves it there so it can be repaired or removed safely. If a previous filesystem move already placed the full-size file at its destination, recovery keeps that destination and reconciles the database before recording the item as failed. After recovery releases the lock, back up the failed file and either replace it with a valid image or delete its image record from the gallery, then run **Start Move** again if images still need moving. Do not delete an active journal row or edit `images.image_subfolder` while maintenance is active.
 

@@ -82,13 +82,14 @@ const ARCHITECTURE_CAPABILITIES = JSON.parse(
  * caller sees through general access, a membership, or admin rights. `user` also makes the admin-only image storage
  * routes answer 403. `imageMoves` seeds the image move journal: `idle` (the
  * default), `needs-recovery` (an interrupted job that only Recover can finish), `failed` (a job that ended in error,
- * which counts as finished), `queue-active` (Start Move is refused with 409 while recovery still works) or `instant`
- * (a move so small it commits before the POST answers, so `is_running` is already false). While a move or recovery
- * runs, image files and media mutations answer 409 like the real maintenance guard; listings stay readable.
+ * which counts as finished) or `instant` (a move so small it commits before the POST answers, so `is_running` is
+ * already false). Like the real service, Start Move is refused while any queue item is pending or in progress (the
+ * representative profile seeds some; clear the queue first). While a move runs or a job awaits recovery, image files,
+ * media mutations and enqueueing answer 409 like the real maintenance guard; listings stay readable.
  */
 const CAPABILITY_FAULTS = new Set(['ok', 'error', 'empty']);
 const INTERMEDIATES_CALLERS = new Set(['admin', 'user', 'multiuser-admin']);
-const IMAGE_MOVE_FAULTS = new Set(['idle', 'needs-recovery', 'failed', 'queue-active', 'instant']);
+const IMAGE_MOVE_FAULTS = new Set(['idle', 'needs-recovery', 'failed', 'instant']);
 const IMAGE_MOVE_MAINTENANCE_DETAIL = 'Image storage maintenance is active';
 /** The job states the real service counts as finished; any other journaled job still needs recovery. */
 const FINISHED_IMAGE_MOVE_JOB_STATES = new Set(['committed', 'error']);
@@ -180,6 +181,14 @@ const tickImageMove = (state) => {
     commitImageMove(state);
   }
 };
+
+/** Mirrors `is_maintenance_active`: a running operation, or a journaled job that has not finished. */
+const isImageMoveMaintenanceActive = (state) =>
+  state.imageStorage.running !== null || imageMoveStatus(state).active_job_id !== null;
+
+/** Mirrors `has_active_queue_work`, which gates Start Move: any queue item pending or in progress. */
+const hasActiveQueueWork = (state) =>
+  [...state.queueItems.values()].some((item) => item.status === 'pending' || item.status === 'in_progress');
 
 /**
  * The real maintenance guard covers image uploads, deletions, edits, star changes, copies, downloads, image files
@@ -1440,8 +1449,8 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           if (imageMoveStatus(state).active_job_id !== null) {
             return json(409, { detail: 'An image move job is already active' });
           }
-          if (faults.imageMoves === 'queue-active') {
-            return json(409, { detail: 'Cannot move images while the queue has active work' });
+          if (hasActiveQueueWork(state)) {
+            return json(409, { detail: 'Cannot start image move while queue work is active' });
           }
 
           startImageMoveOperation(state, 'move_all', { instant: faults.imageMoves === 'instant' });
@@ -1457,7 +1466,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         }
       }
 
-      if (state.imageStorage.running !== null && isImageMoveMaintenanceRoute(method, path, url)) {
+      if (isImageMoveMaintenanceActive(state) && isImageMoveMaintenanceRoute(method, path, url)) {
         return json(409, { detail: IMAGE_MOVE_MAINTENANCE_DETAIL });
       }
 
@@ -1921,6 +1930,10 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         const action = queueMatch[1];
 
         if (action === 'enqueue_batch' && method === 'POST') {
+          if (isImageMoveMaintenanceActive(state)) {
+            return json(409, { detail: IMAGE_MOVE_MAINTENANCE_DETAIL });
+          }
+
           const { batch = {} } = await readJsonBody(request);
           const runs = Number.isInteger(batch.runs) && batch.runs > 0 ? batch.runs : 1;
           const now = timestamp(state);

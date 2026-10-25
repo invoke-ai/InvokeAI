@@ -248,6 +248,16 @@ const getJson = async (backend, path, init) => {
   return body;
 };
 
+/** The representative queue holds pending and in-progress items, which refuse Start Move as on the real server. */
+const clearQueue = (backend) => getJson(backend, '/api/v1/queue/default/clear', { method: 'PUT' });
+
+const enqueueBatch = (backend) =>
+  fetch(`${backend.origin}/api/v1/queue/default/enqueue_batch`, {
+    body: JSON.stringify({ batch: { graph: { edges: [], id: 'pbr', nodes: {} }, runs: 1 }, prepend: false }),
+    headers: { 'content-type': 'application/json' },
+    method: 'POST',
+  });
+
 test('queue item ids take the backend limit: the head of the order, counted as returned, bounded', async () => {
   await withRepresentativeBackend(async (backend) => {
     for (const orderDir of ['DESC', 'ASC']) {
@@ -1251,6 +1261,7 @@ test('image storage: a move runs across status polls, commits, and refuses to ov
       headers: { 'content-type': 'application/json' },
       method: 'PATCH',
     });
+    await clearQueue(backend);
 
     const accepted = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
 
@@ -1293,6 +1304,7 @@ test('image storage: a move runs across status polls, commits, and refuses to ov
     );
     assert.equal((await fetch(`${backend.origin}/api/v1/board_images/`)).status, 409);
     assert.equal((await fetch(`${backend.origin}/api/v1/boards/?all=true`)).status, 200);
+    assert.equal((await enqueueBatch(backend)).status, 409);
 
     assert.deepEqual(await getJson(backend, '/api/v1/image_moves/status'), {
       active_job_id: null,
@@ -1314,6 +1326,7 @@ test('image storage: an instant move commits inside the POST, and a failed job c
       method: 'PATCH',
     });
     await getJson(backend, '/__faults?imageMoves=instant', { method: 'POST' });
+    await clearQueue(backend);
 
     const accepted = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
 
@@ -1341,7 +1354,32 @@ test('image storage: an instant move commits inside the POST, and a failed job c
   });
 });
 
-test('image storage: faults seed an interrupted job for recovery, a busy queue, and a non-admin caller', async () => {
+test('image storage: Start Move waits for an idle queue, and recovery does not', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ image_subfolder_strategy: 'date' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+    await clearQueue(backend);
+    assert.equal((await enqueueBatch(backend)).status, 201);
+
+    // A queued item that has not run yet is active work, as `has_active_queue_work` counts it.
+    const refused = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
+
+    assert.equal(refused.status, 409);
+    assert.deepEqual(await refused.json(), { detail: 'Cannot start image move while queue work is active' });
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/recover`, { method: 'POST' })).status, 202);
+    await getJson(backend, '/api/v1/image_moves/status');
+    assert.equal((await getJson(backend, '/api/v1/image_moves/status')).is_running, false);
+
+    await clearQueue(backend);
+
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' })).status, 202);
+  });
+});
+
+test('image storage: faults seed an interrupted job for recovery and a non-admin caller', async () => {
   await withRepresentativeBackend(async (backend) => {
     await getJson(backend, '/__faults?imageMoves=needs-recovery', { method: 'POST' });
 
@@ -1351,6 +1389,12 @@ test('image storage: faults seed an interrupted job for recovery, a busy queue, 
     assert.equal(interrupted.is_running, false);
     assert.equal(interrupted.last_error, 'Server stopped during an image move');
     assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' })).status, 409);
+
+    // A job awaiting recovery keeps maintenance active, so the guard still refuses image files and enqueueing.
+    const imageName = (await getJson(backend, '/api/v1/images/?limit=1&offset=0')).items[0].image_name;
+
+    assert.equal((await fetch(`${backend.origin}/api/v1/images/i/${imageName}/thumbnail`)).status, 409);
+    assert.equal((await enqueueBatch(backend)).status, 409);
 
     const recovering = await fetch(`${backend.origin}/api/v1/image_moves/recover`, { method: 'POST' });
 
@@ -1364,13 +1408,8 @@ test('image storage: faults seed an interrupted job for recovery, a busy queue, 
     assert.equal(recovered.is_running, false);
     assert.equal(recovered.last_error, null);
     assert.equal(recovered.latest_job.state, 'committed');
-
-    await getJson(backend, '/__faults?imageMoves=queue-active', { method: 'POST' });
-
-    const refused = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
-
-    assert.equal(refused.status, 409);
-    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/recover`, { method: 'POST' })).status, 202);
+    assert.equal((await fetch(`${backend.origin}/api/v1/images/i/${imageName}/thumbnail`)).status, 200);
+    assert.equal((await enqueueBatch(backend)).status, 201);
 
     await getJson(backend, '/__faults?intermediatesCaller=user', { method: 'POST' });
 

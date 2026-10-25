@@ -160,10 +160,12 @@ const postImageMove = async (
       signal: owner.signal,
     }).then(toImageMoveStatus);
   } catch (error) {
-    // A refusal usually means the cached status is stale (another admin's job, finished queue work): re-read it so
-    // the editor locks or frees its controls from what the server says now.
+    // A refusal usually means the cached status is stale (another admin's job, finished queue work): re-read it
+    // before the caller unlocks, so the editor's controls follow what the server says now rather than the stale
+    // status. A failed re-read leaves the status query in error (which keeps the controls locked) and never
+    // replaces the refusal: invalidation does not reject on refetch errors.
     if (isAccountScopeCurrent(owner)) {
-      void client.invalidateQueries({ queryKey });
+      await client.invalidateQueries({ queryKey });
     }
     throw error;
   }

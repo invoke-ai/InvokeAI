@@ -1,5 +1,5 @@
 import { accountLifecycle } from '@platform/state/accountLifecycle';
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -179,17 +179,52 @@ describe('image move status', () => {
     expect(mocks.refreshGalleryThumbnails).toHaveBeenCalledExactlyOnceWith(owner);
   });
 
-  it('re-reads the status when the server refuses to start, since the cached status is what misled the caller', async () => {
+  it('re-reads the status after a refusal and rejects only once the fresh status is cached', async () => {
     const client = new QueryClient();
     const owner = accountLifecycle.capture();
-    client.setQueryData(imageStorageKeys.moveStatus(owner), { isRunning: false });
+    const statusRead = createDeferred<unknown>();
     const refusal = new Error('{"detail":"An image move job is already running"}');
-    mocks.apiFetchJson.mockRejectedValueOnce(refusal);
+    mocks.apiFetchJson.mockResolvedValueOnce(committedStatus);
+    // A mounted editor observes the status, so the invalidation refetches it.
+    const observer = new QueryObserver(client, imageMoveStatusQueryOptions(owner));
+    const unsubscribe = observer.subscribe(() => undefined);
+    await vi.waitFor(() => expect(client.getQueryData(imageStorageKeys.moveStatus(owner))).toBeDefined());
+    mocks.apiFetchJson.mockRejectedValueOnce(refusal).mockReturnValueOnce(statusRead.promise);
+
+    let settled = false;
+    const started = startImageMove(client, owner).finally(() => {
+      settled = true;
+    });
+    const outcome = started.catch((error: unknown) => error);
+
+    await vi.waitFor(() => expect(mocks.apiFetchJson).toHaveBeenCalledTimes(3));
+    await Promise.resolve();
+    // Until the re-read lands the caller keeps its controls locked against the stale idle status.
+    expect(settled).toBe(false);
+
+    statusRead.resolve(runningStatus);
+
+    await expect(outcome).resolves.toBe(refusal);
+    expect(client.getQueryData(imageStorageKeys.moveStatus(owner))).toMatchObject({ activeJobId: 3, isRunning: true });
+    expect(mocks.invalidateGallery).not.toHaveBeenCalled();
+    unsubscribe();
+  });
+
+  it('keeps the refusal when the status re-read fails too', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const owner = accountLifecycle.capture();
+    const refusal = new Error('{"detail":"Cannot start image move while queue work is active"}');
+    mocks.apiFetchJson.mockResolvedValueOnce(committedStatus);
+    const observer = new QueryObserver(client, imageMoveStatusQueryOptions(owner));
+    const unsubscribe = observer.subscribe(() => undefined);
+    await vi.waitFor(() => expect(client.getQueryData(imageStorageKeys.moveStatus(owner))).toBeDefined());
+    mocks.apiFetchJson.mockRejectedValueOnce(refusal).mockRejectedValueOnce(new Error('status unavailable'));
 
     await expect(startImageMove(client, owner)).rejects.toBe(refusal);
 
-    expect(client.getQueryState(imageStorageKeys.moveStatus(owner))?.isInvalidated).toBe(true);
-    expect(mocks.invalidateGallery).not.toHaveBeenCalled();
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(3);
+    expect(client.getQueryState(imageStorageKeys.moveStatus(owner))?.status).toBe('error');
+    unsubscribe();
   });
 
   it('drops a response that lands after the account changed', async () => {

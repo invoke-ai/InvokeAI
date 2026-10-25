@@ -110,6 +110,7 @@ const confirmIn = (label: string) =>
   [...(dialog()?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find((candidate) =>
     candidate.textContent?.includes(label)
   );
+const maintenanceGroup = () => host.querySelector<HTMLElement>('[role="group"][aria-labelledby]');
 const trigger = () => host.querySelector<HTMLButtonElement>('[data-scope="select"][data-part="trigger"]');
 const refetchStatus = () => act(() => queryClient.refetchQueries({ queryKey: ['gallery', 'image-storage'] }));
 const createDeferred = <T,>() => {
@@ -156,7 +157,7 @@ describe('image storage settings', () => {
 
     await expect.poll(() => trigger()?.textContent).toContain('settings.imageStorage.layouts.flat');
     await expect.poll(() => text()).toContain('settings.imageStorage.statusIdle 0');
-    expect(text()).toContain('settings.imageStorage.latestJob 2 settings.imageStorage.jobStates.committed');
+    expect(text()).toContain('settings.imageStorage.latestJob settings.imageStorage.jobStates.committed');
 
     await act(() => userEvent.click(trigger()!));
     await expect.poll(() => document.querySelectorAll('[role="option"]').length).toBe(4);
@@ -239,7 +240,9 @@ describe('image storage settings', () => {
 
     await expect.poll(() => text()).toContain('settings.imageStorage.statusIdle 0');
     expect(mocks.invalidateGallery).toHaveBeenCalledTimes(1);
-    expect(button('settings.imageStorage.startMove')?.disabled).toBe(false);
+    // Every image is in the layout now, so there is nothing left to start.
+    expect(button('settings.imageStorage.startMove')?.disabled).toBe(true);
+    expect(text()).toContain('settings.imageStorage.nothingToDo');
     expect(trigger()?.disabled).toBe(false);
   });
 
@@ -255,7 +258,7 @@ describe('image storage settings', () => {
     });
     await render();
 
-    await expect.poll(() => text()).toContain('settings.imageStorage.statusNeedsRecovery 3');
+    await expect.poll(() => text()).toContain('settings.imageStorage.statusNeedsRecovery');
     expect(text()).toContain('Server stopped during an image move');
     expect(button('settings.imageStorage.startMove')?.disabled).toBe(true);
     expect(button('settings.imageStorage.recover')?.disabled).toBe(false);
@@ -283,20 +286,26 @@ describe('image storage settings', () => {
 
     await expect.poll(() => host.querySelector('[role="alert"]')?.textContent).toBe('Queue work is active');
     expect(button('settings.imageStorage.startMove')?.disabled).toBe(false);
+    // The refusal describes the button it came from; the disabled Recover keeps only its own note.
+    const recoverNote = [...host.querySelectorAll('p')].find((node) =>
+      node.textContent?.includes('settings.imageStorage.recoverNotNeeded')
+    );
     expect(button('settings.imageStorage.startMove')?.getAttribute('aria-describedby')).toBe(
       host.querySelector('[role="alert"]')?.id
     );
+    expect(button('settings.imageStorage.recover')?.getAttribute('aria-describedby')).toBe(recoverNote?.id);
     expect(mocks.invalidateGallery).not.toHaveBeenCalled();
   });
 
   it('re-reads the status after a refused start and locks the controls on the move it reveals', async () => {
+    const reread = createDeferred<unknown>();
     let status: unknown = idleStatus(12);
     installRoutes({
       [`GET ${CONFIG_ROUTE}`]: () => ({ config: { image_subfolder_strategy: 'date' } }),
       [`GET ${STATUS_ROUTE}`]: () => status,
       [`POST /api/v1/image_moves/start`]: () => {
         // Another admin started a move after this editor last read the status.
-        status = runningStatus('move_all');
+        status = reread.promise;
         return new ApiError(JSON.stringify({ detail: 'An image move job is already running' }), 409);
       },
     });
@@ -307,6 +316,17 @@ describe('image storage settings', () => {
     await act(() => userEvent.click(button('settings.imageStorage.startMove')!));
     await expect.poll(() => dialog()).not.toBeNull();
     await act(() => userEvent.click(confirmIn('settings.imageStorage.startMove')!));
+    await expect.poll(() => calls('GET', STATUS_ROUTE).length).toBe(2);
+
+    // The cache still says idle, but nothing unlocks until the re-read lands.
+    expect(dialog()).not.toBeNull();
+    expect(button('settings.imageStorage.startMove')?.disabled).toBe(true);
+    expect(trigger()?.disabled).toBe(true);
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+
+    await act(() => {
+      reread.resolve(runningStatus('move_all'));
+    });
 
     await expect
       .poll(() => host.querySelector('[role="alert"]')?.textContent)
@@ -316,9 +336,9 @@ describe('image storage settings', () => {
     expect(button('settings.imageStorage.startMove')?.disabled).toBe(true);
     expect(button('settings.imageStorage.recover')?.disabled).toBe(true);
     expect(trigger()?.disabled).toBe(true);
-    // Its opener is disabled now; the closed dialog hands focus to the section reporting the refusal.
+    // Its opener is disabled now; the closed dialog hands focus to the named section reporting the refusal.
     await expect.poll(() => dialog()).toBeNull();
-    await expect.poll(() => host.contains(document.activeElement)).toBe(true);
+    await expect.poll(() => document.activeElement).toBe(maintenanceGroup());
   });
 
   it('shows the start in flight and locks the layout until the server has answered', async () => {
@@ -353,7 +373,7 @@ describe('image storage settings', () => {
     await expect.poll(() => dialog()).toBeNull();
     await expect.poll(() => text()).toContain('settings.imageStorage.statusMoving');
     expect(trigger()?.disabled).toBe(true);
-    await expect.poll(() => host.contains(document.activeElement)).toBe(true);
+    await expect.poll(() => document.activeElement).toBe(maintenanceGroup());
   });
 
   it('keeps the layout locked until the move status has loaded', async () => {
@@ -369,11 +389,13 @@ describe('image storage settings', () => {
     expect(trigger()?.disabled).toBe(true);
     expect(button('settings.imageStorage.startMove')?.disabled).toBe(true);
 
+    expect(text()).toContain('settings.imageStorage.unavailableStatus');
+
     await act(() => {
-      statusRead.resolve(idleStatus(0));
+      statusRead.resolve(idleStatus(12));
     });
 
-    await expect.poll(() => text()).toContain('settings.imageStorage.statusIdle 0');
+    await expect.poll(() => text()).toContain('settings.imageStorage.statusIdle 12');
     expect(trigger()?.disabled).toBe(false);
     expect(button('settings.imageStorage.startMove')?.disabled).toBe(false);
   });
@@ -383,7 +405,7 @@ describe('image storage settings', () => {
     installRoutes({
       [`GET ${CONFIG_ROUTE}`]: () => ({ config: { image_subfolder_strategy: 'flat' } }),
       [`GET ${STATUS_ROUTE}`]: () =>
-        fail ? new ApiError('{"detail":"Image move service unavailable"}', 503) : idleStatus(0),
+        fail ? new ApiError('{"detail":"Image move service unavailable"}', 503) : idleStatus(12),
     });
     await render();
 
@@ -393,7 +415,107 @@ describe('image storage settings', () => {
     fail = false;
     await act(() => userEvent.click(button('common.retry')!));
 
-    await expect.poll(() => text()).toContain('settings.imageStorage.statusIdle 0');
+    await expect.poll(() => text()).toContain('settings.imageStorage.statusIdle 12');
     expect(button('settings.imageStorage.startMove')?.disabled).toBe(false);
+  });
+  it('enables each job button only when the status gives it something to do, and says why otherwise', async () => {
+    let status: unknown = idleStatus(0);
+    installRoutes({
+      [`GET ${CONFIG_ROUTE}`]: () => ({ config: { image_subfolder_strategy: 'date' } }),
+      [`GET ${STATUS_ROUTE}`]: () => status,
+    });
+    await render();
+
+    await expect.poll(() => text()).toContain('settings.imageStorage.statusIdle 0');
+    expect(button('settings.imageStorage.startMove')?.disabled).toBe(true);
+    expect(button('settings.imageStorage.recover')?.disabled).toBe(true);
+    expect(text()).toContain('settings.imageStorage.nothingToDo');
+
+    status = idleStatus(12);
+    await refetchStatus();
+    await expect.poll(() => text()).toContain('settings.imageStorage.statusIdle 12');
+    expect(button('settings.imageStorage.startMove')?.disabled).toBe(false);
+    expect(button('settings.imageStorage.recover')?.disabled).toBe(true);
+    expect(text()).toContain('settings.imageStorage.recoverNotNeeded');
+    const reason = [...host.querySelectorAll('p')].find((node) =>
+      node.textContent?.includes('settings.imageStorage.recoverNotNeeded')
+    );
+    expect(button('settings.imageStorage.recover')?.getAttribute('aria-describedby')).toBe(reason?.id);
+    // The note explains the disabled Recover only; the enabled Start Move is not described by it.
+    expect(button('settings.imageStorage.startMove')?.hasAttribute('aria-describedby')).toBe(false);
+
+    status = interruptedStatus;
+    await refetchStatus();
+    await expect.poll(() => text()).toContain('settings.imageStorage.statusNeedsRecovery');
+    expect(button('settings.imageStorage.startMove')?.disabled).toBe(true);
+    expect(button('settings.imageStorage.recover')?.disabled).toBe(false);
+
+    status = runningStatus('recovery');
+    await refetchStatus();
+    await expect.poll(() => text()).toContain('settings.imageStorage.statusRecovering');
+    expect(button('settings.imageStorage.startMove')?.disabled).toBe(true);
+    expect(button('settings.imageStorage.recover')?.disabled).toBe(true);
+    expect(text()).toContain('settings.imageStorage.unavailableRunning');
+  });
+
+  it('locks the job buttons while a layout change is being saved', async () => {
+    const saved = createDeferred<unknown>();
+    let layout = 'date';
+    installRoutes({
+      [`GET ${CONFIG_ROUTE}`]: () => ({ config: { image_subfolder_strategy: layout } }),
+      [`PATCH ${CONFIG_ROUTE}`]: () => saved.promise,
+      [`GET ${STATUS_ROUTE}`]: () => idleStatus(12),
+    });
+    await render();
+    await expect.poll(() => button('settings.imageStorage.startMove')?.disabled).toBe(false);
+
+    await act(() => userEvent.click(trigger()!));
+    await expect.poll(() => document.querySelectorAll('[role="option"]').length).toBe(4);
+    const hashOption = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((option) =>
+      option.textContent?.includes('settings.imageStorage.layouts.hash')
+    );
+    await act(() => userEvent.click(hashOption!));
+    await expect.poll(() => calls('PATCH', CONFIG_ROUTE).length).toBe(1);
+
+    // A move started now would read whichever layout the save leaves behind.
+    expect(button('settings.imageStorage.startMove')?.disabled).toBe(true);
+    expect(button('settings.imageStorage.recover')?.disabled).toBe(true);
+    expect(text()).toContain('settings.imageStorage.unavailableSavingLayout');
+
+    layout = 'hash';
+    await act(() => {
+      saved.resolve({ config: { image_subfolder_strategy: 'hash' } });
+    });
+
+    await expect.poll(() => button('settings.imageStorage.startMove')?.disabled).toBe(false);
+    expect(trigger()?.textContent).toContain('settings.imageStorage.layouts.hash');
+  });
+
+  it('returns focus to the opener when the confirmation is cancelled or dismissed', async () => {
+    installRoutes({
+      [`GET ${CONFIG_ROUTE}`]: () => ({ config: { image_subfolder_strategy: 'date' } }),
+      [`GET ${STATUS_ROUTE}`]: () => interruptedStatus,
+    });
+    await render();
+    await expect.poll(() => button('settings.imageStorage.recover')?.disabled).toBe(false);
+
+    await act(() => userEvent.click(button('settings.imageStorage.recover')!));
+    await expect.poll(() => dialog()).not.toBeNull();
+    await act(() => userEvent.click(confirmIn('Cancel')!));
+    await expect.poll(() => dialog()).toBeNull();
+    await expect.poll(() => document.activeElement).toBe(button('settings.imageStorage.recover'));
+
+    await act(() => userEvent.click(button('settings.imageStorage.recover')!));
+    await expect.poll(() => dialog()).not.toBeNull();
+    await act(() => userEvent.keyboard('{Escape}'));
+    await expect.poll(() => dialog()).toBeNull();
+    await expect.poll(() => document.activeElement).toBe(button('settings.imageStorage.recover'));
+    expect(calls('POST', '/api/v1/image_moves/recover')).toHaveLength(0);
+
+    // The section that receives focus after a confirmed action is named by its heading.
+    const group = maintenanceGroup();
+    expect(document.getElementById(group?.getAttribute('aria-labelledby') ?? '')?.textContent).toBe(
+      'settings.imageStorage.maintenanceHeading'
+    );
   });
 });

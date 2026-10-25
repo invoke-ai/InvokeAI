@@ -2088,8 +2088,8 @@
       "statusIdle_other": "{{count}} images are stored outside the current layout.",
       "statusMoving": "Moving images into the current layout…",
       "statusRecovering": "Recovering an interrupted image move…",
-      "statusNeedsRecovery": "Image move job {{jobId}} was interrupted. Run Recover to finish it before starting another move.",
-      "latestJob": "Last job {{jobId}}: {{state}}",
+      "statusNeedsRecovery": "An image move was interrupted. Run Recover to finish it before starting another move.",
+      "latestJob": "Last move: {{state}}",
       "jobStates": {
         "planned": "planned",
         "moving": "moving",
@@ -2104,7 +2104,12 @@
       "recover": "Recover",
       "recoverConfirmTitle": "Recover the image move journal?",
       "recoverConfirmBody": "Recovery finishes moves that were recorded before the server stopped. Items in an ambiguous state are left for manual repair and reported here.",
-      "recoverFailed": "Image move recovery could not be started."
+      "recoverFailed": "Image move recovery could not be started.",
+      "unavailableStatus": "Start Move and Recover become available once the move status has loaded.",
+      "unavailableRunning": "Start Move and Recover become available again when the current job finishes.",
+      "unavailableSavingLayout": "Start Move and Recover become available once the new layout is saved.",
+      "recoverNotNeeded": "Recover is only needed after a move is interrupted.",
+      "nothingToDo": "Nothing to move, and no interrupted move to recover."
     },
     "galleryMaintenance": {
       "heading": "Gallery maintenance",

@@ -18,7 +18,7 @@ import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { Field } from '@platform/ui/Field';
 import { Select } from '@platform/ui/Select';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useId, useMemo, useRef, useState } from 'react';
+import { type MouseEvent, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const tKey = (key: string): string => `settings.imageStorage.${key}`;
@@ -26,6 +26,52 @@ const CONTROL_WIDTH = { base: 'full', md: '72' } as const;
 const SELECT_POSITIONING = { strategy: 'fixed', sameWidth: true, hideWhenDetached: true } as const;
 
 type ImageMoveAction = 'start' | 'recover';
+
+interface JobAvailability {
+  canRecover: boolean;
+  canStart: boolean;
+  /** Visible reason for the disabled buttons, unless the status line already explains it. */
+  reasonKey: string | null;
+}
+
+/**
+ * Each button is enabled only when the server would do something with it: Recover only for an interrupted job (any
+ * other recovery is a no-op behind the server-wide maintenance lock), Start Move only when images need moving.
+ */
+const getJobAvailability = ({
+  isActing,
+  isSavingLayout,
+  status,
+}: {
+  isActing: boolean;
+  isSavingLayout: boolean;
+  /** Null until a usable status has loaded. */
+  status: ImageMoveStatus | null;
+}): JobAvailability => {
+  if (status === null) {
+    return { canRecover: false, canStart: false, reasonKey: 'unavailableStatus' };
+  }
+  if (isActing) {
+    // The confirmation dialog shows the request in flight.
+    return { canRecover: false, canStart: false, reasonKey: null };
+  }
+  if (status.isRunning) {
+    return { canRecover: false, canStart: false, reasonKey: 'unavailableRunning' };
+  }
+  if (isSavingLayout) {
+    // The new layout changes what needs moving.
+    return { canRecover: false, canStart: false, reasonKey: 'unavailableSavingLayout' };
+  }
+  if (status.activeJobId !== null) {
+    // The status line tells the admin to run Recover before another move.
+    return { canRecover: true, canStart: false, reasonKey: null };
+  }
+  if (status.needsMoveCount > 0) {
+    return { canRecover: false, canStart: true, reasonKey: 'recoverNotNeeded' };
+  }
+
+  return { canRecover: false, canStart: false, reasonKey: 'nothingToDo' };
+};
 
 /** Server image storage: the folder layout for new images and the move/recovery job for existing ones. */
 export const ImageStorageSettings = () => {
@@ -51,14 +97,23 @@ const ImageStorageEditor = () => {
   // Polling lives with this editor: the gallery refresh at the end of a move needs it open until the job stops.
   const statusQuery = useQuery(imageMoveStatusQueryOptions());
   const actionErrorId = useId();
-  // After an accepted start, or a refusal that reveals another admin's move, every control is disabled; the
-  // closing confirmation returns focus to the section that now reports the outcome instead of the document body.
+  const availabilityId = useId();
+  const maintenanceHeadingId = useId();
   const maintenanceRef = useRef<HTMLDivElement>(null);
-  const getMaintenanceEl = useCallback(() => maintenanceRef.current, []);
+  // The button that opened the confirmation, and whether it was confirmed rather than dismissed.
+  const openerRef = useRef<HTMLButtonElement | null>(null);
+  const isConfirmedRef = useRef(false);
+  // Cancel returns focus to the opener. A confirmed action reports its outcome in the maintenance group, and an
+  // accepted job disables the opener, so focus lands on that group rather than the document body.
+  const getFinalFocus = useCallback(() => {
+    const opener = isConfirmedRef.current ? null : openerRef.current;
+
+    return opener && !opener.disabled ? opener : maintenanceRef.current;
+  }, []);
   const { isBusy: isSavingLayout, run: runLayoutSave } = useScopedAction();
   const { isBusy: isActing, run: runAction } = useScopedAction();
   const [layoutError, setLayoutError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<{ action: ImageMoveAction; message: string } | null>(null);
   const [pendingAction, setPendingAction] = useState<ImageMoveAction | null>(null);
 
   const layout = layoutQuery.data ?? 'flat';
@@ -91,8 +146,19 @@ const ImageStorageEditor = () => {
     [layout, queryClient, runLayoutSave, t]
   );
 
-  const requestStart = useCallback(() => setPendingAction('start'), []);
-  const requestRecover = useCallback(() => setPendingAction('recover'), []);
+  const requestAction = useCallback((action: ImageMoveAction, opener: HTMLButtonElement) => {
+    openerRef.current = opener;
+    isConfirmedRef.current = false;
+    setPendingAction(action);
+  }, []);
+  const requestStart = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => requestAction('start', event.currentTarget),
+    [requestAction]
+  );
+  const requestRecover = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => requestAction('recover', event.currentTarget),
+    [requestAction]
+  );
   const closeConfirmation = useCallback(() => setPendingAction(null), []);
   // Returns the request so the dialog shows it in flight; the dialog closes when it settles, either way.
   const confirmAction = useCallback(async () => {
@@ -102,26 +168,37 @@ const ImageStorageEditor = () => {
       return;
     }
 
+    isConfirmedRef.current = true;
     setActionError(null);
     await runAction(
       async (owner) => {
         await (action === 'start' ? startImageMove(queryClient, owner) : startImageMoveRecovery(queryClient, owner));
       },
       (_message, error) =>
-        setActionError(getApiErrorMessage(error, t(tKey(action === 'start' ? 'startFailed' : 'recoverFailed'))))
+        setActionError({
+          action,
+          message: getApiErrorMessage(error, t(tKey(action === 'start' ? 'startFailed' : 'recoverFailed'))),
+        })
     );
   }, [pendingAction, queryClient, runAction, t]);
   const retryStatus = useCallback(() => void statusQuery.refetch(), [statusQuery]);
   const retryLayout = useCallback(() => void layoutQuery.refetch(), [layoutQuery]);
 
   const status = statusQuery.data ?? null;
-  const isRunning = status?.isRunning ?? false;
-  const hasActiveJob = status !== null && status.activeJobId !== null;
-  const isStatusUsable = status !== null && !statusQuery.isError;
-  const isBusy = isRunning || isActing || !isStatusUsable;
+  const usableStatus = statusQuery.isError ? null : status;
+  const availability = getJobAvailability({ isActing, isSavingLayout, status: usableStatus });
   // The move reads the layout per batch, so changing it while a job runs (or may be running: status unknown, or a
   // start still being accepted) would leave the images split between two layouts.
-  const isLayoutLocked = layoutQuery.isPending || isSavingLayout || isBusy;
+  const isLayoutLocked =
+    layoutQuery.isPending || isSavingLayout || isActing || usableStatus === null || usableStatus.isRunning;
+  // Each button references only what explains it: its own action's failure, and the note while it is disabled.
+  const describedBy = (action: ImageMoveAction, isEnabled: boolean) =>
+    [
+      actionError?.action === action ? actionErrorId : null,
+      availability.reasonKey && !isEnabled ? availabilityId : null,
+    ]
+      .filter(Boolean)
+      .join(' ') || undefined;
 
   return (
     <Stack gap="4">
@@ -153,8 +230,8 @@ const ImageStorageEditor = () => {
           />
         )}
       </Field>
-      <Stack ref={maintenanceRef} gap="2" tabIndex={-1}>
-        <Text color="fg" fontSize="lg" fontWeight="500">
+      <Stack ref={maintenanceRef} aria-labelledby={maintenanceHeadingId} gap="2" role="group" tabIndex={-1}>
+        <Text color="fg" fontSize="lg" fontWeight="500" id={maintenanceHeadingId}>
           {t(tKey('maintenanceHeading'))}
         </Text>
         <Text color="fg.muted" fontSize="md">
@@ -168,8 +245,8 @@ const ImageStorageEditor = () => {
         />
         <HStack gap="2" wrap="wrap">
           <Button
-            aria-describedby={actionError ? actionErrorId : undefined}
-            disabled={isBusy || hasActiveJob}
+            aria-describedby={describedBy('start', availability.canStart)}
+            disabled={!availability.canStart}
             loading={isActing && pendingAction === 'start'}
             size="lg"
             variant="outline"
@@ -178,8 +255,8 @@ const ImageStorageEditor = () => {
             {t(tKey('startMove'))}
           </Button>
           <Button
-            aria-describedby={actionError ? actionErrorId : undefined}
-            disabled={isBusy}
+            aria-describedby={describedBy('recover', availability.canRecover)}
+            disabled={!availability.canRecover}
             loading={isActing && pendingAction === 'recover'}
             size="lg"
             variant="outline"
@@ -188,16 +265,21 @@ const ImageStorageEditor = () => {
             {t(tKey('recover'))}
           </Button>
         </HStack>
+        {availability.reasonKey ? (
+          <Text color="fg.muted" fontSize="xs" id={availabilityId}>
+            {t(tKey(availability.reasonKey))}
+          </Text>
+        ) : null}
         {actionError ? (
           <Text color="fg.error" fontSize="md" id={actionErrorId} minW="0" role="alert" wordBreak="break-word">
-            {actionError}
+            {actionError.message}
           </Text>
         ) : null}
       </Stack>
       <ConfirmDialog
         body={t(tKey(pendingAction === 'recover' ? 'recoverConfirmBody' : 'startConfirmBody'))}
         confirmLabel={t(tKey(pendingAction === 'recover' ? 'recover' : 'startMove'))}
-        finalFocusEl={getMaintenanceEl}
+        finalFocusEl={getFinalFocus}
         isDestructive={false}
         isOpen={pendingAction !== null}
         title={t(tKey(pendingAction === 'recover' ? 'recoverConfirmTitle' : 'startConfirmTitle'))}
@@ -242,7 +324,7 @@ const ImageMoveStatusLine = ({
   let summary: string;
 
   if (status.activeJobId !== null && !status.isRunning) {
-    summary = t(tKey('statusNeedsRecovery'), { jobId: status.activeJobId });
+    summary = t(tKey('statusNeedsRecovery'));
   } else if (status.isRunning) {
     summary = t(tKey(status.operation === 'recovery' ? 'statusRecovering' : 'statusMoving'));
   } else {
@@ -259,10 +341,7 @@ const ImageMoveStatusLine = ({
       </HStack>
       {status.latestJob && !status.isRunning && status.activeJobId === null ? (
         <Text color="fg.muted" fontSize="xs">
-          {t(tKey('latestJob'), {
-            jobId: status.latestJob.id,
-            state: t(tKey(`jobStates.${status.latestJob.state}`)),
-          })}
+          {t(tKey('latestJob'), { state: t(tKey(`jobStates.${status.latestJob.state}`)) })}
         </Text>
       ) : null}
       {errorMessage ? (
