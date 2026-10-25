@@ -1,11 +1,14 @@
 import errno
+import os
+import shutil
+import stat
 from pathlib import Path
 from typing import BinaryIO
 
 import pytest
 
 from invokeai.app.util import no_replace
-from invokeai.app.util.no_replace import publish_noreplace, rename_noreplace
+from invokeai.app.util.no_replace import file_signature, publish_noreplace, rename_noreplace
 
 
 def _refuse_link(src: Path, dst: Path) -> None:
@@ -81,12 +84,16 @@ def test_publish_refuses_an_existing_destination(tmp_path: Path, monkeypatch: py
     assert src.read_bytes() == b"new payload"
 
 
+@pytest.mark.parametrize("read_only_source", [False, True], ids=["writable-source", "read-only-source"])
 def test_a_failed_copy_leaves_no_destination_and_reports_every_attempt(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, read_only_source: bool
 ) -> None:
     _limit_mount(monkeypatch, "copy-only")
     src = tmp_path / "work.tmp"
     src.write_bytes(b"complete payload")
+    if read_only_source:
+        # The copy inherits the read-only mode, which Windows refuses to unlink.
+        src.chmod(stat.S_IREAD)
     dst = tmp_path / "published"
 
     def fail_midway(source: BinaryIO, target: BinaryIO) -> None:
@@ -104,6 +111,72 @@ def test_a_failed_copy_leaves_no_destination_and_reports_every_attempt(
     rename_error = exc_info.value.__cause__
     assert isinstance(rename_error, OSError) and rename_error.errno == errno.ENOTSUP
     assert isinstance(rename_error.__cause__, PermissionError)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Windows cannot replace a file that is open")
+def test_a_failed_copy_keeps_a_destination_another_writer_put_in_its_place(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _limit_mount(monkeypatch, "copy-only")
+    src = tmp_path / "work.tmp"
+    src.write_bytes(b"complete payload")
+    dst = tmp_path / "published"
+
+    def replace_destination_then_fail(source: BinaryIO, target: BinaryIO) -> None:
+        target.write(source.read(4))
+        replacement = tmp_path / "replacement"
+        replacement.write_bytes(b"other owner")
+        os.replace(replacement, dst)
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    monkeypatch.setattr(no_replace.shutil, "copyfileobj", replace_destination_then_fail)
+
+    with pytest.raises(OSError) as exc_info:
+        publish_noreplace(src, dst)
+
+    assert exc_info.value.errno == errno.ENOSPC
+    assert dst.read_bytes() == b"other owner"
+    assert src.read_bytes() == b"complete payload"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Windows has no POSIX permission bits")
+def test_a_copy_is_never_more_accessible_than_its_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _limit_mount(monkeypatch, "copy-only")
+    src = tmp_path / "work.tmp"
+    src.write_bytes(b"private payload")
+    src.chmod(0o600)
+    dst = tmp_path / "published"
+    real_copyfileobj = shutil.copyfileobj
+    modes_while_copying: list[int] = []
+
+    def copy_and_record_mode(source: BinaryIO, target: BinaryIO) -> None:
+        modes_while_copying.append(stat.S_IMODE(os.fstat(target.fileno()).st_mode))
+        real_copyfileobj(source, target)
+
+    monkeypatch.setattr(no_replace.shutil, "copyfileobj", copy_and_record_mode)
+    previous_umask = os.umask(0o022)
+    try:
+        publish_noreplace(src, dst)
+    finally:
+        os.umask(previous_umask)
+
+    assert modes_while_copying == [0o600]
+    assert stat.S_IMODE(dst.stat().st_mode) == 0o600
+    assert dst.read_bytes() == b"private payload"
+
+
+@pytest.mark.parametrize("mount", ["hard-links", "no-hard-links", "copy-only"])
+def test_publish_returns_the_signature_of_the_file_it_published(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mount: str
+) -> None:
+    _limit_mount(monkeypatch, mount)
+    src = tmp_path / "work.tmp"
+    src.write_bytes(b"complete payload")
+    dst = tmp_path / "published"
+
+    signature = publish_noreplace(src, dst)
+
+    assert signature == file_signature(dst.lstat())
 
 
 def test_rename_refuses_an_existing_destination(tmp_path: Path) -> None:

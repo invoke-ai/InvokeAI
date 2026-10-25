@@ -23,7 +23,7 @@ from invokeai.app.services.image_files.image_files_common import (
     ImageFileSaveException,
 )
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.util.no_replace import publish_noreplace
+from invokeai.app.util.no_replace import file_signature, publish_noreplace
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -324,7 +324,6 @@ class DiskImageFileStorage(ImageFileStorageBase):
         thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
         temporary_path: Path | None = None
         thumbnail: PILImageType | None = None
-        published_identity: tuple[int, int] | None = None
         try:
             with Image.open(image_path) as source_image:
                 thumbnail = make_thumbnail(source_image, thumbnail_size)
@@ -336,21 +335,19 @@ class DiskImageFileStorage(ImageFileStorageBase):
             thumbnail.save(temporary_path, format="WEBP")
             with open(temporary_path, "rb+") as completed_file:
                 os.fsync(completed_file.fileno())
-            temporary_stat = temporary_path.stat()
-            temporary_identity = (temporary_stat.st_dev, temporary_stat.st_ino)
             try:
-                # Publishes the fully written temporary file atomically and refuses to
-                # replace a thumbnail another writer created after our first existence check.
-                publish_noreplace(temporary_path, thumbnail_path)
+                # Publishes the fully written temporary file, refusing to replace a thumbnail another
+                # writer created after our first existence check. Where the drive forces a copy, the
+                # published thumbnail is a different file than the temporary one.
+                published_signature = publish_noreplace(temporary_path, thumbnail_path)
             except FileExistsError:
                 return False
-            published_identity = temporary_identity
             try:
                 self.__fsync_directory(thumbnail_path.parent)
             except Exception:
                 try:
-                    current_stat = thumbnail_path.lstat()
-                    if (current_stat.st_dev, current_stat.st_ino) == published_identity:
+                    # Only our own thumbnail goes: not a replacement, nor one save() rewrote in place.
+                    if file_signature(thumbnail_path.lstat()) == published_signature:
                         thumbnail_path.unlink()
                         self.evict_cache_paths([thumbnail_path])
                         try:

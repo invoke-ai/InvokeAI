@@ -40,6 +40,11 @@ def _refuse_link(src: Path, dst: Path) -> None:
     raise PermissionError(errno.EPERM, "Operation not permitted", str(dst))
 
 
+def _refuse_no_replace_rename(src: Path, dst: Path) -> None:
+    """Refuse an atomic no-replace rename the way macOS exFAT, NFS and many FUSE mounts do."""
+    raise OSError(errno.ENOTSUP, "Operation not supported", str(dst))
+
+
 def _failing_directory_fsync(error_number: int):
     """An ``os.fsync`` that fails for directory descriptors only; file fsyncs still work."""
     real_fsync = os.fsync
@@ -236,12 +241,14 @@ def test_generate_thumbnail_if_missing_fsyncs_a_writable_temporary_file(
 
 
 @posix_only
-@pytest.mark.parametrize("hard_links", [True, False], ids=["hard-links", "no-hard-links"])
+@pytest.mark.parametrize("mount", ["hard-links", "no-hard-links", "copy-only"])
 def test_generate_thumbnail_if_missing_removes_thumbnail_if_directory_fsync_fails(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, hard_links: bool
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mount: str
 ):
-    if not hard_links:
+    if mount in ("no-hard-links", "copy-only"):
         monkeypatch.setattr(no_replace.os, "link", _refuse_link)
+    if mount == "copy-only":
+        monkeypatch.setattr(no_replace, "rename_noreplace", _refuse_no_replace_rename)
     storage = DiskImageFileStorage(tmp_path)
     image_path = storage.get_path("fsync-failure.png")
     with Image.new("RGB", (8, 8), (20, 40, 60)) as source:
