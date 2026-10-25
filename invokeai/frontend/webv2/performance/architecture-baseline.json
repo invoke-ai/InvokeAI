@@ -842,7 +842,6 @@
           "source:src/workbench/canvas-engine/document/documentTree.ts",
           "source:src/workbench/canvas-engine/document/insertionAnchors.ts",
           "source:src/workbench/canvas-engine/document/layerEligibility.ts",
-          "source:src/workbench/canvas-engine/document/layerFactories.ts",
           "source:src/workbench/canvas-engine/document/layerStacks.ts",
           "source:src/workbench/canvas-engine/document/mergeVisible.ts",
           "source:src/workbench/canvas-engine/document/selectionRepair.ts",
