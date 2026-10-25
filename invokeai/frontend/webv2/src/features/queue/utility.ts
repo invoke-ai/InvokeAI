@@ -4,8 +4,6 @@ export {
   submitUtilityGraph,
   UtilityQueueError,
   type RunUtilityGraphOptions,
-  type SubmitUtilityGraphOptions,
   type UtilityGraphResult,
   type UtilityGraphSubmission,
-  type UtilityItemStatusReader,
 } from './runtime/utilityGraph';

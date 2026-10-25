@@ -1,4 +1,5 @@
 import type { InvocationCompleteEvent, QueueItemStatusChangedEvent } from '@features/queue/contracts';
+import type { QueueItemsCanceledEvent } from '@features/queue/data/events';
 import type { SocketHub } from '@platform/transport/socketHub';
 import type { BackendConnectionStatus } from '@platform/transport/types';
 
@@ -136,6 +137,20 @@ const statusEvent = (
   ...overrides,
 });
 
+const bulkCanceledEvent = (itemIds: number[]): QueueItemsCanceledEvent => ({
+  canceled_item_ids: itemIds,
+  canceled_item_ids_by_user: { 'user-1': itemIds },
+  queue_id: 'default',
+  timestamp: 1,
+  user_ids: ['user-1'],
+});
+
+/** Yields a real macrotask, so everything the previous tasks queued (an unhandled rejection report included) runs. */
+const nextMacrotask = () =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
+
 const okEnqueue: UtilityEnqueue = () => Promise.resolve({ enqueued: 1, itemIds: [1] });
 
 const createDeferred = <T>(): { promise: Promise<T>; resolve: (value: T) => void } => {
@@ -197,10 +212,11 @@ describe('runUtilityGraph — await + settle', () => {
     fake.emit('queue_item_status_changed', statusEvent('completed'));
 
     await expect(promise).resolves.toEqual({ height: 48, imageName: 'filtered.png', origin: ORIGIN, width: 64 });
-    // Both listeners detached on settle.
+    // Every listener detached on settle: output, status, queue clear, and bulk cancel.
     expect(fake.handlerCount('invocation_complete')).toBe(0);
     expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
-    expect(fake.detachCount).toBe(2);
+    expect(fake.detachCount).toBe(4);
+    expect(fake.connectionHandlerCount()).toBe(0);
   });
 
   it('ignores completions from other output nodes when outputNodeId is set', async () => {
@@ -351,7 +367,7 @@ describe('runUtilityGraph — await + settle', () => {
     expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
     reconciliation.resolve({ height: 48, imageName: 'late.png', width: 64 });
     await Promise.resolve();
-    expect(fake.detachCount).toBe(2);
+    expect(fake.detachCount).toBe(4);
   });
 
   it('allows delayed socket output to win after a transient reconciliation failure', async () => {
@@ -1111,6 +1127,71 @@ describe('runUtilityGraph — enqueue failures', () => {
       hub: fake.hub,
     });
     await expect(promise).rejects.toMatchObject({ message: 'network down', reason: 'enqueue' });
+
+    // A backend refusal shows its detail, never the raw JSON body.
+    const cause = new ApiError('{"detail":"queue paused"}', 409);
+    await expect(
+      runUtilityGraph({
+        createId: () => UTIL_ID,
+        enqueue: () => Promise.reject(cause),
+        graph: { edges: [], id: 'g', nodes: {} },
+        hub: createFakeHub().hub,
+      })
+    ).rejects.toMatchObject({ cause, message: 'queue paused', reason: 'enqueue' });
+  });
+});
+
+describe('runUtilityGraph — missed settlement', () => {
+  it('re-reads the item after a queue clear, bulk cancel, or reconnect instead of waiting for the timeout', async () => {
+    const graph = { edges: [], id: 'g', nodes: {} };
+    const removed = createFakeHub();
+    const readRemoved = vi.fn<UtilityItemStatusReader>(() =>
+      Promise.reject(new ApiError('{"detail":"Queue item not found"}', 404))
+    );
+    const removedRun = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: () => Promise.resolve({ enqueued: 1, itemIds: [3] }),
+      graph,
+      hub: removed.hub,
+      readItemStatus: readRemoved,
+      timeoutMs: 0,
+    });
+    await vi.waitFor(() => expect(removed.handlerCount('queue_cleared')).toBe(1));
+    await Promise.resolve();
+    removed.emit('queue_cleared', { queue_id: 'default', timestamp: 1, user_id: null });
+    await expect(removedRun).rejects.toMatchObject({ reason: 'removed' });
+    expect(readRemoved).toHaveBeenCalledExactlyOnceWith(3, undefined);
+    expect(removed.handlerCount('queue_items_canceled')).toBe(0);
+
+    const canceled = createFakeHub();
+    const canceledRun = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: () => Promise.resolve({ enqueued: 1, itemIds: [3] }),
+      graph,
+      hub: canceled.hub,
+      readItemStatus: () => Promise.resolve({ status: 'canceled' }),
+      timeoutMs: 0,
+    });
+    await nextMacrotask();
+    canceled.emit('queue_items_canceled', bulkCanceledEvent([3]));
+    await expect(canceledRun).rejects.toMatchObject({ reason: 'canceled' });
+
+    // A reconnect that finds the item completed reconciles its output as a socket completion would.
+    const reconnected = createFakeHub();
+    const reconnectedRun = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: () => Promise.resolve({ enqueued: 1, itemIds: [3] }),
+      graph,
+      hub: reconnected.hub,
+      readItemStatus: () => Promise.resolve({ status: 'completed' }),
+      reconcileCompletedOutput: () => Promise.resolve({ height: 8, imageName: 'out.png', width: 8 }),
+      timeoutMs: 0,
+    });
+    await nextMacrotask();
+    reconnected.connection('disconnected');
+    reconnected.connection('connected');
+    await expect(reconnectedRun).resolves.toEqual({ height: 8, imageName: 'out.png', origin: ORIGIN, width: 8 });
+    expect(reconnected.connectionHandlerCount()).toBe(0);
   });
 });
 
@@ -1338,9 +1419,10 @@ describe('submitUtilityGraph — fire, then watch settlement', () => {
     expect(removed).toHaveBeenCalledExactlyOnceWith('abort', handler);
   });
 
-  // Vitest fails a run on an unhandled rejection, so settling `settled` before the caller holds it must stay quiet.
+  // `settled` can reject before the caller holds it. Vitest fails the run on an unhandled rejection, and a real
+  // macrotask between the rejection and the caller's handler gives one the chance to be reported.
+
   it('settles quietly when the account changes while the enqueue is still pending', async () => {
-    vi.useFakeTimers();
     const fake = createFakeHub();
     const controller = new AbortController();
     const deferred = createDeferred<{ enqueued: number; itemIds: number[] }>();
@@ -1353,7 +1435,8 @@ describe('submitUtilityGraph — fire, then watch settlement', () => {
     });
 
     controller.abort();
-    await Promise.resolve();
+    await nextMacrotask();
+    vi.useFakeTimers();
     deferred.resolve({ enqueued: 1, itemIds: [1] });
 
     const submission = await pending;
@@ -1375,7 +1458,7 @@ describe('submitUtilityGraph — fire, then watch settlement', () => {
     });
 
     fake.emit('queue_item_status_changed', statusEvent('failed', { error_message: 'No model' }));
-    await Promise.resolve();
+    await nextMacrotask();
     deferred.resolve({ enqueued: 1, itemIds: [1] });
 
     const submission = await pending;
@@ -1446,6 +1529,72 @@ describe('submitUtilityGraph — fire, then watch settlement', () => {
     expect(fake.handlerCount('queue_cleared')).toBe(0);
   });
 
+  it('re-reads the item when a bulk cancel or delete names it, and ignores bulk events for other items', async () => {
+    const fake = createFakeHub();
+    const readItemStatus = vi.fn<UtilityItemStatusReader>(() => Promise.resolve({ status: 'canceled' }));
+    const submission = await submitUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: () => Promise.resolve({ enqueued: 1, itemIds: [9] }),
+      graph,
+      hub: fake.hub,
+      readItemStatus,
+    });
+    const outcome = submission.settled.then(
+      () => 'resolved',
+      (error: UtilityQueueError) => error.reason
+    );
+
+    // Other owners' items, and the id-less companion other users receive, leave this item watched.
+    fake.emit('queue_items_canceled', bulkCanceledEvent([4, 5]));
+    fake.emit('queue_items_canceled', bulkCanceledEvent([]));
+    await nextMacrotask();
+    expect(readItemStatus).not.toHaveBeenCalled();
+    expect(fake.handlerCount('queue_items_canceled')).toBe(1);
+
+    // Bulk operations cancel waiting items in one statement and emit no per-item status change.
+    fake.emit('queue_items_canceled', bulkCanceledEvent([4, 9]));
+
+    await expect(outcome).resolves.toBe('canceled');
+    expect(readItemStatus).toHaveBeenCalledExactlyOnceWith(9, undefined);
+    expect(fake.handlerCount('queue_items_canceled')).toBe(0);
+
+    // A bulk delete removes the row: the read answers 404.
+    const deleted = createFakeHub();
+    const deletedSubmission = await submitUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: () => Promise.resolve({ enqueued: 1, itemIds: [9] }),
+      graph,
+      hub: deleted.hub,
+      readItemStatus: () => Promise.reject(new ApiError('{"detail":"Queue item not found"}', 404)),
+    });
+    deleted.emit('queue_items_canceled', bulkCanceledEvent([9]));
+    await expect(deletedSubmission.settled).rejects.toMatchObject({ reason: 'removed' });
+  });
+
+  it('defers a bulk cancel that arrives before the enqueue response until the item id is known', async () => {
+    const fake = createFakeHub();
+    const deferred = createDeferred<{ enqueued: number; itemIds: number[] }>();
+    const readItemStatus = vi.fn<UtilityItemStatusReader>(() => Promise.resolve({ status: 'canceled' }));
+    const pending = submitUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue: () => deferred.promise,
+      graph,
+      hub: fake.hub,
+      readItemStatus,
+    });
+
+    // The ids are unknown until the enqueue answers, so any bulk event may have named this item.
+    fake.emit('queue_items_canceled', bulkCanceledEvent([12]));
+    await Promise.resolve();
+    expect(readItemStatus).not.toHaveBeenCalled();
+
+    deferred.resolve({ enqueued: 1, itemIds: [12] });
+    const submission = await pending;
+
+    await expect(submission.settled).rejects.toMatchObject({ reason: 'canceled' });
+    expect(readItemStatus).toHaveBeenCalledExactlyOnceWith(12, undefined);
+  });
+
   it('defers a clear that arrives before the enqueue response until the item id is known', async () => {
     const fake = createFakeHub();
     const deferred = createDeferred<{ enqueued: number; itemIds: number[] }>();
@@ -1483,7 +1632,7 @@ describe('submitUtilityGraph — fire, then watch settlement', () => {
         enqueue: okEnqueue,
         graph,
         hub: fake.hub,
-        readItemStatus: () => Promise.resolve({ error_message: 'boom', status }),
+        readItemStatus: () => Promise.resolve({ errorMessage: 'boom', status }),
       });
       const outcome = submission.settled.then(
         () => 'resolved',

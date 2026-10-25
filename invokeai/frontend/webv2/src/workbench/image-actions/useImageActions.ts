@@ -43,6 +43,7 @@ import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { submitUtilityGraph, type UtilityGraphSubmission, UtilityQueueError } from '@features/queue/utility';
 import { copyImage } from '@platform/browser/clipboard';
 import { downloadBlob } from '@platform/browser/downloadBlob';
+import { createLogger } from '@platform/logging/logger';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
   assertAccountScopeCurrent,
@@ -911,6 +912,12 @@ export const useImageActions = ({
         const owner = captureAccountScope();
         const galleryValues = getLatestWidgetValues('gallery');
         let submission: UtilityGraphSubmission;
+        const reportFailure = (error: unknown) => {
+          const message = toErrorMessage(error);
+
+          createLogger({ area: 'image-actions', namespace: 'gallery', projectId }, { owner }).error({ error, message });
+          notifications.add({ kind: 'error', message, title: t('widgets.gallery.itemActions.pbrMaps.failed') });
+        };
 
         try {
           const pendingBoards = ensureGalleryBoardDestinations(queryClient);
@@ -931,11 +938,7 @@ export const useImageActions = ({
         } catch (error: unknown) {
           if (isAccountScopeCurrent(owner)) {
             void invalidateGalleryBoardDestinations(queryClient, owner);
-            notifications.add({
-              kind: 'error',
-              message: toErrorMessage(error),
-              title: t('widgets.gallery.itemActions.pbrMaps.failed'),
-            });
+            reportFailure(error);
           }
           return;
         }
@@ -980,7 +983,7 @@ export const useImageActions = ({
             // An abort only ends the watch; the backend item keeps running.
             if (!(error instanceof UtilityQueueError && error.reason === 'aborted')) {
               void invalidateGalleryBoardDestinations(queryClient, owner);
-              recordError(error);
+              reportFailure(error);
             }
           }
         );

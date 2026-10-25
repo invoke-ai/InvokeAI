@@ -13,6 +13,7 @@ import {
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
 import { parseOpenApiToTemplates } from '@features/workflow/react';
+import { clearLogs, getLogSnapshot } from '@platform/logging/logger';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError, getApiErrorMessage } from '@platform/transport/http';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -889,8 +890,9 @@ describe('generate PBR maps', () => {
     expect(mocks.notificationsAdd).not.toHaveBeenCalled();
   });
 
-  it('reports an enqueue failure as an error notice and a failed run through the error channel', async () => {
+  it('reports an enqueue failure and a failed run as logged PBR error notices', async () => {
     const { UtilityQueueError } = await import('@features/queue/utility');
+    clearLogs();
     // The runtime wraps the backend's JSON refusal as an ApiError cause and derives the readable message the way
     // `submitUtilityGraph` does; the toast must show that detail, never the JSON.
     const cause = new ApiError(JSON.stringify({ detail: 'queue paused' }), 409);
@@ -914,13 +916,25 @@ describe('generate PBR maps', () => {
       await actionsRef.current?.generatePbrMaps(image);
     });
     await act(async () => {
-      settlement.reject(new Error('No PBR model'));
+      settlement.reject(new UtilityQueueError('failed', 'No PBR model'));
       await settlement.settled.catch(() => {});
     });
 
-    expect(mocks.reportError).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({ area: 'image-actions', message: 'No PBR model', namespace: 'gallery' })
-    );
+    // A run that fails after it was queued names the action, as an enqueue failure does.
+    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith({
+      kind: 'error',
+      message: 'No PBR model',
+      title: 'widgets.gallery.itemActions.pbrMaps.failed',
+    });
+    expect(mocks.reportError).not.toHaveBeenCalled();
+    expect(
+      getLogSnapshot()
+        .entries.filter((entry) => entry.source.area === 'image-actions')
+        .map(({ level, message, namespace }) => ({ level, message, namespace }))
+    ).toEqual([
+      { level: 'error', message: 'No PBR model', namespace: 'gallery' },
+      { level: 'error', message: 'queue paused', namespace: 'gallery' },
+    ]);
     expect(mocks.invalidateGallery).not.toHaveBeenCalled();
   });
 
