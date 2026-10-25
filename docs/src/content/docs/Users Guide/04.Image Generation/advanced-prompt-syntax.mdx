@@ -1,7 +1,7 @@
 ---
 title: Advanced Prompt Syntax
-description: Fine control over prompts — attention weighting, blending and conjunctions for SD 1.5, SD 2.x and SDXL, and the advanced dynamic prompt syntax for multiple choices, weights, variables and comments.
-lastUpdated: 2026-10-15
+description: Fine control over prompts — attention weighting for SD and Anima models, blending and conjunctions for SD models, and advanced dynamic prompt syntax.
+lastUpdated: 2026-10-25
 sidebar:
   order: 3
 ---
@@ -10,10 +10,10 @@ Most prompts need nothing more than plain text, perhaps with a [prompt template]
 
 ## Attention weighting
 
-Attention weighting makes parts of the prompt count for more or less than the rest. It uses Compel syntax, which applies to **SD 1.5, SD 2.x and SDXL**. Newer model families, including FLUX, Z-Image, CogView4 and Qwen Image, do not use it, and the symbols are passed to the model as ordinary text.
+Attention weighting makes parts of the prompt count for more or less than the rest. **SD 1.5, SD 2.x and SDXL** use Compel. **Anima** accepts the attention-weight forms shown below and applies the weights to its own text conditioning; it does not run its text encoder through Compel. Other model families, including FLUX, Z-Image, CogView4 and Qwen Image, pass these symbols to the model as ordinary text.
 
 :::note[Compatibility note]
-  If a weighted prompt seems to be ignored, check which model you are using. The syntax in this section only affects SD 1.5, SD 2.x and SDXL. The prompt field colors weights, groups and embeddings only while one of those models is selected; with any other model, or none, they appear as plain text.
+  If a weighted prompt seems to be ignored, check which model you are using. Anima supports the attention-weight forms, but not Compel's `.blend()` or `.and()` functions. The prompt field colors weights, groups and embeddings only while an SD 1.5, SD 2.x or SDXL model is selected; Anima currently has no attention highlighting.
 :::
 
 | Syntax | Effect |
@@ -52,6 +52,12 @@ Use numeric weights when you want precise control instead of repeated plus or mi
 `1` is neutral, values above `1` increase emphasis, and values between `0` and `1` reduce it. Wrap the weighted phrase in parentheses.
 
 Groups can be nested, and the weights combine. In `(portrait with (blue eyes)1.3)1.1`, the outer group strengthens the whole phrase, and `blue eyes` gets even more emphasis.
+
+### Anima attention weights
+
+In InvokeAI, Anima uses the same **attention syntax** as the examples above: `(long hair)2`, `(long hair)0.5`, `hair+`, and `(long hair)++`. Nested weights multiply. `1` is neutral; `0` clears the affected adapter vectors. A `-` suffix reduces weight by 10%; negative numeric weights are not part of Compel's attention syntax. Very large weights can destabilize generation. Anima's weighting is applied after its text encoders, not by Compel's CLIP conditioning algorithm.
+
+Parentheses group text even without an explicit weight. Escape them as `\(cosplay\)` when they should remain literal; the Anima prompt node version was raised to `1.6.0` for this behavior change. The Anima model card uses ComfyUI's `(chibi:2)` form, but in InvokeAI write `(chibi)2`: `(chibi:2)` receives no weight and the text encoder sees `chibi:2`. Anima does not support Compel's `.blend()` and `.and()` prompt functions.
 
 ### Adjusting weights with the keyboard
 

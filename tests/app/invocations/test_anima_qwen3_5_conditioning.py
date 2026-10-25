@@ -37,8 +37,12 @@ class _Loaded:
 class _FakeQwen35Tokenizer:
     pad_token_id = 248044
 
+    def __init__(self) -> None:
+        self.prompt: str | None = None
+
     def encode(self, prompt: str, add_special_tokens: bool) -> list[int]:
         assert add_special_tokens is False
+        self.prompt = prompt
         return [] if not prompt else [5, 6, 7]
 
 
@@ -52,25 +56,27 @@ class _FakeQwen35Encoder(torch.nn.Module):
         return [torch.full((1, input_ids.shape[1], 8), float(i)) for i in layer_indices]
 
 
-def _encode_qwen3_5(monkeypatch, prompt: str) -> tuple[torch.Tensor, torch.Tensor, _FakeQwen35Encoder]:
+def _encode_qwen3_5(monkeypatch, prompt: str) -> tuple[torch.Tensor, torch.Tensor, _FakeQwen35Encoder, str | None]:
     module = "invokeai.app.invocations.text_encoder.anima_text_encoder"
     monkeypatch.setattr(f"{module}.PreTrainedTokenizerBase", _FakeQwen35Tokenizer)
     # The node imports Qwen35Encoder when it runs, from its own module.
     monkeypatch.setattr("invokeai.backend.qwen3_5.qwen3_5_encoder.Qwen35Encoder", _FakeQwen35Encoder)
     encoder = _FakeQwen35Encoder()
+    tokenizer = _FakeQwen35Tokenizer()
     context = MagicMock()
-    context.models.load.side_effect = [_Loaded(_FakeQwen35Tokenizer()), _Loaded(encoder)]
+    context.models.load.side_effect = [_Loaded(tokenizer), _Loaded(encoder)]
     invocation = AnimaTextEncoderInvocation.model_construct(
         prompt=prompt, qwen3_5_encoder=SimpleNamespace(tokenizer=object(), text_encoder=object())
     )
     states, mask = invocation._encode_qwen3_5(context)
-    return states, mask, encoder
+    return states, mask, encoder, tokenizer.prompt
 
 
 def test_qwen3_5_is_read_at_the_trained_layers_with_an_attention_only_last_layer(monkeypatch) -> None:
-    states, mask, encoder = _encode_qwen3_5(monkeypatch, "1girl, Miku")
+    states, mask, encoder, prompt = _encode_qwen3_5(monkeypatch, "1girl, Miku")
 
     assert encoder.calls == [([5, 6, 7], QWEN35_LAYER_INDICES, True)]
+    assert prompt == "1girl, Miku"
     assert states.shape == (len(QWEN35_LAYER_INDICES), 3, 8)
     assert mask.tolist() == [True, True, True]
 
@@ -91,11 +97,18 @@ def test_the_prompt_node_does_not_import_transformers_qwen3_5_at_startup() -> No
 
 
 def test_an_empty_prompt_is_one_masked_padding_token(monkeypatch) -> None:
-    states, mask, encoder = _encode_qwen3_5(monkeypatch, "")
+    states, mask, encoder, prompt = _encode_qwen3_5(monkeypatch, "")
 
     assert encoder.calls[0][0] == [_FakeQwen35Tokenizer.pad_token_id]
+    assert prompt == ""
     assert states.shape[1] == 1
     assert mask.tolist() == [False]
+
+
+def test_qwen3_5_receives_cleaned_prompt_without_attention_markup(monkeypatch) -> None:
+    _, _, _, prompt = _encode_qwen3_5(monkeypatch, "a (long hair)2")
+
+    assert prompt == "a long hair"
 
 
 # --- denoise node -------------------------------------------------------------------------------------
