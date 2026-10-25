@@ -1,6 +1,6 @@
 {
   "browserExecutable": "/home/lstein/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome",
-  "capturedAt": "2026-10-24",
+  "capturedAt": "2026-10-18",
   "routes": [
     {
       "activatedResourceBaseline": {
