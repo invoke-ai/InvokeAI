@@ -145,11 +145,13 @@ export class ControlDerivationController implements CanvasControlDerivationCapab
       }
       const { before, pixels: beforePixels } = resolved;
       const after = structuredClone(next);
+      const recorded = this.recordOnPublish();
       const result = txn.publish(
         amended?.label ?? label,
         this.replaceStep(after, null, live),
         {
           bytes: (beforePixels ? rgbaBytes(beforePixels.rect) : 0) + HISTORY_ENTRY_OVERHEAD_BYTES,
+          dispose: recorded.dispose,
           heldAssetRefs: collectHistoryMediaRefs(before, after),
           redo: () => ctx.applyStep(this.replaceStep(after, null, before)),
           undo: () => this.restoreBefore(before, beforePixels, after),
@@ -162,7 +164,7 @@ export class ControlDerivationController implements CanvasControlDerivationCapab
           : { status: layerEditRefusal(result.status) };
       }
       const inputKey = controlDetectionInputKey(after);
-      this.last = {
+      recorded.record({
         before,
         beforePixels,
         coalesceKey,
@@ -171,7 +173,7 @@ export class ControlDerivationController implements CanvasControlDerivationCapab
         layerId,
         requestsMap: controlDetectionInputKey(before) !== inputKey,
         token: result.token,
-      };
+      });
       return { status: 'committed' };
     } finally {
       txn.end();
@@ -197,6 +199,7 @@ export class ControlDerivationController implements CanvasControlDerivationCapab
     detection,
     guard,
     image,
+    makeDurable,
     rect,
     signal,
   }: Parameters<CanvasControlDerivationCapability['commitControlMap']>[0]): Promise<ControlMapCommitResult> {
@@ -251,6 +254,8 @@ export class ControlDerivationController implements CanvasControlDerivationCapab
       return { status: 'unrepresentable' };
     }
     try {
+      // Promoted only once nothing refuses it, so a result that is dropped stays collectible.
+      await makeDurable();
       const decoded = await o.decodeImage(image, {
         isCurrent: () => ctx.isPermitCurrent(permit),
         scaleToImage: false,
@@ -290,12 +295,14 @@ export class ControlDerivationController implements CanvasControlDerivationCapab
         const { before, pixels: beforePixels } = resolved;
         const prepared = ctx.preparePixels(live.id, mapRect, afterPixels.pixels);
         const label = paired?.label ?? `Detect ${after.controlType ?? 'control'}`;
+        const recorded = this.recordOnPublish();
         const result = txn.publish(
           label,
           this.replaceStep(after, prepared, live),
           {
             bytes:
               (beforePixels ? rgbaBytes(beforePixels.rect) : 0) + rgbaBytes(mapRect) + HISTORY_ENTRY_OVERHEAD_BYTES,
+            dispose: recorded.dispose,
             heldAssetRefs: collectHistoryMediaRefs(before, after),
             redo: () =>
               replayWithPixels(ctx, after.id, afterPixels, (replayed) => this.replaceStep(after, replayed, before)),
@@ -307,7 +314,7 @@ export class ControlDerivationController implements CanvasControlDerivationCapab
         if (result.status !== 'committed') {
           return { status: guardedResultRefusal(result) };
         }
-        this.last = {
+        recorded.record({
           before,
           beforePixels,
           coalesceKey: undefined,
@@ -316,7 +323,7 @@ export class ControlDerivationController implements CanvasControlDerivationCapab
           layerId: after.id,
           requestsMap: true,
           token: result.token,
-        };
+        });
         return { status: 'committed' };
       } finally {
         txn.end();
@@ -331,6 +338,26 @@ export class ControlDerivationController implements CanvasControlDerivationCapab
 
   dispose(): void {
     this.last = null;
+  }
+
+  /**
+   * Ties the record of an entry about to publish to that entry's lifetime: its `dispose` (eviction, a cleared redo
+   * stack, replacement by an amending commit) drops the record, so its before-pixels never outlive the entry.
+   */
+  private recordOnPublish(): { dispose: () => void; record: (entry: RecordedEntry) => void } {
+    let recorded: RecordedEntry | null = null;
+    return {
+      dispose: () => {
+        if (recorded && this.last === recorded) {
+          this.last = null;
+        }
+        recorded = null;
+      },
+      record: (entry) => {
+        recorded = entry;
+        this.last = entry;
+      },
+    };
   }
 
   /**

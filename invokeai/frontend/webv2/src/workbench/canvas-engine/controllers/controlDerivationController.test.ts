@@ -95,9 +95,21 @@ const createHarness = (
   /** Commits `patch` against the live layer, as the coordinator's intents do. */
   const patch = (label: string, change: Partial<CanvasControlLayerContract>, coalesceKey?: string) =>
     controller.commitControlLayerPatch({ coalesceKey, expected: live(), label, next: { ...live(), ...change } });
+  const makeDurable = vi.fn(() => Promise.resolve());
   const commitMap = (guard = controller.captureControlDetectionGuard(layer.id)!) =>
-    controller.commitControlMap({ detection: DEPTH, guard, image: MAP, rect: MAP_RECT });
-  return { ...h, commitMap, controller, decodeImage, discardPersisted, endStructuralPreview, fake, live, patch };
+    controller.commitControlMap({ detection: DEPTH, guard, image: MAP, makeDurable, rect: MAP_RECT });
+  return {
+    ...h,
+    commitMap,
+    controller,
+    decodeImage,
+    discardPersisted,
+    endStructuralPreview,
+    fake,
+    live,
+    makeDurable,
+    patch,
+  };
 };
 
 describe('ControlDerivationController.commitControlLayerPatch', () => {
@@ -331,11 +343,75 @@ describe('ControlDerivationController.commitControlMap', () => {
         detection: DEPTH,
         guard,
         image: MAP,
+        makeDurable: h.makeDurable,
         rect: MAP_RECT,
         signal: AbortSignal.abort(),
       })
     ).resolves.toEqual({ status: 'aborted' });
     expect(h.decodeImage).not.toHaveBeenCalled();
+    expect(h.makeDurable).not.toHaveBeenCalled();
+  });
+
+  it('promotes the map only once nothing refuses it, before decoding', async () => {
+    const h = createHarness(controlLayer({ controlType: 'depth', detection: DEPTH }));
+    const guard = h.controller.captureControlDetectionGuard('control')!;
+
+    h.setEditingLocked(true);
+    await expect(h.commitMap(guard)).resolves.toEqual({ status: 'busy' });
+    h.setEditingLocked(false);
+    h.fake.documentRevision += 1;
+    await expect(h.commitMap(guard)).resolves.toEqual({ status: 'stale' });
+    expect(h.makeDurable).not.toHaveBeenCalled();
+
+    h.fake.documentRevision -= 1;
+    await expect(h.commitMap(guard)).resolves.toEqual({ status: 'committed' });
+    expect(h.makeDurable).toHaveBeenCalledOnce();
+    expect(h.makeDurable.mock.invocationCallOrder[0]).toBeLessThan(h.decodeImage.mock.invocationCallOrder[0]!);
+  });
+
+  it('refuses a map it could not promote without decoding or recording it', async () => {
+    const h = createHarness(controlLayer({ controlType: 'depth', detection: DEPTH }));
+    h.makeDurable.mockRejectedValueOnce(new Error('PATCH 500'));
+
+    await expect(h.commitMap()).resolves.toEqual({ message: 'PATCH 500', status: 'failed' });
+    expect(h.decodeImage).not.toHaveBeenCalled();
+    expect(h.dispatched).toEqual([]);
+    expect(h.history.entries().past).toEqual([]);
+  });
+});
+
+describe('ControlDerivationController pairing record', () => {
+  // The record's before-pixels have no other observable owner once their entry is gone; read it directly.
+  const recorded = (h: ReturnType<typeof createHarness>) => h.controller['last'];
+  /** Another owner's step, as a brush stroke or a move would publish. */
+  const publishForeignEntry = (h: ReturnType<typeof createHarness>) =>
+    h.history.admit(256)!.publish({
+      bytes: 256,
+      heldAssetRefs: { images: [], videos: [] },
+      label: 'Brush stroke',
+      redo: () => undefined,
+      undo: () => undefined,
+    });
+
+  it.each([
+    ['history is cleared', (h: ReturnType<typeof createHarness>) => h.history.clear()],
+    ['the byte budget evicts it', (h: ReturnType<typeof createHarness>) => h.history.trimToBytes(0)],
+    [
+      'another step discards it from the redo stack',
+      async (h: ReturnType<typeof createHarness>) => {
+        await h.history.undo();
+        expect(recorded(h)).not.toBeNull();
+        publishForeignEntry(h);
+      },
+    ],
+  ])('releases the unpersisted before-pixels once %s', async (_case, dropEntry) => {
+    const h = createHarness(controlLayer({ source: { bitmap: null, type: 'paint' } }), { pendingPixels: true });
+    h.patch('Replace image', { source: { image: PHOTO, type: 'image' } });
+    expect(recorded(h)?.beforePixels).not.toBeNull();
+
+    await dropEntry(h);
+
+    expect(recorded(h)).toBeNull();
   });
 });
 

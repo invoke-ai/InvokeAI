@@ -167,6 +167,11 @@ export interface CanvasControlDerivationCapability {
     image: CanvasImageRef;
     rect: Rect;
     detection: CanvasControlDetectionContract;
+    /**
+     * Makes `image` durable. Awaited only once the guard holds and nothing holds the document, just before decoding,
+     * so a refused or stale result is never promoted; a rejection refuses the commit `failed`.
+     */
+    makeDurable(): Promise<void>;
     signal?: AbortSignal;
   }): Promise<ControlMapCommitResult>;
 }

@@ -4,13 +4,9 @@ import type { LayerFlushResult } from '@workbench/canvas-engine/controllers/pers
 import type { BackendGraphContract } from '@workbench/graphContracts';
 
 import { createAccountLifecycle } from '@platform/state/accountLifecycle';
-import {
-  controlDetectionInputKey,
-  createControlLayer,
-  isControlMapCurrent,
-  withDetectedMap,
-} from '@workbench/canvas-engine/api';
+import { controlDetectionInputKey, createControlLayer, isControlMapCurrent } from '@workbench/canvas-engine/api';
 import { documentFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { withDetectedMap } from '@workbench/canvas-engine/document/controlDerivation';
 import { createCanvasEditGate, type CanvasEditLease } from '@workbench/canvas-engine/editGate';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -50,6 +46,7 @@ const createHarness = (initial: CanvasControlLayerContract[] = [photoLayer('a')]
   const gate = createCanvasEditGate();
   let lease: CanvasEditLease | null = null;
   let mapCommitOverride: (() => ControlMapCommitResult) | null = null;
+  let onCommitPublished: (() => void) | null = null;
   const derivation = {
     captureControlDetectionGuard: vi.fn((layerId: string) => {
       const layer = layers.get(layerId);
@@ -64,28 +61,37 @@ const createHarness = (initial: CanvasControlLayerContract[] = [photoLayer('a')]
       }
     ),
     commitControlMap: vi.fn(
-      (options: {
+      async (options: {
         guard: { layerId: string; documentRevision: number; inputKey: string };
         image: { height: number; imageName: string; width: number };
         rect: { height: number; width: number; x: number; y: number };
         detection: { type: string; settings: Record<string, unknown> };
+        makeDurable(): Promise<void>;
       }): Promise<ControlMapCommitResult> => {
         if (mapCommitOverride) {
-          return Promise.resolve(mapCommitOverride());
+          return mapCommitOverride();
         }
         // The engine refuses while a modal operation holds the edit lease.
         if (lease?.isCurrent()) {
-          return Promise.resolve({ status: 'busy' });
+          return { status: 'busy' };
         }
         const layer = layers.get(options.guard.layerId);
         if (!layer) {
-          return Promise.resolve({ status: 'missing' });
+          return { status: 'missing' };
         }
         if (options.guard.documentRevision !== revision || options.guard.inputKey !== controlDetectionInputKey(layer)) {
-          return Promise.resolve({ status: 'stale' });
+          return { status: 'stale' };
+        }
+        // Like the engine, promote only once nothing refuses the map.
+        try {
+          await options.makeDurable();
+        } catch (error) {
+          return { message: (error as Error).message, status: 'failed' };
         }
         setLayer(withDetectedMap(layer, { image: options.image, rect: options.rect }, options.detection)!);
-        return Promise.resolve({ status: 'committed' });
+        // The engine publishes synchronously, and its document change reconciles before the commit returns.
+        onCommitPublished?.();
+        return { status: 'committed' };
       }
     ),
   };
@@ -159,6 +165,9 @@ const createHarness = (initial: CanvasControlLayerContract[] = [photoLayer('a')]
     setLayer,
     setMapCommit: (override: (() => ControlMapCommitResult) | null) => {
       mapCommitOverride = override;
+    },
+    onCommitPublished: (listener: (() => void) | null) => {
+      onCommitPublished = listener;
     },
     status: (id = 'a') => coordinator.getStatus(id),
   };
@@ -276,6 +285,9 @@ describe('ControlDetectionCoordinator', () => {
 
     for (let run = 1; run <= 4; run += 1) {
       h.setLayer({ ...h.layer(), source: paint(`strokes-v${String(run)}.png`) });
+      // The upload landing is a document change; it keeps the run, which restarts once it finishes.
+      h.coordinator.reconcileWithDocument();
+      expect(h.graphs[0]!.signal.aborted).toBe(false);
       await h.finishGraph();
       if (run < 4) {
         expect(h.status()).toEqual({ status: 'queued' });
@@ -337,6 +349,8 @@ describe('ControlDetectionCoordinator', () => {
 
     await settle(CONTROL_DETECTION_COMMIT_TIMEOUT_MS);
     expect(h.status()).toEqual({ error: { code: 'commit-busy' }, status: 'error' });
+    // A result that never landed stays an intermediate the server collects.
+    expect(h.makeDurable).not.toHaveBeenCalled();
     const final = attempts();
     await settle(10_000);
     expect(attempts()).toBe(final);
@@ -506,7 +520,7 @@ describe('ControlDetectionCoordinator', () => {
     await h.finishGraph();
 
     expect(h.status()).toEqual({ error: { code: 'apply-failed', detail: 'PATCH 500' }, status: 'error' });
-    expect(h.derivation.commitControlMap).not.toHaveBeenCalled();
+    expect(isControlMapCurrent(h.layer())).toBe(false);
   });
 
   it('gives up a queued slot when its job is cancelled', async () => {
@@ -524,6 +538,98 @@ describe('ControlDetectionCoordinator', () => {
 
     expect(h.runFilterGraph).toHaveBeenCalledTimes(3);
     expect(h.graphs.map((graph) => graph.imageName)).toEqual(['b.png', 'd.png']);
+  });
+
+  it('never promotes a result superseded while it waits for the document', async () => {
+    const h = createHarness();
+    h.coordinator.applyIntent('a', { controlType: 'edges', kind: 'set-type' });
+    await settle();
+    const lease = h.acquireLease();
+    await h.finishGraph();
+    expect(h.status()).toEqual({ status: 'queued' });
+
+    h.coordinator.applyIntent('a', { detector: 'mlsd_detection', kind: 'set-detector' });
+    lease!.release();
+    h.emitLockChange();
+    await settle();
+    await h.finishGraph();
+
+    expect(h.makeDurable).toHaveBeenCalledExactlyOnceWith('map-2.png');
+    expect(h.layer().source).toMatchObject({ bitmap: { imageName: 'map-2.png' } });
+  });
+
+  it('keeps a cancelled job from overwriting its successor’s status', async () => {
+    const h = createHarness([photoLayer('a'), photoLayer('b'), photoLayer('c')]);
+    for (const id of ['a', 'b', 'c']) {
+      h.coordinator.applyIntent(id, { controlType: 'edges', kind: 'set-type' });
+    }
+    await settle();
+    expect(h.status('c')).toEqual({ status: 'queued' });
+
+    // `a` finishing hands its slot to `c`; before `c` resumes, a new detector replaces its job.
+    const capture = h.derivation.captureControlDetectionGuard.getMockImplementation()!;
+    h.derivation.captureControlDetectionGuard.mockImplementationOnce((layerId) => {
+      h.coordinator.applyIntent('c', { detector: 'mlsd_detection', kind: 'set-detector' });
+      return capture(layerId);
+    });
+    await h.finishGraph();
+
+    expect(h.status('c')).toEqual({ status: 'queued' });
+    await settle();
+    expect(h.status('c')).toEqual({ detector: 'mlsd_detection', status: 'processing' });
+  });
+
+  it.each([
+    [
+      'an undo of its type',
+      (layer: CanvasControlLayerContract) => ({ ...layer, controlType: undefined, detection: null }),
+    ],
+    [
+      'an undo to another detector',
+      (layer: CanvasControlLayerContract) => ({ ...layer, detection: { settings: {}, type: 'mlsd_detection' } }),
+    ],
+  ])('cancels the backend run after %s, without scheduling another', async (_label, undo) => {
+    const h = createHarness();
+    h.coordinator.applyIntent('a', { controlType: 'edges', kind: 'set-type' });
+    await settle();
+    const running = h.graphs[0]!;
+    expect(h.status()).toMatchObject({ status: 'processing' });
+
+    h.setLayer(undo(h.layer()));
+    h.coordinator.reconcileWithDocument();
+
+    expect(running.signal.aborted).toBe(true);
+    expect(h.status()).toEqual({ status: 'idle' });
+    await h.finishGraph();
+    await settle(10_000);
+    expect(h.runFilterGraph).toHaveBeenCalledOnce();
+    expect(h.derivation.commitControlMap).not.toHaveBeenCalled();
+  });
+
+  it('keeps a job whose own commit reconciles the document while it publishes', async () => {
+    const h = createHarness();
+    h.onCommitPublished(() => h.coordinator.reconcileWithDocument());
+    h.coordinator.applyIntent('a', { controlType: 'edges', kind: 'set-type' });
+    await settle();
+    const running = h.graphs[0]!;
+
+    await h.finishGraph();
+
+    expect(running.signal.aborted).toBe(false);
+    expect(isControlMapCurrent(h.layer())).toBe(true);
+    expect(h.status()).toEqual({ status: 'idle' });
+  });
+
+  it('keeps a run through document changes that leave its input alone', async () => {
+    const h = createHarness();
+    h.coordinator.applyIntent('a', { controlType: 'edges', kind: 'set-type' });
+    await settle();
+
+    h.setLayer({ ...h.layer(), name: 'Edges 1' });
+    h.coordinator.reconcileWithDocument();
+
+    expect(h.graphs[0]!.signal.aborted).toBe(false);
+    expect(h.status()).toMatchObject({ status: 'processing' });
   });
 
   it('disposes idempotently, cancelling work and releasing subscriptions', async () => {

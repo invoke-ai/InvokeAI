@@ -408,6 +408,7 @@ describe('setControlLayerView', () => {
           detection: DEPTH,
           guard,
           image: { height: 10, imageName: 'map-2', width: 10 },
+          makeDurable: () => Promise.resolve(),
           rect: { height: 10, width: 10, x: 0, y: 0 },
         });
         await h.releaseImages();

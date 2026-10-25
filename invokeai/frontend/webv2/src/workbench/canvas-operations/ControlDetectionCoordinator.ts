@@ -3,7 +3,8 @@
  * document changes never do, so undo and redo cannot re-run detection. One job per layer, at most
  * {@link CONTROL_DETECTION_MAX_CONCURRENT} graphs per engine; results land through the engine's guarded map commit,
  * which refuses while a modal operation, gesture or layer session holds the document, so a finished result waits
- * and retries instead of blocking them.
+ * and retries instead of blocking them. The commit promotes a result to durable pixels only once it is about to
+ * land, so a dropped result stays an intermediate the server collects.
  */
 
 import type { AccountOwnedResource, AccountScope } from '@platform/state/accountLifecycle';
@@ -67,7 +68,7 @@ export interface ControlDetectionCoordinatorDeps {
     outputNodeId: string;
     signal?: AbortSignal;
   }): Promise<{ height: number; imageName: string; width: number }>;
-  /** Adopts a result as canvas-owned pixels; called only for results about to commit. */
+  /** Adopts a result as canvas-owned pixels; called by the map commit once nothing refuses it. */
   makeDurable(imageName: string): Promise<void>;
   /** Notifies when the edit lease, interaction lock or an editing session may have been released. */
   subscribeLockChanges(listener: () => void): () => void;
@@ -89,7 +90,8 @@ export interface ControlDetectionCoordinator {
   /** Restarts the layers {@link suspend} interrupted that still need a map. */
   resume(): void;
   /**
-   * Follows a document change without scheduling work: drops jobs and statuses of removed layers, and settles a
+   * Follows a document change without scheduling work: drops jobs and statuses of removed layers, cancels a job whose
+   * layer no longer needs it or whose input changed other than by its own paint landing (undo, redo), and settles a
    * leftover error or queued status once the layer needs no detection (an undo past the failed edit).
    */
   reconcileWithDocument(): void;
@@ -130,9 +132,16 @@ interface Job {
   readonly controller: AbortController;
   /** The input key it detects (updated once a flush settles the paint); a command for the same key keeps it. */
   inputKey: string;
+  /** The layer `inputKey` was read from, to tell the layer's own paint landing apart from other input changes. */
+  recipe: CanvasControlLayerContract;
   readonly restarts: number;
   timer: ReturnType<typeof setTimeout> | null;
   running: boolean;
+  /**
+   * While its map commit runs: the commit's own publish changes the document and reconciles synchronously, and the
+   * engine's checks already settle what the job's result may still do.
+   */
+  committing: boolean;
   /** Ends a commit retry wait early (a lock was released). */
   wake: (() => void) | null;
 }
@@ -221,6 +230,13 @@ export const createControlDetectionCoordinator = (
     return layer?.type === 'control' ? layer : null;
   };
 
+  /** Writes only while `job` is its layer's job, so a cancelled job never overwrites its successor's status. */
+  const setJobStatus = (job: Job, status: ControlDetectionStatus): void => {
+    if (jobs.get(job.layerId) === job) {
+      statuses.set(job.layerId, status);
+    }
+  };
+
   const cancelJob = (layerId: string): void => {
     const job = jobs.get(layerId);
     if (!job) {
@@ -284,14 +300,28 @@ export const createControlDetectionCoordinator = (
   ): Promise<JobOutcome> => {
     const startedAt = Date.now();
     let delay: number = CONTROL_DETECTION_COMMIT_RETRY_MS.initial;
+    let durable = false;
+    const makeDurable = async (): Promise<void> => {
+      if (!durable) {
+        await deps.makeDurable(map.image.imageName);
+        durable = true;
+      }
+    };
     for (;;) {
-      const result = await deps.derivation.commitControlMap({
-        detection,
-        guard,
-        image: map.image,
-        rect: map.rect,
-        signal,
-      });
+      job.committing = true;
+      let result: Awaited<ReturnType<ControlDerivationPort['commitControlMap']>>;
+      try {
+        result = await deps.derivation.commitControlMap({
+          detection,
+          guard,
+          image: map.image,
+          makeDurable,
+          rect: map.rect,
+          signal,
+        });
+      } finally {
+        job.committing = false;
+      }
       switch (result.status) {
         case 'committed':
           return { kind: 'committed' };
@@ -316,7 +346,7 @@ export const createControlDetectionCoordinator = (
           if (remaining <= 0) {
             return errorOutcome('commit-busy', result.message);
           }
-          statuses.set(job.layerId, QUEUED);
+          setJobStatus(job, QUEUED);
           await waitForRetry(job, Math.min(delay, remaining), signal);
           delay = Math.min(delay * 2, CONTROL_DETECTION_COMMIT_RETRY_MS.max);
           break;
@@ -350,30 +380,20 @@ export const createControlDetectionCoordinator = (
       return { kind: 'drop' };
     }
     job.inputKey = guard.inputKey;
+    job.recipe = layer;
     const recipe = layer;
     const { detection } = layer;
 
     await acquireSlot(signal);
     let map: ControlDetectionMap;
     try {
-      statuses.set(job.layerId, { detector: detection.type, status: 'processing' });
+      setJobStatus(job, { detector: detection.type, status: 'processing' });
       map = await runControlDetection({ detection, input, runFilterGraph: deps.runFilterGraph, signal });
     } finally {
       releaseSlot();
     }
 
-    let check = checkGuard(guard, recipe);
-    if (check !== 'current') {
-      return { kind: check };
-    }
-    try {
-      await deps.makeDurable(map.image.imageName);
-    } catch (error) {
-      signal.throwIfAborted();
-      return errorOutcome('apply-failed', failureDetail(error));
-    }
-    signal.throwIfAborted();
-    check = checkGuard(guard, recipe);
+    const check = checkGuard(guard, recipe);
     if (check !== 'current') {
       return { kind: check };
     }
@@ -396,9 +416,11 @@ export const createControlDetectionCoordinator = (
     }
     cancelJob(layerId);
     const job: Job = {
+      committing: false,
       controller: new AbortController(),
       inputKey,
       layerId,
+      recipe: layer,
       restarts,
       running: false,
       timer: null,
@@ -538,9 +560,23 @@ export const createControlDetectionCoordinator = (
           settleWithoutDetection(layerId);
           continue;
         }
-        // A job settles its own status; only one left behind by a failed or interrupted run is stale here.
+        const job = jobs.get(layerId);
+        if (job?.committing) {
+          continue;
+        }
+        if (job) {
+          // History moved the layer away from what the job detects: its result would be dropped, so stop the graph
+          // now. The layer's own paint landing keeps it, to restart once it finishes.
+          const inputChanged =
+            controlDetectionInputKey(layer) !== job.inputKey && !onlyOwnPaintChanged(job.recipe, layer);
+          if (!wantsDetection(layer) || inputChanged) {
+            settleWithoutDetection(layerId);
+          }
+          continue;
+        }
+        // Only a status left behind by a failed or interrupted run is stale here.
         const { status } = statuses.get(layerId);
-        if (!jobs.has(layerId) && (status === 'error' || status === 'queued') && !wantsDetection(layer)) {
+        if ((status === 'error' || status === 'queued') && !wantsDetection(layer)) {
           interrupted.delete(layerId);
           statuses.set(layerId, IDLE_CONTROL_DETECTION_STATUS);
         }
