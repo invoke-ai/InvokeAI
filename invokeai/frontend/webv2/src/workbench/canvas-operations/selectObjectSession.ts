@@ -131,6 +131,9 @@ const getPreparedSourceError = (
   if (result.status === 'dimension-mismatch') {
     return withDetail('output-dimension', result.message);
   }
+  if (result.status === 'adjustment-refused') {
+    return { code: `adjustment-${result.reason}` };
+  }
   return { code: 'not-ready' };
 };
 

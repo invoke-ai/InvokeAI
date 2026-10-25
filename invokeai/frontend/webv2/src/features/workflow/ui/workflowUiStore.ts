@@ -19,8 +19,8 @@ export type AddNodeConnectionFilter =
 
 /** Bridge transient menu actions to always-mounted workflow dialogs and file input through session UI state. */
 
-/** The library dialog's views: the project's own workflows, bundled templates, or the account's templates. */
-export type WorkflowLibraryTab = 'project' | 'default' | 'user';
+/** The library dialog's views: project workflows, bundled templates, owned templates, or public templates. */
+export type WorkflowLibraryTab = 'project' | 'default' | 'user' | 'shared';
 
 /** What a surface asked the publication host to do with one project workflow. */
 export type WorkflowPublicationIntent =

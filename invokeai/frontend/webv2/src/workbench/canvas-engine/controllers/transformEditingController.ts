@@ -42,7 +42,7 @@ export interface TransformEditingControllerOptions {
 
 const IDENTITY: LayerTransform = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
 
-const isRefusal = (status: string): status is CanvasEditRefusal =>
+const isRefusal = (status: string): status is Extract<CanvasEditRefusal, string> =>
   status === 'busy' || status === 'gesture-active' || status === 'not-ready' || status === 'over-budget';
 
 const unchanged = (left: LayerTransform, right: LayerTransform): boolean =>

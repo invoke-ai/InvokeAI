@@ -40,9 +40,9 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { COLOR_LABEL_ITEMS } from './colorLabels';
-import { ADJUSTMENT_ADD_ITEMS } from './layerContextActions';
+import { ADJUSTMENT_ADD_ITEMS, adjustmentAddActionId } from './layerContextActions';
 import { canGroupSelection, groupLayers, ungroupLayers } from './layerGroupCommands';
-import { createIdentityAdjustment } from './layerOps';
+import { createAdjustmentEntry } from './layerOps';
 
 const SUBMENU_POSITIONING = { placement: 'right-start' } as const;
 
@@ -211,7 +211,7 @@ export const LayerGroupContextMenu = ({
 
   const handleAddAdjustment = useCallback(
     (type: CanvasAdjustmentEntry['type']) => () => {
-      const entry = createIdentityAdjustment(type);
+      const entry = createAdjustmentEntry(type);
       const before = group.adjustments ?? [];
       commitPrepared(t('widgets.layers.menu.addAdjustment'), (model) =>
         model.prepare({
@@ -302,7 +302,7 @@ export const LayerGroupContextMenu = ({
                       key={item.type}
                       icon={item.icon}
                       label={t(item.labelKey)}
-                      value={`add-${item.type}`}
+                      value={adjustmentAddActionId(item)}
                       onSelect={handleAddAdjustment(item.type)}
                     />
                   ))}
