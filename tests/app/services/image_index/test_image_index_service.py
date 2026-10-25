@@ -1306,7 +1306,7 @@ def test_activation_prunes_only_obsolete_vocabulary_archives(
         "cluster_vocab_old.npz123.tmp.npz",
         "cluster_vocab_old.npz.random.tmp.npz",
         "cluster_vocab_custom_old.npz.random.tmp.npz",
-        "cluster_vocab_old.npz.random.TMP.NPZ",
+        "cluster_vocab_old.npz.uppercase.TMP.NPZ",
         "cluster_vocab_old.npz.bak",
         "other-cache.npz",
         "invokeai.db",
