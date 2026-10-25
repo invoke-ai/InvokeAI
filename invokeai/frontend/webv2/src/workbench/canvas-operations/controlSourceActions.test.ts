@@ -4,7 +4,12 @@ import type { Project } from '@workbench/projectContracts';
 
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { createControlLayer } from '@workbench/canvas-engine/api';
-import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import {
+  documentFrom,
+  groupContract,
+  layerContract,
+  stacksFrom,
+} from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createTestInsertionAnchorCapture } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import { createInitialWorkbenchState } from '@workbench/workbenchState.testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -12,7 +17,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { uploadCanvasImage } from './backend/canvasImages';
 import type { ControlLayerIntent, ControlLayerIntentResult } from './operationTypes';
 
-import { fillControlFromBbox, sendGalleryImageAsControl } from './controlSourceActions';
+import {
+  fillControlFromBbox,
+  getControlSourceSnapshot,
+  resolveControlFileDrop,
+  sendGalleryImageAsControl,
+  uploadControlImageFile,
+} from './controlSourceActions';
 import { attachCanvasOperations } from './operationAccess';
 
 const BBOX = { height: 512, width: 768, x: 31, y: 47 };
@@ -221,5 +232,138 @@ describe('sendGalleryImageAsControl', () => {
 
     const busy = liveEngine(project, { intentResult: 'blocked' });
     await expect(send(project, busy.engine).result).resolves.toEqual({ status: 'blocked' });
+  });
+});
+
+describe('uploadControlImageFile', () => {
+  const FILE = new File(['png'], 'photo.png', { type: 'image/png' });
+  const UPLOADED = { height: 64, imageName: 'photo-upload.png', width: 96 } as GalleryImage;
+
+  /** A canvas holding `layer`; `pixels` stands for strokes only the engine's cache holds, and can change. */
+  const canvasWith = (layer: CanvasLayerContract) => {
+    const pixels = { drawn: false };
+    const intents: ControlLayerIntent[] = [];
+    const engine = {
+      document: { getDocument: () => ({ ...documentFrom([layer], layer.id), bbox: BBOX }) },
+      exports: { hasExportableLayerContent: () => pixels.drawn },
+    };
+    attachCanvasOperations(engine, {
+      applyControlLayerIntent: (_layerId: string, intent: ControlLayerIntent) => {
+        intents.push(intent);
+        return 'updated';
+      },
+    } as never);
+    return { engine, intents, pixels };
+  };
+
+  it('places the file at the bbox origin and names the image after it', async () => {
+    const { engine, intents } = canvasWith(createControlLayer({ id: 'control-1', name: 'Depth 1' }));
+    const onUploaded = vi.fn();
+
+    await expect(
+      uploadControlImageFile({
+        engine,
+        file: FILE,
+        layerId: 'control-1',
+        onUploaded,
+        uploadImage: () => Promise.resolve(UPLOADED),
+      })
+    ).resolves.toEqual({ imageName: 'photo-upload.png', result: 'updated', status: 'applied' });
+    expect(intents).toEqual([
+      {
+        image: { height: 64, imageName: 'photo-upload.png', width: 96 },
+        kind: 'replace-image',
+        transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 31, y: 47 },
+      },
+    ]);
+    expect(onUploaded).toHaveBeenCalledOnce();
+    expect(getControlSourceSnapshot(engine).origins['photo-upload.png']).toEqual({ kind: 'file', name: 'photo.png' });
+  });
+
+  it('leaves strokes drawn on an empty layer during the upload in place', async () => {
+    const { engine, intents, pixels } = canvasWith(createControlLayer({ id: 'control-1', name: 'Depth 1' }));
+    const onUploaded = vi.fn();
+    const uploadImage = () => {
+      pixels.drawn = true;
+      return Promise.resolve(UPLOADED);
+    };
+
+    await expect(
+      uploadControlImageFile({ engine, file: FILE, layerId: 'control-1', onUploaded, uploadImage })
+    ).resolves.toEqual({ status: 'changed' });
+    expect(intents).toEqual([]);
+    // The image is stored all the same, so the gallery that now lists it is refreshed.
+    expect(onUploaded).toHaveBeenCalledOnce();
+    expect(getControlSourceSnapshot(engine).uploading.has('control-1')).toBe(false);
+  });
+
+  it('replaces the image a layer already had, as the Replace button asks', async () => {
+    const withImage = {
+      ...createControlLayer({ id: 'control-1', name: 'Depth 1' }),
+      source: { image: { height: 8, imageName: 'old.png', width: 8 }, type: 'image' },
+    } as CanvasControlLayerContract;
+    const { engine, intents } = canvasWith(withImage);
+
+    await expect(
+      uploadControlImageFile({ engine, file: FILE, layerId: 'control-1', uploadImage: () => Promise.resolve(UPLOADED) })
+    ).resolves.toMatchObject({ status: 'applied' });
+    expect(intents).toHaveLength(1);
+  });
+});
+
+/** Decides the canvas's drop effect while files hover, and whether a drop is used. */
+describe('resolveControlFileDrop', () => {
+  const emptyControl = createControlLayer({ id: 'control-1', name: 'Depth 1' });
+  const IMAGE_ITEM = { type: 'image/png' };
+  const resolve = (
+    nodes: Parameters<typeof documentFrom>[0],
+    selectedLayerId: string,
+    { files = [IMAGE_ITEM] as { type: string }[], hasPixels = false, isCanvasLocked = false } = {}
+  ) =>
+    resolveControlFileDrop({
+      document: documentFrom(nodes, selectedLayerId),
+      engine: { exports: { hasExportableLayerContent: () => hasPixels } },
+      files,
+      isCanvasLocked,
+    });
+  const refusedWith = (titleKey: string) => ({ notice: { kind: 'info', titleKey }, status: 'refused' });
+
+  it('takes one image file onto an empty, unlocked control layer', () => {
+    expect(resolve([emptyControl], 'control-1')).toEqual({ layerId: 'control-1', status: 'accepted' });
+  });
+
+  it.each([
+    [
+      'several files',
+      [emptyControl],
+      {
+        files: [IMAGE_ITEM, IMAGE_ITEM],
+      },
+      'widgets.canvas.fileDrop.oneFile',
+    ],
+    [
+      'a file that is not an image',
+      [emptyControl],
+      { files: [{ type: 'text/plain' }] },
+      'widgets.canvas.fileDrop.notImage',
+    ],
+    ['a locked canvas', [emptyControl], { isCanvasLocked: true }, 'widgets.layers.actions.busy'],
+    ['a layer with strokes', [emptyControl], { hasPixels: true }, 'widgets.canvas.fileDrop.noTarget'],
+    [
+      'a layer locked by its group',
+      [groupContract('group-1', [emptyControl], { isLocked: true })],
+      {},
+      'widgets.layers.actions.locked',
+    ],
+  ] as const)('refuses %s', (_label, nodes, options, titleKey) => {
+    expect(
+      resolve([...nodes], 'control-1', { ...options, files: 'files' in options ? [...options.files] : undefined })
+    ).toEqual(refusedWith(titleKey));
+  });
+
+  it('refuses a selected layer that is not a control layer', () => {
+    expect(resolve([layerContract('raster-1', 'raster')], 'raster-1')).toEqual(
+      refusedWith('widgets.canvas.fileDrop.noTarget')
+    );
   });
 });

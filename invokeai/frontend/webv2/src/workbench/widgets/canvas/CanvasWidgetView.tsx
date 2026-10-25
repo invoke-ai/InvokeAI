@@ -214,8 +214,9 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   const isInteractionLocked = interactionCapabilities.isSurfaceInteractionLocked;
 
   // A desktop file dropped on the canvas fills the selected control layer while it is empty, as the hint over it
-  // says. Every file drag is taken here, since the browser's default would navigate away from the app; a drop the
-  // canvas cannot use says why instead of doing nothing.
+  // says. Every file drag is taken here, since the browser's default would navigate away from the app. While it
+  // hovers, the drop effect shows whether the canvas would take it; a drop that still arrives and cannot be used
+  // says why instead of doing nothing.
   const queryClient = useQueryClient();
   const showNotice = useCallback(
     (notice: ControlSourceNotice | null) => {
@@ -229,11 +230,27 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
     },
     [notifications, t]
   );
-  const handleFileDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
-    if (isFileDrag(event.dataTransfer)) {
+  const isFileDropLocked = isInteractionLocked || interactionCapabilities.isDocumentEditingLocked;
+  const handleFileDragOver = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>) => {
+      const { dataTransfer } = event;
+      if (!isFileDrag(dataTransfer)) {
+        return;
+      }
       event.preventDefault();
-    }
-  }, []);
+      const accepted =
+        engine !== null &&
+        resolveControlFileDrop({
+          document,
+          engine,
+          // File contents stay hidden until the drop, but each item's type is readable while it hovers.
+          files: [...dataTransfer.items].filter((item) => item.kind === 'file'),
+          isCanvasLocked: isFileDropLocked,
+        }).status === 'accepted';
+      dataTransfer.dropEffect = accepted ? 'copy' : 'none';
+    },
+    [document, engine, isFileDropLocked]
+  );
   const handleFileDrop = useCallback(
     (event: ReactDragEvent<HTMLDivElement>) => {
       if (!isFileDrag(event.dataTransfer)) {
@@ -248,7 +265,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         document,
         engine,
         files,
-        isCanvasLocked: isInteractionLocked || interactionCapabilities.isDocumentEditingLocked,
+        isCanvasLocked: isFileDropLocked,
       });
       if (resolution.status === 'refused') {
         showNotice(resolution.notice);
@@ -261,7 +278,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         onUploaded: (owner) => void invalidateGallery(queryClient, owner),
       }).then((outcome) => showNotice(getControlUploadNotice(outcome)));
     },
-    [document, engine, interactionCapabilities.isDocumentEditingLocked, isInteractionLocked, queryClient, showNotice]
+    [document, engine, isFileDropLocked, queryClient, showNotice]
   );
   const handleSurfaceContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {

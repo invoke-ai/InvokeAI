@@ -94,6 +94,8 @@ export type UploadControlImageResult =
   | { status: 'applied'; result: ControlLayerIntentResult; imageName: string }
   /** Another upload to the layer is still on its way. */
   | { status: 'uploading' }
+  /** The layer was empty when the upload started and is not now (drawn on, or no longer a control layer). */
+  | { status: 'changed' }
   | { status: 'stale' }
   | { status: 'failed'; message: string };
 
@@ -101,10 +103,15 @@ export type UploadControlImageResult =
  * Uploads an image file and makes it a control layer's image at the bbox origin (`replace-image`, which detects its
  * map), recording the file's name as the image's origin. The Properties Upload button and a file dropped on the
  * canvas share it. One upload per layer at a time; `onUploaded` runs once the file is stored, for the caller to
- * refresh the gallery it now appears in. The upload stays with the account that started it.
+ * refresh the gallery it now appears in. A layer that was empty when the upload started must still be, so strokes
+ * drawn meanwhile are never replaced; replacing an image the layer already had is what was asked for. The upload
+ * stays with the account that started it.
  */
 export const uploadControlImageFile = async (options: {
-  engine: { readonly document: Pick<CanvasDocumentCapability, 'getDocument'> };
+  engine: {
+    readonly document: Pick<CanvasDocumentCapability, 'getDocument'>;
+    readonly exports: Pick<CanvasExportCapability, 'hasExportableLayerContent'>;
+  };
   layerId: string;
   file: File;
   onUploaded?: (owner: AccountScope) => void;
@@ -114,12 +121,24 @@ export const uploadControlImageFile = async (options: {
   if (getControlSourceSnapshot(engine).uploading.has(layerId)) {
     return { status: 'uploading' };
   }
+  const isEmptyControlLayer = (): boolean => {
+    const document = engine.document.getDocument();
+    const layer = document ? getDocumentLayer(document, layerId) : null;
+    return (
+      layer?.type === 'control' &&
+      getControlImageState(layer, engine.exports.hasExportableLayerContent(layerId)) === 'empty'
+    );
+  };
+  const wasEmpty = isEmptyControlLayer();
   const owner = captureAccountScope();
   setUploading(engine, layerId, true);
   try {
     const uploaded = await uploadImage(file, 'none', { signal: owner.signal });
     assertAccountScopeCurrent(owner);
     onUploaded?.(owner);
+    if (wasEmpty && !isEmptyControlLayer()) {
+      return { status: 'changed' };
+    }
     const bbox = engine.document.getDocument()?.bbox;
     const result = getCanvasOperations(engine).applyControlLayerIntent(layerId, {
       image: { height: uploaded.height, imageName: uploaded.imageName, width: uploaded.width },
@@ -180,6 +199,8 @@ export const getControlUploadNotice = (outcome: UploadControlImageResult): Contr
       return getControlIntentNotice(outcome.result);
     case 'uploading':
       return { kind: 'info', titleKey: 'widgets.layers.control.source.uploadPending' };
+    case 'changed':
+      return { kind: 'info', titleKey: 'widgets.layers.control.source.changedDuringUpload' };
     case 'failed':
       return { kind: 'error', message: outcome.message, titleKey: 'widgets.layers.control.source.uploadFailed' };
     case 'stale':
@@ -195,7 +216,8 @@ export type ControlFileDropResolution =
 /**
  * Whether files dragged onto the canvas can fill the selected control layer: exactly one image file, the canvas
  * accepting edits, and the selected layer a control layer that is not locked (by itself or a group) and still empty.
- * `files` are the drag's file items while it hovers, and its files once dropped.
+ * `files` are the drag's file items while it hovers (their `type` is readable then, to set the drop effect), and its
+ * files once dropped.
  */
 export const resolveControlFileDrop = (input: {
   document: CanvasDocumentContractV3;

@@ -753,9 +753,10 @@ describe('ControlLayerSettings adapter rows', () => {
     const group = page.getByRole('radiogroup', { name: 'Priority' });
     await expect.element(group).toHaveAccessibleDescription('Priority applies to ControlNet models only.');
     await expect.element(page.getByRole('radio', { name: 'Control' })).toBeDisabled();
-    // The disabled radios take no focus; the group does, and shows the reason.
+    // The disabled radios take no focus; the radiogroup itself does, once, and shows the reason.
+    expect(page.getByRole('group', { name: 'Priority' }).elements()).toHaveLength(0);
     await act(() => userEvent.tab());
-    const reasonGroup = page.getByRole('group', { name: 'Priority' });
+    const reasonGroup = page.getByRole('radiogroup', { name: 'Priority' });
     while (document.activeElement !== reasonGroup.element() && host!.contains(document.activeElement)) {
       await act(() => userEvent.tab());
     }
@@ -772,7 +773,7 @@ describe('ControlLayerSettings adapter rows', () => {
     await expect
       .element(page.getByRole('radiogroup', { name: 'Priority' }))
       .toHaveAccessibleDescription('FLUX ControlNets have no priority setting.');
-    await userEvent.hover(page.getByRole('group', { name: 'Priority' }));
+    await userEvent.hover(page.getByRole('radiogroup', { name: 'Priority' }));
     await expect.element(page.getByRole('tooltip')).toHaveTextContent('FLUX ControlNets have no priority setting.');
   });
 

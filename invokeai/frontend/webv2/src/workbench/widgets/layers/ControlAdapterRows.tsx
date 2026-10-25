@@ -195,34 +195,26 @@ export const ControlAdapterRows = ({
         </Text>
       </PropertyControlRow>
       <PropertyControlRow label={priorityLabel}>
-        {/* Disabled radios take no focus, so the group itself does while unavailable: its reason shows on focus too. */}
-        <Tooltip content={priorityUnavailable} disabled={priorityUnavailable === null}>
-          <Box
-            aria-describedby={priorityUnavailable ? priorityReasonId : undefined}
-            aria-label={priorityUnavailable ? priorityLabel : undefined}
-            focusVisibleRing="outside"
-            gridColumn="2 / -1"
-            minW="0"
-            opacity={priorityUnavailable ? 0.45 : undefined}
-            role={priorityUnavailable ? 'group' : undefined}
-            rounded="sm"
-            tabIndex={priorityUnavailable ? 0 : undefined}
-          >
+        <Box gridColumn="2 / -1" minW="0" opacity={priorityUnavailable ? 0.45 : undefined}>
+          {/* Disabled radios take no focus, so the radiogroup itself does while unavailable, showing its reason. */}
+          <Tooltip content={priorityUnavailable} disabled={priorityUnavailable === null}>
             <SegmentedControl
               aria-describedby={priorityUnavailable ? priorityReasonId : undefined}
               ariaLabel={priorityLabel}
               disabled={disabled || priorityUnavailable !== null}
+              focusVisibleRing="outside"
               options={priorityOptions}
+              tabIndex={priorityUnavailable ? 0 : undefined}
               value={model.priority.value}
               onChange={handlePriority}
             />
-            {priorityUnavailable ? (
-              <span hidden id={priorityReasonId}>
-                {priorityUnavailable}
-              </span>
-            ) : null}
-          </Box>
-        </Tooltip>
+          </Tooltip>
+          {priorityUnavailable ? (
+            <span hidden id={priorityReasonId}>
+              {priorityUnavailable}
+            </span>
+          ) : null}
+        </Box>
       </PropertyControlRow>
     </>
   );

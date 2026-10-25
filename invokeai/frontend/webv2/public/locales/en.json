@@ -4225,7 +4225,8 @@
           "frameNotReady": "The canvas is still preparing image data. Try again shortly.",
           "frameFailed": "Couldn't use the frame",
           "uploadFailed": "Couldn't use that image",
-          "uploadPending": "An image is still uploading to this layer."
+          "uploadPending": "An image is still uploading to this layer.",
+          "changedDuringUpload": "The layer changed while the image uploaded, so the image was not used."
         },
         "stepsReadout": "{{begin}}–{{end}}%",
         "summary": {

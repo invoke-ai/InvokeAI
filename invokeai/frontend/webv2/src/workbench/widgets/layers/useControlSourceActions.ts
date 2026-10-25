@@ -1,4 +1,8 @@
-import type { CanvasDocumentCapability, CanvasToolCapability } from '@workbench/canvas-engine/api';
+import type {
+  CanvasDocumentCapability,
+  CanvasExportCapability,
+  CanvasToolCapability,
+} from '@workbench/canvas-engine/api';
 import type {
   CanvasCompositeExportEngine,
   ControlLayerIntent,
@@ -28,6 +32,7 @@ export type ControlSourceAction = 'upload' | 'frame' | 'draw';
 /** The engine surface the Image row's actions need. */
 export type ControlSourceEngine = CanvasCompositeExportEngine & {
   readonly document: CanvasDocumentCapability;
+  readonly exports: Pick<CanvasExportCapability, 'hasExportableLayerContent'>;
   readonly projectId: string;
   readonly tools: Pick<CanvasToolCapability, 'setTool'>;
 };
