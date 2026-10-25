@@ -150,13 +150,40 @@ describe('loadCanvasState', () => {
     });
   });
 
-  it('repairs a persisted Qwen-Image control weight below the node floor with the kind default', () => {
+  it('keeps a control layer mode and negative weight whatever kind it stores, live, in snapshots and in session', () => {
+    // Created under Z-Image, then run on SDXL with a negative weight: the stored kind is advisory, the resolved one
+    // governs, so the document must load and save as it is.
+    const adapter = {
+      beginEndStepPct: [0.1, 0.9],
+      controlMode: 'more_control',
+      kind: 'z_image_control',
+      model: null,
+      weight: -0.3,
+    };
+    const state = withNodes([{ ...createControlLayer({ id: 'z-control', name: 'Z Control' }), adapter }], 'control');
+    const loaded = load({
+      ...state,
+      snapshots: [{ createdAt: 'now', document: state.document, id: 'snapshot', name: 'Snapshot' }],
+    });
+    const adapterOf = (document: (typeof loaded)['document']) => {
+      const layer = document.stacks.control[0];
+      return layer?.type === 'control' ? layer.adapter : null;
+    };
+
+    expect(adapterOf(loaded.document)).toEqual(adapter);
+    expect(adapterOf(loaded.snapshots[0]!.document)).toEqual(adapter);
+    // Snapshot save and restore and document replace normalize in session; a refusal there would silently no-op.
+    const normalized = normalizeCanvasDocumentContract(loaded.document);
+    expect(normalized && adapterOf(normalized)).toEqual(adapter);
+  });
+
+  it('repairs a persisted control weight outside what any kind runs with the kind default', () => {
     const loaded = load(
       withNodes(
         [
           {
             ...createControlLayer({ id: 'q-control', name: 'Q Control' }),
-            adapter: { kind: 'qwen_image_control', model: 'qwen-union', weight: -0.5 },
+            adapter: { kind: 'qwen_image_control', model: 'qwen-union', weight: -1.5 },
           },
         ],
         'control'
@@ -450,7 +477,7 @@ describe('loadCanvasState', () => {
   it('normalizes control adapters in both the live document and saved snapshots', () => {
     const invalidLayer = {
       ...createControlLayer({ id: 'z-control', name: 'Z Control' }),
-      adapter: { beginEndStepPct: [0.8, 0.2], controlMode: null, kind: 'z_image_control', model: null, weight: -1 },
+      adapter: { beginEndStepPct: [0.8, 0.2], controlMode: null, kind: 'z_image_control', model: null, weight: -1.5 },
     };
     const state = withNodes([invalidLayer], 'control');
     const loaded = load({

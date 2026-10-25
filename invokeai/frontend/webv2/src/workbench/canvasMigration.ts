@@ -12,7 +12,6 @@ import type {
   LayerStackKind,
 } from '@workbench/canvas-engine/api';
 
-import { getControlAdapterMinWeight } from '@features/generation/graph';
 import { createItemId } from '@platform/browser/randomUuid';
 import {
   CANVAS_MAX_NODE_COUNT,
@@ -26,7 +25,7 @@ import { z } from 'zod';
 import type { CanvasLoadDiagnostic, CanvasLoadResult, CanvasVersionScope } from './canvasLoadContracts';
 
 import { MAX_SUPPORTED_CANVAS_SCHEMA_VERSION, MIN_SUPPORTED_CANVAS_SCHEMA_VERSION } from './canvasSchemaVersion';
-import { normalizeControlAdapter } from './controlAdapters';
+import { isStorableControlStepRange, isStorableControlWeight, normalizeControlAdapter } from './controlAdapters';
 
 export const DEFAULT_CANVAS_DOCUMENT_WIDTH = 1024;
 export const DEFAULT_CANVAS_DOCUMENT_HEIGHT = 1024;
@@ -163,11 +162,10 @@ const zControlAdapter = z
     model: z.string().nullable(),
     weight: zFiniteNumber,
   })
-  .refine(({ beginEndStepPct }) => {
-    const [begin, end] = beginEndStepPct;
-    return begin >= 0 && end <= 1 && begin < end;
-  })
-  .refine(({ kind, weight }) => weight >= getControlAdapterMinWeight(kind) && weight <= 2);
+  // The same bounds for every kind: the stored kind is advisory (the resolved kind governs in the panel, readiness
+  // validation and the graph), and a refusal here would reject the whole document.
+  .refine(({ beginEndStepPct }) => isStorableControlStepRange(beginEndStepPct))
+  .refine(({ weight }) => isStorableControlWeight(weight));
 const zMaskFill = z.object({
   color: z.string(),
   style: z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']),
