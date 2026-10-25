@@ -225,6 +225,23 @@ const FUN_UNION_BASES: ReadonlySet<string> = new Set(['z-image', 'qwen-image', '
 const FUN_UNION_COVERS: readonly ControlFamily[] = ['canny', 'mlsd', 'softedge', 'depth', 'openpose'];
 /** InstantX FLUX.1 Union modes the control types map onto. */
 const FLUX_UNION_COVERS: readonly ControlFamily[] = ['canny', 'tile', 'depth', 'openpose'];
+/** The xinsir SDXL Union (ProMax) conditions; upscale also takes an SDXL union as its tile ControlNet. */
+const SDXL_UNION_COVERS: readonly ControlFamily[] = [
+  'openpose',
+  'depth',
+  'canny',
+  'mlsd',
+  'lineart',
+  'lineart_anime',
+  'scribble',
+  'softedge',
+  'normal',
+  'tile',
+];
+const UNION_COVERS_BY_BASE: Readonly<Record<string, readonly ControlFamily[]>> = {
+  flux: FLUX_UNION_COVERS,
+  sdxl: SDXL_UNION_COVERS,
+};
 
 /** Lowercase name words, split at punctuation and camelCase boundaries. */
 const nameTokens = (name: string): string[] =>
@@ -275,21 +292,37 @@ const preprocessorFamily = (model: Pick<ModelConfig, 'default_settings'>): Contr
   return preprocessor && Object.hasOwn(PREPROCESSOR_FAMILY, preprocessor) ? PREPROCESSOR_FAMILY[preprocessor]! : null;
 };
 
-/**
- * Classify a control model: union models first (a base's Fun union, a FLUX union, any other `union` name), then
- * strong name words, the saved preprocessor, and the remaining name words.
- */
-export const classifyControlModel = (
-  model: Pick<ModelConfig, 'name' | 'base' | 'type' | 'default_settings'>
-): ControlModelClass => {
+type ClassifiableModel = Pick<ModelConfig, 'name' | 'base' | 'type' | 'default_settings'>;
+
+const classify = (model: ClassifiableModel): ControlModelClass => {
   const tokens = nameTokens(model.name);
   if (model.type === 'controlnet' && FUN_UNION_BASES.has(model.base)) {
     return { covers: FUN_UNION_COVERS, family: null, purpose: null, union: true };
   }
   if (hasToken(tokens, 'union')) {
     // Other bases' union models need the backend to expose their control types; until then they are explicit picks.
-    return { covers: model.base === 'flux' ? FLUX_UNION_COVERS : [], family: null, purpose: null, union: true };
+    return { covers: UNION_COVERS_BY_BASE[model.base] ?? [], family: null, purpose: null, union: true };
   }
   const family = strongNameFamily(tokens) ?? preprocessorFamily(model) ?? weakNameFamily(tokens);
   return { covers: [], family, purpose: family ? FAMILY_PURPOSE[family] : null, union: false };
+};
+
+/**
+ * Resolution, row renders and readiness ticks classify the same model configs over and over. Configs are replaced,
+ * never mutated, so a config object keys its class for as long as anything holds it.
+ */
+const classCache = new WeakMap<ClassifiableModel, ControlModelClass>();
+
+/**
+ * Classify a control model: union models first (a base's Fun union; a FLUX or SDXL union, covering its known
+ * conditions; any other `union` name, covering nothing), then strong name words, the saved preprocessor, and the
+ * remaining name words.
+ */
+export const classifyControlModel = (model: ClassifiableModel): ControlModelClass => {
+  let modelClass = classCache.get(model);
+  if (!modelClass) {
+    modelClass = classify(model);
+    classCache.set(model, modelClass);
+  }
+  return modelClass;
 };

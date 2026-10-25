@@ -129,7 +129,12 @@ describe('classifyControlModel', () => {
   });
 
   it.each([
-    ['an SDXL union, offered only as an explicit pick', model('controlnet-union-sdxl-promax', 'sdxl'), []],
+    [
+      'an SDXL union, covering the xinsir ProMax conditions',
+      model('xinsir-controlnet-union-sdxl-promax', 'sdxl'),
+      ['openpose', 'depth', 'canny', 'mlsd', 'lineart', 'lineart_anime', 'scribble', 'softedge', 'normal', 'tile'],
+    ],
+    ['an SD1.5 union, offered only as an explicit pick', model('controlnet-union-sd15', 'sd-1'), []],
     [
       'a FLUX union, covering the InstantX modes',
       model('FLUX.1-dev-Controlnet-Union-Pro', 'flux', 'controlnet', 'canny_image_processor'),
@@ -140,5 +145,14 @@ describe('classifyControlModel', () => {
     ['a FLUX.2 Fun union', model('FLUX.2-dev-Fun-Controlnet', 'flux2'), FUN_COVERS],
   ] as const)('classifies %s', (_label, input, covers) => {
     expect(classifyControlModel(input)).toEqual({ covers, family: null, purpose: null, union: true });
+  });
+
+  it('classifies a replaced model config afresh', () => {
+    const config = model('control_v11p_sd15_canny', 'sd-1');
+    expect(classifyControlModel(config).family).toBe('canny');
+
+    // A renamed model arrives as a new config object; the class must follow the new name.
+    expect(classifyControlModel({ ...config, name: 'control_v11f1p_sd15_depth' }).family).toBe('depth');
+    expect(classifyControlModel(config).family).toBe('canny');
   });
 });

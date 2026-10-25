@@ -107,7 +107,7 @@ export type FilterCommitTarget = RasterFilterCommitTarget;
  * starts from the detector's defaults with the type's fixed settings; `draw` empties the image for painting.
  */
 export type ControlLayerIntent =
-  | { kind: 'set-type'; controlType: ControlType | null; name?: string }
+  | { kind: 'set-type'; controlType: ControlType; name?: string }
   | { kind: 'set-detector'; detector: string | null }
   | { kind: 'set-detector-settings'; settings: Record<string, unknown> }
   | { kind: 'replace-image'; image: CanvasImageRef; transform?: LayerTransform }

@@ -58,21 +58,9 @@ const withoutDerivedPixels = (layer: CanvasControlLayerContract): CanvasControlL
 
 const setType = (
   layer: CanvasControlLayerContract,
-  controlType: ControlType | null,
+  controlType: ControlType,
   options: ControlLayerIntentOptions
 ): CanvasControlLayerContract => {
-  if (controlType === null) {
-    if (layer.controlType === undefined) {
-      return layer;
-    }
-    // Restore first, so the image the user brought is what an untyped layer keeps.
-    const next = { ...restoreControlOriginal(layer) };
-    delete next.controlType;
-    delete next.detection;
-    delete next.original;
-    delete next.originalTransform;
-    return next;
-  }
   if (layer.controlType === controlType) {
     return layer;
   }

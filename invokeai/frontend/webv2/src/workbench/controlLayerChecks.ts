@@ -3,7 +3,6 @@ import type { CanvasControlLayerContract, CanvasLayerContract } from '@workbench
 
 import {
   createControlValidationSequence,
-  getControlValidationReason,
   isControlKindSupportedForBase,
   type ControlAdapterKind,
   type ControlValidationReason,
@@ -54,20 +53,6 @@ export interface ControlLayerJudgement {
   skip: boolean;
 }
 
-const resolveLayer = (
-  layer: CanvasControlLayerContract,
-  mainModel: MainModel,
-  models: readonly ModelConfig[],
-  context: ControlLayerCheckContext
-): ControlModelResolution =>
-  resolveControlModel({
-    base: mainModel.base,
-    layer,
-    models,
-    remembered: context.remembered,
-    supportsKind: context.supportsKind,
-  });
-
 /**
  * Judges control layers in generation order, as the invocation does: per-generation limits count only layers that
  * passed. Invoke readiness, the settings panel and the invocation collector share it.
@@ -79,7 +64,13 @@ export const createControlLayerSequence = (
 ): ((layer: CanvasControlLayerContract) => ControlLayerJudgement) => {
   const validate = createControlValidationSequence(mainModel);
   return (layer) => {
-    const resolution = resolveLayer(layer, mainModel, models, context);
+    const resolution = resolveControlModel({
+      base: mainModel.base,
+      layer,
+      models,
+      remembered: context.remembered,
+      supportsKind: context.supportsKind,
+    });
     // A layer with no type and no model keeps its reason for the panel but is skipped; having no model, it never
     // passes, so it never claims a per-generation slot.
     const reason =
@@ -118,31 +109,6 @@ export const getBlockingControlLayerIssues = (params: {
     }
   }
   return issues;
-};
-
-/** Ambient warnings include empty layers but omit per-kind limits, which belong in the Invoke tooltip. */
-const judgeAttention = (
-  layer: CanvasControlLayerContract,
-  mainModel: MainModel,
-  models: readonly ModelConfig[],
-  context: ControlLayerCheckContext
-): { resolution: ControlModelResolution; reason: ControlLayerIssueCode | null } => {
-  const resolution = resolveLayer(layer, mainModel, models, context);
-  const reason =
-    getControlValidationReason({
-      adapterModel: resolution.model,
-      beginEndStepPct: layer.adapter.beginEndStepPct,
-      controlLoraIndex: 0,
-      flux2ControlIndex: 0,
-      kind: resolution.kind,
-      mainBase: mainModel.base,
-      mainVariant: mainModel.variant ?? undefined,
-      qwenImageControlIndex: 0,
-      unresolvedModel: resolution.unresolved,
-      weight: layer.adapter.weight,
-      zImageControlIndex: 0,
-    }) ?? (needsControlDetection(layer) ? 'detection_pending' : null);
-  return { reason, resolution };
 };
 
 /**
@@ -186,14 +152,13 @@ export const describeControlLayer = (
       reason: resolution.unresolved ?? (needsControlDetection(layer) ? 'detection_pending' : null),
       resolution,
     };
-  } else if (ctx.earlier) {
+  } else {
+    // Without `earlier` the layer comes first in a fresh sequence, so no per-generation limit can apply.
     const judge = createControlLayerSequence(ctx.mainModel, ctx.models, context);
-    for (const earlier of ctx.earlier) {
+    for (const earlier of ctx.earlier ?? []) {
       judge(earlier);
     }
     judgement = judge(layer);
-  } else {
-    judgement = judgeAttention(layer, ctx.mainModel, ctx.models, context);
   }
   return { map: getControlMapState(layer), reason: judgement.reason, resolution: judgement.resolution };
 };

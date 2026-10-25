@@ -92,16 +92,6 @@ describe('applyControlLayerIntent: set-type', () => {
     expect(next.filter).toBeUndefined();
   });
 
-  it('removes the type and every derivation field, restoring the original first', () => {
-    const next = apply(detected(), { controlType: null, kind: 'set-type' });
-
-    expect(next.source).toEqual(photo);
-    for (const key of ['controlType', 'detection', 'original', 'originalTransform', 'filter'] as const) {
-      expect(next).not.toHaveProperty(key);
-    }
-    expect(next.adapter.model).toBe('explicit-model');
-  });
-
   it('renames in the same patch and reports an unchanged type as the same object', () => {
     const typed = detected();
 

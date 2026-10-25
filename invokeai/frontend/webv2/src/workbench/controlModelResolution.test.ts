@@ -4,7 +4,12 @@ import type { CanvasControlLayerContract, ControlType } from '@workbench/canvas-
 
 import { describe, expect, it } from 'vitest';
 
-import { getTypeAvailability, resolveControlModel, type ControlModelMemory } from './controlModelResolution';
+import {
+  getTypeAvailability,
+  isRememberableControlPick,
+  resolveControlModel,
+  type ControlModelMemory,
+} from './controlModelResolution';
 
 const model = (key: string, base: string, type = 'controlnet', extra: Partial<ModelConfig> = {}): ModelConfig =>
   ({ base, key, name: key, type, ...extra }) as ModelConfig;
@@ -44,7 +49,7 @@ const depthB = model('sdxl-depth-b', 'sdxl', 'controlnet', {
 });
 const normal = model('sdxl-normal', 'sdxl');
 const pose = model('sdxl-openpose', 'sdxl');
-const sdxlUnion = model('sdxl-union-promax', 'sdxl');
+const sdxlUnion = model('xinsir-controlnet-union-sdxl-promax', 'sdxl');
 const sd1Depth = model('sd15-depth', 'sd-1');
 
 describe('resolveControlModel without a type', () => {
@@ -52,6 +57,25 @@ describe('resolveControlModel without a type', () => {
     const resolution = resolve(layer(undefined, { kind: 't2i_adapter', model: pose.key }), 'sdxl', [pose]);
 
     expect(resolution).toMatchObject({ how: 'none', kind: 't2i_adapter', model: pose, unresolved: null });
+    expect(resolution.candidates).toEqual([]);
+  });
+
+  it('lists every model it could run on the base, for a direct pick, and no candidates', () => {
+    const resolution = resolve(layer(undefined), 'sdxl', [
+      depthA,
+      pose,
+      sdxlUnion,
+      sd1Depth,
+      model('sdxl-main', 'sdxl', 'main'),
+      model('my-sdxl-control', 'sdxl'),
+    ]);
+
+    expect(resolution.usable.map((entry) => entry.key)).toEqual([
+      depthA.key,
+      pose.key,
+      sdxlUnion.key,
+      'my-sdxl-control',
+    ]);
     expect(resolution.candidates).toEqual([]);
   });
 
@@ -130,6 +154,16 @@ describe('resolveControlModel with a type', () => {
     expect(resolve(layer('depth'), 'sdxl', models, { 'sd-1:depth': depthB.key }).how).toBe('ask');
   });
 
+  it('prefers the remembered covering union over the only model made for the type', () => {
+    const models = [depthA, sdxlUnion];
+
+    expect(resolve(layer('depth'), 'sdxl', models)).toMatchObject({ how: 'only', model: depthA });
+    expect(resolve(layer('depth'), 'sdxl', models, { 'sdxl:depth': sdxlUnion.key })).toMatchObject({
+      how: 'remembered',
+      model: sdxlUnion,
+    });
+  });
+
   it('matches the family the chosen detector produces', () => {
     const canny = model('sdxl-canny', 'sdxl');
     const mlsd = model('sdxl-mlsd', 'sdxl');
@@ -148,6 +182,9 @@ describe('resolveControlModel with a type', () => {
 
   it('uses the one union model that covers the family', () => {
     const zUnion = model('z-image-fun-controlnet', 'z-image');
+
+    expect(resolve(layer('pose'), 'sdxl', [sdxlUnion])).toMatchObject({ how: 'union', model: sdxlUnion });
+    expect(resolve(layer('color'), 'sdxl', [sdxlUnion]).unresolved).toBe('no_model_for_type');
 
     expect(resolve(layer('depth'), 'z-image', [zUnion])).toMatchObject({
       how: 'union',
@@ -171,8 +208,10 @@ describe('resolveControlModel with a type', () => {
       kind: 'controlnet',
       unresolved: 'no_control_models',
     });
-    // An SDXL union carries no coverage until the backend reports its control types.
-    expect(resolve(layer('pose'), 'sdxl', [sdxlUnion]).unresolved).toBe('no_model_for_type');
+    // An SD1.5 union carries no coverage until the backend reports its control types.
+    expect(resolve(layer('pose'), 'sd-1', [model('controlnet-union-sd15', 'sd-1')]).unresolved).toBe(
+      'no_model_for_type'
+    );
   });
 
   it('only counts models the base runs and validation would accept', () => {
@@ -205,9 +244,8 @@ describe('resolveControlModel model lists and family match', () => {
       model('sdxl-main', 'sdxl', 'main'),
     ]);
 
-    expect(resolution.candidates).toEqual([depthA]);
+    expect(resolution.candidates).toEqual([depthA, sdxlUnion]);
     expect(resolution.usable).toEqual([depthA, pose, sdxlUnion]);
-    expect(resolve(layer(undefined, { model: pose.key }), 'sdxl', [pose]).usable).toEqual([]);
   });
 
   it('says whether the model matches the detector family or only the type', () => {
@@ -222,6 +260,21 @@ describe('resolveControlModel model lists and family match', () => {
       how: 'explicit',
     });
     expect(resolve(layer('depth'), 'sdxl', [depthA, depthB]).familyMatch).toBe(false);
+  });
+});
+
+describe('isRememberableControlPick', () => {
+  it('remembers only a candidate for the type and detector family', () => {
+    const unpurposed = model('my-sdxl-control', 'sdxl');
+    const models = [depthA, normal, pose, sdxlUnion, unpurposed];
+    const resolution = resolve(layer('depth', { detector: 'depth_anything_depth_estimation' }), 'sdxl', models);
+
+    expect(isRememberableControlPick(resolution, depthA)).toBe(true);
+    expect(isRememberableControlPick(resolution, sdxlUnion)).toBe(true);
+    expect(isRememberableControlPick(resolution, normal)).toBe(false);
+    expect(isRememberableControlPick(resolution, pose)).toBe(false);
+    expect(isRememberableControlPick(resolution, unpurposed)).toBe(false);
+    expect(isRememberableControlPick(resolve(layer(undefined), 'sdxl', models), depthA)).toBe(false);
   });
 });
 
@@ -259,12 +312,12 @@ describe('getTypeAvailability', () => {
     expect(byType(getTypeAvailability('sdxl', [depthA, depthB, pose, sdxlUnion, sd1Depth], supportsAll))).toEqual({
       color: ['missing', 0],
       depth: ['ask', 2],
-      edges: ['missing', 0],
-      lineart: ['missing', 0],
+      edges: ['union', 1],
+      lineart: ['union', 1],
       pose: ['ready', 1],
-      sketch: ['missing', 0],
-      softedge: ['missing', 0],
-      tile: ['missing', 0],
+      sketch: ['union', 1],
+      softedge: ['union', 1],
+      tile: ['union', 1],
     });
     expect(
       byType(

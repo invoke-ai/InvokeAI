@@ -26,9 +26,10 @@ export type ControlModelUnresolvedReason =
 
 export interface ControlModelResolution {
   /**
-   * `explicit`: the layer's own pick. `remembered`: the last pick for this base and type. `only`: the one model made
-   * for the type. `union`: the one union model covering it. `ask`: several fit. `missing`: none fit. `none`: the
-   * layer has no type, so its stored adapter applies as it is.
+   * `explicit`: the layer's own pick. `remembered`: the last pick for this base and type, still among `candidates`;
+   * it applies to every layer of that base and type without an explicit pick. `only`: the one model made for the
+   * type. `union`: the one union model covering it. `ask`: several fit. `missing`: none fit. `none`: the layer has
+   * no type, so its stored adapter applies as it is.
    */
   how: 'explicit' | 'remembered' | 'only' | 'union' | 'ask' | 'missing' | 'none';
   model: ModelConfig | null;
@@ -36,7 +37,7 @@ export interface ControlModelResolution {
   kind: ControlAdapterKind;
   /** Models that fit the type: those made for it first, then covering unions. */
   candidates: readonly ModelConfig[];
-  /** Every model the layer could run on this base, whatever it was made for; empty for untyped layers. */
+  /** Every model the layer could run on this base, whatever it was made for, typed or not. */
   usable: readonly ModelConfig[];
   /**
    * Whether the model was made for (or, as a union, covers) the family the detector produces; false when it only
@@ -65,6 +66,9 @@ const usableKind = (model: ModelConfig, base: string | null, supportsKind: Suppo
   return kind && supportsKind(kind) && getControlModelUnusableReason(model, kind) === null ? kind : null;
 };
 
+const usableModels = (base: string | null, models: readonly ModelConfig[], supportsKind: SupportsKind) =>
+  models.filter((model) => usableKind(model, base, supportsKind) !== null);
+
 const collectCandidates = (
   type: ControlType,
   family: ControlFamily,
@@ -72,7 +76,7 @@ const collectCandidates = (
   models: readonly ModelConfig[],
   supportsKind: SupportsKind
 ): CandidateSets => {
-  const usable = models.filter((model) => usableKind(model, base, supportsKind) !== null);
+  const usable = usableModels(base, models, supportsKind);
   const classes = new Map(usable.map((model) => [model, classifyControlModel(model)]));
   const byFamily = usable.filter((model) => classes.get(model)!.family === family);
   return {
@@ -88,7 +92,8 @@ const collectCandidates = (
 /**
  * Which model drives a control layer: an explicit pick for this base, the remembered pick for (base, type), the
  * only model made for the type, a choice between several, the one covering union model, or none. A pick made for
- * another base is ignored, not cleared, so switching back restores it.
+ * another base is ignored, not cleared, so switching back restores it. An untyped layer runs its stored adapter as
+ * it is; its `usable` still lists every model it could run on the base, for a direct pick.
  */
 export const resolveControlModel = (input: {
   layer: Pick<CanvasControlLayerContract, 'controlType' | 'detection' | 'adapter'>;
@@ -110,7 +115,7 @@ export const resolveControlModel = (input: {
       kind: layer.adapter.kind,
       model: picked,
       unresolved: layer.adapter.model ? (picked ? null : 'missing_model') : 'missing_type',
-      usable: [],
+      usable: usableModels(base, models, supportsKind),
     };
   }
 
@@ -160,6 +165,14 @@ export const resolveControlModel = (input: {
   }
   return settle('missing', null, usable.length === 0 ? 'no_control_models' : 'no_model_for_type');
 };
+
+/**
+ * Whether picking `model` should become the remembered pick for the layer's base and type. Resolution honours a
+ * remembered pick only among `candidates`, and it then drives every unpicked layer of that base and type, so a model
+ * made for another family, or one nothing identifies, stays this layer's own pick.
+ */
+export const isRememberableControlPick = (resolution: ControlModelResolution, model: ModelConfig): boolean =>
+  resolution.candidates.some((candidate) => candidate.key === model.key);
 
 /** How a control type would resolve on a fresh layer, for the Type menu's hints. */
 export interface ControlTypeAvailability {
