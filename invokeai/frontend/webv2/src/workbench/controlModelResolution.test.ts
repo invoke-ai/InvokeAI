@@ -264,17 +264,35 @@ describe('resolveControlModel model lists and family match', () => {
 });
 
 describe('isRememberableControlPick', () => {
-  it('remembers only a candidate for the type and detector family', () => {
-    const unpurposed = model('my-sdxl-control', 'sdxl');
-    const models = [depthA, normal, pose, sdxlUnion, unpurposed];
-    const resolution = resolve(layer('depth', { detector: 'depth_anything_depth_estimation' }), 'sdxl', models);
+  const unpurposed = model('my-sdxl-control', 'sdxl');
+  const models = [depthA, depthB, normal, pose, sdxlUnion, unpurposed];
+
+  it.each([
+    ['depth_anything_depth_estimation', 'the depth detector'],
+    ['normal_map', 'the normal-map detector'],
+  ])('remembers only a model for the primary family or a union covering it, whatever %s (%s)', (detector) => {
+    const resolution = resolve(layer('depth', { detector }), 'sdxl', models);
 
     expect(isRememberableControlPick(resolution, depthA)).toBe(true);
     expect(isRememberableControlPick(resolution, sdxlUnion)).toBe(true);
     expect(isRememberableControlPick(resolution, normal)).toBe(false);
     expect(isRememberableControlPick(resolution, pose)).toBe(false);
     expect(isRememberableControlPick(resolution, unpurposed)).toBe(false);
+  });
+
+  it('remembers nothing for an untyped layer or a model the base cannot run', () => {
     expect(isRememberableControlPick(resolve(layer(undefined), 'sdxl', models), depthA)).toBe(false);
+    expect(isRememberableControlPick(resolve(layer('depth'), 'sdxl', models), sd1Depth)).toBe(false);
+  });
+
+  it('keeps a secondary-family pick from unsettling other layers of the type', () => {
+    const remembered: ControlModelMemory = { 'sdxl:depth': depthB.key };
+    const normalLayer = resolve(layer('depth', { detector: 'normal_map' }), 'sdxl', models, remembered);
+    const memory = isRememberableControlPick(normalLayer, normal) ? { 'sdxl:depth': normal.key } : remembered;
+
+    expect(
+      resolve(layer('depth', { detector: 'depth_anything_depth_estimation' }), 'sdxl', models, memory)
+    ).toMatchObject({ how: 'remembered', model: depthB, unresolved: null });
   });
 });
 

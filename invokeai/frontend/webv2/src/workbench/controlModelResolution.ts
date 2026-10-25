@@ -35,6 +35,8 @@ export interface ControlModelResolution {
   model: ModelConfig | null;
   /** The kind the layer runs as: the model's own, else the base's default (the stored kind for untyped layers). */
   kind: ControlAdapterKind;
+  /** The layer's control type; null for untyped layers. */
+  controlType: ControlType | null;
   /** Models that fit the type: those made for it first, then covering unions. */
   candidates: readonly ModelConfig[];
   /** Every model the layer could run on this base, whatever it was made for, typed or not. */
@@ -109,6 +111,7 @@ export const resolveControlModel = (input: {
   if (!type) {
     return {
       candidates: [],
+      controlType: null,
       familyMatch: false,
       how: 'none',
       instantxControlMode: null,
@@ -130,6 +133,7 @@ export const resolveControlModel = (input: {
     const modelClass = model ? classifyControlModel(model) : null;
     return {
       candidates,
+      controlType: type,
       familyMatch:
         modelClass !== null &&
         (modelClass.family === family || (modelClass.union && modelClass.covers.includes(family))),
@@ -167,12 +171,19 @@ export const resolveControlModel = (input: {
 };
 
 /**
- * Whether picking `model` should become the remembered pick for the layer's base and type. Resolution honours a
- * remembered pick only among `candidates`, and it then drives every unpicked layer of that base and type, so a model
- * made for another family, or one nothing identifies, stays this layer's own pick.
+ * Whether picking `model` should become the remembered pick for the layer's base and type. The memory is keyed by
+ * base and type and drives every unpicked layer of both, whatever their detector, so only a usable model made for
+ * the type's primary family, or a union covering it, is remembered. A pick for a secondary family (normal under
+ * Depth, MLSD under Edges, face under Pose), or one nothing identifies, stays this layer's own.
  */
-export const isRememberableControlPick = (resolution: ControlModelResolution, model: ModelConfig): boolean =>
-  resolution.candidates.some((candidate) => candidate.key === model.key);
+export const isRememberableControlPick = (resolution: ControlModelResolution, model: ModelConfig): boolean => {
+  if (!resolution.controlType || !resolution.usable.some((usable) => usable.key === model.key)) {
+    return false;
+  }
+  const primary = CONTROL_TYPE_SPECS[resolution.controlType].primaryFamily;
+  const modelClass = classifyControlModel(model);
+  return modelClass.family === primary || (modelClass.union && modelClass.covers.includes(primary));
+};
 
 /** How a control type would resolve on a fresh layer, for the Type menu's hints. */
 export interface ControlTypeAvailability {
