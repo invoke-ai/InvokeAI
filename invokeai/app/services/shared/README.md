@@ -849,17 +849,17 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
   through the loop linkage) is gated with that branch: for a frame that rejects the branch, neither the `For` nor its
   body runs. A gated `For` brings in a `For` nested in its body together with that body. Two `For`s stay ungated. A
   `For` nested in the body of an ungated `For` runs with that loop. A `For` whose final output feeds the `If` directly
-  is attached only after it finalizes, and the `If` is not prepared before that, so gating it on the `If` would
-  deadlock. Known limitation: with a per-item condition, such a `For` and its body run even for items that reject the
-  branch, and an error they raise is recorded.
+  attaches after it finalizes; with a per-item condition, rejected frames do not run the `For` or its body, and selected
+  frames wait for its final output before the `If` input is attached.
 - An `If` has no execution in a frame where the innermost iterator in its ancestry has no items. When an `Iterate` in
   its iterator ancestry, whether it feeds `If.condition` or a branch, has no items at all, no `If` execution is created,
   the branch sources are retired empty, the downstream `Collect` produces an empty collection, and the state completes
   without an error. The same holds for a literal condition whose selected branch runs under an empty `Iterate` reached
   only through a `For` final output. Retirement may add the branch source IDs to `executed_history`; neither branch
-  invocation runs and no branch result is created. Known limitation: with a wired condition, an `If` whose branch
-  reaches an empty `Iterate` only through a `For` final output stalls, whether the condition is root-frame or per item
-  of that `Iterate`.
+  invocation runs and no branch result is created. With a wired root-frame condition and one parent `Iterate` carried
+  through a selected `For` final output, the `If` broadcasts over the parent frames; an empty parent `Iterate` gives it
+  no executions and the downstream `Collect` remains empty. Multiple unrelated open frames that cannot be paired still
+  fail validation before execution.
 - The SQLite queue/processor path has evidence for cancellation before and after `If` resolution and retry from each
   boundary for both condition polarities. A canceled attempt keeps its activation ledger and cannot resume; retry
   starts a fresh state and must emit a fresh matching activation token before selected-only completion.

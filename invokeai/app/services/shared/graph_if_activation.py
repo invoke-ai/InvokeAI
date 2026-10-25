@@ -45,8 +45,8 @@ class _IfActivationController:
         # A For's loop body feeds its ForReturn, which reaches the For only through the loop linkage. The body belongs
         # to the branch whenever its For does, and leaves it with the For. Fors are visited outermost first, so a gated
         # For brings in a For nested in its body together with that body. Two Fors stay ungated. One whose final
-        # output enters the If directly is attached only after it finalizes, and the If is not prepared before that,
-        # so the For cannot wait for the If's verdict. One nested in an ungated For's body is expanded by that loop,
+        # output enters the If directly is attached after it finalizes. With a wired condition the For and its body
+        # can still be gated once that condition resolves. One nested in an ungated For's body is expanded by that loop,
         # which needs it to run. (A For enclosing the If is a frame iterator of the If and was removed above.)
         for_by_return_id: dict[str, str] = {}
         if any(isinstance(self._state.graph.nodes.get(node_id), ForInvocation) for node_id in branch_sources):
@@ -61,6 +61,7 @@ class _IfActivationController:
                 if (
                     for_id not in branch_sources
                     or for_id in direct_sources
+                    and not self._state.graph._get_input_edges(if_node_id, "condition")
                     or any(
                         for_id in body_ids_by_for[enclosing_id] and enclosing_id not in for_by_return_id.values()
                         for enclosing_id in body_ids_by_for

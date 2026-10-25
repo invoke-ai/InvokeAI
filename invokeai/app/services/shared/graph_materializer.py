@@ -275,12 +275,18 @@ class _ExecutionNodeBuilder:
             if not isinstance(self._state.graph.get_node(if_node_id), IfInvocation):
                 continue
             condition_edges = self._state.graph._get_input_edges(if_node_id, "condition")
-            if len(condition_edges) != 1:
-                continue
-            condition_source_id = condition_edges[0].source.node_id
-            if isinstance(self._state.graph.get_node(condition_source_id), IterateInvocation):
-                self._empty_condition_if_sources.setdefault(condition_source_id, ())
-                self._empty_condition_if_sources[condition_source_id] += (if_node_id,)
+            iterator_graph = self.iterator_graph(graph)
+            if len(condition_edges) == 1 and isinstance(
+                self._state.graph.get_node(condition_edges[0].source.node_id), IterateInvocation
+            ):
+                empty_frame_sources = (condition_edges[0].source.node_id,)
+            elif condition_edges and not self._get_ordered_iterator_axes_for_edges(condition_edges, iterator_graph):
+                empty_frame_sources = self._get_iterator_ancestry(iterator_graph).get_frame_iterators(if_node_id)
+            else:
+                empty_frame_sources = ()
+            for source_id in empty_frame_sources:
+                self._empty_condition_if_sources.setdefault(source_id, ())
+                self._empty_condition_if_sources[source_id] += (if_node_id,)
 
         self._activation_retirement_rebuild_required = True
         self._rebuild_activation_retirement_candidates()
@@ -1748,7 +1754,7 @@ class _ExecutionNodeBuilder:
             if condition_iterator_ids:
                 iterator_nodes = condition_axes
             else:
-                iterator_nodes = self.get_node_iterators(node_id, iterator_graph)
+                iterator_nodes = list(self._get_iterator_ancestry(iterator_graph).get_frame_iterators(node_id))
         else:
             iterator_nodes = self.get_node_iterators(node_id, iterator_graph)
         if condition_edges and not iterator_nodes:
@@ -1768,7 +1774,14 @@ class _ExecutionNodeBuilder:
         # This specialization derives one branch axis against a root-frame condition. Mixed or nested condition
         # axes use the general parent-mapping path.
         iterator_ancestry = self._get_iterator_ancestry(iterator_graph)
-        iterator_nodes = self._get_if_frame_iterator_nodes(node_id, iterator_graph)
+        if condition_edges:
+            if all(
+                outer_id in iterator_ancestry.get_ordered_iterator_ancestors(inner_id)
+                for outer_id, inner_id in itertools.pairwise(iterator_nodes)
+            ):
+                iterator_nodes = iterator_nodes[-1:]
+        else:
+            iterator_nodes = self._get_if_frame_iterator_nodes(node_id, iterator_graph)
         if len(iterator_nodes) != 1:
             return iter([[]])
         for branch_field in ("true_input", "false_input"):
@@ -1963,6 +1976,13 @@ class _ExecutionNodeBuilder:
             source_if_id = self._state._prepared_registry().get_source_node_id(exec_node_id)
             target_path = self._state._get_iteration_path(exec_node_id)
             selected_edges = self._state.graph._get_input_edges(source_if_id, selected_field)
+            if any(
+                isinstance(source_node := self._state.graph.get_node(edge.source.node_id), ForInvocation)
+                and get_output_field_scope(source_node, edge.source.field) == OutputScope.Final
+                and not self._state._all_for_contexts_finalized(source_node.id)
+                for edge in selected_edges
+            ):
+                continue
             attached_edges: list[Edge] = []
             selected_exec_ids: list[str] = []
             for source_edge in selected_edges:
@@ -2419,7 +2439,11 @@ class _ExecutionNodeBuilder:
                     isinstance(self._state.graph.get_node(node_id), ForReturnInvocation)
                     and self._is_deferred_nested_for_return(node_id)
                 )
-                and not self._has_unmaterializable_for_final_input(node_id)
+                and (
+                    isinstance(self._state.graph.get_node(node_id), IfInvocation)
+                    and bool(self._state.graph._get_input_edges(node_id, "condition"))
+                    or not self._has_unmaterializable_for_final_input(node_id)
+                )
                 and node_id not in deferred_root_collect_if_descendants
                 and (
                     all(

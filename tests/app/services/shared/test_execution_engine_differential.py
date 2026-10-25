@@ -3537,10 +3537,40 @@ def test_root_condition_if_with_for_output_branch_under_iterate_completes(
     trace, state = _run_to_completion(_graph_from(nodes, edges))
 
     # Selecting the root value keeps main's single root-frame If; selected-branch cardinality is decided separately.
-    expected = [["b:a", "b:b"], ["b:c"]] if condition else ["fb"]
+    expected = [["b:a", "b:b"], ["b:c"]] if condition else (["fb", "fb"] if computed_condition else ["fb"])
     assert _source_values(state, "collect") == {(): expected}
     if not condition:
         assert not {"for", "body", "ret", "mid"} & set(trace)
+
+
+def test_literal_root_condition_ignores_unselected_for_output_branch_under_iterate() -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[["a", "b"], ["c"]]),
+            IterateInvocation(id="iterate"),
+            ForInvocation(id="for"),
+            MarkedAnyTypeTestInvocation(id="body", marker="b:"),
+            ForReturnInvocation(id="ret"),
+            AnyTypeTestInvocation(id="mid"),
+            AnyTypeTestInvocation(id="fallback", value="fb"),
+            IfInvocation(id="if", condition=False),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "iterate", "collection"),
+            ("iterate", "item", "for", "collection"),
+            ("for", "item", "body", "value"),
+            ("body", "value", "ret", "output"),
+            create_loop_linkage("for", "ret"),
+            ("for", "output_collection", "mid", "value"),
+            ("mid", "value", "if", "true_input"),
+            ("fallback", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+    trace, state = _run_to_completion(graph)
+    assert _source_values(state, "collect") == {(): ["fb"]}
+    assert not {"for", "body", "ret", "mid"} & set(trace)
 
 
 @pytest.mark.parametrize("condition", [True, False])
@@ -3573,6 +3603,100 @@ def test_literal_if_with_empty_nested_iterate_on_a_branch_has_no_frames(conditio
 
     assert _source_values(state, "collect") == {(0,): [], (1,): []}
     assert "if" not in trace
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["default", "forced-compatibility"])
+def test_wired_root_condition_with_empty_for_parent_frame_completes(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[]),
+            IterateInvocation(id="iterate"),
+            ForInvocation(id="for"),
+            ForReturnInvocation(id="ret"),
+            FixedCollectionTestInvocation(id="condition", value=True),
+            AnyTypeTestInvocation(id="fallback", value="fb"),
+            IfInvocation(id="if"),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "iterate", "collection"),
+            ("iterate", "item", "for", "collection"),
+            ("for", "item", "ret", "output"),
+            create_loop_linkage("for", "ret"),
+            ("for", "output_collection", "if", "true_input"),
+            ("condition", "condition", "if", "condition"),
+            ("fallback", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+    state = GraphExecutionState(graph=graph)
+    if force_compatibility_scheduler:
+        state._execution_scheduler = _ExecutionScheduler(state)
+
+    trace: list[str] = []
+    while (node := state.next()) is not None:
+        source_id = state.prepared_source_mapping[node.id]
+        trace.append(source_id)
+        state.complete(node.id, node.invoke(Mock()))
+
+    assert not state.has_error(), state.errors
+    assert state.is_complete(), f"trace={trace}; executed={state.executed}; prepared={state.source_prepared_mapping}"
+    assert _source_values(state, "collect") == {(): []}
+    assert not {"if", "for", "ret", "fallback"} & set(trace)
+
+
+@pytest.mark.parametrize(
+    "force_compatibility_scheduler", [False, True], ids=["default-route", "forced-compatibility-route"]
+)
+def test_per_item_if_skips_direct_for_output_in_rejected_frames(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=["", "x"]),
+            IterateInvocation(id="iterate"),
+            FixedCollectionTestInvocation(id="condition"),
+            ForInvocation(id="for"),
+            AnyTypeTestInvocation(id="body"),
+            ForReturnInvocation(id="ret"),
+            AnyTypeTestInvocation(id="fallback", value="fb"),
+            IfInvocation(id="if"),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "iterate", "collection"),
+            ("iterate", "item", "condition", "value"),
+            ("condition", "condition", "if", "condition"),
+            ("condition", "collection", "for", "collection"),
+            ("for", "item", "body", "value"),
+            ("body", "value", "ret", "output"),
+            create_loop_linkage("for", "ret"),
+            ("for", "output_collection", "if", "true_input"),
+            ("fallback", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+    state = GraphExecutionState(graph=graph)
+    if force_compatibility_scheduler:
+        state._execution_scheduler = _ExecutionScheduler(state)
+    trace: list[tuple[str, tuple[int, ...]]] = []
+    while (node := state.next()) is not None:
+        source_id = state.prepared_source_mapping[node.id]
+        iteration_path = state._get_iteration_path(node.id)
+        trace.append((source_id, iteration_path))
+        state.complete(node.id, node.invoke(Mock()))
+
+    assert not state.has_error(), state.errors
+    assert state.is_complete(), f"execution stalled after {trace}"
+    assert _source_values(state, "if") == {(0,): "fb", (1,): [0, 1]}
+    assert _source_values(state, "collect") == {(): ["fb", [0, 1]]}
+    assert [path for source_id, path in trace if source_id == "if"] == [(0,), (1,)]
+    assert [path for source_id, path in trace if source_id == "for"] == [(1, 0), (1, 1)]
+    assert [path for source_id, path in trace if source_id == "body"] == [(1, 0), (1, 1)]
+    assert [path for source_id, path in trace if source_id == "ret"] == [(1, 0), (1, 1)]
+    assert not any(source_id in {"for", "body", "ret"} and path[:1] == (0,) for source_id, path in trace)
 
 
 def _unrelated_open_branches_graph(condition: bool, computed_condition: bool) -> Graph:
@@ -10998,16 +11122,17 @@ def test_per_item_if_preserves_unrelated_root_collect_frames(
 @pytest.mark.parametrize(
     ("conditions", "expected"),
     [
-        ([False, True, True], ["fb", [5, 6], [5, 6]]),
-        ([True, True], [[5, 6], [5, 6]]),
+        pytest.param([False, True, True], ["fb", [5, 6], [5, 6]], id="mixed-conditions"),
+        pytest.param([True, True], [[5, 6], [5, 6]], id="all-true"),
+        pytest.param([False, False, False], ["fb", "fb", "fb"], id="all-false"),
     ],
-    ids=["mixed-conditions", "all-true"],
 )
 def test_per_item_if_keeps_closed_for_output_collection(
     force_compatibility_scheduler: bool,
     conditions: list[bool],
     expected: list[Any],
 ) -> None:
+    """Root For item paths are distinct from condition frames; no selected frame means no For work."""
     graph = Graph()
     graph.add_node(CollectionConcatInvocation(id="conditions", first=conditions))
     graph.add_node(IterateInvocation(id="condition_iterate"))
@@ -11037,11 +11162,14 @@ def test_per_item_if_keeps_closed_for_output_collection(
     assert state.is_complete(), f"graph stalled after {trace}"
     output_exec_id = next(iter(state.source_prepared_mapping["output"]))
     assert state.results[output_exec_id].collection == expected
-    final_for_exec_id = max(
-        state.source_prepared_mapping["for"],
-        key=lambda exec_node_id: state.execution_graph.get_node(exec_node_id).index,
-    )
-    assert state.results[final_for_exec_id].output_collection == [5, 6]
+    if any(conditions):
+        final_for_exec_id = max(
+            state.source_prepared_mapping["for"],
+            key=lambda exec_node_id: state.execution_graph.get_node(exec_node_id).index,
+        )
+        assert state.results[final_for_exec_id].output_collection == [5, 6]
+    else:
+        assert not {"for", "body", "for_return"} & set(trace)
 
 
 @pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
