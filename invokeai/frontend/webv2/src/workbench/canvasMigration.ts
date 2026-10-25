@@ -416,30 +416,37 @@ const hasV5Adjustment = (node: Record<string, unknown>): boolean =>
   Array.isArray(node.adjustments) &&
   node.adjustments.some((entry) => isRecord(entry) && V5_ADJUSTMENT_TYPES.has(entry.type));
 
-/** The control derivation fields a v4 reader would strip on load, losing the kept original on its next save. */
+/** The control derivation fields a v5 reader would strip on load, losing the kept original on its next save. */
 const CONTROL_DERIVATION_KEYS = ['controlType', 'detection', 'original', 'originalTransform'] as const;
 
-const controlLayerRequiresV5 = (node: Record<string, unknown>): boolean =>
+const controlLayerRequiresV6 = (node: Record<string, unknown>): boolean =>
   node.type === 'control' && CONTROL_DERIVATION_KEYS.some((key) => node[key] !== undefined);
 
+const ownSchemaRequirement = (node: Record<string, unknown>): CanvasSchemaVersion => {
+  if (controlLayerRequiresV6(node)) {
+    return 6;
+  }
+  if (hasV5Adjustment(node)) {
+    return 5;
+  }
+  return textSourceRequiresV4(node.source) ? 4 : 3;
+};
+
 /**
- * v4: custom-font typography. v5: a noise or spatial adjustment, enabled or not, which a v4 reader would drop, or a
- * control layer carrying any derivation field.
+ * The newest schema a node or any descendant needs. v4: custom-font typography. v5: a noise or spatial adjustment,
+ * enabled or not, which a v4 reader would drop. v6: a control layer carrying any derivation field.
  */
 const nodeSchemaRequirement = (node: unknown): CanvasSchemaVersion => {
   if (!isRecord(node)) {
     return 3;
   }
-  if (hasV5Adjustment(node) || controlLayerRequiresV5(node)) {
-    return 5;
-  }
-  let required: CanvasSchemaVersion = textSourceRequiresV4(node.source) ? 4 : 3;
+  let required = ownSchemaRequirement(node);
   if (Array.isArray(node.children)) {
     for (const child of node.children) {
-      required = Math.max(required, nodeSchemaRequirement(child)) as CanvasSchemaVersion;
       if (required === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION) {
         break;
       }
+      required = Math.max(required, nodeSchemaRequirement(child)) as CanvasSchemaVersion;
     }
   }
   return required;
@@ -519,15 +526,7 @@ type LoadStep<T> = Extract<CanvasLoadResult<T>, { status: 'loaded' }> | Refusal;
 type DeclaredVersion = { kind: 'current' } | { kind: 'other'; version: number } | { kind: 'malformed' };
 
 const classifyVersion = (value: unknown): DeclaredVersion => {
-  if (value === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION) {
-    return { kind: 'current' };
-  }
-  if (
-    typeof value === 'number' &&
-    Number.isInteger(value) &&
-    value >= MIN_SUPPORTED_CANVAS_SCHEMA_VERSION &&
-    value < MAX_SUPPORTED_CANVAS_SCHEMA_VERSION
-  ) {
+  if (isSupportedCanvasSchemaVersion(value)) {
     return { kind: 'current' };
   }
   if (typeof value === 'number' && Number.isInteger(value) && value >= 1) {

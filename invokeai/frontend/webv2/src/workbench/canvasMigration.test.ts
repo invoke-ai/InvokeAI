@@ -916,16 +916,36 @@ describe('loadCanvasState', () => {
       expect(Object.keys(actual as object).sort()).toEqual(Object.keys(expected).sort());
     };
 
-    it('round-trips a typed, detected layer and writes a v3 or v4 canvas as version 5', () => {
-      for (const declared of [3, 4]) {
+    it('round-trips a typed, detected layer and writes a v3, v4 or v5 canvas as version 6', () => {
+      for (const declared of [3, 4, 5]) {
         const loaded = load(declaring(withNodes([typed], 'control'), declared));
         expectExactly(loaded.document.stacks.control[0], typed);
-        expect(loaded.version).toBe(5);
-        expect(loaded.document.version).toBe(5);
+        expect(loaded.version).toBe(6);
+        expect(loaded.document.version).toBe(6);
       }
       expect(
         load(withNodes([groupContract('outer', [groupContract('inner', [typed as never])])], 'control')).version
-      ).toBe(5);
+      ).toBe(6);
+    });
+
+    it.each([
+      ['controlType', { controlType: 'edges' }],
+      ['detection', { detection: null }],
+      ['original', { original: { image: image('photo.png'), type: 'image' } }],
+      ['originalTransform', { originalTransform: { rotation: 0, scaleX: 2, scaleY: 2, x: 0, y: 0 } }],
+    ])('requires version 6 for a control leaf carrying only %s', (_key, fields) => {
+      const stacks = withNodes([{ ...legacy, ...fields }], 'control').document.stacks;
+      expect(writableCanvasSchemaVersion([3], { stacks })).toBe(6);
+    });
+
+    it('requires version 6, not 5, when a group adjustment and a typed child share a document', () => {
+      const spatial = { amount: 40, id: 'clarity', isEnabled: true, size: 40, type: 'clarity' };
+      const graded = groupContract('graded', [typed as never], { adjustments: [spatial as never] });
+      expect(load(withNodes([graded], 'control')).version).toBe(6);
+
+      const adjusted = withNodes([{ ...createEmptyPaintLayer('Detail', 'detail'), adjustments: [spatial] }]);
+      const stacks = { ...adjusted.document.stacks, control: [typed] };
+      expect(load({ ...adjusted, document: { ...adjusted.document, stacks } }).version).toBe(6);
     });
 
     it('keeps a legacy control layer unchanged and at its declared version', () => {
@@ -935,7 +955,7 @@ describe('loadCanvasState', () => {
       expect(loaded.document.version).toBe(3);
     });
 
-    it('does not adopt version 5 for derivation keys present only as undefined', () => {
+    it('does not adopt version 6 for derivation keys present only as undefined', () => {
       const undefinedKeys = { ...legacy, controlType: undefined, detection: undefined, original: undefined };
       expect(writableCanvasSchemaVersion([3], { stacks: withNodes([undefinedKeys], 'control').document.stacks })).toBe(
         3
@@ -943,20 +963,20 @@ describe('loadCanvasState', () => {
       expect(load(withNodes([undefinedKeys], 'control')).version).toBe(3);
     });
 
-    it('never lowers a declared version 5 once the fields are gone', () => {
-      const loaded = load(declaring(withNodes([legacy], 'control'), 5));
-      expect(loaded.version).toBe(5);
-      expect(loaded.document.version).toBe(5);
+    it('never lowers a declared version 6 once the fields are gone', () => {
+      const loaded = load(declaring(withNodes([legacy], 'control'), 6));
+      expect(loaded.version).toBe(6);
+      expect(loaded.document.version).toBe(6);
     });
 
-    it('writes version 5 when only a snapshot holds a typed layer, leaving the live document at its own version', () => {
+    it('writes version 6 when only a snapshot holds a typed layer, leaving the live document at its own version', () => {
       const loaded = load({
         ...createEmptyCanvasState(),
         snapshots: [{ createdAt: 'now', document: withNodes([typed], 'control').document, id: 's', name: 'S' }],
       });
-      expect(loaded.version).toBe(5);
+      expect(loaded.version).toBe(6);
       expect(loaded.document.version).toBe(3);
-      expect(loaded.snapshots[0]?.document.version).toBe(5);
+      expect(loaded.snapshots[0]?.document.version).toBe(6);
     });
 
     it('keeps an unknown detector type and its settings', () => {

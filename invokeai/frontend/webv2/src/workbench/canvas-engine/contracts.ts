@@ -479,12 +479,12 @@ export const CANVAS_MAX_NODE_COUNT = 10_000;
 export interface CanvasDocumentContractV3 {
   /**
    * Schema this document needs: 3 for plain content, 4 for custom-font typography, 5 for noise or spatial
-   * (clarity, texture, dehaze) adjustments or control-layer derivation fields. Each document mutation raises it to the
-   * newer of its content's need and the canvas state's version. A restored snapshot's document keeps its own, possibly
-   * lower, version until the next mutation; the state's version and the project's compatibility floor stay put
-   * meanwhile.
+   * (clarity, texture, dehaze) adjustments, 6 for control-layer derivation fields. Each document mutation raises it to
+   * the newer of its content's need and the canvas state's version. A restored snapshot's document keeps its own,
+   * possibly lower, version until the next mutation; the state's version and the project's compatibility floor stay
+   * put meanwhile.
    */
-  version: 3 | 4 | 5;
+  version: 3 | 4 | 5 | 6;
   width: number;
   height: number;
   background: 'transparent' | { color: string };
@@ -508,10 +508,10 @@ export interface CanvasStagingAreaContractV2 extends CanvasStagingAreaContract {
 export interface CanvasStateContractV3 {
   /**
    * Newest schema the state needs: the newest of its previous version, the live document's and every snapshot's
-   * (3 plain, 4 custom-font typography, 5 noise or spatial adjustments or control-layer derivation fields). Sticky:
+   * (3 plain, 4 custom-font typography, 5 noise or spatial adjustments, 6 control-layer derivation fields). Sticky:
    * removing that content never lowers it.
    */
-  version: 3 | 4 | 5;
+  version: 3 | 4 | 5 | 6;
   document: CanvasDocumentContractV3;
   /**
    * Monotonic wholesale-replacement counter. The mirror clears pixel history whenever it changes, including

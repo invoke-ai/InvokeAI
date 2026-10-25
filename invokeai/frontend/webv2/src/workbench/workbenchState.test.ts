@@ -9379,18 +9379,18 @@ describe('canvas schema adoption', () => {
     });
   const versions = (state: WorkbenchState) => [getCanvas(state).version, getCanvas(state).document.version];
 
-  it('moves a v4 canvas to schema 5 when a control layer gains a type, and keeps 5 after it loses it', () => {
+  it('moves a v4 canvas to schema 6 when a control layer gains a type, and keeps 6 after it loses it', () => {
     let state = withV4Canvas([createControlLayer('ctrl')]);
     expect(versions(state)).toEqual([4, 4]);
 
     state = workbenchReducer(state, { layer: typedControl('ctrl'), layerId: 'ctrl', type: 'replaceCanvasLayer' });
-    expect(versions(state)).toEqual([5, 5]);
+    expect(versions(state)).toEqual([6, 6]);
 
     state = workbenchReducer(state, { layer: createControlLayer('ctrl'), layerId: 'ctrl', type: 'replaceCanvasLayer' });
-    expect(versions(state)).toEqual([5, 5]);
+    expect(versions(state)).toEqual([6, 6]);
 
     state = workbenchReducer(state, { document: createEmptyCanvasDocument(), type: 'replaceCanvasDocument' });
-    expect(getCanvas(state).version).toBe(5);
+    expect(getCanvas(state).version).toBe(6);
   });
 
   it('adopts 4, not 5, for custom-font typography alone', () => {
