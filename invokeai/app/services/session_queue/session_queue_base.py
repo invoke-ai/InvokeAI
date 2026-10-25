@@ -184,8 +184,9 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def cancel_queue_item(self, item_id: int) -> SessionQueueItem:
-        """Cancels a session queue item"""
+    def cancel_queue_item(self, item_id: int, queue_item: Optional[SessionQueueItem] = None) -> SessionQueueItem:
+        """Cancels a session queue item and its workflow-call chain. A supplied `queue_item`, the item's own, takes the
+        committed cancellation before it is announced, as with `complete_queue_item`."""
         pass
 
     @abstractmethod

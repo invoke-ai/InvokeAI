@@ -1,3 +1,4 @@
+import copy
 import gc
 import time
 import traceback
@@ -274,8 +275,14 @@ class DefaultSessionRunner(SessionRunnerBase):
             f"Canceling queue item {queue_item.item_id}: owner {queue_item.user_id} is deactivated, "
             "deleted, or could not be verified"
         )
+        # A copy for the queue to update: the session loop's own item keeps the status it had.
+        canceling = copy.copy(queue_item)
         with suppress(SessionQueueItemNotFoundError):
-            self._settle(queue_item.item_id, lambda: self._services.session_queue.cancel_queue_item(queue_item.item_id))
+            self._settle(
+                queue_item.item_id,
+                lambda: self._services.session_queue.cancel_queue_item(queue_item.item_id, queue_item=canceling),
+                queue_item=canceling,
+            )
         return True
 
     def _settle(
@@ -288,11 +295,17 @@ class DefaultSessionRunner(SessionRunnerBase):
         """Run a terminal queue transition of the item and keep the item it returned in `_settled_item`: a calibration
         item's outcome, should the queue prune or clear the item before the runner records it. The queue announces a
         transition after committing it and updating a supplied `queue_item`. Keep that snapshot if the announcement
-        raises, even if the row was pruned meanwhile; without one, read the row back while it still exists."""
+        raises and the transition moved it to a final status, even if the row was pruned meanwhile; otherwise read the
+        row back while it still exists."""
+        status_before = None if queue_item is None else queue_item.status
         try:
             settled = transition()
         except Exception as error:
-            if queue_item is not None and queue_item.status in ("completed", "failed", "canceled"):
+            if (
+                queue_item is not None
+                and queue_item.status != status_before
+                and queue_item.status in ("completed", "failed", "canceled")
+            ):
                 self._settled_item = queue_item
             elif not isinstance(error, SessionQueueItemNotFoundError):
                 with suppress(Exception):
