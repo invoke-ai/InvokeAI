@@ -12,3 +12,6 @@ export const getPreviewMetadataOpen = (values: Record<string, unknown>): boolean
 
 export const getPreviewFilmstripVisible = (values: Record<string, unknown>): boolean =>
   values.filmstripVisible !== false;
+
+/** Whether the Preview's videos loop: on until the viewer turns it off in the player. */
+export const getPreviewVideoLoop = (values: Record<string, unknown>): boolean => values.videoLoop !== false;

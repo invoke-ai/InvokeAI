@@ -9,6 +9,7 @@ import { act, Activity, createRef, type Ref } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
 
 import {
   PreviewFrame,
@@ -36,25 +37,19 @@ vi.mock('@features/identity', () => ({
 }));
 
 const i18n = createInstance();
-void i18n.use(initReactI18next).init({
+await i18n.use(initReactI18next).init({
   fallbackLng: 'en',
-  initAsync: false,
+  interpolation: { escapeValue: false },
   lng: 'en',
-  resources: {
-    en: {
-      translation: {
-        widgets: {
-          preview: {
-            dropToCompare: 'Drop to compare',
-            resetZoom: 'Reset zoom',
-            videoFailed: 'Video could not be loaded',
-            videoRetry: 'Retry',
-          },
-        },
-      },
-    },
-  },
+  resources: { en: { translation: await fetch('/locales/en.json').then((response) => response.json()) } },
 });
+
+// Preview loads the player with its first video. Loaded up front, it mounts in the render that asks for it, before the
+// element can load media the stubbed tests below stand in for.
+await import('@platform/ui/video-player/VideoPlayer');
+
+// The mock backend's clip: 64×64 H.264, 10 frames at 10 fps, one second long. Vite serves the package root.
+const FIXTURE_VIDEO_URL = '/scripts/mock-assets/fixture-video.mp4';
 
 type VideoSource = Extract<PreviewMediaSource, { kind: 'video' }>;
 
@@ -66,6 +61,12 @@ const videoSource: VideoSource = {
   src: 'data:audio/wav;base64,UklGRiUAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQEAAACA',
 };
 const invalidVideoSource: VideoSource = { ...videoSource, src: 'data:video/mp4;base64,AAAA' };
+const fixtureVideoSource: VideoSource = {
+  ...videoSource,
+  fps: 10,
+  itemKey: 'video:fixture.mp4',
+  src: FIXTURE_VIDEO_URL,
+};
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -96,13 +97,17 @@ const DragMonitor = () => {
 const VideoHarness = ({
   isItemCurrent = () => true,
   onCopyAvailabilityChange,
+  onVideoLoopChange,
   source = videoSource,
   videoControllerRef,
+  videoLoop,
 }: {
   isItemCurrent?: (itemKey: GalleryItemKey) => boolean;
   onCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
+  onVideoLoopChange?: (loop: boolean) => void;
   source?: VideoSource;
   videoControllerRef?: Ref<PreviewVideoFrameController>;
+  videoLoop?: boolean;
 }) => {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -120,6 +125,8 @@ const VideoHarness = ({
           isItemCurrent={isItemCurrent}
           onVideoCopyAvailabilityChange={onCopyAvailabilityChange}
           videoControllerRef={videoControllerRef}
+          videoLoop={videoLoop}
+          onVideoLoopChange={onVideoLoopChange}
         />
       </div>
     </DndContext>
@@ -146,28 +153,21 @@ afterEach(async () => {
   root = null;
 });
 
-describe('PreviewFrame native video arm', () => {
-  it('renders the native player with the protected media contract attributes', async () => {
-    await interact(() => {
-      root?.render(
-        <I18nextProvider i18n={i18n}>
-          <ChakraProvider value={system}>
-            <VideoHarness />
-          </ChakraProvider>
-        </I18nextProvider>
-      );
-    });
+describe('PreviewFrame video', () => {
+  it('renders the player with the protected media contract attributes', async () => {
+    await renderVideo();
 
-    const video = host?.querySelector<HTMLVideoElement>('video');
+    const video = getVideo();
 
-    expect(video).not.toBeNull();
     expect(host?.querySelectorAll('video')).toHaveLength(1);
-    expect(video?.controls).toBe(true);
-    expect(video?.playsInline).toBe(true);
-    expect(video?.getAttribute('preload')).toBe('metadata');
-    expect(video?.getAttribute('poster')).toBe(videoSource.poster);
-    expect(video?.getAttribute('src')).toBe(videoSource.src);
-    expect(video?.getAttribute('aria-label')).toBe(videoSource.label);
+    expect(video.controls).toBe(false);
+    expect(video.playsInline).toBe(true);
+    expect(video.getAttribute('preload')).toBe('metadata');
+    expect(video.getAttribute('poster')).toBe(videoSource.poster);
+    expect(video.getAttribute('src')).toBe(videoSource.src);
+    await expect.element(page.getByRole('group', { name: videoSource.label })).toContainElement(video);
+    // Looping is on until the viewer turns it off.
+    await expect.element(page.getByRole('button', { name: 'Loop' })).toHaveAttribute('aria-pressed', 'true');
     expect(host?.querySelector('img[alt="Video clip.mp4"]')).toBeNull();
   });
 
@@ -488,7 +488,7 @@ describe('PreviewFrame native video arm', () => {
     expect(playback.getTime()).toBe(9);
   });
 
-  it('reports the loop under its request, stops it on demand, and resumes it from the native control', async () => {
+  it('reports the loop under its request, stops it on demand, and resumes it from the player', async () => {
     const token = requestVideoSpanPlayback({ endSeconds: 4, itemKey: videoSource.itemKey, startSeconds: 2 });
     await renderVideo();
     const video = getVideo();
@@ -541,7 +541,7 @@ describe('PreviewFrame native video arm', () => {
     await interact(() => undefined);
     expect(getVideoSpanPlaybackState()).toMatchObject({ isPlaying: true, token: third });
 
-    // Hiding pauses and clears running status; showing preserves armed identity for native play.
+    // Hiding pauses and clears running status; showing preserves armed identity for the player's play.
     await renderKeptVideo('hidden');
     expect(getVideoSpanPlaybackState()).toBeNull();
 
@@ -552,30 +552,25 @@ describe('PreviewFrame native video arm', () => {
     expect(getVideoSpanPlaybackState()).toMatchObject({ isPlaying: true, token: third });
   });
 
-  it('does not offer a stop for a window the clamp collapsed', async () => {
+  it('plays a span the clamp collapsed from its start as the loop toggle says, with no stop to offer', async () => {
     await renderVideo();
     const video = getVideo();
     const playback = stubSpanPlayback(video, { duration: 6 });
 
-    // Collapsed bounds play once without reporting an armed selection loop.
+    // Collapsed bounds are no window: the clip plays from there, and the viewer's loop stays as it was.
     await interact(() => requestVideoSpanPlayback({ endSeconds: 9, itemKey: videoSource.itemKey, startSeconds: 8 }));
 
     expect(playback.play).toHaveBeenCalledTimes(1);
+    expect(playback.getTime()).toBe(6);
     expect(getVideoSpanPlaybackState()).toBeNull();
+    expect(video.loop).toBe(true);
+    await expect.element(page.getByRole('button', { name: 'Loop' })).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('does not arm a drag or cancel wheel events from the video surface and native controls', async () => {
-    await interact(() => {
-      root?.render(
-        <I18nextProvider i18n={i18n}>
-          <ChakraProvider value={system}>
-            <VideoHarness />
-          </ChakraProvider>
-        </I18nextProvider>
-      );
-    });
+  it('does not arm a drag or cancel wheel events from the video surface and its player', async () => {
+    await renderVideo();
 
-    const video = host!.querySelector<HTMLVideoElement>('video')!;
+    const video = getVideo();
     const content = video.parentElement;
 
     expect(content).not.toBeNull();
@@ -679,7 +674,7 @@ describe('PreviewFrame native video arm', () => {
     await interact(() => firstVideo.dispatchEvent(new Event('error')));
 
     expect(host?.textContent).toContain('Video could not be loaded');
-    expect(host?.querySelector<HTMLButtonElement>('button')?.textContent).toBe('Retry');
+    await expect.element(page.getByRole('button', { name: 'Retry' })).toBeVisible();
     expect(
       [...(host?.querySelectorAll<HTMLImageElement>('img') ?? [])].some(
         (image) => image.getAttribute('src') === videoSource.poster
@@ -708,7 +703,7 @@ describe('PreviewFrame native video arm', () => {
     await interact(() => video.dispatchEvent(new Event('error')));
     expect(identityMocks.refreshProtectedMediaCookie).toHaveBeenCalledTimes(1);
 
-    await interact(() => host?.querySelector<HTMLButtonElement>('button')?.click());
+    await interact(() => getRetryButton().click());
     expect(load).toHaveBeenCalledTimes(2);
     expect(host?.textContent).not.toContain('Video could not be loaded');
 
@@ -952,31 +947,106 @@ describe('PreviewFrame native video arm', () => {
   });
 });
 
+describe('PreviewFrame video span playback through the player', () => {
+  it('loops a requested span within the clip while looping is on', async () => {
+    await renderHarness({ source: fixtureVideoSource });
+    const video = await loadedVideo();
+    const seeks = recordSeeks(video);
+    const token = requestVideoSpanPlayback({ endSeconds: 0.5, itemKey: fixtureVideoSource.itemKey, startSeconds: 0.2 });
+
+    await expect.poll(() => video.paused).toBe(false);
+    // The scrubber shades the span the player now confines playback to.
+    await expect.poll(() => getScrubberRoot().hasAttribute('data-playback-window')).toBe(true);
+
+    // The request's own seek, then at least one wrap back from the span's end.
+    await expect.poll(() => seeks.filter(isSpanStart).length, { timeout: 3000 }).toBeGreaterThanOrEqual(2);
+    expect(video.paused).toBe(false);
+    expect(getVideoSpanPlaybackState()).toMatchObject({ isPlaying: true, token });
+    video.pause();
+  });
+
+  it('plays a requested span once and rests on its last frame while looping is off, then replays it from the player', async () => {
+    await renderHarness({ source: fixtureVideoSource, videoLoop: false });
+    const video = await loadedVideo();
+    const seeks = recordSeeks(video);
+    // Frames 2 to 4, as the Video panel asks: the end is frame 5's start, exclusive.
+    const token = requestVideoSpanPlayback({ endSeconds: 0.5, itemKey: fixtureVideoSource.itemKey, startSeconds: 0.2 });
+    const isResting = () => video.paused && !video.seeking && Math.abs(video.currentTime - 0.45) < 1e-6;
+
+    await expect.poll(() => video.paused).toBe(false);
+    await expect.poll(isResting, { timeout: 3000 }).toBe(true);
+
+    await expect.element(page.getByText('Frame 4 / 9')).toBeVisible();
+    expect(seeks.filter(isSpanStart)).toHaveLength(1);
+    // Still armed: the Video panel's control turns back into play for the same request.
+    expect(getVideoSpanPlaybackState()).toMatchObject({ isPlaying: false, token });
+
+    await userEvent.click(page.getByRole('button', { name: 'Play' }));
+
+    await expect.poll(() => seeks.filter(isSpanStart).length).toBe(2);
+    await expect.poll(() => getVideoSpanPlaybackState()).toMatchObject({ isPlaying: true, token });
+    await expect.poll(isResting, { timeout: 3000 }).toBe(true);
+  });
+
+  it('hands the loop toggle to the caller', async () => {
+    const onVideoLoopChange = vi.fn();
+    await renderHarness({ onVideoLoopChange, source: fixtureVideoSource, videoLoop: false });
+    const video = await loadedVideo();
+    const loopButton = page.getByRole('button', { name: 'Loop' });
+
+    await expect.element(loopButton).toHaveAttribute('aria-pressed', 'false');
+    expect(video.loop).toBe(false);
+
+    await userEvent.click(loopButton);
+
+    expect(onVideoLoopChange).toHaveBeenCalledExactlyOnceWith(true);
+  });
+
+  it("retires the span when the player's scrubber takes the playhead outside it", async () => {
+    await renderHarness({ source: fixtureVideoSource });
+    const video = await loadedVideo();
+
+    requestVideoSpanPlayback({ endSeconds: 0.5, itemKey: fixtureVideoSource.itemKey, startSeconds: 0.2 });
+    await expect.poll(() => getVideoSpanPlaybackState()?.isPlaying).toBe(true);
+
+    await act(() => page.getByRole('slider', { name: 'Seek' }).element().focus());
+    await userEvent.keyboard('{End}');
+
+    await expect.poll(() => getVideoSpanPlaybackState()).toBeNull();
+    await expect.poll(() => getScrubberRoot().hasAttribute('data-playback-window')).toBe(false);
+    // Back to the viewer's loop over the whole clip.
+    expect(video.loop).toBe(true);
+    video.pause();
+  });
+});
+
 describe('PreviewFrame video keep-alive', () => {
   it('stops playback when the shell hides the widget instead of unmounting it', async () => {
     await renderKeptVideo('visible');
     const video = getVideo();
-    const pause = vi.spyOn(video, 'pause');
+    const playback = stubSpanPlayback(video);
 
+    await interact(() => void video.play());
     await renderKeptVideo('hidden');
 
     // The element survives — this is the keep-alive path, not an unmount — but
-    // `display: none` does not stop media, so the frame has to pause it itself.
+    // `display: none` does not stop media, so the player has to pause it itself, once.
     expect(getVideo()).toBe(video);
     expect(video.checkVisibility()).toBe(false);
-    expect(pause).toHaveBeenCalledOnce();
+    expect(playback.pauseSpy).toHaveBeenCalledOnce();
     expect(video.paused).toBe(true);
   });
 
   it('leaves playback alone while the widget stays visible', async () => {
     await renderKeptVideo('visible');
     const video = getVideo();
-    const pause = vi.spyOn(video, 'pause');
+    const playback = stubSpanPlayback(video);
 
+    await interact(() => void video.play());
     await renderKeptVideo('visible');
 
     expect(getVideo()).toBe(video);
-    expect(pause).not.toHaveBeenCalled();
+    expect(playback.pauseSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -992,6 +1062,7 @@ const renderKeptVideo = async (mode: 'hidden' | 'visible'): Promise<void> => {
       </I18nextProvider>
     );
   });
+  await waitForPlayer();
 };
 
 const renderVideo = async (
@@ -1014,6 +1085,69 @@ const renderVideo = async (
       </I18nextProvider>
     );
   });
+  await waitForPlayer();
+};
+
+const renderHarness = async (props: Parameters<typeof VideoHarness>[0]): Promise<void> => {
+  await interact(() => {
+    root?.render(
+      <I18nextProvider i18n={i18n}>
+        <ChakraProvider value={system}>
+          <VideoHarness {...props} />
+        </ChakraProvider>
+      </I18nextProvider>
+    );
+  });
+  await waitForPlayer();
+};
+
+/** The player loads with the first video Preview shows; until then the poster stands in. */
+const waitForPlayer = async (): Promise<void> => {
+  // Once loaded, the player mounts in the render itself; returning at once keeps the stubbed tests ahead of the media.
+  if (host?.querySelector('video')) {
+    return;
+  }
+
+  await vi.waitFor(async () => {
+    // Inside act, React holds the retry the loaded player schedules until act ends.
+    await act(async () => {});
+    expect(host?.querySelector('video')).not.toBeNull();
+  });
+};
+
+/** The mounted video once its metadata and first frame are in, so the player's controls are live. */
+const loadedVideo = async (): Promise<HTMLVideoElement> => {
+  const video = getVideo();
+
+  await expect.poll(() => video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA, { timeout: 5000 }).toBe(true);
+  await expect.element(page.getByRole('button', { name: 'Loop' })).toBeEnabled();
+  // A span request follows a press in the Video panel; without that activation the browser refuses audible playback.
+  await userEvent.keyboard('{Shift}');
+
+  return video;
+};
+
+const recordSeeks = (video: HTMLVideoElement): number[] => {
+  const seeks: number[] = [];
+
+  video.addEventListener('seeking', () => seeks.push(video.currentTime));
+
+  return seeks;
+};
+
+const isSpanStart = (seconds: number): boolean => Math.abs(seconds - 0.2) < 1e-6;
+
+const getScrubberRoot = (): Element => {
+  const scrubber = page
+    .getByRole('slider', { name: 'Seek' })
+    .element()
+    .closest('[data-scope="slider"][data-part="root"]');
+
+  if (!scrubber) {
+    throw new Error('Expected the player scrubber.');
+  }
+
+  return scrubber;
 };
 
 const getVideo = (): HTMLVideoElement => {
@@ -1025,6 +1159,9 @@ const getVideo = (): HTMLVideoElement => {
 
   return video;
 };
+
+const getRetryButton = (): HTMLButtonElement =>
+  page.getByRole('button', { name: 'Retry' }).element() as HTMLButtonElement;
 
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
@@ -1118,6 +1255,7 @@ const stubSpanPlayback = (
       },
     },
     duration: { configurable: true, get: () => duration },
+    ended: { configurable: true, get: () => paused && currentTime >= duration },
     paused: { configurable: true, get: () => paused },
     readyState: { configurable: true, get: () => currentReadyState },
   });
