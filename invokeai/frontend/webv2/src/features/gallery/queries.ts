@@ -34,7 +34,6 @@ export {
   getGalleryItemBoardIdsFromCaches,
   getGalleryProjectBoardsFromCaches,
   getGalleryItemStarredFromCaches,
-  createGalleryThumbnailRetryController,
   invalidateGallery,
   invalidateGalleryBoardDestinations,
   invalidateGalleryItems,

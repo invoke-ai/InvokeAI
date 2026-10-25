@@ -25,7 +25,7 @@ import { act, useCallback } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { commands, userEvent } from 'vitest/browser';
 
 import { LivePreviewFollowProvider, useLivePreviewFollow } from './livePreviewFollow';
 import { usePreviewHeaderContext, type PreviewItemPosition } from './previewHeaderStore';
@@ -3760,4 +3760,40 @@ describe('preview deletion confirmation', () => {
     }
     await expect.poll(() => document.querySelector('[role="alertdialog"]')).toBeNull();
   });
+});
+
+describe('preview image recovery', () => {
+  const imageRouteCommands = commands as typeof commands & {
+    endThumbnailRouteFailures: () => Promise<void>;
+    getThumbnailRequests: () => Promise<{ statuses: number[]; types: string[]; urls: string[] }>;
+    startThumbnailRoute: (pathnames: string[], options?: { failures?: number; status?: number }) => Promise<void>;
+    stopThumbnailRoute: () => Promise<void>;
+  };
+  const shownImage = () => host?.querySelector<HTMLImageElement>('img[alt="newest"]') ?? null;
+
+  it('reloads the full image an image move refused once the move ends', async () => {
+    // A fresh account lifetime: earlier tests' failed images must not leave a probe waiting on a real timer.
+    accountLifecycle.activate('preview-image-recovery');
+    // The real guard answers full image reads with 409 too while the files move.
+    await imageRouteCommands.startThumbnailRoute(['/images/newest/full'], { failures: 1_000_000, status: 409 });
+    vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout'] });
+
+    try {
+      await render();
+      await expect.poll(() => shownImage()?.complete === true && shownImage()?.naturalWidth === 0).toBe(true);
+      expect((await imageRouteCommands.getThumbnailRequests()).statuses).toEqual([409]);
+
+      // Two minutes into the move, it still refuses the image, which stays down.
+      await act(() => vi.advanceTimersByTimeAsync(2 * 60_000));
+      expect(shownImage()?.naturalWidth).toBe(0);
+
+      await imageRouteCommands.endThumbnailRouteFailures();
+      await act(() => vi.advanceTimersByTimeAsync(30_000));
+      await expect.poll(() => shownImage()?.naturalWidth).toBe(64);
+      expect(shownImage()?.getAttribute('src')).toContain('gallery_image_recovery=');
+    } finally {
+      vi.useRealTimers();
+      await imageRouteCommands.stopThumbnailRoute();
+    }
+  }, 20_000);
 });

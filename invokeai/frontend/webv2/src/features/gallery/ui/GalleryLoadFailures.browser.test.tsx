@@ -92,8 +92,9 @@ const image = (name: string, boardId: string, day = 1): GalleryItem => ({
 const page = (items: GalleryItem[], total = items.length): Promise<GalleryItemsPage> =>
   Promise.resolve({ items, total });
 const thumbnailRouteCommands = commands as typeof commands & {
-  getThumbnailRequests: () => Promise<{ statuses: number[]; urls: string[] }>;
-  startThumbnailRoute: (pathname: string, options?: { failures?: number; status?: number }) => Promise<void>;
+  endThumbnailRouteFailures: () => Promise<void>;
+  getThumbnailRequests: () => Promise<{ statuses: number[]; types: string[]; urls: string[] }>;
+  startThumbnailRoute: (pathnames: string[], options?: { failures?: number; status?: number }) => Promise<void>;
   stopThumbnailRoute: () => Promise<void>;
 };
 const fail = (): Promise<never> => Promise.reject(new Error('Service Unavailable'));
@@ -368,43 +369,84 @@ describe('Gallery listing failures', () => {
     await waitFor(() => expect(host?.contains(document.activeElement)).toBe(true));
   });
 
-  it('reloads a thumbnail the move refused by itself, without any user action', async () => {
-    // The real guard answers thumbnail reads with 409 while the files move; nothing tells this tab when it ends.
-    const thumbnailPath = '/api/v1/images/i/dog-moving.png/thumbnail';
-    await thumbnailRouteCommands.startThumbnailRoute(thumbnailPath, { failures: 1, status: 409 });
-    transport.listItems.mockImplementation(() =>
-      page([{ ...image('dog-moving.png', 'dogs', 3), thumbnailUrl: thumbnailPath }, ...DOG_ITEMS.slice(1)])
+  it('reloads every thumbnail a long image move refused, once, probing one image per interval meanwhile', async () => {
+    // The real guard answers every image read with 409 while the files move; nothing tells this tab when it ends.
+    const moving = Array.from({ length: 6 }, (_, index) => ({
+      ...image(`moving-${String(index)}.png`, 'dogs', 10 - index),
+      thumbnailUrl: `/api/v1/images/i/moving-${String(index)}.png/thumbnail`,
+    }));
+    const paths = moving.map((item) => item.thumbnailUrl);
+    const pathOf = (url: string) => new URL(url, window.location.href).pathname;
+    const countByPath = (urls: string[]) =>
+      Object.fromEntries(paths.map((path) => [path, urls.filter((url) => pathOf(url) === path).length]));
+    const eachPath = (count: number) => Object.fromEntries(paths.map((path) => [path, count]));
+    const imageRequests = async () => {
+      const log = await thumbnailRouteCommands.getThumbnailRequests();
+      return log.urls.filter((_, index) => log.types[index] === 'image');
+    };
+    // The probe's reads are answered in the page, so they settle within the fake clock's steps; the tiles' own
+    // image reads go to the network route.
+    let isMoving = true;
+    const browserFetch = globalThis.fetch;
+    const probes = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) =>
+      paths.includes(pathOf(String(input)))
+        ? Promise.resolve(
+            isMoving
+              ? new Response('moving', { status: 409 })
+              : new Response('<svg xmlns="http://www.w3.org/2000/svg"/>', {
+                  headers: { 'content-type': 'image/svg+xml' },
+                })
+          )
+        : browserFetch(input, init)
     );
+    const probedPaths = () => probes.mock.calls.map(([input]) => pathOf(String(input)));
+    await thumbnailRouteCommands.startThumbnailRoute(paths, { failures: 1_000_000, status: 409 });
+    transport.listItems.mockImplementation(() => page(moving));
+    // Real time keeps flowing for Query and the image loads; the test jumps the clock through the move.
+    vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout'] });
 
     try {
-      // StrictMode rehearses the tile's unmount; the retry must survive it as it does in the app.
+      // StrictMode rehearses each tile's unmount; recovery must survive it as it does in the app.
       await renderGallery({}, 'center', NO_SESSIONS, { strict: true });
-      await waitFor(() => expect(thumbnailNames()).toHaveLength(3));
-      const thumbnail = host!.querySelector<HTMLImageElement>('img[alt="dog-moving.png"]')!;
-      await expect.poll(() => thumbnail.complete).toBe(true);
-      expect(thumbnail.naturalWidth).toBe(0);
-      expect((await thumbnailRouteCommands.getThumbnailRequests()).statuses).toEqual([409]);
+      await waitFor(() => expect(thumbnailNames()).toHaveLength(6));
+      const thumbnails = moving.map((item) => host!.querySelector<HTMLImageElement>(`img[alt="${item.name}"]`)!);
+      await expect.poll(() => thumbnails.every((thumbnail) => thumbnail.complete)).toBe(true);
+      expect(thumbnails.every((thumbnail) => thumbnail.naturalWidth === 0)).toBe(true);
+      expect(countByPath(await imageRequests())).toEqual(eachPath(1));
 
-      // The first retry, after ~3 s, succeeds.
+      // Through six minutes of move the probe keeps asking about one image for the whole grid every 15 to 30 s,
+      // never one per tile.
+      for (let interval = 1; interval <= 12; interval += 1) {
+        const before = probes.mock.calls.length;
+        await act(() => vi.advanceTimersByTimeAsync(30_000));
+        expect(probes.mock.calls.length - before).toBeGreaterThanOrEqual(1);
+        expect(probes.mock.calls.length - before).toBeLessThanOrEqual(2);
+      }
+      expect(new Set(probedPaths()).size).toBe(1);
+      expect(await imageRequests()).toHaveLength(6);
+      expect(thumbnails.every((thumbnail) => thumbnail.naturalWidth === 0)).toBe(true);
+
+      // The move ends: the next probe sees an image served and every failed tile reloads by itself.
+      isMoving = false;
+      await thumbnailRouteCommands.endThumbnailRouteFailures();
+      await act(() => vi.advanceTimersByTimeAsync(30_000));
       await expect
-        .poll(async () => (await thumbnailRouteCommands.getThumbnailRequests()).statuses, { timeout: 10_000 })
-        .toEqual([409, 200]);
-      await expect.poll(() => thumbnail.complete && thumbnail.naturalWidth > 0).toBe(true);
-      const { urls } = await thumbnailRouteCommands.getThumbnailRequests();
-      expect(urls[1]).not.toBe(urls[0]);
-      expect(urls[1]).toContain('gallery_thumbnail_revision=');
-      // A loaded image stays put: no further request after success.
-      await act(
-        () =>
-          new Promise<void>((resolve) => {
-            setTimeout(resolve, 500);
-          })
-      );
-      expect((await thumbnailRouteCommands.getThumbnailRequests()).urls).toHaveLength(2);
+        .poll(() =>
+          moving.map((item) => host!.querySelector<HTMLImageElement>(`img[alt="${item.name}"]`)!.naturalWidth)
+        )
+        .toEqual(moving.map(() => 64));
+
+      // Each tile asked twice in all: the refused read and one reload. Nothing asks again afterwards.
+      const probeCount = probes.mock.calls.length;
+      await act(() => vi.advanceTimersByTimeAsync(5 * 60_000));
+      expect(countByPath(await imageRequests())).toEqual(eachPath(2));
+      expect(probes.mock.calls.length).toBe(probeCount);
     } finally {
+      vi.useRealTimers();
+      probes.mockRestore();
       await thumbnailRouteCommands.stopThumbnailRoute();
     }
-  }, 20_000);
+  }, 30_000);
 
   it('shows an anchored window that failed as failed, never the unfiltered recents', async () => {
     transport.listItems.mockImplementation(fail);
