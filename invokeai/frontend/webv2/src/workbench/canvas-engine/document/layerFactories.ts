@@ -2,6 +2,8 @@ import type {
   CanvasControlLayerContract,
   CanvasImageRef,
   CanvasInpaintMaskLayerContract,
+  CanvasLayerBaseContract,
+  CanvasLayerSourceContract,
   CanvasMaskFillContract,
   CanvasRegionalGuidanceLayerContract,
 } from '@workbench/canvas-engine/contracts';
@@ -108,3 +110,28 @@ export const createControlLayer = (
     withTransparencyEffect: true,
   };
 };
+
+/**
+ * A control layer made from another layer, keeping its appearance and flags with a default adapter. `content` either
+ * places baked pixels at `rect` under an identity transform, or reuses a source and transform as they are.
+ */
+export const createControlLayerFrom = (
+  from: CanvasLayerBaseContract,
+  options: {
+    id: string;
+    name: string;
+    base: string | null;
+    model: string | null;
+    content: { readonly rect: Rect } | { readonly source: CanvasLayerSourceContract };
+  }
+): CanvasControlLayerContract => ({
+  ...createControlLayer(options.name, options.id, options.base, options.model),
+  blendMode: from.blendMode,
+  ...(from.colorLabel ? { colorLabel: from.colorLabel } : {}),
+  isEnabled: from.isEnabled,
+  isLocked: from.isLocked,
+  opacity: from.opacity,
+  ...('rect' in options.content
+    ? { source: { bitmap: null, offset: { x: options.content.rect.x, y: options.content.rect.y }, type: 'paint' } }
+    : { source: structuredClone(options.content.source), transform: { ...from.transform } }),
+});

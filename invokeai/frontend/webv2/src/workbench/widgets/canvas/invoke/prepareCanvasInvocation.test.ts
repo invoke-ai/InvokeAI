@@ -690,6 +690,19 @@ describe('runCanvasInvocation', () => {
     expect(harness.notices()).toHaveLength(0);
   });
 
+  it('names the layer or group whose Clarity, Texture or Dehaze refused generation, and dispatches nothing', async () => {
+    const harness = makeHarness();
+    harness.deps.composeForGeneration = () =>
+      Promise.resolve({ ownerId: 'g', ownerName: 'Sky', reason: 'too-large', status: 'adjustment-refused' });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual([
+      'Clarity, Texture and Dehaze can’t run on “Sky”: its content is larger than 16.8 megapixels (4096 × 4096 px). Disable or remove them, or crop the content, then invoke again.',
+    ]);
+  });
+
   it('uses the frozen canvas and detached pixels after edits at composite, upload, and queue-dispatch boundaries', async () => {
     let liveDocument = makeDoc([rasterLayer('frozen-layer')], 96);
     liveDocument.bbox = { height: 64, width: 64, x: 7, y: 11 };
@@ -961,6 +974,19 @@ describe('runCanvasInvocation', () => {
     expect(notices[0]?.message).toBe('upload exploded');
     expect(harness.dedupe.byKey).toHaveLength(0);
     expect(harness.dedupe.byHash).toHaveLength(0);
+    expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('records the raster memory notice and dispatches nothing when the composite is over budget', async () => {
+    const harness = makeHarness();
+    harness.executorDeps.reserve = (bytes) => ({ availableBytes: 0, requestedBytes: bytes, status: 'over-budget' });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual([
+      'The canvas composite exceeds the available raster memory budget.',
+    ]);
     expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
   });
 

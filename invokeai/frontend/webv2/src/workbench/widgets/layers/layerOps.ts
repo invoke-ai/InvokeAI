@@ -20,7 +20,12 @@ export type { CanvasStructuralEngine } from '@workbench/canvas-engine/api';
 
 import { getRegionalGuidanceSupport } from '@features/generation/graph';
 import { createItemId } from '@platform/browser/randomUuid';
-import { getSourceContentRect, isMergeableRasterLayer, mergeDownEligibility } from '@workbench/canvas-engine/api';
+import {
+  getSourceContentRect,
+  isIdentityAdjustments,
+  isMergeableRasterLayer,
+  mergeDownEligibility,
+} from '@workbench/canvas-engine/api';
 import { CONTROL_ADAPTER_DEFAULTS, createDefaultControlAdapter } from '@workbench/controlAdapters';
 
 type LayerTransform = CanvasLayerBaseContract['transform'];
@@ -223,8 +228,27 @@ export const createReferenceImageId = (): string => createItemId('rgref');
 /** Mints a fresh raster adjustment-entry id. */
 export const createAdjustmentId = (): string => createItemId('adj');
 
-/** A fresh adjustment entry of `type` at its identity values (invert has none). */
-export const createIdentityAdjustment = (type: CanvasAdjustmentEntry['type']): CanvasAdjustmentEntry => {
+/**
+ * A new noise entry's amount: σ ≈ 13 of 255, grain clearly visible at 100% zoom without swamping detail. Lower
+ * values suit subtle grain or dither; the slider covers both.
+ */
+export const DEFAULT_NOISE_AMOUNT = 0.1;
+
+/** A new noise entry's grain size: one independent sample per pixel, the finest grain. */
+export const DEFAULT_NOISE_SIZE = 1;
+
+/** Clarity's and Texture's default feature sizes in owner pixels, matching the backend nodes' defaults. */
+export const DEFAULT_CLARITY_SIZE = 40;
+export const DEFAULT_TEXTURE_SIZE = 8;
+
+/** A fresh uint32 pattern seed for a noise entry. */
+export const createNoiseSeed = (): number => crypto.getRandomValues(new Uint32Array(1))[0]!;
+
+/**
+ * A fresh adjustment entry of `type`. Parametric types start at identity so adding one changes nothing until edited;
+ * invert has no parameters and noise starts at a visible grain with a fresh seed, so both apply at once.
+ */
+export const createAdjustmentEntry = (type: CanvasAdjustmentEntry['type']): CanvasAdjustmentEntry => {
   const id = createAdjustmentId();
   switch (type) {
     case 'brightness-contrast':
@@ -241,6 +265,25 @@ export const createIdentityAdjustment = (type: CanvasAdjustmentEntry['type']): C
       return { id, isEnabled: true, rotation: 0, type };
     case 'invert':
       return { id, isEnabled: true, type };
+    case 'noise':
+      return {
+        amount: DEFAULT_NOISE_AMOUNT,
+        distribution: 'gaussian',
+        grain: 'monochrome',
+        id,
+        isEnabled: true,
+        // Grain that fades out in shadows and highlights reads as film rather than as a noise overlay.
+        response: 'midtones',
+        seed: createNoiseSeed(),
+        size: DEFAULT_NOISE_SIZE,
+        type,
+      };
+    case 'clarity':
+      return { amount: 0, id, isEnabled: true, size: DEFAULT_CLARITY_SIZE, type };
+    case 'texture':
+      return { amount: 0, id, isEnabled: true, size: DEFAULT_TEXTURE_SIZE, type };
+    case 'dehaze':
+      return { amount: 0, id, isEnabled: true, type };
   }
 };
 
@@ -385,6 +428,14 @@ export const canConvertRasterControl = (layer: CanvasLayerContract): boolean => 
 };
 
 type PixelLayer = CanvasRasterLayerContractV2 | CanvasControlLayerContract;
+
+/**
+ * Whether a raster layer's adjustments change its pixels. Control layers carry no adjustments, so such a layer reaches
+ * the control stack only with its pixels baked by the engine (`copyLayerToControl`, `convertLayerToControl`); its
+ * alpha, all a mask conversion reads, no adjustment changes.
+ */
+export const needsBakedControlPixels = (layer: CanvasLayerContract): boolean =>
+  layer.type === 'raster' && !isIdentityAdjustments(layer.adjustments);
 type PixelSource = Extract<CanvasLayerSourceContract, { type: 'image' | 'paint' }>;
 
 const cloneTransform = (layer: CanvasLayerContract): LayerTransform => ({ ...layer.transform });
@@ -435,6 +486,7 @@ const destinationBase = (layer: CanvasLayerContract, id: string, isCopy: boolean
   transform: cloneTransform(layer),
 });
 
+/** Clones the source and transform; null for a layer {@link needsBakedControlPixels}, which no clone represents. */
 const pixelLayerToControl = (
   layer: PixelLayer,
   id: string,
@@ -442,7 +494,7 @@ const pixelLayerToControl = (
   base?: string | null,
   model?: string | null
 ): CanvasControlLayerContract | null => {
-  const source = clonePixelSource(layer);
+  const source = needsBakedControlPixels(layer) ? null : clonePixelSource(layer);
   if (!source) {
     return null;
   }
