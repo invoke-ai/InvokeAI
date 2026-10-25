@@ -14,6 +14,7 @@ import type * as UseTopbarShortcutModule from './useTopbarShortcut';
 // icon. Mock queue plumbing to isolate that gate.
 const harness = vi.hoisted(() => ({
   bindings: {} as Record<string, { aria: string; display: string; parts: string[] }>,
+  revealed: [] as string[],
   progress: { activeItemIndex: 1, completedItemCount: 0, message: '', percentage: 0.42 as number | null },
   summary: { current: 1, remaining: 1, runningQueueItemId: 'item-1', total: 1 },
 }));
@@ -26,9 +27,17 @@ vi.mock('./useTopbarShortcut', async (importOriginal) => ({
   ...(await importOriginal<typeof UseTopbarShortcutModule>()),
   useTopbarShortcutBinding: (commandId: string) => harness.bindings[commandId] ?? null,
 }));
+vi.mock('@workbench/widgets/layers/revealLayerProperties', () => ({
+  useRevealLayerProperties: () => (layerId: string) => harness.revealed.push(layerId),
+}));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { shortcut?: string }) => (options?.shortcut ? `${key}: ${options.shortcut}` : key),
+    t: (key: string, options?: { count?: number; reason?: string; shortcut?: string }) =>
+      options?.shortcut
+        ? `${key}: ${options.shortcut}`
+        : options?.count !== undefined
+          ? `${key}(${[options.count, options.reason].filter((value) => value !== undefined).join(', ')})`
+          : key,
   }),
 }));
 
@@ -47,9 +56,9 @@ let root: Root | null = null;
 
 const makeInvocationState = (overrides: Partial<InvocationState> = {}): InvocationState => ({
   batchCount: 1,
-  blockingReasons: [],
   invocation,
   invoke: vi.fn(() => Promise.resolve()),
+  issues: [],
   isPreparing: false,
   isValid: true,
   placedTypeIds: new Set<never>(),
@@ -82,6 +91,7 @@ const hasSpinner = (button: HTMLButtonElement): boolean => button.querySelector(
 
 beforeEach(() => {
   harness.bindings = {};
+  harness.revealed = [];
   harness.progress.percentage = 0.42;
   harness.summary.total = 1;
   harness.summary.runningQueueItemId = 'item-1';
@@ -165,19 +175,23 @@ describe('InvokeButton front of queue', () => {
     expect(invoke).toHaveBeenNthCalledWith(2, { prepend: true });
   });
 
-  it('ignores both clicks while Invoke is blocked', async () => {
+  it('ignores both clicks while Invoke is blocked by issues no layer can show', async () => {
     const invoke = vi.fn(() => Promise.resolve());
     const { button } = await renderInvokeButton({
-      blockingReasons: ['The backend is disconnected.'],
       invoke,
       isValid: false,
+      issues: [{ layerId: null, message: 'The backend is disconnected.' }],
     });
 
+    expect(button.getAttribute('aria-disabled')).toBe('true');
+    expect(button.getAttribute('aria-label')).toBe('topbar.invoke.unavailable');
+    expect(getComputedStyle(button).opacity).toBe('0.55');
     // Dispatched: a blocked Invoke is not actionable for a pointer driver.
     await act(() => button.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     await act(() => button.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true })));
 
     expect(invoke).not.toHaveBeenCalled();
+    expect(harness.revealed).toEqual([]);
   });
 
   it('names the live front-of-queue binding and Shift+click, and lists both bindings as shortcuts', async () => {
@@ -199,5 +213,43 @@ describe('InvokeButton front of queue', () => {
     await act(() => userEvent.hover(button));
 
     await expect.element(page.getByText('topbar.invoke.invokeFrontHintNoShortcut')).toBeVisible();
+  });
+});
+
+describe('InvokeButton issues', () => {
+  const LAYER_ISSUES = [
+    { layerId: 'control-2', message: 'Control layer "Depth 1": Choose a model.' },
+    { layerId: null, message: 'The backend is disconnected.' },
+  ];
+
+  it('counts the issues in place of the shortcut and keeps listing them in the tooltip', async () => {
+    harness.bindings = { 'app.invoke': { aria: 'Control+Enter', display: 'Ctrl+Enter', parts: ['ctrl', 'enter'] } };
+    const { button } = await renderInvokeButton({ isValid: false, issues: LAYER_ISSUES });
+
+    expect(button.textContent).toContain('topbar.invoke.issueCount(2)');
+    expect(button.querySelector('kbd')).toBeNull();
+    await act(() => userEvent.hover(button));
+
+    await expect.element(page.getByText('Control layer "Depth 1": Choose a model.')).toBeVisible();
+    await expect.element(page.getByText('backend is disconnected.')).toBeVisible();
+  });
+
+  it('shows the first issue’s layer on click or Enter, and never invokes', async () => {
+    const invoke = vi.fn(() => Promise.resolve());
+    const { button } = await renderInvokeButton({ invoke, isValid: false, issues: LAYER_ISSUES });
+
+    expect(button.getAttribute('aria-disabled')).not.toBe('true');
+    // Actionable, so not dimmed like a blocked Invoke.
+    expect(getComputedStyle(button).opacity).toBe('1');
+    expect(button.getAttribute('aria-label')).toBe(
+      'topbar.invoke.showIssue(2, Control layer "Depth 1": Choose a model.)'
+    );
+
+    await act(() => userEvent.click(button));
+    button.focus();
+    await act(() => userEvent.keyboard('{Enter}'));
+
+    expect(harness.revealed).toEqual(['control-2', 'control-2']);
+    expect(invoke).not.toHaveBeenCalled();
   });
 });

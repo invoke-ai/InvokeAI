@@ -95,7 +95,7 @@ describe('LayerController', () => {
     commitLayerCopy: () => false,
     ctx: {} as never,
     exportBaked: vi.fn(),
-    getControlModel: () => ({ base: null, model: null }),
+    getMainModelBase: () => null,
     isGuardCurrent: () => true,
   };
   const newRasterLayer = { backend: {} as never, ctx: {} as never, layers: {} as never, selection: {} as never };

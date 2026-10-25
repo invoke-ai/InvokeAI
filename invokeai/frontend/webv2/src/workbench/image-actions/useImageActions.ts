@@ -58,11 +58,14 @@ import {
   createCanvasFromImages,
   getCanvasImportNotice,
   getCanvasEngine,
+  getSendAsControlNotice,
   importGalleryImagesToCanvas,
+  sendGalleryImageAsControl,
   type GalleryCanvasImportDestination,
 } from '@workbench/canvas-operations/api';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { useRevealLayerProperties } from '@workbench/widgets/layers/revealLayerProperties';
 import { getProjectWidgetInstance, getProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchQueries, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo } from 'react';
@@ -149,6 +152,8 @@ export interface ImageActions extends GalleryItemActions {
   savePromptAsTemplate: (image: GalleryImage) => Promise<void>;
   selectForCompare: (image: GalleryImage) => void;
   sendToCanvas: (images: readonly GalleryImage[], destination: GalleryCanvasImportDestination) => Promise<void>;
+  /** Fills the selected control layer when it has no image yet, else adds a control layer; shows its Properties. */
+  sendImageAsControl: (image: GalleryImage) => Promise<void>;
   setImagesStarred: (imageNames: string[], starred: boolean) => Promise<void>;
   useAsReferenceImage: (image: GalleryImage) => void;
   useAsReferenceVideo: (item: GalleryVideoItem) => void;
@@ -219,6 +224,7 @@ export const useImageActions = ({
   requestDeletionConfirmation: RequestDeletionConfirmation;
 }): ImageActions => {
   const openWorkbenchWidget = useOpenWorkbenchWidget();
+  const revealLayerProperties = useRevealLayerProperties();
   const commands = useWorkbenchCommands();
   const { gallery, generation, notifications } = commands;
   const queries = useWorkbenchQueries();
@@ -1230,6 +1236,45 @@ export const useImageActions = ({
           });
         }
       },
+      sendImageAsControl: async (image) => {
+        const owner = captureAccountScope();
+
+        try {
+          const targetProjectId = projectId ?? queries.getSnapshot().activeProject.id;
+          const project = queries.getProject(targetProjectId);
+          const result = project
+            ? await sendGalleryImageAsControl({
+                applyCanvasMutation: commands.canvas.apply,
+                engine: getCanvasEngine(project.id) ?? null,
+                getProject: queries.getProject,
+                image,
+                isActiveProject: queries.isActiveProject,
+                project,
+              })
+            : ({ status: 'stale-project' } as const);
+
+          assertAccountScopeCurrent(owner);
+          const notice = getSendAsControlNotice(result);
+          notifications.add({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}) });
+
+          if ((result.status === 'filled' || result.status === 'created') && queries.isActiveProject(targetProjectId)) {
+            // The menu that asked has no trigger to hand focus back to, so the Canvas takes it, as for any import.
+            openWorkbenchWidget('canvas', { preferredRegions: ['center'], requireCenterView: true });
+            revealLayerProperties(result.layerId);
+          }
+        } catch (error: unknown) {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
+          recordCanvasImportError({
+            error,
+            localizedMessage: t('widgets.canvas.import.failed'),
+            notifications,
+            projectId,
+          });
+        }
+      },
       setImagesStarred: (imageNames, starred) =>
         setItemsStarred(
           imageNames.map((name) => ({ kind: 'image', name })),
@@ -1339,6 +1384,7 @@ export const useImageActions = ({
     queryClient,
     queries,
     requestDeletionConfirmation,
+    revealLayerProperties,
     selectForCompare,
     supportedModels,
     t,

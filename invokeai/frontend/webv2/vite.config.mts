@@ -155,6 +155,11 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/widgets/canvas/invoke/canvasScaling.ts',
   // The Preview (open at boot) and the Canvas staging bar share the Auto-switch menu; alone it costs a boot request.
   '/workbench/widgets/shared/AutoSwitchMenu.tsx',
+  // Invoke, the image menu (editor boot) and the lazy layer menu reveal a layer's Properties through these.
+  '/workbench/widgets/layers/layerPropertiesRequestStore.ts',
+  '/workbench/widgets/layers/revealLayerProperties.ts',
+  // The reveal opens widgets through this; its own imports (focus regions, context, widget registry) boot already.
+  '/workbench/useOpenWorkbenchWidget.ts',
 ] as const;
 
 // The workflow core, its UI barrel and the project workflow collection are one chunk: the editor boots with all of
@@ -296,7 +301,6 @@ const CANVAS_LAYER_SHARED_MODULES = [
   '/workbench/widgets/layers/layerExportActions.ts',
   '/workbench/widgets/layers/layerGroupCommands.ts',
   '/workbench/widgets/layers/layerMenuState.ts',
-  '/workbench/widgets/layers/layerPropertiesRequestStore.ts',
   '/workbench/widgets/layers/runLayerWorkflow.ts',
   '/workbench/widgets/layers/useSelectedModelBase.ts',
 ];

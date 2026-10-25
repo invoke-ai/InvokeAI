@@ -77,6 +77,8 @@ const mocks = vi.hoisted(() => ({
   patchGalleryItemCaches: vi.fn((..._args: unknown[]) => vi.fn()),
   removeFromBoard: vi.fn(),
   reportError: vi.fn(),
+  revealLayerProperties: vi.fn(),
+  sendGalleryImageAsControl: vi.fn(),
   requestDeletionConfirmation: vi.fn(),
   resolveItem: vi.fn(),
   setStarred: vi.fn(),
@@ -182,14 +184,21 @@ vi.mock('@platform/browser/downloadBlob', () => ({
 
 vi.mock('@workbench/canvas-operations/api', async () => {
   // The notice mapper is pure; the rest of the canvas-operations surface stays doubled.
-  const { getCanvasImportNotice } = await import('@workbench/canvas-operations/canvasImportNotice');
+  const { getCanvasImportNotice, getSendAsControlNotice } =
+    await import('@workbench/canvas-operations/canvasImportNotice');
   return {
     createCanvasFromImages: (...args: unknown[]) => mocks.createCanvasFromImages(...args),
     getCanvasEngine: (...args: unknown[]) => mocks.getCanvasEngine(...args),
     getCanvasImportNotice,
+    getSendAsControlNotice,
     importGalleryImagesToCanvas: (...args: unknown[]) => mocks.importGalleryImagesToCanvas(...args),
+    sendGalleryImageAsControl: (...args: unknown[]) => mocks.sendGalleryImageAsControl(...args),
   };
 });
+
+vi.mock('@workbench/widgets/layers/revealLayerProperties', () => ({
+  useRevealLayerProperties: () => mocks.revealLayerProperties,
+}));
 
 vi.mock('@workbench/WorkbenchContext', () => {
   // The workbench store owns one commands object, so it is the same on every read.
@@ -465,6 +474,56 @@ describe('canvas destinations', () => {
     );
     expect(mocks.notificationsAdd).toHaveBeenCalledWith({ kind: 'success', title: 'widgets.canvas.import.success' });
     // The canvas the images went to is no longer on screen; the one that is must not be brought forward.
+    expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
+  });
+
+  it('names the control layer an image filled and shows its Properties', async () => {
+    mocks.getProject.mockImplementation((id: string) => makeMockProject(id));
+    mocks.sendGalleryImageAsControl.mockResolvedValueOnce({
+      layerId: 'control-1',
+      layerName: 'Depth 1',
+      status: 'filled',
+    });
+
+    await act(() => actionsRef.current!.sendImageAsControl(galleryImage('a.png')));
+
+    expect(mocks.sendGalleryImageAsControl).toHaveBeenCalledWith(
+      expect.objectContaining({ image: expect.objectContaining({ imageName: 'a.png' }) })
+    );
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'success',
+      title: 'widgets.canvas.import.controlFilled',
+    });
+    expect(mocks.revealLayerProperties).toHaveBeenCalledWith('control-1');
+    // The menu has no trigger to restore focus to: the focusing open hands it to the Canvas first.
+    expect(mocks.openWorkbenchWidget).toHaveBeenCalledWith('canvas', {
+      preferredRegions: ['center'],
+      requireCenterView: true,
+    });
+    expect(mocks.openWorkbenchWidget.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.revealLayerProperties.mock.invocationCallOrder[0]!
+    );
+  });
+
+  it('reports a new control layer as an import, and a refusal without moving the layout', async () => {
+    mocks.getProject.mockImplementation((id: string) => makeMockProject(id));
+    mocks.sendGalleryImageAsControl.mockResolvedValueOnce({ layerId: 'control-2', status: 'created' });
+
+    await act(() => actionsRef.current!.sendImageAsControl(galleryImage('a.png')));
+
+    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith({
+      kind: 'success',
+      title: 'widgets.canvas.import.success',
+    });
+    expect(mocks.revealLayerProperties).toHaveBeenLastCalledWith('control-2');
+
+    mocks.revealLayerProperties.mockClear();
+    mocks.openWorkbenchWidget.mockClear();
+    mocks.sendGalleryImageAsControl.mockResolvedValueOnce({ status: 'blocked' });
+    await act(() => actionsRef.current!.sendImageAsControl(galleryImage('a.png')));
+
+    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith({ kind: 'info', title: 'widgets.canvas.import.blocked' });
+    expect(mocks.revealLayerProperties).not.toHaveBeenCalled();
     expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
   });
 });

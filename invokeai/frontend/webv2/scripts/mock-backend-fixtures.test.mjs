@@ -1689,6 +1689,56 @@ test('model seed sets are opt-in, and re-identify fills what the probe would rec
   });
 });
 
+test('control model seed sets cover both preprocessor id forms, and a PATCH changes their default settings', async () => {
+  const records = [...MODEL_SEED_SETS['control-sdxl'], ...MODEL_SEED_SETS['control-flux']].map(({ record }) => record);
+  const allKeys = Object.values(MODEL_SEED_SETS).flatMap((entries) => entries.map(({ record }) => record.key));
+  assert.equal(new Set(allKeys).size, allKeys.length);
+  const preprocessors = new Set(records.map((record) => record.default_settings?.preprocessor));
+  // Installed models name their preprocessor by the legacy processor id or by the detection node's id.
+  assert.ok(preprocessors.has('depth_anything_image_processor'));
+  assert.ok(preprocessors.has('depth_anything_depth_estimation'));
+  assert.deepEqual(
+    MODEL_SEED_SETS['control-flux'].map(({ record }) => [record.type, record.base]),
+    [
+      ['main', 'flux'],
+      ['control_lora', 'flux'],
+      ['controlnet', 'flux'],
+    ]
+  );
+
+  await withRepresentativeBackend(async (backend) => {
+    const listed = async () => (await getJson(backend, '/api/v2/models/')).models;
+    const before = (await listed()).length;
+    const sendJson = (path, init, body) =>
+      fetch(`${backend.origin}${path}`, {
+        ...init,
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    const post = (path, body) => sendJson(path, { method: 'POST' }, body);
+    const patch = (path, body) => sendJson(path, { method: 'PATCH' }, body);
+    for (const set of ['control-sdxl', 'control-flux']) {
+      assert.equal((await post('/__models', { set })).status, 200);
+    }
+    const byKey = new Map((await listed()).map((model) => [model.key, model]));
+    assert.equal(byKey.size, before + records.length);
+    assert.equal(byKey.get('seed-t2i-adapter-canny-sdxl-1.0').type, 't2i_adapter');
+    assert.equal(byKey.get('seed-my-sdxl-control').default_settings, null);
+
+    const patched = await patch('/api/v2/models/i/seed-my-sdxl-control', {
+      default_settings: { preprocessor: 'canny_image_processor' },
+    });
+    assert.equal(patched.status, 200);
+    assert.deepEqual((await getJson(backend, '/api/v2/models/i/seed-my-sdxl-control')).default_settings, {
+      preprocessor: 'canny_image_processor',
+    });
+    assert.equal((await patch('/api/v2/models/i/missing', { name: 'x' })).status, 404);
+
+    await getJson(backend, '/__reset', { method: 'POST' });
+    assert.equal((await listed()).length, before);
+  });
+});
+
 test('runtime config PATCH preserves other writable fields and validates the queue history limit', async () => {
   await withRepresentativeBackend(async (backend) => {
     await getJson(backend, '/api/v1/app/runtime_config', {

@@ -67,7 +67,7 @@ Current extracted ownership includes:
 - `RasterMemoryBudgetController`: base, derived, group, decoded, detached, reserved and overage byte accounting plus generation-scoped reservations and operation-owned reservations and pins.
 - `RenderController`: render targets, scheduler construction, previews, render lifecycle.
 - `HistoryController`: engine-owned history, guarded async replay with failure reporting, inactive byte trimming.
-- `PersistenceController`: dirty-bitmap flush barriers and disposal.
+- `PersistenceController`: dirty-bitmap flush barriers (whole document, or one layer through `applicationHost.flushLayerUploads`) and disposal.
 - `EditingController`: selection state and exclusive edit-lease lifecycle.
 - `InteractionController`: public tool commands and their disposal boundary.
 - `LayerController`: guarded layer mutations and thumbnail capability ports.
@@ -76,6 +76,8 @@ Current extracted ownership includes:
 - `StagedResultController`: guarded staged-candidate acceptance and its history entry.
 - `PixelEditController`, `SelectionImageController`, `LayerMutationController`: atomic pixel/document publication at their respective boundaries. Pixel editor materializes control layers and raster-image layers in place before destructive edits, keeping conversion plus pixels in one undoable transaction.
 - `MaskResultController`, `FilterResultController`, `GeneratedResultController`: guarded application-result adoption through narrow host ports.
+- `ControlDerivationController`: control-layer intent patches and detected-map commits (see "Control derivation").
+- `ControlViewController`: the display-only Original / Overlay view of one control layer (see "Control layer view").
 
 Controller-local tests instantiate these boundaries with fakes. Integration tests in `engine.test.ts` cover composition, document routing, cross-controller invariants.
 
@@ -199,6 +201,47 @@ Canvas widget stops candidate's originating batch only after an accept has commi
 Continue-staging variant uses same guarded transaction but inserts candidate as a disabled raster layer, preserves exact staging-area state and current layer selection, keeps staged preview active. Lets users bank candidates without visually doubling preview or ending comparison. Undo and redo affect only the banked layer after initial transaction.
 
 Undo removes accepted layer and restores prior selection. Redo restores identical layer and selection without recreating event or staging candidate. History entry replays failure-atomically; successful commit publishes through an admitted transaction, which clears any previous redo stack. Undo intentionally does not return accepted candidate to staging.
+
+## Control derivation
+
+A typed control layer can keep the pixels it was detected from (`original`, framed by `originalTransform`) beside the derived map in `source`. The invariants are documented on `CanvasControlLayerContract`; `document/controlDerivation.ts` owns them as pure rules, and every engine path that changes a control layer's pixels or frame applies one of them so no edit leaves a map paired with an original it no longer derives from:
+
+| Operation                                                         | Rule                                                                                         |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Materialize before a pixel edit (`buildMaterializedPixelLayer`)   | `rebaseControlOriginal` with the baked transform; a frame the bake would shear detaches      |
+| Transform Apply baking a paint map (`TransformEditingController`) | the same rebase in the bake's own step, so undo restores the whole before-contract           |
+| Crop to bbox                                                      | detach (the cropped pixels become the image)                                                 |
+| Generated or Select Object result replacing a control layer       | detach and drop `filter`: the result is the image, not a filter's map                        |
+| Filter result on a control layer                                  | refused `unsupported`: Filter runs on raster layers only; a control map comes from detection |
+| Filter result copied from a raster layer to a new control layer   | a fresh control layer; `controlCopy.controlType` types the copy with `detection: null`       |
+| Paint on a map that needs no materialize                          | only `source` changes; the map stays current                                                 |
+
+`ControlDerivationController`, reached through `CanvasApplicationHost` (`captureControlDetectionGuard`, `commitControlLayerPatch`, `commitControlMap`) like the Filter, Mask and Generated adoptions, is the only writer of derivation fields besides those rules. The application's detection coordinator calls `commitControlLayerPatch` for an intent (type, detector, settings, image) and `commitControlMap` for a detection result, guarded by `captureControlDetectionGuard`: same `documentRevision` and same `controlDetectionInputKey`, which ignores weight, name and paint on the map, so those never discard a running detection. Neither commit passes the operation edit owner. A detection runs in the background while the user keeps working, so its commit must yield to whatever holds the document: an operation's lease (Filter, Select Object, Transform), a gesture, a replay or a session holding the layer's pixels all refuse it `busy`, and the coordinator retries once the lock releases. The guard capture and the map commit's freshness checks (before decoding, after it, and once admitted) read the reducer document, so a background job never ends the user's structural preview; only an admitted commit does, and the map is built from the layer as it stands after that. A map whose input is the layer's own unpersisted paint is also `busy` until `flushLayerUploads` lands those strokes in the `original` it records. The commit promotes the map image through the caller's `makeDurable` only once its first check passes, just before decoding, and promotes it once across retries: promoted maps are exempt from server-side intermediate cleanup, so a result that is refused, superseded or dropped as stale before then stays collectible. A refusal after promotion (stale after decoding, over-budget, a history refusal, a busy timeout) still leaves that map durable and unreferenced; this is accepted because detector graphs cache their results, so a re-run can return a map the document or history still references and deleting a dropped one could remove a live map. A document change (undo, redo) that leaves a layer needing no detection, or changes its input other than by its own paint landing, cancels that layer's run and its backend queue item, except while that run's own map commit is in flight, whose publish reconciles synchronously.
+
+History pairing keeps one undo per user intent. A patch with a `coalesceKey` replaces the newest entry while that is the controller's patch of the same layer and key, so a settings scrub is one step. A map replaces the newest entry while that is the controller's entry for the same layer that requested this input key (a patch that changed the detection input, or an earlier map), so one undo reverts "set type" and its map together; otherwise the map records its own "Detect <type>" entry, and a weight or name patch in between is never undone together with a later map. The controller's record of its newest entry, including any unpersisted before-pixels, is dropped when that entry is disposed (evicted, cleared, discarded from redo or replaced), so it never outlives the entry. Patches route as user edits; maps publish as `system` so a background result never changes the invocation route. Undo restores the exact before-state: a contract whose source is persisted re-rasterizes from it, and unpersisted paint the step replaced is captured and replayed with the entry. A source change discards the outgoing source's pending persistence. Undo and redo never schedule detection; a restored stale map shows as needing detection until the user asks again.
+
+### Control layer view
+
+`previews.setControlLayerView(layerId, 'original' | 'map' | 'overlay')` lets the user compare a control layer's map with the picture it was detected from. `ControlViewController` owns the one view that can exist. It refuses while an operation holds the document (`documentEditingLocked`) or a generation or staging locks the canvas (`setInteractionLocked`). Otherwise it reserves raster memory for the original's decoded pixels, rasterizes the `original` source with the layer rasterizers, and once the surface exists accounts it as detached pixels until the view ends; the reservation ends with the decode. `map` ends the view and resolves `shown`.
+
+| Outcome       | Meaning                                                                                |
+| ------------- | -------------------------------------------------------------------------------------- |
+| `shown`       | the view (or the map) is displayed                                                     |
+| `missing`     | no control layer with a kept original that has pixels                                  |
+| `locked`      | an operation or a generation holds the canvas                                          |
+| `stale`       | a newer request, a reset below or an edit of the layer superseded the decode in flight |
+| `over-budget` | the original's pixels do not fit the raster budget; nothing was decoded                |
+| `failed`      | the original could not be fetched or decoded                                           |
+
+The view records the contract it was built from and publishes `{ layerId, view }` as the `controlLayerView` interaction state. It returns to the map (`null`, surface released, layer invalidated), ending any decode in flight, on:
+
+- any change to the layer's contract (every edit, undo, redo and detection commit) and its removal;
+- another selection;
+- a stroke or other pixel edit admitted on the layer (strokes paint the map live), a direct repaint of it, and its cache invalidation (including `clearCaches`);
+- the editing lock or the interaction lock engaging;
+- document replacement, the project going away, cooldown and disposal.
+
+The compositor draws the original as layer-local pixels, like a floating selection: through the layer matrix and `originalTransform`, at the layer's opacity and blend, without the control-transparency effect. `original` draws it in place of the map, even when the layer has no map; `overlay` draws the map over it at `CONTROL_OVERLAY_MAP_ALPHA` of the layer's opacity. The original's landing joins the leaf's bounds, so culling and bounded damage cover it. Control layers never sit in a composited group scope (only raster-stack groups composite in isolation), so group surfaces never see a view. Isolation suppresses it, and only screen frames pass it: history, persistence, thumbnails, exports and generation composites read the map.
 
 ## PSD export
 
