@@ -11,6 +11,7 @@ import {
   isControlMapCurrent,
   needsControlDetection,
   rebaseControlOriginal,
+  repairControlDerivationRecord,
   restoreControlOriginal,
   withDetectedMap,
 } from './controlDerivation';
@@ -129,6 +130,22 @@ describe('detachControlDerivation', () => {
     expect(detachControlDerivation(legacy)).toBe(legacy);
     const none = layer({ controlType: 'depth', detection: null, source: photo });
     expect(detachControlDerivation(none)).toBe(none);
+  });
+});
+
+describe('repairControlDerivationRecord', () => {
+  it('returns a record that already holds the invariants unchanged', () => {
+    for (const valid of [layer(), detected(), layer({ controlType: 'depth', detection: null, source: photo })]) {
+      expect(repairControlDerivationRecord(valid as never)).toBe(valid);
+    }
+  });
+
+  it('repairs a copy, leaving the persisted record untouched', () => {
+    const persisted = { ...detected(), original: { bitmap: null, type: 'paint' } };
+    const repaired = repairControlDerivationRecord(persisted);
+    expect(repaired).toEqual({ ...detected(), detection: null, original: undefined });
+    expect(repaired).not.toHaveProperty('original');
+    expect(persisted.original).toEqual({ bitmap: null, type: 'paint' });
   });
 });
 

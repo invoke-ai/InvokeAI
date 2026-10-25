@@ -184,3 +184,48 @@ export const restoreControlOriginal = (layer: CanvasControlLayerContract): Canva
   delete next.filter;
   return next;
 };
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isPersistedPixelSource = (source: unknown): boolean =>
+  isRecord(source) && (source.type === 'image' || (source.type === 'paint' && isRecord(source.bitmap)));
+
+/**
+ * Restores I1-I3 on an unvalidated persisted control leaf so load can repair it instead of refusing the document: a
+ * null type counts as absent, an original without pixels detaches, and only bookkeeping that no longer holds is
+ * dropped, never `source`. Shape validation stays with the loader.
+ */
+export const repairControlDerivationRecord = (record: Record<string, unknown>): Record<string, unknown> => {
+  const next = { ...record };
+  let changed = false;
+  const drop = (key: 'controlType' | 'detection' | 'original' | 'originalTransform') => {
+    if (key in next) {
+      delete next[key];
+      changed = true;
+    }
+  };
+  if (next.controlType === null) {
+    drop('controlType');
+  }
+  if (next.controlType === undefined) {
+    drop('detection');
+    drop('original');
+    drop('originalTransform');
+    return changed ? next : record;
+  }
+  if (next.original !== undefined && !isPersistedPixelSource(next.original)) {
+    drop('original');
+    if (next.detection !== undefined && next.detection !== null) {
+      next.detection = null;
+      changed = true;
+    }
+  }
+  if (next.original !== undefined && !isRecord(next.detection)) {
+    drop('original');
+  }
+  if (next.original === undefined) {
+    drop('originalTransform');
+  }
+  return changed ? next : record;
+};

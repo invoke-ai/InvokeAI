@@ -19,6 +19,7 @@ import {
   CONTROL_TYPES,
   LAYER_STACK_ORDER,
 } from '@workbench/canvas-engine/api';
+import { repairControlDerivationRecord } from '@workbench/canvas-engine/document/controlDerivation';
 import { repairSelectedLayerId } from '@workbench/canvas-engine/document/selectionRepair';
 import { z } from 'zod';
 
@@ -590,43 +591,11 @@ interface ParseContext {
   count: number;
 }
 
-const isPixelSourceWithPixels = (source: unknown): boolean =>
-  isRecord(source) && (source.type === 'image' || (source.type === 'paint' && isRecord(source.bitmap)));
-
-/**
- * Restores the control derivation invariants (see `CanvasControlLayerContract`) on a fresh leaf copy instead of
- * refusing the document: each repair keeps the pixels generation uses and drops only bookkeeping that no longer holds.
- */
-const repairControlDerivation = (layer: Record<string, unknown>): Record<string, unknown> => {
-  if (layer.controlType === null) {
-    delete layer.controlType;
-  }
-  if (layer.controlType === undefined) {
-    delete layer.detection;
-    delete layer.original;
-    delete layer.originalTransform;
-    return layer;
-  }
-  if (layer.original !== undefined && !isPixelSourceWithPixels(layer.original)) {
-    delete layer.original;
-    if (layer.detection !== undefined) {
-      layer.detection = null;
-    }
-  }
-  if (layer.original !== undefined && !isRecord(layer.detection)) {
-    delete layer.original;
-  }
-  if (layer.original === undefined) {
-    delete layer.originalTransform;
-  }
-  return layer;
-};
-
 /** Fills the known optional defaults on a leaf, then validates it strictly. */
 const parseLeaf = (value: Record<string, unknown>, path: string, context: ParseContext): CanvasLayerContract | null => {
   let candidate: Record<string, unknown> = value;
   if (value.type === 'control') {
-    candidate = repairControlDerivation({
+    candidate = repairControlDerivationRecord({
       ...value,
       adapter: normalizeControlAdapter(value.adapter),
       withTransparencyEffect: value.withTransparencyEffect === undefined ? true : value.withTransparencyEffect,
