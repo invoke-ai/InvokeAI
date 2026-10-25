@@ -1,6 +1,7 @@
 import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 
-import { Badge, Box, Flex, HStack, Icon, Image, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, Flex, HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { useAuthSession } from '@features/identity';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { MenuActionItem } from '@features/workflow/ui/MenuActionItem';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
@@ -46,6 +47,7 @@ import {
   useWorkflowLibraryMissingCounts,
   WorkflowRequirementsList,
 } from './WorkflowRequirementsList';
+import { WORKFLOW_THUMBNAIL_ASPECT_RATIO, WorkflowThumbnailImage } from './workflowThumbnail';
 
 /**
  * The project's own workflows, presented through the library's card contract. Everything here is a local
@@ -53,7 +55,6 @@ import {
  */
 
 const DETAIL_RAIL_WIDTH = '18rem';
-const THUMBNAIL_ASPECT_RATIO = 3 / 2;
 
 export interface ProjectWorkflowsViewProps {
   contextMenuPoint: WorkflowCardMenuAnchor | null;
@@ -235,6 +236,7 @@ const ProjectWorkflowDetailPanel = ({
   onRename,
 }: ProjectWorkflowDetailPanelProps) => {
   const { t } = useTranslation();
+  const session = useAuthSession();
   const deps = useModelRequirementDeps();
   const templatesSnapshot = useInvocationTemplatesSnapshot();
   const openAddModels = useOpenAddModels();
@@ -322,7 +324,7 @@ const ProjectWorkflowDetailPanel = ({
   const showThumbnail = Boolean(thumbnailUrl) && thumbnailUrl !== failedThumbnailUrl;
   const lastRun = entry.lastRun ? formatRelativeTime(entry.lastRun.completedAt, new Date()) : '';
   const source = entry.source;
-  const canUpdateSource = isUpdatableSource(source);
+  const canUpdateSource = isUpdatableSource(source, session);
 
   const actionItems = (
     <>
@@ -388,16 +390,9 @@ const ProjectWorkflowDetailPanel = ({
       <Scrollable flex="1" label={name} minH="0">
         <Stack gap="2" minW="0" p="2.5">
           <Stack gap="1" minW="0">
-            <Box aspectRatio={THUMBNAIL_ASPECT_RATIO} bg="bg.muted" overflow="hidden" rounded="md" w="full">
+            <Box aspectRatio={WORKFLOW_THUMBNAIL_ASPECT_RATIO} bg="bg.muted" overflow="hidden" rounded="md" w="full">
               {showThumbnail ? (
-                <Image
-                  alt=""
-                  h="full"
-                  objectFit="cover"
-                  src={thumbnailUrl ?? undefined}
-                  w="full"
-                  onError={handleThumbnailError}
-                />
+                <WorkflowThumbnailImage src={thumbnailUrl} onError={handleThumbnailError} />
               ) : (
                 <Flex align="center" direction="column" gap="1" h="full" justify="center" w="full">
                   <Icon aria-hidden as={ImageOffIcon} boxSize="5" color="fg.subtle" opacity={0.6} />

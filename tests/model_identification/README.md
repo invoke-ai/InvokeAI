@@ -97,7 +97,7 @@ If the model is multi-file (e.g. diffusers-style), omit this key or set it to a 
 
 #### `"expected_config_attrs"`
 
-This field is a dict of expected configuration attributes for the model. It is required for all test cases.
+This field is a dict of expected configuration attributes for the model. It is required for all test cases except those with an `"expected_refusal"`.
 
 It is used to verify that the model's configuration matches expectations. The keys and values in this dict depend on the specific model and its configuration.
 
@@ -125,6 +125,16 @@ For example, for a SD1.5 main (pipeline) inpainting model in diffusers format, y
     "prediction_type": "epsilon",
     "variant": "inpaint"
   }
+}
+```
+
+#### `"expected_refusal"`
+
+For a model that identification recognizes and refuses, so the install fails with a reason (an `InvalidMatchError`), set this to a substring of that reason instead of giving `"expected_config_attrs"` (setting both fails the test). The test then expects no config and exactly one refusal, containing the substring.
+
+```json
+{
+  "expected_refusal": "not supported in GGUF format"
 }
 ```
 

@@ -4,9 +4,13 @@ import type { ReactNode } from 'react';
 
 import { chakra, DataList, HStack, Icon, Menu, Portal, Separator, Stack, Text } from '@chakra-ui/react';
 import { isConvertibleToDiffusers } from '@features/models/core/baseIdentity';
+import {
+  supportsExternalModelSettings,
+  type ExternalModelSettingsModel,
+} from '@features/models/core/externalModelFields';
 import { isLinkableType } from '@features/models/core/relationships';
 import { isAbsoluteModelPath, resolveModelAbsolutePath } from '@features/models/core/schemas';
-import { getModelSourceHref } from '@features/models/core/taxonomy';
+import { getModelSourceHref, getUnrecordedModelFact } from '@features/models/core/taxonomy';
 import { useModelsSelector, type ModelsSnapshot } from '@features/models/data/modelsStore';
 import {
   discardModelDraft,
@@ -14,6 +18,7 @@ import {
   useModelDraft,
   type ModelDraft,
 } from '@features/models/ui/modelDraftsStore';
+import { useModelsUi } from '@features/models/ui/ModelsUiContext';
 import { ModelActionMenuItems, type PendingModelAction } from '@features/models/ui/shared/ModelActionsMenu';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { formatBytes } from '@platform/i18n/languages';
@@ -28,12 +33,14 @@ import { useTranslation } from 'react-i18next';
 import { CpuOnlySetting, supportsCpuOnlySetting } from './CpuOnlySetting';
 import { supportsDefaultSettings, type DefaultSettingsModel } from './defaultSettingsFields';
 import { DefaultSettingsSection } from './DefaultSettingsSection';
+import { ExternalModelSection } from './ExternalModelSection';
 import { MissingFileBadge, ModelBaseBadge, ModelFormatBadge } from './ModelBadges';
 import { ModelEditForm } from './ModelEditForm';
 import { ModelImageUpload } from './ModelImageUpload';
 import { ModelSettingsMenuItems } from './ModelSettingsMenuItems';
 import { RelatedModelsSection } from './RelatedModelsSection';
 import { MemoizedTriggerPhrasesEditor } from './TriggerPhrasesEditor';
+import { UnrecordedFactNotice } from './UnrecordedFactNotice';
 import { UpdatePathDialog } from './UpdatePathDialog';
 
 const TRIGGER_PHRASE_TYPES = new Set(['main', 'lora', 'embedding']);
@@ -45,6 +52,7 @@ type CpuOnlyModel = Pick<ModelConfig, 'cpu_only' | 'key' | 'name' | 'type'>;
 type ModelIdentityModel = Pick<
   ModelConfig,
   | 'base'
+  | 'cond_in_channels'
   | 'config_path'
   | 'cover_image'
   | 'description'
@@ -59,6 +67,7 @@ type ModelIdentityModel = Pick<
   | 'provider_id'
   | 'provider_model_id'
   | 'repo_variant'
+  | 'scale'
   | 'source'
   | 'source_type'
   | 'source_url'
@@ -83,6 +92,7 @@ const selectModelIdentity = (snapshot: ModelsSnapshot, modelKey: string): ModelI
   return model
     ? {
         base: model.base,
+        cond_in_channels: model.cond_in_channels,
         config_path: model.config_path,
         cover_image: model.cover_image,
         description: model.description,
@@ -97,6 +107,7 @@ const selectModelIdentity = (snapshot: ModelsSnapshot, modelKey: string): ModelI
         provider_id: model.provider_id,
         provider_model_id: model.provider_model_id,
         repo_variant: model.repo_variant,
+        scale: model.scale,
         source: model.source,
         source_type: model.source_type,
         source_url: model.source_url,
@@ -110,13 +121,32 @@ const selectDefaultSettingsModel = (snapshot: ModelsSnapshot, modelKey: string):
   const model = findModel(snapshot, modelKey);
 
   // `base` and `format` are projected too: together with the type they are the loader key the backend
-  // answers the FP8 Storage question on, and all three parts change the answer.
+  // answers the FP8 Storage question on, and all three parts change the answer. `variant` joins them
+  // for Generate's scheduler rules, which differ by variant within a base.
   return model
     ? {
         base: model.base,
         default_settings: model.default_settings,
         format: model.format,
         key: model.key,
+        type: model.type,
+        variant: model.variant,
+      }
+    : null;
+};
+
+const selectExternalModel = (snapshot: ModelsSnapshot, modelKey: string): ExternalModelSettingsModel | null => {
+  const model = findModel(snapshot, modelKey);
+
+  return model
+    ? {
+        capabilities: model.capabilities,
+        default_settings: model.default_settings,
+        key: model.key,
+        name: model.name,
+        provider_id: model.provider_id,
+        provider_model_id: model.provider_model_id,
+        source: model.source,
         type: model.type,
       }
     : null;
@@ -174,6 +204,13 @@ export const ModelDetail = ({
         </>
       ) : null}
 
+      {supportsExternalModelSettings(model) ? (
+        <>
+          <Separator borderColor="border.subtle" />
+          <ExternalModelSectionContainer modelKey={model.key} />
+        </>
+      ) : null}
+
       {supportsDefaultSettings(model) ? (
         <>
           <Separator borderColor="border.subtle" />
@@ -228,6 +265,8 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
 }: ModelIdentitySectionProps) {
   const notify = useNotify();
   const { t } = useTranslation();
+  const { canManageModels } = useModelsUi();
+  const unrecordedFact = getUnrecordedModelFact(model);
   // The open editor lives with the model's retained draft, so it survives leaving the pane and coming back.
   const isEditing = useModelDraft(model.key, isIdentityEditorOpen);
 
@@ -273,6 +312,13 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
         />
       </HStack>
 
+      {unrecordedFact ? (
+        <UnrecordedFactNotice
+          fact={unrecordedFact}
+          onReidentify={canManageModels ? () => onRequestConfirm({ kind: 'reidentify', model }) : null}
+        />
+      ) : null}
+
       {isEditing ? (
         <ModelEditForm
           model={model}
@@ -315,7 +361,12 @@ const ModelDetailActions = ({
       </Button>
       <Menu.Root positioning={{ placement: 'bottom-end' }}>
         <Menu.Trigger asChild>
-          <IconButton aria-label={t('models.actions')} loading={isActionBusy} variant="ghost">
+          <IconButton
+            aria-label={t('models.actions')}
+            data-model-actions-trigger=""
+            loading={isActionBusy}
+            variant="ghost"
+          >
             <Icon as={MoreHorizontalIcon} boxSize="4" />
           </IconButton>
         </Menu.Trigger>
@@ -354,6 +405,24 @@ const DefaultSettingsSectionContainer = memo(function DefaultSettingsSectionCont
       model={model}
       onError={(message) => notify.error(t('models.defaultSettings'), message)}
       onSaved={() => notify.success(t('models.defaultSettingsSaved'))}
+    />
+  );
+});
+
+const ExternalModelSectionContainer = memo(function ExternalModelSectionContainer({ modelKey }: { modelKey: string }) {
+  const notify = useNotify();
+  const { t } = useTranslation();
+  const model = useModelsSelector((snapshot) => selectExternalModel(snapshot, modelKey));
+
+  if (!model || !supportsExternalModelSettings(model)) {
+    return null;
+  }
+
+  return (
+    <ExternalModelSection
+      model={model}
+      onError={(message) => notify.error(t('models.externalProvider'), message)}
+      onSaved={() => notify.success(t('models.externalSettingsSaved'))}
     />
   );
 });
@@ -436,6 +505,10 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
     { label: t('models.fileSize'), value: formatBytes(model.file_size) },
     { label: t('models.variant'), value: model.variant ?? '—' },
     { label: t('models.predictionType'), value: model.prediction_type ?? '—' },
+    // Recorded by the probe for upscalers; an unrecorded one is explained by the notice above instead.
+    ...(typeof model.scale === 'number'
+      ? [{ label: t('models.nativeScale'), value: t('models.nativeScaleValue', { scale: model.scale }) }]
+      : []),
     { label: t('models.hash'), value: model.hash },
     {
       action: canUpdatePath ? (

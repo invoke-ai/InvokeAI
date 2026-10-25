@@ -36,6 +36,13 @@ describe('getGalleryUploadTargetLabel', () => {
     });
   });
 
+  it('is unavailable while a search looks in every board, which has no board of its own to upload to', () => {
+    expect(getGalleryUploadTargetLabel([board], 'all', t)).toEqual({
+      isAvailable: false,
+      label: 'widgets.gallery.uploadsUnavailableForAllBoards',
+    });
+  });
+
   it('marks date boards unavailable', () => {
     expect(getGalleryUploadTargetLabel([board], 'by_date:2026-09-04', t)).toEqual({
       isAvailable: false,

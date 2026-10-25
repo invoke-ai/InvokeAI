@@ -20,7 +20,8 @@ from invokeai.app.util.video_thumbnails import decoder_frame_count
 def _write_mp4(tmp_path, n_frames: int):
     """Encode a tiny synthetic MP4 with exactly ``n_frames`` frames at 8 fps."""
     path = tmp_path / "synth.mp4"
-    frames = [np.full((32, 32, 3), 64 + i * 8, dtype=np.uint8) for i in range(n_frames)]
+    # Wrap explicitly: numpy 2 refuses to cast 256 into uint8 (numpy 1 wrapped it silently).
+    frames = [np.full((32, 32, 3), (64 + i * 8) % 256, dtype=np.uint8) for i in range(n_frames)]
     iio.imwrite(path, frames, plugin="FFMPEG", codec="libx264", fps=8.0, macro_block_size=1)
     return path
 

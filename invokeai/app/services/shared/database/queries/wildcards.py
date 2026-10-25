@@ -1,13 +1,14 @@
 """Wildcards: an account's named lists of values that a prompt can draw from."""
 
 import functools
+import itertools
 import json
 from collections.abc import Sequence
 from typing import Any, Optional
 
 from sqlalchemy import Connection, Row, Update, bindparam, delete, insert, select, update
 
-from invokeai.app.services.shared.database.queries.base import QueryModule, mapped, read, write
+from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, mapped, read, write
 from invokeai.app.services.shared.database.schema.wildcards import wildcards
 from invokeai.app.services.wildcard_records.wildcard_records_common import (
     WildcardChanges,
@@ -23,6 +24,12 @@ _GET = select(*_COLUMNS).where(_W.id == bindparam("wildcard_id"))
 _OWNED = select(*_COLUMNS).where(_W.user_id == bindparam("user_id")).order_by(_W.name)
 _INSERT = insert(wildcards)
 _DELETE = delete(wildcards).where(_W.id == bindparam("wildcard_id"))
+_OWNED_AMONG = select(_W.id).where(
+    _W.user_id == bindparam("user_id"), _W.id.in_(bindparam("wildcard_ids", expanding=True))
+)
+_DELETE_OWNED = delete(wildcards).where(
+    _W.user_id == bindparam("user_id"), _W.id.in_(bindparam("wildcard_ids", expanding=True))
+)
 
 
 @functools.cache
@@ -82,3 +89,15 @@ class WildcardQueries(QueryModule):
     @write
     def delete(self, conn: Connection, wildcard_id: str) -> None:
         conn.execute(_DELETE, {"wildcard_id": wildcard_id})
+
+    @write
+    def delete_owned(self, conn: Connection, user_id: str, wildcard_ids: Sequence[str]) -> list[str]:
+        """Deletes those of the wildcards that the account owns and returns their ids; the others are left alone."""
+        deleted: list[str] = []
+        for chunk in itertools.batched(wildcard_ids, IN_CHUNK):
+            params = {"user_id": user_id, "wildcard_ids": list(chunk)}
+            owned = [row[0] for row in conn.execute(_OWNED_AMONG, params).all()]
+            if owned:
+                conn.execute(_DELETE_OWNED, {"user_id": user_id, "wildcard_ids": owned})
+                deleted.extend(owned)
+        return deleted

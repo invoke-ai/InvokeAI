@@ -54,7 +54,7 @@ describe('LayoutPresetDialog', () => {
             defaultRoute={BUILT_IN_DEFAULT_ROUTE}
             iconId="workflow"
             isOpen
-            name="Automate"
+            name="Workflow"
             sourceOptions={BUILT_IN_SOURCE_OPTIONS}
             submitLabel="Save preset"
             title="Edit layout preset"
