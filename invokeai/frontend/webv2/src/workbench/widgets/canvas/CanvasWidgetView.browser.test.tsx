@@ -96,8 +96,8 @@ const candidate: CanvasStagingCandidateContract = {
   width: 64,
 };
 
-/** Stages the first image of a three-image batch whose remaining images are `status`. */
-const renderView = async (status: QueueItem['status']) => {
+/** Stages the first image of a three-image batch whose remaining images are `status`; unstaged, the surface is live. */
+const renderView = async (status: QueueItem['status'], { staged = true } = {}) => {
   const initial = createInitialWorkbenchState();
   const base = initial.projects[0]!;
   const batch = {
@@ -117,8 +117,10 @@ const renderView = async (status: QueueItem['status']) => {
   } as unknown as QueueItem;
   const store = createWorkbenchStore({ ...initial, projects: [{ ...base, queue: { items: [batch] } }] });
   const projectId = store.getState().activeProjectId;
-  store.commands.canvas.appendStagingCandidate({ candidate, projectId });
-  store.commands.canvas.apply(projectId, { imageIndex: 0, type: 'setStagedImageIndex' });
+  if (staged) {
+    store.commands.canvas.appendStagingCandidate({ candidate, projectId });
+    store.commands.canvas.apply(projectId, { imageIndex: 0, type: 'setStagedImageIndex' });
+  }
   harness.store = store;
   harness.engine = createCanvasEngine({
     backend: createTestStubRasterBackend(),
@@ -133,7 +135,16 @@ const renderView = async (status: QueueItem['status']) => {
   host.style.width = '1000px';
   document.body.append(host);
   root = createRoot(host);
-  const runtime = { commands: { register: () => () => undefined }, hotkeys: { register: () => () => undefined } };
+  const commandHandlers = new Map<string, () => void>();
+  const runtime = {
+    commands: {
+      register: ({ handler, id }: { handler: () => void; id: string }) => {
+        commandHandlers.set(id, handler);
+        return () => commandHandlers.delete(id);
+      },
+    },
+    hotkeys: { register: () => () => undefined },
+  };
   await act(() =>
     root!.render(
       <I18nextProvider i18n={i18n}>
@@ -145,7 +156,7 @@ const renderView = async (status: QueueItem['status']) => {
       </I18nextProvider>
     )
   );
-  return { projectId, store };
+  return { commandHandlers, projectId, store };
 };
 
 describe('CanvasWidgetView accept and stop', () => {
@@ -172,5 +183,71 @@ describe('CanvasWidgetView accept and stop', () => {
     const project = store.getState().projects[0]!;
     expect(project.canvas.document.stacks.raster).toHaveLength(1);
     expect(project.queue.items[0]?.status).toBe('completed');
+  });
+});
+
+describe('CanvasWidgetView clipboard shortcuts', () => {
+  // A plain-HTTP origin is not a secure context, so the browser exposes no async Clipboard API.
+  const withoutClipboard = () => vi.spyOn(Navigator.prototype, 'clipboard', 'get').mockReturnValue(undefined!);
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('says why copy and cut fail, and keeps the pixels a failed cut would erase', async () => {
+    const { commandHandlers, store } = await renderView('completed', { staged: false });
+    withoutClipboard();
+    vi.spyOn(harness.engine!.selection, 'exportSelectionBlob').mockResolvedValue(new Blob([], { type: 'image/png' }));
+    const erase = vi.spyOn(harness.engine!.selection, 'eraseSelection');
+
+    await act(() => commandHandlers.get('canvas.copySelection')!());
+    await vi.waitFor(() =>
+      expect(store.getState().notifications[0]).toMatchObject({
+        kind: 'error',
+        message: 'Copying needs HTTPS or localhost',
+        title: 'Could not copy the selection to the clipboard',
+      })
+    );
+
+    // Cut fails the same way, so the store coalesces it into the same notice.
+    await act(() => commandHandlers.get('canvas.cutSelection')!());
+    await vi.waitFor(() => expect(store.getState().notifications[0]?.occurrenceCount).toBe(2));
+    expect(erase).not.toHaveBeenCalled();
+  });
+
+  it('says why paste does nothing', async () => {
+    const { commandHandlers, store } = await renderView('completed', { staged: false });
+    withoutClipboard();
+
+    await act(() => commandHandlers.get('canvas.pasteImage')!());
+
+    await vi.waitFor(() =>
+      expect(store.getState().notifications[0]).toMatchObject({
+        kind: 'error',
+        message: 'Pasting needs HTTPS or localhost',
+        title: 'Could not paste an image from the clipboard',
+      })
+    );
+  });
+
+  it('reports a clipboard image that cannot be retrieved without blaming the address', async () => {
+    const { commandHandlers, store } = await renderView('completed', { staged: false });
+    const item = {
+      getType: () => Promise.reject(new DOMException('Image data unavailable', 'DataError')),
+      types: ['image/png'],
+    } as unknown as ClipboardItem;
+    vi.spyOn(Navigator.prototype, 'clipboard', 'get').mockReturnValue({
+      read: () => Promise.resolve([item]),
+    } as unknown as Clipboard);
+
+    await act(() => commandHandlers.get('canvas.pasteImage')!());
+
+    await vi.waitFor(() =>
+      expect(store.getState().notifications[0]).toMatchObject({
+        kind: 'error',
+        title: 'Could not paste an image from the clipboard',
+      })
+    );
+    expect(store.getState().notifications[0]?.message).toBeUndefined();
   });
 });

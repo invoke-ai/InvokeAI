@@ -398,7 +398,155 @@ const MODEL_TYPES = ['main', 'lora', 'controlnet', 'vae', 'embedding'];
 // Main models cycle through their own bases so Generate sees SDXL mains and refiners, not only SD 1.5.
 const MAIN_MODEL_BASES = ['sd-1', 'sdxl', 'sdxl-refiner'];
 
-const createModels = (count) =>
+/** The source of the hosted record the mock starter catalog also lists, so the Model Manager shows it read-only. */
+export const CATALOG_MANAGED_EXTERNAL_SOURCE = 'external://gemini/gemini-2.5-flash-image';
+
+/**
+ * Hosted-provider records with the capability shapes the Generate panel, Canvas, and Model Manager read: a named
+ * resolution table (Gemini), fixed sizes per ratio with an edit mode (OpenAI), provider toggles (Seedream), and a
+ * record the starter catalog manages. No shipped provider accepts a mask, so none advertises inpaint.
+ */
+const EXTERNAL_MODEL_FIXTURES = [
+  {
+    base: 'external',
+    capabilities: {
+      allowed_aspect_ratios: ['1:1', '16:9', '9:16'],
+      max_image_size: { height: 4096, width: 4096 },
+      max_images_per_request: 1,
+      max_reference_images: 14,
+      modes: ['txt2img'],
+      resolution_presets: ['1K', '2K'].flatMap((imageSize) =>
+        [
+          ['1:1', 1, 1],
+          ['16:9', 16, 9],
+          ['9:16', 9, 16],
+        ].map(([ratio, w, h]) => {
+          const base = imageSize === '1K' ? 1024 : 2048;
+          const width = w >= h ? base : Math.round((base * w) / h);
+          const height = w >= h ? Math.round((base * h) / w) : base;
+          return {
+            aspect_ratio: ratio,
+            height,
+            image_size: imageSize,
+            label: `${ratio} (${imageSize}) — ${width}×${height}`,
+            width,
+          };
+        })
+      ),
+      supports_reference_images: true,
+      supports_seed: true,
+    },
+    cover_image: null,
+    default_settings: { height: 1024, num_images: 1, width: 1024 },
+    description: 'Fixture hosted model with named resolution presets and sampling options.',
+    file_size: 0,
+    format: 'external_api',
+    hash: 'external:gemini:fixture-gemini-image',
+    key: 'fixture-external-gemini',
+    name: 'Fixture Gemini Image',
+    path: 'external://gemini/fixture-gemini-image',
+    provider_id: 'gemini',
+    provider_model_id: 'fixture-gemini-image',
+    source: 'external://gemini/fixture-gemini-image',
+    source_type: 'external',
+    source_url: null,
+    trigger_phrases: null,
+    type: 'external_image_generator',
+  },
+  {
+    base: 'external',
+    capabilities: {
+      allowed_aspect_ratios: ['1:1', '3:2', '2:3'],
+      aspect_ratio_sizes: {
+        '1:1': { height: 1024, width: 1024 },
+        '3:2': { height: 1024, width: 1536 },
+        '2:3': { height: 1536, width: 1024 },
+      },
+      max_images_per_request: 10,
+      modes: ['txt2img', 'img2img'],
+      supports_reference_images: true,
+    },
+    cover_image: null,
+    default_settings: { height: 1024, num_images: 1, width: 1024 },
+    description: 'Fixture hosted model with fixed ratio sizes and canvas image-to-image.',
+    file_size: 0,
+    format: 'external_api',
+    hash: 'external:openai:fixture-gpt-image',
+    key: 'fixture-external-openai',
+    name: 'Fixture GPT Image',
+    path: 'external://openai/fixture-gpt-image',
+    provider_id: 'openai',
+    // A GPT Image model id, so Generate offers OpenAI's quality, background, and input-fidelity options; the
+    // fixture source keeps the record out of the starter catalog and editable in the Model Manager.
+    provider_model_id: 'gpt-image-1',
+    source: 'external://openai/fixture-gpt-image',
+    source_type: 'external',
+    source_url: null,
+    trigger_phrases: null,
+    type: 'external_image_generator',
+  },
+  {
+    base: 'external',
+    capabilities: {
+      allowed_aspect_ratios: ['1:1', '16:9'],
+      aspect_ratio_sizes: { '1:1': { height: 2048, width: 2048 }, '16:9': { height: 1600, width: 2848 } },
+      max_images_per_request: 15,
+      max_reference_images: 14,
+      modes: ['txt2img', 'img2img'],
+      supports_reference_images: true,
+    },
+    cover_image: null,
+    default_settings: { height: 2048, num_images: 1, width: 2048 },
+    description: 'Fixture hosted model with provider toggles.',
+    file_size: 0,
+    format: 'external_api',
+    hash: 'external:seedream:fixture-seedream',
+    key: 'fixture-external-seedream',
+    name: 'Fixture Seedream',
+    path: 'external://seedream/fixture-seedream',
+    provider_id: 'seedream',
+    provider_model_id: 'fixture-seedream',
+    source: 'external://seedream/fixture-seedream',
+    source_type: 'external',
+    source_url: null,
+    trigger_phrases: null,
+    type: 'external_image_generator',
+  },
+  {
+    base: 'external',
+    capabilities: {
+      allowed_aspect_ratios: ['1:1', '16:9', '9:16'],
+      max_images_per_request: 1,
+      max_reference_images: 3,
+      modes: ['txt2img'],
+      supports_reference_images: true,
+    },
+    cover_image: null,
+    default_settings: { height: 1024, num_images: 1, width: 1024 },
+    description: 'Fixture hosted model whose capabilities the starter catalog manages.',
+    file_size: 0,
+    format: 'external_api',
+    hash: 'external:gemini:gemini-2.5-flash-image',
+    key: 'fixture-external-gemini-catalog',
+    name: 'Fixture Gemini Flash (Catalog)',
+    path: CATALOG_MANAGED_EXTERNAL_SOURCE,
+    provider_id: 'gemini',
+    provider_model_id: 'gemini-2.5-flash-image',
+    source: CATALOG_MANAGED_EXTERNAL_SOURCE,
+    source_type: 'external',
+    source_url: null,
+    trigger_phrases: null,
+    type: 'external_image_generator',
+  },
+];
+
+/** The last slots of the model library hold the hosted-provider records so the profile counts stay as declared. */
+const createModels = (count) => [
+  ...createLocalModels(Math.max(0, count - EXTERNAL_MODEL_FIXTURES.length)),
+  ...EXTERNAL_MODEL_FIXTURES.slice(0, count).map((model) => structuredClone(model)),
+];
+
+const createLocalModels = (count) =>
   range(count, (index) => {
     const id = ordinal(index);
     const type = MODEL_TYPES[index % MODEL_TYPES.length];
@@ -425,6 +573,86 @@ const createModels = (count) =>
       type,
     };
   });
+
+/** A model record in the shape the list endpoint serves; the seed sets below override only what they need. */
+const seedModel = ({ key, name, ...fields }) => ({
+  base: 'any',
+  cover_image: null,
+  default_settings: null,
+  description: null,
+  file_size: 32_000_000,
+  format: 'checkpoint',
+  hash: `seed-hash-${key}`,
+  key,
+  name,
+  path: `seeds/${key}.safetensors`,
+  source: `seeds/${key}.safetensors`,
+  source_type: 'path',
+  source_url: null,
+  trigger_phrases: null,
+  variant: null,
+  ...fields,
+});
+
+/**
+ * Opt-in model sets for browser checks, added by `POST /__models` so the profiles' fixture counts stay fixed. Each
+ * entry is the record as installed plus `probe`: the fields `POST /api/v2/models/i/{key}/reidentify` fills in, as
+ * the backend's probe would for a record installed before it recorded them.
+ */
+export const MODEL_SEED_SETS = Object.freeze({
+  // Anima ControlNet-LLLite adapters: one usable, two from before `cond_in_channels` was recorded.
+  'anima-lllite': [
+    { record: seedModel({ base: 'anima', key: 'seed-anima-main', name: 'Anima Preview', type: 'main' }) },
+    {
+      record: seedModel({
+        base: 'anima',
+        cond_in_channels: 3,
+        key: 'seed-lllite-sketch',
+        name: 'Anima LLLite Sketch',
+        type: 'controlnet',
+      }),
+    },
+    {
+      probe: { cond_in_channels: 3 },
+      record: seedModel({
+        base: 'anima',
+        cond_in_channels: null,
+        key: 'seed-lllite-lineart',
+        name: 'Anima LLLite Lineart (old install)',
+        type: 'controlnet',
+      }),
+    },
+    {
+      probe: { cond_in_channels: 4 },
+      record: seedModel({
+        base: 'anima',
+        cond_in_channels: null,
+        key: 'seed-lllite-inpaint',
+        name: 'Anima LLLite Inpainting (old install)',
+        type: 'controlnet',
+      }),
+    },
+  ],
+  // Spandrel upscalers with a recorded native scale, a 1x model, and one from before the scale was recorded.
+  spandrel: [
+    {
+      record: seedModel({ key: 'seed-spandrel-4x', name: '4x-UltraSharp', scale: 4, type: 'spandrel_image_to_image' }),
+    },
+    {
+      record: seedModel({ key: 'seed-spandrel-2x', name: '2x-AnimeSharp', scale: 2, type: 'spandrel_image_to_image' }),
+    },
+    { record: seedModel({ key: 'seed-spandrel-1x', name: '1x-Denoise', scale: 1, type: 'spandrel_image_to_image' }) },
+    {
+      probe: { scale: 4 },
+      record: seedModel({
+        key: 'seed-spandrel-legacy',
+        name: 'RealESRGAN x4 (old install)',
+        scale: null,
+        type: 'spandrel_image_to_image',
+      }),
+    },
+  ],
+});
 
 const createNodePacks = (nodeCount) =>
   range(Math.ceil(nodeCount / 5), (packIndex) => {

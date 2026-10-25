@@ -248,7 +248,7 @@ const surfaces = [
     path: representativeProjectPath,
     ready: async (page) => {
       await waitForWorkbench(page);
-      await selectLayoutPreset(page, 'Automate', 'Workflow');
+      await selectLayoutPreset(page, 'Workflow', 'Workflow');
       await page.getByText('Fixture Node 001', { exact: true }).waitFor();
       // Pan the y=0 fixture clear of the floating toolbar before measuring targets.
       const pane = await page.locator('.react-flow__pane').boundingBox();
@@ -429,6 +429,13 @@ const runKeyboardJourney = async (browser) => {
     const previewTrigger = centerViewTrigger(page, 'Preview');
 
     await previewTrigger.focus();
+    await previewTrigger.press('ControlOrMeta+k');
+    await paletteDialog.waitFor();
+    await expectFocused(paletteInput, 'Opening the Workbench palette should focus its search field.');
+    await paletteInput.press('Escape');
+    await paletteDialog.waitFor({ state: 'hidden' });
+    await expectFocused(previewTrigger, 'Closing the Workbench palette should restore the keyboard origin.');
+
     await previewTrigger.press('Enter');
 
     // Compose keeps Preview and Gallery as its center views; Canvas lives under "Add to center".
@@ -910,7 +917,7 @@ const runKeepAliveStateJourney = async (browser) => {
     assert.equal((await zoomTrigger.textContent())?.trim(), '200%', 'The zoom control must report the chosen zoom.');
 
     // Away and back, which is the whole point of keeping the widgets mounted.
-    await selectLayoutPreset(page, 'Automate', 'Workflow');
+    await selectLayoutPreset(page, 'Workflow', 'Workflow');
     await waitForSettledDocument(page);
     await selectLayoutPreset(page, 'Edit', 'Canvas');
     await waitForSettledDocument(page);

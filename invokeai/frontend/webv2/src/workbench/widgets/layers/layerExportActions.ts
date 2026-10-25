@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import type { ExportBakedLayerBlobResult } from '@workbench/canvas-engine/api';
+import type { AdjustmentRefusal, ExportBakedLayerBlobResult } from '@workbench/canvas-engine/api';
 
 import { canOnBoard } from '@features/gallery/contracts';
 import {
@@ -10,34 +10,20 @@ import {
   invalidateGalleryBoardDestinations,
   invalidateGalleryItems,
 } from '@features/gallery/queries';
+import { type ClipboardAccess, copyImage } from '@platform/browser/clipboard';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 
-type ClipboardLike = { write(items: ClipboardItem[]): Promise<void> };
-type ClipboardItemCtor = new (items: Record<string, Blob>) => ClipboardItem;
+type LayerAssetExportFailureStatus = Exclude<ExportBakedLayerBlobResult['status'], 'ok' | 'adjustment-refused'>;
+type LayerAssetExportResult =
+  | { status: 'ok'; blob: Blob }
+  | { status: LayerAssetExportFailureStatus }
+  | AdjustmentRefusal;
 
-export interface CopyBlobToClipboardDeps {
-  clipboard?: ClipboardLike;
-  ClipboardItemCtor?: ClipboardItemCtor;
-}
-
-export const copyBlobToClipboard = async (blob: Blob, deps: CopyBlobToClipboardDeps = {}): Promise<void> => {
-  const clipboard = deps.clipboard ?? globalThis.navigator?.clipboard;
-  const ClipboardItemImpl = deps.ClipboardItemCtor ?? globalThis.ClipboardItem;
-  if (!clipboard || !ClipboardItemImpl) {
-    throw new Error('Clipboard image copy is unavailable');
-  }
-  const type = blob.type || 'image/png';
-  await clipboard.write([new ClipboardItemImpl({ [type]: blob })]);
-};
-
-type LayerAssetExportFailureStatus = Exclude<ExportBakedLayerBlobResult['status'], 'ok'>;
-type LayerAssetExportResult = { status: 'ok'; blob: Blob } | { status: LayerAssetExportFailureStatus };
-
-interface CopyLayerToClipboardDeps extends CopyBlobToClipboardDeps {
+interface CopyLayerToClipboardDeps extends ClipboardAccess {
   exportLayer(layerId: string, options: { includeDisabled: boolean }): Promise<LayerAssetExportResult>;
 }
 
@@ -45,12 +31,15 @@ interface CopyLayerToClipboardDeps extends CopyBlobToClipboardDeps {
 export const copyLayerToClipboard = async (
   layerId: string,
   { exportLayer, ...clipboard }: CopyLayerToClipboardDeps
-): Promise<'ok' | LayerAssetExportFailureStatus> => {
+): Promise<'ok' | LayerAssetExportFailureStatus | AdjustmentRefusal> => {
   const result = await exportLayer(layerId, { includeDisabled: true });
+  if (result.status === 'adjustment-refused') {
+    return result;
+  }
   if (result.status !== 'ok') {
     return result.status;
   }
-  await copyBlobToClipboard(result.blob, clipboard);
+  await copyImage(result.blob, clipboard);
   return 'ok';
 };
 
@@ -68,7 +57,8 @@ export type SaveLayerToBoardResult =
   | 'stale'
   | 'board-view-only'
   | 'board-unavailable'
-  | LayerAssetExportFailureStatus;
+  | LayerAssetExportFailureStatus
+  | AdjustmentRefusal;
 
 /**
  * Owns the complete local-export → gallery-upload boundary: the baked layer is uploaded to `boardId` (`'none'` for
@@ -102,6 +92,9 @@ export const saveLayerToBoard = async (
     const result = await exportLayer(layerId, { includeDisabled: true, signal: owner.signal });
 
     assertAccountScopeCurrent(owner);
+    if (result.status === 'adjustment-refused') {
+      return result;
+    }
     if (result.status !== 'ok') {
       return result.status;
     }

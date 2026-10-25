@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { resolve } from 'node:path';
@@ -5,11 +6,13 @@ import { resolve } from 'node:path';
 import {
   assertMockBackendFixture,
   assertMockBackendProfileName,
+  CATALOG_MANAGED_EXTERNAL_SOURCE,
   collectCanvasLeaves,
   createMockBackendFixture,
   getFixtureProjectWorkflowDocument,
   getMockBackendFixtureCounts,
   MOCK_BACKEND_FIXED_EPOCH,
+  MODEL_SEED_SETS,
 } from './mock-backend-fixtures.mjs';
 
 /** The canvas schema every mock project declares; the real server keeps the same floor per record. */
@@ -234,6 +237,17 @@ const STARTER_MODEL = {
   type: 'main',
 };
 
+/** The hosted starter whose source a fixture record carries, so that record reads as catalog-managed. */
+const EXTERNAL_STARTER_MODEL = {
+  base: 'external',
+  description: 'Fixture hosted starter model',
+  format: 'external_api',
+  is_installed: false,
+  name: 'Fixture Gemini Flash (Catalog)',
+  source: CATALOG_MANAGED_EXTERNAL_SOURCE,
+  type: 'external_image_generator',
+};
+
 const MOCK_APP_VERSION = 'fixture';
 
 const STARTER_MODELS_RESPONSE = {
@@ -244,10 +258,78 @@ const STARTER_MODELS_RESPONSE = {
       name: 'SDXL',
     },
   },
-  starter_models: [STARTER_MODEL],
+  starter_models: [STARTER_MODEL, EXTERNAL_STARTER_MODEL],
+};
+
+/** Starters read as installed when a library record carries their source, as the backend reports them. */
+const getStarterModelsResponse = (state) => {
+  const installedSources = new Set([...state.models.values()].map((model) => model.source));
+  const withInstalled = (starter) => ({ ...starter, is_installed: installedSources.has(starter.source) });
+
+  return {
+    starter_bundles: Object.fromEntries(
+      Object.entries(STARTER_MODELS_RESPONSE.starter_bundles).map(([base, bundle]) => [
+        base,
+        { ...bundle, models: bundle.models.map(withInstalled) },
+      ])
+    ),
+    starter_models: STARTER_MODELS_RESPONSE.starter_models.map(withInstalled),
+  };
+};
+
+/** The backend's `EXTERNAL_PROVIDER_FIELDS`, in its order: the config route lists each, configured or not. */
+const EXTERNAL_PROVIDER_IDS = ['alibabacloud', 'atlascloud', 'gemini', 'openai', 'seedream'];
+
+/**
+ * Hosted-provider credentials as the config route reports them. A provider the profile's hosted records route to has a
+ * key, since the backend removes a provider's records when its key is removed; the rest have none.
+ */
+const createExternalProviderConfigs = (models) => {
+  const routed = new Set(
+    models.filter((model) => model.type === 'external_image_generator').map((model) => model.provider_id)
+  );
+
+  return new Map(
+    EXTERNAL_PROVIDER_IDS.map((providerId) => [
+      providerId,
+      { api_key_configured: routed.has(providerId), base_url: null, provider_id: providerId },
+    ])
+  );
+};
+
+/** The backend drops a provider's hosted records when its key is removed or reset. */
+const removeExternalModelsForProvider = (state, providerId) => {
+  for (const [key, model] of state.models) {
+    if (model.type === 'external_image_generator' && model.provider_id === providerId) {
+      state.models.delete(key);
+    }
+  }
 };
 
 const DELIVERY_CLAIM_TTL_MS = 120_000;
+
+/** The wildcard the server stores; the caller owns every wildcard the mock holds. */
+const SEEDED_WILDCARD_NAMES = ['animals', 'colors', 'styles/painting'];
+
+/** Most ids one `POST /api/v1/wildcards/delete` takes, as `MAX_WILDCARD_BATCH_SIZE` on the server. */
+const MAX_WILDCARD_BATCH_SIZE = 1000;
+
+/** `count` wildcards: the seeded names first, then numbered ones, as `?wildcards=<count>` on a reset asks. */
+const createWildcards = (count) =>
+  new Map(
+    Array.from({ length: count }, (_, index) => {
+      const name = SEEDED_WILDCARD_NAMES[index] ?? `wildcard-${String(index + 1).padStart(4, '0')}`;
+      const id = `wildcard-id-${String(index + 1).padStart(4, '0')}`;
+
+      return [id, { id, name, user_id: MOCK_USER_ID, values: [`${name} one`, `${name} two`] }];
+    })
+  );
+
+const sortedWildcards = (state) =>
+  [...state.wildcards.values()].sort((left, right) => left.name.localeCompare(right.name)).map(clone);
+
+const wildcardNameTaken = (state, name, exceptId = null) =>
+  [...state.wildcards.values()].some((wildcard) => wildcard.name === name && wildcard.id !== exceptId);
 
 const createState = (profile) => {
   const fixture = assertMockBackendFixture(createMockBackendFixture(profile));
@@ -262,8 +344,11 @@ const createState = (profile) => {
         JSON.stringify({ alphaNoticeAcknowledged: true, whatsNewSeenVersion: MOCK_APP_VERSION }),
       ],
     ]),
+    externalProviders: createExternalProviderConfigs(fixture.models),
     images: new Map(fixture.images.map((image) => [image.image_name, clone(image)])),
     models: new Map(fixture.models.map((model) => [model.key, clone(model)])),
+    /** What re-identify fills in per model key; only `POST /__models` seeds entries. */
+    modelProbes: new Map(),
     mutationClock: 0,
     nextBoardNumber: fixture.boards.length + 1,
     nextImageNumber: fixture.images.length + 1,
@@ -281,6 +366,7 @@ const createState = (profile) => {
     runtimeConfig: { generation_devices: 'auto', max_queue_history: null },
     invocationCache: { enabled: true, hits: 0, max_size: 1000, misses: 0, size: 0 },
     videos: new Map(fixture.videos.map((video) => [video.video_name, clone(video)])),
+    wildcards: createWildcards(profile === 'empty' ? 0 : SEEDED_WILDCARD_NAMES.length),
     workflows: new Map(fixture.workflows.map((workflow) => [workflow.workflow_id, clone(workflow)])),
     nextWorkflowNumber: fixture.workflows.length + 1,
     /** Custom workflow thumbnails by workflow id; the version stands in for the server's cache-busting query. */
@@ -562,7 +648,17 @@ const compareGalleryItems = (left, right, orderDir, starredFirst) => {
   );
 };
 
-const filterGalleryItems = (state, url, { createdDate, starredFirst } = {}) => {
+/**
+ * Whether `board_id=all` lists the board's items, as the server's listing of every readable board: an active board the
+ * caller may read.
+ */
+const isListedBoard = (state, faults, boardId) => {
+  const board = state.boards.get(boardId);
+
+  return board !== undefined && !board.archived && boardAccessFor(state, faults, board).readable;
+};
+
+const filterGalleryItems = (state, url, faults, { createdDate, starredFirst } = {}) => {
   const boardId = url.searchParams.get('board_id');
   const categories = getRequestedCategories(url);
   const createdFrom = url.searchParams.get('created_from');
@@ -578,7 +674,11 @@ const filterGalleryItems = (state, url, { createdDate, starredFirst } = {}) => {
       if (mediaKind && item.kind !== mediaKind) {
         return false;
       }
-      if (boardId && (boardId === 'none' ? item.board_id !== null : item.board_id !== boardId)) {
+      if (boardId === 'all') {
+        if (item.board_id !== null && !isListedBoard(state, faults, item.board_id)) {
+          return false;
+        }
+      } else if (boardId && (boardId === 'none' ? item.board_id !== null : item.board_id !== boardId)) {
         return false;
       }
       if (origin && itemOrigin !== origin) {
@@ -623,19 +723,19 @@ const filterGalleryItems = (state, url, { createdDate, starredFirst } = {}) => {
     );
 };
 
-const getGalleryItemLocation = (state, url) => {
+const getGalleryItemLocation = (state, url, faults) => {
   const kind = url.searchParams.get('kind');
   const name = url.searchParams.get('name');
-  const items = filterGalleryItems(state, url, { starredFirst: false });
+  const items = filterGalleryItems(state, url, faults, { starredFirst: false });
   const index = items.findIndex((item) => item.kind === kind && item.name === name);
 
   return index === -1 ? null : { kind, name, index, total: items.length };
 };
 
-const listGalleryItems = (state, url) => {
+const listGalleryItems = (state, url, faults) => {
   const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0) || 0);
   const limit = Math.max(0, Number(url.searchParams.get('limit') ?? 10) || 0);
-  const filtered = filterGalleryItems(state, url);
+  const filtered = filterGalleryItems(state, url, faults);
 
   return {
     items: limit === 0 ? [] : filtered.slice(offset, offset + limit),
@@ -645,8 +745,8 @@ const listGalleryItems = (state, url) => {
   };
 };
 
-const listGalleryItemNames = (state, url, options) => {
-  const items = filterGalleryItems(state, url, options);
+const listGalleryItemNames = (state, url, faults, options) => {
+  const items = filterGalleryItems(state, url, faults, options);
 
   return {
     items: items.map(({ kind, name }) => ({ kind, name })),
@@ -957,6 +1057,15 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
 
         faults = createFaults();
 
+        const wildcardCount = url.searchParams.get('wildcards') ?? body.wildcards;
+        if (wildcardCount !== undefined && wildcardCount !== null) {
+          const count = Number(wildcardCount);
+          if (!Number.isInteger(count) || count < 0) {
+            return json(400, { detail: `Invalid wildcard count: ${String(wildcardCount)}` });
+          }
+          state.wildcards = createWildcards(count);
+        }
+
         const collisions = [...url.searchParams.getAll('collide'), ...(body.collide ?? [])]
           .flatMap((value) => String(value).split(','))
           .map((value) => value.trim())
@@ -976,6 +1085,25 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           state.queueItems.set(item.item_id, clone(item));
         }
         return json(200, { ok: true });
+      }
+
+      if (method === 'POST' && path === '/__models') {
+        // Test seam: adds model records, from a named seed set or given whole; the profiles' counts stay fixed.
+        const body = await readJsonBody(request);
+        if (body.set !== undefined && !Object.hasOwn(MODEL_SEED_SETS, body.set)) {
+          return json(400, { detail: `Unknown model seed set: ${String(body.set)}` });
+        }
+        const entries = [
+          ...(body.set === undefined ? [] : MODEL_SEED_SETS[body.set]),
+          ...(Array.isArray(body.models) ? body.models.map((record) => ({ record })) : []),
+        ];
+        for (const { probe, record } of entries) {
+          state.models.set(record.key, clone(record));
+          if (probe) {
+            state.modelProbes.set(record.key, clone(probe));
+          }
+        }
+        return json(200, { keys: entries.map(({ record }) => record.key), ok: true });
       }
 
       if (path === '/__faults') {
@@ -1180,8 +1308,42 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         });
       }
 
-      if (path.startsWith('/api/v1/app/external_providers')) {
-        return json(200, []);
+      if (method === 'GET' && path === '/api/v1/app/external_providers/config') {
+        return json(200, [...state.externalProviders.values()].map(clone));
+      }
+
+      const externalProviderMatch = /^\/api\/v1\/app\/external_providers\/config\/([^/]+)$/.exec(path);
+      if (externalProviderMatch && (method === 'POST' || method === 'DELETE')) {
+        const providerId = decodeURIComponent(externalProviderMatch[1]);
+        const config = state.externalProviders.get(providerId);
+
+        if (!config) {
+          return json(404, { detail: `Unknown external provider '${providerId}'` });
+        }
+        if (method === 'DELETE') {
+          Object.assign(config, { api_key_configured: false, base_url: null });
+          removeExternalModelsForProvider(state, providerId);
+          return json(200, clone(config));
+        }
+
+        const update = await readJsonBody(request);
+        const apiKey = typeof update.api_key === 'string' ? update.api_key.trim() : null;
+        const baseUrl = typeof update.base_url === 'string' ? update.base_url.trim() : null;
+
+        if (apiKey === null && baseUrl === null) {
+          return json(400, { detail: 'No external provider config fields provided' });
+        }
+        if (baseUrl !== null) {
+          config.base_url = baseUrl || null;
+        }
+        if (apiKey !== null) {
+          config.api_key_configured = apiKey !== '';
+          if (apiKey === '') {
+            removeExternalModelsForProvider(state, providerId);
+          }
+        }
+
+        return json(200, clone(config));
       }
 
       if (path === '/api/v1/projects/' || path === '/api/v1/projects') {
@@ -1764,7 +1926,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, faults.capabilities === 'empty' ? [] : ARCHITECTURE_CAPABILITIES);
       }
       if (method === 'GET' && path === '/api/v2/models/starter_models') {
-        return json(200, STARTER_MODELS_RESPONSE);
+        return json(200, getStarterModelsResponse(state));
       }
       if (method === 'GET' && path === '/api/v2/models/hf_login') {
         return json(200, 'unknown');
@@ -1773,12 +1935,36 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, []);
       }
 
+      const reidentifyMatch = /^\/api\/v2\/models\/i\/([^/]+)\/reidentify$/.exec(path);
+      if (method === 'POST' && reidentifyMatch) {
+        // Like the backend's re-probe: fields recorded since the model was installed are filled in.
+        const key = decodeURIComponent(reidentifyMatch[1]);
+        const model = state.models.get(key);
+        if (!model) {
+          return json(404, { detail: 'Model not found' });
+        }
+        const identified = { ...model, ...state.modelProbes.get(key) };
+        state.models.set(key, identified);
+        return json(200, clone(identified));
+      }
+
       const modelMatch = /^\/api\/v2\/models\/i\/([^/]+)$/.exec(path);
       if (modelMatch) {
         const key = decodeURIComponent(modelMatch[1]);
         const model = state.models.get(key);
 
-        return model ? json(200, model) : json(404, { detail: 'Model not found' });
+        if (!model) {
+          return json(404, { detail: 'Model not found' });
+        }
+        if (method === 'PATCH') {
+          // Mirrors ModelRecordService.update_model: each submitted field replaces the stored one wholesale.
+          const changes = await readJsonBody(request);
+          const updated = { ...model, ...changes };
+          state.models.set(key, updated);
+          return json(200, updated);
+        }
+
+        return json(200, model);
       }
 
       if (method === 'GET' && (path === '/api/v2/models' || path === '/api/v2/models/')) {
@@ -1790,7 +1976,59 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       }
 
       if (method === 'GET' && (path === '/api/v1/wildcards' || path === '/api/v1/wildcards/')) {
-        return json(200, []);
+        return json(200, sortedWildcards(state));
+      }
+
+      if (method === 'POST' && (path === '/api/v1/wildcards' || path === '/api/v1/wildcards/')) {
+        const body = await readJsonBody(request);
+        const name = typeof body.name === 'string' ? body.name.trim() : '';
+        if (!name || !Array.isArray(body.values)) {
+          return json(422, { detail: 'A wildcard needs a name and values' });
+        }
+        if (wildcardNameTaken(state, name)) {
+          return json(409, { detail: `A wildcard named '${name}' already exists` });
+        }
+        const id = `wildcard-id-${randomUUID()}`;
+        const wildcard = { id, name, user_id: MOCK_USER_ID, values: body.values.map(String) };
+        state.wildcards.set(id, wildcard);
+        return json(201, clone(wildcard));
+      }
+
+      if (method === 'POST' && path === '/api/v1/wildcards/delete') {
+        // Mirrors the server: 1 to 1000 ids, duplicates once, unknown ids skipped and left out of the result.
+        const body = await readJsonBody(request);
+        const ids = body.wildcard_ids;
+        if (!Array.isArray(ids) || ids.length === 0 || ids.length > MAX_WILDCARD_BATCH_SIZE) {
+          return json(422, { detail: `wildcard_ids takes 1 to ${String(MAX_WILDCARD_BATCH_SIZE)} ids` });
+        }
+        const deletedIds = [...new Set(ids)].filter((id) => state.wildcards.delete(id));
+        return json(200, { deleted_ids: deletedIds });
+      }
+
+      const wildcardMatch = /^\/api\/v1\/wildcards\/([^/]+)$/.exec(path);
+      if (wildcardMatch && (method === 'PATCH' || method === 'DELETE')) {
+        const id = decodeURIComponent(wildcardMatch[1]);
+        const wildcard = state.wildcards.get(id);
+        if (!wildcard) {
+          return json(404, { detail: 'Wildcard not found' });
+        }
+        if (method === 'DELETE') {
+          state.wildcards.delete(id);
+          response.writeHead(204);
+          return response.end();
+        }
+        const body = await readJsonBody(request);
+        const name = typeof body.name === 'string' ? body.name.trim() : wildcard.name;
+        if (wildcardNameTaken(state, name, id)) {
+          return json(409, { detail: `A wildcard named '${name}' already exists` });
+        }
+        const updated = {
+          ...wildcard,
+          name,
+          values: Array.isArray(body.values) ? body.values.map(String) : wildcard.values,
+        };
+        state.wildcards.set(id, updated);
+        return json(200, clone(updated));
       }
 
       if ((method === 'PUT' || method === 'DELETE') && /^\/api\/v1\/intermediates\/holds\/[^/]+$/.test(path)) {
@@ -2221,7 +2459,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       if (method === 'GET' && virtualBoardItemNamesMatch) {
         const date = decodeURIComponent(virtualBoardItemNamesMatch[1]);
 
-        return json(200, listGalleryItemNames(state, url, { createdDate: date }));
+        return json(200, listGalleryItemNames(state, url, faults, { createdDate: date }));
       }
 
       const virtualBoardNamesMatch = /^\/api\/v1\/virtual_boards\/by_date\/([^/]+)\/image_names$/.exec(path);
@@ -2404,17 +2642,17 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       }
 
       if (method === 'GET' && path === '/api/v1/gallery/items/') {
-        return json(200, listGalleryItems(state, url));
+        return json(200, listGalleryItems(state, url, faults));
       }
 
       if (method === 'GET' && path === '/api/v1/gallery/items/location') {
-        const location = getGalleryItemLocation(state, url);
+        const location = getGalleryItemLocation(state, url, faults);
 
         return location ? json(200, location) : json(404, { detail: 'Gallery item not found' });
       }
 
       if (method === 'GET' && path === '/api/v1/gallery/items/names') {
-        return json(200, listGalleryItemNames(state, url));
+        return json(200, listGalleryItemNames(state, url, faults));
       }
 
       const imageAssetMatch = /^\/api\/v1\/images\/i\/([^/]+)\/(full|thumbnail)$/.exec(path);
@@ -2672,6 +2910,18 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           .split(',')
           .map((tag) => tag.trim())
           .filter(Boolean);
+      const workflowTagsForVisibility = (value, isPublic) => {
+        const tags = String(value ?? '')
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter((tag) => tag && tag !== 'shared');
+
+        if (isPublic) {
+          tags.push('shared');
+        }
+
+        return tags.join(',');
+      };
 
       if (path === '/api/v1/workflows/tags') {
         const categories = url.searchParams.getAll('categories');
@@ -2699,6 +2949,37 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         }
 
         return json(200, counts);
+      }
+
+      const visibilityMatch = /^\/api\/v1\/workflows\/i\/([^/]+)\/is_public$/.exec(path);
+      if (visibilityMatch) {
+        if (method !== 'PATCH') {
+          return json(405, { detail: `No mock for ${method} ${path}` });
+        }
+
+        const workflowId = decodeURIComponent(visibilityMatch[1]);
+        const workflow = state.workflows.get(workflowId);
+
+        if (!workflow) {
+          return json(404, { detail: 'Workflow not found' });
+        }
+        if (workflow.category === 'default') {
+          return json(403, { detail: 'Bundled workflows cannot be modified' });
+        }
+
+        const body = await readJsonBody(request);
+        if (typeof body.is_public !== 'boolean') {
+          return json(422, { detail: 'is_public must be a boolean' });
+        }
+
+        workflow.is_public = body.is_public;
+        workflow.tags = workflowTagsForVisibility(workflow.tags, body.is_public);
+        workflow.workflow = {
+          ...workflow.workflow,
+          tags: workflowTagsForVisibility(workflow.workflow?.tags, body.is_public),
+        };
+
+        return json(200, workflowRecord(workflow));
       }
 
       const workflowMatch = /^\/api\/v1\/workflows\/i\/([^/]+)(\/opened_at|\/thumbnail)?$/.exec(path);
@@ -2826,7 +3107,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           category: 'user',
           created_at: timestamp(state),
           description: content.description ?? '',
-          is_public: true,
+          is_public: !isMultiuserCaller(faults),
           name: content.name ?? '',
           opened_at: null,
           revision: 1,
@@ -2848,15 +3129,31 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         const categories = url.searchParams.getAll('categories');
         const query = url.searchParams.get('query')?.trim().toLocaleLowerCase() ?? '';
         const tags = url.searchParams.getAll('tags');
+        const isPublic = url.searchParams.get('is_public');
         // The API pages from 0; the client asks for page 0 first.
         const page = Math.max(0, Number(url.searchParams.get('page') ?? 0) || 0);
         const perPage = Math.max(1, Number(url.searchParams.get('per_page') ?? 20) || 20);
-        const items = [...state.workflows.values()].filter(
-          (workflow) =>
-            (categories.length === 0 || categories.includes(workflow.category)) &&
-            (!query || `${workflow.name} ${workflow.description}`.toLocaleLowerCase().includes(query)) &&
-            (tags.length === 0 || tags.some((tag) => workflowTags(workflow).includes(tag)))
-        );
+        const orderBy = url.searchParams.get('order_by') ?? 'updated_at';
+        const sign = url.searchParams.get('direction') === 'ASC' ? 1 : -1;
+        // As the server orders: names ignoring ASCII case (SQLite's NOCASE), NULLs lowest, the id breaking ties.
+        const sortKey = (workflow) =>
+          orderBy === 'name'
+            ? workflow.name.replace(/[A-Z]/g, (letter) => letter.toLowerCase())
+            : (workflow[orderBy] ?? null);
+        const compare = (left, right) =>
+          left === right ? 0 : left === null ? -1 : right === null ? 1 : left < right ? -1 : 1;
+        const items = [...state.workflows.values()]
+          .filter(
+            (workflow) =>
+              (categories.length === 0 || categories.includes(workflow.category)) &&
+              (!query || `${workflow.name} ${workflow.description}`.toLocaleLowerCase().includes(query)) &&
+              (tags.length === 0 || tags.some((tag) => workflowTags(workflow).includes(tag))) &&
+              (isPublic === null || String(workflow.is_public) === isPublic)
+          )
+          .sort(
+            (left, right) =>
+              sign * (compare(sortKey(left), sortKey(right)) || compare(left.workflow_id, right.workflow_id))
+          );
         const pages = Math.max(1, Math.ceil(items.length / perPage));
         const pageItems = items.slice(page * perPage, (page + 1) * perPage).map(workflowListItem);
 

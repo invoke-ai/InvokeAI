@@ -14,7 +14,7 @@ import type { RegisteredHotkey } from './types';
 import { firstPartyHotkeyCatalog } from './catalog';
 import { useExtensionHotkeyDefinitions } from './extensionHotkeys';
 import { useRegisterFirstPartyCommands } from './firstPartyCommands';
-import { toTinykeysBinding } from './keys';
+import { acceptsHotkeyPress, toTinykeysBinding } from './keys';
 import { applyCustomHotkeys, resolveHotkey } from './resolve';
 import { getHotkeyTargetWidget, resolveHotkeyTarget } from './targetWidget';
 
@@ -91,7 +91,11 @@ export const WorkbenchHotkeyRuntime = () => {
         const tinykeysBinding = toTinykeysBinding(key);
 
         if (tinykeysBinding) {
-          bindings[tinykeysBinding] = (event) => handleHotkey(event, key);
+          bindings[tinykeysBinding] = (event) => {
+            if (acceptsHotkeyPress(event, key)) {
+              handleHotkey(event, key);
+            }
+          };
         }
       }
     }

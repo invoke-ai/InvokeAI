@@ -78,7 +78,7 @@ const createEngine = (interaction: Partial<CanvasInteractionState> = {}) => {
           status: 'duplicated',
         })
       ),
-      mergeLayerDown: vi.fn((): MergeDownResult => 'merged'),
+      mergeLayerDown: vi.fn((): Promise<MergeDownResult> => Promise.resolve('merged')),
       nudgeSelectedLayer: vi.fn(() => ({ status: 'committed' as const })),
     },
     selection: {
@@ -586,12 +586,12 @@ describe('mergeDown', () => {
     expect(engine.layers.mergeLayerDown).not.toHaveBeenCalled();
   });
 
-  it('reports a merge the engine refused', () => {
+  it('reports a merge the engine refused', async () => {
     const engine = createEngine();
-    engine.layers.mergeLayerDown.mockReturnValue('over-budget');
+    engine.layers.mergeLayerDown.mockResolvedValue('over-budget');
     const reportLayerOperation = vi.fn();
     executeCanvasHotkeyCommand('canvas.mergeDown', contextOf({ engine, reportLayerOperation }));
-    expect(reportLayerOperation).toHaveBeenCalledExactlyOnceWith('over-budget');
+    await vi.waitFor(() => expect(reportLayerOperation).toHaveBeenCalledExactlyOnceWith('over-budget'));
   });
 });
 

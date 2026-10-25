@@ -10,6 +10,21 @@ import type { WorkflowFlowEdge, WorkflowFlowNode } from './flowAdapters';
 
 export type WorkflowFlowInstance = ReactFlowInstance<WorkflowFlowNode, WorkflowFlowEdge>;
 
+/**
+ * How far the editor toolbar reaches into the graph from the editor's left edge (its 8px inset, its 38px column, and
+ * a gap). Graph content a view is fitted to, or a fresh view opens on, starts right of it, so the toolbar never
+ * covers a node.
+ */
+export const WORKFLOW_TOOLBAR_CLEARANCE_PX = 56;
+
+/** Every fit of the editor's graph: XYFlow's 10% padding, with the toolbar's column kept clear on the left. */
+export const WORKFLOW_FIT_PADDING = {
+  bottom: 0.1,
+  left: `${WORKFLOW_TOOLBAR_CLEARANCE_PX}px`,
+  right: 0.1,
+  top: 0.1,
+} as const;
+
 let flowInstance: WorkflowFlowInstance | null = null;
 
 export const registerWorkflowFlowInstance = (instance: WorkflowFlowInstance): void => {

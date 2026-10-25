@@ -182,6 +182,9 @@ dependencies = [
 "cuda" = [
   "torch==2.13.0+cu130; (sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'win32' and platform_machine != 'ARM64')",
   "torchvision==0.28.0+cu130; (sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'win32' and platform_machine != 'ARM64')",
+  # The Linux torch wheel requires triton; the Windows wheel requires none. triton-windows is the Windows build
+  # (no win_arm64 wheel); its minor version must match the Triton that torch 2.13 is built against.
+  "triton-windows>=3.7,<3.8; sys_platform == 'win32' and platform_machine != 'ARM64'",
   # macOS / linux_aarch64 fallback, see note under "cpu"
   "torch==2.7.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
   "torchvision==0.22.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",

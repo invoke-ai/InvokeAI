@@ -15,7 +15,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { commands, userEvent } from 'vitest/browser';
 
 import type * as SettingsStoreModule from './store';
@@ -180,6 +180,12 @@ describe('gallery maintenance in Data & workspace settings', () => {
   let host: HTMLDivElement;
   let root: Root;
   let queryClient: QueryClient;
+
+  // The settings page lazy-loads the maintenance section; load it up front so the first poll is not timing a cold
+  // chunk on a loaded machine.
+  beforeAll(async () => {
+    await import('./GalleryMaintenance');
+  });
 
   const renderSettings = async () => {
     await act(() =>
