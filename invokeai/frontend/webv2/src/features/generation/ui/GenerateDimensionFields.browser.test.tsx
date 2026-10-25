@@ -311,7 +311,7 @@ describe('GenerateDimensionFields aspect ratio', () => {
 
 describe('GenerateDimensionFields Reset size', () => {
   const resetSizeButton = () => host?.querySelector<HTMLButtonElement>('button[aria-label="Reset size"]') ?? null;
-  const menuItems = () => [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')];
+  const menuItems = () => [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')];
   const menuItem = (label: string) => menuItems().find((item) => item.textContent?.startsWith(label)) ?? null;
   const openMenu = () => settle(() => resetSizeButton()?.click());
   // Zag selects on a real pointer release, which a synthetic click() does not send.
@@ -398,22 +398,44 @@ describe('GenerateDimensionFields Reset size', () => {
     }
   });
 
-  it('marks the applied choices current and disabled, and drops an optimal size that is the native square', async () => {
+  it('checks the applied choice, keeps it reachable, and drops an optimal size that is the native square', async () => {
     await render({ aspectRatioId: '1:1', aspectRatioIsLocked: true, aspectRatioValue: 1, height: 512, width: 512 });
 
     await openMenu();
 
     const square = menuItem('Square at native size');
-    expect(square?.getAttribute('aria-current')).toBe('true');
-    expect(square?.getAttribute('aria-disabled')).toBe('true');
+    expect(square?.getAttribute('aria-checked')).toBe('true');
+    expect(square?.hasAttribute('aria-disabled')).toBe(false);
     expect(menuItems()).toHaveLength(1);
     await unmountAndReset();
 
     // The same size under a free ratio is not yet the locked square.
     await render({ aspectRatioId: 'Free', aspectRatioIsLocked: false, aspectRatioValue: 1, height: 512, width: 512 });
     await openMenu();
-    expect(menuItem('Square at native size')?.hasAttribute('aria-current')).toBe(false);
-    expect(menuItem('Square at native size')?.hasAttribute('aria-disabled')).toBe(false);
+    expect(menuItem('Square at native size')?.getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('lands the keyboard on the applied choice, and choosing it again changes nothing', async () => {
+    const { onResetSize } = await render({
+      aspectRatioId: '1:1',
+      aspectRatioIsLocked: true,
+      aspectRatioValue: 1,
+      height: 512,
+      width: 512,
+    });
+
+    resetSizeButton()?.focus();
+    await userEvent.keyboard('{Enter}');
+    await vi.waitFor(() => expect(document.activeElement?.getAttribute('role')).toBe('menu'));
+    await userEvent.keyboard('{ArrowDown}');
+    const square = menuItem('Square at native size');
+    await vi.waitFor(() => expect(square?.hasAttribute('data-highlighted')).toBe(true));
+    expect(document.activeElement?.getAttribute('aria-activedescendant')).toBe(square?.id);
+
+    await userEvent.keyboard('{Enter}');
+
+    await vi.waitFor(() => expect(menuItems()).toHaveLength(0));
+    expect(onResetSize).not.toHaveBeenCalled();
   });
 
   it('offers model defaults only for a model that sets its own size', async () => {

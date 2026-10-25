@@ -101,16 +101,27 @@ interface ResetSizeChoice {
   value: string;
   label: string;
   size: Dimensions;
-  /** Already applied: shown checked and disabled. */
+  /** Already applied: shown checked, and choosing it again changes nothing. */
   isCurrent: boolean;
   onSelect: () => void;
 }
 
-/** The ratio row's Reset size menu; each choice shows the size it sets. */
+/**
+ * The ratio row's Reset size menu; each choice shows the size it sets. The choices are radio items, so the applied one
+ * stays reachable and reads as checked, and an open menu always has an item to land on. Two choices can set the
+ * same size; the first of them is the checked one.
+ */
 const ResetSizeMenu = ({ choices }: { choices: readonly ResetSizeChoice[] }) => {
   const { t } = useTranslation();
   const ids = useTooltipTriggerIds();
   const label = t('widgets.generate.resetSize');
+  const current = choices.find((choice) => choice.isCurrent)?.value ?? '';
+  const onValueChange = ({ value }: { value: string }) => {
+    const choice = choices.find((candidate) => candidate.value === value);
+    if (choice && !choice.isCurrent) {
+      choice.onSelect();
+    }
+  };
 
   return (
     <Menu.Root ids={ids} positioning={RESET_SIZE_MENU_POSITIONING}>
@@ -124,32 +135,28 @@ const ResetSizeMenu = ({ choices }: { choices: readonly ResetSizeChoice[] }) => 
       <Portal>
         <Menu.Positioner>
           <MenuContent minW="15rem">
-            {choices.map((choice) => (
-              <Menu.Item
-                key={choice.value}
-                aria-current={choice.isCurrent ? 'true' : undefined}
-                disabled={choice.isCurrent}
-                value={choice.value}
-                onSelect={choice.onSelect}
-              >
-                <HStack gap="2" minW="0" w="full">
-                  <Icon
-                    as={CheckIcon}
-                    aria-hidden
-                    boxSize="3.5"
-                    color="fg.subtle"
-                    flexShrink={0}
-                    opacity={choice.isCurrent ? 1 : 0}
-                  />
-                  <Text flex="1" fontSize="md" truncate>
-                    {choice.label}
-                  </Text>
-                  <Text color="fg.subtle" flexShrink={0} fontSize="sm" fontVariantNumeric="tabular-nums">
-                    {`${choice.size.width}×${choice.size.height}`}
-                  </Text>
-                </HStack>
-              </Menu.Item>
-            ))}
+            <Menu.RadioItemGroup value={current} onValueChange={onValueChange}>
+              {choices.map((choice) => (
+                <Menu.RadioItem key={choice.value} value={choice.value}>
+                  <HStack gap="2" minW="0" w="full">
+                    <Icon
+                      as={CheckIcon}
+                      aria-hidden
+                      boxSize="3.5"
+                      color="fg.subtle"
+                      flexShrink={0}
+                      opacity={choice.value === current ? 1 : 0}
+                    />
+                    <Text flex="1" fontSize="md" truncate>
+                      {choice.label}
+                    </Text>
+                    <Text color="fg.subtle" flexShrink={0} fontSize="sm" fontVariantNumeric="tabular-nums">
+                      {`${choice.size.width}×${choice.size.height}`}
+                    </Text>
+                  </HStack>
+                </Menu.RadioItem>
+              ))}
+            </Menu.RadioItemGroup>
           </MenuContent>
         </Menu.Positioner>
       </Portal>

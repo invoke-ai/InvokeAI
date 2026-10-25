@@ -52,6 +52,7 @@ beforeAll(async () => {
 
 const TINT = '#e07575';
 const PICKED = '#3a7bd5';
+type ShapeSource = Extract<CanvasLayerSourceContract, { type: 'shape' }>;
 const SHAPE_SOURCE = {
   fill: '#ff0000',
   height: 10,
@@ -60,7 +61,7 @@ const SHAPE_SOURCE = {
   strokeWidth: 2,
   type: 'shape',
   width: 10,
-} satisfies Extract<CanvasLayerSourceContract, { type: 'shape' }>;
+} satisfies ShapeSource;
 const TEXT_SOURCE = {
   align: 'left',
   color: '#123456',
@@ -103,12 +104,15 @@ afterEach(async () => {
 /**
  * A real engine over a project holding a mask, a shape, a text layer and a paint layer, with `selected` selected. The feed's registered router is captured so tests drive picks the way the color-picker tool does.
  */
-const setup = async (selected: 'm0' | 'shape' | 'text' | 'paint', { withTintEditor = false } = {}) => {
+const setup = async (
+  selected: 'm0' | 'shape' | 'text' | 'paint',
+  { shapeSource = SHAPE_SOURCE, withTintEditor = false }: { shapeSource?: ShapeSource; withTintEditor?: boolean } = {}
+) => {
   const store = createWorkbenchStore();
   harness.store = store;
   const projectId = store.getState().activeProjectId;
   const layers: CanvasLayerContract[] = [
-    layerContract('shape', 'raster', { name: 'Shape', source: SHAPE_SOURCE }),
+    layerContract('shape', 'raster', { name: 'Shape', source: shapeSource }),
     layerContract('text', 'raster', { name: 'Text', source: TEXT_SOURCE }),
     layerContract('paint', 'raster', { name: 'Paint' }),
     layerContract('m0', 'inpaint_mask', { name: 'Mask' }),
@@ -274,6 +278,43 @@ describe('CanvasColorFeed Alt-pick routing', () => {
 
     await act(() => view.engine.history.undo());
     expect(sourceOf(view.layer('shape'))).toEqual(SHAPE_SOURCE);
+  });
+
+  it.each([
+    ['foreground', 'fill', { ...SHAPE_SOURCE, fill: null }],
+    ['background', 'stroke', { ...SHAPE_SOURCE, stroke: null }],
+  ] as const)(
+    'leaves a selected shape’s %s-target %s off when the shape has none, and picks into the pair',
+    async (target, _field, shapeSource) => {
+      const view = await setup('shape', { shapeSource });
+      await act(() => view.store.commands.widgets.patchValues('canvas', { activeColorTarget: target }));
+
+      await view.pick(['#101010', PICKED], 'commit');
+
+      expect(sourceOf(view.layer('shape'))).toEqual(shapeSource);
+      expect(view.engine.history.getEntries().past).toEqual([]);
+      expect(view.canvasValues().activeColors).toMatchObject({ [target]: PICKED });
+    }
+  );
+
+  it('does not turn a shape’s stroke back on when it goes off mid-pick', async () => {
+    const view = await setup('shape');
+    await act(() => view.store.commands.widgets.patchValues('canvas', { activeColorTarget: 'background' }));
+    await act(() => view.router()('#101010', 'preview'));
+
+    const strokeless = { ...SHAPE_SOURCE, stroke: null };
+    await act(() =>
+      view.store.commands.canvas.apply(view.projectId, {
+        document: {
+          ...view.document(),
+          stacks: stacksFrom([layerContract('shape', 'raster', { name: 'Shape', source: strokeless })]),
+        },
+        type: 'replaceCanvasDocument',
+      })
+    );
+    await act(() => view.router()(PICKED, 'commit'));
+
+    expect(sourceOf(view.layer('shape'))).toEqual(strokeless);
   });
 
   it('writes a selected text layer’s color in one undo step', async () => {

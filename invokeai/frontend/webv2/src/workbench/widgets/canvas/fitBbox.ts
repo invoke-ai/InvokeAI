@@ -1,7 +1,7 @@
 /**
- * Union enabled, renderable, nonempty layer bounds in document space. Mask fitting includes only inpaint masks and
- * pads by the mask blur plus {@link MASK_FIT_MARGIN}; snap inward with {@link fitRectToGrid}. Return null for no
- * content or a collapsed result.
+ * Union enabled, renderable, nonempty layer bounds in document space. Fitting to layers snaps inward with
+ * {@link fitRectToGrid}. Mask fitting includes only inpaint masks, pads by the mask blur plus {@link MASK_FIT_MARGIN}
+ * and snaps outward, so no grid cuts the feathered edge. Return null for no content or a collapsed result.
  */
 
 import {
@@ -31,6 +31,16 @@ export const fitRectToGrid = (rect: Rect, gridSize: number): Rect => {
   const y = Math.ceil(rect.y / g) * g;
   const width = Math.floor((rect.width - (x - rect.x)) / g) * g;
   const height = Math.floor((rect.height - (y - rect.y)) / g) * g;
+  return { height, width, x, y };
+};
+
+/** Snap outward: round origins down and far edges up, so the result contains `rect`. */
+const expandRectToGrid = (rect: Rect, gridSize: number): Rect => {
+  const g = gridSize > 1 ? gridSize : 1;
+  const x = Math.floor(rect.x / g) * g;
+  const y = Math.floor(rect.y / g) * g;
+  const width = Math.ceil((rect.x + rect.width) / g) * g - x;
+  const height = Math.ceil((rect.y + rect.height) / g) * g - y;
   return { height, width, x, y };
 };
 
@@ -65,8 +75,9 @@ export const computeFitBboxToLayers = (doc: CanvasDocumentContractV3, gridSize: 
 };
 
 /**
- * The grid-snapped frame that fits the visible INPAINT masks padded by `maskBlur` plus {@link MASK_FIT_MARGIN}, or
- * `null` when there are none. `maskBlur` is the project's clamped compositing mask blur.
+ * The grid-aligned frame that contains the visible INPAINT masks padded by `maskBlur` plus {@link MASK_FIT_MARGIN},
+ * or `null` when there are none. `maskBlur` is the project's clamped compositing mask blur. Snapping inward would cut
+ * up to a grid step less one pixel from each side, more than the margin on 16 and 32 px grids.
  */
 export const computeFitBboxToMasks = (
   doc: CanvasDocumentContractV3,
@@ -84,6 +95,5 @@ export const computeFitBboxToMasks = (
     x: bounds.x - padding,
     y: bounds.y - padding,
   };
-  const fitted = fitRectToGrid(expanded, gridSize);
-  return isEmpty(fitted) ? null : fitted;
+  return expandRectToGrid(expanded, gridSize);
 };

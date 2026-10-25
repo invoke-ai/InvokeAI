@@ -58,22 +58,28 @@ const createEngine = () => {
   return { engine: engine as unknown as ToolFooterProps['engine'], setPending };
 };
 
+/** Renders the footer `width` px wide. */
+const renderFooter = async (engine: ToolFooterProps['engine'], width = 320) => {
+  const Footer = transformForm.footer!;
+  host = document.createElement('div');
+  host.style.width = `${width}px`;
+  document.body.append(host);
+  root = createRoot(host);
+  await act(() =>
+    root!.render(
+      <I18nextProvider i18n={i18n}>
+        <ChakraProvider value={system}>
+          <Footer engine={engine} isExternalInteractionLocked={false} />
+        </ChakraProvider>
+      </I18nextProvider>
+    )
+  );
+};
+
 describe('Transform footer', () => {
   it('says while a transform waits for its stroke to save, in a polite live region, and clears after', async () => {
     const { engine, setPending } = createEngine();
-    const Footer = transformForm.footer!;
-    host = document.createElement('div');
-    document.body.append(host);
-    root = createRoot(host);
-    await act(() =>
-      root!.render(
-        <I18nextProvider i18n={i18n}>
-          <ChakraProvider value={system}>
-            <Footer engine={engine} isExternalInteractionLocked={false} />
-          </ChakraProvider>
-        </I18nextProvider>
-      )
-    );
+    await renderFooter(engine);
     const status = page.getByRole('status');
     await expect.element(status).toBeInTheDocument();
     await expect.element(status).toHaveTextContent('');
@@ -84,5 +90,18 @@ describe('Transform footer', () => {
 
     await setPending(null);
     await expect.element(status).toHaveTextContent('');
+  });
+
+  it('shows the whole status in a tooltip where a narrow pane truncates it', async () => {
+    const { engine, setPending } = createEngine();
+    await renderFooter(engine, 180);
+    await setPending('layer-1');
+    const status = page.getByRole('status');
+    const line = status.element() as HTMLElement;
+    expect(line.scrollWidth).toBeGreaterThan(line.clientWidth);
+
+    await status.getByText('Waiting for the stroke to save…').hover();
+
+    await expect.element(page.getByRole('tooltip')).toHaveTextContent('Waiting for the stroke to save…');
   });
 });

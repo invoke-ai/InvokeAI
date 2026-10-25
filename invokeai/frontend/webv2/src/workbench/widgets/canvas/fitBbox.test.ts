@@ -118,8 +118,8 @@ describe('computeFitBboxToMasks', () => {
       imageLayer('a', 0, 0, 500, 500), // ignored (not a mask)
       inpaintMask('m', 100, 100, { height: 40, imageName: 'm-img', width: 40 }),
     ]);
-    // mask bounds {100,100,40,40} → blur 0 pads 8 → {92,92,56,56} → grid 8 → {96,96,48,48}.
-    expect(computeFitBboxToMasks(doc, 8, 0)).toEqual({ height: 48, width: 48, x: 96, y: 96 });
+    // mask bounds {100,100,40,40} → blur 0 pads 8 → 92..148 → grid 8 outward → 88..152.
+    expect(computeFitBboxToMasks(doc, 8, 0)).toEqual({ height: 64, width: 64, x: 88, y: 88 });
   });
 
   it('pads by the mask blur plus 8 so the feathered edge stays inside the frame', () => {
@@ -129,17 +129,60 @@ describe('computeFitBboxToMasks', () => {
     expect(computeFitBboxToMasks(doc, 1, 0)).toEqual({ height: 116, width: 116, x: 192, y: 192 });
   });
 
-  it('grid-snaps the blur-padded rect inward', () => {
+  it('grid-snaps the blur-padded rect outward', () => {
     const doc = docWith([inpaintMask('m', 100, 100, { height: 40, imageName: 'm-img', width: 40 })]);
-    // Blur 16 pads 24 → {76,76,88,88}; grid 8 moves the origin up to 80 (+4) and floors 84 to 80.
-    expect(computeFitBboxToMasks(doc, 8, 16)).toEqual({ height: 80, width: 80, x: 80, y: 80 });
+    // Blur 16 pads 24 → 76..164; grid 8 floors the origin to 72 and ceils the far edge to 168.
+    expect(computeFitBboxToMasks(doc, 8, 16)).toEqual({ height: 96, width: 96, x: 72, y: 72 });
+  });
+
+  /** The frame holds the whole feathered mask: its bounds grown by the blur on every side. */
+  const expectContainsFeather = (
+    frame: { x: number; y: number; width: number; height: number } | null,
+    mask: { x: number; y: number; width: number; height: number },
+    blur: number
+  ) => {
+    expect(frame).not.toBeNull();
+    expect(frame!.x).toBeLessThanOrEqual(mask.x - blur);
+    expect(frame!.y).toBeLessThanOrEqual(mask.y - blur);
+    expect(frame!.x + frame!.width).toBeGreaterThanOrEqual(mask.x + mask.width + blur);
+    expect(frame!.y + frame!.height).toBeGreaterThanOrEqual(mask.y + mask.height + blur);
+  };
+
+  it.each([
+    // Grid 16, mask 105..205: padded 81..229 snaps to 80..240. Inward snapping gave 96..224, cutting 89..96.
+    [16, 105, { height: 160, width: 160, x: 80, y: 80 }],
+    // Grid 32, mask 121..221: padded 97..245 snaps to 96..256. Inward snapping gave 128..224, cutting the mask itself.
+    [32, 121, { height: 160, width: 160, x: 96, y: 96 }],
+  ] as const)('keeps the blurred edge inside a grid-%i frame', (grid, origin, expected) => {
+    const mask = { height: 100, width: 100, x: origin, y: origin };
+    const doc = docWith([inpaintMask('m', origin, origin, { height: 100, imageName: 'm-img', width: 100 })]);
+
+    const frame = computeFitBboxToMasks(doc, grid, 16);
+
+    expect(frame).toEqual(expected);
+    expectContainsFeather(frame, mask, 16);
+  });
+
+  it('contains the feathered mask at every offset on 16 and 32 px grids', () => {
+    for (const grid of [16, 32]) {
+      for (let offset = 0; offset < grid; offset += 1) {
+        const mask = { height: 37, width: 53, x: 200 + offset, y: 300 - offset };
+        const doc = docWith([inpaintMask('m', mask.x, mask.y, { height: 37, imageName: 'm-img', width: 53 })]);
+        const frame = computeFitBboxToMasks(doc, grid, 16);
+
+        expectContainsFeather(frame, mask, 16);
+        for (const value of [frame!.x, frame!.y, frame!.width, frame!.height]) {
+          expect(value % grid).toBe(0);
+        }
+      }
+    }
   });
 
   it('excludes regional-guidance masks (legacy fits inpaint_mask only)', () => {
     const regional = maskLayer('regional_guidance', 'rg', 400, 400, { height: 40, imageName: 'rg-img', width: 40 });
     const doc = docWith([regional, inpaintMask('m', 100, 100, { height: 40, imageName: 'm-img', width: 40 })]);
     // Identical to the inpaint-only fit above: the regional mask contributes nothing.
-    expect(computeFitBboxToMasks(doc, 8, 0)).toEqual({ height: 48, width: 48, x: 96, y: 96 });
+    expect(computeFitBboxToMasks(doc, 8, 0)).toEqual({ height: 64, width: 64, x: 88, y: 88 });
     // Regional masks alone ⇒ nothing to fit.
     expect(computeFitBboxToMasks(docWith([regional]), 8, 0)).toBeNull();
   });

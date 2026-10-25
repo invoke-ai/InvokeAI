@@ -34,7 +34,8 @@ type PickTarget =
 
 /**
  * Precedence: the armed mask tint while its mask is still selected; a selected shape (the foreground target writes
- * its fill, the background its stroke); a selected text layer; otherwise the pair.
+ * its fill, the background its stroke) when it has that slot; a selected text layer; otherwise the pair. A shape's
+ * off slot is no target, as in its own options, where the toggle alone turns a slot on.
  */
 const resolvePickTarget = (engine: CanvasEngineHandle, canvasValues: Record<string, unknown>): PickTarget => {
   const model = engine.document.model();
@@ -48,7 +49,10 @@ const resolvePickTarget = (engine: CanvasEngineHandle, canvasValues: Record<stri
   }
   const selected = document?.selectedLayerId ? (model?.getLayer(document.selectedLayerId) ?? null) : null;
   if (selected?.type === 'raster' && selected.source.type === 'shape') {
-    return { field: pairTarget === 'foreground' ? 'fill' : 'stroke', kind: 'shape', layerId: selected.id };
+    const field = pairTarget === 'foreground' ? 'fill' : 'stroke';
+    if (selected.source[field] !== null) {
+      return { field, kind: 'shape', layerId: selected.id };
+    }
   }
   if (selected?.type === 'raster' && selected.source.type === 'text') {
     return { kind: 'text-layer', layerId: selected.id };
@@ -121,6 +125,10 @@ const ColorSampleRouting = ({ engine }: { engine: CanvasEngineHandle }) => {
         return { ids: [target.layerId], status: 'missing' };
       }
       if (target.kind === 'shape' && layer.source.type === 'shape') {
+        // The slot can go off mid-pick (an undo, say); the pick never turns it back on.
+        if (layer.source[target.field] === null) {
+          return { status: 'unchanged' };
+        }
         return model.prepare({ id: layer.id, source: { ...layer.source, [target.field]: hex }, type: 'patch-source' });
       }
       if (target.kind === 'text-layer' && layer.source.type === 'text') {

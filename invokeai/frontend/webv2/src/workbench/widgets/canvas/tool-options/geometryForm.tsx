@@ -10,6 +10,7 @@ import type {
 import { Flex, Text } from '@chakra-ui/react';
 import { AspectRatioLockButton, AspectRatioSelect } from '@features/generation/components';
 import { ASPECT_RATIO_MAP, deriveAspectRatioId } from '@features/generation/settings';
+import { Tooltip } from '@platform/ui/Tooltip';
 import { constrainBboxToRatio, lookupDocumentLeaf } from '@workbench/canvas-engine/api';
 import {
   useCanvasActiveTool,
@@ -266,11 +267,17 @@ const TransformFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProp
   const disabled = isExternalInteractionLocked || (!session && !hasFloat);
   const onApply = useCallback(() => engine.layers.applyTransform(), [engine]);
   const onCancel = useCallback(() => engine.layers.cancelTransform(), [engine]);
+  const pendingText = t('widgets.canvas.transformPending');
   return (
     <ApplyCancelBar applyDisabled={disabled} cancelDisabled={disabled} onApply={onApply} onCancel={onCancel}>
-      {/* Always mounted, so screen readers hear the wait start and end as the live region's text changes. */}
+      {/* Always mounted, so screen readers hear the wait start and end as the live region's text changes. The
+          tooltip shows the whole line where a narrow pane truncates it. */}
       <Text color="fg.muted" role="status" truncate>
-        {isPending ? t('widgets.canvas.transformPending') : null}
+        {isPending ? (
+          <Tooltip content={pendingText}>
+            <span>{pendingText}</span>
+          </Tooltip>
+        ) : null}
       </Text>
     </ApplyCancelBar>
   );
