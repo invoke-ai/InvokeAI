@@ -1,6 +1,9 @@
+from types import SimpleNamespace
+
 import pytest
 
 from invokeai.app.invocations.logic import BooleanLogicInvocation, IfInvocation
+from invokeai.app.invocations.loops import ForInvocation
 from invokeai.app.invocations.math import AddInvocation
 from invokeai.app.invocations.primitives import BooleanOutput
 from invokeai.app.services.shared import graph_if_runtime
@@ -8,7 +11,7 @@ from invokeai.app.services.shared.execution_engine.scheduler import ActivationDe
 from invokeai.app.services.shared.graph import Edge, EdgeConnection, Graph, GraphExecutionState
 from invokeai.app.services.shared.graph_iterator_ancestry import _IteratorAncestry
 from invokeai.app.services.shared.graph_runtime_records import _ApplyTransaction
-from invokeai.app.services.shared.graph_validation import IterateInvocation
+from invokeai.app.services.shared.graph_validation import CollectInvocation, IterateInvocation
 from tests.app.services.shared.import_test_utils import assert_module_imports_without_graph
 
 
@@ -24,6 +27,29 @@ def state() -> GraphExecutionState:
 @pytest.mark.platform_independent
 def test_runtime_import_without_graph() -> None:
     assert_module_imports_without_graph("invokeai.app.services.shared.graph_if_runtime")
+
+
+@pytest.mark.parametrize(
+    ("source_kind", "source_field", "axes", "expected"),
+    [
+        ("regular", "value", ("outer", "inner"), ("outer",)),
+        ("regular", "value", (), ()),
+        ("for_final", "output_collection", ("outer",), ("outer",)),
+    ],
+)
+def test_collect_item_axis_closure_handles_empty_axes_and_for_final_output(
+    source_kind: str, source_field: str, axes: tuple[str, ...], expected: tuple[str, ...]
+) -> None:
+    source = IfInvocation(id="source", condition=True) if source_kind == "regular" else ForInvocation(id="source")
+    graph = Graph()
+    graph.nodes.update({"source": source, "collect": CollectInvocation(id="collect")})
+    state = SimpleNamespace(graph=graph)
+    edge = Edge(
+        source=EdgeConnection(node_id="source", field=source_field),
+        destination=EdgeConnection(node_id="collect", field="item"),
+    )
+
+    assert graph_if_runtime._without_closed_axis(state, edge, axes) == expected
 
 
 @pytest.mark.parametrize(

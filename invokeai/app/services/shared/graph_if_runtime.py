@@ -199,19 +199,19 @@ def _validate_collect_branch_axes(
     condition_axes = set(iterator_ancestry.get_frame_axes_for_edge(condition_edge))
     if not condition_axes:
         return
-    branch_axes: dict[str, set[str]] = {}
+    branch_axes = {
+        branch_field: set(axes)
+        for branch_field, axes in _get_if_branch_frame_axes(state, iterator_ancestry, node_id, frame_axes_cache).items()
+    }
     branch_collect_sources: dict[str, set[str]] = {}
     source_graph = state._get_source_graph_flat()
     for branch_field in ("true_input", "false_input"):
-        axes: set[str] = set()
         collect_sources: set[str] = set()
         for edge in state.graph._get_input_edges(node_id, branch_field):
-            axes.update(_get_edge_frame_axes(state, iterator_ancestry, edge, frame_axes_cache) or ())
             ancestors = nx.ancestors(source_graph, edge.source.node_id) | {edge.source.node_id}
             collect_sources.update(
                 source_id for source_id in ancestors if isinstance(state.graph.get_node(source_id), CollectInvocation)
             )
-        branch_axes[branch_field] = axes
         branch_collect_sources[branch_field] = collect_sources
     for branch_field, other_field in (("true_input", "false_input"), ("false_input", "true_input")):
         axes = branch_axes[branch_field]
@@ -314,6 +314,24 @@ def _get_edge_frame_axes(
     return frame_axes_cache[edge.source.node_id]
 
 
+def _get_if_branch_frame_axes(
+    state: "GraphExecutionState",
+    iterator_ancestry: _IteratorAncestry,
+    node_id: str,
+    frame_axes_cache: dict[str, Optional[tuple[str, ...]]],
+) -> dict[str, tuple[str, ...]]:
+    """Return each If branch's ordered open axes, resolving Collect-backed sources once per call."""
+    result: dict[str, tuple[str, ...]] = {}
+    for branch in ("true_input", "false_input"):
+        axes: list[str] = []
+        for edge in state.graph._get_input_edges(node_id, branch):
+            for axis_id in _get_edge_frame_axes(state, iterator_ancestry, edge, frame_axes_cache) or ():
+                if axis_id not in axes:
+                    axes.append(axis_id)
+        result[branch] = tuple(axes)
+    return result
+
+
 def _get_effective_iteration_paths_for_edge(
     state: "GraphExecutionState",
     edge: Edge,
@@ -373,14 +391,9 @@ def _get_effective_iteration_paths_for_edge(
                     iterator_ancestry,
                     cache,
                 )
-                group_depth = len(iterator_ancestry.get_iterator_axes_for_edge(input_edge))
-                input_source = state.graph.get_node(input_edge.source.node_id)
-                # A For's final output already excludes the For's own axis, so the Collect closes nothing more.
-                is_for_final = isinstance(input_source, ForInvocation) and (
-                    get_output_field_scope(input_source, input_edge.source.field) == OutputScope.Final
+                group_depth = len(
+                    _without_closed_axis(state, input_edge, iterator_ancestry.get_iterator_axes_for_edge(input_edge))
                 )
-                if input_edge.destination.field == ITEM_FIELD and not is_for_final:
-                    group_depth = max(group_depth - 1, 0)
                 collapsed_paths.update(path[:group_depth] for path in input_paths)
             cache[cache_key] = collapsed_paths or ({()} if not input_edges else set())
             continue
@@ -429,12 +442,7 @@ def _get_if_iteration_paths_with_ancestry(
             # A filtered materialization view can omit unresolved condition sources.
             continue
     branch_axes = {
-        branch: {
-            axis_id
-            for edge in state.graph._get_input_edges(node_id, branch)
-            for axis_id in (_get_edge_frame_axes(state, iterator_ancestry, edge, {}) or ())
-        }
-        for branch in ("true_input", "false_input")
+        branch: set(axes) for branch, axes in _get_if_branch_frame_axes(state, iterator_ancestry, node_id, {}).items()
     }
     shared_deeper_branch_axes = (
         bool(branch_axes["true_input"])

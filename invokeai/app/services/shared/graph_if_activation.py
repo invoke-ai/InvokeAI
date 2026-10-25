@@ -9,11 +9,11 @@ if TYPE_CHECKING:
 
 
 class _IfActivationController:
-    """Own activation admission for concrete execution nodes.
+    """Compile activation dependencies for source nodes on compatibility paths.
 
     Unlike the legacy compiler, this controller does not lower or cache a
-    branch projection. It answers one readiness question for one prepared
-    execution node from the current source graph and durable execution frame.
+    branch projection. It derives frame-scoped branch requirements from the
+    current source graph for the fallback scheduler.
     """
 
     def __init__(self, state: "GraphExecutionState") -> None:
@@ -128,14 +128,6 @@ class _IfActivationController:
         self._branch_memberships_by_source[source_node_id] = memberships
         return memberships
 
-    def get_dependencies(self, exec_node_id: str) -> tuple[ActivationDependency, ...]:
-        """Return activation requirements for one concrete prepared node."""
-
-        source_node_id = self._state._prepared_registry().get_source_node_id(exec_node_id)
-        if not self._get_if_node_ids():
-            return ()
-        return self.get_source_dependencies(source_node_id, self._state._get_iteration_path(exec_node_id))
-
     def get_source_dependencies(
         self, source_node_id: str, iteration_path: tuple[int, ...] = ()
     ) -> tuple[ActivationDependency, ...]:
@@ -146,43 +138,3 @@ class _IfActivationController:
             for if_node_id, fields in self._branch_memberships(source_node_id)
             if len(fields) == 1
         )
-
-    def is_source_admitted(self, source_node_id: str, iteration_path: tuple[int, ...] = ()) -> bool:
-        dependencies = self.get_source_dependencies(source_node_id, iteration_path)
-        return bool(
-            not dependencies
-            or all(self._state._is_activation_dependency_satisfied(dependency) for dependency in dependencies)
-        )
-
-    def is_source_rejected(self, source_node_id: str, iteration_path: tuple[int, ...] = ()) -> bool:
-        return any(
-            self._state._is_activation_dependency_rejected(dependency)
-            for dependency in self.get_source_dependencies(source_node_id, iteration_path)
-        )
-
-    def is_source_inactive(self, source_node_id: str, iteration_path: tuple[int, ...] = ()) -> bool:
-        """Return whether a source belongs exclusively to a rejected If branch."""
-
-        if iteration_path:
-            return self.is_source_rejected(source_node_id, iteration_path)
-
-        relevant_if_ids = {if_node_id for if_node_id, _ in self._branch_memberships(source_node_id)}
-        if not relevant_if_ids:
-            return False
-
-        frames: set[tuple[int, ...]] = set()
-        for if_node_id in relevant_if_ids:
-            frames.update(
-                self._state._get_iteration_path(exec_node_id)
-                for exec_node_id in self._state._prepared_registry().get_prepared_ids(if_node_id)
-            )
-        if not frames:
-            return False
-
-        for frame in frames:
-            dependencies = self.get_source_dependencies(source_node_id, frame)
-            if dependencies and not any(
-                self._state._is_activation_dependency_rejected(dependency) for dependency in dependencies
-            ):
-                return False
-        return True

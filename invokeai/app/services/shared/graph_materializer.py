@@ -15,7 +15,7 @@ from invokeai.app.invocations.loops import (
 )
 from invokeai.app.services.shared import graph_if_runtime
 from invokeai.app.services.shared.execution_engine.primitives import ActivationGate
-from invokeai.app.services.shared.graph_iterator_ancestry import _IteratorAncestry
+from invokeai.app.services.shared.graph_iterator_ancestry import _get_ordered_input_edges, _IteratorAncestry
 from invokeai.app.services.shared.graph_loop_topology import NestedForBody, NestedIterateBody, NestedIterateChain
 from invokeai.app.services.shared.graph_models import Edge, EdgeConnection
 from invokeai.app.services.shared.graph_validation import (
@@ -99,15 +99,7 @@ class _ExecutionNodeBuilder:
         if not input_edges:
             return ()
 
-        destination = self._state.graph.get_node(input_edges[0].destination.node_id)
-        input_field_order = {field: index for index, field in enumerate(type(destination).model_fields)}
-        ordered_edges = sorted(
-            input_edges,
-            key=lambda edge: (
-                input_field_order.get(edge.destination.field, len(input_field_order)),
-                edge.source.node_id,
-            ),
-        )
+        ordered_edges = _get_ordered_input_edges(self._state.graph, input_edges)
         axes: list[str] = []
         for edge in ordered_edges:
             for axis_id in self._get_iteration_axes(edge.source.node_id):
@@ -1258,18 +1250,10 @@ class _ExecutionNodeBuilder:
     ) -> list[str]:
         if isinstance(self._state.graph.get_node(source_node_id), IfInvocation):
             iterator_ancestry = self._get_iterator_ancestry(iterator_graph or self.iterator_graph())
-            branch_axes = [
-                tuple(
-                    dict.fromkeys(
-                        axis_id
-                        for edge in self._state.graph._get_input_edges(source_node_id, branch)
-                        for axis_id in (
-                            graph_if_runtime._get_edge_frame_axes(self._state, iterator_ancestry, edge, {}) or ()
-                        )
-                    )
-                )
-                for branch in ("true_input", "false_input")
-            ]
+            branch_axes_by_field = graph_if_runtime._get_if_branch_frame_axes(
+                self._state, iterator_ancestry, source_node_id, {}
+            )
+            branch_axes = [branch_axes_by_field[branch] for branch in ("true_input", "false_input")]
             condition_axes = {
                 axis_id
                 for edge in self._state.graph._get_input_edges(source_node_id, "condition")
@@ -2221,14 +2205,8 @@ class _ExecutionNodeBuilder:
         if not condition_edges or any(not edges for edges in branch_edges):
             return False
 
-        axes = [
-            {
-                axis_id
-                for edge in edges
-                for axis_id in (graph_if_runtime._get_edge_frame_axes(self._state, iterator_ancestry, edge, {}) or ())
-            }
-            for edges in branch_edges
-        ]
+        branch_axes = graph_if_runtime._get_if_branch_frame_axes(self._state, iterator_ancestry, node_id, {})
+        axes = [set(branch_axes[field]) for field in ("true_input", "false_input")]
         condition_axes = {
             axis_id for edge in condition_edges for axis_id in iterator_ancestry.get_frame_axes_for_edge(edge)
         }

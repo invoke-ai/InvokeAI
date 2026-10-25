@@ -3,10 +3,21 @@ from typing import TYPE_CHECKING, Optional
 from invokeai.app.invocations.fields import OutputScope
 from invokeai.app.invocations.loops import ForInvocation
 from invokeai.app.services.shared.graph_models import Edge
-from invokeai.app.services.shared.graph_validation import IterateInvocation, get_output_field_scope, nx
+from invokeai.app.services.shared.graph_validation import Graph, IterateInvocation, get_output_field_scope, nx
 
 if TYPE_CHECKING:
     from invokeai.app.services.shared.graph import GraphExecutionState
+
+
+def _get_ordered_input_edges(graph: Graph, input_edges: list[Edge]) -> list[Edge]:
+    if not input_edges:
+        return []
+    destination = graph.get_node(input_edges[0].destination.node_id)
+    field_order = {field: index for index, field in enumerate(type(destination).model_fields)}
+    return sorted(
+        input_edges,
+        key=lambda edge: (field_order.get(edge.destination.field, len(field_order)), edge.source.node_id),
+    )
 
 
 class _IteratorAncestry:
@@ -76,12 +87,8 @@ class _IteratorAncestry:
                 continue
             visited.add(current_node_id)
             pending.append((current_node_id, True))
-            current_node = self._state.graph.get_node(current_node_id)
-            input_fields = list(type(current_node).model_fields)
-            field_order = {field: index for index, field in enumerate(input_fields)}
-            input_edges = sorted(
-                self._state.graph._get_input_edges(current_node_id),
-                key=lambda edge: (field_order.get(edge.destination.field, len(field_order)), edge.source.node_id),
+            input_edges = _get_ordered_input_edges(
+                self._state.graph, self._state.graph._get_input_edges(current_node_id)
             )
             for edge in reversed(input_edges):
                 source_node_id = edge.source.node_id
@@ -136,11 +143,8 @@ class _IteratorAncestry:
                 continue
             visited.add((current_node_id, opens))
             pending.append((current_node_id, True, opens))
-            current_node = self._state.graph.get_node(current_node_id)
-            field_order = {field: index for index, field in enumerate(type(current_node).model_fields)}
-            input_edges = sorted(
-                self._state.graph._get_input_edges(current_node_id),
-                key=lambda edge: (field_order.get(edge.destination.field, len(field_order)), edge.source.node_id),
+            input_edges = _get_ordered_input_edges(
+                self._state.graph, self._state.graph._get_input_edges(current_node_id)
             )
             for edge in reversed(input_edges):
                 source_node_id = edge.source.node_id
