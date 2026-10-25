@@ -730,6 +730,51 @@ def test_a_settled_item_keeps_its_outcome_when_a_session_callback_raises_and_the
     assert (run.run_id, run.status, run.error) == (run_id, outcome, None)
 
 
+def test_an_owner_revocation_whose_announcement_raised_keeps_the_item_canceled_once_pruned(
+    tmp_path: Path,
+    mock_invoker: Invoker,
+    service: WorkingMemoryCalibrationService,
+    queue: SessionQueue,
+    runner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The owner was deactivated after admission. The queue committed the cancellation, and a prune removed the item
+    before the announcement raised: the runner's error does not turn the cancellation into a failure."""
+    mock_invoker.services.configuration.multiuser = True
+    _user(mock_invoker, "first-admin@test.com", is_admin=True)
+    admin_id = _user(mock_invoker, "admin@test.com", is_admin=True)
+    run_id, item_id = _create(service, admin_id, "complete")
+    admit = service.admit
+
+    def admitted_then_deactivated(*args, **kwargs) -> Optional[str]:
+        refusal = admit(*args, **kwargs)
+        mock_invoker.services.users.update(admin_id, UserUpdateRequest(is_active=False))
+        return refusal
+
+    monkeypatch.setattr(service, "admit", admitted_then_deactivated)
+    events = mock_invoker.services.events
+    emit = events.emit_queue_item_status_changed
+
+    def announce(queue_item, *args, **kwargs):
+        if queue_item.status == "canceled":
+            queue.prune("default")
+            raise RuntimeError("the event bus is gone")
+        return emit(queue_item, *args, **kwargs)
+
+    monkeypatch.setattr(events, "emit_queue_item_status_changed", announce)
+    item = queue.dequeue()
+    assert item is not None
+    with pytest.raises(RuntimeError, match="event bus"):
+        runner[0].run(item)
+
+    assert queue.get_queue_item_ids("default").item_ids == [] and _SEEN == []
+    [stored] = json.loads((tmp_path / "working_memory" / f"{GPU_CLASS.id}.json").read_bytes())["runs"]
+    observed = stored["observed"][str(item_id)]
+    assert (observed["status"], observed.get("error_message")) == ("canceled", None)
+    [run] = service.get_status().device_classes[0].runs
+    assert (run.run_id, run.status, run.error) == (run_id, "canceled", None)
+
+
 def test_a_runner_failure_outside_the_nodes_is_recorded_as_failed(
     service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, monkeypatch: pytest.MonkeyPatch
 ) -> None:

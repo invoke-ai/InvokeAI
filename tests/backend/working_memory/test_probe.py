@@ -4,13 +4,19 @@
 (reserved = allocated + cached), what the driver counts, peaks since the last reset, and a release that returns the
 cached blocks when `TorchDevice.empty_cache` runs -- as a real device does. Each test scripts allocations through it and
 reads the `MeasuredWindow` the probe recorded; expected values follow from the script alone. The probe reads it through
-`FakeCounters`, or with `cuda_device` through the real `counters.DeviceCounters` and torch's CUDA functions.
+`FakeCounters`, or with `cuda_device` through the real `counters.DeviceCounters` and torch's CUDA functions. Windows
+lock their models in `FakeCache`, or in `CacheOnFakeDevice`, the real model cache, where its own offloads and evictions
+are under test.
 """
 
+import gc
+import logging
 import sys
 import threading
+import weakref
 from contextlib import contextmanager
 from typing import Callable, Iterator, Optional
+from unittest.mock import MagicMock
 
 import pytest
 import torch
@@ -18,6 +24,7 @@ import torch
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.util import devices
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.working_memory import counters, probe
@@ -211,6 +218,82 @@ class FakeCache:
         return sum(self._locks.values())
 
 
+class CacheOnFakeDevice:
+    """A real `ModelCache`, whose offload and eviction paths run as they are, standing in for a GPU's on a `FakeDevice`.
+    It runs on the CPU, with its VRAM budget capped and its VRAM in use read from the fake device, so that it never
+    asks a GPU; its entries' weights are on the fake device until they move to RAM or their model dies. Its lock --
+    replaced but for `lock_dropped` -- offloads the entries `offloads` names for the locked model through the cache,
+    then pins the record and puts its weights on the device."""
+
+    def __init__(self, device: FakeDevice):
+        logger = MagicMock()
+        logger.getEffectiveLevel.return_value = logging.INFO
+        self.device = device
+        self.cache = ModelCache(
+            execution_device_working_mem_gb=1.0,
+            enable_partial_loading=False,
+            keep_ram_copy_of_weights=True,
+            max_vram_cache_size_gb=8.0,
+            execution_device="cpu",
+            storage_device="cpu",
+            logger=logger,
+        )
+        self.cache.lock = self._lock  # type: ignore[method-assign]
+        self.cache._get_vram_in_use = lambda: device.allocated  # type: ignore[method-assign]
+        self.offloads: dict[str, list[str]] = {}
+        self._on_device: dict[str, weakref.finalize] = {}
+
+    def admit(self, key: str, on_device: bool = True) -> int:
+        """Admit an unlocked model of 2 MiB that computes on the device, its weights there or in RAM; its size."""
+        self.cache.put(key, torch.nn.Linear(1024, 512, bias=False))
+        cached_model = self.cache._cached_models[key].cached_model
+        cached_model._compute_device = torch.device("meta")
+        if on_device:
+            cached_model._is_in_vram = True
+            self._weights_on_device(self.cache._cached_models[key])
+        return cached_model.total_bytes()
+
+    def lock_dropped(self, record: CacheRecord) -> None:
+        """Lock and unlock a record the cache dropped, through the cache's own lock, which puts its weights on the
+        device (#7513)."""
+        ModelCache.lock(self.cache, record, None)
+        self._weights_on_device(record)
+        self.cache.unlock(record)
+
+    def _weights_on_device(self, record: CacheRecord) -> None:
+        weights = record.cached_model.total_bytes()
+        self.device.alloc(weights)
+        self._on_device[record.key] = weakref.finalize(record.cached_model.model, self.device.free, weights)
+
+    def model(self, key: str, total_bytes: int = 1 * GIB) -> LoadedModelWithoutConfig:
+        """A model a window can lock on this cache, not one of its entries."""
+        return LoadedModelWithoutConfig(
+            CacheRecord(key=key, cached_model=FakeCachedModel(total_bytes, "meta")), cache=self.cache
+        )
+
+    def offload(self, key: str) -> None:
+        """Move the entry to RAM, as a node's `context.models.offload_from_vram` does."""
+        freed = self.cache.offload_model_from_vram(key)
+        self._on_device.pop(key).detach()
+        self.device.free(freed)
+
+    def drop(self, key: str) -> None:
+        """Drop the entry, as a changed model setting does; its weights go when its model's last reference does."""
+        assert self.cache.drop_model(key) == 1
+
+    def _lock(
+        self, record: CacheRecord, working_mem_bytes: Optional[int], max_move_bytes: Optional[int] = None
+    ) -> bool:
+        for key in self.offloads.get(record.key, []):
+            self.offload(key)
+        model = record.cached_model
+        self.device.alloc(model.total - model.resident)
+        model.resident = model.total
+        with self.cache._lock:
+            self.cache._pin(record)
+        return True
+
+
 @pytest.fixture
 def device(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeDevice]:
     fake = FakeDevice()
@@ -228,6 +311,18 @@ def device(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeDevice]:
     assert all(c.closed for c in opened), "every window's counters are closed, so no sampler outlives it"
     assert probe.armed is False
     assert probe.locking == [], "every lock leaves `locking` once it has settled or failed"
+
+
+@pytest.fixture
+def model_cache(device: FakeDevice) -> Iterator[CacheOnFakeDevice]:
+    # The cache's drops and offloads run a full `gc.collect()`; frozen, the worker's earlier heap is not walked.
+    gc.freeze()
+    cache = CacheOnFakeDevice(device)
+    try:
+        yield cache
+    finally:
+        cache.cache.shutdown()
+        gc.unfreeze()
 
 
 _DEVICE_COUNTERS = counters.DeviceCounters
@@ -455,6 +550,237 @@ def test_a_co_lock_that_offloads_more_than_it_loads_takes_its_offload_off_the_of
     (window,) = scope.windows
     assert window.reserved is not None and window.reserved.offset == 1 * GIB - 512 * MIB
     assert window.demand_bytes == 2 * GIB
+
+
+def test_a_co_lock_that_offloads_more_than_it_loads_has_a_negative_offset(
+    device: FakeDevice, model_cache: CacheOnFakeDevice
+):
+    """The cache's own offload, inside the lock of this thread's co-lock: what it moves is offset, not a void."""
+    text_encoder = model_cache.admit("text-encoder")  # resident and unlocked: part of the baseline
+    vae = model_cache.model("vae")
+    adapter = model_cache.model("adapter", total_bytes=text_encoder // 4)
+    model_cache.offloads["adapter"] = ["text-encoder"]
+
+    with _scope() as scope:
+        with vae.model_on_device(working_memory=_estimate()):
+            with adapter:
+                pass
+            device.alloc(2 * GIB)
+            device.free(2 * GIB)
+
+    (window,) = scope.windows
+    assert window.reserved is not None and window.reserved.offset == text_encoder // 4 - text_encoder
+    assert window.demand_bytes == 2 * GIB
+    assert (window.valid, window.reasons) == (True, [])
+
+
+@pytest.mark.parametrize("evict", ["drop", "offload"])
+def test_weights_another_thread_takes_off_the_device_void_the_window(
+    device: FakeDevice, model_cache: CacheOnFakeDevice, evict: str
+):
+    """While the window is open, another thread drops or offloads a model the window does not use (Clear Model Cache,
+    a changed model setting, a load making room), and only then does the operation allocate. The counters fell by what
+    left, so the window would credit the operation with less than it took."""
+    text_encoder = model_cache.admit("text-encoder")
+    opened, evicted = threading.Event(), threading.Event()
+
+    def clear_model_cache() -> None:
+        if opened.wait(timeout=30):
+            getattr(model_cache, evict)("text-encoder")
+            evicted.set()
+
+    thread = threading.Thread(target=clear_model_cache)
+    thread.start()
+    try:
+        with _scope() as scope:
+            with model_cache.model("vae").model_on_device(working_memory=_estimate()):
+                opened.set()
+                assert evicted.wait(timeout=30), "the other thread took the weights off the device"
+                device.alloc(3 * text_encoder // 2)
+                device.free(3 * text_encoder // 2)
+    finally:
+        opened.set()
+        thread.join()
+
+    (window,) = scope.windows
+    assert window.demand_bytes == text_encoder // 2, "what the counters show: the allocation less what left"
+    assert (window.valid, window.fit_eligible, window.reasons) == (False, False, ["weights_left"])
+
+
+def test_weights_another_thread_moves_void_a_window_that_closes_before_the_move_returns(
+    device: FakeDevice, model_cache: CacheOnFakeDevice
+):
+    """The probe hears of an offload before the weights move: the window allocates and closes while the move is still
+    under way on the other thread."""
+    text_encoder = model_cache.admit("text-encoder")
+    cached_model = model_cache.cache._cached_models["text-encoder"].cached_model
+    opened, moved, closed = threading.Event(), threading.Event(), threading.Event()
+    unload = cached_model.full_unload_from_vram
+
+    def unload_while_the_window_closes() -> int:
+        freed = unload()
+        model_cache._on_device.pop("text-encoder").detach()
+        device.free(freed)
+        moved.set()
+        closed.wait(timeout=30)
+        return freed
+
+    cached_model.full_unload_from_vram = unload_while_the_window_closes
+    unlock = model_cache.cache.unlock
+
+    def closed_then_unlock(record: CacheRecord) -> None:
+        closed.set()  # the window has closed; its unlock waits for the cache's lock, which the move holds
+        unlock(record)
+
+    model_cache.cache.unlock = closed_then_unlock  # type: ignore[method-assign]
+
+    def offload() -> None:
+        if opened.wait(timeout=30):
+            model_cache.cache.offload_model_from_vram("text-encoder")
+
+    thread = threading.Thread(target=offload)
+    thread.start()
+    try:
+        with _scope() as scope:
+            with model_cache.model("vae").model_on_device(working_memory=_estimate()):
+                opened.set()
+                assert moved.wait(timeout=30), "the other thread moved the weights"
+                device.alloc(3 * text_encoder // 2)
+                device.free(3 * text_encoder // 2)
+    finally:
+        opened.set()
+        closed.set()
+        thread.join()
+
+    (window,) = scope.windows
+    assert (window.valid, window.reasons) == (False, ["weights_left"])
+
+
+@pytest.mark.parametrize("evict", ["drop", "offload"])
+def test_weights_this_thread_takes_off_the_device_outside_a_lock_void_the_window(
+    device: FakeDevice, model_cache: CacheOnFakeDevice, evict: str
+):
+    """A model loaded mid-operation makes room in RAM by dropping one that was on the device, or a node offloads one
+    it is done with: no co-lock offsets it."""
+    text_encoder = model_cache.admit("text-encoder")
+
+    with _scope() as scope:
+        with model_cache.model("vae").model_on_device(working_memory=_estimate()):
+            getattr(model_cache, evict)("text-encoder")
+            device.alloc(3 * text_encoder // 2)
+            device.free(3 * text_encoder // 2)
+
+    (window,) = scope.windows
+    assert (window.valid, window.reasons) == (False, ["weights_left"])
+
+
+def test_a_child_windows_co_lock_offloading_weights_voids_its_parent(
+    device: FakeDevice, model_cache: CacheOnFakeDevice
+):
+    """The child's offset takes what its co-lock moves; the suspended parent offsets nothing, so it is void."""
+    text_encoder = model_cache.admit("text-encoder")
+    adapter = model_cache.model("adapter", total_bytes=text_encoder // 4)
+    model_cache.offloads["adapter"] = ["text-encoder"]
+
+    with _scope() as scope:
+        with model_cache.model("transformer", total_bytes=4 * GIB).model_on_device(working_memory=_estimate(8 * GIB)):
+            with model_cache.model("vae", total_bytes=GIB // 4).model_on_device(working_memory=_estimate()):
+                with adapter:
+                    pass
+            device.alloc(3 * text_encoder // 2)
+            device.free(3 * text_encoder // 2)
+
+    child, parent = scope.windows
+    assert child.reserved is not None and child.reserved.offset == text_encoder // 4 - text_encoder
+    assert (child.valid, child.reasons) == (True, [])
+    assert (parent.valid, parent.reasons) == (False, ["weights_left"])
+
+
+@pytest.mark.parametrize("let_go", ["before-the-window-opened", "while-the-window-measures", "after-the-window-closed"])
+def test_a_dropped_model_voids_the_window_its_weights_die_in(
+    device: FakeDevice, model_cache: CacheOnFakeDevice, let_go: str
+):
+    """The cache drops a model a node still holds, which keeps its weights on the device until the node lets go -- as
+    a reference cycle keeps them until a garbage collection. Only a window open when they leave is void."""
+    text_encoder = model_cache.admit("text-encoder")
+    held = [model_cache.cache._cached_models["text-encoder"]]
+
+    with _scope() as scope:
+        model_cache.drop("text-encoder")
+        if let_go == "before-the-window-opened":
+            held.clear()
+        with model_cache.model("vae").model_on_device(working_memory=_estimate()):
+            if let_go == "while-the-window-measures":
+                held.clear()
+            device.alloc(3 * text_encoder // 2)
+            device.free(3 * text_encoder // 2)
+
+    (window,) = scope.windows
+    if let_go == "while-the-window-measures":
+        assert window.demand_bytes == text_encoder // 2
+        assert (window.valid, window.reasons) == (False, ["weights_left"])
+    else:
+        assert window.demand_bytes == 3 * text_encoder // 2
+        assert (window.valid, window.reasons) == (True, [])
+
+
+def test_a_dropped_record_a_lock_put_on_the_device_voids_the_window_its_weights_die_in(
+    device: FakeDevice, model_cache: CacheOnFakeDevice
+):
+    """Dropped while its weights were in RAM, the record had nothing to watch; a handle then locked it onto the device,
+    and no later drop reports it. Its weights die with the handle while a window measures."""
+    text_encoder = model_cache.admit("text-encoder", on_device=False)
+    held = [model_cache.cache._cached_models["text-encoder"]]
+
+    with _scope() as scope:
+        model_cache.drop("text-encoder")
+        model_cache.lock_dropped(held[0])
+        with model_cache.model("vae").model_on_device(working_memory=_estimate()):
+            held.clear()
+            device.alloc(3 * text_encoder // 2)
+            device.free(3 * text_encoder // 2)
+
+    (window,) = scope.windows
+    assert window.demand_bytes == text_encoder // 2
+    assert (window.valid, window.reasons) == (False, ["weights_left"])
+
+
+def test_a_model_without_weights_on_the_device_leaving_the_cache_leaves_the_window_valid(
+    device: FakeDevice, model_cache: CacheOnFakeDevice
+):
+    """A LoRA dropped from RAM to make room for a load: nothing leaves the device."""
+    model_cache.admit("lora", on_device=False)
+
+    with _scope() as scope:
+        with model_cache.model("vae").model_on_device(working_memory=_estimate()):
+            model_cache.drop("lora")
+            device.alloc(1 * GIB)
+            device.free(1 * GIB)
+
+    (window,) = scope.windows
+    assert (window.valid, window.reasons, window.demand_bytes) == (True, [], 1 * GIB)
+
+
+def test_a_cpu_only_model_leaving_the_device_cache_leaves_the_window_valid(
+    device: FakeDevice, model_cache: CacheOnFakeDevice
+):
+    """A `cpu_only` text encoder in the GPU's cache computes on the CPU, its "VRAM" RAM: offloaded or dropped, nothing
+    leaves the device."""
+    model_cache.cache.put("t5", torch.nn.Linear(1024, 512, bias=False))
+    cached_model = model_cache.cache._cached_models["t5"].cached_model
+    assert cached_model.compute_device.type == "cpu"
+    cached_model._is_in_vram = True
+
+    with _scope() as scope:
+        with model_cache.model("vae").model_on_device(working_memory=_estimate()):
+            model_cache.cache.offload_model_from_vram("t5")
+            cached_model._is_in_vram = True
+            model_cache.drop("t5")
+            device.alloc(1 * GIB)
+            device.free(1 * GIB)
+
+    (window,) = scope.windows
+    assert (window.valid, window.reasons) == (True, [])
 
 
 def test_a_nested_window_measures_alone_and_its_outputs_stay_in_the_parent(device: FakeDevice):
