@@ -1026,6 +1026,7 @@ def test_cancelling_leaves_staging_another_owner_claimed_untouched(
     mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
 ) -> None:
     assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
     tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}claimed-elsewhere-{uuid.uuid4().hex}"
     tmpdir.mkdir()
     partial = tmpdir / "model.safetensors.downloading"
@@ -1259,6 +1260,7 @@ def test_queue_rejection_during_shutdown_preserves_completed_download(
     mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
 ) -> None:
     assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
     tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}queue-stop-{uuid.uuid4().hex}"
     partial_path = _write_remote_install_marker(mm2_installer, tmpdir, 9905, InstallStatus.DOWNLOADS_DONE)
     job = ModelInstallJob(
