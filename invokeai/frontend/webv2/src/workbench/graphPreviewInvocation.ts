@@ -4,6 +4,7 @@ import type { AccountScope } from '@platform/state/accountLifecycle';
 import { isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 
 import type { InvocationSourceId } from './invocationContracts';
+import type { SubmitResolvedInvocationDeps } from './invocationSubmit';
 import type { Project } from './projectContracts';
 import type { prepareCanvasInvocation } from './widgets/canvas/invoke/prepareCanvasInvocation';
 import type { WorkbenchCommands } from './workbenchStore';
@@ -16,6 +17,8 @@ export interface GraphPreviewInvokeDeps {
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
   /** Words a blocked canvas preview's control layer for the notice. */
   formatControlLayerError: Parameters<typeof prepareCanvasInvocation>[0]['formatControlLayerError'];
+  /** Words a Model only upscale preview whose input metadata could not be read. */
+  formatUpscaleMetadataFailure: SubmitResolvedInvocationDeps['formatUpscaleMetadataFailure'];
   models: readonly ModelConfig[] | undefined;
   owner: AccountScope;
   prepareCanvasInvocation: typeof prepareCanvasInvocation;
@@ -30,6 +33,7 @@ export interface GraphPreviewInvokeDeps {
 export const resolveAndSubmitGraphPreviewInvocation = ({
   commands,
   formatControlLayerError,
+  formatUpscaleMetadataFailure,
   models,
   owner,
   prepareCanvasInvocation: prepareCanvas,
@@ -60,6 +64,7 @@ export const resolveAndSubmitGraphPreviewInvocation = ({
   void submitResolvedInvocation({
     commands,
     formatControlLayerError,
+    formatUpscaleMetadataFailure,
     models,
     owner,
     prepareCanvasInvocation: prepareCanvas,

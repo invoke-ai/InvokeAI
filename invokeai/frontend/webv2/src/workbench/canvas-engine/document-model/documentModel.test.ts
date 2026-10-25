@@ -335,6 +335,27 @@ describe('createDocumentModel', () => {
       expect(after.canvas.document.stacks.raster[1]).toMatchObject({ name: 'G copy', type: 'group' });
     });
 
+    it('keeps adjustment entries on a duplicated layer, noise seeds included, so the copy looks identical', () => {
+      const adjustments = [
+        {
+          amount: 0.1,
+          distribution: 'gaussian',
+          id: 'n',
+          isEnabled: true,
+          grain: 'monochrome',
+          response: 'flat',
+          size: 1,
+          seed: 1234,
+          type: 'noise',
+        },
+      ] as const;
+      const project = projectWith([layer('r1', 'raster', { adjustments: [...adjustments] })], 'r1');
+      const { after } = roundTrip(project, { createId: () => 'd0', ids: ['r1'], type: 'duplicate' });
+
+      const copy = after.canvas.document.stacks.raster.find((node) => node.id === 'd0');
+      expect(copy).toMatchObject({ adjustments });
+    });
+
     it('moves within sibling lists, keeping a selected group and its descendants together', () => {
       const project = projectWith(tree(), 'r3');
       const moved = roundTrip(project, { ids: ['G', 'r3'], kind: 'front', type: 'move' });

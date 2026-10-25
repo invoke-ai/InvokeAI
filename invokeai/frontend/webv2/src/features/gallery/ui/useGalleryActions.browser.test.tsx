@@ -1105,3 +1105,25 @@ describe('setSemanticImageQuery', () => {
     });
   });
 });
+
+describe('search scope', () => {
+  it('starts a newly scoped listing from its first page', () => {
+    actionsRef.current?.setSearchScope('all');
+
+    expect(patchGalleryValues).toHaveBeenCalledExactlyOnceWith({ galleryPage: 0, searchScope: 'all' });
+  });
+
+  it('refuses uploads while a search looks in every board, before any request', async () => {
+    galleryValues = { searchScope: 'all', searchTerm: 'cat' };
+    await renderProbe();
+
+    const uploaded = await actionsRef.current?.uploadFiles([new File(['x'], 'a.png', { type: 'image/png' })]);
+
+    expect(uploaded).toEqual([]);
+    expect(mocks.ensureGalleryBoardDestinations).not.toHaveBeenCalled();
+    expect(mocks.uploadGalleryImage).not.toHaveBeenCalled();
+    expect(mocks.notificationsReportError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'widgets.gallery.uploadsUnavailableForAllBoards' })
+    );
+  });
+});

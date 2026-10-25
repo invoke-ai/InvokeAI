@@ -2,7 +2,8 @@ import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 import type { WorkflowRecordDTO } from '@features/workflow/queries';
 import type { FormEvent } from 'react';
 
-import { chakra, Input, Portal, Stack, Text } from '@chakra-ui/react';
+import { Checkbox, chakra, Input, Portal, Stack, Text } from '@chakra-ui/react';
+import { getAuthSession, useAuthSession } from '@features/identity';
 import { savedWorkflowDetailQueryOptions } from '@features/workflow/data/savedWorkflowQueries';
 import { getLibraryWorkflowRecord } from '@features/workflow/queries';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
@@ -29,7 +30,7 @@ import {
   DeferredGraphPreviewDialog,
   preloadGraphPreview,
 } from './libraryPreviewSource';
-import { isUpdatableSource } from './projectWorkflowEntries';
+import { isBundledLibraryWorkflowId, isUpdatableSource } from './projectWorkflowEntries';
 import { formatRelativeTime } from './relativeTime';
 import {
   discardUnresolvedWorkflowPublication,
@@ -89,6 +90,7 @@ const contextOf = (stage: ActiveStage, busy = false): StageContext => ({
 
 export const WorkflowPublicationHost = () => {
   const { t } = useTranslation();
+  const session = useAuthSession();
   const { project } = useWorkflowUi();
   const workflows = useWorkflowProjectSelector((project) => project.workflows);
   const projectId = useWorkflowProjectSelector((project) => project.id);
@@ -124,6 +126,7 @@ export const WorkflowPublicationHost = () => {
 
       const snapshot = project.getSnapshot();
       const entry = snapshot.workflows.find((candidate) => candidate.document.id === intent.workflowId);
+      const source = entry?.source;
 
       if (!entry) {
         return;
@@ -147,19 +150,23 @@ export const WorkflowPublicationHost = () => {
 
       if (intent.kind === 'save-as-new') {
         setStage({ ...context, kind: 'save-as-new' });
-      } else if (isUpdatableSource(entry.source)) {
+      } else if (source && isUpdatableSource(source, getAuthSession())) {
         setStage(
-          entry.source.revision === null
-            ? { ...context, currentRevision: null, kind: 'conflict', libraryWorkflowId: entry.source.libraryWorkflowId }
+          source.revision === null
+            ? { ...context, currentRevision: null, kind: 'conflict', libraryWorkflowId: source.libraryWorkflowId }
             : {
                 ...context,
-                expectedRevision: entry.source.revision,
+                expectedRevision: source.revision,
                 kind: 'confirm-update',
-                libraryWorkflowId: entry.source.libraryWorkflowId,
+                libraryWorkflowId: source.libraryWorkflowId,
               }
         );
-      } else if (entry.source) {
-        setStage({ ...context, kind: 'unavailable', reason: 'bundled' });
+      } else if (source) {
+        setStage({
+          ...context,
+          kind: 'unavailable',
+          reason: isBundledLibraryWorkflowId(source.libraryWorkflowId) ? 'bundled' : 'forbidden',
+        });
       }
     };
     let lastActiveKey = '';
@@ -220,6 +227,7 @@ export const WorkflowPublicationHost = () => {
           case 'unavailable':
             return { ...context, kind: 'unavailable', reason: result.reason };
           case 'failed':
+          case 'partial':
             return { ...context, failed: result, kind: 'retry' };
           default:
             return IDLE;
@@ -234,7 +242,7 @@ export const WorkflowPublicationHost = () => {
   );
 
   const handleSaveAsNew = useCallback(
-    async (name: string) => {
+    async (name: string, isPublic?: boolean) => {
       if (activeStage.kind === 'idle') {
         return;
       }
@@ -242,7 +250,7 @@ export const WorkflowPublicationHost = () => {
       const { operation, workflowId } = activeStage;
 
       beginBusy(operation);
-      follow(operation, await publication.saveAsNew({ name, workflowId }));
+      follow(operation, await publication.saveAsNew({ isPublic, name, workflowId }));
     },
     [activeStage, beginBusy, follow, publication]
   );
@@ -403,10 +411,29 @@ export const WorkflowPublicationHost = () => {
         <Text color="fg.muted" fontSize="md">
           {t('workflowLibrary.updateConfirmCallers')}
         </Text>
+        <Text color="fg.muted" fontSize="md">
+          {t('workflowLibrary.updateConfirmIrreversible')}
+        </Text>
       </Stack>
     ),
     [confirmTemplateName, t]
   );
+  // Saving as new re-links a workflow that already updates a template of the account's; the dialog says which.
+  const relinkSource =
+    activeStage.kind === 'save-as-new' && stageEntry && isUpdatableSource(stageEntry.source, session)
+      ? stageEntry.source
+      : null;
+  const relinkTemplateName = useQuery({
+    ...savedWorkflowDetailQueryOptions(relinkSource?.libraryWorkflowId ?? ''),
+    enabled: relinkSource !== null,
+    select: (record) => record.name,
+  }).data;
+  const relinkNotice =
+    relinkSource === null
+      ? null
+      : relinkTemplateName
+        ? t('workflowLibrary.saveToLibraryRelink', { template: relinkTemplateName })
+        : t('workflowLibrary.saveToLibraryRelinkUnnamed');
   const conflictOptions = useMemo(
     () => [
       { label: t('workflowLibrary.saveAsNew'), onSelect: switchToSaveAsNew, value: 'save-as-new' },
@@ -431,7 +458,9 @@ export const WorkflowPublicationHost = () => {
       <SaveToLibraryDialog
         initialName={stageEntry?.document.name ?? ''}
         isOpen={activeStage.kind === 'save-as-new'}
+        relinkNotice={relinkNotice}
         isPending={isBusy}
+        showPublicChoice={session.multiuserEnabled}
         onClose={close}
         onSubmit={handleSaveAsNew}
       />
@@ -481,13 +510,19 @@ export const WorkflowPublicationHost = () => {
       <ChoiceDialog
         body={
           activeStage.kind === 'retry'
-            ? t('workflowLibrary.retryBody', { message: activeStage.failed.message, name: workflowName })
+            ? activeStage.failed.status === 'partial'
+              ? t('workflowLibrary.publicVisibilityPartial', { message: activeStage.failed.message })
+              : t('workflowLibrary.retryBody', { message: activeStage.failed.message, name: workflowName })
             : ''
         }
         isBusy={isBusy}
         isOpen={activeStage.kind === 'retry'}
         options={retryOptions}
-        title={t('workflowLibrary.retryTitle')}
+        title={
+          activeStage.kind === 'retry' && activeStage.failed.status === 'partial'
+            ? t('workflowLibrary.visibilityUpdateFailed')
+            : t('workflowLibrary.retryTitle')
+        }
         onClose={close}
       />
 
@@ -583,6 +618,8 @@ const ReviewBody = ({
     );
   }
 
+  const description = record.workflow.description;
+
   return (
     <Stack gap="2">
       <Text fontSize="lg">{t('workflowLibrary.reviewBody', { name: workflowName })}</Text>
@@ -590,9 +627,9 @@ const ReviewBody = ({
         <Text fontSize="lg" fontWeight="600" overflowWrap="anywhere">
           {record.name || t('workflowLibrary.untitled')}
         </Text>
-        {record.description ? (
+        {typeof description === 'string' && description ? (
           <Text color="fg.muted" fontSize="md" lineClamp={3}>
-            {record.description}
+            {description}
           </Text>
         ) : null}
         <Text color="fg.subtle" fontSize="xs">
@@ -680,30 +717,40 @@ const ChoiceButton = ({
   </Button>
 );
 
-/** Names the new template. The explanation is the contract: current input values become the template's defaults. */
+/**
+ * Names the new template. The explanation is the contract: current input values become the template's defaults, and
+ * the workflow then links to the new template under its name.
+ */
 export const SaveToLibraryDialog = ({
   initialName,
   isOpen,
   isPending,
+  showPublicChoice,
   onClose,
   onSubmit,
+  relinkNotice,
 }: {
   initialName: string;
   isOpen: boolean;
   isPending: boolean;
+  showPublicChoice: boolean;
   onClose: () => void;
-  onSubmit: (name: string) => Promise<void> | void;
+  onSubmit: (name: string, isPublic?: boolean) => Promise<void> | void;
+  /** For a workflow already linked to another writable template: where Update library template stops writing. */
+  relinkNotice: string | null;
 }) => {
   const { t } = useTranslation();
 
   const handleSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      const name = new FormData(event.currentTarget).get('templateName')?.toString().trim() ?? '';
+      const formData = new FormData(event.currentTarget);
+      const name = formData.get('templateName')?.toString().trim() ?? '';
+      const isPublic = showPublicChoice ? formData.has('isPublic') : undefined;
 
-      void onSubmit(name || t('workflowLibrary.untitled'));
+      void onSubmit(name || t('workflowLibrary.untitled'), isPublic);
     },
-    [onSubmit, t]
+    [onSubmit, showPublicChoice, t]
   );
   const handleOpenChange = useCallback((event: { open: boolean }) => (event.open ? undefined : onClose()), [onClose]);
 
@@ -733,6 +780,25 @@ export const SaveToLibraryDialog = ({
                   <Text color="fg.muted" fontSize="md">
                     {t('workflowLibrary.saveToLibraryExplanation')}
                   </Text>
+                  {relinkNotice ? (
+                    <Text color="fg.muted" data-save-to-library-relink fontSize="md">
+                      {relinkNotice}
+                    </Text>
+                  ) : null}
+                  {showPublicChoice ? (
+                    <Checkbox.Root colorPalette="accent" size="sm">
+                      <Checkbox.HiddenInput name="isPublic" />
+                      <Checkbox.Control />
+                      <Checkbox.Label>
+                        <Stack gap="0">
+                          <Text>{t('workflowLibrary.publicWorkflow')}</Text>
+                          <Text color="fg.subtle" fontSize="xs">
+                            {t('workflowLibrary.publicVisibilityHelp')}
+                          </Text>
+                        </Stack>
+                      </Checkbox.Label>
+                    </Checkbox.Root>
+                  ) : null}
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer>

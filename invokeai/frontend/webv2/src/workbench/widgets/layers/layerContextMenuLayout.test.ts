@@ -88,7 +88,7 @@ describe('getLayerContextMenuLayout', () => {
           'transform',
           'rename',
           'fit-to-bbox',
-          'add-adjustment(add-brightness-contrast,add-exposure,add-levels,add-curves,add-hsl,add-hue,add-invert)',
+          'add-adjustment(add-brightness-contrast,add-exposure,add-levels,add-curves,add-hsl,add-hue,add-invert,add-texture,add-clarity,add-dehaze,add-noise-adjustment)',
           'add-regenerate-region',
           'filter',
           'select-object',
@@ -106,7 +106,7 @@ describe('getLayerContextMenuLayout', () => {
         ],
         presentation: 'list',
       },
-      { id: 'output', items: ['crop-to-bbox', 'save-to-assets'], presentation: 'list' },
+      { id: 'output', items: ['crop-to-bbox', 'save-to-board'], presentation: 'list' },
       {
         id: 'state',
         items: [

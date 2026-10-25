@@ -184,7 +184,6 @@ const Widget = ({ item }: { item: GalleryImageItem | GalleryVideoItem }) => {
       data-hotkey-widget-instance-id="preview-instance"
       data-hotkey-widget-region="center"
       data-hotkey-widget-type-id="preview"
-      role="region"
       style={{ display: 'flex', flexDirection: 'column', height: 360, width: 640 }}
     >
       <div style={{ display: 'flex', height: 32, justifyContent: 'flex-end' }}>
@@ -212,7 +211,26 @@ const render = async (item: GalleryImageItem | GalleryVideoItem) => {
           <ChakraProvider value={system}>
             <FocusRegionProvider controller={createTestFocusController()}>
               <WorkbenchHotkeyRuntime />
-              <Widget item={item} />
+              {/* As a docked Preview sits in the workbench: the nearest region is the whole project. */}
+              <div aria-label="Project" role="region">
+                <Widget item={item} />
+                <div
+                  data-hotkey-widget-instance-id="gallery-instance"
+                  data-hotkey-widget-region="left"
+                  data-hotkey-widget-type-id="gallery"
+                >
+                  <button data-testid="gallery-tile" type="button">
+                    Tile
+                  </button>
+                </div>
+                <div
+                  data-hotkey-widget-instance-id="canvas-instance"
+                  data-hotkey-widget-region="right"
+                  data-hotkey-widget-type-id="canvas"
+                  data-testid="canvas"
+                  style={{ height: 40 }}
+                />
+              </div>
             </FocusRegionProvider>
           </ChakraProvider>
         </I18nextProvider>
@@ -418,6 +436,25 @@ describe('PreviewDetailsPopover', () => {
       document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'mouse' }));
       document.body.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'mouse' }));
     });
+    await settle(100);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('stays open while a Gallery elsewhere changes the selection, and closes for another widget', async () => {
+    await render(imageItem);
+    await expect.element(page.getByText('a tall prompt')).toBeVisible();
+    const pointAt = (element: HTMLElement) =>
+      act(() => {
+        element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'mouse' }));
+        element.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'mouse' }));
+      });
+
+    await pointAt(host.querySelector<HTMLElement>('[data-testid="gallery-tile"]')!);
+    await settle(100);
+    expect(onOpenChange).not.toHaveBeenCalled();
+
+    // Another widget in the same project region.
+    await pointAt(host.querySelector<HTMLElement>('[data-testid="canvas"]')!);
     await settle(100);
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });

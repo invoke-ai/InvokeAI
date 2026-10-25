@@ -107,7 +107,7 @@ const makeEffects = (): LayerContextActionEffects => ({
   extractMaskedArea: vi.fn(() => Promise.resolve()),
   fitToBbox: vi.fn(),
   group: vi.fn(),
-  mergeDown: vi.fn(),
+  mergeDown: vi.fn(() => Promise.resolve()),
   mergeSelected: vi.fn(),
   openProperties: vi.fn(),
   openRename: vi.fn(),
@@ -115,10 +115,10 @@ const makeEffects = (): LayerContextActionEffects => ({
   startSelectObject: vi.fn(),
   startFilter: vi.fn(),
   patchConfig: vi.fn(),
-  rasterize: vi.fn(),
+  rasterize: vi.fn(() => Promise.resolve()),
   reorder: vi.fn(),
   setColorLabel: vi.fn(),
-  saveToAssets: vi.fn(() => Promise.resolve()),
+  saveToBoard: vi.fn(() => Promise.resolve()),
   toggleLock: vi.fn(),
   toggleQuickSwitchBookmark: vi.fn(),
   toggleVisibility: vi.fn(),
@@ -280,6 +280,17 @@ describe('layer context action registry', () => {
     expect(transform).toHaveBeenCalledOnce();
   });
 
+  it('saves the layer to the board chosen in its picker', async () => {
+    const effects = makeEffects();
+    const board = { id: 'board-7', label: 'Sketches' };
+    const definition = getLayerContextActionDefinition('save-to-board');
+
+    await definition.handler(makeRuntimeContext(rasterLayer, { board, effects }));
+
+    expect(effects.saveToBoard).toHaveBeenCalledWith(board);
+    expect(() => definition.handler(makeRuntimeContext(rasterLayer, { effects }))).toThrow();
+  });
+
   it('starts Select Object for the action layer through the registry', () => {
     const effects = makeEffects();
     const context = makeRuntimeContext(rasterLayer, { effects });
@@ -308,6 +319,8 @@ describe('layer context action registry', () => {
 
     getLayerContextActionDefinition('move-to-front').handler(context);
     getLayerContextActionDefinition('add-curves').handler(context);
+    getLayerContextActionDefinition('add-noise-adjustment').handler(context);
+    getLayerContextActionDefinition('add-clarity').handler(context);
     getLayerContextActionDefinition('filter').handler(context);
     getLayerContextActionDefinition('intersect').handler(context);
     getLayerContextActionDefinition('copy-to-control').handler(context);
@@ -316,6 +329,8 @@ describe('layer context action registry', () => {
 
     expect(effects.reorder).toHaveBeenCalledWith('front', 'move-to-front');
     expect(effects.addAdjustment).toHaveBeenCalledWith('curves');
+    expect(effects.addAdjustment).toHaveBeenCalledWith('noise');
+    expect(effects.addAdjustment).toHaveBeenCalledWith('clarity');
     expect(effects.startFilter).toHaveBeenCalledWith(rasterLayer.id);
     expect(effects.booleanMerge).toHaveBeenCalledWith('intersect');
     expect(effects.copyTo).toHaveBeenCalledWith('control');
@@ -469,8 +484,12 @@ describe('getLayerContextActions', () => {
       'add-hsl',
       'add-hue',
       'add-invert',
+      'add-texture',
+      'add-clarity',
+      'add-dehaze',
+      'add-noise-adjustment',
       'add-regenerate-region',
-      'save-to-assets',
+      'save-to-board',
       'copy-to-clipboard',
       'crop-to-bbox',
       'extract-masked-area',
@@ -581,6 +600,8 @@ describe('getLayerContextActions', () => {
   it('offers add-noise and add-denoise-limit only while the mask lacks that modifier', () => {
     const bare = getLayerContextActions(makeState(makeLayer('inpaint_mask')));
     expect(byId(bare, 'add-noise').isDisabled).toBe(false);
+    // The mask's noise modifier and the raster noise adjustment are separate actions.
+    expect(bare.some((action) => action.id === 'add-noise-adjustment')).toBe(false);
     expect(byId(bare, 'add-denoise-limit').isDisabled).toBe(false);
     const configured = getLayerContextActions(
       makeState({
@@ -596,7 +617,7 @@ describe('getLayerContextActions', () => {
   it('still allows non-destructive copy and export from a locked layer when interaction is free', () => {
     const actions = getLayerContextActions(makeState({ ...rasterLayer, isLocked: true }));
     expect(byId(actions, 'copy-to-clipboard').isDisabled).toBe(false);
-    expect(byId(actions, 'save-to-assets').isDisabled).toBe(false);
+    expect(byId(actions, 'save-to-board').isDisabled).toBe(false);
   });
 
   it('disables locked-layer mutations but keeps toggle lock enabled', () => {
@@ -616,6 +637,10 @@ describe('getLayerContextActions', () => {
       'add-hsl',
       'add-hue',
       'add-invert',
+      'add-texture',
+      'add-clarity',
+      'add-dehaze',
+      'add-noise-adjustment',
       'add-regenerate-region',
       'filter',
       'select-object',
@@ -666,10 +691,10 @@ describe('getLayerContextActions', () => {
     const noEngine = getLayerContextActions(makeState(rasterLayer, { hasEngine: false }));
     const empty = getLayerContextActions(makeState(rasterLayer, { hasSupportedContent: false }));
 
-    for (const id of ['transform', 'filter', 'save-to-assets', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
+    for (const id of ['transform', 'filter', 'save-to-board', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
       expect(byId(noEngine, id).isDisabled, id).toBe(true);
     }
-    for (const id of ['save-to-assets', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
+    for (const id of ['save-to-board', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
       expect(byId(empty, id).isDisabled, id).toBe(true);
     }
   });
@@ -678,7 +703,7 @@ describe('getLayerContextActions', () => {
     const cacheOnly = createEmptyPaintLayer('Cache only', 'cache-only');
     const actions = getLayerContextActions(makeState(cacheOnly, { hasSupportedContent: true }));
 
-    expect(byId(actions, 'save-to-assets').isDisabled).toBe(false);
+    expect(byId(actions, 'save-to-board').isDisabled).toBe(false);
     expect(byId(actions, 'fit-to-bbox').isDisabled).toBe(true);
   });
 
@@ -696,8 +721,12 @@ describe('getLayerContextActions', () => {
         'add-hsl',
         'add-hue',
         'add-invert',
+        'add-texture',
+        'add-clarity',
+        'add-dehaze',
+        'add-noise-adjustment',
         'add-regenerate-region',
-        'save-to-assets',
+        'save-to-board',
         'copy-to-clipboard',
         'crop-to-bbox',
         'merge-down',

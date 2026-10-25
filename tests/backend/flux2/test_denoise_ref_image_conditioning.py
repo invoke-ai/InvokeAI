@@ -61,7 +61,7 @@ def _inputs() -> dict[str, Any]:
 
 
 def _scheduler() -> FlowMatchEulerDiscreteScheduler:
-    return FlowMatchEulerDiscreteScheduler(num_train_timesteps=1000, shift=3.0)
+    return FlowMatchEulerDiscreteScheduler(num_train_timesteps=1000)
 
 
 @pytest.mark.parametrize("use_scheduler", [False, True], ids=["euler", "scheduler"])

@@ -17,7 +17,13 @@ from invokeai.app.invocations.model import (
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.architectures import accepted_vae_bases
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
+    ModelFormat,
+    ModelType,
+    Qwen3VariantType,
+    SubModelType,
+)
 
 
 @invocation_output("z_image_model_loader_output")
@@ -122,6 +128,7 @@ class ZImageModelLoaderInvocation(BaseInvocation):
         # Determine Qwen3 Encoder source
         if self.qwen3_encoder_model is not None:
             # Use standalone Qwen3 Encoder
+            self._validate_qwen3_encoder_variant(context, self.qwen3_encoder_model)
             qwen3_tokenizer = self.qwen3_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
             qwen3_encoder = self.qwen3_encoder_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
         elif self.qwen3_source_model is not None:
@@ -143,6 +150,23 @@ class ZImageModelLoaderInvocation(BaseInvocation):
             transformer=TransformerField(transformer=transformer, loras=[]),
             qwen3_encoder=Qwen3EncoderField(tokenizer=qwen3_tokenizer, text_encoder=qwen3_encoder),
             vae=VAEField(vae=vae),
+        )
+
+    def _validate_qwen3_encoder_variant(self, context: InvocationContext, encoder: ModelIdentifierField) -> None:
+        """Z-Image's caption embedder takes the Qwen3 4B hidden size (2560). Every Qwen3 size installs
+        under the same model type, so the 8B (4096) or 0.6B (1024) would otherwise load and then fail
+        as a shape mismatch on the first denoise step, naming a tensor rather than the selection."""
+        config = context.models.get_config(encoder)
+        variant = getattr(config, "variant", None)
+        is_qwen3 = config.type is ModelType.Qwen3Encoder
+        if is_qwen3 and variant == Qwen3VariantType.Qwen3_4B:
+            return
+        described = (
+            f"a Qwen3 encoder of variant '{getattr(variant, 'value', variant)}'" if is_qwen3 else "not a Qwen3 encoder"
+        )
+        raise ValueError(
+            f"'{config.name}' is {described}. Z-Image conditions on the Qwen3 4B encoder (hidden size 2560): "
+            "select a Qwen3 4B encoder, or clear it and set 'Qwen3 Source' to a Z-Image pipeline."
         )
 
     def _get_self_contained_source(self, context: InvocationContext) -> Optional[ModelIdentifierField]:

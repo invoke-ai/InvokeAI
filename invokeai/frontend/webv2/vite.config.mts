@@ -127,6 +127,8 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/hotkeys/targetWidget.ts',
   '/workbench/widget-frame/compactWidgetCapacity.tsx',
   '/features/gallery/ui/GalleryItemSearch.tsx',
+  // The image menu (editor boot) and the lazy layer menu share the board destination list; alone it costs a request.
+  '/workbench/image-actions/GalleryBoardDestinationGroups.tsx',
   '/app/GalleryUiAdapter.tsx',
   '/features/generation/core/prompt/ast.ts',
   '/features/generation/core/prompt/attention.ts',
@@ -147,6 +149,8 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/shell/topbar/ProjectSwitcher.tsx',
   // The canvas dims sync reads the render-size keys at boot; the lazy canvas slots and compiler share them.
   '/workbench/widgets/canvas/invoke/canvasScaling.ts',
+  // The Preview (open at boot) and the Canvas staging bar share the Auto-switch menu; alone it costs a boot request.
+  '/workbench/widgets/shared/AutoSwitchMenu.tsx',
 ] as const;
 
 // The workflow core, its UI barrel and the project workflow collection are one chunk: the editor boots with all of
@@ -279,6 +283,7 @@ const CANVAS_LAYER_SHARED_MODULES = [
   '/workbench/widgets/canvas/useColorSampler.ts',
   '/workbench/widgets/canvas/useStructuralCommit.ts',
   '/workbench/widgets/layers/LayerContextMenu.tsx',
+  '/workbench/widgets/layers/LayerSaveToBoardSubmenu.tsx',
   '/workbench/widgets/layers/RunLayerWorkflowDialog.tsx',
   '/workbench/widgets/layers/colorLabels.ts',
   '/workbench/widgets/layers/layerActionSession.ts',

@@ -15,6 +15,7 @@ export {
   hasModelDefaultVae,
   isAspectRatioLocked,
   isFluxDypePreset,
+  isGenerateModelConfig,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
@@ -67,6 +68,19 @@ export {
 } from './core/baseGenerationPolicies';
 export { hasArchitectureCapabilities } from './core/architectureCapabilities';
 export {
+  describeExternalCanvasRefusal,
+  GEMINI_TEMPERATURE_MAX,
+  GEMINI_TEMPERATURE_MIN,
+  getExternalProviderOptionKeys,
+  getExternalResolutionPresets,
+  isExternalTextOnlyCanvasModel,
+  isGeminiThinkingLevel,
+  isOpenAIImageBackground,
+  isOpenAIImageQuality,
+  isOpenAIInputFidelity,
+  resolveExternalCanvasRequestSize,
+} from './core/externalProvider';
+export {
   resolveGenerateWidgetValues,
   type ResolvedGenerateWidgetValues,
   type ResolveGenerateWidgetValuesInput,
@@ -77,10 +91,12 @@ export {
   isAnimaQwen3Encoder,
   isBundledMainForBase,
   isDiffusersMainForBase,
+  isFlux2MistralEncoder,
+  isFlux2Qwen3EncoderForModel,
   isKrea2Qwen3VlEncoder,
-  isNonAnimaQwen3Encoder,
   isVaeAcceptedByBase,
   isVaeCompatibleWithGenerateModel,
+  isZImageQwen3Encoder,
 } from './core/componentCompatibility';
 export {
   isValidKrea2RebalanceWeights,

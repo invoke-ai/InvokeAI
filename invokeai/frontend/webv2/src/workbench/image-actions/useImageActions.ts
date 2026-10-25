@@ -36,6 +36,7 @@ import { setPendingPromptTemplateDraft } from '@features/generation/react';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { copyImage } from '@platform/browser/clipboard';
 import { downloadBlob } from '@platform/browser/downloadBlob';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
@@ -268,11 +269,13 @@ export const useImageActions = ({
 
       return board ? getGalleryBoardLabel(board, t) : t('widgets.gallery.uncategorized');
     };
-    const getLatestWidgetValues = (widgetId: 'gallery' | 'generate' | 'video') => {
+    const getLatestProject = () => {
       const snapshot = queries.getSnapshot();
-      const project = projectId
-        ? snapshot.projects.find((candidate) => candidate.id === projectId)
-        : snapshot.activeProject;
+
+      return projectId ? snapshot.projects.find((candidate) => candidate.id === projectId) : snapshot.activeProject;
+    };
+    const getLatestWidgetValues = (widgetId: 'gallery' | 'generate' | 'video') => {
+      const project = getLatestProject();
 
       return project ? getProjectWidgetValues(project, widgetId) : {};
     };
@@ -864,7 +867,7 @@ export const useImageActions = ({
           const blob = await toPngBlob(sourceBlob);
 
           assertAccountScopeCurrent(owner);
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          await copyImage(blob);
           assertAccountScopeCurrent(owner);
           recordSuccess('Copied image to clipboard');
         } catch (error: unknown) {
@@ -1037,6 +1040,7 @@ export const useImageActions = ({
           generateValues,
           getGenerateValues: getLatestGenerateValues,
           image,
+          isCanvasFrame: getLatestProject()?.invocation.sourceId === 'canvas',
           kind,
           models,
           projectId,

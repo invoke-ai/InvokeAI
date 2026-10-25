@@ -73,24 +73,24 @@ The history keeps the last 64 steps. It lasts only while the project is open in 
 
 Right-click a layer, or select it and press **Shift+F10**, for its menu. Right-clicking the canvas opens the same menu for the selected layer.
 
-<Image src={layersContext} alt="The menu of a raster layer, with Transform, Rename layer, Fit to bbox, Add adjustment, Add regenerate region, Filter, Select object, Merge down, Copy to, Convert to, Crop layer to bbox, Save layer to uploads, Disable layer, Lock layer, Color label and Delete layer." width={500} />
+<Image src={layersContext} alt="The menu of a raster layer, with Transform, Rename layer, Fit to bbox, Add adjustment, Add regenerate region, Filter, Select object, Merge down, Copy to, Convert to, Crop layer to bbox, Save layer to board, Disable layer, Lock layer, Bookmark for quick switch, Color label and Delete layer." width={500} />
 
 The icons at the top **Arrange** the layer (move it to the front, forward, backward or to the back), **Duplicate layer** and **Group layers**. Below them:
 
 * **For every layer:**
   * **Rename layer** and **Fit to bbox** (scale the layer to fit inside the generation frame).
-  * **Merge down**.
+  * **Merge down** — combines the layer with the one below. Each layer's adjustments are baked into the merged pixels; undo restores both layers with their adjustments.
   * **Copy to** — including **Copy layer to clipboard**, and copies to other layer types.
-  * **Crop layer to bbox** and **Save layer to uploads** (save it to the Gallery's Uploads).
+  * **Crop layer to bbox** and **Save layer to board** (save it to the Gallery as an upload, in Uncategorized or a board you pick from its submenu).
   * **Disable layer**, **Lock layer**, **Bookmark for quick switch** and **Color label**. A bookmarked layer is where **Q** switches on the canvas; press **Q** again to return. The bookmark is temporary and is not saved in the project. It can reset when the canvas is released, for example after switching away from its project, and resets on reload.
   * **Delete layer**.
 * **Raster layers:**
   * **Transform**.
-  * **Add adjustment** — Brightness/Contrast, Exposure, Levels, Curves, Saturation, Hue or Invert. Adjustments are non-destructive and appear as child rows.
+  * **Add adjustment** — Brightness/Contrast, Exposure, Levels, Curves, Saturation, Hue, Invert, Texture, Clarity, Dehaze or Noise. Adjustments are non-destructive and appear as child rows. Texture, Clarity and Dehaze change detail and contrast; Noise adds film grain.
   * **Add regenerate region** — treats the layer's own shape as an inpaint mask.
   * **Filter**, **Select object** and **Run workflow** — process the layer; see the [Canvas guide](/users-guide/canvas/canvas-guide/#filters-and-object-selection).
   * **Boolean operations** — combine the layer with the one below: intersect, cut out, cut away or exclude.
-  * **Convert to** — make it a control layer, inpaint mask or regional guidance layer. Text, shape and gradient layers can also be rasterized into plain pixels.
+  * **Convert to** — make it a control layer, inpaint mask or regional guidance layer. Text, shape and gradient layers can also be rasterized into plain pixels. Control layers have no adjustments, so converting or copying a layer with adjustments to a control layer bakes them, with the layer's scaling and rotation, into its pixels; undo restores the raster layer with its adjustments.
 * **Control layers:** **Transform**, **Filter**, **Select object**, **Run workflow**, **Enable transparent preview**, and **Convert to raster layer**.
 * **Inpaint masks:** **Add noise**, **Add denoise limit**, **Extract masked area** (copy the masked part of the image to a new layer), and **Hide layer**.
 * **Regional guidance:** **Enable auto-negative**, **Add reference image**, and **Hide layer**.
@@ -119,6 +119,44 @@ The Layer section is dimmed while results are being staged or a canvas generatio
 * **Filter** — start the Filter operation.
 
 Adjustment child rows each have their own settings, such as **Brightness** and **Contrast**, **Exposure**, **Levels** and **Curves** with a channel selector, **Saturation**, and **Hue**. A regenerate region has a **Fill color** and **Fill style**.
+
+**Noise** adds film grain with these settings:
+
+* **Distribution** — **Gaussian** for natural, film-like grain, or **Uniform** for an even spread. Both have the same strength at the same amount; larger grain sizes look gaussian either way.
+* **Grain** — **Mono** changes brightness only; **Color** varies each color channel separately; **Chroma** varies only hue and colorfulness and leaves brightness alone, like the color speckle of a digital sensor.
+* **Tonal response** — **Midtones** (the default) gives full grain in the midtones and fades it to none in pure black and white, as film does; **Even** gives the same grain at every tone.
+* **Size** — how large each grain is, from 1 px (every pixel varies on its own, the default) to 8 px. Larger grain is softer and clumpier but keeps the same strength.
+* **Amount** — the grain's strength. 2–5% gives subtle grain, about 10% (the default) clearly visible grain, and high values very heavy noise.
+* **New pattern** (dice button) — picks a different random grain pattern.
+
+Things to know about Noise:
+
+* **The pattern stays put.** Each Noise adjustment keeps its grain pattern until you pick a new one, and reloading the project keeps it. Duplicating a Noise adjustment gives the copy a new pattern.
+* **The grain you see is the grain you get.** Generating, exporting, merging and saving to PSD all use the same pattern and strength. One exception: PSD has no group adjustments, so a group's Noise is baked onto each of its layers separately, and where semi-transparent layers in the group overlap, the PSD can look slightly different.
+* **Grain follows its layer.** It moves, scales and rotates with the layer; on a group, it stays fixed to the canvas instead. While you drag a selection, the dragged pixels keep their grain; once placed, they take the layer's grain at their new position.
+* **Baking.** Rasterizing a text, shape or gradient layer whose Noise adjustment is enabled bakes its whole adjustment stack into the pixels and removes it, so the grain stays where it was. **Merge down** bakes each layer's adjustments the same way.
+* **Older versions of Invoke.** Once a project has had a Noise adjustment, it needs a version of Invoke with Noise adjustments, even after you remove the adjustment; older versions refuse to open it.
+
+**Texture**, **Clarity** and **Dehaze** work on detail and contrast across an area rather than pixel by pixel. They match the [Clarity, Texture and Contrast Dehaze workflow nodes](/users-guide/workflows/image-adjustments/):
+
+* **Texture** — fine detail, such as skin, fabric or foliage. Positive amounts bring it out; negative amounts smooth it.
+* **Clarity** — midtone contrast in larger shapes. Positive amounts add punch; negative amounts soften the image.
+* **Dehaze** — broad contrast and color intensity. Positive amounts increase both, which can lift a flat, washed-out image; negative amounts reduce both. It is an aesthetic approximation, not physical haze removal: it does not estimate real haze or recover lost detail, and strong settings can clip tones or colors.
+
+Their settings:
+
+* **Amount** — from −200 to 200. The default, 0, changes nothing. Double-click the field or press **Backspace** in it to reset it.
+* **Size** (Texture and Clarity only) — how large the detail is that the adjustment affects: 1 to 100 px for Texture (8 by default) and 4 to 1000 px for Clarity (40 by default). It is measured in the layer's own pixels, before the layer is scaled, so resizing a layer does not change which detail is affected. On a group, it is measured in canvas pixels.
+
+Things to know about Texture, Clarity and Dehaze:
+
+* **They are computed in the background.** Each one looks at the whole layer, so the canvas computes it in the background and stays responsive. Meanwhile, the canvas shows the previous result, or the layer without them after you paint on it. A small spinner appears on the layer's row when the work takes more than a moment.
+* **Size limit.** They cannot run on content larger than 4096 × 4096 px (16.8 megapixels, measured over the area the layer's visible content spans, in the layer's own pixels before any scaling; for a group, at document resolution). A warning icon then appears on the layer's or group's row, the canvas leaves them out, and anything that uses the layer's pixels with them — generating, exporting, merging, rasterizing, filtering, copying or converting to a control layer, saving to PSD, painting on an image layer — is refused with a message naming the layer or group. Disable or remove them, or crop the content. The same warning appears when there is not enough canvas memory or the computation fails; hover over it for what to do, or select the adjustment to read it in Properties.
+* **What you see is what you get.** Generating, exporting, merging, rasterizing and saving to PSD use the same result as the canvas, computing it first if the canvas is still working on it. One exception: PSD has no group adjustments, so a group's Texture, Clarity and Dehaze are applied to each of its layers separately, and the PSD can look different from the canvas.
+* **While you drag a selection**, the dragged pixels show without them; once placed, the layer is computed again with them.
+* **Thumbnails** of layers the canvas has not shown yet can leave them out.
+* **Baking.** Rasterizing a text, shape or gradient layer with one of them enabled bakes its whole adjustment stack into the pixels and removes it. **Merge down** bakes each layer's adjustments the same way.
+* **Older versions of Invoke.** Like Noise, once a project has had one of these adjustments, older versions of Invoke refuse to open it, even after you remove the adjustment.
 
 ### Control layer
 
