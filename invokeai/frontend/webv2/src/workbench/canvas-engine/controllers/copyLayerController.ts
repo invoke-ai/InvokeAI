@@ -57,8 +57,8 @@ export interface CopyLayerControllerOptions {
     anchor: CanvasNodeInsertionAnchor
   ) => boolean;
   readonly exportBaked: (layerId: string) => Promise<ExportResult>;
-  /** The main model's base and its default control model, for a control copy's adapter. */
-  readonly getControlModel: () => { readonly base: string | null; readonly model: string | null };
+  /** The main model's base, for a control copy's adapter kind and defaults. */
+  readonly getMainModelBase: () => string | null;
   readonly isGuardCurrent: (guard: LayerExportGuard) => boolean;
 }
 
@@ -105,7 +105,7 @@ export class CopyLayerController {
         return { status: 'not-ready' };
       }
       const layer = createControlLayerFrom(sourceLayer, {
-        ...this.deps.getControlModel(),
+        base: this.deps.getMainModelBase(),
         content: { source: sourceLayer.source },
         id: ctx.createLayerId(),
         name: `${sourceLayer.name} copy`,
@@ -148,7 +148,7 @@ export class CopyLayerController {
         const layer =
           target === 'control'
             ? createControlLayerFrom(sourceLayer, {
-                ...this.deps.getControlModel(),
+                base: this.deps.getMainModelBase(),
                 content: { rect: baked.rect },
                 id,
                 name,

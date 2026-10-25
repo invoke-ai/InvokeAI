@@ -232,6 +232,46 @@ const surfaces = [
     },
   },
   {
+    id: 'workbench-canvas-control-layer',
+    path: representativeProjectPath,
+    ready: async (page) => {
+      // Seed after the reset in openRepresentativePage, then reload so the model list includes the seed.
+      const seeded = await fetch(`${backendOrigin}/__models`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ set: 'control-sdxl' }),
+      });
+      assert.ok(seeded.ok, `Could not seed control models: ${String(seeded.status)}.`);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await waitForWorkbench(page);
+      await selectLayoutPreset(page, 'Edit', 'Canvas');
+      // The representative main model is SD 1.x; the seeded control models are SDXL, so switch to an SDXL main
+      // (Fixture Model 006) through the Generate panel's model picker.
+      await page.getByText('Fixture Model 001', { exact: true }).click();
+      const search = page.getByRole('combobox', { name: /^Search / });
+      await search.fill('Fixture Model 006');
+      await page.getByRole('option', { name: /Fixture Model 006(?!\d)/ }).click();
+      // Once the picker has closed, the trigger is the only place naming the new model.
+      await search.waitFor({ state: 'hidden' });
+      await page.getByText('Fixture Model 006', { exact: true }).waitFor();
+      await page.getByRole('button', { exact: true, name: 'Add layer' }).click();
+      await page.getByRole('menuitem', { exact: true, name: 'Control layer' }).click();
+      // The new layer's Properties panel and the canvas hint over its empty source are both scanned.
+      const type = page.getByRole('combobox', { exact: true, name: 'Type' });
+      await type.waitFor();
+      await page.getByRole('note').filter({ hasText: 'Drop an image here' }).waitFor();
+      await waitForSettledDocument(page);
+      await assertNoAxeViolations(page, 'workbench-canvas-control-layer-untyped');
+      // Typed as Depth: the seed holds two depth models, so the panel asks for one; the runner scans this state.
+      await type.click();
+      await page.getByRole('option', { name: /^Depth/ }).click();
+      await page
+        .getByRole('combobox', { exact: true, name: 'Model' })
+        .filter({ hasText: 'Choose a depth model' })
+        .waitFor();
+    },
+  },
+  {
     id: 'workbench-gallery-representative',
     path: representativeProjectPath,
     ready: async (page) => {
