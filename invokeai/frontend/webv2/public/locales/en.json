@@ -3431,8 +3431,9 @@
         "cropAllNoneCropped": "No layer was cropped",
         "cropAllNothing": "Every layer already fits the frame",
         "cropAllNothingUnlocked": "Every unlocked layer already fits the frame",
-        "cropAllUnreadable_one": "{{count}} layer could not be read and was left as it is.",
-        "cropAllUnreadable_other": "{{count}} layers could not be read and were left as they are.",
+        "cropAllUnreadable": "“{{name}}” could not be read and was left as it is.",
+        "cropAllUnreadableWithOthers_one": "“{{name}}” and {{count}} other layer could not be read and were left as they are.",
+        "cropAllUnreadableWithOthers_other": "“{{name}}” and {{count}} other layers could not be read and were left as they are.",
         "croppedAllLayers_one": "Cropped {{count}} layer to the frame",
         "croppedAllLayers_other": "Cropped {{count}} layers to the frame",
         "croppedAllLayersSkipped_one": "{{count}} locked layer skipped.",
@@ -3452,7 +3453,7 @@
         "saveToGallery": "Save to Gallery",
         "saved": "Saved to gallery",
         "stale": "The canvas changed while saving. Try again.",
-        "unreadable": "A layer's image could not be read (it may have been deleted or damaged). Disable or delete that layer, then try again."
+        "unreadable": "“{{name}}” could not be read (its image may have been deleted or damaged). Disable or delete that layer, then try again."
       },
       "controls": {
         "clearCanvas": "Clear canvas",
@@ -3956,7 +3957,7 @@
         "toggleVisibility": "Enable/disable",
         "transform": "Transform",
         "unsupported": "This action is not supported for this layer.",
-        "unreadable": "A layer's image could not be read (it may have been deleted or damaged), so nothing was changed.",
+        "unreadable": "“{{name}}” could not be read (its image may have been deleted or damaged), so nothing was changed. Delete or replace that layer, then try again.",
         "unlock": "Unlock layer",
         "unlockSelected": "Unlock selected",
         "group": "Group layers",
@@ -4362,7 +4363,7 @@
         "exportNotReady": "Layers are still loading — try exporting again in a moment",
         "exportOverBudget": "Not enough raster memory is available to export this PSD",
         "exportStale": "The canvas changed during export — try again",
-        "exportUnreadable": "A layer's image could not be read, so nothing was exported. Delete or replace that layer, then export again",
+        "exportUnreadable": "“{{name}}” could not be read, so nothing was exported. Delete or replace that layer, then export again",
         "exportAborted": "PSD export was canceled",
         "exportFailed": "PSD export failed",
         "exportPsd": "Export to PSD",

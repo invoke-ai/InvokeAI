@@ -9,6 +9,7 @@ import type {
   CanvasMaskNoiseContract,
   BooleanRasterOperation,
   LayerStackMoveKind,
+  LayerUnreadable,
   RegionalGuidanceReferenceImage,
 } from '@workbench/canvas-engine/api';
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
@@ -49,7 +50,7 @@ import {
   useLayerQuickSwitch,
 } from '@workbench/widgets/canvas/engineStoreHooks';
 import {
-  describeAdjustmentRefusal,
+  describeNamedRefusal,
   reportLayerOperation,
   usePreparedCommit,
 } from '@workbench/widgets/canvas/useStructuralCommit';
@@ -166,7 +167,6 @@ type LayerActionErrorStatus =
   | 'missing'
   | 'not-ready'
   | 'over-budget'
-  | 'unreadable'
   | 'unsupported';
 
 const LAYER_ACTION_ERROR_KEYS: Record<LayerActionErrorStatus, string> = {
@@ -179,7 +179,6 @@ const LAYER_ACTION_ERROR_KEYS: Record<LayerActionErrorStatus, string> = {
   missing: 'widgets.layers.actions.missing',
   'not-ready': 'widgets.layers.actions.notReady',
   'over-budget': 'widgets.layers.actions.overBudget',
-  unreadable: 'widgets.layers.actions.unreadable',
   unsupported: 'widgets.layers.actions.unsupported',
 };
 
@@ -379,8 +378,8 @@ const LayerMenu = ({
   );
 
   const makeStatusError = useCallback(
-    (status: LayerActionErrorStatus | AdjustmentRefusal): Error =>
-      new Error(typeof status === 'string' ? t(LAYER_ACTION_ERROR_KEYS[status]) : describeAdjustmentRefusal(status, t)),
+    (status: LayerActionErrorStatus | AdjustmentRefusal | LayerUnreadable): Error =>
+      new Error(typeof status === 'string' ? t(LAYER_ACTION_ERROR_KEYS[status]) : describeNamedRefusal(status, t)),
     [t]
   );
 
@@ -402,7 +401,7 @@ const LayerMenu = ({
           return;
         }
         if (result.status !== 'nothing') {
-          reportLayerOperation(result.status, notify.error, t);
+          reportLayerOperation(result.status === 'unreadable' ? result : result.status, notify.error, t);
           return;
         }
       } catch {
@@ -441,7 +440,7 @@ const LayerMenu = ({
       throw makeStatusError('not-ready');
     }
     const result = await engine.layers.mergeInpaintMasks(actionTargets({ layer, selectedIds }));
-    if (isAdjustmentRefusal(result)) {
+    if (isAdjustmentRefusal(result) || result.status === 'unreadable') {
       reportLayerOperation(result, notify.error, t);
     } else if (result.status === 'ineligible') {
       notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.actions.mergeMasksIneligible'));
@@ -457,12 +456,10 @@ const LayerMenu = ({
       return;
     }
     void engine.layers.mergeSelectedRasterLayers(actionTargets({ layer, selectedIds })).then((result) => {
-      if (isAdjustmentRefusal(result)) {
-        notify.error(t('widgets.layers.actions.actionFailed'), describeAdjustmentRefusal(result, t));
+      if (typeof result === 'object') {
+        notify.error(t('widgets.layers.actions.actionFailed'), describeNamedRefusal(result, t));
       } else if (result === 'not-ready') {
         notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.groupActions.mergeNotReady'));
-      } else if (result === 'unreadable') {
-        notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.actions.unreadable'));
       } else if (result === 'over-budget') {
         notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.groupActions.mergeOverBudget'));
       } else if (result === 'failed') {
@@ -726,11 +723,11 @@ const LayerMenu = ({
       case 'locked':
       case 'empty':
       case 'not-ready':
-      case 'unreadable':
       case 'over-budget':
         throw makeStatusError(result.status);
       case 'outside-frame':
         throw new Error(t('widgets.layers.actions.cropOutsideFrame'));
+      case 'unreadable':
       case 'adjustment-refused':
         throw makeStatusError(result);
       case 'busy':
@@ -750,7 +747,7 @@ const LayerMenu = ({
     }
     const result = await engine.exports.extractMaskedArea(layer.id);
     if (result.status !== 'extracted') {
-      throw makeStatusError(isAdjustmentRefusal(result) ? result : result.status);
+      throw makeStatusError(isAdjustmentRefusal(result) || result.status === 'unreadable' ? result : result.status);
     }
   }, [engine, layer.id, makeStatusError]);
 
@@ -783,7 +780,7 @@ const LayerMenu = ({
     }
     const result = await engine.layers.copyLayerToRaster(layer.id);
     if (result.status !== 'copied') {
-      throw makeStatusError(isAdjustmentRefusal(result) ? result : result.status);
+      throw makeStatusError(isAdjustmentRefusal(result) || result.status === 'unreadable' ? result : result.status);
     }
   }, [addCopy, engine, getActionLabel, layer, makeStatusError]);
 
@@ -803,7 +800,7 @@ const LayerMenu = ({
     }
     const result = await engine.layers.copyLayerToControl(layer.id);
     if (result.status !== 'copied') {
-      throw makeStatusError(isAdjustmentRefusal(result) ? result : result.status);
+      throw makeStatusError(isAdjustmentRefusal(result) || result.status === 'unreadable' ? result : result.status);
     }
   }, [addCopy, base, defaultControlModel, engine, getActionLabel, layer, makeStatusError]);
 

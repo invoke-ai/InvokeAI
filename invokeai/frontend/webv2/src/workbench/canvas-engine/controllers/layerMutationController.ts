@@ -3,6 +3,7 @@ import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/c
 import type { CanvasCommandRefusal } from '@workbench/canvas-engine/document/commandRefusal';
 import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import type { SubsetOf } from '@workbench/canvas-engine/editConcurrency';
+import type { LayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
@@ -42,13 +43,14 @@ export type ConvertLayerToControlResult =
   | 'converted'
   | SubsetOf<CanvasCommandRefusal, 'missing' | 'locked' | 'unsupported'>
   | LayerEditRefusal
-  | 'unreadable'
   | 'failed'
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 type BakedExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
-  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'unreadable' | 'over-budget' }
+  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 export type DuplicateLayerRasterPlan =
@@ -65,7 +67,8 @@ export type DuplicateLayerRasterPlan =
 
 type DuplicateRasterPreparationResult =
   | { readonly status: 'ready'; readonly layer: CanvasLayerContract }
-  | { readonly status: 'not-ready' | 'unreadable' | 'over-budget' };
+  | { readonly status: 'not-ready' | 'over-budget' }
+  | LayerUnreadable;
 
 export interface LayerMutationControllerOptions {
   readonly ctx: Pick<
@@ -170,6 +173,9 @@ export class LayerMutationController {
           return { status: 'not-ready' };
         }
         const prepared = await o.prepareDuplicateRasterSource(source.id);
+        if (prepared.status === 'unreadable') {
+          return prepared;
+        }
         if (prepared.status !== 'ready') {
           return { status: prepared.status };
         }
@@ -496,7 +502,7 @@ export class LayerMutationController {
       return 'locked';
     }
     const baked = await o.exportBaked(current.id);
-    if (baked.status === 'adjustment-refused') {
+    if (baked.status === 'adjustment-refused' || baked.status === 'unreadable') {
       return baked;
     }
     if (baked.status === 'empty') {

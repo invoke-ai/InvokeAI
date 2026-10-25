@@ -361,8 +361,10 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
             : composed.status === 'adjustment-refused'
               ? ADJUSTMENT_REFUSAL_NOTICES[composed.reason](composed.ownerName)
               : composed.status === 'unreadable'
-                ? "A layer's image could not be read (it may have been deleted or damaged). Disable or delete that layer, then invoke again."
-                : `The canvas could not be captured for generation (${composed.status}).`
+                ? `“${composed.layerName}” could not be read (its image may have been deleted or damaged). Disable or delete that layer, then invoke again.`
+                : composed.status === 'not-ready'
+                  ? 'Some layers are still loading. Wait a moment, then invoke again.'
+                  : `The canvas could not be captured for generation (${composed.status}).`
       );
       return;
     }

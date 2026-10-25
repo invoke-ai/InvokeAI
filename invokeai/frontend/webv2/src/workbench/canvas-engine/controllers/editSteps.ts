@@ -8,6 +8,7 @@ import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/c
 import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import type { CanvasTransactionOutcome, SubsetOf } from '@workbench/canvas-engine/editConcurrency';
 import type { HeldAssetRefs } from '@workbench/canvas-engine/history/history';
+import type { LayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
@@ -15,6 +16,7 @@ import type { Rect } from '@workbench/canvas-engine/types';
 
 import { getDocumentLayer, isNodeAbsent } from '@workbench/canvas-engine/document/documentIndex';
 import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
+import { isLayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 
 import type {
   CanvasMutationContext,
@@ -35,14 +37,15 @@ export const rgbaBytes = (rect: Rect): number => Math.max(0, rect.width) * Math.
 // ---- Publication outcomes ----------------------------------------------------------------------------------
 
 /**
- * Whether a layer operation can read a layer's cache now: `not-ready` while its pixels load (waiting helps),
- * `unreadable` once rasterizing its current source failed (waiting does not; the operation refuses and says so).
+ * Whether a layer operation can read a layer's cache now: `not-ready` while its pixels load or cannot be fetched for
+ * now (waiting helps), {@link LayerUnreadable} once rasterizing its current source failed (waiting does not; the
+ * operation refuses and names the layer).
  */
-export type LayerCacheReadiness = 'ready' | 'not-ready' | 'unreadable';
+export type LayerCacheReadiness = 'ready' | 'not-ready' | LayerUnreadable;
 
-/** Layers read together: one that cannot be read refuses the set even while others still load. */
+/** Layers read together: the first that cannot be read refuses the set even while others still load. */
 export const readinessOfAll = (readiness: readonly LayerCacheReadiness[]): LayerCacheReadiness =>
-  readiness.includes('unreadable') ? 'unreadable' : readiness.includes('not-ready') ? 'not-ready' : 'ready';
+  readiness.find(isLayerUnreadable) ?? (readiness.includes('not-ready') ? 'not-ready' : 'ready');
 
 /** A refused admission as callers report it; a gesture in progress reads as contention. */
 export type LayerEditRefusal = SubsetOf<CanvasTransactionOutcome, 'busy' | 'not-ready' | 'over-budget'>;

@@ -9,26 +9,31 @@ export type PsdExportNoticeKey =
   | 'widgets.layers.groupActions.exportUnreadable'
   | 'widgets.layers.groupActions.exportAborted';
 
+/** A notice's translation key and interpolation; an unreadable layer is named. */
+export interface PsdExportNotice {
+  readonly key: PsdExportNoticeKey;
+  readonly options?: { readonly name: string };
+}
+
 /** The notice for a non-refusal result; an `AdjustmentRefusal` is worded by `describeAdjustmentRefusal`. */
-export const getPsdExportNoticeKey = (
-  result: Exclude<PsdExportResult, AdjustmentRefusal>
-): PsdExportNoticeKey | null => {
+export const getPsdExportNotice = (result: Exclude<PsdExportResult, AdjustmentRefusal>): PsdExportNotice | null => {
+  if (typeof result === 'object') {
+    return { key: 'widgets.layers.groupActions.exportUnreadable', options: { name: result.layerName } };
+  }
   switch (result) {
     case 'exported':
       return null;
     case 'not-ready':
-      return 'widgets.layers.groupActions.exportNotReady';
+      return { key: 'widgets.layers.groupActions.exportNotReady' };
     case 'too-large':
-      return 'widgets.layers.groupActions.exportTooLarge';
+      return { key: 'widgets.layers.groupActions.exportTooLarge' };
     case 'nothing':
-      return 'widgets.layers.groupActions.exportNothing';
+      return { key: 'widgets.layers.groupActions.exportNothing' };
     case 'over-budget':
-      return 'widgets.layers.groupActions.exportOverBudget';
+      return { key: 'widgets.layers.groupActions.exportOverBudget' };
     case 'stale':
-      return 'widgets.layers.groupActions.exportStale';
-    case 'unreadable':
-      return 'widgets.layers.groupActions.exportUnreadable';
+      return { key: 'widgets.layers.groupActions.exportStale' };
     case 'aborted':
-      return 'widgets.layers.groupActions.exportAborted';
+      return { key: 'widgets.layers.groupActions.exportAborted' };
   }
 };

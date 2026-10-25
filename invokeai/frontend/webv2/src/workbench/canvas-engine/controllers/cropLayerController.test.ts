@@ -64,7 +64,7 @@ const createHarness = (
     exportBaked: (layerId) => {
       exported.push(layerId);
       if (options.unreadable) {
-        return Promise.resolve({ status: 'unreadable' as const });
+        return Promise.resolve({ layerId, layerName: 'Paint', status: 'unreadable' as const });
       }
       const entry = h.layers.get(layerId)!;
       const current = getDocumentLayer(h.document(), layerId)!;
@@ -121,7 +121,11 @@ describe('CropLayerController', () => {
   it('says a layer that could not be read is unreadable, not still loading', async () => {
     const h = createHarness(undefined, { unreadable: true });
 
-    await expect(h.controller.crop('paint')).resolves.toEqual({ status: 'unreadable' });
+    await expect(h.controller.crop('paint')).resolves.toEqual({
+      layerId: 'paint',
+      layerName: 'Paint',
+      status: 'unreadable',
+    });
     expect(h.dispatched).toEqual([]);
     expect(h.history.canUndo()).toBe(false);
   });
@@ -185,6 +189,8 @@ const createCropAllHarness = (
     refusal?: AdjustmentRefusal;
     /** Leaves added on top whose pixels cannot be read. */
     unreadable?: readonly CanvasLayerContract[];
+    /** Leaves whose pixels are not ready (still loading, or their image could not be fetched for now). */
+    notReady?: readonly string[];
     /** Settles pending paint uploads; resolves at once by default. */
     flushPendingPixels?: () => Promise<void>;
   } = {}
@@ -242,8 +248,12 @@ const createCropAllHarness = (
       const read = exportOptions?.applyAdjustments === false ? `${layerId}:raw` : layerId;
       exported.push(read);
       options.onExport?.(layerId);
-      if (options.unreadable?.some((leaf) => leaf.id === layerId)) {
-        return Promise.resolve({ status: 'unreadable' as const });
+      const unreadable = options.unreadable?.find((leaf) => leaf.id === layerId);
+      if (unreadable) {
+        return Promise.resolve({ layerId, layerName: unreadable.name, status: 'unreadable' as const });
+      }
+      if (options.notReady?.includes(layerId)) {
+        return Promise.resolve({ status: 'not-ready' as const });
       }
       if (options.refusal?.ownerId === layerId && read === layerId) {
         return Promise.resolve(options.refusal);
@@ -304,7 +314,7 @@ describe('CropLayerController: crop all layers', () => {
     await expect(h.controller.cropAll()).resolves.toEqual({
       cropped: 4,
       skippedLocked: 2,
-      skippedUnreadable: 0,
+      skippedUnreadable: [],
       status: 'cropped',
     });
     expect(h.exported).toEqual(['mask', 'region', 'control', 'inside:raw', 'raster']);
@@ -319,7 +329,7 @@ describe('CropLayerController: crop all layers', () => {
     await expect(h.controller.cropAll()).resolves.toEqual({
       cropped: 4,
       skippedLocked: 2,
-      skippedUnreadable: 0,
+      skippedUnreadable: [],
       status: 'cropped',
     });
     expect(h.exported).toEqual(['mask', 'region', 'control', 'inside', 'raster:raw', 'raster']);
@@ -338,7 +348,7 @@ describe('CropLayerController: crop all layers', () => {
     await expect(h.controller.cropAll()).resolves.toEqual({
       cropped: 4,
       skippedLocked: 2,
-      skippedUnreadable: 0,
+      skippedUnreadable: [],
       status: 'cropped',
     });
 
@@ -397,25 +407,45 @@ describe('CropLayerController: crop all layers', () => {
     expect(h.layers.get('raster')?.rect).toEqual(FRAME);
   });
 
-  it('skips leaves whose pixels cannot be read and crops the rest, counting those that reach past the frame', async () => {
+  it('skips leaves whose pixels cannot be read and crops the rest, naming those that reach past the frame', async () => {
     /** An image layer whose decode failed; its contract still says where its content lies. */
-    const unreadableImage = (id: string, x: number) =>
+    const unreadableImage = (id: string, name: string, x: number) =>
       layerContract(id, 'raster', {
+        name,
         source: { image: { height: 10, imageName: `${id}.png`, width: 10 }, type: 'image' },
         transform: { rotation: 0, scaleX: 1, scaleY: 1, x, y: 0 },
       } as Partial<CanvasLayerContract>);
-    const h = createCropAllHarness({ unreadable: [unreadableImage('gone', 15), unreadableImage('goneInside', 5)] });
+    const h = createCropAllHarness({
+      unreadable: [
+        unreadableImage('gone', 'Sky', 15),
+        unreadableImage('goneInside', 'Inside sky', 5),
+        unreadableImage('goneLeft', 'Hills', -5),
+      ],
+    });
 
     await expect(h.controller.cropAll()).resolves.toEqual({
       cropped: 4,
       skippedLocked: 2,
-      skippedUnreadable: 1,
+      skippedUnreadable: [
+        { layerId: 'gone', layerName: 'Sky', status: 'unreadable' },
+        { layerId: 'goneLeft', layerName: 'Hills', status: 'unreadable' },
+      ],
       status: 'cropped',
     });
-    expect(h.exported).toEqual(['mask', 'region', 'control', 'gone', 'goneInside', 'inside', 'raster']);
+    expect(h.exported).toEqual(['mask', 'region', 'control', 'gone', 'goneInside', 'goneLeft', 'inside', 'raster']);
     expect(getDocumentLayer(h.document(), 'gone')).toBe(getDocumentLayer(h.original, 'gone'));
     expect(getDocumentLayer(h.document(), 'raster')).not.toBe(getDocumentLayer(h.original, 'raster'));
     expect(h.history.entries().past).toEqual(['Crop all layers to frame']);
+  });
+
+  it('refuses as not ready, without skipping, when a leaf it must read is not ready', async () => {
+    const h = createCropAllHarness({ notReady: ['control'] });
+
+    await expect(h.controller.cropAll()).resolves.toEqual({ status: 'not-ready' });
+    expect(h.document()).toBe(h.original);
+    expect(h.dispatched).toEqual([]);
+    expect(h.history.canUndo()).toBe(false);
+    expect(h.reservedBytes()).toBe(0);
   });
 
   it('settles pending paint uploads before it reads any leaf', async () => {
@@ -444,7 +474,7 @@ describe('CropLayerController: crop all layers', () => {
 
     await expect(h.controller.cropAll()).resolves.toEqual({
       skippedLocked: 2,
-      skippedUnreadable: 0,
+      skippedUnreadable: [],
       status: 'nothing',
     });
     expect(h.dispatched).toEqual([]);

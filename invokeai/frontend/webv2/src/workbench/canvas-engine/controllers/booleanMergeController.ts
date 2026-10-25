@@ -1,5 +1,6 @@
 import type { LayerExportGuard } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { LayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
@@ -29,14 +30,15 @@ export type BooleanRasterResult =
   | 'missing'
   | 'unsupported'
   | 'empty'
-  | 'unreadable'
   | 'failed'
   | LayerEditRefusal
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
-  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'unreadable' | 'over-budget' }
+  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 export interface BooleanMergeControllerOptions {
@@ -124,7 +126,7 @@ export class BooleanMergeController {
           return 'over-budget';
         }
         if (upperPixels.status === 'unreadable' || belowPixels.status === 'unreadable') {
-          return 'unreadable';
+          return upperPixels.status === 'unreadable' ? upperPixels : (belowPixels as LayerUnreadable);
         }
         if (upperPixels.status === 'not-ready' || belowPixels.status === 'not-ready') {
           return 'not-ready';

@@ -75,8 +75,8 @@ export const getCropAllUnavailableReasonKey = (document: CanvasDocumentContractV
 
 /**
  * Crops every unlocked layer to the frame as one undo step and says what happened: how many layers it cropped, how
- * many locked or unreadable ones it left as they were, or that nothing needed cropping. The canvas menu and the
- * command share it.
+ * many locked ones it skipped, which layer could not be read (named, with a count of any others), or that nothing
+ * needed cropping. The canvas menu and the command share it.
  */
 export const cropAllLayersToFrame = async (
   layers: Pick<CanvasEngineLayerCapability, 'cropAllLayersToBbox'>,
@@ -94,16 +94,24 @@ export const cropAllLayersToFrame = async (
     case 'cropped':
     case 'nothing': {
       const { skippedLocked, skippedUnreadable } = result;
+      const [firstUnreadable] = skippedUnreadable;
       const skipped =
         [
           skippedLocked > 0 ? t('widgets.canvas.contextMenu.croppedAllLayersSkipped', { count: skippedLocked }) : '',
-          skippedUnreadable > 0 ? t('widgets.canvas.contextMenu.cropAllUnreadable', { count: skippedUnreadable }) : '',
+          !firstUnreadable
+            ? ''
+            : skippedUnreadable.length === 1
+              ? t('widgets.canvas.contextMenu.cropAllUnreadable', { name: firstUnreadable.layerName })
+              : t('widgets.canvas.contextMenu.cropAllUnreadableWithOthers', {
+                  count: skippedUnreadable.length - 1,
+                  name: firstUnreadable.layerName,
+                }),
         ]
           .filter(Boolean)
           .join(' ') || undefined;
       if (result.status === 'cropped') {
         notify.success(t('widgets.canvas.contextMenu.croppedAllLayers', { count: result.cropped }), skipped);
-      } else if (skippedUnreadable > 0) {
+      } else if (firstUnreadable) {
         // Those layers needed cropping and could not be read: nothing the user asked for happened.
         notify.error(t('widgets.canvas.contextMenu.cropAllNoneCropped'), skipped);
       } else {

@@ -1,5 +1,6 @@
 import type {
   AdjustmentRefusal,
+  LayerUnreadable,
   CanvasDocumentContractV3,
   CanvasEngine,
   LayerStackMoveKind,
@@ -152,7 +153,7 @@ export interface CanvasHotkeyContext extends Omit<CanvasToolCommandContext, 'eng
   readonly notifyLayerDuplicateFailed: () => void;
   readonly reportStructuralCommit: (result: StructuralCommitResult) => void;
   readonly reportPreparedCommit: (outcome: PreparedCommitOutcome) => void;
-  readonly reportLayerOperation: (refusal: LayerOperationRefusal | AdjustmentRefusal) => void;
+  readonly reportLayerOperation: (refusal: LayerOperationRefusal | AdjustmentRefusal | LayerUnreadable) => void;
   readonly t: (key: string) => string;
 }
 
@@ -313,7 +314,7 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
             ctx.notifyLayerDuplicateFailed();
             return;
           }
-          ctx.reportLayerOperation(result.status);
+          ctx.reportLayerOperation(result.status === 'unreadable' ? result : result.status);
         })
         .catch(() => {
           // The engine keeps rejected transactions atomic; route both rejection

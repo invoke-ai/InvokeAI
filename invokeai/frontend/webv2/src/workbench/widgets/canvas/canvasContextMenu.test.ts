@@ -130,39 +130,49 @@ describe('cropAllLayersToFrame', () => {
     };
   };
 
+  const unreadable = (layerName: string) => ({
+    layerId: layerName.toLowerCase(),
+    layerName,
+    status: 'unreadable' as const,
+  });
+
   it.each([
-    [{ cropped: 1, skippedLocked: 0, skippedUnreadable: 0 }, ['Cropped 1 layer to the frame', undefined]],
+    [{ cropped: 1, skippedLocked: 0, skippedUnreadable: [] }, ['Cropped 1 layer to the frame', undefined]],
     [
-      { cropped: 4, skippedLocked: 1, skippedUnreadable: 0 },
+      { cropped: 4, skippedLocked: 1, skippedUnreadable: [] },
       ['Cropped 4 layers to the frame', '1 locked layer skipped.'],
     ],
     [
-      { cropped: 2, skippedLocked: 3, skippedUnreadable: 0 },
+      { cropped: 2, skippedLocked: 3, skippedUnreadable: [] },
       ['Cropped 2 layers to the frame', '3 locked layers skipped.'],
     ],
     [
-      { cropped: 2, skippedLocked: 1, skippedUnreadable: 2 },
+      { cropped: 2, skippedLocked: 1, skippedUnreadable: [unreadable('Sky'), unreadable('Hills')] },
       [
         'Cropped 2 layers to the frame',
-        '1 locked layer skipped. 2 layers could not be read and were left as they are.',
+        '1 locked layer skipped. “Sky” and 1 other layer could not be read and were left as they are.',
       ],
+    ],
+    [
+      { cropped: 1, skippedLocked: 0, skippedUnreadable: [unreadable('Sky'), unreadable('Hills'), unreadable('Sea')] },
+      ['Cropped 1 layer to the frame', '“Sky” and 2 other layers could not be read and were left as they are.'],
     ],
   ])('reports %o as cropped, with the layers it left as they were', async (counts, expected) => {
     expect(await notices({ status: 'cropped', ...counts })).toEqual({ error: [], info: [], success: [expected] });
   });
 
   it('says nothing needed cropping, and that only unlocked layers were checked when some were skipped', async () => {
-    expect((await notices({ skippedLocked: 0, skippedUnreadable: 0, status: 'nothing' })).info).toEqual([
+    expect((await notices({ skippedLocked: 0, skippedUnreadable: [], status: 'nothing' })).info).toEqual([
       ['Every layer already fits the frame', undefined],
     ]);
-    expect((await notices({ skippedLocked: 2, skippedUnreadable: 0, status: 'nothing' })).info).toEqual([
+    expect((await notices({ skippedLocked: 2, skippedUnreadable: [], status: 'nothing' })).info).toEqual([
       ['Every unlocked layer already fits the frame', '2 locked layers skipped.'],
     ]);
   });
 
   it('reports a crop that left only unreadable layers uncropped as a failure, never as still loading', async () => {
-    expect(await notices({ skippedLocked: 0, skippedUnreadable: 1, status: 'nothing' })).toEqual({
-      error: [['No layer was cropped', '1 layer could not be read and was left as it is.']],
+    expect(await notices({ skippedLocked: 0, skippedUnreadable: [unreadable('Sky')], status: 'nothing' })).toEqual({
+      error: [['No layer was cropped', '“Sky” could not be read and was left as it is.']],
       info: [],
       success: [],
     });

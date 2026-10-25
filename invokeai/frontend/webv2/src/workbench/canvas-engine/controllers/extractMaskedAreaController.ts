@@ -15,6 +15,7 @@ import type { Rect } from '@workbench/canvas-engine/types';
 import { compileDocumentLeaves } from '@workbench/canvas-engine/document-model/documentModel';
 import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { getSourceContentRect } from '@workbench/canvas-engine/document/sources';
+import { isLayerUnreadable, type LayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 import { isEmpty } from '@workbench/canvas-engine/math/rect';
 import {
   type AdjustmentRefusal,
@@ -51,20 +52,17 @@ import {
 export type ExtractMaskedAreaResult =
   | { status: 'extracted'; layerId: string }
   | {
-      status:
-        | LayerEditRefusal
-        | SubsetOf<CanvasCommandRefusal, 'missing' | 'unsupported'>
-        | 'empty'
-        | 'unreadable'
-        | 'failed';
+      status: LayerEditRefusal | SubsetOf<CanvasCommandRefusal, 'missing' | 'unsupported'> | 'empty' | 'failed';
     }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 type OwnedExport = Extract<ExportResult, { status: 'ok' }>;
 
 type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
-  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'unreadable' | 'over-budget' }
+  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 export interface ExtractMaskedAreaControllerOptions {
@@ -149,7 +147,7 @@ export class ExtractMaskedAreaController {
     }
     const readiness = readinessOfAll([mask, ...contributors].map((layer) => this.deps.cacheReadiness(layer, document)));
     if (readiness !== 'ready') {
-      return { status: readiness };
+      return readiness === 'not-ready' ? { status: readiness } : readiness;
     }
     const owned: Extract<ExportResult, { status: 'ok' }>[] = [];
     const acquire = async (resultPromise: Promise<ExportResult>): Promise<ExportResult> => {
@@ -175,10 +173,15 @@ export class ExtractMaskedAreaController {
         return { status: 'busy' };
       }
       const statuses = [maskPixels, ...contributorPixels].map((pixels) => pixels.status);
-      for (const status of ['over-budget', 'unreadable', 'not-ready'] as const) {
-        if (statuses.includes(status)) {
-          return { status };
-        }
+      if (statuses.includes('over-budget')) {
+        return { status: 'over-budget' };
+      }
+      const unreadable = [maskPixels, ...contributorPixels].find(isLayerUnreadable);
+      if (unreadable) {
+        return unreadable;
+      }
+      if (statuses.includes('not-ready')) {
+        return { status: 'not-ready' };
       }
       if (maskPixels.status !== 'ok' || statuses.some((status) => status !== 'ok')) {
         return { status: 'empty' };

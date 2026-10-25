@@ -20,12 +20,19 @@ describe('getCreateFromBboxNotice', () => {
     ['stale', 'info', 'widgets.canvas.contextMenu.stale'],
     ['not-ready', 'info', 'widgets.canvas.contextMenu.notReady'],
     ['over-budget', 'info', 'widgets.canvas.contextMenu.notReady'],
-    ['unreadable', 'error', 'widgets.canvas.contextMenu.unreadable'],
     ['blocked', 'info', 'widgets.canvas.import.blocked'],
     ['stale-document', 'error', 'widgets.canvas.import.staleDocument'],
     ['stale-project', 'error', 'widgets.canvas.import.staleProject'],
   ] as const)('maps %s to a %s notice', (status, kind, titleKey) => {
     expect(getCreateFromBboxNotice({ status })).toEqual({ kind, titleKey });
+  });
+
+  it('names the layer that could not be read', () => {
+    expect(getCreateFromBboxNotice({ layerId: 'layer-7', layerName: 'Sky', status: 'unreadable' })).toEqual({
+      kind: 'error',
+      options: { name: 'Sky' },
+      titleKey: 'widgets.canvas.contextMenu.unreadable',
+    });
   });
 
   it('passes an adjustment refusal on as an error for the view to word', () => {

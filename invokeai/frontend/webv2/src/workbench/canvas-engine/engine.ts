@@ -170,6 +170,7 @@ import { colorLoupePixels, renderOverlay } from '@workbench/canvas-engine/render
 import { trimPaintCacheToAlpha } from '@workbench/canvas-engine/render/paintCacheTrim';
 import { createDomRasterBackend, type RasterBackend, type RasterSurface } from '@workbench/canvas-engine/render/raster';
 import {
+  RasterCompositeNotReadyError,
   RasterCompositeOverBudgetError,
   RasterCompositeUnreadableError,
 } from '@workbench/canvas-engine/render/rasterComposite';
@@ -196,6 +197,7 @@ import { FULL_DAMAGE } from '@workbench/canvas-engine/types';
 import { createViewport, type Viewport } from '@workbench/canvas-engine/viewport';
 
 import type { ImagePatchApply } from './history/imagePatch';
+import type { LayerUnreadable } from './layerExportGuards';
 import type { CanvasProjectMutation } from './mutationContracts';
 import type { StrokeCommittedEvent, Tool, ToolContext } from './tools/tool';
 
@@ -204,7 +206,7 @@ import { createDocumentMirror, type DocumentMirror } from './document/documentMi
 import { decideLayerChange, nextThumbnailDisplayToken } from './document/layerChangeDecision';
 import { getSourceBounds, getSourceContentRect, isRenderableLayer, renderableSourceOf } from './document/sources';
 import { collectCanvasFontReferences, replaceCanvasFontReferences } from './fontReferences';
-import { createLayerExportGuards, isSupportedExportSource } from './layerExportGuards';
+import { createLayerExportGuards, isSupportedExportSource, layerUnreadable } from './layerExportGuards';
 import { createLayerRasterizer } from './layerRasterizer';
 import { createPreviewPublisher } from './previewPublisher';
 import { createRasterSnapshotCapture } from './rasterSnapshotCapture';
@@ -1267,7 +1269,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const {
     dispose: disposeLayerRasterizer,
     getOrStartLayerRasterization,
-    hasFailed: hasFailedRasterization,
+    getFailure: getRasterizationFailure,
     isBackingOff: isRasterizationBackingOff,
   } = createLayerRasterizer({
     createSurface: (width, height) => backend.createSurface(width, height),
@@ -1369,11 +1371,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const rasterizeLayerPixels = rasterExportController.rasterize.bind(rasterExportController);
   const prepareLayerRasterCache = async (layerId: string) => {
     const result = await rasterizeLayerPixels(layerId, { includeDisabled: true });
+    if (result.status === 'unreadable') {
+      return result;
+    }
     if (result.status !== 'ok') {
-      return {
-        status:
-          result.status === 'over-budget' || result.status === 'unreadable' ? result.status : ('not-ready' as const),
-      };
+      return { status: result.status === 'over-budget' ? result.status : ('not-ready' as const) };
     }
     const layer = result.guard.layer;
     result.release();
@@ -1395,13 +1397,14 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const exportBakedLayerBlob = rasterExportController.blob.bind(rasterExportController);
   type StructuralExportLayerPixelsResult =
     | Extract<ExportLayerPixelsResult, { status: 'ok' }>
-    | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'unreadable' | 'over-budget' }
+    | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+    | LayerUnreadable
     | AdjustmentRefusal;
   const normalizeStructuralExport = async (
     result: Promise<ExportLayerPixelsResult>
   ): Promise<StructuralExportLayerPixelsResult> => {
     const resolved = await result;
-    if (resolved.status === 'ok' || resolved.status === 'adjustment-refused') {
+    if (resolved.status === 'ok' || resolved.status === 'adjustment-refused' || resolved.status === 'unreadable') {
       return resolved;
     }
     return { status: resolved.status === 'aborted' ? 'not-ready' : resolved.status };
@@ -1419,7 +1422,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     document: CanvasDocumentContractV3
   ): Promise<'published' | 'stale' | 'error'> => {
     const result = await getOrStartLayerRasterization(layer, document);
-    return result === 'aborted' ? 'stale' : result;
+    return result === 'aborted' ? 'stale' : result === 'unavailable' ? 'error' : result;
   };
 
   const cropLayerToBbox = (layerId: string): Promise<CropLayerResult> => layerController.crop.crop(layerId);
@@ -1441,7 +1444,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       throw new RasterCompositeOverBudgetError();
     }
     if (result.status === 'unreadable') {
-      throw new RasterCompositeUnreadableError(layerId);
+      throw new RasterCompositeUnreadableError(result);
+    }
+    if (result.status === 'not-ready') {
+      throw new RasterCompositeNotReadyError(layerId);
     }
     throw new Error(`Cannot rasterize layer ${layerId} for export: ${result.status}.`);
   };
@@ -2162,21 +2168,25 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     return !!entry && !entry.stale && !isCurrentRasterizationJob(layer);
   };
   /**
-   * `unreadable` while a failure is recorded for the layer's current source. Once its backoff has ended this also
-   * tries the image again in the background (a layer off screen or disabled is never redrawn to do so), so an image
-   * that became available recovers; a retry that fails again only restarts the backoff.
+   * Unreadable while an `unreadable` failure is recorded for the layer's current source, `not-ready` while it loads or
+   * its image could not be fetched for now. The image is tried again in the background (a layer off screen or disabled
+   * is never redrawn to do so), so one that became available recovers: at once after an `unavailable` failure, since
+   * the user asking again is the moment a recovered server should be noticed, and only once the backoff has ended
+   * after an `unreadable` one. A retry that fails again only restarts the backoff; a running job is joined, not
+   * duplicated.
    */
   const layerCacheReadinessForOp = (layer: CanvasLayerContract, doc: CanvasDocumentContractV3): LayerCacheReadiness => {
     if (isLayerCacheReadyForOp(layer, doc)) {
       return 'ready';
     }
-    if (isCurrentRasterizationJob(layer) || !hasFailedRasterization(layer)) {
+    const failure = isCurrentRasterizationJob(layer) ? null : getRasterizationFailure(layer);
+    if (!failure) {
       return 'not-ready';
     }
-    if (!isRasterizationBackingOff(layer)) {
+    if (failure === 'unavailable' || !isRasterizationBackingOff(layer)) {
       scheduleLayerRasterization([layer.id]);
     }
-    return 'unreadable';
+    return failure === 'unreadable' ? layerUnreadable(doc, layer.id) : 'not-ready';
   };
 
   const prepareGeneratedPaintCache = (layerId: string, rect: Rect, pixels: RasterSurface) =>

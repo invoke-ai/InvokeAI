@@ -1,4 +1,5 @@
 import type { CanvasDocumentContractV3 } from '@workbench/canvas-engine/contracts';
+import type { LayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
@@ -12,6 +13,7 @@ import {
   compositeScratchPixels,
   getBaseRasterContentBounds,
   planBaseRasterComposite,
+  RasterCompositeNotReadyError,
   RasterCompositeOverBudgetError,
   RasterCompositeUnreadableError,
   renderRasterComposite,
@@ -22,7 +24,8 @@ export type RasterCompositeExportRequest = { bounds: 'content' } | { bounds: 're
 
 export type RasterCompositeExportResult =
   | { status: 'ok'; blob: Blob; rect: Rect }
-  | { status: 'empty' | 'stale' | 'not-ready' | 'unreadable' | 'over-budget' }
+  | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 export interface RasterCompositeExportSnapshot {
@@ -77,7 +80,7 @@ export const exportRasterComposite = async (
         return { status: 'over-budget' };
       }
       if (error instanceof RasterCompositeUnreadableError) {
-        return { status: 'unreadable' };
+        return error.refusal;
       }
       if (error instanceof AdjustmentRefusedError) {
         return adjustmentRefusal(document, error.ownerId, error.reason);
@@ -85,6 +88,9 @@ export const exportRasterComposite = async (
       // Spatial work is cancelled only by cooldown, cache release or disposal; the export can simply be retried.
       if (!deps.isSnapshotCurrent(snapshot) || (error instanceof DOMException && error.name === 'AbortError')) {
         return { status: 'stale' };
+      }
+      if (error instanceof RasterCompositeNotReadyError) {
+        return { status: 'not-ready' };
       }
       throw error;
     }

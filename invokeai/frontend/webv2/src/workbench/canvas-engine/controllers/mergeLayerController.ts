@@ -30,6 +30,7 @@ import {
   inpaintMaskMergeEligibility,
 } from '@workbench/canvas-engine/document/mergeVisible';
 import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
+import { isLayerUnreadable, type LayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 import { isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 import {
   applyAdjustments,
@@ -69,8 +70,14 @@ import {
   type LayerPixels,
 } from './editSteps';
 
-/** `unreadable`: a contributor's pixels could not be read (its image is gone or does not decode). */
-export type MergeVisibleResult = 'merged' | LayerEditRefusal | 'nothing' | 'unreadable' | 'failed' | AdjustmentRefusal;
+/** {@link LayerUnreadable}: the first contributor whose pixels could not be read (its image is gone or does not decode). */
+export type MergeVisibleResult =
+  | 'merged'
+  | LayerEditRefusal
+  | 'nothing'
+  | 'failed'
+  | LayerUnreadable
+  | AdjustmentRefusal;
 
 /**
  * Every refusal leaves document, pixels and history alone. `settings-differ`: the masks are otherwise eligible, but
@@ -78,7 +85,8 @@ export type MergeVisibleResult = 'merged' | LayerEditRefusal | 'nothing' | 'unre
  */
 export type MergeInpaintMasksResult =
   | { status: 'merged'; layerId: string }
-  | { status: 'ineligible' | 'settings-differ' | 'missing' | 'unreadable' | 'failed' | LayerEditRefusal }
+  | { status: 'ineligible' | 'settings-differ' | 'missing' | 'failed' | LayerEditRefusal }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 /**
@@ -98,7 +106,8 @@ interface SelectedMergeSpec {
 
 type SelectedMergeResult =
   | { status: 'merged'; layerId: string }
-  | { status: Exclude<MergeVisibleResult, 'merged' | AdjustmentRefusal> }
+  | { status: Exclude<MergeVisibleResult, 'merged' | LayerUnreadable | AdjustmentRefusal> }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 const IDENTITY_TRANSFORM = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
@@ -131,13 +140,14 @@ export type MergeDownResult =
   | 'merged'
   | SubsetOf<CanvasCommandRefusal, 'missing' | 'unsupported'>
   | LayerEditRefusal
-  | 'unreadable'
   | 'failed'
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
-  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'unreadable' | 'over-budget' }
+  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 export interface MergeLayerControllerOptions {
@@ -424,8 +434,9 @@ export class MergeLayerController {
       if (exports.some((result) => result.status === 'over-budget')) {
         return 'over-budget';
       }
-      if (exports.some((result) => result.status === 'unreadable')) {
-        return 'unreadable';
+      const unreadable = exports.find(isLayerUnreadable);
+      if (unreadable) {
+        return unreadable;
       }
       if (exports.some((result) => result.status !== 'ok')) {
         return 'not-ready';
@@ -576,7 +587,7 @@ export class MergeLayerController {
       label: 'Merge selected layers',
       stack: 'raster',
     });
-    return isAdjustmentRefusal(result) ? result : result.status;
+    return isAdjustmentRefusal(result) || isLayerUnreadable(result) ? result : result.status;
   }
 
   /** Unions the coverage of selected inpaint masks, anywhere in the stack, into one new mask above the topmost. */
@@ -604,7 +615,7 @@ export class MergeLayerController {
       label: 'Merge masks',
       stack: 'inpaint_mask',
     });
-    if (result.status === 'merged' || isAdjustmentRefusal(result)) {
+    if (result.status === 'merged' || isAdjustmentRefusal(result) || isLayerUnreadable(result)) {
       return result;
     }
     return { status: result.status === 'nothing' ? 'ineligible' : result.status };
@@ -654,8 +665,9 @@ export class MergeLayerController {
       if (exports.some((result) => result.status === 'over-budget')) {
         return { status: 'over-budget' };
       }
-      if (exports.some((result) => result.status === 'unreadable')) {
-        return { status: 'unreadable' };
+      const unreadable = exports.find(isLayerUnreadable);
+      if (unreadable) {
+        return unreadable;
       }
       if (exports.some((result) => result.status !== 'ok')) {
         return { status: 'not-ready' };

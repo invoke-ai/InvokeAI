@@ -13,9 +13,14 @@ import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { isSupportedExportSource } from '@workbench/canvas-engine/layerExportGuards';
+import { ImageUnavailableError } from '@workbench/canvas-engine/render/rasterizers/imageRasterizer';
 
-/** How a rasterization ended: pixels landed, the world moved, it threw, or it was cancelled. */
-export type LayerRasterizationOutcome = 'published' | 'stale' | 'error' | 'aborted';
+/**
+ * How a rasterization ended: pixels landed, the world moved, it was cancelled, or it failed. `error`: the source cannot
+ * be read (its image is missing or does not decode, or rendering threw), so it fails again until it changes.
+ * `unavailable`: its image could not be fetched for now, so a later try may succeed.
+ */
+export type LayerRasterizationOutcome = 'published' | 'stale' | 'error' | 'unavailable' | 'aborted';
 
 /** The registry of in-flight rasterizations, keyed by layer. */
 export interface RasterizationJobRegistry {
@@ -66,12 +71,13 @@ export interface LayerRasterizer {
     signal?: AbortSignal
   ): Promise<LayerRasterizationOutcome>;
   /**
-   * Whether the last rasterization of `layer`'s current source, cache version and document generation failed, so its
-   * stale cache cannot become ready by waiting. A success or any change to the layer clears it.
+   * How the last rasterization of `layer`'s current source, cache version and document generation failed, or null:
+   * `unreadable` when its stale cache cannot become ready by waiting, `unavailable` when its image could not be
+   * fetched for now. A success or any change to the layer clears it.
    */
-  hasFailed(layer: CanvasLayerContract): boolean;
+  getFailure(layer: CanvasLayerContract): RasterizationFailureKind | null;
   /**
-   * Whether {@link hasFailed} and the failure's retry backoff is still running. The backoff starts at
+   * Whether a failure of either kind is recorded and its retry backoff is still running. The backoff starts at
    * {@link RASTERIZATION_RETRY_BASE_MS} and doubles per repeated failure up to {@link RASTERIZATION_RETRY_MAX_MS}; its
    * end invalidates the layer's render, so a displayed layer retries on its own.
    */
@@ -80,8 +86,11 @@ export interface LayerRasterizer {
   dispose(): void;
 }
 
-/** What a failed rasterization read; a later failure of the same key is the same failure. */
+export type RasterizationFailureKind = 'unreadable' | 'unavailable';
+
+/** What a failed rasterization read; a later failure of the same key continues its backoff, whatever its kind. */
 interface RasterizationFailure {
+  readonly kind: RasterizationFailureKind;
   readonly version: number;
   readonly documentGeneration: number;
   readonly source: CanvasLayerSourceContract;
@@ -247,14 +256,22 @@ export const createLayerRasterizer = (deps: CreateLayerRasterizerDeps): LayerRas
           return 'stale';
         }
         deps.thumbnails.setStatus(layer.id, 'error');
-        // Retrying the same source fails the same way; only its first failure is worth a notice.
+        const kind: RasterizationFailureKind = error instanceof ImageUnavailableError ? 'unavailable' : 'unreadable';
+        // Retrying the same source fails the same way; only its first failure of each kind is worth a notice.
         const failedEntry = layerCache.peek(layer.id);
         const previous = failedEntry ? failures.get(failedEntry) : undefined;
         const repeated = !!failedEntry && isSameFailure(previous, version, documentGeneration, source);
         endBackoff(previous);
         if (failedEntry && !deps.isDisposed()) {
           const attempts = repeated ? previous!.attempts + 1 : 1;
-          const failure: RasterizationFailure = { attempts, cancelRetry: null, documentGeneration, source, version };
+          const failure: RasterizationFailure = {
+            attempts,
+            cancelRetry: null,
+            documentGeneration,
+            kind,
+            source,
+            version,
+          };
           failure.cancelRetry = setTimer(
             () => {
               failure.cancelRetry = null;
@@ -266,14 +283,14 @@ export const createLayerRasterizer = (deps: CreateLayerRasterizerDeps): LayerRas
           backoffs.add(failure);
           failures.set(failedEntry, failure);
         }
-        if (!repeated) {
+        if (!repeated || previous!.kind !== kind) {
           try {
             deps.reportError('Layer thumbnail rasterization failed', layer.id, error);
           } catch {
             // Diagnostics must not turn a handled thumbnail failure into a rejection.
           }
         }
-        return 'error';
+        return kind === 'unavailable' ? 'unavailable' : 'error';
       } finally {
         signal?.removeEventListener('abort', abort);
         jobs.finish(layer.id, job);
@@ -291,7 +308,8 @@ export const createLayerRasterizer = (deps: CreateLayerRasterizerDeps): LayerRas
       ? failure
       : undefined;
   };
-  const hasFailed = (layer: CanvasLayerContract): boolean => !!currentFailure(layer);
+  const getFailure = (layer: CanvasLayerContract): RasterizationFailureKind | null =>
+    currentFailure(layer)?.kind ?? null;
   const isBackingOff = (layer: CanvasLayerContract): boolean => !!currentFailure(layer)?.cancelRetry;
 
   const dispose = (): void => {
@@ -300,5 +318,5 @@ export const createLayerRasterizer = (deps: CreateLayerRasterizerDeps): LayerRas
     }
   };
 
-  return { dispose, getOrStartLayerRasterization, hasFailed, isBackingOff };
+  return { dispose, getFailure, getOrStartLayerRasterization, isBackingOff };
 };

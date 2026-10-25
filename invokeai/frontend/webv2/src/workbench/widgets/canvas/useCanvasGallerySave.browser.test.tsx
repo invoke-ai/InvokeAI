@@ -48,7 +48,8 @@ vi.mock('@features/gallery/queries', async (importOriginal) => ({
 }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { board?: string }) => (options?.board ? `${key}: ${options.board}` : key),
+    t: (key: string, options?: { board?: string; name?: string }) =>
+      options?.board || options?.name ? `${key}: ${options.board ?? options.name}` : key,
   }),
 }));
 
@@ -138,14 +139,14 @@ describe('useCanvasGallerySave across surfaces', () => {
     await act(() => menu.current!.save('canvas'));
     expect(mocks.saveCanvasToGallery).toHaveBeenCalledTimes(2);
   });
-  it('says a layer could not be read rather than that the canvas is still preparing', async () => {
-    mocks.saveCanvasToGallery.mockResolvedValueOnce({ status: 'unreadable' });
+  it('names the layer that could not be read rather than saying the canvas is still preparing', async () => {
+    mocks.saveCanvasToGallery.mockResolvedValueOnce({ layerId: 'layer-7', layerName: 'Sky', status: 'unreadable' });
 
     await act(() => header.current!.save('canvas'));
 
     expect(mocks.notifyError).toHaveBeenCalledWith(
       'widgets.canvas.contextMenu.saveError',
-      'widgets.canvas.contextMenu.unreadable'
+      'widgets.canvas.contextMenu.unreadable: Sky'
     );
     expect(mocks.notifyInfo).not.toHaveBeenCalled();
     expect(mocks.reportError).not.toHaveBeenCalled();

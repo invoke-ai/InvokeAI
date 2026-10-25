@@ -1,5 +1,5 @@
 import type { GalleryImage } from '@features/gallery';
-import type { AdjustmentRefusal, CanvasLayerCapability } from '@workbench/canvas-engine/api';
+import type { AdjustmentRefusal, CanvasLayerCapability, LayerUnreadable } from '@workbench/canvas-engine/api';
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { Project } from '@workbench/projectContracts';
@@ -28,7 +28,8 @@ export type CreateFromBboxDestination = 'global-reference' | CreateFromBboxLayer
 export type CreateFromBboxResult =
   | { status: 'created'; destination: CreateFromBboxLayerDestination; layerIds: string[] }
   | { status: 'uploaded'; image: CanvasImageUploadResult }
-  | { status: 'empty' | 'stale' | 'not-ready' | 'unreadable' | 'over-budget' }
+  | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' }
+  | LayerUnreadable
   | AdjustmentRefusal
   | { status: 'blocked' | 'stale-document' | 'stale-project' };
 

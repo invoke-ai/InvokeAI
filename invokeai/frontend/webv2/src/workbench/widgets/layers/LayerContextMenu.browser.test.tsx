@@ -7,7 +7,7 @@ import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 import { ChakraProvider } from '@chakra-ui/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
-import { getDocumentIndex, getDocumentLeaves } from '@workbench/canvas-engine/api';
+import { CanvasImageMissingError, getDocumentIndex, getDocumentLeaves } from '@workbench/canvas-engine/api';
 import {
   groupContract,
   layerContract,
@@ -83,7 +83,7 @@ const maskLayer = (id: string, overrides: Partial<CanvasLayerContract> = {}): Ca
 
 /**
  * Renders the Layers panel's layer menu over a real engine for `nodes`, with `selectedIds` selected in the panel (the
- * first as primary), returning a way to open it on a layer. Images named in `unreadable` fail to load.
+ * first as primary), returning a way to open it on a layer. Images named in `unreadable` no longer exist.
  */
 const renderMenu = async (
   nodes: CanvasNodeContract[],
@@ -110,7 +110,7 @@ const renderMenu = async (
   const engine = createCanvasEngine({
     ensureProjectOnServer: () => Promise.resolve(),
     imageResolver: (imageName) =>
-      unreadable.includes(imageName) ? Promise.reject(new Error('image deleted')) : Promise.resolve(pixels),
+      unreadable.includes(imageName) ? Promise.reject(new CanvasImageMissingError(imageName)) : Promise.resolve(pixels),
     mutationPort: createCanvasProjectMutationPort(store, projectId),
     projectId,
     reportError: () => undefined,
@@ -196,10 +196,10 @@ describe('Layers context menu over a real engine', () => {
     ['Crop layer to frame', ['gone'], []],
     ['Merge selected layers', ['gone', 'kept'], ['kept']],
   ] as const)(
-    'says %s could not read a missing image, never that it is still loading',
+    'says %s could not read a missing image, naming its layer, never that it is still loading',
     async (label, ids, readable) => {
       const { document, notices, openMenu } = await renderMenu(
-        ids.map(imageLayer),
+        ids.map((id) => (id === 'gone' ? { ...imageLayer(id), name: 'Sky' } : imageLayer(id))),
         ids,
         ids.filter((id) => !(readable as readonly string[]).includes(id)).map((id) => `${id}.png`)
       );
@@ -211,13 +211,24 @@ describe('Layers context menu over a real engine', () => {
       await vi.waitFor(() =>
         expect(notices()).toContainEqual([
           'Layer action failed',
-          "A layer's image could not be read (it may have been deleted or damaged), so nothing was changed.",
+          '“Sky” could not be read (its image may have been deleted or damaged), so nothing was changed. Delete or replace that layer, then try again.',
         ])
       );
       expect(notices().flat()).not.toContain('The layer content is still loading. Try again shortly.');
       expect(document().stacks).toBe(before.stacks);
     }
   );
+
+  it('describes Add regenerate region under its label', async () => {
+    const { openMenu } = await renderMenu([imageLayer('art')]);
+
+    await openMenu('art');
+
+    const regenerate = document.querySelector('[role="menuitem"][data-value="add-regenerate-region"]');
+    expect(regenerate?.textContent).toBe(
+      'Add regenerate regionRegenerate where this layer has content, as a live inpaint mask.'
+    );
+  });
 
   it('keeps an unavailable Merge masks reachable by keyboard and says why', async () => {
     const { engine, openMenu } = await renderMenu(

@@ -10,7 +10,11 @@ import {
   isAdjustmentRefusal,
 } from '@workbench/canvas-engine/api';
 import { useCanvasEngineRead } from '@workbench/widgets/canvas/engineStoreHooks';
-import { describeAdjustmentRefusal, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
+import {
+  describeAdjustmentRefusal,
+  describeNamedRefusal,
+  usePreparedCommit,
+} from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectName } from '@workbench/WorkbenchContext';
 import { EyeIcon, EyeOffIcon, FileDownIcon, LayersIcon, PlusIcon } from 'lucide-react';
 import { useMemo } from 'react';
@@ -25,7 +29,7 @@ import {
   stackVisibilityAxis,
   type StackActionId,
 } from './layerStackActions';
-import { getPsdExportNoticeKey } from './psdExportNotice';
+import { getPsdExportNotice } from './psdExportNotice';
 import { useAddLayer } from './useAddLayer';
 
 export type LayerStackActionsEngine = Pick<CanvasEngineHandle, 'document' | 'exports' | 'interaction' | 'layers'>;
@@ -93,9 +97,9 @@ export const useLayerStackActions = (
                 });
                 return;
               }
-              const noticeKey = getPsdExportNoticeKey(result);
-              if (noticeKey) {
-                toaster.create({ title: t(noticeKey), type: 'warning' });
+              const notice = getPsdExportNotice(result);
+              if (notice) {
+                toaster.create({ title: t(notice.key, notice.options), type: 'warning' });
               }
             })
             .catch(() => toaster.create({ title: t('widgets.layers.groupActions.exportFailed'), type: 'error' }));
@@ -111,20 +115,14 @@ export const useLayerStackActions = (
             return;
           }
           void engine.layers.mergeVisibleRasterLayers().then((result) => {
-            if (isAdjustmentRefusal(result)) {
+            if (typeof result === 'object') {
               toaster.create({
-                description: describeAdjustmentRefusal(result, t),
+                description: describeNamedRefusal(result, t),
                 title: t('widgets.layers.actions.actionFailed'),
-                type: 'warning',
+                type: isAdjustmentRefusal(result) ? 'warning' : 'error',
               });
             } else if (result === 'not-ready') {
               toaster.create({ title: t('widgets.layers.groupActions.mergeNotReady'), type: 'warning' });
-            } else if (result === 'unreadable') {
-              toaster.create({
-                description: t('widgets.layers.actions.unreadable'),
-                title: t('widgets.layers.actions.actionFailed'),
-                type: 'error',
-              });
             } else if (result === 'over-budget') {
               toaster.create({ title: t('widgets.layers.groupActions.mergeOverBudget'), type: 'warning' });
             } else if (result === 'failed') {

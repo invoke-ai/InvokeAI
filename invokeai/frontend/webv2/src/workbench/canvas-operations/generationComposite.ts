@@ -10,6 +10,7 @@ import type {
   CanvasDocumentSnapshot,
   CanvasRegionalGuidanceLayerContract,
   CanvasStateContractV3,
+  LayerUnreadable,
 } from '@workbench/canvas-engine/api';
 import type { CaptureRasterSnapshotResult } from '@workbench/canvas-engine/rasterTransactions';
 import type { Rect } from '@workbench/canvas-engine/types';
@@ -128,7 +129,8 @@ export interface GenerationComposites {
 
 export type ComposeForGenerationResult =
   | { status: 'ok'; composites: GenerationComposites; dedupeCommit: GenerationCompositeDedupeCommit }
-  | { status: 'no-document' | 'stale' | 'aborted' | 'not-ready' | 'unreadable' | 'over-budget' }
+  | { status: 'no-document' | 'stale' | 'aborted' | 'not-ready' | 'over-budget' }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 /**

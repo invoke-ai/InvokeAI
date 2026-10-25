@@ -50,6 +50,7 @@ import type {
   CanvasFontReplacementSummary,
   CanvasFontReplacementTarget,
 } from './fontReferences';
+import type { LayerUnreadable } from './layerExportGuards';
 import type { CanvasLayerPreviewMutation, CanvasProjectMutation } from './mutationContracts';
 import type { AdjustmentRefusal } from './render/exactAdjustments';
 import type { Rect, ToolId, Vec2 } from './types';
@@ -266,11 +267,11 @@ export interface CanvasDocumentSnapshot {
 
 export type PsdExportResult =
   | AdjustmentRefusal
+  | LayerUnreadable
   | 'exported'
   | 'nothing'
   | 'too-large'
   | 'over-budget'
-  | 'unreadable'
   | SubsetOf<CanvasTransactionOutcome, 'not-ready' | 'stale' | 'aborted'>;
 
 export interface CanvasPsdExportCapability {
@@ -378,9 +379,9 @@ export type ExportBakedLayerBlobResult =
         | SubsetOf<CanvasTransactionOutcome, 'not-ready' | 'aborted'>
         | 'disabled'
         | 'empty'
-        | 'over-budget'
-        | 'unreadable';
+        | 'over-budget';
     }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 export interface CanvasSelectionCapability {
@@ -553,12 +554,9 @@ export interface FilterPreviewInput {
 export type DuplicateLayersResult =
   | { readonly status: 'duplicated'; readonly duplicateIds: readonly string[]; readonly selectedLayerId: string }
   | {
-      readonly status:
-        | SubsetOf<CanvasTransactionOutcome, 'busy' | 'not-ready' | 'stale'>
-        | 'nothing'
-        | 'over-budget'
-        | 'unreadable';
-    };
+      readonly status: SubsetOf<CanvasTransactionOutcome, 'busy' | 'not-ready' | 'stale'> | 'nothing' | 'over-budget';
+    }
+  | LayerUnreadable;
 /**
  * Layer pixel operations report a distinct outcome: refused before anything changed (`busy`, `not-ready`,
  * `over-budget` when the edit could never be undone), nothing to do, or `failed` when the document refused it.
@@ -779,7 +777,7 @@ export {
   TEXT_FONT_WEIGHTS,
 } from './engineStores';
 export type { LayerTransform } from './transform/transformMath';
-export type { ImageResolver } from './render/rasterizers';
+export { CanvasImageMissingError, type ImageResolver } from './render/rasterizers';
 export type { Rect, SelectionOp, ToolId, Vec2 } from './types';
 export { adjustmentsKey, buildCurveLut, isIdentityAdjustments } from './render/adjustments';
 export { isAdjustmentRefusal, type AdjustmentRefusal, type AdjustmentRefusalReason } from './render/exactAdjustments';
@@ -894,7 +892,7 @@ export {
   type CanvasNodeMove,
   type InsertionAnchorCapture,
 } from './document/insertionAnchors';
-export { isExportableRasterLayer } from './layerExportGuards';
+export { isExportableRasterLayer, isLayerUnreadable, type LayerUnreadable } from './layerExportGuards';
 export {
   getLayerThumbnailFallbackRenderState,
   nextLayerThumbnailFallbackStage,

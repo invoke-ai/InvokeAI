@@ -15,6 +15,7 @@ import type {
   CommitMaskImageResult,
   CommitMaskImageResultOptions,
 } from '@workbench/canvas-engine/controllers/maskResultController';
+import type { LayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 import type { CanvasCompositeExecutorDeps } from '@workbench/canvas-engine/rasterTransactions';
 import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
@@ -48,7 +49,8 @@ export interface CanvasApplicationHost {
     options?: ExportLayerPixelsOptions
   ): Promise<
     | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
-    | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'unreadable' | 'over-budget' }
+    | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+    | LayerUnreadable
     | AdjustmentRefusal
   >;
   getCompositeExecutorDeps(): CanvasCompositeExecutorDeps;

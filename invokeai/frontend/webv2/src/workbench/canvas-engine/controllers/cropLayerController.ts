@@ -5,6 +5,7 @@ import type {
   CanvasLayerSourceContract,
 } from '@workbench/canvas-engine/contracts';
 import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
+import type { LayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
@@ -31,29 +32,38 @@ import {
 
 /**
  * `locked`: the layer or a group above it is locked. `outside-frame`: the layer lies wholly outside the frame, so the
- * crop would empty it (crop all does that; an explicit crop of one layer refuses). `unreadable`: its pixels could not
- * be read (an image that is gone or does not decode).
+ * crop would empty it (crop all does that; an explicit crop of one layer refuses). {@link LayerUnreadable}: its
+ * pixels could not be read (an image that is gone or does not decode).
  */
 export type CropLayerResult =
   | { status: 'cropped' }
-  | { status: 'missing' | 'locked' | 'unsupported' | 'empty' | 'outside-frame' | 'unreadable' | LayerEditRefusal }
+  | { status: 'missing' | 'locked' | 'unsupported' | 'empty' | 'outside-frame' | LayerEditRefusal }
   | { status: 'failed'; message: string }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
+/** What crop all left alone: how many locked leaves, and each unreadable one in document order. */
+interface CropAllSkipped {
+  readonly skippedLocked: number;
+  readonly skippedUnreadable: readonly LayerUnreadable[];
+}
+
 /**
- * `skippedLocked` counts locked leaves (own or ancestor lock) and `skippedUnreadable` leaves whose pixels could not be
- * read, each only when its content reaches past the frame; both are left as they are. `nothing` when every other leaf
- * already fits; every refusal leaves document, pixels and history alone.
+ * `skippedLocked` counts locked leaves (own or ancestor lock) and `skippedUnreadable` lists leaves whose pixels could
+ * not be read, each only when its content reaches past the frame; both are left as they are. `nothing` when every
+ * other leaf already fits; every refusal leaves document, pixels and history alone. A leaf whose image could not be
+ * fetched for now refuses the whole crop as `not-ready`, since trying again can crop it too.
  */
 export type CropAllLayersResult =
-  | { status: 'cropped'; cropped: number; skippedLocked: number; skippedUnreadable: number }
-  | { status: 'nothing'; skippedLocked: number; skippedUnreadable: number }
+  | ({ status: 'cropped'; cropped: number } & CropAllSkipped)
+  | ({ status: 'nothing' } & CropAllSkipped)
   | { status: 'stale' | 'failed' | LayerEditRefusal }
   | AdjustmentRefusal;
 
 type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
-  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'unreadable' | 'over-budget' }
+  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 export interface CropLayerControllerOptions {
@@ -138,11 +148,7 @@ const cropPixels = (backend: RasterBackend, exported: RasterSurface, exportedRec
 };
 
 /** What crop all makes of one leaf's export. */
-type CropExport =
-  | Extract<ExportResult, { status: 'ok' }>
-  | { status: 'skip' }
-  | { status: 'unreadable' }
-  | CropAllLayersResult;
+type CropExport = Extract<ExportResult, { status: 'ok' }> | { status: 'skip' } | LayerUnreadable | CropAllLayersResult;
 
 /** One leaf's crop: its contract and pixels before and after. */
 interface LayerCrop {
@@ -181,7 +187,7 @@ export class CropLayerController {
     }
     try {
       const exported = await this.deps.exportBaked(layerId);
-      if (exported.status === 'adjustment-refused') {
+      if (exported.status === 'adjustment-refused' || exported.status === 'unreadable') {
         return exported;
       }
       if (exported.status !== 'ok') {
@@ -287,7 +293,7 @@ export class CropLayerController {
     }
     const document = ctx.getDocument();
     if (!document) {
-      return { skippedLocked: 0, skippedUnreadable: 0, status: 'nothing' };
+      return { skippedLocked: 0, skippedUnreadable: [], status: 'nothing' };
     }
     const frame = roundOut(document.bbox);
     /** Whether cropping would change `leaf`, judged from its contract: content reaching past the frame. */
@@ -296,7 +302,7 @@ export class CropLayerController {
       return !isEmpty(content) && cropRectFor(transformBounds(leaf.worldTransform, content), frame) !== null;
     };
     let skippedLocked = 0;
-    let skippedUnreadable = 0;
+    const skippedUnreadable: LayerUnreadable[] = [];
     const candidates: SemanticLeaf[] = [];
     for (const leaf of compileDocumentLeaves(document)) {
       const eligibility = cropEligibility(leaf, this.deps.isSupportedSource);
@@ -318,7 +324,7 @@ export class CropLayerController {
         if (exported.status === 'unreadable') {
           // Waiting cannot make it readable; one such layer must not hold every other layer back.
           if (reachesPastFrame(leaf)) {
-            skippedUnreadable += 1;
+            skippedUnreadable.push(exported);
           }
           continue;
         }
@@ -374,18 +380,15 @@ export class CropLayerController {
   }
 
   /**
-   * A leaf's baked pixels for crop all, `skip` when it has nothing to crop, or `unreadable`. A leaf with its own adjustment stack is
-   * first exported raw: adjustments never move pixels, so the raw rect is the baked one, and a leaf already inside the
-   * frame never runs its stack (a spatial job that could refuse the whole crop). Its guard still joins the staleness
-   * check, as every read leaf's does.
+   * A leaf's baked pixels for crop all, `skip` when it has nothing to crop, or its unreadable refusal. A leaf with its
+   * own adjustment stack is first exported raw: adjustments never move pixels, so the raw rect is the baked one, and a
+   * leaf already inside the frame never runs its stack (a spatial job that could refuse the whole crop). Its guard
+   * still joins the staleness check, as every read leaf's does.
    */
   private async exportForCrop(layer: CanvasLayerContract, frame: Rect): Promise<CropExport> {
     const settle = (exported: ExportResult): CropExport => {
-      if (exported.status === 'ok' || exported.status === 'adjustment-refused') {
+      if (exported.status === 'ok' || exported.status === 'adjustment-refused' || exported.status === 'unreadable') {
         return exported;
-      }
-      if (exported.status === 'unreadable') {
-        return { status: 'unreadable' };
       }
       if (exported.status === 'missing') {
         return { status: 'stale' };
@@ -410,7 +413,7 @@ export class CropLayerController {
   private publishAll(
     document: CanvasDocumentContractV3,
     cropped: readonly CroppedLeaf[],
-    skipped: { readonly skippedLocked: number; readonly skippedUnreadable: number }
+    skipped: CropAllSkipped
   ): CropAllLayersResult {
     const { ctx } = this.deps;
     const afterBytes = cropped.reduce((sum, leaf) => sum + rgbaBytes(leaf.pixels.rect), 0);

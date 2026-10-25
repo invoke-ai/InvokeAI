@@ -61,6 +61,7 @@ import { createBitmapStore } from './document/bitmapStore';
 import { mergeDownMatrix } from './document/mergeDown';
 import { createCanvasEngine as createCoreCanvasEngine } from './engine';
 import { RASTERIZATION_RETRY_BASE_MS } from './layerRasterizer';
+import { CanvasImageMissingError } from './render/rasterizers/imageRasterizer';
 
 interface EngineStore {
   dispatch(action: EngineTestAction): void;
@@ -813,7 +814,7 @@ describe('createCanvasEngine', () => {
     }
   });
 
-  it('keeps Merge down unreadable past the backoff for a layer nobody redraws, and merges once its image loads', async () => {
+  it('answers Merge down not ready while an image cannot be fetched, retrying it on every ask, and merges once it loads', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
       const document = { ...makeDoc(), stacks: stacksFrom([rasterLayer('upper'), rasterLayer('flaky')]) };
@@ -822,7 +823,127 @@ describe('createCanvasEngine', () => {
       const imageResolver = vi.fn((imageName: string) =>
         imageName !== 'flaky' || available
           ? Promise.resolve(new Blob())
-          : Promise.reject(new Error('backend restarting'))
+          : Promise.reject(new Error('Failed to load canvas image "flaky" (503)'))
+      );
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        bitmapStore: createSpyBitmapStore(),
+        imageResolver,
+        projectId,
+        reportError: vi.fn(),
+        store,
+      });
+      const settle = async () => {
+        for (let tick = 0; tick < 50; tick += 1) {
+          await Promise.resolve();
+        }
+      };
+      const flakyFetches = () => imageResolver.mock.calls.filter(([name]) => name === 'flaky').length;
+      expect((await engine.exports.exportLayerPixels('upper')).status).toBe('ok');
+      expect(await engine.exports.exportLayerPixels('flaky')).toEqual({ status: 'not-ready' });
+      expect(flakyFetches()).toBe(1);
+      // Asking again fetches at once, inside the backoff; a second ask joins that fetch rather than starting another.
+      const asks = [engine.layers.mergeLayerDown('upper'), engine.layers.mergeLayerDown('upper')];
+      expect(await Promise.all(asks)).toEqual(['not-ready', 'not-ready']);
+      await settle();
+      expect(flakyFetches()).toBe(2);
+
+      // The server recovers; the next ask, still inside the backoff, fetches and the one after merges.
+      available = true;
+      expect(await engine.layers.mergeLayerDown('upper')).toBe('not-ready');
+      await settle();
+      expect(flakyFetches()).toBe(3);
+      expect(await engine.layers.mergeLayerDown('upper')).toBe('merged');
+      engine.lifecycle.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('crops all at once when asked again after a fetch outage ends, without waiting out the backoff', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const document = {
+        ...makeDoc(),
+        bbox: { height: 8, width: 8, x: 0, y: 0 },
+        stacks: stacksFrom([rasterLayer('flaky'), rasterLayer('a')]),
+      };
+      const { projectId, store } = createReducerBackedStore(document);
+      let available = false;
+      const imageResolver = vi.fn((imageName: string) =>
+        imageName !== 'flaky' || available
+          ? Promise.resolve(new Blob())
+          : Promise.reject(new Error('Failed to load canvas image "flaky" (503)'))
+      );
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        bitmapStore: createSpyBitmapStore(),
+        imageResolver,
+        projectId,
+        reportError: vi.fn(),
+        store,
+      });
+      const flakyFetches = () => imageResolver.mock.calls.filter(([name]) => name === 'flaky').length;
+
+      expect(await engine.layers.cropAllLayersToBbox()).toEqual({ status: 'not-ready' });
+      expect(getDocumentLayer(engine.document.getDocument()!, 'a')).toMatchObject({ source: { type: 'image' } });
+      expect(flakyFetches()).toBe(1);
+
+      available = true;
+      expect(await engine.layers.cropAllLayersToBbox()).toEqual({
+        cropped: 2,
+        skippedLocked: 0,
+        skippedUnreadable: [],
+        status: 'cropped',
+      });
+      expect(flakyFetches()).toBe(2);
+      engine.lifecycle.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('names the topmost of two unreadable layers when Merge selected refuses', async () => {
+    const document = {
+      ...makeDoc(),
+      stacks: stacksFrom([
+        { ...rasterLayer('upper'), name: 'Sky' },
+        { ...rasterLayer('below'), name: 'Hills' },
+      ]),
+    };
+    const { projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: (imageName) => Promise.reject(new CanvasImageMissingError(imageName)),
+      projectId,
+      reportError: vi.fn(),
+      store,
+    });
+
+    // Contributors are read in document order, topmost first, and the first that cannot be read is named.
+    expect(await engine.layers.mergeSelectedRasterLayers(['below', 'upper'])).toEqual({
+      layerId: 'upper',
+      layerName: 'Sky',
+      status: 'unreadable',
+    });
+    expect(getDocumentLeaves(engine.document.getDocument()!).map((layer) => layer.id)).toEqual(['upper', 'below']);
+    engine.lifecycle.dispose();
+  });
+
+  it('keeps Merge down unreadable past the backoff for a layer nobody redraws, and merges once its image loads', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const document = {
+        ...makeDoc(),
+        stacks: stacksFrom([rasterLayer('upper'), { ...rasterLayer('flaky'), name: 'Sky' }]),
+      };
+      const { projectId, store } = createReducerBackedStore(document);
+      let available = false;
+      const imageResolver = vi.fn((imageName: string) =>
+        imageName !== 'flaky' || available
+          ? Promise.resolve(new Blob())
+          : Promise.reject(new CanvasImageMissingError(imageName))
       );
       const reportError = vi.fn();
       const engine = createCanvasEngine({
@@ -838,21 +959,23 @@ describe('createCanvasEngine', () => {
           await Promise.resolve();
         }
       };
+      // The refusal names the layer below, which is the one that cannot be read.
+      const unreadable = { layerId: 'flaky', layerName: 'Sky', status: 'unreadable' };
       // No surface is attached, so nothing redraws either layer.
       expect((await engine.exports.exportLayerPixels('upper')).status).toBe('ok');
-      expect((await engine.exports.exportLayerPixels('flaky')).status).toBe('unreadable');
-      expect(await engine.layers.mergeLayerDown('upper')).toBe('unreadable');
+      expect(await engine.exports.exportLayerPixels('flaky')).toEqual(unreadable);
+      expect(await engine.layers.mergeLayerDown('upper')).toEqual(unreadable);
 
       vi.advanceTimersByTime(RASTERIZATION_RETRY_BASE_MS);
       // Past the backoff it still cannot be read, and asking tries the image again in the background.
-      expect(await engine.layers.mergeLayerDown('upper')).toBe('unreadable');
+      expect(await engine.layers.mergeLayerDown('upper')).toEqual(unreadable);
       await settle();
       expect(imageResolver.mock.calls.filter(([name]) => name === 'flaky')).toHaveLength(2);
       expect(reportError.mock.calls).toHaveLength(1);
 
       available = true;
       vi.advanceTimersByTime(RASTERIZATION_RETRY_BASE_MS * 2);
-      expect(await engine.layers.mergeLayerDown('upper')).toBe('unreadable');
+      expect(await engine.layers.mergeLayerDown('upper')).toEqual(unreadable);
       await settle();
       expect(await engine.layers.mergeLayerDown('upper')).toBe('merged');
       engine.lifecycle.dispose();
@@ -1099,7 +1222,7 @@ describe('createCanvasEngine', () => {
     const { store } = createReactiveStore(makeDoc());
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
-      imageResolver: () => Promise.reject(new Error('decode unavailable')),
+      imageResolver: (imageName) => Promise.reject(new CanvasImageMissingError(imageName)),
       projectId: 'p1',
       reportError: vi.fn(),
       store,
@@ -1107,6 +1230,8 @@ describe('createCanvasEngine', () => {
     const documentSnapshot = engine.document.captureSnapshot();
 
     await expect(engine.exports.captureRasterSnapshot(documentSnapshot!, ['a'])).resolves.toEqual({
+      layerId: 'a',
+      layerName: 'a',
       status: 'unreadable',
     });
     engine.lifecycle.dispose();
@@ -1345,18 +1470,40 @@ describe('createCanvasEngine', () => {
     engine.lifecycle.dispose();
   });
 
-  it('refuses a composite export with a layer whose image cannot be read as unreadable', async () => {
-    const { store } = createReactiveStore(makeDoc());
+  it('refuses a composite export with a layer whose image is gone as unreadable, naming the layer', async () => {
+    const { store } = createReactiveStore({
+      ...makeDoc(),
+      stacks: stacksFrom([{ ...rasterLayer('a'), name: 'Sky' }, rasterLayer('b')]),
+    });
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
-      imageResolver: () => Promise.reject(new Error('image deleted')),
+      imageResolver: (imageName) =>
+        imageName === 'a' ? Promise.reject(new CanvasImageMissingError(imageName)) : Promise.resolve(new Blob()),
       projectId: 'p1',
       reportError: vi.fn(),
       store,
     });
 
     await expect(engine.exports.exportRasterComposite({ bounds: 'content' })).resolves.toEqual({
+      layerId: 'a',
+      layerName: 'Sky',
       status: 'unreadable',
+    });
+    engine.lifecycle.dispose();
+  });
+
+  it('refuses a composite export as not ready, never unreadable, while a layer image cannot be fetched', async () => {
+    const { store } = createReactiveStore(makeDoc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.reject(new Error('Failed to load canvas image "a" (503)')),
+      projectId: 'p1',
+      reportError: vi.fn(),
+      store,
+    });
+
+    await expect(engine.exports.exportRasterComposite({ bounds: 'content' })).resolves.toEqual({
+      status: 'not-ready',
     });
     engine.lifecycle.dispose();
   });
@@ -1724,7 +1871,11 @@ describe('createCanvasEngine', () => {
       store,
     });
 
-    expect(await engine.exports.exportLayerPixels('shape')).toEqual({ status: 'unreadable' });
+    expect(await engine.exports.exportLayerPixels('shape')).toEqual({
+      layerId: 'shape',
+      layerName: 'shape',
+      status: 'unreadable',
+    });
     expect((await engine.exports.exportLayerPixels('shape')).status).toBe('ok');
     engine.lifecycle.dispose();
   });
@@ -2362,7 +2513,7 @@ describe('createCanvasEngine', () => {
     expect(await engine.layers.cropAllLayersToBbox()).toEqual({
       cropped: 3,
       skippedLocked: 1,
-      skippedUnreadable: 0,
+      skippedUnreadable: [],
       status: 'cropped',
     });
     const cropped = structuredClone(engine.document.getDocument()!);
@@ -2395,17 +2546,18 @@ describe('createCanvasEngine', () => {
       backend: createTestStubRasterBackend(),
       bitmapStore: createSpyBitmapStore(),
       imageResolver: (imageName) =>
-        imageName === 'broken' ? Promise.reject(new Error('image deleted')) : Promise.resolve(new Blob()),
+        imageName === 'broken' ? Promise.reject(new CanvasImageMissingError(imageName)) : Promise.resolve(new Blob()),
       projectId,
       reportError,
       store,
     });
     const broken = getDocumentLayer(engine.document.getDocument()!, 'broken');
+    const skippedUnreadable = [{ layerId: 'broken', layerName: 'broken', status: 'unreadable' }];
 
     expect(await engine.layers.cropAllLayersToBbox()).toEqual({
       cropped: 1,
       skippedLocked: 0,
-      skippedUnreadable: 1,
+      skippedUnreadable,
       status: 'cropped',
     });
     expect(getDocumentLayer(engine.document.getDocument()!, 'broken')).toBe(broken);
@@ -2413,7 +2565,7 @@ describe('createCanvasEngine', () => {
     // Asking again reads the image again, but the same failure raises no second notice.
     expect(await engine.layers.cropAllLayersToBbox()).toEqual({
       skippedLocked: 0,
-      skippedUnreadable: 1,
+      skippedUnreadable,
       status: 'nothing',
     });
     const readFailures = reportError.mock.calls.filter(
@@ -2464,7 +2616,7 @@ describe('createCanvasEngine', () => {
     const { projectId, store } = createReducerBackedStore(document);
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
-      imageResolver: () => Promise.reject(new Error('decode failed')),
+      imageResolver: (imageName) => Promise.reject(new CanvasImageMissingError(imageName)),
       projectId,
       store,
     });
@@ -2472,7 +2624,11 @@ describe('createCanvasEngine', () => {
     expect(await engine.layers.cropLayerToBbox('missing')).toEqual({ status: 'missing' });
     expect(await engine.layers.cropLayerToBbox('locked')).toEqual({ status: 'locked' });
     expect(await engine.layers.cropLayerToBbox('polygon')).toEqual({ status: 'unsupported' });
-    expect(await engine.layers.cropLayerToBbox('unreadable')).toEqual({ status: 'unreadable' });
+    expect(await engine.layers.cropLayerToBbox('unreadable')).toEqual({
+      layerId: 'unreadable',
+      layerName: 'unreadable',
+      status: 'unreadable',
+    });
     engine.lifecycle.dispose();
   });
 
@@ -5738,7 +5894,7 @@ describe('requestLayerThumbnail', () => {
       expect.objectContaining({
         area: 'canvas-engine',
         context: expect.objectContaining({
-          error: expect.objectContaining({ message: 'decode failed' }),
+          error: expect.objectContaining({ message: 'Canvas image "a" could not be fetched.' }),
           layerId: 'a',
         }),
         message: 'Layer thumbnail rasterization failed',
@@ -7936,7 +8092,7 @@ describe('structural raster publication failure atomicity', () => {
     }
     slowImage.resolve(new Blob());
 
-    await expect(crop).resolves.toEqual({ cropped: 2, skippedLocked: 0, skippedUnreadable: 0, status: 'cropped' });
+    await expect(crop).resolves.toEqual({ cropped: 2, skippedLocked: 0, skippedUnreadable: [], status: 'cropped' });
     expect(engine.history.getEntries().past).toEqual(['Crop all layers to frame']);
     engine.lifecycle.dispose();
   });
