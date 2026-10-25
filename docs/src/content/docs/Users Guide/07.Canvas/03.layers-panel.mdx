@@ -30,7 +30,7 @@ The **Color** tab edits the two painting colors: the **Foreground color**, which
 * **Pick a color from the canvas** — the eyedropper. You can also hold **Alt** on the canvas. A magnifying loupe shows the pixel under the pointer and its RGB values; see the [Canvas guide](/users-guide/canvas/canvas-guide/#tools).
 * When an inpaint mask or regional guidance layer is selected, a third chip, **Mask tint**, edits the color of its overlay.
 
-Picking with **Alt** on the canvas writes to what you are editing: the mask tint while **Mask tint** is chosen, the selected shape layer's fill (foreground chip) or stroke (background chip), the selected text layer's color, and otherwise the active foreground or background color. A pick that changes a layer is one undoable step. The eyedropper button sets the mask tint while **Mask tint** is chosen, and otherwise the active foreground or background color.
+Picking with **Alt** on the canvas writes to what you are editing: the mask tint while **Mask tint** is chosen, the selected shape layer's fill (foreground chip) or stroke (background chip), the selected text layer's color, and otherwise the active foreground or background color. A pick never turns on a fill or stroke the shape does not have: on such a shape it sets the active foreground or background color instead. A pick that changes a layer is one undoable step. The eyedropper button sets the mask tint while **Mask tint** is chosen, and otherwise the active foreground or background color.
 
 The canvas's tool keys, such as **B** for the Brush, and **[**, **]**, **X** and **D**, also work while the Layers panel or the Color tab has focus, except while you type in a field.
 
@@ -85,7 +85,8 @@ The icons at the top **Arrange** the layer (move it to the front, forward, backw
   * **Rename layer** and **Fit to frame** (scale the layer to fit inside the generation frame).
   * **Merge down** — combines the layer with the one below. Each layer's adjustments are baked into the merged pixels; undo restores both layers with their adjustments.
   * **Copy to** — including **Copy layer to clipboard**, and copies to other layer types.
-  * **Crop layer to frame** and **Save layer to board** (save it to the Gallery as an upload, in Uncategorized or a board you pick from its submenu).
+  * **Crop layer to frame** — keeps only the part of the layer inside the generation frame. It refuses, saying why, a layer that is locked or inside a locked group, a layer that lies entirely outside the frame (cropping would leave it empty), and a layer whose image could not be read, for example because it was deleted from the Gallery.
+  * **Save layer to board** — saves the layer to the Gallery as an upload, in Uncategorized or a board you pick from its submenu.
   * **Disable layer**, **Lock layer**, **Bookmark for quick switch** and **Color label**. A bookmarked layer is where **Q** switches on the canvas; press **Q** again to return. The bookmark is temporary and is not saved in the project. It can reset when the canvas is released, for example after switching away from its project, and resets on reload.
   * **Remove from group** — for a layer inside a group: moves it out, directly above the group. With several layers selected, it appears when they are all in the same group, and moves them together in their current order. The emptied group stays.
   * **Delete layer**.
@@ -100,7 +101,7 @@ The icons at the top **Arrange** the layer (move it to the front, forward, backw
 * **Inpaint masks:** **Add noise**, **Add denoise limit**, **Extract masked area** (copy the masked part of the image to a new layer), and **Hide layer**.
 * **Regional guidance:** **Enable auto-negative**, **Add reference image**, and **Hide layer**.
 
-When several layers are selected, the menu also offers **Merge selected layers**. When only inpaint masks are selected, it offers **Merge masks** instead: the masks are combined into one new inpaint mask, named after the topmost one with "merged" added, which takes the topmost mask's fill color and style, noise and denoise limit. The new mask is placed where the topmost one was, even when the masks are in different groups, and replaces them. Merge masks needs two or more enabled, unlocked inpaint masks with content. One undo brings the original masks back.
+When several layers are selected, the menu also offers **Merge selected layers**. When only inpaint masks are selected, it offers **Merge masks** instead: the masks are combined into one new inpaint mask, named after the topmost one with "merged" added. It covers everywhere any of the masks did, at full strength whatever each mask's opacity, and takes the topmost mask's fill color and style. The new mask is placed where the topmost one was, even when the masks are in different groups, and replaces them. Merge masks needs two or more enabled, unlocked inpaint masks with content, whose noise and denoise limit settings match, since the new mask applies one setting to all of its area. When the item is unavailable, highlighting it shows why. One undo brings the original masks back.
 
 ## Properties
 

@@ -16,6 +16,8 @@ import { useCanvasGallerySave } from './useCanvasGallerySave';
 const mocks = vi.hoisted(() => ({
   activeProjectId: 'project-1',
   findGalleryItem: vi.fn(),
+  notifyError: vi.fn(),
+  notifyInfo: vi.fn(),
   reportError: vi.fn(),
   saveCanvasToGallery: vi.fn<(options: { region: CanvasGallerySaveRegion }) => Promise<unknown>>(),
 }));
@@ -31,7 +33,9 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   }),
 }));
 vi.mock('@workbench/image-actions/useFindGalleryItem', () => ({ useFindGalleryItem: () => mocks.findGalleryItem }));
-vi.mock('@workbench/useNotify', () => ({ useNotify: () => ({ error: vi.fn(), info: vi.fn(), success: vi.fn() }) }));
+vi.mock('@workbench/useNotify', () => ({
+  useNotify: () => ({ error: mocks.notifyError, info: mocks.notifyInfo, success: vi.fn() }),
+}));
 vi.mock('@features/gallery/queries', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   // The auto-add board, B, as the Gallery's board listing names it.
@@ -134,6 +138,19 @@ describe('useCanvasGallerySave across surfaces', () => {
     await act(() => menu.current!.save('canvas'));
     expect(mocks.saveCanvasToGallery).toHaveBeenCalledTimes(2);
   });
+  it('says a layer could not be read rather than that the canvas is still preparing', async () => {
+    mocks.saveCanvasToGallery.mockResolvedValueOnce({ status: 'unreadable' });
+
+    await act(() => header.current!.save('canvas'));
+
+    expect(mocks.notifyError).toHaveBeenCalledWith(
+      'widgets.canvas.contextMenu.saveError',
+      'widgets.canvas.contextMenu.unreadable'
+    );
+    expect(mocks.notifyInfo).not.toHaveBeenCalled();
+    expect(mocks.reportError).not.toHaveBeenCalled();
+  });
+
   it.each([
     [
       'refuses the board (403)',

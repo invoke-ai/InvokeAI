@@ -2,14 +2,14 @@ import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { WidgetCommandApi, WidgetHotkeyApi } from '@workbench/widgetContracts';
 
 import { useNotify } from '@workbench/useNotify';
+import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
 import {
   CANVAS_COMPANION_HOTKEYS,
   CANVAS_HISTORY_HOTKEYS,
   executeCanvasToolCommand,
   reportTransformRefusal,
   type CanvasToolCommandId,
-} from '@workbench/widgets/canvas/canvasHotkeyCommands';
-import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
+} from '@workbench/widgets/canvas/canvasToolCommands';
 import { useActiveColorCommands } from '@workbench/widgets/canvas/color-system/useActiveColors';
 import { useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useEffect, useEffectEvent } from 'react';

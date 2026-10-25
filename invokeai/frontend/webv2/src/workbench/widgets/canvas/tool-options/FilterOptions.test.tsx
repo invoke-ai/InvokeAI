@@ -160,6 +160,7 @@ describe('getFilterErrorTranslationKey', () => {
     'source-adjustment-over-budget': true,
     'source-adjustment-too-large': true,
     'source-over-budget': true,
+    'source-unreadable': true,
     stale: true,
     unsupported: true,
   };

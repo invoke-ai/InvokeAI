@@ -20,6 +20,7 @@ describe('getCreateFromBboxNotice', () => {
     ['stale', 'info', 'widgets.canvas.contextMenu.stale'],
     ['not-ready', 'info', 'widgets.canvas.contextMenu.notReady'],
     ['over-budget', 'info', 'widgets.canvas.contextMenu.notReady'],
+    ['unreadable', 'error', 'widgets.canvas.contextMenu.unreadable'],
     ['blocked', 'info', 'widgets.canvas.import.blocked'],
     ['stale-document', 'error', 'widgets.canvas.import.staleDocument'],
     ['stale-project', 'error', 'widgets.canvas.import.staleProject'],

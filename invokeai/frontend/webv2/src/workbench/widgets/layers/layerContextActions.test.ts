@@ -85,7 +85,7 @@ const makeState = (
     interactionLocked: false,
     canGroupSelection: true,
     canDeleteSelection: true,
-    canMergeMasks: true,
+    mergeMasksEligibility: 'eligible',
     canMergeSelection: true,
     canRemoveFromGroup: true,
     layer,
@@ -205,6 +205,10 @@ describe('layer context action registry', () => {
       'widgets.layers.actions.cropUnsupported',
       'widgets.layers.actions.cropped',
       'widgets.layers.actions.mergeMasksIneligible',
+      'widgets.layers.actions.mergeMasksSettingsDiffer',
+      'widgets.layers.actions.canvasNotReady',
+      'widgets.layers.actions.interactionLocked',
+      'widgets.layers.actions.removeFromGroupLocked',
       'widgets.layers.actions.transformIneligible',
       'widgets.layers.rasterFilter.busy',
       'widgets.layers.rasterFilter.cancel',
@@ -989,14 +993,31 @@ describe('remove-from-group', () => {
 
   it("is enabled by the model's answer and routes to its effect", () => {
     const document = makeDocument(grouped);
+    const enabled = byId(getLayerContextActions(makeState(r1, { document })), 'remove-from-group');
+    expect(enabled).toMatchObject({ isDisabled: false, unavailableReasonKey: undefined });
     const refused = getLayerContextActions(makeState(r1, { canRemoveFromGroup: false, document }));
     expect(byId(refused, 'remove-from-group').isDisabled).toBe(true);
-    const locked = getLayerContextActions(makeState(r1, { document, interactionLocked: true }));
-    expect(byId(locked, 'remove-from-group').isDisabled).toBe(true);
 
     const runtime = makeRuntimeContext(r1, { document });
     void getLayerContextActionDefinition('remove-from-group').handler(runtime);
     expect(runtime.effects.removeFromGroup).toHaveBeenCalledOnce();
+  });
+
+  it('says why it is disabled in each state that disables it', () => {
+    const reason = (layer: CanvasLayerContract, nodes: CanvasNodeContract[], state: Partial<LayerContextActionState>) =>
+      byId(getLayerContextActions(makeState(layer, { document: makeDocument(nodes), ...state })), 'remove-from-group')
+        .unavailableReasonKey;
+    const lockedLayer = { ...r1, isLocked: true };
+    const refused = { canRemoveFromGroup: false };
+
+    expect(reason(r1, grouped, { ...refused, hasEngine: false })).toBe('widgets.layers.actions.canvasNotReady');
+    expect(reason(lockedLayer, [groupContract('G', [lockedLayer])], refused)).toBe(
+      'widgets.layers.actions.removeFromGroupLocked'
+    );
+    // A lock on any group above the layer refuses the move just the same.
+    const nested = [groupContract('Outer', [groupContract('G', [r1])], { isLocked: true })];
+    expect(reason(r1, nested, refused)).toBe('widgets.layers.actions.removeFromGroupLocked');
+    expect(reason(r1, grouped, { interactionLocked: true })).toBe('widgets.layers.actions.interactionLocked');
   });
 });
 
@@ -1018,14 +1039,38 @@ describe('merge-masks', () => {
 
   it("is enabled by the engine's eligibility and routes to its effect", () => {
     const state = { document: makeDocument(layers), selectedIds: ['m1', 'm2'] };
-    expect(byId(getLayerContextActions(makeState(m1, state)), 'merge-masks').isDisabled).toBe(false);
-    expect(byId(getLayerContextActions(makeState(m1, state)), 'merge-masks').descriptionKey).toBeUndefined();
-    const ineligible = getLayerContextActions(makeState(m1, { ...state, canMergeMasks: false }));
-    expect(byId(ineligible, 'merge-masks').isDisabled).toBe(true);
-    expect(byId(ineligible, 'merge-masks').descriptionKey).toBe('widgets.layers.actions.mergeMasksIneligible');
+    expect(byId(getLayerContextActions(makeState(m1, state)), 'merge-masks')).toMatchObject({
+      isDisabled: false,
+      unavailableReasonKey: undefined,
+    });
+    const ineligible = getLayerContextActions(makeState(m1, { ...state, mergeMasksEligibility: 'ineligible' }));
+    expect(byId(ineligible, 'merge-masks')).toMatchObject({
+      descriptionKey: undefined,
+      isDisabled: true,
+      unavailableReasonKey: 'widgets.layers.actions.mergeMasksIneligible',
+    });
 
     const runtime = makeRuntimeContext(m1, state);
     void getLayerContextActionDefinition('merge-masks').handler(runtime);
     expect(runtime.effects.mergeMasks).toHaveBeenCalledOnce();
+  });
+
+  it('tells a settings mismatch, a canvas still starting and a busy canvas apart from other ineligibility', () => {
+    const reason = (nodes: CanvasNodeContract[], state: Partial<LayerContextActionState>) =>
+      byId(
+        getLayerContextActions(makeState(m1, { document: makeDocument(nodes), selectedIds: ['m1', 'm2'], ...state })),
+        'merge-masks'
+      ).unavailableReasonKey;
+
+    expect(reason([m1, m2], { mergeMasksEligibility: 'settings-differ' })).toBe(
+      'widgets.layers.actions.mergeMasksSettingsDiffer'
+    );
+    expect(reason([m1, m2], { mergeMasksEligibility: 'ineligible' })).toBe(
+      'widgets.layers.actions.mergeMasksIneligible'
+    );
+    expect(reason([m1, m2], { hasEngine: false, mergeMasksEligibility: 'ineligible' })).toBe(
+      'widgets.layers.actions.canvasNotReady'
+    );
+    expect(reason([m1, m2], { interactionLocked: true })).toBe('widgets.layers.actions.interactionLocked');
   });
 });

@@ -13,6 +13,7 @@ import {
   getBaseRasterContentBounds,
   planBaseRasterComposite,
   RasterCompositeOverBudgetError,
+  RasterCompositeUnreadableError,
   renderRasterComposite,
   type RenderRasterCompositeDeps,
 } from '@workbench/canvas-engine/render/rasterComposite';
@@ -21,7 +22,7 @@ export type RasterCompositeExportRequest = { bounds: 'content' } | { bounds: 're
 
 export type RasterCompositeExportResult =
   | { status: 'ok'; blob: Blob; rect: Rect }
-  | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' }
+  | { status: 'empty' | 'stale' | 'not-ready' | 'unreadable' | 'over-budget' }
   | AdjustmentRefusal;
 
 export interface RasterCompositeExportSnapshot {
@@ -74,6 +75,9 @@ export const exportRasterComposite = async (
     } catch (error) {
       if (error instanceof RasterCompositeOverBudgetError) {
         return { status: 'over-budget' };
+      }
+      if (error instanceof RasterCompositeUnreadableError) {
+        return { status: 'unreadable' };
       }
       if (error instanceof AdjustmentRefusedError) {
         return adjustmentRefusal(document, error.ownerId, error.reason);

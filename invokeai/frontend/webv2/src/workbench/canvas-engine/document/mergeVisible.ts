@@ -1,4 +1,8 @@
-import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type {
+  CanvasDocumentContractV3,
+  CanvasInpaintMaskLayerContract,
+  CanvasLayerContract,
+} from '@workbench/canvas-engine/contracts';
 import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
 
 import { getDocumentIndex } from './documentIndex';
@@ -83,17 +87,29 @@ export const canMergeSelectedRasters = (
     );
 
 /**
- * Whether merge-masks can take the exact selection: two or more inpaint masks, each contributing, unlocked and holding
- * pixels, wherever they sit in the stack. Regional guidance never merges this way.
+ * What generation applies across an inpaint mask's area besides its coverage: the enabled noise level and denoise
+ * limit (a disabled modifier keeps its tuned value out of generation). Fill and opacity are display-only.
  */
-export const canMergeInpaintMasks = (
+const maskGenerationSettings = (layer: CanvasInpaintMaskLayerContract): string =>
+  `${layer.noise?.isEnabled ? layer.noise.level : '-'}|${layer.denoise?.isEnabled ? layer.denoise.limit : '-'}`;
+
+/**
+ * Whether merge-masks can take the exact selection: two or more inpaint masks, each contributing, unlocked and holding
+ * pixels, wherever they sit in the stack (`ineligible` otherwise), whose generation settings agree, since the merged
+ * mask carries one set over the whole union (`settings-differ`, reported only for an otherwise eligible selection).
+ * Regional guidance never merges this way.
+ */
+export type InpaintMaskMergeEligibility = 'eligible' | 'ineligible' | 'settings-differ';
+
+export const inpaintMaskMergeEligibility = (
   leaves: readonly SemanticLeaf[],
   selectedLayerIds: ReadonlySet<string>,
   hasContent: HasMergeVisibleContent
-): boolean => {
+): InpaintMaskMergeEligibility => {
   if (selectedLayerIds.size < 2) {
-    return false;
+    return 'ineligible';
   }
+  const settings = new Set<string>();
   let found = 0;
   for (const leaf of leaves) {
     if (!selectedLayerIds.has(leaf.id)) {
@@ -105,10 +121,20 @@ export const canMergeInpaintMasks = (
       leaf.effectiveLocked ||
       !hasContent(leaf.id)
     ) {
-      return false;
+      return 'ineligible';
     }
+    settings.add(maskGenerationSettings(leaf.layer));
     found += 1;
   }
   // A selected group or a missing id is not a mask leaf.
-  return found === selectedLayerIds.size;
+  if (found !== selectedLayerIds.size) {
+    return 'ineligible';
+  }
+  return settings.size === 1 ? 'eligible' : 'settings-differ';
 };
+
+export const canMergeInpaintMasks = (
+  leaves: readonly SemanticLeaf[],
+  selectedLayerIds: ReadonlySet<string>,
+  hasContent: HasMergeVisibleContent
+): boolean => inpaintMaskMergeEligibility(leaves, selectedLayerIds, hasContent) === 'eligible';

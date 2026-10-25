@@ -29,6 +29,7 @@ export type LayerOperationRefusal =
   | 'not-ready'
   | 'over-budget'
   | 'stale'
+  | 'unreadable'
   | 'unsupported';
 
 const LAYER_OPERATION_KEYS: Record<LayerOperationRefusal, string> = {
@@ -40,6 +41,7 @@ const LAYER_OPERATION_KEYS: Record<LayerOperationRefusal, string> = {
   'not-ready': 'widgets.layers.actions.notReady',
   'over-budget': 'widgets.layers.actions.overBudget',
   stale: 'widgets.layers.actions.stale',
+  unreadable: 'widgets.layers.actions.unreadable',
   unsupported: 'widgets.layers.actions.unsupported',
 };
 

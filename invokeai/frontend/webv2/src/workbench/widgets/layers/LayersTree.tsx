@@ -514,7 +514,13 @@ export const LayersTree = ({
             void copyLayerToClipboard(key, { exportLayer: currentEngine.exports.exportBakedLayerBlob }).then(
               (status) => {
                 if (status !== 'ok') {
-                  copyFailed(isAdjustmentRefusal(status) ? describeAdjustmentRefusal(status, t) : undefined);
+                  copyFailed(
+                    isAdjustmentRefusal(status)
+                      ? describeAdjustmentRefusal(status, t)
+                      : status === 'unreadable'
+                        ? t('widgets.layers.actions.unreadable')
+                        : undefined
+                  );
                 }
               },
               () => copyFailed()

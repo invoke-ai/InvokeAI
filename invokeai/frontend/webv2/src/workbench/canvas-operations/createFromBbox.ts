@@ -28,7 +28,7 @@ export type CreateFromBboxDestination = 'global-reference' | CreateFromBboxLayer
 export type CreateFromBboxResult =
   | { status: 'created'; destination: CreateFromBboxLayerDestination; layerIds: string[] }
   | { status: 'uploaded'; image: CanvasImageUploadResult }
-  | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' }
+  | { status: 'empty' | 'stale' | 'not-ready' | 'unreadable' | 'over-budget' }
   | AdjustmentRefusal
   | { status: 'blocked' | 'stale-document' | 'stale-project' };
 

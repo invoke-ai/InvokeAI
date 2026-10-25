@@ -36,7 +36,7 @@ The tool strip on the left edge of the canvas holds the drawing and editing tool
 The Shape and Select buttons hold several tools. Click to use the current one, or press and hold (or right-click, or press **→** on) the button to choose another from a menu that lists each tool with its shortcut. To pick a color from the canvas, hold **Alt** with any painting tool and click. While you pick, a round **loupe** follows the pointer: it magnifies the pixels around it, boxes the pixel that will be picked in the center, and shows that pixel's RGB values. The pointer itself is hidden, so aim with the boxed pixel. You can drag to sample as you go; the color is set when you release, and **Escape** cancels the pick and restores the previous color. The picked color goes to what you are editing:
 
 * the selected mask's tint, while **Mask tint** is chosen in the [Color](/users-guide/canvas/layers-panel/#color) tab;
-* the selected shape layer's fill when the foreground chip is active, or its stroke when the background chip is active;
+* the selected shape layer's fill when the foreground chip is active, or its stroke when the background chip is active. A pick never turns on a fill or stroke the shape doesn't have; it sets the active color instead;
 * the selected text layer's color;
 * otherwise the active foreground or background color.
 
@@ -67,7 +67,7 @@ In InvokeAI 6, the Lasso drew directly into an inpaint mask, and created one if 
 
 ## Navigating the canvas
 
-* **Zoom** with the mouse wheel, which zooms around the pointer, or choose a level from the zoom menu in the header (25% to 500%). **Ctrl+1**, **Ctrl+2**, **Ctrl+3** and **Ctrl+4** zoom to 100%, 200%, 400% and 800% around the center of the view. Many browsers use these keys to switch tabs and do not pass them to the page; there, use the zoom menu instead.
+* **Zoom** with the mouse wheel, which zooms around the pointer, or choose a level from the zoom menu in the header (25% to 500%). **Ctrl+1**, **Ctrl+2**, **Ctrl+3** and **Ctrl+4** zoom to 100%, 200%, 400% and 800% around the center of the view. Many browsers use these keys to switch tabs and do not pass them to the page; there, choose **Zoom to 100%**, **Zoom to 200%**, **Zoom to 400%** or **Zoom to 800%** from the command palette (**Ctrl+K**), or assign other keys in **Settings → Hotkeys**.
 * **Pan** with the View tool, by holding **Space**, or by dragging with the middle mouse button.
 * **Fit to view** (header) fits the generation frame and all layers into the window.
 
@@ -76,8 +76,8 @@ In InvokeAI 6, the Lasso drew directly into an inpaint mask, and created one if 
 The buttons along the top of the canvas, from left to right:
 
 * **Zoom level** and **Fit to view**.
-* **Fit frame to layers** (**Shift+N**) — resizes the generation frame to enclose all layers.
-* **Fit frame to masks** (**Shift+B**) — resizes the generation frame to enclose the inpaint masks, with a margin of the **Mask blur** (in the Generate panel's **Compositing** section) plus 8 pixels, so the blurred edge of the mask stays inside the frame. With the default blur of 16, the margin is 24 pixels.
+* **Fit frame to layers** (**Shift+N**) — resizes the generation frame to the area all layers cover. With **Snap to grid** on, the frame then shrinks inward to the model's grid, so it can trim up to one grid step less one pixel from each edge of the layers.
+* **Fit frame to masks** (**Shift+B**) — resizes the generation frame to enclose the inpaint masks, with a margin of the **Mask blur** (in the Generate panel's **Compositing** section) plus 8 pixels, so the blurred edge of the mask stays inside the frame. With the default blur of 16, the margin is 24 pixels. With **Snap to grid** on, the frame then grows outward to the model's grid, so the margin can be wider but never narrower.
 * **Undo canvas edit** (**Ctrl+Z**) and **Redo canvas edit** (**Ctrl+Shift+Z** or **Ctrl+Y**).
 * **Save Canvas to Gallery** — saves the visible canvas as an image on the board new results go to: the auto-add board, or the selected board when none is set (see [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes)). Its arrow offers **Save Frame to Gallery**, which saves only what is inside the generation frame. A message names the board the image went to; its **Show in Gallery** button selects the image in the Gallery and keeps the Canvas in the center.
 * **Clear canvas** (**Ctrl+Alt+N**, **Cmd+Option+N** on macOS) — after you confirm, clears all layers and starts a fresh canvas with an empty inpaint mask. This cannot be undone.
@@ -115,7 +115,7 @@ Choose **Transform** from a layer's menu, or press **Shift+T**, to scale and rot
 
 Press **Enter** or click **Apply** to finish, or **Escape** or **Cancel** to undo the transform. The **Transform** tab of the Layers panel sets the position, scale and rotation numerically. A negative scale flips the layer.
 
-To crop a layer to the generation frame, choose **Crop layer to frame** from its menu. **Fit to frame** scales a layer to fit inside the frame. To crop every layer at once, use **Crop all layers to frame** in the [canvas menu](#the-canvas-menu).
+To crop a layer to the generation frame, choose **Crop layer to frame** from its menu; a layer entirely outside the frame is left alone. **Fit to frame** scales a layer to fit inside the frame. To crop every layer at once, use **Crop all layers to frame** in the [canvas menu](#the-canvas-menu).
 
 ## Filters and object selection
 
@@ -168,7 +168,7 @@ Right-click the canvas to open the menu of the selected layer, the same menu as 
 
 * **Save to Gallery** — **Save Canvas to Gallery** or **Save Frame to Gallery**.
 * **Create From Frame** — copy what is inside the generation frame into a **New Global Reference Image**, **New Regional Reference Image**, **New Control Layer** or **New Raster Layer**.
-* **Crop all layers to frame** — crops every raster layer, control layer, inpaint mask and regional guidance layer to the generation frame, including hidden and disabled layers and layers inside groups, as one undoable step. Groups, layer order and visibility are unchanged. A layer entirely outside the frame is emptied rather than deleted. Locked layers, and layers in a locked group, are skipped. A notice says how many layers were cropped, counting only the ones that changed, and how many locked layers were skipped.
+* **Crop all layers to frame** — crops every raster layer, control layer, inpaint mask and regional guidance layer to the generation frame, including hidden and disabled layers and layers inside groups, as one undoable step. Groups, layer order and visibility are unchanged. A layer entirely outside the frame is emptied rather than deleted. Locked layers, and layers in a locked group, are skipped, and so are layers whose image could not be read, for example because it was deleted from the Gallery; the other layers are still cropped. A brush stroke still being saved is saved first. A notice says how many layers were cropped, counting only the ones that changed, and how many locked or unreadable layers were left as they were. When every layer is locked, or there are no layers, the item is unavailable; highlighting it shows why.
 
 With no layer selected, the menu has only the Canvas section.
 

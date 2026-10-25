@@ -14,10 +14,11 @@ import {
   canMergeSelectedRasters,
   canMergeVisibleRasters,
   getMergeVisibleRasterLayers,
+  inpaintMaskMergeEligibility,
 } from './mergeVisible';
 
 const raster = (id: string, overrides: Partial<CanvasLayerContract> = {}) => layerContract(id, 'raster', overrides);
-const mask = (id: string) => layerContract(id, 'inpaint_mask');
+const mask = (id: string, overrides: Partial<CanvasLayerContract> = {}) => layerContract(id, 'inpaint_mask', overrides);
 const gradientRaster = (id: string): CanvasLayerContract =>
   raster(id, {
     source: {
@@ -126,8 +127,18 @@ describe('merge-masks eligibility', () => {
     layerContract('region', 'regional_guidance'),
     mask('empty'),
     raster('raster'),
+    mask('noisy', { noise: { isEnabled: true, level: 0.3 } } as Partial<CanvasLayerContract>),
+    mask('noisyToo', {
+      mask: { bitmap: null, fill: { color: '#00ff00', style: 'grid' } },
+      noise: { isEnabled: true, level: 0.3 },
+    } as Partial<CanvasLayerContract>),
+    mask('noisier', { noise: { isEnabled: true, level: 0.6 } } as Partial<CanvasLayerContract>),
+    mask('quietNoise', { noise: { isEnabled: false, level: 0.6 } } as Partial<CanvasLayerContract>),
+    mask('limited', { denoise: { isEnabled: true, limit: 0.4 } } as Partial<CanvasLayerContract>),
+    mask('unlimited', { denoise: { isEnabled: false, limit: 0.4 } } as Partial<CanvasLayerContract>),
   ];
   const can = (ids: string[]) => canMergeInpaintMasks(leavesOf(nodes), new Set(ids), hasContent);
+  const eligibility = (ids: string[]) => inpaintMaskMergeEligibility(leavesOf(nodes), new Set(ids), hasContent);
 
   it('accepts two or more contributing, unlocked masks with pixels in any groups', () => {
     expect(can(['top', 'inA', 'inB'])).toBe(true);
@@ -146,5 +157,25 @@ describe('merge-masks eligibility', () => {
     ['a mask without pixels', ['top', 'empty']],
   ])('refuses a selection holding %s', (_, ids) => {
     expect(can(ids)).toBe(false);
+    expect(eligibility(ids)).toBe('ineligible');
+  });
+
+  it('accepts masks whose enabled noise and denoise match, whatever their fill or disabled modifiers', () => {
+    expect(can(['noisy', 'noisyToo'])).toBe(true);
+    expect(can(['top', 'quietNoise', 'unlimited'])).toBe(true);
+  });
+
+  it.each([
+    ['noise levels', ['noisy', 'noisier']],
+    ['enabled and absent noise', ['top', 'noisy']],
+    ['enabled and disabled noise', ['noisier', 'quietNoise']],
+    ['enabled and disabled denoise limits', ['limited', 'unlimited']],
+  ])('refuses different %s as a settings mismatch', (_, ids) => {
+    expect(can(ids)).toBe(false);
+    expect(eligibility(ids)).toBe('settings-differ');
+  });
+
+  it('names an ineligible mask before a settings mismatch', () => {
+    expect(eligibility(['noisy', 'noisier', 'locked'])).toBe('ineligible');
   });
 });

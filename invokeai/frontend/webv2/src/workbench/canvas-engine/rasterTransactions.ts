@@ -29,9 +29,10 @@ export interface CanvasRasterSnapshot {
   release(): void;
 }
 
+/** `unreadable`: a required layer's pixels could not be read (its image is gone or does not decode). */
 export type CaptureRasterSnapshotResult =
   | { status: 'ok'; snapshot: CanvasRasterSnapshot }
-  | { status: 'stale' | 'aborted' | 'not-ready' | 'over-budget' };
+  | { status: 'stale' | 'aborted' | 'not-ready' | 'unreadable' | 'over-budget' };
 
 export interface CanvasCompositeExecutorDeps {
   backend: {

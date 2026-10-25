@@ -10,7 +10,7 @@ export type CanvasCompositeRegion = 'canvas' | 'bbox';
 
 export type ExportCanvasCompositeResult =
   | { status: 'ok'; blob: Blob; rect: Rect }
-  | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' }
+  | { status: 'empty' | 'stale' | 'not-ready' | 'unreadable' | 'over-budget' }
   | AdjustmentRefusal;
 
 export type CanvasCompositeExportEngine = {

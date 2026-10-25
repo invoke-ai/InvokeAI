@@ -154,7 +154,11 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
         if (liveResult.status !== 'ok') {
           return {
             status:
-              liveResult.status === 'aborted' || liveResult.status === 'over-budget' ? liveResult.status : 'not-ready',
+              liveResult.status === 'aborted' ||
+              liveResult.status === 'over-budget' ||
+              liveResult.status === 'unreadable'
+                ? liveResult.status
+                : 'not-ready',
           };
         }
         const live = liveResult;

@@ -123,7 +123,7 @@ const mergeScene = (scene: Scene, displayed: boolean, service?: SpatialAdjustmen
     ctx: h.ctx,
     exportBaked: () => Promise.reject(new Error('merge down reads live caches')),
     hasExportableContent: (layerId) => (h.layers.get(layerId)?.rect.width ?? 0) > 0,
-    isCacheReady: () => true,
+    cacheReadiness: () => 'ready',
     layers: h.layers,
     needsPixelPersistence: () => false,
     peekAdjustedSurface: (contract, entry) =>
@@ -233,10 +233,10 @@ const coverage = (rect: Rect, alpha: number): RasterSurface => {
 };
 
 describe('MergeLayerController in Chromium: merge masks', () => {
-  it('unions coverage source-over, each mask at its own opacity', async () => {
-    // The top mask is half-covered at full opacity; the one below is fully covered at half opacity.
+  it('unions coverage source-over, ignoring each mask’s display opacity', async () => {
+    // The top mask is half-covered at full opacity; the one below is fully covered but shown at 40 % opacity.
     const sources: Record<string, { alpha: number; opacity: number; rect: Rect }> = {
-      below: { alpha: 255, opacity: 0.5, rect: { height: 10, width: 10, x: 5, y: 0 } },
+      below: { alpha: 255, opacity: 0.4, rect: { height: 10, width: 10, x: 5, y: 0 } },
       top: { alpha: 128, opacity: 1, rect: { height: 10, width: 10, x: 0, y: 0 } },
     };
     const document: CanvasDocumentContractV3 = {
@@ -278,7 +278,7 @@ describe('MergeLayerController in Chromium: merge masks', () => {
           surface: coverage(sources[layerId]!.rect, sources[layerId]!.alpha),
         }),
       hasExportableContent: () => true,
-      isCacheReady: () => true,
+      cacheReadiness: () => 'ready',
       layers: h.layers,
       needsPixelPersistence: () => true,
       peekAdjustedSurface: () => null,
@@ -289,9 +289,10 @@ describe('MergeLayerController in Chromium: merge masks', () => {
 
     const merged = created.find((surface) => surface.width === 15 && surface.height === 10)!;
     const alphaAt = (x: number): number => merged.ctx.getImageData(x, 5, 1, 1).data[3]!;
-    // Top only: its own coverage. Below only: half of full coverage. Both: 128 over 128 = 128 + 128 * (1 - 128/255).
+    // Top only: its own partial coverage. Below only: full coverage, which generation reads as masked (alpha > 127)
+    // however faintly the mask was shown. Both: full coverage under the top's.
     expect(alphaAt(2)).toBeCloseTo(128, -0.5);
-    expect(alphaAt(12)).toBeCloseTo(128, -0.5);
-    expect(alphaAt(7)).toBeCloseTo(128 + 128 * (1 - 128 / 255), -0.5);
+    expect(alphaAt(12)).toBe(255);
+    expect(alphaAt(7)).toBe(255);
   });
 });

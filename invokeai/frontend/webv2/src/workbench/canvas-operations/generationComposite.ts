@@ -128,7 +128,7 @@ export interface GenerationComposites {
 
 export type ComposeForGenerationResult =
   | { status: 'ok'; composites: GenerationComposites; dedupeCommit: GenerationCompositeDedupeCommit }
-  | { status: 'no-document' | 'stale' | 'aborted' | 'not-ready' | 'over-budget' }
+  | { status: 'no-document' | 'stale' | 'aborted' | 'not-ready' | 'unreadable' | 'over-budget' }
   | AdjustmentRefusal;
 
 /**

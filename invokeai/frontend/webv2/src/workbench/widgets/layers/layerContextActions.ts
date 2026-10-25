@@ -4,6 +4,7 @@ import type {
   CanvasColorLabel,
   CanvasDocumentContractV3,
   CanvasLayerContract,
+  InpaintMaskMergeEligibility,
   LayerStackMoveKind,
 } from '@workbench/canvas-engine/api';
 import type { LucideIcon } from 'lucide-react';
@@ -144,8 +145,8 @@ export interface LayerContextActionState {
   canDeleteSelection: boolean;
   /** Whether the whole multi-selection can merge into one raster, asked the same way. */
   canMergeSelection: boolean;
-  /** Whether the engine would merge `actionTargets` into one inpaint mask. */
-  canMergeMasks: boolean;
+  /** Whether merge masks would take `actionTargets`, and if not, whether only their generation settings differ. */
+  mergeMasksEligibility: InpaintMaskMergeEligibility;
   /** The model's answer for lifting `actionTargets` out of their group. */
   canRemoveFromGroup: boolean;
   /** A group above the layer hides it on the canvas; the layer's own flag cannot override that. */
@@ -216,10 +217,10 @@ interface LayerContextActionDefinitionBase {
   tone?: 'danger';
   /** A raw hotkey string (e.g. `mod+]`) shown as a trailing hint on the item. */
   hint?: string;
-  /** A second line under the label explaining what the action does. */
+  /** A second line under the label explaining what the action does, shown whether or not it is enabled. */
   descriptionKey?: string;
-  /** A second line that depends on the context, such as why the action is unavailable; wins over `descriptionKey`. */
-  getDescriptionKey?(context: LayerContextActionState): string | undefined;
+  /** Why the disabled action cannot run here; asked only when `isEnabled` is false. */
+  getUnavailableReasonKey?(context: LayerContextActionState): string | undefined;
   isVisible(context: LayerContextActionState): boolean;
   isEnabled(context: LayerContextActionState): boolean;
   handler(context: LayerContextActionRuntimeContext): void | Promise<void>;
@@ -255,6 +256,8 @@ export interface LayerContextAction {
   hint?: string;
   descriptionKey?: string;
   isDisabled: boolean;
+  /** Set only on a disabled action whose reason is known; the menu keeps such an item reachable and says why. */
+  unavailableReasonKey?: string;
   handler(context: LayerContextActionRuntimeContext): void | Promise<void>;
 }
 
@@ -328,6 +331,16 @@ const isLayerFrozen = (context: LayerContextActionState): boolean =>
   context.layer.isLocked || (layerEntry(context)?.ancestorsLocked ?? false);
 const isLayerMutable = (context: LayerContextActionState): boolean =>
   isInteractionFree(context) && !isLayerFrozen(context);
+const CANVAS_NOT_READY_REASON = 'widgets.layers.actions.canvasNotReady';
+const INTERACTION_LOCKED_REASON = 'widgets.layers.actions.interactionLocked';
+/** Any target locked, by itself or by a group above it: the model refuses to move it out. */
+const isAnyTargetFrozen = (context: LayerContextActionState): boolean => {
+  const index = getDocumentIndex(context.document);
+  return actionTargets(context).some((id) => {
+    const entry = index.byId.get(id);
+    return !!entry && (entry.node.isLocked || entry.ancestorsLocked);
+  });
+};
 const hasReadablePixels = (context: LayerContextActionState): boolean =>
   context.hasEngine && context.hasSupportedContent && !context.interactionLocked;
 const hasMutablePixels = (context: LayerContextActionState): boolean =>
@@ -486,6 +499,14 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
   },
   {
     defaultLabel: 'Remove from group',
+    getUnavailableReasonKey: (context) =>
+      !context.hasEngine
+        ? CANVAS_NOT_READY_REASON
+        : isAnyTargetFrozen(context)
+          ? 'widgets.layers.actions.removeFromGroupLocked'
+          : context.interactionLocked
+            ? INTERACTION_LOCKED_REASON
+            : undefined,
     handler: ({ effects }) => effects.removeFromGroup(),
     icon: UngroupIcon,
     id: 'remove-from-group',
@@ -709,12 +730,18 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
   },
   {
     defaultLabel: 'Merge masks',
-    // The engine's eligibility has several reasons; name them rather than leave the item silently disabled.
-    getDescriptionKey: (context) => (context.canMergeMasks ? undefined : 'widgets.layers.actions.mergeMasksIneligible'),
+    getUnavailableReasonKey: (context) =>
+      !context.hasEngine
+        ? CANVAS_NOT_READY_REASON
+        : context.mergeMasksEligibility === 'settings-differ'
+          ? 'widgets.layers.actions.mergeMasksSettingsDiffer'
+          : context.mergeMasksEligibility === 'ineligible'
+            ? 'widgets.layers.actions.mergeMasksIneligible'
+            : INTERACTION_LOCKED_REASON,
     handler: ({ effects }) => effects.mergeMasks(),
     icon: MergeIcon,
     id: 'merge-masks',
-    isEnabled: (context) => isInteractionFree(context) && context.canMergeMasks,
+    isEnabled: (context) => isInteractionFree(context) && context.mergeMasksEligibility === 'eligible',
     isVisible: (context) => isMultiTarget(context) && allTargetsInpaintMasks(context),
     labelKey: 'widgets.layers.actions.mergeMasks',
     order: 1,
@@ -1086,20 +1113,24 @@ export const getLayerContextActionDefinition = (id: LayerContextActionId): Layer
 export const getLayerContextActions = (context: LayerContextActionState): LayerContextAction[] =>
   LAYER_CONTEXT_ACTION_DEFINITIONS.filter(
     (definition) => definition.supportedLayerTypes.includes(context.layer.type) && definition.isVisible(context)
-  ).map((definition) => ({
-    defaultLabel: definition.getDefaultLabel?.(context) ?? definition.defaultLabel,
-    descriptionKey: definition.getDescriptionKey?.(context) ?? definition.descriptionKey,
-    handler: definition.handler,
-    hint: definition.hint,
-    icon: definition.getIcon?.(context) ?? definition.icon,
-    iconColor: definition.iconColor,
-    id: definition.id,
-    isDisabled: !definition.isEnabled(context),
-    labelCount: definition.getLabelCount?.(context),
-    labelKey: definition.getLabelKey?.(context) ?? definition.labelKey,
-    order: definition.order,
-    picker: definition.picker,
-    section: definition.section,
-    submenu: definition.submenu,
-    tone: definition.tone,
-  }));
+  ).map((definition) => {
+    const isDisabled = !definition.isEnabled(context);
+    return {
+      defaultLabel: definition.getDefaultLabel?.(context) ?? definition.defaultLabel,
+      descriptionKey: definition.descriptionKey,
+      handler: definition.handler,
+      hint: definition.hint,
+      icon: definition.getIcon?.(context) ?? definition.icon,
+      iconColor: definition.iconColor,
+      id: definition.id,
+      isDisabled,
+      labelCount: definition.getLabelCount?.(context),
+      labelKey: definition.getLabelKey?.(context) ?? definition.labelKey,
+      order: definition.order,
+      picker: definition.picker,
+      section: definition.section,
+      submenu: definition.submenu,
+      tone: definition.tone,
+      unavailableReasonKey: isDisabled ? definition.getUnavailableReasonKey?.(context) : undefined,
+    };
+  });

@@ -77,7 +77,7 @@ export interface LayerTransformOverride {
   rotation?: number;
 }
 
-/** Where the last committed brush or eraser stroke ended, per layer id, in document space. */
+/** Where the last committed brush or eraser stroke ended, per layer id, in that layer's local space. */
 export interface PaintLineEnds {
   get(layerId: string): Vec2 | undefined;
   set(layerId: string, point: Vec2): void;
@@ -151,8 +151,9 @@ export interface ToolContext {
   /** Compositor providers that make sampling WYSIWYG; absent ⇒ raw cached pixels. */
   sampleProviders?: Pick<CompositeOptions, 'adjustedSurface' | 'derivedSurfaces' | 'groupSurface'>;
   /**
-   * Where the last committed brush or eraser stroke ended on each layer, in document space; shared by both tools for
-   * Shift-click lines. The engine owns it and forgets entries on replay, document replacement and layer removal.
+   * Where the last committed brush or eraser stroke ended on each layer, layer-local so moving or transforming the
+   * layer carries it; shared by both tools for Shift-click lines. The engine owns it and forgets entries on replay,
+   * document replacement and layer removal.
    */
   paintLineEnds?: PaintLineEnds;
   /**

@@ -72,7 +72,7 @@ const createHarness = (
     ctx: h.ctx,
     exportBaked: () => Promise.reject(new Error('merge down reads live caches')),
     hasExportableContent: (layerId) => (h.layers.get(layerId)?.rect.width ?? 0) > 0,
-    isCacheReady: () => true,
+    cacheReadiness: () => 'ready',
     layers: h.layers,
     needsPixelPersistence: () => true,
     peekAdjustedSurface: () => displayed,
@@ -295,7 +295,7 @@ describe('MergeLayerController: merge visible with a spatial group stack', () =>
               }
         ),
       hasExportableContent: () => true,
-      isCacheReady: () => true,
+      cacheReadiness: () => 'ready',
       layers: h.layers,
       needsPixelPersistence: () => false,
       peekAdjustedSurface: () => null,
@@ -357,11 +357,17 @@ describe('MergeLayerController: merge masks', () => {
     top: { height: 10, width: 10, x: 0, y: 0 },
   };
 
-  const createMaskHarness = (options: { historyBytes?: number; onExport?: () => void } = {}) => {
-    const top = layerContract('top', 'inpaint_mask', {
+  const createMaskHarness = (
+    options: { bottomNoiseLevel?: number; historyBytes?: number; onExport?: () => void } = {}
+  ) => {
+    // Generation settings every source shares, so the merge may carry them over the whole union.
+    const settings = (noiseLevel = 0.2) => ({
       denoise: { isEnabled: true, limit: 0.4 },
+      noise: { isEnabled: true, level: noiseLevel },
+    });
+    const top = layerContract('top', 'inpaint_mask', {
+      ...settings(),
       mask: { bitmap: null, fill: { color: '#123456', style: 'grid' } },
-      noise: { isEnabled: true, level: 0.2 },
       opacity: 0.5,
     } as Partial<CanvasLayerContract>);
     const document: CanvasDocumentContractV3 = {
@@ -371,8 +377,11 @@ describe('MergeLayerController: merge masks', () => {
       selectedLayerId: 'middle',
       stacks: stacksFrom([
         groupContract('first', [layerContract('other', 'inpaint_mask'), top]),
-        groupContract('second', [layerContract('middle', 'inpaint_mask')]),
-        layerContract('bottom', 'inpaint_mask'),
+        groupContract('second', [layerContract('middle', 'inpaint_mask', settings() as Partial<CanvasLayerContract>)]),
+        layerContract('bottom', 'inpaint_mask', {
+          ...settings(options.bottomNoiseLevel),
+          mask: { bitmap: null, fill: { color: '#abcdef', style: 'solid' } },
+        } as Partial<CanvasLayerContract>),
       ]),
       version: 3,
       width: 100,
@@ -398,7 +407,7 @@ describe('MergeLayerController: merge masks', () => {
         });
       },
       hasExportableContent: (layerId) => (h.layers.get(layerId)?.rect.width ?? 0) > 0,
-      isCacheReady: () => true,
+      cacheReadiness: () => 'ready',
       layers: h.layers,
       needsPixelPersistence: () => true,
       peekAdjustedSurface: () => null,
@@ -410,7 +419,7 @@ describe('MergeLayerController: merge masks', () => {
   const structure = (document: CanvasDocumentContractV3) =>
     [...getDocumentIndex(document).byId.values()].map((entry) => [entry.node.id, entry.parentId, entry.siblingIndex]);
 
-  it('unions masks from different groups into one mask above the topmost, configured like it, as one step', async () => {
+  it('unions masks from different groups into one mask above the topmost, with its fill, as one step', async () => {
     const h = createMaskHarness();
 
     const result = await h.controller.mergeInpaintMasks(['bottom', 'top', 'middle']);
@@ -460,6 +469,14 @@ describe('MergeLayerController: merge masks', () => {
 
     await expect(h.controller.mergeInpaintMasks(ids)).resolves.toEqual({ status });
     expect(h.dispatched).toEqual([]);
+  });
+
+  it('refuses masks whose noise or denoise settings differ without reading pixels', async () => {
+    const h = createMaskHarness({ bottomNoiseLevel: 0.7, onExport: () => expect.fail('read pixels') });
+
+    await expect(h.controller.mergeInpaintMasks(['top', 'bottom'])).resolves.toEqual({ status: 'settings-differ' });
+    expect(h.dispatched).toEqual([]);
+    expect(h.history.canUndo()).toBe(false);
   });
 
   it('refuses a merge it could never undo with nothing changed', async () => {

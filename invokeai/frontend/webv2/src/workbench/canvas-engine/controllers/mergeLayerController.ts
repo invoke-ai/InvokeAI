@@ -27,6 +27,7 @@ import {
   canMergeInpaintMasks,
   canMergeSelectedRasters,
   getMergeVisibleRasterLeaves,
+  inpaintMaskMergeEligibility,
 } from '@workbench/canvas-engine/document/mergeVisible';
 import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
 import { isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
@@ -59,19 +60,25 @@ import {
   layerOperationStatus,
   paintLayerAt,
   publishAddedRasterLayer,
+  readinessOfAll,
   rgbaBytes,
   withReplayReservation,
+  type LayerCacheReadiness,
   type LayerEditRefusal,
   replaceLayerStep,
   type LayerPixels,
 } from './editSteps';
 
-export type MergeVisibleResult = 'merged' | LayerEditRefusal | 'nothing' | 'failed' | AdjustmentRefusal;
+/** `unreadable`: a contributor's pixels could not be read (its image is gone or does not decode). */
+export type MergeVisibleResult = 'merged' | LayerEditRefusal | 'nothing' | 'unreadable' | 'failed' | AdjustmentRefusal;
 
-/** Every refusal leaves document, pixels and history alone. */
+/**
+ * Every refusal leaves document, pixels and history alone. `settings-differ`: the masks are otherwise eligible, but
+ * their enabled noise or denoise settings differ.
+ */
 export type MergeInpaintMasksResult =
   | { status: 'merged'; layerId: string }
-  | { status: 'ineligible' | 'missing' | 'failed' | LayerEditRefusal }
+  | { status: 'ineligible' | 'settings-differ' | 'missing' | 'unreadable' | 'failed' | LayerEditRefusal }
   | AdjustmentRefusal;
 
 /**
@@ -83,6 +90,8 @@ interface SelectedMergeSpec {
   readonly label: string;
   readonly stack: LayerStackKind;
   canMerge(document: CanvasDocumentContractV3, selectedIds: ReadonlySet<string>): boolean;
+  /** The alpha a contributor composites at. */
+  contributorAlpha(contributor: CanvasLayerContract): number;
   /** The merged leaf placing pixels at `rect`, from the contributors top first. */
   createResult(id: string, contributors: readonly CanvasLayerContract[], rect: Rect): CanvasLayerContract;
 }
@@ -96,7 +105,7 @@ const IDENTITY_TRANSFORM = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
 
 /**
  * One inpaint mask carrying the union of the sources' coverage at `rect`, named after and configured like the topmost
- * source: its fill, noise and denoise.
+ * source: its fill, and the noise and denoise every source shares.
  */
 const mergedMaskLayer = (id: string, contributors: readonly CanvasLayerContract[], rect: Rect): CanvasLayerContract => {
   const top = contributors[0]!;
@@ -122,19 +131,20 @@ export type MergeDownResult =
   | 'merged'
   | SubsetOf<CanvasCommandRefusal, 'missing' | 'unsupported'>
   | LayerEditRefusal
+  | 'unreadable'
   | 'failed'
   | AdjustmentRefusal;
 
 type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
-  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'unreadable' | 'over-budget' }
   | AdjustmentRefusal;
 
 export interface MergeLayerControllerOptions {
   readonly backend: RasterBackend;
   readonly ctx: CanvasMutationContext;
   readonly layers: LayerCacheStore;
-  readonly isCacheReady: (layer: CanvasLayerContract, document: CanvasDocumentContractV3) => boolean;
+  readonly cacheReadiness: (layer: CanvasLayerContract, document: CanvasDocumentContractV3) => LayerCacheReadiness;
   readonly hasExportableContent: (layerId: string) => boolean;
   readonly exportBaked: (layerId: string) => Promise<ExportResult>;
   readonly needsPixelPersistence: (layer: CanvasLayerContract) => boolean;
@@ -182,12 +192,14 @@ export class MergeLayerController {
     const belowCache = this.deps.layers.get(below.id);
     const upperHasContent = this.deps.hasExportableContent(upper.id);
     const belowHasContent = this.deps.hasExportableContent(below.id);
-    if (
-      (upperHasContent && !upperCache) ||
-      (belowHasContent && !belowCache) ||
-      !this.deps.isCacheReady(upper, document) ||
-      !this.deps.isCacheReady(below, document)
-    ) {
+    const readiness = readinessOfAll([
+      this.deps.cacheReadiness(upper, document),
+      this.deps.cacheReadiness(below, document),
+    ]);
+    if (readiness !== 'ready') {
+      return readiness;
+    }
+    if ((upperHasContent && !upperCache) || (belowHasContent && !belowCache)) {
       return 'not-ready';
     }
     const matrix = mergeDownMatrix(below.transform, upper.transform);
@@ -412,6 +424,9 @@ export class MergeLayerController {
       if (exports.some((result) => result.status === 'over-budget')) {
         return 'over-budget';
       }
+      if (exports.some((result) => result.status === 'unreadable')) {
+        return 'unreadable';
+      }
       if (exports.some((result) => result.status !== 'ok')) {
         return 'not-ready';
       }
@@ -556,6 +571,7 @@ export class MergeLayerController {
     const result = await this.mergeSelectedInto(layerIds, {
       canMerge: (document, selectedIds) =>
         canMergeSelectedRasters(document, compileDocumentLeaves(document), selectedIds, this.deps.hasExportableContent),
+      contributorAlpha: (contributor) => contributor.opacity,
       createResult: (id, contributors, rect) => paintLayerAt(id, `${contributors[0]!.name} merged`, rect),
       label: 'Merge selected layers',
       stack: 'raster',
@@ -569,9 +585,21 @@ export class MergeLayerController {
     if (document && layerIds.some((id) => !getDocumentNode(document, id))) {
       return { status: 'missing' };
     }
+    if (
+      document &&
+      inpaintMaskMergeEligibility(
+        compileDocumentLeaves(document),
+        new Set(layerIds),
+        this.deps.hasExportableContent
+      ) === 'settings-differ'
+    ) {
+      return { status: 'settings-differ' };
+    }
     const result = await this.mergeSelectedInto(layerIds, {
       canMerge: (candidate, selectedIds) =>
         canMergeInpaintMasks(compileDocumentLeaves(candidate), selectedIds, this.deps.hasExportableContent),
+      // Opacity only tints a mask on screen; generation reads its coverage alone, so it never thins merged coverage.
+      contributorAlpha: () => 1,
       createResult: mergedMaskLayer,
       label: 'Merge masks',
       stack: 'inpaint_mask',
@@ -583,8 +611,8 @@ export class MergeLayerController {
   }
 
   /**
-   * Composites the selected leaves bottom-up (source-over, each at its opacity) into a new leaf above the topmost and
-   * removes them, as one undo step that restores every source in place with its raw pixels.
+   * Composites the selected leaves bottom-up (source-over, each at the spec's alpha) into a new leaf above the topmost
+   * and removes them, as one undo step that restores every source in place with its raw pixels.
    */
   private async mergeSelectedInto(layerIds: readonly string[], spec: SelectedMergeSpec): Promise<SelectedMergeResult> {
     const { ctx } = this.deps;
@@ -625,6 +653,9 @@ export class MergeLayerController {
       }
       if (exports.some((result) => result.status === 'over-budget')) {
         return { status: 'over-budget' };
+      }
+      if (exports.some((result) => result.status === 'unreadable')) {
+        return { status: 'unreadable' };
       }
       if (exports.some((result) => result.status !== 'ok')) {
         return { status: 'not-ready' };
@@ -699,7 +730,7 @@ export class MergeLayerController {
         for (let index = successful.length - 1; index >= 0; index -= 1) {
           const exported = successful[index]!;
           const contributor = contributors[index]!;
-          context.globalAlpha = contributor.opacity;
+          context.globalAlpha = spec.contributorAlpha(contributor);
           context.globalCompositeOperation = 'source-over';
           context.drawImage(exported.surface.canvas, exported.rect.x - rect.x, exported.rect.y - rect.y);
         }

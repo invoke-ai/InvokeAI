@@ -60,6 +60,7 @@ import type { StrokeCommittedEvent } from './tools/tool';
 import { createBitmapStore } from './document/bitmapStore';
 import { mergeDownMatrix } from './document/mergeDown';
 import { createCanvasEngine as createCoreCanvasEngine } from './engine';
+import { RASTERIZATION_RETRY_BASE_MS } from './layerRasterizer';
 
 interface EngineStore {
   dispatch(action: EngineTestAction): void;
@@ -753,6 +754,113 @@ describe('createCanvasEngine', () => {
     engine.lifecycle.dispose();
   });
 
+  it('retries a layer whose image failed only once its backoff ends, and shows it once the image loads', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const raf = createControllableRaf();
+      vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+      vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+      const document = { ...makeDoc(), stacks: stacksFrom([rasterLayer('flaky')]), selectedLayerId: 'flaky' };
+      const { projectId, store } = createReducerBackedStore(document);
+      let available = false;
+      const imageResolver = vi.fn(() =>
+        available ? Promise.resolve(new Blob()) : Promise.reject(new Error('backend restarting'))
+      );
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        bitmapStore: createSpyBitmapStore(),
+        imageResolver,
+        projectId,
+        reportError: vi.fn(),
+        store,
+      });
+      engine.surface.attach(createInputCanvas().element, createInputCanvas().element);
+      // The shared helper waits on a timer, which these fake timers hold.
+      const settle = async () => {
+        for (let tick = 0; tick < 50; tick += 1) {
+          await Promise.resolve();
+        }
+      };
+      const renderFrames = async () => {
+        for (let frame = 0; frame < 3; frame += 1) {
+          engine.viewport.getViewport().zoomAtPoint(1 + frame / 10, { x: 0, y: 0 });
+          raf.flush();
+          await settle();
+        }
+      };
+
+      await renderFrames();
+      expect(imageResolver).toHaveBeenCalledOnce();
+      expect(engine.stores.thumbnailStatus.get('flaky')).toBe('error');
+
+      // Frames inside the backoff never read the image again.
+      vi.advanceTimersByTime(RASTERIZATION_RETRY_BASE_MS - 1);
+      await renderFrames();
+      expect(imageResolver).toHaveBeenCalledOnce();
+
+      // Its end invalidates the layer by itself, and the next frame reads the image, which now loads.
+      available = true;
+      vi.advanceTimersByTime(1);
+      raf.flush();
+      await settle();
+      expect(imageResolver).toHaveBeenCalledTimes(2);
+      expect(engine.stores.thumbnailStatus.get('flaky')).toBe('ready');
+      await renderFrames();
+      expect(imageResolver).toHaveBeenCalledTimes(2);
+      engine.lifecycle.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps Merge down unreadable past the backoff for a layer nobody redraws, and merges once its image loads', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const document = { ...makeDoc(), stacks: stacksFrom([rasterLayer('upper'), rasterLayer('flaky')]) };
+      const { projectId, store } = createReducerBackedStore(document);
+      let available = false;
+      const imageResolver = vi.fn((imageName: string) =>
+        imageName !== 'flaky' || available
+          ? Promise.resolve(new Blob())
+          : Promise.reject(new Error('backend restarting'))
+      );
+      const reportError = vi.fn();
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        bitmapStore: createSpyBitmapStore(),
+        imageResolver,
+        projectId,
+        reportError,
+        store,
+      });
+      const settle = async () => {
+        for (let tick = 0; tick < 50; tick += 1) {
+          await Promise.resolve();
+        }
+      };
+      // No surface is attached, so nothing redraws either layer.
+      expect((await engine.exports.exportLayerPixels('upper')).status).toBe('ok');
+      expect((await engine.exports.exportLayerPixels('flaky')).status).toBe('unreadable');
+      expect(await engine.layers.mergeLayerDown('upper')).toBe('unreadable');
+
+      vi.advanceTimersByTime(RASTERIZATION_RETRY_BASE_MS);
+      // Past the backoff it still cannot be read, and asking tries the image again in the background.
+      expect(await engine.layers.mergeLayerDown('upper')).toBe('unreadable');
+      await settle();
+      expect(imageResolver.mock.calls.filter(([name]) => name === 'flaky')).toHaveLength(2);
+      expect(reportError.mock.calls).toHaveLength(1);
+
+      available = true;
+      vi.advanceTimersByTime(RASTERIZATION_RETRY_BASE_MS * 2);
+      expect(await engine.layers.mergeLayerDown('upper')).toBe('unreadable');
+      await settle();
+      expect(await engine.layers.mergeLayerDown('upper')).toBe('merged');
+      engine.lifecycle.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('settles a claimed color sample on release, after the sampling gesture ends', async () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
@@ -834,7 +942,7 @@ describe('createCanvasEngine', () => {
     engine.lifecycle.dispose();
   });
 
-  it('sends a pick’s commit or cancel only to the sink that took its first preview', async () => {
+  it('sends a pick’s commit or cancel only to the sink that took its first preview, through real pointer events', async () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
@@ -987,7 +1095,7 @@ describe('createCanvasEngine', () => {
     engine.lifecycle.dispose();
   });
 
-  it('returns typed not-ready when asynchronous raster cache preparation fails', async () => {
+  it('returns typed unreadable when asynchronous raster cache preparation fails', async () => {
     const { store } = createReactiveStore(makeDoc());
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
@@ -999,7 +1107,7 @@ describe('createCanvasEngine', () => {
     const documentSnapshot = engine.document.captureSnapshot();
 
     await expect(engine.exports.captureRasterSnapshot(documentSnapshot!, ['a'])).resolves.toEqual({
-      status: 'not-ready',
+      status: 'unreadable',
     });
     engine.lifecycle.dispose();
   });
@@ -1234,6 +1342,22 @@ describe('createCanvasEngine', () => {
     await expect(engine.lifecycle.beginCooldown()).resolves.toBe('cooled');
 
     expect(bitmapStore.flushPendingUploads).toHaveBeenCalledTimes(2);
+    engine.lifecycle.dispose();
+  });
+
+  it('refuses a composite export with a layer whose image cannot be read as unreadable', async () => {
+    const { store } = createReactiveStore(makeDoc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.reject(new Error('image deleted')),
+      projectId: 'p1',
+      reportError: vi.fn(),
+      store,
+    });
+
+    await expect(engine.exports.exportRasterComposite({ bounds: 'content' })).resolves.toEqual({
+      status: 'unreadable',
+    });
     engine.lifecycle.dispose();
   });
 
@@ -1600,7 +1724,7 @@ describe('createCanvasEngine', () => {
       store,
     });
 
-    expect(await engine.exports.exportLayerPixels('shape')).toEqual({ status: 'not-ready' });
+    expect(await engine.exports.exportLayerPixels('shape')).toEqual({ status: 'unreadable' });
     expect((await engine.exports.exportLayerPixels('shape')).status).toBe('ok');
     engine.lifecycle.dispose();
   });
@@ -2235,7 +2359,12 @@ describe('createCanvasEngine', () => {
     });
     const before = structuredClone(engine.document.getDocument()!);
 
-    expect(await engine.layers.cropAllLayersToBbox()).toEqual({ cropped: 3, skippedLocked: 1, status: 'cropped' });
+    expect(await engine.layers.cropAllLayersToBbox()).toEqual({
+      cropped: 3,
+      skippedLocked: 1,
+      skippedUnreadable: 0,
+      status: 'cropped',
+    });
     const cropped = structuredClone(engine.document.getDocument()!);
     expect(getDocumentLayer(cropped, 'a')).toMatchObject({ source: { bitmap: null, offset: { x: 8, y: 5 } } });
     expect(getDocumentLayer(cropped, 'outside')).toMatchObject({ isEnabled: false, source: { bitmap: null } });
@@ -2254,7 +2383,47 @@ describe('createCanvasEngine', () => {
     engine.lifecycle.dispose();
   });
 
-  it('cropLayerToBbox returns empty without mutation when the layer and bbox do not overlap', async () => {
+  it('cropAllLayersToBbox crops around a layer whose image cannot be read, and reports the read failure once', async () => {
+    const document = {
+      ...makeDoc(),
+      bbox: { height: 8, width: 8, x: 0, y: 0 },
+      stacks: stacksFrom([rasterLayer('broken'), rasterLayer('a')]),
+    };
+    const { projectId, store } = createReducerBackedStore(document);
+    const reportError = vi.fn();
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: (imageName) =>
+        imageName === 'broken' ? Promise.reject(new Error('image deleted')) : Promise.resolve(new Blob()),
+      projectId,
+      reportError,
+      store,
+    });
+    const broken = getDocumentLayer(engine.document.getDocument()!, 'broken');
+
+    expect(await engine.layers.cropAllLayersToBbox()).toEqual({
+      cropped: 1,
+      skippedLocked: 0,
+      skippedUnreadable: 1,
+      status: 'cropped',
+    });
+    expect(getDocumentLayer(engine.document.getDocument()!, 'broken')).toBe(broken);
+    expect(getDocumentLayer(engine.document.getDocument()!, 'a')).toMatchObject({ source: { type: 'paint' } });
+    // Asking again reads the image again, but the same failure raises no second notice.
+    expect(await engine.layers.cropAllLayersToBbox()).toEqual({
+      skippedLocked: 0,
+      skippedUnreadable: 1,
+      status: 'nothing',
+    });
+    const readFailures = reportError.mock.calls.filter(
+      ([report]) => (report as { message: string }).message === 'Layer thumbnail rasterization failed'
+    );
+    expect(readFailures).toHaveLength(1);
+    engine.lifecycle.dispose();
+  });
+
+  it('cropLayerToBbox refuses without mutation a layer that lies wholly outside the frame', async () => {
     const document = { ...makeDoc(), bbox: { height: 5, width: 5, x: 50, y: 50 } };
     const { projectId, store } = createReducerBackedStore(document);
     const bitmapStore = createSpyBitmapStore();
@@ -2267,14 +2436,14 @@ describe('createCanvasEngine', () => {
     });
     const before = engine.document.getDocument();
 
-    expect(await engine.layers.cropLayerToBbox('a')).toEqual({ status: 'empty' });
+    expect(await engine.layers.cropLayerToBbox('a')).toEqual({ status: 'outside-frame' });
     expect(engine.document.getDocument()).toBe(before);
     expect(engine.stores.canUndo.get()).toBe(false);
     expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
     engine.lifecycle.dispose();
   });
 
-  it('cropLayerToBbox reports missing, locked, unsupported, and not-ready layers explicitly', async () => {
+  it('cropLayerToBbox reports missing, locked, unsupported, and unreadable layers explicitly', async () => {
     // A polygon without enough points to fill has no raster to crop.
     const polygon: CanvasLayerSourceContract = {
       fill: '#000',
@@ -2289,7 +2458,7 @@ describe('createCanvasEngine', () => {
     const layers = [
       { ...rasterLayer('locked'), isLocked: true },
       { ...rasterLayer('polygon'), source: polygon },
-      rasterLayer('pending'),
+      rasterLayer('unreadable'),
     ];
     const document = { ...makeDoc(), stacks: stacksFrom(layers) };
     const { projectId, store } = createReducerBackedStore(document);
@@ -2303,7 +2472,7 @@ describe('createCanvasEngine', () => {
     expect(await engine.layers.cropLayerToBbox('missing')).toEqual({ status: 'missing' });
     expect(await engine.layers.cropLayerToBbox('locked')).toEqual({ status: 'locked' });
     expect(await engine.layers.cropLayerToBbox('polygon')).toEqual({ status: 'unsupported' });
-    expect(await engine.layers.cropLayerToBbox('pending')).toEqual({ status: 'not-ready' });
+    expect(await engine.layers.cropLayerToBbox('unreadable')).toEqual({ status: 'unreadable' });
     engine.lifecycle.dispose();
   });
 
@@ -3378,6 +3547,109 @@ describe('engine-owned pixel editing', () => {
     h.engine.document.replaceDocument(structuredClone(h.engine.document.getDocument()!));
     await h.publishInitialCache();
     expect(strokeSpan(click(42, true))).toBeCloseTo(dab, 6);
+    h.engine.lifecycle.dispose();
+  });
+
+  it('starts a Shift-click line from the last stroke end on a layer nudged 100 px since', async () => {
+    const h = createRasterImageEraserHarness({ adjustments: [], blendMode: 'normal', opacity: 1 });
+    await h.publishInitialCache();
+    let xs: number[] = [];
+    vi.stubGlobal(
+      'Path2D',
+      class RecordingPath2D {
+        closePath() {}
+        lineTo(x: number) {
+          xs.push(x);
+        }
+        moveTo(x: number) {
+          xs.push(x);
+        }
+        quadraticCurveTo(_cx: number, _cy: number, x: number) {
+          xs.push(x);
+        }
+      }
+    );
+    const strokeSpan = (x: number, shiftKey: boolean): number => {
+      xs = [];
+      h.overlay.fire('pointerdown', { ...pointerAt(x, 20), shiftKey });
+      h.overlay.fire('pointerup', { ...pointerAt(x, 20, { buttons: 0 }), shiftKey });
+      return Math.max(...xs) - Math.min(...xs);
+    };
+
+    h.engine.tools.setTool('brush');
+    const dab = strokeSpan(12, false);
+    expect(h.engine.layers.nudgeSelectedLayer(100, 0).status).toBe('committed');
+    // The stroke ended at x=12 on the layer, which now sits at x=112: the line runs 30 px, not 130.
+    const line = strokeSpan(142, true);
+    expect(line).toBeGreaterThan(dab + 25);
+    expect(line).toBeLessThan(dab + 35);
+    h.engine.lifecycle.dispose();
+  });
+
+  it.each([
+    [
+      'cropped',
+      async (h: ReturnType<typeof createPixelEditHarness>) => {
+        expect(h.engine.layers.nudgeSelectedLayer(30, 0).status).toBe('committed');
+        expect(await h.engine.layers.cropLayerToBbox('paint')).toEqual({ status: 'cropped' });
+      },
+    ],
+    [
+      'transformed and applied',
+      (h: ReturnType<typeof createPixelEditHarness>) => {
+        expect(h.engine.layers.beginTransform('paint')).toBe('started');
+        expect(h.engine.stores.transformSession.get()?.layerId).toBe('paint');
+        h.engine.layers.updateTransformSession({ rotation: 0, scaleX: 1, scaleY: 1, x: 30, y: 0 });
+        h.engine.layers.applyTransform();
+        expect(h.engine.stores.transformSession.get()).toBeNull();
+        expect(h.engine.history.getEntries().past.at(-1)).toBe('Transform layer');
+      },
+    ],
+  ])('starts a Shift-click line where the last stroke ended once its paint layer is %s', async (_label, edit) => {
+    const h = createPixelEditHarness({
+      blendMode: 'normal',
+      id: 'paint',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Paint',
+      opacity: 1,
+      source: { bitmap: { height: 10, imageName: 'paint-bitmap', width: 20 }, offset: { x: 5, y: 15 }, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    });
+    await h.publishInitialCache();
+    let xs: number[] = [];
+    vi.stubGlobal(
+      'Path2D',
+      class RecordingPath2D {
+        closePath() {}
+        lineTo(x: number) {
+          xs.push(x);
+        }
+        moveTo(x: number) {
+          xs.push(x);
+        }
+        quadraticCurveTo(_cx: number, _cy: number, x: number) {
+          xs.push(x);
+        }
+      }
+    );
+    const strokeSpan = (x: number, shiftKey: boolean): number => {
+      xs = [];
+      h.overlay.fire('pointerdown', { ...pointerAt(x, 20), shiftKey });
+      h.overlay.fire('pointerup', { ...pointerAt(x, 20, { buttons: 0 }), shiftKey });
+      return Math.max(...xs) - Math.min(...xs);
+    };
+
+    h.engine.tools.setTool('brush');
+    const dab = strokeSpan(12, false);
+    await edit(h);
+    // Both edits rebuild the layer at an identity transform with the stroke's pixels 30 px to the right, at x=42.
+    expect(getDocumentLeaves(h.engine.document.getDocument()!)[0]?.transform).toMatchObject({ x: 0, y: 0 });
+    h.engine.tools.setTool('brush');
+    const line = strokeSpan(72, true);
+    expect(line).toBeGreaterThan(dab + 25);
+    expect(line).toBeLessThan(dab + 35);
     h.engine.lifecycle.dispose();
   });
 
@@ -7603,6 +7875,69 @@ describe('structural raster publication failure atomicity', () => {
     });
     expect(engine.stores.canUndo.get()).toBe(true);
     await expectLayerCacheExact(engine, source.id, croppedCache);
+    engine.lifecycle.dispose();
+  });
+
+  it('crop all right after a stroke waits for its upload, so the acknowledgement cannot make it stale', async () => {
+    const painted: CanvasRasterLayerContractV2 = {
+      ...(rasterLayer('painted') as CanvasRasterLayerContractV2),
+      source: { bitmap: { height: 10, imageName: 'painted-before', width: 10 }, offset: { x: 0, y: 0 }, type: 'paint' },
+    };
+    const document: CanvasDocumentContractV3 = {
+      ...makeDoc(),
+      bbox: { height: 7, width: 6, x: 2, y: 3 },
+      stacks: stacksFrom([painted, rasterLayer('slow')]),
+    };
+    const reducer = createReducerBackedStore(document);
+    const upload = createDeferred<{ height: number; imageName: string; width: number }>();
+    const uploadImage = vi.fn(() => upload.promise);
+    let placed: { offset: { x: number; y: number }; surface: RasterSurface } | null = null;
+    const bitmapStore = createBitmapStore({
+      debounceMs: 1500,
+      dispatch: createTestMutationPort(reducer.store, reducer.projectId).dispatch,
+      encodeSurface: (surface) =>
+        Promise.resolve(new Blob([`${surface.width}x${surface.height}`], { type: 'image/png' })),
+      getLayerSource: (layerId) => {
+        const layer = getDocumentLeaves(
+          reducer.store.getState().projects.find((project) => project.id === reducer.projectId)?.canvas.document
+        ).find((candidate) => candidate.id === layerId);
+        return layer?.type === 'raster' ? layer.source : null;
+      },
+      getLayerSurface: () => placed,
+      hashBlob: (blob) => blob.text(),
+      maxUploadAttempts: 1,
+      retryDelaysMs: [],
+      sleep: () => Promise.resolve(),
+      uploadImage,
+    });
+    // The second layer's image is still decoding, so crop all is mid-read when the acknowledgement could land.
+    const slowImage = createDeferred<Blob>();
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore,
+      imageResolver: (imageName) => (imageName === 'slow' ? slowImage.promise : Promise.resolve(new Blob())),
+      projectId: reducer.projectId,
+      store: reducer.store,
+    });
+    const before = await snapshotLayerCache(engine, painted.id);
+    placed = { offset: { x: before.rect.x, y: before.rect.y }, surface: before.surface };
+    // A stroke marks the layer dirty and its debounced upload starts.
+    bitmapStore.markLayerDirty(painted.id);
+    void bitmapStore.flushPendingUploads();
+    for (let tick = 0; tick < 50 && uploadImage.mock.calls.length === 0; tick += 1) {
+      await Promise.resolve();
+    }
+    expect(uploadImage).toHaveBeenCalledOnce();
+
+    const crop = engine.layers.cropAllLayersToBbox();
+    upload.resolve({ height: 10, imageName: 'painted-after', width: 10 });
+    for (let tick = 0; tick < 50; tick += 1) {
+      await Promise.resolve();
+    }
+    slowImage.resolve(new Blob());
+
+    await expect(crop).resolves.toEqual({ cropped: 2, skippedLocked: 0, skippedUnreadable: 0, status: 'cropped' });
+    expect(engine.history.getEntries().past).toEqual(['Crop all layers to frame']);
     engine.lifecycle.dispose();
   });
 });
@@ -15893,6 +16228,21 @@ describe('beginTransform', () => {
     return { dispatch, engine };
   };
 
+  it('refuses as busy while interaction is locked, leaving the selection and tool unchanged', () => {
+    const { dispatch, engine } = setup([rasterLayer('a'), rasterLayer('b')], 'a');
+    engine.tools.setInteractionLocked(true);
+    // The lock itself parks the surface on the view tool.
+    const lockedTool = engine.stores.activeTool.get();
+    dispatch.mockClear();
+
+    expect(engine.layers.beginTransform('b')).toBe('busy');
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(engine.document.getDocument()?.selectedLayerId).toBe('a');
+    expect(engine.stores.activeTool.get()).toBe(lockedTool);
+    expect(engine.stores.transformSession.get()).toBeNull();
+    engine.lifecycle.dispose();
+  });
+
   it('selects the layer and opens its session now, even with transform already active and no session', () => {
     const { engine } = setup([rasterLayer('a'), rasterLayer('b')], null);
     engine.tools.setTool('transform');
@@ -15905,39 +16255,11 @@ describe('beginTransform', () => {
     engine.lifecycle.dispose();
   });
 
-  it('cancels a session on another layer, dropping its preview, before opening one on the target', () => {
-    const { dispatch, engine } = setup([rasterLayer('a'), rasterLayer('b')], 'a');
-    engine.tools.setTool('transform');
-    engine.layers.updateTransformSession({ rotation: 0, scaleX: 2, scaleY: 2, x: 5, y: 6 });
-    dispatch.mockClear();
-
-    expect(engine.layers.beginTransform('b')).toBe('started');
-    expect(engine.stores.transformSession.get()).toMatchObject({
-      layerId: 'b',
-      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
-    });
-    // Only the selection changed: the abandoned preview on `a` never landed.
-    expect(dispatch.mock.calls.map(([action]) => action.type)).toEqual(['setCanvasSelectedLayer']);
-    expect(getDocumentLayer(engine.document.getDocument(), 'a')?.transform.scaleX).toBe(1);
-    engine.lifecycle.dispose();
-  });
-
-  it.each([
-    ['locked', [{ ...rasterLayer('b'), isLocked: true }], 'locked'],
-    ['a mask', [thumbnailMaskLayer('b', 'inpaint_mask')], 'ineligible'],
-    ['missing', [rasterLayer('a')], 'missing'],
-  ] as const)('refuses %s without selecting or switching tools', (_, layers, status) => {
-    const { dispatch, engine } = setup([rasterLayer('a'), ...layers.filter((layer) => layer.id !== 'a')], 'a');
-
-    expect(engine.layers.beginTransform('b')).toBe(status);
-    expect(dispatch).not.toHaveBeenCalled();
-    expect(engine.stores.activeTool.get()).not.toBe('transform');
-    expect(engine.stores.transformSession.get()).toBeNull();
-    engine.lifecycle.dispose();
-  });
-
-  /** Paints a stroke onto a new layer, then asks for its transform before persistence acknowledges the pixels. */
-  const strokeThenTransform = (options: { uploadImage?: () => Promise<never> } = {}) => {
+  /**
+   * Paints a stroke onto a new layer (or an empty paint layer that already exists), then asks for its transform
+   * before persistence acknowledges the pixels.
+   */
+  const strokeThenTransform = (options: { existingLayer?: boolean; uploadImage?: () => Promise<never> } = {}) => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
@@ -15956,10 +16278,14 @@ describe('beginTransform', () => {
       windowListeners.set(type, listener)
     );
     vi.stubGlobal('removeEventListener', (type: string) => windowListeners.delete(type));
+    const existing: CanvasLayerContract = {
+      ...(rasterLayer('paint') as CanvasRasterLayerContractV2),
+      source: { bitmap: null, type: 'paint' },
+    };
     const { dispatch, projectId, store } = createReducerBackedStore({
       ...makeDoc(),
-      selectedLayerId: null,
-      stacks: stacksFrom([]),
+      selectedLayerId: options.existingLayer ? existing.id : null,
+      stacks: stacksFrom(options.existingLayer ? [existing] : []),
     });
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
@@ -16033,6 +16359,17 @@ describe('beginTransform', () => {
     h.engine.lifecycle.dispose();
   });
 
+  it('stops waiting on an undo, whose replay lands on a document the request never saw', async () => {
+    // The layer survives the undo, still selected under transform, so only the replay itself ends the wait.
+    const h = strokeThenTransform({ existingLayer: true });
+    expect(h.layerId).toBe('paint');
+    await h.engine.history.undo();
+    expect(h.engine.interaction.get('pendingTransformLayerId')).toBeNull();
+    h.persist();
+    expect(h.sessionLayerId()).toBeNull();
+    h.engine.lifecycle.dispose();
+  });
+
   it('keeps waiting through retried upload failures, and stops with a refusal once no retry follows', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
@@ -16078,43 +16415,6 @@ describe('beginTransform', () => {
     } finally {
       vi.useRealTimers();
     }
-  });
-
-  it('refuses as busy while interaction is locked, leaving the selection and tool unchanged', () => {
-    const { dispatch, engine } = setup([rasterLayer('a'), rasterLayer('b')], 'a');
-    engine.tools.setInteractionLocked(true);
-    // The lock itself parks the surface on the view tool.
-    const lockedTool = engine.stores.activeTool.get();
-    dispatch.mockClear();
-
-    expect(engine.layers.beginTransform('b')).toBe('busy');
-    expect(dispatch).not.toHaveBeenCalled();
-    expect(engine.document.getDocument()?.selectedLayerId).toBe('a');
-    expect(engine.stores.activeTool.get()).toBe(lockedTool);
-    expect(engine.stores.transformSession.get()).toBeNull();
-    engine.lifecycle.dispose();
-  });
-
-  it('refuses as busy while document edits are locked, leaving the selection and tool unchanged', () => {
-    const { dispatch, engine } = setup([rasterLayer('a'), rasterLayer('b')], 'a');
-    engine.tools.setTool('brush');
-    engine.stores.documentEditingLocked.set(true);
-    dispatch.mockClear();
-
-    expect(engine.layers.beginTransform('b')).toBe('busy');
-    expect(dispatch).not.toHaveBeenCalled();
-    expect(engine.stores.activeTool.get()).toBe('brush');
-    expect(engine.stores.transformSession.get()).toBeNull();
-    engine.lifecycle.dispose();
-  });
-
-  it('refuses as busy once disposed, without touching the selection', () => {
-    const { dispatch, engine } = setup([rasterLayer('a'), rasterLayer('b')], 'a');
-    engine.lifecycle.dispose();
-    dispatch.mockClear();
-
-    expect(engine.layers.beginTransform('b')).toBe('busy');
-    expect(dispatch).not.toHaveBeenCalled();
   });
 });
 

@@ -25,6 +25,8 @@ export type SamSessionErrorCode =
   | 'output-dimension'
   | 'decode'
   | 'locked'
+  /** The layer's image could not be read (it is gone or does not decode). */
+  | 'unreadable'
   | 'unknown';
 export interface SamSessionError {
   code: SamSessionErrorCode;
@@ -77,6 +79,8 @@ export type FilterSessionErrorCode =
   | 'disabled'
   | 'empty'
   | 'source-over-budget'
+  /** The layer's image could not be read (it is gone or does not decode). */
+  | 'source-unreadable'
   /** The layer's Clarity, Texture or Dehaze could not run on the source, so it was not filtered without them. */
   | 'source-adjustment-too-large'
   | 'source-adjustment-over-budget'

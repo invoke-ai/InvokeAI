@@ -27,9 +27,16 @@ import {
   type SpatialRunner,
 } from '@workbench/canvas-engine/render/exactAdjustments';
 
+/**
+ * `not-ready`: the pixels are still loading or moved while they were read, so trying again can succeed. `unreadable`:
+ * rasterizing the layer's current source failed (an image that is gone or does not decode), so trying again cannot
+ * succeed until the source changes.
+ */
 export type ExportLayerPixelsResult =
   | ({ status: 'ok' } & RasterReadLease)
-  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' | 'aborted' }
+  | {
+      status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'unreadable' | 'over-budget' | 'aborted';
+    }
   | AdjustmentRefusal;
 
 export interface RasterExportControllerOptions {
@@ -206,7 +213,7 @@ export class RasterExportController {
     try {
       const rasterized = await this.options.getOrStartRasterization(layer, document, options.signal);
       if (rasterized !== 'published') {
-        return { status: rasterized === 'aborted' ? 'aborted' : 'not-ready' };
+        return { status: rasterized === 'aborted' ? 'aborted' : rasterized === 'error' ? 'unreadable' : 'not-ready' };
       }
       const currentDocument = this.options.getDocument();
       const currentLayer = currentDocument ? lookupDocumentLayer(currentDocument, layerId) : null;

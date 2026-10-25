@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   cropAllLayersToFrame,
-  hasCroppableLayers,
+  getCropAllUnavailableReasonKey,
   resolveCanvasContextMenu,
   resolveCanvasContextMenuBranch,
 } from './canvasContextMenu';
@@ -89,29 +89,31 @@ describe('resolveCanvasContextMenu', () => {
   });
 });
 
-describe('hasCroppableLayers', () => {
+describe('getCropAllUnavailableReasonKey', () => {
   const documentWith = (nodes: CanvasNodeContract[]): CanvasDocumentContractV3 => ({
     ...createEmptyCanvasDocument(),
     stacks: stacksFrom(nodes),
   });
 
   it('finds a croppable leaf in any stack, hidden or disabled ones included', () => {
-    expect(hasCroppableLayers(documentWith([layerContract('mask', 'inpaint_mask', { isEnabled: false })]))).toBe(true);
-    expect(hasCroppableLayers(documentWith([groupContract('G', [layerContract('region', 'regional_guidance')])]))).toBe(
-      true
-    );
+    expect(
+      getCropAllUnavailableReasonKey(documentWith([layerContract('mask', 'inpaint_mask', { isEnabled: false })]))
+    ).toBeNull();
+    expect(
+      getCropAllUnavailableReasonKey(documentWith([groupContract('G', [layerContract('region', 'regional_guidance')])]))
+    ).toBeNull();
   });
 
-  it('has nothing to crop when every leaf is locked by itself or by a group above it', () => {
-    expect(hasCroppableLayers(documentWith([]))).toBe(false);
+  it('says why there is nothing to crop: no layers, or every leaf locked by itself or a group above it', () => {
+    expect(getCropAllUnavailableReasonKey(documentWith([]))).toBe('widgets.canvas.contextMenu.cropAllNoLayers');
     expect(
-      hasCroppableLayers(
+      getCropAllUnavailableReasonKey(
         documentWith([
           layerContract('locked', 'raster', { isLocked: true }),
           groupContract('G', [layerContract('inside', 'control')], { isLocked: true }),
         ])
       )
-    ).toBe(false);
+    ).toBe('widgets.canvas.contextMenu.cropAllAllLocked');
   });
 });
 
@@ -129,20 +131,41 @@ describe('cropAllLayersToFrame', () => {
   };
 
   it.each([
-    [{ cropped: 1, skippedLocked: 0 }, ['Cropped 1 layer to the frame', undefined]],
-    [{ cropped: 4, skippedLocked: 1 }, ['Cropped 4 layers to the frame', '1 locked layer skipped']],
-    [{ cropped: 2, skippedLocked: 3 }, ['Cropped 2 layers to the frame', '3 locked layers skipped']],
-  ])('reports %o as cropped, with the locked layers it skipped', async (counts, expected) => {
+    [{ cropped: 1, skippedLocked: 0, skippedUnreadable: 0 }, ['Cropped 1 layer to the frame', undefined]],
+    [
+      { cropped: 4, skippedLocked: 1, skippedUnreadable: 0 },
+      ['Cropped 4 layers to the frame', '1 locked layer skipped.'],
+    ],
+    [
+      { cropped: 2, skippedLocked: 3, skippedUnreadable: 0 },
+      ['Cropped 2 layers to the frame', '3 locked layers skipped.'],
+    ],
+    [
+      { cropped: 2, skippedLocked: 1, skippedUnreadable: 2 },
+      [
+        'Cropped 2 layers to the frame',
+        '1 locked layer skipped. 2 layers could not be read and were left as they are.',
+      ],
+    ],
+  ])('reports %o as cropped, with the layers it left as they were', async (counts, expected) => {
     expect(await notices({ status: 'cropped', ...counts })).toEqual({ error: [], info: [], success: [expected] });
   });
 
   it('says nothing needed cropping, and that only unlocked layers were checked when some were skipped', async () => {
-    expect((await notices({ skippedLocked: 0, status: 'nothing' })).info).toEqual([
+    expect((await notices({ skippedLocked: 0, skippedUnreadable: 0, status: 'nothing' })).info).toEqual([
       ['Every layer already fits the frame', undefined],
     ]);
-    expect((await notices({ skippedLocked: 2, status: 'nothing' })).info).toEqual([
-      ['Every unlocked layer already fits the frame', '2 locked layers skipped'],
+    expect((await notices({ skippedLocked: 2, skippedUnreadable: 0, status: 'nothing' })).info).toEqual([
+      ['Every unlocked layer already fits the frame', '2 locked layers skipped.'],
     ]);
+  });
+
+  it('reports a crop that left only unreadable layers uncropped as a failure, never as still loading', async () => {
+    expect(await notices({ skippedLocked: 0, skippedUnreadable: 1, status: 'nothing' })).toEqual({
+      error: [['No layer was cropped', '1 layer could not be read and was left as it is.']],
+      info: [],
+      success: [],
+    });
   });
 
   it('names the layer whose adjustments prevented the crop', async () => {

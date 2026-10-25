@@ -2,6 +2,7 @@ import type {
   CanvasAdjustmentsContract,
   CanvasDocumentContractV3,
   CanvasLayerContract,
+  CanvasNodeContract,
 } from '@workbench/canvas-engine/contracts';
 import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { Rect } from '@workbench/canvas-engine/types';
@@ -33,19 +34,23 @@ const layer: CanvasLayerContract = {
 const CACHE_RECT: Rect = { height: 50, width: 50, x: -10, y: -10 };
 const BBOX: Rect = { height: 20, width: 20, x: 0, y: 0 };
 
-const createHarness = (historyBytes?: number) => {
+const createHarness = (
+  historyBytes?: number,
+  options: { readonly nodes?: CanvasNodeContract[]; readonly unreadable?: boolean } = {}
+) => {
   const document: CanvasDocumentContractV3 = {
     background: 'transparent',
     bbox: BBOX,
     height: 100,
     selectedLayerId: 'paint',
-    stacks: stacksFrom([layer]),
+    stacks: stacksFrom(options.nodes ?? [layer]),
     version: 3,
     width: 100,
   };
   const h = createLayerOperationHarness(document, { historyBytes });
   h.layers.getOrCreateRect('paint', CACHE_RECT);
   const discardPersisted = vi.fn();
+  const exported: string[] = [];
   const controller = new CropLayerController({
     backend: h.backend,
     captureCache: (target) => {
@@ -57,6 +62,10 @@ const createHarness = (historyBytes?: number) => {
     ctx: h.ctx,
     discardPersisted,
     exportBaked: (layerId) => {
+      exported.push(layerId);
+      if (options.unreadable) {
+        return Promise.resolve({ status: 'unreadable' as const });
+      }
       const entry = h.layers.get(layerId)!;
       const current = getDocumentLayer(h.document(), layerId)!;
       return Promise.resolve({
@@ -67,10 +76,11 @@ const createHarness = (historyBytes?: number) => {
         surface: entry.surface,
       });
     },
+    flushPendingPixels: () => Promise.resolve(),
     isGuardCurrent: () => true,
     isSupportedSource: () => true,
   });
-  return { ...h, controller, discardPersisted, original: getDocumentLayer(h.document(), 'paint')! };
+  return { ...h, controller, discardPersisted, exported, original: getDocumentLayer(h.document(), 'paint')! };
 };
 
 describe('CropLayerController', () => {
@@ -98,6 +108,31 @@ describe('CropLayerController', () => {
     expect(h.document()).toBe(before);
     expect(h.dispatched).toEqual([]);
     expect(h.layers.get('paint')?.rect).toEqual(CACHE_RECT);
+  });
+
+  it('refuses a layer under a locked group, as crop all skips it, without reading it', async () => {
+    const h = createHarness(undefined, { nodes: [groupContract('G', [layer], { isLocked: true })] });
+
+    await expect(h.controller.crop('paint')).resolves.toEqual({ status: 'locked' });
+    expect(h.exported).toEqual([]);
+    expect(h.dispatched).toEqual([]);
+  });
+
+  it('says a layer that could not be read is unreadable, not still loading', async () => {
+    const h = createHarness(undefined, { unreadable: true });
+
+    await expect(h.controller.crop('paint')).resolves.toEqual({ status: 'unreadable' });
+    expect(h.dispatched).toEqual([]);
+    expect(h.history.canUndo()).toBe(false);
+  });
+
+  it('refuses to empty a layer that lies wholly outside the frame', async () => {
+    const h = createHarness();
+    h.layers.delete('paint');
+    h.layers.getOrCreateRect('paint', { height: 10, width: 10, x: 60, y: 60 });
+
+    await expect(h.controller.crop('paint')).resolves.toEqual({ status: 'outside-frame' });
+    expect(h.dispatched).toEqual([]);
   });
 
   it('leaves the step on the undo stack when its replay is refused', async () => {
@@ -148,6 +183,10 @@ const createCropAllHarness = (
     onExport?: (layerId: string) => void;
     /** Refuses the owner's bake; its raw export still succeeds. */
     refusal?: AdjustmentRefusal;
+    /** Leaves added on top whose pixels cannot be read. */
+    unreadable?: readonly CanvasLayerContract[];
+    /** Settles pending paint uploads; resolves at once by default. */
+    flushPendingPixels?: () => Promise<void>;
   } = {}
 ) => {
   const raster = (id: string) =>
@@ -162,6 +201,7 @@ const createCropAllHarness = (
     height: 100,
     selectedLayerId: 'raster',
     stacks: stacksFrom([
+      ...(options.unreadable ?? []),
       raster('inside'),
       raster('raster'),
       lockedPaint('locked'),
@@ -202,6 +242,9 @@ const createCropAllHarness = (
       const read = exportOptions?.applyAdjustments === false ? `${layerId}:raw` : layerId;
       exported.push(read);
       options.onExport?.(layerId);
+      if (options.unreadable?.some((leaf) => leaf.id === layerId)) {
+        return Promise.resolve({ status: 'unreadable' as const });
+      }
       if (options.refusal?.ownerId === layerId && read === layerId) {
         return Promise.resolve(options.refusal);
       }
@@ -219,6 +262,7 @@ const createCropAllHarness = (
         surface: entry.surface,
       });
     },
+    flushPendingPixels: options.flushPendingPixels ?? (() => Promise.resolve()),
     isGuardCurrent: () => guard.current,
     isSupportedSource: () => true,
   });
@@ -257,7 +301,12 @@ describe('CropLayerController: crop all layers', () => {
     };
     const h = createCropAllHarness({ adjusted: ['inside'], refusal });
 
-    await expect(h.controller.cropAll()).resolves.toEqual({ cropped: 4, skippedLocked: 2, status: 'cropped' });
+    await expect(h.controller.cropAll()).resolves.toEqual({
+      cropped: 4,
+      skippedLocked: 2,
+      skippedUnreadable: 0,
+      status: 'cropped',
+    });
     expect(h.exported).toEqual(['mask', 'region', 'control', 'inside:raw', 'raster']);
     expect(getDocumentLayer(h.document(), 'inside')).toBe(getDocumentLayer(h.original, 'inside'));
     expect(h.layers.get('raster')?.rect).toEqual(FRAME);
@@ -267,7 +316,12 @@ describe('CropLayerController: crop all layers', () => {
   it('bakes an adjusted leaf it must crop, after releasing its raw read', async () => {
     const h = createCropAllHarness({ adjusted: ['raster'] });
 
-    await expect(h.controller.cropAll()).resolves.toEqual({ cropped: 4, skippedLocked: 2, status: 'cropped' });
+    await expect(h.controller.cropAll()).resolves.toEqual({
+      cropped: 4,
+      skippedLocked: 2,
+      skippedUnreadable: 0,
+      status: 'cropped',
+    });
     expect(h.exported).toEqual(['mask', 'region', 'control', 'inside', 'raster:raw', 'raster']);
     // The raw read is released before the bake reserves, so the peak stays one export.
     const croppedRegion = bytes({ height: 10, width: 5, x: 0, y: 0 });
@@ -281,7 +335,12 @@ describe('CropLayerController: crop all layers', () => {
   it('crops every unlocked leaf that reaches past the frame in one entry, and replays it as one', async () => {
     const h = createCropAllHarness();
 
-    await expect(h.controller.cropAll()).resolves.toEqual({ cropped: 4, skippedLocked: 2, status: 'cropped' });
+    await expect(h.controller.cropAll()).resolves.toEqual({
+      cropped: 4,
+      skippedLocked: 2,
+      skippedUnreadable: 0,
+      status: 'cropped',
+    });
 
     // Hidden, disabled and grouped leaves crop too; locked ones are never read, and only those reaching past the
     // frame count as skipped.
@@ -338,6 +397,44 @@ describe('CropLayerController: crop all layers', () => {
     expect(h.layers.get('raster')?.rect).toEqual(FRAME);
   });
 
+  it('skips leaves whose pixels cannot be read and crops the rest, counting those that reach past the frame', async () => {
+    /** An image layer whose decode failed; its contract still says where its content lies. */
+    const unreadableImage = (id: string, x: number) =>
+      layerContract(id, 'raster', {
+        source: { image: { height: 10, imageName: `${id}.png`, width: 10 }, type: 'image' },
+        transform: { rotation: 0, scaleX: 1, scaleY: 1, x, y: 0 },
+      } as Partial<CanvasLayerContract>);
+    const h = createCropAllHarness({ unreadable: [unreadableImage('gone', 15), unreadableImage('goneInside', 5)] });
+
+    await expect(h.controller.cropAll()).resolves.toEqual({
+      cropped: 4,
+      skippedLocked: 2,
+      skippedUnreadable: 1,
+      status: 'cropped',
+    });
+    expect(h.exported).toEqual(['mask', 'region', 'control', 'gone', 'goneInside', 'inside', 'raster']);
+    expect(getDocumentLayer(h.document(), 'gone')).toBe(getDocumentLayer(h.original, 'gone'));
+    expect(getDocumentLayer(h.document(), 'raster')).not.toBe(getDocumentLayer(h.original, 'raster'));
+    expect(h.history.entries().past).toEqual(['Crop all layers to frame']);
+  });
+
+  it('settles pending paint uploads before it reads any leaf', async () => {
+    let settle!: () => void;
+    const h = createCropAllHarness({
+      flushPendingPixels: () =>
+        new Promise<void>((resolve) => {
+          settle = resolve;
+        }),
+    });
+
+    const crop = h.controller.cropAll();
+    await Promise.resolve();
+    expect(h.exported).toEqual([]);
+    settle();
+
+    await expect(crop).resolves.toMatchObject({ cropped: 4, status: 'cropped' });
+  });
+
   it('reports nothing when every unlocked leaf already fits the frame', async () => {
     const h = createCropAllHarness();
     for (const id of ['raster', 'control', 'mask', 'region']) {
@@ -345,7 +442,11 @@ describe('CropLayerController: crop all layers', () => {
       h.layers.getOrCreateRect(id, CACHE_RECTS.inside!);
     }
 
-    await expect(h.controller.cropAll()).resolves.toEqual({ skippedLocked: 2, status: 'nothing' });
+    await expect(h.controller.cropAll()).resolves.toEqual({
+      skippedLocked: 2,
+      skippedUnreadable: 0,
+      status: 'nothing',
+    });
     expect(h.dispatched).toEqual([]);
     expect(h.history.canUndo()).toBe(false);
   });

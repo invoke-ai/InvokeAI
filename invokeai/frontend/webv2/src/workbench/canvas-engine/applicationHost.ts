@@ -48,7 +48,7 @@ export interface CanvasApplicationHost {
     options?: ExportLayerPixelsOptions
   ): Promise<
     | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
-    | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+    | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'unreadable' | 'over-budget' }
     | AdjustmentRefusal
   >;
   getCompositeExecutorDeps(): CanvasCompositeExecutorDeps;

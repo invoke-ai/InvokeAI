@@ -360,7 +360,9 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
             ? 'The canvas changed while generation was being prepared. Please invoke again.'
             : composed.status === 'adjustment-refused'
               ? ADJUSTMENT_REFUSAL_NOTICES[composed.reason](composed.ownerName)
-              : `The canvas could not be captured for generation (${composed.status}).`
+              : composed.status === 'unreadable'
+                ? "A layer's image could not be read (it may have been deleted or damaged). Disable or delete that layer, then invoke again."
+                : `The canvas could not be captured for generation (${composed.status}).`
       );
       return;
     }

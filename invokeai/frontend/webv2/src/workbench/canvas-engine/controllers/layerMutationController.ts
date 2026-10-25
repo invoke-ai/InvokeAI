@@ -42,12 +42,13 @@ export type ConvertLayerToControlResult =
   | 'converted'
   | SubsetOf<CanvasCommandRefusal, 'missing' | 'locked' | 'unsupported'>
   | LayerEditRefusal
+  | 'unreadable'
   | 'failed'
   | AdjustmentRefusal;
 
 type BakedExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
-  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'unreadable' | 'over-budget' }
   | AdjustmentRefusal;
 
 export type DuplicateLayerRasterPlan =
@@ -64,7 +65,7 @@ export type DuplicateLayerRasterPlan =
 
 type DuplicateRasterPreparationResult =
   | { readonly status: 'ready'; readonly layer: CanvasLayerContract }
-  | { readonly status: 'not-ready' | 'over-budget' };
+  | { readonly status: 'not-ready' | 'unreadable' | 'over-budget' };
 
 export interface LayerMutationControllerOptions {
   readonly ctx: Pick<

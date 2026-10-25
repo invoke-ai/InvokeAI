@@ -14,7 +14,8 @@ export type CreateFromBboxNotice =
         | 'widgets.canvas.contextMenu.createdFromBbox'
         | 'widgets.canvas.contextMenu.empty'
         | 'widgets.canvas.contextMenu.notReady'
-        | 'widgets.canvas.contextMenu.stale';
+        | 'widgets.canvas.contextMenu.stale'
+        | 'widgets.canvas.contextMenu.unreadable';
       /** `destination` is itself a translation key naming the created entity. */
       options?: CanvasImportNotice['options'] | { destination: string };
     }
@@ -47,6 +48,8 @@ export const getCreateFromBboxNotice = (
     case 'not-ready':
     case 'over-budget':
       return { kind: 'info', titleKey: 'widgets.canvas.contextMenu.notReady' };
+    case 'unreadable':
+      return { kind: 'error', titleKey: 'widgets.canvas.contextMenu.unreadable' };
     case 'adjustment-refused':
       return { kind: 'error', refusal: result };
     case 'blocked':

@@ -1,18 +1,19 @@
 /**
  * Shared brush/eraser gesture resolves or creates a target, drives a StrokeSession and commits/cancels. Only
  * gesture-start layer creation dispatches here; moves never dispatch. Fill/erase differ by blend and option
- * source. A Shift press on a layer with a remembered stroke end draws a straight segment from it.
+ * source. A Shift press on a layer with a remembered stroke end draws a straight segment from it; the end is kept
+ * layer-local, so moving or transforming the layer carries it.
  */
 
 import type { CanvasLayerContract, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
 import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
-import type { PointerInput } from '@workbench/canvas-engine/types';
+import type { Mat2d, PointerInput } from '@workbench/canvas-engine/types';
 
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { isLeafPaintable, isLayerTransparencyLocked } from '@workbench/canvas-engine/document/layerEligibility';
 import { isMaskLayer } from '@workbench/canvas-engine/document/sources';
-import { fromTRS, invert } from '@workbench/canvas-engine/math/mat2d';
+import { applyToPoint, fromTRS, invert } from '@workbench/canvas-engine/math/mat2d';
 
 import type { StrokeEdit, Tool, ToolContext } from './tool';
 
@@ -76,6 +77,12 @@ const editTarget = (
   layerId,
   ...extra,
 });
+
+/** The target layer's document matrix; null is identity (a new or materialized layer). */
+const targetMatrix = ({ transform }: PaintTarget): Mat2d | null =>
+  transform
+    ? fromTRS({ x: transform.x, y: transform.y }, transform.rotation, transform.scaleX, transform.scaleY)
+    : null;
 
 /** Resolves (or auto-creates) the paint target for a gesture, or `null` to no-op. */
 const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget | null => {
@@ -268,14 +275,7 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
         return;
       }
       const composite = resolvedTarget.transparencyLocked && spec.id === 'brush' ? 'source-atop' : spec.composite;
-      const layerTransform = resolvedTarget.transform
-        ? fromTRS(
-            { x: resolvedTarget.transform.x, y: resolvedTarget.transform.y },
-            resolvedTarget.transform.rotation,
-            resolvedTarget.transform.scaleX,
-            resolvedTarget.transform.scaleY
-          )
-        : null;
+      const layerTransform = targetMatrix(resolvedTarget);
       if (layerTransform && !invert(layerTransform)) {
         // A zero-scale layer has no paintable geometry to invert into.
         resolvedTarget.cancel();
@@ -309,9 +309,10 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
           thinning: spec.thinning(ctx),
           tool: spec.id,
         });
-        // Shift continues from the layer's last stroke end: both points take the press pressure, so the segment
-        // renders as a line rather than collapsing to a tap.
-        const lineStart = input.modifiers.shift ? ctx.paintLineEnds?.get(target.layerId) : undefined;
+        // Shift continues from the layer's last stroke end, placed through the layer's current transform: both points
+        // take the press pressure, so the segment renders as a line rather than collapsing to a tap.
+        const localStart = input.modifiers.shift ? ctx.paintLineEnds?.get(target.layerId) : undefined;
+        const lineStart = localStart && layerTransform ? applyToPoint(layerTransform, localStart) : localStart;
         session.addPoints(lineStart ? [{ ...input, documentPoint: lineStart }, input] : [input]);
       } catch {
         abortSession();
@@ -342,7 +343,13 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
         }
         endSession();
         if (published) {
-          ctx.paintLineEnds?.set(activeTarget.layerId, { ...input.documentPoint });
+          // Kept layer-local, in the space the stroke painted; the press already refused a non-invertible matrix.
+          const matrix = targetMatrix(activeTarget);
+          const toLocal = matrix ? invert(matrix) : null;
+          ctx.paintLineEnds?.set(
+            activeTarget.layerId,
+            toLocal ? applyToPoint(toLocal, input.documentPoint) : { ...input.documentPoint }
+          );
         } else {
           activeTarget.cancel();
         }

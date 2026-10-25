@@ -108,6 +108,14 @@ export class RasterCompositeOverBudgetError extends Error {
   }
 }
 
+/** Thrown when a contributor's pixels cannot be read (its image is gone or does not decode); export maps it to `unreadable`. */
+export class RasterCompositeUnreadableError extends Error {
+  constructor(readonly layerId: string) {
+    super(`The pixels of layer ${layerId} could not be read.`);
+    this.name = 'RasterCompositeUnreadableError';
+  }
+}
+
 const defaultReadImageData = (surface: RasterSurface, rect: Rect): ImageData =>
   surface.ctx.getImageData(rect.x, rect.y, rect.width, rect.height);
 

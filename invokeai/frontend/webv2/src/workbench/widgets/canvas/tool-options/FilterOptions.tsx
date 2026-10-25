@@ -88,6 +88,7 @@ const FILTER_ERROR_TRANSLATION_KEYS: Record<FilterSessionErrorCode, string> = {
   'source-adjustment-over-budget': 'widgets.layers.rasterFilter.sourceAdjustmentOverBudget',
   'source-adjustment-too-large': 'widgets.layers.rasterFilter.sourceAdjustmentTooLarge',
   'source-over-budget': 'widgets.layers.rasterFilter.sourceOverBudget',
+  'source-unreadable': 'widgets.layers.rasterFilter.sourceUnreadable',
   stale: 'widgets.layers.rasterFilter.stale',
   unsupported: 'widgets.layers.rasterFilter.unsupported',
 };

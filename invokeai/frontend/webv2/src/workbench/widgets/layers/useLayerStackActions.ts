@@ -119,6 +119,12 @@ export const useLayerStackActions = (
               });
             } else if (result === 'not-ready') {
               toaster.create({ title: t('widgets.layers.groupActions.mergeNotReady'), type: 'warning' });
+            } else if (result === 'unreadable') {
+              toaster.create({
+                description: t('widgets.layers.actions.unreadable'),
+                title: t('widgets.layers.actions.actionFailed'),
+                type: 'error',
+              });
             } else if (result === 'over-budget') {
               toaster.create({ title: t('widgets.layers.groupActions.mergeOverBudget'), type: 'warning' });
             } else if (result === 'failed') {

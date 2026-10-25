@@ -26,6 +26,7 @@ import {
   getDocumentIndex,
   getDocumentLayer,
   getSourceContentRect,
+  inpaintMaskMergeEligibility,
   isAdjustmentRefusal,
   isGroupNode,
   isHideableLayer,
@@ -40,8 +41,8 @@ import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
 import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import { publishLayerPanelSelection, readLayerPanelState, useLayerPanelState } from '@workbench/layerPanelState';
 import { useNotify } from '@workbench/useNotify';
-import { reportTransformRefusal } from '@workbench/widgets/canvas/canvasHotkeyCommands';
 import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
+import { reportTransformRefusal } from '@workbench/widgets/canvas/canvasToolCommands';
 import {
   useCanvasDocumentEditingLocked,
   useCanvasEngineRead,
@@ -165,6 +166,7 @@ type LayerActionErrorStatus =
   | 'missing'
   | 'not-ready'
   | 'over-budget'
+  | 'unreadable'
   | 'unsupported';
 
 const LAYER_ACTION_ERROR_KEYS: Record<LayerActionErrorStatus, string> = {
@@ -177,6 +179,7 @@ const LAYER_ACTION_ERROR_KEYS: Record<LayerActionErrorStatus, string> = {
   missing: 'widgets.layers.actions.missing',
   'not-ready': 'widgets.layers.actions.notReady',
   'over-budget': 'widgets.layers.actions.overBudget',
+  unreadable: 'widgets.layers.actions.unreadable',
   unsupported: 'widgets.layers.actions.unsupported',
 };
 
@@ -308,10 +311,14 @@ const LayerMenu = ({
       )
     );
   });
-  const canMergeMasks = useCanvasEngineRead(
-    engine,
-    () => !!engine && targets.length > 1 && engine.layers.canMergeInpaintMasks(targets)
-  );
+  const mergeMasksEligibility = useCanvasEngineRead(engine, () => {
+    const model = engine?.document.model() ?? null;
+    return engine && model
+      ? inpaintMaskMergeEligibility(model.compileLeaves(), new Set(targets), (layerId) =>
+          engine.exports.hasExportableLayerContent(layerId)
+        )
+      : 'ineligible';
+  });
   const canRemoveTargetsFromGroup = useCanvasEngineRead(engine, () =>
     canRemoveFromGroup(engine?.document.model() ?? null, targets)
   );
@@ -326,7 +333,6 @@ const LayerMenu = ({
     () => ({
       canDeleteSelection,
       canGroupSelection: canGroup,
-      canMergeMasks,
       canMergeSelection: canMerge,
       canRemoveFromGroup: canRemoveTargetsFromGroup,
       hiddenByAncestor,
@@ -338,6 +344,7 @@ const LayerMenu = ({
       hasWorkflowBindings: workflowAvailability.hasWorkflowBindings,
       interactionLocked,
       layer,
+      mergeMasksEligibility,
       modelBase: base,
       selectedIds,
     }),
@@ -348,13 +355,13 @@ const LayerMenu = ({
       canDeleteSelection,
       canGroup,
       canMerge,
-      canMergeMasks,
       canRemoveTargetsFromGroup,
       document,
       engine,
       hasSupportedContent,
       interactionLocked,
       layer,
+      mergeMasksEligibility,
       selectedIds,
       workflowAvailability.canRunWorkflow,
       workflowAvailability.hasWorkflowBindings,
@@ -438,6 +445,8 @@ const LayerMenu = ({
       reportLayerOperation(result, notify.error, t);
     } else if (result.status === 'ineligible') {
       notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.actions.mergeMasksIneligible'));
+    } else if (result.status === 'settings-differ') {
+      notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.actions.mergeMasksSettingsDiffer'));
     } else if (result.status !== 'merged') {
       reportLayerOperation(result.status, notify.error, t);
     }
@@ -452,6 +461,8 @@ const LayerMenu = ({
         notify.error(t('widgets.layers.actions.actionFailed'), describeAdjustmentRefusal(result, t));
       } else if (result === 'not-ready') {
         notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.groupActions.mergeNotReady'));
+      } else if (result === 'unreadable') {
+        notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.actions.unreadable'));
       } else if (result === 'over-budget') {
         notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.groupActions.mergeOverBudget'));
       } else if (result === 'failed') {
@@ -715,8 +726,11 @@ const LayerMenu = ({
       case 'locked':
       case 'empty':
       case 'not-ready':
+      case 'unreadable':
       case 'over-budget':
         throw makeStatusError(result.status);
+      case 'outside-frame':
+        throw new Error(t('widgets.layers.actions.cropOutsideFrame'));
       case 'adjustment-refused':
         throw makeStatusError(result);
       case 'busy':
@@ -1381,11 +1395,16 @@ const LayerMenuSubmenu = ({
 
 type LayerMenuTranslate = (key: string, options: { count?: number; defaultValue: string }) => string;
 
-/** Copying a layer needs the clipboard, which a plain-HTTP origin lacks; the item says so instead of failing. */
+/**
+ * Why the item cannot run: the registry's reason for a disabled action, or, since copying a layer needs the clipboard,
+ * which a plain-HTTP origin lacks, that. The item stays reachable by keyboard and says so instead of failing.
+ */
 const getUnavailableReason = (action: LayerContextAction, t: LayerMenuTranslate): string | undefined =>
   action.id === 'copy-to-clipboard' && !canCopyImage()
     ? t('common.copyUnavailable', { defaultValue: 'Copying needs HTTPS or localhost' })
-    : undefined;
+    : action.unavailableReasonKey
+      ? t(action.unavailableReasonKey, { defaultValue: '' }) || undefined
+      : undefined;
 
 const LayerMenuIconActionItem = ({
   action,

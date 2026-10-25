@@ -18,14 +18,8 @@ import { createControlLayer } from '@workbench/widgets/layers/layerOps';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import { CANVAS_HEADER_HOTKEYS } from './canvasHeaderCommands';
-import {
-  CANVAS_COMPANION_HOTKEYS,
-  CANVAS_ONLY_HOTKEYS,
-  executeCanvasHotkeyCommand,
-  executeCanvasToolCommand,
-  reportTransformRefusal,
-  type CanvasHotkeyContext,
-} from './canvasHotkeyCommands';
+import { CANVAS_ONLY_HOTKEYS, executeCanvasHotkeyCommand, type CanvasHotkeyContext } from './canvasHotkeyCommands';
+import { CANVAS_COMPANION_HOTKEYS, executeCanvasToolCommand, reportTransformRefusal } from './canvasToolCommands';
 
 const rasterLayer = (id: string, overrides: Partial<CanvasLayerContract> = {}): CanvasLayerContract =>
   ({

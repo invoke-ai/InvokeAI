@@ -41,12 +41,7 @@ import { CanvasCreateFromBboxSubmenu } from './CanvasCreateFromBboxSubmenu';
 import { CanvasCropAllLayersMenuItem } from './CanvasCropAllLayersMenuItem';
 import { CanvasEditRefusalNotices } from './CanvasEditRefusalNotices';
 import { CanvasGlobalContextMenu } from './CanvasGlobalContextMenu';
-import {
-  CANVAS_COMPANION_HOTKEYS,
-  CANVAS_ONLY_HOTKEYS,
-  executeCanvasHotkeyCommand,
-  reportTransformRefusal,
-} from './canvasHotkeyCommands';
+import { CANVAS_ONLY_HOTKEYS, executeCanvasHotkeyCommand } from './canvasHotkeyCommands';
 import { resolveCanvasImageDrop } from './canvasImageDnd';
 import { CanvasImageDropOverlay } from './CanvasImageDropOverlay';
 import { createCanvasInteractionLockReader, getCanvasInteractionCapabilities } from './canvasInteractionLock';
@@ -59,6 +54,7 @@ import {
 } from './canvasSettings';
 import { CanvasSurface } from './CanvasSurface';
 import { CanvasSurfaceContextLayout } from './CanvasSurfaceContextLayout';
+import { CANVAS_COMPANION_HOTKEYS, reportTransformRefusal } from './canvasToolCommands';
 import { resolveCheckerColors } from './checkerColors';
 import { CanvasColorFeed } from './color-system/CanvasColorFeed';
 import { useActiveColorCommands } from './color-system/useActiveColors';
@@ -497,16 +493,16 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
     () => <CanvasCreateFromBboxSubmenu disabled={isCompositeMenuDisabled} onCreate={createFromBbox} />,
     [createFromBbox, isCompositeMenuDisabled]
   );
-  const isCropAllDisabled = isInteractionLocked || interactionCapabilities.isDocumentEditingLocked;
+  const isCropAllLocked = isInteractionLocked || interactionCapabilities.isDocumentEditingLocked;
   const compositeSubmenus = useMemo(
     () => (
       <>
         {saveToGallerySubmenu}
         {createFromBboxSubmenu}
-        {engine ? <CanvasCropAllLayersMenuItem disabled={isCropAllDisabled} layers={engine.layers} /> : null}
+        {engine ? <CanvasCropAllLayersMenuItem interactionLocked={isCropAllLocked} layers={engine.layers} /> : null}
       </>
     ),
-    [createFromBboxSubmenu, engine, isCropAllDisabled, saveToGallerySubmenu]
+    [createFromBboxSubmenu, engine, isCropAllLocked, saveToGallerySubmenu]
   );
   const canvasSurface = useMemo(
     () => (engine ? <CanvasSurface engine={engine} instanceId={instance.id} /> : null),

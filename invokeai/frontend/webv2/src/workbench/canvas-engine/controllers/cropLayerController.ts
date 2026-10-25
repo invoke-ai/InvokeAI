@@ -4,11 +4,12 @@ import type {
   CanvasLayerContract,
   CanvasLayerSourceContract,
 } from '@workbench/canvas-engine/contracts';
+import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
 import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
-import { compileDocumentLeaves } from '@workbench/canvas-engine/document-model/documentModel';
+import { compileDocumentLeaves, lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
@@ -28,25 +29,31 @@ import {
   type LayerPixels,
 } from './editSteps';
 
+/**
+ * `locked`: the layer or a group above it is locked. `outside-frame`: the layer lies wholly outside the frame, so the
+ * crop would empty it (crop all does that; an explicit crop of one layer refuses). `unreadable`: its pixels could not
+ * be read (an image that is gone or does not decode).
+ */
 export type CropLayerResult =
   | { status: 'cropped' }
-  | { status: 'missing' | 'locked' | 'unsupported' | 'empty' | LayerEditRefusal }
+  | { status: 'missing' | 'locked' | 'unsupported' | 'empty' | 'outside-frame' | 'unreadable' | LayerEditRefusal }
   | { status: 'failed'; message: string }
   | AdjustmentRefusal;
 
 /**
- * `skippedLocked` counts locked leaves (own or ancestor lock) whose content reaches past the frame. `nothing` when
- * every unlocked leaf already fits; every refusal leaves document, pixels and history alone.
+ * `skippedLocked` counts locked leaves (own or ancestor lock) and `skippedUnreadable` leaves whose pixels could not be
+ * read, each only when its content reaches past the frame; both are left as they are. `nothing` when every other leaf
+ * already fits; every refusal leaves document, pixels and history alone.
  */
 export type CropAllLayersResult =
-  | { status: 'cropped'; cropped: number; skippedLocked: number }
-  | { status: 'nothing'; skippedLocked: number }
+  | { status: 'cropped'; cropped: number; skippedLocked: number; skippedUnreadable: number }
+  | { status: 'nothing'; skippedLocked: number; skippedUnreadable: number }
   | { status: 'stale' | 'failed' | LayerEditRefusal }
   | AdjustmentRefusal;
 
 type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
-  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'unreadable' | 'over-budget' }
   | AdjustmentRefusal;
 
 export interface CropLayerControllerOptions {
@@ -75,9 +82,29 @@ export interface CropLayerControllerOptions {
     admit?: (rect: Rect) => boolean
   ) => LayerPixels | null | 'not-ready' | 'over-budget';
   readonly discardPersisted: (layerId: string) => void;
+  /**
+   * Settles paint uploads already owed (the persistence barrier canvas invocation crosses), so an acknowledgement
+   * replacing a layer's contract cannot land while crop all reads every leaf and refuse it as `stale`.
+   */
+  readonly flushPendingPixels: () => Promise<void>;
 }
 
 const failedCrop: CropLayerResult = { message: 'The crop could not be applied.', status: 'failed' };
+
+/**
+ * Whether a crop may change `leaf`, asked by single crop and crop all alike: never when it or a group above it is
+ * locked, and only for a source the export can bake.
+ */
+const cropEligibility = (
+  leaf: SemanticLeaf,
+  isSupportedSource: (source: CanvasLayerSourceContract) => boolean
+): 'eligible' | 'locked' | 'unsupported' => {
+  if (leaf.effectiveLocked) {
+    return 'locked';
+  }
+  const source = renderableSourceOf(leaf.layer);
+  return source && isSupportedSource(source) ? 'eligible' : 'unsupported';
+};
 
 /**
  * The contract of `layer` cropped to `rect`: its baked pixels now sit at `rect` in a paint source (or mask bitmap) with
@@ -110,6 +137,13 @@ const cropPixels = (backend: RasterBackend, exported: RasterSurface, exportedRec
   return cropped;
 };
 
+/** What crop all makes of one leaf's export. */
+type CropExport =
+  | Extract<ExportResult, { status: 'ok' }>
+  | { status: 'skip' }
+  | { status: 'unreadable' }
+  | CropAllLayersResult;
+
 /** One leaf's crop: its contract and pixels before and after. */
 interface LayerCrop {
   readonly before: CanvasLayerContract;
@@ -137,16 +171,13 @@ export class CropLayerController {
       return { status: 'busy' };
     }
     const document = ctx.getDocument();
-    const layer = getDocumentLayer(document, layerId);
-    if (!document || !layer) {
+    const leaf = document ? lookupDocumentLeaf(document, layerId) : null;
+    if (!document || !leaf) {
       return { status: 'missing' };
     }
-    if (layer.isLocked) {
-      return { status: 'locked' };
-    }
-    const source = renderableSourceOf(layer);
-    if (!source || !this.deps.isSupportedSource(source)) {
-      return { status: 'unsupported' };
+    const eligibility = cropEligibility(leaf, this.deps.isSupportedSource);
+    if (eligibility !== 'eligible') {
+      return { status: eligibility };
     }
     try {
       const exported = await this.deps.exportBaked(layerId);
@@ -161,23 +192,25 @@ export class CropLayerController {
           return { status: 'busy' };
         }
         const liveDocument = ctx.getDocument();
-        const liveLayer = getDocumentLayer(liveDocument, layerId);
-        if (!liveDocument || !liveLayer) {
+        const liveLeaf = liveDocument ? lookupDocumentLeaf(liveDocument, layerId) : null;
+        if (!liveDocument || !liveLeaf) {
           return { status: 'missing' };
         }
-        if (liveLayer.isLocked) {
+        const liveEligibility = cropEligibility(liveLeaf, this.deps.isSupportedSource);
+        if (liveEligibility === 'locked') {
           return { status: 'locked' };
         }
         if (!this.deps.isGuardCurrent(exported.guard)) {
           return { status: 'not-ready' };
         }
-        const liveSource = renderableSourceOf(liveLayer);
-        if (!liveSource || !this.deps.isSupportedSource(liveSource)) {
+        if (liveEligibility === 'unsupported') {
           return { status: 'unsupported' };
         }
+        const liveLayer = liveLeaf.layer;
         const overlap = intersect(exported.rect, roundOut(liveDocument.bbox));
+        // Crop all empties such a layer in place; asked for this one layer, emptying it is never what was meant.
         if (!overlap || isEmpty(overlap)) {
-          return { status: 'empty' };
+          return { status: 'outside-frame' };
         }
         const cropRect = roundOut(overlap);
         const txn = ctx.begin({ historyBytes: rgbaBytes(cropRect) + HISTORY_ENTRY_OVERHEAD_BYTES });
@@ -233,9 +266,10 @@ export class CropLayerController {
 
   /**
    * Crops every leaf of every stack to the frame as one history entry. Locked leaves (their own lock or an ancestor's)
-   * are skipped; leaves already inside the frame, empty ones and unsupported sources are left alone; a leaf entirely
-   * outside the frame is emptied in place, so ids, order, groups and flags never change. Each leaf's export is
-   * released as soon as its cropped pixels are copied, so the peak is the cropped set plus one export.
+   * and leaves whose pixels cannot be read are skipped; leaves already inside the frame, empty ones and unsupported
+   * sources are left alone; a leaf entirely outside the frame is emptied in place, so ids, order, groups and flags
+   * never change. Pending paint uploads settle first. Each leaf's export is released as soon as its cropped pixels
+   * are copied, so the peak is the cropped set plus one export.
    */
   async cropAll(): Promise<CropAllLayersResult> {
     const { ctx } = this.deps;
@@ -243,34 +277,49 @@ export class CropLayerController {
     if (this.disposed || !permit) {
       return { status: 'busy' };
     }
+    try {
+      await this.deps.flushPendingPixels();
+    } catch {
+      // A layer whose upload failed or is held still crops from its live pixels; the guards below still fence it.
+    }
+    if (this.disposed || !ctx.isPermitCurrent(permit)) {
+      return { status: 'busy' };
+    }
     const document = ctx.getDocument();
     if (!document) {
-      return { skippedLocked: 0, status: 'nothing' };
+      return { skippedLocked: 0, skippedUnreadable: 0, status: 'nothing' };
     }
     const frame = roundOut(document.bbox);
-    let skippedLocked = 0;
-    const candidates: CanvasLayerContract[] = [];
-    for (const leaf of compileDocumentLeaves(document)) {
-      const source = renderableSourceOf(leaf.layer);
-      if (!source || !this.deps.isSupportedSource(source)) {
-        continue;
-      }
-      if (!leaf.effectiveLocked) {
-        candidates.push(leaf.layer);
-        continue;
-      }
-      // A locked leaf counts only when cropping would have changed it: content reaching past the frame.
+    /** Whether cropping would change `leaf`, judged from its contract: content reaching past the frame. */
+    const reachesPastFrame = (leaf: SemanticLeaf): boolean => {
       const content = getSourceContentRect(leaf.layer, document);
-      if (!isEmpty(content) && cropRectFor(transformBounds(leaf.worldTransform, content), frame)) {
+      return !isEmpty(content) && cropRectFor(transformBounds(leaf.worldTransform, content), frame) !== null;
+    };
+    let skippedLocked = 0;
+    let skippedUnreadable = 0;
+    const candidates: SemanticLeaf[] = [];
+    for (const leaf of compileDocumentLeaves(document)) {
+      const eligibility = cropEligibility(leaf, this.deps.isSupportedSource);
+      if (eligibility === 'eligible') {
+        candidates.push(leaf);
+      } else if (eligibility === 'locked' && reachesPastFrame(leaf)) {
         skippedLocked += 1;
       }
     }
     const guards: LayerExportGuard[] = [];
     const cropped: CroppedLeaf[] = [];
     try {
-      for (const layer of candidates) {
+      for (const leaf of candidates) {
+        const { layer } = leaf;
         const exported = await this.exportForCrop(layer, frame);
         if (exported.status === 'skip') {
+          continue;
+        }
+        if (exported.status === 'unreadable') {
+          // Waiting cannot make it readable; one such layer must not hold every other layer back.
+          if (reachesPastFrame(leaf)) {
+            skippedUnreadable += 1;
+          }
           continue;
         }
         if (exported.status !== 'ok') {
@@ -312,9 +361,9 @@ export class CropLayerController {
         return { status: 'stale' };
       }
       if (cropped.length === 0) {
-        return { skippedLocked, status: 'nothing' };
+        return { skippedLocked, skippedUnreadable, status: 'nothing' };
       }
-      return this.publishAll(liveDocument, cropped, skippedLocked);
+      return this.publishAll(liveDocument, cropped, { skippedLocked, skippedUnreadable });
     } catch {
       return { status: 'failed' };
     } finally {
@@ -325,20 +374,18 @@ export class CropLayerController {
   }
 
   /**
-   * A leaf's baked pixels for crop all, or `skip` when it has nothing to crop. A leaf with its own adjustment stack is
+   * A leaf's baked pixels for crop all, `skip` when it has nothing to crop, or `unreadable`. A leaf with its own adjustment stack is
    * first exported raw: adjustments never move pixels, so the raw rect is the baked one, and a leaf already inside the
    * frame never runs its stack (a spatial job that could refuse the whole crop). Its guard still joins the staleness
    * check, as every read leaf's does.
    */
-  private async exportForCrop(
-    layer: CanvasLayerContract,
-    frame: Rect
-  ): Promise<Extract<ExportResult, { status: 'ok' }> | { status: 'skip' } | CropAllLayersResult> {
-    const settle = (
-      exported: ExportResult
-    ): Extract<ExportResult, { status: 'ok' }> | { status: 'skip' } | CropAllLayersResult => {
+  private async exportForCrop(layer: CanvasLayerContract, frame: Rect): Promise<CropExport> {
+    const settle = (exported: ExportResult): CropExport => {
       if (exported.status === 'ok' || exported.status === 'adjustment-refused') {
         return exported;
+      }
+      if (exported.status === 'unreadable') {
+        return { status: 'unreadable' };
       }
       if (exported.status === 'missing') {
         return { status: 'stale' };
@@ -363,7 +410,7 @@ export class CropLayerController {
   private publishAll(
     document: CanvasDocumentContractV3,
     cropped: readonly CroppedLeaf[],
-    skippedLocked: number
+    skipped: { readonly skippedLocked: number; readonly skippedUnreadable: number }
   ): CropAllLayersResult {
     const { ctx } = this.deps;
     const afterBytes = cropped.reduce((sum, leaf) => sum + rgbaBytes(leaf.pixels.rect), 0);
@@ -408,7 +455,7 @@ export class CropLayerController {
         undo: replay('before'),
       });
       const status = layerOperationStatus(result);
-      return status === 'committed' ? { cropped: crops.length, skippedLocked, status: 'cropped' } : { status };
+      return status === 'committed' ? { cropped: crops.length, ...skipped, status: 'cropped' } : { status };
     } finally {
       txn.end();
     }

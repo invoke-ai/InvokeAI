@@ -28,7 +28,7 @@ export type CanvasGallerySaveRegion = CanvasCompositeRegion;
 export type SaveCanvasToGalleryResult =
   /** `boardId` is where the image went: a board id, or `none` for Uncategorized. */
   | { status: 'saved'; boardId: string; imageName: string }
-  | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' }
+  | { status: 'empty' | 'stale' | 'not-ready' | 'unreadable' | 'over-budget' }
   | AdjustmentRefusal;
 
 const buildCanvasSaveMetadata = (project: Project, rect: Rect): Record<string, unknown> => {

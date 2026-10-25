@@ -34,6 +34,16 @@ export const rgbaBytes = (rect: Rect): number => Math.max(0, rect.width) * Math.
 
 // ---- Publication outcomes ----------------------------------------------------------------------------------
 
+/**
+ * Whether a layer operation can read a layer's cache now: `not-ready` while its pixels load (waiting helps),
+ * `unreadable` once rasterizing its current source failed (waiting does not; the operation refuses and says so).
+ */
+export type LayerCacheReadiness = 'ready' | 'not-ready' | 'unreadable';
+
+/** Layers read together: one that cannot be read refuses the set even while others still load. */
+export const readinessOfAll = (readiness: readonly LayerCacheReadiness[]): LayerCacheReadiness =>
+  readiness.includes('unreadable') ? 'unreadable' : readiness.includes('not-ready') ? 'not-ready' : 'ready';
+
 /** A refused admission as callers report it; a gesture in progress reads as contention. */
 export type LayerEditRefusal = SubsetOf<CanvasTransactionOutcome, 'busy' | 'not-ready' | 'over-budget'>;
 

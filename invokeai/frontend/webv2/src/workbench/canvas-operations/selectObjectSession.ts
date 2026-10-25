@@ -136,6 +136,9 @@ const getPreparedSourceError = (
   if (result.status === 'adjustment-refused') {
     return { code: `adjustment-${result.reason}` };
   }
+  if (result.status === 'unreadable') {
+    return { code: 'unreadable' };
+  }
   return { code: 'not-ready' };
 };
 

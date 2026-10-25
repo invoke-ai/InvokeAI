@@ -270,6 +270,7 @@ export type PsdExportResult =
   | 'nothing'
   | 'too-large'
   | 'over-budget'
+  | 'unreadable'
   | SubsetOf<CanvasTransactionOutcome, 'not-ready' | 'stale' | 'aborted'>;
 
 export interface CanvasPsdExportCapability {
@@ -377,7 +378,8 @@ export type ExportBakedLayerBlobResult =
         | SubsetOf<CanvasTransactionOutcome, 'not-ready' | 'aborted'>
         | 'disabled'
         | 'empty'
-        | 'over-budget';
+        | 'over-budget'
+        | 'unreadable';
     }
   | AdjustmentRefusal;
 
@@ -550,7 +552,13 @@ export interface FilterPreviewInput {
 
 export type DuplicateLayersResult =
   | { readonly status: 'duplicated'; readonly duplicateIds: readonly string[]; readonly selectedLayerId: string }
-  | { readonly status: SubsetOf<CanvasTransactionOutcome, 'busy' | 'not-ready' | 'stale'> | 'nothing' | 'over-budget' };
+  | {
+      readonly status:
+        | SubsetOf<CanvasTransactionOutcome, 'busy' | 'not-ready' | 'stale'>
+        | 'nothing'
+        | 'over-budget'
+        | 'unreadable';
+    };
 /**
  * Layer pixel operations report a distinct outcome: refused before anything changed (`busy`, `not-ready`,
  * `over-budget` when the edit could never be undone), nothing to do, or `failed` when the document refused it.
@@ -637,8 +645,6 @@ export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
    */
   beginTransform(layerId: string): BeginTransformResult;
   booleanMergeRasterLayers(upperLayerId: string, operation: BooleanRasterOperation): Promise<BooleanRasterResult>;
-  /** Whether `mergeInpaintMasks` would accept these ids; pure, for menu enablement. */
-  canMergeInpaintMasks(layerIds: readonly string[]): boolean;
   cancelTextEdit(): void;
   cancelTransform(): void;
   clearMask(layerId: string): MaskEditResult;
@@ -797,6 +803,8 @@ export {
   areSelectedRasterLayersContiguous,
   canMergeSelectedRasters,
   canMergeVisibleRasters,
+  inpaintMaskMergeEligibility,
+  type InpaintMaskMergeEligibility,
 } from './document/mergeVisible';
 export { documentToExportLocalSamPoint } from './samCoordinates';
 export { bboxEquals, constrainBboxToRatio, roundBbox } from './tools/bboxHitTest';

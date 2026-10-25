@@ -25,7 +25,7 @@ import {
 
 type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
-  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'unreadable' | 'over-budget' }
   | AdjustmentRefusal;
 
 /** The stack a baked copy lands in: a raster paint layer, or a control layer with a default adapter. */
@@ -33,7 +33,14 @@ export type CopyLayerTarget = 'raster' | 'control';
 
 export type CopyLayerResult =
   | { status: 'copied'; layerId: string }
-  | { status: LayerEditRefusal | SubsetOf<CanvasCommandRefusal, 'missing' | 'unsupported'> | 'empty' | 'failed' }
+  | {
+      status:
+        | LayerEditRefusal
+        | SubsetOf<CanvasCommandRefusal, 'missing' | 'unsupported'>
+        | 'empty'
+        | 'unreadable'
+        | 'failed';
+    }
   | AdjustmentRefusal;
 
 export interface CopyLayerControllerOptions {

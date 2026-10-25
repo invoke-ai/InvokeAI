@@ -87,6 +87,7 @@ const SAM_ERROR_TRANSLATION_KEYS: Record<SamSessionErrorCode, string> = {
   queue: 'widgets.layers.selectObject.errorQueue',
   reconcile: 'widgets.layers.selectObject.errorReconcile',
   unknown: 'widgets.layers.selectObject.errorUnknown',
+  unreadable: 'widgets.layers.selectObject.errorUnreadable',
   upload: 'widgets.layers.selectObject.errorUpload',
 };
 

@@ -930,6 +930,27 @@ describe('Shift-click straight lines', () => {
     expect(h.paintLineEnds.get('paint1')).toEqual({ x: 60, y: 10 });
   });
 
+  it('keeps the line start on the layer when the layer moves', () => {
+    const layer = paintLayer('paint1');
+    const h = lineHarness([layer], 'paint1');
+    const brush = createBrushTool();
+    down(brush, h.ctx, pointer(10, 10));
+    up(brush, h.ctx, pointer(10, 10));
+    h.span();
+
+    // Nudge the layer 100 px right: its last stroke end now sits at document x=110.
+    const nudged = makeDoc([{ ...layer, transform: { ...layer.transform, x: 100 } }], 'paint1');
+    const ctx: ToolContext = { ...h.ctx, getDocument: () => nudged };
+    down(brush, ctx, pointer(160, 10, { shift: true }));
+    up(brush, ctx, pointer(160, 10, { shift: true }));
+
+    // 50 px from x=110 to x=160 plus the brush radius at each end, not 150 px from where the end used to be.
+    const span = h.span();
+    expect(span).toBeGreaterThanOrEqual(50);
+    expect(span).toBeLessThan(60);
+    expect(h.paintLineEnds.get('paint1')).toEqual({ x: 60, y: 10 });
+  });
+
   it('paints a dab on a Shift press without a remembered point, or on a layer with none', () => {
     const h = lineHarness([paintLayer('paint1'), paintLayer('paint2')], 'paint2');
     h.paintLineEnds.set('paint1', { x: 10, y: 10 });
