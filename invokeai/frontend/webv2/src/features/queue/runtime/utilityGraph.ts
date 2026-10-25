@@ -210,7 +210,8 @@ export const reconcileUtilityCompletedOutput: UtilityCompletedOutputReconciler =
 
 /**
  * How long a submitted utility graph goes unheard from before its item is read again; the first run may download
- * models. An item still open at the read re-arms it, so the watch itself never gives up.
+ * models. An item still open at the read re-arms it, so the watch never gives up: it ends only on a terminal status,
+ * the item's removal, or an abort.
  */
 export const DEFAULT_UTILITY_RECONCILE_INTERVAL_MS = 30 * 60_000;
 
@@ -403,12 +404,6 @@ export interface SubmitUtilityGraphOptions {
    * backend item is never canceled: the caller only asked to stop watching.
    */
   signal?: AbortSignal;
-  /**
-   * After this many ms without a settlement (default {@link DEFAULT_UTILITY_RECONCILE_INTERVAL_MS}; `0` disables)
-   * the item is read again; an item still open re-arms the read. The watch ends only on a terminal status, the
-   * item's removal, or an abort.
-   */
-  reconcileIntervalMs?: number;
 }
 
 /** An accepted utility submission whose results are not returned, only awaited. */
@@ -434,7 +429,6 @@ export const submitUtilityGraph = async (options: SubmitUtilityGraphOptions): Pr
   const enqueue = options.enqueue ?? enqueueUtility;
   const cancel = options.cancel ?? cancelQueueItems;
   const readItemStatus = options.readItemStatus ?? readUtilityItemStatus;
-  const reconcileIntervalMs = options.reconcileIntervalMs ?? DEFAULT_UTILITY_RECONCILE_INTERVAL_MS;
   let origin: string;
   try {
     origin = buildUtilityQueueItemOrigin((options.createId ?? createUuid)());
@@ -509,13 +503,13 @@ export const submitUtilityGraph = async (options: SubmitUtilityGraphOptions): Pr
 
   /** An item still open at the periodic read re-arms it. */
   const armReconcileTimer = (): void => {
-    if (isSettled || reconcileIntervalMs <= 0) {
+    if (isSettled) {
       return;
     }
     timer = setTimeout(() => {
       timer = null;
       void watch.read().then(armReconcileTimer);
-    }, reconcileIntervalMs);
+    }, DEFAULT_UTILITY_RECONCILE_INTERVAL_MS);
   };
 
   let result: Awaited<ReturnType<UtilityEnqueue>>;

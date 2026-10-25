@@ -1675,20 +1675,4 @@ describe('submitUtilityGraph — fire, then watch settlement', () => {
     expect(fake.handlerCount('queue_item_status_changed')).toBe(0);
     expect(vi.getTimerCount()).toBe(0);
   });
-
-  it('does not arm a reconcile read when the interval is disabled', async () => {
-    vi.useFakeTimers();
-    const fake = createFakeHub();
-    const submission = await submitUtilityGraph({
-      createId: () => UTIL_ID,
-      enqueue: okEnqueue,
-      graph,
-      hub: fake.hub,
-      reconcileIntervalMs: 0,
-    });
-
-    expect(vi.getTimerCount()).toBe(0);
-    fake.emit('queue_item_status_changed', statusEvent('completed'));
-    await expect(submission.settled).resolves.toBeUndefined();
-  });
 });
