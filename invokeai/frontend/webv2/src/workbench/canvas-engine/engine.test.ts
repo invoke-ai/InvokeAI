@@ -19419,10 +19419,10 @@ describe('control derivation composition', () => {
     const patch = { expected: control, label: 'Set control type', next: { ...control, controlType: 'depth' as const } };
 
     engine.stores.documentEditingLocked.set(true);
-    expect(engine.controlDerivation.commitControlLayerPatch(patch)).toEqual({ status: 'busy' });
+    expect(applicationHost.commitControlLayerPatch(patch)).toEqual({ status: 'busy' });
     engine.stores.documentEditingLocked.set(false);
-    expect(engine.controlDerivation.commitControlLayerPatch(patch)).toEqual({ status: 'committed' });
-    expect(engine.controlDerivation.captureControlDetectionGuard('control')).toMatchObject({
+    expect(applicationHost.commitControlLayerPatch(patch)).toEqual({ status: 'committed' });
+    expect(applicationHost.captureControlDetectionGuard('control')).toMatchObject({
       documentRevision: 0,
       layerId: 'control',
       projectId: 'p1',

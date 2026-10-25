@@ -255,7 +255,7 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     core.stores.documentEpoch,
   ];
   const controlDetection = createControlDetectionCoordinator({
-    derivation: core.controlDerivation,
+    derivation: host,
     flushLayerUploads: host.flushLayerUploads,
     getDocument: host.getDocument,
     makeDurable: controlDetectionDeps?.makeDurable ?? galleryDurability.makeCanvasAsset,

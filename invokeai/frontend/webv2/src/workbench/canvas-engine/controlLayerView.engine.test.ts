@@ -97,7 +97,7 @@ const createHarness = (layer: CanvasControlLayerContract = controlLayer()) => {
   );
   const surfaces: StubRasterSurface[] = [];
   const stub = createTestStubRasterBackend();
-  const { engine } = createCanvasEngine({
+  const { applicationHost, engine } = createCanvasEngine({
     backend: {
       ...stub,
       createSurface: (width, height) => {
@@ -147,6 +147,7 @@ const createHarness = (layer: CanvasControlLayerContract = controlLayer()) => {
     engine,
     failImages: () => settleImages('reject'),
     /** What the view holds: decoding reserves, a shown original is retained as detached pixels. */
+    host: applicationHost,
     held: () => {
       const { detachedBytes, reservedBytes } = raster.memory.snapshot();
       return { detached: detachedBytes, reserved: reservedBytes };
@@ -380,7 +381,7 @@ describe('setControlLayerView', () => {
     [
       'an edit of the layer',
       (h) =>
-        h.engine.controlDerivation.commitControlLayerPatch({
+        h.host.commitControlLayerPatch({
           expected: h.live(),
           label: 'Weight',
           next: { ...h.live(), adapter: { ...h.live().adapter, weight: 0.5 } },
@@ -403,8 +404,8 @@ describe('setControlLayerView', () => {
     [
       'a detection map commit',
       async (h) => {
-        const guard = h.engine.controlDerivation.captureControlDetectionGuard('control')!;
-        const committed = h.engine.controlDerivation.commitControlMap({
+        const guard = h.host.captureControlDetectionGuard('control')!;
+        const committed = h.host.commitControlMap({
           detection: DEPTH,
           guard,
           image: { height: 10, imageName: 'map-2', width: 10 },
@@ -430,7 +431,7 @@ describe('setControlLayerView', () => {
   ])('returns to the map on %s', async (_case, act) => {
     const h = createHarness();
     // Undo needs a step to revert; recording it before the view leaves the view on the current layer.
-    h.engine.controlDerivation.commitControlLayerPatch({
+    h.host.commitControlLayerPatch({
       expected: h.live(),
       label: 'Name',
       next: { ...h.live(), name: 'Depth' },

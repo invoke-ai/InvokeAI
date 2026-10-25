@@ -1,4 +1,5 @@
 import type {
+  CanvasControlDerivationCapability,
   CommitGeneratedImageOptions,
   CommitGeneratedImageResult,
   ExportBakedLayerBlobResult,
@@ -33,8 +34,11 @@ export type SelectObjectStartContext =
       sourceRect: Rect;
     };
 
-/** Narrow core primitives used only by application-level canvas coordinators. */
-export interface CanvasApplicationHost {
+/**
+ * Narrow core primitives used only by application-level canvas coordinators, including the control derivation commits
+ * the detection coordinator lands its intents and maps through.
+ */
+export interface CanvasApplicationHost extends CanvasControlDerivationCapability {
   captureGuard(layerId: string): LayerExportGuard | null;
   clearFilterPreview(layerId: string): void;
   clearSamPreview(): void;

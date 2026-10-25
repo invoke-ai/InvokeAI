@@ -1,5 +1,4 @@
 import type {
-  CanvasControlDerivationCapability,
   CanvasEditRefusal,
   CanvasHistoryReplayStatus,
   CanvasHistoryCapability,
@@ -318,8 +317,6 @@ export interface CanvasEngineInternalExportCapability extends CanvasEngineExport
 
 /** Private engine composition shape used only inside the Canvas implementation and its tests. */
 export interface CanvasEngineImplementation extends CanvasEngine {
-  /** Control-layer intent and detection-map commits, for the application's detection coordinator. */
-  readonly controlDerivation: CanvasControlDerivationCapability;
   readonly exports: CanvasEngineInternalExportCapability;
   readonly stores: EngineStores;
 }
@@ -3026,9 +3023,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
 
   const applicationHost: CanvasApplicationHost = {
+    captureControlDetectionGuard: (layerId) => controlDerivationController.captureControlDetectionGuard(layerId),
     captureGuard: captureCurrentLayerExportGuard,
     clearFilterPreview,
     clearSamPreview,
+    commitControlLayerPatch: (options) => controlDerivationController.commitControlLayerPatch(options),
+    commitControlMap: (options) => controlDerivationController.commitControlMap(options),
     commitFilter: (options) => commitRasterFilterResult(options, documentEditOwner),
     commitGenerated: (options) => commitGeneratedImageResult(options, documentEditOwner),
     commitMask: (options) => commitMaskImageResult(options, documentEditOwner),
@@ -3082,7 +3082,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
 
   const engine: CanvasEngineImplementation = {
-    controlDerivation: controlDerivationController,
     diagnostics: diagnosticsCapability,
     document: documentCapability,
     edits: editingController.edits,
