@@ -886,7 +886,7 @@ const SingleImageMenuItems = ({
       />
       <ContextMenuItem
         icon={BoxIcon}
-        label="Generate PBR Maps"
+        label={t('widgets.gallery.itemActions.pbrMaps.label')}
         value="generate-pbr-maps"
         onClick={handleGeneratePbrMaps}
       />

@@ -23,6 +23,7 @@ import { EMPTY_IMAGE_RECALL_CAPABILITIES } from './imageRecall';
 
 const NO_BOARDS: [] = [];
 const LOAD_WORKFLOW = 'widgets.gallery.itemActions.loadWorkflow.label';
+const GENERATE_PBR_MAPS = 'widgets.gallery.itemActions.pbrMaps.label';
 
 const findGalleryItem = vi.fn();
 
@@ -347,7 +348,7 @@ describe('ImageContextMenu PBR maps', () => {
     const actions = createActions(vi.fn());
     await renderMenu(actions, [image('texture.png')]);
 
-    await interact(() => getMenuItem('Generate PBR Maps').click());
+    await interact(() => getMenuItem(GENERATE_PBR_MAPS).click());
 
     expect(actions.generatePbrMaps).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({ imageName: 'texture.png' })
@@ -357,7 +358,7 @@ describe('ImageContextMenu PBR maps', () => {
   it('is absent from bulk menus, which queue nothing per image', async () => {
     await renderMenu(createActions(vi.fn()), [image('a.png'), image('b.png')]);
 
-    expect(document.body.textContent).not.toContain('Generate PBR Maps');
+    expect(document.body.textContent).not.toContain(GENERATE_PBR_MAPS);
   });
 });
 

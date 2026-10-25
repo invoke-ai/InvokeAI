@@ -4740,6 +4740,7 @@
           "completed": "PBR maps are ready",
           "completedMessage": "Normal, roughness and displacement maps for {{name}} were added to the gallery.",
           "failed": "Could not generate PBR maps",
+          "label": "Generate PBR Maps",
           "queued": "Generating PBR maps",
           "queuedMessage": "Normal, roughness and displacement maps for {{name}} are queued.",
           "removed": "PBR maps removed from the queue",

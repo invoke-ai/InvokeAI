@@ -3774,8 +3774,25 @@ describe('preview image recovery', () => {
   it('reloads the full image an image move refused once the move ends', async () => {
     // A fresh account lifetime: earlier tests' failed images must not leave a probe waiting on a real timer.
     accountLifecycle.activate('preview-image-recovery');
+    const imagePath = '/images/newest/full';
+    // The recovery probe's reads are answered in the page, so they settle within the fake clock's steps; the
+    // image element's own reads go to the network route.
+    let isMoving = true;
+    const isProbe = (input: unknown) => new URL(String(input), window.location.href).pathname === imagePath;
+    const browserFetch = globalThis.fetch;
+    const probes = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) =>
+      isProbe(input)
+        ? Promise.resolve(
+            isMoving
+              ? new Response('moving', { status: 409 })
+              : new Response('<svg xmlns="http://www.w3.org/2000/svg"/>', {
+                  headers: { 'content-type': 'image/svg+xml' },
+                })
+          )
+        : browserFetch(input, init)
+    );
     // The real guard answers full image reads with 409 too while the files move.
-    await imageRouteCommands.startThumbnailRoute(['/images/newest/full'], { failures: 1_000_000, status: 409 });
+    await imageRouteCommands.startThumbnailRoute([imagePath], { failures: 1_000_000, status: 409 });
     vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout'] });
 
     try {
@@ -3783,16 +3800,21 @@ describe('preview image recovery', () => {
       await expect.poll(() => shownImage()?.complete === true && shownImage()?.naturalWidth === 0).toBe(true);
       expect((await imageRouteCommands.getThumbnailRequests()).statuses).toEqual([409]);
 
-      // Two minutes into the move, it still refuses the image, which stays down.
+      // Two minutes into the move, the probe keeps asking and the image stays down.
       await act(() => vi.advanceTimersByTimeAsync(2 * 60_000));
+      expect(probes.mock.calls.filter(([input]) => isProbe(input)).length).toBeGreaterThan(1);
       expect(shownImage()?.naturalWidth).toBe(0);
+      expect((await imageRouteCommands.getThumbnailRequests()).statuses).toEqual([409]);
 
+      // The move ends: the next probe sees the image served and the preview reloads it.
+      isMoving = false;
       await imageRouteCommands.endThumbnailRouteFailures();
       await act(() => vi.advanceTimersByTimeAsync(30_000));
       await expect.poll(() => shownImage()?.naturalWidth).toBe(64);
       expect(shownImage()?.getAttribute('src')).toContain('gallery_image_recovery=');
     } finally {
       vi.useRealTimers();
+      probes.mockRestore();
       await imageRouteCommands.stopThumbnailRoute();
     }
   }, 20_000);
