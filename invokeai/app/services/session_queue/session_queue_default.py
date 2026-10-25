@@ -626,13 +626,16 @@ class SessionQueue(SessionQueueBase):
     def prune(self, queue_id: str, user_id: Optional[str] = None) -> PruneResult:
         return PruneResult(deleted=self._queries.session_queue.prune(queue_id, user_id=user_id))
 
-    def cancel_queue_item(self, item_id: int) -> SessionQueueItem:
+    def cancel_queue_item(self, item_id: int, queue_item: Optional[SessionQueueItem] = None) -> SessionQueueItem:
         chain_item_ids = self._get_workflow_call_chain_item_ids(item_id)
         canceled_item: SessionQueueItem | None = None
         for chain_item_id in chain_item_ids:
-            queue_item = self._set_queue_item_status(item_id=chain_item_id, status="canceled")
-            if chain_item_id == item_id:
-                canceled_item = queue_item
+            own = chain_item_id == item_id
+            transitioned = self._set_queue_item_status(
+                item_id=chain_item_id, status="canceled", queue_item=queue_item if own else None
+            )
+            if own:
+                canceled_item = transitioned
         assert canceled_item is not None
         return canceled_item
 
