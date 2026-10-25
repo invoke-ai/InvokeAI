@@ -113,6 +113,7 @@ afterEach(async () => {
   root = null;
   getArchitectureCapabilities.mockReset();
   statuses.clear();
+  i18n.removeResourceBundle('en', 'translation');
   // Returns the capability store and the core registry to their unloaded state between tests.
   accountLifecycle.invalidate();
 });
@@ -162,5 +163,25 @@ describe('ControlLayerStatusIcon detection and new reasons', () => {
 
     expect(host!.querySelector('.chakra-spinner')).toBeNull();
     expect(warning()).not.toBeNull();
+  });
+
+  it('shows the spinner, not the pending warning, while detection waits to run', async () => {
+    getArchitectureCapabilities.mockResolvedValueOnce(architectureCapabilitiesFixture);
+    await settle(ensureArchitectureCapabilitiesLoaded);
+    i18n.addResource('en', 'translation', 'widgets.layers.control.detectionQueued', 'Waiting to run {{detector}}…');
+    i18n.addResource(
+      'en',
+      'translation',
+      'widgets.layers.control.filters.depth_anything_depth_estimation',
+      'Depth Anything'
+    );
+    await render(pendingDepthLayer);
+
+    await settle(() => statuses.set('control-1', { status: 'queued' }));
+
+    expect(warning()).toBeNull();
+    expect(host!.querySelector('.chakra-spinner')).not.toBeNull();
+    // The queued status names no detector; the label uses the one the layer asks for, and does not claim it runs.
+    expect(host!.textContent).toBe('Waiting to run Depth Anything…');
   });
 });

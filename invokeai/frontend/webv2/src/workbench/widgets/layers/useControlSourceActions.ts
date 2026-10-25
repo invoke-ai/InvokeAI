@@ -3,17 +3,21 @@ import type {
   CanvasCompositeExportEngine,
   ControlLayerIntent,
   ControlLayerIntentResult,
+  ControlSourceNotice,
+  ControlSourceSnapshot,
 } from '@workbench/canvas-operations/api';
 
-import { galleryTransfers } from '@features/gallery';
 import { invalidateGallery } from '@features/gallery/queries';
-import {
-  assertAccountScopeCurrent,
-  captureAccountScope,
-  isAccountScopeCurrent,
-} from '@platform/state/accountLifecycle';
+import { useExternalStoreSelector } from '@platform/state/selectors';
 import { useQueryClient } from '@tanstack/react-query';
-import { fillControlFromBbox } from '@workbench/canvas-operations/api';
+import {
+  fillControlFromBbox,
+  getControlIntentNotice,
+  getControlSourceSnapshot,
+  getControlUploadNotice,
+  subscribeControlSourceSnapshot,
+  uploadControlImageFile,
+} from '@workbench/canvas-operations/api';
 import { useNotify } from '@workbench/useNotify';
 import { describeAdjustmentRefusal } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useCallback, useState } from 'react';
@@ -28,84 +32,85 @@ export type ControlSourceEngine = CanvasCompositeExportEngine & {
   readonly tools: Pick<CanvasToolCapability, 'setTool'>;
 };
 
-/** Where an image this panel placed came from; images placed elsewhere are described by their size. */
-export type ControlSourceOrigin = { kind: 'file'; name: string } | { kind: 'frame' };
+/** Stands in for a missing engine: it has no source state, so it reads the empty snapshot. */
+const NO_ENGINE = {};
+const noSubscription = (): (() => void) => () => undefined;
+const selectSnapshot = (snapshot: ControlSourceSnapshot) => snapshot;
+
+/** Shows a control source notice through the workbench notices. */
+const useControlNoticeReporter = (): ((notice: ControlSourceNotice | null) => void) => {
+  const { t } = useTranslation();
+  const notify = useNotify();
+  return useCallback(
+    (notice: ControlSourceNotice | null) => {
+      if (notice) {
+        notify[notice.kind](t(notice.titleKey), notice.messageKey ? t(notice.messageKey) : notice.message);
+      }
+    },
+    [notify, t]
+  );
+};
+
+/** Says why a control layer intent did not land; `updated`, `unchanged` and `missing` say nothing. */
+export const useControlIntentReporter = (): ((result: ControlLayerIntentResult) => void) => {
+  const report = useControlNoticeReporter();
+  return useCallback((result: ControlLayerIntentResult) => report(getControlIntentNotice(result)), [report]);
+};
 
 /**
  * The Image row's three ways to fill a control layer. Each ends in one Properties intent (`replace-image` or `draw`),
- * so the coordinator detects the map; `applyIntent` reports refusals. An action outlives the panel: its result still
- * lands on the layer by id.
+ * so the coordinator detects the map, and reports a refusal. An action outlives the panel: its result still lands on
+ * the layer by id. An upload started from the canvas shows here as busy too.
  */
 export const useControlSourceActions = ({
   applyIntent,
   engine,
   layerId,
-  reportIntent,
 }: {
   /** Applies an intent and reports a refusal. */
   applyIntent: (intent: ControlLayerIntent) => ControlLayerIntentResult | null;
-  /** Reports a refusal of an intent applied elsewhere. */
-  reportIntent: (result: ControlLayerIntentResult) => void;
   engine: ControlSourceEngine | null;
   layerId: string;
 }) => {
   const { t } = useTranslation();
   const notify = useNotify();
   const queryClient = useQueryClient();
-  const [busy, setBusy] = useState<ControlSourceAction | null>(null);
-  const [origins, setOrigins] = useState<Readonly<Record<string, ControlSourceOrigin>>>({});
-  const remember = useCallback(
-    (imageName: string, origin: ControlSourceOrigin) => setOrigins((current) => ({ ...current, [imageName]: origin })),
-    []
+  const report = useControlNoticeReporter();
+  const reportIntent = useControlIntentReporter();
+  const [isFillingFromFrame, setIsFillingFromFrame] = useState(false);
+  const subscribe = useCallback(
+    (listener: () => void) => (engine ? subscribeControlSourceSnapshot(engine, listener) : noSubscription()),
+    [engine]
   );
+  const getSnapshot = useCallback(() => getControlSourceSnapshot(engine ?? NO_ENGINE), [engine]);
+  const { origins, uploading } = useExternalStoreSelector(subscribe, getSnapshot, selectSnapshot);
+  const busy: ControlSourceAction | null = isFillingFromFrame ? 'frame' : uploading.has(layerId) ? 'upload' : null;
 
   const upload = useCallback(
     async (file: File) => {
-      if (!engine || busy) {
+      if (!engine || isFillingFromFrame) {
         return;
       }
-      const owner = captureAccountScope();
-      setBusy('upload');
-      try {
-        const uploaded = await galleryTransfers.upload(file, 'none', { signal: owner.signal });
-        assertAccountScopeCurrent(owner);
-        const bbox = engine.document.getDocument()?.bbox;
-        const result = applyIntent({
-          image: { height: uploaded.height, imageName: uploaded.imageName, width: uploaded.width },
-          kind: 'replace-image',
-          // New images land at the bbox origin, as every other canvas import does.
-          transform: bbox ? { rotation: 0, scaleX: 1, scaleY: 1, x: bbox.x, y: bbox.y } : undefined,
-        });
-        if (result === 'updated') {
-          remember(uploaded.imageName, { kind: 'file', name: file.name });
-        }
-        void invalidateGallery(queryClient, owner);
-      } catch (error) {
-        if (isAccountScopeCurrent(owner)) {
-          notify.error(
-            t('widgets.layers.control.source.uploadFailed'),
-            error instanceof Error ? error.message : String(error)
-          );
-        }
-      } finally {
-        setBusy(null);
-      }
+      const outcome = await uploadControlImageFile({
+        engine,
+        file,
+        layerId,
+        onUploaded: (owner) => void invalidateGallery(queryClient, owner),
+      });
+      report(getControlUploadNotice(outcome));
     },
-    [applyIntent, busy, engine, notify, queryClient, remember, t]
+    [engine, isFillingFromFrame, layerId, queryClient, report]
   );
 
   const fromFrame = useCallback(async () => {
     if (!engine || busy) {
       return;
     }
-    setBusy('frame');
+    setIsFillingFromFrame(true);
     try {
       const filled = await fillControlFromBbox({ engine, layerId });
       switch (filled.status) {
         case 'applied':
-          if (filled.result === 'updated') {
-            remember(filled.imageName, { kind: 'frame' });
-          }
           reportIntent(filled.result);
           return;
         case 'empty':
@@ -127,9 +132,9 @@ export const useControlSourceActions = ({
         error instanceof Error ? error.message : String(error)
       );
     } finally {
-      setBusy(null);
+      setIsFillingFromFrame(false);
     }
-  }, [busy, engine, layerId, notify, remember, reportIntent, t]);
+  }, [busy, engine, layerId, notify, reportIntent, t]);
 
   const draw = useCallback(() => {
     const result = applyIntent({ kind: 'draw' });

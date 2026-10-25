@@ -4,7 +4,7 @@ import type { Project } from '@workbench/projectContracts';
 
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { createControlLayer } from '@workbench/canvas-engine/api';
-import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createTestInsertionAnchorCapture } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import { createInitialWorkbenchState } from '@workbench/workbenchState.testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -188,6 +188,18 @@ describe('sendGalleryImageAsControl', () => {
     const added = forward.add[0]!.nodes[0]!;
     expect(added).toMatchObject({ source: { image: { imageName: 'gallery.png' }, type: 'image' }, type: 'control' });
     expect(result).toEqual({ layerId: added.id, status: 'created' });
+  });
+
+  it('adds a new control layer instead of filling an empty one inside a locked group', async () => {
+    const lockedGroup = groupContract('group-1', [emptyControl], { isLocked: true });
+    const project = projectWith([lockedGroup as unknown as CanvasLayerContract], 'control-1');
+    const { commitStructural, engine, intents } = liveEngine(project);
+
+    const result = await send(project, engine).result;
+
+    expect(intents).toEqual([]);
+    expect(commitStructural).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({ status: 'created' });
   });
 
   it('adds a new control layer through ingestion when the project has no live canvas', async () => {

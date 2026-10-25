@@ -1,6 +1,8 @@
 import type * as DndKitCore from '@dnd-kit/core';
 import type {
   CanvasControlLayerContract,
+  CanvasLayerContract,
+  CanvasNodeContract,
   ControlLayerView,
   ControlLayerViewOutcome,
 } from '@workbench/canvas-engine/api';
@@ -12,12 +14,18 @@ import type { WidgetViewProps } from '@workbench/widgetContracts';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { galleryTransfers, type GalleryImage } from '@features/gallery';
 import { auditAccessibility } from '@platform/browser/auditAccessibility.testing';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { createControlLayer } from '@workbench/canvas-engine/api';
-import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import {
+  groupContract,
+  layerContract,
+  stacksFrom,
+} from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
-import { getCanvasOperations } from '@workbench/canvas-operations/api';
+import { getCanvasOperations, getControlSourceSnapshot } from '@workbench/canvas-operations/api';
 import { createControlDetectionStatusStore } from '@workbench/canvas-operations/controlDetectionStatusStore';
 import { createCanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import { createCanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
@@ -124,18 +132,20 @@ const candidate: CanvasStagingCandidateContract = {
 
 /**
  * Stages the first image of a three-image batch whose remaining images are `status`; unstaged, the surface is live.
- * `selectedLayer` starts the document with that one layer selected; `beforeRender` sees the engine before the view
- * subscribes to it.
+ * `selectedLayer` starts the document with that layer selected, alone or among `nodes`; `beforeRender` sees the
+ * engine before the view subscribes to it.
  */
 const renderView = async (
   status: QueueItem['status'],
   {
     beforeRender,
+    nodes,
     selectedLayer,
     staged = true,
   }: {
     beforeRender?: (engine: CanvasEngine) => void;
-    selectedLayer?: CanvasControlLayerContract;
+    nodes?: CanvasNodeContract[];
+    selectedLayer?: CanvasLayerContract;
     staged?: boolean;
   } = {}
 ) => {
@@ -149,7 +159,7 @@ const renderView = async (
           document: {
             ...created.canvas.document,
             selectedLayerId: selectedLayer.id,
-            stacks: stacksFrom([selectedLayer]),
+            stacks: stacksFrom(nodes ?? [selectedLayer]),
           },
         },
       }
@@ -204,9 +214,11 @@ const renderView = async (
     root!.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
-          <CanvasWidgetView
-            {...({ instance: activeProject().widgetInstances.canvas, runtime } as unknown as WidgetViewProps)}
-          />
+          <QueryClientProvider client={new QueryClient()}>
+            <CanvasWidgetView
+              {...({ instance: activeProject().widgetInstances.canvas, runtime } as unknown as WidgetViewProps)}
+            />
+          </QueryClientProvider>
         </ChakraProvider>
       </I18nextProvider>
     )
@@ -384,12 +396,12 @@ describe('CanvasWidgetView control layer overlay', () => {
     const layer = depthLayer;
     // The shell reserves this much of the center view for its header row (zoom, fit, undo).
     host!.style.setProperty('--wb-center-chrome-inset', '3rem');
-    const status = page.getByRole('status').filter({ hasText: /^Running / });
+    const status = page.getByRole('status').filter({ hasText: /^(Running|Waiting to run) / });
 
     expect(status.elements()).toHaveLength(0);
 
     await act(() => statuses.set(layer.id, { status: 'queued' }));
-    await expect.element(status).toHaveTextContent('Running Depth Anything…');
+    await expect.element(status).toHaveTextContent('Waiting to run Depth Anything…');
     await expect.element(status).toHaveAttribute('aria-live', 'polite');
     const headerBottom = host!.getBoundingClientRect().top + 48;
     expect(status.element().getBoundingClientRect().top).toBeGreaterThanOrEqual(headerBottom);
@@ -483,7 +495,7 @@ describe('CanvasWidgetView control layer overlay', () => {
   });
 
   it.each([
-    ['queued', { status: 'queued' as const }, /^Running /],
+    ['queued', { status: 'queued' as const }, /^Waiting to run /],
     ['failed', { error: { code: 'process-failed' as const }, status: 'error' as const }, /failed/],
   ])('gives the slot to the detection chip while a run is %s', async (_case, runStatus, chipText) => {
     const statuses = await renderWithStatuses(readyLayer);
@@ -535,5 +547,119 @@ describe('CanvasWidgetView control layer overlay', () => {
 
     await expect.element(page.getByRole('status')).toBeInTheDocument();
     expect(viewSwitch().elements()).toHaveLength(0);
+  });
+});
+
+describe('CanvasWidgetView desktop file drops', () => {
+  const emptyControlLayer = createControlLayer({ id: 'control-1', name: 'Control Layer 1' });
+  const PHOTO_FILE = new File([new Uint8Array([137, 80, 78, 71])], 'photo.png', { type: 'image/png' });
+  const UPLOADED = { height: 64, imageName: 'dropped.png', width: 96 } as GalleryImage;
+  const hint = () => page.getByRole('note');
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** Sends a native drag carrying `transfer` over the canvas and drops it; returns whether each event was taken. */
+  const drag = async (transfer: DataTransfer) => {
+    const surface = page.getByRole('region', { exact: true, name: 'Canvas surface' }).element();
+    const over = new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: transfer });
+    const drop = new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer });
+    await act(() => surface.dispatchEvent(over));
+    await act(() => surface.dispatchEvent(drop));
+    return { dropTaken: drop.defaultPrevented, overTaken: over.defaultPrevented };
+  };
+  const dragFiles = (files: File[]) => {
+    const transfer = new DataTransfer();
+    for (const file of files) {
+      transfer.items.add(file);
+    }
+    return drag(transfer);
+  };
+  const lastNotice = (store: Awaited<ReturnType<typeof renderView>>['store']) => store.getState().notifications[0];
+
+  it('fills an empty control layer from a dropped image, says it is uploading, and refuses a second drop meanwhile', async () => {
+    let finishUpload!: (image: GalleryImage) => void;
+    const upload = vi.spyOn(galleryTransfers, 'upload').mockReturnValue(
+      new Promise((resolve) => {
+        finishUpload = resolve;
+      })
+    );
+    const { store } = await renderView('completed', {
+      beforeRender: (engine) => {
+        vi.spyOn(getCanvasOperations(engine), 'applyControlLayerIntent').mockReturnValue('updated');
+      },
+      selectedLayer: emptyControlLayer,
+      staged: false,
+    });
+    const apply = vi.mocked(getCanvasOperations(harness.engine!).applyControlLayerIntent);
+
+    expect(await dragFiles([PHOTO_FILE])).toEqual({ dropTaken: true, overTaken: true });
+    await expect.element(hint()).toHaveTextContent('Uploading…');
+    await expect.element(hint()).toHaveAttribute('aria-busy', 'true');
+
+    // A second drop while the first is on its way would race it: refused, with the reason.
+    await dragFiles([PHOTO_FILE]);
+    expect(upload).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() =>
+      expect(lastNotice(store)).toMatchObject({ title: 'An image is still uploading to this layer.' })
+    );
+
+    await act(() => finishUpload(UPLOADED));
+    await vi.waitFor(() => expect(apply).toHaveBeenCalledTimes(1));
+    const { bbox } = activeProject().canvas.document;
+    expect(upload).toHaveBeenCalledWith(PHOTO_FILE, 'none', expect.anything());
+    expect(apply).toHaveBeenCalledWith('control-1', {
+      image: { height: 64, imageName: 'dropped.png', width: 96 },
+      kind: 'replace-image',
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: bbox.x, y: bbox.y },
+    });
+    // Properties names the image after the file, as for its own Upload.
+    expect(getControlSourceSnapshot(harness.engine!).origins['dropped.png']).toEqual({
+      kind: 'file',
+      name: 'photo.png',
+    });
+    // The upload has landed: the card no longer says it is uploading.
+    await vi.waitFor(() => expect(hint().element().getAttribute('aria-busy')).toBe('false'));
+    expect(hint().element().textContent).toContain('Drop an image here');
+  });
+
+  it('refuses a drop on a control layer locked by its group before uploading anything', async () => {
+    const upload = vi.spyOn(galleryTransfers, 'upload');
+    const { store } = await renderView('completed', {
+      nodes: [groupContract('group-1', [emptyControlLayer], { isLocked: true })],
+      selectedLayer: emptyControlLayer,
+      staged: false,
+    });
+
+    expect(await dragFiles([PHOTO_FILE])).toEqual({ dropTaken: true, overTaken: true });
+
+    expect(lastNotice(store)).toMatchObject({ title: 'Unlock the layer before using this action.' });
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it('says what a drop needs when no empty control layer is selected, or the files do not fit', async () => {
+    const upload = vi.spyOn(galleryTransfers, 'upload');
+    const { store } = await renderView('completed', {
+      selectedLayer: layerContract('raster-1', 'raster'),
+      staged: false,
+    });
+
+    await dragFiles([PHOTO_FILE]);
+    expect(lastNotice(store)).toMatchObject({ title: 'Select an empty control layer to drop an image on it.' });
+    await dragFiles([new File(['notes'], 'notes.txt', { type: 'text/plain' })]);
+    expect(lastNotice(store)).toMatchObject({ title: 'Only image files can be dropped on the canvas.' });
+    await dragFiles([PHOTO_FILE, PHOTO_FILE]);
+    expect(lastNotice(store)).toMatchObject({ title: 'Drop one image at a time.' });
+
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it('leaves a drag that carries no files alone', async () => {
+    await renderView('completed', { selectedLayer: emptyControlLayer, staged: false });
+    const transfer = new DataTransfer();
+    transfer.setData('text/plain', 'not a file');
+
+    expect(await drag(transfer)).toEqual({ dropTaken: false, overTaken: false });
   });
 });

@@ -41,6 +41,9 @@ export type ControlModelAction = 'reset' | 'find-one' | 'install-starters';
 
 export type ControlPriority = 'more_prompt' | 'balanced' | 'more_control';
 
+/** Why Priority cannot be set: the model is not a ControlNet, or it is a FLUX ControlNet, which has no mode. */
+export type ControlPriorityUnavailable = 'kind' | 'flux';
+
 export interface ControlPanelModel {
   image: { state: ControlImageState; imageName: string | null };
   type: {
@@ -76,7 +79,10 @@ export interface ControlPanelModel {
   };
   adapter: {
     kind: ControlAdapterKind;
-    priority: { disabled: boolean; value: ControlPriority | null };
+    /**
+     * `unbalanced` only for a layer that stored it: new picks cannot choose it, so it shows until the user moves off.
+     */
+    priority: { unavailable: ControlPriorityUnavailable | null; value: ControlPriority | 'unbalanced' | null };
     stepsReadout: PanelText;
   };
 }
@@ -177,25 +183,30 @@ const deriveDetection = (input: ControlPanelInput): ControlPanelModel['detection
     { disabled: false, hint: null, label: noneLabel, value: DETECTION_NONE },
   ];
   const detection = layer.detection ?? null;
-  const value = detection ? detection.type : DETECTION_NONE;
+  // An empty layer has no detector yet: its first image gets the type's default, so there is nothing to choose (None
+  // would change nothing) until an image arrives.
+  const pendingImage = !detection && imageState === 'empty' && CONTROL_TYPE_SPECS[type].defaultDetector !== null;
+  const value = detection ? detection.type : pendingImage ? null : DETECTION_NONE;
   const action = failed ? 'retry' : status.status === 'idle' && map === 'stale' ? 'detect' : null;
   const settings = detection && detectorHint === null ? { detector: detection.type, values: detection.settings } : null;
   return {
     action,
     busy,
-    disabled: false,
+    disabled: pendingImage,
     failed,
     options,
     settings,
     // A detector with nothing to run on says why; None has no settings at all.
-    settingsUnavailable: settings
-      ? null
-      : detection && detectorHint
-        ? detectorHint
-        : { key: 'detectionNoSettings', refs: { detector: detection ? `filters.${detection.type}` : noneLabel.key } },
+    settingsUnavailable: pendingImage
+      ? { key: 'detectionAddImageFirst' }
+      : settings
+        ? null
+        : detection && detectorHint
+          ? detectorHint
+          : { key: 'detectionNoSettings', refs: { detector: detection ? `filters.${detection.type}` : noneLabel.key } },
     tone: failed ? 'error' : 'default',
     value,
-    valueText: detection ? filterLabel(detection.type) : noneLabel,
+    valueText: detection ? filterLabel(detection.type) : pendingImage ? { key: 'detectionChosenOnImage' } : noneLabel,
   };
 };
 
@@ -267,7 +278,10 @@ const deriveModel = (input: ControlPanelInput): ControlPanelModel['model'] => {
     case 'remembered':
       return withReason({
         action: 'reset',
-        caption: mismatch ?? { key: 'modelCaption.pick', refs: { kind: kindRef, type: typeRef } },
+        caption: mismatch ?? {
+          key: resolution.how === 'remembered' ? 'modelCaption.remembered' : 'modelCaption.pick',
+          refs: { kind: kindRef, type: typeRef },
+        },
         captionTone: mismatch ? 'warning' : 'muted',
         name: resolution.model?.name ?? null,
         tone: 'default',
@@ -331,15 +345,16 @@ const deriveModel = (input: ControlPanelInput): ControlPanelModel['model'] => {
 const percent = (value: number): number => Math.round(value * 100);
 
 const deriveAdapter = (input: ControlPanelInput): ControlPanelModel['adapter'] => {
-  const { layer, resolution } = input;
+  const { base, layer, resolution } = input;
   const { beginEndStepPct, controlMode } = layer.adapter;
   const isControlNet = resolution.kind === 'controlnet';
   return {
     kind: resolution.kind,
     priority: {
-      disabled: !isControlNet,
-      // Legacy `unbalanced` has no segment and shows none checked; ControlNet without a stored mode runs balanced.
-      value: controlMode === 'unbalanced' ? null : (controlMode ?? (isControlNet ? 'balanced' : null)),
+      // The FLUX ControlNet graph sends no control mode, so a FLUX layer has nothing for Priority to set.
+      unavailable: !isControlNet ? 'kind' : base?.id === 'flux' ? 'flux' : null,
+      // A ControlNet without a stored mode runs balanced.
+      value: controlMode ?? (isControlNet ? 'balanced' : null),
     },
     stepsReadout: {
       key: 'stepsReadout',

@@ -27,9 +27,12 @@ import { getCanvasOperations } from '@workbench/canvas-operations/api';
 import { getControlImageState } from '@workbench/canvasLayerContent';
 import { deriveControlKind } from '@workbench/controlAdapters';
 import { createControlLayerCheckContext, describeControlLayer } from '@workbench/controlLayerChecks';
-import { controlModelMemoryKey, getTypeAvailability } from '@workbench/controlModelResolution';
+import {
+  controlModelMemoryKey,
+  getTypeAvailability,
+  isRememberableControlPick,
+} from '@workbench/controlModelResolution';
 import { patchControlModelMemory, useWorkbenchPreferenceSelector } from '@workbench/settings/store';
-import { useNotify } from '@workbench/useNotify';
 import {
   useCanvasDocumentEditingLocked,
   useCanvasEngineRead,
@@ -48,7 +51,7 @@ import { deriveControlPanel } from './controlPanelModel';
 import { ControlSourceRow } from './ControlSourceRow';
 import { ControlTypeRow } from './ControlTypeRow';
 import { isAutoControlLayerName, nextControlTypeLayerName } from './layerOps';
-import { useControlSourceActions } from './useControlSourceActions';
+import { useControlIntentReporter, useControlSourceActions } from './useControlSourceActions';
 import { useSelectedMainModel } from './useSelectedMainModel';
 
 const selectCapabilitiesStatus = (snapshot: ArchitectureCapabilitiesSnapshot) => snapshot.status;
@@ -81,7 +84,6 @@ interface ControlLayerSettingsProps {
  */
 export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProps) => {
   const { t } = useTranslation();
-  const notify = useNotify();
   const navigate = useNavigate();
   const projectId = useActiveProjectId();
   const { canManageModels } = useCapabilities();
@@ -177,30 +179,7 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
     status,
   });
 
-  const reportIntent = useCallback(
-    (result: ControlLayerIntentResult) => {
-      switch (result) {
-        case 'blocked':
-          notify.info(t('widgets.layers.actions.busy'));
-          return;
-        case 'locked':
-          notify.info(t('widgets.layers.actions.locked'));
-          return;
-        case 'no-detection-input':
-          notify.info(t('widgets.layers.control.detectionNoInput'));
-          return;
-        case 'over-budget':
-          notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.actions.overBudget'));
-          return;
-        case 'failed':
-          notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.actions.operationFailed'));
-          return;
-        default:
-        // `updated`, `unchanged`, and `missing` (the layer went away, and this panel with it) say nothing.
-      }
-    },
-    [notify, t]
-  );
+  const reportIntent = useControlIntentReporter();
   const applyIntent = useCallback(
     (intent: ControlLayerIntent): ControlLayerIntentResult | null => {
       if (!engine) {
@@ -218,7 +197,7 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
     }
   }, [engine, layer.id]);
 
-  const source = useControlSourceActions({ applyIntent, engine, layerId: layer.id, reportIntent });
+  const source = useControlSourceActions({ applyIntent, engine, layerId: layer.id });
   const sourceLabel = (() => {
     if (imageState !== 'image') {
       return t('widgets.layers.control.source.drawn');
@@ -287,22 +266,28 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
   );
 
   const memoryKey = baseId && layer.controlType ? controlModelMemoryKey(baseId, layer.controlType) : null;
+  // Account-wide and outside canvas undo, so only a pick that fits the type is remembered for later layers; any other
+  // pick (purpose not set, another family) stays this layer's own.
   const handleModelPick = useCallback(
     (model: ModelConfig) => {
       const kind = deriveControlKind(model);
       commitAdapter(kind ? { kind, model: model.key } : { model: model.key }, t('widgets.layers.control.model'));
-      if (memoryKey) {
+      if (memoryKey && isRememberableControlPick(resolution, model)) {
         void patchControlModelMemory(memoryKey, model.key);
       }
     },
-    [commitAdapter, memoryKey, t]
+    [commitAdapter, memoryKey, resolution, t]
   );
+  // Reset undoes what drives the layer: the remembered pick is forgotten only when it is the model shown.
+  const forgetsRemembered =
+    memoryKey !== null && resolution.model !== null && remembered[memoryKey] === resolution.model.key;
   const handleModelReset = useCallback(() => {
+    // With no model the stored kind is advisory (normalization keeps the values the resolved kind accepts).
     commitAdapter({ model: null }, t('widgets.layers.control.model'));
-    if (memoryKey) {
+    if (forgetsRemembered && memoryKey) {
       void patchControlModelMemory(memoryKey, null);
     }
-  }, [commitAdapter, memoryKey, t]);
+  }, [commitAdapter, forgetsRemembered, memoryKey, t]);
   const findModels = useCallback(() => {
     void navigate({ search: { project: projectId }, to: '/models' });
   }, [navigate, projectId]);
@@ -367,7 +352,7 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
         model={panel.model}
         reidentifyPending={reidentifyPending}
         rememberedHint={
-          resolution.how === 'remembered' && layer.controlType && base
+          forgetsRemembered && layer.controlType && base
             ? t('widgets.layers.control.modelRememberedHint', {
                 base: base.label,
                 type: t(`widgets.layers.control.typeNouns.${layer.controlType}`),

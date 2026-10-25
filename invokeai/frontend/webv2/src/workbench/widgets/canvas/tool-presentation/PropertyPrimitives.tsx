@@ -1,14 +1,40 @@
-import type { ReactNode } from 'react';
+import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 
 import { Badge, chakra, Flex, Grid, Icon, Stack, Switch, Text } from '@chakra-ui/react';
 import { SegmentedControl } from '@platform/ui/SegmentedControl';
+import { Tooltip } from '@platform/ui/Tooltip';
 import { ChevronDownIcon } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { setPropertyGroupCollapsed, usePropertyGroupCollapsed } from './propertyGroupStore';
 
 const GROUP_HEADER_HOVER = { color: 'fg' } as const;
+
+/**
+ * A row label that names itself in a tooltip while the pointer is on it and its column cuts it short. Only then is a
+ * tooltip (and its portal) mounted, so the many rows of a Properties pane cost none at rest.
+ */
+const PropertyRowLabel = ({ label, labelId }: { label: string; labelId?: string }) => {
+  const [isTipShown, setIsTipShown] = useState(false);
+  const showIfCut = useCallback((event: ReactPointerEvent<HTMLParagraphElement>) => {
+    const element = event.currentTarget;
+    setIsTipShown(element.scrollWidth > element.clientWidth);
+  }, []);
+  const hide = useCallback(() => setIsTipShown(false), []);
+  const text = (
+    <Text color="fg.muted" id={labelId} minW="0" truncate onPointerEnter={showIfCut} onPointerLeave={hide}>
+      {label}
+    </Text>
+  );
+  return isTipShown ? (
+    <Tooltip content={label} open>
+      {text}
+    </Tooltip>
+  ) : (
+    text
+  );
+};
 
 /**
  * Use fixed label/trailing columns around a flexible control so sliders and numbers never wrap; blank labels
@@ -25,9 +51,7 @@ export const PropertyControlRow = ({
   labelId?: string;
 }) => (
   <Grid alignItems="center" columnGap="2" gridTemplateColumns="4.5rem minmax(0, 1fr) auto" minH="control.md" w="full">
-    <Text color="fg.muted" id={labelId} minW="0" title={label} truncate>
-      {label}
-    </Text>
+    {label ? <PropertyRowLabel label={label} labelId={labelId} /> : <Text color="fg.muted" id={labelId} minW="0" />}
     {children}
   </Grid>
 );

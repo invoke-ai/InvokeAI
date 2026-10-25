@@ -123,4 +123,28 @@ describe('Select', () => {
     await act(() => userEvent.keyboard('{ArrowDown}{ArrowDown}{Enter}'));
     expect(onValueChange).toHaveBeenLastCalledWith(expect.objectContaining({ value: ['none'] }));
   });
+
+  it('opens with a header-less group without a divider above it', async () => {
+    // The header-less group comes first: a divider belongs between groups, never above the first option.
+    const items = [DETECTOR_ITEMS[2]!, DETECTOR_ITEMS[0]!, DETECTOR_ITEMS[1]!];
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <Select
+            aria-label="Detection"
+            collection={createListCollection({ items })}
+            groupBy={getDetectorGroup}
+            renderGroupLabel={renderDetectorGroupLabel}
+            value={DETECTOR_VALUE}
+          />
+        </ChakraProvider>
+      );
+    });
+    await act(() => trigger().click());
+    await expect.poll(() => document.querySelectorAll('[role="option"]').length).toBe(3);
+
+    const listbox = document.querySelector<HTMLElement>('[role="listbox"]')!;
+    expect(listbox.querySelectorAll('[role="separator"]')).toHaveLength(0);
+    expect(listbox.querySelector('[role="option"]')?.textContent).toContain('None');
+  });
 });

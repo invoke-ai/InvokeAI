@@ -8,8 +8,14 @@ import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import { Box, Flex, HStack, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { useDndContext } from '@dnd-kit/core';
 import { isGalleryImageDragData } from '@features/gallery/utility';
+import { useExternalStoreSelector } from '@platform/state/selectors';
 import { SegmentedControl } from '@platform/ui/SegmentedControl';
 import { getDocumentNode, isControlMapCurrent, lookupDocumentLeaf } from '@workbench/canvas-engine/api';
+import {
+  getControlSourceSnapshot,
+  subscribeControlSourceSnapshot,
+  type ControlSourceSnapshot,
+} from '@workbench/canvas-operations/api';
 import { getControlImageState } from '@workbench/canvasLayerContent';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { ImagePlusIcon, TriangleAlertIcon } from 'lucide-react';
@@ -76,6 +82,16 @@ const SelectedControlLayerOverlay = ({
   const activeTool = useCanvasActiveTool(engine);
   const status = useControlDetectionStatus(engine, layer.id);
   const { active } = useDndContext();
+  const subscribeSource = useCallback(
+    (listener: () => void) => subscribeControlSourceSnapshot(engine, listener),
+    [engine]
+  );
+  const getSourceSnapshot = useCallback(() => getControlSourceSnapshot(engine), [engine]);
+  const isUploading = useExternalStoreSelector(
+    subscribeSource,
+    getSourceSnapshot,
+    useCallback((snapshot: ControlSourceSnapshot) => snapshot.uploading.has(layer.id), [layer.id])
+  );
   const { notifications } = useWorkbenchCommands();
   const isDocumentEditingLocked = useCanvasDocumentEditingLocked(engine);
   const isDisplayed = useActiveProjectSelector(selectSelectedLayerDisplayed);
@@ -121,12 +137,10 @@ const SelectedControlLayerOverlay = ({
   const isGalleryDrag = isGalleryImageDragData(active?.data.current);
   // Draw hides the hint: the user is about to give the layer its pixels by hand. A locked surface (staging, a running
   // canvas generation) refuses drops, and a gallery drag shows the drop zones in its place.
+  // An upload on its way (from Properties or a dropped file) keeps the card up, saying so.
   const isHintVisible =
     imageState === 'empty' &&
-    !isInteractionLocked &&
-    !isGalleryDrag &&
-    activeTool !== 'brush' &&
-    activeTool !== 'eraser';
+    (isUploading || (!isInteractionLocked && !isGalleryDrag && activeTool !== 'brush' && activeTool !== 'eraser'));
   // Idle status keeps the switch and the detection chip apart: one or the other occupies the slot. The engine refuses
   // a view while the canvas is locked, and a layer that does not draw has nothing to compare.
   const isViewSwitchVisible =
@@ -163,16 +177,22 @@ const SelectedControlLayerOverlay = ({
           visibility={isHintVisible ? 'visible' : 'hidden'}
           zIndex="1"
         >
-          <CanvasFloatingBar maxW="72" pointerEvents="none" px="3" py="2" role="note">
+          <CanvasFloatingBar aria-busy={isUploading} maxW="72" pointerEvents="none" px="3" py="2" role="note">
             <HStack align="center" gap="2.5">
-              <Icon as={ImagePlusIcon} boxSize="5" color="fg.muted" flexShrink={0} />
+              {isUploading ? (
+                <Spinner boxSize="4" color="fg.muted" flexShrink={0} />
+              ) : (
+                <Icon as={ImagePlusIcon} boxSize="5" color="fg.muted" flexShrink={0} />
+              )}
               <Stack gap="0.5" minW="0">
                 <Text fontSize="md" fontWeight="600">
-                  {t('widgets.canvas.controlHint.title')}
+                  {t(isUploading ? 'widgets.canvas.controlHint.uploading' : 'widgets.canvas.controlHint.title')}
                 </Text>
-                <Text color="fg.muted" fontSize="md">
-                  {t('widgets.canvas.controlHint.body')}
-                </Text>
+                {isUploading ? null : (
+                  <Text color="fg.muted" fontSize="md">
+                    {t('widgets.canvas.controlHint.body')}
+                  </Text>
+                )}
               </Stack>
             </HStack>
           </CanvasFloatingBar>
@@ -206,7 +226,12 @@ const SelectedControlLayerOverlay = ({
                         detector: detectorLabel,
                         reason: t(`widgets.layers.control.detectionErrors.${status.error.code}`),
                       })
-                    : t('widgets.layers.control.detecting', { detector: detectorLabel })}
+                    : t(
+                        status.status === 'queued'
+                          ? 'widgets.layers.control.detectionQueued'
+                          : 'widgets.layers.control.detecting',
+                        { detector: detectorLabel }
+                      )}
                 </Text>
               </HStack>
             </CanvasFloatingBar>

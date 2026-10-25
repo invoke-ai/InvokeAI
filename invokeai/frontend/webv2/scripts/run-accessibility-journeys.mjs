@@ -245,11 +245,30 @@ const surfaces = [
       await page.reload({ waitUntil: 'domcontentloaded' });
       await waitForWorkbench(page);
       await selectLayoutPreset(page, 'Edit', 'Canvas');
+      // The representative main model is SD 1.x; the seeded control models are SDXL, so switch to an SDXL main
+      // (Fixture Model 006) through the Generate panel's model picker.
+      await page.getByText('Fixture Model 001', { exact: true }).click();
+      const search = page.getByRole('combobox', { name: /^Search / });
+      await search.fill('Fixture Model 006');
+      await page.getByRole('option', { name: /Fixture Model 006(?!\d)/ }).click();
+      // Once the picker has closed, the trigger is the only place naming the new model.
+      await search.waitFor({ state: 'hidden' });
+      await page.getByText('Fixture Model 006', { exact: true }).waitFor();
       await page.getByRole('button', { exact: true, name: 'Add layer' }).click();
       await page.getByRole('menuitem', { exact: true, name: 'Control layer' }).click();
       // The new layer's Properties panel and the canvas hint over its empty source are both scanned.
-      await page.getByRole('combobox', { exact: true, name: 'Type' }).waitFor();
+      const type = page.getByRole('combobox', { exact: true, name: 'Type' });
+      await type.waitFor();
       await page.getByRole('note').filter({ hasText: 'Drop an image here' }).waitFor();
+      await waitForSettledDocument(page);
+      await assertNoAxeViolations(page, 'workbench-canvas-control-layer-untyped');
+      // Typed as Depth: the seed holds two depth models, so the panel asks for one; the runner scans this state.
+      await type.click();
+      await page.getByRole('option', { name: /^Depth/ }).click();
+      await page
+        .getByRole('combobox', { exact: true, name: 'Model' })
+        .filter({ hasText: 'Choose a depth model' })
+        .waitFor();
     },
   },
   {

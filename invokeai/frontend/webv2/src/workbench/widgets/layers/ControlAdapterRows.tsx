@@ -5,6 +5,7 @@ import { Box, Text } from '@chakra-ui/react';
 import { getControlAdapterMinWeight } from '@features/generation/graph';
 import { SegmentedControl } from '@platform/ui/SegmentedControl';
 import { Slider } from '@platform/ui/Slider';
+import { Tooltip } from '@platform/ui/Tooltip';
 import {
   FormNumberField,
   useNumberCommit,
@@ -19,6 +20,8 @@ import { CONTROL_WEIGHT_BOUNDS } from './layerOps';
 
 const STEP_RANGE_STEP = 0.05;
 const PRIORITIES: readonly ControlPriority[] = ['more_prompt', 'balanced', 'more_control'];
+// A layer that stored the retired `unbalanced` mode sees it as a fourth segment, so the value is visible and can be left.
+const PRIORITIES_WITH_UNBALANCED: readonly (ControlPriority | 'unbalanced')[] = [...PRIORITIES, 'unbalanced'];
 
 const formatWeight = (value: number): string => value.toFixed(2);
 const formatPercent = (value: number): string => `${Math.round(value * 100)}%`;
@@ -120,18 +123,33 @@ export const ControlAdapterRows = ({
       })
     : formatPanelText(t, model.stepsReadout, i18n.language);
 
+  const isLegacyUnbalanced = model.priority.value === 'unbalanced';
   const priorityOptions = useMemo(
-    () => PRIORITIES.map((value) => ({ label: t(`widgets.layers.control.priorityModes.${value}`), value })),
-    [t]
+    () =>
+      (isLegacyUnbalanced ? PRIORITIES_WITH_UNBALANCED : PRIORITIES).map((value) => ({
+        label: t(`widgets.layers.control.priorityModes.${value}`),
+        value,
+      })),
+    [isLegacyUnbalanced, t]
   );
   const handlePriority = useCallback(
     (value: string) => {
       if (value !== model.priority.value) {
-        editing.commit({ controlMode: value as ControlPriority }, priorityLabel);
+        editing.commit(
+          { controlMode: value as NonNullable<CanvasControlAdapterContract['controlMode']> },
+          priorityLabel
+        );
       }
     },
     [editing, model.priority.value, priorityLabel]
   );
+  const priorityUnavailable = model.priority.unavailable
+    ? t(
+        model.priority.unavailable === 'flux'
+          ? 'widgets.layers.control.priorityUnavailableFlux'
+          : 'widgets.layers.control.priorityUnavailable'
+      )
+    : null;
 
   return (
     <>
@@ -177,21 +195,34 @@ export const ControlAdapterRows = ({
         </Text>
       </PropertyControlRow>
       <PropertyControlRow label={priorityLabel}>
-        <Box gridColumn="2 / -1" minW="0" opacity={model.priority.disabled ? 0.45 : undefined}>
-          <SegmentedControl
-            aria-describedby={model.priority.disabled ? priorityReasonId : undefined}
-            ariaLabel={priorityLabel}
-            disabled={disabled || model.priority.disabled}
-            options={priorityOptions}
-            value={model.priority.value}
-            onChange={handlePriority}
-          />
-          {model.priority.disabled ? (
-            <span hidden id={priorityReasonId}>
-              {t('widgets.layers.control.priorityUnavailable')}
-            </span>
-          ) : null}
-        </Box>
+        {/* Disabled radios take no focus, so the group itself does while unavailable: its reason shows on focus too. */}
+        <Tooltip content={priorityUnavailable} disabled={priorityUnavailable === null}>
+          <Box
+            aria-describedby={priorityUnavailable ? priorityReasonId : undefined}
+            aria-label={priorityUnavailable ? priorityLabel : undefined}
+            focusVisibleRing="outside"
+            gridColumn="2 / -1"
+            minW="0"
+            opacity={priorityUnavailable ? 0.45 : undefined}
+            role={priorityUnavailable ? 'group' : undefined}
+            rounded="sm"
+            tabIndex={priorityUnavailable ? 0 : undefined}
+          >
+            <SegmentedControl
+              aria-describedby={priorityUnavailable ? priorityReasonId : undefined}
+              ariaLabel={priorityLabel}
+              disabled={disabled || priorityUnavailable !== null}
+              options={priorityOptions}
+              value={model.priority.value}
+              onChange={handlePriority}
+            />
+            {priorityUnavailable ? (
+              <span hidden id={priorityReasonId}>
+                {priorityUnavailable}
+              </span>
+            ) : null}
+          </Box>
+        </Tooltip>
       </PropertyControlRow>
     </>
   );

@@ -3642,7 +3642,13 @@
       },
       "controlHint": {
         "title": "Drop an image here",
-        "body": "or pick one in Properties"
+        "body": "or pick one in Properties",
+        "uploading": "Uploading…"
+      },
+      "fileDrop": {
+        "oneFile": "Drop one image at a time.",
+        "notImage": "Only image files can be dropped on the canvas.",
+        "noTarget": "Select an empty control layer to drop an image on it."
       },
       "controlView": {
         "label": "Control layer view",
@@ -4082,7 +4088,7 @@
           "capabilities_unavailable": "waiting for model capabilities to load.",
           "choose_model": "Several installed models fit this control type; choose one.",
           "control_lora_limit": "Only one Control LoRA can be used at a time.",
-          "detection_pending": "Detection is out of date; run it again from the layer's Properties.",
+          "detection_pending": "Detection is running or out of date; wait for it, or run it again from the layer's Properties.",
           "duplicate_lllite_model": "Another control layer already uses this ControlNet-LLLite model; each can be applied once per generation.",
           "flux2_control_limit": "Only one FLUX.2 [dev] ControlNet can be used at a time.",
           "flux2_klein_control": "FLUX.2 [dev] ControlNet is not compatible with FLUX.2 Klein models.",
@@ -4105,6 +4111,7 @@
         },
         "weight": "Weight",
         "detecting": "Running {{detector}}…",
+        "detectionQueued": "Waiting to run {{detector}}…",
         "detectionErrors": {
           "process-failed": "the detector could not run",
           "apply-failed": "the map could not be applied",
@@ -4117,6 +4124,8 @@
         },
         "detectionFailed": "{{detector}} failed: {{reason}}",
         "detectionNeedsImage": "Add an image to detect from",
+        "detectionChosenOnImage": "Chosen when an image is added",
+        "detectionAddImageFirst": "Add an image first",
         "detectionNoInput": "Replace the image to detect again",
         "detectionNoSettings": "No settings for {{detector}}",
         "detectionNone": {
@@ -4158,6 +4167,7 @@
           "only": "{{kind}} · your only {{type}} model",
           "union": "{{kind}} · via Union, which covers {{type}}",
           "pick": "{{kind}} · your pick for {{type}}",
+          "remembered": "{{kind}} · remembered for {{type}}",
           "ambiguous_other": "{{count}} models fit: {{models}}",
           "noneForBase": "No installed model handles {{type}} for {{base}}.",
           "noModels": "No control models are installed for {{base}}.",
@@ -4170,14 +4180,15 @@
         "modelGroups": {
           "purpose": "Made for {{type}}",
           "union": "Union",
-          "unknown": "Purpose not set"
+          "unknown": "Purpose not set",
+          "installed": "Installed models"
         },
         "modelItemCaption": "{{kind}} · {{origin}}",
         "modelOrigin": {
           "starter": "starter",
           "downloaded": "downloaded"
         },
-        "modelRememberedHint": "Your pick is used for every {{type}} layer on {{base}} that has no model of its own.",
+        "modelRememberedHint": "Reset also forgets the {{type}} model remembered for {{base}}, in every project.",
         "modelValue": {
           "choose": "Choose a {{type}} model",
           "noneForBase": "None for {{base}}",
@@ -4187,9 +4198,11 @@
         "priorityModes": {
           "more_prompt": "Prompt",
           "balanced": "Balanced",
-          "more_control": "Control"
+          "more_control": "Control",
+          "unbalanced": "Unbalanced"
         },
         "priorityUnavailable": "Priority applies to ControlNet models only.",
+        "priorityUnavailableFlux": "FLUX ControlNets have no priority setting.",
         "rows": {
           "image": "Image",
           "type": "Type",
@@ -4211,7 +4224,8 @@
           "frameEmpty": "Nothing is visible inside the frame",
           "frameNotReady": "The canvas is still preparing image data. Try again shortly.",
           "frameFailed": "Couldn't use the frame",
-          "uploadFailed": "Couldn't use that image"
+          "uploadFailed": "Couldn't use that image",
+          "uploadPending": "An image is still uploading to this layer."
         },
         "stepsReadout": "{{begin}}–{{end}}%",
         "summary": {

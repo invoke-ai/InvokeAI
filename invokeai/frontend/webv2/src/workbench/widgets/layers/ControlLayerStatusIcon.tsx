@@ -24,9 +24,9 @@ const selectCapabilitiesStatus = (snapshot: ArchitectureCapabilitiesSnapshot) =>
 const selectControlModelMemory = (preferences: WorkbenchPreferences) => preferences.controlModelMemory;
 
 /**
- * A control layer row's status: a spinner while its map is being detected, else a warning when the layer needs
- * attention, judged as its Properties panel judges it. `contributing` is the effective enablement; a layer gated by
- * a group is not validated.
+ * A control layer row's status: a spinner while its map is queued for or being detected, else a warning when the
+ * layer needs attention, judged as its Properties panel judges it. `contributing` is the effective enablement; a
+ * layer gated by a group is not validated.
  */
 export const ControlLayerStatusIcon = ({
   layer,
@@ -66,10 +66,19 @@ export const ControlLayerStatusIcon = ({
     )
   );
 
-  if (detection.status === 'processing') {
-    const label = t('widgets.layers.control.detecting', {
-      detector: t(`widgets.layers.control.filters.${detection.detector}`, detection.detector),
-    });
+  // A queued run (debounce, a free slot, a commit waiting for the document) is as busy as a running one; it names
+  // the detector the layer asks for, since it has not started one yet.
+  const detector =
+    detection.status === 'processing'
+      ? detection.detector
+      : detection.status === 'queued'
+        ? layer.detection?.type
+        : undefined;
+  if (detector) {
+    const label = t(
+      detection.status === 'queued' ? 'widgets.layers.control.detectionQueued' : 'widgets.layers.control.detecting',
+      { detector: t(`widgets.layers.control.filters.${detector}`, detector) }
+    );
     return (
       <Tooltip content={label}>
         <Box alignItems="center" display="inline-flex" flexShrink={0}>

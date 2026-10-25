@@ -165,7 +165,7 @@ describe('control panel design states', () => {
     });
   });
 
-  it('5: an explicit or remembered pick says so and offers Reset', () => {
+  it('5: an explicit or remembered pick says which it is and offers Reset', () => {
     const explicit = panelOf(
       detected('depth', 'depth_anything_depth_estimation', {
         adapter: { ...controlLayer().adapter, model: 'sdxl-depth-b' },
@@ -177,13 +177,17 @@ describe('control panel design states', () => {
       remembered: { 'sdxl:depth': 'sdxl-depth-b' },
     });
 
-    for (const panel of [explicit, remembered]) {
-      expect(panel.model).toMatchObject({
-        action: 'reset',
-        caption: { key: 'modelCaption.pick' },
-        name: 'sdxl-depth-b',
-      });
-    }
+    expect(explicit.model).toMatchObject({
+      action: 'reset',
+      caption: { key: 'modelCaption.pick', refs: { kind: 'kinds.controlnet', type: 'typeNouns.depth' } },
+      name: 'sdxl-depth-b',
+    });
+    // An undo takes back the layer's pick but not the account's memory: the caption must not read as the same pick.
+    expect(remembered.model).toMatchObject({
+      action: 'reset',
+      caption: { key: 'modelCaption.remembered', refs: { kind: 'kinds.controlnet', type: 'typeNouns.depth' } },
+      name: 'sdxl-depth-b',
+    });
   });
 
   it('6: a union model covering the type is used and named as the union', () => {
@@ -276,6 +280,27 @@ describe('control panel detection', () => {
     );
     expect(emptied.detection.settingsUnavailable).toEqual({ key: 'detectionNeedsImage' });
   });
+
+  it('leaves the detector to the first image of an empty layer instead of reading None', () => {
+    const empty = panelOf(controlLayer({ controlType: 'depth', detection: null }));
+    const withImage = panelOf(detected('depth', null));
+    // Tile has no detector to choose, so None is what it will be.
+    const tile = panelOf(controlLayer({ controlType: 'tile', detection: null }));
+
+    // Nothing to choose yet (None would change nothing), and no settings until there is an image.
+    expect(empty.detection).toMatchObject({
+      disabled: true,
+      settingsUnavailable: { key: 'detectionAddImageFirst' },
+      value: null,
+      valueText: { key: 'detectionChosenOnImage' },
+    });
+    expect(withImage.detection).toMatchObject({
+      disabled: false,
+      value: 'none',
+      valueText: { key: 'detectionNone.depth' },
+    });
+    expect(tile.detection).toMatchObject({ disabled: false, value: 'none', valueText: { key: 'detectionNone.tile' } });
+  });
 });
 
 describe('control panel model caption', () => {
@@ -309,18 +334,26 @@ describe('control panel model caption', () => {
 });
 
 describe('control panel adapter rows', () => {
-  it('dims Priority for a non-ControlNet model and reads legacy unbalanced as none checked', () => {
+  it('makes Priority unavailable for a non-ControlNet model and for a FLUX ControlNet, which sends no mode', () => {
+    const sdxl = panelOf(detected('depth', 'depth_anything_depth_estimation'));
     const t2i = panelOf(detected('edges', 'canny_edge_detection'), { models: [t2iCanny] });
+    const flux = panelOf(detected('depth', 'depth_anything_depth_estimation'), { base: 'flux', models: [fluxUnion] });
+
+    expect(sdxl.adapter).toMatchObject({ kind: 'controlnet', priority: { unavailable: null, value: 'balanced' } });
+    expect(t2i.adapter).toMatchObject({ kind: 't2i_adapter', priority: { unavailable: 'kind' } });
+    expect(flux.adapter).toMatchObject({ kind: 'controlnet', priority: { unavailable: 'flux' } });
+  });
+
+  it('keeps a stored legacy unbalanced mode as the value, so the panel can show it', () => {
     const legacy = panelOf(
       detected('depth', 'depth_anything_depth_estimation', {
         adapter: { ...controlLayer().adapter, beginEndStepPct: [0.1, 0.75], controlMode: 'unbalanced' },
       })
     );
 
-    expect(t2i.adapter).toMatchObject({ kind: 't2i_adapter', priority: { disabled: true } });
     expect(legacy.adapter).toEqual({
       kind: 'controlnet',
-      priority: { disabled: false, value: null },
+      priority: { unavailable: null, value: 'unbalanced' },
       stepsReadout: { key: 'stepsReadout', values: { begin: 10, end: 75 } },
     });
   });

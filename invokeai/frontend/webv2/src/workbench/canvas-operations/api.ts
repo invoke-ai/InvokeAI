@@ -26,9 +26,20 @@ export {
 export { getCreateFromBboxNotice, type CreateFromBboxNotice } from './createFromBboxNotice';
 export {
   fillControlFromBbox,
+  getControlIntentNotice,
+  getControlSourceSnapshot,
+  getControlUploadNotice,
+  resolveControlFileDrop,
   sendGalleryImageAsControl,
+  subscribeControlSourceSnapshot,
+  uploadControlImageFile,
+  type ControlFileDropResolution,
+  type ControlSourceNotice,
+  type ControlSourceOrigin,
+  type ControlSourceSnapshot,
   type FillControlFromBboxResult,
   type SendGalleryImageAsControlResult,
+  type UploadControlImageResult,
 } from './controlSourceActions';
 export type { CanvasCompositeExportEngine } from './exportCanvasComposite';
 export type {

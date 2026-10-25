@@ -3,7 +3,7 @@ import type { ModelConfig } from '@features/models';
 import type { ControlType } from '@workbench/canvas-engine/api';
 import type { ControlModelResolution } from '@workbench/controlModelResolution';
 
-import { Box, createListCollection, Stack, Text } from '@chakra-ui/react';
+import { Box, createListCollection, HStack, Stack, Text } from '@chakra-ui/react';
 import { ensureStartersLoaded } from '@features/models';
 import { Button } from '@platform/ui/Button';
 import { Select } from '@platform/ui/Select';
@@ -25,7 +25,7 @@ const TONE_COLORS: Record<PanelTone, string | undefined> = {
   warning: 'fg.warning',
 };
 
-type ModelGroup = 'purpose' | 'union' | 'unknown';
+type ModelGroup = 'purpose' | 'union' | 'unknown' | 'installed';
 
 interface ModelItem {
   caption: string;
@@ -40,9 +40,15 @@ const groupOf = (item: ModelItem): string => item.group;
 /**
  * The models a typed layer can pick, grouped: made for its type (or its detector's family), every union model on the
  * base (one that does not cover the type is still a deliberate pick), then models whose purpose nothing names.
- * Models made for another type stay out; untyped layers pick nothing here.
+ * Models made for another type stay out. An untyped layer (one from before types) lists every usable model.
  */
-const groupModels = (resolution: ControlModelResolution): { group: ModelGroup; model: ModelConfig }[] => {
+const groupModels = (
+  resolution: ControlModelResolution,
+  controlType: ControlType | null
+): { group: ModelGroup; model: ModelConfig }[] => {
+  if (!controlType) {
+    return resolution.usable.map((model) => ({ group: 'installed' as const, model }));
+  }
   const unions = resolution.usable.filter((model) => classifyControlModel(model).union);
   const purpose = resolution.candidates.filter((model) => !unions.includes(model));
   const unknown = resolution.usable.filter(
@@ -81,7 +87,7 @@ export const ControlModelRow = ({
   onReset(): void;
   /** Listed disabled after the rest: they need re-identifying before a layer can use them. */
   reidentifyPending: readonly ModelConfig[];
-  /** Said beside Reset when the pick came from memory, since it applies to other layers too. */
+  /** Said on Reset when it also forgets the remembered pick, which applies to other layers and projects too. */
   rememberedHint: string | null;
   resolution: ControlModelResolution;
   /** Sources of the starter models; null until the catalog has loaded, when items leave their origin out. */
@@ -118,11 +124,11 @@ export const ControlModelRow = ({
     };
     return createListCollection<ModelItem>({
       items: [
-        ...groupModels(resolution).map(({ group, model: entry }) => itemFor(entry, group, false)),
+        ...groupModels(resolution, controlType).map(({ group, model: entry }) => itemFor(entry, group, false)),
         ...reidentifyPending.map((entry) => itemFor(entry, 'unknown', true)),
       ],
     });
-  }, [reidentifyPending, resolution, starterSources, t]);
+  }, [controlType, reidentifyPending, resolution, starterSources, t]);
   const renderGroupLabel = useCallback(
     (group: string) =>
       group === 'purpose'
@@ -160,7 +166,14 @@ export const ControlModelRow = ({
     }
   }, []);
   const triggerProps = useMemo(() => ({ 'aria-describedby': captionId }), [captionId]);
-  const valueText = model.name ?? (model.valueText ? format(model.valueText) : '');
+  // The Select disables an empty list; an untyped layer then says there is nothing to pick rather than "Set by type".
+  const valueText =
+    model.name ??
+    (!controlType && collection.items.length === 0
+      ? t('widgets.layers.control.modelValue.noModels')
+      : model.valueText
+        ? format(model.valueText)
+        : '');
   const valueTextProps = useMemo(() => ({ color: TONE_COLORS[model.tone] }), [model.tone]);
   const showAction = model.action === 'reset' || (model.action !== null && canManageModels);
   const actionLabel =
@@ -171,15 +184,17 @@ export const ControlModelRow = ({
         : t('widgets.layers.control.modelAction.installStarters');
   const actionButton = showAction ? (
     <Button
+      alignSelf="start"
       color="accent.fg"
+      flexShrink={0}
       fontSize="sm"
-      h="auto"
+      h="1rem"
+      lineHeight="1rem"
       minW="0"
       px="0"
       size="xs"
       textDecoration="underline"
       variant="plain"
-      verticalAlign="baseline"
       onClick={handleAction}
     >
       {actionLabel}
@@ -208,13 +223,21 @@ export const ControlModelRow = ({
         </Box>
       </PropertyControlRow>
       <PropertyControlRow>
-        <Box gridColumn="2 / -1" minW="0">
-          {/* Always two lines tall, so the rows below never move as the explanation changes. */}
-          <Text color={TONE_COLORS[model.captionTone]} fontSize="sm" h="2rem" lineClamp={2} lineHeight="1rem">
-            <span id={captionId}>{model.caption ? format(model.caption) : null}</span>{' '}
-            {actionButton && rememberedHint ? <Tooltip content={rememberedHint}>{actionButton}</Tooltip> : actionButton}
+        {/* Always two lines tall, so the rows below never move; the action sits beside the caption, never clipped. */}
+        <HStack align="start" gap="1.5" gridColumn="2 / -1" h="2rem" minW="0">
+          <Text
+            color={TONE_COLORS[model.captionTone]}
+            flex="1"
+            fontSize="sm"
+            id={captionId}
+            lineClamp={2}
+            lineHeight="1rem"
+            minW="0"
+          >
+            {model.caption ? format(model.caption) : null}
           </Text>
-        </Box>
+          {actionButton && rememberedHint ? <Tooltip content={rememberedHint}>{actionButton}</Tooltip> : actionButton}
+        </HStack>
       </PropertyControlRow>
     </Stack>
   );
