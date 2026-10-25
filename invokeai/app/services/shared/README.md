@@ -837,7 +837,11 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
     (a node between the `Collect` and the `Iterate`, or extra collected items) can change the length, and selecting
     the upstream axis over its reopening pairs it with per-group frames; both would drop or invent frames.
   - A branch whose open axes, or the axes a branch `Collect` keeps, are deeper than a per-item condition's, unless
-    both branches carry the same deeper axes.
+    both branches carry the same deeper axes. Each `Collect.item` closes its innermost axis and keeps the outer axes;
+    this identity is followed through chained `Collect`s and ordinary passthrough nodes. A shared deeper axis lets the
+    `If` run once per available innermost frame. When both branches are Collect-backed, they must share a Collect in
+    that chain; matching axis names or equal collection lengths alone are insufficient. An asymmetric Collect chain
+    is rejected before invocation. A downstream `Collect` retains empty outer groups.
   - A root-frame condition choosing between branches with different deeper axes. When both branches share nested
     deeper axes, a root-frame condition runs the `If` once per frame of the innermost one.
   Selected-branch frame cardinality is not supported.

@@ -276,14 +276,18 @@ class _ExecutionNodeBuilder:
                 continue
             condition_edges = self._state.graph._get_input_edges(if_node_id, "condition")
             iterator_graph = self.iterator_graph(graph)
-            if len(condition_edges) == 1 and isinstance(
-                self._state.graph.get_node(condition_edges[0].source.node_id), IterateInvocation
-            ):
-                empty_frame_sources = (condition_edges[0].source.node_id,)
-            elif condition_edges and not self._get_ordered_iterator_axes_for_edges(condition_edges, iterator_graph):
-                empty_frame_sources = self._get_iterator_ancestry(iterator_graph).get_frame_iterators(if_node_id)
-            else:
-                empty_frame_sources = ()
+            ancestry = self._get_iterator_ancestry(iterator_graph)
+            empty_frame_sources = tuple(
+                dict.fromkeys(
+                    [
+                        axis_id
+                        for edge in condition_edges
+                        if iterator_graph.has_node(edge.source.node_id)
+                        for axis_id in ancestry.get_iterator_axes_for_edge(edge)
+                    ]
+                    + list(ancestry.get_frame_iterators(if_node_id))
+                )
+            )
             for source_id in empty_frame_sources:
                 self._empty_condition_if_sources.setdefault(source_id, ())
                 self._empty_condition_if_sources[source_id] += (if_node_id,)
@@ -1252,6 +1256,28 @@ class _ExecutionNodeBuilder:
     def _get_collect_source_iterator_ids(
         self, source_node_id: str, iterator_graph: Optional["nx.DiGraph"] = None
     ) -> list[str]:
+        if isinstance(self._state.graph.get_node(source_node_id), IfInvocation):
+            iterator_ancestry = self._get_iterator_ancestry(iterator_graph or self.iterator_graph())
+            branch_axes = [
+                tuple(
+                    dict.fromkeys(
+                        axis_id
+                        for edge in self._state.graph._get_input_edges(source_node_id, branch)
+                        for axis_id in (
+                            graph_if_runtime._get_edge_frame_axes(self._state, iterator_ancestry, edge, {}) or ()
+                        )
+                    )
+                )
+                for branch in ("true_input", "false_input")
+            ]
+            condition_axes = {
+                axis_id
+                for edge in self._state.graph._get_input_edges(source_node_id, "condition")
+                for axis_id in iterator_ancestry.get_frame_axes_for_edge(edge)
+            }
+            if branch_axes[0] and branch_axes[0] == branch_axes[1] and set(branch_axes[0]) > condition_axes:
+                return list(branch_axes[0])
+
         iterator_node_ids = self.get_node_iterators(source_node_id, iterator_graph)
         if isinstance(self._state.graph.get_node(source_node_id), IterateInvocation):
             iterator_node_ids.append(source_node_id)
@@ -2187,6 +2213,44 @@ class _ExecutionNodeBuilder:
         if_exec_ids = self._state.source_prepared_mapping.get(if_node_id, set())
         return not if_exec_ids or not all(exec_id in self._state._resolved_if_exec_branches for exec_id in if_exec_ids)
 
+    def _should_defer_shared_collect_if(self, node_id: str, iterator_ancestry: _IteratorAncestry) -> bool:
+        if not isinstance(self._state.graph.get_node(node_id), IfInvocation):
+            return False
+        condition_edges = self._state.graph._get_input_edges(node_id, "condition")
+        branch_edges = [self._state.graph._get_input_edges(node_id, field) for field in ("true_input", "false_input")]
+        if not condition_edges or any(not edges for edges in branch_edges):
+            return False
+
+        axes = [
+            {
+                axis_id
+                for edge in edges
+                for axis_id in (graph_if_runtime._get_edge_frame_axes(self._state, iterator_ancestry, edge, {}) or ())
+            }
+            for edges in branch_edges
+        ]
+        condition_axes = {
+            axis_id for edge in condition_edges for axis_id in iterator_ancestry.get_frame_axes_for_edge(edge)
+        }
+        if axes[0] != axes[1] or not axes[0] > condition_axes:
+            return False
+
+        branch_sources = [
+            set().union(
+                *(
+                    nx.ancestors(self._state._get_source_graph_flat(), edge.source.node_id) | {edge.source.node_id}
+                    for edge in edges
+                )
+            )
+            for edges in branch_edges
+        ]
+        shared_collects = {
+            source_id
+            for source_id in branch_sources[0] & branch_sources[1]
+            if isinstance(self._state.graph.get_node(source_id), CollectInvocation)
+        }
+        return any(source_id not in self._state.executed for source_id in shared_collects)
+
     def _expand_root_if_for_completed_collect_branch(self, graph: "nx.DiGraph") -> Optional[str]:
         """Align a root-conditioned If frame with each completed selected Collect frame."""
         iterator_graph = self.iterator_graph(graph)
@@ -2462,6 +2526,7 @@ class _ExecutionNodeBuilder:
                     and self._is_if_condition_ready(node_id)
                     or not isinstance(self._state.graph.get_node(node_id), IfInvocation)
                 )
+                and not self._should_defer_shared_collect_if(node_id, iterator_ancestry)
                 and self._has_admitted_source_mapping(node_id, g, iterator_ancestry)
                 and not self._should_defer_sibling_if_collect_iterate(node_id)
                 and (
