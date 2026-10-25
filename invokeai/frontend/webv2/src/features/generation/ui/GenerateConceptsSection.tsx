@@ -57,7 +57,7 @@ export const GenerateConceptsContent = ({
   );
 
   const addLora = (model: ModelConfig | null) => {
-    if (isLoraModelConfig(model)) {
+    if (selectedModel && isLoraSupported(selectedModel) && isLoraModelConfig(model)) {
       commitLoras((latest) => addConcept(latest, model, selectedModel));
     }
   };

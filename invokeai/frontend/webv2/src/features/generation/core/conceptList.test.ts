@@ -39,6 +39,35 @@ describe('addConcept', () => {
   ])('leaves the list unchanged when the concept %s', (_, model, mainModel) => {
     expect(addConcept(LIST, model, mainModel)).toBe(LIST);
   });
+
+  it('checks Wan LoRA variants against the main model in the correct direction', () => {
+    const model = lora('wan-5b', 'wan', { variant: '5b' });
+    const mainModel: GenerateModelConfig = {
+      base: 'wan',
+      key: 'wan-main',
+      name: 'Wan',
+      type: 'main',
+      variant: 't2v_a14b',
+    };
+
+    expect(addConcept(LIST, model, mainModel)).toBe(LIST);
+    expect(addConcept(LIST, model, { ...mainModel, variant: 'ti2v_5b' })).toEqual([
+      ...LIST,
+      { isEnabled: true, model, weight: 0.75 },
+    ]);
+  });
+
+  it('supports compatible video concepts outside the Generate model families', () => {
+    const model = lora('minimax-lora', 'minimax-h3');
+    const mainModel: GenerateModelConfig = {
+      base: 'minimax-h3',
+      key: 'minimax-main',
+      name: 'MiniMax',
+      type: 'main',
+    };
+
+    expect(addConcept(LIST, model, mainModel)).toEqual([...LIST, { isEnabled: true, model, weight: 0.75 }]);
+  });
 });
 
 describe('updateConcept', () => {
@@ -59,6 +88,33 @@ describe('updateConcept', () => {
     ['the update is empty', 'ink', {}],
   ])('leaves the list unchanged when %s', (_, key, update) => {
     expect(updateConcept(LIST, key, update)).toBe(LIST);
+  });
+
+  it('updates every matching key in a loaded list without removing duplicate rows', () => {
+    const list = [...LIST, { isEnabled: true, model: CHALK, weight: -0.5 }];
+    const next = updateConcept(list, 'chalk', { isEnabled: false, weight: 0.9 });
+
+    expect(next).toEqual([
+      LIST[0],
+      { isEnabled: false, model: CHALK, weight: 0.9 },
+      { isEnabled: false, model: CHALK, weight: 0.9 },
+    ]);
+    expect(next[0]).toBe(list[0]);
+  });
+
+  it('updates a later duplicate when the first matching row already has the requested values', () => {
+    const list = [...LIST, { isEnabled: true, model: CHALK, weight: -0.5 }];
+    const next = updateConcept(list, 'chalk', { isEnabled: false, weight: 1.25 });
+
+    expect(next).toEqual([...LIST, { isEnabled: false, model: CHALK, weight: 1.25 }]);
+    expect(next[0]).toBe(list[0]);
+    expect(next[1]).toBe(list[1]);
+  });
+
+  it('leaves a duplicate-key list unchanged when all matching rows already match', () => {
+    const list = [...LIST, { isEnabled: false, model: CHALK, weight: 1.25 }];
+
+    expect(updateConcept(list, 'chalk', { isEnabled: false, weight: 1.25 })).toBe(list);
   });
 });
 
