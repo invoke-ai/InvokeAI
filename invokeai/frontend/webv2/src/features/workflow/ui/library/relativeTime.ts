@@ -1,5 +1,7 @@
 /** Inject current time so relative captions remain deterministic. */
 
+import { useState } from 'react';
+
 const DIVISIONS: readonly { amount: number; unit: Intl.RelativeTimeFormatUnit }[] = [
   { amount: 60, unit: 'second' },
   { amount: 60, unit: 'minute' },
@@ -34,10 +36,18 @@ export const formatRelativeTime = (timestamp: string, now: Date): string => {
 };
 
 /**
- * Caption for a past event (last run, last update), read against a clock snapshot the component takes once per mount:
- * the React Compiler memoizes render output, so reading the clock during render would be stale anyway. A timestamp
- * newer than the snapshot is either server clock skew or an event since mount; both mean "just happened", so it reads
- * as "now" rather than "in X". Use `formatRelativeTime` directly where future times are meaningful.
+ * Past-event captions clamp server clock skew to "now". Use `formatRelativeTime` where future times are meaningful.
  */
 export const formatTimeSince = (timestamp: string, snapshot: Date): string =>
   formatRelativeTime(timestamp, new Date(Math.max(snapshot.getTime(), Date.parse(timestamp))));
+
+/** Data refreshes advance the clock without resetting the view's other local state. */
+export const useDataTimeSnapshot = (data: object | null | undefined): Date => {
+  const [snapshot, setSnapshot] = useState(() => ({ data, now: new Date() }));
+
+  if (snapshot.data !== data) {
+    setSnapshot(() => ({ data, now: new Date() }));
+  }
+
+  return snapshot.now;
+};

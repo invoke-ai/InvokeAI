@@ -31,7 +31,7 @@ import {
   preloadGraphPreview,
 } from './libraryPreviewSource';
 import { isBundledLibraryWorkflowId, isUpdatableSource } from './projectWorkflowEntries';
-import { formatTimeSince } from './relativeTime';
+import { formatTimeSince, useDataTimeSnapshot } from './relativeTime';
 import {
   discardUnresolvedWorkflowPublication,
   getUnresolvedWorkflowPublication,
@@ -601,7 +601,7 @@ const ReviewBody = ({
   onPreview: (() => void) | undefined;
 }) => {
   const { t } = useTranslation();
-  const [openedAt] = useState(() => new Date());
+  const dataTime = useDataTimeSnapshot(record);
 
   if (error) {
     return (
@@ -636,7 +636,7 @@ const ReviewBody = ({
         <Text color="fg.subtle" fontSize="xs">
           {t('workflowLibrary.reviewRevision', {
             revision: record.revision,
-            when: record.updated_at ? formatTimeSince(record.updated_at, openedAt) : '',
+            when: record.updated_at ? formatTimeSince(record.updated_at, dataTime) : '',
           })}
         </Text>
       </Stack>

@@ -32,7 +32,7 @@ import {
   isUpdatableSource,
   toProjectWorkflowLibraryEntries,
 } from './projectWorkflowEntries';
-import { formatTimeSince } from './relativeTime';
+import { formatTimeSince, useDataTimeSnapshot } from './relativeTime';
 import {
   getWorkflowLibraryCardId,
   getWorkflowLibraryCardMenuContentId,
@@ -241,7 +241,7 @@ const ProjectWorkflowDetailPanel = ({
   const templatesSnapshot = useInvocationTemplatesSnapshot();
   const openAddModels = useOpenAddModels();
   const [failedThumbnailUrl, setFailedThumbnailUrl] = useState<string | null>(null);
-  const [openedAt] = useState(() => new Date());
+  const dataTime = useDataTimeSnapshot(entry);
 
   const libraryEntry = useMemo(
     () =>
@@ -323,7 +323,7 @@ const ProjectWorkflowDetailPanel = ({
   const name = entryName;
   const thumbnailUrl = libraryEntry.item.thumbnail_url;
   const showThumbnail = Boolean(thumbnailUrl) && thumbnailUrl !== failedThumbnailUrl;
-  const lastRun = entry.lastRun ? formatTimeSince(entry.lastRun.completedAt, openedAt) : '';
+  const lastRun = entry.lastRun ? formatTimeSince(entry.lastRun.completedAt, dataTime) : '';
   const source = entry.source;
   const canUpdateSource = isUpdatableSource(source, session);
 
