@@ -341,6 +341,57 @@ describe('image storage settings', () => {
     await expect.poll(() => document.activeElement).toBe(maintenanceGroup());
   });
 
+  it('drops a refusal once the move it was refused against ends', async () => {
+    let status: unknown = idleStatus(12);
+    installRoutes({
+      [`GET ${CONFIG_ROUTE}`]: () => ({ config: { image_subfolder_strategy: 'date' } }),
+      [`GET ${STATUS_ROUTE}`]: () => status,
+      [`POST /api/v1/image_moves/start`]: () => {
+        // Another admin started a move after this editor last read the status.
+        status = runningStatus('move_all');
+        return new ApiError(JSON.stringify({ detail: 'An image move job is already running' }), 409);
+      },
+    });
+    await render();
+    await expect.poll(() => button('settings.imageStorage.startMove')?.disabled).toBe(false);
+
+    await act(() => userEvent.click(button('settings.imageStorage.startMove')!));
+    await expect.poll(() => dialog()).not.toBeNull();
+    await act(() => userEvent.click(confirmIn('settings.imageStorage.startMove')!));
+
+    const alert = () => host.querySelector('[role="alert"]');
+    await expect.poll(() => alert()?.textContent).toBe('An image move job is already running');
+    await expect.poll(() => text()).toContain('settings.imageStorage.statusMoving');
+    expect(button('settings.imageStorage.startMove')?.getAttribute('aria-describedby')?.split(' ')).toContain(
+      alert()?.id
+    );
+
+    // The move journals one job per batch: polls during it see the job ids advance, with no active job between
+    // batches, and keep the refusal it explains.
+    for (const [activeJobId, latestJobId] of [
+      [null, 3],
+      [4, 4],
+      [null, 4],
+      [5, 5],
+    ] as const) {
+      status = {
+        ...runningStatus('move_all'),
+        active_job_id: activeJobId,
+        latest_job: { error_message: null, id: latestJobId, state: activeJobId === null ? 'committed' : 'moving' },
+      };
+      await refetchStatus();
+      expect(alert()?.textContent).toBe('An image move job is already running');
+    }
+
+    status = { ...idleStatus(12), latest_job: { error_message: null, id: 5, state: 'committed' } };
+    await refetchStatus();
+
+    await expect.poll(() => text()).toContain('settings.imageStorage.statusIdle 12');
+    expect(alert()).toBeNull();
+    expect(button('settings.imageStorage.startMove')?.disabled).toBe(false);
+    expect(button('settings.imageStorage.startMove')?.hasAttribute('aria-describedby')).toBe(false);
+  });
+
   it('shows the start in flight and locks the layout until the server has answered', async () => {
     const accepted = createDeferred<unknown>();
     let status: unknown = idleStatus(12);

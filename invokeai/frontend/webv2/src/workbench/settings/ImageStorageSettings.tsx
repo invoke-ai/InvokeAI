@@ -27,6 +27,20 @@ const SELECT_POSITIONING = { strategy: 'fixed', sameWidth: true, hideWhenDetache
 
 type ImageMoveAction = 'start' | 'recover';
 
+/**
+ * The job state a refusal was answered against. A running move journals one job per batch, so its job ids advance
+ * (with no active job between batches) while it runs: running is one state however far it has got. Otherwise the
+ * active and latest jobs tell the states apart. A refusal stops applying once the status moves past it (the move
+ * that refused the start ends, for example).
+ */
+const getJobKey = (status: ImageMoveStatus | undefined): string => {
+  if (!status) {
+    return 'unknown';
+  }
+
+  return status.isRunning ? 'running' : `idle:${String(status.activeJobId)}:${String(status.latestJob?.id ?? null)}`;
+};
+
 interface JobAvailability {
   canRecover: boolean;
   canStart: boolean;
@@ -113,7 +127,9 @@ const ImageStorageEditor = () => {
   const { isBusy: isSavingLayout, run: runLayoutSave } = useScopedAction();
   const { isBusy: isActing, run: runAction } = useScopedAction();
   const [layoutError, setLayoutError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<{ action: ImageMoveAction; message: string } | null>(null);
+  const [actionError, setActionError] = useState<{ action: ImageMoveAction; jobKey: string; message: string } | null>(
+    null
+  );
   const [pendingAction, setPendingAction] = useState<ImageMoveAction | null>(null);
 
   const layout = layoutQuery.data ?? 'flat';
@@ -177,6 +193,8 @@ const ImageStorageEditor = () => {
       (_message, error) =>
         setActionError({
           action,
+          // The refusal re-read the status before it settled, so the cache holds the job it was refused against.
+          jobKey: getJobKey(queryClient.getQueryData(imageMoveStatusQueryOptions().queryKey)),
           message: getApiErrorMessage(error, t(tKey(action === 'start' ? 'startFailed' : 'recoverFailed'))),
         })
     );
@@ -185,6 +203,7 @@ const ImageStorageEditor = () => {
   const retryLayout = useCallback(() => void layoutQuery.refetch(), [layoutQuery]);
 
   const status = statusQuery.data ?? null;
+  const shownActionError = actionError?.jobKey === getJobKey(statusQuery.data) ? actionError : null;
   const usableStatus = statusQuery.isError ? null : status;
   const availability = getJobAvailability({ isActing, isSavingLayout, status: usableStatus });
   // The move reads the layout per batch, so changing it while a job runs (or may be running: status unknown, or a
@@ -194,7 +213,7 @@ const ImageStorageEditor = () => {
   // Each button references only what explains it: its own action's failure, and the note while it is disabled.
   const describedBy = (action: ImageMoveAction, isEnabled: boolean) =>
     [
-      actionError?.action === action ? actionErrorId : null,
+      shownActionError?.action === action ? actionErrorId : null,
       availability.reasonKey && !isEnabled ? availabilityId : null,
     ]
       .filter(Boolean)
@@ -270,9 +289,9 @@ const ImageStorageEditor = () => {
             {t(tKey(availability.reasonKey))}
           </Text>
         ) : null}
-        {actionError ? (
+        {shownActionError ? (
           <Text color="fg.error" fontSize="md" id={actionErrorId} minW="0" role="alert" wordBreak="break-word">
-            {actionError.message}
+            {shownActionError.message}
           </Text>
         ) : null}
       </Stack>
