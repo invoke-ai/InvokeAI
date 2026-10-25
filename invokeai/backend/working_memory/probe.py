@@ -19,14 +19,18 @@ What a window measures, per counter (driver, torch reserved, torch allocated; se
    it closes, the parent releases the child's cached blocks, resets the peaks and goes on; the child's lasting outputs
    stay in the parent's figures.
 4. A `TorchDevice.empty_cache()` inside the window ends a segment: the driver is read before the release. A direct
-   `torch.cuda.empty_cache()` (a library's, or cuDNN's and MIOpen's after an algorithm search) and an offload on the
-   cache's background thread do not, so the driver figure can miss what they released; torch's peaks still bound it.
+   `torch.cuda.empty_cache()` (a library's, or cuDNN's and MIOpen's after an algorithm search) does not, so the driver
+   figure can miss what it released; torch's peaks still bound it. Another thread's `TorchDevice.empty_cache()` is a
+   sample within the segment, read before the release and leaving the peaks alone; weights that left the device before
+   it are `weights_left`'s concern, below.
 5. Close: synchronize and read the final segment. Per counter, the delta is the largest segment peak less the
    baseline and that segment's offset; `demand_bytes` is the largest delta of the counters that could be read.
 
 A window is invalid (`valid=False`, with its reasons) when another thread locked a model on the same device's cache
 while it was open, held one when it opened or was still locking one then (Expand Prompt and Image to Prompt run next to
-sessions; see `locking`), when an allocation failed or only succeeded after the allocator released its cache (a retry
+sessions; see `locking`), when weights left the device other than through one of the window's co-locks (`weights_left`:
+an offload by another thread or by this one outside a lock, or the weights of a model the cache dropped dying; see
+`offloading` and `dropped`), when an allocation failed or only succeeded after the allocator released its cache (a retry
 squeezes the peak: an untiled 3072px FLUX VAE decode on an RTX 4090 read 22.5 GiB at the card's limit, ~1280 bytes per
 pixel instead of ~2150), when Windows still keeps more than `SPILL_TOLERANCE_BYTES` of the process in shared memory
 `SPILL_SETTLE_S` after close (right after a decode the counter spikes transiently, 589 MiB, and is back at 9 MiB at the
@@ -37,15 +41,24 @@ reset or a synchronization, at the window's open as much as later; a failed lock
 windows, since its lock bookkeeping is suspect), and when no counter could be read. A model less than fully resident at
 open keeps the window valid but not `fit_eligible`: streamed weights are working memory the estimate does not price.
 
+`weights_left` covers what the model cache moves off the device, and the weights of records it drops, while a scope is
+armed. Three things it does not cover or covers coarsely: a record dropped while no scope was armed (between nodes, or
+racing the arming) whose weights die during a window; device tensors something else still references when the cache
+moves a model, which go only when that reference does; and a co-lock of a nested window, which only the window in the
+co-lock offsets, so that what it moves off the device voids that window's suspended ancestors (what it moves on leaves
+them reading high).
+
 Without a scope, the probe costs a context-variable read per estimated `model_on_device`, an entry in `locking` and a
-read of `armed` per lock, a read of `armed` per unlock, and a truth test of `devices.EMPTY_CACHE_OBSERVERS` per
-`empty_cache`.
+read of `armed` per lock in the loader, a read of `armed` per pass of a lock onto a GPU (`lock`, each `continue_lock`)
+in the model cache and per offload or drop there, a read of `armed` per unlock, and a truth test of
+`devices.EMPTY_CACHE_OBSERVERS` per `empty_cache`.
 """
 
 import contextvars
 import os
 import threading
 import time
+import weakref
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Final, Literal, Optional
@@ -84,6 +97,7 @@ FOREIGN_DEVICE_TOLERANCE_BYTES: Final = 256 * MIB
 
 Reason = Literal[
     "foreign_lock",
+    "weights_left",
     "foreign_device_load",
     "oom",
     "alloc_retry",
@@ -202,6 +216,15 @@ settled, perhaps after the window closed. Both move weights while the window mea
 another thread's lock is in progress on its cache is void. A list, so that the loader's side is an append and a remove,
 each atomic under the GIL, and takes no lock."""
 
+_freed_weights: list[int] = []
+"""The cache (by id) of each record dropped while armed whose weights on the device have died since, in the order they
+died. Appended by a finalizer, which runs on whatever thread drops the last reference or collects the garbage, so the
+append is the whole of it: atomic under the GIL, and no lock. A window voids itself at close if its cache is among the
+entries appended while it was open."""
+
+_watched_models: "weakref.WeakSet[object]" = weakref.WeakSet()
+"""The models whose finalizer feeds `_freed_weights`, so that each is registered once. Changed under `_state_lock`."""
+
 _boundary = threading.local()
 
 
@@ -273,6 +296,8 @@ class _Window:
         self.resident_fraction = 1.0
         self.opened_at = 0.0
         self.recorded = False
+        # How many entries `_freed_weights` had when the window was registered.
+        self.freed_seen = 0
 
     def add_reason(self, reason: Reason) -> None:
         if reason not in self.reasons:
@@ -448,6 +473,8 @@ class _Window:
                     > FOREIGN_DEVICE_TOLERANCE_BYTES
                 ):
                     self.add_reason("foreign_device_load")
+            if any(cache_id == id(self.cache) for cache_id in _freed_weights[self.freed_seen :]):
+                self.add_reason("weights_left")
             if self in _open_windows:
                 _open_windows.remove(self)
             if self in self.scope._stack:
@@ -526,9 +553,11 @@ class ProbeScope:
         window = _Window(self, cache, record, estimate, reservation_applied_bytes)
         # Registered before the cache is asked: from here on, a lock another thread starts or settles on this cache
         # voids the window (`lock_started`, `lock_settled`), and one in progress or held shows in `locking` and
-        # `locks_held()`. Its counters are not open yet, so releases pass it by.
+        # `locks_held()`; so do weights leaving the device (`offloading`, `dropped`). Its counters are not open yet, so
+        # releases pass it by.
         with _state_lock:
             _open_windows.append(window)
+            window.freed_seen = len(_freed_weights)
         try:
             if self._tainted:
                 window.add_reason("probe_error")
@@ -608,7 +637,8 @@ class _EmptyCacheObserver:
                         continue
                     if window.thread != me:
                         # Another thread's release (process-global on CUDA) takes this window's cached blocks too:
-                        # read its driver before they go, but leave its peaks alone mid-operation.
+                        # read its driver before they go, but leave its peaks alone mid-operation. Weights that thread
+                        # moved or freed before it have voided the window (`offloading`, `dropped`).
                         window.fold(window.counters.read(), ends_segment=False)
                     elif not own_boundary:
                         window.fold(window.counters.read())
@@ -635,6 +665,8 @@ def _arm() -> None:
     with _state_lock:
         _armed_scopes += 1
         if _armed_scopes == 1:
+            # No window is open: what an earlier scope's drops left behind concerns none.
+            _freed_weights.clear()
             devices.EMPTY_CACHE_OBSERVERS.append(_observer)
             armed = True
 
@@ -766,3 +798,64 @@ def unlocked(cache: object, record: "CacheRecord") -> None:
                     scope._held.pop(key, None)
     except Exception:
         _hook_failed(scope, cache, "follow an unlock")
+
+
+def _on_device(record: "CacheRecord") -> bool:
+    cached_model = record.cached_model
+    return cached_model.compute_device.type != "cpu" and cached_model.cur_vram_bytes() > 0
+
+
+def _void_on(cache: object, reason: Reason) -> None:
+    """Void every window open on `cache` but this thread's window in a co-lock, whose offset takes what the lock moves.
+    That is the thread's innermost window; its suspended ancestors offset nothing a child's co-lock moves, so they are
+    void too. Call with `_state_lock` held."""
+    me = threading.get_ident()
+    for window in _open_windows:
+        if window.cache is cache and not (window.thread == me and window.state == "co_lock"):
+            window.add_reason(reason)
+
+
+def offloading(cache: object, record: "CacheRecord") -> None:
+    """`record`'s weights are about to move from its device to RAM on this thread. Called by the model cache while
+    `armed`, under its lock, before they go, so that a window closing meanwhile already knows.
+
+    What leaves lowers the device's counters, so a window open on that cache would credit its operation with less than
+    it took. A window in a co-lock on this thread keeps what the lock moves in its offset; any other offload voids the
+    window (`weights_left`): another thread's (an architecture switch, a node making room, a load on another thread),
+    this thread's outside a lock, or a nested window's co-lock for its suspended ancestors. Accounting for it instead
+    would need what left per counter, and only the allocated bytes fall with the move; reserved and the driver fall with
+    the next release. A window that opens after this call waits in `locks_held()` until the cache releases its lock, and
+    reads its baseline after that."""
+    try:
+        if not _on_device(record):
+            return
+        with _state_lock:
+            _void_on(cache, "weights_left")
+    except Exception:
+        _hook_failed(None, cache, "follow an offload")
+
+
+def dropped(cache: object, record: "CacheRecord") -> None:
+    """The cache no longer holds `record`: it drops it now (a load making room in RAM, Clear Model Cache, a changed model
+    setting, the keep-alive timeout), or a lock moved weights of a record it dropped earlier onto the device. Called by
+    the model cache while `armed`, under its lock.
+
+    Weights the record has on the device leave with its model's last reference, which may outlive the cache's call: a
+    reference cycle waits for a garbage collection, a handle a node keeps waits for the node. So the model's finalizer,
+    registered once per model, tells the probe (`_freed_weights`), and every window open on the cache when the weights
+    died is void at its close (`weights_left`). A model that cannot be weakly referenced voids the windows open now, as
+    an offload does."""
+    try:
+        if not _on_device(record):
+            return
+        model = record.cached_model.model
+        with _state_lock:
+            if model in _watched_models:
+                return
+            try:
+                weakref.finalize(model, _freed_weights.append, id(cache)).atexit = False
+                _watched_models.add(model)
+            except TypeError:
+                _void_on(cache, "weights_left")
+    except Exception:
+        _hook_failed(None, cache, "follow a dropped model")
