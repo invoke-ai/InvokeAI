@@ -1,6 +1,9 @@
 ---
-// The marketing home page below Starlight's hero, which renders the H1, the tagline and the beta pill from the
-// frontmatter of `src/content/docs/index.mdx`.
+// The marketing home page below Starlight's hero, which renders the H1 and the tagline from the frontmatter of
+// `src/content/docs/index.mdx`, and the announcement pill (`src/lib/home-announcement.mjs`). The mock app UI in the
+// tour demos (`tour/`) and the What's new motifs (`whats-new/`) stays English on purpose: node, field and board names,
+// buttons and the gallery's own labels mirror the English app, and their widths are tuned to that text. What speaks to
+// the reader about a demo, such as its region label, keyboard hint and announcements, is a UI string.
 import ArrowRight from '@lucide/astro/icons/arrow-right';
 import Download from '@lucide/astro/icons/download';
 import { Image } from 'astro:assets';
@@ -15,6 +18,7 @@ import ShowcaseMarquee from './ShowcaseMarquee.astro';
 import CanvasCompare from './tour/CanvasCompare.astro';
 import GalleryDemo from './tour/GalleryDemo.astro';
 import WorkflowDemo from './tour/WorkflowDemo.astro';
+import Trans from './Trans.astro';
 import WhatsNewBento from './WhatsNewBento.astro';
 // A copy of the app's `invokeai/frontend/webv2/src/assets/V7Logo.webp`; `src/lib/app-assets.test.mjs` keeps them equal.
 import v7Logo from '../../assets/v7-logo.webp';
@@ -23,11 +27,11 @@ import workbenchImage from '../../content/docs/Users Guide/assets/canvas-edit-la
 
 const base = import.meta.env.BASE_URL;
 const href = (path: string) => withBase(path, base);
+const { t } = Astro.locals;
 
 const topic = (id: string) => {
   const found = docsTopics.find((candidate) => candidate.id === id);
   if (!found) throw new Error(`The home page links to the unknown docs topic "${id}".`);
-  const { t } = Astro.locals;
   return {
     label: topicLabel(t, found),
     description: topicDescription(t, found),
@@ -45,28 +49,44 @@ const page = (label: string, description: string, link: string) => {
 
 const paths = [
   {
-    kicker: 'Create',
-    title: 'Make images and video',
+    kicker: t('home.directory.create.kicker'),
+    title: t('home.directory.create.title'),
     links: [topic('get-started'), topic('guide'), topic('models'), topic('troubleshooting'), topic('releases')],
   },
   {
-    kicker: 'Run',
-    title: 'Configure and deploy',
+    kicker: t('home.directory.run.kicker'),
+    title: t('home.directory.run.title'),
     links: [
       topic('configure'),
-      page('Docker', 'Run Invoke in a container', '/configuration/docker/'),
-      page('Multi-user mode', 'Accounts on a shared server', '/configuration/multi-user-mode/admin-guide/'),
-      page('Low-VRAM mode', 'Large models on smaller GPUs', '/configuration/optimization/low-vram-mode/'),
+      page(t('home.directory.docker.label'), t('home.directory.docker.description'), '/configuration/docker/'),
+      page(
+        t('home.directory.multiUser.label'),
+        t('home.directory.multiUser.description'),
+        '/configuration/multi-user-mode/admin-guide/'
+      ),
+      page(
+        t('home.directory.lowVram.label'),
+        t('home.directory.lowVram.description'),
+        '/configuration/optimization/low-vram-mode/'
+      ),
     ],
   },
   {
-    kicker: 'Build',
-    title: 'Extend Invoke',
+    kicker: t('home.directory.build.kicker'),
+    title: t('home.directory.build.title'),
     links: [
       topic('developers'),
       topic('contribute'),
-      page('Creating nodes', 'Write your own invocations', '/development/guides/creating-nodes/'),
-      page('Node packs', 'Share nodes as a Git repository', '/development/guides/creating-node-pack/'),
+      page(
+        t('home.directory.creatingNodes.label'),
+        t('home.directory.creatingNodes.description'),
+        '/development/guides/creating-nodes/'
+      ),
+      page(
+        t('home.directory.nodePacks.label'),
+        t('home.directory.nodePacks.description'),
+        '/development/guides/creating-node-pack/'
+      ),
     ],
   },
 ];
@@ -226,12 +246,19 @@ const glowBands = (
 const showcase = sortShowcase(await getCollection('showcase')).slice(0, 12);
 
 const community = [
-  { label: 'Browse the community showcase', link: href('/showcase/') },
-  { label: 'Join the Discord', link: 'https://discord.gg/ZmtBAhwWhy' },
-  { label: 'Invoke on GitHub', link: 'https://github.com/invoke-ai/InvokeAI' },
-  { label: 'Become a sponsor', link: 'https://github.com/sponsors/invoke-ai' },
-  { label: 'Train LoRAs with Invoke Training', link: 'https://github.com/invoke-ai/invoke-training' },
+  { label: t('home.community.showcaseLink'), link: href('/showcase/') },
+  { label: t('home.community.discordLink'), link: 'https://discord.gg/ZmtBAhwWhy' },
+  { label: t('home.community.githubLink'), link: 'https://github.com/invoke-ai/InvokeAI' },
+  { label: t('home.community.sponsorLink'), link: 'https://github.com/sponsors/invoke-ai' },
+  { label: t('home.community.trainingLink'), link: 'https://github.com/invoke-ai/invoke-training' },
 ];
+
+/** The pages the install paragraph links, by the tag around each link's text in `home.install.body`. */
+const installLinks: Record<string, string> = {
+  requirements: '/start-here/system-requirements/',
+  manual: '/start-here/manual/',
+  docker: '/configuration/docker/',
+};
 
 ---
 
@@ -241,14 +268,14 @@ const community = [
       <div class="cta__buttons">
         <a class="docs-button docs-button--primary docs-button--xl" href={href('/download/')}>
           <Download aria-hidden="true" />
-          Download Invoke
+          {t('home.cta.download')}
         </a>
         <a class="docs-button docs-button--secondary docs-button--xl" href={href(topic('get-started').link)}>
-          Read the docs
+          {t('home.cta.readDocs')}
           <ArrowRight class="nudge" aria-hidden="true" />
         </a>
       </div>
-      <p class="cta__platforms">Windows · macOS · Linux · Apache 2.0</p>
+      <p class="cta__platforms">{t('home.cta.platformsAndLicense')}</p>
     </div>
 
     <figure class="hero-shot" data-hero-shot>
@@ -259,7 +286,7 @@ const community = [
       <div class="frame frame--hero">
         <Image
           src={workbenchImage}
-          alt="The Invoke workbench in the Edit layout: the Generate panel with an SDXL model, prompt, size and guidance settings on the left, the Canvas with a mountain meadow in the center, and the color picker and Layers panel on the right."
+          alt={t('home.hero.screenshotAlt')}
           widths={[640, 960, 1280, 1600, 2000, 2560, workbenchImage.width]}
           sizes="(min-width: 50rem) min(calc(100vw - 3rem), 90rem), calc(100vw - 2rem)"
           loading="eager"
@@ -269,20 +296,17 @@ const community = [
     </figure>
   </div>
 
-  <section class="tour" aria-label="Product tour">
+  <section class="tour" aria-label={t('home.tour.label')}>
     <div class="tour__item">
       <div class="tour__intro">
         <div class="heading">
-          <p class="eyebrow">Canvas</p>
-          <h2>Paint exactly where it matters</h2>
+          <p class="eyebrow">{t('home.tour.canvas.eyebrow')}</p>
+          <h2>{t('home.tour.canvas.title')}</h2>
         </div>
         <div class="tour__text">
-          <p>
-            Mask an area, describe what belongs there and accept the result to a layer. Inpainting, outpainting, regional
-            prompts and control layers all work on one canvas.
-          </p>
+          <p>{t('home.tour.canvas.body')}</p>
           <a class="more" href={href('/users-guide/canvas/introduction/')}>
-            Canvas introduction
+            {t('home.tour.canvas.link')}
             <ArrowRight class="nudge" size={14} aria-hidden="true" />
           </a>
         </div>
@@ -294,15 +318,12 @@ const community = [
     <div class="tour__item tour__item--split tour__item--workflow" data-workflow-bounds>
       <div class="tour__text">
         <div class="heading">
-          <p class="eyebrow">Workflows</p>
-          <h2>Wire up your own pipeline</h2>
+          <p class="eyebrow">{t('home.tour.workflows.eyebrow')}</p>
+          <h2>{t('home.tour.workflows.title')}</h2>
         </div>
-        <p>
-          Chain steps into a node graph and run it from a simple form. Add community node packs with the Custom Node
-          Manager, or follow the ComfyUI migration guide to the nodes you already know.
-        </p>
+        <p>{t('home.tour.workflows.body')}</p>
         <a class="more" href={href('/users-guide/workflows/introduction/')}>
-          Workflows guide
+          {t('home.tour.workflows.link')}
           <ArrowRight class="nudge" size={14} aria-hidden="true" />
         </a>
       </div>
@@ -312,16 +333,12 @@ const community = [
     <div class="tour__item tour__item--split tour__item--reverse tour__item--gallery">
       <div class="tour__text">
         <div class="heading">
-          <p class="eyebrow">Gallery</p>
-          <h2>Every image, easy to find</h2>
+          <p class="eyebrow">{t('home.tour.gallery.eyebrow')}</p>
+          <h2>{t('home.tour.gallery.title')}</h2>
         </div>
-        <p>
-          Boards and stars keep your images and videos in order. Each project collects its results in an Inbox and boards
-          of its own, and Library boards are there from every project. Search by prompt or, with image indexing turned on,
-          by what an image shows.
-        </p>
+        <p>{t('home.tour.gallery.body')}</p>
         <a class="more" href={href('/users-guide/gallery/introduction/')}>
-          Gallery guide
+          {t('home.tour.gallery.link')}
           <ArrowRight class="nudge" size={14} aria-hidden="true" />
         </a>
       </div>
@@ -334,11 +351,11 @@ const community = [
       <section class="section" aria-labelledby="home-showcase">
         <div class="section__top">
           <div class="heading">
-            <p class="eyebrow">Community</p>
-            <h2 id="home-showcase">Made with Invoke</h2>
+            <p class="eyebrow">{t('home.showcase.eyebrow')}</p>
+            <h2 id="home-showcase">{t('home.showcase.title')}</h2>
           </div>
           <a class="more" href={href('/showcase/')}>
-            View the showcase
+            {t('home.showcase.link')}
             <ArrowRight class="nudge" size={14} aria-hidden="true" />
           </a>
         </div>
@@ -352,8 +369,8 @@ const community = [
       <div class="section__header">
         <Image class="logo" src={v7Logo} alt="" widths={[96, 128, 256]} sizes="(min-width: 50rem) 7rem, 5rem" />
         <div class="heading">
-          <p class="eyebrow">What's new in 7</p>
-          <h2 id="home-new">One workbench for every way you create</h2>
+          <p class="eyebrow">{t('home.whatsNew.eyebrow')}</p>
+          <h2 id="home-new">{t('home.whatsNew.title')}</h2>
         </div>
       </div>
     </WhatsNewBento>
@@ -363,15 +380,12 @@ const community = [
     <ModelFamilies>
       <div class="section__top">
         <div class="heading">
-          <p class="eyebrow">Models</p>
-          <h2 id="home-models">The latest open models, on your own hardware</h2>
-          <p class="section__intro">
-            Each model family has a guide to its variants, hardware needs and settings. External providers add hosted
-            models such as GPT Image and Gemini, billed to your own account.
-          </p>
+          <p class="eyebrow">{t('home.models.eyebrow')}</p>
+          <h2 id="home-models">{t('home.models.title')}</h2>
+          <p class="section__intro">{t('home.models.intro')}</p>
         </div>
         <a class="more" href={href('/users-guide/models/model-families/')}>
-          Compare model families
+          {t('home.models.link')}
           <ArrowRight class="nudge" size={14} aria-hidden="true" />
         </a>
       </div>
@@ -380,8 +394,8 @@ const community = [
 
   <section class="section" aria-labelledby="home-directory">
     <div class="heading">
-      <p class="eyebrow">Documentation</p>
-      <h2 id="home-directory">Find your way in</h2>
+      <p class="eyebrow">{t('home.directory.eyebrow')}</p>
+      <h2 id="home-directory">{t('home.directory.title')}</h2>
     </div>
     <div class="paths">
       {
@@ -414,17 +428,16 @@ const community = [
   <section class="card community" aria-labelledby="home-community">
     <div class="community__text">
       <div class="heading">
-        <p class="eyebrow">Community</p>
-        <h2 id="home-community">Built in the open</h2>
+        <p class="eyebrow">{t('home.community.eyebrow')}</p>
+        <h2 id="home-community">{t('home.community.title')}</h2>
       </div>
       <p>
-        Invoke is free software under the Apache 2.0 license, made by <a href={href('/contributing/contributors/')}
-          >contributors around the world</a
-        >. The hosted Invoke.ai platform has shut down since its founding team joined Adobe. The open-source project
-        carries on, stewarded by long-time core maintainers Lincoln Stein (lstein) and Vic (Blessedcoolant).
+        <Trans message={t('home.community.body')}>
+          {(text: string) => <a href={href('/contributing/contributors/')}>{text}</a>}
+        </Trans>
       </p>
       <a class="sponsor" href="https://www.blacksmith.sh/">
-        <Image src={blacksmithLogo} alt="CI powered by Blacksmith" width={240} densities={[1, 2]} />
+        <Image src={blacksmithLogo} alt={t('home.community.sponsorAlt')} width={240} densities={[1, 2]} />
       </a>
     </div>
     <ul class="community__links" role="list">
@@ -443,19 +456,19 @@ const community = [
 
   <section class="card install" aria-labelledby="home-install">
     <div class="install__text">
-      <h2 id="home-install">Install with the Invoke Launcher</h2>
+      <h2 id="home-install">{t('home.install.title')}</h2>
       <p>
-        The Launcher installs, updates and launches Invoke on Windows, macOS and Linux. Check the <a
-          href={href('/start-here/system-requirements/')}>system requirements</a
-        > first, or install <a href={href('/start-here/manual/')}>manually</a> or with <a
-          href={href('/configuration/docker/')}>Docker</a
-        >.
+        <Trans message={t('home.install.body')}>
+          {(text: string, tag: string) => (installLinks[tag] ? <a href={href(installLinks[tag])}>{text}</a> : text)}
+        </Trans>
       </p>
     </div>
     <div class="install__buttons">
-      <a class="docs-button docs-button--primary docs-button--lg" href={href('/download/')}>Download the Launcher</a>
+      <a class="docs-button docs-button--primary docs-button--lg" href={href('/download/')}>
+        {t('home.install.downloadLauncher')}
+      </a>
       <a class="docs-button docs-button--secondary docs-button--lg" href={href('/start-here/installation/')}>
-        Installation guide
+        {t('home.install.guide')}
       </a>
     </div>
   </section>

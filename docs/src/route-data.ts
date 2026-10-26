@@ -3,8 +3,9 @@ import { defineRouteMiddleware } from '@astrojs/starlight/route-data';
 
 import { CROWDIN_PROJECT_URL, getPathLocale, locales, splitSitePath, translatedLocales } from './config/locales.mjs';
 import { getCurrentTopic, topicLabel } from './config/topics';
-import { withBase } from './lib/base-path';
+import { localizedHref, withBase } from './lib/base-path';
 import { isLocalizablePage } from './lib/docs-page';
+import { announcementHtml } from './lib/home-announcement.mjs';
 import {
   addCrossListings,
   fileDirectory,
@@ -55,6 +56,16 @@ export const onRequest = defineRouteMiddleware(async (context, next) => {
     ({ tag, attrs }) =>
       !(tag === 'link' && attrs?.rel === 'alternate' && attrs.hreflang) || keptLangs.has(String(attrs.hreflang))
   );
+
+  const { hero } = route.entry.data;
+  if (hero && splitSitePath(context.url.pathname, import.meta.env.BASE_URL)?.path === '/') {
+    // The home page's announcement pill. The entry is shared by every locale's route, so give this route its own copy.
+    const html = announcementHtml({
+      text: context.locals.t('home.hero.announcement'),
+      href: localizedHref('/start-here/upgrading/', { locale: route.locale, base: import.meta.env.BASE_URL }),
+    });
+    route.entry = { ...route.entry, data: { ...route.entry.data, hero: { ...hero, image: { html } } } };
+  }
 
   if (route.isFallback) {
     // A fallback page is the English page, so search engines should index that one in its place.

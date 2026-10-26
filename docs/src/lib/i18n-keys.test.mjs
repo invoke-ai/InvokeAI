@@ -5,6 +5,7 @@ import { describe, it } from 'node:test';
 import { i18nSchema } from '@astrojs/starlight/schema';
 
 import { translatedLocales } from '../config/locales.mjs';
+import { modelFamilies } from '../config/model-families.ts';
 import { docsTopics, topicGroups } from '../config/topics.ts';
 import en from '../content/i18n/en.json' with { type: 'json' };
 import { fileDirectory, sidebarGroupKey } from './sidebar.mjs';
@@ -78,10 +79,17 @@ describe('en.json', () => {
     assert.deepEqual(keys.sort(), [...new Set(expected)].sort());
   });
 
+  it('has the tagline of every model family on the home page, and no others', () => {
+    const keys = Object.keys(en).filter((key) => /^modelFamilies\.[^.]+\.tagline$/.test(key));
+    assert.deepEqual(keys.sort(), modelFamilies.map(({ slug }) => `modelFamilies.${slug}.tagline`).sort());
+  });
+
   it('has no key the code does not use', () => {
+    // Keys the code builds from ids, which the tests above match to those ids.
+    const builtByCode = /^(topics\.|sidebar\.group\.|modelFamilies\.[^.]+\.tagline$)/;
     const unused = Object.keys(en)
       .map((key) => key.replace(pluralSuffix, ''))
-      .filter((key) => !usedKeys.has(key) && !key.startsWith('topics.') && !key.startsWith('sidebar.group.'));
+      .filter((key) => !usedKeys.has(key) && !builtByCode.test(key));
     assert.deepEqual(unused, []);
   });
 

@@ -91,7 +91,7 @@ const tiles = entries.map((entry) => {
         type="button"
         class="marquee-toggle docs-button docs-button--ghost docs-button--icon docs-button--md"
         aria-pressed="false"
-        aria-label="Pause showcase animation"
+        aria-label={Astro.locals.t('home.showcase.pauseAnimation')}
         data-marquee-toggle
         hidden
       >

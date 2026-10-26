@@ -14,49 +14,50 @@ import VideoMotif from './whats-new/VideoMotif.astro';
 import WorkbenchMotif from './whats-new/WorkbenchMotif.astro';
 
 const base = import.meta.env.BASE_URL;
+const { t } = Astro.locals;
 
 // In reading order, which the grid areas below follow at every width.
 const tiles = [
   {
     id: 'workbench',
-    title: 'The workbench',
-    body: 'One window built from panels. Arrange them on the rails, float the Preview over your canvas, and switch between saved layout presets in one click.',
+    title: t('whatsNew.workbench.title'),
+    body: t('whatsNew.workbench.body'),
     link: '/users-guide/workbench/introduction/',
     Motif: WorkbenchMotif,
   },
   {
     id: 'projects',
-    title: 'Projects',
-    body: 'A project keeps its canvas, workflows, layout and boards together. It saves automatically and exports as one .invk file.',
+    title: t('whatsNew.projects.title'),
+    body: t('whatsNew.projects.body'),
     link: '/users-guide/projects/introduction/',
     Motif: ProjectsMotif,
   },
   {
     id: 'canvas',
-    title: 'A new canvas',
-    body: 'Pressure-sensitive brushes, gradients, shapes and text on layers with 16 blend modes, beside inpainting, regional guidance and control layers. Exports to PSD.',
+    title: t('whatsNew.canvas.title'),
+    body: t('whatsNew.canvas.body'),
     link: '/users-guide/canvas/canvas-guide/',
     Motif: CanvasMotif,
   },
   {
     id: 'video',
-    title: 'Video with sound',
-    badge: 'Experimental',
-    body: 'Short clips from Wan 2.2, or with a synchronized stereo soundtrack from LTX-2 and MiniMax H3.',
+    title: t('whatsNew.video.title'),
+    badge: t('whatsNew.experimentalBadge'),
+    body: t('whatsNew.video.body'),
     link: '/users-guide/video-generation/introduction/',
     Motif: VideoMotif,
   },
   {
     id: 'map',
-    title: 'The Image Map',
-    body: 'Every image and video laid out by visual similarity, in labelled clusters. It also lets you search the gallery by what an image shows.',
+    title: t('whatsNew.imageMap.title'),
+    body: t('whatsNew.imageMap.body'),
     link: '/users-guide/image-map/introduction/',
     Motif: ImageMapMotif,
   },
   {
     id: 'loops',
-    title: 'Loops in workflows',
-    body: 'For and ForReturn nodes repeat a group of steps for each item in a collection, and can carry values from one iteration to the next.',
+    title: t('whatsNew.loops.title'),
+    body: t('whatsNew.loops.body'),
     link: '/users-guide/workflows/loop-nodes/',
     Motif: LoopMotif,
   },

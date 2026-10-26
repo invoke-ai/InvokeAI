@@ -23,6 +23,8 @@ type Props = {
 };
 
 const { start = 50, class: className } = Astro.props;
+const { t } = Astro.locals;
+const valueTemplate = t('canvasCompare.valueText');
 const imageProps = {
   widths: [640, before.width],
   sizes: '(min-width: 72rem) 66rem, calc(100vw - 2rem)',
@@ -32,7 +34,12 @@ const imageProps = {
 ---
 
 {/* `not-content` opts out of Starlight's Markdown spacing, which would push the stacked layers apart. */}
-<figure class:list={['compare not-content', className]} data-canvas-compare style={`--pos: ${start}%`}>
+<figure
+  class:list={['compare not-content', className]}
+  data-canvas-compare
+  data-value-text={valueTemplate}
+  style={`--pos: ${start}%`}
+>
   {/* Marks the figure before first paint, so readers with JavaScript never see the side-by-side layout. */}
   <script is:inline>
     document.currentScript.parentElement.dataset.js = '';
@@ -41,30 +48,30 @@ const imageProps = {
     <div class="compare__pane compare__pane--before">
       <Image
         src={before}
-        alt="Before: a plate with salmon nigiri, a yellow roll and, on the right, a plain maroon roll."
+        alt={t('canvasCompare.beforeAlt')}
         {...imageProps}
       />
-      <span class="compare__label compare__label--before" aria-hidden="true">Before</span>
+      <span class="compare__label compare__label--before" aria-hidden="true">{t('canvasCompare.before')}</span>
     </div>
     <div class="compare__pane compare__pane--after">
       <Image
         src={after}
-        alt="After inpainting: the maroon roll, and only it, regenerated as a nori-wrapped roll topped with salmon roe."
+        alt={t('canvasCompare.afterAlt')}
         {...imageProps}
       />
-      <span class="compare__label compare__label--after" aria-hidden="true">After</span>
+      <span class="compare__label compare__label--after" aria-hidden="true">{t('canvasCompare.after')}</span>
     </div>
     <div class="compare__track">
       <div
         class="compare__handle"
         role="slider"
         tabindex="0"
-        aria-label="Before and after comparison"
+        aria-label={t('canvasCompare.label')}
         aria-orientation="horizontal"
         aria-valuemin="0"
         aria-valuemax="100"
         aria-valuenow={start}
-        aria-valuetext={valueText(start)}
+        aria-valuetext={valueText(start, valueTemplate)}
         data-compare-handle
       >
         <ChevronsLeftRight aria-hidden="true" size={16} />
@@ -101,7 +108,7 @@ const imageProps = {
       // One custom property drives the clip and the divider's translate: no layout reads or writes per move.
       root.style.setProperty('--pos', `${position}%`);
       handle.setAttribute('aria-valuenow', String(Math.round(position)));
-      handle.setAttribute('aria-valuetext', valueText(position));
+      handle.setAttribute('aria-valuetext', valueText(position, root.dataset.valueText!));
     };
 
     const stopNudge = () => {

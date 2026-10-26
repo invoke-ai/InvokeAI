@@ -1,5 +1,6 @@
 // The browser half of `WorkflowDemo.astro`: node dragging and keyboard moves, collapsing, and rewiring edges. The page
 // already holds the initial render; this keeps it in step with the graph state as it changes.
+import { interpolate } from '../../i18n.mjs';
 import {
   EDGE_INSET,
   WORLD,
@@ -45,6 +46,9 @@ export const mountWorkflowDemo = (root: HTMLElement) => {
   const connectionPath = root.querySelector<SVGPathElement>('[data-connection]');
   const announcer = root.querySelector<HTMLElement>('[data-announcer]');
   if (!stage || !edgeLayer || !connectionPath || !announcer) return;
+  const i18n: Record<'collapseNode' | 'expandNode' | 'connected' | 'disconnected' | 'field', string> = JSON.parse(
+    root.dataset.i18n!,
+  );
 
   const { nodes, edges: initialEdges } = createInitialGraph();
   let edges: GraphEdge[] = initialEdges;
@@ -195,7 +199,7 @@ export const mountWorkflowDemo = (root: HTMLElement) => {
   const describeHandle = (nodeId: string, kind: 'input' | 'output', name: string) => {
     const node = nodeById.get(nodeId)!;
     const field = (kind === 'input' ? node.inputs : node.outputs).find((candidate) => candidate.name === name);
-    return `${field?.label ?? name} of ${node.title}`;
+    return interpolate(i18n.field, { field: field?.label ?? name, node: node.title });
   };
 
   const announce = (message: string) => {
@@ -228,7 +232,7 @@ export const mountWorkflowDemo = (root: HTMLElement) => {
       node.open = !node.open;
       element.dataset.open = String(node.open);
       collapse.setAttribute('aria-expanded', String(node.open));
-      collapse.setAttribute('aria-label', node.open ? 'Collapse node' : 'Expand node');
+      collapse.setAttribute('aria-label', node.open ? i18n.collapseNode : i18n.expandNode);
       relayoutNode(node);
       updateEdgePaths(node.id);
     });
@@ -309,10 +313,13 @@ export const mountWorkflowDemo = (root: HTMLElement) => {
         targetHandle: target.handle,
       });
       announce(
-        `Connected ${describeHandle(source.node, 'output', source.handle)} to ${describeHandle(target.node, 'input', target.handle)}.`,
+        interpolate(i18n.connected, {
+          source: describeHandle(source.node, 'output', source.handle),
+          target: describeHandle(target.node, 'input', target.handle),
+        }),
       );
     } else if (lifted) {
-      announce(`Removed the connection to ${describeHandle(lifted.target, 'input', lifted.targetHandle)}.`);
+      announce(interpolate(i18n.disconnected, { target: describeHandle(lifted.target, 'input', lifted.targetHandle) }));
     }
     if (edges === before) return;
     const touched = new Set([...before, ...edges].map((edge) => edge.target));

@@ -102,7 +102,7 @@ const ids = {
 
 <section
   class:list={['gallery-demo', 'not-content', className]}
-  aria-label="Interactive gallery demo"
+  aria-label={Astro.locals.t('galleryDemo.label')}
   data-gallery-demo
   data-project-id={GALLERY_DEMO_PROJECT.id}
   data-selected-board={selectedBoard.id}

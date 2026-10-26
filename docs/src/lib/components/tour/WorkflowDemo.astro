@@ -35,7 +35,16 @@ interface Props {
   class?: string;
 }
 
-const { id = 'workflow-demo', label = 'Interactive workflow demo', class: className } = Astro.props;
+const { t } = Astro.locals;
+const { id = 'workflow-demo', label = t('workflowDemo.label'), class: className } = Astro.props;
+// Reader-facing copy, which the client finishes (`workflow-demo-client.ts`). Node and field names are mock app UI.
+const i18n = {
+  collapseNode: t('workflowDemo.collapseNode'),
+  expandNode: t('workflowDemo.expandNode'),
+  connected: t('workflowDemo.connected'),
+  disconnected: t('workflowDemo.disconnected'),
+  field: t('workflowDemo.field'),
+};
 
 const { nodes, edges } = createInitialGraph();
 const layouts = new Map(nodes.map((node) => [node.id, layoutNode(node, getConnectedInputs(edges, node.id))]));
@@ -69,6 +78,7 @@ const boardOptions = ['Auto', 'None (Uncategorized)', 'Landscapes', 'Concept Art
   aria-label={label}
   aria-describedby={`${id}-hint`}
   data-workflow-demo
+  data-i18n={JSON.stringify(i18n)}
   style={`--wf-world-width: ${WORLD.width}px; --wf-world-height: ${WORLD.height}px;`}
 >
   <div class="wf__stage" data-stage>
@@ -111,7 +121,7 @@ const boardOptions = ['Auto', 'None (Uncategorized)', 'Landscapes', 'Concept Art
             data-node={node.id}
             data-open={String(node.open)}
             role="group"
-            aria-label={`${node.title} node`}
+            aria-label={t('workflowDemo.node', { title: node.title, interpolation: { escapeValue: false } })}
             tabindex="0"
             style={`translate: ${node.x}px ${node.y}px; width: ${node.width}px;`}
           >
@@ -120,7 +130,7 @@ const boardOptions = ['Auto', 'None (Uncategorized)', 'Landscapes', 'Concept Art
                 class="wf-node__chevron"
                 type="button"
                 aria-expanded={String(node.open)}
-                aria-label={node.open ? 'Collapse node' : 'Expand node'}
+                aria-label={node.open ? i18n.collapseNode : i18n.expandNode}
                 data-collapse
               >
                 <ChevronDown class="wf-node__chevron-open" size={14} aria-hidden="true" />
@@ -266,10 +276,7 @@ const boardOptions = ['Auto', 'None (Uncategorized)', 'Landscapes', 'Concept Art
     </svg>
   </div>
 
-  <p class="wf__sr" id={`${id}-hint`}>
-    Drag a node by its title, or focus it and use the arrow keys to move it. Drag from an output dot to a matching input
-    to connect them.
-  </p>
+  <p class="wf__sr" id={`${id}-hint`}>{t('workflowDemo.hint')}</p>
   <p class="wf__sr" aria-live="polite" data-announcer></p>
 </section>
 

@@ -1,4 +1,6 @@
 // @ts-check
+import { interpolate } from '../../i18n.mjs';
+
 // Position maths for the Canvas tour's before/after slider (`CanvasCompare.astro`). Positions are percentages of the
 // image width, from the left edge: the before image shows left of the divider, the after image right of it.
 
@@ -73,10 +75,11 @@ export const touchGesture = (dx, dy) => {
 /**
  * The slider's spoken value: how much of each image shows.
  * @param {number} value
+ * @param {string} template the `canvasCompare.valueText` UI string, with `{{before}}` and `{{after}}` percentages
  */
-export const valueText = (value) => {
+export const valueText = (value, template) => {
   const before = Math.round(clampPercent(value));
-  return `${before}% before, ${100 - before}% after`;
+  return interpolate(template, { before, after: 100 - before });
 };
 
 /**

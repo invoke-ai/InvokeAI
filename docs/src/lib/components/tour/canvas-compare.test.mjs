@@ -81,9 +81,11 @@ describe('nudgeAt', () => {
 
 describe('valueText', () => {
   it('names the share of each image in view', () => {
-    assert.equal(valueText(50), '50% before, 50% after');
-    assert.equal(valueText(62.4), '62% before, 38% after');
-    assert.equal(valueText(0), '0% before, 100% after');
+    const template = '{{before}}% before, {{after}}% after';
+    assert.equal(valueText(50, template), '50% before, 50% after');
+    assert.equal(valueText(62.4, template), '62% before, 38% after');
+    assert.equal(valueText(0, template), '0% before, 100% after');
+    assert.equal(valueText(30, 'vorher {{before}} %, nachher {{after}} %'), 'vorher 30 %, nachher 70 %');
   });
 });
 

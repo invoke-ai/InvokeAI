@@ -9,10 +9,13 @@ import ArrowRight from '@lucide/astro/icons/arrow-right';
 import type { ImageMetadata } from 'astro';
 import { Image } from 'astro:assets';
 
-import { externalProviders, modelFamilies } from '../../config/model-families';
+import { externalProviders, modelFamilies, type Label } from '../../config/model-families';
 import { withBase } from '../base-path';
+import Trans from './Trans.astro';
 
 const base = import.meta.env.BASE_URL;
+const { t } = Astro.locals;
+const label = (value: Label) => (typeof value === 'string' ? value : t(value.labelKey));
 
 const covers = import.meta.glob<ImageMetadata>('../../assets/model-families/*.webp', { eager: true, import: 'default' });
 const coverFor = (slug: string) => covers[`../../assets/model-families/${slug}.webp`];
@@ -22,7 +25,7 @@ const coverFor = (slug: string) => covers[`../../assets/model-families/${slug}.w
   <slot />
   <ul class="grid" role="list">
     {
-      modelFamilies.map(({ slug, name, link, kind, tagline, license, vram, formats, hue }) => {
+      modelFamilies.map(({ slug, name, link, kind, license, vram, formats, hue }) => {
         const cover = coverFor(slug);
         return (
           <li>
@@ -49,24 +52,32 @@ const coverFor = (slug: string) => covers[`../../assets/model-families/${slug}.w
                   <span class="name" id={`model-${slug}`}>
                     {name}
                   </span>
-                  {kind === 'video' && <span class="tag tag--video">Video</span>}
+                  {kind === 'video' && <span class="tag tag--video">{t('modelFamilies.videoTag')}</span>}
                   <ArrowRight class="arrow" size={16} aria-hidden="true" />
                 </span>
                 <span class="tagline" id={`model-${slug}-tagline`}>
-                  {tagline}
+                  {t(`modelFamilies.${slug}.tagline`)}
                 </span>
                 <span class="tags">
                   <span class:list={['tag', `tag--${license.kind}`]}>
-                    <span class="sr-only">License: </span>
-                    {license.label}
+                    <Trans
+                      message={t('modelFamilies.licenseTag', {
+                        license: label(license.label),
+                        interpolation: { escapeValue: false },
+                      })}
+                    >
+                      {(text: string) => <span class="sr-only">{text}</span>}
+                    </Trans>
                   </span>
                   {vram !== undefined && (
                     <span class="tag tag--plain">
-                      {vram} GB+<span class="sr-only"> VRAM</span>
+                      <Trans message={t('modelFamilies.vramTag', { gigabytes: vram })}>
+                        {(text: string) => <span class="sr-only">{text}</span>}
+                      </Trans>
                     </span>
                   )}
                   {formats.map((format) => (
-                    <span class="tag tag--plain">{format}</span>
+                    <span class="tag tag--plain">{label(format)}</span>
                   ))}
                 </span>
               </span>
@@ -77,7 +88,7 @@ const coverFor = (slug: string) => covers[`../../assets/model-families/${slug}.w
     }
   </ul>
   <div class="external">
-    <p class="external__label" id="home-models-external">External providers, billed to your own account</p>
+    <p class="external__label" id="home-models-external">{t('modelFamilies.externalProviders')}</p>
     <ul class="external__links" role="list" aria-labelledby="home-models-external">
       {
         externalProviders.map(({ name, link }) => (
