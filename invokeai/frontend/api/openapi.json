@@ -1602,6 +1602,12 @@
                       "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
                     },
                     {
@@ -2126,6 +2132,12 @@
                       "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
                     },
                     {
@@ -2648,6 +2660,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
@@ -3217,6 +3235,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
@@ -3813,6 +3837,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
@@ -5284,6 +5314,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
@@ -20534,6 +20570,12 @@
           },
           {
             "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
+          },
+          {
+            "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+          },
+          {
+            "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
           },
           {
             "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
@@ -88350,6 +88392,12 @@
                 "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
               },
               {
+                "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+              },
+              {
+                "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
               },
               {
@@ -89120,6 +89168,12 @@
                     "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
                   },
                   {
@@ -89820,6 +89874,12 @@
                 "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
               },
               {
+                "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+              },
+              {
+                "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
               },
               {
@@ -90329,6 +90389,12 @@
               },
               {
                 "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
+              },
+              {
+                "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+              },
+              {
+                "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
@@ -91334,6 +91400,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_QwenImage21_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_Wan_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/TinyAutoencoder_Checkpoint_LTX2_Config"
                 },
                 {
                   "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
@@ -110550,6 +110622,147 @@
         ],
         "title": "TinyAutoencoder_Checkpoint_Flux2_Config"
       },
+      "TinyAutoencoder_Checkpoint_LTX2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "tiny_autoencoder",
+            "title": "Type",
+            "default": "tiny_autoencoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "latent_channels": {
+            "type": "integer",
+            "title": "Latent Channels",
+            "description": "Latent channels the decoder consumes."
+          },
+          "base": {
+            "type": "string",
+            "const": "ltx-2",
+            "title": "Base",
+            "default": "ltx-2"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "latent_channels",
+          "base"
+        ],
+        "title": "TinyAutoencoder_Checkpoint_LTX2_Config"
+      },
       "TinyAutoencoder_Checkpoint_QwenImage21_Config": {
         "properties": {
           "key": {
@@ -111113,6 +111326,148 @@
           "base"
         ],
         "title": "TinyAutoencoder_Checkpoint_SDXL_Config"
+      },
+      "TinyAutoencoder_Checkpoint_Wan_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "tiny_autoencoder",
+            "title": "Type",
+            "default": "tiny_autoencoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "latent_channels": {
+            "type": "integer",
+            "title": "Latent Channels",
+            "description": "Latent channels the decoder consumes."
+          },
+          "base": {
+            "type": "string",
+            "const": "wan",
+            "title": "Base",
+            "default": "wan"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "latent_channels",
+          "base"
+        ],
+        "title": "TinyAutoencoder_Checkpoint_Wan_Config",
+        "description": "taew2_1 (16 channels, also Qwen-Image, Krea-2, Anima) or taew2_2 (48, TI2V-5B): `latent_channels` decides."
       },
       "TransformerField": {
         "properties": {
