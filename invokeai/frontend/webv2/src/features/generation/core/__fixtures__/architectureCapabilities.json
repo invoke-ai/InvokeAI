@@ -16,8 +16,8 @@
       "control_kinds": [
         "anima_lllite"
       ],
-      "max_reference_images": 0,
-      "reference_images_require_variant": null,
+      "max_reference_images": 4,
+      "reference_images_require_variant": "anima_qwen3",
       "supports_regional_guidance": true,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -74,8 +74,8 @@
       "control_kinds": [
         "anima_lllite"
       ],
-      "max_reference_images": 0,
-      "reference_images_require_variant": null,
+      "max_reference_images": 4,
+      "reference_images_require_variant": "anima_qwen3",
       "supports_regional_guidance": true,
       "regional_negative": false,
       "clip_skip_max": null,

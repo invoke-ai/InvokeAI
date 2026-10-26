@@ -11,10 +11,6 @@ export { SeedField, type SeedFieldProps } from './ui/shared/SeedField';
 export { FluxReduxControls } from './ui/reference-images/ReferenceImageControls';
 export { GenerateCollapsibleSection as GenerationSettingsSection } from './ui/shared/GenerateCollapsibleSection';
 export { CapabilitiesGate, type CapabilitiesGateProps } from './ui/shared/CapabilitiesGate';
-export {
-  ConceptList,
-  ConceptRow,
-  type ConceptModelPort,
-  type ConceptRowProps,
-  type ConceptUpdate,
-} from './ui/shared/ConceptRow';
+export { ConceptList, ConceptRow, type ConceptModelPort, type ConceptRowProps } from './ui/shared/ConceptRow';
+// Only lazy widget UIs edit concept lists; exporting it from `settings` would put it in the editor's startup graph.
+export { addConcept, removeConcept, type ConceptUpdate, updateConcept } from './core/conceptList';

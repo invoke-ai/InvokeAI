@@ -119,7 +119,6 @@ const Harness = ({ ref }: { ref: Ref<OpenSurface> }) => {
   return (
     <LayerSurfaceHost
       commands={rowCommands}
-      dispatch={() => true}
       document={mocks.project.canvas.document}
       editingLocked={false}
       engine={engine}

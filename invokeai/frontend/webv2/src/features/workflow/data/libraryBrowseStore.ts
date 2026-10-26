@@ -41,6 +41,8 @@ export type WorkflowLibrarySort = 'updated' | 'opened' | 'created' | 'name';
 
 export interface WorkflowLibraryBrowseFilter {
   category: WorkflowLibraryCategory;
+  /** Public user workflows form a distinct view; absent keeps user listings owner scoped. */
+  isPublic?: boolean;
   tag: string | null;
   search: string;
   /** Applies to the user category only; see `getListOrder`. */
@@ -68,7 +70,7 @@ export interface WorkflowLibraryBrowseSnapshot {
   page: number;
   pages: number;
   total: number;
-  /** Chip counts for the current category. */
+  /** Chip counts for the current category and visibility filter. */
   tagCounts: readonly WorkflowTagCount[];
   /** Total user-category workflows, for the one-time Browse/Yours auto-switch. */
   userTotal: number | null;
@@ -120,7 +122,7 @@ const store = createExternalStore<WorkflowLibraryBrowseSnapshot>(INITIAL_SNAPSHO
 // #region View cache
 
 /**
- * Views already browsed (Browse, Yours, a tag or search), kept so switching back shows them at once with their
+ * Views already browsed (Browse, Yours, Shared, a tag or search), kept so switching back shows them at once with their
  * enrichment instead of refetching and re-reading every row. A view older than `VIEW_FRESH_MS` is revalidated in the
  * background and merged in place; library mutations drop the other views.
  */
@@ -141,7 +143,14 @@ const viewCache = new Map<string, CachedBrowseView>();
 let currentViewFetchedAt = 0;
 
 const getFilterKey = (filter: WorkflowLibraryBrowseFilter): string =>
-  JSON.stringify([filter.category, filter.search, filter.tag, getListOrder(filter).orderBy]);
+  JSON.stringify([
+    filter.category,
+    filter.isPublic,
+    filter.search,
+    filter.tag,
+    getListOrder(filter).orderBy,
+    getListOrder(filter).direction,
+  ]);
 
 const rememberCurrentView = (): void => {
   const { entries, filter, page, pages, status, tagCounts, total } = store.getSnapshot();
@@ -390,6 +399,7 @@ const fetchPage = (
   listLibraryWorkflows({
     ...getListOrder(filter),
     category: filter.category,
+    ...(filter.isPublic === undefined ? {} : { isPublic: filter.isPublic }),
     page,
     perPage: PER_PAGE,
     query: filter.search || undefined,
@@ -440,14 +450,22 @@ const loadMorePages = async (filter: WorkflowLibraryBrowseFilter, page: number, 
 };
 
 /** Tag chips are best-effort: a failed count leaves the previous chips in place. */
-const loadTagCounts = async (category: WorkflowLibraryCategory, owner: AccountScope): Promise<void> => {
+const loadTagCounts = async (
+  category: WorkflowLibraryCategory,
+  isPublic: boolean | undefined,
+  owner: AccountScope
+): Promise<void> => {
   try {
-    const tags = await getAllWorkflowTags({ categories: [category], signal: owner.signal });
+    const publicFilter = isPublic === undefined ? {} : { isPublic };
+    const tags = await getAllWorkflowTags({ categories: [category], ...publicFilter, signal: owner.signal });
     const counts =
-      tags.length > 0 ? await getWorkflowTagCounts({ categories: [category], signal: owner.signal, tags }) : {};
+      tags.length > 0
+        ? await getWorkflowTagCounts({ categories: [category], ...publicFilter, signal: owner.signal, tags })
+        : {};
 
-    // A category switch mid-flight owns the chips now.
-    if (!isAccountScopeCurrent(owner) || store.getSnapshot().filter.category !== category) {
+    // A category or visibility switch mid-flight owns the chips now.
+    const filter = store.getSnapshot().filter;
+    if (!isAccountScopeCurrent(owner) || filter.category !== category || filter.isPublic !== isPublic) {
       return;
     }
 
@@ -490,6 +508,7 @@ export const setWorkflowLibraryBrowseFilter = (patch: Partial<WorkflowLibraryBro
 
   const owner = captureAccountScope();
   const isCategoryChanged = filter.category !== snapshot.filter.category;
+  const isTagScopeChanged = isCategoryChanged || filter.isPublic !== snapshot.filter.isPublic;
 
   rememberCurrentView();
 
@@ -526,14 +545,14 @@ export const setWorkflowLibraryBrowseFilter = (patch: Partial<WorkflowLibraryBro
     page: 0,
     pages: 0,
     status: 'loading',
-    tagCounts: isCategoryChanged ? EMPTY_TAG_COUNTS : snapshot.tagCounts,
+    tagCounts: isTagScopeChanged ? EMPTY_TAG_COUNTS : snapshot.tagCounts,
     total: 0,
   });
 
   void loadFirstPage(filter, owner);
 
-  if (isCategoryChanged) {
-    void loadTagCounts(filter.category, owner);
+  if (isTagScopeChanged) {
+    void loadTagCounts(filter.category, filter.isPublic, owner);
   }
 };
 
@@ -577,7 +596,11 @@ export const ensureWorkflowLibraryBrowseLoaded = (sort: WorkflowLibrarySort): Pr
     hasTemplateLoadFailed = false;
     store.patchSnapshot({ error: null, status: 'loading' });
 
-    await Promise.all([loadFirstPage(filter, owner), loadTagCounts(filter.category, owner), probeUserTotal(owner)]);
+    await Promise.all([
+      loadFirstPage(filter, owner),
+      loadTagCounts(filter.category, filter.isPublic, owner),
+      probeUserTotal(owner),
+    ]);
   });
 };
 
@@ -645,7 +668,7 @@ export const refreshWorkflowLibraryBrowse = (): Promise<void> =>
       }
     }
 
-    await loadTagCounts(filter.category, owner);
+    await loadTagCounts(filter.category, filter.isPublic, owner);
   });
 
 export const getWorkflowLibraryBrowseSnapshot = (): WorkflowLibraryBrowseSnapshot => store.getSnapshot();

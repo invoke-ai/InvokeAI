@@ -71,7 +71,7 @@ const readout = (): HTMLElement => {
   );
 
   if (!(found instanceof HTMLElement)) {
-    throw new Error('the cluster readout is not in the document');
+    throw new TypeError('the cluster readout is not in the document');
   }
 
   return found;

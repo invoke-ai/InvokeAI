@@ -1,5 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
-import type { GenerateSettings, MainModelConfig } from '@features/generation/core/types';
+import type { GenerateModelConfig, GenerateSettings, MainModelConfig } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
@@ -50,7 +50,7 @@ void i18n.use(initReactI18next).init({
       translation: {
         common: {
           newSeed: 'New seed',
-          scrubber: { editValue: 'Edit {{label}}' },
+          scrubber: { editValue: 'Edit {{label}}: {{value}}' },
           seed: 'Seed',
           seedMode: {
             decrement: 'Decrement',
@@ -192,7 +192,7 @@ const settle = (action: () => void): Promise<void> =>
   });
 
 /** `applyCommits` writes committed patches back to the draft, as the panel does, for fields that read them back. */
-const render = async (model: MainModelConfig, settings: Partial<GenerateSettings> = {}, applyCommits = false) => {
+const render = async (model: GenerateModelConfig, settings: Partial<GenerateSettings> = {}, applyCommits = false) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -347,6 +347,22 @@ describe('GenerateRenderSection denoising strength', () => {
     const guidanceIndex = controls.indexOf(guidanceFrame('CFG')!);
     expect(guidanceIndex).toBeGreaterThan(-1);
     expect(controls[guidanceIndex + 1]?.getAttribute('data-testid')).toBe('strength-field');
+  });
+
+  it('adds no strength for a hosted provider, which edits the canvas composite at its own', async () => {
+    harness.invocationSourceId = 'canvas';
+    await render({
+      base: 'external',
+      capabilities: { modes: ['txt2img', 'img2img'] },
+      format: 'external_api',
+      key: 'gpt-image',
+      name: 'GPT Image',
+      provider_id: 'openai',
+      type: 'external_image_generator',
+    });
+
+    expect(host?.querySelector('[data-testid="strength-field"]')).toBeNull();
+    expect(host?.querySelector('[data-testid="strength-badge"]')).toBeNull();
   });
 });
 

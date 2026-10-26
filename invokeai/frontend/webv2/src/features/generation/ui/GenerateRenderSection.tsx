@@ -779,8 +779,9 @@ export const GenerateRenderSection = ({
     </GenerateCollapsibleSection>
   );
 
-  // Switching source remounts the section's subtree, as the Size section does.
-  return project.invocationSourceId === 'canvas' ? (
+  // Switching source remounts the section's subtree, as the Size section does. A hosted provider edits the canvas
+  // composite at its own strength, so the canvas adds none for it.
+  return project.invocationSourceId === 'canvas' && selectedModel?.type !== 'external_image_generator' ? (
     <CanvasDenoisingStrengthSlot>{renderSection}</CanvasDenoisingStrengthSlot>
   ) : (
     renderSection(null)

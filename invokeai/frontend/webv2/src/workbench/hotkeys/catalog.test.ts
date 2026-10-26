@@ -11,7 +11,7 @@ import { toPlatformHotkey } from './resolve';
 
 describe('firstPartyHotkeyCatalog', () => {
   it('keeps legacy default hotkey parity', () => {
-    expect(firstPartyHotkeyCatalog).toHaveLength(120);
+    expect(firstPartyHotkeyCatalog).toHaveLength(121);
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('app.togglePreview');
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('app.invoke');
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('app.openCommandPalette');
@@ -59,6 +59,39 @@ describe('firstPartyHotkeyCatalog', () => {
 
     expect(swap).toMatchObject({ defaultKeys: ['x'], implemented: true });
     expect(reset).toMatchObject({ defaultKeys: ['d'], implemented: true });
+  });
+
+  it('offers crop all layers to frame unbound, for a key the user chooses', () => {
+    const cropAll = firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'canvas.cropAllLayersToFrame');
+
+    expect(cropAll).toMatchObject({ defaultKeys: [], implemented: true, title: 'Crop All Layers To Frame' });
+  });
+
+  it('binds transform to Shift+T only, leaving Mod+T to the browser', () => {
+    const transform = firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'canvas.transformSelected');
+
+    expect(transform).toMatchObject({ defaultKeys: ['shift+t'], implemented: true, title: 'Transform Selected Layer' });
+  });
+
+  it.each([
+    ['canvas.setZoomTo100Percent', 'mod+1', 'Zoom to 100%'],
+    ['canvas.setZoomTo200Percent', 'mod+2', 'Zoom to 200%'],
+    ['canvas.setZoomTo400Percent', 'mod+3', 'Zoom to 400%'],
+    ['canvas.setZoomTo800Percent', 'mod+4', 'Zoom to 800%'],
+  ])('implements %s on %s, titled %s', (id, key, title) => {
+    const zoom = firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === id);
+
+    expect(zoom).toMatchObject({ defaultKeys: [key], implemented: true, title });
+  });
+
+  // Ids keep "bbox" so saved custom bindings survive; only the visible titles say "Frame".
+  it('titles every frame command without the word bbox', () => {
+    const titles = firstPartyHotkeyCatalog.map((hotkey) => hotkey.title);
+
+    expect(titles.filter((title) => /bbox|bounding box/i.test(title))).toEqual([]);
+    expect(firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'canvas.fitBboxToMasks')?.title).toBe(
+      'Fit Frame To Masks'
+    );
   });
 
   it('keeps layout saving explicit and out of editable controls', () => {

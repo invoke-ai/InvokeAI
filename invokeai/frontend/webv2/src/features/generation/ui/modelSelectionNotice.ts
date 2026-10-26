@@ -1,3 +1,4 @@
+import type { GenerateModelSelectionResult } from '@features/generation/core/baseGenerationPolicies';
 import type { TFunction } from 'i18next';
 
 interface GenerateModelSelectionNotifier {
@@ -37,5 +38,31 @@ export const notifyGenerateModelSelectionCleared = ({
         name: modelName,
       }
     )
+  );
+};
+
+/** A switch that only moves the size is not confirmed, so this names the size it moved to. */
+export const notifyGenerateDimensionsAdjusted = ({
+  modelName,
+  notifications,
+  result,
+  t,
+}: {
+  modelName: string;
+  notifications: GenerateModelSelectionNotifier;
+  result: Pick<GenerateModelSelectionResult, 'dimensionsAdjusted' | 'settings'>;
+  t: TFunction;
+}): void => {
+  if (!result.dimensionsAdjusted) {
+    return;
+  }
+
+  notifications.info(
+    t('widgets.generate.dimensionsAdjusted'),
+    t('widgets.generate.dimensionsAdjustedDescription', {
+      height: result.settings.height,
+      name: modelName,
+      width: result.settings.width,
+    })
   );
 };

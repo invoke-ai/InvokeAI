@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import type { ExportBakedLayerBlobResult } from '@workbench/canvas-engine/api';
+import type { AdjustmentRefusal, ExportBakedLayerBlobResult, LayerUnreadable } from '@workbench/canvas-engine/api';
 
 import { canOnBoard } from '@features/gallery/contracts';
 import {
@@ -17,8 +17,15 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 
-type LayerAssetExportFailureStatus = Exclude<ExportBakedLayerBlobResult['status'], 'ok'>;
-type LayerAssetExportResult = { status: 'ok'; blob: Blob } | { status: LayerAssetExportFailureStatus };
+type LayerAssetExportFailureStatus = Exclude<
+  ExportBakedLayerBlobResult['status'],
+  'ok' | 'adjustment-refused' | 'unreadable'
+>;
+type LayerAssetExportResult =
+  | { status: 'ok'; blob: Blob }
+  | { status: LayerAssetExportFailureStatus }
+  | LayerUnreadable
+  | AdjustmentRefusal;
 
 interface CopyLayerToClipboardDeps extends ClipboardAccess {
   exportLayer(layerId: string, options: { includeDisabled: boolean }): Promise<LayerAssetExportResult>;
@@ -28,8 +35,11 @@ interface CopyLayerToClipboardDeps extends ClipboardAccess {
 export const copyLayerToClipboard = async (
   layerId: string,
   { exportLayer, ...clipboard }: CopyLayerToClipboardDeps
-): Promise<'ok' | LayerAssetExportFailureStatus> => {
+): Promise<'ok' | LayerAssetExportFailureStatus | LayerUnreadable | AdjustmentRefusal> => {
   const result = await exportLayer(layerId, { includeDisabled: true });
+  if (result.status === 'adjustment-refused' || result.status === 'unreadable') {
+    return result;
+  }
   if (result.status !== 'ok') {
     return result.status;
   }
@@ -51,7 +61,9 @@ export type SaveLayerToBoardResult =
   | 'stale'
   | 'board-view-only'
   | 'board-unavailable'
-  | LayerAssetExportFailureStatus;
+  | LayerAssetExportFailureStatus
+  | LayerUnreadable
+  | AdjustmentRefusal;
 
 /**
  * Owns the complete local-export → gallery-upload boundary: the baked layer is uploaded to `boardId` (`'none'` for
@@ -85,6 +97,9 @@ export const saveLayerToBoard = async (
     const result = await exportLayer(layerId, { includeDisabled: true, signal: owner.signal });
 
     assertAccountScopeCurrent(owner);
+    if (result.status === 'adjustment-refused' || result.status === 'unreadable') {
+      return result;
+    }
     if (result.status !== 'ok') {
       return result.status;
     }

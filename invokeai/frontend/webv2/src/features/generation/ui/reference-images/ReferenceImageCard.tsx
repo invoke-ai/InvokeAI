@@ -9,6 +9,7 @@ import type { CSSProperties } from 'react';
 
 import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { FindInGalleryButton } from '@features/gallery/mediaSlot';
+import { isStrengthOnlyIPAdapterBase } from '@features/generation/core/baseGenerationPolicies';
 import { getEffectiveReferenceImage } from '@features/generation/core/referenceImage';
 import { getReferenceImageUrls } from '@features/generation/data/referenceImageUrls';
 import { GenerationModelSelect as ModelSelect } from '@features/generation/ui/GenerationUiContext';
@@ -149,7 +150,9 @@ const ReferenceImageCardBase = ({
               {config.type === 'ip_adapter' ? (
                 <>
                   {' · '}
-                  {t(getModeLabelKey(config.method))}{' '}
+                  {isStrengthOnlyIPAdapterBase(selectedBase)
+                    ? t('widgets.generate.strength')
+                    : t(getModeLabelKey(config.method))}{' '}
                   <Text as="span" color="fg.subtle" fontFamily="mono">
                     {formatWeight(config.weight)}
                   </Text>
@@ -246,6 +249,7 @@ const ReferenceImageCardBase = ({
                 key={config.model?.key ?? 'no-model'}
                 config={config}
                 disabled={!isEnabled}
+                strengthOnly={isStrengthOnlyIPAdapterBase(selectedBase)}
                 onChange={changeConfig}
               >
                 <ReferenceModelSelector
@@ -343,7 +347,7 @@ const ReferenceModelSelector = ({
           value={config.model?.key ?? null}
           onChange={selectReferenceModel}
         />
-        {config.type === 'ip_adapter' ? (
+        {config.type === 'ip_adapter' && !isStrengthOnlyIPAdapterBase(selectedBase) ? (
           <ClipVisionSelect
             key={config.model?.key ?? 'no-model'}
             config={config}
