@@ -46,6 +46,7 @@ jobs:
           filters: |
             docs:
               - '.github/workflows/deploy-docs.yml'
+              - 'crowdin.yml'
               - 'docs/**'
               # The docs color tokens are generated from the app's theme.
               - 'invokeai/frontend/webv2/src/platform/ui/theme/themes.ts'

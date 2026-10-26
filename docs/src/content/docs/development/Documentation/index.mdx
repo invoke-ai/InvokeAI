@@ -184,29 +184,14 @@ To render the image, you'd just use a relative path in your markdown.
 ![Alt text here](./assets/demonstration.webp)
 ```
 
-### Adding Translations
+### Translations
 
-Currently, the documentation is only available in English. If you wish to add translations for other languages, we've already laid the ground work for you to do so.
+English is the source of truth: write and update the English pages and strings only. Translators work in [Crowdin](/contributing/translations/), which opens pull requests with their translations.
 
-Firstly, add a new folder within the `src/content/i18n` directory, and create your translated version of the markdown file into the same path as the original.
+- **Pages.** Translations of the user-facing trees (`start-here/`, `Users Guide/`, `configuration/`, `troubleshooting/` and the home page) land in `src/content/docs/<locale>/`, mirroring the English paths. Crowdin owns those directories, so don't edit them by hand. A page without a translation shows the English page with a notice. A translation changes only prose: `pnpm test` fails one that adds or changes imports, components, `{…}` expressions, links or frontmatter other than titles and descriptions.
+- **Interface strings.** Text in components and layouts comes from `src/content/i18n/en.json`. Add a key there and read it with `Astro.locals.t('key')`, or with the `Trans` component when the message contains markup such as a link. `pnpm test` fails when the code uses a key `en.json` lacks, or `en.json` has a key nothing uses.
 
-For example:
-
-<FileTree>
-  - src/
-    - content/
-      - docs/
-        - start-here/
-          - installation.mdx
-      - i18n/
-        - zh-CN Country code here
-          - start-here/
-            - installation.mdx
-</FileTree>
-
-We recommend simply copy/pasting the file and rewriting the text from there.
-
-Learn more about the intricacies of translating Astro Starlight docs [here](https://starlight.astro.build/guides/i18n).
+Maintainers: the [docs README](https://github.com/invoke-ai/InvokeAI/blob/main/docs/README.md) covers Crowdin setup, adding a locale and reviewing a translation pull request.
 
 ## Running a Build
 
@@ -299,6 +284,7 @@ The docs contain tests for the following:
 | Verify Deployment Output | Check to ensure the asset and page paths have the expected base paths dependent on deploy targets | Build, Deploy |
 | Check Docs Data | Checks to ensure the generated files are accurate | Deploy |
 | Check App Search Index | Checks that the app's copy of the docs search index matches the build | Deploy |
+| Translation Checks | Checks that translated pages and interface strings add no code, markup or links and keep their placeholders (`src/lib/translation-checks.mjs`, part of `pnpm test`) | Deploy |
 
 ## GitHub Actions
 
