@@ -20,8 +20,8 @@ import { useTranslation } from 'react-i18next';
 const STATE_PALETTES: Record<LineDisplayState, string> = {
   in_use: 'green',
   insufficient: 'gray',
+  interrupted: 'gray',
   stale: 'orange',
-  stopped: 'gray',
   unusable: 'red',
 };
 
@@ -37,8 +37,8 @@ export const LineStateBadge = ({ state }: { state: LineDisplayState | null }) =>
           ? t('models.workingMemory.stateUnusable')
           : state === 'insufficient'
             ? t('models.workingMemory.stateInsufficient')
-            : state === 'stopped'
-              ? t('models.workingMemory.stateStopped')
+            : state === 'interrupted'
+              ? t('models.workingMemory.stateInterrupted')
               : t('models.workingMemory.stateNone');
 
   return (
@@ -135,8 +135,8 @@ const LineStateHelp = ({ line }: { line: WorkingMemoryLine }) => {
   const facts = line.changed_facts.map(factLabel).join(', ');
   // The server explains a line only stopped attempts measured in English; this says the same in the user's language.
   const text =
-    lineDisplayState(line) === 'stopped'
-      ? t('models.workingMemory.helpStopped')
+    lineDisplayState(line) === 'interrupted'
+      ? t('models.workingMemory.helpInterrupted')
       : line.state === 'in_use'
         ? t('models.workingMemory.helpInUse')
         : line.state === 'stale'

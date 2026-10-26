@@ -82,7 +82,9 @@ const ARCHITECTURE_CAPABILITIES = JSON.parse(
  * already holds the token). `sharedBoards: true` adds boards other accounts own (`SHARED_BOARD_FIXTURES`), which the
  * caller sees through general access, a membership, or admin rights.
  * `workingMemory` selects a calibration device scenario, and `stoppedCalibration: <main model key>` gives that model an
- * attempt Stop aborted (see mock-working-memory.mjs).
+ * attempt Stop aborted, `runningCalibration: <main model key>` one still running, which holds the GPU,
+ * `modelChangedCalibration: <main model key>` one whose steps failed for a changed model (see
+ * mock-working-memory.mjs).
  */
 const CAPABILITY_FAULTS = new Set(['ok', 'error', 'empty']);
 const INTERMEDIATES_CALLERS = new Set(['admin', 'user', 'multiuser-admin']);
@@ -337,6 +339,7 @@ const wildcardNameTaken = (state, name, exceptId = null) =>
 /** `clock` is the working-memory mock's time source (see mock-working-memory.mjs). */
 const createState = (profile, clock) => {
   const fixture = assertMockBackendFixture(createMockBackendFixture(profile));
+  const models = new Map(fixture.models.map((model) => [model.key, clone(model)]));
 
   return {
     boardMembers: new Map(),
@@ -350,7 +353,7 @@ const createState = (profile, clock) => {
     ]),
     externalProviders: createExternalProviderConfigs(fixture.models),
     images: new Map(fixture.images.map((image) => [image.image_name, clone(image)])),
-    models: new Map(fixture.models.map((model) => [model.key, clone(model)])),
+    models,
     /** What re-identify fills in per model key; only `POST /__models` seeds entries. */
     modelProbes: new Map(),
     mutationClock: 0,
@@ -372,7 +375,7 @@ const createState = (profile, clock) => {
     videos: new Map(fixture.videos.map((video) => [video.video_name, clone(video)])),
     wildcards: createWildcards(profile === 'empty' ? 0 : SEEDED_WILDCARD_NAMES.length),
     workflows: new Map(fixture.workflows.map((workflow) => [workflow.workflow_id, clone(workflow)])),
-    workingMemory: createWorkingMemoryMock(fixture.models, { clock }),
+    workingMemory: createWorkingMemoryMock(fixture.models, { clock, currentModel: (key) => models.get(key) }),
     nextWorkflowNumber: fixture.workflows.length + 1,
     /** Custom workflow thumbnails by workflow id; the version stands in for the server's cache-busting query. */
     workflowThumbnails: new Map(),
@@ -1144,6 +1147,21 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
             }
 
             faults.workingMemory = workingMemory;
+          }
+
+          if (
+            body.modelChangedCalibration !== undefined &&
+            !state.workingMemory.seedModelChanged(body.modelChangedCalibration)
+          ) {
+            return json(400, {
+              detail: `No main model to seed a changed-model calibration on: ${String(body.modelChangedCalibration)}`,
+            });
+          }
+
+          if (body.runningCalibration !== undefined && !state.workingMemory.seedRunning(body.runningCalibration)) {
+            return json(400, {
+              detail: `No main model to seed a running calibration on: ${String(body.runningCalibration)}`,
+            });
           }
 
           if (body.stoppedCalibration !== undefined && !state.workingMemory.seedStopped(body.stoppedCalibration)) {

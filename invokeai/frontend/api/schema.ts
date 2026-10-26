@@ -1206,8 +1206,9 @@ export type paths = {
         put?: never;
         /**
          * Calibrate Model Working Memory
-         * @description Start a working-memory calibration run: enqueue the batch with every node uncached and measure each node's
-         *     model operations on the generation device. Needs exactly one generation device, and it must be a GPU. The queue
+         * @description Start a working-memory calibration run: enqueue the batch with every node uncached, its images intermediates
+         *     on no board (never in the gallery; clearing intermediates removes them), and measure each node's model operations
+         *     on the generation device. Needs exactly one generation device, and it must be a GPU. The queue
          *     takes all of the batch's items or none.
          *
          *     Once the items are queued, a request without an `idempotency_key` succeeds even when the store fails for a passing
@@ -53756,7 +53757,7 @@ export type components = {
             counted: boolean;
             /**
              * Excluded Reason
-             * @description Why a size is not counted: fragmented, its windows measured the allocator's fragmentation (`backend/working_memory/fragmentation.py`); partial_residency, the model was not fully on the device; aborted_attempt, its windows come from aborted attempts (Stop, a queue clear, a failed submission), which never feed a line. Null for a counted size
+             * @description Why a size is not counted: fragmented, its windows measured the allocator's fragmentation (`backend/working_memory/fragmentation.py`); partial_residency, the model was not fully on the device; aborted_attempt, its windows come from aborted attempts (Stop, a queue clear, a failed submission, a model changed after the calibration was planned), which never feed a line. Null for a counted size
              */
             excluded_reason: ("fragmented" | "partial_residency" | "aborted_attempt") | null;
             /**
@@ -53839,6 +53840,11 @@ export type components = {
             /** Error */
             error: string | null;
             /**
+             * Error Code
+             * @description Why the failed item failed, where a client acts on it (`CalibrationErrorCode`): model_changed, a model its graph names changed or was removed after the calibration was planned. Null otherwise
+             */
+            error_code: "model_changed" | null;
+            /**
              * Created At
              * Format: date-time
              */
@@ -53857,7 +53863,7 @@ export type components = {
             attempt_steps: number | null;
             /**
              * Held Back
-             * @description Why no window of the run feeds a fit: running, it or a run of its attempt is still in the queue, and its windows join once all have finished; aborted_attempt, its attempt was aborted, and its windows never feed one: an item of it ended canceled (Stop, a queue clear), the attempt ended before it queued all attempt_steps runs (Stop, a failed submission), or a reset removed a run of it while it ran. Null when its windows are judged like any finished run's
+             * @description Why no window of the run feeds a fit: running, it or a run of its attempt is still in the queue, and its windows join once all have finished; aborted_attempt, its attempt was aborted, and its windows never feed one: an item of it ended canceled (Stop, a queue clear) or failed because a model changed after the calibration was planned (model_changed), the attempt ended before it queued all attempt_steps runs (Stop, a failed submission), or a reset removed a run of it while it ran. Null when its windows are judged like any finished run's
              */
             held_back: ("running" | "aborted_attempt") | null;
         };
@@ -53980,7 +53986,8 @@ export type components = {
         /**
          * WorkingMemoryCalibrationRequest
          * @description The batch a calibration run enqueues, built by the client. The server sets origin, destination, runs and the
-         *     graph's id, and turns the node cache off.
+         *     graph's id, turns the node cache off, and makes every node's images intermediates on no board: never in the
+         *     gallery, and removed by clearing intermediates.
          */
         WorkingMemoryCalibrationRequest: {
             /** @description The graph to measure */
@@ -53997,7 +54004,7 @@ export type components = {
             idempotency_key?: string | null;
             /**
              * Attempt Id
-             * @description A client-generated id of the calibration attempt the run belongs to (1-64 letters, digits, '_', '-', '.', ':'), so a client that enqueues one run per step can group them. Sent together with attempt_steps, never alone (422). No window of an attempt feeds an estimate until it queued attempt_steps runs and every one has finished; a run a reset removed still counts as queued, without its measurements. An aborted attempt never feeds one: an item of it ended canceled (Stop, a queue clear), it ended before it queued all its runs (Stop, a failed submission), or a reset removed a run of it while it ran. An item that failed ends that step, not the attempt. The run id derives from the idempotency_key, the request and the attempt, so an idempotency_key names one run: repeating the request under the same attempt returns that run, and reusing the key under another attempt is refused with 409 while the queue keeps the key's receipt. Make each key unique per run of an attempt.
+             * @description A client-generated id of the calibration attempt the run belongs to (1-64 letters, digits, '_', '-', '.', ':'), so a client that enqueues one run per step can group them. Sent together with attempt_steps, never alone (422). No window of an attempt feeds an estimate until it queued attempt_steps runs and every one has finished; a run a reset removed still counts as queued, without its measurements. An aborted attempt never feeds one: an item of it ended canceled (Stop, a queue clear) or failed because a model changed after the calibration was planned (error_code model_changed), it ended before it queued all its runs (Stop, a failed submission), or a reset removed a run of it while it ran. An item that failed ends that step, not the attempt. The run id derives from the idempotency_key, the request and the attempt, so an idempotency_key names one run: repeating the request under the same attempt returns that run, and reusing the key under another attempt is refused with 409 while the queue keeps the key's receipt. Make each key unique per run of an attempt.
              */
             attempt_id?: string | null;
             /**
@@ -54053,6 +54060,11 @@ export type components = {
              * @description The error of a failed item, when the run failed
              */
             error: string | null;
+            /**
+             * Error Code
+             * @description Why the failed item failed, where a client acts on it (`CalibrationErrorCode`): model_changed, a model its graph names changed or was removed after the calibration was planned. Null otherwise
+             */
+            error_code: "model_changed" | null;
             /**
              * Item Ids
              * @description Every queue item of the run known, retries and the items they retried
@@ -57288,7 +57300,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description This machine cannot calibrate now (no GPU, or several generation devices), the device class's store file is unusable and kept as it is (possibly after the items were queued, which then fail when they start), the queue has no room for all of the run's items (it then takes none), the idempotency key was used for another request, or attempt_steps differs from that of the attempt's runs already stored (or of the run a repeated request names) */
+            /** @description This machine cannot calibrate now (no GPU, or several generation devices), the device class's store file is unusable and kept as it is (possibly after the items were queued, which then fail when they start), the queue has no room for all of the run's items (it then takes none), the idempotency key was used for another request, or attempt_steps differs from that of the attempt's runs already stored (or of the run a repeated request names). Two of them carry a code, as `{"code": ..., "message": ...}` in `detail`: `calibration_running`, another calibration attempt still runs on this GPU; `model_changed`, a model the graph names changed or was removed since the graph was compiled */
             409: {
                 headers: {
                     [name: string]: unknown;

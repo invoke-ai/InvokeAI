@@ -149,6 +149,12 @@ export const selectAttemptRuns = (runs: readonly WorkingMemoryRun[], attemptId?:
   return ordered.filter((run) => run.attempt_id === target);
 };
 
+/**
+ * Why the server refused a calibration's step, where the section says it in its own words: another attempt of the
+ * model is running, or the model's record changed after the graphs were compiled over it.
+ */
+export type CalibrationRefusal = 'alreadyRunning' | 'modelChanged';
+
 /** What this tab knows of an attempt it started. */
 export interface LocalAttempt {
   attemptId: string;
@@ -158,6 +164,8 @@ export interface LocalAttempt {
   submitting: boolean;
   /** Why posting stopped early, when it did. */
   submissionError: string | null;
+  /** The refusal that error was, when the server named one. */
+  submissionRefusal?: CalibrationRefusal;
   /** The user stopped it. */
   stopped: boolean;
   /**
@@ -191,8 +199,17 @@ export type CalibrationOutcome =
   /** Every run was canceled before it measured anything, so nothing was discarded. */
   | { kind: 'canceled' }
   /** `canceled`: runs were canceled, so the attempt did not stop because queuing ended early. */
-  | { kind: 'partial'; canceled: boolean; discarded: boolean; error: string | null; queued: number; total: number }
-  | { kind: 'failed'; discarded: boolean; error: string | null; kept: boolean };
+  | {
+      kind: 'partial';
+      canceled: boolean;
+      discarded: boolean;
+      error: string | null;
+      /** The refusal that `error` was, when the server named one. */
+      refusal?: CalibrationRefusal;
+      queued: number;
+      total: number;
+    }
+  | { kind: 'failed'; discarded: boolean; error: string | null; kept: boolean; refusal?: CalibrationRefusal };
 
 /**
  * Progress and the latest attempt's outcome. A run counts as running while any of its items is pending or running
@@ -251,12 +268,13 @@ export const deriveCalibrationProgress = ({
   const measured = attempt.some((run) => run.status === 'completed' || run.status === 'partial');
   const aborted = attempt.some((run) => run.held_back === 'aborted_attempt');
   const discarded = measured && aborted;
-  const partial = (error: string | null): CalibrationOutcome => ({
+  const partial = (error: string | null, refusal?: CalibrationRefusal): CalibrationOutcome => ({
     canceled,
     discarded,
     error,
     kind: 'partial',
     queued: attempt.length,
+    refusal,
     total: plannedTotal,
   });
 
@@ -267,8 +285,14 @@ export const deriveCalibrationProgress = ({
       activity: idle,
       outcome:
         attempt.length === 0
-          ? { discarded, error: current.submissionError, kept: false, kind: 'failed' }
-          : partial(current.submissionError),
+          ? {
+              discarded,
+              error: current.submissionError,
+              kept: false,
+              kind: 'failed',
+              refusal: current.submissionRefusal,
+            }
+          : partial(current.submissionError, current.submissionRefusal),
     };
   }
 
@@ -276,12 +300,25 @@ export const deriveCalibrationProgress = ({
     return { activity: idle, outcome: current?.stopped ? { kind: 'canceled' } : { kind: 'none' } };
   }
 
-  const failed = attempt.find((run) => run.status === 'failed');
+  // A model of the graph changed after the attempt was planned: its items fail as they are admitted, and the section
+  // says so in its own words rather than the server's.
+  const failed =
+    attempt.find((run) => run.status === 'failed' && run.error_code === 'model_changed') ??
+    attempt.find((run) => run.status === 'failed');
 
   if (failed) {
+    const modelChanged = failed.error_code === 'model_changed';
+
     return {
       activity: idle,
-      outcome: { discarded, error: failed.error, kept: measured && !aborted, kind: 'failed' },
+      outcome: {
+        discarded,
+        error: failed.error,
+        // What earlier steps measured is of a model that has changed since: no claim that it still counts.
+        kept: measured && !aborted && !modelChanged,
+        kind: 'failed',
+        refusal: modelChanged ? 'modelChanged' : undefined,
+      },
     };
   }
 
@@ -297,19 +334,20 @@ export const deriveCalibrationProgress = ({
 };
 
 /**
- * How a line reads: its server state, or `stopped` for a line that only stopped attempts measured. The server calls
- * that line `insufficient`, but its cause is the Stop, not a lack of sizes.
+ * How a line reads: its server state, or `interrupted` for a line that only aborted attempts measured (Stop, a queue
+ * clear, a failed submission, a changed model). The server calls that line `insufficient`, but its cause is the
+ * interruption, not a lack of sizes.
  */
-export type LineDisplayState = WorkingMemoryLineState | 'stopped';
+export type LineDisplayState = WorkingMemoryLineState | 'interrupted';
 
 export const lineDisplayState = (line: Pick<WorkingMemoryLine, 'sizes' | 'state'>): LineDisplayState =>
   line.state === 'insufficient' &&
   line.sizes.length > 0 &&
   line.sizes.every((size) => size.excluded_reason === 'aborted_attempt')
-    ? 'stopped'
+    ? 'interrupted'
     : line.state;
 
-const LINE_STATE_SEVERITY: readonly LineDisplayState[] = ['unusable', 'stale', 'insufficient', 'stopped', 'in_use'];
+const LINE_STATE_SEVERITY: readonly LineDisplayState[] = ['unusable', 'stale', 'insufficient', 'interrupted', 'in_use'];
 
 /** The most severe of the lines' display states, or null without lines. */
 export const summarizeLineStates = (states: readonly LineDisplayState[]): LineDisplayState | null =>
@@ -408,6 +446,15 @@ export const getCalibrationBlocker = ({
 
   return isRunning ? { kind: 'running' } : null;
 };
+
+/**
+ * The model whose calibration attempt holds this GPU, as the status lists it, or null. The server takes one attempt
+ * per device class at a time; a run without an attempt holds nothing.
+ */
+export const modelCalibratingOnGpu = (status: Pick<WorkingMemoryStatus, 'device_classes'>): string | null =>
+  status.device_classes
+    .find((entry) => entry.is_current)
+    ?.runs.find((run) => run.status === 'running' && run.attempt_id !== null)?.model_key ?? null;
 
 /**
  * Whether the server's way of measuring GPU memory was checked against real hardware on this GPU's backend: the
