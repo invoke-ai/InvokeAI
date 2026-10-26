@@ -1,0 +1,127 @@
+---
+import {
+  mountSetupPicker,
+  resolveSetup,
+  SETUP_OPTIONS,
+  SETUP_STORAGE_KEY,
+  setupVisibilityCss,
+} from './setup-picker.mjs';
+
+// One radio per GPU id; its label text and availability follow the selected OS.
+const gpus = [...new Set(SETUP_OPTIONS.flatMap((os) => os.gpus.map((gpu) => gpu.id)))].map((id) => ({
+  id,
+  labels: SETUP_OPTIONS.flatMap((os) => os.gpus.filter((gpu) => gpu.id === id).map((gpu) => ({ os: os.id, label: gpu.label }))),
+}));
+
+// The shared segment tabs draw a divider before every chip but the first. GPU chips hidden for the selected OS still
+// count as siblings, so drop the divider of each OS's first shown GPU when hidden chips precede it.
+const dividerCss = SETUP_OPTIONS.map((os) => ({ os: os.id, first: gpus.find((gpu) => gpu.labels.some((l) => l.os === os.id)) }))
+  .filter(({ first }) => first && first !== gpus[0])
+  .map(({ os, first }) => `:root[data-setup-os="${os}"] .docs-segment-tab:has(> input[value="${first?.id}"])::before{display:none}`)
+  .join('\n');
+const visibilityCss = `${setupVisibilityCss(SETUP_OPTIONS)}\n${dividerCss}`;
+const mountScript = `(${mountSetupPicker})(document.currentScript.parentElement, ${JSON.stringify(SETUP_OPTIONS)}, ${resolveSetup}, ${JSON.stringify(SETUP_STORAGE_KEY)});`;
+---
+
+<Fragment set:html={`<style>${visibilityCss}</style>`} />
+
+<div class="setup-picker not-content" data-pagefind-ignore>
+  <p class="setup-picker__fallback">
+    Commands that differ by operating system or GPU are listed for every setup, each labeled with the setup it
+    applies to.
+  </p>
+  <div class="setup-picker__panel">
+    <fieldset class="setup-picker__row">
+      <legend class="docs-eyebrow">Operating system</legend>
+      <div class="setup-picker__segments docs-segment-tabs">
+        {
+          SETUP_OPTIONS.map((os) => (
+            <label class="docs-segment-tab">
+              <input type="radio" name="setup-os" value={os.id} />
+              {os.label}
+            </label>
+          ))
+        }
+      </div>
+    </fieldset>
+    <fieldset class="setup-picker__row">
+      <legend class="docs-eyebrow">GPU</legend>
+      <div class="setup-picker__segments docs-segment-tabs">
+        {
+          gpus.map((gpu) => (
+            <label class="docs-segment-tab" data-setup-for-os={gpu.labels.map(({ os }) => os).join(' ')}>
+              <input type="radio" name="setup-gpu" value={gpu.id} />
+              {new Set(gpu.labels.map(({ label }) => label)).size === 1 ? (
+                gpu.labels[0].label
+              ) : (
+                gpu.labels.map(({ os, label }) => <span data-setup-for-os={os}>{label}</span>)
+              )}
+            </label>
+          ))
+        }
+      </div>
+    </fieldset>
+    <p class="setup-picker__summary" aria-live="polite" aria-atomic="true">
+      Showing commands for <strong data-setup-summary></strong>
+    </p>
+  </div>
+  <script is:inline set:html={mountScript} />
+</div>
+
+<style>
+  /*
+   * A bordered panel like the content tabs' container: the OS and GPU segment tabs are inset 6px, and the labels and
+   * summary start 16px in, in line with the chips' text (6px inset + 10px chip padding).
+   */
+  .setup-picker__panel {
+    display: none;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 6px;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+  }
+
+  .setup-picker__fallback {
+    margin: 0;
+    color: var(--docs-text-subtle);
+  }
+
+  :global(:root[data-setup-os]) .setup-picker__panel {
+    display: flex;
+  }
+
+  :global(:root[data-setup-os]) .setup-picker__fallback {
+    display: none;
+  }
+
+  .setup-picker__row {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  /* Labels start 16px in, in line with the chips' text. */
+  .setup-picker__row legend {
+    padding: 0.375rem var(--docs-tab-pad-x) 0.25rem;
+  }
+
+  /* Five Windows GPU chips can outgrow a phone-width panel; the shared strip does not wrap. */
+  .setup-picker__segments {
+    flex-wrap: wrap;
+  }
+
+  .setup-picker__summary {
+    margin: 0;
+    padding: 0.25rem var(--docs-tab-pad-x) 0.375rem;
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-xs);
+  }
+
+  .setup-picker__summary strong {
+    color: var(--docs-text-muted);
+    font-weight: 500;
+  }
+</style>

@@ -1,0 +1,47 @@
+---
+import { describeVariant, SETUP_OPTIONS } from './setup-picker.mjs';
+
+type Props = {
+  /** Space-separated OS ids this content applies to; omit for every OS. */
+  os?: string;
+  /** Space-separated GPU ids this content applies to; omit for every GPU. */
+  gpu?: string;
+  /** Replaces the generated label shown when no setup is picked. */
+  label?: string;
+};
+
+const { os, gpu, label } = Astro.props as Props;
+const variant = describeVariant(SETUP_OPTIONS, { os, gpu });
+---
+
+<div
+  class="setup-variant"
+  data-setup-variant
+  data-setup-for-os={variant.os?.join(' ')}
+  data-setup-for-gpu={variant.gpu?.join(' ')}
+>
+  <p class="setup-variant__label" data-pagefind-ignore>{label ?? variant.label}</p>
+  <slot />
+</div>
+
+<style>
+  .setup-variant__label {
+    display: inline-flex;
+    padding: 0.25rem var(--docs-tab-pad-x);
+    border-radius: var(--docs-radius);
+    background-color: var(--docs-accent-tint);
+    color: var(--docs-accent-text);
+    font-size: var(--docs-control-font-size);
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  /* With a setup picked, only the matching variant shows, so its label adds nothing. */
+  :global(:root[data-setup-os]) .setup-variant__label {
+    display: none;
+  }
+
+  :global(:root[data-setup-os]) .setup-variant__label + :global(*) {
+    margin-top: 0;
+  }
+</style>

@@ -1,0 +1,24 @@
+---
+// Groups SetupVariant alternatives of which exactly one shows for each setup. Fails the build when a
+// setup the picker offers would see none of them, or more than one. Content that only adds to one
+// setup (a note, a table) belongs outside the switch.
+import { findCoverageGaps, SETUP_OPTIONS, variantsInHtml } from './setup-picker.mjs';
+
+const html = await Astro.slots.render('default');
+const variants = variantsInHtml(html);
+const { missing, repeated } = findCoverageGaps(SETUP_OPTIONS, variants);
+if (missing.length || repeated.length) {
+  throw new Error(
+    // Astro.url names the route being rendered (possibly llms.txt), not the source page, so name the variants.
+    `SetupSwitch with variants ${variants.map((v) => `[${v.os?.join(' ') ?? 'any'} / ${v.gpu?.join(' ') ?? 'any'}]`).join(' ')}: ` +
+      [
+        missing.length ? `no variant for ${missing.join(', ')}` : '',
+        repeated.length ? `several variants for ${repeated.join(', ')}` : '',
+      ]
+        .filter(Boolean)
+        .join('; ')
+  );
+}
+---
+
+<Fragment set:html={html} />
