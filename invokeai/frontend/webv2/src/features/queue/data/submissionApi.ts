@@ -15,7 +15,7 @@ import {
   sanitizeBatchCount,
 } from '@features/queue/core/promptBatch';
 import { mapWithConcurrency } from '@platform/core/concurrency';
-import { addOutputImageNames } from '@platform/core/outputImages';
+import { addOutputImageNames, getOutputImageNames } from '@platform/core/outputImages';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
 import { absolutizeApiUrl, ApiError, apiFetch, apiFetchJson } from '@platform/transport/http';
@@ -140,9 +140,14 @@ export const enqueueWorkflow = async (request: QueueEnqueueWorkflowRequest): Pro
 export const enqueueUtility = async (request: {
   graph: QueueEnqueueWorkflowRequest['graph'];
   origin: string;
+  /** Put the item ahead of queued generations. */
+  prepend?: boolean;
 }): Promise<{ enqueued: number; itemIds: number[] }> => {
   const result = await apiFetchJson<{ enqueued?: number; item_ids?: number[] }>('/api/v1/queue/default/enqueue_batch', {
-    body: JSON.stringify({ batch: { graph: request.graph, origin: request.origin, runs: 1 }, prepend: false }),
+    body: JSON.stringify({
+      batch: { graph: request.graph, origin: request.origin, runs: 1 },
+      prepend: request.prepend === true,
+    }),
     method: 'POST',
   });
 
@@ -165,12 +170,45 @@ const getResultImageNames = (queueItem: QueueServerItemDTO, options?: QueueResul
   return [...imageNames];
 };
 
+/** VideoOutput shape: `{ video: { video_name }, width, height, ... }`. */
+const getOutputVideoName = (result: unknown): string | undefined => {
+  if (!result || typeof result !== 'object') {
+    return undefined;
+  }
+
+  const videoName = (result as { video?: { video_name?: unknown } }).video?.video_name;
+  return typeof videoName === 'string' ? videoName : undefined;
+};
+
+type QueueResultMediaRef = { kind: 'image' | 'video'; name: string };
+
+/** Image and video outputs in session-result order, then output order within a result; first occurrence kept. */
+const getResultMediaRefs = (queueItem: QueueServerItemDTO): QueueResultMediaRef[] => {
+  const refs = new Map<string, QueueResultMediaRef>();
+
+  for (const result of Object.values(queueItem.session?.results ?? {})) {
+    for (const name of getOutputImageNames(result)) {
+      refs.set(`image:${name}`, { kind: 'image', name });
+    }
+
+    const videoName = getOutputVideoName(result);
+    if (videoName !== undefined) {
+      refs.set(`video:${videoName}`, { kind: 'video', name: videoName });
+    }
+  }
+
+  return [...refs.values()];
+};
+
 /**
- * The last non-intermediate image a completed backend item saved, by execution order: image records are read from the
- * end until one is not an intermediate. Null when it saved none, and for a workflow-call child, whose outputs reach
- * the user through its parent's results.
+ * The last non-intermediate image or video a completed backend item saved, by execution order: media records are read
+ * from the end until one is not an intermediate. Null when it saved none, and for a workflow-call child, whose outputs
+ * reach the user through its parent's results.
  */
-export const readQueueItemLastSavedImageName = async (itemId: number, signal?: AbortSignal): Promise<string | null> => {
+export const readQueueItemLastSavedOutput = async (
+  itemId: number,
+  signal?: AbortSignal
+): Promise<QueueResultMediaRef | null> => {
   const owner = captureAccountScope();
   const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
   const item = await getQueueItem(itemId, requestSignal);
@@ -181,13 +219,14 @@ export const readQueueItemLastSavedImageName = async (itemId: number, signal?: A
     return null;
   }
 
-  for (const imageName of getResultImageNames(item).reverse()) {
-    let image: QueueImageDTO;
+  for (const ref of getResultMediaRefs(item).reverse()) {
+    let record: { is_intermediate: boolean };
 
     try {
-      image = await apiFetchJson<QueueImageDTO>(`/api/v1/images/i/${encodeURIComponent(imageName)}`, {
-        signal: requestSignal,
-      });
+      record = await apiFetchJson<QueueImageDTO | QueueVideoDTO>(
+        `/api/v1/${ref.kind}s/i/${encodeURIComponent(ref.name)}`,
+        { signal: requestSignal }
+      );
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
         continue;
@@ -197,8 +236,8 @@ export const readQueueItemLastSavedImageName = async (itemId: number, signal?: A
 
     assertAccountScopeCurrent(owner);
 
-    if (!image.is_intermediate) {
-      return image.image_name;
+    if (!record.is_intermediate) {
+      return ref;
     }
   }
 
@@ -266,13 +305,8 @@ const collectResultVideoNames = (queueItem: QueueServerItemDTO, options?: QueueR
     : Object.values(results);
 
   for (const result of resultValues) {
-    if (!result || typeof result !== 'object') {
-      continue;
-    }
-
-    // VideoOutput shape: { video: { video_name }, width, height, ... }.
-    const videoName = (result as { video?: { video_name?: unknown } }).video?.video_name;
-    if (typeof videoName === 'string') {
+    const videoName = getOutputVideoName(result);
+    if (videoName !== undefined) {
       videoNames.add(videoName);
     }
   }

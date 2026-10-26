@@ -15,6 +15,8 @@ import pytest
 from invokeai.app.util.video_audio import _ffmpeg_exe, extract_audio_pcm
 from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav
 
+pytestmark = pytest.mark.ffmpeg
+
 
 def _sine(rate: int, seconds: float, freq: float) -> np.ndarray:
     t = np.arange(int(rate * seconds)) / rate

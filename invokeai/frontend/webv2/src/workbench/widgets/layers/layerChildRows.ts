@@ -29,7 +29,11 @@ export type LayerChildRowKind =
   | 'adjustment-curves'
   | 'adjustment-hsl'
   | 'adjustment-hue'
-  | 'adjustment-invert';
+  | 'adjustment-invert'
+  | 'adjustment-noise'
+  | 'adjustment-clarity'
+  | 'adjustment-texture'
+  | 'adjustment-dehaze';
 
 type AdjustmentChildKind = Extract<LayerChildRowKind, `adjustment-${string}`>;
 
@@ -39,22 +43,30 @@ export const adjustmentChildKind = (type: CanvasAdjustmentEntry['type']): Adjust
 
 const ADJUSTMENT_KIND_OF: Record<CanvasAdjustmentEntry['type'], AdjustmentChildKind> = {
   'brightness-contrast': 'adjustment-brightness-contrast',
+  clarity: 'adjustment-clarity',
   curves: 'adjustment-curves',
+  dehaze: 'adjustment-dehaze',
   exposure: 'adjustment-exposure',
   hsl: 'adjustment-hsl',
   hue: 'adjustment-hue',
   invert: 'adjustment-invert',
   levels: 'adjustment-levels',
+  noise: 'adjustment-noise',
+  texture: 'adjustment-texture',
 };
 
 const CHILD_ROW_NAME_KEYS: Record<Exclude<LayerChildRowKind, 'reference-image'>, string> = {
   'adjustment-brightness-contrast': 'widgets.layers.modifiers.brightnessContrast',
+  'adjustment-clarity': 'widgets.layers.adjustments.clarity',
   'adjustment-curves': 'widgets.layers.adjustments.curves',
+  'adjustment-dehaze': 'widgets.layers.adjustments.dehaze',
   'adjustment-exposure': 'widgets.layers.adjustments.exposure',
   'adjustment-hsl': 'widgets.layers.adjustments.saturation',
   'adjustment-hue': 'widgets.layers.adjustments.hue',
   'adjustment-invert': 'widgets.layers.adjustments.invert',
   'adjustment-levels': 'widgets.layers.adjustments.levels',
+  'adjustment-noise': 'widgets.layers.adjustments.noise',
+  'adjustment-texture': 'widgets.layers.adjustments.texture',
   'layer-region': 'widgets.layers.modifiers.regenerateRegion',
   'mask-denoise': 'widgets.layers.modifiers.denoise',
   'mask-noise': 'widgets.layers.modifiers.noise',
@@ -79,12 +91,25 @@ const adjustmentDetail = (entry: CanvasAdjustmentEntry): string | null => {
     }
     case 'levels':
       return entry.channel && entry.channel !== 'rgb' ? entry.channel.toUpperCase() : null;
+    case 'noise':
+      return `${Math.round(entry.amount * 100)}%`;
+    case 'clarity':
+    case 'texture':
+    case 'dehaze': {
+      // A signed strength, as on the backend nodes; it is not a percentage of any visible change.
+      const amount = Math.round(entry.amount);
+      return `${amount > 0 ? '+' : ''}${amount}`;
+    }
     case 'brightness-contrast':
     case 'curves':
     case 'invert':
       return null;
   }
 };
+
+/** The localized fact following an adjustment row's detail, as row fields to spread. */
+const adjustmentDetailLabel = (entry: CanvasAdjustmentEntry): { detailLabelKey?: string } =>
+  entry.type === 'noise' ? { detailLabelKey: `widgets.layers.adjustments.noiseGrains.${entry.grain}` } : {};
 
 /** Kinds whose list order is document truth; their rows offer Move up/down and Duplicate. */
 export const isOrderedChildKind = (kind: LayerChildRowKind): boolean => kind.startsWith('adjustment-');
@@ -115,6 +140,8 @@ export interface ProjectedChildRow {
   readonly image: { readonly imageName: string; readonly thumbnailUrl: string } | null;
   /** A compact preformatted fact shown beside the name (a percent, degrees), or `null`. */
   readonly detail: string | null;
+  /** The i18n key of a localized fact shown after `detail` (noise's grain); absent when the kind has none. */
+  readonly detailLabelKey?: string;
   /** The user-given name of a renameable item (adjustment entries), or `null`. */
   readonly customName: string | null;
 }
@@ -123,7 +150,8 @@ export type LayerChildRowAction =
   | { type: 'set-enabled'; isEnabled: boolean }
   | { type: 'remove' }
   | { type: 'move'; direction: -1 | 1 }
-  | { type: 'duplicate'; newId: string }
+  /** `newNoiseSeed` reseeds a duplicated noise entry: an identical copy would stack perfectly correlated grain. */
+  | { type: 'duplicate'; newId: string; newNoiseSeed: number }
   | { type: 'rename'; name: string | null };
 
 /** A child row's live item facts, resolved from the document; `null` when it is gone. */
@@ -257,6 +285,7 @@ export const projectLayerChildRows = (vm: SemanticNode): readonly ProjectedChild
         ...baseRow(vm),
         customName: adjustment.name ?? null,
         detail: adjustmentDetail(adjustment),
+        ...adjustmentDetailLabel(adjustment),
         image: null,
         isEnabled: adjustment.isEnabled,
         itemId: adjustment.id,
@@ -335,6 +364,10 @@ export const layerChildRemoveLabelKey = (kind: LayerChildRowKind): string => {
     case 'adjustment-hsl':
     case 'adjustment-hue':
     case 'adjustment-invert':
+    case 'adjustment-noise':
+    case 'adjustment-clarity':
+    case 'adjustment-texture':
+    case 'adjustment-dehaze':
       return 'widgets.layers.modifiers.removeAdjustment';
   }
 };
@@ -614,7 +647,9 @@ export const layerChildRowCommand = (
         const copy =
           source.type === 'curves'
             ? { ...source, curves: structuredClone(source.curves), id: action.newId }
-            : { ...source, id: action.newId };
+            : source.type === 'noise'
+              ? { ...source, id: action.newId, seed: action.newNoiseSeed }
+              : { ...source, id: action.newId };
         next = [...before.slice(0, index + 1), copy, ...before.slice(index + 1)];
         break;
       }

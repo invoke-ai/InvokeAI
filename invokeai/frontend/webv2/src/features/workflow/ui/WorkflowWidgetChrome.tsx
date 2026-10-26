@@ -1,6 +1,7 @@
 import type { InvocationTemplate, ProjectWorkflowSource, XYPosition } from '@features/workflow/contracts';
 
 import { Box, HStack, Icon, Menu, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
+import { useAuthSession } from '@features/identity';
 import { savedWorkflowDetailQueryOptions } from '@features/workflow/data/savedWorkflowQueries';
 import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
@@ -51,7 +52,7 @@ import { CallSavedWorkflowSyncRuntime } from './editor/CallSavedWorkflowSyncRunt
 import { getWorkflowFlowInstance } from './editor/flowInstanceStore';
 import { releaseWorkflowViewportsExcept } from './editor/workflowViewportStore';
 import { LibraryCopyChoiceHost } from './library/LibraryCopyChoiceDialog';
-import { isUpdatableSource } from './library/projectWorkflowEntries';
+import { isBundledLibraryWorkflowId, isUpdatableSource } from './library/projectWorkflowEntries';
 import { WorkflowLibraryDialog } from './library/WorkflowLibraryDialog';
 import { WorkflowPublicationHost } from './library/WorkflowPublicationHost';
 import { PendingWorkflowLoader } from './PendingLibraryWorkflowLoader';
@@ -91,14 +92,19 @@ const PERSISTENCE_VIEW: Record<
 };
 
 /**
- * What the workflow's library link says: the template it updates, a bundled template, or none. The template's name
- * is not part of the project; it is read only once asked for, through the query the update confirmation uses.
+ * What the workflow's library link says: the template it updates, a bundled template, another linked template, or
+ * none. The template's name is not part of the project; it is read only once asked for, through the query the update
+ * confirmation uses.
  */
-const useTemplateLinkDescription = (source: ProjectWorkflowSource | undefined, wantsName: boolean): string => {
+const useTemplateLinkDescription = (
+  source: ProjectWorkflowSource | undefined,
+  wantsName: boolean,
+  session: ReturnType<typeof useAuthSession>
+): string => {
   const { t } = useTranslation();
-  const isLinked = isUpdatableSource(source);
+  const isLinked = isUpdatableSource(source, session);
   const templateName = useQuery({
-    ...savedWorkflowDetailQueryOptions(isLinked ? source.libraryWorkflowId : ''),
+    ...savedWorkflowDetailQueryOptions(isLinked && source ? source.libraryWorkflowId : ''),
     enabled: isLinked && wantsName,
     select: (record) => record.name,
   }).data;
@@ -108,7 +114,11 @@ const useTemplateLinkDescription = (source: ProjectWorkflowSource | undefined, w
       ? t('widgets.workflow.linkedTemplate', { name: templateName })
       : t('widgets.workflow.linkedTemplateUnnamed')
     : source
-      ? t('workflowLibrary.sourceBundled')
+      ? isBundledLibraryWorkflowId(source.libraryWorkflowId)
+        ? t('workflowLibrary.sourceBundled')
+        : source.revision === null
+          ? t('workflowLibrary.sourceUnknownRevision')
+          : t('workflowLibrary.sourceRevision', { revision: source.revision })
       : t('workflowLibrary.sourceNone');
 };
 
@@ -123,8 +133,9 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
   const projectId = useWorkflowProjectSelector((project) => project.id);
   const activeWorkflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
   const source = useWorkflowProjectSelector((project) => project.activeWorkflow.source);
+  const session = useAuthSession();
   const [wantsTemplateName, setWantsTemplateName] = useState(false);
-  const linkDescription = useTemplateLinkDescription(source, wantsTemplateName);
+  const linkDescription = useTemplateLinkDescription(source, wantsTemplateName, session);
   const linkDescriptionId = useId();
   const openProjectWorkflows = useCallback(
     () => openWorkflowLibraryAtProjectWorkflow(projectId, activeWorkflowId),
@@ -152,9 +163,16 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
 
   // Center chrome already names the widget; the workflow name opens the project's workflows with this one selected.
   const displayName = workflowName || t('widgets.workflow.untitled');
-  const isLinked = isUpdatableSource(source);
-  // A source that cannot be updated is a bundled template's.
+  const isLinked = isUpdatableSource(source, session);
+  // A source this account cannot update is locked, whether bundled or owned by another account.
   const linkIcon = isLinked ? Link2Icon : source ? LockIcon : Link2OffIcon;
+  const linkKind = isLinked
+    ? 'linked'
+    : source
+      ? isBundledLibraryWorkflowId(source.libraryWorkflowId)
+        ? 'bundled'
+        : 'read-only'
+      : 'none';
 
   return (
     // Sized by its content, so a narrow center shrinks it and the view menu beside it in proportion; a zero basis
@@ -178,13 +196,7 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
         >
           <Icon as={LibraryIcon} boxSize="3.5" flexShrink={0} />
           <MiddleTruncate color={workflowName ? undefined : 'fg.subtle'} fontWeight="600" minW="0" text={displayName} />
-          <Icon
-            as={linkIcon}
-            boxSize="3.5"
-            color="fg.subtle"
-            data-template-link={isLinked ? 'linked' : source ? 'bundled' : 'none'}
-            flexShrink={0}
-          />
+          <Icon as={linkIcon} boxSize="3.5" color="fg.subtle" data-template-link={linkKind} flexShrink={0} />
         </Button>
       </Tooltip>
       <VisuallyHidden id={linkDescriptionId}>{linkDescription}</VisuallyHidden>
@@ -198,13 +210,14 @@ const LABEL_CLIP_CSS = { overflow: 'clip', overflowClipMargin: '4px' } as const;
 /** Entries contributed to the shared widget actions menu. */
 export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
   const { t } = useTranslation();
+  const session = useAuthSession();
   const { getProjectGraph } = useWorkflowUi();
   const { widgets } = useWorkflowHostCommands();
   const { createWorkflow } = useProjectGraphCommands();
   const notify = useWorkflowNotifications();
   const activeWorkflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
   const source = useWorkflowProjectSelector((project) => project.activeWorkflow.source);
-  const canUpdateSource = isUpdatableSource(source);
+  const canUpdateSource = isUpdatableSource(source, session);
 
   const openDetailsPanel = useCallback(() => {
     widgets.open({ region: 'left', widgetId: 'workflow' });
@@ -291,8 +304,11 @@ const selectPersistenceView = (persistence: WorkflowProjectPersistence) => ({
 
 export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
   const { t } = useTranslation();
+  const session = useAuthSession();
   const activeWorkflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
-  const canUpdateSource = useWorkflowProjectSelector((project) => isUpdatableSource(project.activeWorkflow.source));
+  const canUpdateSource = useWorkflowProjectSelector((project) =>
+    isUpdatableSource(project.activeWorkflow.source, session)
+  );
   const { hasLocalRecovery, status } = useWorkflowPersistenceSelector(selectPersistenceView);
   const openAddNode = useCallback(() => setAddNodeOpen(true), []);
   const openWorkflowLibrary = useCallback(() => setWorkflowLibraryOpen(true), []);

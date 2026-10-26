@@ -4,15 +4,19 @@ import type { WorkbenchCanvasCommands, WorkbenchQueries } from '@workbench/workb
 
 import { galleryImages } from '@features/gallery';
 import {
+  getCanvasImportNotice,
+  getSendAsControlNotice,
   importGalleryImagesToCanvas,
+  sendGalleryImageAsControl,
+  type CanvasImportNotice,
   type GalleryCanvasImportDestination,
-  type ImportGalleryImagesResult,
 } from '@workbench/canvas-operations/api';
 
 import { orderCanvasImageDropImages } from './canvasImageDnd';
 
-type CanvasImageDropEngine = Pick<CanvasEngineHandle, 'document' | 'layers' | 'projectId'>;
+type CanvasImageDropEngine = Pick<CanvasEngineHandle, 'document' | 'exports' | 'layers' | 'projectId'>;
 
+/** Imports the dropped gallery images and says how it went, as the gallery menu's matching action does. */
 export const executeCanvasImageDropImport = async ({
   destination,
   canvas,
@@ -22,6 +26,7 @@ export const executeCanvasImageDropImport = async ({
   imageNames,
   importGalleryImages = importGalleryImagesToCanvas,
   project,
+  sendAsControl = sendGalleryImageAsControl,
 }: {
   destination: GalleryCanvasImportDestination;
   canvas: WorkbenchCanvasCommands;
@@ -31,17 +36,23 @@ export const executeCanvasImageDropImport = async ({
   imageNames: readonly string[];
   importGalleryImages?: typeof importGalleryImagesToCanvas;
   project: Project;
-}): Promise<ImportGalleryImagesResult> => {
+  sendAsControl?: typeof sendGalleryImageAsControl;
+}): Promise<CanvasImportNotice> => {
   const fetchedImages = await getGalleryImages([...imageNames]);
   const images = orderCanvasImageDropImages(imageNames, fetchedImages);
-
-  return importGalleryImages({
+  const shared = {
     applyCanvasMutation: canvas.apply,
-    destination,
     engine,
     getProject: queries.getProject,
-    images,
     isActiveProject: queries.isActiveProject,
     project,
-  });
+  };
+
+  // One image dropped as a control layer fills the selected control layer still waiting for one, as Use as Control
+  // does; the resized zone always adds a layer, since its image is made for the generation size.
+  const [image] = images;
+  if (destination === 'control' && images.length === 1 && image) {
+    return getSendAsControlNotice(await sendAsControl({ ...shared, image }));
+  }
+  return getCanvasImportNotice(await importGalleryImages({ ...shared, destination, images }));
 };

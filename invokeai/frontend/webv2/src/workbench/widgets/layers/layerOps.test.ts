@@ -5,6 +5,7 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { createControlLayer } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { describe, expect, it } from 'vitest';
 
@@ -23,7 +24,7 @@ import {
   copyRasterToInpaintMask,
   copyRasterToRegionalGuidance,
   copyRegionalGuidanceToInpaintMask,
-  createControlLayer,
+  createAdjustmentEntry,
   createEmptyPaintLayer,
   createInpaintMaskFromImage,
   createInpaintMaskLayer,
@@ -38,8 +39,9 @@ import {
   fitLayerTransformToBbox,
   getControlTransparencyEffectPatch,
   getRegionalGuidanceAutoNegativePatch,
+  isAutoControlLayerName,
   isMergeableRasterLayer,
-  nextControlLayerName,
+  nextControlTypeLayerName,
   nextInpaintMaskName,
   nextRegionalGuidanceFillColor,
   REGIONAL_GUIDANCE_FILL_COLORS,
@@ -102,6 +104,27 @@ describe('createEmptyPaintLayer', () => {
     expect(createEmptyPaintLayer('a').id).toMatch(
       /^layer-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
     );
+  });
+});
+
+describe('createAdjustmentEntry', () => {
+  it('starts noise as visible film grain: monochrome, fading toward black and white, per-pixel, 10%, fresh seed', () => {
+    const first = createAdjustmentEntry('noise');
+    const second = createAdjustmentEntry('noise');
+    expect(first).toMatchObject({
+      amount: 0.1,
+      distribution: 'gaussian',
+      grain: 'monochrome',
+      isEnabled: true,
+      response: 'midtones',
+      size: 1,
+      type: 'noise',
+    });
+    for (const entry of [first, second]) {
+      const { seed } = entry as Extract<typeof entry, { type: 'noise' }>;
+      expect(Number.isInteger(seed) && seed >= 0 && seed <= 0xffffffff).toBe(true);
+    }
+    expect(first.id).not.toBe(second.id);
   });
 });
 
@@ -273,7 +296,25 @@ describe('nextInpaintMaskName', () => {
   });
 });
 
-describe('createControlLayer', () => {
+describe('control layer naming by type', () => {
+  it('numbers a typed layer after the other layers of its type, filling the first gap', () => {
+    expect(nextControlTypeLayerName('Depth', [])).toBe('Depth 1');
+    expect(nextControlTypeLayerName('Depth', ['Depth 1', 'Depth 3', 'Pose 2', 'Control Layer 2'])).toBe('Depth 2');
+    // Labels are matched literally, not as patterns.
+    expect(nextControlTypeLayerName('Line art (v2)', ['Line art (v2) 1'])).toBe('Line art (v2) 2');
+  });
+
+  it('renames only names the app gave the layer', () => {
+    const labels = ['Depth', 'Soft edges'];
+    expect(isAutoControlLayerName('Control Layer 4', labels)).toBe(true);
+    expect(isAutoControlLayerName('Soft edges 2', labels)).toBe(true);
+    expect(isAutoControlLayerName('Depth', labels)).toBe(false);
+    expect(isAutoControlLayerName('My depth pass', labels)).toBe(false);
+    expect(isAutoControlLayerName('Tile 1', labels)).toBe(false);
+  });
+});
+
+describe('control adapter defaults', () => {
   it('centralizes legacy defaults for every adapter kind', () => {
     expect(CONTROL_ADAPTER_DEFAULTS).toEqual({
       anima_lllite: { beginEndStepPct: [0, 1], controlMode: null, kind: 'anima_lllite', model: null, weight: 1 },
@@ -308,54 +349,12 @@ describe('createControlLayer', () => {
     expect(DEFAULT_CONTROL_ADAPTER.weight).toBe(0.75);
     expect(CONTROL_WEIGHT_BOUNDS).toEqual({ inputMax: 2, inputMin: -1, sliderMax: 2, sliderMin: 0, step: 0.05 });
   });
-
-  it('builds an empty control layer with the legacy-default ControlNet adapter and transparency on', () => {
-    const layer = createControlLayer('Control Layer 1', 'c1');
-    expect(layer).toMatchObject({
-      id: 'c1',
-      isEnabled: true,
-      name: 'Control Layer 1',
-      type: 'control',
-      withTransparencyEffect: true,
-    });
-    expect(layer.source).toEqual({ bitmap: null, type: 'paint' });
-    expect(layer.adapter).toEqual(DEFAULT_CONTROL_ADAPTER);
-    expect(layer.adapter.weight).toBe(0.75);
-    // The default adapter's mutable array must be copied, not shared.
-    expect(layer.adapter.beginEndStepPct).not.toBe(DEFAULT_CONTROL_ADAPTER.beginEndStepPct);
-    expect(layer.adapter.beginEndStepPct).toEqual([0, 0.75]);
-  });
-
-  it('uses Z-Image control defaults when created for a Z-Image main model', () => {
-    expect(createControlLayer('Z Control', 'z1', 'z-image').adapter).toEqual(CONTROL_ADAPTER_DEFAULTS.z_image_control);
-  });
-
-  it('uses Anima ControlNet-LLLite defaults when created for an Anima main model', () => {
-    expect(createControlLayer('Anima Control', 'a1', 'anima', 'sketch').adapter).toEqual({
-      ...CONTROL_ADAPTER_DEFAULTS.anima_lllite,
-      model: 'sketch',
-    });
-  });
-
-  it('seeds the provided default control model and stays null without one', () => {
-    expect(createControlLayer('C', 'c1', 'sdxl', 'union-model').adapter.model).toBe('union-model');
-    expect(createControlLayer('C', 'c1', 'sdxl').adapter.model).toBeNull();
-    expect(createControlLayer('Z', 'z1', 'z-image', 'z-control').adapter.model).toBe('z-control');
-  });
-});
-
-describe('nextControlLayerName', () => {
-  it('returns the first free "Control Layer N" gap', () => {
-    expect(nextControlLayerName([])).toBe('Control Layer 1');
-    expect(nextControlLayerName(['Control Layer 1', 'Control Layer 3'])).toBe('Control Layer 2');
-    expect(nextControlLayerName(['Control Layer 1', 'Control Layer 2'])).toBe('Control Layer 3');
-  });
 });
 
 describe('canConvertRasterControl', () => {
   it('is true for image/paint raster layers and control layers, false otherwise', () => {
     expect(canConvertRasterControl(createEmptyPaintLayer('p', 'p'))).toBe(true);
-    expect(canConvertRasterControl(createControlLayer('c', 'c'))).toBe(true);
+    expect(canConvertRasterControl(createControlLayer({ id: 'c', name: 'c' }))).toBe(true);
     expect(
       canConvertRasterControl(
         paintLayer('img', { source: { image: { height: 1, imageName: 'i', width: 1 }, type: 'image' } })
@@ -454,7 +453,7 @@ describe('fitLayerTransformToBbox', () => {
 
 describe('menu patch helpers', () => {
   it('builds control transparency effect patches', () => {
-    const layer = createControlLayer('control', 'c1');
+    const layer = createControlLayer({ id: 'c1', name: 'control' });
 
     expect(getControlTransparencyEffectPatch(layer)).toEqual({ layerType: 'control', withTransparencyEffect: false });
   });
@@ -491,20 +490,18 @@ describe('convertRasterControlLayer', () => {
     expect(converted?.type === 'control' ? converted.adapter : null).toEqual(CONTROL_ADAPTER_DEFAULTS.z_image_control);
   });
 
-  it('seeds the default control model through convert and copy paths', () => {
-    const converted = convertRasterControlLayer(paintLayer('r'), 'control', 'sdxl', 'union-model');
-    expect(converted?.type === 'control' ? converted.adapter.model : null).toBe('union-model');
-
-    const viaConvert = convertRasterToControl(createEmptyPaintLayer('r2', 'r2'), 'sdxl', 'union-model');
-    expect(viaConvert?.adapter.model).toBe('union-model');
-
-    const viaCopy = copyRasterToControl(createEmptyPaintLayer('r3', 'r3'), 'copy-id', 'sdxl', 'union-model');
-    expect(viaCopy?.adapter.model).toBe('union-model');
-    expect(copyRasterToControl(createEmptyPaintLayer('r4', 'r4'), 'copy-id-2', 'sdxl')?.adapter.model).toBeNull();
+  it('converts and copies raster layers into untyped control layers without a model', () => {
+    const typed = { ...createEmptyPaintLayer('r', 'r'), filter: { settings: {}, type: 'canny_edge_detection' } };
+    for (const control of [convertRasterToControl(typed, 'sdxl'), copyRasterToControl(typed, 'copy-id', 'sdxl')]) {
+      expect(control?.adapter).toEqual(DEFAULT_CONTROL_ADAPTER);
+      expect(control).not.toHaveProperty('controlType');
+      expect(control).not.toHaveProperty('detection');
+      expect(control).not.toHaveProperty('filter');
+    }
   });
 
   it('converts control→raster preserving the pixel source and round-trips', () => {
-    const control = createControlLayer('C', 'c1');
+    const control = createControlLayer({ id: 'c1', name: 'C' });
     const withSource = {
       ...control,
       source: { image: { height: 48, imageName: 'pic', width: 64 }, type: 'image' },
@@ -524,7 +521,7 @@ describe('convertRasterControlLayer', () => {
   });
 
   it('returns null when the layer already has the target type or cannot convert', () => {
-    expect(convertRasterControlLayer(createControlLayer('c', 'c'), 'control')).toBeNull();
+    expect(convertRasterControlLayer(createControlLayer({ id: 'c', name: 'c' }), 'control')).toBeNull();
     expect(convertRasterControlLayer(createEmptyPaintLayer('p', 'p'), 'raster')).toBeNull();
     expect(convertRasterControlLayer(createInpaintMaskLayer('m', 'm'), 'control')).toBeNull();
   });
@@ -590,7 +587,7 @@ describe('layer copy and conversion parity', () => {
   });
 
   it('copies control layers to pixel and mask-backed destinations', () => {
-    const control = { ...createControlLayer('Control', 'c1'), source: raster.source, transform };
+    const control = { ...createControlLayer({ id: 'c1', name: 'Control' }), source: raster.source, transform };
 
     expect(copyControlToRaster(control, 'r-copy')).toMatchObject({
       id: 'r-copy',
@@ -631,6 +628,29 @@ describe('layer copy and conversion parity', () => {
       name: 'Mask copy copy',
       type: 'inpaint_mask',
     });
+  });
+
+  it('clones into a control layer only while the stack changes no pixel; masks keep reading alpha', () => {
+    const unchanged = {
+      ...raster,
+      adjustments: [
+        { amount: 0, id: 'clarity', isEnabled: true, size: 40, type: 'clarity' as const },
+        { id: 'invert', isEnabled: false, type: 'invert' as const },
+      ],
+    };
+    expect(convertRasterToControl(unchanged)).toMatchObject({ source: raster.source, transform });
+    expect(copyRasterToControl(unchanged, 'c-copy')).toMatchObject({ source: raster.source, transform });
+
+    for (const entry of [
+      { brightness: 0.2, contrast: 0, id: 'bc', isEnabled: true, type: 'brightness-contrast' as const },
+      { amount: 30, id: 'dehaze', isEnabled: true, type: 'dehaze' as const },
+    ]) {
+      const adjusted = { ...raster, adjustments: [entry] };
+      expect(copyRasterToControl(adjusted, 'c-copy')).toBeNull();
+      expect(convertRasterToControl(adjusted)).toBeNull();
+      expect(convertRasterControlLayer(adjusted, 'control')).toBeNull();
+      expect(convertRasterToInpaintMask(adjusted)?.mask.bitmap).toEqual(raster.source.bitmap);
+    }
   });
 
   it('rejects parametric raster sources that cannot be represented as masks or controls', () => {

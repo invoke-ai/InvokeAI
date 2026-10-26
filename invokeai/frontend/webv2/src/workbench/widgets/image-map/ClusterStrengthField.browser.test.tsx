@@ -144,7 +144,7 @@ const spinner = (): HTMLInputElement => {
   const input = host?.querySelector('input[type="number"]');
 
   if (!(input instanceof HTMLInputElement)) {
-    throw new Error('the clustering-strength spinner is not in the document');
+    throw new TypeError('the clustering-strength spinner is not in the document');
   }
 
   return input;
