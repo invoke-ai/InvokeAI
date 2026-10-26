@@ -2,12 +2,14 @@ import splashImageUrl from '@assets/SplashImage.webp';
 import { Box, Flex, Heading, HStack, Spinner, Text, VStack } from '@chakra-ui/react';
 import { APP_VERSION } from '@platform/runtime/appMetadata';
 import { InvokeMark } from '@platform/ui/InvokeMark';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const splashImageStyle = { backgroundPosition: 'center', backgroundSize: 'cover' } as const;
 
 export const WorkbenchSplashScreen = ({ messageKey = 'splash.loadingWorkspace' }: { messageKey?: string }) => {
   const { t } = useTranslation();
+  const [year] = useState(() => new Date().getFullYear());
 
   return (
     <Flex align="center" aria-busy="true" h="100vh" justify="center" layerStyle="dotGrid" role="status" w="100vw">
@@ -37,7 +39,7 @@ export const WorkbenchSplashScreen = ({ messageKey = 'splash.loadingWorkspace' }
               </Text>
             </Flex>
             <Text fontSize="xs" mt="auto" fontFamily="mono">
-              {t('splash.copyright', { year: new Date().getFullYear() })}
+              {t('splash.copyright', { year })}
             </Text>
           </VStack>
         </HStack>

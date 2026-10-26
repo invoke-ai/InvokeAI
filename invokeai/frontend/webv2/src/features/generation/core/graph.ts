@@ -26,6 +26,7 @@ import {
   getFlux2DiffusersComponentSource,
   getGenerationDimensions,
   getGenerationValidationReasons,
+  isStrengthOnlyIPAdapterBase,
   type SupportedGenerateBase,
 } from './baseGenerationPolicies';
 import {
@@ -125,7 +126,11 @@ const addIPAdapterReferenceImages = (
   model: MainModelConfig,
   denoise: BackendInvocationContract
 ) => {
-  const refs = getEnabledReferenceImages(settings, 'ip_adapter').filter((ref) => ref.config.model?.base === model.base);
+  const strengthOnly = isStrengthOnlyIPAdapterBase(model.base);
+  // Anima drops a strength-0 adapter anyway; sending one would still encode the image, or install the encoder.
+  const refs = getEnabledReferenceImages(settings, 'ip_adapter').filter(
+    (ref) => ref.config.model?.base === model.base && !(strengthOnly && ref.config.weight === 0)
+  );
 
   if (refs.length === 0) {
     return;
@@ -140,17 +145,23 @@ const addIPAdapterReferenceImages = (
       continue;
     }
 
-    const node = addNode(graph, {
+    const shared = {
       begin_step_percent: beginEndStepPct[0],
-      clip_vision_model: clipVisionModel,
       end_step_percent: beginEndStepPct[1],
-      id: createId('ip_adapter'),
       image: toImageField(image),
       ip_adapter_model: adapterModel,
-      method,
-      type: model.base === 'flux' ? 'flux_ip_adapter' : 'ip_adapter',
-      weight,
-    });
+    };
+    // Anima's adapter brings its own SigLIP2 encoder and has no method: it takes a strength alone.
+    const node = strengthOnly
+      ? addNode(graph, { ...shared, id: createId('anima_ip_adapter'), strength: weight, type: 'anima_ip_adapter' })
+      : addNode(graph, {
+          ...shared,
+          clip_vision_model: clipVisionModel,
+          id: createId('ip_adapter'),
+          method,
+          type: model.base === 'flux' ? 'flux_ip_adapter' : 'ip_adapter',
+          weight,
+        });
 
     addEdge(graph, node, 'ip_adapter', collector, 'item');
   }
@@ -1284,12 +1295,14 @@ const buildAnimaGraph = (
 
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
+  addIPAdapterReferenceImages(graph, settings, model, denoise);
   addMetadata(graph, output, settings, model, 'anima_txt2img', projectSettings, {
     qwen3_encoder: qwen3EncoderModel,
     ...(qwen35EncoderModel ? { qwen3_5_encoder: qwen35EncoderModel } : {}),
     scheduler,
     vae: vaeModel,
   });
+  addReferenceImageMetadata(graph, output, settings);
 
   return graph;
 };
