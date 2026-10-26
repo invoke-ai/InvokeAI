@@ -10,7 +10,7 @@ import {
   isGalleryNavigationStateUnchanged,
 } from '@features/gallery/contracts';
 import { isOpenQueueItem } from '@features/queue/contracts';
-import { readQueueItemLastSavedImageName } from '@features/queue/queries';
+import { readQueueItemLastSavedOutput } from '@features/queue/queries';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 
 import type { GalleryRevealContext } from './revealGalleryItem';
@@ -48,9 +48,9 @@ export type ExternalGenerationRevealOutcome =
 const SETTLED: ExternalGenerationRevealOutcome = { kind: 'settled' };
 
 /**
- * Reveal another client's completed generation, as Find in Gallery would: select the board of its last saved image,
- * then the image, and announce it. It never takes the Gallery from the user. It stands down once a newer completion
- * arrives, while the user types in the focused window, while a run of their own in this project is open, while a
+ * Reveal another client's completed generation, as Find in Gallery would: select the board of its last saved image
+ * or video, then the item, and announce it. It never takes the Gallery from the user. It stands down once a newer
+ * completion arrives, while the user types in the focused window, while a run of their own in this project is open, while a
  * search or semantic query narrows the listing, while several items are selected, while another reveal is locating
  * its item, and once the user navigates the Gallery after arrival; all of these are dropped. A hidden tab only defers
  * it: the outcome asks to resume once the tab is visible. Every condition is checked again immediately before the
@@ -95,9 +95,9 @@ export const revealExternalGeneration = async (
     return standDown();
   }
 
-  const imageName = await readQueueItemLastSavedImageName(queueItemId, signal);
+  const output = await readQueueItemLastSavedOutput(queueItemId, signal);
 
-  if (imageName === null) {
+  if (output === null) {
     return SETTLED;
   }
   if (!isOwned() || !mayApply()) {
@@ -105,11 +105,14 @@ export const revealExternalGeneration = async (
   }
 
   owned = claimGalleryNavigationSequence();
-  await revealGalleryItem(
-    context,
-    { kind: 'image', name: imageName },
-    { accountScope, announcement: 'external-generation', locatorSignal: signal, mayApply, projectId, sequence: owned }
-  );
+  await revealGalleryItem(context, output, {
+    accountScope,
+    announcement: 'external-generation',
+    locatorSignal: signal,
+    mayApply,
+    projectId,
+    sequence: owned,
+  });
 
   // Revealing changes the Gallery's navigation, so only a reveal the tab's hiding stood down can resume.
   return standDown();

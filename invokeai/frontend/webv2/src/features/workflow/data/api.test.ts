@@ -4,7 +4,13 @@ const mocks = vi.hoisted(() => ({ apiFetch: vi.fn(), apiFetchJson: vi.fn() }));
 
 vi.mock('@platform/transport/http', () => ({ apiFetch: mocks.apiFetch, apiFetchJson: mocks.apiFetchJson }));
 
-import { getAllWorkflowTags, getLibraryWorkflowRecord, getWorkflowTagCounts, listLibraryWorkflows } from './api';
+import {
+  getAllWorkflowTags,
+  getLibraryWorkflowRecord,
+  getWorkflowTagCounts,
+  listLibraryWorkflows,
+  setLibraryWorkflowPublic,
+} from './api';
 
 describe('workflow library api', () => {
   beforeEach(() => {
@@ -54,6 +60,18 @@ describe('workflow library api', () => {
 
     await expect(getLibraryWorkflowRecord('workflow-1')).resolves.toEqual(record);
     expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/workflows/i/workflow-1', { signal: undefined });
+  });
+
+  it('updates workflow visibility with the workflow record endpoint', async () => {
+    const record = { workflow_id: 'workflow-1', name: 'Workflow 1', workflow: {}, is_public: true };
+    mocks.apiFetchJson.mockResolvedValue(record);
+
+    await expect(setLibraryWorkflowPublic('team/workflow id', true)).resolves.toEqual(record);
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/workflows/i/team%2Fworkflow%20id/is_public', {
+      body: JSON.stringify({ is_public: true }),
+      method: 'PATCH',
+      signal: undefined,
+    });
   });
 
   it('gets tag counts for the given tags', async () => {

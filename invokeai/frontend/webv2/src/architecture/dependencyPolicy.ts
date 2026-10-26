@@ -158,9 +158,12 @@ const REDUCER_DOCUMENT_MODULES = [
   'workbench/canvas-engine/document/layerStacks',
   'workbench/canvas-engine/document/selectionRepair',
 ];
-/** The loader repairs a persisted selection at ingress with the seam's own repair. */
+/** The loader repairs a persisted selection and control derivation at ingress with the seam's own repairs. */
 const CANVAS_LOADER = 'workbench/canvasMigration.ts';
-const LOADER_DOCUMENT_MODULES = ['workbench/canvas-engine/document/selectionRepair'];
+const LOADER_DOCUMENT_MODULES = [
+  'workbench/canvas-engine/document/controlDerivation',
+  'workbench/canvas-engine/document/selectionRepair',
+];
 
 const isSeamAllowance = (sourcePath: string, target: string): boolean =>
   (sourcePath === CANVAS_REDUCER && REDUCER_DOCUMENT_MODULES.includes(target)) ||

@@ -53,6 +53,10 @@ export interface FlushPendingUploadsOptions {
    * that the user cannot see through pass false and fail fast instead.
    */
   readonly waitForHeldPixels?: boolean;
+  /** Limits the barrier to these layers' dirty and in-flight work; absent means every layer. */
+  readonly layerIds?: readonly string[];
+  /** Stops waiting with an `AbortError`; uploads already started still settle. */
+  readonly signal?: AbortSignal;
 }
 
 /** Injectable timer seam (defaults to the global timers). */
@@ -140,7 +144,7 @@ export interface BitmapStore {
   suspendLayer(layerId: string): () => void;
   /** Cancels pending persistence and invalidates an in-flight result for one layer. */
   discardLayer(layerId: string): void;
-  /** Flushes every dirty layer immediately and resolves once all in-flight uploads settle. */
+  /** Flushes dirty layers (all, or `options.layerIds`) now and resolves once their in-flight uploads settle. */
   flushPendingUploads(options?: FlushPendingUploadsOptions): Promise<void>;
   /**
    * Detects the most recently applied paint ref so the engine skips self-echo rasterization. Different refs
@@ -227,9 +231,20 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
       resolve();
     }
   };
-  const waitForSuspensionChange = (): Promise<void> =>
-    new Promise((resolve) => {
-      suspensionWaiters.add(resolve);
+  const abortError = (): DOMException => new DOMException('Canvas pixel persistence wait aborted.', 'AbortError');
+  /** Resolves on the next suspension change; an abort rejects and drops the waiter. */
+  const waitForSuspensionChange = (signal?: AbortSignal): Promise<void> =>
+    new Promise((resolve, reject) => {
+      const onAbort = (): void => {
+        suspensionWaiters.delete(waiter);
+        reject(abortError());
+      };
+      const waiter = (): void => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve();
+      };
+      suspensionWaiters.add(waiter);
+      signal?.addEventListener('abort', onAbort, { once: true });
     });
 
   const clearTimer = (layerId: string): void => {
@@ -665,24 +680,50 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
   /** Safety net against a genuine infinite loop; real barrier calls settle in a handful of rounds. */
   const MAX_BARRIER_ITERATIONS = 10_000;
 
-  const flushPendingUploads = async ({ waitForHeldPixels = true }: FlushPendingUploadsOptions = {}): Promise<void> => {
+  /** Settles with `promise`, or rejects with an `AbortError` once `signal` aborts. */
+  const untilAborted = <T>(promise: Promise<T>, signal: AbortSignal | undefined): Promise<T> => {
+    if (!signal) {
+      return promise;
+    }
+    return new Promise<T>((resolve, reject) => {
+      const onAbort = (): void => reject(abortError());
+      if (signal.aborted) {
+        onAbort();
+        return;
+      }
+      signal.addEventListener('abort', onAbort, { once: true });
+      promise.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
+    });
+  };
+
+  const flushPendingUploads = async ({
+    layerIds,
+    signal,
+    waitForHeldPixels = true,
+  }: FlushPendingUploadsOptions = {}): Promise<void> => {
     // Flush dirty layers and await in-flight work until newer strokes also persist. Do not retry failures within
     // this barrier; poll deferred ownership until pixels are released, unless the caller cannot wait.
+    const scope = layerIds ? new Set(layerIds) : null;
+    const inScope = (layerId: string): boolean => scope === null || scope.has(layerId);
     const blockedThisBarrier = new Set<string>();
     for (let iteration = 0; iteration < MAX_BARRIER_ITERATIONS; iteration += 1) {
-      const toFlush = Array.from(dirty).filter((layerId) => !blockedThisBarrier.has(layerId) && !isSuspended(layerId));
+      if (signal?.aborted) {
+        throw abortError();
+      }
+      const scopedDirty = Array.from(dirty).filter(inScope);
+      const toFlush = scopedDirty.filter((layerId) => !blockedThisBarrier.has(layerId) && !isSuspended(layerId));
       for (const layerId of toFlush) {
         clearTimer(layerId);
         void runFlush(layerId);
       }
-      const ops = [...inFlight.values()];
+      const ops = [...inFlight].filter(([layerId]) => inScope(layerId)).map(([, op]) => op);
       if (ops.length === 0) {
-        const suspendedLayerIds = Array.from(dirty).filter((layerId) => isSuspended(layerId));
+        const suspendedLayerIds = scopedDirty.filter((layerId) => isSuspended(layerId));
         if (suspendedLayerIds.length > 0) {
           if (!waitForHeldPixels) {
             throw new BitmapPersistenceError(suspendedLayerIds, 'held');
           }
-          await waitForSuspensionChange();
+          await waitForSuspensionChange(signal);
           continue;
         }
         const unpersistedLayerIds = Array.from(blockedThisBarrier).filter(
@@ -693,7 +734,7 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
         }
         return;
       }
-      await Promise.all(ops);
+      await untilAborted(Promise.all(ops), signal);
       const deferredLayerIds: string[] = [];
       for (const layerId of toFlush) {
         if (dirty.has(layerId) && dirtyReason.get(layerId) === 'failure') {
@@ -706,7 +747,7 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
         if (!waitForHeldPixels) {
           throw new BitmapPersistenceError(deferredLayerIds, 'held');
         }
-        await sleep(DEFAULT_DEFERRED_RETRY_MS);
+        await untilAborted(sleep(DEFAULT_DEFERRED_RETRY_MS), signal);
       }
     }
     throw new Error('Canvas pixel persistence barrier exceeded its iteration limit.');
