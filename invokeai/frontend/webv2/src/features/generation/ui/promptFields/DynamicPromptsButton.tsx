@@ -1,4 +1,4 @@
-import type { PromptSyntaxProfile } from '@features/generation/core/prompt/capabilities';
+import type { PromptSyntaxProfile } from '@features/generation/core/prompt/compel';
 import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
 
 import { Popover, Portal, Stack, Text } from '@chakra-ui/react';

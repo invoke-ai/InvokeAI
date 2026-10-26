@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getPromptSyntaxProfile, supportsPromptAttentionSyntax } from './capabilities';
-import { getCompelPromptNodeType } from './compel';
+import { getCompelPromptNodeType, getPromptSyntaxProfile, supportsPromptAttentionSyntax } from './compel';
 
 describe('supportsPromptAttentionSyntax', () => {
   it.each(['sd-1', 'sd-2', 'sdxl', 'anima'])('reads attention syntax for %s', (base) => {

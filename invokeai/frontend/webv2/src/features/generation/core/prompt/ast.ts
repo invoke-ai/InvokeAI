@@ -42,6 +42,7 @@ export type PromptAstNode =
 const WORD_CHAR = /[\p{L}\p{N}\p{M}_]/u;
 const WHITESPACE = /\s/;
 const NUMERIC_WEIGHT = /^[+-]?\d+(?:\.\d+)?/;
+const ANIMA_NUMERIC_WEIGHT = /(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)/y;
 const SYMBOLIC_WEIGHT = /^(?:\++|-+)/;
 const PUNCTUATION = new Set([
   '.',
@@ -133,6 +134,64 @@ const readNumericAttention = (prompt: string, start: number): { value: number; e
   return { value: Number(match), end };
 };
 
+const readAnimaGroupAttention = (prompt: string, start: number): { value: PromptAttention; end: number } | null => {
+  const marker = prompt[start];
+  if (marker === '+' || marker === '-') {
+    let end = start + 1;
+    while (prompt[end] === marker) {
+      end++;
+    }
+    return { value: prompt.slice(start, end), end };
+  }
+
+  ANIMA_NUMERIC_WEIGHT.lastIndex = start;
+  const match = ANIMA_NUMERIC_WEIGHT.exec(prompt);
+  return match ? { value: Number(match[0]), end: ANIMA_NUMERIC_WEIGHT.lastIndex } : null;
+};
+
+/** Follow the backend's comma/whitespace word boundaries in one pass through each bare word. */
+const readAnimaWord = (prompt: string, start: number): { tokens: PromptToken[]; end: number } => {
+  const tokens: PromptToken[] = [];
+  let index = start;
+  let wordStart = start;
+  let blocked = false;
+
+  while (index < prompt.length && !/[\s(),]/.test(prompt[index] ?? '')) {
+    const char = prompt[index] ?? '';
+    if (char === '+' || char === '-') {
+      let end = index + 1;
+      while (prompt[end] === char) {
+        end++;
+      }
+      const next = prompt[end];
+      const nextContinuesWord = next !== undefined && !/[\s(),.+=\-"]/.test(next);
+      if (end === index + 1 && nextContinuesWord) {
+        index = end;
+        continue;
+      }
+      if (wordStart < index && !blocked) {
+        tokens.push({ type: 'word', value: prompt.slice(wordStart, index), range: range(wordStart, index) });
+        tokens.push({ type: 'weight', value: prompt.slice(index, end), range: range(index, end) });
+        wordStart = end;
+        blocked = false;
+      } else {
+        blocked = true;
+      }
+      index = end;
+      continue;
+    }
+    if (char === '.' || char === '=' || char === '"') {
+      blocked = true;
+    }
+    index++;
+  }
+
+  if (wordStart < index) {
+    tokens.push({ type: 'word', value: prompt.slice(wordStart, index), range: range(wordStart, index) });
+  }
+  return { tokens, end: index };
+};
+
 const readWord = (prompt: string, start: number): { token: PromptToken; extraToken?: PromptToken; end: number } => {
   const first = String.fromCodePoint(prompt.codePointAt(start) ?? 0);
   let end = start + first.length;
@@ -188,9 +247,10 @@ export const tokenizePrompt = (prompt: string, syntaxProfile: 'compel' | 'anima'
     if (char === ')') {
       tokens.push({ type: 'rparen', range: range(index, index + 1) });
 
-      const numeric = readNumericAttention(prompt, index + 1);
-      const symbolic = numeric ? null : readSymbolicAttention(prompt, index + 1);
-      const weight = numeric ?? symbolic;
+      const weight =
+        syntaxProfile === 'anima'
+          ? readAnimaGroupAttention(prompt, index + 1)
+          : (readNumericAttention(prompt, index + 1) ?? readSymbolicAttention(prompt, index + 1));
 
       if (weight) {
         tokens.push({
@@ -207,52 +267,16 @@ export const tokenizePrompt = (prompt: string, syntaxProfile: 'compel' | 'anima'
     }
 
     if (syntaxProfile === 'anima') {
-      if (',{}|'.includes(char)) {
+      if (char === ',') {
         tokens.push({ type: 'punct', value: char, range: range(index, index + 1) });
         index++;
         continue;
       }
-
-      let end = index + 1;
-
-      while (end < prompt.length && !/[\s(),{}|]/.test(prompt[end] ?? '')) {
-        end++;
+      const word = readAnimaWord(prompt, index);
+      for (const token of word.tokens) {
+        tokens.push(token);
       }
-
-      const source = prompt.slice(index, end);
-      const internalWeight = /(?:\+{2,}|-{2,})(?=[^+=.,(){}|\s-])/.exec(source);
-
-      if (internalWeight?.index && !/[.=]/.test(source)) {
-        const word = source.slice(0, internalWeight.index);
-        const weightStart = index + word.length;
-        tokens.push({ type: 'word', value: word, range: range(index, weightStart) });
-        tokens.push({
-          type: 'weight',
-          value: internalWeight[0],
-          range: range(weightStart, weightStart + internalWeight[0].length),
-          source: internalWeight[0],
-        });
-        index = weightStart + internalWeight[0].length;
-        continue;
-      }
-
-      const suffix = source.match(/(?:\++|-+)$/)?.[0];
-      const base = suffix ? source.slice(0, -suffix.length) : source;
-      // Compel's bare-word attention does not apply across dot/equal syntax, and a sign without a word is literal.
-      const canWeight = Boolean(suffix && base && !/[.=]/.test(base) && !/[+-]$|[+-]{2}/.test(base));
-
-      if (canWeight) {
-        tokens.push({ type: 'word', value: base, range: range(index, index + base.length) });
-        tokens.push({ type: 'weight', value: suffix!, range: range(index + base.length, end), source: suffix });
-      } else {
-        tokens.push({
-          type: /^[+-]/.test(source) || /[.=]/.test(source) ? 'punct' : 'word',
-          value: source,
-          range: range(index, end),
-        });
-      }
-
-      index = end;
+      index = word.end;
       continue;
     }
 

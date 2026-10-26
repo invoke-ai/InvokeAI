@@ -1,8 +1,7 @@
 import type { PromptAstNode, PromptRange, PromptToken } from './ast';
-import type { PromptSyntaxProfile } from './capabilities';
 
 import { parsePromptTokens, tokenizePrompt } from './ast';
-import { getUnsupportedPromptMethodRanges } from './capabilities';
+import { getUnsupportedPromptMethodRanges, type PromptSyntaxProfile } from './compel';
 import { scanDynamicPromptSyntax } from './dynamicPromptSyntax';
 
 export type PromptHighlightKind =

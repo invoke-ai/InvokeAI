@@ -26,8 +26,7 @@ import {
   SHAPE_OVERRIDES,
   tunedSettingsFor,
 } from './graphCoverage.testing';
-import { getPromptSyntaxProfile, supportsPromptAttentionSyntax } from './prompt/capabilities';
-import { COMPEL_NODE_TYPES } from './prompt/compel';
+import { COMPEL_NODE_TYPES, getPromptSyntaxProfile, supportsPromptAttentionSyntax } from './prompt/compel';
 import { REFINER_DENOISE_NODE_ID } from './sdxlRefinerGraph';
 
 const compileForShape = (

@@ -1,5 +1,5 @@
 import type { DynamicPromptsConfig } from '@features/generation/core/dynamicPrompts';
-import type { PromptSyntaxProfile } from '@features/generation/core/prompt/capabilities';
+import type { PromptSyntaxProfile } from '@features/generation/core/prompt/compel';
 import type { PromptHighlightOptions } from '@features/generation/core/prompt/highlight';
 import type { DynamicPromptsExpansion } from '@features/generation/ui/useDynamicPrompts';
 

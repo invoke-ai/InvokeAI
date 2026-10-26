@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { parsePrompt, serializePrompt, tokenizePrompt } from './ast';
 
@@ -8,6 +8,59 @@ describe('prompt AST', () => {
   it('tokenizes symbolic weights without treating hyphenated words as attention', () => {
     expect(tokenizePrompt('cat+').map((token) => token.type)).toEqual(['word', 'weight']);
     expect(tokenizePrompt('razor-sharp').map((token) => token.type)).toEqual(['word', 'punct', 'word']);
+  });
+
+  it.each([
+    ['(cat)-1', '-', '1'],
+    ['(cat)+1', '+', '1'],
+    ['(cat).5', 0.5, ''],
+    ['(cat)2.', 2, ''],
+    ['(cat)2next', 2, 'next'],
+    ['(cat)++dog', '++', 'dog'],
+  ] as const)('reads Anima group suffixes in %s', (prompt, weight, tail) => {
+    const tokens = tokenizePrompt(prompt, 'anima');
+    expect(tokens[3]).toMatchObject({ type: 'weight', value: weight });
+    expect(tokens.slice(4).map((token) => ('value' in token ? token.value : ''))).toEqual(tail ? [tail] : []);
+  });
+
+  it.each([
+    ['foo|bar+', ['foo|bar', '+']],
+    ['foo{bar}+', ['foo{bar}', '+']],
+    ['foo"bar+', ['foo"bar+']],
+    ['foo.bar+', ['foo.bar+']],
+    ['foo=bar+', ['foo=bar+']],
+    ['foo++bar.baz', ['foo', '++', 'bar.baz']],
+    ['foo++bar=2', ['foo', '++', 'bar=2']],
+  ] as const)('uses backend bare-word boundaries in %s', (prompt, values) => {
+    expect(tokenizePrompt(prompt, 'anima').map((token) => ('value' in token ? token.value : undefined))).toEqual(
+      values
+    );
+  });
+
+  it('keeps total substring reads linear across adjacent Anima attention runs', () => {
+    const prompt = 'a++'.repeat(2000);
+    const originalSlice = String.prototype.slice;
+    let copiedChars = 0;
+    const spy = vi.spyOn(String.prototype, 'slice').mockImplementation(function (
+      this: string,
+      start?: number,
+      end?: number
+    ) {
+      if (this.length === prompt.length && start !== undefined) {
+        copiedChars += (end ?? this.length) - start;
+      }
+      return originalSlice.call(this, start, end);
+    });
+
+    try {
+      const tokens = tokenizePrompt(prompt, 'anima');
+      expect(tokens).toHaveLength(4000);
+      expect(tokens[0]).toMatchObject({ type: 'word', value: 'a' });
+      expect(tokens.at(-1)).toMatchObject({ type: 'weight', value: '++' });
+      expect(copiedChars).toBeLessThanOrEqual(prompt.length * 3);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('parses prompt function argument ranges', () => {

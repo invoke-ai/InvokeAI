@@ -1,4 +1,4 @@
-import type { PromptSyntaxProfile } from '@features/generation/core/prompt/capabilities';
+import type { PromptSyntaxProfile } from '@features/generation/core/prompt/compel';
 import type { ResizableTextareaProps } from '@platform/ui';
 import type { Ref, UIEvent } from 'react';
 

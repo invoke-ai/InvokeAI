@@ -1,5 +1,5 @@
 import type { GenerationModelCatalogItem as ModelConfig, PromptHistoryItem } from '@features/generation/contracts';
-import type { PromptSyntaxProfile } from '@features/generation/core/prompt/capabilities';
+import type { PromptSyntaxProfile } from '@features/generation/core/prompt/compel';
 import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 import type {
   ExpandPromptSuggestion,

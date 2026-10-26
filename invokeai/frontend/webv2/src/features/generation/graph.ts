@@ -15,8 +15,7 @@ export {
   toModelIdentifier,
 } from './core/graphBuilder';
 export { detectCanvasMode } from './core/canvas/canvasMode';
-export { getPromptSyntaxProfile, supportsPromptAttentionSyntax } from './core/prompt/capabilities';
-export { getCompelPromptNodeType } from './core/prompt/compel';
+export { getCompelPromptNodeType, getPromptSyntaxProfile, supportsPromptAttentionSyntax } from './core/prompt/compel';
 export {
   areControlAdapterValuesValid,
   CONTROL_ADAPTER_KINDS,

@@ -4,7 +4,7 @@ import type { ExpandPromptSuggestion, GenerateLora, GenerateModelConfig } from '
 import type { ChangeEvent, KeyboardEvent } from 'react';
 
 import { Box, Text } from '@chakra-ui/react';
-import { getPromptSyntaxProfile } from '@features/generation/core/prompt/capabilities';
+import { getPromptSyntaxProfile } from '@features/generation/core/prompt/compel';
 import { applyPromptTemplate, getPromptTemplateChunks } from '@features/generation/core/promptTemplates';
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';

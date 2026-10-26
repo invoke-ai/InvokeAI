@@ -31,3 +31,56 @@ export const getCompelPromptNodeType = (base: string): (typeof COMPEL_PROMPT_NOD
 
   return COMPEL_PROMPT_NODE_TYPES[base];
 };
+
+/** The prompt syntax consumed by the selected model's text encoder. */
+export type PromptSyntaxProfile = 'none' | 'compel' | 'anima';
+
+export const getPromptSyntaxProfile = (base: string | null | undefined): PromptSyntaxProfile => {
+  if (base === 'anima') {
+    return 'anima';
+  }
+
+  return typeof base === 'string' && isCompelPromptBase(base) ? 'compel' : 'none';
+};
+
+export const supportsPromptAttentionSyntax = (base: string | null | undefined): boolean =>
+  getPromptSyntaxProfile(base) !== 'none';
+
+/** Method tails belong to Compel; the preceding group still has Anima attention syntax. */
+export const getUnsupportedPromptMethodRanges = (
+  prompt: string
+): { start: number; end: number; groupStart?: number; groupEnd?: number }[] => {
+  const matches = Array.from(prompt.matchAll(/\.[A-Za-z_][A-Za-z0-9_]*\([^()]*\)/g));
+  if (!matches.length) {
+    return [];
+  }
+
+  const openings: number[] = [];
+  const groupStartByClose = new Map<number, number>();
+  for (let index = 0; index < prompt.length; index++) {
+    if (prompt[index] === '\\' && (prompt[index + 1] === '(' || prompt[index + 1] === ')')) {
+      index++;
+    } else if (prompt[index] === '(') {
+      openings.push(index);
+    } else if (prompt[index] === ')') {
+      const opening = openings.pop();
+      if (opening !== undefined) {
+        groupStartByClose.set(index, opening);
+      }
+    }
+  }
+
+  return matches.map((match) => {
+    let preceding = match.index - 1;
+    while (preceding >= 0 && /\s/.test(prompt[preceding] ?? '')) {
+      preceding--;
+    }
+    const groupStart = groupStartByClose.get(preceding);
+    return {
+      start: match.index,
+      end: match.index + match[0].length,
+      groupStart,
+      groupEnd: groupStart === undefined ? undefined : preceding + 1,
+    };
+  });
+};

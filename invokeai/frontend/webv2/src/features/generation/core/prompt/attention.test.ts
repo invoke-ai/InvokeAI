@@ -30,6 +30,8 @@ describe('prompt attention adjustment', () => {
     ['foo,bar+', 'foo,bar++'],
     ['foo.bar+', '(foo.bar+)+'],
     ['foo=bar+', '(foo=bar+)+'],
+    ['foo"bar+', '(foo"bar+)+'],
+    ['++x+', '(++x+)+'],
   ])('uses Anima word boundaries for %s', (prompt, expected) => {
     const caret = Math.floor(prompt.length / 2);
     expect(adjustPromptAttention(prompt, caret, caret, 'increment', false, 'anima').prompt).toBe(expected);
@@ -41,12 +43,48 @@ describe('prompt attention adjustment', () => {
     expect(adjustPromptAttention(prompt, caret, caret, 'increment', false, 'anima').prompt).toBe(prompt);
   });
 
+  it.each([
+    ['blue-green+ .and()', 'blue-green++ .and()'],
+    ['blue-green+ .blend(0.5, 0.5)', 'blue-green++ .blend(0.5, 0.5)'],
+    ["blue-green+ ('red', 'blue').and()", "blue-green++ ('red', 'blue').and()"],
+    ["blue-green+ ('red', 'blue').blend(0.5, 0.5)", "blue-green++ ('red', 'blue').blend(0.5, 0.5)"],
+    ['.and() blue-green+', '.and() blue-green++'],
+  ])('preserves unsupported calls while editing nearby Anima attention in %s', (prompt, expected) => {
+    const caret = prompt.indexOf('blue') + 3;
+    expect(adjustPromptAttention(prompt, caret, caret, 'increment', false, 'anima').prompt).toBe(expected);
+  });
+
+  it('edits Anima attention inside the group before an unsupported method without changing its tail', () => {
+    const prompt = '(red+, blue).and() blue-green+';
+    const caret = prompt.indexOf('red') + 1;
+    expect(adjustPromptAttention(prompt, caret, caret, 'increment', false, 'anima').prompt).toBe(
+      '(red++, blue).and() blue-green+'
+    );
+  });
+
+  it.each([0, '(red, blue'.length])(
+    'adjusts the whole group from delimiter caret %i before an unsupported method',
+    (caret) => {
+      const prompt = '(red, blue).and()';
+      expect(adjustPromptAttention(prompt, caret, caret, 'increment', false, 'anima').prompt).toBe(
+        '(red, blue)+.and()'
+      );
+    }
+  );
+
   it('adjusts the second weighted word after an adjacent symbolic suffix for Anima', () => {
     const prompt = 'foo++bar+';
     const caret = prompt.indexOf('bar') + 1;
     const result = adjustPromptAttention(prompt, caret, caret, 'increment', false, 'anima');
 
     expect(result.prompt).toBe('(foo bar)++');
+  });
+
+  it('keeps a zero Anima group at zero when decreasing attention', () => {
+    const prompt = '(cat)0';
+    const caret = prompt.indexOf('cat') + 1;
+    expect(adjustPromptAttention(prompt, caret, caret, 'decrement', false, 'anima').prompt).toBe(prompt);
+    expect(adjustPromptAttention(prompt, caret, caret, 'increment', false, 'anima').prompt).toBe('(cat)0.1');
   });
 
   it.each([

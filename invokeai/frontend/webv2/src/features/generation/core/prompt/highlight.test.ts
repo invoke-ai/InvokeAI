@@ -148,6 +148,30 @@ describe('prompt highlight segments', () => {
   });
 
   describe('Anima attention-only syntax', () => {
+    it.each([
+      ['(cat)-1', '-', 'attention'],
+      ['(cat)+1', '+', 'attention'],
+      ['(cat).5', '.5', 'attentionNumeric'],
+      ['(cat)2.', '2.', 'attentionNumeric'],
+      ['(cat)2next', '2', 'attentionNumeric'],
+      ['(cat)++dog', '++', 'attention'],
+    ] as const)('highlights the supported group suffix in %s', (prompt, suffix, kind) => {
+      const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+      expect(segments).toContainEqual(expect.objectContaining({ text: suffix, kind }));
+      expect(segments.map((segment) => segment.text).join('')).toBe(prompt);
+    });
+
+    it('keeps earlier weights visible when later text has unsupported syntax', () => {
+      const prompt = 'foo++bar.baz foo++bar=2 foo"bar+ foo|bar+';
+      const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+      expect(segments.filter((segment) => segment.kind === 'attention').map((segment) => segment.text)).toEqual([
+        '++',
+        '++',
+        '+',
+      ]);
+      expect(segments.map((segment) => segment.text).join('')).toBe(prompt);
+    });
+
     it('highlights supported word and group weights across Compel-style word boundaries', () => {
       const prompt = 'blue-green+ hair!+ a+b+ foo++bar+ (long hair)2';
       const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
@@ -182,6 +206,18 @@ describe('prompt highlight segments', () => {
 
       expect(segments.some((segment) => segment.kind === 'variantBrace')).toBe(true);
       expect(segments.find((segment) => segment.text.includes('.and()'))?.kind).toBe('text');
+    });
+
+    it('highlights attention in the group before a plain Compel-only method', () => {
+      const prompt = 'blue-green+ (red+, blue).and()';
+      const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+
+      expect(segments.filter((segment) => segment.kind === 'attention').map((segment) => segment.text)).toEqual([
+        '+',
+        '+',
+      ]);
+      expect(segments.find((segment) => segment.text.includes('.and()'))?.kind).toBe('text');
+      expect(segments.map((segment) => segment.text).join('')).toBe(prompt);
     });
   });
 });

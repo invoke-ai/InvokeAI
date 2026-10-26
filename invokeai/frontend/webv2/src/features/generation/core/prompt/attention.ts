@@ -1,8 +1,7 @@
 import type { PromptAstNode, PromptAttention, PromptRange } from './ast';
-import type { PromptSyntaxProfile } from './capabilities';
 
 import { parsePrompt, serializePromptWithSelection } from './ast';
-import { getUnsupportedPromptMethodRanges } from './capabilities';
+import { getUnsupportedPromptMethodRanges, type PromptSyntaxProfile } from './compel';
 
 export type PromptAttentionDirection = 'increment' | 'decrement';
 
@@ -210,15 +209,28 @@ const unifyEqualWeights = (leaves: WeightedLeaf[]): void => {
   }
 };
 
-const wrapRun = (children: PromptAstNode[], attention: PromptAttention, selected: boolean): PromptAstNode => {
+const wrapRun = (
+  children: PromptAstNode[],
+  attention: PromptAttention,
+  selected: boolean,
+  syntaxProfile: Exclude<PromptSyntaxProfile, 'none'>
+): PromptAstNode => {
   const child = children.length === 1 ? children[0] : undefined;
-  if (typeof attention === 'string' && (child?.type === 'word' || child?.type === 'group')) {
+  if (
+    typeof attention === 'string' &&
+    (child?.type === 'group' ||
+      (child?.type === 'word' &&
+        (syntaxProfile === 'compel' || (!/[.="]/.test(child.text) && !/^[+-]/.test(child.text)))))
+  ) {
     return { ...child, attention, isSelection: selected || undefined };
   }
   return { type: 'group', attention, children, range: GENERATED_RANGE, isSelection: selected || undefined };
 };
 
-const groupWeightedLeaves = (leaves: WeightedLeaf[]): PromptAstNode[] => {
+const groupWeightedLeaves = (
+  leaves: WeightedLeaf[],
+  syntaxProfile: Exclude<PromptSyntaxProfile, 'none'>
+): PromptAstNode[] => {
   const nodes: PromptAstNode[] = [];
   let index = 0;
   while (index < leaves.length) {
@@ -256,7 +268,8 @@ const groupWeightedLeaves = (leaves: WeightedLeaf[]): PromptAstNode[] => {
           run.map((leaf) => {
             const steps = leaf.node.type === 'whitespace' ? 0 : leaf.weight.steps! - commonSteps;
             return { ...leaf, weight: { ...leaf.weight, steps, value: symbolicValue(steps) } };
-          })
+          }),
+          syntaxProfile
         )
       : run.map(leafNode);
     const attention = symbolic ? (sign > 0 ? '+' : '-').repeat(Math.abs(commonSteps)) : first.weight.value;
@@ -264,7 +277,8 @@ const groupWeightedLeaves = (leaves: WeightedLeaf[]): PromptAstNode[] => {
       wrapRun(
         children,
         attention,
-        run.every((leaf) => leaf.selected)
+        run.every((leaf) => leaf.selected),
+        syntaxProfile
       )
     );
     index = contentEnd;
@@ -316,6 +330,10 @@ const adjustNodes = (
       continue;
     }
     const stepped = stepWeight(combineWeights(inherited, leaf.weight), direction, preferNumeric);
+    if (syntaxProfile === 'anima' && stepped.value < 0) {
+      leaf.selected = false;
+      continue;
+    }
     const relativeSteps = stepped.steps !== null && inherited.steps !== null ? stepped.steps - inherited.steps : null;
     const canUseSymbolic =
       relativeSteps !== null &&
@@ -334,7 +352,7 @@ const adjustNodes = (
     return { nodes, modified: false };
   }
   unifyEqualWeights(leaves);
-  return { nodes: groupWeightedLeaves(leaves), modified: true };
+  return { nodes: groupWeightedLeaves(leaves, syntaxProfile), modified: true };
 };
 
 export const adjustPromptAttention = (
@@ -351,23 +369,66 @@ export const adjustPromptAttention = (
       start: Math.max(0, Math.min(prompt.length, selectionStart, selectionEnd)),
       end: Math.min(prompt.length, Math.max(0, selectionStart, selectionEnd)),
     };
+    let editStart = 0;
+    let editEnd = prompt.length;
+    let editSelection = selection;
     if (syntaxProfile === 'anima') {
       for (const range of getUnsupportedPromptMethodRanges(prompt)) {
         if (overlaps(selection, range)) {
           return unchanged;
         }
+        if (
+          range.groupStart !== undefined &&
+          range.groupEnd !== undefined &&
+          selection.start >= range.groupStart &&
+          selection.end <= range.groupEnd
+        ) {
+          const collapsed = selection.start === selection.end;
+          const touchesDelimiter =
+            selection.start === range.groupStart ||
+            (collapsed ? selection.end >= range.groupEnd - 1 : selection.end > range.groupEnd - 1);
+          if (touchesDelimiter) {
+            editStart = Math.max(editStart, range.groupStart);
+            editEnd = Math.min(editEnd, range.groupEnd);
+            editSelection = { start: range.groupStart + 1, end: range.groupEnd - 1 };
+          } else {
+            editStart = Math.max(editStart, range.groupStart + 1);
+            editEnd = Math.min(editEnd, range.groupEnd - 1);
+          }
+          continue;
+        }
+        if (range.end <= selection.start) {
+          editStart = Math.max(editStart, range.end);
+        } else if (range.start >= selection.end) {
+          const groupIsBeyondSelection =
+            range.groupStart !== undefined && range.groupStart > selection.start && range.groupStart >= selection.end;
+          editEnd = Math.min(editEnd, groupIsBeyondSelection ? range.groupStart! : range.start);
+        }
       }
     }
 
+    // Keep unsupported method tails and unselected source groups outside the serialized span.
+    const editablePrompt = prompt.slice(editStart, editEnd);
     const result = adjustNodes(
-      parsePrompt(prompt, syntaxProfile),
-      selection,
+      parsePrompt(editablePrompt, syntaxProfile),
+      {
+        start: Math.max(0, editSelection.start - editStart),
+        end: Math.min(editablePrompt.length, editSelection.end - editStart),
+      },
       direction,
       preferNumericAttentionStyle,
       NEUTRAL,
       syntaxProfile
     );
-    return result.modified ? serializePromptWithSelection(result.nodes, prompt) : unchanged;
+    if (!result.modified) {
+      return unchanged;
+    }
+    const edited = serializePromptWithSelection(result.nodes, editablePrompt);
+    return {
+      prompt: prompt.slice(0, editStart) + edited.prompt + prompt.slice(editEnd),
+      selectionStart: editStart + edited.selectionStart,
+      selectionEnd: editStart + edited.selectionEnd,
+    };
   } catch {
     // Prompts are edited while incomplete, and pathological nesting must not break typing.
     return unchanged;

@@ -3,7 +3,7 @@ import type { GenerateLora, GenerateModelConfig } from '@features/generation/cor
 import type { ChangeEvent, KeyboardEvent } from 'react';
 
 import { HStack, Text } from '@chakra-ui/react';
-import { getPromptSyntaxProfile } from '@features/generation/core/prompt/capabilities';
+import { getPromptSyntaxProfile } from '@features/generation/core/prompt/compel';
 import { getPromptTemplateChunks } from '@features/generation/core/promptTemplates';
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
