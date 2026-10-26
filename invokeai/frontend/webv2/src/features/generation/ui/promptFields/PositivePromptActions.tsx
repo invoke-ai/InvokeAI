@@ -1,4 +1,5 @@
 import type { GenerationModelCatalogItem as ModelConfig, PromptHistoryItem } from '@features/generation/contracts';
+import type { PromptSyntaxProfile } from '@features/generation/core/prompt/capabilities';
 import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 import type {
   ExpandPromptSuggestion,
@@ -167,12 +168,12 @@ interface PositivePromptActionsProps {
   template: PromptTemplateState;
   onInsertText: (text: string) => void;
   showSyntaxHighlighting: boolean;
-  /** Whether the selected model reads Compel attention syntax, the only syntax left in an expanded prompt. */
-  attentionSyntax: boolean;
+  /** Expanded prompts retain model-specific attention syntax after dynamic expansion. */
+  syntaxProfile: PromptSyntaxProfile;
 }
 
 export const PositivePromptActions = ({
-  attentionSyntax,
+  syntaxProfile,
   batchCount,
   droppedImage,
   dynamicPrompts,
@@ -196,7 +197,8 @@ export const PositivePromptActions = ({
         <DynamicPromptsButton
           batchCount={batchCount}
           config={dynamicPrompts}
-          highlightExpandedPrompts={showSyntaxHighlighting && attentionSyntax}
+          highlightExpandedPrompts={showSyntaxHighlighting && syntaxProfile !== 'none'}
+          syntaxProfile={syntaxProfile}
           positivePrompt={effectivePositivePrompt}
           showSyntaxHighlighting={showSyntaxHighlighting}
           onInsertText={onInsertText}

@@ -25,11 +25,26 @@ class _Group:
 class _Frame:
     parts: list[str | _Group] = field(default_factory=list)
     text: list[str] = field(default_factory=list)
+    word_start: int = 0
+    word_has_unsupported_syntax: bool = False
+
+    def append_text(self, value: str, *, blocked: bool = False, escaped: bool = False) -> None:
+        for char in value:
+            self.text.append(char)
+            if char.isspace() or char == ",":
+                self.word_start = len(self.text)
+                self.word_has_unsupported_syntax = False
+            elif char in '.=")' and not escaped:
+                self.word_has_unsupported_syntax = True
+        if blocked:
+            self.word_has_unsupported_syntax = True
 
     def flush_text(self) -> None:
         if self.text:
             self.parts.append("".join(self.text))
             self.text.clear()
+        self.word_start = 0
+        self.word_has_unsupported_syntax = False
 
 
 def _validate_weight(weight: float) -> float:
@@ -93,7 +108,7 @@ def parse_prompt_attention(prompt: str) -> tuple[str, list[WeightedTextRange]]:
         frame = frames[-1]
         if char == "\\" and index + 1 < len(prompt) and prompt[index + 1] in "()\\":
             has_escapes = True
-            frame.text.extend((char, prompt[index + 1]))
+            frame.append_text(prompt[index : index + 2], escaped=True)
             index += 2
         elif char == "(":
             frame.flush_text()
@@ -109,30 +124,35 @@ def parse_prompt_attention(prompt: str) -> tuple[str, list[WeightedTextRange]]:
                 frames[-1].parts.append(" ")
             has_markup = True
             index = next_index
-        elif char in "+-" and frame.text:
+        elif char in "+-":
             end = index + 1
             while end < len(prompt) and prompt[end] == char:
                 end += 1
-            # Compel treats a lone sign between two words as literal text.
-            next_is_word = end < len(prompt) and (prompt[end].isalnum() or prompt[end] == "_")
-            word_start = len(frame.text)
-            while word_start > 0 and (frame.text[word_start - 1].isalnum() or frame.text[word_start - 1] in "_@"):
-                word_start -= 1
-            if word_start < len(frame.text) and (end - index > 1 or not next_is_word):
+            # A lone sign followed by another word character belongs to that word in Compel.
+            next_continues_word = end < len(prompt) and not (prompt[end].isspace() or prompt[end] in '(),.+=-"')
+            if end == index + 1 and next_continues_word:
+                frame.append_text(char)
+                index = end
+                continue
+
+            # Comma separates fragments; a dot, equals sign, or quote makes a bare word
+            # fall back to literal text. Keep that decision as the word grows so malformed
+            # runs cannot repeatedly scan the entire prefix before token truncation.
+            if frame.word_start < len(frame.text) and not frame.word_has_unsupported_syntax:
                 weight, _ = _suffix_weight(prompt, index)
-                word = "".join(frame.text[word_start:])
-                del frame.text[word_start:]
+                word = "".join(frame.text[frame.word_start :])
+                del frame.text[frame.word_start :]
                 frame.flush_text()
                 frame.parts.append(_Group([word], weight=weight))
-                if next_is_word:
+                if next_continues_word:
                     frame.parts.append(" ")
                 has_markup = True
                 index = end
             else:
-                frame.text.append(char)
-                index += 1
+                frame.append_text(prompt[index:end], blocked=True)
+                index = end
         else:
-            frame.text.append(char)
+            frame.append_text(char)
             index += 1
 
     while len(frames) > 1:

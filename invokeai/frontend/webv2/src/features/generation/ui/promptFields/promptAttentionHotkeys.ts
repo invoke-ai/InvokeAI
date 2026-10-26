@@ -46,12 +46,14 @@ export const adjustFocusedPromptAttention = (
   }
 
   const selectionDirection = textarea.selectionDirection;
+  const syntaxProfile = textarea.getAttribute('data-prompt-syntax-profile') === 'anima' ? 'anima' : 'compel';
   const result = adjustPromptAttention(
     textarea.value,
     textarea.selectionStart,
     textarea.selectionEnd,
     direction,
-    preferNumericAttentionStyle
+    preferNumericAttentionStyle,
+    syntaxProfile
   );
 
   if (result.prompt === textarea.value) {

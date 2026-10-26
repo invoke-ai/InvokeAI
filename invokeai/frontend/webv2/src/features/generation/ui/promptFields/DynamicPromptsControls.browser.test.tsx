@@ -65,6 +65,7 @@ const render = async (onChange: (patch: Partial<DynamicPromptsConfig>) => void =
               },
             }}
             highlightExpandedPrompts
+            syntaxProfile="compel"
             positivePrompt="a {red|green} cat"
             showSyntaxHighlighting
             onInsertText={vi.fn()}

@@ -20,6 +20,36 @@ const adjust = (
 
 describe('prompt attention adjustment', () => {
   it.each([
+    ['blue-green+', 'blue-green++'],
+    ['hair!+', 'hair!++'],
+    ['a+b+', 'a+b++'],
+    ['foo/bar+', 'foo/bar++'],
+    ['foo:bar+', 'foo:bar++'],
+    ['a?b+', 'a?b++'],
+    ['word_+', 'word_++'],
+    ['foo,bar+', 'foo,bar++'],
+    ['foo.bar+', '(foo.bar+)+'],
+    ['foo=bar+', '(foo=bar+)+'],
+  ])('uses Anima word boundaries for %s', (prompt, expected) => {
+    const caret = Math.floor(prompt.length / 2);
+    expect(adjustPromptAttention(prompt, caret, caret, 'increment', false, 'anima').prompt).toBe(expected);
+  });
+
+  it('does not rewrite unsupported Compel method calls for Anima', () => {
+    const prompt = "('red', 'blue').and()";
+    const caret = prompt.indexOf('and');
+    expect(adjustPromptAttention(prompt, caret, caret, 'increment', false, 'anima').prompt).toBe(prompt);
+  });
+
+  it('adjusts the second weighted word after an adjacent symbolic suffix for Anima', () => {
+    const prompt = 'foo++bar+';
+    const caret = prompt.indexOf('bar') + 1;
+    const result = adjustPromptAttention(prompt, caret, caret, 'increment', false, 'anima');
+
+    expect(result.prompt).toBe('(foo bar)++');
+  });
+
+  it.each([
     ['(a b)++', 'a', 'decrement', '(a b+)+'],
     ['(a b+)++', 'a', 'increment', '(a b)+++'],
     ['x (a+ b)+', 'x (a+', 'increment', '(x a++ b)+'],

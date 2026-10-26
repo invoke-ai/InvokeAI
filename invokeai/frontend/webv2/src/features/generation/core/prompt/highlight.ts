@@ -1,6 +1,8 @@
 import type { PromptAstNode, PromptRange, PromptToken } from './ast';
+import type { PromptSyntaxProfile } from './capabilities';
 
 import { parsePromptTokens, tokenizePrompt } from './ast';
+import { getUnsupportedPromptMethodRanges } from './capabilities';
 import { scanDynamicPromptSyntax } from './dynamicPromptSyntax';
 
 export type PromptHighlightKind =
@@ -26,10 +28,10 @@ export type PromptHighlightKind =
 
 export interface PromptHighlightOptions {
   /**
-   * False when the model reads the prompt as plain text: Compel's weights, groups, embeddings, functions and bracket
-   * errors stay plain. Dynamic-prompt syntax is expanded before any encoder sees the prompt, so it is unaffected.
+   * Compel handles weights, embeddings and functions; Anima handles attention only. Dynamic-prompt syntax is expanded
+   * before either encoder sees the prompt, so it is unaffected by this profile.
    */
-  attentionSyntax?: boolean;
+  syntaxProfile?: PromptSyntaxProfile;
   /** Enable dynamic highlighting only on surfaces that actually expand syntax. */
   dynamicPrompts?: boolean;
   /** Resolvable wildcard names; omitted leaves every `__name__` neutral. */
@@ -258,6 +260,60 @@ const collectDynamicPromptAnnotations = (prompt: string, knownWildcards?: Readon
     range,
   }));
 
+const collectUnsupportedMethodAnnotations = (prompt: string): HighlightAnnotation[] =>
+  getUnsupportedPromptMethodRanges(prompt).map((range) => ({
+    kind: 'text',
+    priority: 36,
+    range,
+  }));
+
+/** Anima's lexical words can cross dynamic-syntax boundaries; split only for painting, after parsing. */
+const splitTokensAtAnnotations = (
+  prompt: string,
+  tokens: PromptToken[],
+  annotations: HighlightAnnotation[]
+): PromptToken[] => {
+  const boundaries = [...new Set(annotations.flatMap(({ range }) => [range.start, range.end]))].sort((a, b) => a - b);
+  const result: PromptToken[] = [];
+  let boundaryIndex = 0;
+
+  for (const token of tokens) {
+    while ((boundaries[boundaryIndex] ?? Infinity) <= token.range.start) {
+      boundaryIndex++;
+    }
+
+    let start = token.range.start;
+    const ends: number[] = [];
+    let next = boundaryIndex;
+
+    while ((boundaries[next] ?? Infinity) < token.range.end) {
+      ends.push(boundaries[next]!);
+      next++;
+    }
+
+    ends.push(token.range.end);
+
+    for (const end of ends) {
+      const part = prompt.slice(start, end);
+      const range = { start, end };
+
+      if (token.type === 'word' || token.type === 'punct' || token.type === 'whitespace') {
+        result.push({ ...token, value: part, range });
+      } else if (token.type === 'weight') {
+        result.push({ ...token, value: part, source: part, range });
+      } else {
+        result.push({ ...token, range });
+      }
+
+      start = end;
+    }
+
+    boundaryIndex = next;
+  }
+
+  return result;
+};
+
 export const buildPromptHighlightSegments = (
   prompt: string,
   options: PromptHighlightOptions = {}
@@ -267,19 +323,27 @@ export const buildPromptHighlightSegments = (
   }
 
   try {
-    const attentionSyntax = options.attentionSyntax ?? true;
-    // Compel tokens still segment the prompt, so dynamic annotations land on the same boundaries either way.
-    const tokens = tokenizePrompt(prompt);
+    const syntaxProfile = options.syntaxProfile ?? 'compel';
+    // Token boundaries keep dynamic annotations aligned even when the model reads plain text.
+    const tokens = tokenizePrompt(prompt, syntaxProfile === 'anima' ? 'anima' : 'compel');
     const annotations = [
-      ...(attentionSyntax
-        ? [...collectAnnotations(prompt, parsePromptTokens(tokens)), ...collectParenthesisErrors(tokens)]
+      ...(syntaxProfile !== 'none'
+        ? [
+            ...collectAnnotations(prompt, parsePromptTokens(tokens, syntaxProfile)),
+            ...(syntaxProfile === 'compel'
+              ? collectParenthesisErrors(tokens)
+              : collectUnsupportedMethodAnnotations(prompt)),
+          ]
         : []),
       ...(options.dynamicPrompts ? collectDynamicPromptAnnotations(prompt, options.knownWildcards) : []),
     ];
     const segments: PromptHighlightSegment[] = [];
 
-    forEachTokenAnnotation(tokens, annotations, (token, annotation) => {
-      const baseKind = attentionSyntax ? tokenKind(token) : 'text';
+    const displayTokens = syntaxProfile === 'anima' ? splitTokensAtAnnotations(prompt, tokens, annotations) : tokens;
+
+    forEachTokenAnnotation(displayTokens, annotations, (token, annotation) => {
+      const baseKind =
+        syntaxProfile === 'none' || (syntaxProfile === 'anima' && token.type === 'punct') ? 'text' : tokenKind(token);
       const kind = annotation && annotation.priority > BASE_PRIORITY[baseKind] ? annotation.kind : baseKind;
 
       appendSegment(segments, {

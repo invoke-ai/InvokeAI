@@ -1,4 +1,6 @@
 import type { DynamicPromptsConfig } from '@features/generation/core/dynamicPrompts';
+import type { PromptSyntaxProfile } from '@features/generation/core/prompt/capabilities';
+import type { PromptHighlightOptions } from '@features/generation/core/prompt/highlight';
 import type { DynamicPromptsExpansion } from '@features/generation/ui/useDynamicPrompts';
 
 import { Badge, HStack, Menu, NumberInput, Portal, Stack, Switch, Text } from '@chakra-ui/react';
@@ -22,6 +24,11 @@ import { useTranslation } from 'react-i18next';
 
 /** Rendering every row of a 10,000-prompt expansion would cost more than it tells the user. */
 const MAX_PREVIEW_ROWS = 200;
+const PROMPT_HIGHLIGHT_OPTIONS: Record<PromptSyntaxProfile, PromptHighlightOptions> = {
+  anima: { syntaxProfile: 'anima' },
+  compel: { syntaxProfile: 'compel' },
+  none: { syntaxProfile: 'none' },
+};
 const TABULAR_NUMS = { fontVariantNumeric: 'tabular-nums' } as const;
 // Use a hover fill distinct from the popover's muted surface.
 const PROMPT_ROW_HOVER_PROPS = { bg: 'bg.hover' } as const;
@@ -43,11 +50,13 @@ export const DynamicPromptsPanel = ({
   expansion,
   onUsePrompt,
   showSyntaxHighlighting,
+  syntaxProfile,
 }: {
   batchCount: number;
   config: DynamicPromptsFieldConfig;
   expansion: DynamicPromptsExpansion;
   showSyntaxHighlighting: boolean;
+  syntaxProfile: PromptSyntaxProfile;
   onUsePrompt: (prompt: string) => void;
 }) => {
   const { t } = useTranslation();
@@ -240,6 +249,7 @@ export const DynamicPromptsPanel = ({
               isDisabled={expansion.prompts.length === 1}
               prompt={prompt}
               showSyntaxHighlighting={showSyntaxHighlighting}
+              syntaxProfile={syntaxProfile}
               onUsePrompt={onUsePrompt}
             />
           ))}
@@ -260,11 +270,13 @@ const DynamicPromptRow = ({
   onUsePrompt,
   prompt,
   showSyntaxHighlighting,
+  syntaxProfile,
 }: {
   index: number;
   isDisabled: boolean;
   prompt: string;
   showSyntaxHighlighting: boolean;
+  syntaxProfile: PromptSyntaxProfile;
   onUsePrompt: (prompt: string) => void;
 }) => {
   const { t } = useTranslation();
@@ -293,8 +305,12 @@ const DynamicPromptRow = ({
           {index + 1}
         </Text>
         <Text as="span" color="fg" fontFamily="mono" fontSize="0.72rem" textAlign="start" wordBreak="break-word">
-          {/* Expanded prompts highlight attention/embeddings only; dynamic syntax has already been consumed. */}
-          <HighlightedPrompt enabled={showSyntaxHighlighting} prompt={prompt} />
+          {/* Dynamic syntax has already been consumed; the selected model controls remaining prompt syntax. */}
+          <HighlightedPrompt
+            enabled={showSyntaxHighlighting}
+            options={PROMPT_HIGHLIGHT_OPTIONS[syntaxProfile]}
+            prompt={prompt}
+          />
         </Text>
       </button>
     </Row>

@@ -159,7 +159,7 @@ const readWord = (prompt: string, start: number): { token: PromptToken; extraTok
   };
 };
 
-export const tokenizePrompt = (prompt: string): PromptToken[] => {
+export const tokenizePrompt = (prompt: string, syntaxProfile: 'compel' | 'anima' = 'compel'): PromptToken[] => {
   const tokens: PromptToken[] = [];
   let index = 0;
 
@@ -203,6 +203,56 @@ export const tokenizePrompt = (prompt: string): PromptToken[] => {
       } else {
         index++;
       }
+      continue;
+    }
+
+    if (syntaxProfile === 'anima') {
+      if (',{}|'.includes(char)) {
+        tokens.push({ type: 'punct', value: char, range: range(index, index + 1) });
+        index++;
+        continue;
+      }
+
+      let end = index + 1;
+
+      while (end < prompt.length && !/[\s(),{}|]/.test(prompt[end] ?? '')) {
+        end++;
+      }
+
+      const source = prompt.slice(index, end);
+      const internalWeight = /(?:\+{2,}|-{2,})(?=[^+=.,(){}|\s-])/.exec(source);
+
+      if (internalWeight?.index && !/[.=]/.test(source)) {
+        const word = source.slice(0, internalWeight.index);
+        const weightStart = index + word.length;
+        tokens.push({ type: 'word', value: word, range: range(index, weightStart) });
+        tokens.push({
+          type: 'weight',
+          value: internalWeight[0],
+          range: range(weightStart, weightStart + internalWeight[0].length),
+          source: internalWeight[0],
+        });
+        index = weightStart + internalWeight[0].length;
+        continue;
+      }
+
+      const suffix = source.match(/(?:\++|-+)$/)?.[0];
+      const base = suffix ? source.slice(0, -suffix.length) : source;
+      // Compel's bare-word attention does not apply across dot/equal syntax, and a sign without a word is literal.
+      const canWeight = Boolean(suffix && base && !/[.=]/.test(base) && !/[+-]$|[+-]{2}/.test(base));
+
+      if (canWeight) {
+        tokens.push({ type: 'word', value: base, range: range(index, index + base.length) });
+        tokens.push({ type: 'weight', value: suffix!, range: range(index + base.length, end), source: suffix });
+      } else {
+        tokens.push({
+          type: /^[+-]/.test(source) || /[.=]/.test(source) ? 'punct' : 'word',
+          value: source,
+          range: range(index, end),
+        });
+      }
+
+      index = end;
       continue;
     }
 
@@ -269,7 +319,10 @@ class PromptParser {
   private lastEmbeddingEnd = -1;
   private readonly groupEnds = new Map<number, number>();
 
-  constructor(private readonly tokens: PromptToken[]) {
+  constructor(
+    private readonly tokens: PromptToken[],
+    private readonly syntaxProfile: 'compel' | 'anima' = 'compel'
+  ) {
     const openings: number[] = [];
     for (let index = 0; index < tokens.length; index++) {
       const type = tokens[index]?.type;
@@ -619,7 +672,8 @@ class PromptParser {
         case 'lparen': {
           const lparen = token;
           const savedIndex = this.index;
-          const promptFunction = this.parsePromptFunctionIfPresent(lparen, savedIndex);
+          const promptFunction =
+            this.syntaxProfile === 'compel' ? this.parsePromptFunctionIfPresent(lparen, savedIndex) : null;
 
           if (promptFunction) {
             nodes.push(promptFunction);
@@ -736,9 +790,13 @@ const trimWhitespaceTokens = (tokens: PromptToken[]): PromptToken[] => {
   return tokens.slice(start, end);
 };
 
-export const parsePromptTokens = (tokens: PromptToken[]): PromptAstNode[] => new PromptParser(tokens).parse();
+export const parsePromptTokens = (
+  tokens: PromptToken[],
+  syntaxProfile: 'compel' | 'anima' = 'compel'
+): PromptAstNode[] => new PromptParser(tokens, syntaxProfile).parse();
 
-export const parsePrompt = (prompt: string): PromptAstNode[] => parsePromptTokens(tokenizePrompt(prompt));
+export const parsePrompt = (prompt: string, syntaxProfile: 'compel' | 'anima' = 'compel'): PromptAstNode[] =>
+  parsePromptTokens(tokenizePrompt(prompt, syntaxProfile), syntaxProfile);
 
 interface SerializeVisitor {
   onNode?: (node: PromptAstNode, start: number, end: number) => void;

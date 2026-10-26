@@ -49,6 +49,30 @@ def test_lone_plus_between_words_and_hyphen_inside_word_are_literal() -> None:
     assert parse_prompt_attention(prompt) == (prompt, [(0, len(prompt), 1.0)])
 
 
+@pytest.mark.parametrize(
+    ("prompt", "cleaned", "spans"),
+    [
+        ("blue-green+", "blue-green", [("blue-green", 1.1)]),
+        ("hair!+", "hair!", [("hair!", 1.1)]),
+        ("a+b+", "a+b", [("a+b", 1.1)]),
+        ("foo/bar+", "foo/bar", [("foo/bar", 1.1)]),
+        ("foo,bar+", "foo,bar", [("foo,", 1.0), ("bar", 1.1)]),
+        ("foo.bar+", "foo.bar+", [("foo.bar+", 1.0)]),
+        ("foo=bar+", "foo=bar+", [("foo=bar+", 1.0)]),
+        ("++x+", "++x+", [("++x+", 1.0)]),
+        ("+-", "+-", [("+-", 1.0)]),
+        (r"hair\)+", "hair)", [("hair)", 1.1)]),
+    ],
+)
+def test_bare_word_suffix_uses_compel_word_boundaries(
+    prompt: str, cleaned: str, spans: list[tuple[str, float]]
+) -> None:
+    actual_prompt, ranges = parse_prompt_attention(prompt)
+
+    assert actual_prompt == cleaned
+    assert _spans(actual_prompt, ranges) == spans
+
+
 def test_weight_suffix_before_adjacent_word_keeps_the_words_separate() -> None:
     prompt, ranges = parse_prompt_attention("(long hair)2next, blue++eyes")
 
@@ -113,6 +137,21 @@ def test_deep_and_unbalanced_groups_are_iterative() -> None:
 
 def test_many_literal_signs_preserve_the_prompt() -> None:
     prompt = "a+b-c" * 10_000
+    assert parse_prompt_attention(prompt) == (prompt, [(0, len(prompt), 1.0)])
+
+
+@pytest.mark.parametrize("sign", ["+", "-"])
+def test_large_literal_sign_runs_use_bounded_parser_reads(sign: str) -> None:
+    class BudgetedPrompt(str):
+        reads = 0
+
+        def __getitem__(self, key):
+            self.reads += 1
+            if self.reads > len(self) * 4:
+                raise AssertionError("A literal sign run was rescanned instead of consumed once")
+            return super().__getitem__(key)
+
+    prompt = BudgetedPrompt(" " + sign * 20_000)
     assert parse_prompt_attention(prompt) == (prompt, [(0, len(prompt), 1.0)])
 
 

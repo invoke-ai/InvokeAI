@@ -126,14 +126,14 @@ describe('prompt highlight segments', () => {
     it('leaves weights, groups, embeddings, functions and bracket errors plain', () => {
       const prompt = "cat+ (dog)1.2 <emb> ('a', 'b').and() \\( unclosed(";
 
-      expect(buildPromptHighlightSegments(prompt, { attentionSyntax: false })).toEqual([
+      expect(buildPromptHighlightSegments(prompt, { syntaxProfile: 'none' })).toEqual([
         { kind: 'text', range: { start: 0, end: prompt.length }, text: prompt },
       ]);
     });
 
     it('still marks dynamic-prompt syntax, which is expanded before any encoder reads the prompt', () => {
       const prompt = '{red+|green} # note';
-      const segments = buildPromptHighlightSegments(prompt, { attentionSyntax: false, dynamicPrompts: true });
+      const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'none', dynamicPrompts: true });
 
       expect(segments).toEqual([
         { kind: 'variantBrace', range: { start: 0, end: 1 }, text: '{' },
@@ -144,6 +144,44 @@ describe('prompt highlight segments', () => {
         { kind: 'text', range: { start: 12, end: 13 }, text: ' ' },
         { kind: 'comment', range: { start: 13, end: 19 }, text: '# note' },
       ]);
+    });
+  });
+
+  describe('Anima attention-only syntax', () => {
+    it('highlights supported word and group weights across Compel-style word boundaries', () => {
+      const prompt = 'blue-green+ hair!+ a+b+ foo++bar+ (long hair)2';
+      const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+
+      expect(segments.filter((segment) => segment.kind === 'attention').map((segment) => segment.text)).toEqual([
+        '+',
+        '+',
+        '+',
+        '++',
+        '+',
+      ]);
+      expect(segments.find((segment) => segment.kind === 'attentionNumeric')?.text).toBe('2');
+      expect(segments.map((segment) => segment.text).join('')).toBe(prompt);
+    });
+
+    it('leaves Compel-only functions, embeddings, and dot/equal suffixes plain', () => {
+      const prompt = 'foo.bar+ foo=bar+ <embedding> (red, blue).blend(0.5, 0.5)';
+      const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+
+      expect(segments.find((segment) => segment.text.includes('foo.bar+'))?.kind).toBe('text');
+      expect(segments.find((segment) => segment.text.includes('foo=bar+'))?.kind).toBe('text');
+      expect(segments.find((segment) => segment.text.includes('<embedding>'))?.kind).toBe('text');
+      expect(segments.find((segment) => segment.text.includes('.blend(0.5, 0.5)'))?.kind).toBe('text');
+      expect(segments.some((segment) => segment.kind === 'promptFunctionMethod' || segment.kind === 'embedding')).toBe(
+        false
+      );
+    });
+
+    it('keeps dynamic expansion highlighting while Anima methods are plain', () => {
+      const prompt = '{red+|blue} .and()';
+      const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima', dynamicPrompts: true });
+
+      expect(segments.some((segment) => segment.kind === 'variantBrace')).toBe(true);
+      expect(segments.find((segment) => segment.text.includes('.and()'))?.kind).toBe('text');
     });
   });
 });

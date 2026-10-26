@@ -1,7 +1,7 @@
 ---
 title: Advanced Prompt Syntax
 description: Fine control over prompts — attention weighting for SD and Anima models, blending and conjunctions for SD models, and advanced dynamic prompt syntax.
-lastUpdated: 2026-10-25
+lastUpdated: 2026-10-27
 sidebar:
   order: 3
 ---
@@ -13,7 +13,7 @@ Most prompts need nothing more than plain text, perhaps with a [prompt template]
 Attention weighting makes parts of the prompt count for more or less than the rest. **SD 1.5, SD 2.x and SDXL** use Compel. **Anima** accepts the attention-weight forms shown below and applies the weights to its own text conditioning; it does not run its text encoder through Compel. Other model families, including FLUX, Z-Image, CogView4 and Qwen Image, pass these symbols to the model as ordinary text.
 
 :::note[Compatibility note]
-  If a weighted prompt seems to be ignored, check which model you are using. Anima supports the attention-weight forms, but not Compel's `.blend()` or `.and()` functions. The prompt field colors weights, groups and embeddings only while an SD 1.5, SD 2.x or SDXL model is selected; Anima currently has no attention highlighting.
+  If a weighted prompt seems to be ignored, check which model you are using. Anima supports the attention-weight forms, but not Compel's `.blend()` or `.and()` functions or embeddings. Its prompt field highlights groups and weights; Compel-only syntax stays plain. SD 1.5, SD 2.x and SDXL also highlight their supported embeddings and prompt functions.
 :::
 
 | Syntax | Effect |
@@ -61,7 +61,7 @@ Parentheses group text even without an explicit weight. Escape them as `\(cospla
 
 ### Adjusting weights with the keyboard
 
-In a prompt field, select text and press **Ctrl+Up** or **Ctrl+Down** to raise or lower its attention. With no selection, the shortcut targets the word at the cursor. Selecting a group's parentheses or weight targets its contents. The shortcut works while an SD 1.5, SD 2.x or SDXL model is selected; with any other model the keys keep their usual text-editing behavior.
+In a prompt field, select text and press **Ctrl+Up** or **Ctrl+Down** to raise or lower its attention. With no selection, the shortcut targets the word at the cursor. Selecting a group's parentheses or weight targets its contents. The shortcut works with SD 1.5, SD 2.x, SDXL and Anima; with other models the keys keep their usual text-editing behavior. For Anima, punctuation within a Compel-style word such as `blue-green` or `hair!` remains part of that word.
 
 - A selection inside a group changes only the selected words. A selection crossing a group boundary changes the selected words on both sides.
 - Symbolic weights move one `+` or `-` step. Numeric weights change by `0.1` of effective attention, including inherited group weights.

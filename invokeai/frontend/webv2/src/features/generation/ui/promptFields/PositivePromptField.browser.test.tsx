@@ -91,6 +91,7 @@ it('keeps positive prompt actions enabled when stale view mode has no active tem
 
 it('colours and weights attention syntax only while the selected model reads it', async () => {
   const sdxl: GenerateModelConfig = { base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' };
+  const anima: GenerateModelConfig = { base: 'anima', key: 'anima', name: 'Anima', type: 'main' };
   const krea: GenerateModelConfig = { base: 'krea-2', key: 'krea', name: 'Krea-2 Turbo', type: 'main' };
   host = document.createElement('div');
   document.body.append(host);
@@ -147,4 +148,10 @@ it('colours and weights attention syntax only while the selected model reads it'
   expect(colouredSegments()).toEqual(['a cat', '+']);
   expect(await weightCat()).toBe(true);
   await expect.poll(() => textarea().value).toBe('a cat++');
+
+  await render(anima);
+  expect(textarea().getAttribute('data-prompt-syntax-profile')).toBe('anima');
+  expect(colouredSegments()).toEqual(['a cat', '++']);
+  expect(await weightCat()).toBe(true);
+  await expect.poll(() => textarea().value).toBe('a cat+++');
 });

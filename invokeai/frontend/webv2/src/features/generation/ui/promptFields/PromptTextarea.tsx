@@ -1,3 +1,4 @@
+import type { PromptSyntaxProfile } from '@features/generation/core/prompt/capabilities';
 import type { ResizableTextareaProps } from '@platform/ui';
 import type { Ref, UIEvent } from 'react';
 
@@ -28,7 +29,7 @@ const PROMPT_TEXTAREA_HIGHLIGHTED_CSS = {
 };
 
 /**
- * What the prompt does with Compel attention syntax. `edit` highlights it and lets the weighting keys rewrite it;
+ * Whether the selected syntax profile can be edited here. `edit` highlights it and lets the weighting keys rewrite it;
  * `highlight` only highlights it, for text not yet bound to a model; `none` leaves it plain because the model reads
  * the prompt as written.
  */
@@ -36,6 +37,7 @@ type PromptAttentionSyntax = 'edit' | 'highlight' | 'none';
 
 interface PromptTextareaProps extends Omit<ResizableTextareaProps, 'underlay'> {
   attentionSyntax?: PromptAttentionSyntax;
+  syntaxProfile?: PromptSyntaxProfile;
   /** Enable dynamic highlighting only for prompts that actually expand syntax. */
   highlightDynamicPrompts?: boolean;
   /** Resolvable wildcard names; an unknown `__name__` is underlined as an error. */
@@ -63,6 +65,7 @@ const setRef = (ref: Ref<HTMLTextAreaElement> | undefined, element: HTMLTextArea
 
 export const PromptTextarea = ({
   attentionSyntax = 'highlight',
+  syntaxProfile = 'compel',
   fontFamily = 'mono',
   fontSize,
   highlightDynamicPrompts = false,
@@ -80,7 +83,9 @@ export const PromptTextarea = ({
   const [scroll, setScroll] = useState({ left: 0, top: 0 });
   const [textareaWrapWidth, setTextareaWrapWidth] = useState<number | null>(null);
   const isWithinHighlightBudget = value.length > 0 && value.length <= MAX_HIGHLIGHTED_PROMPT_LENGTH;
-  const highlightsSyntax = showSyntaxHighlighting && (attentionSyntax !== 'none' || highlightDynamicPrompts);
+  const readsAttention = attentionSyntax !== 'none' && syntaxProfile !== 'none';
+  const editsAttention = attentionSyntax === 'edit' && readsAttention;
+  const highlightsSyntax = showSyntaxHighlighting && (readsAttention || highlightDynamicPrompts);
   // Template chunk emphasis is independent of the syntax-highlighting preference.
   const shouldHighlight = (highlightsSyntax || templateChunks !== null) && isWithinHighlightBudget;
   const effectiveFontSize = fontSize ?? PROMPT_FONT_SIZE;
@@ -90,8 +95,12 @@ export const PromptTextarea = ({
   const paddingInlineStart = showLineNumbers ? `calc(${PROMPT_TEXTAREA_PX} + ${gutterCh}ch)` : undefined;
 
   const highlightOptions = useMemo(
-    () => ({ attentionSyntax: attentionSyntax !== 'none', dynamicPrompts: highlightDynamicPrompts, knownWildcards }),
-    [attentionSyntax, highlightDynamicPrompts, knownWildcards]
+    () => ({
+      syntaxProfile: readsAttention ? syntaxProfile : ('none' as const),
+      dynamicPrompts: highlightDynamicPrompts,
+      knownWildcards,
+    }),
+    [readsAttention, syntaxProfile, highlightDynamicPrompts, knownWildcards]
   );
 
   const needsMirror = shouldHighlight || showLineNumbers;
@@ -235,7 +244,7 @@ export const PromptTextarea = ({
   return (
     <ResizableTextarea
       {...props}
-      {...(attentionSyntax === 'edit' ? PROMPT_ATTENTION_TARGET_PROPS : null)}
+      {...(editsAttention ? { ...PROMPT_ATTENTION_TARGET_PROPS, 'data-prompt-syntax-profile': syntaxProfile } : null)}
       bg={shouldHighlight ? 'transparent' : props.bg}
       caretColor={shouldHighlight ? 'fg' : props.caretColor}
       color={shouldHighlight ? 'transparent' : props.color}

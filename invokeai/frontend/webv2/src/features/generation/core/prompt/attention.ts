@@ -1,6 +1,8 @@
 import type { PromptAstNode, PromptAttention, PromptRange } from './ast';
+import type { PromptSyntaxProfile } from './capabilities';
 
 import { parsePrompt, serializePromptWithSelection } from './ast';
+import { getUnsupportedPromptMethodRanges } from './capabilities';
 
 export type PromptAttentionDirection = 'increment' | 'decrement';
 
@@ -96,15 +98,25 @@ const resolveSelection = (nodes: PromptAstNode[], selection: PromptRange): Promp
   return selection;
 };
 
-const flattenNodes = (nodes: PromptAstNode[], leaves: WeightedLeaf[], weight = NEUTRAL): void => {
+const flattenNodes = (
+  nodes: PromptAstNode[],
+  leaves: WeightedLeaf[],
+  weight = NEUTRAL,
+  syntaxProfile: Exclude<PromptSyntaxProfile, 'none'> = 'compel'
+): void => {
   for (const node of nodes) {
     const inherited = node.type === 'group' || node.type === 'word' ? inheritWeight(weight, node.attention) : weight;
     if (node.type === 'group') {
-      flattenNodes(node.children, leaves, inherited);
+      flattenNodes(node.children, leaves, inherited, syntaxProfile);
     } else {
       const previous = leaves.at(-1);
       // Preserve Compel's implicit word boundaries when removing parentheses.
-      if (previous?.node.type === 'word' && node.type === 'word' && previous.node.range.end < node.range.start) {
+      if (
+        previous?.node.type === 'word' &&
+        node.type === 'word' &&
+        (previous.node.range.end < node.range.start ||
+          (syntaxProfile === 'anima' && previous.node.range.end === node.range.start))
+      ) {
         leaves.push({
           node: { type: 'whitespace', value: ' ', range: { start: previous.node.range.end, end: node.range.start } },
           weight: NEUTRAL,
@@ -265,11 +277,12 @@ const adjustNodes = (
   selection: PromptRange,
   direction: PromptAttentionDirection,
   preferNumeric: boolean,
-  inherited = NEUTRAL
+  inherited = NEUTRAL,
+  syntaxProfile: Exclude<PromptSyntaxProfile, 'none'> = 'compel'
 ): { nodes: PromptAstNode[]; modified: boolean } => {
   const target = resolveSelection(nodes, selection);
   const leaves: WeightedLeaf[] = [];
-  flattenNodes(nodes, leaves);
+  flattenNodes(nodes, leaves, NEUTRAL, syntaxProfile);
   selectLeaves(leaves, target);
   let modified = false;
   for (const leaf of leaves) {
@@ -286,7 +299,7 @@ const adjustNodes = (
         if (!overlaps(target, arg.contentRange)) {
           return arg;
         }
-        const result = adjustNodes(arg.nodes, target, direction, preferNumeric, context);
+        const result = adjustNodes(arg.nodes, target, direction, preferNumeric, context, syntaxProfile);
         functionModified ||= result.modified;
         return result.modified ? { ...arg, nodes: result.nodes } : arg;
       });
@@ -329,7 +342,8 @@ export const adjustPromptAttention = (
   selectionStart: number,
   selectionEnd: number,
   direction: PromptAttentionDirection,
-  preferNumericAttentionStyle = false
+  preferNumericAttentionStyle = false,
+  syntaxProfile: Exclude<PromptSyntaxProfile, 'none'> = 'compel'
 ): PromptAttentionAdjustment => {
   const unchanged = { prompt, selectionStart, selectionEnd };
   try {
@@ -337,7 +351,22 @@ export const adjustPromptAttention = (
       start: Math.max(0, Math.min(prompt.length, selectionStart, selectionEnd)),
       end: Math.min(prompt.length, Math.max(0, selectionStart, selectionEnd)),
     };
-    const result = adjustNodes(parsePrompt(prompt), selection, direction, preferNumericAttentionStyle);
+    if (syntaxProfile === 'anima') {
+      for (const range of getUnsupportedPromptMethodRanges(prompt)) {
+        if (overlaps(selection, range)) {
+          return unchanged;
+        }
+      }
+    }
+
+    const result = adjustNodes(
+      parsePrompt(prompt, syntaxProfile),
+      selection,
+      direction,
+      preferNumericAttentionStyle,
+      NEUTRAL,
+      syntaxProfile
+    );
     return result.modified ? serializePromptWithSelection(result.nodes, prompt) : unchanged;
   } catch {
     // Prompts are edited while incomplete, and pathological nesting must not break typing.
