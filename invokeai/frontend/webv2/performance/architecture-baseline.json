@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 804953,
+        "brotliBytes": 808399,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 804296,
+        "gzipBytes": 807399,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2074195,
-        "largestAssetRawBytes": 752422,
+        "initialRawBytes": 2083953,
+        "largestAssetRawBytes": 751904,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 103111,
+        "ownedRawBytes": 103029,
         "requestCount": 35,
         "scriptRequestCount": 19,
         "sourceOwners": [
@@ -352,15 +352,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1213758,
+        "brotliBytes": 1216912,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1206518,
+        "gzipBytes": 1209036,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3341503,
-        "largestAssetRawBytes": 752422,
+        "initialRawBytes": 3350470,
+        "largestAssetRawBytes": 751904,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 156608,
+        "ownedRawBytes": 156430,
         "requestCount": 71,
         "scriptRequestCount": 55,
         "sourceOwners": [
@@ -850,7 +850,6 @@
           "source:src/workbench/canvas-engine/document/mergeVisible.ts",
           "source:src/workbench/canvas-engine/document/selectionRepair.ts",
           "source:src/workbench/canvas-engine/document/sources.ts",
-          "source:src/workbench/canvas-engine/editing/controlPixelEdit.ts",
           "source:src/workbench/canvas-engine/engineStores.ts",
           "source:src/workbench/canvas-engine/layerExportGuards.ts",
           "source:src/workbench/canvas-engine/math/mat2d.ts",
@@ -865,7 +864,6 @@
           "source:src/workbench/canvas-engine/render/maskFill.ts",
           "source:src/workbench/canvas-engine/render/rasterComposite.ts",
           "source:src/workbench/canvas-engine/render/rasterizers/textRasterizer.ts",
-          "source:src/workbench/canvas-engine/render/thumbnail.ts",
           "source:src/workbench/canvas-engine/transform/transformMath.ts",
           "source:src/workbench/canvasDimsSync.ts",
           "source:src/workbench/canvasLayerContent.ts",
@@ -1122,7 +1120,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-10-23",
+  "capturedAt": "2026-10-24",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

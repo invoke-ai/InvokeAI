@@ -147,15 +147,22 @@ describe('InvokeButton icon slot', () => {
   it('acknowledges canvas preparation immediately and ignores a second click', async () => {
     harness.summary.total = 0;
     const invoke = vi.fn(() => Promise.resolve());
-    const { button } = await renderInvokeButton({ invoke, isPreparing: true });
+    const { button } = await renderInvokeButton({
+      invoke,
+      isPreparing: true,
+      isValid: false,
+      issues: [{ layerId: 'control-2', message: 'Control layer "Depth 1": Choose a model.' }],
+    });
 
     expect(button.getAttribute('aria-disabled')).toBe('true');
-    expect(button.getAttribute('aria-label')).toBe('topbar.invoke.preparing');
+    await expect.element(button).toHaveAccessibleName('topbar.invoke.invoke');
+    await expect.element(button).toHaveAccessibleDescription('topbar.invoke.preparing');
     expect(hasSpinner(button)).toBe(true);
 
     await act(() => button.click());
 
     expect(invoke).not.toHaveBeenCalled();
+    expect(harness.revealed).toEqual([]);
   });
 });
 
@@ -180,11 +187,17 @@ describe('InvokeButton front of queue', () => {
     const { button } = await renderInvokeButton({
       invoke,
       isValid: false,
-      issues: [{ layerId: null, message: 'The backend is disconnected.' }],
+      issues: [
+        { layerId: null, message: 'The backend is disconnected.' },
+        { layerId: 'control-2', message: 'Control layer "Depth 1": Choose a model.' },
+      ],
     });
 
+    // The visible label names it (WCAG 2.5.3); the blocking reason describes it.
     expect(button.getAttribute('aria-disabled')).toBe('true');
-    expect(button.getAttribute('aria-label')).toBe('topbar.invoke.unavailable');
+    await expect.element(button).toHaveAccessibleName('topbar.invoke.issueCount(2)');
+    await expect.element(button).toHaveAccessibleDescription('topbar.invoke.unavailable');
+
     expect(getComputedStyle(button).opacity).toBe('0.55');
     // Dispatched: a blocked Invoke is not actionable for a pointer driver.
     await act(() => button.dispatchEvent(new MouseEvent('click', { bubbles: true })));
@@ -199,9 +212,13 @@ describe('InvokeButton front of queue', () => {
       'app.invoke': { aria: 'Control+Enter', display: 'Ctrl+Enter', parts: ['ctrl', 'enter'] },
       'app.invokeFront': frontBinding,
     };
+    // Wide enough for the keycap hint.
+    await page.viewport(1440, 900);
     const { button } = await renderInvokeButton();
 
     expect(button.getAttribute('aria-keyshortcuts')).toBe('Control+Enter Control+Shift+Enter');
+    // The keycap hint shows at this width but stays out of the name; aria-keyshortcuts carries the binding.
+    await expect.element(button).toHaveAccessibleName('topbar.invoke.invoke');
     await act(() => userEvent.hover(button));
 
     await expect.element(page.getByText('topbar.invoke.invokeFrontHint: Ctrl+Shift+Enter')).toBeVisible();
@@ -244,6 +261,10 @@ describe('InvokeButton issues', () => {
     expect(button.getAttribute('aria-label')).toBe(
       'topbar.invoke.showIssue(2, Control layer "Depth 1": Choose a model.)'
     );
+    await expect
+      .element(button)
+      .toHaveAccessibleName('topbar.invoke.showIssue(2, Control layer "Depth 1": Choose a model.)');
+    expect(button.hasAttribute('aria-describedby')).toBe(false);
 
     await act(() => userEvent.click(button));
     button.focus();

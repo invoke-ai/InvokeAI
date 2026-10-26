@@ -2,7 +2,7 @@ import type { FocusEvent, MouseEvent } from 'react';
 
 import { Box, HStack, Icon, Kbd, ProgressCircle, Separator, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getDeterminateProgressFraction } from '@features/queue/contracts';
-import { Button } from '@platform/ui/Button';
+import { Button, useUnavailableControl } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getDestinationLabel } from '@workbench/invocation';
 import { useActiveQueueProgress } from '@workbench/queue-integration/useActiveQueueProgress';
@@ -86,6 +86,15 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
       revealLayerProperties(issueLayerId);
     }
   }, [issueLayerId, revealLayerProperties]);
+  // The visible text names unavailable controls; the reason describes why they cannot act.
+  const unavailable = useUnavailableControl(
+    canInvoke || issueLayerId !== null
+      ? undefined
+      : isPreparing
+        ? t('topbar.invoke.preparing')
+        : t('topbar.invoke.unavailable', { reason: issues[0]?.message ?? t('topbar.invoke.unrunnable') }),
+    undefined
+  );
 
   const iconMode = isPreparing
     ? ({ mode: 'progress', value: null } as const)
@@ -98,18 +107,12 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   return (
     <Tooltip content={tooltipContent} contentProps={TOOLTIP_CONTENT_PROPS} openDelay={200} showArrow>
       <Button
-        aria-disabled={!canInvoke && issueLayerId === null}
+        {...unavailable?.props}
         aria-keyshortcuts={ariaKeyShortcuts}
         aria-label={
-          canInvoke
-            ? t('topbar.invoke.invoke')
-            : isPreparing
-              ? t('topbar.invoke.preparing')
-              : issueLayerId !== null
-                ? t('topbar.invoke.showIssue', { count: issues.length, reason: issues[0]?.message })
-                : t('topbar.invoke.unavailable', {
-                    reason: issues[0]?.message ?? t('topbar.invoke.unrunnable'),
-                  })
+          issueLayerId !== null
+            ? t('topbar.invoke.showIssue', { count: issues.length, reason: issues[0]?.message })
+            : undefined
         }
         colorPalette="brand"
         css={INVOKE_BUTTON_CSS}
@@ -125,7 +128,8 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
         onPointerLeave={handlePointerLeave}
         zIndex="2"
       >
-        <Box alignItems="center" boxSize="3.5" display="flex" justifyContent="center" position="relative">
+        {/* Decorative: the queue's progress has its own status surfaces, and it must not change the button's name. */}
+        <Box aria-hidden alignItems="center" boxSize="3.5" display="flex" justifyContent="center" position="relative">
           {iconMode.mode === 'play' ? (
             <Icon as={PlayIcon} boxSize="3.5" />
           ) : iconMode.value === null ? (
@@ -141,8 +145,10 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
           )}
         </Box>
         {showsIssues ? t('topbar.invoke.issueCount', { count: issues.length }) : t('topbar.invoke.invoke')}
+        {unavailable?.description}
         {shortcutParts && !showsIssues ? (
-          <Kbd css={HIDE_BELOW_HINT_WIDTH} variant="outline" borderColor={SHORTCUT_BORDER} color="inherit">
+          // The keycap stays out of the name; aria-keyshortcuts announces the binding.
+          <Kbd aria-hidden css={HIDE_BELOW_HINT_WIDTH} variant="outline" borderColor={SHORTCUT_BORDER} color="inherit">
             <TopbarShortcutKeys parts={shortcutParts} />
           </Kbd>
         ) : null}

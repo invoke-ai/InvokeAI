@@ -371,7 +371,7 @@ const ChannelFields = ({
   return (
     <Flex gap="1" wrap="wrap">
       <chakra.button
-        aria-label={t('widgets.layers.colorPane.format')}
+        aria-label={t('widgets.layers.colorPane.format', { format: format.toUpperCase() })}
         color="fg.muted"
         flexShrink={0}
         fontSize="xs"

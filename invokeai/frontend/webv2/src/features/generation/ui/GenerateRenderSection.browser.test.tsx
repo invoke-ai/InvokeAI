@@ -49,7 +49,7 @@ void i18n.use(initReactI18next).init({
       translation: {
         common: {
           newSeed: 'New seed',
-          scrubber: { editValue: 'Edit {{label}}' },
+          scrubber: { editValue: 'Edit {{label}}: {{value}}' },
           seed: 'Seed',
           seedMode: {
             decrement: 'Decrement',
