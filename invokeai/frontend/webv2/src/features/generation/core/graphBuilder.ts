@@ -42,7 +42,7 @@ export const addEdge = (
 };
 
 /** Rename every matching node ID and edge reference. */
-const renameNode = (graph: BackendGraphContract, oldId: string, newId: string): BackendInvocationContract => {
+export const renameNode = (graph: BackendGraphContract, oldId: string, newId: string): BackendInvocationContract => {
   const node = graph.nodes[oldId];
   if (!node) {
     throw new Error(`Could not find the "${oldId}" node to rename.`);

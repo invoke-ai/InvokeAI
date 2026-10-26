@@ -635,7 +635,7 @@ def test_the_processor_comes_from_the_qwen_image_2_1_pipeline_the_tokenizer_is_f
         )
     )
     tower, processor = _pipeline_encoder_node(1)._edit_identifiers(context)
-    assert (tower.key, tower.submodel_type) == ("qwen21", SubModelType.VisionTower)
+    assert (tower.key, tower.submodel_type) == ("qwen21", SubModelType.VisionEncoder)
     assert (processor.key, processor.submodel_type) == ("qwen21", SubModelType.Processor)
 
 
@@ -683,7 +683,7 @@ def _encode_until_reservation(num_references: int, image_size: int = 1024) -> tu
         SubModelType.TextEncoder: SimpleNamespace(
             model=text_encoder, compute_device=torch.device("cpu"), model_on_device=on_device
         ),
-        SubModelType.VisionTower: SimpleNamespace(
+        SubModelType.VisionEncoder: SimpleNamespace(
             model=tower, compute_device=torch.device("cpu"), model_on_device=lambda: nullcontext((None, tower))
         ),
         SubModelType.Tokenizer: nullcontext(load_bundled_qwen3_vl_tokenizer()),
@@ -714,7 +714,7 @@ def test_only_an_edit_loads_the_vision_tower(num_references: int) -> None:
     _, loaded = _encode_until_reservation(num_references, image_size=64)
     # The encoder is the tower-less one either way: its language model is cached once for both.
     assert loaded[0] is SubModelType.TextEncoder and SubModelType.TextEncoder not in loaded[1:]
-    assert (SubModelType.VisionTower in loaded) is bool(num_references)
+    assert (SubModelType.VisionEncoder in loaded) is bool(num_references)
     assert (SubModelType.Processor in loaded) is bool(num_references)
 
 
@@ -759,7 +759,7 @@ def test_an_edit_encodes_with_the_tower_attached_and_detaches_it(fail: bool, mon
 
     infos = {
         SubModelType.TextEncoder: info(encoder),
-        SubModelType.VisionTower: info(tower),
+        SubModelType.VisionEncoder: info(tower),
         SubModelType.Tokenizer: nullcontext(tokenizer),
         SubModelType.Processor: info(processor),
     }

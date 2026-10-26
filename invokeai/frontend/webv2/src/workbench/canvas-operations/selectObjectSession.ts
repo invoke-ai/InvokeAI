@@ -62,6 +62,8 @@ export interface SelectObjectSessionDeps<T> {
 
 export interface CreateSelectObjectSessionOptions<T> {
   deps: SelectObjectSessionDeps<T>;
+  /** Auto Process is an account preference; the session starts from it and Reset keeps it. */
+  initialAutoProcess?: boolean;
   operation: CanvasOperationSession;
 }
 
@@ -86,9 +88,9 @@ export interface SelectObjectSession<T> {
   dispose(): void;
 }
 
-const defaultState = <T>(): SelectObjectSessionState<T> => ({
+const defaultState = <T>(autoProcess: boolean): SelectObjectSessionState<T> => ({
   applyPolygonRefinement: false,
-  autoProcess: false,
+  autoProcess,
   error: null,
   input: { prompt: '', type: 'prompt' },
   invert: false,
@@ -131,6 +133,12 @@ const getPreparedSourceError = (
   if (result.status === 'dimension-mismatch') {
     return withDetail('output-dimension', result.message);
   }
+  if (result.status === 'adjustment-refused') {
+    return { code: `adjustment-${result.reason}` };
+  }
+  if (result.status === 'unreadable') {
+    return { code: 'unreadable' };
+  }
   return { code: 'not-ready' };
 };
 
@@ -161,7 +169,7 @@ class SamSessionFailure extends Error {
 
 export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionOptions<T>): SelectObjectSession<T> => {
   const { deps, operation } = options;
-  let state = defaultState<T>();
+  let state = defaultState<T>(options.initialAutoProcess ?? false);
   let source: SelectObjectPreparedSource | null = null;
   let requestToken = 0;
   let lastPublishedHash: string | null = null;
@@ -529,7 +537,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       operation.reset();
       source = null;
       lastPublishedHash = null;
-      publishState(defaultState<T>());
+      publishState(defaultState<T>(state.autoProcess));
     },
     subscribe: (listener) => {
       if (disposed) {

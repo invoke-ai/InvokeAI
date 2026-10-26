@@ -1,6 +1,7 @@
 /**
- * Pure canvas compiler over uploaded inputs. Resize through the processing grid and restore the bbox; reject
- * external models and unsupported encode modes.
+ * Pure canvas compiler over uploaded inputs. Resize through the processing grid and restore the bbox; hosted
+ * providers are asked for one of their own sizes, take the bbox composite for edits, and have their result restored
+ * to the bbox; reject unsupported modes.
  */
 
 import type { SupportedGenerateBase } from '@features/generation/core/baseGenerationPolicies';
@@ -8,11 +9,17 @@ import type { BackendGraphContract, BackendInvocationContract } from '@features/
 import type { ComponentModelConfig, GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
 import { getGenerationValidationReasons } from '@features/generation/core/baseGenerationPolicies';
-import { findVaeSource, GRAPH_BUILDERS } from '@features/generation/core/graph';
+import {
+  describeExternalCanvasRefusal,
+  isExternalGenerationMode,
+  isExternalTextOnlyCanvasModel,
+} from '@features/generation/core/externalProvider';
+import { buildExternalGraph, findVaeSource, GRAPH_BUILDERS } from '@features/generation/core/graph';
 import {
   addEdge,
   addNode,
   addOutputPostprocessors,
+  renameNode,
   replaceCanvasOutput,
   toGraphContract,
 } from '@features/generation/core/graphBuilder';
@@ -112,8 +119,21 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSi
   const reasons: string[] = [];
 
   if (model.type === 'external_image_generator') {
-    reasons.push(`${model.name} does not support canvas generation.`);
-    return reasons;
+    if (mode !== 'txt2img' && isExternalTextOnlyCanvasModel(model)) {
+      // Every edit mode comes from raster content in the frame, which names the cause better than the mode does.
+      reasons.push(describeExternalCanvasRefusal(model, { kind: 'raster_content' }));
+    } else if (mode === 'inpaint') {
+      // The Canvas keep-mask does not match provider edit-mask contracts, and there is no masked compositing tail.
+      reasons.push(`${model.name} does not support inpainting on the canvas yet. Remove or disable the inpaint mask.`);
+    } else if (mode === 'outpaint') {
+      reasons.push(`${model.name} does not support outpainting on the canvas.`);
+    }
+    if (input.controlLayers && input.controlLayers.length > 0) {
+      reasons.push(`${model.name} does not support control layers.`);
+    }
+    if (input.regionalGuidance && input.regionalGuidance.length > 0) {
+      reasons.push(`${model.name} does not support regional guidance.`);
+    }
   }
 
   if (getIsPidActive(settings.pidMode, model.base)) {
@@ -137,9 +157,9 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSi
   }
 
   if (!Number.isFinite(bbox.width) || !Number.isFinite(bbox.height) || bbox.width <= 0 || bbox.height <= 0) {
-    reasons.push('Canvas bounding box must have a positive area.');
+    reasons.push('Canvas frame must have a positive area.');
   } else if (!Number.isInteger(bbox.width) || !Number.isInteger(bbox.height)) {
-    reasons.push('Canvas bounding box dimensions must be whole pixels.');
+    reasons.push('Canvas frame dimensions must be whole pixels.');
   }
 
   if (isImageMode(mode)) {
@@ -147,7 +167,8 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSi
       reasons.push('Canvas generation requires a composited source image.');
     }
 
-    if (!Number.isFinite(strength) || strength <= 0 || strength > 1) {
+    // A provider edits at its own strength; only the local denoise reads this one.
+    if (model.type !== 'external_image_generator' && (!Number.isFinite(strength) || strength <= 0 || strength > 1)) {
       reasons.push('Canvas denoising strength must be greater than 0 and at most 1.');
     }
   }
@@ -234,6 +255,69 @@ const resizeCanvasOutputToBbox = (
   addEdge(graph, retired, 'image', output, 'image');
 };
 
+/**
+ * Hosted nodes return an image collection; restore each image to the bbox with its own provider metadata. A
+ * text-to-image result at another aspect ratio is scaled to cover the bbox and center-cropped, never stretched.
+ * Scaling before cropping keeps the crop centered when a provider answers at another scale of the requested shape
+ * (named sizes such as Gemini's `2K`). An edit result is resized plainly, undoing its init image's resize.
+ */
+const restoreExternalCanvasOutputToBbox = (
+  graph: BackendGraphContract,
+  input: Pick<CompileCanvasGraphInput, 'bbox' | 'destination'> & { mode: 'txt2img' | 'img2img' },
+  requestSize: CanvasSize
+): void => {
+  const { bbox, destination, mode } = input;
+  const provider = renameNode(graph, 'canvas_output', 'canvas_processing_output');
+  provider.is_intermediate = true;
+  const image = addNode(graph, { id: 'canvas_provider_image', type: 'iterate', use_cache: false });
+  const metadata = addNode(graph, { id: 'canvas_provider_metadata', type: 'metadata_from_image' });
+  const output = { id: 'canvas_output', is_intermediate: destination === 'canvas', use_cache: false };
+  // Keep core metadata on the provider so its output adds request identity, defaults and actual seed to it.
+  addEdge(graph, provider, 'collection', image, 'collection');
+  addEdge(graph, image, 'item', metadata, 'image');
+
+  if (mode === 'img2img' || requestSize.width * bbox.height === requestSize.height * bbox.width) {
+    const resize = addNode(graph, { ...output, height: bbox.height, type: 'img_resize', width: bbox.width });
+    addEdge(graph, image, 'item', resize, 'image');
+    addEdge(graph, metadata, 'metadata', resize, 'metadata');
+    return;
+  }
+
+  const scale = Math.max(bbox.width / requestSize.width, bbox.height / requestSize.height);
+  const cover = addNode(graph, {
+    height: Math.max(bbox.height, Math.round(requestSize.height * scale)),
+    id: 'canvas_provider_cover',
+    is_intermediate: true,
+    type: 'img_resize',
+    use_cache: false,
+    width: Math.max(bbox.width, Math.round(requestSize.width * scale)),
+  });
+  const crop = addNode(graph, {
+    ...output,
+    height: bbox.height,
+    type: 'img_crop',
+    width: bbox.width,
+    x: Math.floor((cover.width - bbox.width) / 2),
+    y: Math.floor((cover.height - bbox.height) / 2),
+  });
+  addEdge(graph, image, 'item', cover, 'image');
+  addEdge(graph, cover, 'image', crop, 'image');
+  addEdge(graph, metadata, 'metadata', crop, 'metadata');
+};
+
+/** Feeds the provider the composite at the request size, as the backend would have resized it to its own bucket. */
+const resizeExternalInitImage = (graph: BackendGraphContract, imageName: string, requestSize: CanvasSize): void => {
+  const provider = graph.nodes.canvas_output as BackendInvocationContract;
+  delete provider.init_image;
+  addEdge(
+    graph,
+    addInputResizeNode(graph, 'canvas_resize_image_to_request', imageName, requestSize),
+    'image',
+    provider,
+    'init_image'
+  );
+};
+
 /** Keeps saved-image metadata aligned to the bbox footprint, not the internal processing size. */
 const setCanvasMetadataDimensions = (graph: BackendGraphContract, bbox: CompileCanvasGraphInput['bbox']): void => {
   const metadata = findMetadataNode(graph);
@@ -288,9 +372,6 @@ const addInputResizeNode = (
 
 /** Resolves the encode node type for a supported base (throws otherwise). */
 const requireI2lType = (model: GenerateModelConfig): string => {
-  if (model.type === 'external_image_generator') {
-    throw new Error(`${model.name} does not support canvas generation.`);
-  }
   const i2lType = CANVAS_I2L_NODE_TYPES[model.base as SupportedGenerateBase];
   if (!i2lType) {
     throw new Error(`Canvas generation is not supported for ${model.name}.`);
@@ -740,17 +821,11 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
 
   const validationReasons = [
     ...getCanvasValidationReasons(input, processingSize),
-    ...getGenerationValidationReasons(model, settings),
+    ...getGenerationValidationReasons(model, settings, isExternalGenerationMode(mode) ? mode : 'txt2img'),
   ];
 
   if (validationReasons.length > 0) {
     throw new Error(validationReasons[0]);
-  }
-
-  const builder = GRAPH_BUILDERS[model.base as SupportedGenerateBase];
-
-  if (!builder || model.type === 'external_image_generator') {
-    throw new Error(`${model.name} does not support canvas generation.`);
   }
 
   // Canvas outputs are intermediate; gallery outputs are durable.
@@ -759,6 +834,44 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
     ...projectSettings,
     randDevice: input.randDevice ?? (projectSettings.useCpuNoise ? 'cpu' : 'cuda'),
   };
+
+  if (model.type === 'external_image_generator') {
+    // Validation above already named the mode; this narrows the provider inputs to the two modes Canvas compiles.
+    if (mode !== 'txt2img' && mode !== 'img2img') {
+      throw new Error(`${model.name} does not support ${mode}ing on the canvas.`);
+    }
+
+    // The provider is asked for the processing size, one of its own sizes, and the returned whole image is restored
+    // to the exact bbox footprint before staging or saving. No local denoising strength applies.
+    const backendGraph = buildExternalGraph(
+      settings,
+      model,
+      outputIsIntermediate,
+      runtimeProjectSettings,
+      mode === 'txt2img' ? { mode } : { initImageName: compositeImageName as string, mode }
+    );
+    if (mode === 'img2img' && !sizesMatch(processingSize, bbox)) {
+      resizeExternalInitImage(backendGraph, compositeImageName as string, processingSize);
+    }
+    restoreExternalCanvasOutputToBbox(backendGraph, { bbox, destination, mode }, processingSize);
+    setCanvasMetadataDimensions(backendGraph, bbox);
+
+    return {
+      backendGraph,
+      graph: toGraphContract(backendGraph, `${model.name} ${mode}`),
+      mode,
+      negativePromptNodeId: 'negative_prompt',
+      positivePromptNodeId: 'positive_prompt',
+      seedNodeId: 'seed',
+    };
+  }
+
+  const builder = GRAPH_BUILDERS[model.base as SupportedGenerateBase];
+
+  if (!builder) {
+    throw new Error(`Canvas generation is not supported for ${model.name}.`);
+  }
+
   const backendGraph = builder(settings, model, outputIsIntermediate, runtimeProjectSettings);
   const { compositing } = input;
 

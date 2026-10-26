@@ -1,19 +1,25 @@
+import type { AdjustmentRefusal } from '@workbench/canvas-engine/api';
+
 import type { CanvasImportNotice } from './canvasImportNotice';
 import type { CreateFromBboxLayerDestination, CreateFromBboxResult } from './createFromBbox';
 
 import { getCanvasImportNotice } from './canvasImportNotice';
 
-export interface CreateFromBboxNotice {
-  kind: 'error' | 'info' | 'success';
-  titleKey:
-    | CanvasImportNotice['titleKey']
-    | 'widgets.canvas.contextMenu.createdFromBbox'
-    | 'widgets.canvas.contextMenu.empty'
-    | 'widgets.canvas.contextMenu.notReady'
-    | 'widgets.canvas.contextMenu.stale';
-  /** `destination` is itself a translation key naming the created entity. */
-  options?: CanvasImportNotice['options'] | { destination: string };
-}
+/** A translated notice, or a spatial adjustment refusal the view words like every other one. */
+export type CreateFromBboxNotice =
+  | {
+      kind: 'error' | 'info' | 'success';
+      titleKey:
+        | CanvasImportNotice['titleKey']
+        | 'widgets.canvas.contextMenu.createdFromBbox'
+        | 'widgets.canvas.contextMenu.empty'
+        | 'widgets.canvas.contextMenu.notReady'
+        | 'widgets.canvas.contextMenu.stale'
+        | 'widgets.canvas.contextMenu.unreadable';
+      /** `destination` is itself a translation key naming the created entity; `name` names an unreadable layer. */
+      options?: CanvasImportNotice['options'] | { destination: string } | { name: string };
+    }
+  | { kind: 'error'; refusal: AdjustmentRefusal };
 
 const DESTINATION_LABEL_KEYS: Record<CreateFromBboxLayerDestination, string> = {
   control: 'widgets.canvas.import.control',
@@ -42,6 +48,10 @@ export const getCreateFromBboxNotice = (
     case 'not-ready':
     case 'over-budget':
       return { kind: 'info', titleKey: 'widgets.canvas.contextMenu.notReady' };
+    case 'unreadable':
+      return { kind: 'error', options: { name: result.layerName }, titleKey: 'widgets.canvas.contextMenu.unreadable' };
+    case 'adjustment-refused':
+      return { kind: 'error', refusal: result };
     case 'blocked':
     case 'stale-document':
     case 'stale-project':
