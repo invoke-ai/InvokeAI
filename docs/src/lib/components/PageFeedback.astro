@@ -3,6 +3,7 @@ import ThumbsDown from '@lucide/astro/icons/thumbs-down';
 import ThumbsUp from '@lucide/astro/icons/thumbs-up';
 
 import { getReportIssueUrl } from '../report-issue';
+import Trans from './Trans.astro';
 
 type Props = {
   /** Distinguishes the element ids of the copies in the right rail and the footer. */
@@ -12,27 +13,30 @@ type Props = {
 const labelId = `docs-feedback-label-${Astro.props.instance}`;
 
 const { entry } = Astro.locals.starlightRoute;
+const { t } = Astro.locals;
 const reportIssueUrl = getReportIssueUrl(entry.data.title, new URL(Astro.url.pathname, Astro.site).href);
 ---
 
 <docs-page-feedback class="feedback">
   <div class="question" role="group" aria-labelledby={labelId}>
-    <p id={labelId}>Was this page helpful?</p>
+    <p id={labelId}>{t('pageFeedback.question')}</p>
     <div class="answers">
       <button type="button" class="docs-button docs-button--secondary" data-helpful="yes">
         <ThumbsUp size={14} />
-        Yes
+        {t('pageFeedback.answerYes')}
       </button>
       <button type="button" class="docs-button docs-button--secondary" data-helpful="no">
         <ThumbsDown size={14} />
-        No
+        {t('pageFeedback.answerNo')}
       </button>
     </div>
   </div>
   <div class="thanks" tabindex="-1" hidden>
-    <p>Thanks for your feedback.</p>
+    <p>{t('pageFeedback.thanks')}</p>
     <p data-unhelpful hidden>
-      Tell us what was missing or wrong: <a href={reportIssueUrl}>Report an issue</a>
+      <Trans message={t('pageFeedback.reportPrompt')}>
+        {(text: string) => <a href={reportIssueUrl}>{text}</a>}
+      </Trans>
     </p>
   </div>
 </docs-page-feedback>

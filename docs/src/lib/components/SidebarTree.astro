@@ -27,10 +27,10 @@ const directories =
   );
 const hrefToId = makeHrefToId(import.meta.env.BASE_URL);
 
-const sectionIcon = (group: SidebarGroup) => {
+const sectionDirectoryOf = (group: SidebarGroup) => {
   const directory = sectionDirectory(group, directories, hrefToId);
   if (!directory) throw new Error(`The sidebar section "${group.label}" has no pages to place it by.`);
-  return getSidebarSectionIcon(directory, group.label);
+  return directory;
 };
 const hasCurrentPage = (group: SidebarGroup) => flattenLinks(group.entries).some((link) => link.isCurrent);
 ---
@@ -54,10 +54,12 @@ const hasCurrentPage = (group: SidebarGroup) => flattenLinks(group.entries).some
           </li>
         );
       }
-      const SectionIcon = sectionIcon(entry);
+      const directory = sectionDirectoryOf(entry);
+      const SectionIcon = getSidebarSectionIcon(directory, entry.label);
       return (
         <li>
-          <details open={hasCurrentPage(entry) || !entry.collapsed}>
+          {/* The section's directory keys its open state in every locale (`sidebar-state.mjs`). */}
+          <details open={hasCurrentPage(entry) || !entry.collapsed} data-section={directory}>
             <summary class="section">
               <span class="section-icon"><SectionIcon size={14} /></span>
               <span class:list={['label', { 'docs-eyebrow': !nested }]}>{entry.label}</span>

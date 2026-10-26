@@ -2,11 +2,11 @@
 // Groups SetupVariant alternatives of which exactly one shows for each setup. Fails the build when a
 // setup the picker offers would see none of them, or more than one. Content that only adds to one
 // setup (a note, a table) belongs outside the switch.
-import { findCoverageGaps, SETUP_OPTIONS, variantsInHtml } from './setup-picker.mjs';
+import { findCoverageGaps, localizeSetupOptions, SETUP_OPTIONS, variantsInHtml } from './setup-picker.mjs';
 
 const html = await Astro.slots.render('default');
 const variants = variantsInHtml(html);
-const { missing, repeated } = findCoverageGaps(SETUP_OPTIONS, variants);
+const { missing, repeated } = findCoverageGaps(localizeSetupOptions(SETUP_OPTIONS, Astro.locals.t), variants);
 if (missing.length || repeated.length) {
   throw new Error(
     // Astro.url names the route being rendered (possibly llms.txt), not the source page, so name the variants.

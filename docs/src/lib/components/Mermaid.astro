@@ -84,10 +84,10 @@ const { title = '' } = Astro.props as Props;
 <figure class="expandable-diagram">
   <figcaption>{title}</figcaption>
 
-  <div class="diagram-content">Loading diagram...</div>
+  <div class="diagram-content">{Astro.locals.t('mermaid.loading')}</div>
 
   <details>
-    <summary>Source</summary>
+    <summary>{Astro.locals.t('mermaid.sourceCode')}</summary>
     <slot />
   </details>
 </figure>

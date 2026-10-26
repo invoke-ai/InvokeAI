@@ -3,7 +3,7 @@
  * content column, so the table itself can fill the column with ordinary table layout and size its columns to their
  * longest word or code token instead of breaking them. The wrapper's `data-label` names the table, from its caption
  * or else the nearest heading before it, for the scroll region the page makes of a table that overflows
- * (`src/lib/components/MarkdownContent.astro`).
+ * (`src/lib/components/MarkdownContent.astro`, which also names a table that has neither).
  */
 export function rehypeTableScroll() {
   return (tree) => {
@@ -18,7 +18,7 @@ export function rehypeTableScroll() {
           return child;
         }
         const caption = child.children.find((cell) => cell.type === 'element' && cell.tagName === 'caption');
-        const label = (caption && textOf(caption).trim()) || lastHeading || 'Table';
+        const label = (caption && textOf(caption).trim()) || lastHeading || undefined;
         return { type: 'element', tagName: 'div', properties: { className: ['table-scroll'], dataLabel: label }, children: [child] };
       });
     };

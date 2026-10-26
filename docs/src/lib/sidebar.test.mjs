@@ -11,6 +11,7 @@ import {
   sectionDirectory,
   selectCrossListings,
   sortAndRelabel,
+  translateGroupLabels,
 } from './sidebar.mjs';
 import { generateDocsId } from './sort-prefix.mjs';
 
@@ -42,6 +43,26 @@ describe('generateDocsId', () => {
   it('prefers a frontmatter slug, but ignores an empty one', () => {
     assert.equal(generateDocsId({ entry: '01.a.mdx', data: { slug: 'custom/path' } }), 'custom/path');
     assert.equal(generateDocsId({ entry: '01.a.mdx', data: { slug: '' } }), 'a');
+  });
+});
+
+describe('translateGroupLabels', () => {
+  it('translates group labels at every depth by their slug, keeping labels without a string and link labels', () => {
+    const german = {
+      'sidebar.group.image-generation': 'Bildgenerierung',
+      'sidebar.group.advanced-topics': 'Fortgeschritten',
+    };
+    const t = Object.assign((key) => german[key], { exists: (key) => key in german });
+    const sidebar = [
+      group('Image Generation', 'image-generation', [
+        link('image-generation/introduction', 'Introduction'),
+        group('Advanced Topics', 'image-generation/advanced-topics', [link('image-generation/advanced-topics/x')]),
+      ]),
+      group('Gallery', 'gallery', []),
+    ];
+    translateGroupLabels(sidebar, t);
+    assert.deepEqual(labels(sidebar), ['Bildgenerierung', 'Gallery']);
+    assert.deepEqual(labels(sidebar[0].entries), ['Introduction', 'Fortgeschritten']);
   });
 });
 

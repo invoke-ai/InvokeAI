@@ -7,7 +7,7 @@ import { Image } from 'astro:assets';
 import { getCollection } from 'astro:content';
 
 import { getSectionIcon, getTopicIcon } from '../../config/icons';
-import { docsTopics } from '../../config/topics';
+import { docsTopics, topicDescription, topicLabel } from '../../config/topics';
 import { withBase } from '../base-path';
 import { sortShowcase } from '../showcase.mjs';
 import ModelFamilies from './ModelFamilies.astro';
@@ -27,7 +27,13 @@ const href = (path: string) => withBase(path, base);
 const topic = (id: string) => {
   const found = docsTopics.find((candidate) => candidate.id === id);
   if (!found) throw new Error(`The home page links to the unknown docs topic "${id}".`);
-  return { label: found.label, description: found.description, link: found.link, Icon: getTopicIcon(found) };
+  const { t } = Astro.locals;
+  return {
+    label: topicLabel(t, found),
+    description: topicDescription(t, found),
+    link: found.link,
+    Icon: getTopicIcon(found),
+  };
 };
 
 /** A directory row for a page, with the icon of the sidebar section it belongs to. */

@@ -1,55 +1,66 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { describeVariant, findCoverageGaps, resolveSetup, SETUP_OPTIONS, variantsInHtml } from './setup-picker.mjs';
+import en from '../../content/i18n/en.json' with { type: 'json' };
+import {
+  describeVariant,
+  findCoverageGaps,
+  localizeSetupOptions,
+  resolveSetup,
+  SETUP_OPTIONS,
+  variantsInHtml,
+} from './setup-picker.mjs';
+
+// The English page's options.
+const options = localizeSetupOptions(SETUP_OPTIONS, (key) => en[key]);
 
 describe('resolveSetup', () => {
   it('keeps a valid stored setup regardless of the platform', () => {
-    assert.deepEqual(resolveSetup(SETUP_OPTIONS, { os: 'linux', gpu: 'amd' }, 'macOS'), { os: 'linux', gpu: 'amd' });
-    assert.deepEqual(resolveSetup(SETUP_OPTIONS, { os: 'windows', gpu: 'arm64' }, 'Linux'), {
+    assert.deepEqual(resolveSetup(options, { os: 'linux', gpu: 'amd' }, 'macOS'), { os: 'linux', gpu: 'amd' });
+    assert.deepEqual(resolveSetup(options, { os: 'windows', gpu: 'arm64' }, 'Linux'), {
       os: 'windows',
       gpu: 'arm64',
     });
   });
 
   it("falls back to the OS's default GPU when the OS does not offer the GPU", () => {
-    assert.deepEqual(resolveSetup(SETUP_OPTIONS, { os: 'macos', gpu: 'nvidia' }), { os: 'macos', gpu: 'apple' });
-    assert.deepEqual(resolveSetup(SETUP_OPTIONS, { os: 'windows', gpu: 'apple' }), { os: 'windows', gpu: 'nvidia' });
-    assert.deepEqual(resolveSetup(SETUP_OPTIONS, { os: 'linux', gpu: 'arm64' }), { os: 'linux', gpu: 'nvidia' });
+    assert.deepEqual(resolveSetup(options, { os: 'macos', gpu: 'nvidia' }), { os: 'macos', gpu: 'apple' });
+    assert.deepEqual(resolveSetup(options, { os: 'windows', gpu: 'apple' }), { os: 'windows', gpu: 'nvidia' });
+    assert.deepEqual(resolveSetup(options, { os: 'linux', gpu: 'arm64' }), { os: 'linux', gpu: 'nvidia' });
   });
 
   it('detects the OS from the platform on a first visit', () => {
-    assert.deepEqual(resolveSetup(SETUP_OPTIONS, null, 'MacIntel'), { os: 'macos', gpu: 'apple' });
-    assert.deepEqual(resolveSetup(SETUP_OPTIONS, null, 'macOS'), { os: 'macos', gpu: 'apple' });
-    assert.deepEqual(resolveSetup(SETUP_OPTIONS, null, 'Linux x86_64'), { os: 'linux', gpu: 'nvidia' });
-    assert.deepEqual(resolveSetup(SETUP_OPTIONS, null, 'Win32'), { os: 'windows', gpu: 'nvidia' });
-    assert.deepEqual(resolveSetup(SETUP_OPTIONS, null, undefined), { os: 'windows', gpu: 'nvidia' });
+    assert.deepEqual(resolveSetup(options, null, 'MacIntel'), { os: 'macos', gpu: 'apple' });
+    assert.deepEqual(resolveSetup(options, null, 'macOS'), { os: 'macos', gpu: 'apple' });
+    assert.deepEqual(resolveSetup(options, null, 'Linux x86_64'), { os: 'linux', gpu: 'nvidia' });
+    assert.deepEqual(resolveSetup(options, null, 'Win32'), { os: 'windows', gpu: 'nvidia' });
+    assert.deepEqual(resolveSetup(options, null, undefined), { os: 'windows', gpu: 'nvidia' });
   });
 
   it('ignores stored junk and unknown ids', () => {
     for (const junk of ['macos', 42, [], { os: 'beos' }]) {
-      assert.deepEqual(resolveSetup(SETUP_OPTIONS, junk, 'Linux'), { os: 'linux', gpu: 'nvidia' });
+      assert.deepEqual(resolveSetup(options, junk, 'Linux'), { os: 'linux', gpu: 'nvidia' });
     }
-    assert.deepEqual(resolveSetup(SETUP_OPTIONS, { os: 'beos', gpu: 'amd' }, 'Linux'), { os: 'linux', gpu: 'amd' });
+    assert.deepEqual(resolveSetup(options, { os: 'beos', gpu: 'amd' }, 'Linux'), { os: 'linux', gpu: 'amd' });
   });
 });
 
 describe('describeVariant', () => {
   it('labels a variant with its OS and GPU names', () => {
-    assert.deepEqual(describeVariant(SETUP_OPTIONS, { os: 'windows linux', gpu: 'nvidia' }), {
+    assert.deepEqual(describeVariant(options, { os: 'windows linux', gpu: 'nvidia' }), {
       os: ['windows', 'linux'],
       gpu: ['nvidia'],
       label: 'Windows, Linux · NVIDIA',
     });
-    assert.equal(describeVariant(SETUP_OPTIONS, { os: 'linux', gpu: 'none' }).label, 'Linux · None (CPU)');
-    assert.deepEqual(describeVariant(SETUP_OPTIONS, { os: 'macos' }), { os: ['macos'], gpu: undefined, label: 'macOS' });
+    assert.equal(describeVariant(options, { os: 'linux', gpu: 'none' }).label, 'Linux · None (CPU)');
+    assert.deepEqual(describeVariant(options, { os: 'macos' }), { os: ['macos'], gpu: undefined, label: 'macOS' });
   });
 
   it('rejects typos and GPUs the chosen OS does not offer, so no command is silently hidden', () => {
-    assert.throws(() => describeVariant(SETUP_OPTIONS, { os: 'window' }), /Unknown setup OS "window"/);
-    assert.throws(() => describeVariant(SETUP_OPTIONS, { gpu: 'nvida' }), /GPU "nvida"/);
-    assert.throws(() => describeVariant(SETUP_OPTIONS, { os: 'macos', gpu: 'nvidia' }), /GPU "nvidia"/);
-    assert.throws(() => describeVariant(SETUP_OPTIONS, {}), /needs an `os` or a `gpu`/);
+    assert.throws(() => describeVariant(options, { os: 'window' }), /Unknown setup OS "window"/);
+    assert.throws(() => describeVariant(options, { gpu: 'nvida' }), /GPU "nvida"/);
+    assert.throws(() => describeVariant(options, { os: 'macos', gpu: 'nvidia' }), /GPU "nvidia"/);
+    assert.throws(() => describeVariant(options, {}), /needs an `os` or a `gpu`/);
   });
 });
 
@@ -60,12 +71,12 @@ describe('findCoverageGaps', () => {
       { gpu: ['amd', 'intel', 'none', 'apple'] },
       { os: ['windows'], gpu: ['arm64'] },
     ];
-    assert.deepEqual(findCoverageGaps(SETUP_OPTIONS, variants), { missing: [], repeated: [] });
+    assert.deepEqual(findCoverageGaps(options, variants), { missing: [], repeated: [] });
   });
 
   it('names setups that see no variant or more than one', () => {
     const variants = [{ os: ['windows'] }, { os: ['windows', 'linux'], gpu: ['nvidia'] }];
-    assert.deepEqual(findCoverageGaps(SETUP_OPTIONS, variants), {
+    assert.deepEqual(findCoverageGaps(options, variants), {
       missing: ['macOS · Apple silicon', 'Linux · AMD', 'Linux · Intel Arc', 'Linux · None (CPU)'],
       repeated: ['Windows · NVIDIA'],
     });

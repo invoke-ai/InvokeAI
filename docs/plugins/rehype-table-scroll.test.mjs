@@ -19,7 +19,7 @@ describe('rehypeTableScroll', () => {
     assert.deepEqual(aside.children[0].children, [nested]);
   });
 
-  it("names each table by its caption, else the nearest heading before it, else 'Table'", () => {
+  it('names each table by its caption, else the nearest heading before it, else leaves it unnamed', () => {
     const tree = {
       type: 'root',
       children: [
@@ -31,6 +31,6 @@ describe('rehypeTableScroll', () => {
     };
     rehypeTableScroll()(tree);
     const labels = [tree.children[0], tree.children[2].children[0], tree.children[3]].map((w) => w.properties.dataLabel);
-    assert.deepEqual(labels, ['Table', 'Environment variables', 'Support tiers']);
+    assert.deepEqual(labels, [undefined, 'Environment variables', 'Support tiers']);
   });
 });

@@ -1,5 +1,5 @@
 ---
-import Default from '@astrojs/starlight/components/MarkdownContent.astro';
+import '@astrojs/starlight/style/markdown.css';
 
 import { localizeHtmlLinks } from '../locale-links.mjs';
 
@@ -9,7 +9,10 @@ const localizedHtml =
   locale && localizeHtmlLinks(await Astro.slots.render('default'), { base: import.meta.env.BASE_URL, locale });
 ---
 
-<Default>{localizedHtml ? <Fragment set:html={localizedHtml} /> : <slot />}</Default>
+{/* Starlight's own markup, plus the name the script below gives a table that has none. */}
+<div class="sl-markdown-content" data-table-label={Astro.locals.t('markdown.tableLabel')}>
+  {localizedHtml ? <Fragment set:html={localizedHtml} /> : <slot />}
+</div>
 
 <script>
   // A table wider than the content column scrolls in its wrapper (`plugins/rehype-table-scroll.mjs`). Make that wrapper
@@ -19,7 +22,8 @@ const localizedHtml =
     if (wrapper.scrollWidth > wrapper.clientWidth) {
       wrapper.tabIndex = 0;
       wrapper.setAttribute('role', 'region');
-      wrapper.setAttribute('aria-label', wrapper.dataset.label || 'Table');
+      const content = wrapper.closest<HTMLElement>('[data-table-label]')!;
+      wrapper.setAttribute('aria-label', wrapper.dataset.label || content.dataset.tableLabel!);
     } else {
       wrapper.removeAttribute('tabindex');
       wrapper.removeAttribute('role');

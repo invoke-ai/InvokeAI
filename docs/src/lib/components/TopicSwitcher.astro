@@ -4,7 +4,14 @@ import ChevronsUpDown from '@lucide/astro/icons/chevrons-up-down';
 import Search from '@lucide/astro/icons/search';
 
 import { getTopicIcon } from '../../config/icons';
-import { docsTopics, topicGroups, type DocsTopic } from '../../config/topics';
+import {
+  docsTopics,
+  topicDescription,
+  topicGroupLabel,
+  topicGroups,
+  topicLabel,
+  type DocsTopic,
+} from '../../config/topics';
 import { localizedHref } from '../base-path';
 
 type Props = {
@@ -14,8 +21,20 @@ type Props = {
 const { current } = Astro.props;
 const base = import.meta.env.BASE_URL;
 const { locale } = Astro.locals.starlightRoute;
-const CurrentIcon = getTopicIcon(current);
-const groups = topicGroups.map((group) => ({ group, topics: docsTopics.filter((topic) => topic.group === group) }));
+const { t } = Astro.locals;
+const display = (topic: DocsTopic) => ({
+  ...topic,
+  label: topicLabel(t, topic),
+  description: topicDescription(t, topic),
+  Icon: getTopicIcon(topic),
+});
+const currentDisplay = display(current);
+const { Icon: CurrentIcon } = currentDisplay;
+const groups = topicGroups.map((group) => ({
+  id: `docs-topic-group-${group.toLowerCase()}`,
+  label: topicGroupLabel(t, group),
+  topics: docsTopics.filter((topic) => topic.group === group).map(display),
+}));
 ---
 
 <docs-topic-switcher class="topic-switcher">
@@ -25,41 +44,41 @@ const groups = topicGroups.map((group) => ({ group, topics: docsTopics.filter((t
     aria-expanded="false"
     aria-controls="docs-topic-switcher-popup"
     aria-haspopup="dialog"
-    aria-label={`Topic: ${current.label}. Change topic`}
+    aria-label={t('topicSwitcher.trigger', { topic: currentDisplay.label, interpolation: { escapeValue: false } })}
   >
     <span class="tile tile--selected"><CurrentIcon size={16} /></span>
     <span class="text">
-      <span class="title">{current.label}</span>
-      <span class="description">{current.description}</span>
+      <span class="title">{currentDisplay.label}</span>
+      <span class="description">{currentDisplay.description}</span>
     </span>
     <ChevronsUpDown class="chevrons" size={14} />
   </button>
 
-  <div id="docs-topic-switcher-popup" class="popup docs-popup" role="dialog" aria-label="Choose a docs topic" hidden>
+  <div id="docs-topic-switcher-popup" class="popup docs-popup" role="dialog" aria-label={t('topicSwitcher.dialog')} hidden>
     <div class="filter">
       <Search size={14} />
       <input
         type="text"
         role="combobox"
-        aria-label="Filter topics"
+        aria-label={t('topicSwitcher.filterPlaceholder')}
         aria-controls="docs-topic-switcher-list"
         aria-expanded="true"
         aria-autocomplete="list"
         autocomplete="off"
         spellcheck="false"
-        placeholder="Filter topics"
+        placeholder={t('topicSwitcher.filterPlaceholder')}
       />
     </div>
-    <div id="docs-topic-switcher-list" class="list" role="listbox" aria-label="Topics">
+    <div id="docs-topic-switcher-list" class="list" role="listbox" aria-label={t('topicSwitcher.listLabel')}>
       {
-        groups.map(({ group, topics }) => (
-          <div class="group" role="group" aria-labelledby={`docs-topic-group-${group.toLowerCase()}`}>
-            <div class="group-label docs-eyebrow" id={`docs-topic-group-${group.toLowerCase()}`}>
-              {group}
+        groups.map(({ id, label, topics }) => (
+          <div class="group" role="group" aria-labelledby={id}>
+            <div class="group-label docs-eyebrow" id={id}>
+              {label}
             </div>
             {topics.map((topic) => {
               const isCurrent = topic.id === current.id;
-              const TopicIcon = getTopicIcon(topic);
+              const { Icon: TopicIcon } = topic;
               return (
                 <a
                   id={`docs-topic-option-${topic.id}`}
@@ -88,11 +107,11 @@ const groups = topicGroups.map((group) => ({ group, topics: docsTopics.filter((t
         ))
       }
     </div>
-    <p class="empty" role="status"></p>
+    <p class="empty" role="status" data-empty-text={t('topicSwitcher.empty')}></p>
     <div class="hints" aria-hidden="true">
-      <span><kbd>↑</kbd><kbd>↓</kbd> move</span>
-      <span><kbd>↵</kbd> open</span>
-      <span><kbd>esc</kbd> close</span>
+      <span><kbd>↑</kbd><kbd>↓</kbd> {t('keyboardHint.moveSelection')}</span>
+      <span><kbd>↵</kbd> {t('keyboardHint.openSelection')}</span>
+      <span><kbd>esc</kbd> {t('keyboardHint.closePopup')}</span>
     </div>
   </div>
 </docs-topic-switcher>
@@ -136,7 +155,7 @@ const groups = topicGroups.map((group) => ({ group, topics: docsTopics.filter((t
         for (const option of options) option.hidden = !option.dataset.filterText!.includes(query);
         for (const group of groups) group.hidden = !group.querySelector('[role="option"]:not([hidden])');
         const matches = visibleOptions();
-        empty.textContent = matches.length > 0 ? '' : 'No topics match.';
+        empty.textContent = matches.length > 0 ? '' : empty.dataset.emptyText!;
         setActive(matches.find((option) => option.getAttribute('aria-current') === 'page') ?? matches[0]);
       };
 

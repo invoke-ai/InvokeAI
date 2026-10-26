@@ -13,6 +13,7 @@ import VersionMenu from './VersionMenu.astro';
 const base = import.meta.env.BASE_URL;
 // Without a sidebar drawer, the main navigation stays in the header on phones.
 const { entry, hasSidebar, locale } = Astro.locals.starlightRoute;
+const { t } = Astro.locals;
 // Matches the language menu's own condition (`LanguageMenu.astro`).
 const hasLanguageMenu = await isLocalizablePage(entry.id);
 // YouTube is in the footer.
@@ -25,7 +26,7 @@ const headerSocial = (socialConfig ?? []).filter(({ icon }) => icon === 'github'
     { 'docs-header--nav-on-phones': !hasSidebar, 'docs-header--has-language-menu': hasLanguageMenu },
   ]}
 >
-  <a href={localizedHref('/', { locale, base })} class="home" aria-label="Invoke home">
+  <a href={localizedHref('/', { locale, base })} class="home" aria-label={t('nav.home')}>
     <svg class="logomark" width="22" height="22" viewBox="0 0 44 44" fill="none" aria-hidden="true">
       <path d="M29.1951 10.6667H42V2H2V10.6667H14.8049L29.1951 33.3333H42V42H2V33.3333H14.8049" stroke-width="3.6"
       ></path>
@@ -53,7 +54,7 @@ const headerSocial = (socialConfig ?? []).filter(({ icon }) => icon === 'github'
     }
     <a class="download docs-button docs-button--primary docs-button--lg" href={withBase('/download/', base)}>
       <Download size={14} />
-      <span class="download__label">Download</span>
+      <span class="download__label">{t('nav.download')}</span>
     </a>
   </div>
 </div>

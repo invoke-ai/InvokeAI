@@ -21,7 +21,6 @@ describe('resolveScope', () => {
     assert.deepEqual(pressed(state), ['topic']);
     assert.deepEqual(state.filters, { topic: 'models' });
     assert.equal(state.showSettings, false);
-    assert.equal(state.announcement, 'Searching in Models');
   });
 
   it('widens to All docs without a filter, showing settings', () => {
@@ -29,7 +28,6 @@ describe('resolveScope', () => {
     assert.deepEqual(pressed(state), ['all']);
     assert.equal(state.filters, undefined);
     assert.equal(state.showSettings, true);
-    assert.equal(state.announcement, 'Searching all docs');
   });
 
   it('offers only All docs on pages outside every topic, whatever was asked for', () => {

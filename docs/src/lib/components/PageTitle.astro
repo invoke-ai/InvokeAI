@@ -1,9 +1,10 @@
 ---
-import { getCurrentTopic } from '../../config/topics';
+import { getCurrentTopic, topicLabel } from '../../config/topics';
 import { localizedHref } from '../base-path';
 import { findCurrentTrail } from '../sidebar.mjs';
 
 const { entry, locale, sidebar } = Astro.locals.starlightRoute;
+const { t } = Astro.locals;
 const topic = getCurrentTopic(Astro.locals);
 const trail = topic && findCurrentTrail(sidebar);
 // The breadcrumb carries the Pagefind `topic` filter that scopes search to a topic, on pages Pagefind indexes; its
@@ -14,10 +15,10 @@ const topicFilter = topic && entry.data.pagefind !== false ? `topic:${topic.id}`
 <div class="page-heading">
   {
     topic && (
-      <nav aria-label="Breadcrumb" data-pagefind-ignore data-pagefind-filter={topicFilter}>
+      <nav aria-label={t('page.breadcrumb')} data-pagefind-ignore data-pagefind-filter={topicFilter}>
         <ol>
           <li>
-            <a href={localizedHref(topic.link, { locale, base: import.meta.env.BASE_URL })}>{topic.label}</a>
+            <a href={localizedHref(topic.link, { locale, base: import.meta.env.BASE_URL })}>{topicLabel(t, topic)}</a>
           </li>
           {trail?.groups.map((group) => <li>{group}</li>)}
           {trail && <li aria-current="page">{trail.link.label}</li>}

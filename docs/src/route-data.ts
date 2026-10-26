@@ -2,7 +2,7 @@ import { getCollection } from 'astro:content';
 import { defineRouteMiddleware } from '@astrojs/starlight/route-data';
 
 import { CROWDIN_PROJECT_URL, getPathLocale, locales, splitSitePath, translatedLocales } from './config/locales.mjs';
-import { getCurrentTopic } from './config/topics';
+import { getCurrentTopic, topicLabel } from './config/topics';
 import { withBase } from './lib/base-path';
 import { isLocalizablePage } from './lib/docs-page';
 import {
@@ -12,6 +12,7 @@ import {
   paginate,
   selectCrossListings,
   sortAndRelabel,
+  translateGroupLabels,
 } from './lib/sidebar.mjs';
 
 const hrefToId = makeHrefToId(import.meta.env.BASE_URL);
@@ -69,6 +70,7 @@ export const onRequest = defineRouteMiddleware(async (context, next) => {
     const { fileNames, directories, crossListings } = docsIndex;
     sortAndRelabel(route.sidebar, fileNames, hrefToId);
     addCrossListings(route.sidebar, crossListings, directories, hrefToId);
+    translateGroupLabels(route.sidebar, context.locals.t);
   }
 
   await next();
@@ -84,6 +86,9 @@ export const onRequest = defineRouteMiddleware(async (context, next) => {
   // Search scopes itself to the current topic, so only pages Pagefind indexes carry one.
   const topic = route.entry.data.pagefind !== false && getCurrentTopic(context.locals);
   if (topic) {
-    route.head.push({ tag: 'meta', attrs: { name: 'docs-topic', content: topic.id, 'data-title': topic.label } });
+    route.head.push({
+      tag: 'meta',
+      attrs: { name: 'docs-topic', content: topic.id, 'data-title': topicLabel(context.locals.t, topic) },
+    });
   }
 });

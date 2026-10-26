@@ -5,8 +5,10 @@ import Pagination from 'virtual:starlight/components/Pagination';
 import { socialConfig } from '../../config/social';
 import { withBase } from '../base-path';
 import PageTools from './PageTools.astro';
+import Trans from './Trans.astro';
 
 const { entry, toc } = Astro.locals.starlightRoute;
+const { t } = Astro.locals;
 // Splash pages (home, download) are not documentation pages, so they get no page tools.
 const showPageTools = entry.data.template !== 'splash';
 ---
@@ -23,17 +25,15 @@ const showPageTools = entry.data.template !== 'splash';
   <Pagination />
   <div class="bottom">
     <p>
-      This site was designed and developed by <a
-        href="https://aetherfox.studio"
-        target="_blank"
-        rel="noreferrer noopener">Aether Fox Studio</a
-      >.
+      <Trans message={t('footer.credit')}>
+        {(text: string) => <a href="https://aetherfox.studio" target="_blank" rel="noreferrer noopener">{text}</a>}
+      </Trans>
     </p>
     <ul class="social">
       <li>
         <a href={withBase('/showcase/', import.meta.env.BASE_URL)}>
           <Icon name="star" size="16px" />
-          Showcase
+          {t('nav.showcase')}
         </a>
       </li>
       {

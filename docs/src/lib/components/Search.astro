@@ -2,20 +2,39 @@
 // Replaces Starlight's search with a command palette over the Pagefind index that Starlight builds: results scoped to
 // the current topic or all docs, grouped by topic, plus matching `invokeai.yaml` settings from a compact index
 // (`src/pages/settings-search.json.ts`). Pagefind and the settings index load on first use, not with the page.
-import { docsTopics } from '../../config/topics';
+import { docsTopics, topicLabel } from '../../config/topics';
+import { pluralForms } from '../i18n.mjs';
 
-const label = Astro.locals.t('search.label');
-// Results carry their topic's id (`PageTitle.astro`); groups show its title.
-const topicTitles = JSON.stringify(docsTopics.map(({ id, label: title }) => [id, title]));
+const { t } = Astro.locals;
+const label = t('search.label');
+// The script's strings. Templates keep their `{{placeholders}}` for the script to fill (`../i18n.mjs`).
+const i18n = {
+  // Results carry their topic's id (`PageTitle.astro`); groups show its title.
+  topicTitles: docsTopics.map((topic) => [topic.id, topicLabel(t, topic)]),
+  otherPages: t('search.otherPages'),
+  recent: t('search.recentSearches'),
+  settingsGroup: t('search.settingsGroup'),
+  settingDefault: t('search.settingDefault'),
+  loadError: t('search.loadError'),
+  devNotice: t('search.devWarning'),
+  searchingIn: t('search.searchingIn'),
+  searchingAll: t('search.searchingAll'),
+  scopeChangeStatus: t('search.scopeChangeStatus'),
+  noResults: t('search.noResults'),
+  noResultsInTopic: t('search.noResultsInTopic'),
+  resultCount: pluralForms(t, 'search.resultCount'),
+  moreInAllDocs: pluralForms(t, 'search.moreInAllDocs'),
+  showInAllDocs: pluralForms(t, 'search.showInAllDocs'),
+};
 ---
 
-<docs-search data-topic-titles={topicTitles} data-locale={Astro.locals.starlightRoute.locale}>
+<docs-search data-i18n={JSON.stringify(i18n)} data-locale={Astro.locals.starlightRoute.locale}>
   <button type="button" class="trigger" aria-label={label} aria-haspopup="dialog" aria-keyshortcuts="Control+K /">
     <svg class="trigger__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"
       ><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg
     >
     <span class="trigger__label" aria-hidden="true">{label}</span>
-    <kbd class="trigger__shortcut" aria-hidden="true" style="display: none;"><kbd>Ctrl</kbd><kbd>K</kbd></kbd>
+    <kbd class="trigger__shortcut" aria-hidden="true" style="display: none;"><kbd>{t('search.ctrlKey')}</kbd><kbd>K</kbd></kbd>
   </button>
 
   <dialog class="modal" aria-label={label}>
@@ -34,30 +53,30 @@ const topicTitles = JSON.stringify(docsTopics.map(({ id, label: title }) => [id,
         autocapitalize="off"
         spellcheck="false"
         enterkeyhint="go"
-        placeholder="Search docs, settings, hotkeys, models…"
+        placeholder={t('search.placeholder')}
       />
       <kbd class="field__esc" aria-hidden="true">esc</kbd>
-      <button type="button" class="field__cancel">{Astro.locals.t('search.cancelLabel')}</button>
+      <button type="button" class="field__cancel">{t('search.cancelLabel')}</button>
     </div>
 
-    <div class="scopes" role="group" aria-label="Search scope">
-      <span class="scopes__label" aria-hidden="true">In</span>
+    <div class="scopes" role="group" aria-label={t('search.scope')}>
+      <span class="scopes__label" aria-hidden="true">{t('search.scopeChipsIntro')}</span>
       <div class="docs-segment-tabs">
         <button type="button" class="chip docs-segment-tab" data-scope="topic" aria-pressed="false" hidden></button>
-        <button type="button" class="chip docs-segment-tab" data-scope="all" aria-pressed="true">All docs</button>
+        <button type="button" class="chip docs-segment-tab" data-scope="all" aria-pressed="true">{t('search.allDocs')}</button>
       </div>
     </div>
 
     <div class="body">
-      <div class="results" id="docs-search-results" role="listbox" aria-label="Search results"></div>
+      <div class="results" id="docs-search-results" role="listbox" aria-label={t('search.results')}></div>
       <p class="notice" hidden></p>
       <button type="button" class="widen" hidden></button>
     </div>
 
     <div class="hints" aria-hidden="true">
-      <span><kbd>↑</kbd><kbd>↓</kbd> move</span>
-      <span><kbd>↵</kbd> open</span>
-      <span class="hints__credit">Search by Pagefind</span>
+      <span><kbd>↑</kbd><kbd>↓</kbd> {t('keyboardHint.moveSelection')}</span>
+      <span><kbd>↵</kbd> {t('keyboardHint.openSelection')}</span>
+      <span class="hints__credit">{t('search.credit')}</span>
     </div>
     <p class="sr-only" role="status"></p>
   </dialog>
@@ -82,6 +101,7 @@ const topicTitles = JSON.stringify(docsTopics.map(({ id, label: title }) => [id,
 
 <script>
   import { localizedHref } from '../base-path';
+  import { formatPlural, interpolate } from '../i18n.mjs';
   import {
     RECENT_STORAGE_KEY,
     addRecent,
@@ -107,15 +127,32 @@ const topicTitles = JSON.stringify(docsTopics.map(({ id, label: title }) => [id,
     search: (term: string, options?: object) => Promise<PagefindResponse | null>;
   };
   type Section = { label: string; rows: { element: HTMLAnchorElement; recent: RecentEntry }[] };
+  /** The frontmatter's `i18n`. */
+  type Strings = {
+    topicTitles: [string, string][];
+    resultCount: Record<string, string>;
+    moreInAllDocs: Record<string, string>;
+    showInAllDocs: Record<string, string>;
+  } & Record<
+    | 'otherPages'
+    | 'recent'
+    | 'settingsGroup'
+    | 'settingDefault'
+    | 'loadError'
+    | 'devNotice'
+    | 'searchingIn'
+    | 'searchingAll'
+    | 'scopeChangeStatus'
+    | 'noResults'
+    | 'noResultsInTopic',
+    string
+  >;
 
   const BASE = import.meta.env.BASE_URL.replace(/\/?$/, '/');
   const DEBOUNCE_MS = 120;
   const MAX_PAGES = 8;
   const MAX_SECTIONS_PER_PAGE = 2;
   const MAX_SETTINGS = 4;
-  const UNTITLED_TOPIC = 'Other pages';
-  const LOAD_ERROR = 'Search couldn’t load. Check your connection, then try again.';
-  const DEV_NOTICE = 'Search only works in a production build.\nRun pnpm build, then pnpm preview, to try it locally.';
 
   const ICON_PAGE =
     '<svg class="row__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M9 13h6M9 17h4"/></svg>';
@@ -197,12 +234,13 @@ const topicTitles = JSON.stringify(docsTopics.map(({ id, label: title }) => [id,
     return { element, recent: { title: row.page, section: row.section, url: row.url } };
   };
 
-  const settingRow = (setting: SettingEntry, page: string) => {
+  /** `defaultLabel` is the `{{value}}` template of the default value's pill. */
+  const settingRow = (setting: SettingEntry, page: string, defaultLabel: string) => {
     const url = `${page}#${settingAnchorId(setting.key)}`;
     const element = makeRow(url, 'setting');
     const meta = make('span', 'row__meta');
     meta.append(make('code', 'row__key', setting.key), make('span', 'pill', setting.type));
-    meta.append(make('span', 'pill', `default ${setting.default}`));
+    meta.append(make('span', 'pill', interpolate(defaultLabel, { value: setting.default })));
     if (setting.env) meta.append(make('span', 'row__env', setting.env));
     const description = make('span', 'row__excerpt');
     appendWithCode(description, setting.description);
@@ -237,8 +275,10 @@ const topicTitles = JSON.stringify(docsTopics.map(({ id, label: title }) => [id,
       const chips = [...dialog.querySelectorAll<HTMLButtonElement>('.chip')];
       const topicChip = chips.find((chip) => chip.dataset.scope === 'topic')!;
 
-      const topicTitles = new Map<string, string>(JSON.parse(this.dataset.topicTitles!));
+      const i18n: Strings = JSON.parse(this.dataset.i18n!);
+      const topicTitles = new Map(i18n.topicTitles);
       const locale = this.dataset.locale;
+      const lang = document.documentElement.lang;
       const topicMeta = document.querySelector<HTMLMetaElement>('meta[name="docs-topic"]');
       const topic = topicMeta?.dataset.title ? { id: topicMeta.content, title: topicMeta.dataset.title } : undefined;
       if (topic) topicChip.textContent = topic.title;
@@ -303,19 +343,22 @@ const topicTitles = JSON.stringify(docsTopics.map(({ id, label: title }) => [id,
         notice.hidden = !message;
         widen.textContent = widenLabel;
         widen.hidden = !widenLabel;
-        status.textContent = [scopeAnnouncement, announcement].filter(Boolean).join(': ');
+        status.textContent =
+          scopeAnnouncement && announcement
+            ? interpolate(i18n.scopeChangeStatus, { scope: scopeAnnouncement, results: announcement })
+            : scopeAnnouncement || announcement;
         scopeAnnouncement = '';
       };
 
       const renderRecent = () => {
         const recent = readRecent() ?? [];
-        render(recent.length > 0 ? [{ label: 'Recent', rows: recent.map(recentRow) }] : []);
+        render(recent.length > 0 ? [{ label: i18n.recent, rows: recent.map(recentRow) }] : []);
       };
 
       const search = async ({ debounce }: { debounce: boolean }) => {
         const id = ++searchId;
         // Pagefind's index only exists after a build.
-        if (import.meta.env.DEV) return render([], { message: DEV_NOTICE });
+        if (import.meta.env.DEV) return render([], { message: i18n.devNotice });
         const query = input.value.trim();
         if (!query) return renderRecent();
 
@@ -339,14 +382,16 @@ const topicTitles = JSON.stringify(docsTopics.map(({ id, label: title }) => [id,
           const sections: Section[] = [];
           if (showSettings && settings.length > 0) {
             sections.push({
-              label: 'Settings · invokeai.yaml',
+              label: i18n.settingsGroup,
               rows: settings
                 .slice(0, MAX_SETTINGS)
-                .map((setting) => settingRow(setting, localizedHref(settingsIndex!.page, { locale, base: BASE }))),
+                .map((setting) =>
+                  settingRow(setting, localizedHref(settingsIndex!.page, { locale, base: BASE }), i18n.settingDefault),
+                ),
             });
           }
           const rows = pages.flatMap((page) => toPageRows(page, MAX_SECTIONS_PER_PAGE));
-          for (const group of groupByTopic(rows, topicTitles, UNTITLED_TOPIC)) {
+          for (const group of groupByTopic(rows, topicTitles, i18n.otherPages)) {
             sections.push({ label: group.label, rows: group.rows.map(pageRow) });
           }
 
@@ -354,32 +399,33 @@ const topicTitles = JSON.stringify(docsTopics.map(({ id, label: title }) => [id,
           const elsewhere = scoped
             ? response.unfilteredResultCount - response.results.length + (showSettings ? 0 : settings.length)
             : 0;
-          const plural = (count: number) => `${count} ${count === 1 ? 'result' : 'results'}`;
           if (sections.length > 0) {
             render(sections, {
-              widenLabel: elsewhere > 0 ? `${elsewhere} more ${elsewhere === 1 ? 'result' : 'results'} in All docs` : '',
-              announcement: plural(found),
+              widenLabel: elsewhere > 0 ? formatPlural(i18n.moreInAllDocs, elsewhere, lang) : '',
+              announcement: formatPlural(i18n.resultCount, found, lang),
             });
           } else {
             const message = scoped
-              ? `No results for “${query}” in ${scoped.title}.`
-              : `No results for “${query}”. Try fewer or different words.`;
+              ? interpolate(i18n.noResultsInTopic, { query, topic: scoped.title })
+              : interpolate(i18n.noResults, { query });
             render([], {
               message,
-              widenLabel: elsewhere > 0 ? `Show ${plural(elsewhere)} in All docs` : '',
+              widenLabel: elsewhere > 0 ? formatPlural(i18n.showInAllDocs, elsewhere, lang) : '',
               announcement: message,
             });
           }
         } catch (error) {
           if (id !== searchId) return;
           console.error('[docs-search]', error);
-          render([], { message: LOAD_ERROR, announcement: LOAD_ERROR });
+          render([], { message: i18n.loadError, announcement: i18n.loadError });
         }
       };
 
       const setScope = (next: typeof state.scope) => {
         applyScope(next);
-        scopeAnnouncement = state.announcement;
+        scopeAnnouncement = state.scoped
+          ? interpolate(i18n.searchingIn, { topic: state.scoped.title })
+          : i18n.searchingAll;
         search({ debounce: false });
       };
 

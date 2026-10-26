@@ -1,7 +1,8 @@
 // Keeps the sidebar's sections open or closed as the reader left them, across pages of the session. Starlight's own
 // persistence keeps one state for one sidebar and only restores it on wide screens, so every topic switch, and every
-// page on a phone, reset the sections; this keys the state by topic and section instead. Plain JavaScript so
-// `node --test` can exercise it; `Sidebar.astro` runs `mountSidebarState` as an inline script.
+// page on a phone, reset the sections; this keys the state by topic and section directory instead, which every locale
+// shares. Plain JavaScript so `node --test` can exercise it; `Sidebar.astro` runs `mountSidebarState` as an inline
+// script.
 
 /** @param {string} topicId */
 export const sidebarStateKey = (topicId) => `docs-sidebar:${topicId}`;
@@ -33,14 +34,8 @@ export const visibleScrollTop = (scroller) =>
  */
 export const mountSidebarState = (tree, key, resolve, scrollTopToKeep) => {
   const scroller = document.getElementById('starlight__sidebar');
-  /** A section's labels from the outermost, so equally named sections in different groups stay apart. */
-  const pathOf = (/** @type {Element} */ details) => {
-    const labels = [];
-    for (let node = details; node; node = node.parentElement?.closest('details') ?? null) {
-      labels.unshift(node.querySelector(':scope > summary')?.textContent?.trim() ?? '');
-    }
-    return labels.join(' / ');
-  };
+  /** A section's directory (`SidebarTree.astro`), the same in every locale; state kept under other keys is ignored. */
+  const sectionOf = (/** @type {HTMLElement} */ details) => details.dataset.section ?? '';
 
   /** @type {{ open: Record<string, boolean>, scroll?: number }} */
   let state = { open: {} };
@@ -58,7 +53,7 @@ export const mountSidebarState = (tree, key, resolve, scrollTopToKeep) => {
     details.open = resolve({
       rendered: details.open,
       containsCurrent: details.querySelector('[aria-current="page"]') !== null,
-      stored: state.open[pathOf(details)],
+      stored: state.open[sectionOf(details)],
     });
   }
   if (scroller && typeof state.scroll === 'number') scroller.scrollTop = state.scroll;
@@ -67,7 +62,7 @@ export const mountSidebarState = (tree, key, resolve, scrollTopToKeep) => {
   tree.addEventListener('click', (event) => {
     const details = event.target instanceof Element ? event.target.closest('summary')?.parentElement : null;
     if (!(details instanceof HTMLDetailsElement)) return;
-    state.open[pathOf(details)] = !details.open;
+    state.open[sectionOf(details)] = !details.open;
     save();
   });
   addEventListener('pagehide', () => {

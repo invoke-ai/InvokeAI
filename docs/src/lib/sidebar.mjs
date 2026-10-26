@@ -1,3 +1,5 @@
+import { slug } from 'github-slugger';
+
 import { splitSitePath } from '../config/locales.mjs';
 import { generateDocsId, getSortPrefix, stripSortPrefix } from './sort-prefix.mjs';
 
@@ -86,6 +88,27 @@ export const sortAndRelabel = (entries, fileNames, hrefToId) => {
     if (entry.type !== 'group') continue;
     if ('autogenerate' in entry && entry.autogenerate) entry.label = stripSortPrefix(entry.label);
     sortAndRelabel(entry.entries, fileNames, hrefToId);
+  }
+};
+
+/**
+ * The UI string key of a sidebar group's label: the label's slug, which is also the last segment of the URL path of
+ * the directory a group is generated from, e.g. `sidebar.group.image-generation`.
+ * @param {string} label the English label
+ */
+export const sidebarGroupKey = (label) => `sidebar.group.${slug(label)}`;
+
+/**
+ * Translates the labels of groups at every depth, directory-derived ones included. A label without a UI string stays.
+ * @param {SidebarEntry[]} entries
+ * @param {{ (key: string): string, exists: (key: string) => boolean }} t
+ */
+export const translateGroupLabels = (entries, t) => {
+  for (const entry of entries) {
+    if (entry.type !== 'group') continue;
+    const key = sidebarGroupKey(entry.label);
+    if (t.exists(key)) entry.label = t(key);
+    translateGroupLabels(entry.entries, t);
   }
 };
 

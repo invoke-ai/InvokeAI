@@ -12,6 +12,7 @@ type Props = {
 
 const { placement } = Astro.props;
 const { hasSidebar, locale } = Astro.locals.starlightRoute;
+const { t } = Astro.locals;
 const base = import.meta.env.BASE_URL;
 const trimSlash = (path: string) => path.replace(/\/$/, '');
 const pathname = trimSlash(Astro.url.pathname);
@@ -23,7 +24,7 @@ const showcaseHref = withBase('/showcase/', base);
 
 const items = [
   {
-    label: 'Docs',
+    label: t('nav.docs'),
     href: docsHref,
     // The app's help menu links its documentation with this icon.
     icon: BookOpenText,
@@ -31,7 +32,7 @@ const items = [
     current: getCurrentTopic(Astro.locals) ? (pathname === trimSlash(docsHref) ? 'page' : 'true') : undefined,
   },
   {
-    label: 'Showcase',
+    label: t('nav.showcase'),
     href: showcaseHref,
     icon: Images,
     current: pathname === trimSlash(showcaseHref) ? 'page' : undefined,
@@ -39,7 +40,7 @@ const items = [
 ];
 
 const Wrapper = placement === 'header' ? 'nav' : 'div';
-const wrapperAttrs = placement === 'header' ? { 'aria-label': 'Site' } : {};
+const wrapperAttrs = placement === 'header' ? { 'aria-label': t('nav.siteNavLabel') } : {};
 ---
 
 {/* The header copy is the site navigation landmark. The drawer copy sits inside Starlight's sidebar landmark, so it

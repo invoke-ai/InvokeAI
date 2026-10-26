@@ -1,41 +1,45 @@
 ---
 import {
+  localizeSetupOptions,
   mountSetupPicker,
   resolveSetup,
   SETUP_OPTIONS,
   SETUP_STORAGE_KEY,
   setupVisibilityCss,
 } from './setup-picker.mjs';
+import Trans from './Trans.astro';
+
+const { t } = Astro.locals;
+const options = localizeSetupOptions(SETUP_OPTIONS, t);
 
 // One radio per GPU id; its label text and availability follow the selected OS.
-const gpus = [...new Set(SETUP_OPTIONS.flatMap((os) => os.gpus.map((gpu) => gpu.id)))].map((id) => ({
+const gpus = [...new Set(options.flatMap((os) => os.gpus.map((gpu) => gpu.id)))].map((id) => ({
   id,
-  labels: SETUP_OPTIONS.flatMap((os) => os.gpus.filter((gpu) => gpu.id === id).map((gpu) => ({ os: os.id, label: gpu.label }))),
+  labels: options.flatMap((os) => os.gpus.filter((gpu) => gpu.id === id).map((gpu) => ({ os: os.id, label: gpu.label }))),
 }));
 
 // The shared segment tabs draw a divider before every chip but the first. GPU chips hidden for the selected OS still
 // count as siblings, so drop the divider of each OS's first shown GPU when hidden chips precede it.
-const dividerCss = SETUP_OPTIONS.map((os) => ({ os: os.id, first: gpus.find((gpu) => gpu.labels.some((l) => l.os === os.id)) }))
+const dividerCss = options.map((os) => ({ os: os.id, first: gpus.find((gpu) => gpu.labels.some((l) => l.os === os.id)) }))
   .filter(({ first }) => first && first !== gpus[0])
   .map(({ os, first }) => `:root[data-setup-os="${os}"] .docs-segment-tab:has(> input[value="${first?.id}"])::before{display:none}`)
   .join('\n');
-const visibilityCss = `${setupVisibilityCss(SETUP_OPTIONS)}\n${dividerCss}`;
-const mountScript = `(${mountSetupPicker})(document.currentScript.parentElement, ${JSON.stringify(SETUP_OPTIONS)}, ${resolveSetup}, ${JSON.stringify(SETUP_STORAGE_KEY)});`;
+const visibilityCss = `${setupVisibilityCss(options)}\n${dividerCss}`;
+// Escaping `<` keeps translated labels from closing the script.
+const optionsJson = JSON.stringify(options).replaceAll('<', '\\u003c');
+const mountScript = `(${mountSetupPicker})(document.currentScript.parentElement, ${optionsJson}, ${resolveSetup}, ${JSON.stringify(SETUP_STORAGE_KEY)});`;
 ---
 
 <Fragment set:html={`<style>${visibilityCss}</style>`} />
 
 <div class="setup-picker not-content" data-pagefind-ignore>
-  <p class="setup-picker__fallback">
-    Commands that differ by operating system or GPU are listed for every setup, each labeled with the setup it
-    applies to.
-  </p>
+  <p class="setup-picker__fallback">{t('setupPicker.fallback')}</p>
   <div class="setup-picker__panel">
     <fieldset class="setup-picker__row">
-      <legend class="docs-eyebrow">Operating system</legend>
+      <legend class="docs-eyebrow">{t('setupPicker.os')}</legend>
       <div class="setup-picker__segments docs-segment-tabs">
         {
-          SETUP_OPTIONS.map((os) => (
+          options.map((os) => (
             <label class="docs-segment-tab">
               <input type="radio" name="setup-os" value={os.id} />
               {os.label}
@@ -45,7 +49,7 @@ const mountScript = `(${mountSetupPicker})(document.currentScript.parentElement,
       </div>
     </fieldset>
     <fieldset class="setup-picker__row">
-      <legend class="docs-eyebrow">GPU</legend>
+      <legend class="docs-eyebrow">{t('setupPicker.gpu')}</legend>
       <div class="setup-picker__segments docs-segment-tabs">
         {
           gpus.map((gpu) => (
@@ -62,7 +66,10 @@ const mountScript = `(${mountSetupPicker})(document.currentScript.parentElement,
       </div>
     </fieldset>
     <p class="setup-picker__summary" aria-live="polite" aria-atomic="true">
-      Showing commands for <strong data-setup-summary></strong>
+      {/* The script fills in the setup. */}
+      <Trans message={t('setupPicker.summary', { setup: '' })}>
+        {(text: string) => <strong data-setup-summary>{text}</strong>}
+      </Trans>
     </p>
   </div>
   <script is:inline set:html={mountScript} />

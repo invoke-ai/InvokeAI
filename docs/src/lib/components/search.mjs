@@ -31,8 +31,6 @@ export const resolveScope = (topic, requested = topic ? 'topic' : 'all') => {
     scoped,
     filters: scoped ? { topic: scoped.id } : undefined,
     showSettings: !scoped || scoped.id === SETTINGS_TOPIC_ID,
-    /** Read out when a control changes the scope. */
-    announcement: scoped ? `Searching in ${scoped.title}` : 'Searching all docs',
     chips: [
       { scope: 'topic', hidden: !topic, pressed: scope === 'topic' },
       { scope: 'all', hidden: false, pressed: scope === 'all' },

@@ -6,7 +6,16 @@ import { docsSchema, i18nSchema } from '@astrojs/starlight/schema';
 
 import { changelogsLoader } from 'starlight-changelogs/loader';
 
+import en from './content/i18n/en.json';
 import { generateDocsId } from './lib/sort-prefix.mjs';
+
+// `en.json` declares the site's own UI strings (and the few Starlight strings it rewords), which Crowdin translates
+// into each locale's file. Its keys are the schema, so a string is declared once.
+const uiStrings = z.object(
+  Object.fromEntries(Object.keys(en).map((key) => [key, z.string().optional()])) as {
+    [Key in keyof typeof en]: z.ZodOptional<z.ZodString>;
+  }
+);
 
 export const collections = {
   docs: defineCollection({
@@ -21,12 +30,7 @@ export const collections = {
   }),
   i18n: defineCollection({
     loader: i18nLoader(),
-    schema: i18nSchema({
-      extend: z.object({
-        // Replaces `page.editLink` on translated pages, which link to the Crowdin project (`src/route-data.ts`).
-        'page.translateLink': z.string().optional(),
-      }),
-    }),
+    schema: i18nSchema({ extend: uiStrings }),
   }),
   // Community artwork for `/showcase/` and the home page. `src/content/showcase/README.md` explains how to add one.
   showcase: defineCollection({

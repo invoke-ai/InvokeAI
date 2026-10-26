@@ -1,5 +1,5 @@
 ---
-import { describeVariant, SETUP_OPTIONS } from './setup-picker.mjs';
+import { describeVariant, localizeSetupOptions, SETUP_OPTIONS } from './setup-picker.mjs';
 
 type Props = {
   /** Space-separated OS ids this content applies to; omit for every OS. */
@@ -11,7 +11,7 @@ type Props = {
 };
 
 const { os, gpu, label } = Astro.props as Props;
-const variant = describeVariant(SETUP_OPTIONS, { os, gpu });
+const variant = describeVariant(localizeSetupOptions(SETUP_OPTIONS, Astro.locals.t), { os, gpu });
 ---
 
 <div

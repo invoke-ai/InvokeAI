@@ -38,7 +38,12 @@ const items = Object.entries(locales).map(([key, { label, lang }]) => {
       <LinkMenu
         id={`docs-language-menu-${placement}`}
         label={code}
-        accessibleLabel={`${Astro.locals.t('languageSelect.accessibleLabel')}: ${code} (${current.label})`}
+        accessibleLabel={Astro.locals.t('languageMenu.accessibleLabel', {
+          label: Astro.locals.t('languageSelect.accessibleLabel'),
+          code,
+          language: current.label,
+          interpolation: { escapeValue: false },
+        })}
         items={items}
         direction={placement === 'drawer' ? 'up' : 'down'}
         iconOnlyWhenNarrow={placement === 'header'}

@@ -6,10 +6,18 @@
 /** @typedef {{ id: string, label: string }} SetupGpu */
 /** @typedef {{ id: string, label: string, gpus: SetupGpu[] }} SetupOs */
 /** @typedef {{ os: string, gpu: string }} Setup */
+/**
+ * A brand name as its `label`, or the UI string key of its label.
+ * @typedef {{ id: string, label?: string, labelKey?: string }} SetupGpuOption
+ */
+/** @typedef {{ id: string, label: string, gpus: SetupGpuOption[] }} SetupOsOption */
 
 export const SETUP_STORAGE_KEY = 'invoke-docs:setup';
 
-/** The first GPU of each OS is its default. @type {SetupOs[]} */
+/**
+ * The first GPU of each OS is its default. Pages use these through `localizeSetupOptions`.
+ * @type {SetupOsOption[]}
+ */
 export const SETUP_OPTIONS = [
   {
     id: 'windows',
@@ -18,11 +26,11 @@ export const SETUP_OPTIONS = [
       { id: 'nvidia', label: 'NVIDIA' },
       { id: 'amd', label: 'AMD' },
       { id: 'intel', label: 'Intel Arc' },
-      { id: 'none', label: 'Other / none' },
+      { id: 'none', labelKey: 'setupPicker.option.otherOrNone' },
       { id: 'arm64', label: 'ARM64' },
     ],
   },
-  { id: 'macos', label: 'macOS', gpus: [{ id: 'apple', label: 'Apple silicon' }] },
+  { id: 'macos', label: 'macOS', gpus: [{ id: 'apple', labelKey: 'setupPicker.option.appleSilicon' }] },
   {
     id: 'linux',
     label: 'Linux',
@@ -30,10 +38,22 @@ export const SETUP_OPTIONS = [
       { id: 'nvidia', label: 'NVIDIA' },
       { id: 'amd', label: 'AMD' },
       { id: 'intel', label: 'Intel Arc' },
-      { id: 'none', label: 'None (CPU)' },
+      { id: 'none', labelKey: 'setupPicker.option.noneCpu' },
     ],
   },
 ];
+
+/**
+ * The setup options with every label in the page's language.
+ * @param {SetupOsOption[]} options
+ * @param {(key: string) => string} t
+ * @returns {SetupOs[]}
+ */
+export const localizeSetupOptions = (options, t) =>
+  options.map((os) => ({
+    ...os,
+    gpus: os.gpus.map(({ id, label, labelKey }) => ({ id, label: labelKey ? t(labelKey) : String(label) })),
+  }));
 
 /**
  * Turns a stored (untrusted) value into a valid setup. A missing or unknown OS falls back to the

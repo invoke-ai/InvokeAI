@@ -3,10 +3,12 @@ import { Icon } from '@astrojs/starlight/components';
 import Pencil from '@lucide/astro/icons/pencil';
 
 import { getReportIssueUrl } from '../report-issue';
+import Trans from './Trans.astro';
 
 const { editUrl, entry, isFallback, lang, lastUpdated, locale } = Astro.locals.starlightRoute;
 // Translated pages link to Crowdin instead of their file (`src/route-data.ts`).
-const editLabel = Astro.locals.t(locale && !isFallback ? 'page.translateLink' : 'page.editLink');
+const { t } = Astro.locals;
+const editLabel = locale && !isFallback ? t('page.translateLink') : t('page.editLink');
 const reportIssueUrl = getReportIssueUrl(entry.data.title, new URL(Astro.url.pathname, Astro.site).href);
 ---
 
@@ -21,15 +23,19 @@ const reportIssueUrl = getReportIssueUrl(entry.data.title, new URL(Astro.url.pat
   }
   <a href={reportIssueUrl} class="print:hidden">
     <Icon name="github" size="14px" />
-    Report an issue
+    {t('page.reportIssue')}
   </a>
   {
     lastUpdated && (
       <p>
-        Updated{' '}
-        <time datetime={lastUpdated.toISOString()}>
-          {lastUpdated.toLocaleDateString(lang, { dateStyle: 'medium', timeZone: 'UTC' })}
-        </time>
+        <Trans
+          message={t('page.updated', {
+            date: lastUpdated.toLocaleDateString(lang, { dateStyle: 'medium', timeZone: 'UTC' }),
+            interpolation: { escapeValue: false },
+          })}
+        >
+          {(text: string) => <time datetime={lastUpdated.toISOString()}>{text}</time>}
+        </Trans>
       </p>
     )
   }
