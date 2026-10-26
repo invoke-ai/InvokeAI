@@ -1,0 +1,32 @@
+---
+import Default from '@astrojs/starlight/components/MarkdownContent.astro';
+---
+
+<Default><slot /></Default>
+
+<script>
+  // A table wider than the content column scrolls in its wrapper (`plugins/rehype-table-scroll.mjs`). Make that wrapper
+  // a named, focusable region so it can be scrolled from the keyboard, as Safari does not focus scroll boxes; tables
+  // that fit stay out of the tab order.
+  const sync = (wrapper: HTMLElement) => {
+    if (wrapper.scrollWidth > wrapper.clientWidth) {
+      wrapper.tabIndex = 0;
+      wrapper.setAttribute('role', 'region');
+      wrapper.setAttribute('aria-label', wrapper.dataset.label || 'Table');
+    } else {
+      wrapper.removeAttribute('tabindex');
+      wrapper.removeAttribute('role');
+      wrapper.removeAttribute('aria-label');
+    }
+  };
+  const wrappers = [...document.querySelectorAll<HTMLElement>('.table-scroll')];
+  // Watch the table too: it can widen (a web font swapping in) without its wrapper changing size.
+  const observer = new ResizeObserver((entries) => {
+    for (const entry of entries) sync(entry.target.closest<HTMLElement>('.table-scroll')!);
+  });
+  for (const wrapper of wrappers) {
+    observer.observe(wrapper);
+    const table = wrapper.querySelector('table');
+    if (table) observer.observe(table);
+  }
+</script>

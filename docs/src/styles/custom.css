@@ -1,61 +1,1236 @@
-:root {
-  /* Page Layout */
-  --sl-content-width: 84ch;
+/*
+ * Colors come from the app's Classic theme as `--invoke-*` tokens (`plugins/theme-tokens.mjs`). Style with the
+ * semantic `--docs-*` tokens below, or with Starlight's `--sl-color-*` variables, which map onto them.
+ */
+:root,
+::backdrop {
+  /* Surfaces */
+  --docs-bg: var(--invoke-inset);
+  --docs-surface: var(--invoke-neutral-900);
+  --docs-control: var(--invoke-neutral-800);
+  --docs-control-hover: var(--invoke-neutral-700);
+  /* The app's hover fill for tabs, rows and ghost buttons: a faint accent-tinted foreground. */
+  --docs-hover: var(--invoke-bg-hover);
+  --docs-border-subtle: var(--invoke-neutral-800);
+  --docs-border: var(--invoke-neutral-700);
+  --docs-border-strong: var(--invoke-neutral-500);
+  /*
+   * For containers that may sit on a tinted surface: white at 16% is as visible on the page as `--docs-border`
+   * (1.55:1 against 1.58:1) and takes on the tint of an aside instead of reading grey on it.
+   */
+  --docs-border-translucent: color-mix(in oklab, var(--invoke-neutral-50) 16%, transparent);
+  --docs-grid-dot: color-mix(in oklab, var(--invoke-grid) 45%, transparent);
+  --docs-shadow-popup: 0 24px 48px -12px color-mix(in oklab, var(--invoke-neutral-950) 85%, transparent);
 
-  /* Typography */
-  --__sl-font: 'Inter', sans-serif;
-  --__sl-font-mono:
-    'Roboto Mono', SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  /* Text */
+  --docs-text-strong: var(--invoke-neutral-50);
+  --docs-text: var(--invoke-neutral-100);
+  --docs-text-muted: var(--invoke-neutral-200);
+  --docs-text-subtle: var(--invoke-neutral-300);
 
-  --radius: 0.35rem;
+  /* Blue is the interaction color: links, focus, selection, primary actions. Lime and yellow are for logos and the home hero glow only. */
+  --docs-accent: var(--invoke-accent);
+  --docs-accent-contrast: var(--invoke-accent-contrast);
+  --docs-accent-tint: color-mix(in oklab, var(--invoke-accent) 14%, transparent);
+  /* Text on the tint, and link hover: lighter and less saturated than the accent. */
+  --docs-accent-text: oklch(from var(--invoke-accent) 86% 0.08 h);
+  --docs-brand: var(--invoke-brand);
 
-  /* Colors */
-  --sl-color-bg: #1c1f23;
-  --sl-color-bg-nav: #31343b;
-  --sl-color-bg-sidebar: #272a2f;
+  --docs-radius: 5px;
+  --docs-radius-lg: 8px;
+  /*
+   * Every bordered content container (code blocks, asides, cards, tables, prev/next links, the setup picker) shares
+   * one radius, so nested containers match. It is the code frame's outer radius: the file-name chip's 5px corners
+   * plus its 6px inset and the frame's 1px border.
+   */
+  --docs-radius-container: 12px;
+  /* How far a container nested in another sits inside its border (see "Nesting" below). */
+  --docs-nest-inset: 4px;
 
-  --sl-color-gray-7: #272a2f;
+  /*
+   * The app's control sizes. Tabs follow its compact segment tabs (`platform/ui/SegmentTabs.tsx`): the content tabs,
+   * the header links and code block titles. Buttons: see "Buttons" below.
+   */
+  --docs-tab-strip-height: 2rem;
+  --docs-tab-height: 1.75rem;
+  --docs-tab-min-width: 2.5rem;
+  --docs-tab-pad-x: 0.625rem;
+  --docs-tab-gap: 0.375rem;
+  --docs-tab-shown: var(--invoke-bg-shown);
+  --docs-tab-divider: var(--invoke-border-emphasized);
+  --docs-tab-transition: background-color 120ms, color 120ms;
+  --docs-button-md-height: 1.75rem;
+  --docs-button-xl-height: 2.75rem;
+  --docs-control-font-size: 0.75rem;
+  --docs-control-transition: background-color 100ms, border-color 100ms, color 100ms;
 
-  --sl-color-hairline: rgba(255, 255, 255, 0.08);
-  --sl-color-hairline-light: rgba(255, 255, 255, 0.16);
+  /* Popups and dropdowns appear the way the search dialog does: fading in as they drop 4px into place. */
+  --docs-popup-duration: 120ms;
+  --docs-popup-easing: ease-out;
+  --docs-popup-offset: -4px;
 
-  --sl-color-text-accent: #97d2ee;
-  --sl-color-text-accent-2: #e4fd1d;
+  /* Starlight */
+  --sl-font: 'Inter Variable';
+  --sl-font-mono: 'Roboto Mono Variable';
+  --sl-content-width: 52rem;
+  --sl-nav-height: 3.25rem;
+  /*
+   * Every control in the header (search, site links, version menu, social links, download, the menu button) has one
+   * height, 32px on narrow screens and 36px wider, and one 7px radius. Icon-only controls are square.
+   */
+  --docs-header-control-height: 2rem;
+  --docs-header-control-radius: 7px;
+  --sl-menu-button-size: var(--docs-header-control-height);
+  --sl-sidebar-width: 19rem;
+  /* The right rail: narrower until the viewport leaves the content column its full width beside both sidebars. */
+  --docs-rail-width: 16rem;
+  /* Added to the sidebar's scrollbar gutter, which is reserved on both edges (see `.sidebar-pane`). */
+  --sl-sidebar-pad-x: 0.5rem;
+  --sl-line-height: 1.7;
+  --sl-text-h1: clamp(2rem, 1.5rem + 2vw, 2.5rem);
+  --sl-text-h2: 1.5rem;
+  --sl-text-h3: 1.25rem;
+  --sl-text-h4: 1.0625rem;
+  --sl-text-h5: 1rem;
 
-  --sl-color-accent-2-rgb: 228, 253, 29;
+  --sl-color-white: var(--docs-text-strong);
+  --sl-color-gray-1: var(--invoke-neutral-100);
+  --sl-color-gray-2: var(--invoke-neutral-200);
+  --sl-color-gray-3: var(--invoke-neutral-300);
+  --sl-color-gray-4: var(--invoke-neutral-400);
+  --sl-color-gray-5: var(--docs-border);
+  --sl-color-gray-6: var(--docs-surface);
+  --sl-color-black: var(--docs-bg);
+
+  --sl-color-accent-low: color-mix(in oklab, var(--invoke-accent) 18%, var(--docs-bg));
+  --sl-color-accent: var(--docs-accent);
+  --sl-color-accent-high: var(--docs-accent-text);
+  --sl-color-text: var(--docs-text);
+  --sl-color-text-accent: var(--docs-accent);
+  --sl-color-text-invert: var(--docs-accent-contrast);
+  --sl-color-bg: var(--docs-bg);
+  --sl-color-bg-nav: var(--docs-surface);
+  --sl-color-bg-sidebar: var(--docs-bg);
+  --sl-color-bg-inline-code: var(--docs-control);
+  --sl-color-bg-accent: var(--docs-accent);
+  --sl-color-hairline-light: var(--docs-border);
+  --sl-color-hairline: var(--docs-border-subtle);
+  --sl-color-hairline-shade: var(--docs-border);
+  --sl-color-backdrop-overlay: color-mix(in oklab, var(--docs-bg) 70%, transparent);
+
+  /* Starlight's aside, badge and card hues: notes are blue, tips and success green, cautions amber, dangers red. */
+  --sl-color-blue-low: color-mix(in oklab, var(--invoke-accent) 12%, var(--docs-bg));
+  --sl-color-blue: var(--invoke-accent);
+  --sl-color-blue-high: var(--docs-accent-text);
+  --sl-color-purple-low: color-mix(in oklab, var(--invoke-success) 12%, var(--docs-bg));
+  --sl-color-purple: var(--invoke-success);
+  --sl-color-purple-high: color-mix(in oklab, var(--invoke-success) 70%, var(--docs-text-strong));
+  --sl-color-green-low: color-mix(in oklab, var(--invoke-success) 12%, var(--docs-bg));
+  --sl-color-green: var(--invoke-success);
+  --sl-color-green-high: color-mix(in oklab, var(--invoke-success) 70%, var(--docs-text-strong));
+  --sl-color-orange-low: color-mix(in oklab, var(--invoke-warning) 12%, var(--docs-bg));
+  --sl-color-orange: var(--invoke-warning);
+  --sl-color-orange-high: color-mix(in oklab, var(--invoke-warning) 70%, var(--docs-text-strong));
+  --sl-color-red-low: color-mix(in oklab, var(--invoke-danger) 12%, var(--docs-bg));
+  --sl-color-red: var(--invoke-danger);
+  --sl-color-red-high: color-mix(in oklab, var(--invoke-danger) 70%, var(--docs-text-strong));
 }
 
-html,
-body {
+@media (min-width: 50rem) {
+  :root {
+    --sl-nav-pad-x: 1.25rem;
+    --docs-header-control-height: 2.25rem;
+  }
+}
+
+@media (min-width: 90rem) {
+  :root {
+    --docs-rail-width: 19rem;
+  }
+}
+
+html {
   scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--docs-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--docs-accent);
+  outline-offset: 2px;
 }
 
 .text-xs {
   font-size: var(--sl-text-xs);
 }
 
-[data-has-hero] {
-  header {
-    background-color: var(--sl-color-bg);
-    border-color: transparent;
+/*
+ * Dropdowns (`.docs-popup`): fade and slide in from their trigger above them, and out again on close, where the
+ * browser can keep a closing element displayed for the transition (elsewhere they close at once). Focus moves on
+ * close without waiting for it.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .docs-popup {
+    transition:
+      opacity var(--docs-popup-duration) var(--docs-popup-easing),
+      translate var(--docs-popup-duration) var(--docs-popup-easing),
+      display var(--docs-popup-duration) allow-discrete;
 
-    .header {
-      max-width: calc(var(--sl-content-width) + 8rem);
-      margin-inline: auto;
+    @starting-style {
+      opacity: 0;
+      translate: 0 var(--docs-popup-offset);
+    }
+
+    &[hidden] {
+      opacity: 0;
+      translate: 0 var(--docs-popup-offset);
+      pointer-events: none;
     }
   }
 }
 
-.site-title {
-  transition: transform 100ms ease-in-out;
+/*
+ * Nesting. A wrapper (an aside, tabs, a disclosure, a card) holds content `--docs-wrap-pad` inside its border. A
+ * container placed directly in its content (a code block, tabs, a table, a disclosure, an aside, a card) bleeds out
+ * so its edge sits `--docs-nest-inset` inside the wrapper's border, with corners that complement the wrapper's: its
+ * radius less the border and that inset, never below the control radius. Its own padding shrinks by the bleed, so its
+ * text stays in line with the wrapper's (`--docs-text-offset`, the distance from its edge to its text).
+ *
+ * A custom property cannot be derived from its own inherited value, so each wrapper publishes the values for its
+ * content under the name its parent level does not use (`-a`/`-b`), and its children take them as the current
+ * `--docs-radius-container` and `--docs-nest-shift`. This covers three levels of nesting. A disclosure's summary
+ * spans its box, so it keeps the box's own values.
+ */
+:where(.starlight-aside, starlight-tabs, .sl-markdown-content details:not(.settings-accordion), article.card):not(
+    :where(.starlight-aside, starlight-tabs, .sl-markdown-content details:not(.settings-accordion), article.card) *
+  ) {
+  --docs-nest-radius-b: max(var(--docs-radius), calc(var(--docs-radius-container) - 1px - var(--docs-nest-inset)));
+  --docs-nest-shift-b: calc(var(--docs-wrap-pad) - var(--docs-nest-inset));
 
-  &:hover {
-    transform: scale(1.02);
-  }
-  &:active {
-    transform: scale(0.98);
+  > :not(summary) {
+    --docs-radius-container: var(--docs-nest-radius-b);
+    --docs-nest-shift: var(--docs-nest-shift-b);
+    --docs-text-offset: initial;
+    --docs-nest-strip: initial;
   }
 }
+:where(.starlight-aside, starlight-tabs, .sl-markdown-content details:not(.settings-accordion), article.card)
+  :where(.starlight-aside, starlight-tabs, .sl-markdown-content details:not(.settings-accordion), article.card):not(
+    :where(.starlight-aside, starlight-tabs, .sl-markdown-content details:not(.settings-accordion), article.card)
+      :where(.starlight-aside, starlight-tabs, .sl-markdown-content details:not(.settings-accordion), article.card)
+      *
+  ) {
+  --docs-nest-radius-a: max(var(--docs-radius), calc(var(--docs-radius-container) - 1px - var(--docs-nest-inset)));
+  --docs-nest-shift-a: calc(var(--docs-wrap-pad) - var(--docs-nest-inset));
+
+  > :not(summary) {
+    --docs-radius-container: var(--docs-nest-radius-a);
+    --docs-nest-shift: var(--docs-nest-shift-a);
+    --docs-text-offset: initial;
+    --docs-nest-strip: initial;
+  }
+}
+:where(.starlight-aside, starlight-tabs, .sl-markdown-content details:not(.settings-accordion), article.card)
+  :where(.starlight-aside, starlight-tabs, .sl-markdown-content details:not(.settings-accordion), article.card)
+  :where(.starlight-aside, starlight-tabs, .sl-markdown-content details:not(.settings-accordion), article.card) {
+  --docs-nest-radius-b: max(var(--docs-radius), calc(var(--docs-radius-container) - 1px - var(--docs-nest-inset)));
+  --docs-nest-shift-b: calc(var(--docs-wrap-pad) - var(--docs-nest-inset));
+
+  > :not(summary) {
+    --docs-radius-container: var(--docs-nest-radius-b);
+    --docs-nest-shift: var(--docs-nest-shift-b);
+    --docs-text-offset: initial;
+    --docs-nest-strip: initial;
+  }
+}
+/*
+ * Containers directly in a wrapper's content bleed; one inside a list or a paragraph keeps its place. A nested strip
+ * (tabs, a code block's title) is inset by the same `--docs-nest-inset`, and a nested box that ends its wrapper's
+ * content tucks down to that inset too.
+ */
+:where(.starlight-aside__content, starlight-tabs [role='tabpanel'], .sl-markdown-content details, article.card .body)
+  > :where(starlight-tabs, .expressive-code, details, .table-scroll, .starlight-aside, article.card, .sl-link-card) {
+  --docs-text-offset: var(--docs-nest-shift);
+  --docs-nest-strip: var(--docs-nest-inset);
+  margin-inline: calc(-1 * var(--docs-nest-shift));
+
+  /* The last element, inline scripts aside (Starlight's tabs leave one after themselves). */
+  &:not(:has(~ :not(script))) {
+    margin-bottom: calc(-1 * var(--docs-nest-shift));
+  }
+}
+
+/* Layout */
+
+/*
+ * The page fills the viewport, and the content column with it: the main frame (which paints the dot grid) and each
+ * box down to the last content panel grow to the space left below the header, so the grid runs to the bottom edge
+ * and the footer (`margin-top: auto`) sits at the bottom of a short page and after the content of a long one.
+ */
+.page {
+  min-height: 100dvh;
+}
+
+.main-frame {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  background-image: radial-gradient(circle, var(--docs-grid-dot) 1px, transparent 1px);
+  background-size: 20px 20px;
+
+  > :has(> .main-pane),
+  .main-pane,
+  .main-pane > main,
+  .main-pane > main > .content-panel:last-child,
+  .main-pane > main > .content-panel:last-child > .sl-container {
+    display: flex;
+    flex: 1 0 auto;
+    flex-direction: column;
+  }
+}
+
+/* The rail sits beside the content from the `lg` breakpoint, as Starlight lays it out. */
+@media (min-width: 72rem) {
+  .main-frame > :has(> .main-pane) {
+    flex-direction: row;
+  }
+}
+
+.right-sidebar {
+  background-color: var(--docs-bg);
+}
+
+@media (min-width: 72rem) {
+  /* The right rail mirrors the navigation sidebar's border. */
+  .right-sidebar {
+    border-inline-start: 1px solid var(--docs-border);
+  }
+
+  /*
+   * On wide screens Starlight right-aligns the content column and splits the spare width between a gap after the
+   * navigation sidebar and the table of contents. Instead, keep the table of contents at its own width against the
+   * right edge and centre the content in the remaining space.
+   */
+  [data-has-sidebar][data-has-toc] .main-pane {
+    --sl-content-margin-inline: auto;
+    flex: 1;
+    min-width: 0;
+  }
+
+  [data-has-sidebar][data-has-toc] .right-sidebar-container {
+    width: var(--docs-rail-width);
+    flex-shrink: 0;
+  }
+
+  /* The fixed panel would otherwise take the viewport width and run past the right edge. */
+  [data-has-sidebar][data-has-toc] .right-sidebar {
+    width: var(--docs-rail-width);
+  }
+}
+
+/* The page heading and the content read as one column. */
+.content-panel:has(.page-heading) {
+  padding-bottom: 0;
+}
+.content-panel + .content-panel {
+  border-top: 0;
+}
+
+/* Navigation sidebar */
+
+/*
+ * Starlight reserves a scrollbar gutter on the pane's end edge only, so the content sat further from the right border
+ * than from the left. Reserving it on both edges keeps the insets equal whether or not the pane scrolls, and on
+ * platforms with overlay scrollbars, which reserve nothing. A thin scrollbar keeps the gutters narrow.
+ */
+#starlight__sidebar.sidebar-pane {
+  scrollbar-width: thin;
+  scrollbar-gutter: stable both-edges;
+}
+
+#starlight__sidebar .sidebar-content {
+  gap: 0.75rem;
+}
+
+/* Small uppercase headings: sidebar sections, the topic switcher's groups, the table of contents. */
+:is(.docs-eyebrow, .right-sidebar-panel starlight-toc h2) {
+  color: var(--docs-text-subtle);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Table of contents in the right rail */
+
+.right-sidebar-panel starlight-toc {
+  h2 {
+    margin-bottom: 0.375rem;
+  }
+
+  a {
+    --pad-inline: 0rem;
+    padding-block: 0.25rem;
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-xs);
+    line-height: 1.35;
+    text-decoration: none;
+
+    &:hover {
+      color: var(--docs-text-strong);
+    }
+  }
+
+  a[aria-current='true'] {
+    color: var(--docs-accent);
+    font-weight: 500;
+  }
+}
+
+mobile-starlight-toc nav {
+  border-top-color: var(--docs-border);
+}
+
+/* Content */
+
+.sl-markdown-content {
+  :is(h2, h3, h4, h5, h6):not(:where(.not-content *)) {
+    font-weight: 650;
+  }
+  h2:not(:where(.not-content *)) {
+    letter-spacing: -0.02em;
+  }
+
+  /*
+   * Prose links only: a link button carries `not-content` itself, and a link card's title link is styled by the card.
+   */
+  a:not(.not-content, .docs-button, :where(.not-content *, .sl-link-card *)) {
+    text-decoration-color: color-mix(in oklab, var(--docs-accent) 40%, transparent);
+    text-underline-offset: 0.2em;
+
+    &:hover {
+      color: var(--docs-accent-text);
+      text-decoration-color: currentColor;
+    }
+  }
+
+  code:not(:where(.not-content *)) {
+    border-radius: 4px;
+  }
+
+  /*
+   * A block (code, table, tabs, disclosure, aside) inside a list item or step sits 12px below the text it belongs to,
+   * whether that text is a paragraph or a bare line, which Starlight's spacing does not reach. What follows keeps its
+   * larger gap, so the block reads with the text above it.
+   */
+  li > :where(.expressive-code, .table-scroll, starlight-tabs, details, .starlight-aside) {
+    margin-top: 0.75rem;
+  }
+
+  hr:not(:where(.not-content *)) {
+    border-color: var(--docs-border-subtle);
+  }
+
+  /*
+   * Tables sit in a bordered scroll container (`plugins/rehype-table-scroll.mjs`) and fill it with ordinary table
+   * layout: columns size to their longest word or code token, which never breaks, and a table wider than the column
+   * scrolls inside its border.
+   */
+  .table-scroll:not(:where(.not-content *)) {
+    --docs-wrap-pad: calc(var(--docs-text-offset, 15px) - 1px);
+    overflow-x: auto;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+    scrollbar-width: thin;
+  }
+  table:not(:where(.not-content *)) {
+    display: table;
+    width: 100%;
+    font-size: var(--sl-text-sm);
+
+    :is(th, td),
+    :is(th, td) code {
+      overflow-wrap: normal;
+    }
+  }
+  :is(th, td):not(:where(.not-content *)),
+  :is(th:first-child, td:first-child, th:last-child, td:last-child):not(:where(.not-content *)) {
+    padding: 0.625rem 0.875rem;
+    border-bottom: 1px solid var(--docs-border-subtle);
+  }
+  :is(th:first-child, td:first-child):not(:where(.not-content *)) {
+    padding-inline-start: var(--docs-wrap-pad, 0.875rem);
+  }
+  :is(th:last-child, td:last-child):not(:where(.not-content *)) {
+    padding-inline-end: var(--docs-wrap-pad, 0.875rem);
+  }
+  /*
+   * The header separator runs under every header cell. The `:first-child` arm matches the specificity of the cell
+   * padding rule above, which otherwise gave the first and last header cells the subtler body-row border.
+   */
+  thead :is(th, th:first-child):not(:where(.not-content *)) {
+    border-bottom: 1px solid var(--docs-border);
+  }
+  th:not(:where(.not-content *)) {
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-2xs);
+  }
+  tr:last-child > td:not(:where(.not-content *)) {
+    border-bottom: 0;
+  }
+}
+
+/*
+ * Asides are accented with their type's color: notes take the accent, tips success, cautions warning and dangers the
+ * danger color. The Classic theme's warning and danger are muted (chroma 0.06 and 0.08), so mixed into the bluish
+ * surface they read as grey. Keep each color's lightness and hue but give it a chroma floor, and tint the background
+ * in the type's hue at a fixed lightness and chroma, so every type is recognizable at a glance. No inset bar.
+ */
+.starlight-aside {
+  --docs-aside-seed: var(--invoke-accent);
+  --docs-aside-color: oklch(from var(--docs-aside-seed) l max(c, 0.12) h);
+  --docs-aside-bg: oklch(from var(--docs-aside-seed) 0.31 0.035 h);
+  /* Text sits 17px inside the outer edge on every side (16px padding plus the border); less when nested. */
+  --docs-wrap-pad: calc(var(--docs-text-offset, 17px) - 1px);
+  padding: var(--docs-wrap-pad);
+  border: 1px solid color-mix(in oklab, var(--docs-aside-color) 58%, var(--invoke-surface));
+  border-radius: var(--docs-radius-container);
+  background-color: var(--docs-aside-bg);
+  color: var(--docs-text);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+
+  .starlight-aside__title {
+    gap: 0.5rem;
+    color: var(--docs-aside-color);
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .starlight-aside__icon {
+    width: 1rem;
+    height: 1rem;
+    font-size: 1rem;
+    flex: none;
+    color: var(--docs-aside-color);
+  }
+
+  .starlight-aside__title + .starlight-aside__content {
+    margin-top: 0.375rem;
+  }
+
+  .starlight-aside__content {
+    --sl-content-gap-y: 0.75rem;
+
+    a:not(.not-content, .docs-button, :where(.not-content *, .sl-link-card *)) {
+      color: var(--docs-accent);
+    }
+    a:not(.not-content, .docs-button, :where(.not-content *, .sl-link-card *)):hover {
+      color: var(--docs-accent-text);
+    }
+    code:not(:where(.not-content *)) {
+      background-color: var(--docs-control);
+    }
+  }
+}
+
+/*
+ * Tips: the app's success green (hue 142) reads olive at the asides' dark lightness, so shift it toward mint (hue 158)
+ * with a deeper, more saturated tint. A docs-only override; the app's success token is unchanged.
+ */
+/* Containers inside an aside take its tint at their edges rather than a grey border. */
+.starlight-aside {
+  :is(.table-scroll, details) {
+    border-color: var(--docs-border-translucent);
+  }
+  .expressive-code {
+    --ec-brdCol: var(--docs-border-translucent);
+    --ec-frm-edTabBarBrdCol: var(--docs-border-translucent);
+    --ec-frm-edTabBarBrdBtmCol: var(--docs-border-translucent);
+    --ec-frm-trmTtbBrdBtmCol: var(--docs-border-translucent);
+  }
+}
+
+.starlight-aside--tip {
+  --docs-aside-seed: var(--invoke-success);
+  --docs-aside-color: oklch(from var(--docs-aside-seed) 0.82 max(c, 0.13) 158);
+  --docs-aside-bg: oklch(from var(--docs-aside-seed) 0.29 0.045 158);
+}
+.starlight-aside--caution {
+  --docs-aside-seed: var(--invoke-warning);
+}
+.starlight-aside--danger {
+  --docs-aside-seed: var(--invoke-danger);
+}
+
+/*
+ * Content disclosures (`<details>`) are bordered containers, like asides and code blocks, instead of Starlight's
+ * left-bar style. The summary row works like the sidebar's section headings: a hover fill, a chevron that turns, and
+ * the same open and close animation. The settings reference styles its own accordions.
+ */
+.sl-markdown-content details:not(:where(.not-content *, .settings-accordion)) {
+  --docs-wrap-pad: calc(var(--docs-text-offset, 13px) - 1px);
+  interpolate-size: allow-keywords;
+  padding: 0 var(--docs-wrap-pad);
+  border: 1px solid var(--docs-border);
+  border-radius: var(--docs-radius-container);
+  background-color: var(--docs-surface);
+
+  /* The summary spans the box, its label in line with the content. */
+  > summary {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin: 0 calc(-1 * var(--docs-wrap-pad));
+    padding: 0.5rem var(--docs-wrap-pad);
+    border-radius: calc(var(--docs-radius-container) - 1px);
+    color: var(--docs-text-strong);
+    font-weight: 600;
+    transition: background-color 100ms;
+
+    &:hover {
+      background-color: var(--docs-hover);
+    }
+
+    &::before {
+      --sl-details-marker-size: 1rem;
+      flex: none;
+      margin: 0;
+      color: var(--docs-text-subtle);
+      transition: transform 180ms ease-out;
+    }
+  }
+
+  &[open] > summary {
+    margin-block: 0;
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+  }
+
+  > summary + * {
+    margin-top: 0.25rem;
+  }
+  > :last-child:not(summary) {
+    margin-bottom: 0.75rem;
+  }
+  /* A nested box that ends the content tucks down to the nest inset (see "Nesting"). */
+  >
+    :not(summary, :has(~ :not(script))):where(
+      starlight-tabs,
+      .expressive-code,
+      details,
+      .table-scroll,
+      .starlight-aside,
+      article.card,
+      .sl-link-card
+    ) {
+    margin-bottom: var(--docs-nest-inset);
+  }
+
+  &::details-content {
+    block-size: 0;
+    opacity: 0;
+    overflow: clip;
+    transition:
+      block-size 180ms ease-out,
+      opacity 180ms ease-out,
+      content-visibility 180ms ease-out allow-discrete;
+  }
+  &[open]::details-content {
+    block-size: auto;
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    > summary::before,
+    &::details-content {
+      transition: none;
+    }
+  }
+}
+
+/*
+ * Cards and link cards are the app's launchpad tiles and project cards (`IntentTiles.tsx`, `ProjectCard.tsx`): the
+ * panel surface with a subtle border, the content-container radius, 12px padding, a muted 16px icon, and on hover a
+ * brighter surface with an emphasized border. Text keeps the docs' reading sizes. Other link cards (prev/next links)
+ * use `.docs-link-card` with `.docs-link-card__title`, `.docs-link-card__description` and `.docs-link-card__icon`.
+ */
+article.card,
+:is(.sl-link-card, .docs-link-card) {
+  --docs-wrap-pad: calc(var(--docs-text-offset, 13px) - 1px);
+  gap: 0.25rem;
+  padding: 0.75rem var(--docs-wrap-pad);
+  border: 1px solid var(--invoke-neutral-600);
+  border-radius: var(--docs-radius-container);
+  background-color: var(--docs-surface);
+  box-shadow: none;
+}
+
+article.card {
+  .title {
+    gap: 0.5rem;
+    color: var(--docs-text-strong);
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+  }
+
+  .icon {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--docs-text-subtle);
+    font-size: 1rem;
+  }
+
+  /*
+   * The body fills the card, so in a row of cards stretched to the tallest the buttons (bare or in a paragraph) sit
+   * at the bottom, at least 14px below the text. Buttons keep their own width; several stack.
+   */
+  .body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    font-size: var(--sl-text-sm);
+
+    > .sl-link-button {
+      align-self: flex-start;
+      margin-block: 0;
+    }
+    > .sl-link-button + .sl-link-button {
+      margin-top: 0.5rem;
+    }
+    > .sl-link-button:not(.sl-link-button ~ *),
+    > p:has(> .sl-link-button) {
+      margin-top: auto;
+    }
+    > :has(+ .sl-link-button):not(.sl-link-button) {
+      margin-bottom: 0.875rem;
+    }
+    > p:has(> .sl-link-button):not(:first-child) {
+      padding-top: 0.875rem;
+    }
+  }
+}
+
+:is(.sl-link-card, .docs-link-card) {
+  color: var(--docs-text-strong);
+  text-decoration: none;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+
+  :is(.title, .docs-link-card__title) {
+    color: var(--docs-text-strong);
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  :is(.description, .docs-link-card__description) {
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-xs);
+  }
+
+  :is(.icon, .docs-link-card__icon) {
+    flex: none;
+    width: 1rem;
+    height: 1rem;
+    font-size: 1rem;
+    color: var(--docs-text-subtle);
+    transition: color 150ms ease;
+  }
+
+  &:hover {
+    border-color: var(--docs-border-strong);
+    background-color: var(--docs-control);
+
+    :is(.icon, .docs-link-card__icon) {
+      color: var(--docs-text-strong);
+    }
+  }
+
+  /* Ring the whole card: Starlight's title link stretches over its card. */
+  &:is(:focus-visible, :has(a:focus-visible)) {
+    outline: 2px solid var(--docs-accent);
+    outline-offset: 2px;
+  }
+  a:focus-visible {
+    outline: none;
+  }
+}
+
+/*
+ * Buttons, after the app's button recipe. Contract: `.docs-button` with a variant and, optionally, a size:
+ * - variants: `--primary` (solid accent, dark text, brightening on hover), `--secondary` (the app's outline button:
+ *   no fill, the strong border, a hover fill and an unchanged border) and `--ghost` (no border, a hover fill);
+ * - sizes: `--md` (the default, 28px, the app's `control.md`), `--lg` (the header controls' height and radius, 36px or
+ *   32px on narrow screens) and `--xl` (44px, the app's `control.3xl`, for calls to action);
+ * - `--icon` for a square, icon-only button (give it an accessible name).
+ * An icon is an inline SVG child before or after the label (a Lucide component, say); it takes the size's icon size
+ * and the text color. Every button shares the transition, focus ring, active and disabled states. Starlight's
+ * LinkButton (primary, secondary, minimal), the mobile menu button and the code copy button map onto it.
+ */
+:where(.docs-button, .sl-link-button, .sl-menu-button, .expressive-code .copy button) {
+  --docs-button-height: var(--docs-button-md-height);
+  --docs-button-pad-x: 0.625rem;
+  --docs-button-gap: 0.25rem;
+  --docs-button-icon: 1rem;
+  --docs-button-text: 0.75rem;
+  --docs-button-radius: var(--docs-radius);
+  align-items: center;
+  justify-content: center;
+  gap: var(--docs-button-gap);
+  height: var(--docs-button-height);
+  margin: 0;
+  padding: 0 var(--docs-button-pad-x);
+  border: 1px solid transparent;
+  border-radius: var(--docs-button-radius);
+  box-shadow: none;
+  font: 500 var(--docs-button-text) / 1.2 var(--__sl-font);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: var(--docs-control-transition);
+
+  > svg {
+    flex: none;
+    width: var(--docs-button-icon);
+    height: var(--docs-button-icon);
+    font-size: var(--docs-button-icon);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--docs-accent);
+    outline-offset: 2px;
+  }
+
+  &:is(:disabled, [aria-disabled='true']) {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+/* Starlight's menu button keeps its own `display`, which hides it from `md` up. */
+:where(.docs-button, .sl-link-button, .expressive-code .copy button) {
+  display: inline-flex;
+}
+
+:where(.docs-button--lg, .sl-menu-button) {
+  --docs-button-height: var(--docs-header-control-height);
+  --docs-button-pad-x: 0.75rem;
+  --docs-button-gap: 0.375rem;
+  --docs-button-text: var(--sl-text-xs);
+  --docs-button-radius: var(--docs-header-control-radius);
+}
+
+:where(.docs-button--xl) {
+  --docs-button-height: var(--docs-button-xl-height);
+  --docs-button-pad-x: 1.25rem;
+  --docs-button-gap: 0.5rem;
+  --docs-button-icon: 1.25rem;
+  --docs-button-text: 1rem;
+  --docs-button-radius: var(--docs-radius-lg);
+}
+
+:where(.docs-button--icon, .sl-menu-button, .expressive-code .copy button) {
+  width: var(--docs-button-height);
+  padding: 0;
+}
+
+:where(.docs-button--primary, .sl-link-button.primary) {
+  background-color: var(--docs-accent);
+  color: var(--docs-accent-contrast);
+
+  &:is(:hover, :active, [aria-expanded='true']) {
+    background-color: oklch(from var(--docs-accent) calc(l + 0.05) c h);
+    color: var(--docs-accent-contrast);
+  }
+}
+
+:where(.docs-button--secondary, .sl-link-button.secondary, .sl-menu-button) {
+  border-color: var(--docs-border-strong);
+  background-color: transparent;
+  color: var(--docs-text-strong);
+
+  &:is(:hover, :active, [aria-expanded='true'], :has(~ :popover-open)) {
+    background-color: var(--docs-hover);
+    color: var(--docs-text-strong);
+  }
+}
+
+:where(.docs-button--ghost, .sl-link-button.minimal, .expressive-code .copy button) {
+  background-color: transparent;
+  color: var(--docs-text-muted);
+
+  &:is(:hover, :active, [aria-expanded='true']) {
+    background-color: var(--docs-hover);
+    color: var(--docs-text-strong);
+  }
+}
+
+.card .sl-link-button {
+  margin-bottom: 0;
+}
+
+/*
+ * A LinkButton in the content flow, or a paragraph holding only LinkButtons, sits 12px below the text before it and a
+ * content gap above what follows; the base `margin: 0` above outranks Starlight's layered spacing. Starlight leaves no
+ * margin on an element after a link, so the button's own bottom margin holds that gap. Buttons in a row sit 8px
+ * apart, the 5px word space between them included. Zero specificity, so cards and steps keep their own spacing.
+ */
+.sl-markdown-content :where(.sl-link-button):not(:where(p *)),
+.sl-markdown-content :where(p:has(> .sl-link-button):not(:has(> :not(.sl-link-button)))) {
+  margin-block: 0.75rem var(--sl-content-gap-y);
+}
+
+.sl-markdown-content :where(.sl-link-button:has(~ .sl-link-button)) {
+  margin-inline-end: 0.1875rem;
+}
+
+.sl-steps > li::before {
+  font-family: var(--__sl-font-mono);
+}
+
+/*
+ * Steps sit 24px (one and a half content gaps) apart however a step ends. Starlight spaces them with a margin on the
+ * step's last child, which a link button, or a hidden setup variant left last, never gets, so the next step's number
+ * ends up against the text. The step's own padding holds the space instead, which the guide line spans. The last
+ * element keeps only the shift Starlight gives a first child to align it with the number.
+ */
+.sl-steps > li {
+  padding-bottom: calc(1.5 * var(--sl-content-gap-y));
+
+  > :not(:has(~ :not(script))) {
+    margin-bottom: var(--shift-y, 0);
+
+    /* A list ending the step would otherwise carry its last item's spacing out to the step's edge. */
+    &:is(ul, ol) > li:last-child > :not(:has(~ :not(script))) {
+      margin-bottom: 0;
+    }
+  }
+}
+
+/*
+ * Segment tabs, the app's `SegmentTabs.tsx`: a frameless strip of 28px chips, 2px apart, with a short divider between
+ * neighbours. The shown chip has a light neutral fill and keeps it on hover; the dividers beside it, or beside a
+ * hovered chip, fade out. No underline or inset bar.
+ *
+ * Markup contract: a `.docs-segment-tabs` strip whose children are either `.docs-segment-tab` chips or wrappers (such
+ * as `li`) each holding one chip. A chip is shown when it has `aria-selected="true"`, `aria-pressed="true"` (a toggle
+ * button), `aria-current`, or (a `label` chip) a checked input; a label chip hides its radio and draws the focus ring when the radio has keyboard focus.
+ * Starlight's `<Tabs>` strip, the header's site links and code block titles use the same rules.
+ */
+:is(.docs-segment-tabs, starlight-tabs [role='tablist']) {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: var(--docs-tab-strip-height);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  list-style: none;
+
+  > * {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  /* The divider sits in the 2px gap before each item but the first. */
+  > * + *::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: -1.5px;
+    top: calc(50% - 0.4375rem);
+    width: 1px;
+    height: 0.875rem;
+    border-radius: 999px;
+    background-color: var(--docs-tab-divider);
+    pointer-events: none;
+    transition: opacity 120ms;
+  }
+  /* Hidden beside a shown or hovered chip, whether the chip is the item or inside it. */
+  > :is(
+      .docs-segment-tab:is([aria-selected='true'], [aria-pressed='true'], [aria-current], :has(input:checked), :hover),
+      :has(> :is(.docs-segment-tab, [role='tab']):is([aria-selected='true'], [aria-pressed='true'], [aria-current], :hover))
+    ) {
+    &::before,
+    & + *::before {
+      opacity: 0;
+    }
+  }
+}
+
+/* No specificity, so the states below and each user's own rules apply over it; unlayered, it still beats Starlight's. */
+:where(.docs-segment-tab, starlight-tabs [role='tab'], .expressive-code .frame.has-title:not(.is-terminal) .title) {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--docs-tab-gap);
+  min-width: var(--docs-tab-min-width);
+  height: var(--docs-tab-height);
+  margin: 0;
+  padding: 0 var(--docs-tab-pad-x);
+  border: 0;
+  border-radius: var(--docs-radius);
+  box-shadow: none;
+  color: var(--docs-text-subtle);
+  font-size: var(--docs-control-font-size);
+  font-weight: 500;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: var(--docs-tab-transition);
+
+  svg {
+    flex: none;
+  }
+}
+
+/* The strip clips anything outside its padding, so the ring sits on the chip's edge. */
+:is(.docs-segment-tab, starlight-tabs [role='tab']):focus-visible {
+  outline-offset: 0;
+}
+
+:is(.docs-segment-tab, starlight-tabs [role='tab']):not(
+    [aria-selected='true'],
+    [aria-pressed='true'],
+    [aria-current],
+    :has(input:checked)
+  ):hover {
+  background-color: var(--docs-hover);
+  color: var(--docs-text-strong);
+}
+
+:is(.docs-segment-tab, starlight-tabs [role='tab']):is(
+    [aria-selected='true'],
+    [aria-pressed='true'],
+    [aria-current],
+    :has(input:checked)
+  ),
+.expressive-code .frame.has-title:not(.is-terminal) .title {
+  background-color: var(--docs-tab-shown);
+  color: var(--docs-text-strong);
+}
+
+/*
+ * The large size, for segment tabs among the header's controls: chips as tall as those controls, with their radius,
+ * and padding, gap and icons scaled up to suit. The dividers keep their 14px.
+ */
+.docs-segment-tabs--lg {
+  min-height: var(--docs-header-control-height);
+
+  .docs-segment-tab {
+    gap: 0.5rem;
+    height: var(--docs-header-control-height);
+    padding-inline: 0.75rem;
+    border-radius: var(--docs-header-control-radius);
+    font-size: var(--sl-text-xs);
+
+    svg {
+      width: 1rem;
+      height: 1rem;
+    }
+  }
+}
+
+/* A label chip's radio is the control: hidden, but covering the chip so it takes the clicks. */
+.docs-segment-tab {
+  cursor: pointer;
+
+  input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: inherit;
+  }
+
+  &:has(input:focus-visible) {
+    outline: 2px solid var(--docs-accent);
+  }
+}
+
+/*
+ * Starlight's tabs and their panels sit in a light container like a code block's: the border, the container radius,
+ * the strip inset 6px like a code block's title strip, and no line between strip and panel. Panel text starts 16px
+ * in, in line with the chips' text (6px inset + 10px chip padding). No background, so it reads on asides too.
+ */
+starlight-tabs {
+  --docs-wrap-pad: calc(var(--docs-text-offset, 17px) - 1px);
+  /*
+   * The strip sits the same distance inside the border on every side: 6px, or the nest inset when nested. The chips'
+   * padding takes up the rest of the text offset; their corners keep the control radius.
+   */
+  --docs-strip-inset: var(--docs-nest-strip, 6px);
+  border: 1px solid var(--docs-border-translucent);
+  border-radius: var(--docs-radius-container);
+
+  .tablist-wrapper {
+    /* The inset also leaves room for the focus ring, which the strip's scrolling would otherwise clip. */
+    padding: var(--docs-strip-inset);
+    scrollbar-width: thin;
+  }
+
+  [role='tablist'] {
+    min-height: var(--docs-tab-height);
+  }
+
+  [role='tab'] {
+    padding-inline: max(6px, calc(var(--docs-wrap-pad) - var(--docs-strip-inset)));
+  }
+
+  [role='tab'] svg {
+    width: 1rem;
+    height: 1rem;
+    font-size: 1rem;
+  }
+
+  .tablist-wrapper ~ [role='tabpanel'] {
+    margin-top: 0;
+    padding: 0.25rem var(--docs-wrap-pad) var(--docs-wrap-pad);
+
+    /* A nested box that opens the panel sits one strip inset below the chips, as they sit inside the border. */
+    >
+      :first-child:where(
+        starlight-tabs,
+        .expressive-code,
+        details,
+        .table-scroll,
+        .starlight-aside,
+        article.card,
+        .sl-link-card
+      ) {
+      margin-top: -0.25rem;
+    }
+  }
+}
+
+/* Code */
+
+/*
+ * A code block's file name is a shown segment tab (see above) in the app's panel strip: 6px around the chip (4px when
+ * nested), inside the frame's 1px border. That puts the chip's text 1px + 6px + 10px = 17px from the frame's edge, in
+ * line with the code (1px border + 16px padding). Like every chip, it keeps the 5px control radius.
+ */
+.expressive-code {
+  /* Code text sits 17px inside the frame's edge, less when nested; the title strip and copy button follow it. */
+  --docs-code-pad: calc(var(--docs-text-offset, 17px) - var(--ec-brdWd));
+  --ec-codePadInl: var(--docs-code-pad);
+  --ec-brdRad: calc(var(--docs-radius-container) - var(--ec-brdWd));
+  --docs-code-inset: calc(var(--ec-brdWd) + var(--docs-nest-strip, 6px));
+  /* Lucide's copy and check icons, as the masks of the copy button. */
+  --ec-frm-copyIcon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='14' height='14' x='8' y='8' rx='2' ry='2'/%3E%3Cpath d='M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2'/%3E%3C/svg%3E");
+  --docs-code-copied-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+}
+
+.expressive-code .frame.has-title:not(.is-terminal) {
+  .header {
+    align-items: center;
+    padding: var(--docs-code-inset);
+  }
+
+  .title {
+    padding-inline: max(6px, calc(var(--ec-brdWd) + var(--docs-code-pad) - var(--docs-code-inset)));
+    font-family: var(--__sl-font-mono);
+
+    &::after {
+      display: none;
+    }
+  }
+}
+
+/*
+ * The copy button is the app's 28px ghost icon button, inset like the title chip in every frame (expressive-code keeps
+ * the first line of code clear of it). On pointer devices it shows while the code block is hovered or focused, as
+ * expressive-code shows it; on touch devices it always shows. After a copy its icon turns to a check and a small chip
+ * says so.
+ */
+.expressive-code .copy {
+  align-items: center;
+  inset-block-start: var(--docs-code-inset);
+  inset-inline-end: var(--docs-code-inset);
+
+  /* A ghost icon button (see "Buttons"); its icon is expressive-code's mask, drawn in the text color. */
+  button {
+    opacity: 1;
+    transition: var(--docs-control-transition), opacity 100ms;
+
+    &::before,
+    > div {
+      display: none;
+    }
+
+    &::after {
+      margin: calc((var(--docs-button-height) - 0.875rem) / 2);
+      background-color: currentColor;
+      mask-size: 100% 100%;
+    }
+  }
+
+  &:has(.feedback.show) button {
+    color: var(--docs-text-strong);
+
+    &::after {
+      mask-image: var(--docs-code-copied-icon);
+    }
+  }
+
+  .feedback {
+    padding: 0.125rem 0.5rem;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius);
+    background-color: var(--docs-control);
+    color: var(--docs-text-strong);
+    font-size: var(--docs-control-font-size);
+    transform: none;
+    translate: 0 var(--docs-popup-offset);
+    transition:
+      opacity var(--docs-popup-duration) var(--docs-popup-easing),
+      translate var(--docs-popup-duration) var(--docs-popup-easing);
+
+    &::after {
+      display: none;
+    }
+
+    &.show {
+      translate: 0 0;
+    }
+  }
+}
+
+/*
+ * In a terminal frame the copy button sits in the code, centred on the first line below the title bar, rather than
+ * across the bar's lower edge. The offset adds up expressive-code's bar (borders, padding and one line of UI text)
+ * and the code's top padding; the first line keeps clear of the button, as in other frames.
+ */
+.expressive-code .frame.is-terminal .copy {
+  inset-block-start: calc(
+    2 * var(--ec-brdWd) + 2 * var(--ec-uiPadBlk) + var(--ec-uiLineHt) * var(--ec-uiFontSize) + var(--ec-codePadBlk) +
+      (var(--ec-codeLineHt) * var(--ec-codeFontSize) - var(--docs-button-md-height)) / 2
+  );
+}
+
+@media (hover: hover) {
+  .expressive-code .frame:not(:hover, :focus-within) .copy:not(:has(.feedback.show)) button:not(:focus-visible) {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .expressive-code .copy .feedback {
+    translate: none;
+    transition: none;
+  }
+}
+
+/* Splash pages */
 
 .hero {
   padding-top: clamp(2.5rem, calc(1rem + 10vmin), 5rem);
@@ -70,361 +1245,22 @@ body {
       text-align: center;
     }
   }
-}
 
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-
-  .title--wrapper {
-    flex-shrink: 0;
+  h1 {
+    color: var(--docs-text-strong);
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 1.05;
   }
 
-  /* Site Search Container */
-  .sl-flex:has(site-search) {
-    order: 2;
-    justify-content: end;
-    width: 100%;
-    max-width: 22rem;
-
-    @media (max-width: 799px) {
-      width: auto;
-    }
-  }
-
-  /* Social Items */
-  > :last-child:has(> .social-icons) {
-    order: 1;
-    margin-left: auto;
-    justify-content: end;
+  .tagline {
+    color: var(--docs-text-muted);
   }
 }
 
-.page {
-  background-image: radial-gradient(circle, var(--sl-color-hairline) 1px, transparent 1px);
-  background-size: 20px 20px;
-}
-
-.right-sidebar-container {
-  background: var(--sl-color-bg);
-}
-
-/*
- * On wide screens Starlight right-aligns the content column and splits the spare width between a gap
- * after the navigation sidebar and the table of contents. Instead, keep the table of contents at its
- * own width against the right edge and centre the content in the remaining space.
- */
-@media (min-width: 72rem) {
-  [data-has-sidebar][data-has-toc] .main-pane {
-    --sl-content-margin-inline: auto;
-    flex: 1;
-    min-width: 0;
-  }
-
-  [data-has-sidebar][data-has-toc] .right-sidebar-container {
-    width: var(--sl-sidebar-width);
-    flex-shrink: 0;
-  }
-
-  /* The fixed panel would otherwise take the viewport width and run past the right edge. */
-  [data-has-sidebar][data-has-toc] .right-sidebar {
-    width: var(--sl-sidebar-width);
-  }
-}
-
-#starlight__sidebar .sidebar-content {
-  a {
-    transition:
-      background 50ms ease-in-out,
-      color 50ms ease-in-out;
-
-    &:not([aria-current='page']):hover {
-      background: var(--sl-color-hairline);
-    }
-    &:not([aria-current='page']):active {
-      background: var(--sl-color-hairline-light);
-    }
-
-    &[aria-current='page'] span,
-    span {
-      font-weight: normal;
-    }
-  }
-
-  /* Only top-level sections keep bold labels; nested directory labels match page links. */
-  ul ul .group-label .large {
-    font-weight: normal;
-  }
-}
-
-site-search > button {
-  transition: border-color 100ms ease-in-out;
-}
-
-.sl-link-button {
-  border-radius: 0.5rem;
-}
-
-.sl-link-card {
-  background: var(--sl-color-bg);
-  transition: border-color 100ms ease-in-out;
-
-  &:active {
-    border-color: var(--sl-color-hairline-light);
-  }
-
-  svg {
-    transition: color 100ms ease-in-out;
-  }
-}
-
-.expressive-code .frame pre {
-  background: var(--sl-color-bg-sidebar);
-}
-
-.expressive-code .has-title {
-  .header {
-    border-bottom: var(--ec-brdWd) solid var(--ec-brdCol);
-  }
-  .header .title {
-    border-inline: var(--ec-brdWd) solid var(--ec-brdCol);
-    border-top: var(--ec-brdWd) solid var(--ec-brdCol);
-    background: var(--sl-color-bg-sidebar);
-    font-family: var(--__sl-font-mono);
-    font-size: var(--sl-text-xs);
-    padding: calc(var(--ec-uiPadBlk) + var(--ec-frm-edActTabIndHt)) var(--ec-uiPadInl);
-    cursor: pointer;
-
-    &::after {
-      display: none;
-    }
-
-    &::before {
-      position: absolute;
-      content: '';
-      inset: 0;
-      background: var(--sl-color-hairline);
-      opacity: 0;
-      transition: opacity 75ms ease-in-out;
-    }
-
-    &:hover::before {
-      opacity: 1;
-    }
-  }
-}
-
-ul[role='tablist'] {
-  border-bottom: 1px solid var(--sl-color-hairline);
-}
-
-a[role='tab'] {
-  border: none;
-  padding: 0.275rem 0.5rem;
-  transition: all 100ms ease;
-  border-radius: var(--radius);
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-  border-bottom-width: 2px;
-  border-bottom-style: solid;
-  box-shadow: none;
-
-  &:not([aria-selected='true']) {
-    border-color: transparent;
-    color: var(--sl-color-text);
-  }
-
-  &:not([aria-selected='true']):hover {
-    background: var(--sl-color-hairline);
-  }
-
-  &:not([aria-selected='true']):active {
-    background: var(--sl-color-hairline-light);
-  }
-
-  &[aria-selected='true'] {
-    font-weight: normal;
-    --sl-tab-color-border: var(--sl-color-text-accent);
-    color: var(--sl-color-text-accent);
-  }
-}
-
-/* Decorate tabs with parent aside colors */
-aside a[role='tab'] {
-  &[aria-selected='true'] {
-    --sl-tab-color-border: var(--sl-color-asides-border);
-    color: var(--sl-color-asides-text-accent);
-  }
-}
-
-a[rel='next'],
-a[rel='prev'] {
-  background: var(--sl-color-bg);
-  transition: border-color 100ms ease-in-out;
-}
-
-.sl-steps {
-  & > li::before {
-    font-family: var(--__sl-font-mono);
-  }
-}
-
-article.card {
-  border-radius: var(--radius);
-
-  padding: clamp(1rem, calc(0.125rem + 3vw), 1.5rem);
-}
-
-.starlight-aside {
-  border-radius: var(--radius);
-  border: none;
-  position: relative;
-  padding: 0.75rem;
-  padding-left: 1.5rem;
-
-  &::before {
-    content: '';
-    position: absolute;
-    left: 0.35rem;
-    width: 0.25rem;
-    inset-block: 0.35rem;
-    border-radius: 999px;
-    background: var(--sl-color-asides-border);
-  }
-}
-
-.hero .actions {
-  gap: 1.5rem;
-}
-
-.card .sl-link-button {
-  margin-bottom: 0;
-}
-
-.sl-link-button {
-  position: relative;
-  overflow: hidden;
-  transition: transform 100ms ease-in-out;
-
-  &:not(.minimal) {
-    padding: 0.65rem 0.85rem;
-
-    &::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: var(--sl-color-hairline);
-      opacity: 0;
-      transition: opacity 75ms ease-in-out;
-      pointer-events: none;
-    }
-  }
-
-  &:hover::before {
-    opacity: 1;
-  }
-
-  &:hover,
-  &:focus-visible {
-    transform: scale(1.02);
-  }
-
-  &:active {
-    transform: scale(0.98);
-  }
-
-  &.primary::before {
-    background: rgba(0, 0, 0, 0.12);
-  }
-
-  &.secondary {
-    border-color: var(--sl-color-gray-5);
-  }
-}
-
-/* Contextual Menu */
-#contextual-menu-container {
-
-  & > button {
-    transition: background 100ms ease-in-out;
-  }
-
-  #contextual-dropdown-menu button {
-    transition: background 75ms ease-in-out;
-  }
-}
-
-/* TODO: Custom markdown content styles */
-.sl-markdown-content {
-  table {
-    :is(th:first-child, td:first-child):not(:where(.not-content *)) {
-      padding: 0.5rem 1rem;
-    }
-    tr:hover {
-      background-color: var(--sl-color-bg-sidebar);
-    }
-  }
-}
-
-/* Splash Page-specific styles */
-
-/* Make the default body font a bit smaller on the splash/home page. */
-[data-has-hero] .sl-markdown-content {
-  font-size: 0.9rem;
-}
-
-@keyframes splash-animate {
-  0% { background-position: 0% 0%; }
-  50% { background-position: 0% 100%; }
-  100% { background-position: 0% 0%; }
-}
-
-.splash-img {
-  --thickness: 2px;
-
-  position: relative;
-
-  img {
-    position: relative;
-    z-index: 2;
-    border-radius: var(--radius);
-  }
-
-  &::before,
-  &::after {
-    content: '';
-    position: absolute;
-    display: block;
-    background-size: 100% 200%;
-    animation: splash-animate 6s ease-in-out infinite;
-  }
-
-  /* Border */
-  &::before {
-    z-index: 1;
-    inset: calc(-1 * var(--thickness));
-    border-radius: calc(var(--radius) + var(--thickness));
-    background-image: linear-gradient(
-      rgb(var(--sl-color-accent-2-rgb)),
-      rgb(var(--sl-color-accent-2-rgb), 0) 80%
-    );
-  }
-
-  /* Glow */
-  &::after {
-    z-index: 0;
-    /* Mirror the border's gradient */
-    background-image: linear-gradient(
-      rgb(var(--sl-color-accent-2-rgb)),
-      rgba(var(--sl-color-accent-2-rgb), 0) 70%
-    );
-    /* Diffuse the gradient into a glow */
-    filter: blur(24px);
-    inset: -6px;
-    opacity: 0.7; 
-    border-radius: calc(var(--radius) * 3);
-    opacity: 0.65;
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
   }
 }

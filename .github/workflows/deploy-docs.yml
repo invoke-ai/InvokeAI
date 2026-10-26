@@ -47,6 +47,10 @@ jobs:
             docs:
               - '.github/workflows/deploy-docs.yml'
               - 'docs/**'
+              # The docs color tokens are generated from the app's theme.
+              - 'invokeai/frontend/webv2/src/platform/ui/theme/themes.ts'
+              # docs/src/assets/v7-logo.webp must match the app's logo (docs/src/lib/app-assets.test.mjs).
+              - 'invokeai/frontend/webv2/src/assets/V7Logo.webp'
               - 'scripts/generate_docs_json.py'
               - 'invokeai/app/**'
               - 'invokeai/backend/**'
@@ -66,6 +70,9 @@ jobs:
     steps:
       - name: checkout
         uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          # Full history: each page's "Updated" date comes from its last commit.
+          fetch-depth: 0
 
       # Python (needed for generate-docs-data)
       - name: setup uv

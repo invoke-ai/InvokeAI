@@ -40,7 +40,7 @@ The documentation is organized into a file tree structure. It should be very fam
       - lib/ utility functions and shared code
         - components/ reusable, custom components
       - pages/ non-documentation pages
-      - styles/ global styles and themes
+      - styles/ global styles; colors, tabs and buttons follow the app's Classic theme (`plugins/theme-tokens.mjs`)
 </FileTree>
 
 ## Development
@@ -103,6 +103,8 @@ There are 2 main ways to get your development environment set up for documentati
 
 If there's another local server running on port `4321` prior to running this, then use the port specified in the output.
 
+The docs' colors come from the app's theme, `invokeai/frontend/webv2/src/platform/ui/theme/themes.ts`. Saving that file restarts the dev server, so theme changes show up on their own; a change to `plugins/theme-tokens.mjs`, which turns the theme into the docs' tokens, needs a manual restart.
+
 ### Adding Pages
 
 Located within the `src/content/docs/` directory, this is where the documentation pages are stored and organized by category. These categories are file-based and are mirrored to the sidebar navigation.
@@ -132,39 +134,15 @@ For example, if we wanted to document a new feature called "Instant Bananas", we
 
 The way you organize your added pages dictates how the URL structure is generated for your documentation pages. In this example, the url for the `index.md` page would be `https://invoke.ai/features/instant-bananas/`, and the url for the `requirements.mdx` page would be `https://invoke.ai/features/instant-bananas/requirements/`.
 
-If you wish to add a top-level category, then one additional step is required for the category to appear in the sidebar.
+The sidebar is split into topics, such as Get Started, Guide and Models, and each page shows the sidebar of its own topic. `src/config/topics.ts` lists the topics with the label, description, icon and landing page that the topic switcher shows, and `src/config/sidebar.ts` gives each topic its sidebar items, usually a directory to autogenerate from. A new page in an existing directory joins its topic automatically. A new top-level directory needs a topic, or must be added to an existing topic's items, or the build fails with a message naming the page.
 
-Within the `src/config/sidebar.ts` file, you'll need to add a new sidebar category object to the array, since the fine-grained control over top-level categories needs to be a bit more explicit.
-
-```diff lang="js"
-const sidebar = [
+```diff lang="js" title="src/config/sidebar.ts"
+const topicItems = {
   // ...
-  {
-    label: 'Concepts',
-    items: [
-      {
-        autogenerate: { directory: 'concepts' },
-      },
-    ],
-  },
-+  {
-+    label: 'A New Category',
-+    items: [
-+      {
-+        autogenerate: { directory: 'new-category' },
-+      },
-+    ],
-+  },
-  {
-    label: 'Features',
-    items: [
-      {
-        autogenerate: { directory: 'features' },
-      },
-    ],
-  },
+  configure: [{ autogenerate: { directory: 'configuration' } }],
++  'new-topic': [{ autogenerate: { directory: 'new-category' } }],
   // ...
-]
+};
 ```
 
 ### Ordering Pages

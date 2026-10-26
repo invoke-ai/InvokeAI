@@ -20,6 +20,9 @@ importers:
       '@fontsource-variable/roboto-mono':
         specifier: ^5.3.0
         version: 5.3.0
+      '@lucide/astro':
+        specifier: ^1.61.0
+        version: 1.61.0(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1))
       astro:
         specifier: ^7.4.2
         version: 7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1)
@@ -38,15 +41,18 @@ importers:
       starlight-changelogs:
         specifier: ^0.7.1
         version: 0.7.1(@astrojs/starlight@0.42.7(@astrojs/markdown-remark@7.3.4)(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1)))(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1))
-      starlight-contextual-menu:
-        specifier: ^0.1.5
-        version: 0.1.5(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1))(starlight-markdown@0.1.5(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1)))
       starlight-links-validator:
         specifier: ^0.27.0
         version: 0.27.0(@astrojs/starlight@0.42.7(@astrojs/markdown-remark@7.3.4)(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1)))(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1))
       starlight-llms-txt:
         specifier: ^0.12.0
         version: 0.12.0(@astrojs/markdown-remark@7.3.4)(@astrojs/markdown-satteri@0.4.5)(@astrojs/starlight@0.42.7(@astrojs/markdown-remark@7.3.4)(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1)))(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1))
+      starlight-markdown:
+        specifier: ^0.1.5
+        version: 0.1.5(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1))
+      starlight-sidebar-topics:
+        specifier: ^0.9.0
+        version: 0.9.0(@astrojs/starlight@0.42.7(@astrojs/markdown-remark@7.3.4)(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1)))(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1))
     devDependencies:
       node-addon-api:
         specifier: ^8.9.2
@@ -618,6 +624,11 @@ packages:
 
   '@jridgewell/sourcemap-codec@1.6.0':
     resolution: {integrity: sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw==}
+
+  '@lucide/astro@1.61.0':
+    resolution: {integrity: sha512-XoFZGoHjYtnDTuOQ4b105IO+WUCh8rzitIgBIrkOcdC1PRmsvLx+fwnrCRHiZ1JfbA36r/jAMxQL/HeyRqKJjQ==}
+    peerDependencies:
+      astro: ^4 || ^5 || ^6 || ^7
 
   '@mdx-js/mdx@3.1.1':
     resolution: {integrity: sha512-f6ZO2ifpwAQIpzGWaBQT2TXxPv6z3RBzQKpVftEWN78Vl/YweF1uwussDx8ECAXVtr3Rs89fKyG9YlzUs9DyGQ==}
@@ -2246,12 +2257,6 @@ packages:
     peerDependencies:
       '@astrojs/starlight': '>=0.38.0'
 
-  starlight-contextual-menu@0.1.5:
-    resolution: {integrity: sha512-MYQ6eFDIBBnKrEh3XqR7RZ6YDJ641ADmrSjj93d+cVJGPvrCHrd6VYiKeehhczsrn6GqjaCCFAn4xUd69gcfcQ==}
-    peerDependencies:
-      astro: ^5.0.0
-      starlight-markdown: ^0.1.5
-
   starlight-links-validator@0.27.0:
     resolution: {integrity: sha512-UvPl8L9hfWR+yWbLOEtljLmpJCGcM6AVseVy5IO9dmqdOjW4R+Y8FaYyVA5axCC8RvxM5xU7M1WTerpwU8rYbw==}
     peerDependencies:
@@ -2268,6 +2273,13 @@ packages:
     resolution: {integrity: sha512-23LXRaZp7pyE+r/HP6rxHfwic8HfvUBT4EImECA6encs/eTtrF0Z+7svANofdtfbiNt31D5q26i03B6FtcSmGg==}
     peerDependencies:
       astro: ^5.0.0
+
+  starlight-sidebar-topics@0.9.0:
+    resolution: {integrity: sha512-xFwMAAtTVyqsO5DZ8Ldk0vN+2QoPdtjtDi8fbrzvQATIJvIvfaBLL9JzfXAjNHI9vMkj35VMWMd8tTICeO6RIA==}
+    engines: {node: '>=22.12.0'}
+    peerDependencies:
+      '@astrojs/starlight': '>=0.42.0'
+      astro: ^7.2.10
 
   std-env@4.3.0:
     resolution: {integrity: sha512-OtU/EgQ1kIm5KwqQpBC6ZEMXrZRui11w8zgfTWp8cdO9B8OaPsbA8bTHO2P+HNo1VlUTGMVBwPhydu6poeXiag==}
@@ -3072,6 +3084,10 @@ snapshots:
       minipass: 7.1.3
 
   '@jridgewell/sourcemap-codec@1.6.0': {}
+
+  '@lucide/astro@1.61.0(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1))':
+    dependencies:
+      astro: 7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1)
 
   '@mdx-js/mdx@3.1.1':
     dependencies:
@@ -5350,11 +5366,6 @@ snapshots:
       - astro
       - supports-color
 
-  starlight-contextual-menu@0.1.5(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1))(starlight-markdown@0.1.5(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1))):
-    dependencies:
-      astro: 7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1)
-      starlight-markdown: 0.1.5(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1))
-
   starlight-links-validator@0.27.0(@astrojs/starlight@0.42.7(@astrojs/markdown-remark@7.3.4)(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1)))(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1)):
     dependencies:
       '@astrojs/markdown-satteri': 0.4.5
@@ -5397,6 +5408,12 @@ snapshots:
   starlight-markdown@0.1.5(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1)):
     dependencies:
       astro: 7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1)
+
+  starlight-sidebar-topics@0.9.0(@astrojs/starlight@0.42.7(@astrojs/markdown-remark@7.3.4)(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1)))(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1)):
+    dependencies:
+      '@astrojs/starlight': 0.42.7(@astrojs/markdown-remark@7.3.4)(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1))
+      astro: 7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1)
+      picomatch: 4.0.7
 
   std-env@4.3.0: {}
 

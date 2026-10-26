@@ -1,6 +1,6 @@
 {
   "skipLink.label": "Skip to content",
-  "search.label": "Search",
+  "search.label": "Search docs",
   "search.ctrlKey": "Ctrl",
   "search.cancelLabel": "Cancel",
   "search.devWarning": "Search is only available in production builds. \nTry building and previewing the site to test it out locally.",

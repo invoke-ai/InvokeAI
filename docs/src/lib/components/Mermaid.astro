@@ -8,7 +8,41 @@ const { title = '' } = Astro.props as Props;
 
 <script>
   import mermaid from 'mermaid';
-  mermaid.initialize({ startOnLoad: false });
+
+  /**
+   * Resolves a docs color token to an sRGB hex color. Mermaid derives shades from its theme colors and cannot parse
+   * the OKLCH values the tokens hold, so let a canvas convert them.
+   */
+  const resolveColor = (token: string) => {
+    const context = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+    context.fillStyle = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+    context.fillRect(0, 0, 1, 1);
+    const [r, g, b] = context.getImageData(0, 0, 1, 1).data;
+    return `#${[r, g, b].map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
+  };
+
+  const getThemeVariables = () => {
+    const surface = resolveColor('--invoke-neutral-900');
+    const control = resolveColor('--invoke-neutral-800');
+    const border = resolveColor('--invoke-neutral-700');
+    const text = resolveColor('--invoke-neutral-50');
+    return {
+      darkMode: true,
+      fontFamily: getComputedStyle(document.body).fontFamily,
+      background: resolveColor('--invoke-neutral-950'),
+      primaryColor: control,
+      primaryTextColor: text,
+      primaryBorderColor: resolveColor('--invoke-accent'),
+      secondaryColor: surface,
+      tertiaryColor: surface,
+      lineColor: resolveColor('--invoke-neutral-300'),
+      textColor: text,
+      clusterBkg: surface,
+      clusterBorder: border,
+      titleColor: resolveColor('--invoke-neutral-200'),
+      edgeLabelBackground: surface,
+    };
+  };
 
   function extractAndCleanMermaidCode() {
     const mermaidElements = document.querySelectorAll('figure.expandable-diagram');
@@ -42,7 +76,8 @@ const { title = '' } = Astro.props as Props;
   // Wait for the DOM to be fully loaded
   document.addEventListener('DOMContentLoaded', async () => {
     extractAndCleanMermaidCode();
-    mermaid.initialize({ startOnLoad: true });
+    mermaid.initialize({ startOnLoad: false, theme: 'base', themeVariables: getThemeVariables() });
+    await mermaid.run({ querySelector: 'figure.expandable-diagram pre.mermaid' });
   });
 </script>
 
