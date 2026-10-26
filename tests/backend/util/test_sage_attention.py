@@ -14,7 +14,6 @@ import functools
 import importlib.util
 import logging
 import threading
-from collections import Counter
 from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 from types import SimpleNamespace
@@ -25,6 +24,7 @@ import torch.nn.functional as F
 
 import invokeai.backend.util.sage_attention as sage
 from invokeai.backend.util.sage_attention import install_sage_attention, sage_attention_scope
+from invokeai.backend.util.triton_kernels import MAX_CACHE_FAILURES, TritonKernelHealth
 
 # torch's own function, captured before any test installs the wrapper.
 TORCH_SDPA = F.scaled_dot_product_attention
@@ -118,12 +118,16 @@ def _cuda_build(
     monkeypatch.setattr(torch.cuda, "get_device_name", lambda index=None: "Fake GPU")
     monkeypatch.setattr(sage, "_import_sageattention", lambda: (VERSION, module))
     monkeypatch.setattr(sage, "_cuda_index", lambda q, k, v: 0)
-    monkeypatch.setattr(sage, "_disabled_devices", set())
-    monkeypatch.setattr(sage, "_validated", _all_variants(capabilities))
-    monkeypatch.setattr(sage, "_cache_failures", Counter())
-    monkeypatch.setattr(sage, "_announced_devices", set())
+    monkeypatch.setattr(sage, "_health", _health_with_validated(_all_variants(capabilities)))
     monkeypatch.setattr(torch.cuda, "device", lambda index: contextlib.nullcontext())
     return module, torch_calls
+
+
+def _health_with_validated(variants) -> TritonKernelHealth:
+    health = TritonKernelHealth()
+    for variant in variants:
+        health.mark_validated(variant)
+    return health
 
 
 def _all_variants(devices) -> set:
@@ -312,7 +316,7 @@ class TestRouting:
 class TestFirstCallCheck:
     def test_a_devices_first_result_is_compared_with_torch_once(self, monkeypatch):
         module, torch_calls = _cuda_build(monkeypatch, {0: (8, 9)})
-        monkeypatch.setattr(sage, "_validated", set())
+        monkeypatch.setattr(sage, "_health", TritonKernelHealth())
         install_sage_attention()
         q, k = _q(1, 2, QUERY_LEN, 64), _q(1, 2, KEY_LEN, 64)
 
@@ -326,7 +330,7 @@ class TestFirstCallCheck:
     def test_the_check_pairs_a_gqa_query_group_with_its_own_kv_head(self, monkeypatch):
         """Query heads 0-3 attend to K/V head 0; comparing them with head 1 instead would retire a correct kernel."""
         module, torch_calls = _cuda_build(monkeypatch, {0: (8, 9)})
-        monkeypatch.setattr(sage, "_validated", set())
+        monkeypatch.setattr(sage, "_health", TritonKernelHealth())
         install_sage_attention()
         q, k, v = _q(1, 8, QUERY_LEN, 64), _q(1, 2, KEY_LEN, 64), _q(1, 2, KEY_LEN, 64)
         v[:, 1] += 3.0  # a K/V head unlike head 0, so a wrong pairing cannot pass
@@ -341,7 +345,7 @@ class TestFirstCallCheck:
     def test_each_precision_and_head_size_is_checked_on_its_first_call(self, monkeypatch):
         """They select different compiled kernels; one passing says nothing about the others."""
         module, torch_calls = _cuda_build(monkeypatch, {0: (8, 9)})
-        monkeypatch.setattr(sage, "_validated", set())
+        monkeypatch.setattr(sage, "_health", TritonKernelHealth())
         install_sage_attention()
         hd64, hd128 = _q(1, 2, QUERY_LEN, 64), _q(1, 2, QUERY_LEN, 128)
         bf16 = _q(1, 2, QUERY_LEN, 64, dtype=torch.bfloat16)
@@ -357,7 +361,7 @@ class TestFirstCallCheck:
     def test_a_wrong_first_result_retires_the_device_and_returns_torchs(self, monkeypatch, caplog, garbage):
         """A kernel the build lacks for this GPU returns uninitialized memory instead of raising."""
         module, torch_calls = _cuda_build(monkeypatch, {0: (8, 9)})
-        monkeypatch.setattr(sage, "_validated", set())
+        monkeypatch.setattr(sage, "_health", TritonKernelHealth())
         install_sage_attention()
         q, k = _q(1, 2, QUERY_LEN, 64), _q(1, 2, KEY_LEN, 64)
         module.result = torch.full((1, 2, QUERY_LEN, 64), garbage, dtype=torch.float16)
@@ -453,16 +457,16 @@ class TestFailures:
             with sage_attention_scope():
                 F.scaled_dot_product_attention(q, k, k)
 
-        for error in [PermissionError("denied")] * (sage._MAX_CACHE_FAILURES - 1) + [None]:
+        for error in [PermissionError("denied")] * (MAX_CACHE_FAILURES - 1) + [None]:
             call(error)
-        for _ in range(sage._MAX_CACHE_FAILURES - 1):
+        for _ in range(MAX_CACHE_FAILURES - 1):
             call(PermissionError("denied"))
-        assert not caplog.records and 0 not in sage._disabled_devices, "the success in between reset the count"
+        assert not caplog.records and not sage._health.is_retired(0), "the success in between reset the count"
 
         call(PermissionError("denied"))
         call(None)
-        assert 0 in sage._disabled_devices
-        assert len(module.calls) == 2 * sage._MAX_CACHE_FAILURES, "the last call no longer reached the kernel"
+        assert sage._health.is_retired(0)
+        assert len(module.calls) == 2 * MAX_CACHE_FAILURES, "the last call no longer reached the kernel"
         assert any("cuda:0" in r.message for r in caplog.records if r.levelno == logging.WARNING)
 
     def test_the_scope_closes_when_its_block_raises(self, installed):
@@ -699,10 +703,7 @@ class TestOnNvidiaHardware:
             pick = sage._kernel
             monkeypatch.setattr(sage, "_kernel", lambda module, _capability, cuda: pick(module, (8, 6), cuda))
         monkeypatch.setattr(F, "scaled_dot_product_attention", TORCH_SDPA)
-        monkeypatch.setattr(sage, "_disabled_devices", set())
-        monkeypatch.setattr(sage, "_validated", set())
-        monkeypatch.setattr(sage, "_cache_failures", Counter())
-        monkeypatch.setattr(sage, "_announced_devices", set())
+        monkeypatch.setattr(sage, "_health", TritonKernelHealth())
         install_sage_attention()
         if not getattr(F.scaled_dot_product_attention, sage._SENTINEL, False):
             pytest.skip("the installed sageattention is not one InvokeAI uses (see the startup warning)")

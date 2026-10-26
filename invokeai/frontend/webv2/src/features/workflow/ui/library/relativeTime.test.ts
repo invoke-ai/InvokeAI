@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatRelativeTime } from './relativeTime';
+import { formatRelativeTime, formatTimeSince } from './relativeTime';
 
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
@@ -53,5 +53,19 @@ describe('formatRelativeTime', () => {
   it('returns an empty string for values it cannot read, so callers can drop the caption', () => {
     expect(formatRelativeTime('not-a-timestamp', NOW)).toBe('');
     expect(formatRelativeTime('', NOW)).toBe('');
+  });
+});
+
+describe('formatTimeSince', () => {
+  it('measures events before the snapshot from the snapshot', () => {
+    expect(formatTimeSince(ago(5 * MINUTE), NOW)).toBe('5 minutes ago');
+  });
+
+  it('reads events newer than the snapshot as now, not the future', () => {
+    expect(formatTimeSince(ahead(3 * MINUTE), NOW)).toBe('now');
+  });
+
+  it('returns an empty string for values it cannot read', () => {
+    expect(formatTimeSince('not-a-timestamp', NOW)).toBe('');
   });
 });

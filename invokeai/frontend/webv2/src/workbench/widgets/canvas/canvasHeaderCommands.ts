@@ -80,9 +80,36 @@ export const confirmNewCanvas = (ctx: NewCanvasContext): void => {
   ctx.engine.document.replaceDocument(createNewCanvasState(ctx.document.width, ctx.document.height).document);
 };
 
+/** The header's commands as `[id, titleKey, defaultKeys]`; the header registers them while the Canvas is mounted. */
+export const CANVAS_HEADER_HOTKEYS = [
+  ['canvas.fitBboxToLayers', 'widgets.canvas.controls.fitBboxToLayers', ['shift+n']],
+  ['canvas.fitBboxToMasks', 'widgets.canvas.controls.fitBboxToMasks', ['shift+b']],
+  // The gallery saves have no default keys; they are assignable through the hotkeys settings.
+  ['canvas.saveToGallery', 'widgets.canvas.contextMenu.saveCanvasToGallery', []],
+  ['canvas.saveBboxToGallery', 'widgets.canvas.contextMenu.saveBboxToGallery', []],
+  // Clear canvas keeps its saved-binding id, `newSession`.
+  ['canvas.newSession', 'widgets.canvas.controls.clearCanvas', ['mod+alt+n']],
+  // Browsers reserve Mod+1…8 for tab switching; these act only where the browser delivers the chord.
+  ['canvas.setZoomTo100Percent', 'widgets.canvas.commands.zoomTo100', ['mod+1']],
+  ['canvas.setZoomTo200Percent', 'widgets.canvas.commands.zoomTo200', ['mod+2']],
+  ['canvas.setZoomTo400Percent', 'widgets.canvas.commands.zoomTo400', ['mod+3']],
+  ['canvas.setZoomTo800Percent', 'widgets.canvas.commands.zoomTo800', ['mod+4']],
+] as const satisfies readonly (readonly [id: string, titleKey: string, defaultKeys: readonly string[]])[];
+
+/** The zoom preset commands and the scale each sets about the viewport centre. */
+const ZOOM_PRESET_COMMANDS: Readonly<Record<string, number>> = {
+  'canvas.setZoomTo100Percent': 1,
+  'canvas.setZoomTo200Percent': 2,
+  'canvas.setZoomTo400Percent': 4,
+  'canvas.setZoomTo800Percent': 8,
+};
+
 /** Route new-session commands through the button's confirmation dialog. */
 export const executeCanvasHeaderCommand = (commandId: string, ctx: CanvasHeaderCommandContext): void => {
-  if (commandId === 'canvas.fitBboxToLayers') {
+  const zoomPreset = ZOOM_PRESET_COMMANDS[commandId];
+  if (zoomPreset !== undefined) {
+    zoomAtViewportCentre(ctx.engine, zoomPreset);
+  } else if (commandId === 'canvas.fitBboxToLayers') {
     applyFitBbox(ctx, ctx.fitLayersRect, true);
   } else if (commandId === 'canvas.fitBboxToMasks') {
     applyFitBbox(ctx, ctx.fitMasksRect, false);

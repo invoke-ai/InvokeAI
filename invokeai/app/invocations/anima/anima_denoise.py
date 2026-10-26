@@ -26,6 +26,7 @@ from torchvision.transforms.functional import resize as tv_resize
 from torchvision.transforms.functional import to_tensor
 from tqdm import tqdm
 
+from invokeai.app.invocations.anima.anima_ip_adapter import AnimaIPAdapterField
 from invokeai.app.invocations.anima.anima_lllite import AnimaLLLiteField
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
@@ -40,6 +41,7 @@ from invokeai.app.invocations.latent_noise import validate_noise_tensor_shape
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.anima.anima_transformer import IPAdapterBlockFn
 from invokeai.backend.anima.anima_transformer_patch import patch_anima_for_regional_prompting
 from invokeai.backend.anima.conditioning_data import AnimaRegionalTextConditioning, AnimaTextConditioning
 from invokeai.backend.anima.control_net_lllite import (
@@ -48,8 +50,10 @@ from invokeai.backend.anima.control_net_lllite import (
     prepare_cond_image,
     prepare_mask,
 )
+from invokeai.backend.anima.ip_adapter import AnimaIPAdapter, AnimaIPAdapterExtension, combine_block_fns
 from invokeai.backend.anima.regional_prompting import AnimaRegionalPromptingExtension
 from invokeai.backend.anima.scheduler_driver import AnimaSchedulerDriver
+from invokeai.backend.architectures import FeaturesFacet, require
 from invokeai.backend.flux.schedulers import (
     ANIMA_SCHEDULER_LABELS,
     ANIMA_SCHEDULER_NAME_VALUES,
@@ -176,7 +180,7 @@ class AnimaInpaintExtension(RectifiedFlowInpaintExtension):
     title="Denoise - Anima",
     tags=["image", "anima"],
     category="image",
-    version="1.8.0",
+    version="1.9.0",
     classification=Classification.Prototype,
 )
 class AnimaDenoiseInvocation(BaseInvocation):
@@ -227,6 +231,12 @@ class AnimaDenoiseInvocation(BaseInvocation):
         description="Anima ControlNet-LLLite conditioning (e.g. inpaint adapter, control layers). Adapters are "
         "applied in a deterministic order (sorted by model key); each model may be used at most once.",
         input=Input.Connection,
+    )
+    ip_adapter: AnimaIPAdapterField | list[AnimaIPAdapterField] | None = InputField(
+        default=None,
+        description="Anima IP-Adapter reference images. Images that share an adapter model are attended together.",
+        input=Input.Connection,
+        title="IP-Adapter",
     )
     scheduler: ANIMA_SCHEDULER_NAME_VALUES = InputField(
         default="euler",
@@ -345,19 +355,58 @@ class AnimaDenoiseInvocation(BaseInvocation):
         return rgb_pm1
 
     @staticmethod
+    def _normalize_ip_adapters(
+        ip_adapter: AnimaIPAdapterField | list[AnimaIPAdapterField] | None,
+    ) -> list[list[AnimaIPAdapterField]]:
+        """The IP-Adapter inputs that do anything, grouped by model and sorted by model key.
+
+        Strength 0 drops an image entirely; a model left with no image is not loaded and its bundled LoRA is not
+        applied, so it generates exactly what no adapter does. The images of one model are attended together and
+        its LoRA is applied once. Sorted, as in `_normalize_control_lllite`, so the result does not depend on collect
+        order, which follows execution order: across models by key, and within a model by image and settings, since
+        the order of the concatenated tokens changes the attention's reduction order and so the low bits.
+        """
+        if ip_adapter is None:
+            fields: list[AnimaIPAdapterField] = []
+        elif isinstance(ip_adapter, AnimaIPAdapterField):
+            fields = [ip_adapter]
+        else:
+            fields = ip_adapter
+
+        groups: dict[str, list[AnimaIPAdapterField]] = {}
+        for field in fields:
+            if field.strength > 0:
+                groups.setdefault(field.ip_adapter_model.key, []).append(field)
+        max_images = require(BaseModelType.Anima, FeaturesFacet).max_reference_images
+        for group in groups.values():
+            if len(group) > max_images:
+                raise ValueError(
+                    f"The Anima IP-Adapter '{group[0].ip_adapter_model.name}' has {len(group)} reference images; "
+                    f"at most {max_images} can share one adapter."
+                )
+            group.sort(key=lambda f: (f.image_name, f.strength, f.begin_step_percent, f.end_step_percent))
+        return [groups[key] for key in sorted(groups)]
+
+    @staticmethod
+    def _is_in_step_window(
+        begin_step_percent: float, end_step_percent: float, step_index: int, total_steps: int
+    ) -> bool:
+        """The step range rule of `_get_lllite_multiplier` (and BaseControlNetExtension._get_weight)."""
+        first_step = math.floor(begin_step_percent * total_steps)
+        last_step = math.ceil(end_step_percent * total_steps)
+        return first_step <= step_index <= last_step
+
+    @staticmethod
     def _get_lllite_multiplier(lllite_field: AnimaLLLiteField, step_index: int, total_steps: int) -> float:
         """Step-range gate for one LLLite adapter's multiplier.
 
         Uses the same user-facing step-index/percent convention as
         BaseControlNetExtension._get_weight.
         """
-        first_step = math.floor(lllite_field.begin_step_percent * total_steps)
-        last_step = math.ceil(lllite_field.end_step_percent * total_steps)
-
-        if step_index < first_step or step_index > last_step:
-            return 0.0
-
-        return lllite_field.weight
+        in_window = AnimaDenoiseInvocation._is_in_step_window(
+            lllite_field.begin_step_percent, lllite_field.end_step_percent, step_index, total_steps
+        )
+        return lllite_field.weight if in_window else 0.0
 
     def _get_noise(
         self,
@@ -596,6 +645,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
             )
 
         lllite_fields = self._normalize_control_lllite(self.control_lllite)
+        ip_adapter_groups = self._normalize_ip_adapters(self.ip_adapter)
 
         transformer_info = context.models.load(self.transformer.transformer)
 
@@ -731,12 +781,32 @@ class AnimaDenoiseInvocation(BaseInvocation):
                 )
                 lllite_adapters.append((lllite_field, lllite_model, lllite_cond))
 
+            # Loaded before the LoRA patching, which applies each one's bundled LoRA with the user's.
+            ip_adapters: list[tuple[list[AnimaIPAdapterField], AnimaIPAdapter]] = []
+            for ip_adapter_group in ip_adapter_groups:
+                ip_adapter_field = ip_adapter_group[0]
+                ip_adapter_info = context.models.load(ip_adapter_field.ip_adapter_model)
+                (_, ip_adapter_model) = exit_stack.enter_context(ip_adapter_info.model_on_device())
+                if not isinstance(ip_adapter_model, AnimaIPAdapter):
+                    raise TypeError(
+                        f"Expected an Anima IP-Adapter for '{ip_adapter_field.ip_adapter_model.name}', got "
+                        f"{type(ip_adapter_model).__name__}."
+                    )
+                # Its bundled LoRA would otherwise patch blocks this transformer does not have.
+                if ip_adapter_model.num_blocks > len(transformer.blocks):
+                    raise ValueError(
+                        f"The Anima IP-Adapter '{ip_adapter_field.ip_adapter_model.name}' has "
+                        f"{ip_adapter_model.num_blocks} blocks, more than this {len(transformer.blocks)}-block Anima "
+                        "model. It was trained on a deeper Anima and cannot be used with this one."
+                    )
+                ip_adapters.append((ip_adapter_group, ip_adapter_model))
+
             # Apply LoRA models to the transformer.
             # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
                     model=transformer,
-                    patches=self._lora_iterator(context, len(transformer.blocks)),
+                    patches=self._lora_iterator(context, len(transformer.blocks), [m for _, m in ip_adapters]),
                     prefix=ANIMA_LORA_TRANSFORMER_PREFIX,
                     dtype=inference_dtype,
                     cached_weights=cached_weights,
@@ -746,6 +816,11 @@ class AnimaDenoiseInvocation(BaseInvocation):
             # Anima-3.8B's semantic connector conditions the context on the timestep, so its context
             # is recomputed at every step; every other Anima model's context is computed once here.
             uses_connector = bool(getattr(transformer, "has_semantic_connector", False))
+            if uses_connector and ip_adapters:
+                context.logger.warning(
+                    "The Anima IP-Adapter is for the Qwen3 Anima models (2B and 2.9B), not Anima-3.8B; its effect on "
+                    "this model is untested."
+                )
             self._check_qwen3_5_conditioning(
                 context, uses_connector, pos_text_conditionings, neg_text_conditionings or []
             )
@@ -802,12 +877,55 @@ class AnimaDenoiseInvocation(BaseInvocation):
             # Apply regional prompting patch if we have regional masks
             exit_stack.enter_context(patch_anima_for_regional_prompting(transformer, regional_extension))
 
+            # The positive pass alone gets the reference image: the reference's default CFG mode gives the negative
+            # pass null tokens, which its gate turns into no IP term at all.
+            ip_adapter_extensions = [
+                (
+                    fields,
+                    AnimaIPAdapterExtension(
+                        model,
+                        [(context.tensors.load(field.tokens_name), field.strength) for field in fields],
+                        len(transformer.blocks),
+                        inference_dtype,
+                        device,
+                    ),
+                )
+                for fields, model in ip_adapters
+            ]
+            # Per adapter and set of in-window images, so steps sharing a set reuse its concatenated tokens.
+            ip_adapter_block_fns: dict[tuple[int, tuple[int, ...]], list[Optional[IPAdapterBlockFn]]] = {}
+
+            def ip_adapter_blocks_at(step_index: int) -> Optional[list[Optional[IPAdapterBlockFn]]]:
+                per_adapter: list[list[Optional[IPAdapterBlockFn]]] = []
+                for adapter_index, (fields, extension) in enumerate(ip_adapter_extensions):
+                    active = tuple(
+                        i
+                        for i, field in enumerate(fields)
+                        if self._is_in_step_window(
+                            field.begin_step_percent, field.end_step_percent, step_index, total_steps
+                        )
+                    )
+                    if not active:
+                        continue
+                    fns = ip_adapter_block_fns.get((adapter_index, active))
+                    if fns is None:
+                        fns = extension.block_fns(transformer.blocks, active)
+                        ip_adapter_block_fns[(adapter_index, active)] = fns
+                    per_adapter.append(fns)
+                return combine_block_fns(per_adapter)
+
             # Helper to run transformer with pre-computed context (bypasses LLM Adapter)
-            def _run_transformer(ctx: torch.Tensor, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+            def _run_transformer(
+                ctx: torch.Tensor,
+                x: torch.Tensor,
+                t: torch.Tensor,
+                ip_adapter_blocks: Optional[list[Optional[IPAdapterBlockFn]]],
+            ) -> torch.Tensor:
                 return transformer(
                     x=x.to(transformer.dtype if hasattr(transformer, "dtype") else inference_dtype),
                     timesteps=t,
                     context=ctx,
+                    ip_adapter_blocks=ip_adapter_blocks,
                     # t5xxl_ids=None skips the LLM Adapter — context is already pre-computed
                 )
 
@@ -834,10 +952,12 @@ class AnimaDenoiseInvocation(BaseInvocation):
                         ).expand(latents.shape[0])
                         step_pos_context, step_neg_context = contexts_at(it.sigma_curr)
 
-                        noise_pred_cond = _run_transformer(step_pos_context, latents, timestep).float()
+                        noise_pred_cond = _run_transformer(
+                            step_pos_context, latents, timestep, ip_adapter_blocks_at(user_step)
+                        ).float()
 
                         if do_cfg and step_neg_context is not None:
-                            noise_pred_uncond = _run_transformer(step_neg_context, latents, timestep).float()
+                            noise_pred_uncond = _run_transformer(step_neg_context, latents, timestep, None).float()
                             noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_cond - noise_pred_uncond)
                         else:
                             noise_pred = noise_pred_cond
@@ -891,10 +1011,12 @@ class AnimaDenoiseInvocation(BaseInvocation):
                         ).expand(latents.shape[0])
                         step_pos_context, step_neg_context = contexts_at(sigma_curr)
 
-                        noise_pred_cond = _run_transformer(step_pos_context, latents, timestep).float()
+                        noise_pred_cond = _run_transformer(
+                            step_pos_context, latents, timestep, ip_adapter_blocks_at(step_idx)
+                        ).float()
 
                         if do_cfg and step_neg_context is not None:
-                            noise_pred_uncond = _run_transformer(step_neg_context, latents, timestep).float()
+                            noise_pred_uncond = _run_transformer(step_neg_context, latents, timestep, None).float()
                             noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_cond - noise_pred_uncond)
                         else:
                             noise_pred = noise_pred_cond
@@ -965,8 +1087,10 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
         return step_callback
 
-    def _lora_iterator(self, context: InvocationContext, transformer_depth: int) -> Iterator[PatchSpec]:
-        """Iterate over LoRA models to apply to the transformer.
+    def _lora_iterator(
+        self, context: InvocationContext, transformer_depth: int, ip_adapters: list[AnimaIPAdapter]
+    ) -> Iterator[PatchSpec]:
+        """LoRA models to apply to the transformer: the user's, then each IP-Adapter model's own at 1.0, once per model.
 
         A LoRA trained on a shallower Anima has its blocks moved to where this depth-expanded model keeps
         them (see `invokeai.backend.anima.block_layout`).
@@ -986,3 +1110,6 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     f"matching blocks of this {transformer_depth}-block model."
                 )
             yield (patch, lora.weight, lora_info.model_in_ram())
+        # Already held on device by the caller, so no cache pin is needed.
+        for ip_adapter in ip_adapters:
+            yield (anima_lora_for_depth(ip_adapter.lora_patch(), transformer_depth)[0], 1.0)

@@ -10,6 +10,7 @@ import type {
   CanvasDocumentSnapshot,
   CanvasRegionalGuidanceLayerContract,
   CanvasStateContractV3,
+  LayerUnreadable,
 } from '@workbench/canvas-engine/api';
 import type { CaptureRasterSnapshotResult } from '@workbench/canvas-engine/rasterTransactions';
 import type { Rect } from '@workbench/canvas-engine/types';
@@ -20,6 +21,11 @@ import type {
 
 import { lookupDocumentLayer } from '@workbench/canvas-engine/document-model/documentModel';
 import { intersect } from '@workbench/canvas-engine/math/rect';
+import {
+  type AdjustmentRefusal,
+  AdjustmentRefusedError,
+  adjustmentRefusal,
+} from '@workbench/canvas-engine/render/exactAdjustments';
 import {
   computeCompositeContentBounds,
   executeCompositePlan,
@@ -47,6 +53,8 @@ export interface GenerationModeFacts {
   contentBounds: Rect | null;
   /** Whether the composited bbox surface is fully opaque (no transparent holes). */
   bboxFullyCovered: boolean;
+  /** Whether any composited pixel in the bbox is not fully transparent. */
+  bboxHasContent: boolean;
   /** Whether an enabled inpaint mask with masked (non-white) content exists. */
   hasActiveInpaintMask: boolean;
 }
@@ -121,7 +129,9 @@ export interface GenerationComposites {
 
 export type ComposeForGenerationResult =
   | { status: 'ok'; composites: GenerationComposites; dedupeCommit: GenerationCompositeDedupeCommit }
-  | { status: 'no-document' | 'stale' | 'aborted' | 'not-ready' | 'over-budget' };
+  | { status: 'no-document' | 'stale' | 'aborted' | 'not-ready' | 'over-budget' }
+  | LayerUnreadable
+  | AdjustmentRefusal;
 
 /**
  * Runs the complete canvas → generation composite pipeline against `host`.
@@ -184,6 +194,7 @@ export const composeForGeneration = async (
   const deps: ExecuteCompositePlanDeps = {
     ...executorDeps,
     dedupe: operationDedupe,
+    signal: options.signal,
     getLayerSurface: (layerId) => {
       const detached = rasterSnapshot.layerSurfaces.get(layerId);
       // The raster snapshot owns these detached pixels until the whole operation releases it.
@@ -218,7 +229,6 @@ export const composeForGeneration = async (
 
     if (contentBounds && intersect(contentBounds, bbox) !== null) {
       const result = await executeCompositePlan(plan, deps);
-      baseImageName = result.base.imageName;
 
       // Composite the denoise-limit mask before mode detection: even opaque raster content becomes inpaint when
       // the mask has coverage.
@@ -228,9 +238,12 @@ export const composeForGeneration = async (
       mode = options.detectMode({
         bbox,
         bboxFullyCovered: result.bboxFullyCovered,
+        bboxHasContent: result.bboxHasContent,
         contentBounds,
         hasActiveInpaintMask: maskResult?.hasContent ?? false,
       });
+      // A strategy may still settle on txt2img (no visible pixels in the frame), which takes no base image.
+      baseImageName = mode === 'txt2img' ? null : result.base.imageName;
 
       if (mode === 'inpaint' || mode === 'outpaint') {
         // A real (non-white) mask feeds create_gradient_mask; outpaint without one
@@ -301,6 +314,11 @@ export const composeForGeneration = async (
       dedupeCommit,
       status: 'ok',
     };
+  } catch (error) {
+    if (error instanceof AdjustmentRefusedError) {
+      return adjustmentRefusal(document, error.ownerId, error.reason);
+    }
+    throw error;
   } finally {
     rasterSnapshot.release();
   }
