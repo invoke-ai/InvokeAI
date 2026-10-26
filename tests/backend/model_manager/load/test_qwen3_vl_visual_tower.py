@@ -1,10 +1,11 @@
 """Dropping the Qwen3-VL visual tower on the safetensors load paths.
 
 Krea-2 and Ideogram 4 condition on the language tower's hidden states; `Qwen3VLModel.forward`
-reaches `self.visual` only for `pixel_values`, which neither invocation passes, and Ideogram 4 does
-not go through `forward` at all. The tower is therefore never executed, and dropping it takes
-0.39-0.77 GiB off the 4B encoder depending on the container. Qwen-Image-2.1 drops it for text
-prompts too, and loads the tower on its own for edits.
+reaches `self.visual` only for `pixel_values`, which text-only encoding never passes, and Ideogram 4
+does not go through `forward` at all. Krea-2 and Qwen-Image-2.1 reference images do run the tower,
+but a separately loaded one (the `VisionEncoder` submodel) attached to the encoder for that call. The
+encoder's own tower is therefore never executed, and dropping it takes 0.39-0.77 GiB off the 4B
+encoder depending on the container.
 
 These tests use a real (tiny) `Qwen3VLModel`, so what disappears is the architecture's actual vision
 tower rather than a stand-in. MiniMax H3 does run this tower and loads through
@@ -357,7 +358,7 @@ def test_the_qwen_image_2_1_pipeline_loads_the_tower_on_its_own(
     )
 
     _assert_tower_gone(loader._load_model(config, SubModelType.TextEncoder))
-    _assert_tower_loaded(loader._load_model(config, SubModelType.VisionTower), saved)
+    _assert_tower_loaded(loader._load_model(config, SubModelType.VisionEncoder), saved)
 
 
 def _shard_the_tower_and_leave_a_stray_file(tmp_path: Path) -> None:
@@ -382,7 +383,7 @@ def test_a_sharded_tower_loads_from_the_shards_its_index_names(monkeypatch, tmp_
     )
     _shard_the_tower_and_leave_a_stray_file(tmp_path)
 
-    _assert_tower_loaded(loader._load_model(config, SubModelType.VisionTower), saved)
+    _assert_tower_loaded(loader._load_model(config, SubModelType.VisionEncoder), saved)
 
 
 def test_the_tower_reserves_its_own_size_at_the_dtype_it_loads_in(monkeypatch, tmp_path: Path) -> None:
@@ -394,4 +395,4 @@ def test_the_tower_reserves_its_own_size_at_the_dtype_it_loads_in(monkeypatch, t
     _shard_the_tower_and_leave_a_stray_file(tmp_path)
 
     elements = sum(v.nelement() for v in saved.visual.state_dict().values())
-    assert loader.get_size_fs(config, tmp_path, SubModelType.VisionTower) == 4 * elements
+    assert loader.get_size_fs(config, tmp_path, SubModelType.VisionEncoder) == 4 * elements

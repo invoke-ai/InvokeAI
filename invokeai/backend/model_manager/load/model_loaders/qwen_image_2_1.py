@@ -70,14 +70,14 @@ class QwenImage21DiffusersModel(GenericDiffusersLoader):
     and `Qwen3VLModel` is what the standalone Qwen3-VL loaders return, so the text encoder node sees one class.
 
     `TextEncoder` drops the vision tower, as the standalone loaders do: text prompts never reach it.
-    `VisionTower` is that tower alone (~1.1 GiB), read from the same folder for edits, which attach it to the
+    `VisionEncoder` is that tower alone (~1.1 GiB), read from the same folder for edits, which attach it to the
     cached encoder while they encode. The language model's weights are cached once for both.
     """
 
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
-        if submodel_type is SubModelType.VisionTower:
+        if submodel_type is SubModelType.VisionEncoder:
             # A few hundred tensors of the encoder's folder, not the folder: reserving its ~17 GB for the tower
             # would evict models for nothing. Sized at the dtype they load in, whatever the file stores.
             element_size = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device()).itemsize
@@ -110,7 +110,7 @@ class QwenImage21DiffusersModel(GenericDiffusersLoader):
         else:
             dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
 
-        if submodel_type is SubModelType.VisionTower:
+        if submodel_type is SubModelType.VisionEncoder:
             tower = _load_vision_tower(model_path / SubModelType.TextEncoder.value, dtype)
             return self._apply_fp8_layerwise_casting(tower, config, submodel_type)
 
@@ -137,7 +137,7 @@ class QwenImage21DiffusersModel(GenericDiffusersLoader):
                 raise
 
         if submodel_type is SubModelType.TextEncoder:
-            # Text prompts never reach the vision tower; edits load it as `VisionTower` and attach it while they
+            # Text prompts never reach the vision tower; edits load it as `VisionEncoder` and attach it while they
             # encode.
             drop_qwen3vl_visual_tower(result)
 

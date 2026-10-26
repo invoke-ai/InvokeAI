@@ -9,6 +9,7 @@ never occupy VRAM. The loader signals this by returning `torch.device("cpu")` fr
 from types import SimpleNamespace
 from typing import Optional
 
+import pytest
 import torch
 
 from invokeai.backend.model_manager.load.load_default import ModelLoader
@@ -49,11 +50,11 @@ def test_config_without_cpu_only_attr_returns_none():
     assert _loader()._get_execution_device(SimpleNamespace(), None) is None
 
 
-def test_a_main_models_cpu_only_puts_its_encoder_and_vision_tower_on_the_cpu():
-    # Qwen-Image-2.1 attaches the tower to the encoder while it reads references, so the two must share a device;
-    # the denoiser stays on the cache default.
+@pytest.mark.parametrize("submodel_type", [SubModelType.TextEncoder, SubModelType.VisionEncoder])
+def test_a_main_models_cpu_only_setting_moves_its_encoders_to_the_cpu(submodel_type):
+    # The vision encoder runs inside the text encoder's forward (Krea-2 and Qwen-Image-2.1 edits), so `cpu_only`
+    # has to put both on the same device.
     config = SimpleNamespace(default_settings=SimpleNamespace(cpu_only=True))
-    loader = _loader()
-    assert loader._get_execution_device(config, SubModelType.TextEncoder) == torch.device("cpu")
-    assert loader._get_execution_device(config, SubModelType.VisionTower) == torch.device("cpu")
-    assert loader._get_execution_device(config, SubModelType.Transformer) is None
+
+    assert _loader()._get_execution_device(config, submodel_type) == torch.device("cpu")
+    assert _loader()._get_execution_device(config, SubModelType.Transformer) is None

@@ -7,6 +7,7 @@ import torch
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
+    ImageField,
     Input,
     InputField,
     TensorField,
@@ -15,8 +16,16 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import Qwen3VLEncoderField
 from invokeai.app.invocations.primitives import Krea2ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.krea2.text_encoding import encode_krea2_prompt
+from invokeai.backend.krea2.text_encoding import (
+    KREA2_MAX_REFERENCE_IMAGES,
+    encode_krea2_prompt,
+    encode_krea2_prompt_with_images,
+    prepare_vlm_reference,
+    tokenize_krea2_prompt_with_images,
+    working_memory_bytes,
+)
 from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
+from invokeai.backend.model_manager.taxonomy import SubModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2_LORA_QWEN3VL_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -27,13 +36,16 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
 )
 from invokeai.backend.util.devices import TorchDevice
 
-# The loader drops the Qwen3-VL visual tower: conditioning never executes it, so its weights would be
-# dead resident bytes. An adapter can still carry layers for it -- a Krea-2 LoRA's encoder keys are
+# The loader drops the Qwen3-VL visual tower from the text encoder: text-only encoding never runs it, and
+# reference images run a separately loaded tower, so in the encoder its weights would be dead resident
+# bytes. An adapter can still carry layers for it -- a Krea-2 LoRA's encoder keys are
 # whatever followed `text_encoder.`, and the converter does emit `lora_qwen3vl-visual.*` -- and those
 # layers now resolve to no module. Left to the patcher that is one "Failed to find module for LoRA
 # layer key" per layer per generation (~108 lines on the 4B, whose vision tower has 27 blocks),
 # reading as though the adapter were broken. It is not, and it never did anything: patching a module
-# that `forward` does not reach cannot change an image.
+# that `forward` does not reach cannot change an image. With reference images the tower is a separate cache
+# entry lent to the encoder only after the patches are in place, so its layers stay unpatched there too:
+# ai-toolkit trains edit LoRAs with the encoder frozen.
 _VISUAL_TOWER_LORA_LAYERS = re.compile(rf"^{re.escape(KREA2_LORA_QWEN3VL_PREFIX)}visual\.")
 
 
@@ -42,7 +54,7 @@ _VISUAL_TOWER_LORA_LAYERS = re.compile(rf"^{re.escape(KREA2_LORA_QWEN3VL_PREFIX)
     title="Prompt - Krea-2",
     tags=["prompt", "conditioning", "krea2", "krea-2"],
     category="conditioning",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )
@@ -51,6 +63,9 @@ class Krea2TextEncoderInvocation(BaseInvocation):
 
     The encoder taps 12 decoder hidden-state layers and stacks them per token, producing a 4D
     conditioning tensor (B, seq, 12, hidden) that the Krea-2 transformer's text-fusion stage consumes.
+
+    With reference images (edit mode, for edit LoRAs) the Qwen3-VL vision tower reads them into the prompt,
+    ahead of the text, and the conditioning has the prompt's natural length rather than 512 tokens.
     """
 
     prompt: str = InputField(description="Text prompt describing the desired image.", ui_component=UIComponent.Textarea)
@@ -64,6 +79,12 @@ class Krea2TextEncoderInvocation(BaseInvocation):
         description=FieldDescriptions.qwen3_vl_encoder,
         input=Input.Connection,
     )
+    reference_images: list[ImageField] = InputField(
+        default=[],
+        max_length=KREA2_MAX_REFERENCE_IMAGES,
+        description="Up to three reference images for an edit LoRA, read by the Qwen3-VL vision tower in this order "
+        "(Picture 1, 2, 3). Needs a safetensors or Diffusers encoder: a GGUF encoder has no vision tower.",
+    )
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> Krea2ConditioningOutput:
@@ -72,28 +93,55 @@ class Krea2TextEncoderInvocation(BaseInvocation):
         prompt_mask = prompt_mask.detach().to("cpu") if prompt_mask is not None else None
 
         conditioning_data = ConditioningFieldData(
-            conditionings=[Krea2ConditioningInfo(prompt_embeds=prompt_embeds, prompt_embeds_mask=prompt_mask)]
+            conditionings=[
+                Krea2ConditioningInfo(
+                    prompt_embeds=prompt_embeds,
+                    prompt_embeds_mask=prompt_mask,
+                    num_reference_images=len(self.reference_images),
+                )
+            ]
         )
         conditioning_name = context.conditioning.save(conditioning_data)
         return Krea2ConditioningOutput.build(conditioning_name, mask=self.mask)
 
     def _encode(self, context: InvocationContext) -> tuple[torch.Tensor, torch.Tensor | None]:
+        images = [prepare_vlm_reference(context.images.get_pil(field.image_name)) for field in self.reference_images]
         tokenizer_info = context.models.load(self.qwen3_vl_encoder.tokenizer)
+        image_inputs = vision_info = None
+        if images:
+            # The processor and tokenizer are small and run on the CPU, so a reference the processor refuses (an
+            # extreme aspect ratio) fails here, before either tower is read.
+            processor_info = context.models.load(
+                self.qwen3_vl_encoder.tokenizer.model_copy(update={"submodel_type": SubModelType.Processor})
+            )
+            with processor_info as processor, tokenizer_info as tokenizer:
+                image_inputs = tokenize_krea2_prompt_with_images(self.prompt, images, processor, tokenizer)
+            # Before the encoder: the loader refuses an encoder without a tower (GGUF) here, ahead of reading
+            # the far larger language tower for nothing. The tower is its own cache entry, so text-only prompts
+            # never pay for it.
+            vision_info = context.models.load(
+                self.qwen3_vl_encoder.text_encoder.model_copy(update={"submodel_type": SubModelType.VisionEncoder})
+            )
         text_encoder_info = context.models.load(self.qwen3_vl_encoder.text_encoder)
         text_encoder_format = context.models.get_config(self.qwen3_vl_encoder.text_encoder).format
         # An nvfp4 or GGUF build dequantizes each packed Linear per forward, a transient its resident size does
         # not cover. Read from the unlocked model, before the lock the reservation applies to; zero for
         # other builds.
-        dequant_bytes = peak_dequant_transient_bytes(
+        working_mem_bytes = peak_dequant_transient_bytes(
             text_encoder_info.model, TorchDevice.choose_bfloat16_safe_dtype(text_encoder_info.compute_device)
         )
+        if image_inputs is not None:
+            # The references lengthen the sequence, and attention grows with its square. The image path does not
+            # truncate, so this is the prompt's natural length.
+            working_mem_bytes += working_memory_bytes(image_inputs["input_ids"].shape[1])
 
         context.util.signal_progress("Running Qwen3-VL text encoder")
 
         with ExitStack() as exit_stack:
-            tokenizer = exit_stack.enter_context(tokenizer_info)
+            # The image path has tokenized already.
+            text_tokenizer = exit_stack.enter_context(tokenizer_info) if image_inputs is None else None
             (cached_weights, text_encoder) = exit_stack.enter_context(
-                text_encoder_info.model_on_device(working_mem_bytes=dequant_bytes)
+                text_encoder_info.model_on_device(working_mem_bytes=working_mem_bytes)
             )
             device = get_effective_device(text_encoder)
 
@@ -119,7 +167,20 @@ class Krea2TextEncoderInvocation(BaseInvocation):
                 )
             )
 
-            prompt_embeds, prompt_mask, _ = encode_krea2_prompt(self.prompt, tokenizer, text_encoder)
+            if text_tokenizer is not None:
+                prompt_embeds, prompt_mask, _ = encode_krea2_prompt(self.prompt, text_tokenizer, text_encoder)
+            else:
+                assert image_inputs is not None and vision_info is not None
+                # Locked after the encoder and released before it (the stack unwinds in reverse), and the
+                # encode undoes the swap before returning: neither cache entry may be moved while the tower is
+                # part of the encoder's module tree. With the encoder's reservation: the cache counts the locked
+                # encoder as in use, so the tower is placed only in VRAM beyond the room the encoder's forward
+                # needs (the default reservation would let it take that room). Adding the tower's size to the
+                # encoder's reservation instead would count a tower that is already resident twice.
+                (_, vision_tower) = exit_stack.enter_context(
+                    vision_info.model_on_device(working_mem_bytes=working_mem_bytes)
+                )
+                prompt_embeds, prompt_mask = encode_krea2_prompt_with_images(image_inputs, text_encoder, vision_tower)
 
         return prompt_embeds, prompt_mask
 

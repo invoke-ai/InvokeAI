@@ -96,7 +96,7 @@ const compareSqliteBinaryText = (a: string, b: string): number => (a === b ? 0 :
  * Normalize SQLite and ISO timestamps before comparing; their space/T separators otherwise misorder same-day
  * items.
  */
-const compareCreatedAt = (a: string, b: string): number =>
+export const compareCreatedAt = (a: string, b: string): number =>
   compareSqliteBinaryText(normalizeServerTimestamp(a), normalizeServerTimestamp(b));
 
 /** Mirrors the backend's time/kind/name order for mixed gallery items. */

@@ -192,6 +192,7 @@ export const useRegisterFirstPartyCommands = () => {
         commands,
         generateValues: getProjectWidgetValues(activeProject, 'generate'),
         image,
+        isCanvasFrame: activeProject.invocation.sourceId === 'canvas',
         kind,
         models: getAvailableModels() ?? [],
         owner,

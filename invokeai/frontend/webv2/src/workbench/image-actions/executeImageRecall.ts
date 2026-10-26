@@ -296,6 +296,7 @@ export const executeImageRecall = async ({
   generateValues,
   getGenerateValues,
   image,
+  isCanvasFrame,
   kind,
   models,
   owner: callerOwner,
@@ -306,6 +307,8 @@ export const executeImageRecall = async ({
   generateValues: Record<string, unknown>;
   getGenerateValues?: () => Record<string, unknown>;
   image: GalleryImage;
+  /** The project's route is Canvas, whose frame the Generate size is. */
+  isCanvasFrame?: boolean;
   kind: ImageRecallKind;
   models: ModelConfig[];
   /** Caller-captured identity lifetime; direct synchronous callers may omit it. */
@@ -350,6 +353,7 @@ export const executeImageRecall = async ({
     const result = buildImageRecallSettings({
       currentValues: currentGenerateValues,
       image,
+      isCanvasFrame,
       kind,
       metadata,
       models,

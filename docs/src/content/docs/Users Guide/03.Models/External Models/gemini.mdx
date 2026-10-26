@@ -39,6 +39,19 @@ Reference-image input is used to condition generation but counts as txt2img — 
 
 All Gemini models are single-image-per-request — batch size is fixed at 1. To generate multiple variations, queue multiple invocations.
 
+## Provider-Specific Options
+
+Selecting a Gemini model adds a **Provider options** section to the Generate panel:
+
+- **Temperature** — Override the sampling temperature (0–2; the provider default is 1).
+- **Thinking level** — `minimal` or `high`, or the provider default.
+
+Gemini 3 models list their resolution presets under **Provider size** in the Size section. Picking one sets the width and height to the preset and sends its named size (`1K`, `2K`, `4K`) to the API. The named size and the sampling options are recorded in the image metadata and restored by **Recall All** and **Remix**.
+
+## Canvas
+
+Gemini models generate only from text, so on the Canvas the bounding box must be free of raster content: hide raster layers or move their content out of the box to generate. Invoke asks for the size whose aspect ratio is closest to the bounding box's; for Gemini 3 that is the smallest named size covering the box at that ratio, such as `2K` for a 2000×2000 box. The result is scaled to cover the bounding box and cropped to it from the center, so it is never stretched.
+
 ## Tips
 
 <Steps>

@@ -10,6 +10,7 @@ from invokeai.backend.model_manager.checkpoint_prefix import CheckpointPrefix
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
 from invokeai.backend.model_manager.configs.controlnet import ControlNet_Checkpoint_Anima_Config
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.ip_adapter import IPAdapter_Checkpoint_Anima_Config
 from invokeai.backend.model_manager.configs.main import ANIMA_V2_CONNECTOR_KEY_PREFIX, Main_Checkpoint_Anima_Config
 from invokeai.backend.model_manager.load.fp8_capability import NotApplicable
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
@@ -389,4 +390,32 @@ class AnimaControlNetLLLiteModel(ModelLoader):
         model_dtype = TorchDevice.choose_anima_inference_dtype(target_device)
         model.to(dtype=model_dtype)
 
+        return model
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Anima, type=ModelType.IPAdapter, format=ModelFormat.Checkpoint)
+class AnimaIPAdapterModelLoader(ModelLoader):
+    """Loads the SigLIP2 Anima IP-Adapter (per-block image K/V projections and gates, plus its cross-attention LoRA)."""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        from safetensors import safe_open
+        from safetensors.torch import load_file
+
+        from invokeai.backend.anima.ip_adapter import AnimaIPAdapter
+
+        if not isinstance(config, IPAdapter_Checkpoint_Anima_Config):
+            raise ValueError("Only IPAdapter_Checkpoint_Anima_Config models are supported here.")
+
+        model_path = Path(config.path)
+        sd = load_file(model_path)
+        reject_quantized_side_channel(sd, f"Anima IP-Adapter checkpoint {model_path.name}")
+        with safe_open(model_path, framework="pt", device="cpu") as f:
+            metadata = f.metadata()
+
+        model = AnimaIPAdapter.from_state_dict(sd, metadata)
+        model.to(dtype=TorchDevice.choose_anima_inference_dtype(TorchDevice.choose_torch_device()))
         return model

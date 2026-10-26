@@ -154,6 +154,14 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   ideogram4GuidanceScale: null,
   ideogram4Mu: null,
   ideogram4ColorPalette: [],
+  externalImageSize: null,
+  openaiQuality: 'auto',
+  openaiBackground: 'auto',
+  openaiInputFidelity: null,
+  geminiTemperature: null,
+  geminiThinkingLevel: null,
+  seedreamWatermark: false,
+  seedreamOptimizePrompt: false,
   krea2RebalanceEnabled: false,
   krea2RebalanceMultiplier: 4,
   krea2RebalanceWeights: '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0',
@@ -629,8 +637,9 @@ describe('image recall', () => {
     expect(result?.values.aspectRatioId).toBe('2:3');
   });
 
-  it('recalls the size for an external generator, which has no architecture row to wait for', () => {
-    // External providers have no capability row and must remain eligible for dimension recall.
+  it('recalls the exact size for an external generator, which has no architecture row or grid', () => {
+    // External providers have no capability row and must remain eligible for dimension recall; their providers
+    // bucket sizes themselves, so the image's pixel size is kept rather than snapped to a local model grid.
     const externalModel = {
       base: 'external',
       capabilities: { modes: ['txt2img'], supports_seed: true },
@@ -651,11 +660,11 @@ describe('image recall', () => {
         vaeModels: [],
       });
 
-    expect(recall()?.values).toMatchObject({ height: 768, width: 512 });
+    expect(recall()?.values).toMatchObject({ height: 770, width: 513 });
 
     resetArchitectureCapabilities();
     try {
-      expect(recall()?.values).toMatchObject({ height: 768, width: 512 });
+      expect(recall()?.values).toMatchObject({ height: 770, width: 513 });
     } finally {
       setArchitectureCapabilities(architectureCapabilitiesFixture);
     }
@@ -1248,6 +1257,283 @@ describe('image recall', () => {
       expect(capabilities.remix).toBe(true);
     });
   });
+
+  describe('external provider options', () => {
+    const openaiModel = {
+      base: 'external',
+      capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: true },
+      format: 'external_api',
+      key: 'gpt-image',
+      name: 'GPT Image',
+      provider_id: 'openai',
+      provider_model_id: 'gpt-image-1',
+      type: 'external_image_generator',
+    } as GenerateWidgetValues['model'];
+    const geminiModel = {
+      ...openaiModel,
+      capabilities: {
+        modes: ['txt2img'],
+        resolution_presets: [
+          { aspect_ratio: '1:1', height: 1024, image_size: '1K', label: '1:1 (1K)', width: 1024 },
+          { aspect_ratio: '1:1', height: 2048, image_size: '2K', label: '1:1 (2K)', width: 2048 },
+        ],
+      },
+      key: 'gemini-3',
+      name: 'Gemini 3',
+      provider_id: 'gemini',
+    } as GenerateWidgetValues['model'];
+    const seedreamModel = {
+      ...openaiModel,
+      capabilities: { modes: ['txt2img'] },
+      key: 'seedream',
+      name: 'Seedream',
+      provider_id: 'seedream',
+    } as GenerateWidgetValues['model'];
+    // What the provider nodes record (`_build_output_provider_metadata`) plus the named size the base node records.
+    const providerMetadata = {
+      gemini_temperature: 0.4,
+      gemini_thinking_level: 'high',
+      image_size: '2K',
+      openai_background: 'transparent',
+      openai_input_fidelity: 'high',
+      openai_quality: 'low',
+      seedream_optimize_prompt: true,
+      seedream_watermark: true,
+    };
+    const recall = (model: GenerateWidgetValues['model'], metadata: Record<string, unknown>, kind: 'all' | 'remix') =>
+      buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind,
+        metadata: { ...metadata, model: { key: model.key } },
+        models: [],
+        supportedModels: [model],
+        vaeModels: [],
+      });
+
+    it('restores only the options the recalled OpenAI model accepts', () => {
+      const result = recall(openaiModel, providerMetadata, 'all');
+
+      expect(result?.values).toMatchObject({
+        openaiBackground: 'transparent',
+        openaiInputFidelity: 'high',
+        openaiQuality: 'low',
+      });
+      // Another provider's keys and a named size the model does not list stay at the current values.
+      expect(result?.values).toMatchObject({
+        externalImageSize: null,
+        geminiTemperature: null,
+        geminiThinkingLevel: null,
+        seedreamOptimizePrompt: false,
+        seedreamWatermark: false,
+      });
+      expect(result?.fields).toContain('externalProvider');
+    });
+
+    it('restores Gemini sampling and the named size the model lists, on a remix too', () => {
+      const result = recall(geminiModel, providerMetadata, 'remix');
+
+      expect(result?.values).toMatchObject({
+        externalImageSize: '2K',
+        height: 2048,
+        width: 2048,
+        geminiTemperature: 0.4,
+        geminiThinkingLevel: 'high',
+        openaiQuality: 'auto',
+      });
+      expect(result?.fields).toContain('externalProvider');
+    });
+
+    it('skips a named size that is ambiguous without dimensions or an aspect ratio', () => {
+      const ambiguousModel = {
+        ...geminiModel,
+        capabilities: {
+          modes: ['txt2img'],
+          resolution_presets: [
+            { aspect_ratio: '1:1', height: 2048, image_size: '2K', label: '1:1 (2K)', width: 2048 },
+            { aspect_ratio: '16:9', height: 1152, image_size: '2K', label: '16:9 (2K)', width: 2048 },
+          ],
+        },
+      } as GenerateWidgetValues['model'];
+      const ambiguous = recall(ambiguousModel, { image_size: '2K' }, 'all');
+      const resolved = recall(ambiguousModel, { image_size: '2K', aspect_ratio: '16:9' }, 'all');
+
+      expect(ambiguous?.values.externalImageSize).toBeNull();
+      expect(ambiguous?.fields).not.toContain('externalProvider');
+      expect(resolved?.values).toMatchObject({ externalImageSize: '2K', height: 1152, width: 2048 });
+    });
+
+    it('restores the named size a Canvas output was generated at, though it records its frame', () => {
+      const canvasModel = {
+        ...geminiModel,
+        capabilities: {
+          modes: ['txt2img'],
+          resolution_presets: [
+            { aspect_ratio: '1:1', height: 1024, image_size: '1K', label: '1:1 (1K)', width: 1024 },
+            { aspect_ratio: '1:1', height: 2048, image_size: '2K', label: '1:1 (2K)', width: 2048 },
+            { aspect_ratio: '16:9', height: 1152, image_size: '2K', label: '16:9 (2K)', width: 2048 },
+          ],
+        },
+      } as GenerateWidgetValues['model'];
+
+      // A 2000×2000 frame asked for 2K at 1:1; a 1900×1000 one for 2K at 16:9, its nearest ratio.
+      expect(recall(canvasModel, { height: 2000, image_size: '2K', width: 2000 }, 'all')?.values).toMatchObject({
+        externalImageSize: '2K',
+        height: 2048,
+        width: 2048,
+      });
+      expect(recall(canvasModel, { height: 1000, image_size: '2K', width: 1900 }, 'all')?.values).toMatchObject({
+        externalImageSize: '2K',
+        height: 1152,
+        width: 2048,
+      });
+
+      // On a Canvas route the size is the frame: it is restored as recorded, and the Canvas asks for 2K from it.
+      const onCanvas = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        isCanvasFrame: true,
+        kind: 'all',
+        metadata: { height: 1000, image_size: '2K', model: { key: canvasModel.key }, width: 1900 },
+        models: [],
+        supportedModels: [canvasModel],
+        vaeModels: [],
+      });
+      expect(onCanvas?.values).toMatchObject({ height: 1000, width: 1900 });
+      expect(onCanvas?.fields).toContain('size');
+    });
+
+    it.each([0, 2])('recalls Gemini temperature boundary %s', (temperature) => {
+      expect(recall(geminiModel, { gemini_temperature: temperature }, 'all')?.values.geminiTemperature).toBe(
+        temperature
+      );
+    });
+
+    it('rejects a negative recalled Gemini temperature while preserving the current choice', () => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues({ model: geminiModel, modelKey: geminiModel.key, geminiTemperature: 0.4 }),
+        image,
+        kind: 'all',
+        metadata: { external_provider: 'gemini', gemini_temperature: -0.1 },
+        models: [],
+        supportedModels: [geminiModel],
+        vaeModels: [],
+      });
+
+      expect(result?.values.geminiTemperature).toBe(0.4);
+    });
+
+    it.each(['all', 'remix'] as const)('restores omitted nullable provider defaults during %s', (kind) => {
+      for (const model of [geminiModel, openaiModel]) {
+        const result = buildImageRecallSettings({
+          currentValues: createValues({
+            model,
+            modelKey: model.key,
+            geminiTemperature: 0.4,
+            geminiThinkingLevel: 'high',
+            openaiInputFidelity: 'high',
+          }),
+          image,
+          kind,
+          metadata: { external_provider: model.provider_id },
+          models: [],
+          supportedModels: [model],
+          vaeModels: [],
+        });
+
+        if (model.provider_id === 'gemini') {
+          expect(result?.values).toMatchObject({
+            geminiTemperature: null,
+            geminiThinkingLevel: null,
+            openaiInputFidelity: 'high',
+          });
+        } else {
+          expect(result?.values).toMatchObject({
+            geminiTemperature: 0.4,
+            geminiThinkingLevel: 'high',
+            openaiInputFidelity: null,
+          });
+        }
+        expect(result?.fields).toContain('externalProvider');
+      }
+    });
+
+    it('preserves optional provider choices when unrelated partial metadata omits them', () => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues({
+          model: geminiModel,
+          modelKey: geminiModel.key,
+          geminiTemperature: 0.4,
+          geminiThinkingLevel: 'high',
+        }),
+        image,
+        kind: 'all',
+        metadata: { positive_prompt: 'a sunset', external_provider: 'openai' },
+        models: [],
+        supportedModels: [geminiModel],
+        vaeModels: [],
+      });
+
+      expect(result?.values).toMatchObject({ geminiTemperature: 0.4, geminiThinkingLevel: 'high' });
+      expect(result?.fields).not.toContain('externalProvider');
+    });
+
+    it('restores Seedream toggles and drops values the node would reject', () => {
+      const result = recall(
+        seedreamModel,
+        { ...providerMetadata, seedream_optimize_prompt: 'yes', seedream_watermark: false },
+        'all'
+      );
+
+      expect(result?.values.seedreamWatermark).toBe(false);
+      expect(result?.values.seedreamOptimizePrompt).toBe(false);
+      expect(result?.fields).toContain('externalProvider');
+
+      const invalid = recall(geminiModel, { gemini_temperature: 9, gemini_thinking_level: 'max' }, 'all');
+
+      expect(invalid?.values.geminiTemperature).toBeNull();
+      expect(invalid?.values.geminiThinkingLevel).toBeNull();
+      expect(invalid?.fields).not.toContain('externalProvider');
+    });
+
+    it('skips provider metadata when the image was made with a local model', () => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind: 'all',
+        metadata: { ...providerMetadata, model: { key: sdxlModel.key } },
+        models: [],
+        supportedModels: [sdxlModel],
+        vaeModels: [],
+      });
+
+      expect(result?.values).toMatchObject({
+        externalImageSize: null,
+        geminiTemperature: null,
+        geminiThinkingLevel: null,
+        openaiBackground: 'auto',
+        openaiInputFidelity: null,
+        openaiQuality: 'auto',
+        seedreamOptimizePrompt: false,
+        seedreamWatermark: false,
+      });
+      expect(result?.fields).not.toContain('externalProvider');
+    });
+
+    it('offers recall for an image whose only recallable delta is a provider option', () => {
+      const capabilities = getImageRecallCapabilities({
+        currentValues: createValues({ model: seedreamModel, modelKey: seedreamModel.key }),
+        image,
+        metadata: { seedream_watermark: true },
+        models: [],
+        supportedModels: [],
+        vaeModels: [],
+      });
+
+      expect(capabilities.all).toBe(true);
+      expect(capabilities.remix).toBe(true);
+    });
+  });
 });
 
 describe('model-family tuning recall', () => {
@@ -1504,6 +1790,68 @@ describe('Krea-2 style reference without an image', () => {
     expect(result?.fields).toEqual(expect.arrayContaining(['model', 'steps']));
     expect(result?.fields).not.toContain('referenceImages');
     expect(result?.values.referenceImages).toEqual([]);
+  });
+});
+
+describe('Anima IP-Adapter recall', () => {
+  it('restores the reference an Anima image was generated with and submits it unchanged', () => {
+    const { model, settings } = satisfiedSettingsFor('anima', {
+      label: 'qwen3',
+      overrides: { format: 'checkpoint', variant: 'anima_qwen3' },
+    });
+    const animaIpAdapter: ComponentModelConfig = {
+      base: 'anima',
+      key: 'anima-ip-adapter',
+      name: 'Anima IP-Adapter',
+      type: 'ip_adapter',
+    };
+    const adapterNodes = (backendGraph: { nodes: Record<string, Record<string, unknown>> }) =>
+      Object.values(backendGraph.nodes)
+        .filter((node) => node.type === 'anima_ip_adapter')
+        .map(({ id: _id, ...node }) => node);
+    const generated = compileGenerateGraph(
+      {
+        ...settings,
+        referenceImages: [
+          {
+            config: {
+              beginEndStepPct: [0.1, 0.7],
+              clipVisionModel: 'ViT-H',
+              image: { original: { image: { height: 768, image_name: 'character.png', width: 512 } } },
+              method: 'full',
+              model: animaIpAdapter,
+              type: 'ip_adapter',
+              weight: 1.5,
+            },
+            id: 'anima-ref',
+            isEnabled: true,
+          },
+        ],
+      },
+      model,
+      'gallery',
+      { useCpuNoise: true, useNsfwChecker: false, useWatermark: false }
+    ).backendGraph;
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model }),
+      image,
+      kind: 'all',
+      metadata: Object.values(generated.nodes).find((node) => node.type === 'core_metadata'),
+      models: [model, animaIpAdapter],
+      supportedModels: [model],
+      vaeModels: [],
+    });
+
+    expect(result?.fields).toContain('referenceImages');
+    const recalled = compileGenerateGraph(
+      { ...settings, referenceImages: result!.values.referenceImages },
+      model,
+      'gallery',
+      { useCpuNoise: true, useNsfwChecker: false, useWatermark: false }
+    ).backendGraph;
+
+    expect(adapterNodes(generated)).toHaveLength(1);
+    expect(adapterNodes(recalled)).toEqual(adapterNodes(generated));
   });
 });
 

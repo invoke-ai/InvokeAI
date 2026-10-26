@@ -138,6 +138,6 @@ class QwenImage21TextEncoderInvocation(BaseInvocation):
             ):
                 raise ValueError(_NO_VISION_TOWER)
         return (
-            self.qwen3_vl_encoder.text_encoder.model_copy(update={"submodel_type": SubModelType.VisionTower}),
+            self.qwen3_vl_encoder.text_encoder.model_copy(update={"submodel_type": SubModelType.VisionEncoder}),
             self.qwen3_vl_encoder.tokenizer.model_copy(update={"submodel_type": SubModelType.Processor}),
         )

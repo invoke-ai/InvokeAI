@@ -176,7 +176,7 @@ def architecture_capabilities() -> list[ArchitectureCapabilities]:
     is rendered in full, so a client never has to know which fields a variant row is allowed to omit.
 
     Differences too small to have earned a mapping are expressed on the base row instead, by
-    `features.reference_images_require_variant` (Qwen-Image) and
+    `features.reference_images_require_variant` (Qwen-Image and Anima) and
     `features.reference_images_require_format` (Qwen-Image-2.1).
 
     Sorted by base value, then variant, so the response is stable and diffable.
