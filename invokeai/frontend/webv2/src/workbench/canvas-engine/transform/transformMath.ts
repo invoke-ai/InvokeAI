@@ -7,7 +7,7 @@
 import type { CanvasLayerBaseContract } from '@workbench/canvas-engine/contracts';
 import type { Mat2d, Vec2 } from '@workbench/canvas-engine/types';
 
-import { applyToPoint, fromTRS } from '@workbench/canvas-engine/math/mat2d';
+import { applyToPoint, fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { snapMovedPoint } from '@workbench/canvas-engine/math/snapping';
 
 /** The editable layer transform (translate + per-axis scale + rotation in radians). */
@@ -390,3 +390,29 @@ export const bakeMatrix = (transform: LayerTransform): Mat2d => layerTransformMa
 
 /** The identity transform (a reset layer transform after a bake). */
 export const IDENTITY_TRANSFORM: LayerTransform = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
+
+/** Relative tolerance for treating a composite's axes as perpendicular. */
+const SHEAR_TOLERANCE = 1e-9;
+
+/**
+ * The transform that applies `inner`, then `outer`; null when the composite shears (a non-uniform scale outside a
+ * rotation) or collapses an axis, which translate/scale/rotate cannot express. A composite flip keeps the sign of
+ * `outer.scaleX × inner.scaleX` on `scaleX`, so composing a flip with the identity returns the flip rather than a
+ * half-turn.
+ */
+export const composeLayerTransforms = (outer: LayerTransform, inner: LayerTransform): LayerTransform | null => {
+  const { a, b, c, d, e, f } = multiply(layerTransformMatrix(outer), layerTransformMatrix(inner));
+  const xAxis = Math.hypot(a, b);
+  const yAxis = Math.hypot(c, d);
+  if (xAxis === 0 || yAxis === 0 || Math.abs(a * c + b * d) > SHEAR_TOLERANCE * xAxis * yAxis) {
+    return null;
+  }
+  const scaleX = Math.sign(outer.scaleX * inner.scaleX) < 0 ? -xAxis : xAxis;
+  return {
+    rotation: Math.atan2(b / scaleX, a / scaleX),
+    scaleX,
+    scaleY: (a * d - b * c) / scaleX,
+    x: e,
+    y: f,
+  };
+};

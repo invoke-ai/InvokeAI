@@ -15,7 +15,7 @@ const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
   fallbackLng: 'en',
   lng: 'en',
-  resources: { en: { translation: { common: { scrubber: { editValue: 'Edit {{label}}' } } } } },
+  resources: { en: { translation: { common: { scrubber: { editValue: 'Edit {{label}}: {{value}}' } } } } },
 });
 
 let host: HTMLDivElement | null = null;
@@ -138,7 +138,8 @@ describe('ScrubberField', () => {
     expect(slider.getAttribute('aria-valuenow')).toBe('30');
     expect(slider.getAttribute('aria-valuetext')).toBe('30%');
     expect(valueButton()?.textContent).toBe('30%');
-    expect(valueButton()?.getAttribute('aria-label')).toBe('Edit Steps');
+    // The name carries the visible value (WCAG 2.5.3).
+    await expect.element(valueButton()!).toHaveAccessibleName('Edit Steps: 30%');
   });
 
   it('fills the frame at the maximum and still frames the thumb at the minimum', async () => {

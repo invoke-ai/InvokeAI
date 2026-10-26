@@ -23,6 +23,7 @@ import { EMPTY_IMAGE_RECALL_CAPABILITIES } from './imageRecall';
 
 const NO_BOARDS: [] = [];
 const LOAD_WORKFLOW = 'widgets.gallery.itemActions.loadWorkflow.label';
+const GENERATE_PBR_MAPS = 'widgets.gallery.itemActions.pbrMaps.label';
 
 const findGalleryItem = vi.fn();
 
@@ -106,6 +107,7 @@ const createActions = (deleteItems: ImageActions['deleteItems']): ImageActions =
   downloadItems: vi.fn(() => Promise.resolve()),
   downloadImage: vi.fn(() => Promise.resolve()),
   downloadImages: vi.fn(() => Promise.resolve()),
+  generatePbrMaps: vi.fn(() => Promise.resolve()),
   getImageRecallCapabilities: vi.fn(() => Promise.resolve(EMPTY_IMAGE_RECALL_CAPABILITIES)),
   loadImageWorkflow: vi.fn(() => Promise.resolve()),
   moveItemsToBoard: vi.fn(() => Promise.resolve()),
@@ -120,6 +122,7 @@ const createActions = (deleteItems: ImageActions['deleteItems']): ImageActions =
   recallVideoData: vi.fn(() => Promise.resolve()),
   selectForCompare: vi.fn(),
   sendToCanvas: vi.fn(() => Promise.resolve()),
+  sendImageAsControl: vi.fn(() => Promise.resolve()),
   setItemsStarred: vi.fn(() => Promise.resolve()),
   setImagesStarred: vi.fn(() => Promise.resolve()),
   savePromptAsTemplate: vi.fn(),
@@ -341,6 +344,25 @@ describe('ImageContextMenu load workflow', () => {
   });
 });
 
+describe('ImageContextMenu PBR maps', () => {
+  it('hands a single image to the PBR maps action', async () => {
+    const actions = createActions(vi.fn());
+    await renderMenu(actions, [image('texture.png')]);
+
+    await interact(() => getMenuItem(GENERATE_PBR_MAPS).click());
+
+    expect(actions.generatePbrMaps).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ imageName: 'texture.png' })
+    );
+  });
+
+  it('is absent from bulk menus, which queue nothing per image', async () => {
+    await renderMenu(createActions(vi.fn()), [image('a.png'), image('b.png')]);
+
+    expect(document.body.textContent).not.toContain(GENERATE_PBR_MAPS);
+  });
+});
+
 describe('ImageContextMenu starred state', () => {
   const starIconFill = (label: string): string =>
     getComputedStyle(document.querySelector<HTMLElement>(`[aria-label="${label}"] svg`)!).fill;
@@ -473,6 +495,26 @@ describe('ImageContextMenu canvas destinations', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]?.[0].map((entry) => entry.imageName)).toEqual(images.map((entry) => entry.imageName));
     expect(actions.sendToCanvas).not.toHaveBeenCalled();
+  });
+
+  it('offers Use as Control beside Use as Reference Image and hands it the image', async () => {
+    const actions = createActions(vi.fn());
+    await renderMenu(actions, [image('image-0.png')]);
+    const sequence = menuSequence();
+
+    expect(sequence[sequence.indexOf('Use as Reference Image') + 1]).toBe('widgets.gallery.itemActions.useAsControl');
+    await interact(() => getMenuItem('widgets.gallery.itemActions.useAsControl').click());
+
+    expect(vi.mocked(actions.sendImageAsControl).mock.calls.map(([entry]) => entry.imageName)).toEqual(['image-0.png']);
+  });
+
+  it('leaves Use as Control out of a multi-image menu: one control layer takes one image', async () => {
+    await renderMenu(
+      createActions(vi.fn()),
+      Array.from({ length: 2 }, (_, index) => image(`image-${index}.png`))
+    );
+
+    expect(menuSequence()).not.toContain('widgets.gallery.itemActions.useAsControl');
   });
 });
 

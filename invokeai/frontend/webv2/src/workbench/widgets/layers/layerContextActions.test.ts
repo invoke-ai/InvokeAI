@@ -5,6 +5,7 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { createControlLayer } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -18,12 +19,7 @@ import {
   type LayerContextActionRuntimeContext,
   type LayerContextActionState,
 } from './layerContextActions';
-import {
-  createControlLayer,
-  createEmptyPaintLayer,
-  createInpaintMaskLayer,
-  createRegionalGuidanceLayer,
-} from './layerOps';
+import { createEmptyPaintLayer, createInpaintMaskLayer, createRegionalGuidanceLayer } from './layerOps';
 
 seedArchitectureCapabilities();
 
@@ -41,7 +37,7 @@ const paintLayer = (id: string, patch: Partial<CanvasRasterLayerContractV2> = {}
 
 const rasterLayer = paintLayer('raster');
 const nonEmptyControlLayer = {
-  ...createControlLayer('Control', 'control'),
+  ...createControlLayer({ id: 'control', name: 'Control' }),
   source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' as const },
 };
 
@@ -107,7 +103,7 @@ const makeEffects = (): LayerContextActionEffects => ({
   extractMaskedArea: vi.fn(() => Promise.resolve()),
   fitToBbox: vi.fn(),
   group: vi.fn(),
-  mergeDown: vi.fn(),
+  mergeDown: vi.fn(() => Promise.resolve()),
   mergeSelected: vi.fn(),
   openProperties: vi.fn(),
   openRename: vi.fn(),
@@ -115,7 +111,7 @@ const makeEffects = (): LayerContextActionEffects => ({
   startSelectObject: vi.fn(),
   startFilter: vi.fn(),
   patchConfig: vi.fn(),
-  rasterize: vi.fn(),
+  rasterize: vi.fn(() => Promise.resolve()),
   reorder: vi.fn(),
   setColorLabel: vi.fn(),
   saveToBoard: vi.fn(() => Promise.resolve()),
@@ -319,14 +315,18 @@ describe('layer context action registry', () => {
 
     getLayerContextActionDefinition('move-to-front').handler(context);
     getLayerContextActionDefinition('add-curves').handler(context);
+    getLayerContextActionDefinition('add-noise-adjustment').handler(context);
+    getLayerContextActionDefinition('add-clarity').handler(context);
     getLayerContextActionDefinition('filter').handler(context);
     getLayerContextActionDefinition('intersect').handler(context);
-    getLayerContextActionDefinition('copy-to-control').handler(context);
+    getLayerContextActionDefinition('use-as-control-layer').handler(context);
     getLayerContextActionDefinition('convert-to-control').handler(context);
     getLayerContextActionDefinition('regional-auto-negative').handler(context);
 
     expect(effects.reorder).toHaveBeenCalledWith('front', 'move-to-front');
     expect(effects.addAdjustment).toHaveBeenCalledWith('curves');
+    expect(effects.addAdjustment).toHaveBeenCalledWith('noise');
+    expect(effects.addAdjustment).toHaveBeenCalledWith('clarity');
     expect(effects.startFilter).toHaveBeenCalledWith(rasterLayer.id);
     expect(effects.booleanMerge).toHaveBeenCalledWith('intersect');
     expect(effects.copyTo).toHaveBeenCalledWith('control');
@@ -425,7 +425,7 @@ describe('getLayerContextActions', () => {
     expect(byId(rasterActions, 'crop-to-bbox').isDisabled).toBe(true);
     expect(byId(rasterActions, 'filter').isDisabled).toBe(true);
     expect(byId(rasterActions, 'transform').isDisabled).toBe(true);
-    expect(byId(controlActions, 'filter').isDisabled).toBe(true);
+    expect(byId(controlActions, 'select-object').isDisabled).toBe(true);
     expect(byId(rasterActions, 'copy-to-clipboard').isDisabled).toBe(true);
   });
 
@@ -480,6 +480,10 @@ describe('getLayerContextActions', () => {
       'add-hsl',
       'add-hue',
       'add-invert',
+      'add-texture',
+      'add-clarity',
+      'add-dehaze',
+      'add-noise-adjustment',
       'add-regenerate-region',
       'save-to-board',
       'copy-to-clipboard',
@@ -488,12 +492,12 @@ describe('getLayerContextActions', () => {
       'filter',
       'select-object',
       'run-workflow',
+      'use-as-control-layer',
       'intersect',
       'cutout',
       'cutaway',
       'exclude',
       'copy-to-raster',
-      'copy-to-control',
       'copy-to-inpaint-mask',
       'copy-to-regional-guidance',
       'rasterize',
@@ -592,6 +596,8 @@ describe('getLayerContextActions', () => {
   it('offers add-noise and add-denoise-limit only while the mask lacks that modifier', () => {
     const bare = getLayerContextActions(makeState(makeLayer('inpaint_mask')));
     expect(byId(bare, 'add-noise').isDisabled).toBe(false);
+    // The mask's noise modifier and the raster noise adjustment are separate actions.
+    expect(bare.some((action) => action.id === 'add-noise-adjustment')).toBe(false);
     expect(byId(bare, 'add-denoise-limit').isDisabled).toBe(false);
     const configured = getLayerContextActions(
       makeState({
@@ -627,6 +633,10 @@ describe('getLayerContextActions', () => {
       'add-hsl',
       'add-hue',
       'add-invert',
+      'add-texture',
+      'add-clarity',
+      'add-dehaze',
+      'add-noise-adjustment',
       'add-regenerate-region',
       'filter',
       'select-object',
@@ -643,7 +653,7 @@ describe('getLayerContextActions', () => {
 
     const lockedControl = { ...nonEmptyControlLayer, isLocked: true };
     const controlActions = getLayerContextActions(makeState(lockedControl));
-    expect(byId(controlActions, 'filter').isDisabled).toBe(true);
+    expect(byId(controlActions, 'select-object').isDisabled).toBe(true);
     expect(byId(controlActions, 'control-transparency-effect').isDisabled).toBe(true);
     expect(byId(controlActions, 'convert-to-raster').isDisabled).toBe(true);
 
@@ -707,6 +717,10 @@ describe('getLayerContextActions', () => {
         'add-hsl',
         'add-hue',
         'add-invert',
+        'add-texture',
+        'add-clarity',
+        'add-dehaze',
+        'add-noise-adjustment',
         'add-regenerate-region',
         'save-to-board',
         'copy-to-clipboard',
@@ -755,7 +769,7 @@ describe('getLayerContextActions', () => {
 
     expect(idsFor(paint)).toEqual(
       expect.arrayContaining([
-        'copy-to-control',
+        'use-as-control-layer',
         'copy-to-inpaint-mask',
         'copy-to-regional-guidance',
         'convert-to-control',
@@ -764,11 +778,12 @@ describe('getLayerContextActions', () => {
       ])
     );
     expect(idsFor(text)).not.toContain('convert-to-control');
+    expect(idsFor(text)).not.toContain('use-as-control-layer');
     expect(idsFor(text)).not.toContain('copy-to-inpaint-mask');
   });
 
-  it('exposes control-only transparency and raster conversion actions while filtering supported control content', () => {
-    const empty = createControlLayer('Control', 'control-empty');
+  it('exposes control-only transparency and raster conversion actions, and leaves filtering to the Detection row', () => {
+    const empty = createControlLayer({ id: 'control-empty', name: 'Control' });
 
     expect(idsFor(empty, [empty], { hasSupportedContent: false })).toEqual(
       expect.arrayContaining([
@@ -779,9 +794,9 @@ describe('getLayerContextActions', () => {
         'copy-to-regional-guidance',
       ])
     );
-    expect(idsFor(empty, [empty], { hasSupportedContent: false })).not.toContain('filter');
-    expect(idsFor(empty, [empty], { hasSupportedContent: true })).toContain('filter');
-    expect(idsFor(nonEmptyControlLayer)).toContain('filter');
+    expect(idsFor(empty, [empty], { hasSupportedContent: true })).not.toContain('filter');
+    expect(idsFor(nonEmptyControlLayer)).not.toContain('filter');
+    expect(idsFor({ ...nonEmptyControlLayer, controlType: 'depth' })).not.toContain('filter');
   });
 
   it('exposes filter for every supported raster source', () => {
@@ -892,7 +907,7 @@ describe('getLayerContextActions', () => {
 
     expect(idsFor(layer)).toContain('copy-to-inpaint-mask');
     expect(idsFor(layer)).not.toContain('convert-to-inpaint-mask');
-    expect(idsFor(layer)).not.toContain('copy-to-control');
+    expect(idsFor(layer)).not.toContain('use-as-control-layer');
   });
 
   it('exposes boolean raster actions only for an adjacent mergeable raster pair', () => {

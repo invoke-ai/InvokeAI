@@ -262,6 +262,14 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   ideogram4GuidanceScale: null,
   ideogram4Mu: null,
   ideogram4ColorPalette: [],
+  externalImageSize: null,
+  openaiQuality: 'auto',
+  openaiBackground: 'auto',
+  openaiInputFidelity: null,
+  geminiTemperature: null,
+  geminiThinkingLevel: null,
+  seedreamWatermark: false,
+  seedreamOptimizePrompt: false,
   krea2RebalanceEnabled: false,
   krea2RebalanceMultiplier: 4,
   krea2RebalanceWeights: '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0',
@@ -9355,5 +9363,56 @@ describe('auto invocation route switching', () => {
 
     // Editing the surface already routed as the source keeps the manual destination.
     expect(getRoute(state)).toMatchObject({ destination: 'canvas', sourceId: 'generate' });
+  });
+});
+
+describe('canvas schema adoption', () => {
+  const typedControl = (id: string): CanvasControlLayerContract => ({
+    ...createControlLayer(id),
+    controlType: 'depth',
+    detection: { settings: {}, type: 'depth_anything_depth_estimation' },
+    source: { image: { height: 64, imageName: 'photo.png', width: 64 }, type: 'image' },
+  });
+  const withV4Canvas = (layers: readonly CanvasLayerContract[]): WorkbenchState =>
+    workbenchReducer(createInitialWorkbenchState(), {
+      document: { ...createEmptyCanvasDocument(), stacks: stacksFrom([...layers]), version: 4 },
+      type: 'replaceCanvasDocument',
+    });
+  const versions = (state: WorkbenchState) => [getCanvas(state).version, getCanvas(state).document.version];
+
+  it('moves a v4 canvas to schema 6 when a control layer gains a type, and keeps 6 after it loses it', () => {
+    let state = withV4Canvas([createControlLayer('ctrl')]);
+    expect(versions(state)).toEqual([4, 4]);
+
+    state = workbenchReducer(state, { layer: typedControl('ctrl'), layerId: 'ctrl', type: 'replaceCanvasLayer' });
+    expect(versions(state)).toEqual([6, 6]);
+
+    state = workbenchReducer(state, { layer: createControlLayer('ctrl'), layerId: 'ctrl', type: 'replaceCanvasLayer' });
+    expect(versions(state)).toEqual([6, 6]);
+
+    state = workbenchReducer(state, { document: createEmptyCanvasDocument(), type: 'replaceCanvasDocument' });
+    expect(getCanvas(state).version).toBe(6);
+  });
+
+  it('adopts 4, not 5, for custom-font typography alone', () => {
+    const text: CanvasLayerContract = {
+      ...createRasterLayer('text'),
+      source: {
+        align: 'left',
+        color: '#fff',
+        content: 'hello',
+        fontFamily: 'Example',
+        fontRef: { contentHash: 'a'.repeat(64), family: 'Example', id: 'font-1', label: 'Example Regular' },
+        fontSize: 24,
+        fontWeight: 400,
+        lineHeight: 1.2,
+        type: 'text',
+      },
+    };
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('text')]);
+    expect(versions(state)).toEqual([3, 3]);
+
+    state = workbenchReducer(state, { layer: text, layerId: 'text', type: 'replaceCanvasLayer' });
+    expect(versions(state)).toEqual([4, 4]);
   });
 });

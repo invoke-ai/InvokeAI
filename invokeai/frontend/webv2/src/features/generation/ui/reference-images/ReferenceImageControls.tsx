@@ -109,17 +109,22 @@ export const FieldHeader = ({
   );
 };
 
-/** Render children inside Advanced. */
+/**
+ * Render children inside Advanced. `strengthOnly` adapters (Anima) take a strength alone: no mode, and the scale
+ * cannot go negative.
+ */
 export const IPAdapterControls = ({
   children,
   config,
   disabled,
   onChange,
+  strengthOnly = false,
 }: {
   children?: ReactNode;
   config: IPAdapterConfig;
   disabled: boolean;
   onChange: (config: GenerateReferenceImageConfig) => void;
+  strengthOnly?: boolean;
 }) => {
   const { t } = useTranslation();
   const [draftBeginEndStepPct, setDraftBeginEndStepPct] = useState<[number, number] | null>(null);
@@ -210,26 +215,28 @@ export const IPAdapterControls = ({
 
   return (
     <Stack gap="2">
-      <Stack gap="1">
-        <FieldHeader label={t('widgets.generate.mode')} />
-        <SegmentGroup.Root disabled={disabled} value={mode} w="full" onValueChange={handleModeChange}>
-          <SegmentGroup.Indicator />
-          {MODE_SEGMENTS.map((segment) => (
-            <SegmentGroup.Item key={segment.value} flex="1" justifyContent="center" value={segment.value}>
-              <SegmentGroup.ItemText fontSize="xs">{t(segment.labelKey)}</SegmentGroup.ItemText>
-              <SegmentGroup.ItemHiddenInput />
-            </SegmentGroup.Item>
-          ))}
-        </SegmentGroup.Root>
-      </Stack>
+      {strengthOnly ? null : (
+        <Stack gap="1">
+          <FieldHeader label={t('widgets.generate.mode')} />
+          <SegmentGroup.Root disabled={disabled} value={mode} w="full" onValueChange={handleModeChange}>
+            <SegmentGroup.Indicator />
+            {MODE_SEGMENTS.map((segment) => (
+              <SegmentGroup.Item key={segment.value} flex="1" justifyContent="center" value={segment.value}>
+                <SegmentGroup.ItemText fontSize="xs">{t(segment.labelKey)}</SegmentGroup.ItemText>
+                <SegmentGroup.ItemHiddenInput />
+              </SegmentGroup.Item>
+            ))}
+          </SegmentGroup.Root>
+        </Stack>
+      )}
 
       <ScrubberField
         defaultValue={DEFAULT_WEIGHT}
         disabled={disabled}
         formatValue={formatWeight}
-        hint="referenceImageWeight"
-        inputMin={-1}
-        label={t('widgets.generate.weight')}
+        hint={strengthOnly ? 'referenceImageStrength' : 'referenceImageWeight'}
+        inputMin={strengthOnly ? 0 : -1}
+        label={strengthOnly ? t('widgets.generate.strength') : t('widgets.generate.weight')}
         marks={WEIGHT_MARKS}
         max={2}
         min={0}
@@ -259,7 +266,7 @@ export const IPAdapterControls = ({
         <Collapsible.Content>
           <Stack borderTopWidth="1px" gap="2" mt="2" pt="2">
             {children}
-            {mode === 'style' ? (
+            {mode === 'style' && !strengthOnly ? (
               <Stack gap="1">
                 <FieldHeader label={t('widgets.generate.styleVariant')} />
                 <Select
