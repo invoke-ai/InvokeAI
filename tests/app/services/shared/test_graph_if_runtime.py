@@ -346,3 +346,54 @@ def test_prepared_selected_source_preserves_paths_without_ancestry(executed: boo
         lambda *_: (2,),
         _IteratorAncestry(state),
     ) == ([] if executed else [(2,)])
+
+
+def test_collect_empty_path_fallback_reuses_input_edge_axes(monkeypatch: pytest.MonkeyPatch) -> None:
+    graph = Graph(
+        nodes={
+            "outer": AddInvocation(id="outer"),
+            "source": AddInvocation(id="source"),
+            "collect": CollectInvocation(id="collect"),
+        }
+    )
+    graph.edges.append(
+        Edge(
+            source=EdgeConnection(node_id="outer", field="item"),
+            destination=EdgeConnection(node_id="source", field="a"),
+        )
+    )
+    input_edge = Edge(
+        source=EdgeConnection(node_id="source", field="output_collection"),
+        destination=EdgeConnection(node_id="collect", field="item"),
+    )
+    graph.edges.append(input_edge)
+    graph.edges.append(
+        Edge(
+            source=EdgeConnection(node_id="outer", field="item"),
+            destination=EdgeConnection(node_id="consumer", field="value"),
+        )
+    )
+    graph._invalidate_edge_indexes()
+    state = SimpleNamespace(graph=graph, source_prepared_mapping={"outer"})
+    axis_lookups = 0
+
+    def get_edge_frame_axes(_state: object, _ancestry: object, edge: Edge, _cache: dict) -> tuple[str, ...]:
+        nonlocal axis_lookups
+        assert edge == input_edge
+        axis_lookups += 1
+        return ("outer", "inner")
+
+    monkeypatch.setattr(graph_if_runtime, "_get_edge_frame_axes", get_edge_frame_axes)
+
+    assert graph_if_runtime._get_effective_iteration_paths_for_edge(
+        state,
+        Edge(
+            source=EdgeConnection(node_id="collect", field="collection"),
+            destination=EdgeConnection(node_id="consumer", field="value"),
+        ),
+        {"source"},
+        lambda _source_id: {"outer-exec"},
+        lambda _edge, _prepared_id: (),
+        _IteratorAncestry(GraphExecutionState(graph=Graph())),
+    ) == {()}
+    assert axis_lookups == 1

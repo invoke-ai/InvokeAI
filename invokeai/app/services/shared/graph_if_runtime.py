@@ -213,11 +213,12 @@ def _validate_collect_branch_axes(
             for source_id in nx.ancestors(source_graph, edge.source.node_id) | {edge.source.node_id}
         }
         retained_axes = set()
+        branch_destinations = branch_nodes | {node_id}
         for collect_id in branch_nodes:
             if not isinstance(state.graph.get_node(collect_id), CollectInvocation):
                 continue
             for edge in state.graph._get_output_edges(collect_id, COLLECTION_FIELD):
-                if edge.destination.node_id not in branch_nodes | {node_id} or (
+                if edge.destination.node_id not in branch_destinations or (
                     edge.destination.node_id == node_id and edge.destination.field != branch_field
                 ):
                     continue
@@ -409,6 +410,15 @@ def _get_effective_iteration_paths_for_edge(
         if isinstance(source_node, CollectInvocation) and current_edge.source.field == COLLECTION_FIELD:
             input_edges = state.graph._get_input_edges(current_source_id)
             collapsed_paths: set[tuple[int, ...]] = set()
+            frame_axes_cache: dict[str, Optional[tuple[str, ...]]] = {}
+            retained_axes_by_edge = {
+                input_edge: _without_closed_axis(
+                    state,
+                    input_edge,
+                    _get_edge_frame_axes(state, iterator_ancestry, input_edge, frame_axes_cache) or (),
+                )
+                for input_edge in input_edges
+            }
             # Collect.item collapses its final open axis even before its own execution frame exists.
             for input_edge in input_edges:
                 input_paths = _get_effective_iteration_paths_for_edge(
@@ -420,21 +430,11 @@ def _get_effective_iteration_paths_for_edge(
                     iterator_ancestry,
                     cache,
                 )
-                group_depth = len(
-                    _without_closed_axis(
-                        state,
-                        input_edge,
-                        _get_edge_frame_axes(state, iterator_ancestry, input_edge, {}) or (),
-                    )
-                )
+                group_depth = len(retained_axes_by_edge[input_edge])
                 collapsed_paths.update(path[:group_depth] for path in input_paths)
             if not collapsed_paths and input_edges:
                 for input_edge in input_edges:
-                    group_axes = _without_closed_axis(
-                        state,
-                        input_edge,
-                        _get_edge_frame_axes(state, iterator_ancestry, input_edge, {}) or (),
-                    )
+                    group_axes = retained_axes_by_edge[input_edge]
                     if not group_axes:
                         collapsed_paths.add(())
                         continue
