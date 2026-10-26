@@ -1,4 +1,4 @@
-"""Loader for Tiny AutoEncoder preview decoders (madebyollin's TAESD family)."""
+"""Loader for Tiny AutoEncoder preview decoders (madebyollin's TAESD and TAEHV families)."""
 
 from pathlib import Path
 from typing import Any, Optional
@@ -14,9 +14,9 @@ from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, Mod
 from invokeai.backend.tiny_autoencoder.checkpoint import (
     PICKLE_SUFFIXES,
     SAFETENSORS_SUFFIX,
-    build_taesd_decoder,
-    detect_taesd_layout,
-    taesd_decoder_state_dict,
+    build_tiny_autoencoder_decoder,
+    detect_tiny_autoencoder_layout,
+    tiny_autoencoder_state_dict,
 )
 
 
@@ -42,8 +42,10 @@ def _read_checkpoint(path: Path) -> dict[str, Any]:
 @ModelLoaderRegistry.register(
     base=BaseModelType.QwenImage21, type=ModelType.TinyAutoencoder, format=ModelFormat.Checkpoint
 )
+@ModelLoaderRegistry.register(base=BaseModelType.Wan, type=ModelType.TinyAutoencoder, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(base=BaseModelType.LTX2, type=ModelType.TinyAutoencoder, format=ModelFormat.Checkpoint)
 class TinyAutoencoderLoader(ModelLoader):
-    """Builds the TAESD decoder a checkpoint holds and loads it strictly, in either published layout."""
+    """Builds the TAE decoder a checkpoint holds and loads it strictly, dropping any encoder."""
 
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if submodel_type is not None:
@@ -51,10 +53,10 @@ class TinyAutoencoderLoader(ModelLoader):
         if not isinstance(config, TinyAutoencoder_Checkpoint_Config_Base):
             raise ValueError(f"Unexpected model config type: {type(config)}.")
 
-        state_dict = taesd_decoder_state_dict(_read_checkpoint(Path(config.path)))
-        layout = detect_taesd_layout(state_dict)
+        checkpoint = _read_checkpoint(Path(config.path))
+        layout = detect_tiny_autoencoder_layout(checkpoint)
         if layout is None:
-            raise ValueError(f"'{config.name}' is not a TAESD decoder checkpoint.")
-        decoder = build_taesd_decoder(layout)
-        decoder.load_state_dict(state_dict, strict=True)
+            raise ValueError(f"'{config.name}' is not a supported Tiny AutoEncoder checkpoint.")
+        decoder = build_tiny_autoencoder_decoder(layout)
+        decoder.load_state_dict(tiny_autoencoder_state_dict(checkpoint, layout), strict=True)
         return decoder.to(self._torch_dtype).eval().requires_grad_(False)

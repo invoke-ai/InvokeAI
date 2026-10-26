@@ -1,4 +1,4 @@
-"""Loading a Tiny AutoEncoder: the decoder a file holds, from either layout or a ComfyUI `.pth`."""
+"""Loading a Tiny AutoEncoder: the decoder a file holds, from any published layout or a ComfyUI `.pth`."""
 
 from pathlib import Path
 from types import SimpleNamespace
@@ -10,19 +10,23 @@ from safetensors.torch import save_file
 from invokeai.backend.model_manager.configs.tiny_autoencoder import (
     TinyAutoencoder_Checkpoint_Config_Base,
     TinyAutoencoder_Checkpoint_FLUX_Config,
+    TinyAutoencoder_Checkpoint_LTX2_Config,
     TinyAutoencoder_Checkpoint_QwenImage21_Config,
     TinyAutoencoder_Checkpoint_SD1_Config,
+    TinyAutoencoder_Checkpoint_Wan_Config,
 )
 from invokeai.backend.model_manager.load.model_loaders.tiny_autoencoder import TinyAutoencoderLoader
-from invokeai.backend.tiny_autoencoder.taesd import TaesdDecoder
-from tests.fixtures.tiny_autoencoders import TAEQI2_1, TAESD, TAESD3, diffusers_weights, native_weights
+from invokeai.backend.tiny_autoencoder.checkpoint import TAELTX2_3, TAEW2_2
+from invokeai.backend.tiny_autoencoder.decoder import TinyAutoencoderDecoder
+from invokeai.backend.tiny_autoencoder.taehv import TaehvDecoder
+from tests.fixtures.tiny_autoencoders import TAEQI2_1, TAESD, TAESD3, diffusers_weights, native_weights, taehv_weights
 
 
 def _load(
     path: Path,
     config_class: type[TinyAutoencoder_Checkpoint_Config_Base] = TinyAutoencoder_Checkpoint_SD1_Config,
     dtype: torch.dtype = torch.float32,
-) -> TaesdDecoder:
+) -> TinyAutoencoderDecoder:
     loader = object.__new__(TinyAutoencoderLoader)
     loader._torch_dtype = dtype
     loader._logger = SimpleNamespace(info=lambda *_a, **_k: None, warning=lambda *_a, **_k: None)
@@ -30,7 +34,7 @@ def _load(
     return loader._load_model(config)
 
 
-def _assert_holds(decoder: TaesdDecoder, native: dict[str, torch.Tensor]) -> None:
+def _assert_holds(decoder: TinyAutoencoderDecoder, native: dict[str, torch.Tensor]) -> None:
     loaded = decoder.state_dict()
     assert loaded.keys() == native.keys()
     for key, value in native.items():
@@ -93,5 +97,34 @@ def test_a_checkpoint_that_is_not_exactly_the_decoder_is_refused(tmp_path: Path,
         sd["18.conv.6.weight"] = torch.zeros(64, 64, 3, 3)
     save_file(sd, tmp_path / "taesd_decoder.safetensors")
 
-    with pytest.raises(ValueError, match="not a TAESD decoder"):
+    with pytest.raises(ValueError, match="not a supported Tiny AutoEncoder"):
         _load(tmp_path / "taesd_decoder.safetensors")
+
+
+@pytest.mark.parametrize(
+    ("layout", "config_class", "compression"),
+    [(TAEW2_2, TinyAutoencoder_Checkpoint_Wan_Config, 16), (TAELTX2_3, TinyAutoencoder_Checkpoint_LTX2_Config, 32)],
+    ids=["taew2_2", "taeltx"],
+)
+def test_a_taehv_checkpoint_loads_its_decoder_and_drops_the_encoder(
+    tmp_path: Path, layout, config_class, compression: int
+) -> None:
+    published = taehv_weights(layout, dtype=torch.float16)
+    save_file(published, tmp_path / "tae.safetensors")
+
+    decoder = _load(tmp_path / "tae.safetensors", config_class)
+
+    assert isinstance(decoder, TaehvDecoder)
+    _assert_holds(decoder, {k: v for k, v in published.items() if k.startswith("decoder.")})
+    assert decoder.spatial_compression == compression
+    assert all(p.dtype == torch.float32 for p in decoder.parameters())
+    assert not decoder.training
+
+
+def test_a_taehv_checkpoint_with_a_tensor_the_decoder_lacks_is_refused(tmp_path: Path) -> None:
+    sd = taehv_weights(TAEW2_2)
+    sd["decoder.17.conv.6.weight"] = torch.zeros(64, 64, 3, 3)
+    save_file(sd, tmp_path / "taew2_2.safetensors")
+
+    with pytest.raises(ValueError, match="not a supported Tiny AutoEncoder"):
+        _load(tmp_path / "taew2_2.safetensors", TinyAutoencoder_Checkpoint_Wan_Config)

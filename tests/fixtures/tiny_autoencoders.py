@@ -1,12 +1,18 @@
-"""TAESD decoder weights at the published shapes, in both published key layouts.
+"""TAE checkpoints at the published shapes: TAESD in both key layouts, TAEHV in its one.
 
-The shapes come from the decoder module, which `tests/backend/tiny_autoencoder/test_taesd.py` pins
-against the real checkpoints' headers; that test is what makes these fixtures faithful.
+The shapes come from the decoder modules, which `tests/backend/tiny_autoencoder/test_taesd.py` and
+`test_taehv.py` pin against the real checkpoints' headers; those tests are what make these fixtures
+faithful.
 """
 
 import torch
 
-from invokeai.backend.tiny_autoencoder.checkpoint import TaesdLayout, build_taesd_decoder
+from invokeai.backend.tiny_autoencoder.checkpoint import (
+    TaehvLayout,
+    TaesdLayout,
+    build_taehv_decoder,
+    build_taesd_decoder,
+)
 
 TAESD = TaesdLayout(latent_channels=4, arch="default", image_channels=3)
 """taesd / taesdxl."""
@@ -47,3 +53,14 @@ def tinier_weights() -> dict[str, torch.Tensor]:
         combined[f"{prefix}1.bias"] = torch.zeros(channels * 2, dtype=torch.float16)
         combined[f"{prefix}3.weight"] = torch.zeros(channels, channels * 2, 1, 1, dtype=torch.float16)
     return combined
+
+
+def taehv_weights(layout: TaehvLayout, seed: int = 0, dtype: torch.dtype = torch.float32) -> dict[str, torch.Tensor]:
+    """A published TAEHV checkpoint: the decoder with seeded random weights, next to an encoder."""
+    torch.manual_seed(seed)
+    decoder = build_taehv_decoder(layout)
+    sd = {key: value.to(dtype).contiguous() for key, value in decoder.state_dict().items()}
+    # A token encoder: identification and loading must drop it whatever it holds.
+    sd["encoder.0.weight"] = torch.zeros(64, 3 * layout.patch_size**2, 3, 3, dtype=dtype)
+    sd["encoder.0.bias"] = torch.zeros(64, dtype=dtype)
+    return sd

@@ -108,19 +108,28 @@ and nothing else. Each one is a single file, a `.safetensors`, `.pth` or `.pt`.
 | TAEF1 | `diffusion_pytorch_model.safetensors` from `madebyollin/taef1` | FLUX.1 | FLUX.1, Z-Image |
 | TAEF2 | `taef2.safetensors` | FLUX.2 | FLUX.2, ERNIE-Image |
 | TAEQI2.1 | `taeqi2_1.safetensors` | Qwen-Image-2.1 | Qwen-Image-2.1 |
+| TAEW2.1 | `taew2_1.safetensors` | Wan 2.2 | Wan 2.2 A14B, Qwen-Image, Krea-2, Anima |
+| TAEW2.2 | `taew2_2.safetensors` | Wan 2.2 | Wan 2.2 TI2V-5B |
+| TAELTX2.3 | `taeltx2_3.safetensors` | LTX-2 | LTX-2.5 |
 
-Both published layouts load: the decoder-only files (the `*_decoder.safetensors` files above, and the
-`*_decoder.pth` files ComfyUI keeps in `models/vae_approx/`) and the files that hold encoder and decoder together
-(`diffusion_pytorch_model.safetensors`, `taef2.safetensors`, `taeqi2_1.safetensors`).
+The image TAEs (TAESD) load in both published layouts: the decoder-only files (the `*_decoder.safetensors` files
+above, and the `*_decoder.pth` files ComfyUI keeps in `models/vae_approx/`) and the files that hold encoder and
+decoder together (`diffusion_pytorch_model.safetensors`, `taef2.safetensors`, `taeqi2_1.safetensors`). The video
+TAEs (TAEHV: TAEW2.1, TAEW2.2, TAELTX2.3) load as published in madebyollin's `taehv` repository, one file with
+encoder and decoder.
 
-TAESD and TAESDXL read the same 4-channel latents with the same network, and so do TAESD3 and TAEF1 with
-16 channels. For these four the file name, its folder name or the download source has to name the TAE (`taesd`,
-`taesdxl`, `taesd3` or `taef1`); a file that names none of them is refused (**R**). The starter models set the base
-themselves.
+Some networks are not specific to one model. TAESD and TAESDXL read the same 4-channel latents with the same network,
+and so do TAESD3 and TAEF1 with 16 channels; TAEW2.1's network is also published as `taehv` (HunyuanVideo) and
+`taecvx` (CogVideoX). For these the file name, its folder name or the download source has to name the TAE
+(`taesd`, `taesdxl`, `taesd3`, `taef1` or `taew2_1`); a file that names none of them is refused (**R**). An
+install that sets the base explicitly, as the starter models do, needs no name.
 
 - **R:** the "tinier" TAEQI2.1 (`taeqi2_1_tinier`); the message asks for `taeqi2_1.safetensors` instead.
-- **Not recognized:** other Tiny AutoEncoders, such as the 32× Sana decoder and the TAEHV video decoders
-  (`taew2_1`, `taew2_2`, `taeltx_2`). They install as unknown models.
+- **R:** `taeltx_2`, the TAE for LTX-2's VAE. It has TAELTX2.3's network but previews LTX-2.5 worse than the linear
+  preview; the message asks for TAELTX2.3.
+- **R:** `taehv` and `taecvx`, and any unnamed file with TAEW2.1's network.
+- **Not recognized:** other Tiny AutoEncoders, such as the 32× Sana decoder, `taeh3` (MiniMax H3 uses its own
+  built-in preview decoder), `taehv1_5` and the "super" TAEHV decoders. They install as unknown models.
 - A Diffusers `AutoencoderTiny` folder (for example the `madebyollin/taesdxl` repository as a whole) installs as a
   VAE and is not used for previews. Install the single file instead.
 

@@ -12,8 +12,11 @@ and the nvfp4 distilled transformer. The mirror's nvfp4 repack names no quantize
 or header, which the nvfp4 reader requires to know the block-scale layout, so it is refused at load
 time; the official file lists its layers in ``_quantization_metadata``. Both are optional, so the
 cost of the exception falls only on users who choose them.
+
+The preview decoder is madebyollin's (MIT, from GitHub), not part of the LTX-2.5 release.
 """
 
+from invokeai.backend.model_manager.starter_models.common import TINY_AUTOENCODER_NOTE
 from invokeai.backend.model_manager.starter_models.types import StarterModel
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -161,5 +164,17 @@ ltx2_5_duration_head = StarterModel(
     "length (~3.6 MB). Optional. Unlike the other LTX-2.5 starter models this one is fetched from Lightricks' "
     f"gated repo, so it needs a Hugging Face login whose account has accepted the licence. {_LICENSE_NOTE}",
     type=ModelType.LTX2DurationHead,
+    format=ModelFormat.Checkpoint,
+)
+
+
+# taeltx2_3 is upstream's decoder for LTX-2.3 and later. taeltx_2 (LTX-2) has the same network but
+# scored 11.0 dB against the VAE on LTX-2.5 latents, below the linear preview's 26.6 (taeltx2_3: 37.8).
+taeltx2_3 = StarterModel(
+    name="TAELTX2.3 (LTX-2.5 preview decoder)",
+    base=BaseModelType.LTX2,
+    source="https://github.com/madebyollin/taehv/raw/62f7591f59dfbb4c3c02b7a621d180a9eeaba26c/safetensors/taeltx2_3.safetensors",
+    description=f"Sharp live previews for LTX-2.5. {TINY_AUTOENCODER_NOTE} ~24MB",
+    type=ModelType.TinyAutoencoder,
     format=ModelFormat.Checkpoint,
 )

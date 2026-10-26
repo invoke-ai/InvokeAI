@@ -51,6 +51,13 @@ from invokeai.backend.wan.sampling_utils import (
     num_latent_frames_for,
 )
 
+# Latent frames the step preview carries: the middle frame and the one before it. A Tiny AutoEncoder
+# decodes the window and keeps its last frame, which then has the frame before it as temporal memory;
+# the middle frame decoded alone is no better than the linear preview (RTX 4090, PSNR against the VAE
+# on the callback latents: Wan 16 ch 20.3 -> 34.9 dB, Wan 48 ch 19.3 -> 27.5 dB). The linear preview
+# reads only the last frame of the window, so it is unchanged.
+PREVIEW_LATENT_WINDOW = 2
+
 
 @invocation(
     "wan_video_denoise",
@@ -271,6 +278,7 @@ class WanVideoDenoiseInvocation(BaseInvocation):
             first_frame_mask[:, :, 0] = 0
 
         step_callback = self._build_step_callback(context)
+        mid = t_lat // 2
 
         high_model = self.transformer.transformer
         low_model = self.transformer.transformer_low_noise
@@ -378,8 +386,8 @@ class WanVideoDenoiseInvocation(BaseInvocation):
                         order=1,
                         total_steps=total_steps,
                         timestep=int(t.item()),
-                        # Preview shows the middle frame for video.
-                        latents=latents[:, :, t_lat // 2],
+                        # Preview shows the middle frame for video, after a context window before it.
+                        latents=latents[:, :, max(0, mid - PREVIEW_LATENT_WINDOW + 1) : mid + 1],
                     )
                 )
 

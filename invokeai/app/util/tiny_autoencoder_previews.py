@@ -9,14 +9,14 @@ from typing import TYPE_CHECKING
 import torch
 from PIL import Image
 
-from invokeai.app.util.step_callback import render_linear_preview
+from invokeai.app.util.step_callback import preview_frame, render_linear_preview
 from invokeai.backend.architectures import LatentSpace, resolve_latent_space
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.tiny_autoencoder import is_tiny_autoencoder_supported
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.tiny_autoencoder.decoder import TinyAutoencoderDecoder
 from invokeai.backend.tiny_autoencoder.preview import decode_preview, select_tiny_autoencoder
-from invokeai.backend.tiny_autoencoder.taesd import TaesdDecoder
 from invokeai.backend.util.devices import TorchDevice
 
 if TYPE_CHECKING:
@@ -51,7 +51,7 @@ def _first_report(key: Hashable) -> bool:
 
 @dataclass(frozen=True)
 class _HeldDecoder:
-    decoder: TaesdDecoder
+    decoder: TinyAutoencoderDecoder
     device: torch.device
 
 
@@ -117,7 +117,7 @@ class TinyAutoencoderPreviews:
             self._render_cost_s += RENDER_COST_SMOOTHING * (cost - self._render_cost_s)
 
     def render(self, base_model: BaseModelType, sample: torch.Tensor) -> tuple[Image.Image, tuple[int, int]]:
-        space = resolve_latent_space(base_model, sample)
+        space = resolve_latent_space(base_model, preview_frame(sample))
         if not self._disabled:
             try:
                 held = self._decoder_for(base_model, space)
@@ -177,9 +177,9 @@ class TinyAutoencoderPreviews:
 
         lock = ExitStack()
         _, decoder = lock.enter_context(loaded.model_on_device())
-        if not isinstance(decoder, TaesdDecoder):
+        if not isinstance(decoder, TinyAutoencoderDecoder):
             lock.close()
-            raise TypeError(f"expected a TaesdDecoder, the loader returned {type(decoder).__name__}")
+            raise TypeError(f"expected a TinyAutoencoderDecoder, the loader returned {type(decoder).__name__}")
         if loaded.compute_device.type != "cpu" and loaded.resident_weight_bytes < loaded.weight_bytes:
             # The cache's own budget (which `max_vram_cache_size_gb` caps) left the TAE partly in RAM. A CPU
             # model reports no resident bytes at all: its lock does not move it.

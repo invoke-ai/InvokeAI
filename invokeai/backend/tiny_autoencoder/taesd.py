@@ -40,6 +40,8 @@ SOFTWARE.
 import torch
 import torch.nn as nn
 
+from invokeai.backend.tiny_autoencoder.decoder import TinyAutoencoderDecoder
+
 
 def conv(n_in: int, n_out: int, **kwargs) -> nn.Conv2d:
     return nn.Conv2d(n_in, n_out, 3, padding=1, **kwargs)
@@ -72,13 +74,18 @@ class Block(nn.Module):
         return self.fuse(self.conv(x) + self.skip(x))
 
 
-class TaesdDecoder(nn.Sequential):
+class TaesdDecoder(TinyAutoencoderDecoder, nn.Sequential):
     """An upstream decoder `nn.Sequential`, and what its input and output look like."""
 
     def __init__(self, *layers: nn.Module, latent_channels: int, spatial_compression: int):
         super().__init__(*layers)
         self.latent_channels = latent_channels
         self.spatial_compression = spatial_compression
+        # At 1024 a decode costs ~640 MiB of VRAM for the 8x TAEs (~160 MiB for TAEQI2.1) and ~25 ms (RTX
+        # 4090, fp16) at any generation size; uncapped, 2048 costs ~2.5 GiB and ~100 ms. Decoding at full
+        # size and scaling down would look better (SDXL 36.3 vs 30.7 dB against the VAE) but carries that
+        # uncapped cost, so `decode_preview` area-downsamples the latent instead.
+        self.max_preview_edge = 1024
 
 
 def Decoder(latent_channels: int = 4, use_midblock_gn: bool = False, image_channels: int = 3) -> TaesdDecoder:

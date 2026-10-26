@@ -1,14 +1,22 @@
-"""Reading a TAESD checkpoint: which decoder it holds, in either published layout, and what it is not."""
+"""Reading a TAE checkpoint: which decoder it holds, in any published layout, and what it is not."""
 
 import pytest
 import torch
 
 from invokeai.backend.tiny_autoencoder.checkpoint import (
+    TAELTX2_3,
+    TAEW2_1,
+    TAEW2_2,
+    TaehvLayout,
     TaesdLayout,
     build_taesd_decoder,
+    build_tiny_autoencoder_decoder,
+    detect_taehv_layout,
     detect_taesd_layout,
+    detect_tiny_autoencoder_layout,
     is_tinier_taesd,
     taesd_decoder_state_dict,
+    tiny_autoencoder_state_dict,
 )
 from tests.fixtures.tiny_autoencoders import (
     TAEF2,
@@ -17,6 +25,7 @@ from tests.fixtures.tiny_autoencoders import (
     TAESD3,
     diffusers_weights,
     native_weights,
+    taehv_weights,
     tinier_weights,
 )
 
@@ -104,3 +113,68 @@ def test_what_is_not_exactly_a_taesd_decoder_is_not_detected(make) -> None:
 
     assert detect_taesd_layout(sd) is None
     assert not is_tinier_taesd(sd)
+
+
+TAEHV_LAYOUTS = [TAEW2_1, TAEW2_2, TAELTX2_3]
+
+
+@pytest.mark.parametrize("layout", TAEHV_LAYOUTS, ids=["taew2_1", "taew2_2", "taeltx"])
+def test_taehv_files_are_detected_from_shapes_alone_and_not_as_taesd(layout: TaehvLayout) -> None:
+    sd = _on_meta(taehv_weights(layout))
+
+    assert detect_taehv_layout(sd) == layout
+    assert detect_tiny_autoencoder_layout(sd) == layout
+    assert detect_taesd_layout(sd) is None
+
+
+@pytest.mark.parametrize("layout", LAYOUTS, ids=lambda layout: f"{layout.arch}-{layout.latent_channels}")
+def test_taesd_files_are_not_detected_as_taehv(layout: TaesdLayout) -> None:
+    native = native_weights(layout)
+
+    assert detect_taehv_layout(_on_meta(native)) is None
+    assert detect_taehv_layout(_on_meta(diffusers_weights(native))) is None
+    assert detect_tiny_autoencoder_layout(_on_meta(native)) == layout
+
+
+def test_the_taehv_decoder_weights_are_everything_but_the_encoder() -> None:
+    sd = taehv_weights(TAEW2_1)
+
+    decoder_sd = tiny_autoencoder_state_dict(sd, TAEW2_1)
+
+    assert not any(key.startswith("encoder.") for key in decoder_sd)
+    build_tiny_autoencoder_decoder(TAEW2_1).load_state_dict(decoder_sd, strict=True)
+
+
+def _taehv_with(**changes) -> dict[str, torch.Tensor]:
+    """A TAEHV checkpoint of a network no supported base uses: `TaehvLayout` fields changed from taew2_1's."""
+    return taehv_weights(TaehvLayout(**{**vars(TAEW2_1), **changes}))
+
+
+def _truncated_taehv() -> dict[str, torch.Tensor]:
+    sd = taehv_weights(TAEW2_2)
+    del sd["decoder.17.conv.4.bias"]
+    return sd
+
+
+def _extended_taehv() -> dict[str, torch.Tensor]:
+    sd = taehv_weights(TAEW2_2)
+    sd["decoder.23.weight"] = torch.zeros(3, 3, 3, 3)
+    return sd
+
+
+@pytest.mark.parametrize(
+    "make",
+    [
+        # taeh3: MiniMax H3 keeps its own preview path.
+        lambda: _taehv_with(latent_channels=24, patch_size=2),
+        # taehv1_5: 32 channels at 16x, which no architecture denoises in.
+        lambda: _taehv_with(latent_channels=32, patch_size=2),
+        # LTX's width with Wan's temporal strides.
+        lambda: _taehv_with(latent_channels=128, patch_size=4),
+        _truncated_taehv,
+        _extended_taehv,
+    ],
+    ids=["taeh3", "taehv1_5", "ltx-width-wan-strides", "truncated", "extended"],
+)
+def test_taehv_networks_no_supported_base_uses_are_not_detected(make) -> None:
+    assert detect_tiny_autoencoder_layout(_on_meta(make())) is None

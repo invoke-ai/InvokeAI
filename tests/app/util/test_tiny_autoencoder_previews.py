@@ -16,7 +16,7 @@ from invokeai.app.util.step_callback import render_linear_preview
 from invokeai.app.util.tiny_autoencoder_previews import TinyAutoencoderPreviews
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.stable_diffusion.extensions.preview import PipelineIntermediateState
-from invokeai.backend.tiny_autoencoder import preview
+from invokeai.backend.tiny_autoencoder.checkpoint import TAEW2_1, build_taehv_decoder
 from invokeai.backend.tiny_autoencoder.taesd import Decoder
 
 LOGGER_NAME = "test.tiny_autoencoder_previews"
@@ -218,9 +218,10 @@ def test_tae_frame_is_full_resolution_and_reports_the_linear_display_size() -> N
     assert image.mode == "RGB"
 
 
-def test_capped_tae_frame_still_reports_the_full_generation_size(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(preview, "MAX_PREVIEW_EDGE", 96)
-    previews = _previews(_services(_Store([_tae_config()]), _load()))
+def test_capped_tae_frame_still_reports_the_full_generation_size() -> None:
+    decoder = _decoder()
+    decoder.max_preview_edge = 96
+    previews = _previews(_services(_Store([_tae_config()]), _load(decoder)))
 
     image, size = previews.render(BaseModelType.StableDiffusion1, _sample(height=32, width=48))
 
@@ -258,9 +259,9 @@ def test_family_without_any_tae_is_told_so_rather_than_sent_to_the_starters(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     previews = _previews(_services(_Store([_tae_config()]), _load()))
-    wan_sample = torch.randn(1, 16, 8, 8, generator=torch.Generator().manual_seed(0))
+    cogview4_sample = torch.randn(1, 16, 8, 8, generator=torch.Generator().manual_seed(0))
 
-    previews.render(BaseModelType.Wan, wan_sample)
+    previews.render(BaseModelType.CogView4, cogview4_sample)
 
     [info] = _messages(caplog, logging.INFO)
     assert "has no Tiny AutoEncoder" in info and "starter" not in info
@@ -446,3 +447,36 @@ def test_frames_after_the_tae_fell_back_to_linear_return_to_the_stores_interval(
     # it are 0.15 s apart again, with each linear frame's 1 s of waiting not counted as a cost.
     assert [call["percentage"] for call in services.events.emitted] == [0.0, 0.1, 0.2, 0.3, 0.4]
     assert len(decodes) == 3
+
+
+def _wan_window(frames: int = 2) -> torch.Tensor:
+    """What the Wan video denoiser reports: the middle latent frame and the one before it."""
+    return torch.randn(1, 16, frames, 6, 8, generator=torch.Generator().manual_seed(3))
+
+
+def test_a_latent_window_renders_linearly_as_its_last_frame() -> None:
+    window = _wan_window()
+
+    image, size = render_linear_preview(BaseModelType.Wan, window)
+    last, last_size = render_linear_preview(BaseModelType.Wan, window[:, :, -1])
+
+    assert np.array_equal(np.asarray(image), np.asarray(last))
+    assert size == last_size == (64, 48)
+
+
+def test_a_latent_window_is_decoded_by_the_video_tae_of_its_space() -> None:
+    torch.manual_seed(0)
+    taew2_1 = build_taehv_decoder(TAEW2_1).eval()
+    config = SimpleNamespace(
+        key="taew2_1", name="TAEW2.1", type=ModelType.TinyAutoencoder, base=BaseModelType.Wan, latent_channels=16
+    )
+    previews = _previews(_services(_Store([config]), _load(taew2_1)))
+    window = _wan_window()
+
+    image, size = previews.render(BaseModelType.Wan, window)
+
+    with torch.inference_mode():
+        last = taew2_1.decode_video(window.transpose(1, 2))[0, -1]
+    expected = last.clamp(0, 1).mul(255).round().to(torch.uint8).permute(1, 2, 0).numpy()
+    assert np.array_equal(np.asarray(image), expected)
+    assert size == (64, 48)

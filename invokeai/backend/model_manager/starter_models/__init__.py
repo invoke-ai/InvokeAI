@@ -189,6 +189,7 @@ from invokeai.backend.model_manager.starter_models.ltx_2 import (
     ltx2_5_prompt_enhancer,
     ltx2_5_text_encoder_bf16,
     ltx2_5_text_encoder_int8,
+    taeltx2_3,
 )
 from invokeai.backend.model_manager.starter_models.minimax_h3 import (
     minimax_h3_components,
@@ -294,6 +295,8 @@ from invokeai.backend.model_manager.starter_models.types import (
     StarterModelWithoutDependencies,
 )
 from invokeai.backend.model_manager.starter_models.wan import (
+    taew2_1,
+    taew2_2,
     wan_22_5b_vae,
     wan_22_a14b_vae,
     wan_22_i2v_a14b_diffusers,
@@ -512,6 +515,8 @@ STARTER_MODELS: list[StarterModel] = [
     wan_22_t5_encoder,
     wan_22_a14b_vae,
     wan_22_5b_vae,
+    taew2_1,
+    taew2_2,
     wan_22_t2v_a14b_diffusers,
     wan_22_t2v_a14b_low_gguf_q4_k_m,
     wan_22_t2v_a14b_gguf_q4_k_m,
@@ -546,6 +551,7 @@ STARTER_MODELS: list[StarterModel] = [
     ltx2_5_components,
     ltx2_5_prompt_enhancer,
     ltx2_5_duration_head,
+    taeltx2_3,
     gemini_flash_image,
     gemini_pro_image_preview,
     gemini_3_1_flash_image_preview,

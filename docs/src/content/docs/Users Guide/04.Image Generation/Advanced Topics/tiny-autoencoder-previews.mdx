@@ -39,26 +39,33 @@ always and is identical with the setting on or off.
 | TAEF1 (FLUX.1 preview decoder) | FLUX.1, Z-Image |
 | TAEF2 (FLUX.2 preview decoder) | FLUX.2, ERNIE-Image |
 | TAEQI2.1 (Qwen-Image-2.1 preview decoder) | Qwen-Image-2.1 |
+| TAEW2.1 (Wan 2.1 VAE preview decoder) | Wan 2.2 T2V and I2V A14B, Qwen-Image, Qwen-Image Edit, Krea-2, Anima |
+| TAEW2.2 (Wan 2.2 TI2V-5B preview decoder) | Wan 2.2 TI2V-5B |
+| TAELTX2.3 (LTX-2.5 preview decoder) | LTX-2.5 |
 
 A TAE serves every family that denoises in its latent space, so you need only one per row. To install a TAE file
 you already have, see [Preview decoders](/users-guide/models/model-format-support/#preview-decoders-tiny-autoencoders)
 for the files InvokeAI accepts.
 
-FLUX.1, FLUX.2 and ERNIE-Image preview the image the model predicts, so the preview is clean from the first step.
-Z-Image, SD 3 and Qwen-Image-2.1 preview the current noisy latent: early previews show sharp noise, which clears as
-denoising proceeds. SD 1.x/2.x and SDXL depend on the scheduler: DDIM, DDPM, Euler, Euler a, Heun, LMS, KDPM2,
-KDPM2 a and DPM++ SDE report their prediction and preview cleanly; DPM++ 2M, 2M SDE, 3M and 2S, UniPC, DEIS, PNDM,
-LCM, TCD and ER-SDE preview the noisy latent.
+FLUX.1, FLUX.2, ERNIE-Image, Anima and LTX-2.5 preview the image the model predicts, so the preview is clean from
+the first step. Z-Image, SD 3, Qwen-Image-2.1, Qwen-Image, Krea-2 and Wan 2.2 preview the current noisy latent:
+early previews show sharp noise, which clears as denoising proceeds. SD 1.x/2.x and SDXL depend on the scheduler:
+DDIM, DDPM, Euler, Euler a, Heun, LMS, KDPM2, KDPM2 a and DPM++ SDE report their prediction and preview cleanly;
+DPM++ 2M, 2M SDE, 3M and 2S, UniPC, DEIS, PNDM, LCM, TCD and ER-SDE preview the noisy latent.
 
-All other families keep the linear preview: Qwen-Image, Qwen-Image Edit, Krea-2, Anima, CogView4, Ideogram 4,
-Wan 2.2 and LTX-2. MiniMax H3 previews with its own built-in decoder whatever this setting says.
+A video preview shows the middle frame of the clip. For Wan 2.2 the TAE decodes it together with the frame before
+it, which it needs as context for a sharp result; LTX-2.5 decodes the middle frame alone.
+
+CogView4 and Ideogram 4 keep the linear preview. MiniMax H3 always previews with its own built-in decoder, whatever
+this setting says.
 
 ## Cost and fallback
 
 Only the preview frames that are actually sent to the UI are decoded, between two denoising steps. Previews are at
-most 1024 pixels on their long edge; larger generations are previewed at reduced resolution and shown at full size.
-At that size, on an RTX 4090, a preview takes about 25 ms and about 0.65 GB of VRAM while it decodes (about 0.16 GB
-for Qwen-Image-2.1). Without a GPU a preview takes about 2 seconds, so TAE previews are not recommended on CPU-only
+most 1024 pixels on their long edge, and TAEW2.1 previews at most 512 pixels, because its decode would need about
+2 GB of VRAM at 1024×1024. Larger generations are previewed at reduced resolution and shown at full size. At
+1024 pixels, on an RTX 4090, a preview with one of the first six TAEs in the table takes about 25 ms and about 0.65 GB of VRAM while it decodes
+(about 0.16 GB for Qwen-Image-2.1). Without a GPU a preview takes about 2 seconds, so TAE previews are not recommended on CPU-only
 installs.
 
 InvokeAI spaces TAE preview frames so that previews cost at most about a tenth of the denoising time. On fast models
