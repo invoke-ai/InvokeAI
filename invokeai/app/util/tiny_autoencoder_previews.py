@@ -12,7 +12,7 @@ from PIL import Image
 from invokeai.app.util.step_callback import preview_frame, render_linear_preview
 from invokeai.backend.architectures import LatentSpace, resolve_latent_space
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.configs.tiny_autoencoder import is_tiny_autoencoder_supported
+from invokeai.backend.model_manager.configs.tiny_autoencoder import tiny_autoencoder_starters
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.tiny_autoencoder.decoder import TinyAutoencoderDecoder
@@ -206,10 +206,12 @@ class TinyAutoencoderPreviews:
         return self._services.model_manager.load.ram_cache.make_room_in_vram(missing) >= missing
 
     def _report_missing(self, base_model: BaseModelType, space: LatentSpace) -> None:
-        if is_tiny_autoencoder_supported(space):
+        starters = tiny_autoencoder_starters(space)
+        if starters:
+            install = " or ".join(f"the {s.name} starter model (listed under {s.base.value})" for s in starters)
             message = (
                 f"No installed Tiny AutoEncoder decodes {base_model.value} latents; using linear previews. "
-                "Install the matching Tiny AutoEncoder starter model."
+                f"Install {install}."
             )
         else:
             message = f"{base_model.value} has no Tiny AutoEncoder; using linear previews."

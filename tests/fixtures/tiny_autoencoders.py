@@ -60,7 +60,31 @@ def taehv_weights(layout: TaehvLayout, seed: int = 0, dtype: torch.dtype = torch
     torch.manual_seed(seed)
     decoder = build_taehv_decoder(layout)
     sd = {key: value.to(dtype).contiguous() for key, value in decoder.state_dict().items()}
-    # A token encoder: identification and loading must drop it whatever it holds.
-    sd["encoder.0.weight"] = torch.zeros(64, 3 * layout.patch_size**2, 3, 3, dtype=dtype)
-    sd["encoder.0.bias"] = torch.zeros(64, dtype=dtype)
+    # Identification and loading must drop the encoder whatever it holds; zeros at its real shapes.
+    sd |= {key: torch.zeros(shape, dtype=dtype) for key, shape in taehv_encoder_shapes(layout).items()}
     return sd
+
+
+def taehv_encoder_shapes(layout: TaehvLayout) -> dict[str, tuple[int, ...]]:
+    """The 64 encoder tensors of a published TAEHV file, transcribed from the taew2_1, taew2_2, taeltx_2 and
+    taeltx2_3 headers at madebyollin/taehv@62f7591: three 64-wide stages, each opened by a TPool 1x1 conv
+    (`64 * stride` inputs) and a stride-2 conv, with the decoder's temporal strides in reverse."""
+    shapes: dict[str, tuple[int, ...]] = {
+        "encoder.0.weight": (64, 3 * layout.patch_size**2, 3, 3),
+        "encoder.0.bias": (64,),
+    }
+    for pool, downscales in zip((2, 7, 12), reversed(layout.time_upscale), strict=True):
+        shapes[f"encoder.{pool}.conv.weight"] = (64, 64 * (2 if downscales else 1), 1, 1)
+        shapes[f"encoder.{pool + 1}.weight"] = (64, 64, 3, 3)
+        for block in range(pool + 2, pool + 5):
+            shapes |= {
+                f"encoder.{block}.conv.0.weight": (64, 128, 3, 3),
+                f"encoder.{block}.conv.0.bias": (64,),
+                f"encoder.{block}.conv.2.weight": (64, 64, 3, 3),
+                f"encoder.{block}.conv.2.bias": (64,),
+                f"encoder.{block}.conv.4.weight": (64, 64, 3, 3),
+                f"encoder.{block}.conv.4.bias": (64,),
+            }
+    shapes["encoder.17.weight"] = (layout.latent_channels, 64, 3, 3)
+    shapes["encoder.17.bias"] = (layout.latent_channels,)
+    return shapes

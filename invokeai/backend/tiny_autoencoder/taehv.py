@@ -110,9 +110,11 @@ class TaehvDecoder(TinyAutoencoderDecoder):
         self.t_upscale = t[0] * t[1] * t[2]
         self.frames_to_trim = self.t_upscale - 1
         # Every latent frame decodes `t_upscale` frames through the full-resolution stages, which is what an
-        # 8x decoder pays for: taew2_1 needs 2.1 GB and 63 ms at 1024 but 536 MB and 22 ms at 512 (RTX 4090,
-        # fp16). The 16x and 32x decoders run those stages at a half or a quarter of the edge and stay at
-        # 536 MB (taew2_2) and 266 MB (taeltx2_3) at 1024, under TAESD's ~640 MB.
+        # 8x decoder pays for. Measured for one latent (RTX 4090, fp16, `decode_preview`): taew2_1 needs
+        # 2.1 GB and 63 ms at 1024 but 536 MB and 22 ms at 512; the 16x and 32x decoders run those stages
+        # at a half or a quarter of the edge and stay at 536 MB (taew2_2) and 266 MB (taeltx2_3) at 1024,
+        # under TAESD's ~640 MB. A window of latent frames costs about that per frame: Wan video's
+        # two-frame window doubles the memory (see `PREVIEW_LATENT_WINDOW` in `wan_video_denoise.py`).
         self.max_preview_edge = 512 if patch_size == 1 else 1024
 
     def _decode_frames(self, x: torch.Tensor) -> torch.Tensor:

@@ -14,9 +14,9 @@ Scale factors mirror the full VAE: 16x spatial (8x upsampling + 2x pixel shuffle
 temporal (TGrow strides 1/2/2), 24 latent channels. The ``decoder.*`` ``nn.Sequential``
 indices are a state-dict contract with the released ``taeh3.safetensors`` — do not reorder.
 
-H3 keeps its own preview path (``load_remote_model``, ``decode_preview_frame`` over a latent window)
-rather than the ``tiny_autoencoder`` model type: its frames are taken untrimmed from a window, not as
-one trimmed frame per latent.
+H3 keeps its own preview path rather than the ``tiny_autoencoder`` model type: the denoise node fetches
+the weights with ``load_remote_model``, so nothing is installed, and decodes its latent window itself,
+without the preview cap or the frame pacing ``TinyAutoencoderPreviews`` applies.
 """
 
 from pathlib import Path
@@ -32,7 +32,6 @@ TAEH3_PREVIEW_MODEL_URL = (
 )
 
 TAEH3_LATENT_CHANNELS = 24
-TAEH3_TEMPORAL_UPSCALE = 4
 _PIXEL_SHUFFLE_PATCH = 2
 
 

@@ -92,7 +92,7 @@ def _single_tae(result: ModelClassificationResult) -> Any:
         ("preview.safetensors", TAEQI2_1, True, BaseModelType.QwenImage21),
         ("taew2_1.safetensors", TAEW2_1, True, BaseModelType.Wan),
         ("preview.safetensors", TAEW2_2, True, BaseModelType.Wan),
-        ("preview.safetensors", TAELTX2_3, True, BaseModelType.LTX2),
+        ("taeltx2_3.safetensors", TAELTX2_3, True, BaseModelType.LTX2),
     ],
 )
 def test_each_published_tae_is_filed_under_its_base_and_nothing_else_matches(
@@ -178,14 +178,61 @@ def test_a_tae_in_a_file_type_the_loader_does_not_read_is_not_installed_as_one(t
     assert result.config is None or result.config.type is not ModelType.TinyAutoencoder
 
 
-def test_a_taehv_network_shared_with_unsupported_models_is_refused_unless_named(tmp_path: Path) -> None:
-    """taew2_1's network is also published for HunyuanVideo and CogVideoX, whose latents it cannot preview."""
-    for filename in ("preview.safetensors", "taehv.safetensors", "taecvx.safetensors"):
-        result = _identify(_write(tmp_path / filename, TAEW2_1))
+_TAEW2_1_URL = (
+    "https://github.com/madebyollin/taehv/raw/62f7591f59dfbb4c3c02b7a621d180a9eeaba26c/safetensors/taew2_1.safetensors"
+)
 
-        assert result.config is None, filename
-        assert result.invalid_matches
-        assert all("HunyuanVideo" in str(e) and "taew2_1" in str(e) for e in result.invalid_matches)
+
+@pytest.mark.parametrize(
+    ("layout", "twins"),
+    [(TAEW2_1, ("HunyuanVideo (taehv)", "CogVideoX (taecvx)")), (TAELTX2_3, ("LTX-2 (taeltx_2)",))],
+    ids=["taew2_1", "taeltx2_3"],
+)
+def test_a_network_with_unsupported_twins_is_refused_unless_named_or_overridden(
+    tmp_path: Path, layout: TaehvLayout, twins: tuple[str, ...]
+) -> None:
+    """taew2_1's network is also published as taehv and taecvx, taeltx2_3's as taeltx_2."""
+    result = _identify(_write(tmp_path / "preview.safetensors", layout))
+
+    assert result.config is None
+    assert result.invalid_matches
+    assert all(all(twin in str(e) for twin in twins) and "starter models" in str(e) for e in result.invalid_matches)
+
+
+@pytest.mark.parametrize(
+    ("filename", "refusal"),
+    [("taehv.safetensors", "HunyuanVideo preview decoder"), ("taecvx_decoder.pth", "CogVideoX preview decoder")],
+)
+@pytest.mark.parametrize("override", [{}, {"base": BaseModelType.Wan.value}], ids=["no-override", "wan-override"])
+def test_a_file_named_for_a_hunyuanvideo_or_cogvideox_twin_is_refused_whatever_the_override(
+    tmp_path: Path, filename: str, refusal: str, override: dict[str, Any]
+) -> None:
+    path = tmp_path / filename
+    if path.suffix == ".pth":
+        torch.save(taehv_weights(TAEW2_1), path)
+    else:
+        _write(path, TAEW2_1)
+
+    result = _identify(path, **override)
+
+    assert result.config is None
+    assert result.invalid_matches
+    assert all(refusal in str(e) and "rename" not in str(e) for e in result.invalid_matches)
+
+
+def test_the_taew2_1_starter_url_names_its_file_not_the_taehv_repository(tmp_path: Path) -> None:
+    """`.../madebyollin/taehv/raw/<sha>/safetensors/taew2_1.safetensors`: the last segment is the most specific."""
+    path = _write(tmp_path / "preview.safetensors", TAEW2_1)
+
+    config = _single_tae(_identify(path, source=_TAEW2_1_URL, source_type="url"))
+
+    assert (config.base, config.latent_channels) == (BaseModelType.Wan, 16)
+
+
+def test_an_ltx_2_override_files_an_unnamed_taeltx2_3(tmp_path: Path) -> None:
+    path = _write(tmp_path / "preview.safetensors", TAELTX2_3)
+
+    assert _single_tae(_identify(path, base=BaseModelType.LTX2.value)).base is BaseModelType.LTX2
 
 
 def test_a_wan_override_files_an_unnamed_taew2_1(tmp_path: Path) -> None:

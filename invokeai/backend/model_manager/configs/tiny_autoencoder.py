@@ -5,13 +5,20 @@ A TAE decodes the latents an architecture denoises in, so a record is filed unde
 Only single files are TAEs here: a diffusers `AutoencoderTiny` folder stays a VAE, as it always was.
 
 The weights fix the latent width, the compression and the decoder architecture. Some networks are not
-specific to one base: 4 channels serve SD 1 and SDXL, 16 serve SD3 and FLUX.1, and taew2_1's network is
-also published for HunyuanVideo and CogVideoX latents. There an explicit `base` override decides, else
-the TAE's published name. A file that names none of them is refused rather than guessed: a wrong guess
-would install cleanly and render every preview in wrong colours.
+specific to one base or one TAE: 4 channels serve SD 1 and SDXL, 16 serve SD3 and FLUX.1, taew2_1's network
+is also published as taehv (HunyuanVideo) and taecvx (CogVideoX), and taeltx2_3's as taeltx_2 (LTX-2).
+There an explicit `base` override decides, else the TAE's published name. A file that names none of them
+is refused rather than guessed: a wrong guess would install cleanly and render every preview in wrong
+colours. A file named for one of the unsupported twins is refused whatever the override says.
+
+Names are read from the most specific path segment first (`name_components`, then each component's
+segments from the last), so the TAEW2.1 starter's `.../madebyollin/taehv/raw/<sha>/safetensors/
+taew2_1.safetensors` is named by its file, not by the `taehv` repository it is published in.
 """
 
 import re
+from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import ClassVar, Literal, Self
 
 from pydantic import Field
@@ -27,6 +34,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     raise_if_not_file,
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
+from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.tiny_autoencoder.checkpoint import (
     TAELTX2_3,
@@ -51,37 +59,80 @@ _TAE_NAMES: tuple[tuple[str, BaseModelType, int], ...] = (
     ("taew2_2", BaseModelType.Wan, 48),
     ("taeltx2_3", BaseModelType.LTX2, 128),
 )
-_TAE_NAME_PATTERNS = tuple(
-    (base, re.compile(rf"(?<![a-z0-9]){re.escape(name)}(?![a-z0-9])")) for name, base, _ in _TAE_NAMES
-)
-
-# taeltx_2 (for LTX-2's VAE) has taeltx2_3's network, but on LTX-2.5 latents it scored 11.0 dB against the
-# VAE, below the linear preview's 26.6 (taeltx2_3: 37.8), so its name refuses it. `taeltx2` without the
-# `_3` counts as well.
-_TAELTX_2_NAME = re.compile(r"(?<![a-z0-9])taeltx_?2(?![a-z0-9])(?!_3(?![a-z0-9]))")
 
 
-def _names_taeltx_2(components: tuple[str, ...]) -> bool:
-    """Whether the most specific name component that names a TAE names taeltx_2."""
-    for component in components:
-        lowered = component.lower()
-        if _TAELTX_2_NAME.search(lowered):
-            return True
-        if any(pattern.search(lowered) for _, pattern in _TAE_NAME_PATTERNS):
-            return False
-    return False
+def _name_pattern(name: str) -> re.Pattern[str]:
+    return re.compile(rf"(?<![a-z0-9]){re.escape(name)}(?![a-z0-9])")
 
 
-_UNSUPPORTED_TWINS: dict[TinyAutoencoderLayout, tuple[str, ...]] = {
-    TAEW2_1: ("HunyuanVideo (taehv)", "CogVideoX (taecvx)"),
+_TAE_NAME_PATTERNS = tuple(_name_pattern(name) for name, _, _ in _TAE_NAMES)
+
+
+@dataclass(frozen=True)
+class _Twin:
+    """A published TAE with a supported layout's exact network, for latents InvokeAI does not preview with it."""
+
+    label: str
+    pattern: re.Pattern[str]
+    refusal: str
+
+
+_TWINS: dict[TinyAutoencoderLayout, tuple[_Twin, ...]] = {
+    TAEW2_1: (
+        _Twin(
+            "HunyuanVideo (taehv)",
+            _name_pattern("taehv"),
+            "taehv is the HunyuanVideo preview decoder, which InvokeAI does not support. Wan, Qwen-Image, "
+            "Krea-2 and Anima previews use taew2_1: install the TAEW2.1 starter model.",
+        ),
+        _Twin(
+            "CogVideoX (taecvx)",
+            _name_pattern("taecvx"),
+            "taecvx is the CogVideoX preview decoder, which InvokeAI does not support. Wan, Qwen-Image, "
+            "Krea-2 and Anima previews use taew2_1: install the TAEW2.1 starter model.",
+        ),
+    ),
+    # On LTX-2.5 latents taeltx_2 scored 11.0 dB against the VAE, below the linear preview's 26.6
+    # (taeltx2_3: 37.8). `taeltx2` without the `_3` counts as the same name.
+    TAELTX2_3: (
+        _Twin(
+            "LTX-2 (taeltx_2)",
+            re.compile(r"(?<![a-z0-9])taeltx_?2(?![a-z0-9])(?!_3(?![a-z0-9]))"),
+            "taeltx_2 targets the LTX-2 VAE; LTX-2.5 needs taeltx2_3. Install TAELTX2.3 from the starter models.",
+        ),
+    ),
 }
-"""Published TAEs with exactly a supported layout's network, trained on latents InvokeAI does not run."""
 
 
-def _tae_named_in(components: tuple[str, ...]) -> BaseModelType | None:
-    """The base named by the most specific name component that names exactly one."""
+def _name_segments(components: tuple[str, ...]) -> Iterator[str]:
+    """The name evidence, most specific first: each component's path segments from the last."""
     for component in components:
-        named = {base for base, pattern in _TAE_NAME_PATTERNS if pattern.search(component.lower())}
+        for segment in reversed(re.split(r"[/\\:]+", component.lower())):
+            if segment:
+                yield segment
+
+
+def named_tiny_autoencoder(components: tuple[str, ...]) -> tuple[str, BaseModelType, int] | None:
+    """The published TAE `(name, base, latent channels)` the most specific segment naming exactly one names."""
+    for segment in _name_segments(components):
+        named = [
+            entry for entry, pattern in zip(_TAE_NAMES, _TAE_NAME_PATTERNS, strict=True) if pattern.search(segment)
+        ]
+        if len(named) == 1:
+            return named[0]
+    return None
+
+
+def _name_verdict(layout: TinyAutoencoderLayout, components: tuple[str, ...]) -> BaseModelType | _Twin | None:
+    """What the most specific segment naming a supported TAE or one of `layout`'s twins says the file is."""
+    twins = _TWINS.get(layout, ())
+    for segment in _name_segments(components):
+        twin = next((t for t in twins if t.pattern.search(segment)), None)
+        if twin is not None:
+            return twin
+        named = {
+            entry[1] for entry, pattern in zip(_TAE_NAMES, _TAE_NAME_PATTERNS, strict=True) if pattern.search(segment)
+        }
         if len(named) == 1:
             return named.pop()
     return None
@@ -93,11 +144,11 @@ def _unnamed_message(layout: TinyAutoencoderLayout, candidates: frozenset[BaseMo
         bases = " or ".join(sorted(b.value for b in candidates))
         reason = f"reads {layout.latent_channels}-channel latents, which {bases} share,"
     else:
-        twins = " and ".join(_UNSUPPORTED_TWINS[layout])
-        reason = f"shares its network with the {twins} decoders, which InvokeAI does not run,"
+        twins = " and ".join(twin.label for twin in _TWINS[layout])
+        reason = f"has the network of {names} and of the {twins} decoders,"
     return (
-        f"This preview decoder {reason} and its name does not say which it is for. Install it from the "
-        f"starter models, or name the file after the TAE it is ({names})."
+        f"This preview decoder {reason} and nothing in its name says which it is. Install it from the starter "
+        f"models, or, if it is {names}, name the file after it."
     )
 
 
@@ -142,17 +193,15 @@ class TinyAutoencoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
                 )
             raise NotAMatchError(f"a {layout.latent_channels}-channel {layout.arch} TAE is not for {base.value}")
 
-        if layout == TAELTX2_3 and _names_taeltx_2(name_components(mod, override_fields)):
-            raise InvalidMatchError(
-                "taeltx_2 targets the LTX-2 VAE; LTX-2.5 needs taeltx2_3. Install TAELTX2.3 from the starter models."
-            )
+        verdict = _name_verdict(layout, name_components(mod, override_fields))
+        if isinstance(verdict, _Twin):
+            raise InvalidMatchError(verdict.refusal)
 
-        if (len(candidates) > 1 or layout in _UNSUPPORTED_TWINS) and override_fields.get("base") is None:
-            named = _tae_named_in(name_components(mod, override_fields))
-            if named not in candidates:
+        if (len(candidates) > 1 or layout in _TWINS) and override_fields.get("base") is None:
+            if verdict not in candidates:
                 raise InvalidMatchError(_unnamed_message(layout, candidates))
-            if named is not base:
-                raise NotAMatchError(f"named for {named.value}, not {base.value}")
+            if verdict is not base:
+                raise NotAMatchError(f"named for {verdict.value}, not {base.value}")
 
         return cls(**override_fields, latent_channels=layout.latent_channels)
 
@@ -225,10 +274,13 @@ def _bases_fitting(layout: TinyAutoencoderLayout) -> frozenset[BaseModelType]:
     return frozenset(fitting)
 
 
-def is_tiny_autoencoder_supported(space: LatentSpace) -> bool:
-    """Whether InvokeAI identifies a TAE that decodes `space`, i.e. whether there is one worth installing.
-
-    Every supported `(base, latent channels)` has a starter model, so this is also whether a starter
-    serves the space.
-    """
-    return any(latent_space_with_channels(_base_of(config), space.channels) is space for config in _CONFIG_CLASSES)
+def tiny_autoencoder_starters(space: LatentSpace) -> list[StarterModel]:
+    """The starter models that install a TAE for `space`, read from the catalog by the TAE each one installs."""
+    starters = []
+    for starter in STARTER_MODELS:
+        if starter.type is not ModelType.TinyAutoencoder:
+            continue
+        named = named_tiny_autoencoder((starter.source,))
+        if named is not None and latent_space_with_channels(starter.base, named[2]) is space:
+            starters.append(starter)
+    return starters

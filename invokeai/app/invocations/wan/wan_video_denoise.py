@@ -56,6 +56,14 @@ from invokeai.backend.wan.sampling_utils import (
 # the middle frame decoded alone is no better than the linear preview (RTX 4090, PSNR against the VAE
 # on the callback latents: Wan 16 ch 20.3 -> 34.9 dB, Wan 48 ch 19.3 -> 27.5 dB). The linear preview
 # reads only the last frame of the window, so it is unchanged.
+#
+# The window doubles the decode's memory, against a single latent (RTX 4090, fp16, `decode_preview`):
+#   taew2_1 (capped at 512):  832x480 599 vs 302 MiB, 11.8 vs 7.1 ms;  1280x720 599 vs 302 MiB, 9.9 vs 6.4 ms;
+#                             1024x1024 1064 vs 536 MiB, 17.2 vs 10.4 ms
+#   taew2_2 (capped at 1024): 832x480 407 vs 205 MiB, 12.6 vs 11.7 ms; 1280x720 599 vs 302 MiB, 15.6 vs 15.1 ms;
+#                             1024x1024 1064 vs 536 MiB, 31.9 vs 23.5 ms
+# A Wan video step takes seconds, and the ~1 GB transient fits the denoise's working-memory reserve, so the
+# decoders' preview caps stay as they are.
 PREVIEW_LATENT_WINDOW = 2
 
 

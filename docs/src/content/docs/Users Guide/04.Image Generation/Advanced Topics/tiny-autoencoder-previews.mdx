@@ -31,6 +31,11 @@ always and is identical with the setting on or off.
    (search for *preview decoder*). Each one is 5 to 31 MB.
 </Steps>
 
+<Aside type="tip">
+TAEW2.1 is filed under Wan. Filtering the starter models by Qwen-Image, Krea-2 or Anima hides it; searching for
+*TAEW2.1* or *preview decoder* finds it.
+</Aside>
+
 | Starter model | Previews for |
 |---|---|
 | TAESD (SD 1.x/2.x preview decoder) | SD 1.x, SD 2.x |
@@ -61,12 +66,23 @@ this setting says.
 
 ## Cost and fallback
 
-Only the preview frames that are actually sent to the UI are decoded, between two denoising steps. Previews are at
-most 1024 pixels on their long edge, and TAEW2.1 previews at most 512 pixels, because its decode would need about
-2 GB of VRAM at 1024×1024. Larger generations are previewed at reduced resolution and shown at full size. At
-1024 pixels, on an RTX 4090, a preview with one of the first six TAEs in the table takes about 25 ms and about 0.65 GB of VRAM while it decodes
-(about 0.16 GB for Qwen-Image-2.1). Without a GPU a preview takes about 2 seconds, so TAE previews are not recommended on CPU-only
-installs.
+Only the preview frames that are actually sent to the UI are decoded, between two denoising steps. Previews are
+capped on their long edge: at 512 pixels for TAEW2.1, whose decode would need about 2 GB of VRAM at 1024×1024, and
+at 1024 pixels for every other TAE. Larger generations are previewed at reduced resolution and shown at full size.
+
+Measured on an RTX 4090 at the cap:
+
+| TAE | Time per preview | VRAM while it decodes |
+|---|---|---|
+| TAESD, TAESDXL, TAESD3, TAEF1, TAEF2 | about 25 ms | about 0.65 GB |
+| TAEQI2.1 | about 25 ms | about 0.16 GB |
+| TAEW2.1 (512 pixels) | about 22 ms | about 0.54 GB |
+| TAEW2.2 | about 32 ms | about 0.54 GB |
+| TAELTX2.3 | about 29 ms | about 0.27 GB |
+
+A Wan 2.2 video preview, which decodes two latent frames, takes under about 32 ms and about 0.6 GB of VRAM from
+832×480 to 1280×720, and up to about 1.06 GB at 1024×1024. Without a GPU a preview takes about 2 seconds, so TAE
+previews are not recommended on CPU-only installs.
 
 InvokeAI spaces TAE preview frames so that previews cost at most about a tenth of the denoising time. On fast models
 the preview therefore updates a few times per second rather than after every step. In practice the cost is lower: on
@@ -75,7 +91,8 @@ without, roughly 6% more.
 
 InvokeAI falls back to the linear preview by itself, and the generation always continues:
 
-- **No matching TAE installed:** linear previews. The server log names the family once.
+- **No matching TAE installed:** linear previews. The server log says once which starter model to install, and
+  under which family the starter list shows it.
 - **The TAE does not fit in VRAM** next to the running model: linear previews for that generation, noted once in
   the server log. This is the case whenever the main model is only partially loaded into VRAM, as on low-VRAM cards.
 - **Loading or decoding the TAE fails:** a warning in the server log, then linear previews for the rest of that

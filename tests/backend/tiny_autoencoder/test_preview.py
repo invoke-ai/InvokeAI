@@ -14,7 +14,7 @@ from invokeai.backend.model_manager.configs.tiny_autoencoder import (
     TinyAutoencoder_Checkpoint_SD3_Config,
     TinyAutoencoder_Checkpoint_SDXL_Config,
     TinyAutoencoder_Checkpoint_Wan_Config,
-    is_tiny_autoencoder_supported,
+    tiny_autoencoder_starters,
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.tiny_autoencoder.checkpoint import TAELTX2_3, TAEW2_1, TAEW2_2, build_taehv_decoder
@@ -202,21 +202,21 @@ def test_the_choice_among_fitting_taes_is_by_name_then_key_whatever_the_order() 
 
 
 @pytest.mark.parametrize(
-    ("base", "channels", "supported"),
+    ("base", "channels", "starters"),
     [
-        (BaseModelType.StableDiffusion2, 4, True),
-        (BaseModelType.ZImage, 16, True),
-        (BaseModelType.Ideogram4, 32, True),
-        (BaseModelType.QwenImage21, 64, True),
-        (BaseModelType.QwenImage, 16, True),
-        (BaseModelType.Wan, 48, True),
-        (BaseModelType.LTX2, 128, True),
-        (BaseModelType.CogView4, 16, False),
-        (BaseModelType.MiniMaxH3, 24, False),
+        (BaseModelType.StableDiffusion2, 4, ["TAESD (SD 1.x/2.x preview decoder)"]),
+        (BaseModelType.ZImage, 16, ["TAEF1 (FLUX.1 preview decoder)"]),
+        (BaseModelType.Ideogram4, 32, ["TAEF2 (FLUX.2 preview decoder)"]),
+        (BaseModelType.QwenImage21, 64, ["TAEQI2.1 (Qwen-Image-2.1 preview decoder)"]),
+        (BaseModelType.Anima, 16, ["TAEW2.1 (Wan 2.1 VAE preview decoder)"]),
+        (BaseModelType.Wan, 48, ["TAEW2.2 (Wan 2.2 TI2V-5B preview decoder)"]),
+        (BaseModelType.LTX2, 128, ["TAELTX2.3 (LTX-2.5 preview decoder)"]),
+        (BaseModelType.CogView4, 16, []),
+        (BaseModelType.MiniMaxH3, 24, []),
     ],
 )
-def test_whether_any_tae_decodes_a_space(base: BaseModelType, channels: int, supported: bool) -> None:
-    assert is_tiny_autoencoder_supported(_space(base, channels)) is supported
+def test_the_starters_that_install_a_tae_for_a_space(base: BaseModelType, channels: int, starters: list[str]) -> None:
+    assert [starter.name for starter in tiny_autoencoder_starters(_space(base, channels))] == starters
 
 
 @pytest.mark.parametrize(
@@ -270,10 +270,11 @@ def _first_conv_input(decoder: TinyAutoencoderDecoder, latent: torch.Tensor) -> 
     [
         # 1024 pixels at 8x: taew2_1 caps at 512, so the latent is halved.
         (TAEW2_1, (16, 128, 96), (1, 16, 64, 48)),
-        # 1024 pixels at 16x: taew2_2 decodes it as it is.
+        # 1024 pixels at 16x and 32x: taew2_2 and taeltx2_3 decode them as they are.
         (TAEW2_2, (48, 64, 48), (1, 48, 64, 48)),
+        (TAELTX2_3, (128, 32, 24), (1, 128, 32, 24)),
     ],
-    ids=["taew2_1", "taew2_2"],
+    ids=["taew2_1", "taew2_2", "taeltx2_3"],
 )
 def test_each_decoder_brings_its_own_preview_edge(layout, latent: tuple[int, ...], decoded: tuple[int, ...]) -> None:
     decoder = build_taehv_decoder(layout).eval()
@@ -306,21 +307,27 @@ def test_a_one_frame_window_decodes_like_the_single_latent(taew2_1: TinyAutoenco
     )
 
 
-def test_a_capped_window_keeps_its_frames(taew2_1: TinyAutoencoderDecoder, monkeypatch) -> None:
-    """Area pooling a 5-D window pools in time too, unless the size keeps T."""
-    seen: list[tuple[int, ...]] = []
+def test_a_capped_window_pools_each_frame_in_space_and_keeps_them_all(
+    taew2_1: TinyAutoencoderDecoder, monkeypatch
+) -> None:
+    seen: list[torch.Tensor] = []
 
     def record(window: torch.Tensor) -> torch.Tensor:
-        seen.append(tuple(window.shape))
+        seen.append(window)
         raise _Stop
 
     monkeypatch.setattr(taew2_1, "max_preview_edge", 16)
     monkeypatch.setattr(taew2_1, "decode_window", record)
+    window = _latent(1, 16, 2, 4, 4)
 
     with pytest.raises(_Stop):
-        decode_preview(taew2_1, _latent(1, 16, 2, 4, 4))
+        decode_preview(taew2_1, window)
 
-    assert seen == [(1, 16, 2, 2, 2)]
+    [pooled] = seen
+    assert pooled.shape == (1, 16, 2, 2, 2)
+    for frame in range(2):
+        expected = torch.nn.functional.avg_pool2d(window[:, :, frame], 2)
+        torch.testing.assert_close(pooled[:, :, frame], expected)
 
 
 def test_a_taesd_decoder_refuses_a_latent_window(taesd: TaesdDecoder) -> None:

@@ -480,3 +480,15 @@ def test_a_latent_window_is_decoded_by_the_video_tae_of_its_space() -> None:
     expected = last.clamp(0, 1).mul(255).round().to(torch.uint8).permute(1, 2, 0).numpy()
     assert np.array_equal(np.asarray(image), expected)
     assert size == (64, 48)
+
+
+def test_a_missing_tae_names_the_starter_of_its_space_even_under_another_base(caplog: pytest.LogCaptureFixture) -> None:
+    """Anima denoises in the Wan 2.1 VAE's space, whose TAE is filed under Wan in the starter list."""
+    previews = _previews(_services(_Store([]), _load()))
+    anima_sample = torch.randn(1, 16, 8, 8, generator=torch.Generator().manual_seed(0))
+
+    previews.render(BaseModelType.Anima, anima_sample)
+
+    [info] = _messages(caplog, logging.INFO)
+    assert "anima" in info
+    assert "the TAEW2.1 (Wan 2.1 VAE preview decoder) starter model (listed under wan)" in info

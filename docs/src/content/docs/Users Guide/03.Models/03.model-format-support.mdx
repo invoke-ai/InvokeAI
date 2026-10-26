@@ -118,16 +118,18 @@ decoder together (`diffusion_pytorch_model.safetensors`, `taef2.safetensors`, `t
 TAEs (TAEHV: TAEW2.1, TAEW2.2, TAELTX2.3) load as published in madebyollin's `taehv` repository, one file with
 encoder and decoder.
 
-Some networks are not specific to one model. TAESD and TAESDXL read the same 4-channel latents with the same network,
-and so do TAESD3 and TAEF1 with 16 channels; TAEW2.1's network is also published as `taehv` (HunyuanVideo) and
-`taecvx` (CogVideoX). For these the file name, its folder name or the download source has to name the TAE
-(`taesd`, `taesdxl`, `taesd3`, `taef1` or `taew2_1`); a file that names none of them is refused (**R**). An
-install that sets the base explicitly, as the starter models do, needs no name.
+Some networks are not specific to one model. TAESD and TAESDXL read the same 4-channel latents with the same
+network, and so do TAESD3 and TAEF1 with 16 channels. TAEW2.1's network is also published as `taehv`
+(HunyuanVideo) and `taecvx` (CogVideoX), and TAELTX2.3's as `taeltx_2` (LTX-2). For these six the file name, its
+folder name or the download source has to name the TAE (`taesd`, `taesdxl`, `taesd3`, `taef1`, `taew2_1` or
+`taeltx2_3`); a file that names none of them is refused (**R**). An install that sets the base explicitly, as the
+starter models do, needs no name. TAEF2, TAEQI2.1 and TAEW2.2 are recognized by their network alone.
 
 - **R:** the "tinier" TAEQI2.1 (`taeqi2_1_tinier`); the message asks for `taeqi2_1.safetensors` instead.
-- **R:** `taeltx_2`, the TAE for LTX-2's VAE. It has TAELTX2.3's network but previews LTX-2.5 worse than the linear
-  preview; the message asks for TAELTX2.3.
-- **R:** `taehv` and `taecvx`, and any unnamed file with TAEW2.1's network.
+- **R:** a file named `taeltx_2`, the TAE for LTX-2's VAE, even with an explicit base. It previews LTX-2.5 worse than
+  the linear preview; the message asks for TAELTX2.3.
+- **R:** a file named `taehv` or `taecvx`, even with an explicit base. They decode HunyuanVideo and CogVideoX
+  latents, which InvokeAI does not run.
 - **Not recognized:** other Tiny AutoEncoders, such as the 32× Sana decoder, `taeh3` (MiniMax H3 uses its own
   built-in preview decoder), `taehv1_5` and the "super" TAEHV decoders. They install as unknown models.
 - A Diffusers `AutoencoderTiny` folder (for example the `madebyollin/taesdxl` repository as a whole) installs as a

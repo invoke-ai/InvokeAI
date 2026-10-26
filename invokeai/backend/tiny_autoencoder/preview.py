@@ -50,8 +50,14 @@ def decode_preview(
         if longest_edge > decoder.max_preview_edge:
             scale = decoder.max_preview_edge / longest_edge
             size = (max(1, math.floor(height * scale)), max(1, math.floor(width * scale)))
-            # A window keeps its frames: area pooling over a size of T is the identity in time.
-            latents = F.interpolate(latents, size=(*latents.shape[2:-2], *size), mode="area")
+            if latents.dim() == 5:
+                # A window's frames are folded into the batch, so they are pooled in space only and through
+                # the same 2-D path as single latents (3-D adaptive pooling is not verified on every backend).
+                frames = latents.transpose(1, 2)
+                pooled = F.interpolate(frames.flatten(0, 1), size=size, mode="area")
+                latents = pooled.unflatten(0, frames.shape[:2]).transpose(1, 2)
+            else:
+                latents = F.interpolate(latents, size=size, mode="area")
         image = decoder.decode_window(latents) if latents.dim() == 5 else decoder(latents)
         pixels = image[0, :3].clamp(0, 1).mul(255).round().to(torch.uint8).permute(1, 2, 0).cpu()
     return Image.fromarray(pixels.numpy())

@@ -38,10 +38,3 @@ def test_taeh3_frames_are_unchanged() -> None:
     torch.testing.assert_close(frames.mean(dim=(2, 3, 4))[0], torch.tensor(expected_frame_means), rtol=0, atol=2e-5)
     torch.testing.assert_close(frames[0, :, 0, 5, 7], torch.tensor(expected_pixels), rtol=0, atol=2e-5)
     torch.testing.assert_close(frames[0, -1, :, 20, 30], torch.tensor(expected_last_rgb), rtol=0, atol=2e-5)
-
-
-def test_the_taeh3_preview_frame_is_still_the_last_untrimmed_frame() -> None:
-    decoder = _reference_decoder()
-    latents = torch.randn(1, 24, 2, 2, 3, generator=torch.Generator().manual_seed(1))
-
-    torch.testing.assert_close(decoder.decode_preview_frame(latents), decoder.decode(latents)[0, -1], rtol=0, atol=0)
