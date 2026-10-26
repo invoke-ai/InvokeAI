@@ -22,6 +22,7 @@ from invokeai.app.services.events.events_common import (
     InvocationErrorEvent,
     InvocationProgressEvent,
     InvocationStartedEvent,
+    ModelInstallPausedEvent,
     ModelInstallStartedEvent,
 )
 from invokeai.app.services.model_install.model_install_common import URLModelSource
@@ -192,19 +193,22 @@ async def test_model_load_events_are_emitted_only_to_triggering_user() -> None:
 
 
 @pytest.mark.anyio
-async def test_model_install_events_are_emitted_only_to_admins() -> None:
-    from invokeai.app.services.events.events_common import ModelInstallStartedEvent
-
+@pytest.mark.parametrize(
+    ("event_class", "event_name"),
+    [
+        (ModelInstallStartedEvent, "model_install_started"),
+        (ModelInstallPausedEvent, "model_install_paused"),
+    ],
+)
+async def test_model_install_events_are_emitted_only_to_admins(event_class: type, event_name: str) -> None:
     socketio = SocketIO(FastAPI())
     socketio._sio.emit = AsyncMock()
 
-    event = ModelInstallStartedEvent(id=1, source={"type": "url", "url": "https://example.com/model.safetensors"})
+    event = event_class(id=1, source={"type": "url", "url": "https://example.com/model.safetensors"})
 
-    await socketio._handle_model_event(("model_install_started", event))
+    await socketio._handle_model_event((event_name, event))
 
-    socketio._sio.emit.assert_awaited_once_with(
-        event="model_install_started", data=event.model_dump(mode="json"), room="admin"
-    )
+    socketio._sio.emit.assert_awaited_once_with(event=event_name, data=event.model_dump(mode="json"), room="admin")
 
 
 @pytest.mark.anyio

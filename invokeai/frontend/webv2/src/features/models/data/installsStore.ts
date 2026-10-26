@@ -90,6 +90,29 @@ let nextOutcomeId = 1;
 
 const progressByJobId = createKeyedTransientStore<number, InstallDownloadProgress>();
 const rateSamplesByJobId = new Map<number, { bytes: number; at: number }>();
+/**
+ * Latest locally known status per job, from a socket event or an action result, stamped with a sequence. A list
+ * request that started before the stamp may predate that status, so it must not overwrite it; the first list request
+ * started after it is authoritative and clears the fence. Starting earlier does not prove the backend served it
+ * earlier, though, and some transitions emit no event (cancelling a download, pruning settled jobs). So a final list
+ * status always wins, and a stale response may drop a job whose fence is settled, since pruning removes only those,
+ * but only when this client knew the job before the request started; otherwise the backend may have served it before
+ * the job existed.
+ */
+const statusFenceByJobId = new Map<number, { sequence: number; status: ModelInstallStatus }>();
+/** Sequence at which this client first saw each job, from a list response, a socket event, or a creation result. */
+const firstSeenSequenceByJobId = new Map<number, number>();
+let nextStatusFenceSequence = 1;
+/** No backend transition leaves these; `error` is excluded because a failed install can be restarted. */
+const FINAL_STATUSES: ReadonlySet<ModelInstallStatus> = new Set(['completed', 'cancelled']);
+const SETTLED_STATUSES: ReadonlySet<ModelInstallStatus> = new Set(['completed', 'error', 'cancelled']);
+const CANCELLATION_ACTIVE_STATUSES: ReadonlySet<ModelInstallStatus> = new Set([
+  'waiting',
+  'downloading',
+  'downloads_done',
+  'running',
+  'paused',
+]);
 
 const refreshFlight = createTrailingSingleFlight();
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -111,6 +134,9 @@ registerAccountOwnedResource({
     nextOutcomeId = 1;
     progressByJobId.clear();
     rateSamplesByJobId.clear();
+    statusFenceByJobId.clear();
+    firstSeenSequenceByJobId.clear();
+    nextStatusFenceSequence = 1;
     outcomesStore.setSnapshot(EMPTY_INSTALL_OUTCOMES);
     store.setSnapshot(EMPTY_INSTALLS_SNAPSHOT);
   },
@@ -119,6 +145,7 @@ registerAccountOwnedResource({
 
 export const refreshInstalls = (owner: AccountScope = captureAccountScope()): Promise<void> =>
   refreshFlight.run(() => {
+    const startSequence = nextStatusFenceSequence;
     store.patchSnapshot({ status: store.getSnapshot().status === 'loaded' ? 'loaded' : 'loading' });
 
     return listModelInstalls(owner.signal)
@@ -128,6 +155,60 @@ export const refreshInstalls = (owner: AccountScope = captureAccountScope()): Pr
         }
 
         const activeJobIds = new Set(jobs.map((job) => job.id));
+        const reconciledJobs: ModelInstallJob[] = jobs.map((job) => {
+          const fence = statusFenceByJobId.get(job.id);
+
+          if (fence === undefined) {
+            return job;
+          }
+
+          if (fence.status === 'cancelled' && CANCELLATION_ACTIVE_STATUSES.has(job.status)) {
+            // DELETE can succeed before the worker observes cancellation. Keep the optimistic result until REST
+            // reports a terminal state; otherwise a successful refresh can revive the row if its socket was missed.
+            const current = store.getSnapshot().jobs.find((candidate) => candidate.id === job.id) ?? job;
+            return current.status === 'cancelled' ? current : { ...current, status: 'cancelled' };
+          }
+
+          if (fence.sequence >= startSequence && !FINAL_STATUSES.has(job.status)) {
+            // This request predates the fenced status, so its status is stale.
+            const current = store.getSnapshot().jobs.find((candidate) => candidate.id === job.id) ?? job;
+            return current.status === fence.status ? current : { ...current, status: fence.status };
+          }
+
+          // A request started after the fence, or a final status, is authoritative.
+          statusFenceByJobId.delete(job.id);
+          return job;
+        });
+
+        for (const [jobId, fence] of statusFenceByJobId) {
+          if (activeJobIds.has(jobId)) {
+            continue;
+          }
+
+          const knownBeforeStart = (firstSeenSequenceByJobId.get(jobId) ?? Infinity) < startSequence;
+
+          if (fence.sequence >= startSequence && !(SETTLED_STATUSES.has(fence.status) && knownBeforeStart)) {
+            // The job may have been created after the backend served this request.
+            const locallyKnownJob = store.getSnapshot().jobs.find((job) => job.id === jobId);
+
+            if (locallyKnownJob) {
+              reconciledJobs.push({ ...locallyKnownJob, status: fence.status });
+              activeJobIds.add(jobId);
+            }
+          } else {
+            statusFenceByJobId.delete(jobId);
+          }
+        }
+
+        for (const jobId of activeJobIds) {
+          noteJobSeen(jobId);
+        }
+
+        for (const jobId of firstSeenSequenceByJobId.keys()) {
+          if (!activeJobIds.has(jobId) && !statusFenceByJobId.has(jobId)) {
+            firstSeenSequenceByJobId.delete(jobId);
+          }
+        }
 
         for (const [jobId] of progressByJobId.entries()) {
           if (!activeJobIds.has(jobId)) {
@@ -143,7 +224,7 @@ export const refreshInstalls = (owner: AccountScope = captureAccountScope()): Pr
           dismissedJobIds:
             retainedDismissed.length === dismissedJobIds.size ? dismissedJobIds : new Set(retainedDismissed),
           error: null,
-          jobs,
+          jobs: reconciledJobs,
           status: 'loaded',
         });
       })
@@ -197,11 +278,56 @@ const scheduleCatalogRefresh = (): void => {
   }, REFRESH_COALESCE_MS);
 };
 
-/** Optimistically replace one job (e.g. after pause/resume API calls). */
-export const replaceInstallJob = (job: ModelInstallJob): void => {
+const noteJobSeen = (jobId: number): void => {
+  if (!firstSeenSequenceByJobId.has(jobId)) {
+    firstSeenSequenceByJobId.set(jobId, nextStatusFenceSequence++);
+  }
+};
+
+const fenceJobStatus = (jobId: number, status: ModelInstallStatus): void => {
+  statusFenceByJobId.set(jobId, { sequence: nextStatusFenceSequence++, status });
+};
+
+const patchJob = (job: ModelInstallJob): void => {
   store.patchSnapshot({
     jobs: store.getSnapshot().jobs.map((existing) => (existing.id === job.id ? job : existing)),
   });
+};
+
+const projectJobStatus = (jobId: number, status: ModelInstallStatus): void => {
+  if (statusFenceByJobId.get(jobId)?.status === 'cancelled' && CANCELLATION_ACTIVE_STATUSES.has(status)) {
+    return;
+  }
+
+  fenceJobStatus(jobId, status);
+
+  const job = store.getSnapshot().jobs.find((candidate) => candidate.id === jobId);
+
+  if (job && job.status !== status) {
+    patchJob({ ...job, status });
+  }
+};
+
+/** Replace one job with a backend action result (e.g. pause/resume), newer than any list request in flight. */
+export const replaceInstallJob = (job: ModelInstallJob): void => {
+  fenceJobStatus(job.id, job.status);
+  patchJob(job);
+};
+
+/** Project a successful cancel action: the cancel route returns no job, and cancelling a job that is not downloading
+ * emits no event. Cancelling a completed job succeeds as a no-op, so a known completion stands. */
+export const projectInstallCancelled = (jobId: number, owner: AccountScope = captureAccountScope()): void => {
+  if (!isAccountScopeCurrent(owner)) {
+    return;
+  }
+
+  const isCompleted =
+    statusFenceByJobId.get(jobId)?.status === 'completed' ||
+    store.getSnapshot().jobs.some((job) => job.id === jobId && job.status === 'completed');
+
+  if (!isCompleted) {
+    projectJobStatus(jobId, 'cancelled');
+  }
 };
 
 /** Hide a settled job locally until the backend stops listing it. */
@@ -213,6 +339,13 @@ export const dismissInstallJob = (jobId: number): void => {
   }
 };
 
+/** Hide only the jobs included in a successful prune request. */
+export const dismissInstallJobs = (ids: number[]): void => {
+  if (ids.length > 0) {
+    store.patchSnapshot({ dismissedJobIds: new Set([...store.getSnapshot().dismissedJobIds, ...ids]) });
+  }
+};
+
 /** Optimistically add a freshly created job so the queue updates instantly. */
 export const addInstallJob = (job: ModelInstallJob): void => {
   if (store.getSnapshot().jobs.some((existing) => existing.id === job.id)) {
@@ -220,7 +353,17 @@ export const addInstallJob = (job: ModelInstallJob): void => {
     return;
   }
 
-  store.patchSnapshot({ jobs: [job, ...store.getSnapshot().jobs], status: 'loaded' });
+  noteJobSeen(job.id);
+
+  // Any event for the job is at least as new as its creation result, so an existing fence keeps its status.
+  const fence = statusFenceByJobId.get(job.id);
+
+  if (fence === undefined) {
+    fenceJobStatus(job.id, job.status);
+  }
+
+  const added = fence === undefined || fence.status === job.status ? job : { ...job, status: fence.status };
+  store.patchSnapshot({ jobs: [added, ...store.getSnapshot().jobs], status: 'loaded' });
 };
 
 const installLogger = createLogger({ area: 'install', namespace: 'models' });
@@ -290,12 +433,23 @@ export const MODEL_INSTALL_SOCKET_EVENTS = [
   'model_install_download_started',
   'model_install_download_progress',
   'model_install_downloads_complete',
+  'model_install_paused',
   'model_install_complete',
   'model_install_error',
   'model_install_cancelled',
 ] as const;
 
 export type ModelInstallSocketEvent = (typeof MODEL_INSTALL_SOCKET_EVENTS)[number];
+
+const EVENT_STATUS: Record<Exclude<ModelInstallSocketEvent, 'model_install_download_progress'>, ModelInstallStatus> = {
+  model_install_cancelled: 'cancelled',
+  model_install_complete: 'completed',
+  model_install_download_started: 'downloading',
+  model_install_downloads_complete: 'downloads_done',
+  model_install_error: 'error',
+  model_install_paused: 'paused',
+  model_install_started: 'running',
+};
 
 /** Socket sink — wired into the backend socket by the queue coordinator. */
 export const handleModelInstallSocketEvent = (
@@ -313,6 +467,8 @@ export const handleModelInstallSocketEvent = (
     return;
   }
 
+  noteJobSeen(data.id);
+
   if (event === 'model_install_download_progress') {
     const bytes = data.bytes ?? 0;
 
@@ -323,19 +479,30 @@ export const handleModelInstallSocketEvent = (
     });
 
     const job = store.getSnapshot().jobs.find((candidate) => candidate.id === data.id);
+    const fence = statusFenceByJobId.get(data.id);
+
+    if ((!job || job.status === 'waiting') && (fence === undefined || fence.status === 'waiting')) {
+      // Progress proves a waiting job is downloading; preserve newer pause, cancel, or terminal state.
+      fenceJobStatus(data.id, 'downloading');
+    }
 
     if (!job) {
       // The first progress tick may arrive for a job created in another
       // client; make sure the row exists without refetching on every tick.
       scheduleRefresh();
-    } else if (job.status === 'waiting') {
+    } else if (job.status === 'waiting' && (fence === undefined || fence.status === 'waiting')) {
       // Bytes are flowing, so the REST snapshot's `waiting` is stale. Patch
       // locally so download controls (pause/cancel) appear immediately.
-      replaceInstallJob({ ...job, status: 'downloading' });
+      patchJob({ ...job, status: 'downloading' });
     }
 
     return;
   }
+
+  // Project the status each event implies (the backend's job status when it emits) and fence it, so a list response
+  // that started before the event cannot replace it with an older status. The scheduled refresh then fills in the
+  // fields events omit, such as a paused job's download_parts naming the part whose failure auto-paused it.
+  projectJobStatus(data.id, EVENT_STATUS[event]);
 
   if (event === 'model_install_complete' || event === 'model_install_error' || event === 'model_install_cancelled') {
     // Retain settled jobs until cleared, but release their inactive byte-progress state.

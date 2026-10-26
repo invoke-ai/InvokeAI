@@ -58,6 +58,7 @@ _FP8_EXCLUDED_SUBMODEL_TYPES: frozenset[SubModelType] = frozenset(
         SubModelType.TextEncoder,
         SubModelType.TextEncoder2,
         SubModelType.TextEncoder3,
+        SubModelType.VisionEncoder,
         SubModelType.Tokenizer,
         SubModelType.Tokenizer2,
         SubModelType.Tokenizer3,
@@ -341,8 +342,14 @@ class ModelLoader(ModelLoaderBase):
         # Check if this is a text encoder submodel of a main model with cpu_only setting
         if hasattr(config, "default_settings") and config.default_settings is not None:
             if hasattr(config.default_settings, "cpu_only") and config.default_settings.cpu_only is True:
-                # Only apply CPU execution to text encoder submodels
-                if submodel_type in [SubModelType.TextEncoder, SubModelType.TextEncoder2, SubModelType.TextEncoder3]:
+                # Only apply CPU execution to text encoder submodels. The vision encoder is the text encoder's own
+                # tower, run inside its forward, so it has to execute on the same device.
+                if submodel_type in [
+                    SubModelType.TextEncoder,
+                    SubModelType.TextEncoder2,
+                    SubModelType.TextEncoder3,
+                    SubModelType.VisionEncoder,
+                ]:
                     return torch.device("cpu")
 
         # Check if this is a standalone text encoder config with cpu_only field (T5Encoder, Qwen3Encoder, etc.)

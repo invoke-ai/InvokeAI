@@ -156,15 +156,16 @@ def test_a_board_dto_counts_each_kind_of_media(mock_invoker: Invoker, mock_sqlit
         )
         cursor.executemany(
             "INSERT INTO videos (video_name, video_origin, video_category, width, height) VALUES (?, 'internal', ?, 1, 1)",
-            [("first.mp4", "general"), ("second.mp4", "general"), ("asset.mp4", "user")],
+            [("first.mp4", "general"), ("second.mp4", "general"), ("asset.mp4", "user"), ("other.mp4", "other")],
         )
     for name in ("general.png", "control.png", "mask.png"):
         services.board_image_records.add_image_to_board(board_id, name)
-    for name in ("first.mp4", "second.mp4", "asset.mp4"):
+    for name in ("first.mp4", "second.mp4", "asset.mp4", "other.mp4"):
         services.board_video_records.add_video_to_board(board_id, name)
 
     dto = services.boards.get_dto(board_id, viewer=BoardViewer(user_id="system", is_admin=True))
 
+    # Neither the Media nor the Uploads view lists an OTHER video, so neither count includes it.
     assert (dto.image_count, dto.asset_count, dto.video_count, dto.asset_video_count) == (1, 2, 3, 1)
 
 

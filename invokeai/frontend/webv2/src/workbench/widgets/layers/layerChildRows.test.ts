@@ -13,9 +13,11 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import {
+  childRowNameKey,
   getLayerChildItem,
   layerChildDropCommand,
   layerChildMoveTargets,
+  layerChildRemoveLabelKey,
   layerChildRowCommand,
   layerChildRowKey,
   projectLayerChildRows,
@@ -310,6 +312,53 @@ describe('adjustment rows', () => {
     ]);
   });
 
+  it('projects noise entries with their amount and a localized grain, apart from the mask noise row', () => {
+    const noise = (id: string, amount: number, grain: 'monochrome' | 'color' | 'chroma'): CanvasAdjustmentEntry => ({
+      amount,
+      distribution: 'gaussian',
+      grain,
+      id,
+      isEnabled: true,
+      response: 'midtones',
+      seed: 1,
+      size: 1,
+      type: 'noise',
+    });
+    const rows = projectLayerChildRows(
+      rasterRow(
+        documentFrom([
+          rasterWith([noise('n1', 0.1, 'monochrome'), noise('n2', 0.257, 'color'), noise('n3', 0.05, 'chroma')]),
+        ])
+      ).vm
+    );
+    expect(rows.map((row) => [row.kind, row.itemId, row.detail, row.detailLabelKey])).toEqual([
+      ['adjustment-noise', 'n1', '10%', 'widgets.layers.adjustments.noiseGrains.monochrome'],
+      ['adjustment-noise', 'n2', '26%', 'widgets.layers.adjustments.noiseGrains.color'],
+      ['adjustment-noise', 'n3', '5%', 'widgets.layers.adjustments.noiseGrains.chroma'],
+    ]);
+    expect(childRowNameKey('adjustment-noise')).not.toBe(childRowNameKey('mask-noise'));
+    expect(layerChildRemoveLabelKey('adjustment-noise')).toBe('widgets.layers.modifiers.removeAdjustment');
+  });
+
+  it('projects clarity, texture and dehaze entries with their signed amount as a plain strength', () => {
+    const rows = projectLayerChildRows(
+      rasterRow(
+        documentFrom([
+          rasterWith([
+            { amount: 35.4, id: 'c1', isEnabled: true, size: 40, type: 'clarity' },
+            { amount: -120, id: 't1', isEnabled: false, size: 8, type: 'texture' },
+            { amount: 0, id: 'd1', isEnabled: true, type: 'dehaze' },
+          ]),
+        ])
+      ).vm
+    );
+    expect(rows.map((row) => [row.kind, row.itemId, row.isEnabled, row.detail])).toEqual([
+      ['adjustment-clarity', 'c1', true, '+35'],
+      ['adjustment-texture', 't1', false, '-120'],
+      ['adjustment-dehaze', 'd1', true, '0'],
+    ]);
+  });
+
   it('renames an entry, clears the name with null, and refuses no-op renames and non-adjustment kinds', () => {
     const document = documentFrom([rasterWith(), regionalWith([referenceImage('ref1')])]);
     const named = layerChildRowCommand(document, { itemId: 'a1', layerId: 'r1' }, { name: 'Warm up', type: 'rename' });
@@ -351,10 +400,33 @@ describe('adjustment rows', () => {
     const command = layerChildRowCommand(
       document,
       { itemId: 'a1', layerId: 'r1' },
-      { newId: 'a1-copy', type: 'duplicate' }
+      { newId: 'a1-copy', newNoiseSeed: 5, type: 'duplicate' }
     );
     const ids = (command!.config as unknown as { adjustments: { id: string }[] }).adjustments.map((entry) => entry.id);
     expect(ids).toEqual(['a1', 'a1-copy', 'a2', 'a3']);
+  });
+
+  it('reseeds a duplicated noise entry so the copies do not add identical grain', () => {
+    const noise: CanvasAdjustmentEntry = {
+      amount: 0.1,
+      distribution: 'uniform',
+      grain: 'color',
+      id: 'n1',
+      isEnabled: true,
+      response: 'flat',
+      seed: 7,
+      size: 2.5,
+      type: 'noise',
+    };
+    const command = layerChildRowCommand(
+      documentFrom([rasterWith([noise])]),
+      { itemId: 'n1', layerId: 'r1' },
+      { newId: 'n1-copy', newNoiseSeed: 99, type: 'duplicate' }
+    );
+    expect((command!.config as unknown as { adjustments: CanvasAdjustmentEntry[] }).adjustments).toEqual([
+      noise,
+      { ...noise, id: 'n1-copy', seed: 99 },
+    ]);
   });
 
   it('toggles and removes entries, and refuses move/duplicate for non-adjustment kinds', () => {
@@ -375,7 +447,11 @@ describe('adjustment rows', () => {
       layerChildRowCommand(document, { itemId: 'ref1', layerId: 'rg1' }, { direction: 1, type: 'move' })
     ).toBeNull();
     expect(
-      layerChildRowCommand(document, { itemId: 'ref1', layerId: 'rg1' }, { newId: 'x', type: 'duplicate' })
+      layerChildRowCommand(
+        document,
+        { itemId: 'ref1', layerId: 'rg1' },
+        { newId: 'x', newNoiseSeed: 5, type: 'duplicate' }
+      )
     ).toBeNull();
     expect(getLayerChildItem(document, 'r1', 'a3')).toEqual({ isEnabled: true, kind: 'adjustment-curves' });
   });
@@ -607,6 +683,6 @@ describe('layer regenerate region child row', () => {
     expect(removed).toMatchObject({ config: { inpaint: null, layerType: 'raster' } });
 
     expect(layerChildRowCommand(document, target, { direction: 1, type: 'move' })).toBeNull();
-    expect(layerChildRowCommand(document, target, { newId: 'x', type: 'duplicate' })).toBeNull();
+    expect(layerChildRowCommand(document, target, { newId: 'x', newNoiseSeed: 5, type: 'duplicate' })).toBeNull();
   });
 });

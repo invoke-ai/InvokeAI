@@ -1,8 +1,13 @@
-import type { DuplicateLayersResult } from '@workbench/canvas-engine/capabilities';
+import type { DuplicateLayersResult, LayerExportGuard } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { CanvasCommandRefusal } from '@workbench/canvas-engine/document/commandRefusal';
 import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
+import type { SubsetOf } from '@workbench/canvas-engine/editConcurrency';
+import type { LayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
+import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
+import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
@@ -16,20 +21,37 @@ import {
 } from '@workbench/canvas-engine/document/documentIndex';
 import { cloneSubtree, collectSubtreeLeaves } from '@workbench/canvas-engine/document/documentTree';
 import { insertNodesAtAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
+import { createControlLayerFrom } from '@workbench/canvas-engine/document/layerFactories';
 import { haveSameStructure } from '@workbench/canvas-engine/document/layerStacks';
 import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
 
-import type { CanvasMutationContext, EditStep } from './mutationContext';
+import type { CanvasMutationContext, EditPublishResult, EditStep, EditTransaction } from './mutationContext';
 
 import {
   guardedResultRefusal,
   layerEditRefusal,
+  layerOperationStatus,
+  type LayerEditRefusal,
   type LayerPixels,
   rgbaBytes,
   withReplayReservation,
 } from './editSteps';
 
 export type CapturedLayerCache = LayerPixels | null | 'not-ready' | 'over-budget';
+
+export type ConvertLayerToControlResult =
+  | 'converted'
+  | SubsetOf<CanvasCommandRefusal, 'missing' | 'locked' | 'unsupported'>
+  | LayerEditRefusal
+  | 'failed'
+  | LayerUnreadable
+  | AdjustmentRefusal;
+
+type BakedExportResult =
+  | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
+  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | LayerUnreadable
+  | AdjustmentRefusal;
 
 export type DuplicateLayerRasterPlan =
   | {
@@ -45,7 +67,8 @@ export type DuplicateLayerRasterPlan =
 
 type DuplicateRasterPreparationResult =
   | { readonly status: 'ready'; readonly layer: CanvasLayerContract }
-  | { readonly status: 'not-ready' | 'over-budget' };
+  | { readonly status: 'not-ready' | 'over-budget' }
+  | LayerUnreadable;
 
 export interface LayerMutationControllerOptions {
   readonly ctx: Pick<
@@ -66,6 +89,12 @@ export interface LayerMutationControllerOptions {
     | 'preparePixels'
     | 'reserveRaster'
   >;
+  readonly backend: RasterBackend;
+  /** A layer's pixels with its own adjustments and transform baked in, disabled layers included. */
+  readonly exportBaked: (layerId: string) => Promise<BakedExportResult>;
+  /** The main model's base, for a converted control layer's adapter kind and defaults. */
+  readonly getMainModelBase: () => string | null;
+  readonly isGuardCurrent: (guard: LayerExportGuard) => boolean;
   /** Copies a layer's live cache; `admit` accounts its bytes first and refuses the copy as `over-budget`. */
   readonly captureCache: (
     layer: CanvasLayerContract,
@@ -144,6 +173,9 @@ export class LayerMutationController {
           return { status: 'not-ready' };
         }
         const prepared = await o.prepareDuplicateRasterSource(source.id);
+        if (prepared.status === 'unreadable') {
+          return prepared;
+        }
         if (prepared.status !== 'ready') {
           return { status: prepared.status };
         }
@@ -422,19 +454,13 @@ export class LayerMutationController {
   }
 
   convert(label: string, expected: CanvasLayerContract, after: CanvasLayerContract): boolean {
-    const { ctx, ...o } = this.options;
+    const { ctx } = this.options;
     if (expected.id !== after.id || expected.type === after.type) {
       return false;
     }
     const document = ctx.getDocument();
     const current = getDocumentLayer(document, expected.id);
-    if (
-      !document ||
-      !current ||
-      current !== expected ||
-      current.type !== expected.type ||
-      lookupDocumentLeaf(document, current.id)?.effectiveLocked !== false
-    ) {
+    if (!document || !current || current !== expected || !this.isUnlocked(document, current.id)) {
       return false;
     }
     const txn = ctx.begin({ historyBytes: HISTORY_ENTRY_OVERHEAD_BYTES });
@@ -442,52 +468,169 @@ export class LayerMutationController {
       return false;
     }
     try {
-      const captured = o.captureCache(
-        current,
-        document,
-        (rect) => txn.growHistory(rgbaBytes(rect)) && txn.reserveRaster(rgbaBytes(rect))
-      );
-      if (captured === 'not-ready' || captured === 'over-budget') {
-        return false;
-      }
-      // A conversion changes stacks, so undo carries the leaf back to its captured place.
-      const restoreAnchor = ctx.captureRestoreAnchor(current.id) ?? undefined;
-      const before = structuredClone(current);
-      const converted = (
-        layer: CanvasLayerContract,
-        restore: CanvasLayerContract,
-        anchor?: CanvasNodeInsertionAnchor
-      ): EditStep => {
-        const prepared = captured ? ctx.preparePixels(layer.id, captured.rect, captured.pixels) : null;
-        return {
-          accepted: (candidate) => o.sameContract(candidate, layer),
-          install: () => {
-            try {
-              o.discardPersisted(layer.id);
-            } catch {
-              /* Ancillary after reducer acceptance. */
-            }
-            if (prepared) {
-              ctx.installPrepared(prepared, o.needsPixelPersistence(layer));
-            }
-          },
-          mutation: { anchor, id: layer.id, layer, targetType: layer.type, type: 'convertCanvasLayer' },
-          rollback: {
-            mutation: { id: layer.id, layer: restore, targetType: restore.type, type: 'convertCanvasLayer' },
-            restored: (candidate) => o.sameContract(candidate, restore),
-          },
-        };
-      };
-      const result = txn.publish(label, converted(after, current), {
-        bytes: (captured ? rgbaBytes(captured.rect) : 0) + HISTORY_ENTRY_OVERHEAD_BYTES,
-        heldAssetRefs: collectHistoryMediaRefs(before, after),
-        redo: () => replayPrepared(ctx, captured, () => ctx.applyStep(converted(after, before))),
-        undo: () => replayPrepared(ctx, captured, () => ctx.applyStep(converted(before, after, restoreAnchor))),
-      });
-      return result.status === 'committed';
+      return this.publishConversion(txn, label, document, current, after, null).status === 'committed';
     } finally {
       txn.end();
     }
+  }
+
+  /**
+   * Converts a raster image or paint layer into a control layer in place, as one undo step. Control layers carry no
+   * adjustments, so the layer's pixels as displayed — its own stack evaluated exactly (spatial entries included, or
+   * refused) and its transform — become the control layer's paint pixels at an identity transform. Undo restores the
+   * raster layer with its stack and original pixels; redo reinstalls the baked pixels. An empty layer has no pixels
+   * to bake, so it converts as a plain clone of its source and transform, without the stack.
+   */
+  async convertToControl(label: string, expected: CanvasLayerContract): Promise<ConvertLayerToControlResult> {
+    const { ctx, ...o } = this.options;
+    const permit = ctx.capturePermit();
+    if (!permit) {
+      return 'busy';
+    }
+    const document = ctx.getDocument();
+    const current = getDocumentLayer(document, expected.id);
+    if (!document || !current) {
+      return 'missing';
+    }
+    if (current !== expected) {
+      return 'not-ready';
+    }
+    if (current.type !== 'raster' || (current.source.type !== 'image' && current.source.type !== 'paint')) {
+      return 'unsupported';
+    }
+    if (!this.isUnlocked(document, current.id)) {
+      return 'locked';
+    }
+    const baked = await o.exportBaked(current.id);
+    if (baked.status === 'adjustment-refused' || baked.status === 'unreadable') {
+      return baked;
+    }
+    if (baked.status === 'empty') {
+      const plain = createControlLayerFrom(current, {
+        base: o.getMainModelBase(),
+        content: { source: current.source },
+        id: current.id,
+        name: current.name,
+      });
+      return ctx.isPermitCurrent(permit) && this.convert(label, current, plain) ? 'converted' : 'not-ready';
+    }
+    if (baked.status !== 'ok') {
+      return baked.status === 'disabled' ? 'not-ready' : baked.status;
+    }
+    try {
+      if (!ctx.isPermitCurrent(permit)) {
+        return 'busy';
+      }
+      // A preview-tolerant recheck; see `CanvasMutationContext.getReducerDocument`.
+      const liveDocument = ctx.getReducerDocument();
+      if (
+        getDocumentLayer(liveDocument, current.id) !== current ||
+        baked.guard.layer !== current ||
+        !o.isGuardCurrent(baked.guard)
+      ) {
+        return 'not-ready';
+      }
+      const txn = ctx.begin({ historyBytes: rgbaBytes(baked.rect) + HISTORY_ENTRY_OVERHEAD_BYTES });
+      if (!('publish' in txn)) {
+        return layerEditRefusal(txn.status);
+      }
+      try {
+        // Admission ended any open preview; the conversion starts from the document it left.
+        const startDocument = ctx.getDocument();
+        if (!startDocument || getDocumentLayer(startDocument, current.id) !== current) {
+          return 'not-ready';
+        }
+        if (!this.isUnlocked(startDocument, current.id)) {
+          return 'locked';
+        }
+        // The entry's copy of the baked pixels (the export's surface is released below) and its prepared install.
+        if (!txn.reserveRaster(rgbaBytes(baked.rect) * 2)) {
+          return 'over-budget';
+        }
+        const pixels = o.backend.createSurface(baked.rect.width, baked.rect.height);
+        pixels.ctx.drawImage(baked.surface.canvas, 0, 0);
+        const after = createControlLayerFrom(current, {
+          base: o.getMainModelBase(),
+          content: { rect: baked.rect },
+          id: current.id,
+          name: current.name,
+        });
+        const status = layerOperationStatus(
+          this.publishConversion(txn, label, startDocument, current, after, { pixels, rect: baked.rect })
+        );
+        return status === 'committed' ? 'converted' : status;
+      } finally {
+        txn.end();
+      }
+    } finally {
+      baked.release();
+    }
+  }
+
+  private isUnlocked(document: CanvasDocumentContractV3, layerId: string): boolean {
+    return lookupDocumentLeaf(document, layerId)?.effectiveLocked === false;
+  }
+
+  /**
+   * Publishes `current`'s conversion to `after`. `afterPixels` are installed with the converted layer, else its own
+   * live cache is; undo always reinstalls that cache, so a paint layer gets its original pixels back.
+   */
+  private publishConversion(
+    txn: EditTransaction,
+    label: string,
+    document: CanvasDocumentContractV3,
+    current: CanvasLayerContract,
+    after: CanvasLayerContract,
+    afterPixels: LayerPixels | null
+  ): EditPublishResult {
+    const { ctx, ...o } = this.options;
+    const captured = o.captureCache(
+      current,
+      document,
+      (rect) => txn.growHistory(rgbaBytes(rect)) && txn.reserveRaster(rgbaBytes(rect))
+    );
+    if (captured === 'not-ready' || captured === 'over-budget') {
+      return { status: captured };
+    }
+    const forwardPixels = afterPixels ?? captured;
+    // A conversion changes stacks, so undo carries the leaf back to its captured place.
+    const restoreAnchor = ctx.captureRestoreAnchor(current.id) ?? undefined;
+    const before = structuredClone(current);
+    const converted = (
+      layer: CanvasLayerContract,
+      restore: CanvasLayerContract,
+      pixels: LayerPixels | null,
+      anchor?: CanvasNodeInsertionAnchor
+    ): EditStep => {
+      const prepared = pixels ? ctx.preparePixels(layer.id, pixels.rect, pixels.pixels) : null;
+      return {
+        accepted: (candidate) => o.sameContract(candidate, layer),
+        install: () => {
+          try {
+            o.discardPersisted(layer.id);
+          } catch {
+            /* Ancillary after reducer acceptance. */
+          }
+          if (prepared) {
+            ctx.installPrepared(prepared, o.needsPixelPersistence(layer));
+          }
+        },
+        mutation: { anchor, id: layer.id, layer, targetType: layer.type, type: 'convertCanvasLayer' },
+        rollback: {
+          mutation: { id: layer.id, layer: restore, targetType: restore.type, type: 'convertCanvasLayer' },
+          restored: (candidate) => o.sameContract(candidate, restore),
+        },
+      };
+    };
+    return txn.publish(label, converted(after, current, forwardPixels), {
+      bytes:
+        (captured ? rgbaBytes(captured.rect) : 0) +
+        (afterPixels ? rgbaBytes(afterPixels.rect) : 0) +
+        HISTORY_ENTRY_OVERHEAD_BYTES,
+      heldAssetRefs: collectHistoryMediaRefs(before, after),
+      redo: () => replayPrepared(ctx, forwardPixels, () => ctx.applyStep(converted(after, before, forwardPixels))),
+      undo: () => replayPrepared(ctx, captured, () => ctx.applyStep(converted(before, after, captured, restoreAnchor))),
+    });
   }
 
   dispose(): void {}

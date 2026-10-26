@@ -94,7 +94,6 @@ void i18n.use(initReactI18next).init({
       translation: {
         widgets: {
           gallery: {
-            collapseStarredItems: 'Collapse starred items',
             deleteConfirmLabel: 'Delete',
             deleteImagesConfirmTitle: 'Delete image?',
             inProgress: 'In progress',
@@ -164,10 +163,13 @@ const createGallery = (items: GalleryItem[], selected: GalleryItem | null): Gall
   compareImageKey: null,
   galleryView: 'images',
   isComparisonActive: false,
+  isSearchActive: false,
   items,
+  listingBoardId: 'board-a',
   page: 0,
   projectBoardId: null,
   revealTargetPage: null,
+  searchScope: 'board',
   searchTerm: '',
   selectedBoardId: 'board-a',
   ...selectionOf(selected),
@@ -690,7 +692,13 @@ describe('Gallery grid keyboard focus', () => {
     );
     await act(() =>
       setState({
-        gallery: { ...state.gallery, items: createItems(6, 'other'), selectedBoardId: 'board-b', ...selectionOf(null) },
+        gallery: {
+          ...state.gallery,
+          items: createItems(6, 'other'),
+          listingBoardId: 'board-b',
+          selectedBoardId: 'board-b',
+          ...selectionOf(null),
+        },
         galleryValues: { ...state.galleryValues, selectedBoardId: 'board-b', selectedImageNames: [] },
         strip: stripB,
       })
@@ -711,7 +719,7 @@ describe('Gallery grid keyboard focus', () => {
 
     await act(() =>
       setState({
-        gallery: { ...state.gallery, items: [], selectedBoardId: 'board-b' },
+        gallery: { ...state.gallery, items: [], listingBoardId: 'board-b', selectedBoardId: 'board-b' },
         listing: { ...READY_LISTING, status: 'loading' },
       })
     );
@@ -894,7 +902,8 @@ describe('Gallery grid keyboard focus', () => {
     });
     // The strip's disclosure comes first, then the one thumbnail Tab stop.
     await tabIntoGallery();
-    expect(document.activeElement?.getAttribute('aria-label')).toBe('Collapse starred items');
+    expect(document.activeElement?.getAttribute('aria-expanded')).toBe('true');
+    expect(document.activeElement?.textContent).toMatch(/^Starred/);
     await act(() => userEvent.tab());
     expect(focusedThumbnail()).toBe('starred-0.png');
 

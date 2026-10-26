@@ -10,6 +10,9 @@ import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
 
+from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.wildcard_records.wildcard_records_common import WildcardWithoutId
+
 
 def _auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
@@ -26,6 +29,7 @@ def _create(client: TestClient, token: str, name: str, values: list[str]):
         ("post", "/api/v1/wildcards/"),
         ("patch", "/api/v1/wildcards/some-id"),
         ("delete", "/api/v1/wildcards/some-id"),
+        ("post", "/api/v1/wildcards/delete"),
     ],
 )
 def test_routes_require_auth(enable_multiuser: Any, client: TestClient, method: str, path: str):
@@ -90,6 +94,73 @@ def test_update_and_delete(client: TestClient, user1_token: str):
         == status.HTTP_204_NO_CONTENT
     )
     assert client.get("/api/v1/wildcards/", headers=_auth(user1_token)).json() == []
+
+
+def _delete_many(client: TestClient, token: str, wildcard_ids: list[str]):
+    return client.post("/api/v1/wildcards/delete", json={"wildcard_ids": wildcard_ids}, headers=_auth(token))
+
+
+def _names(client: TestClient, token: str) -> list[str]:
+    return [w["name"] for w in client.get("/api/v1/wildcards/", headers=_auth(token)).json()]
+
+
+def test_batch_delete_removes_the_callers_wildcards_and_returns_their_ids(client: TestClient, user1_token: str):
+    colors = _create(client, user1_token, "colors", ["red"]).json()["id"]
+    animals = _create(client, user1_token, "animals", ["cat"]).json()["id"]
+    _create(client, user1_token, "kept", ["x"])
+
+    response = _delete_many(client, user1_token, [colors, animals])
+
+    assert response.status_code == status.HTTP_200_OK
+    assert sorted(response.json()["deleted_ids"]) == sorted([colors, animals])
+    assert _names(client, user1_token) == ["kept"]
+
+
+def test_batch_delete_skips_another_users_wildcards_without_revealing_them(
+    client: TestClient, user1_token: str, user2_token: str
+):
+    mine = _create(client, user1_token, "colors", ["red"]).json()["id"]
+    theirs = _create(client, user2_token, "colors", ["blue"]).json()["id"]
+
+    response = _delete_many(client, user1_token, [mine, theirs])
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["deleted_ids"] == [mine]
+    assert _names(client, user2_token) == ["colors"]
+
+
+def test_batch_delete_ignores_unknown_and_repeated_ids_and_is_idempotent(client: TestClient, user1_token: str):
+    colors = _create(client, user1_token, "colors", ["red"]).json()["id"]
+
+    first = _delete_many(client, user1_token, [colors, "no-such-id", colors])
+    again = _delete_many(client, user1_token, [colors])
+
+    assert first.json()["deleted_ids"] == [colors]
+    assert again.status_code == status.HTTP_200_OK
+    assert again.json()["deleted_ids"] == []
+
+
+@pytest.mark.parametrize("count", [0, 1001])
+def test_batch_delete_rejects_an_empty_or_oversized_list(client: TestClient, user1_token: str, count: int):
+    response = _delete_many(client, user1_token, [f"id-{i}" for i in range(count)])
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+
+
+def test_batch_delete_removes_a_selection_larger_than_one_query_chunk(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+):
+    # 720 ids span two IN-list chunks. Created through the service: 720 HTTP round trips would only add time.
+    first = _create(client, user1_token, "w-0", ["x"]).json()
+    store = mock_invoker.services.wildcard_records
+    ids = [first["id"]] + [
+        store.create(WildcardWithoutId(name=f"w-{i}", values=["x"]), user_id=first["user_id"]).id for i in range(1, 720)
+    ]
+
+    response = _delete_many(client, user1_token, ids)
+
+    assert sorted(response.json()["deleted_ids"]) == sorted(ids)
+    assert _names(client, user1_token) == []
 
 
 def test_dynamicprompts_expands_the_callers_wildcards(client: TestClient, user1_token: str, user2_token: str):

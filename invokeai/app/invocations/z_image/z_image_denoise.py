@@ -1,4 +1,3 @@
-import inspect
 import math
 from contextlib import ExitStack
 from typing import Callable, Iterator, Optional
@@ -27,7 +26,12 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.vae.z_image_image_to_latents import ZImageImageToLatentsInvocation
 from invokeai.app.invocations.z_image.z_image_control import ZImageControlField
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.flux.schedulers import ZIMAGE_SCHEDULER_LABELS, ZIMAGE_SCHEDULER_MAP, ZIMAGE_SCHEDULER_NAME_VALUES
+from invokeai.backend.flux.schedulers import (
+    ZIMAGE_SCHEDULER_LABELS,
+    ZIMAGE_SCHEDULER_MAP,
+    ZIMAGE_SCHEDULER_NAME_VALUES,
+    set_heun_timesteps_from_sigmas,
+)
 from invokeai.backend.fun_controlnet.conditioning import build_fun_control_context
 from invokeai.backend.fun_controlnet.hooks import FunControlHooks, install_fun_control, should_apply
 from invokeai.backend.fun_controlnet.z_image import ZImageFunControl
@@ -410,6 +414,16 @@ class ZImageDenoiseInvocation(BaseInvocation):
             end_idx = int(self.denoising_end * (total_sigmas - 1)) + 1
             sigmas = sigmas[start_idx:end_idx]
 
+        is_heun = self.scheduler == "heun"
+        if is_heun:
+            # Heun divides by every sigma it evaluates the model at, so an interval of zero length at sigma 0 is
+            # 0/0 and turns the latents into NaN; an explicit shift of 0 schedules [1, 0, ..., 0]. Such an interval
+            # has nothing to integrate (Euler steps through it unchanged), so Heun runs only the others and counts
+            # its progress over them. With none left, the pass returns the blended latents, as Euler would.
+            sigmas = [
+                sigma for sigma, sigma_next in zip(sigmas[:-1], sigmas[1:], strict=True) if sigma != sigma_next
+            ] + sigmas[-1:]
+
         total_steps = len(sigmas) - 1
 
         # Load input latents if provided (image-to-image)
@@ -431,13 +445,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
             if self.add_noise:
                 assert noise is not None
                 # Noise the init latents using the first sigma from the clipped
-                # InvokeAI schedule.
-                #
-                # Known limitation: if the selected scheduler later starts from a
-                # different first effective sigma/timestep than sigmas[0], the
-                # img2img preblend below may not match that scheduler exactly.
-                # This is an existing pipeline limitation and affects both
-                # internally generated noise and externally supplied noise.
+                # InvokeAI schedule. Euler and Heun start from this sigma; LCM
+                # creates its own schedule, whose first sigma can differ.
                 s_0 = sigmas[0]
                 latents = s_0 * noise + (1.0 - s_0) * init_latents
             else:
@@ -477,16 +486,13 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 num_train_timesteps=1000,
                 shift=1.0,
             )
-            # Set timesteps - LCM uses its own sigma schedule (num_inference_steps),
-            # while other schedulers can use custom sigmas if supported
-            is_lcm = self.scheduler == "lcm"
-            set_timesteps_sig = inspect.signature(scheduler.set_timesteps)
-            if not is_lcm and "sigmas" in set_timesteps_sig.parameters:
-                scheduler.set_timesteps(sigmas=sigmas, device=device)
+            if is_heun:
+                # Heun runs the shifted, clipped schedule above, so it starts at the sigma the img2img
+                # preblend used and stops at the requested end.
+                set_heun_timesteps_from_sigmas(scheduler, sigmas[:-1], sigmas[-1], device)
             else:
-                # LCM or a scheduler without custom-sigma support computes its own
-                # schedule from num_inference_steps. That can diverge from sigmas[0]
-                # used in the img2img preblend above.
+                # LCM owns its schedule: clipping only sets its step count. Its first sigma can
+                # differ from sigmas[0] used in the img2img preblend above.
                 scheduler.set_timesteps(num_inference_steps=total_steps, device=device)
 
             # For Heun scheduler, the number of actual steps may differ
@@ -609,7 +615,6 @@ class ZImageDenoiseInvocation(BaseInvocation):
                     sigma_curr = sched_timestep.item() / scheduler.config.num_train_timesteps
 
                     # For Heun scheduler, track if we're in first or second order step
-                    is_heun = hasattr(scheduler, "state_in_first_order")
                     in_first_order = scheduler.state_in_first_order if is_heun else True
 
                     # Timestep tensor for Z-Image model
@@ -667,9 +672,10 @@ class ZImageDenoiseInvocation(BaseInvocation):
                     if inpaint_extension is not None:
                         latents = inpaint_extension.merge_intermediate_latents_with_init_latents(latents, sigma_prev)
 
-                    # For Heun, only increment user step after second-order step completes
+                    # For Heun, a user step completes with its second-order evaluation. The final
+                    # interval has none: Diffusers ends it with a first-order step to the terminal sigma.
                     if is_heun:
-                        if not in_first_order:
+                        if not in_first_order or step_index == num_scheduler_steps - 1:
                             user_step += 1
                             # Only call step_callback if we haven't exceeded total_steps
                             if user_step <= total_steps:
@@ -677,7 +683,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
                                 step_callback(
                                     PipelineIntermediateState(
                                         step=user_step,
-                                        order=2,
+                                        # Progress over completed user steps, not the solver's order.
+                                        order=1,
                                         total_steps=total_steps,
                                         timestep=int(sigma_curr * 1000),
                                         latents=latents,

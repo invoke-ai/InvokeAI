@@ -198,6 +198,18 @@ describe('flowAdapters identity preservation', () => {
     expect(compactAgain[0]).toBe(compact[0]);
   });
 
+  it('carries the template status onto invocation nodes and rebuilds them only when it changes', () => {
+    const doc = createDoc();
+    const loading = toFlowNodes(doc, [], undefined, undefined, false, false, 'loading');
+    const stillLoading = toFlowNodes(doc, loading, undefined, undefined, false, false, 'loading');
+    const failed = toFlowNodes(doc, stillLoading, undefined, undefined, false, false, 'error');
+
+    expect(loading[0]?.type === 'invocation' && loading[0].data.templateStatus).toBe('loading');
+    expect(stillLoading[0]).toBe(loading[0]);
+    expect(failed[0]?.type === 'invocation' && failed[0].data.templateStatus).toBe('error');
+    expect(failed[0]).not.toBe(loading[0]);
+  });
+
   it('precomputes resolved connector field types onto connector node data', () => {
     const fieldType = single('ImageField');
     const templates = createTemplates(fieldType);

@@ -1,5 +1,6 @@
 import type { Project } from '@workbench/projectContracts';
 
+import { MAX_SUPPORTED_CANVAS_SCHEMA_VERSION } from '@workbench/canvasSchemaVersion';
 import { addProjectWorkflow, getActiveProjectGraph, recordProjectWorkflowRun } from '@workbench/projectWorkflows';
 import { createDraftProject } from '@workbench/workbenchState';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
@@ -133,7 +134,10 @@ describe('project document serialization', () => {
   it('refuses a document whose canvas was written by a newer client, keeping the raw document', () => {
     const project = getProject();
     const document = serializeProjectDocument(project);
-    const future = { ...document, canvas: { ...(document.canvas as object), version: 5 } };
+    const future = {
+      ...document,
+      canvas: { ...(document.canvas as object), version: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION + 1 },
+    };
 
     const result = deserializeProjectDocument(future);
 
@@ -141,7 +145,7 @@ describe('project document serialization', () => {
       refused: {
         projectId: project.id,
         raw: future,
-        refusal: { scope: 'state', status: 'unsupported-version', version: 5 },
+        refusal: { scope: 'state', status: 'unsupported-version', version: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION + 1 },
         source: 'canvas',
       },
       status: 'refused',
@@ -286,6 +290,54 @@ describe('project document serialization', () => {
       lastRun: { completedAt: 't2', imageName: 'out.png', submittedAt: 't1' },
       source: { libraryWorkflowId: 'lib-2', revision: 7 },
     });
+  });
+
+  it('loads media URLs rebuilt for this deployment, whether stored at another origin or blanked by transfer', () => {
+    const recent = (imageName: string, imageUrl: string, thumbnailUrl: string) => ({
+      height: 8,
+      imageName,
+      imageUrl,
+      queuedAt: 't1',
+      sourceQueueItemId: 'q1',
+      thumbnailUrl,
+      width: 8,
+    });
+    const document = serializeProjectDocumentV3(getProject());
+    const gallery = document.widgetInstances.gallery!;
+    const loaded = loadDocument({
+      ...document,
+      widgetInstances: {
+        ...document.widgetInstances,
+        gallery: {
+          ...gallery,
+          state: {
+            ...gallery.state,
+            values: {
+              ...gallery.state.values,
+              recentImages: [
+                recent(
+                  'saved.png',
+                  'http://localhost:9090/api/v1/images/i/saved.png/full',
+                  'http://localhost:9090/api/v1/images/i/saved.png/thumbnail'
+                ),
+                recent('imported.png', '', ''),
+              ],
+            },
+          },
+        },
+      },
+    } as unknown as Record<string, unknown>);
+
+    expect(loaded.widgetInstances.gallery!.state.values.recentImages).toEqual([
+      expect.objectContaining({
+        imageUrl: 'http://localhost/api/v1/images/i/saved.png/full',
+        thumbnailUrl: 'http://localhost/api/v1/images/i/saved.png/thumbnail',
+      }),
+      expect.objectContaining({
+        imageUrl: 'http://localhost/api/v1/images/i/imported.png/full',
+        thumbnailUrl: 'http://localhost/api/v1/images/i/imported.png/thumbnail',
+      }),
+    ]);
   });
 
   it('refuses a schema-3 document whose collection would lose a workflow instead of repairing it', () => {

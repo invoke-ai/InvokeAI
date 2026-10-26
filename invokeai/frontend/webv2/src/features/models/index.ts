@@ -32,7 +32,12 @@ export { ModelInstallRuntime } from './ui/ModelInstallRuntime';
 export { ModelsPage } from './ui/ModelsPage';
 export {
   ModelsUiProvider,
+  useModelsUi,
   useOpenAddModelsSearch,
   useOpenModelInManager,
+  type ModelSchedulerPolicy,
   type ModelsUiAdapter,
+  type SchedulerPolicyReader,
+  type SchedulerPolicySource,
+  type SchedulerPolicyState,
 } from './ui/ModelsUiContext';
