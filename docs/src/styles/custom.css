@@ -75,8 +75,8 @@
   --sl-content-width: 52rem;
   --sl-nav-height: 3.25rem;
   /*
-   * Every control in the header (search, site links, version menu, social links, download, the menu button) has one
-   * height, 32px on narrow screens and 36px wider, and one 7px radius. Icon-only controls are square.
+   * Every control in the header (search, site links, language and version menus, social links, download, the menu
+   * button) has one height, 32px on narrow screens and 36px wider, and one 7px radius. Icon-only controls are square.
    */
   --docs-header-control-height: 2rem;
   --docs-header-control-radius: 7px;

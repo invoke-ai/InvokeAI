@@ -3,7 +3,7 @@ import BookOpenText from '@lucide/astro/icons/book-open-text';
 import Images from '@lucide/astro/icons/images';
 
 import { docsTopics, getCurrentTopic } from '../../config/topics';
-import { withBase } from '../base-path';
+import { localizedHref, withBase } from '../base-path';
 
 type Props = {
   /** `drawer` renders the copy shown in the mobile sidebar drawer, which stands in for the header's below `md`. */
@@ -11,14 +11,14 @@ type Props = {
 };
 
 const { placement } = Astro.props;
-const { hasSidebar } = Astro.locals.starlightRoute;
+const { hasSidebar, locale } = Astro.locals.starlightRoute;
 const base = import.meta.env.BASE_URL;
 const trimSlash = (path: string) => path.replace(/\/$/, '');
 const pathname = trimSlash(Astro.url.pathname);
 
 const docsLanding = docsTopics.find((topic) => topic.id === 'get-started');
 if (!docsLanding) throw new Error('The header links to the "get-started" docs topic, which no longer exists.');
-const docsHref = withBase(docsLanding.link, base);
+const docsHref = localizedHref(docsLanding.link, { locale, base });
 const showcaseHref = withBase('/showcase/', base);
 
 const items = [

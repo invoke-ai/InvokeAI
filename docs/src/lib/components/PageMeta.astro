@@ -4,7 +4,9 @@ import Pencil from '@lucide/astro/icons/pencil';
 
 import { getReportIssueUrl } from '../report-issue';
 
-const { editUrl, entry, lang, lastUpdated } = Astro.locals.starlightRoute;
+const { editUrl, entry, isFallback, lang, lastUpdated, locale } = Astro.locals.starlightRoute;
+// Translated pages link to Crowdin instead of their file (`src/route-data.ts`).
+const editLabel = Astro.locals.t(locale && !isFallback ? 'page.translateLink' : 'page.editLink');
 const reportIssueUrl = getReportIssueUrl(entry.data.title, new URL(Astro.url.pathname, Astro.site).href);
 ---
 
@@ -13,7 +15,7 @@ const reportIssueUrl = getReportIssueUrl(entry.data.title, new URL(Astro.url.pat
     editUrl && (
       <a href={editUrl} class="print:hidden">
         <Pencil size={14} />
-        {Astro.locals.t('page.editLink')}
+        {editLabel}
       </a>
     )
   }

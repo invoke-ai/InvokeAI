@@ -54,7 +54,8 @@ export const summarizeDescription = (text) => {
  * The compact settings index the search modal fetches: the page that documents the settings, and what each search
  * result row shows.
  * @param {Setting[]} settings
- * @param {string} page the settings reference page's URL, including the deployment base path
+ * @param {string} page the settings reference page's path, without the deployment base path: search links to the
+ *   page in the reader's locale
  * @returns {{ page: string, settings: SettingsSearchEntry[] }}
  */
 export const buildSettingsSearchIndex = (settings, page) => ({

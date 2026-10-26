@@ -19,7 +19,7 @@ describe('resolveScope', () => {
     const state = resolveScope(models);
     assert.equal(state.scope, 'topic');
     assert.deepEqual(pressed(state), ['topic']);
-    assert.deepEqual(state.filters, { topic: 'Models' });
+    assert.deepEqual(state.filters, { topic: 'models' });
     assert.equal(state.showSettings, false);
     assert.equal(state.announcement, 'Searching in Models');
   });
@@ -46,7 +46,7 @@ describe('resolveScope', () => {
 
   it('shows settings in the scope of the topic that documents them', () => {
     const state = resolveScope({ id: 'configure', title: 'Configure & Deploy' });
-    assert.deepEqual(state.filters, { topic: 'Configure & Deploy' });
+    assert.deepEqual(state.filters, { topic: 'configure' });
     assert.equal(state.showSettings, true);
   });
 });
@@ -100,7 +100,7 @@ describe('toPageRows', () => {
     url: '/fp8/',
     excerpt: 'page excerpt',
     meta: { title: 'FP8 Storage' },
-    filters: { topic: ['Configure & Deploy'] },
+    filters: { topic: ['configure'] },
     sub_results: [
       { title: 'FP8 Storage', url: '/fp8/', excerpt: 'intro', locations: [1] },
       { title: 'Hardware', url: '/fp8/#hardware', excerpt: 'hw', anchor: { id: 'hardware' }, locations: [5, 6, 7] },
@@ -110,14 +110,14 @@ describe('toPageRows', () => {
 
   it('keeps the sections with the most matches, in page order, linking to their anchors', () => {
     assert.deepEqual(toPageRows(page, 2), [
-      { url: '/fp8/#hardware', page: 'FP8 Storage', section: 'Hardware', excerpt: 'hw', topic: 'Configure & Deploy' },
-      { url: '/fp8/#enabling', page: 'FP8 Storage', section: 'Enabling', excerpt: 'on', topic: 'Configure & Deploy' },
+      { url: '/fp8/#hardware', page: 'FP8 Storage', section: 'Hardware', excerpt: 'hw', topic: 'configure' },
+      { url: '/fp8/#enabling', page: 'FP8 Storage', section: 'Enabling', excerpt: 'on', topic: 'configure' },
     ]);
   });
 
   it('shows a match before the first heading as the page itself', () => {
     const [intro] = toPageRows({ ...page, sub_results: page.sub_results.slice(0, 1) }, 2);
-    assert.deepEqual(intro, { url: '/fp8/', page: 'FP8 Storage', section: undefined, excerpt: 'intro', topic: 'Configure & Deploy' });
+    assert.deepEqual(intro, { url: '/fp8/', page: 'FP8 Storage', section: undefined, excerpt: 'intro', topic: 'configure' });
   });
 
   it('falls back to the page when Pagefind has no sections, and leaves pages outside every topic untagged', () => {
@@ -128,15 +128,22 @@ describe('toPageRows', () => {
 });
 
 describe('groupByTopic', () => {
-  it('orders groups by their best row and keeps row order within each group', () => {
+  it('orders groups by their best row, keeps row order within each group and titles them by topic', () => {
+    const titles = new Map([
+      ['configure', 'Configure & Deploy'],
+      ['models', 'Models'],
+    ]);
     const rows = [
-      { url: '/a/', topic: 'Configure & Deploy' },
-      { url: '/b/', topic: 'Models' },
+      { url: '/a/', topic: 'configure' },
+      { url: '/b/', topic: 'models' },
       { url: '/c/' },
-      { url: '/d/', topic: 'Configure & Deploy' },
+      { url: '/d/', topic: 'configure' },
     ];
     assert.deepEqual(
-      groupByTopic(rows, 'Other pages').map(({ topic, rows: groupRows }) => [topic, groupRows.map((row) => row.url)]),
+      groupByTopic(rows, titles, 'Other pages').map(({ label, rows: groupRows }) => [
+        label,
+        groupRows.map((row) => row.url),
+      ]),
       [
         ['Configure & Deploy', ['/a/', '/d/']],
         ['Models', ['/b/']],

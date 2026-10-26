@@ -1,3 +1,4 @@
+import { splitSitePath } from '../config/locales.mjs';
 import { generateDocsId, getSortPrefix, stripSortPrefix } from './sort-prefix.mjs';
 
 // Sidebar post-processing for the Starlight route middleware (`src/route-data.ts`): sort-prefix ordering,
@@ -22,17 +23,12 @@ export const trimSlashes = (path) => path.replace(/^\/+|\/+$/g, '');
 export const parentDirectory = (id) => id.slice(0, Math.max(id.lastIndexOf('/'), 0));
 
 /**
- * Maps a sidebar link's href to a docs page id, removing the deployment base path.
+ * Maps a sidebar link's href to the English docs page id, removing the deployment base path and any locale: a
+ * translation mirrors its English file's name and directory, so English data drives every locale's sidebar.
  * @param {string} baseUrl
  * @returns {(href: string) => string}
  */
-export const makeHrefToId = (baseUrl) => {
-  const basePath = trimSlashes(baseUrl);
-  return (href) => {
-    const path = trimSlashes(href);
-    return basePath && path.startsWith(`${basePath}/`) ? path.slice(basePath.length + 1) : path;
-  };
-};
+export const makeHrefToId = (baseUrl) => (href) => trimSlashes(splitSitePath(href, baseUrl)?.path ?? href);
 
 /**
  * A docs file's directory as a URL path, e.g. `src/content/docs/Users Guide/03.Models/x.mdx` -> `users-guide/models`.

@@ -185,6 +185,45 @@ describe('addCrossListings', () => {
   });
 });
 
+describe('locale routes', () => {
+  /** @param {string} id @param {string} label */
+  const localeLink = (id, label) => ({ ...link(id, label), href: `/InvokeAI/de/${id}/` });
+  const localeHrefToId = makeHrefToId('/InvokeAI/');
+
+  it("maps a translated or fallback page's href to the English page id", () => {
+    assert.equal(localeHrefToId('/InvokeAI/de/users-guide/gallery/boards/'), 'users-guide/gallery/boards');
+    assert.equal(localeHrefToId('/InvokeAI/hi/'), '');
+    // Only a known locale is a locale segment.
+    assert.equal(localeHrefToId('/InvokeAI/development/x/'), 'development/x');
+    assert.equal(localeHrefToId('/InvokeAI/it/x/'), 'it/x');
+  });
+
+  it('orders and cross-lists a locale sidebar from the English file names and directories', () => {
+    const sidebar = [
+      group('Models', 'models', [localeLink('models/local/sdxl', 'SDXL')]),
+      group('Video', 'video', [
+        { ...localeLink('video/wan', 'Wan'), autogenerate: { directory: 'video' } },
+        { ...localeLink('video/ltx', 'LTX'), autogenerate: { directory: 'video' } },
+      ]),
+    ];
+    const fileNames = new Map([
+      ['video/wan', '02.wan.mdx'],
+      ['video/ltx', '01.ltx.mdx'],
+    ]);
+    const directories = new Map([
+      ['models/local/sdxl', 'models/local'],
+      ['video/wan', 'video'],
+      ['video/ltx', 'video'],
+    ]);
+    sortAndRelabel(sidebar, fileNames, localeHrefToId);
+    addCrossListings(sidebar, [{ id: 'video/wan', directory: 'models/local' }], directories, localeHrefToId);
+    assert.deepEqual(labels(sidebar[1].entries), ['LTX', 'Wan']);
+    assert.deepEqual(labels(sidebar[0].entries), ['SDXL', 'Wan']);
+    assert.equal(sidebar[0].entries[1].href, '/InvokeAI/de/video/wan/');
+    assert.equal(sectionDirectory(sidebar[1], directories, localeHrefToId), 'video');
+  });
+});
+
 describe('paginate', () => {
   const sidebar = () => {
     const entries = [

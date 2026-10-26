@@ -1,7 +1,10 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+
+import { translatedLocales } from '../src/config/locales.mjs';
 
 const deployTarget = process.env.DEPLOY_TARGET ?? 'custom';
 const base = deployTarget === 'ghpages' ? '/InvokeAI' : '';
+const site = deployTarget === 'ghpages' ? 'https://invoke-ai.github.io' : 'https://v7.invoke.ai';
 const withBase = (path) => `${base}${path}`;
 
 /** @param {string} file a path inside dist */
@@ -34,6 +37,18 @@ const expectations = [
         : 'href="/contributing/new-contributor-guide/"',
       'newContributorChecklist.md',
     ],
+  },
+  {
+    // A locale's fallback page: content and header links stay in the locale, except to root-only releases. Search
+    // engines are pointed at the English page it shows.
+    file: 'de/contributing/index.html',
+    includes: [
+      `href="${withBase('/de/contributing/new-contributor-guide/')}`,
+      `href="${withBase('/de/start-here/installation/')}" aria-current="true"`,
+      `href="${withBase('/releases/')}"`,
+      `<link rel="canonical" href="${site}${withBase('/contributing/')}"/>`,
+    ],
+    excludes: [`href="${withBase('/contributing/new-contributor-guide/')}`],
   },
   {
     file: 'contributing/contribution_guides/newContributorChecklist/index.html',
@@ -81,12 +96,55 @@ const markdown = readDist(`${markdownPage.slice(1)}index.md`);
 if (!markdown.startsWith('# ') || markdown.includes('<html')) {
   errors.push(`dist${markdownPage}index.md is not the page's Markdown source`);
 }
-if (!readDist(`${markdownPage.slice(1)}index.html`).includes(`data-markdown-href="${withBase(`${markdownPage}index.md`)}"`)) {
-  errors.push(`${markdownPage.slice(1)}index.html does not link its page actions to ${withBase(`${markdownPage}index.md`)}`);
+// A locale's fallback page shows the English page, so its actions use the English source.
+for (const page of [markdownPage, `/de${markdownPage}`]) {
+  if (!readDist(`${page.slice(1)}index.html`).includes(`data-markdown-href="${withBase(`${markdownPage}index.md`)}"`)) {
+    errors.push(`${page.slice(1)}index.html does not link its page actions to ${withBase(`${markdownPage}index.md`)}`);
+  }
 }
 
-// Every internal link on the hand-written pages leads to a built file. The links validator only checks Markdown.
-for (const file of ['index.html', 'download/index.html', 'showcase/index.html']) {
+// starlight-changelogs builds release pages at the root only (`astro.config.mjs`).
+if (existsSync(new URL('../dist/de/releases', import.meta.url))) {
+  errors.push('dist/de/releases exists, but release pages are root-only');
+}
+
+// Language alternates list translations only, so pages that are never translated (the contributor docs stay English)
+// and pages without locale routes list none.
+const untranslatedFiles = [
+  'contributing/index.html',
+  'de/contributing/index.html',
+  '404.html',
+  'releases/index.html',
+  'download/index.html',
+];
+for (const file of untranslatedFiles) {
+  if (readDist(file).includes('<link rel="alternate" hreflang=')) {
+    errors.push(`${file} lists language alternates, but has no translation`);
+  }
+}
+
+/** @param {string} directory a directory inside dist */
+const htmlFilesIn = (directory) =>
+  readdirSync(new URL(`../dist/${directory}/`, import.meta.url), { recursive: true })
+    .filter((file) => file.endsWith('.html'))
+    .map((file) => `${directory}/${file}`);
+
+// Every internal link on the hand-written pages, and on every page of a locale, leads to a built file. The links
+// validator only checks Markdown links, and a locale's pages move links into the locale after rendering, where links
+// to root-only pages must stay at the root.
+/** @type {Map<string, boolean>} */
+const builtFiles = new Map();
+const isBuilt = (target) => {
+  if (!builtFiles.has(target)) builtFiles.set(target, existsSync(new URL(`../dist${target}`, import.meta.url)));
+  return builtFiles.get(target);
+};
+const linkCheckedFiles = [
+  'index.html',
+  'download/index.html',
+  'showcase/index.html',
+  ...translatedLocales.flatMap(htmlFilesIn),
+];
+for (const file of linkCheckedFiles) {
   const pageUrl = new URL(`${base}/${file.replace(/index\.html$/, '')}`, 'https://site.invalid');
   for (const [, href] of readDist(file).matchAll(/\shref="([^"]*)"/g)) {
     const url = new URL(href.replaceAll('&amp;', '&'), pageUrl);
@@ -97,7 +155,7 @@ for (const file of ['index.html', 'download/index.html', 'showcase/index.html'])
     }
     const path = decodeURIComponent(url.pathname.slice(base.length));
     const target = path.endsWith('/') ? `${path}index.html` : /\.[^/]+$/.test(path) ? path : `${path}/index.html`;
-    if (!existsSync(new URL(`../dist${target}`, import.meta.url))) {
+    if (!isBuilt(target)) {
       errors.push(`${file} links to ${href}, but dist has no ${target.slice(1)}`);
     }
   }

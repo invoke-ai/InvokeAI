@@ -2,10 +2,14 @@
 // Replaces Starlight's search with a command palette over the Pagefind index that Starlight builds: results scoped to
 // the current topic or all docs, grouped by topic, plus matching `invokeai.yaml` settings from a compact index
 // (`src/pages/settings-search.json.ts`). Pagefind and the settings index load on first use, not with the page.
+import { docsTopics } from '../../config/topics';
+
 const label = Astro.locals.t('search.label');
+// Results carry their topic's id (`PageTitle.astro`); groups show its title.
+const topicTitles = JSON.stringify(docsTopics.map(({ id, label: title }) => [id, title]));
 ---
 
-<docs-search>
+<docs-search data-topic-titles={topicTitles} data-locale={Astro.locals.starlightRoute.locale}>
   <button type="button" class="trigger" aria-label={label} aria-haspopup="dialog" aria-keyshortcuts="Control+K /">
     <svg class="trigger__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"
       ><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg
@@ -77,6 +81,7 @@ const label = Astro.locals.t('search.label');
 </script>
 
 <script>
+  import { localizedHref } from '../base-path';
   import {
     RECENT_STORAGE_KEY,
     addRecent,
@@ -232,6 +237,8 @@ const label = Astro.locals.t('search.label');
       const chips = [...dialog.querySelectorAll<HTMLButtonElement>('.chip')];
       const topicChip = chips.find((chip) => chip.dataset.scope === 'topic')!;
 
+      const topicTitles = new Map<string, string>(JSON.parse(this.dataset.topicTitles!));
+      const locale = this.dataset.locale;
       const topicMeta = document.querySelector<HTMLMetaElement>('meta[name="docs-topic"]');
       const topic = topicMeta?.dataset.title ? { id: topicMeta.content, title: topicMeta.dataset.title } : undefined;
       if (topic) topicChip.textContent = topic.title;
@@ -333,12 +340,14 @@ const label = Astro.locals.t('search.label');
           if (showSettings && settings.length > 0) {
             sections.push({
               label: 'Settings · invokeai.yaml',
-              rows: settings.slice(0, MAX_SETTINGS).map((setting) => settingRow(setting, settingsIndex!.page)),
+              rows: settings
+                .slice(0, MAX_SETTINGS)
+                .map((setting) => settingRow(setting, localizedHref(settingsIndex!.page, { locale, base: BASE }))),
             });
           }
           const rows = pages.flatMap((page) => toPageRows(page, MAX_SECTIONS_PER_PAGE));
-          for (const group of groupByTopic(rows, UNTITLED_TOPIC)) {
-            sections.push({ label: group.topic, rows: group.rows.map(pageRow) });
+          for (const group of groupByTopic(rows, topicTitles, UNTITLED_TOPIC)) {
+            sections.push({ label: group.label, rows: group.rows.map(pageRow) });
           }
 
           const found = response.results.length + (showSettings ? settings.length : 0);

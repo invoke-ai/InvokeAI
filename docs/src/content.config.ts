@@ -19,7 +19,15 @@ export const collections = {
       }),
     }),
   }),
-  i18n: defineCollection({ loader: i18nLoader(), schema: i18nSchema() }),
+  i18n: defineCollection({
+    loader: i18nLoader(),
+    schema: i18nSchema({
+      extend: z.object({
+        // Replaces `page.editLink` on translated pages, which link to the Crowdin project (`src/route-data.ts`).
+        'page.translateLink': z.string().optional(),
+      }),
+    }),
+  }),
   // Community artwork for `/showcase/` and the home page. `src/content/showcase/README.md` explains how to add one.
   showcase: defineCollection({
     loader: glob({ pattern: '**/*.{yaml,yml,json}', base: './src/content/showcase' }),

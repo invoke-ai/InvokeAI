@@ -29,7 +29,7 @@ export const resolveScope = (topic, requested = topic ? 'topic' : 'all') => {
     scope,
     /** The topic results are limited to, if any. */
     scoped,
-    filters: scoped ? { topic: scoped.title } : undefined,
+    filters: scoped ? { topic: scoped.id } : undefined,
     showSettings: !scoped || scoped.id === SETTINGS_TOPIC_ID,
     /** Read out when a control changes the scope. */
     announcement: scoped ? `Searching in ${scoped.title}` : 'Searching all docs',
@@ -98,7 +98,8 @@ export const matchSettings = (settings, query) => {
  *   filters?: Record<string, string[]>,
  *   sub_results?: PagefindSubResult[],
  * }} PagefindResultData
- * @typedef {{ url: string, page: string, section?: string, excerpt: string, topic?: string }} PageRow
+ * @typedef {{ url: string, page: string, section?: string, excerpt: string, topic?: string }} PageRow `topic` is the
+ *   page's topic id, from its Pagefind `topic` filter
  */
 
 /**
@@ -129,21 +130,22 @@ export const toPageRows = (data, maxSections) => {
 };
 
 /**
- * Groups rows by topic, keeping the rank order: groups are ordered by their best row.
+ * Groups rows under their topic's title, keeping the rank order: groups are ordered by their best row.
  * @param {PageRow[]} rows
+ * @param {Map<string, string>} titles topic id -> title
  * @param {string} untitled the group label for pages outside every topic
- * @returns {{ topic: string, rows: PageRow[] }[]}
+ * @returns {{ label: string, rows: PageRow[] }[]}
  */
-export const groupByTopic = (rows, untitled) => {
+export const groupByTopic = (rows, titles, untitled) => {
   /** @type {Map<string, PageRow[]>} */
   const groups = new Map();
   for (const row of rows) {
-    const topic = row.topic ?? untitled;
-    const group = groups.get(topic);
+    const label = (row.topic && titles.get(row.topic)) || untitled;
+    const group = groups.get(label);
     if (group) group.push(row);
-    else groups.set(topic, [row]);
+    else groups.set(label, [row]);
   }
-  return [...groups].map(([topic, groupRows]) => ({ topic, rows: groupRows }));
+  return [...groups].map(([label, groupRows]) => ({ label, rows: groupRows }));
 };
 
 /**

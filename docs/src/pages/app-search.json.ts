@@ -4,12 +4,14 @@
 import type { APIRoute } from 'astro';
 import { getCollection, render } from 'astro:content';
 
+import { getPathLocale } from '../config/locales.mjs';
 import { docsTopics } from '../config/topics';
 import { buildAppSearchIndex } from '../lib/app-search.mjs';
 
 export const GET: APIRoute = async () => {
   // Headings come from Astro's own render, so their anchors are the ids the pages carry.
-  const index = await buildAppSearchIndex(await getCollection('docs'), {
+  // The app links to the English pages.
+  const index = await buildAppSearchIndex(await getCollection('docs', ({ id }) => !getPathLocale(id)), {
     topics: docsTopics,
     getHeadings: async (doc) => (await render(doc)).headings,
   });

@@ -1,8 +1,15 @@
 ---
 import Default from '@astrojs/starlight/components/MarkdownContent.astro';
+
+import { localizeHtmlLinks } from '../locale-links.mjs';
+
+// On a locale's routes, links into the docs stay in that locale, also on pages that show the English content.
+const { locale } = Astro.locals.starlightRoute;
+const localizedHtml =
+  locale && localizeHtmlLinks(await Astro.slots.render('default'), { base: import.meta.env.BASE_URL, locale });
 ---
 
-<Default><slot /></Default>
+<Default>{localizedHtml ? <Fragment set:html={localizedHtml} /> : <slot />}</Default>
 
 <script>
   // A table wider than the content column scrolls in its wrapper (`plugins/rehype-table-scroll.mjs`). Make that wrapper

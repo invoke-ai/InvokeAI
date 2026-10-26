@@ -48,10 +48,10 @@ describe('buildSettingsSearchIndex', () => {
         },
         { name: 'ssl_keyfile', type: 'typing.Optional[pathlib.Path]', default: null, description: 'SSL key file.' },
       ],
-      '/InvokeAI/configuration/invokeai-yaml/',
+      '/configuration/invokeai-yaml/',
     );
     assert.deepEqual(index, {
-      page: '/InvokeAI/configuration/invokeai-yaml/',
+      page: '/configuration/invokeai-yaml/',
       settings: [
         {
           key: 'allow_methods',

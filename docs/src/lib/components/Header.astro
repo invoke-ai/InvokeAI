@@ -4,19 +4,28 @@ import Download from '@lucide/astro/icons/download';
 import Search from 'virtual:starlight/components/Search';
 
 import { socialConfig } from '../../config/social';
-import { withBase } from '../base-path';
+import { localizedHref, withBase } from '../base-path';
+import { isLocalizablePage } from '../docs-page';
+import LanguageMenu from './LanguageMenu.astro';
 import MainNav from './MainNav.astro';
 import VersionMenu from './VersionMenu.astro';
 
 const base = import.meta.env.BASE_URL;
 // Without a sidebar drawer, the main navigation stays in the header on phones.
-const { hasSidebar } = Astro.locals.starlightRoute;
+const { entry, hasSidebar, locale } = Astro.locals.starlightRoute;
+// Matches the language menu's own condition (`LanguageMenu.astro`).
+const hasLanguageMenu = await isLocalizablePage(entry.id);
 // YouTube is in the footer.
 const headerSocial = (socialConfig ?? []).filter(({ icon }) => icon === 'github' || icon === 'discord');
 ---
 
-<div class:list={['docs-header', { 'docs-header--nav-on-phones': !hasSidebar }]}>
-  <a href={withBase('/', base)} class="home" aria-label="Invoke home">
+<div
+  class:list={[
+    'docs-header',
+    { 'docs-header--nav-on-phones': !hasSidebar, 'docs-header--has-language-menu': hasLanguageMenu },
+  ]}
+>
+  <a href={localizedHref('/', { locale, base })} class="home" aria-label="Invoke home">
     <svg class="logomark" width="22" height="22" viewBox="0 0 44 44" fill="none" aria-hidden="true">
       <path d="M29.1951 10.6667H42V2H2V10.6667H14.8049L29.1951 33.3333H42V42H2V33.3333H14.8049" stroke-width="3.6"
       ></path>
@@ -31,7 +40,10 @@ const headerSocial = (socialConfig ?? []).filter(({ icon }) => icon === 'github'
   </div>
 
   <div class="actions print:hidden">
-    <VersionMenu />
+    <LanguageMenu placement="header" />
+    <div class="version">
+      <VersionMenu />
+    </div>
     {
       headerSocial.map(({ label, href, icon }) => (
         <a class="social docs-button docs-button--ghost docs-button--icon docs-button--lg" href={href} aria-label={label} title={label}>
@@ -99,12 +111,18 @@ const headerSocial = (socialConfig ?? []).filter(({ icon }) => icon === 'github'
     display: none;
   }
 
+  .version {
+    display: contents;
+  }
+
   /*
-   * Phones: the logomark, search, version and an icon-only download link fit beside the menu button, or, on pages
-   * without one, beside the main navigation, which needs the wordmark's room.
+   * Phones: the logomark, search, version and an icon-only download link fit beside the menu button, whose drawer
+   * holds the language menu. Pages without one keep the main navigation in the header, which needs the wordmark's
+   * room, and the version menu's too where an icon-only language menu shows.
    */
   @media (max-width: 29.99rem) {
-    .docs-header--nav-on-phones .wordmark {
+    .docs-header--nav-on-phones .wordmark,
+    .docs-header--nav-on-phones.docs-header--has-language-menu .version {
       display: none;
     }
 

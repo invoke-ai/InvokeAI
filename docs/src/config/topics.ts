@@ -4,9 +4,9 @@
 type TopicGroup = 'Use' | 'Run' | 'Build' | 'Help';
 
 type DocsTopic = {
-  /** Stable identifier, exposed to client scripts through the `docs-topic` meta tag. */
+  /** Stable identifier: the Pagefind `topic` filter value, also exposed through the `docs-topic` meta tag. */
   id: string;
-  /** Unique label, shown in the switcher and used as the Pagefind `topic` filter value. */
+  /** Unique label, shown in the switcher; starlight-sidebar-topics identifies the current topic by it. */
   label: string;
   description: string;
   group: TopicGroup;

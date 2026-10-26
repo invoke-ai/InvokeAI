@@ -4,6 +4,7 @@ import type { StarlightRouteData } from '@astrojs/starlight/route-data';
 import { getCollection } from 'astro:content';
 
 import { getSidebarSectionIcon } from '../../config/icons';
+import { getPathLocale } from '../../config/locales.mjs';
 import { fileDirectory, flattenLinks, makeHrefToId, sectionDirectory } from '../sidebar.mjs';
 
 type SidebarEntry = StarlightRouteData['sidebar'][number];
@@ -18,9 +19,12 @@ type Props = {
 
 // Starlight's `SidebarSublist`, with an icon on each section heading (from `config/icons.ts`).
 const { sublist, nested = false } = Astro.props;
+// English pages only, as `hrefToId` maps every locale's links to English ids.
 const directories =
   Astro.props.directories ??
-  new Map((await getCollection('docs')).map((doc) => [doc.id, fileDirectory(doc.filePath)]));
+  new Map(
+    (await getCollection('docs', ({ id }) => !getPathLocale(id))).map((doc) => [doc.id, fileDirectory(doc.filePath)])
+  );
 const hrefToId = makeHrefToId(import.meta.env.BASE_URL);
 
 const sectionIcon = (group: SidebarGroup) => {

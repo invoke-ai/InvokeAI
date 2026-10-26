@@ -1,0 +1,63 @@
+---
+import Languages from '@lucide/astro/icons/languages';
+
+import { locales, splitSitePath } from '../../config/locales.mjs';
+import { localizedHref } from '../base-path';
+import { isLocalizablePage } from '../docs-page';
+import LinkMenu from './LinkMenu.astro';
+
+type Props = {
+  /** `drawer`, the default, is the copy Starlight renders as its `LanguageSelect` in the mobile drawer's footer. */
+  placement?: 'header' | 'drawer';
+};
+
+const { placement = 'drawer' } = Astro.props;
+const { entry, hasSidebar, locale } = Astro.locals.starlightRoute;
+const base = import.meta.env.BASE_URL;
+
+// Every docs page exists in every locale, translated or not, so each language links to the current page.
+const isShown = await isLocalizablePage(entry.id);
+const path = splitSitePath(Astro.url.pathname, base)?.path ?? '/';
+const current = locales[(locale ?? 'root') as keyof typeof locales];
+const code = current.lang.toUpperCase();
+const items = Object.entries(locales).map(([key, { label, lang }]) => {
+  const itemLocale = key === 'root' ? undefined : key;
+  return { label, lang, href: localizedHref(path, { locale: itemLocale, base }), isCurrent: itemLocale === locale };
+});
+---
+
+{
+  isShown && (
+    <div
+      class:list={[
+        'language-menu',
+        // Pages with a sidebar show the drawer's copy on narrow screens.
+        { 'language-menu--in-drawer-when-narrow': placement === 'header' && hasSidebar },
+      ]}
+    >
+      <LinkMenu
+        id={`docs-language-menu-${placement}`}
+        label={code}
+        accessibleLabel={`${Astro.locals.t('languageSelect.accessibleLabel')}: ${code} (${current.label})`}
+        items={items}
+        direction={placement === 'drawer' ? 'up' : 'down'}
+        iconOnlyWhenNarrow={placement === 'header'}
+      >
+        <Languages slot="icon" size={14} />
+      </LinkMenu>
+    </div>
+  )
+}
+
+<style>
+  .language-menu {
+    display: flex;
+    align-items: center;
+  }
+
+  @media (max-width: 49.99rem) {
+    .language-menu--in-drawer-when-narrow {
+      display: none;
+    }
+  }
+</style>

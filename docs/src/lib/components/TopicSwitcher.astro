@@ -5,7 +5,7 @@ import Search from '@lucide/astro/icons/search';
 
 import { getTopicIcon } from '../../config/icons';
 import { docsTopics, topicGroups, type DocsTopic } from '../../config/topics';
-import { withBase } from '../base-path';
+import { localizedHref } from '../base-path';
 
 type Props = {
   current: DocsTopic;
@@ -13,6 +13,7 @@ type Props = {
 
 const { current } = Astro.props;
 const base = import.meta.env.BASE_URL;
+const { locale } = Astro.locals.starlightRoute;
 const CurrentIcon = getTopicIcon(current);
 const groups = topicGroups.map((group) => ({ group, topics: docsTopics.filter((topic) => topic.group === group) }));
 ---
@@ -64,7 +65,7 @@ const groups = topicGroups.map((group) => ({ group, topics: docsTopics.filter((t
                   id={`docs-topic-option-${topic.id}`}
                   class="option"
                   role="option"
-                  href={withBase(topic.link, base)}
+                  href={localizedHref(topic.link, { locale, base })}
                   tabindex="-1"
                   aria-selected="false"
                   aria-current={isCurrent ? 'page' : undefined}
