@@ -410,6 +410,84 @@ const runShortcutGuideJourney = async (browser) => {
   return { id: 'workbench-shortcuts', status: 'passed' };
 };
 
+/**
+ * A status-bar chip is named by its compact content, so every built-in chip must say which widget it is first. Enable
+ * every bottom widget the menu offers, then match each chip's name to one enabled label.
+ */
+const runStatusBarNamesJourney = async (browser) => {
+  const { context, page, pageErrors } = await openRepresentativePage(browser, representativeProjectPath);
+  const id = 'workbench-status-bar-names';
+
+  try {
+    await waitForWorkbench(page);
+    const footer = page.locator('footer');
+    await footer.getByRole('button', { exact: true, name: 'Bottom widget visibility' }).click();
+    const menu = page.getByRole('menu');
+    await menu.waitFor();
+    const items = menu.getByRole('menuitemcheckbox');
+
+    for (let index = 0; index < (await items.count()); index++) {
+      const item = items.nth(index);
+
+      if (
+        (await item.getAttribute('aria-checked')) === 'false' &&
+        (await item.getAttribute('aria-disabled')) !== 'true'
+      ) {
+        await item.click();
+        await page.waitForFunction(
+          (element) => element.getAttribute('aria-checked') === 'true',
+          await item.elementHandle()
+        );
+      }
+    }
+
+    const labels = [];
+
+    for (let index = 0; index < (await items.count()); index++) {
+      if ((await items.nth(index).getAttribute('aria-checked')) === 'true') {
+        // Item text only: a failed widget's row also carries a "Failed" note.
+        labels.push(((await items.nth(index).locator('[data-part="item-text"]').textContent()) ?? '').trim());
+      }
+    }
+
+    await page.keyboard.press('Escape');
+    await menu.waitFor({ state: 'hidden' });
+    // A chip still loading its view is named "Loading <label>" by its busy status fallback.
+    await page.waitForFunction(() => document.querySelector('footer [aria-busy="true"]') === null);
+    await waitForSettledDocument(page);
+    const chips = footer.locator('[data-status-bar-widget] > [role="button"]');
+    const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    assert.ok(labels.length >= 8, `Every built-in bottom widget must be enabled; got ${JSON.stringify(labels)}.`);
+    assert.equal(await chips.count(), labels.length, 'Each enabled bottom widget must render one status-bar chip.');
+
+    for (const label of labels) {
+      // Chromium's computed name; the label must lead as whole words ("Gallery: 102 items", "Queue status Queue idle").
+      const named = footer.getByRole('button', { name: new RegExp(`^${escapeRegExp(label)}(?:$|[\\s:])`) });
+      assert.equal(
+        await chips.and(named).count(),
+        1,
+        `Exactly one status-bar chip's name must start with "${label}"; chips: ${(await chips.allInnerTexts()).join(' | ')}.`
+      );
+    }
+
+    await assertNoAxeViolations(page, id, { include: ['footer'] });
+
+    if (pageErrors.length > 0) {
+      throw new AggregateError(pageErrors, `${id} raised uncaught browser errors.`);
+    }
+  } catch (error) {
+    const directory = resolve(root, 'artifacts/accessibility');
+    await mkdir(directory, { recursive: true });
+    await page.screenshot({ path: resolve(directory, `${id}.png`) }).catch(() => undefined);
+    throw error;
+  } finally {
+    await context.close();
+  }
+
+  return { id: 'workbench-status-bar-names', status: 'passed' };
+};
+
 const runKeyboardJourney = async (browser) => {
   const { context, page, pageErrors } = await openRepresentativePage(browser, '/#/');
 
@@ -950,7 +1028,7 @@ const runKeepAliveStateJourney = async (browser) => {
 
     await selectLayoutPreset(page, 'Edit', 'Canvas');
 
-    const zoomTrigger = page.getByRole('button', { exact: true, name: 'Zoom level' });
+    const zoomTrigger = page.getByRole('button', { name: /^Zoom level\b/ });
     await zoomTrigger.click();
     await page.getByRole('menuitem', { exact: true, name: '200%' }).click();
     await waitForSettledDocument(page);
@@ -1344,6 +1422,9 @@ try {
   }
   if (!requestedJourney || requestedJourney === 'workbench-shortcuts') {
     reports.push(await runShortcutGuideJourney(browser));
+  }
+  if (!requestedJourney || requestedJourney === 'workbench-status-bar-names') {
+    reports.push(await runStatusBarNamesJourney(browser));
   }
   if (!requestedJourney || requestedJourney === 'workbench-topbar-responsive') {
     reports.push(await runResponsiveTopbarJourney(browser));

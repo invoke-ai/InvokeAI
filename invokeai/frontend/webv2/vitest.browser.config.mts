@@ -154,7 +154,7 @@ export default mergeConfig(
         provider: playwright(),
       },
       include: ['src/**/*.browser.test.{ts,tsx}'],
-      setupFiles: ['./scripts/browser-test-console.ts', './scripts/browser-test-viewport.ts'],
+      setupFiles: ['./scripts/browser-test-console.ts', './scripts/browser-test-pointer.ts'],
     },
   })
 );
