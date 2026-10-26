@@ -279,6 +279,64 @@ describe('normalizeGenerateSettings', () => {
     expect(normalized?.vaePrecision).toBe('fp32');
   });
 
+  it('keeps valid hosted-provider options and drops the rest back to provider defaults', () => {
+    const kept = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      externalImageSize: '2K',
+      geminiTemperature: 0.5,
+      geminiThinkingLevel: 'minimal',
+      openaiBackground: 'opaque',
+      openaiInputFidelity: 'high',
+      openaiQuality: 'medium',
+      seedreamOptimizePrompt: true,
+      seedreamWatermark: true,
+    });
+
+    expect(kept).toMatchObject({
+      externalImageSize: '2K',
+      geminiTemperature: 0.5,
+      geminiThinkingLevel: 'minimal',
+      openaiBackground: 'opaque',
+      openaiInputFidelity: 'high',
+      openaiQuality: 'medium',
+      seedreamOptimizePrompt: true,
+      seedreamWatermark: true,
+    });
+
+    const dropped = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      externalImageSize: '',
+      geminiTemperature: 2.5,
+      geminiThinkingLevel: 'max',
+      openaiBackground: 'clear',
+      openaiInputFidelity: 'medium',
+      openaiQuality: 'ultra',
+      seedreamOptimizePrompt: 'yes',
+      seedreamWatermark: 1,
+    });
+
+    expect(dropped).toMatchObject({
+      externalImageSize: null,
+      geminiTemperature: null,
+      geminiThinkingLevel: null,
+      openaiBackground: 'auto',
+      openaiInputFidelity: null,
+      openaiQuality: 'auto',
+      seedreamOptimizePrompt: false,
+      seedreamWatermark: false,
+    });
+  });
+
+  it.each([0, 2])('preserves the Gemini temperature boundary %s', (geminiTemperature) => {
+    expect(normalizeGenerateSettings({ ...legacyStoredValues, geminiTemperature })?.geminiTemperature).toBe(
+      geminiTemperature
+    );
+  });
+
+  it('drops a negative Gemini temperature back to the provider default', () => {
+    expect(normalizeGenerateSettings({ ...legacyStoredValues, geminiTemperature: -0.1 })?.geminiTemperature).toBeNull();
+  });
+
   it('bounds the model-family tuning fields and defaults the rest', () => {
     const normalized = normalizeGenerateSettings({
       ...legacyStoredValues,
@@ -391,6 +449,17 @@ describe('the Anima inpaint adapter settings', () => {
         animaInpaintAdapterWeight: 'heavy',
       })
     ).toMatchObject({ animaInpaintAdapterModel: null, animaInpaintAdapterWeight: 1 });
+  });
+
+  it('keeps the adapter switched on unless a stored value turns it off', () => {
+    // Projects saved before the toggle existed wired a selected adapter, so a missing value means on.
+    expect(normalizeGenerateSettings(legacyStoredValues)?.animaInpaintAdapterEnabled).toBe(true);
+    const enabledFrom = (stored: unknown) =>
+      normalizeGenerateSettings({ ...legacyStoredValues, animaInpaintAdapterEnabled: stored })
+        ?.animaInpaintAdapterEnabled;
+    expect(enabledFrom(false)).toBe(false);
+    expect(enabledFrom(true)).toBe(true);
+    expect(enabledFrom('off')).toBe(true);
   });
 });
 
@@ -588,6 +657,8 @@ describe('dimension helpers', () => {
     expect(getGenerationDimensions({ base: 'flux2', type: 'main' }).grid).toBe(16);
     expect(getGenerationDimensions({ base: 'qwen-image', type: 'main' }).grid).toBe(16);
     expect(getGenerationDimensions({ base: 'cogview4', type: 'main' }).grid).toBe(32);
+    // Hosted providers bucket sizes themselves, so their presets (e.g. 1365 wide) are kept pixel-exact.
+    expect(getGenerationDimensions({ base: 'external', type: 'external_image_generator' }).grid).toBe(1);
     expect(clampDimension(888, getGenerationDimensions({ base: 'flux2', type: 'main' }).grid)).toBe(896);
   });
 });

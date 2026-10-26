@@ -20,7 +20,7 @@ interface LivePreviewFollow {
    * else null.
    */
   followedSessionId: string | null;
-  /** Turns live-follow on and pins `sessionId`: a tile click, or an arrow step onto a tile. */
+  /** Sets Auto-switch to In progress and pins `sessionId`: a tile click, or an arrow step onto a tile. */
   follow(sessionId: string): void;
   pin(sessionId: string): void;
   showAll(): void;
@@ -33,7 +33,8 @@ export const LivePreviewFollowProvider = ({ children }: { children: ReactNode })
   const { projectId, items, enabled } = useActiveProjectSelector((project) => ({
     projectId: project.id,
     items: project.queue.items,
-    enabled: project.settings.showProgressImagesInViewer,
+    // Live frames show only on In progress; Newest switches to finished results alone.
+    enabled: project.settings.viewerAutoSwitch === 'progress',
   }));
   const running = useActiveProgressTargets();
   const followed = useFollowedProgressTargets();
@@ -72,7 +73,7 @@ export const LivePreviewFollowProvider = ({ children }: { children: ReactNode })
       pinnedSessionId,
       followedSessionId,
       follow: (sessionId) => {
-        account.updateProjectPreferences({ showProgressImagesInViewer: true });
+        account.updateProjectPreferences({ viewerAutoSwitch: 'progress' });
         setSelection({ projectId, sessionId });
       },
       pin: (sessionId) => setSelection({ projectId, sessionId }),

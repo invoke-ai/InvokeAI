@@ -30,8 +30,10 @@ import {
 } from '@features/gallery';
 import {
   canOnBoard,
+  getGalleryAutoAddBoardId,
+  getGalleryBoardDestinationGroups,
+  getGalleryBoardLabel,
   getSelectedGalleryImageFromValues,
-  isOwnGalleryBoard,
   toGalleryItemKey,
 } from '@features/gallery/contracts';
 import { FindInGalleryThumbnailButton } from '@features/gallery/mediaSlot';
@@ -40,9 +42,10 @@ import {
   canAddToCachedGalleryBoard,
   ensureGalleryBoardDestinations,
   galleryBoardsOptions,
+  getCachedGalleryBoard,
   invalidateGallery,
 } from '@features/gallery/queries';
-import { useHostGalleryBoards } from '@features/gallery/react';
+import { useHostGalleryBoards, useOptionalGalleryHostProjectContext } from '@features/gallery/react';
 import { galleryImageUrls, galleryVideoUrls } from '@features/gallery/utility';
 import { DEFAULT_LORA_WEIGHT_CONFIG, sanitizeBatchCount, SCHEDULER_OPTIONS } from '@features/generation/settings';
 import { isInvocationNode } from '@features/workflow/contracts';
@@ -501,50 +504,127 @@ const SchedulerInput = ({ id, invalid, onChange, template, value }: WorkflowFiel
   />
 );
 
+interface BoardOption {
+  /** The gallery destination group the board lists under; empty for the fixed Auto and Uncategorized choices. */
+  group: string;
+  label: string;
+  value: string;
+}
+
+const FIXED_BOARD_GROUP = '';
+
 const BoardInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
+  const { t } = useTranslation();
   // The gallery's own listing, so grants, revocations and new boards reach the field as they reach the panel.
   const { data } = useQuery(galleryBoardsOptions());
   const listedBoards = useHostGalleryBoards(data);
+  const host = useOptionalGalleryHostProjectContext();
   // Only boards a node's results may land on: someone else's board the caller can only view would refuse them after
   // the run.
   const boards = useMemo(
     () => listedBoards.filter((board) => board.kind === 'board' && canOnBoard(board, 'add_media')),
     [listedBoards]
   );
-
+  const queryClient = useQueryClient();
+  // The auto-add board as chosen, before any refusal: one the live listing lacks may be archived, which compilation
+  // still accepts, so its label waits on the listing of archived boards too (shared, and read only then).
+  const chosenAutoBoardId = useWorkflowProjectSelector((project) =>
+    getGalleryAutoAddBoardId(project.galleryValues, () => true)
+  );
+  const needsArchivedListing =
+    data !== undefined &&
+    chosenAutoBoardId !== null &&
+    chosenAutoBoardId !== 'none' &&
+    !listedBoards.some((board) => board.id === chosenAutoBoardId);
+  useQuery({ ...galleryBoardsOptions({ includeArchived: true }), enabled: needsArchivedListing });
+  // Compilation sends Auto to the gallery's auto-add board, deciding from the cached listings; the label names the
+  // board the same decision resolves to now. Either listing arriving re-renders the field, which reads it again.
+  const autoBoardId = useWorkflowProjectSelector((project) =>
+    getGalleryAutoAddBoardId(project.galleryValues, (boardId) => canAddToCachedGalleryBoard(boardId, queryClient))
+  );
+  const translate = useCallback((key: string) => t(key), [t]);
+  const groups = useMemo(
+    () =>
+      host
+        ? getGalleryBoardDestinationGroups({
+            boards,
+            projectId: host.projectId ?? null,
+            projectName: host.projectName,
+            projectNames: new Map(host.projects?.map((project) => [project.id, project.name])),
+            t: translate,
+          })
+        : [{ boards, id: 'boards', label: '' }],
+    [boards, host, translate]
+  );
+  const autoBoard =
+    autoBoardId === null
+      ? undefined
+      : (listedBoards.find((board) => board.id === autoBoardId) ?? getCachedGalleryBoard(autoBoardId, queryClient));
+  const autoBoardLabel =
+    autoBoardId === null || autoBoardId === 'none'
+      ? t('widgets.gallery.uncategorized')
+      : // The listing has not arrived yet.
+        autoBoard
+        ? getGalleryBoardLabel(autoBoard, translate)
+        : '…';
+  const options = useMemo<BoardOption[]>(
+    () => [
+      { group: FIXED_BOARD_GROUP, label: t('nodes.boardAuto', { board: autoBoardLabel }), value: 'auto' },
+      { group: FIXED_BOARD_GROUP, label: t('widgets.gallery.uncategorized'), value: 'none' },
+      ...groups.flatMap((group) =>
+        // Without a gallery host there are no group headings; boards list after the fixed choices.
+        group.boards.map((board) => ({
+          group: host ? group.id : FIXED_BOARD_GROUP,
+          label: getGalleryBoardLabel(board, translate),
+          value: board.id,
+        }))
+      ),
+    ],
+    [autoBoardLabel, groups, host, t, translate]
+  );
+  const groupLabels = useMemo(() => new Map(groups.map((group) => [group.id, group.label])), [groups]);
+  const renderGroupLabel = useCallback((group: string) => groupLabels.get(group) ?? null, [groupLabels]);
+  const collection = useMemo(() => createListCollection({ items: options }), [options]);
   const selected =
     value === 'auto' || value === 'none'
       ? value
       : typeof (value as { board_id?: unknown } | null)?.board_id === 'string'
         ? (value as { board_id: string }).board_id
         : 'auto';
-  const options = useMemo(
-    () => [
-      { label: 'Auto', value: 'auto' },
-      { label: 'None', value: 'none' },
-      ...boards.map((board) => ({
-        label: isOwnGalleryBoard(board) || !board.ownerName ? board.name : `${board.name} · ${board.ownerName}`,
-        value: board.id,
-      })),
-    ],
-    [boards]
+  const selectedValue = useMemo(
+    () => (options.some((option) => option.value === selected) ? [selected] : []),
+    [options, selected]
   );
+  const selectIds = useMemo(() => (id ? { trigger: `${id}-select` } : undefined), [id]);
   const onBoardChange = useCallback(
-    (next: string) => onChange(next === 'auto' || next === 'none' ? next : { board_id: next }),
+    ({ value: next }: { value: string[] }) => {
+      const nextValue = next[0];
+
+      if (nextValue !== undefined) {
+        onChange(nextValue === 'auto' || nextValue === 'none' ? nextValue : { board_id: nextValue });
+      }
+    },
     [onChange]
   );
 
   return (
-    <SelectInput
-      id={id}
+    <Select
+      aria-label={template.title}
+      className="nodrag"
+      collection={collection}
+      groupBy={getBoardOptionGroup}
+      ids={selectIds}
       invalid={invalid}
-      options={options}
-      title={template.title}
-      value={selected}
-      onChange={onBoardChange}
+      renderGroupLabel={renderGroupLabel}
+      value={selectedValue}
+      valueTextProps={SELECT_VALUE_TEXT_PROPS}
+      w="full"
+      onValueChange={onBoardChange}
     />
   );
 };
+
+const getBoardOptionGroup = (option: BoardOption): string => option.group;
 
 const MEDIA_FIELD_CONFIG = {
   image: {
@@ -894,7 +974,6 @@ const ImageCollectionInput = ({
           // The empty state keeps the drop target tall enough to hit and doubles as the picker trigger.
           <GalleryPickerPopover accept={IMAGE_ONLY} label={pickerLabel} selection={pickerSelection} onPick={onPick}>
             <chakra.button
-              aria-label={pickerLabel}
               className="nodrag"
               display="block"
               h="20"
@@ -1028,7 +1107,8 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
       <Box ref={setNodeRef} className="nodrag group" h="32" position="relative" rounded="sm" w="full">
         <GalleryPickerPopover accept={pickerAccept} label={pickerLabel} onPick={onPick}>
           <chakra.button
-            aria-label={pickerLabel}
+            // A chosen item shows only its thumbnail; the empty face names itself with its visible text.
+            aria-label={mediaName ? pickerLabel : undefined}
             className="nodrag"
             display="block"
             h="full"

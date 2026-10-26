@@ -174,6 +174,7 @@ def _decode(path: Path) -> list[np.ndarray]:
         reader.close()
 
 
+@pytest.mark.ffmpeg
 @pytest.mark.parametrize("fps", [0, 16])
 def test_whole_clip_at_its_own_rate_is_copied_without_re_encoding(tmp_path: Path, fps: int) -> None:
     """Extend Video passes an untrimmed source through this node on every extension; a
@@ -244,6 +245,7 @@ def _invoke_trim(tmp_path: Path, source: Path, start: int, end: int) -> tuple[Pa
     return saved, context
 
 
+@pytest.mark.ffmpeg
 @pytest.mark.parametrize("start,end", [(0, 80), (10, 80), (10, 99), (32, 63)])
 def test_trim_copies_the_keyframe_aligned_frames_inside_the_range(tmp_path: Path, start: int, end: int) -> None:
     """Trimming the source before extending it must not re-encode the frames that survive
@@ -270,6 +272,7 @@ def test_trim_copies_the_keyframe_aligned_frames_inside_the_range(tmp_path: Path
     assert context.videos.save.call_args.kwargs["duration"] == pytest.approx((end - start + 1) / 16.0)
 
 
+@pytest.mark.ffmpeg
 def test_trim_within_one_keyframe_interval_is_re_encoded(tmp_path: Path) -> None:
     source = tmp_path / "source.mp4"
     _textured_source(source, 100)
@@ -278,6 +281,7 @@ def test_trim_within_one_keyframe_interval_is_re_encoded(tmp_path: Path) -> None
     assert "Stream-copied" not in str(context.logger.info.call_args_list)
 
 
+@pytest.mark.ffmpeg
 def test_whole_clip_copy_does_not_carry_the_sources_generation_metadata(tmp_path: Path) -> None:
     """save() rewrites the record into the file, but falls back to a sidecar if that fails,
     and embedded tags win on read: a copy still carrying the source's would be read back
@@ -293,6 +297,7 @@ def test_whole_clip_copy_does_not_carry_the_sources_generation_metadata(tmp_path
     assert len(_decode(saved)) == 24
 
 
+@pytest.mark.ffmpeg
 @pytest.mark.parametrize("start,end", [(31, 66), (30, 63), (32, 64), (32, 65), (31, 64), (63, 65)])
 def test_short_encoded_ends_keep_one_timeline(tmp_path: Path, start: int, end: int) -> None:
     """x264 encodes a 1-2 frame part with a shorter B-frame delay than a full one, and joining
@@ -309,6 +314,7 @@ def test_short_encoded_ends_keep_one_timeline(tmp_path: Path, start: int, end: i
     assert len(_decode(saved)) == n
 
 
+@pytest.mark.ffmpeg
 def test_open_gop_source_trim_keeps_every_frame(tmp_path: Path) -> None:
     """An open-GOP I-frame is a sync sample but not a clean cut: the frames after it in
     decode order that display before it would be lost from a copied run."""
@@ -347,6 +353,7 @@ def test_open_gop_source_trim_keeps_every_frame(tmp_path: Path) -> None:
         assert len(_decode(saved)) == 100 - start, f"trim from {start}"
 
 
+@pytest.mark.ffmpeg
 @pytest.mark.parametrize("start,end", [(31, 130), (40, 129)])
 def test_cut_moves_inward_rather_than_leave_a_short_encoded_end(tmp_path: Path, start: int, end: int) -> None:
     source = tmp_path / "source.mp4"
@@ -358,6 +365,7 @@ def test_cut_moves_inward_rather_than_leave_a_short_encoded_end(tmp_path: Path, 
     assert len(_decode(saved)) == end - start + 1
 
 
+@pytest.mark.ffmpeg
 def test_squeezed_join_falls_back_to_re_encoding(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """The joined file's timeline is checked, not assumed: with the short-end rule disabled,
     a 1-frame encoded head squeezes the timestamps and the node must re-encode instead."""
@@ -371,6 +379,7 @@ def test_squeezed_join_falls_back_to_re_encoding(tmp_path: Path, monkeypatch: py
     assert len(_decode(saved)) == 65
 
 
+@pytest.mark.ffmpeg
 def test_cancellation_during_a_trim_splice_saves_nothing(tmp_path: Path) -> None:
     source = tmp_path / "source.mp4"
     _textured_source(source, 200)

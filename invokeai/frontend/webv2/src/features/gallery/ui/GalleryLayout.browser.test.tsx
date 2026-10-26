@@ -70,8 +70,10 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}) =>
     compareImageKey: null,
     galleryView: 'images',
     items: [createItem('a.png'), createItem('b.png')],
+    listingBoardId: overrides.selectedBoardId ?? 'dogs',
     pendingPlaceholders: [],
     projectBoardId: null,
+    searchScope: 'board',
     searchTerm: '',
     selectedBoardId: 'dogs',
     selectedItemKey: 'image:a.png',
@@ -433,7 +435,7 @@ describe('gallery layout shells', () => {
       );
       const filter = host?.querySelector<HTMLButtonElement>('[data-gallery-media-filter-menu]');
       const sortIndex = toolbarButtons.findIndex(
-        (button) => button.getAttribute('aria-label') === 'widgets.gallery.imageSort'
+        (button) => button.getAttribute('aria-label') === 'widgets.gallery.imageSortValue'
       );
 
       expect(filter, 'media filter did not render in the toolbar').not.toBeNull();

@@ -75,6 +75,11 @@ const PreviewImageTags = ({ accountEpoch, item }: { accountEpoch: number; item: 
  * Bound Details to the media stage so long metadata scrolls without covering the filmstrip; images offer parsed
  * details alongside raw payload tabs.
  */
+const WIDGET_INSTANCE_ATTRIBUTE = 'data-hotkey-widget-instance-id';
+const WIDGET_TYPE_ATTRIBUTE = 'data-hotkey-widget-type-id';
+/** Every widget's root (and the center header chrome) carries its instance and type for hotkey targeting. */
+const WIDGET_SELECTOR = `[${WIDGET_INSTANCE_ATTRIBUTE}][${WIDGET_TYPE_ATTRIBUTE}]`;
+
 export const PreviewDetailsPopover = ({
   actions,
   image,
@@ -105,13 +110,21 @@ export const PreviewDetailsPopover = ({
     [stageElement]
   );
   const handleOpenChange = useCallback(({ open }: { open: boolean }) => onOpenChange(open), [onOpenChange]);
-  // Keep Details open while stage/filmstrip selection changes and preserve Preview keyboard navigation.
+  // Details follow the selection, so they stay open while it changes: in this Preview (stage, filmstrip, its header
+  // chrome) or in any Gallery, wherever either is docked. Anywhere else closes them.
   const handleInteractOutside = useCallback<InteractOutsideHandler>(
     (event) => {
-      const widget = stageElement?.closest('[role="region"]');
       const target = event.detail.originalEvent.target;
+      const element = target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
+      const targetWidget = element?.closest(WIDGET_SELECTOR);
+      const previewInstanceId = stageElement?.closest(WIDGET_SELECTOR)?.getAttribute(WIDGET_INSTANCE_ATTRIBUTE);
 
-      if (widget && target instanceof Node && widget.contains(target)) {
+      if (
+        targetWidget &&
+        (targetWidget.getAttribute(WIDGET_TYPE_ATTRIBUTE) === 'gallery' ||
+          (previewInstanceId !== undefined &&
+            targetWidget.getAttribute(WIDGET_INSTANCE_ATTRIBUTE) === previewInstanceId))
+      ) {
         event.preventDefault();
       }
     },
