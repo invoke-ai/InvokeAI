@@ -202,7 +202,7 @@ test('the HTTP reset contract selects profiles explicitly and restores the start
     );
     assert.equal(projects.length, 40);
     assert.deepEqual(runtimeConfig, {
-      config: { generation_devices: 'auto', max_queue_history: null },
+      config: { generation_devices: 'auto', image_subfolder_strategy: 'flat', max_queue_history: null },
       set_fields: [],
     });
 
@@ -247,6 +247,16 @@ const getJson = async (backend, path, init) => {
 
   return body;
 };
+
+/** The representative queue holds pending and in-progress items, which refuse Start Move as on the real server. */
+const clearQueue = (backend) => getJson(backend, '/api/v1/queue/default/clear', { method: 'PUT' });
+
+const enqueueBatch = (backend) =>
+  fetch(`${backend.origin}/api/v1/queue/default/enqueue_batch`, {
+    body: JSON.stringify({ batch: { graph: { edges: [], id: 'pbr', nodes: {} }, runs: 1 }, prepend: false }),
+    headers: { 'content-type': 'application/json' },
+    method: 'POST',
+  });
 
 test('queue item ids take the backend limit: the head of the order, counted as returned, bounded', async () => {
   await withRepresentativeBackend(async (backend) => {
@@ -1218,11 +1228,11 @@ test('working-memory calibration: a run per request, replayed by its key, advanc
     async (backend) => {
       const base = '/api/v2/models/i/fixture-model-001/working_memory';
       const plan = await getJson(backend, `${base}/plan`);
-      const request = (key, attempt = { attempt_id: 'attempt-1', attempt_steps: 2 }) => ({
+      const request = (key, attempt = { attempt_id: 'attempt-1', attempt_steps: 2 }, nodes = {}) => ({
         body: JSON.stringify({
           ...attempt,
           data: [],
-          graph: { edges: [], id: plan.cases[0].id, nodes: {} },
+          graph: { edges: [], id: plan.cases[0].id, nodes },
           idempotency_key: key,
         }),
         method: 'POST',
@@ -1230,6 +1240,24 @@ test('working-memory calibration: a run per request, replayed by its key, advanc
       const post = (key) => getJson(backend, `${base}/calibrate`, request(key));
       const refusal = async (key, attempt) =>
         (await fetch(`${backend.origin}${base}/calibrate`, request(key, attempt))).status;
+      /** The answer to a request whose graph names `model` as it compiled over it. */
+      const refusedFor = async (key, model) => {
+        const response = await fetch(
+          `${backend.origin}${base}/calibrate`,
+          request(key, undefined, { main_model_loader: { id: 'main_model_loader', model } })
+        );
+        return [response.status, (await response.json()).detail];
+      };
+      const record = (await getJson(backend, '/api/v2/models/')).models.find(
+        (model) => model.key === 'fixture-model-001'
+      );
+      const identifier = {
+        base: record.base,
+        hash: record.hash,
+        key: record.key,
+        name: record.name,
+        type: record.type,
+      };
 
       assert.equal(plan.supported, true);
       assert.deepEqual((await getJson(backend, `${base}/summary`)).runs, []);
@@ -1239,9 +1267,29 @@ test('working-memory calibration: a run per request, replayed by its key, advanc
       assert.equal(await refusal('lone-steps', { attempt_steps: 2 }), 422);
       assert.equal(await refusal('too-many', { attempt_id: 'attempt-2', attempt_steps: 257 }), 422);
 
+      // A graph naming a model whose record changed, or that was removed, since it compiled is refused with a code.
+      assert.deepEqual(await refusedFor('stale', { ...identifier, hash: 'blake3:old' }), [
+        409,
+        {
+          code: 'model_changed',
+          message: 'Fixture Model 001 changed after this calibration was planned (hash). Calibrate again.',
+        },
+      ]);
+      assert.deepEqual(await refusedFor('gone', { ...identifier, key: 'removed-model', name: 'Old SDXL' }), [
+        409,
+        { code: 'model_changed', message: 'Old SDXL was removed after this calibration was planned. Calibrate again.' },
+      ]);
+
       const first = await post('attempt:0');
       assert.deepEqual(await post('attempt:0'), first);
       assert.equal(await refusal('attempt:1', { attempt_id: 'attempt-1', attempt_steps: 3 }), 409);
+      // One attempt per GPU: another one is refused with a code while this one runs, on this model or another.
+      const busy = await fetch(
+        `${backend.origin}${base}/calibrate`,
+        request('other:0', { attempt_id: 'attempt-2', attempt_steps: 2 })
+      );
+      assert.equal(busy.status, 409);
+      assert.equal((await busy.json()).detail.code, 'calibration_running');
       const second = await post('attempt:1');
       assert.notEqual(second.run_id, first.run_id);
 
@@ -1253,10 +1301,10 @@ test('working-memory calibration: a run per request, replayed by its key, advanc
       assert.deepEqual(await statuses(), ['running', 'running']);
       const summary = await getJson(backend, `${base}/summary`);
       assert.deepEqual(
-        summary.runs.map((run) => [run.attempt_id, run.attempt_steps, run.held_back]),
+        summary.runs.map((run) => [run.attempt_id, run.attempt_steps, run.held_back, run.error_code]),
         [
-          ['attempt-1', 2, 'running'],
-          ['attempt-1', 2, 'running'],
+          ['attempt-1', 2, 'running', null],
+          ['attempt-1', 2, 'running', null],
         ]
       );
       assert.equal(summary.measurement_verified, true);
@@ -1322,7 +1370,22 @@ test('working-memory calibration: seeded model states and device scenarios', asy
     assert.deepEqual(await states('fixture-model-011'), ['stale', 'stale']);
     assert.deepEqual(await states('fixture-model-016'), ['unusable', 'unusable']);
     assert.deepEqual(await states('fixture-model-036'), ['insufficient']);
+    // Opt in: a running attempt, which holds the GPU. Another attempt, of any model, is refused for it; a request
+    // without an attempt is not.
+    assert.deepEqual((await summaryOf('fixture-model-021')).runs, []);
+    await getJson(backend, '/__faults', {
+      body: JSON.stringify({ runningCalibration: 'fixture-model-021' }),
+      method: 'POST',
+    });
     assert.ok((await summaryOf('fixture-model-021')).runs.some((run) => run.status === 'running'));
+    const calibrateOther = (attempt) =>
+      fetch(`${backend.origin}/api/v2/models/i/fixture-model-001/working_memory/calibrate`, {
+        body: JSON.stringify({ ...attempt, data: [], graph: { edges: [], id: 'x', nodes: {} } }),
+        method: 'POST',
+      });
+    const busy = await calibrateOther({ attempt_id: 'mine', attempt_steps: 1 });
+    assert.deepEqual([busy.status, (await busy.json()).detail.code], [409, 'calibration_running']);
+    assert.equal((await calibrateOther({})).status, 201);
     const failed = await summaryOf('fixture-model-026');
     // The failed decode left an invalid window, which point_count counts like the server's.
     assert.deepEqual(
@@ -1373,6 +1436,24 @@ test('working-memory calibration: seeded model states and device scenarios', asy
     ]);
     assert.equal(fp16.own_windows, 7);
 
+    // Opt in: a model whose later steps failed as they were admitted, its record having changed after queuing.
+    await getJson(backend, '/__faults', {
+      body: JSON.stringify({ modelChangedCalibration: 'fixture-model-056' }),
+      method: 'POST',
+    });
+    const changed = await summaryOf('fixture-model-056');
+    const failedRuns = changed.runs.filter((run) => run.status === 'failed');
+    assert.equal(failedRuns.length, changed.runs.length - 4);
+    assert.ok(failedRuns.every((run) => run.error_code === 'model_changed'));
+    assert.match(failedRuns[0].error, /^Fixture Model 056 changed after this calibration was planned/);
+    const statusRun = (await getJson(backend, '/api/v2/models/working_memory/status')).device_classes[0].runs.find(
+      (run) => run.run_id === failedRuns[0].run_id
+    );
+    assert.equal(statusRun.error_code, 'model_changed');
+    // A changed model aborts the whole attempt: its completed steps feed no fit either.
+    assert.ok(changed.runs.every((run) => run.held_back === 'aborted_attempt'));
+    assert.ok(changed.lines.every((line) => line.sizes.every((size) => size.excluded_reason === 'aborted_attempt')));
+
     // Opt in: a model whose attempt Stop aborted after four steps, whose windows never count.
     await getJson(backend, '/__faults', {
       body: JSON.stringify({ stoppedCalibration: 'fixture-model-051' }),
@@ -1411,6 +1492,243 @@ test('working-memory calibration: seeded model states and device scenarios', asy
       method: 'POST',
     });
     assert.equal(unknown.status, 400);
+  });
+});
+
+test('image storage: the layout is patched alone and the move count follows it', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    assert.deepEqual(await getJson(backend, '/api/v1/image_moves/status'), {
+      active_job_id: null,
+      is_running: false,
+      last_error: null,
+      latest_job: null,
+      needs_move_count: 0,
+      operation: null,
+    });
+
+    const patched = await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ image_subfolder_strategy: 'date' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+
+    assert.deepEqual(patched, {
+      config: { generation_devices: 'auto', image_subfolder_strategy: 'date', max_queue_history: null },
+      set_fields: ['image_subfolder_strategy'],
+    });
+    assert.equal((await getJson(backend, '/api/v1/image_moves/status')).needs_move_count, 1_000);
+
+    const invalid = await fetch(`${backend.origin}/api/v1/app/runtime_config`, {
+      body: JSON.stringify({ image_subfolder_strategy: 'by_user' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+
+    assert.equal(invalid.status, 422);
+  });
+});
+
+test('image storage: a move runs across status polls, commits, and refuses to overlap', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ image_subfolder_strategy: 'hash' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+    await clearQueue(backend);
+
+    const accepted = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
+
+    assert.equal(accepted.status, 202);
+    assert.deepEqual(await accepted.json(), {
+      active_job_id: 1,
+      is_running: true,
+      last_error: null,
+      latest_job: { error_message: null, id: 1, state: 'moving' },
+      needs_move_count: 1_000,
+      operation: 'move_all',
+    });
+
+    const overlapping = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
+
+    assert.equal(overlapping.status, 409);
+
+    const inProgress = await getJson(backend, '/api/v1/image_moves/status');
+
+    assert.equal(inProgress.is_running, true);
+    assert.equal(inProgress.operation, 'move_all');
+
+    // Like the real maintenance guard: image files and media mutations refuse while the move runs, listings do not.
+    const listed = await getJson(backend, '/api/v1/images/?limit=1&offset=0');
+    const imageName = listed.items[0].image_name;
+    const thumbnail = await fetch(`${backend.origin}/api/v1/images/i/${imageName}/thumbnail`);
+
+    assert.equal(thumbnail.status, 409);
+    assert.deepEqual(await thumbnail.json(), { detail: 'Image storage maintenance is active' });
+    assert.equal((await fetch(`${backend.origin}/api/v1/images/i/${imageName}`)).status, 200);
+    assert.equal(
+      (
+        await fetch(`${backend.origin}/api/v1/images/star`, {
+          body: JSON.stringify({ image_names: [imageName] }),
+          headers: { 'content-type': 'application/json' },
+          method: 'POST',
+        })
+      ).status,
+      409
+    );
+    assert.equal((await fetch(`${backend.origin}/api/v1/board_images/`)).status, 409);
+    assert.equal((await fetch(`${backend.origin}/api/v1/boards/?all=true`)).status, 200);
+    assert.equal((await enqueueBatch(backend)).status, 409);
+
+    assert.deepEqual(await getJson(backend, '/api/v1/image_moves/status'), {
+      active_job_id: null,
+      is_running: false,
+      last_error: null,
+      latest_job: { error_message: null, id: 1, state: 'committed' },
+      needs_move_count: 0,
+      operation: null,
+    });
+    assert.equal((await fetch(`${backend.origin}/api/v1/images/i/${imageName}/thumbnail`)).status, 200);
+  });
+});
+
+test('image storage: an instant move commits inside the POST, and a failed job counts as finished', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ image_subfolder_strategy: 'type' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+    await getJson(backend, '/__faults?imageMoves=instant', { method: 'POST' });
+    await clearQueue(backend);
+
+    const accepted = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
+
+    assert.equal(accepted.status, 202);
+    assert.deepEqual(await accepted.json(), {
+      active_job_id: null,
+      is_running: false,
+      last_error: null,
+      latest_job: { error_message: null, id: 1, state: 'committed' },
+      needs_move_count: 0,
+      operation: null,
+    });
+
+    await getJson(backend, '/__faults?imageMoves=failed', { method: 'POST' });
+
+    const failed = await getJson(backend, '/api/v1/image_moves/status');
+
+    assert.equal(failed.active_job_id, null);
+    assert.equal(failed.is_running, false);
+    assert.equal(failed.latest_job.state, 'error');
+    assert.equal(failed.latest_job.error_message, 'Disk full while moving images');
+    assert.equal(failed.last_error, 'Disk full while moving images');
+    // A finished job needs no recovery, so another move may start.
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' })).status, 202);
+  });
+});
+
+test('image storage: Start Move waits for an idle queue, and recovery does not', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ image_subfolder_strategy: 'date' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+    await clearQueue(backend);
+    assert.equal((await enqueueBatch(backend)).status, 201);
+
+    // A queued item that has not run yet is active work, as `has_active_queue_work` counts it.
+    const refused = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
+
+    assert.equal(refused.status, 409);
+    assert.deepEqual(await refused.json(), { detail: 'Cannot start image move while queue work is active' });
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/recover`, { method: 'POST' })).status, 202);
+    await getJson(backend, '/api/v1/image_moves/status');
+    assert.equal((await getJson(backend, '/api/v1/image_moves/status')).is_running, false);
+
+    await clearQueue(backend);
+
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' })).status, 202);
+  });
+});
+
+test('image storage: faults seed an interrupted job for recovery and a non-admin caller', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/__faults?imageMoves=needs-recovery', { method: 'POST' });
+
+    const interrupted = await getJson(backend, '/api/v1/image_moves/status');
+
+    assert.equal(interrupted.active_job_id, 1);
+    assert.equal(interrupted.is_running, false);
+    assert.equal(interrupted.last_error, 'Server stopped during an image move');
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' })).status, 409);
+
+    // A job awaiting recovery keeps maintenance active, so the guard still refuses image files and enqueueing.
+    const imageName = (await getJson(backend, '/api/v1/images/?limit=1&offset=0')).items[0].image_name;
+
+    assert.equal((await fetch(`${backend.origin}/api/v1/images/i/${imageName}/thumbnail`)).status, 409);
+    assert.equal((await enqueueBatch(backend)).status, 409);
+
+    const recovering = await fetch(`${backend.origin}/api/v1/image_moves/recover`, { method: 'POST' });
+
+    assert.equal(recovering.status, 202);
+    assert.equal((await recovering.json()).operation, 'recovery');
+    await getJson(backend, '/api/v1/image_moves/status');
+
+    const recovered = await getJson(backend, '/api/v1/image_moves/status');
+
+    assert.equal(recovered.active_job_id, null);
+    assert.equal(recovered.is_running, false);
+    assert.equal(recovered.last_error, null);
+    assert.equal(recovered.latest_job.state, 'committed');
+    assert.equal((await fetch(`${backend.origin}/api/v1/images/i/${imageName}/thumbnail`)).status, 200);
+    assert.equal((await enqueueBatch(backend)).status, 201);
+
+    await getJson(backend, '/__faults?intermediatesCaller=user', { method: 'POST' });
+
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/status`)).status, 403);
+    assert.equal(
+      (
+        await fetch(`${backend.origin}/api/v1/app/runtime_config`, {
+          body: JSON.stringify({ image_subfolder_strategy: 'date' }),
+          headers: { 'content-type': 'application/json' },
+          method: 'PATCH',
+        })
+      ).status,
+      403
+    );
+
+    await getJson(backend, '/__reset', { method: 'POST' });
+
+    assert.equal((await getJson(backend, '/api/v1/image_moves/status')).active_job_id, null);
+  });
+});
+
+test('enqueue_batch accepts a utility graph as pending queue items with its origin', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const before = (await getJson(backend, '/api/v1/queue/default/item_ids')).total_count;
+    const response = await fetch(`${backend.origin}/api/v1/queue/default/enqueue_batch`, {
+      body: JSON.stringify({
+        batch: { graph: { edges: [], id: 'pbr', nodes: {} }, origin: 'utility:pbr-1', runs: 1 },
+        prepend: false,
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+
+    assert.equal(response.status, 201);
+
+    const enqueued = await response.json();
+
+    assert.equal(enqueued.enqueued, 1);
+    assert.equal(enqueued.item_ids.length, 1);
+
+    const item = await getJson(backend, `/api/v1/queue/default/i/${String(enqueued.item_ids[0])}`);
+
+    assert.equal(item.origin, 'utility:pbr-1');
+    assert.equal(item.status, 'pending');
+    assert.equal((await getJson(backend, '/api/v1/queue/default/item_ids')).total_count, before + 1);
   });
 });
 
@@ -1645,10 +1963,60 @@ test('model seed sets are opt-in, and re-identify fills what the probe would rec
   });
 });
 
-test('runtime config PATCH keeps the other writable field and validates the queue history limit', async () => {
+test('control model seed sets cover both preprocessor id forms, and a PATCH changes their default settings', async () => {
+  const records = [...MODEL_SEED_SETS['control-sdxl'], ...MODEL_SEED_SETS['control-flux']].map(({ record }) => record);
+  const allKeys = Object.values(MODEL_SEED_SETS).flatMap((entries) => entries.map(({ record }) => record.key));
+  assert.equal(new Set(allKeys).size, allKeys.length);
+  const preprocessors = new Set(records.map((record) => record.default_settings?.preprocessor));
+  // Installed models name their preprocessor by the legacy processor id or by the detection node's id.
+  assert.ok(preprocessors.has('depth_anything_image_processor'));
+  assert.ok(preprocessors.has('depth_anything_depth_estimation'));
+  assert.deepEqual(
+    MODEL_SEED_SETS['control-flux'].map(({ record }) => [record.type, record.base]),
+    [
+      ['main', 'flux'],
+      ['control_lora', 'flux'],
+      ['controlnet', 'flux'],
+    ]
+  );
+
+  await withRepresentativeBackend(async (backend) => {
+    const listed = async () => (await getJson(backend, '/api/v2/models/')).models;
+    const before = (await listed()).length;
+    const sendJson = (path, init, body) =>
+      fetch(`${backend.origin}${path}`, {
+        ...init,
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    const post = (path, body) => sendJson(path, { method: 'POST' }, body);
+    const patch = (path, body) => sendJson(path, { method: 'PATCH' }, body);
+    for (const set of ['control-sdxl', 'control-flux']) {
+      assert.equal((await post('/__models', { set })).status, 200);
+    }
+    const byKey = new Map((await listed()).map((model) => [model.key, model]));
+    assert.equal(byKey.size, before + records.length);
+    assert.equal(byKey.get('seed-t2i-adapter-canny-sdxl-1.0').type, 't2i_adapter');
+    assert.equal(byKey.get('seed-my-sdxl-control').default_settings, null);
+
+    const patched = await patch('/api/v2/models/i/seed-my-sdxl-control', {
+      default_settings: { preprocessor: 'canny_image_processor' },
+    });
+    assert.equal(patched.status, 200);
+    assert.deepEqual((await getJson(backend, '/api/v2/models/i/seed-my-sdxl-control')).default_settings, {
+      preprocessor: 'canny_image_processor',
+    });
+    assert.equal((await patch('/api/v2/models/i/missing', { name: 'x' })).status, 404);
+
+    await getJson(backend, '/__reset', { method: 'POST' });
+    assert.equal((await listed()).length, before);
+  });
+});
+
+test('runtime config PATCH preserves other writable fields and validates the queue history limit', async () => {
   await withRepresentativeBackend(async (backend) => {
     await getJson(backend, '/api/v1/app/runtime_config', {
-      body: JSON.stringify({ generation_devices: ['cpu'] }),
+      body: JSON.stringify({ generation_devices: ['cpu'], image_subfolder_strategy: 'date' }),
       method: 'PATCH',
     });
     const withHistory = await getJson(backend, '/api/v1/app/runtime_config', {
@@ -1656,7 +2024,11 @@ test('runtime config PATCH keeps the other writable field and validates the queu
       method: 'PATCH',
     });
 
-    assert.deepEqual(withHistory.config, { generation_devices: ['cpu'], max_queue_history: 0 });
+    assert.deepEqual(withHistory.config, {
+      generation_devices: ['cpu'],
+      image_subfolder_strategy: 'date',
+      max_queue_history: 0,
+    });
 
     const invalid = await fetch(`${backend.origin}/api/v1/app/runtime_config`, {
       body: JSON.stringify({ max_queue_history: -1 }),

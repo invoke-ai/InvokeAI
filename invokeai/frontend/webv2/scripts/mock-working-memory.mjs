@@ -9,7 +9,11 @@
  * of them shows lines only the other measured. `fixture-model-046` follows a warm RX 9060 XT: its largest fp32 size
  * measured allocator fragmentation and is not counted, and two of three windows at one fp16 size ran partially resident,
  * which leaves that size counted on the third. `POST /__faults` with `workingMemory` selects a device scenario instead,
- * and with `stoppedCalibration: <model key>` replaces that main model's runs with an attempt Stop aborted.
+ * with `stoppedCalibration: <model key>` replaces that main model's runs with an attempt Stop aborted, with
+ * `runningCalibration: <model key>` with one still running, which holds the GPU, and with
+ * `modelChangedCalibration: <model key>` with one whose later steps failed because the model changed after queuing.
+ * A calibrate request with an attempt is refused (409, coded) while another attempt runs on the GPU, and for a graph
+ * naming a model whose hash, base or type changed since it compiled, or that was removed.
  * Calibration items live here rather than in the fixture queue, so profile counts stay fixed. Tests pass their own
  * `clock` to advance runs without waiting.
  */
@@ -49,7 +53,6 @@ const MODEL_SCENARIOS = {
   'fixture-model-006': 'completed',
   'fixture-model-011': 'stale',
   'fixture-model-016': 'unusable',
-  'fixture-model-021': 'running',
   'fixture-model-026': 'failed',
   'fixture-model-031': 'unsupported',
   'fixture-model-036': 'insufficient',
@@ -107,7 +110,29 @@ const stepsOf = (cases) =>
       .flatMap((item) => Array.from({ length: REPETITIONS.warm_up + REPETITIONS.measured }, () => item))
   );
 
-export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
+/** The server's refusal while another attempt runs on the GPU: one attempt per device class at a time. */
+const RUNNING_REFUSAL = {
+  code: 'calibration_running',
+  message:
+    'Another calibration is still running on this GPU. Wait until it has finished, or stop it, then calibrate again.',
+};
+
+/** The model identifiers a graph names: the nodes' fields that carry a model's key, hash, base and type. */
+const modelIdentifiersOf = (graph) =>
+  Object.values(graph.nodes ?? {}).flatMap((node) =>
+    Object.values(node ?? {}).filter(
+      (value) =>
+        value !== null &&
+        typeof value === 'object' &&
+        ['key', 'hash', 'base', 'type'].every((field) => typeof value[field] === 'string')
+    )
+  );
+
+/**
+ * `currentModel` reads a model's record as it is now, so a graph compiled over an older record is refused as the
+ * server refuses it; the fixture's records stand in without it.
+ */
+export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel } = {}) => {
   const mainModels = models.filter((model) => model.type === 'main');
   const byKey = new Map(models.map((model) => [model.key, model]));
   /** Runs by model key, oldest first: `{ run_id, created_at, items: [{ item_id, case, status, error }] }`. */
@@ -179,6 +204,11 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
       } else if (scenario === 'stopped' && index >= 4) {
         // Stop canceled what the queue still held: the attempt is aborted, the four finished steps included.
         item.status = 'canceled';
+      } else if (scenario === 'modelChanged' && index >= 4) {
+        // The record changed after queuing: the server failed the later items as it admitted them.
+        item.status = 'failed';
+        item.errorCode = 'model_changed';
+        item.error = `${model.name} changed after this calibration was planned (hash). Calibrate again.`;
       } else if (isRunning) {
         item.status = index === 4 ? 'in_progress' : 'pending';
       } else {
@@ -220,7 +250,21 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
    * Replaces a main model's runs with an attempt stopped after four of its steps, so a browser check can review that
    * state (`POST /__faults` with `stoppedCalibration`); false for a key that names no main model. `reset` drops it.
    */
-  const seedStopped = (modelKey) => {
+  const seedStopped = (modelKey) => seedOpted(modelKey, 'stopped');
+
+  /**
+   * Replaces a main model's runs with an attempt still running, which holds the GPU (`POST /__faults` with
+   * `runningCalibration`); false for a key that names no main model.
+   */
+  const seedRunning = (modelKey) => seedOpted(modelKey, 'running');
+
+  /**
+   * Replaces a main model's runs with an attempt whose later steps failed because the model's record changed after
+   * they were queued (`POST /__faults` with `modelChangedCalibration`); false for a key that names no main model.
+   */
+  const seedModelChanged = (modelKey) => seedOpted(modelKey, 'modelChanged');
+
+  const seedOpted = (modelKey, scenario) => {
     const model = mainModels.find((candidate) => candidate.key === modelKey);
 
     if (!model) {
@@ -229,7 +273,7 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
 
     runs.delete(model.key);
     points.delete(model.key);
-    seed(model, 'stopped');
+    seed(model, scenario);
     return true;
   };
 
@@ -237,20 +281,20 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
     const statuses = run.items.map((item) => item.status);
 
     if (statuses.some((status) => status === 'pending' || status === 'in_progress')) {
-      return { error: null, status: 'running' };
+      return { error: null, error_code: null, status: 'running' };
     }
 
     const failed = run.items.find((item) => item.status === 'failed');
 
     if (failed) {
-      return { error: failed.error, status: 'failed' };
+      return { error: failed.error, error_code: failed.errorCode ?? null, status: 'failed' };
     }
 
     if (statuses.every((status) => status === 'completed')) {
-      return { error: null, status: 'completed' };
+      return { error: null, error_code: null, status: 'completed' };
     }
 
-    return { error: null, status: pointCount > 0 ? 'partial' : 'canceled' };
+    return { error: null, error_code: null, status: pointCount > 0 ? 'partial' : 'canceled' };
   };
 
   /** The windows that count: those of the run's completed items. */
@@ -264,9 +308,9 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
 
   /**
    * Why no window of a run feeds a fit, by run id, judged per attempt as the server does: `running` while a run of it
-   * is unsettled; `aborted_attempt` once none is and a run of it ended canceled (Stop, a queue clear) or it holds
-   * fewer runs than it planned (Stop, a failed submission). A failed run ends that run, not the attempt; a run
-   * without an attempt is never aborted.
+   * is unsettled; `aborted_attempt` once none is and a run of it ended canceled (Stop, a queue clear), failed because
+   * the model changed after it was planned, or it holds fewer runs than it planned (Stop, a failed submission). Any
+   * other failed run ends that run, not the attempt; a run without an attempt is never aborted.
    */
   const heldBack = () => {
     const reasons = new Map();
@@ -277,9 +321,14 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
       for (const attempt of attempts.values()) {
         const statuses = attempt.map((run) => runStatus(run, pointCountOf(run)).status);
         const planned = Math.max(...attempt.map((run) => run.attempt_steps ?? 0));
+        const modelChanged = attempt.some((run) =>
+          run.items.some((item) => item.status === 'failed' && item.errorCode === 'model_changed')
+        );
         const aborted =
           attempt[0].attempt_id !== null &&
-          (attempt.length < planned || statuses.some((status) => status === 'canceled' || status === 'partial'));
+          (attempt.length < planned ||
+            modelChanged ||
+            statuses.some((status) => status === 'canceled' || status === 'partial'));
         const reason = statuses.includes('running') ? 'running' : aborted ? 'aborted_attempt' : null;
 
         for (const run of attempt) {
@@ -611,6 +660,44 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
     const key = typeof body.idempotency_key === 'string' ? body.idempotency_key : null;
     const known = key ? receipts.get(key) : undefined;
     const existing = known && (runs.get(model.key) ?? []).find((run) => run.run_id === known);
+
+    if (!existing) {
+      // One attempt per device class, as the server judges it: a request with an attempt is refused while a running
+      // run of another attempt, of any model, holds the GPU. A run without an attempt holds nothing, and a request
+      // without one is never refused for it.
+      const other =
+        attemptId === null
+          ? undefined
+          : [...runs.values()]
+              .flat()
+              .find(
+                (run) =>
+                  run.attempt_id !== null && run.attempt_id !== attemptId && runStatus(run, 0).status === 'running'
+              );
+
+      if (other) {
+        return { body: { detail: RUNNING_REFUSAL }, status: 409 };
+      }
+
+      // Every model the graph names must still be the record it compiled over.
+      for (const identifier of modelIdentifiersOf(body.graph)) {
+        const record = currentModel ? currentModel(identifier.key) : byKey.get(identifier.key);
+        const name = identifier.name ?? record?.name ?? identifier.key;
+
+        if (!record) {
+          const message = `${name} was removed after this calibration was planned. Calibrate again.`;
+          return { body: { detail: { code: 'model_changed', message } }, status: 409 };
+        }
+
+        const facts = ['hash', 'base', 'type'].filter((field) => record[field] !== identifier[field]);
+
+        if (facts.length > 0) {
+          const message = `${name} changed after this calibration was planned (${facts.join(', ')}). Calibrate again.`;
+          return { body: { detail: { code: 'model_changed', message } }, status: 409 };
+        }
+      }
+    }
+
     const caseId = typeof body.graph.id === 'string' ? body.graph.id : null;
     const step = casesOf(model).find((item) => item.id === caseId) ?? casesOf(model)[0];
     const run = existing ?? createRun(model.key, [step], now(), attemptId, attemptSteps);
@@ -707,6 +794,8 @@ export const createWorkingMemoryMock = (models, { clock = Date.now } = {}) => {
     handle,
     isCalibrationPrefix: (prefix) => prefix.startsWith(ORIGIN_PREFIX),
     reset,
+    seedModelChanged,
+    seedRunning,
     seedStopped,
   };
 };

@@ -1,4 +1,5 @@
 import type { GalleryImage } from '@features/gallery';
+import type { sendGalleryImageAsControl } from '@workbench/canvas-operations/api';
 import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { Project } from '@workbench/projectContracts';
 import type { WorkbenchCanvasCommands } from '@workbench/workbenchStore';
@@ -115,7 +116,7 @@ describe('executeCanvasImageDropImport', () => {
 
     const result = await executeCanvasImageDropImport({
       canvas: { apply: () => false } as unknown as WorkbenchCanvasCommands,
-      destination: 'control',
+      destination: 'control-resized',
       engine,
       getGalleryImages: (imageNames) => {
         lookupCalls.push([...imageNames]);
@@ -133,13 +134,72 @@ describe('executeCanvasImageDropImport', () => {
     expect(lookupCalls).toEqual([['first.png', 'second.png']]);
     expect(importCalls).toHaveLength(1);
     expect(importCalls[0]).toMatchObject({
-      destination: 'control',
+      destination: 'control-resized',
       engine,
       getProject: queries.getProject,
       images: [first, second],
       isActiveProject: queries.isActiveProject,
       project,
     });
-    expect(result).toEqual({ failedImageNames: [], layerIds: ['layer-1', 'layer-2'], status: 'imported' });
+    expect(result).toEqual({ kind: 'success', options: { count: 2 }, titleKey: 'widgets.canvas.import.success' });
+  });
+
+  describe('one image on the control zone', () => {
+    const image = { imageName: 'one.png' } as GalleryImage;
+    const project = { id: 'captured-project' } as Project;
+    const drop = (
+      destination: 'control' | 'control-resized',
+      sent: Awaited<ReturnType<typeof sendGalleryImageAsControl>>
+    ) => {
+      const sendCalls: unknown[] = [];
+      const importCalls: unknown[] = [];
+      const result = executeCanvasImageDropImport({
+        canvas: { apply: () => false } as unknown as WorkbenchCanvasCommands,
+        destination,
+        engine: null,
+        getGalleryImages: () => Promise.resolve([image]),
+        imageNames: ['one.png'],
+        importGalleryImages: (options) => {
+          importCalls.push(options);
+          return Promise.resolve({ failedImageNames: [], layerIds: ['new-layer'], status: 'imported' });
+        },
+        project,
+        queries: { getProject: () => project, isActiveProject: () => true },
+        sendAsControl: (options) => {
+          sendCalls.push(options);
+          return Promise.resolve(sent);
+        },
+      });
+      return { importCalls, result, sendCalls };
+    };
+
+    it('fills the selected empty control layer and names it, as Use as Control does', async () => {
+      const { importCalls, result, sendCalls } = drop('control', {
+        layerId: 'control-1',
+        layerName: 'Depth 1',
+        status: 'filled',
+      });
+
+      await expect(result).resolves.toEqual({
+        kind: 'success',
+        options: { name: 'Depth 1' },
+        titleKey: 'widgets.canvas.import.controlFilled',
+      });
+      expect(sendCalls).toEqual([expect.objectContaining({ image, project })]);
+      expect(importCalls).toEqual([]);
+    });
+
+    it('reports a new layer as an import, and leaves the resized zone to the import', async () => {
+      await expect(drop('control', { layerId: 'control-2', status: 'created' }).result).resolves.toEqual({
+        kind: 'success',
+        options: { count: 1 },
+        titleKey: 'widgets.canvas.import.success',
+      });
+
+      const resized = drop('control-resized', { layerId: 'unused', status: 'created' });
+      await resized.result;
+      expect(resized.sendCalls).toEqual([]);
+      expect(resized.importCalls).toEqual([expect.objectContaining({ destination: 'control-resized' })]);
+    });
   });
 });

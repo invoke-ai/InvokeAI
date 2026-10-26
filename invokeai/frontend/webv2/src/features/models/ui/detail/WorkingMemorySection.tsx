@@ -18,6 +18,7 @@ import {
   describeCoverage,
   getCalibrationBlocker,
   isMeasurementMethodVerified,
+  modelCalibratingOnGpu,
   planCalibrationSteps,
 } from '@features/models/core/workingMemory';
 import { useModelsSelector } from '@features/models/data/modelsStore';
@@ -25,6 +26,7 @@ import {
   attachWorkingMemoryRealtime,
   compileWorkingMemoryPlan,
   fetchCurrentWorkingMemoryPlan,
+  calibrationOnGpuNow,
   refreshWorkingMemoryPlan,
   resetCalibration,
   startCalibration,
@@ -55,6 +57,8 @@ import { LineMeasurements, LineStateBadge, SharedModelsList, useCaseLabel } from
 
 const INDICATOR_OPEN_STYLES = { transform: 'rotate(90deg)' } as const;
 const EMPTY_LIVE_REGION = { position: 'absolute' } as const;
+/** How long a Calibrate that found this model's own attempt running waits for Stop to render, in frames. */
+const STOP_WAIT_FRAMES = 30;
 
 /**
  * Working-memory calibration of one model on this machine's GPU: what was measured and whether estimates use it,
@@ -247,6 +251,12 @@ const WorkingMemoryBody = ({
   const throughName = useModelsSelector((snapshot) =>
     plan.calibrated_through ? (snapshot.modelsByKey.get(plan.calibrated_through)?.name ?? null) : null
   );
+  // Another model's attempt holds this GPU: the server refuses a second one. This model's own shows as running.
+  const gpuHolderKey = modelCalibratingOnGpu(status);
+  const gpuHolder = gpuHolderKey !== null && gpuHolderKey !== modelKey ? gpuHolderKey : null;
+  const gpuHolderName = useModelsSelector((snapshot) =>
+    gpuHolder ? (snapshot.modelsByKey.get(gpuHolder)?.name ?? gpuHolder) : null
+  );
 
   const isRunning = activity.kind === 'running';
   const blocker: CalibrationBlocker | { kind: 'noCompiler' } | null =
@@ -262,8 +272,10 @@ const WorkingMemoryBody = ({
   const blockerText = useBlockerText(blocker);
   // A plan that does not compile leaves Calibrate enabled: installing what is missing is fixed outside this section,
   // and the next click checks again.
-  const reasonText =
-    blockerText ?? (compileError ? t('models.workingMemory.blockedCompile', { problem: compileError }) : null);
+  const compileReason = compileError ? t('models.workingMemory.blockedCompile', { problem: compileError }) : null;
+  // Calibrate stays enabled beside it: the next click checks again, and the model is named so it can be found.
+  const busyReason = gpuHolderName ? t('models.workingMemory.busyOnGpu', { model: gpuHolderName }) : null;
+  const reasonText = blockerText ?? compileReason ?? busyReason;
 
   // The opener of a confirmation can disappear or be disabled once it is done; the section's toggle stays.
   const getFinalFocus = () =>
@@ -275,12 +287,15 @@ const WorkingMemoryBody = ({
   // compiles its cases over the model records the server holds now. Graphs compiled earlier are never reused: equal
   // cases can name a model whose record changed meanwhile. The section renders the plan read. A plan that no longer
   // holds is `unavailable`: the section shows the new reason, or the read's error with a retry. A plan the server
-  // supports can still fail to compile here, say for a text encoder that is not installed.
+  // supports can still fail to compile here, say for a text encoder that is not installed. Last, the running check
+  // is made again on the fresh status of this GPU, which takes one attempt at a time: this section's summary knows
+  // only this model's runs, and may predate an attempt another tab started meanwhile.
   const readCalibration = async (
     compiler: CalibrationGraphCompiler,
     signal?: AbortSignal
   ): Promise<
     | { kind: 'unavailable' }
+    | { kind: 'running'; own: boolean }
     | { kind: 'uncompilable'; message: string }
     | { graphs: CalibrationGraph[]; kind: 'ready'; plan: WorkingMemoryPlan }
   > => {
@@ -290,12 +305,27 @@ const WorkingMemoryBody = ({
       return { kind: 'unavailable' };
     }
 
+    let graphs: CalibrationGraph[];
+
     try {
-      return { graphs: await compileWorkingMemoryPlan(compiler, current, signal), kind: 'ready', plan: current };
+      graphs = await compileWorkingMemoryPlan(compiler, current, signal);
     } catch (error) {
       return { kind: 'uncompilable', message: getApiErrorMessage(error, t('common.unknownError')) };
     }
+
+    // A failed read leaves its error in the status query, which the section shows with a retry. A busy GPU shows
+    // as this model's running attempt, or as the reason beside Calibrate naming the model that holds it.
+    const busy = await calibrationOnGpuNow(queryClient).catch(() => undefined);
+
+    if (busy === undefined) {
+      return { kind: 'unavailable' };
+    }
+
+    return busy === null ? { graphs, kind: 'ready', plan: current } : { kind: 'running', own: busy === modelKey };
   };
+
+  // Only for an attempt the server refused at its first step, which slipped past that check: not a failure.
+  const notifyAlreadyRunning = () => notify.info(t('models.workingMemory.alreadyRunning'));
 
   // The plan shown so far may be minutes old. Only a plan that still holds and compiles opens the dialog.
   const prepareCalibration = async () => {
@@ -314,15 +344,34 @@ const WorkingMemoryBody = ({
       return;
     }
 
+    if (readiness.kind === 'running' && readiness.own) {
+      // This model's attempt runs: Stop appears once the refreshed summary reaches the section, and Calibrate turns
+      // disabled then, which drops its focus. Wait a bounded number of frames for Stop, then move focus there.
+      flushSync(() => setIsPreparing(false));
+      for (let frame = 0; frame < STOP_WAIT_FRAMES && !stopRef.current; frame += 1) {
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        });
+      }
+      if (document.activeElement === document.body || document.activeElement === primaryRef.current) {
+        (stopRef.current ?? focusFallbackRef.current)?.focus();
+      }
+      return;
+    }
+
     // The busy Calibrate dropped focus and no dialog takes it, so return it unless it moved on meanwhile: to Calibrate,
-    // enabled again, beside a compile error; else to the section's toggle, since the plan read is about to disable
-    // Calibrate for its reason, or replace this panel with its error (the query tells the section a tick later).
+    // enabled again, beside a compile error or the model that holds the GPU; else to the section's toggle, since the plan read is about to disable Calibrate for its reason, or
+    // replace this panel with its error (the query tells the section a tick later).
     flushSync(() => {
       setIsPreparing(false);
       setCompileError(readiness.kind === 'uncompilable' ? readiness.message : null);
     });
     if (document.activeElement === document.body) {
-      (readiness.kind === 'uncompilable' ? primaryRef.current : focusFallbackRef.current)?.focus();
+      const target =
+        readiness.kind === 'running' || readiness.kind === 'uncompilable'
+          ? primaryRef.current
+          : focusFallbackRef.current;
+      target?.focus();
     }
   };
 
@@ -373,7 +422,14 @@ const WorkingMemoryBody = ({
     if (readiness.kind === 'uncompilable') {
       setCompileError(readiness.message);
     } else if (readiness.kind === 'ready') {
-      void startCalibration({ graphs: readiness.graphs, modelKey, plan: readiness.plan, queryClient });
+      // The server still refuses a second attempt that slipped past the check: its first step answers 409.
+      void startCalibration({ graphs: readiness.graphs, modelKey, plan: readiness.plan, queryClient }).then(
+        ({ alreadyRunning }) => {
+          if (alreadyRunning) {
+            notifyAlreadyRunning();
+          }
+        }
+      );
     }
   };
 
@@ -422,10 +478,14 @@ const WorkingMemoryBody = ({
         <Text color="fg.muted" fontSize="xs" id={reasonId}>
           {blockerText}
         </Text>
-      ) : reasonText ? (
+      ) : compileReason ? (
         // Announced: the click that asked for the dialog opened nothing.
         <Text color="fg.error" fontSize="xs" id={reasonId} overflowWrap="anywhere" role="alert">
-          {reasonText}
+          {compileReason}
+        </Text>
+      ) : busyReason ? (
+        <Text color="fg.muted" fontSize="xs" id={reasonId} overflowWrap="anywhere" role="status">
+          {busyReason}
         </Text>
       ) : null}
 
@@ -603,7 +663,9 @@ const OutcomePanel = ({ outcome }: { outcome: CalibrationOutcome }) => {
   const kept = outcome.kind === 'failed' && outcome.kept ? t('models.workingMemory.failedKept') : null;
 
   const isFailed = outcome.kind === 'failed';
+  // A model whose record changed after its graphs compiled is calibrated again over the new record.
   const detail =
+    (outcome.refusal === 'modelChanged' ? t('models.workingMemory.modelChanged') : null) ||
     outcome.error ||
     (outcome.kind === 'partial'
       ? !outcome.canceled && outcome.queued < outcome.total

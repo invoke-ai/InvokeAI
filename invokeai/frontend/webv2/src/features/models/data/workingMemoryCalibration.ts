@@ -3,10 +3,12 @@ import type { QueryClient } from '@tanstack/react-query';
 import {
   calibrationIdempotencyKey,
   isCalibrationOrigin,
+  modelCalibratingOnGpu,
   newestRunId,
   planCalibrationSteps,
   type CalibrationGraph,
   type CalibrationGraphCompiler,
+  type CalibrationRefusal,
   type LocalAttempt,
   type WorkingMemoryPlan,
   type WorkingMemoryRunCreated,
@@ -21,7 +23,7 @@ import {
   type AccountScope,
 } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
-import { ApiError, getApiErrorMessage, sleep } from '@platform/transport/http';
+import { ApiError, getApiErrorCode, getApiErrorMessage, sleep } from '@platform/transport/http';
 import { socketHub } from '@platform/transport/socketHub';
 
 import { listModels } from './api';
@@ -35,6 +37,7 @@ import {
 import {
   workingMemoryKeys,
   workingMemoryPlanQueryOptions,
+  workingMemoryStatusQueryOptions,
   workingMemorySummaryQueryOptions,
 } from './workingMemoryQueries';
 
@@ -46,8 +49,13 @@ import {
  */
 const attemptsStore = createExternalStore<{ byModel: ReadonlyMap<string, LocalAttempt> }>({ byModel: new Map() });
 
+/** How queuing an attempt ended for the tab that asked: `alreadyRunning` when the server refused its first step. */
+export interface CalibrationStart {
+  alreadyRunning: boolean;
+}
+
 interface Flight {
-  promise: Promise<void>;
+  promise: Promise<CalibrationStart>;
   /** Ends queuing before the next step; a step being posted is not aborted, since its run exists once it answers. */
   stopRequested: boolean;
 }
@@ -89,6 +97,19 @@ const updateAttempt = (modelKey: string, attemptId: string, change: (attempt: Lo
 
 export const useLocalAttempt = (modelKey: string): LocalAttempt | null =>
   attemptsStore.useSelector((snapshot) => snapshot.byModel.get(modelKey) ?? null, Object.is);
+
+/**
+ * The refusals of a step the section explains, by the `code` of the server's structured 409 detail: another attempt
+ * runs on this GPU, or a model the graph names changed (hash, base, type) or was removed since it compiled. Every
+ * other 409 has a plain detail, which names no code.
+ */
+const REFUSAL_CODES: Readonly<Record<string, CalibrationRefusal>> = {
+  calibration_running: 'alreadyRunning',
+  model_changed: 'modelChanged',
+};
+
+const refusalOf = (error: unknown): CalibrationRefusal | undefined =>
+  error instanceof ApiError && error.status === 409 ? REFUSAL_CODES[getApiErrorCode(error) ?? ''] : undefined;
 
 /**
  * A lost response is resent with the same key, which returns the run the first request created. So is a 503: the
@@ -135,6 +156,30 @@ const invalidateAfterChange = async (queryClient: QueryClient, owner: AccountSco
 export const refreshWorkingMemoryPlan = (queryClient: QueryClient, modelKey: string): Promise<void> =>
   queryClient.invalidateQueries({ queryKey: workingMemoryPlanQueryOptions(modelKey).queryKey });
 
+/**
+ * The model whose calibration holds this GPU as the server sees it now, from any tab, or null when none does
+ * (`modelCalibratingOnGpu`). Read right before an attempt starts, after its graphs compiled; the status query keeps
+ * the read, so the section names that model, or holds a failed read's error, which the section shows. A running
+ * attempt marks every model's summary stale, so an attempt of the shown model appears with its progress.
+ */
+export const calibrationOnGpuNow = async (queryClient: QueryClient): Promise<string | null> => {
+  const owner = captureAccountScope();
+  const busy = modelCalibratingOnGpu(
+    await queryClient.fetchQuery({ ...workingMemoryStatusQueryOptions(owner), staleTime: 0 })
+  );
+
+  if (busy !== null) {
+    await queryClient.invalidateQueries({ queryKey: workingMemoryKeys.summaries(owner) });
+  }
+  return busy;
+};
+
+const fetchCurrentWorkingMemorySummary = (queryClient: QueryClient, modelKey: string, owner: AccountScope) =>
+  queryClient.fetchQuery({
+    ...workingMemorySummaryQueryOptions(modelKey, { isConnected: true, isSubmitting: false }, owner),
+    staleTime: 0,
+  });
+
 /** The model's plan as the server builds it now, for a calibration about to start. Rejects with the read's error. */
 export const fetchCurrentWorkingMemoryPlan = (queryClient: QueryClient, modelKey: string): Promise<WorkingMemoryPlan> =>
   queryClient.fetchQuery({ ...workingMemoryPlanQueryOptions(modelKey), staleTime: 0 });
@@ -172,7 +217,8 @@ export const compileWorkingMemoryPlan = async (
  * one's response, so the queue runs them in step order. Every step names the attempt and its step count, so the server
  * fits the attempt's windows only once all of its steps have run. Stops at the first step that still fails once its
  * retries are spent: the runs already queued still run, but the server discards the attempt as aborted, and the
- * section reports it as partial.
+ * section reports it as partial. A first step the server refuses because another attempt runs on this GPU leaves
+ * no record of this one: the section follows what the server lists instead.
  */
 export const startCalibration = ({
   graphs,
@@ -184,7 +230,7 @@ export const startCalibration = ({
   modelKey: string;
   plan: WorkingMemoryPlan;
   queryClient: QueryClient;
-}): Promise<void> => {
+}): Promise<CalibrationStart> => {
   const running = flights.get(modelKey);
 
   if (running) {
@@ -194,7 +240,8 @@ export const startCalibration = ({
   const owner = captureAccountScope();
   const steps = planCalibrationSteps(plan);
   const attemptId = createUuid();
-  const flight: Flight = { promise: Promise.resolve(), stopRequested: false };
+  const flight: Flight = { promise: Promise.resolve({ alreadyRunning: false }), stopRequested: false };
+  let queued = 0;
   const byCase = new Map(graphs.map((compiled) => [compiled.caseId, compiled]));
 
   const known = queryClient.getQueryData<WorkingMemorySummary | null>(workingMemoryKeys.summary(owner, modelKey));
@@ -227,6 +274,7 @@ export const startCalibration = ({
         owner.signal
       );
 
+      queued += 1;
       assertAccountScopeCurrent(owner);
       // Best effort: an unacknowledged receipt only expires later.
       void acknowledgeCalibrationEnqueue(idempotencyKey, owner.signal).catch(() => undefined);
@@ -235,14 +283,27 @@ export const startCalibration = ({
   };
 
   flight.promise = queue()
+    .then(() => ({ alreadyRunning: false }))
     .catch((error: unknown) => {
+      const refusal = refusalOf(error);
+
+      // Another attempt runs on this GPU: this one queued nothing, so it leaves nothing to report.
+      if (refusal === 'alreadyRunning' && queued === 0) {
+        if (isAccountScopeCurrent(owner)) {
+          setAttempt(modelKey, null);
+        }
+        return { alreadyRunning: true };
+      }
+
       // A step that fails once a stop was asked for leaves the attempt stopped, not failed.
       if (isAccountScopeCurrent(owner) && !flight.stopRequested) {
         updateAttempt(modelKey, attemptId, (attempt) => ({
           ...attempt,
           submissionError: getApiErrorMessage(error, ''),
+          submissionRefusal: refusal,
         }));
       }
+      return { alreadyRunning: false };
     })
     .finally(() => {
       if (flights.get(modelKey) === flight) {
@@ -284,10 +345,7 @@ export const stopCalibration = async ({
     await flight.promise;
   }
 
-  const summary = await queryClient.fetchQuery({
-    ...workingMemorySummaryQueryOptions(modelKey, { isConnected: true, isSubmitting: false }, owner),
-    staleTime: 0,
-  });
+  const summary = await fetchCurrentWorkingMemorySummary(queryClient, modelKey, owner);
   const running = (summary?.runs ?? [])
     .filter((run) => run.status === 'running')
     .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at));

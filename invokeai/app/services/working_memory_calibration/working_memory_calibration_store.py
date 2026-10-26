@@ -201,12 +201,25 @@ class CalibrationStore:
         `CalibrationStoreError`.
 
         The run ids share 256 lock files, `creations/<xx>.lock` by the first two hex digits of the id's SHA-256: the
-        folder never holds more, so no file is ever removed (removing one could let a process that opened it before the
-        removal and one that creates it anew each hold a lock of their own). Unrelated runs on one file wait for each
-        other, which costs little: a creation is a short administrator's action. No store file has such a name.
+        folder never holds more besides `attempts_lock`'s, so no file is ever removed (removing one could let a process
+        that opened it before the removal and one that creates it anew each hold a lock of their own). Unrelated runs
+        on one file wait for each other, which costs little: a creation is a short administrator's action. No store
+        file has such a name.
         """
-        stripe = hashlib.sha256(run_id.encode("utf-8")).hexdigest()[:2]
-        lock_path = self._dir / "creations" / f"{stripe}.lock"
+        with self._creation_file(f"{hashlib.sha256(run_id.encode('utf-8')).hexdigest()[:2]}.lock"):
+            yield
+
+    @contextmanager
+    def attempts_lock(self) -> Iterator[None]:
+        """Hold the OS lock every creation of an attempt's run takes, `creations/attempts.lock`, as `creation_lock`
+        does. A file of its own: such a creation holds it together with its run's creation lock, and on a file they
+        shared the second lock would wait for the first until it timed out."""
+        with self._creation_file("attempts.lock"):
+            yield
+
+    @contextmanager
+    def _creation_file(self, name: str) -> Iterator[None]:
+        lock_path = self._dir / "creations" / name
         try:
             lock_path.parent.mkdir(parents=True, exist_ok=True)
             handle = open(lock_path, "a+b")

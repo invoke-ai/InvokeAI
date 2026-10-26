@@ -11,7 +11,11 @@ from fastapi.testclient import TestClient
 
 from invokeai.app.api_app import app
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
+from invokeai.app.invocations.fields import BoardField
+from invokeai.app.invocations.image import BlankImageInvocation
 from invokeai.app.invocations.math import AddInvocation
+from invokeai.app.invocations.model import LoRACollectionLoader, LoRAField, ModelIdentifierField
+from invokeai.app.invocations.sd.sdxl import SDXLModelLoaderInvocation
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import UnknownModelException
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
@@ -47,11 +51,15 @@ def calibration(
     model = SimpleNamespace(
         key="model-key", name="Model", hash="blake3:abc", base=BaseModelType.StableDiffusionXL, type=ModelType.Main
     )
+    # Installed too, and no model the plan covers: only `get_model` knows it.
+    other = SimpleNamespace(
+        key="other-key", name="Other", hash="blake3:def", base=BaseModelType.StableDiffusionXL, type=ModelType.Main
+    )
 
     def get_model(key: str) -> SimpleNamespace:
-        if key != "model-key":
+        if key not in ("model-key", "other-key"):
             raise UnknownModelException(f"unknown model {key}")
-        return model
+        return model if key == "model-key" else other
 
     services.model_manager.store.get_model.side_effect = get_model
     services.model_manager.store.all_models.return_value = [model]
@@ -166,13 +174,37 @@ def test_calibrate_rejects_unknown_models_workflow_calls_and_server_owned_fields
     call_graph = Graph()
     call_graph.add_node(CallSavedWorkflowInvocation(id="call", workflow_id="workflow"))
     use_cache_data = [[{"node_path": "add", "field_name": "use_cache", "items": [True]}]]
+    intermediate_data = [[{"node_path": "add", "field_name": "is_intermediate", "items": [False]}]]
 
     assert _calibrate(client, admin_token, key="missing").status_code == 404
     assert _calibrate(client, admin_token, {"graph": call_graph.model_dump(mode="json")}).status_code == 422
     assert _calibrate(client, admin_token, {"graph": _graph(), "data": use_cache_data}).status_code == 422
+    assert _calibrate(client, admin_token, {"graph": _graph(), "data": intermediate_data}).status_code == 422
     assert _calibrate(client, admin_token, {"graph": _graph(), "origin": "canvas"}).status_code == 422
     assert queue.get_queue_item_ids("default").item_ids == []
     assert service.get_status().device_classes[0].runs == []
+
+
+def _image_graph() -> dict:
+    """The decode's output as a client sends it for the gallery: not an intermediate, on a board."""
+    graph = Graph()
+    graph.add_node(AddInvocation(id="add", a=1, b=2, is_intermediate=False))
+    graph.add_node(BlankImageInvocation(id="blank", is_intermediate=False, board=BoardField(board_id="gallery-board")))
+    return graph.model_dump(mode="json")
+
+
+def test_calibrate_makes_every_node_save_intermediates_on_no_board(
+    client: TestClient, admin_token: str, calibration
+) -> None:
+    queue, _ = calibration
+
+    response = _calibrate(client, admin_token, {"graph": _image_graph()})
+
+    assert response.status_code == 201, response.text
+    item = queue.get_queue_item(response.json()["item_ids"][0])
+    nodes = item.session.graph.nodes
+    assert [node.is_intermediate for node in nodes.values()] == [True, True]
+    assert nodes["blank"].board is None
 
 
 def test_retrying_a_calibration_item_keeps_its_origin_and_owner(
@@ -409,3 +441,82 @@ def test_a_retry_key_reused_for_an_unknown_model_is_a_conflict(
     response = _calibrate(client, admin_token, body, key="no-such-model")
 
     assert response.status_code == 409, response.text
+
+
+def _loader_graph(list_field: bool = False, **compiled: Any) -> dict:
+    """A graph that names the model as the client compiled it, `compiled` overriding the current record: in a loader's
+    model field, or as the LoRA of a collection loader's list."""
+    named = ModelIdentifierField(
+        **{
+            "key": "model-key",
+            "hash": "blake3:abc",
+            "name": "Model",
+            "base": BaseModelType.StableDiffusionXL,
+            "type": ModelType.Main,
+            **compiled,
+        }
+    )
+    graph = Graph()
+    if list_field:
+        graph.add_node(LoRACollectionLoader(id="loras", loras=[LoRAField(lora=named, weight=1.0)]))
+    else:
+        graph.add_node(SDXLModelLoaderInvocation(id="loader", model=named))
+    return graph.model_dump(mode="json")
+
+
+@pytest.mark.parametrize(
+    "list_field, compiled, message",
+    [
+        (False, {"hash": "blake3:compiled-before"}, "Model changed after this calibration was planned (hash)."),
+        (False, {"base": BaseModelType.StableDiffusion1}, "Model changed after this calibration was planned (base)."),
+        (False, {"type": ModelType.LoRA}, "Model changed after this calibration was planned (type)."),
+        (False, {"key": "gone-key", "name": "Gone"}, "Gone was removed after this calibration was planned."),
+        (True, {"hash": "blake3:compiled-before"}, "Model changed after this calibration was planned (hash)."),
+    ],
+    ids=["hash", "base", "type", "removed", "list-field"],
+)
+def test_a_graph_compiled_against_an_older_record_of_the_model_is_refused_with_a_code(
+    client: TestClient, admin_token: str, calibration, list_field: bool, compiled: dict, message: str
+) -> None:
+    """The client compiled the graph, then the model's record changed or went before the request arrived."""
+    current = _calibrate(client, admin_token, {"graph": _loader_graph(list_field)})
+    stale = _calibrate(client, admin_token, {"graph": _loader_graph(list_field, **compiled)})
+
+    assert current.status_code == 201, current.text
+    assert stale.status_code == 409, stale.text
+    assert stale.json()["detail"] == {"code": "model_changed", "message": f"{message} Calibrate again."}
+
+
+def test_an_attempt_is_refused_with_a_code_while_another_one_runs(
+    client: TestClient, admin_token: str, calibration
+) -> None:
+    """Another tab's attempt still waits in the queue: a new attempt is refused, the running attempt's next step is
+    not. (Two requests at once are `test_two_attempts_started_at_once_queue_only_the_first`.)"""
+    first = {"graph": _graph(), "attempt_id": "first-tab", "attempt_steps": 2}
+    second = {"graph": _graph(), "attempt_id": "second-tab", "attempt_steps": 2}
+    assert _calibrate(client, admin_token, first).status_code == 201
+
+    refused = _calibrate(client, admin_token, second)
+
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["detail"] == {
+        "code": "calibration_running",
+        "message": "Another calibration is still running on this GPU. Wait until it has finished, or stop it, then "
+        "calibrate again.",
+    }
+    assert _calibrate(client, admin_token, first).status_code == 201
+
+
+def test_an_attempt_on_another_model_is_refused_while_one_runs_on_the_gpu(
+    client: TestClient, admin_token: str, calibration
+) -> None:
+    """One attempt at a time per GPU, not per model: another model's attempt would measure between its steps."""
+    running = {"graph": _graph(), "attempt_id": "model-tab", "attempt_steps": 2}
+    assert _calibrate(client, admin_token, running).status_code == 201
+
+    refused = _calibrate(
+        client, admin_token, {"graph": _graph(), "attempt_id": "other-tab", "attempt_steps": 2}, key="other-key"
+    )
+
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["detail"]["code"] == "calibration_running"
