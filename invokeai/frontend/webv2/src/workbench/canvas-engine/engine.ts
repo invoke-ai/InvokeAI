@@ -16,17 +16,20 @@ import type {
   CanvasDocumentSnapshot,
   CanvasLifecycleCapability,
   CanvasSelectionCapability,
+  CanvasSurfaceAttachOptions,
   CanvasSurfaceCapability,
   CanvasViewportCapability,
   BooleanRasterOperation,
   BooleanRasterResult,
   CopyLayerResult,
+  CropAllLayersResult,
   CropLayerResult,
   ExportBakedLayerPixelsOptions,
   ExportLayerPixelsOptions,
   ExtractMaskedAreaResult,
   MaskEditResult,
   MergeDownResult,
+  MergeInpaintMasksResult,
   MergeVisibleResult,
   NewRasterLayerResult,
   PsdExportResult,
@@ -80,6 +83,7 @@ import type {
   CanvasLayerContract,
   CanvasLayerSourceContract,
 } from '@workbench/canvas-engine/contracts';
+import type { LayerCacheReadiness } from '@workbench/canvas-engine/controllers/editSteps';
 import type { CreatePath2D } from '@workbench/canvas-engine/freehand';
 import type { ColorSampleProviders, ColorSampler } from '@workbench/canvas-engine/render/colorSample';
 import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
@@ -95,7 +99,10 @@ import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutation
 
 import { createItemId } from '@platform/browser/randomUuid';
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
+import { ColorSampleController } from '@workbench/canvas-engine/controllers/colorSampleController';
+import { ControlDerivationController } from '@workbench/canvas-engine/controllers/controlDerivationController';
 import { PixelEditController } from '@workbench/canvas-engine/controllers/controlPixelController';
+import { ControlViewController } from '@workbench/canvas-engine/controllers/controlViewController';
 import { EditingController } from '@workbench/canvas-engine/controllers/editingController';
 import { FilterResultController } from '@workbench/canvas-engine/controllers/filterResultController';
 import { GeneratedResultController } from '@workbench/canvas-engine/controllers/generatedResultController';
@@ -112,6 +119,7 @@ import {
   createCanvasMutationContext,
   type CanvasMutationContext,
 } from '@workbench/canvas-engine/controllers/mutationContext';
+import { PaintLineEndController } from '@workbench/canvas-engine/controllers/paintLineEndController';
 import { PersistenceController } from '@workbench/canvas-engine/controllers/persistenceController';
 import { PsdExportController } from '@workbench/canvas-engine/controllers/psdExportController';
 import { RasterController } from '@workbench/canvas-engine/controllers/rasterController';
@@ -163,7 +171,11 @@ import { createMaskPatternTile } from '@workbench/canvas-engine/render/maskFill'
 import { colorLoupePixels, renderOverlay } from '@workbench/canvas-engine/render/overlayRenderer';
 import { trimPaintCacheToAlpha } from '@workbench/canvas-engine/render/paintCacheTrim';
 import { createDomRasterBackend, type RasterBackend, type RasterSurface } from '@workbench/canvas-engine/render/raster';
-import { RasterCompositeOverBudgetError } from '@workbench/canvas-engine/render/rasterComposite';
+import {
+  RasterCompositeNotReadyError,
+  RasterCompositeOverBudgetError,
+  RasterCompositeUnreadableError,
+} from '@workbench/canvas-engine/render/rasterComposite';
 import { rasterizeSource, type ImageResolver, type RasterizeDeps } from '@workbench/canvas-engine/render/rasterizers';
 import { fitThumbnailSize, getLayerThumbnailDisplayKey } from '@workbench/canvas-engine/render/thumbnail';
 import { documentDeltaToLocal, liftSelectedPixels } from '@workbench/canvas-engine/selection/floatingSelection';
@@ -187,6 +199,7 @@ import { FULL_DAMAGE } from '@workbench/canvas-engine/types';
 import { createViewport, type Viewport } from '@workbench/canvas-engine/viewport';
 
 import type { ImagePatchApply } from './history/imagePatch';
+import type { LayerUnreadable } from './layerExportGuards';
 import type { CanvasProjectMutation } from './mutationContracts';
 import type { StrokeCommittedEvent, Tool, ToolContext } from './tools/tool';
 
@@ -195,7 +208,7 @@ import { createDocumentMirror, type DocumentMirror } from './document/documentMi
 import { decideLayerChange, nextThumbnailDisplayToken } from './document/layerChangeDecision';
 import { getSourceBounds, getSourceContentRect, isRenderableLayer, renderableSourceOf } from './document/sources';
 import { collectCanvasFontReferences, replaceCanvasFontReferences } from './fontReferences';
-import { createLayerExportGuards, isSupportedExportSource } from './layerExportGuards';
+import { createLayerExportGuards, isSupportedExportSource, layerUnreadable } from './layerExportGuards';
 import { createLayerRasterizer } from './layerRasterizer';
 import { createPreviewPublisher } from './previewPublisher';
 import { createRasterSnapshotCapture } from './rasterSnapshotCapture';
@@ -271,8 +284,6 @@ export interface CanvasEngineOptions {
   uploadIntermediateImage(blob: Blob): Promise<{ height: number; imageName: string; width: number }>;
   /** Supplies the currently selected model base for core-created control layer contracts. */
   getMainModelBase?: () => string | null;
-  /** Supplies the default control model key for core-created control layer contracts. */
-  getDefaultControlModel?: (base: string | null) => string | null;
   /** Supplies the Layers panel's transient multi-selection for grouped moves. */
   getSelectedLayerIds?: () => readonly string[];
   /** Publishes engine history's transient multi-selection changes back to the Layers panel. */
@@ -383,6 +394,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     checkerColors: stores.checkerColors,
     clipToBbox: stores.clipToBbox,
     colorPair: stores.colorPair,
+    controlLayerView: stores.controlLayerView,
     documentEditingLocked: stores.documentEditingLocked,
     eraserOptions: stores.eraserOptions,
     gradientOptions: stores.gradientOptions,
@@ -403,6 +415,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     textEditSession: stores.textEditSession,
     textOptions: stores.textOptions,
     transformSession: stores.transformSession,
+    pendingTransformLayerId: stores.pendingTransformLayerId,
     viewportReady: stores.viewportReady,
     zoom: stores.zoom,
   };
@@ -634,14 +647,19 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         }
         return { offset: { x: entry.rect.x, y: entry.rect.y }, surface: entry.surface };
       },
-      onError: (error, layerId, info) =>
+      onError: (error, layerId, info) => {
+        // A retry may still land the pixels; only a failure no retry follows ends the wait.
+        if (!info.willRetry) {
+          editingController.transform.onUploadFailed(layerId);
+        }
         reportError(
           info.willRetry ? 'Bitmap persistence failed' : 'Bitmap persistence suspended',
           layerId,
           // Lead circuit-opening feedback with persistence stopping until a fresh stroke, rather than repeating
           // the underlying error.
           info.willRetry ? error : new Error('Canvas changes are no longer uploading. A new stroke will retry.')
-        ),
+        );
+      },
       uploadImage: (blob) => opts.uploadImage(blob),
     });
   const persistenceController = new PersistenceController(bitmapStore);
@@ -651,6 +669,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     // replaying over either would land on state the entry never saw. Put both back first; neither is itself
     // undoable until it commits.
     beforeReplay: () => {
+      paintLineEnds.clear();
+      editingController.transform.onReplay();
       floatingSelection.cancel();
       structuralController.endPreview();
     },
@@ -763,6 +783,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     if (renderController.previews.hasFilter(layerId)) {
       clearFilterPreview(layerId);
     }
+    controlView.clear((id) => id === layerId);
     scheduler.invalidate({ layers: [layerId] });
   };
 
@@ -852,6 +873,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     if (renderController.previews.hasFilter(layerId)) {
       clearFilterPreview(layerId);
     }
+    controlView.clear((id) => id === layerId);
   };
 
   // Engine-owned selection masks clip strokes and drive fill/erase. Marching ants redraw only the overlay while
@@ -999,12 +1021,20 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       canEdit: () => canEditDocument(),
       commitStructural: (label, forward, inverse) => commitStructural(label, forward, inverse),
       ctx: mutationContext,
+      enterTool: () => setTool('transform'),
       getCache: (layerId) => layerCache.get(layerId) ?? null,
       getDocument: () => mirror.getDocument(),
+      getUserToolId: () => pipeline.heldRestoreToolId() ?? interactionController.getActiveToolId(),
+      hasFloatingSelection: () => floatingSelection.has(),
       invalidate: (payload) => scheduler.invalidate(payload),
       isGestureActive: () => pipeline.isGestureActive(),
+      isInteractionLocked: () => interactionLocked,
+      peekCacheRect: (layerId) => layerCache.peek(layerId)?.rect,
+      pending: stores.pendingTransformLayerId,
       reportRefusal: reportEditRefusal,
+      rebaseLineEnd: (layerId, from) => paintLineEnds.rebase(layerId, from),
       restoreCache: restoreLayerCache,
+      select: (layerId) => dispatchCanvasMutation({ id: layerId, type: 'setCanvasSelectedLayer' }),
       session: stores.transformSession,
       setOverride: (layerId, transform) => {
         if (transform) {
@@ -1069,17 +1099,16 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     }
   }
 
-  /**
-   * One-shot color claims stash samples during press/drag and settle on release, after structural edits are
-   * allowed. Escape, tool change and teardown resolve null.
-   */
-  let pendingColorSample: {
-    previousToolId: ToolId;
-    resolve: (hex: string | null) => void;
-    sampledHex: string | null;
-  } | null = null;
-  // Where unclaimed eyedropper samples land while a workbench is attached.
-  let colorSampleRouter: ((hex: string) => boolean) | null = null;
+  const colorSamples = new ColorSampleController({
+    endHeldTool: () => pipeline.endForToolSwitch(),
+    getActiveToolId: () => interactionController.getActiveToolId(),
+    setTool: (toolId) => interactionController.setTool(toolId),
+  });
+  // Shift-click line starts, shared by brush and eraser for the engine's lifetime; forgotten on replay and document
+  // replacement, and followed through every change of their layer.
+  const paintLineEnds = new PaintLineEndController({
+    getLayer: (layerId) => getDocumentLayer(mirror.getDocument(), layerId),
+  });
 
   const toolContext: ToolContext = {
     applyTransform: () => applyTransform(),
@@ -1136,24 +1165,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getSamInteraction: () => stores.samInteraction.get(),
     openTextCreate: (docPoint) => openTextCreate(docPoint),
     openTextEdit: (layerId) => openTextEdit(layerId),
+    paintLineEnds,
     sampleProviders: colorSampleProviders,
-    resolveColorSample: (hex) => {
-      if (pendingColorSample) {
-        pendingColorSample.sampledHex = hex;
-        return true;
-      }
-      return colorSampleRouter?.(hex) ?? false;
-    },
-    commitColorSample: () => {
-      if (pendingColorSample !== null && pendingColorSample.sampledHex !== null) {
-        settleColorSample(pendingColorSample.sampledHex, true);
-      }
-    },
-    discardColorSample: () => {
-      if (pendingColorSample !== null) {
-        pendingColorSample.sampledHex = null;
-      }
-    },
+    resolveColorSample: (hex, phase) => colorSamples.route(hex, phase),
     setLayerTransformOverride: (layerId, override) => {
       if (override) {
         transformOverrides.set(layerId, override);
@@ -1255,7 +1269,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     projectId,
   });
 
-  const { getOrStartLayerRasterization } = createLayerRasterizer({
+  const {
+    dispose: disposeLayerRasterizer,
+    getOrStartLayerRasterization,
+    getFailure: getRasterizationFailure,
+    isBackingOff: isRasterizationBackingOff,
+  } = createLayerRasterizer({
     createSurface: (width, height) => backend.createSurface(width, height),
     fontLoader,
     getDocument: () => mirror.getDocument(),
@@ -1355,8 +1374,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const rasterizeLayerPixels = rasterExportController.rasterize.bind(rasterExportController);
   const prepareLayerRasterCache = async (layerId: string) => {
     const result = await rasterizeLayerPixels(layerId, { includeDisabled: true });
+    if (result.status === 'unreadable') {
+      return result;
+    }
     if (result.status !== 'ok') {
-      return { status: result.status === 'over-budget' ? ('over-budget' as const) : ('not-ready' as const) };
+      return { status: result.status === 'over-budget' ? result.status : ('not-ready' as const) };
     }
     const layer = result.guard.layer;
     result.release();
@@ -1379,12 +1401,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   type StructuralExportLayerPixelsResult =
     | Extract<ExportLayerPixelsResult, { status: 'ok' }>
     | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+    | LayerUnreadable
     | AdjustmentRefusal;
   const normalizeStructuralExport = async (
     result: Promise<ExportLayerPixelsResult>
   ): Promise<StructuralExportLayerPixelsResult> => {
     const resolved = await result;
-    if (resolved.status === 'ok' || resolved.status === 'adjustment-refused') {
+    if (resolved.status === 'ok' || resolved.status === 'adjustment-refused' || resolved.status === 'unreadable') {
       return resolved;
     }
     return { status: resolved.status === 'aborted' ? 'not-ready' : resolved.status };
@@ -1402,7 +1425,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     document: CanvasDocumentContractV3
   ): Promise<'published' | 'stale' | 'error'> => {
     const result = await getOrStartLayerRasterization(layer, document);
-    return result === 'aborted' ? 'stale' : result;
+    return result === 'aborted' ? 'stale' : result === 'unavailable' ? 'error' : result;
   };
 
   const cropLayerToBbox = (layerId: string): Promise<CropLayerResult> => layerController.crop.crop(layerId);
@@ -1422,6 +1445,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     }
     if (result.status === 'over-budget') {
       throw new RasterCompositeOverBudgetError();
+    }
+    if (result.status === 'unreadable') {
+      throw new RasterCompositeUnreadableError(result);
+    }
+    if (result.status === 'not-ready') {
+      throw new RasterCompositeNotReadyError(layerId);
     }
     throw new Error(`Cannot rasterize layer ${layerId} for export: ${result.status}.`);
   };
@@ -1492,6 +1521,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   });
   const scheduler: RenderScheduler = renderController.scheduler;
 
+  /** Whether staging holds a candidate, even while its preview is toggled off; the screen then hides masks. */
+  const hasStagedCandidates = (): boolean => (mutationPort.getCanvasState()?.stagingArea.pendingImages.length ?? 0) > 0;
+  let hadStagedCandidates = hasStagedCandidates();
   const compositeFrame = createCompositeFrame({
     backend,
     derivedSurfaceCache,
@@ -1502,10 +1534,18 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       groupSurfaces.get(scope, members, matrices, content, { frame: true }),
     getCheckerboardTile,
     getMaskPatternTile,
+    getControlView: () => controlView.get(),
     layerCache,
     previews: renderController.previews,
     raster: rasterController,
-    rasterizeLayer: (layer, doc) => void getOrStartLayerRasterization(layer, doc),
+    hasStagedCandidates,
+    // A source that just failed waits out its retry backoff (or a change to it) rather than failing again every frame;
+    // the backoff's end invalidates the layer, so the display retries on its own.
+    rasterizeLayer: (layer, doc) => {
+      if (!isRasterizationBackingOff(layer)) {
+        void getOrStartLayerRasterization(layer, doc);
+      }
+    },
     stores,
     transformOverrides,
     viewport,
@@ -1557,12 +1597,25 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     setStagedPreview,
   } = previewPublisher;
 
+  const controlView = new ControlViewController({
+    getDocument: () => mirror.getDocument(),
+    invalidateLayer: (layerId) => scheduler.invalidate({ layers: [layerId] }),
+    isLocked: () => interactionLocked || stores.documentEditingLocked.get(),
+    publish: (view) => stores.controlLayerView.set(view),
+    rasterize: (source, document, signal) => rasterizeSource(source, rasterizeDeps(document, signal)),
+    reserve: (bytes) => rasterController.memory.reserveOperation(bytes, { purpose: 'layer-operation' }),
+    trackDetached: (bytes) => rasterController.memory.trackDetached(bytes),
+  });
+
   // ---- Document mirror ----------------------------------------------------
 
   /** Actual last non-null selection, retained across deselect/reselect and updated by engine selections too. */
   let lastSelectedLayerId: string | null = null;
   const mirror: DocumentMirror = createDocumentMirror(mutationPort, {
-    onDocumentChanged: () => stores.documentEpoch.set(stores.documentEpoch.get() + 1),
+    onDocumentChanged: () => {
+      editingController.transform.onDocumentChanged();
+      stores.documentEpoch.set(stores.documentEpoch.get() + 1);
+    },
     // Bbox changes need only overlay redraw unless a bbox-relative staged preview must move in the composite.
     // Explicitly placed candidates stay fixed.
     onBboxChanged: () => {
@@ -1581,7 +1634,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       // anchors and clear active-gesture state; also clear any lingering bbox preview.
       cleanup.run(() => stores.bboxPreview.set(null));
       cleanup.run(() => history.clear());
-      cleanup.run(() => stores.transformSession.set(null));
+      paintLineEnds.clear();
+      cleanup.run(() => editingController.transform.onDocumentReplaced());
       cleanup.run(() => transformOverrides.clear());
       // A text-edit session likewise belongs to the outgoing document; drop it.
       cleanup.run(() => stores.textEditSession.set(null));
@@ -1590,6 +1644,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       // document — a swap can reuse a layer id with different content, so
       // pruning only "missing" ids isn't enough; drop them all.
       cleanup.run(clearAllFilterPreviews);
+      cleanup.run(() => controlView.clear());
       // Drop document-scoped selection/lasso state and cancel outgoing floats; committing would target a replaced
       // layer.
       cleanup.run(() => floatingSelection.cancel());
@@ -1658,6 +1713,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       const session = stores.transformSession.get();
       const textSession = stores.textEditSession.get();
       for (const id of ids) {
+        paintLineEnds.onLayerChanged(id);
         const decision = decideLayerChange({
           currentThumbnailKey: rasterController.getThumbnailKey(id),
           currentThumbnailVersion: stores.thumbnailVersion.get(id),
@@ -1697,6 +1753,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
           cleanup.run(() => invalidateLayerCache(id));
         }
       }
+      // Any edit of the viewed layer (undo, redo and a detection commit included) returns it to its map.
+      cleanup.run(() => controlView.reconcile());
       cleanup.run(() => scheduler.invalidate({ layers: ids }));
       cleanup.throwIfFailed();
     },
@@ -1723,6 +1781,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       // A float belongs to exactly one layer; selecting another banks it rather
       // than leaving pixels in flight over a layer the user is no longer on.
       cleanup.run(() => floatingSelection.commit());
+      cleanup.run(() => controlView.clear((id) => id !== selectedLayerId));
       const session = stores.transformSession.get();
       if (session && session.layerId !== selectedLayerId) {
         cleanup.run(() => cancelTransform());
@@ -1733,7 +1792,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       cleanup.run(() => scheduler.invalidate({ overlay: true }));
       cleanup.throwIfFailed();
     },
-    onStagingChanged: () => scheduler.invalidate({ overlay: true }),
+    // Gaining the first candidate or losing the last shows or hides masks across the whole screen.
+    onStagingChanged: () => {
+      const staged = hasStagedCandidates();
+      scheduler.invalidate(staged === hadStagedCandidates ? { overlay: true } : { all: true });
+      hadStagedCandidates = staged;
+    },
   });
   // The mirror seeds silently from the current state, so the memory starts from that selection too.
   lastSelectedLayerId = mirror.getDocument()?.selectedLayerId ?? null;
@@ -1797,6 +1861,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       for (const layerId of ids) {
         cleanup.run(() => clearFilterPreview(layerId));
       }
+      cleanup.run(() => controlView.clear());
       projectWasPresent = false;
       cleanup.throwIfFailed();
       return;
@@ -1831,6 +1896,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const unsubscribeBrushOptions = subscribeSizeChange(stores.brushOptions, 'brush');
   const unsubscribeEraserOptions = subscribeSizeChange(stores.eraserOptions, 'eraser');
   const unsubscribeCheckerboard = stores.checkerboard.subscribe(() => scheduler.invalidate({ all: true }));
+  // An operation taking the document (Filter, Select Object) works on the map; the original view ends with it.
+  const unsubscribeControlViewLock = stores.documentEditingLocked.subscribe(() => {
+    if (stores.documentEditingLocked.get()) {
+      controlView.clear();
+    }
+  });
   const unsubscribeCheckerColors = stores.checkerColors.subscribe(() => {
     checkerboardTile = null;
     scheduler.invalidate({ all: true });
@@ -1865,6 +1936,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       // finished the move.
       if (!switchOptions?.temporary) {
         floatingSelection.commit();
+        editingController.transform.onToolSwitch(to);
       }
       for (const listener of toolChangeListeners) {
         listener({ from, temporary: switchOptions?.temporary === true, to });
@@ -1879,41 +1951,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     stepBrushSize: stepActiveBrushSize,
     updateCursor,
   });
-  /**
-   * Settle a pending sample, optionally restoring the previous tool. Tool-switch callers skip restoration so their
-   * requested switch wins.
-   */
-  const settleColorSample = (hex: string | null, restoreTool: boolean): void => {
-    const pending = pendingColorSample;
-    if (!pending) {
-      return;
-    }
-    pendingColorSample = null;
-    pending.resolve(hex);
-    if (restoreTool) {
-      interactionController.setTool(pending.previousToolId);
-    }
-  };
-
   const setTool = (toolId: ToolId, options?: { temporary?: boolean }): void => {
-    // Any move off the eyedropper abandons the sample the caller is awaiting.
-    if (toolId !== 'colorPicker') {
-      settleColorSample(null, false);
-    }
+    colorSamples.onToolChange(toolId);
     interactionController.setTool(toolId, options);
-  };
-
-  /** Samples the document composite and resolves hex on release, after the gesture, or null on cancellation. */
-  const requestColorSample = (): Promise<string | null> => {
-    // A second request supersedes the first; the earlier caller gets a cancel.
-    settleColorSample(null, false);
-    // End any held temporary tool first, so the request records the tool the user was really on.
-    pipeline.endForToolSwitch();
-
-    return new Promise<string | null>((resolve) => {
-      pendingColorSample = { previousToolId: interactionController.getActiveToolId(), resolve, sampledHex: null };
-      interactionController.setTool('colorPicker');
-    });
   };
 
   /**
@@ -1922,10 +1962,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
    * pipeline wiring and node tests.
    */
   const handleEscapePriority = ({ gestureWasActive }: { gestureWasActive: boolean }): void => {
-    // An armed eyedropper is the most recent thing the user opted into, so it
-    // is the first thing Escape takes back.
-    if (pendingColorSample) {
-      settleColorSample(null, true);
+    if (colorSamples.onEscape()) {
       return;
     }
     if (stores.textEditSession.get()) {
@@ -1934,6 +1971,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     }
     if (stores.transformSession.get()) {
       cancelTransform();
+      return;
+    }
+    if (editingController.transform.onEscape()) {
       return;
     }
     if (floatingSelection.has()) {
@@ -1955,6 +1995,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getActiveToolId: () => interactionController.getActiveToolId(),
     getInputElement: () => renderController.getInputElement(),
     getKeyboardRoot: () => renderController.getKeyboardRoot(),
+    getKeyOwnerResolver: () => renderController.getKeyOwnerResolver(),
     getToolContext: () => toolContext,
     handleEscape: handleEscapePriority,
     hasTool: (id) => tools.has(id),
@@ -2021,6 +2062,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     }
     interactionLocked = locked;
     if (locked) {
+      // A generation or staging holds the canvas; the user cannot switch the view back meanwhile.
+      controlView.clear();
       pipeline.cancelActiveGesture();
       setTool('view', { temporary: true });
     }
@@ -2029,8 +2072,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const attach = (
     screenCanvas: HTMLCanvasElement,
     overlayCanvas: HTMLCanvasElement,
-    keyboardRoot?: HTMLElement
-  ): void => renderController.attach(screenCanvas, overlayCanvas, keyboardRoot);
+    keyboardRoot?: HTMLElement,
+    options?: CanvasSurfaceAttachOptions
+  ): void => renderController.attach(screenCanvas, overlayCanvas, keyboardRoot, options);
   const detach = (): void => renderController.detach();
 
   const activate = (): void => {
@@ -2062,6 +2106,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     editingController.cooldown();
     clearStagedPreview();
     clearStagedPreviewCache();
+    controlView.clear();
     detach();
     cancelAllLayerRasterizations();
     rasterController.cancelSpatialAdjustments();
@@ -2108,19 +2153,26 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   let hasEverFitToView = false;
 
+  /**
+   * The document's navigable extent: the bbox (the empty-canvas anchor) joined with every enabled renderable
+   * layer's source bounds. Fit-to-view and the overview share it so both show the same canvas.
+   */
+  const getDocumentExtent = (doc: CanvasDocumentContractV3): Rect => {
+    let extent: Rect = { ...doc.bbox };
+    for (const leaf of compileDocumentLeaves(doc)) {
+      if (leaf.contributionEnabled && isRenderableLayer(leaf.layer)) {
+        extent = union(extent, getSourceBounds(leaf.layer, doc));
+      }
+    }
+    return extent;
+  };
+
   const fitToView = (): void => {
     const doc = mirror.getDocument();
     if (!doc) {
       return;
     }
-    // Fit content union bbox, using the bbox as the empty-canvas anchor and including content beyond it.
-    let bounds: Rect = { ...doc.bbox };
-    for (const leaf of compileDocumentLeaves(doc)) {
-      if (leaf.contributionEnabled && isRenderableLayer(leaf.layer)) {
-        bounds = union(bounds, getSourceBounds(leaf.layer, doc));
-      }
-    }
-    viewport.fitToView(bounds, viewport.getViewportSize());
+    viewport.fitToView(getDocumentExtent(doc), viewport.getViewportSize());
     hasEverFitToView = true;
   };
 
@@ -2142,6 +2194,27 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     }
     const entry = layerCache.get(layer.id);
     return !!entry && !entry.stale && !isCurrentRasterizationJob(layer);
+  };
+  /**
+   * Unreadable while an `unreadable` failure is recorded for the layer's current source, `not-ready` while it loads or
+   * its image could not be fetched for now. The image is tried again in the background (a layer off screen or disabled
+   * is never redrawn to do so), so one that became available recovers: at once after an `unavailable` failure, since
+   * the user asking again is the moment a recovered server should be noticed, and only once the backoff has ended
+   * after an `unreadable` one. A retry that fails again only restarts the backoff; a running job is joined, not
+   * duplicated.
+   */
+  const layerCacheReadinessForOp = (layer: CanvasLayerContract, doc: CanvasDocumentContractV3): LayerCacheReadiness => {
+    if (isLayerCacheReadyForOp(layer, doc)) {
+      return 'ready';
+    }
+    const failure = isCurrentRasterizationJob(layer) ? null : getRasterizationFailure(layer);
+    if (!failure) {
+      return 'not-ready';
+    }
+    if (failure === 'unavailable' || !isRasterizationBackingOff(layer)) {
+      scheduleLayerRasterization([layer.id]);
+    }
+    return failure === 'unreadable' ? layerUnreadable(doc, layer.id) : 'not-ready';
   };
 
   const prepareGeneratedPaintCache = (layerId: string, rect: Rect, pixels: RasterSurface) =>
@@ -2177,13 +2250,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const getMainModelBase = (): string | null => {
     return opts.getMainModelBase?.() ?? null;
-  };
-  const getDefaultControlModel = (base: string | null): string | null => {
-    return opts.getDefaultControlModel?.(base) ?? null;
-  };
-  const getControlModel = (): { base: string | null; model: string | null } => {
-    const base = getMainModelBase();
-    return { base, model: getDefaultControlModel(base) };
   };
 
   /** Conversion reducers clone contracts, so their publication postcondition compares by value. */
@@ -2230,7 +2296,15 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       }
     },
   });
-  const beginPixelEdit = pixelEditController.begin.bind(pixelEditController);
+  const pixelEdits = pixelEditController;
+  /** Strokes paint the map live, so a stroke on a viewed layer first returns it to the map. */
+  const beginPixelEdit: PixelEditController['begin'] = (layerId, options) => {
+    const transaction = pixelEdits.begin(layerId, options);
+    if (transaction) {
+      controlView.clear((id) => id === layerId);
+    }
+    return transaction;
+  };
 
   const captureLayerCache = (
     layer: CanvasLayerContract,
@@ -2307,7 +2381,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     ctx: mutationContext,
     discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
     exportBaked: (layerId) => exportBakedLayerPixelsForStructural(layerId, { includeDisabled: true }),
-    getControlModel,
+    getMainModelBase,
     getDuplicateRasterPlan,
     getSelectedLayerIds: resolveSelectedLayerIds,
     hasPendingPixelWork: (layerId) => bitmapStore.hasPendingWork(layerId),
@@ -2344,11 +2418,20 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     ctx: mutationContext,
     decodeImage: (image, options) => rasterController.decodeImage(image, options),
     discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
-    getDefaultControlModel,
     getMainModelBase,
     needsPixelPersistence: layerNeedsPixelPersistence,
   });
   const commitRasterFilterResult = filterResultController.commit.bind(filterResultController);
+
+  const controlDerivationController = new ControlDerivationController({
+    captureCache: captureLayerCache,
+    ctx: mutationContext,
+    decodeImage: (image, options) => rasterController.decodeImage(image, options),
+    discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
+    getDocumentRevision: () => mutationPort.getCanvasState()?.documentRevision ?? null,
+    hasPendingPixelWork: (layerId) => bitmapStore.hasPendingWork(layerId),
+    isLayerSessionHeld: isLayerHeldBySession,
+  });
 
   const generatedResultController = new GeneratedResultController({
     captureCache: captureLayerCache,
@@ -2356,7 +2439,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     ctx: mutationContext,
     decodeImage: (image, options) => rasterController.decodeImage(image, options),
     discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
-    getDefaultControlModel,
     getMainModelBase,
     needsPixelPersistence: layerNeedsPixelPersistence,
   });
@@ -2383,6 +2465,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const mergeSelectedRasterLayers = (layerIds: readonly string[]): Promise<MergeVisibleResult> =>
     layerController.merge.mergeSelected(layerIds);
   const mergeVisibleRasterLayers = (): Promise<MergeVisibleResult> => layerController.merge.mergeVisible();
+  const mergeInpaintMasks = (layerIds: readonly string[]): Promise<MergeInpaintMasksResult> =>
+    layerController.merge.mergeInpaintMasks(layerIds);
+  const cropAllLayersToBbox = (): Promise<CropAllLayersResult> => layerController.crop.cropAll();
 
   const { captureDocumentSnapshot, captureRasterSnapshot, isDocumentSnapshotCurrent, releaseActiveSnapshots } =
     createRasterSnapshotCapture({
@@ -2524,6 +2609,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       return;
     }
     disposed = true;
+    paintLineEnds.dispose();
+    disposeLayerRasterizer();
     releaseActiveSnapshots();
     rasterController.memory.releaseGeneration(lifecycleGeneration);
     lifecycleGeneration += 1;
@@ -2533,6 +2620,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cleanup.run(cancelOpenPixelEdit);
     cleanup.run(() => pixelEditController?.dispose());
     cleanup.run(() => filterResultController.dispose());
+    cleanup.run(() => controlDerivationController.dispose());
     cleanup.run(() => generatedResultController.dispose());
     cleanup.run(() => stagedResultController.dispose());
     cleanup.run(() => editingController.dispose());
@@ -2547,12 +2635,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cleanup.run(() => stores.textEditSession.set(null));
     cleanup.run(() => antsAnimator.stop());
     // No render loop left to sample with; release any awaited eyedropper.
-    cleanup.run(() => settleColorSample(null, false));
+    cleanup.run(() => colorSamples.dispose());
     cleanup.run(() => activeTool()?.onDeactivate?.(toolContext));
     cleanup.run(unsubscribeViewport);
     cleanup.run(unsubscribeBrushOptions);
     cleanup.run(unsubscribeEraserOptions);
     cleanup.run(unsubscribeCheckerboard);
+    cleanup.run(unsubscribeControlViewLock);
     cleanup.run(unsubscribeCheckerColors);
     cleanup.run(unsubscribeShowGrid);
     cleanup.run(unsubscribeBboxGrid);
@@ -2568,6 +2657,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cleanup.run(() => persistenceController.dispose());
     cleanup.run(() => mirror.dispose());
     cleanup.run(() => previewPublisher.dispose());
+    cleanup.run(() => controlView.dispose());
     cleanup.run(() => renderController.dispose());
     cleanup.run(() => rasterController.dispose());
     cleanup.run(() => fontLoader.dispose());
@@ -2718,7 +2808,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       backend,
       ctx: mutationContext,
       exportBaked: (layerId) => exportBakedLayerPixelsForStructural(layerId),
-      isCacheReady: isLayerCacheReadyForOp,
+      cacheReadiness: layerCacheReadinessForOp,
       isGuardCurrent: isLayerExportGuardCurrent,
     },
     crop: {
@@ -2726,7 +2816,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       captureCache: captureLayerCache,
       ctx: mutationContext,
       discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
-      exportBaked: (layerId) => exportBakedLayerPixelsForStructural(layerId, { includeDisabled: true }),
+      exportBaked: (layerId, options) =>
+        exportBakedLayerPixelsForStructural(layerId, { ...options, includeDisabled: true }),
+      // Held pixels belong to an open edit; crop all must not wait for that edit to end.
+      flushPendingPixels: () => persistenceController.flush({ waitForHeldPixels: false }),
       isGuardCurrent: isLayerExportGuardCurrent,
       isSupportedSource: isSupportedExportSource,
     },
@@ -2735,7 +2828,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       commitLayerCopy,
       ctx: mutationContext,
       exportBaked: (layerId) => exportBakedLayerPixelsForStructural(layerId, { includeDisabled: true }),
-      getControlModel,
+      getMainModelBase,
       isGuardCurrent: isLayerExportGuardCurrent,
     },
     extractMaskedArea: {
@@ -2743,7 +2836,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       ctx: mutationContext,
       exportBaked: (layerId, includeDisabled) => exportBakedLayerPixelsForStructural(layerId, { includeDisabled }),
       hasExportableContent: hasExportableLayerContent,
-      isCacheReady: isLayerCacheReadyForOp,
+      cacheReadiness: layerCacheReadinessForOp,
       isGuardCurrent: isLayerExportGuardCurrent,
       layers: layerCache,
       peekAdjustedCacheSurface: (layerId, surface, adjustments) =>
@@ -2774,7 +2867,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       ctx: mutationContext,
       exportBaked: (layerId) => exportBakedLayerPixelsForStructural(layerId),
       hasExportableContent: hasExportableLayerContent,
-      isCacheReady: isLayerCacheReadyForOp,
+      cacheReadiness: layerCacheReadinessForOp,
       layers: layerCache,
       needsPixelPersistence: layerNeedsPixelPersistence,
       peekAdjustedSurface: (layer, entry) => rasterController.peekAdjustedSurface(layer, entry),
@@ -2874,21 +2967,14 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     handleEscapePriority,
     onEditRefused,
     onStrokeCommitted,
-    requestColorSample,
-    setColorSampleRouter: (router) => {
-      colorSampleRouter = router;
-      return () => {
-        // Compare-and-clear: a later installer must not be evicted by an earlier one's cleanup.
-        if (colorSampleRouter === router) {
-          colorSampleRouter = null;
-        }
-      };
-    },
+    requestColorSample: () => colorSamples.requestSample(),
+    setColorSampleRouter: (router) => colorSamples.setRouter(router),
     setInteractionLocked,
   };
   const layersCapability: CanvasEngineLayerCapability = {
     ...layerController.layers,
     applyTransform,
+    beginTransform: (layerId) => editingController.transform.request(layerId),
     booleanMergeRasterLayers,
     cancelTextEdit,
     cancelTransform,
@@ -2903,8 +2989,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     convertLayerToControl,
     copyLayerToControl,
     copyLayerToRaster,
+    cropAllLayersToBbox,
     cropLayerToBbox,
     duplicateLayers,
+    mergeInpaintMasks,
     mergeLayerDown,
     mergeSelectedRasterLayers,
     mergeVisibleRasterLayers,
@@ -2921,7 +3009,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const drawDocumentOverview = (target: HTMLCanvasElement, maxSizePx: number): Rect | null => {
     const doc = mirror.getDocument();
     const ctx = target.getContext('2d');
-    if (!doc || !ctx || doc.width <= 0 || doc.height <= 0) {
+    if (!doc || !ctx) {
+      return null;
+    }
+    const extent = getDocumentExtent(doc);
+    if (isEmpty(extent)) {
       return null;
     }
     // Overview requests missing offscreen caches and repaints after publication. Attempt each layer once per
@@ -2944,17 +3036,18 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     if (missing.length > 0) {
       scheduleLayerRasterization(missing);
     }
-    const size = fitThumbnailSize(doc.width, doc.height, maxSizePx);
+    const size = fitThumbnailSize(extent.width, extent.height, maxSizePx);
     target.width = size.width;
     target.height = size.height;
-    const scale = size.width / doc.width;
+    const scale = size.width / extent.width;
     // Only `ctx`/`width`/`height` are read by the compositor; the element is not resized through the surface seam.
     const surfaceLike = { canvas: target, ctx, height: size.height, width: size.width } as unknown as RasterSurface;
     compositeDocument(
       surfaceLike,
       doc,
       layerCache,
-      { a: scale, b: 0, c: 0, d: scale, e: 0, f: 0 },
+      // Translate so the extent's origin lands on the target's top-left pixel.
+      { a: scale, b: 0, c: 0, d: scale, e: -extent.x * scale, f: -extent.y * scale },
       {
         adjustedSurface: getAdjustedSurface,
         backend,
@@ -2966,12 +3059,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         regionOverlays: true,
       }
     );
-    return { height: doc.height, width: doc.width, x: 0, y: 0 };
+    return extent;
   };
   const previewCapability: CanvasEnginePreviewCapability = {
     ...layerController.previews,
     drawDocumentOverview,
     preloadStagedPreview,
+    setControlLayerView: (layerId, view) => controlView.set(layerId, view),
     setGuardedFilterPreview,
     setStagedPreview,
   };
@@ -2982,9 +3076,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
 
   const applicationHost: CanvasApplicationHost = {
+    captureControlDetectionGuard: (layerId) => controlDerivationController.captureControlDetectionGuard(layerId),
     captureGuard: captureCurrentLayerExportGuard,
     clearFilterPreview,
     clearSamPreview,
+    commitControlLayerPatch: (options) => controlDerivationController.commitControlLayerPatch(options),
+    commitControlMap: (options) => controlDerivationController.commitControlMap(options),
     commitFilter: (options) => commitRasterFilterResult(options, documentEditOwner),
     commitGenerated: (options) => commitGeneratedImageResult(options, documentEditOwner),
     commitMask: (options) => commitMaskImageResult(options, documentEditOwner),
@@ -2992,6 +3089,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     encodeSurface: (surface) => backend.encodeSurface(surface, 'image/png'),
     exportBakedLayerBlob: (layerId) => exportBakedLayerBlob(layerId, { includeDisabled: true }),
     exportLayerPixels: rasterizeLayerPixelsForStructural,
+    flushLayerUploads: (layerId, options) => persistenceController.flushLayer(layerId, options),
     getCompositeExecutorDeps,
     getDocument: () => mirror.getDocument(),
     isGuardCurrent: isLayerExportGuardCurrent,

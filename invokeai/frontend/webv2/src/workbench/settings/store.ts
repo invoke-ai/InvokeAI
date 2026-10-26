@@ -50,6 +50,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   alphaNoticeAcknowledged: false,
   autoSwitchInvocationRoute: true,
   confirmImageDeletion: true,
+  controlModelMemory: {},
   customHotkeys: {},
   developerConsoleOutputEnabled: false,
   developerLogEnabled: true,
@@ -73,6 +74,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   promptFontSize: 'default',
   queueJobsScope: 'all',
   reduceMotion: false,
+  selectObjectAutoProcess: false,
   showPromptSyntaxHighlighting: true,
   showFocusRegionHighlight: true,
   themeId: DEFAULT_THEME_ID,
@@ -265,6 +267,38 @@ const normalizeGeneratePresets = (values: unknown): StoredGeneratePreset[] => {
   return presets;
 };
 
+/**
+ * `${base}:${controlType}`. The control types are spelled out because importing them from the canvas engine would
+ * pull it into Launchpad's bundle; a store test keeps the list in step with `CONTROL_TYPES`.
+ */
+const CONTROL_MODEL_MEMORY_KEY = /^[^:]+:(?:pose|depth|edges|softedge|lineart|sketch|color|tile)$/;
+const CONTROL_MODEL_MEMORY_MAX_ENTRIES = 256;
+const CONTROL_MODEL_KEY_MAX_LENGTH = 255;
+
+/**
+ * Keeps well-formed entries, the newest {@link CONTROL_MODEL_MEMORY_MAX_ENTRIES} (a pick is re-inserted last), so the
+ * synced blob stays bounded. An already-valid record comes back as is, so patching another preference keeps its
+ * identity and does not re-run selectors that read it (Invoke readiness).
+ */
+const normalizeControlModelMemory = (values: unknown): Record<string, string> => {
+  if (!values || typeof values !== 'object' || Array.isArray(values)) {
+    return {};
+  }
+
+  const entries = Object.entries(values);
+  const kept = entries
+    .filter(
+      (entry): entry is [string, string] =>
+        CONTROL_MODEL_MEMORY_KEY.test(entry[0]) &&
+        typeof entry[1] === 'string' &&
+        entry[1].length > 0 &&
+        entry[1].length <= CONTROL_MODEL_KEY_MAX_LENGTH
+    )
+    .slice(-CONTROL_MODEL_MEMORY_MAX_ENTRIES);
+
+  return kept.length === entries.length ? (values as Record<string, string>) : Object.fromEntries(kept);
+};
+
 export const isViewerAutoSwitchMode = (value: unknown): value is ViewerAutoSwitchMode =>
   value === 'off' || value === 'latest' || value === 'progress';
 
@@ -308,6 +342,7 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.confirmImageDeletion === 'boolean'
       ? preferences.confirmImageDeletion
       : DEFAULT_PREFERENCES.confirmImageDeletion,
+  controlModelMemory: normalizeControlModelMemory(preferences?.controlModelMemory),
   customHotkeys: normalizeCustomHotkeys(preferences?.customHotkeys),
   developerLogEnabled:
     typeof preferences?.developerLogEnabled === 'boolean'
@@ -375,6 +410,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
       : DEFAULT_PREFERENCES.alphaNoticeAcknowledged,
   reduceMotion:
     typeof preferences?.reduceMotion === 'boolean' ? preferences.reduceMotion : DEFAULT_PREFERENCES.reduceMotion,
+  selectObjectAutoProcess:
+    typeof preferences?.selectObjectAutoProcess === 'boolean'
+      ? preferences.selectObjectAutoProcess
+      : DEFAULT_PREFERENCES.selectObjectAutoProcess,
   showFocusRegionHighlight:
     typeof preferences?.showFocusRegionHighlight === 'boolean'
       ? preferences.showFocusRegionHighlight
@@ -698,6 +737,16 @@ export const patchWorkbenchPreferences = async (preferences: Partial<WorkbenchPr
       });
     }
   });
+};
+
+/** Remembers (or, with null, forgets) the control model picked for `key` (see `controlModelMemoryKey`). */
+export const patchControlModelMemory = (key: string, modelKey: string | null): Promise<void> => {
+  const controlModelMemory = { ...store.getSnapshot().preferences.controlModelMemory };
+  delete controlModelMemory[key];
+  if (modelKey !== null) {
+    controlModelMemory[key] = modelKey;
+  }
+  return patchWorkbenchPreferences({ controlModelMemory });
 };
 
 export const clearWorkbenchSettings = async (): Promise<void> => {

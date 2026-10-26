@@ -8,6 +8,7 @@ import { ChakraProvider, createListCollection, Menu, Portal, Select } from '@cha
 import { PromptTextarea } from '@features/generation/components';
 import { adjustFocusedPromptAttention } from '@features/generation/react';
 import { MenuContent } from '@platform/ui/Menu';
+import { SegmentedControl } from '@platform/ui/SegmentedControl';
 import { AppToaster, createActionToast, toaster } from '@platform/ui/toaster';
 import { system } from '@theme/system';
 import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
@@ -512,5 +513,71 @@ describe('WorkbenchHotkeyRuntime and prompt weighting', () => {
 
     expect(claimed).toBe(false);
     expect(textarea.value).toBe('a cat');
+  });
+});
+
+const VIEW_OPTIONS = [
+  { label: 'Original', value: 'original' },
+  { label: 'Map', value: 'map' },
+  { label: 'Overlay', value: 'overlay' },
+];
+
+describe('WorkbenchHotkeyRuntime and a focused segmented control', () => {
+  let controlRoot: Root | null = null;
+
+  afterEach(async () => {
+    await act(() => controlRoot?.unmount());
+    controlRoot = null;
+  });
+
+  const Segments = () => {
+    const [value, setValue] = useState('map');
+    return (
+      <SegmentedControl ariaLabel="View" isFullWidth={false} options={VIEW_OPTIONS} value={value} onChange={setValue} />
+    );
+  };
+
+  it('leaves arrow keys to the radio group while Gallery, which binds them, holds focus', async () => {
+    // Gallery's grid binds the plain arrows to its own navigation.
+    contribute('gallery.galleryNavRight', 'arrowright', 'focused-region', {
+      instanceId: 'gallery',
+      projectId: projectId(),
+      region: 'right',
+      typeId: 'gallery',
+    });
+    await pressOn('right');
+    const controlHost = document.createElement('div');
+    host!.append(controlHost);
+    controlRoot = createRoot(controlHost);
+    await act(() => {
+      controlRoot?.render(
+        <ChakraProvider value={system}>
+          <Segments />
+        </ChakraProvider>
+      );
+    });
+    const radio = (value: string) => controlHost.querySelector<HTMLInputElement>(`input[value="${value}"]`)!;
+    const prevented: boolean[] = [];
+    // Registered after the runtime's listener, so it sees the press once the runtime has handled it.
+    const record = (event: KeyboardEvent) => prevented.push(event.defaultPrevented);
+    window.addEventListener('keydown', record);
+
+    try {
+      await act(async () => {
+        radio('map').focus();
+        await userEvent.keyboard('{ArrowRight}');
+      });
+    } finally {
+      window.removeEventListener('keydown', record);
+    }
+
+    expect(prevented).toEqual([false]);
+    expect(ran).toEqual([]);
+    expect(radio('overlay').checked).toBe(true);
+    expect(document.activeElement).toBe(radio('overlay'));
+
+    // Outside the radio group the same press is Gallery's.
+    await pressKey('ArrowRight', host!.querySelector('[data-testid="right"]')!);
+    expect(ran).toEqual(['gallery.galleryNavRight']);
   });
 });

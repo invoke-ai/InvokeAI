@@ -588,6 +588,7 @@ def test_video_star_endpoints_dedupe_names_and_report_partial_failures(
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.ffmpeg
 def test_upload_video_malformed_mp4_returns_415_and_cleans_up_tmp(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -643,6 +644,7 @@ def test_upload_video_malformed_mp4_returns_415_and_cleans_up_tmp(
     assert not leaked, f"tmp files leaked after 415: {leaked}"
 
 
+@pytest.mark.ffmpeg
 def test_upload_video_rejects_non_mp4_container_with_spoofed_mime(
     client: TestClient, mock_invoker: Invoker, user1_token: str
 ):
@@ -738,6 +740,7 @@ def _make_fixture_media(path: Path, *args: str) -> Path:
     return path
 
 
+@pytest.mark.ffmpeg
 def test_upload_h264_mov_is_remuxed_and_created(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -773,6 +776,7 @@ def test_upload_h264_mov_is_remuxed_and_created(
     assert stored_was_mp4 == [True]
 
 
+@pytest.mark.ffmpeg
 def test_upload_audio_file_is_wrapped_and_marked(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -801,6 +805,7 @@ def test_upload_audio_file_is_wrapped_and_marked(
     assert (create_kwargs["width"], create_kwargs["height"]) == (640, 360)
 
 
+@pytest.mark.ffmpeg
 def test_upload_mp4_with_non_aac_audio_gets_audio_normalized(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -1299,6 +1304,7 @@ def _upload(client: TestClient, token: str, body: bytes, metadata: str | None = 
         )
 
 
+@pytest.mark.ffmpeg
 def test_upload_video_recovers_metadata_workflow_and_graph_embedded_in_the_file(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -1333,6 +1339,7 @@ def test_upload_video_recovers_metadata_workflow_and_graph_embedded_in_the_file(
     assert kwargs["graph"] == tags["invokeai_graph"]
 
 
+@pytest.mark.ffmpeg
 def test_upload_video_client_metadata_wins_over_the_embedded_copy(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -1361,6 +1368,7 @@ def test_upload_video_without_embedded_tags_stores_no_metadata(
     assert (kwargs["metadata"], kwargs["workflow"], kwargs["graph"]) == (None, None, None)
 
 
+@pytest.mark.ffmpeg
 def test_upload_recovers_embedded_tags_from_a_file_the_ingest_path_rewrites(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -1403,6 +1411,7 @@ def test_upload_recovers_embedded_tags_from_a_file_the_ingest_path_rewrites(
     assert stored_tags == [{}]
 
 
+@pytest.mark.ffmpeg
 def test_upload_ignores_an_embedded_metadata_record_over_the_form_field_cap(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):

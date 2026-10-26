@@ -3,6 +3,7 @@ import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasCommandRefusal } from '@workbench/canvas-engine/document/commandRefusal';
 import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import type { SubsetOf } from '@workbench/canvas-engine/editConcurrency';
+import type { LayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
@@ -26,6 +27,7 @@ import {
 type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
   | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 /** The stack a baked copy lands in: a raster paint layer, or a control layer with a default adapter. */
@@ -33,7 +35,10 @@ export type CopyLayerTarget = 'raster' | 'control';
 
 export type CopyLayerResult =
   | { status: 'copied'; layerId: string }
-  | { status: LayerEditRefusal | SubsetOf<CanvasCommandRefusal, 'missing' | 'unsupported'> | 'empty' | 'failed' }
+  | {
+      status: LayerEditRefusal | SubsetOf<CanvasCommandRefusal, 'missing' | 'unsupported'> | 'empty' | 'failed';
+    }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 export interface CopyLayerControllerOptions {
@@ -57,8 +62,8 @@ export interface CopyLayerControllerOptions {
     anchor: CanvasNodeInsertionAnchor
   ) => boolean;
   readonly exportBaked: (layerId: string) => Promise<ExportResult>;
-  /** The main model's base and its default control model, for a control copy's adapter. */
-  readonly getControlModel: () => { readonly base: string | null; readonly model: string | null };
+  /** The main model's base, for a control copy's adapter kind and defaults. */
+  readonly getMainModelBase: () => string | null;
   readonly isGuardCurrent: (guard: LayerExportGuard) => boolean;
 }
 
@@ -105,7 +110,7 @@ export class CopyLayerController {
         return { status: 'not-ready' };
       }
       const layer = createControlLayerFrom(sourceLayer, {
-        ...this.deps.getControlModel(),
+        base: this.deps.getMainModelBase(),
         content: { source: sourceLayer.source },
         id: ctx.createLayerId(),
         name: `${sourceLayer.name} copy`,
@@ -114,6 +119,9 @@ export class CopyLayerController {
       return this.deps.commitLayerCopy(COPY_LABELS.control, layerId, layer, anchor)
         ? { layerId: layer.id, status: 'copied' }
         : { status: 'not-ready' };
+    }
+    if (baked.status === 'unreadable') {
+      return baked;
     }
     if (baked.status !== 'ok') {
       return { status: baked.status === 'disabled' ? 'not-ready' : baked.status };
@@ -148,7 +156,7 @@ export class CopyLayerController {
         const layer =
           target === 'control'
             ? createControlLayerFrom(sourceLayer, {
-                ...this.deps.getControlModel(),
+                base: this.deps.getMainModelBase(),
                 content: { rect: baked.rect },
                 id,
                 name,

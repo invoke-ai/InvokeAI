@@ -31,6 +31,8 @@ from invokeai.app.util.mp4_metadata import find_box, write_mp4_tags
 from invokeai.app.util.video_audio import extract_audio_pcm
 from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav
 
+pytestmark = pytest.mark.ffmpeg
+
 FPS = 16.0
 RATE = 32000
 SIZE = 64
