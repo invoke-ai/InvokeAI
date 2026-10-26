@@ -1,7 +1,10 @@
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from PIL import Image
 
+from invokeai.app.api.extract_metadata import extract_metadata_from_image
 from invokeai.app.invocations.math import AddInvocation, RandomIntInvocation
 from invokeai.app.services.board_access.board_access_common import (
     BoardAccessDeniedError,
@@ -9,8 +12,10 @@ from invokeai.app.services.board_access.board_access_common import (
     ItemAccessDeniedError,
     ItemAction,
 )
+from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.shared.graph import Edge, EdgeConnection, Graph, GraphExecutionState
 from invokeai.app.services.shared.invocation_context import ImagesInterface
+from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 
 
 def _make_interface(allowed: bool) -> tuple[ImagesInterface, MagicMock]:
@@ -254,3 +259,111 @@ def test_image_save_graph_falls_back_to_source_graph_before_materialization() ->
     assert (saved_add_node.a, saved_add_node.b) == (2, 3)
     assert saved_graph == graph
     assert not session.execution_graph.nodes
+
+
+def test_image_save_graph_png_round_trip(tmp_path: Path) -> None:
+    session = GraphExecutionState(
+        graph=Graph(
+            nodes={
+                "random": RandomIntInvocation(id="random", low=17, high=18),
+                "add": AddInvocation(id="add", b=1),
+                "downstream": AddInvocation(id="downstream", b=2),
+            },
+            edges=[
+                Edge(
+                    source=EdgeConnection(node_id="random", field="value"),
+                    destination=EdgeConnection(node_id="add", field="a"),
+                ),
+                Edge(
+                    source=EdgeConnection(node_id="add", field="value"),
+                    destination=EdgeConnection(node_id="downstream", field="a"),
+                ),
+            ],
+        )
+    )
+    random_node = session.next()
+    assert isinstance(random_node, RandomIntInvocation)
+    session.complete(random_node.id, random_node.invoke(MagicMock()))
+    runtime_add_node = session.next()
+    assert isinstance(runtime_add_node, AddInvocation)
+    assert runtime_add_node.a == 17
+    assert runtime_add_node.id != "add"
+
+    workflow = WorkflowWithoutID.model_validate(
+        {
+            "name": "Reusable image workflow",
+            "author": "",
+            "description": "",
+            "version": "1.0.0",
+            "contact": "",
+            "tags": "",
+            "notes": "Keep the authoring workflow separate from the resolved runtime graph.",
+            "exposedFields": [],
+            "meta": {"category": "user", "version": "3.0.0"},
+            "nodes": [],
+            "edges": [],
+        }
+    )
+    workflow_json = workflow.model_dump_json()
+    services = MagicMock()
+    services.configuration.multiuser = False
+    services.configuration.pil_compress_level = 6
+    storage = DiskImageFileStorage(tmp_path / "outputs")
+    invoker = MagicMock()
+    invoker.services = services
+    storage.start(invoker)
+
+    # Replace only ImageService's record/DTO boundary; PNG persistence and extraction are real.
+    def create_image(
+        image: Image.Image, metadata: str | None, workflow: str | None, graph: str | None, **kwargs: object
+    ) -> None:
+        storage.save(image=image, image_name="runtime.png", metadata=metadata, workflow=workflow, graph=graph)
+
+    services.images.create.side_effect = create_image
+    data = MagicMock()
+    data.queue_item.user_id = "queue-user"
+    data.queue_item.workflow = workflow
+    data.queue_item.root_item_id = None
+    data.queue_item._workflow_json_loaded = False
+    data.queue_item._workflow_json_snapshot = None
+    data.queue_item.session = session
+    data.queue_item.session_id = "session"
+    data.queue_item.project_id = "project-1"
+    data.invocation = runtime_add_node
+    images = ImagesInterface(services, data, MagicMock())
+
+    with Image.new("RGB", (2, 2), color=(12, 34, 56)) as image:
+        images.save(image)
+
+    # A fresh reader cannot return the writer's cached image with its populated image.info.
+    reader = DiskImageFileStorage(storage.image_root)
+    with reader.get("runtime.png") as reopened:
+        assert (reopened.format, reopened.size, reopened.getpixel((0, 0))) == ("PNG", (2, 2), (12, 34, 56))
+        extracted = extract_metadata_from_image(
+            pil_image=reopened,
+            invokeai_metadata_override=None,
+            invokeai_workflow_override=None,
+            invokeai_graph_override=None,
+            logger=services.logger,
+        )
+
+    assert extracted.invokeai_graph is not None
+    saved_graph = Graph.model_validate_json(extracted.invokeai_graph)
+    saved_node_id = services.images.create.call_args.kwargs["node_id"]
+    assert saved_node_id == runtime_add_node.id
+    saved_add_node = saved_graph.nodes[saved_node_id]
+    assert isinstance(saved_add_node, AddInvocation)
+    assert (saved_add_node.id, saved_add_node.a, saved_add_node.b) == (runtime_add_node.id, 17, 1)
+    downstream_id = next(iter(session.source_prepared_mapping["downstream"]))
+    assert set(saved_graph.nodes) == {random_node.id, runtime_add_node.id, downstream_id}
+    assert sorted(
+        (edge.source.node_id, edge.source.field, edge.destination.node_id, edge.destination.field)
+        for edge in saved_graph.edges
+    ) == sorted(
+        [
+            (random_node.id, "value", runtime_add_node.id, "a"),
+            (runtime_add_node.id, "value", downstream_id, "a"),
+        ]
+    )
+    assert extracted.invokeai_workflow == workflow_json
+    assert data.queue_item.workflow.model_dump_json() == workflow_json
