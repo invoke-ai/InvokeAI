@@ -99,12 +99,12 @@ export type LayerContextActionId =
   | 'filter'
   | 'select-object'
   | 'run-workflow'
+  | 'use-as-control-layer'
   | 'intersect'
   | 'cutout'
   | 'cutaway'
   | 'exclude'
   | 'copy-to-raster'
-  | 'copy-to-control'
   | 'copy-to-inpaint-mask'
   | 'copy-to-regional-guidance'
   | 'rasterize'
@@ -576,7 +576,8 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     labelKey: 'widgets.layers.control.filter',
     order: 40,
     section: 'primary',
-    supportedLayerTypes: RASTER_AND_CONTROL,
+    // A control layer's map comes from its Detection row; the Filter operation refuses control layers.
+    supportedLayerTypes: RASTER_ONLY,
   },
   {
     defaultLabel: 'Select object',
@@ -601,6 +602,19 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     order: 42,
     section: 'primary',
     supportedLayerTypes: RASTER_AND_CONTROL,
+  },
+  {
+    // Copies the pixels into a new control layer, whose Properties then ask what it should control.
+    defaultLabel: 'Use as control layer',
+    handler: ({ effects }) => effects.copyTo('control'),
+    icon: SlidersHorizontalIcon,
+    id: 'use-as-control-layer',
+    isEnabled: hasReadablePixels,
+    isVisible: (context) => isPixelBackedLayer(context.layer),
+    labelKey: 'widgets.layers.actions.useAsControlLayer',
+    order: 43,
+    section: 'primary',
+    supportedLayerTypes: RASTER_ONLY,
   },
   {
     defaultLabel: 'Toggle transparency effect',
@@ -825,19 +839,6 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     section: 'operations',
     submenu: 'copy-to',
     supportedLayerTypes: ['control', 'inpaint_mask', 'regional_guidance'],
-  },
-  {
-    defaultLabel: 'Copy to control layer',
-    handler: ({ effects }) => effects.copyTo('control'),
-    icon: CopyIcon,
-    id: 'copy-to-control',
-    isEnabled: hasReadablePixels,
-    isVisible: (context) => isPixelBackedLayer(context.layer),
-    labelKey: 'widgets.layers.actions.copyToControl',
-    order: 22,
-    section: 'operations',
-    submenu: 'copy-to',
-    supportedLayerTypes: RASTER_ONLY,
   },
   {
     defaultLabel: 'Copy to inpaint mask',

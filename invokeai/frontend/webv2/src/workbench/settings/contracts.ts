@@ -129,6 +129,11 @@ export interface WorkbenchPreferences {
   krea2RebalancePresets: StoredRebalancePreset[];
   /** User-saved Generate settings snapshots ("recipes"), in the order they were saved. */
   generatePresets: StoredGeneratePreset[];
+  /**
+   * The last control model picked per main-model base and control type (`${base}:${controlType}` → model key);
+   * control layers left on automatic use it. Not shown in Settings.
+   */
+  controlModelMemory: Record<string, string>;
 }
 
 export type SettingsSectionId = string;

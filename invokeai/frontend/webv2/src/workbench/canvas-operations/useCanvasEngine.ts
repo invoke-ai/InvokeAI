@@ -2,12 +2,10 @@ import type { CanvasEngine, ImageResolver } from '@workbench/canvas-engine/api';
 
 import { useFontRuntime } from '@features/fonts/react';
 import { galleryImageUrls } from '@features/gallery/utility';
-import { getModelsSnapshot } from '@features/models';
 import { CanvasImageMissingError } from '@workbench/canvas-engine/api';
 import { createCanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
 import { publishLayerPanelSelection, readLayerPanelState } from '@workbench/layerPanelState';
 import { getWorkbenchPreferences } from '@workbench/settings/store';
-import { resolveDefaultControlModelForBase } from '@workbench/widgets/layers/controlModelOptions';
 import { getSelectedModelBase } from '@workbench/widgets/layers/selectedModel';
 import {
   useActiveProjectId,
@@ -95,7 +93,6 @@ export const useCanvasEngine = (): CanvasEngineHandle | null => {
           }
         },
         liveEngines,
-        getDefaultControlModel: (base) => resolveDefaultControlModelForBase(getModelsSnapshot().models, base),
         getMainModelBase: () => {
           const project = store.getState().projects.find((candidate) => candidate.id === projectId);
           return project ? getSelectedModelBase(project) : null;

@@ -4,6 +4,7 @@ import type {
   CanvasRasterLayerContractV2,
 } from '@workbench/canvas-engine/contracts';
 
+import { createControlLayer } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { describe, expect, it } from 'vitest';
 
@@ -15,12 +16,7 @@ import {
   getLayerContextMenuRenderEntries,
   type LayerContextMenuSection,
 } from './layerContextMenuLayout';
-import {
-  createControlLayer,
-  createEmptyPaintLayer,
-  createInpaintMaskLayer,
-  createRegionalGuidanceLayer,
-} from './layerOps';
+import { createEmptyPaintLayer, createInpaintMaskLayer, createRegionalGuidanceLayer } from './layerOps';
 
 const paintLayer = (id: string, patch: Partial<CanvasRasterLayerContractV2> = {}): CanvasLayerContract => ({
   ...createEmptyPaintLayer(id, id),
@@ -95,6 +91,7 @@ describe('getLayerContextMenuLayout', () => {
           'filter',
           'select-object',
           'run-workflow',
+          'use-as-control-layer',
         ],
         presentation: 'list',
       },
@@ -103,7 +100,7 @@ describe('getLayerContextMenuLayout', () => {
         items: [
           'merge-down',
           'boolean(intersect,cutout,cutaway,exclude)',
-          'copy-to(copy-to-clipboard,copy-to-control,copy-to-inpaint-mask,copy-to-regional-guidance)',
+          'copy-to(copy-to-clipboard,copy-to-inpaint-mask,copy-to-regional-guidance)',
           'convert-to(convert-to-control,convert-to-inpaint-mask,convert-to-regional-guidance)',
         ],
         presentation: 'list',
@@ -139,23 +136,15 @@ describe('getLayerContextMenuLayout', () => {
     });
   });
 
-  it('places control filter and transparency actions before conversion operations', () => {
+  it('places control transparency before conversion operations, with no Filter', () => {
     const control = {
-      ...createControlLayer('Control', 'control'),
+      ...createControlLayer({ id: 'control', name: 'Control' }),
       source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' as const },
     };
 
     expect(summarize(control)[1]).toEqual({
       id: 'primary',
-      items: [
-        'transform',
-        'rename',
-        'fit-to-bbox',
-        'filter',
-        'select-object',
-        'run-workflow',
-        'control-transparency-effect',
-      ],
+      items: ['transform', 'rename', 'fit-to-bbox', 'select-object', 'run-workflow', 'control-transparency-effect'],
       presentation: 'list',
     });
     expect(summarize(control)[2]).toEqual({

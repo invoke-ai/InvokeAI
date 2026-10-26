@@ -6,6 +6,7 @@ import { Button } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getDestinationLabel } from '@workbench/invocation';
 import { useActiveQueueProgress } from '@workbench/queue-integration/useActiveQueueProgress';
+import { useRevealLayerProperties } from '@workbench/widgets/layers/revealLayerProperties';
 import { PlayIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -44,7 +45,8 @@ const plural = (count: number, noun: string): string => `${count} ${noun}${count
  */
 export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const { t } = useTranslation();
-  const { blockingReasons, invoke, isPreparing, isValid } = state;
+  const { invoke, isPreparing, isValid, issues } = state;
+  const revealLayerProperties = useRevealLayerProperties();
   const shortcutBinding = useTopbarShortcutBinding('app.invoke');
   const frontBinding = useTopbarShortcutBinding('app.invokeFront');
   const shortcutParts = shortcutBinding?.parts ?? null;
@@ -76,6 +78,14 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
     [invoke]
   );
   const canInvoke = isValid && !isPreparing;
+  // Blocked by issues: the count replaces the shortcut, and when the first names a layer, activation shows it.
+  const showsIssues = !isValid && !isPreparing && issues.length > 0;
+  const issueLayerId = showsIssues ? (issues[0]?.layerId ?? null) : null;
+  const handleShowIssue = useCallback(() => {
+    if (issueLayerId !== null) {
+      revealLayerProperties(issueLayerId);
+    }
+  }, [issueLayerId, revealLayerProperties]);
 
   const iconMode = isPreparing
     ? ({ mode: 'progress', value: null } as const)
@@ -88,25 +98,28 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   return (
     <Tooltip content={tooltipContent} contentProps={TOOLTIP_CONTENT_PROPS} openDelay={200} showArrow>
       <Button
-        aria-disabled={!canInvoke}
+        aria-disabled={!canInvoke && issueLayerId === null}
         aria-keyshortcuts={ariaKeyShortcuts}
         aria-label={
           canInvoke
             ? t('topbar.invoke.invoke')
             : isPreparing
               ? t('topbar.invoke.preparing')
-              : t('topbar.invoke.unavailable', {
-                  reason: blockingReasons[0] ?? t('topbar.invoke.unrunnable'),
-                })
+              : issueLayerId !== null
+                ? t('topbar.invoke.showIssue', { count: issues.length, reason: issues[0]?.message })
+                : t('topbar.invoke.unavailable', {
+                    reason: issues[0]?.message ?? t('topbar.invoke.unrunnable'),
+                  })
         }
         colorPalette="brand"
         css={INVOKE_BUTTON_CSS}
-        cursor={canInvoke ? undefined : 'not-allowed'}
+        cursor={canInvoke || issueLayerId !== null ? undefined : 'not-allowed'}
         flexShrink={0}
-        opacity={canInvoke ? undefined : 0.55}
+        // A blocked Invoke that can show its first issue is still actionable, so it is not dimmed.
+        opacity={canInvoke || issueLayerId !== null ? undefined : 0.55}
         size="lg"
         onBlur={handleBlur}
-        onClick={canInvoke ? handleClick : undefined}
+        onClick={canInvoke ? handleClick : issueLayerId !== null ? handleShowIssue : undefined}
         onFocus={handleFocus}
         onPointerEnter={handlePointerEnter}
         onPointerLeave={handlePointerLeave}
@@ -127,8 +140,8 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
             </ProgressCircle.Root>
           )}
         </Box>
-        {t('topbar.invoke.invoke')}
-        {shortcutParts ? (
+        {showsIssues ? t('topbar.invoke.issueCount', { count: issues.length }) : t('topbar.invoke.invoke')}
+        {shortcutParts && !showsIssues ? (
           <Kbd css={HIDE_BELOW_HINT_WIDTH} variant="outline" borderColor={SHORTCUT_BORDER} color="inherit">
             <TopbarShortcutKeys parts={shortcutParts} />
           </Kbd>
@@ -148,7 +161,7 @@ const InvokeTooltipContent = ({
   state: InvocationState;
 }) => {
   const { t } = useTranslation();
-  const { batchCount, blockingReasons, invocation, isPreparing, isValid, promptExpansion, workflowBatchSize } = state;
+  const { batchCount, invocation, isPreparing, isValid, issues, promptExpansion, workflowBatchSize } = state;
   const destination = getDestinationLabel(invocation.destination);
   const promptCount = promptExpansion.count;
   const summary =
@@ -186,9 +199,9 @@ const InvokeTooltipContent = ({
         <Text color="fg.muted" fontSize="md">
           {t('topbar.invoke.preparing')}
         </Text>
-      ) : blockingReasons.length > 0 ? (
+      ) : issues.length > 0 ? (
         <Stack gap="1">
-          {blockingReasons.map((reason) => (
+          {issues.map(({ message: reason }) => (
             <HStack key={reason} align="start" gap="1.5">
               <Text color="fg.subtle" fontSize="md" lineHeight="1.35">
                 •

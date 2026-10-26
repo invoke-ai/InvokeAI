@@ -11,10 +11,9 @@ import type {
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { TFunction } from 'i18next';
 
-import { createDocumentModel } from '@workbench/canvas-engine/api';
+import { createControlLayer, createDocumentModel } from '@workbench/canvas-engine/api';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
-import { createControlLayer } from '@workbench/widgets/layers/layerOps';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import { CANVAS_HEADER_HOTKEYS } from './canvasHeaderCommands';
@@ -168,7 +167,7 @@ describe('staging precedence', () => {
 describe('layer navigation without staging', () => {
   const select = (id: string): CanvasProjectMutation => ({ id, type: 'setCanvasSelectedLayer' });
   // Document order puts the control stack above the raster stack: b, a, c.
-  const layers = [rasterLayer('a'), createControlLayer('Control', 'b'), rasterLayer('c')];
+  const layers = [rasterLayer('a'), createControlLayer({ id: 'b', name: 'Control' }), rasterLayer('c')];
 
   it.each([
     ['canvas.nextEntity', 'a', 'c'],
@@ -720,7 +719,7 @@ describe('group selection', () => {
     ...documentOf([], selectedLayerId),
     stacks: stacksFrom(nodes),
   });
-  const control = (id: string): CanvasLayerContract => createControlLayer(id, id);
+  const control = (id: string): CanvasLayerContract => createControlLayer({ id, name: id });
 
   it('reorders, deletes and duplicates a selected group', () => {
     const document = nodeDocument([groupContract('g', [rasterLayer('a')]), rasterLayer('b')], 'g');

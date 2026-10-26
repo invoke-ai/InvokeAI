@@ -18,7 +18,6 @@ import type { ComponentProps, ReactNode } from 'react';
 
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { galleryTransfers } from '@features/gallery';
-import { useModelsSelector } from '@features/models';
 import { canCopyImage } from '@platform/browser/clipboard';
 import { IconButton, MenuActionItem, MenuContent, MenuIconItem, RenameDialog, Tooltip } from '@platform/ui';
 import { useQueryClient } from '@tanstack/react-query';
@@ -54,7 +53,7 @@ import {
   reportLayerOperation,
   usePreparedCommit,
 } from '@workbench/widgets/canvas/useStructuralCommit';
-import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import {
   ArrowRightLeftIcon,
   ArrowUpDownIcon,
@@ -81,7 +80,6 @@ import type {
 } from './layerContextMenuLayout';
 import type { LayerMenuDialogKind, LayerMenuDialogState } from './layerMenuState';
 
-import { resolveDefaultControlModelForBase } from './controlModelOptions';
 import {
   actionTargets,
   getLayerContextActions,
@@ -125,8 +123,8 @@ import {
   MASK_MODIFIER_DEFAULTS,
   needsBakedControlPixels,
 } from './layerOps';
-import { requestLayerProperties } from './layerPropertiesRequestStore';
 import { LayerSaveToBoardSubmenu } from './LayerSaveToBoardSubmenu';
+import { useRevealLayerProperties } from './revealLayerProperties';
 import { RunLayerWorkflowDialog, useLayerWorkflowAvailability } from './RunLayerWorkflowDialog';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
@@ -241,12 +239,9 @@ const LayerMenu = ({
   const commitPrepared = usePreparedCommit(engine);
   const { t } = useTranslation();
   const projectId = useActiveProjectId();
-  const { widgets } = useWorkbenchCommands();
   const notify = useNotify();
   const queryClient = useQueryClient();
   const base = useSelectedModelBase();
-  const models = useModelsSelector((snapshot) => snapshot.models);
-  const defaultControlModel = useMemo(() => resolveDefaultControlModelForBase(models, base), [base, models]);
   const workflowAvailability = useLayerWorkflowAvailability();
   const canvas = useActiveProjectSelector((project) => project.canvas);
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
@@ -521,7 +516,7 @@ const LayerMenu = ({
       }
       const converted =
         layer.type === 'raster' && targetType === 'control'
-          ? convertRasterToControl(layer, base, defaultControlModel)
+          ? convertRasterToControl(layer, base)
           : layer.type === 'raster' && targetType === 'inpaint_mask'
             ? convertRasterToInpaintMask(layer)
             : layer.type === 'raster' && targetType === 'regional_guidance'
@@ -538,7 +533,7 @@ const LayerMenu = ({
         throw makeStatusError('not-ready');
       }
     },
-    [base, defaultControlModel, engine, layer, makeStatusError]
+    [base, engine, layer, makeStatusError]
   );
 
   const handleToggleVisibility = useCallback(() => {
@@ -614,13 +609,7 @@ const LayerMenu = ({
     onDialogExitComplete?.();
   }, [onDialogExitComplete]);
   // Operations present their controls in the Properties pane, so starting one must bring that pane into view.
-  const revealProperties = useCallback(
-    (layerId: string) => {
-      widgets.open({ region: 'right', widgetId: 'layers' });
-      requestLayerProperties(layerId);
-    },
-    [widgets]
-  );
+  const revealProperties = useRevealLayerProperties();
   const startSelectObject = useCallback(
     (layerId: string) => {
       if (!engine) {
@@ -789,10 +778,9 @@ const LayerMenu = ({
       return;
     }
     if (!needsBakedControlPixels(layer)) {
-      addCopy(
-        copyRasterToControl(layer, createLayerId(), base, defaultControlModel),
-        getActionLabel('copy-to-control')
-      );
+      const id = createLayerId();
+      addCopy(copyRasterToControl(layer, id, base), getActionLabel('use-as-control-layer'));
+      revealProperties(id);
       return;
     }
     if (!engine) {
@@ -802,7 +790,8 @@ const LayerMenu = ({
     if (result.status !== 'copied') {
       throw makeStatusError(isAdjustmentRefusal(result) || result.status === 'unreadable' ? result : result.status);
     }
-  }, [addCopy, base, defaultControlModel, engine, getActionLabel, layer, makeStatusError]);
+    revealProperties(result.layerId);
+  }, [addCopy, base, engine, getActionLabel, layer, makeStatusError, revealProperties]);
 
   const handleCopyToInpaintMask = useCallback(() => {
     const id = createLayerId();

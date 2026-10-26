@@ -1173,6 +1173,27 @@ describe('compileCanvasGraph — control layers (integration)', () => {
     weight: 0.65,
   };
 
+  it('carries the InstantX mode of a FLUX union layer onto its flux_controlnet node, and none onto other bases', () => {
+    const unionLayer: ControlLayerGraphInput = {
+      ...controlNetLayer,
+      controlMode: null,
+      instantxControlMode: 4,
+      model: { base: 'flux', key: 'flux-union', name: 'FLUX ControlNet Union Pro', type: 'controlnet' },
+    };
+    const flux = compile(fluxModel, 'txt2img', { controlLayers: [unionLayer] }).backendGraph;
+    const sd1 = compile(sd1Model, 'img2img', {
+      controlLayers: [{ ...controlNetLayer, instantxControlMode: 4 }],
+    }).backendGraph;
+
+    expect(flux.nodes['control_net_control-layer-1']).toMatchObject({
+      instantx_control_mode: 4,
+      type: 'flux_controlnet',
+    });
+    expect(flux.nodes['control_net_control-layer-1']).not.toHaveProperty('control_mode');
+    expect(sd1.nodes['control_net_control-layer-1']?.type).toBe('controlnet');
+    expect(sd1.nodes['control_net_control-layer-1']).not.toHaveProperty('instantx_control_mode');
+  });
+
   it('grafts an enabled control layer through a real compiled canvas graph: control node args, collector → denoise.control wiring, base graph intact', () => {
     const { backendGraph, graph, mode } = compile(sd1Model, 'img2img', { controlLayers: [controlNetLayer] });
 

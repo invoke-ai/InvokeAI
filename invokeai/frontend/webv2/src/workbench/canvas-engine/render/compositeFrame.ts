@@ -42,6 +42,8 @@ export interface CreateCompositeFrameDeps {
   readonly getGroupSurface: NonNullable<CompositeOptions['groupSurface']>;
   readonly getMaskPatternTile: (style: string, color: string) => RasterSurface | null;
   readonly getCheckerboardTile: () => RasterSurface;
+  /** The control layer shown as its kept original, if any. */
+  readonly getControlView: () => CompositeOptions['controlView'];
   /** Starts (or joins) the rasterization of a layer whose cache is stale. */
   readonly rasterizeLayer: (layer: CanvasLayerContract, doc: CanvasDocumentContractV3) => void;
   /** Whether the staging area holds a candidate, shown or not. */
@@ -82,8 +84,8 @@ const sameOptionalRect = (a: Rect | undefined, b: Rect | undefined): boolean =>
 
 /**
  * Composite only for pixel/order/view changes. Rasterize demanded visible layers and protect them during post-draw
- * eviction. SAM isolation restricts drawing and clipping to its layer/rect, suppressing unrelated previews, floats
- * and transform overrides.
+ * eviction. SAM isolation restricts drawing and clipping to its layer/rect, suppressing unrelated previews, floats,
+ * control views and transform overrides.
  */
 export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeFrame => {
   const { derivedSurfaceCache, diagnostics, layerCache, previews, raster, stores, transformOverrides, viewport } = deps;
@@ -223,6 +225,7 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         backend: deps.backend,
         checkerboardTile: stores.checkerboard.get() ? deps.getCheckerboardTile() : null,
         clipRect: isolatedGuard && samPreview ? samPreview.rect : null,
+        controlView: isolatedGuard ? null : deps.getControlView(),
         derivedSurfaces: derivedSurfaceCache,
         diagnostics,
         // Pixels in flight, drawn directly above the layer they were cut from.

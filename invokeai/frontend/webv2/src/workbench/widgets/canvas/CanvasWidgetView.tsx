@@ -1,13 +1,20 @@
 import type { WidgetViewProps } from '@workbench/widgetContracts';
-import type { MouseEvent as ReactMouseEvent } from 'react';
+import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
+import { invalidateGallery } from '@features/gallery/queries';
 import { useQueueItemProgressImage } from '@features/queue/react';
 import { ClipboardUnavailableError, copyImage } from '@platform/browser/clipboard';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { useQueryClient } from '@tanstack/react-query';
 import { preloadCanvasInvocation } from '@workbench/activeInvocationSubmission';
-import { getCanvasImportNotice } from '@workbench/canvas-operations/api';
+import {
+  getControlUploadNotice,
+  resolveControlFileDrop,
+  uploadControlImageFile,
+  type ControlSourceNotice,
+} from '@workbench/canvas-operations/api';
 import { useCanvasEngine, type CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import { getCanvasStagingSlots } from '@workbench/canvasStagingView';
 import { useRegisterShortcutHintSource } from '@workbench/hotkeys/hintSources';
@@ -58,6 +65,7 @@ import { CANVAS_COMPANION_HOTKEYS, reportTransformRefusal } from './canvasToolCo
 import { resolveCheckerColors } from './checkerColors';
 import { CanvasColorFeed } from './color-system/CanvasColorFeed';
 import { useActiveColorCommands } from './color-system/useActiveColors';
+import { ControlLayerCanvasOverlay } from './ControlLayerCanvasOverlay';
 import { useCanvasOperation } from './engineStoreHooks';
 import { executeCanvasImageDropImport } from './executeCanvasImageDropImport';
 import { createCanvasShortcutHintSource } from './shortcutHints';
@@ -70,6 +78,8 @@ import { useCanvasGallerySave } from './useCanvasGallerySave';
 import { useCreateFromBbox } from './useCreateFromBbox';
 import { useStagedResultGallerySave } from './useStagedResultGallerySave';
 import { reportLayerOperation, reportPreparedCommit, reportStructuralCommit } from './useStructuralCommit';
+
+const isFileDrag = (dataTransfer: DataTransfer): boolean => dataTransfer.types.includes('Files');
 
 const MissingFontsDialog = lazy(() =>
   import('./MissingFontsDialog').then((module) => ({ default: module.MissingFontsDialog }))
@@ -205,6 +215,74 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
     operationKind,
   });
   const isInteractionLocked = interactionCapabilities.isSurfaceInteractionLocked;
+
+  // A desktop file dropped on the canvas fills the selected control layer while it is empty, as the hint over it
+  // says. Every file drag is taken here, since the browser's default would navigate away from the app. While it
+  // hovers, the drop effect shows whether the canvas would take it; a drop that still arrives and cannot be used
+  // says why instead of doing nothing.
+  const queryClient = useQueryClient();
+  const showNotice = useCallback(
+    (notice: ControlSourceNotice | null) => {
+      if (notice) {
+        notifications.add({
+          kind: notice.kind,
+          message: notice.messageKey ? t(notice.messageKey) : notice.message,
+          title: t(notice.titleKey),
+        });
+      }
+    },
+    [notifications, t]
+  );
+  const isFileDropLocked = isInteractionLocked || interactionCapabilities.isDocumentEditingLocked;
+  const handleFileDragOver = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>) => {
+      const { dataTransfer } = event;
+      if (!isFileDrag(dataTransfer)) {
+        return;
+      }
+      event.preventDefault();
+      const accepted =
+        engine !== null &&
+        resolveControlFileDrop({
+          document,
+          engine,
+          // File contents stay hidden until the drop, but each item's type is readable while it hovers.
+          files: [...dataTransfer.items].filter((item) => item.kind === 'file'),
+          isCanvasLocked: isFileDropLocked,
+        }).status === 'accepted';
+      dataTransfer.dropEffect = accepted ? 'copy' : 'none';
+    },
+    [document, engine, isFileDropLocked]
+  );
+  const handleFileDrop = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>) => {
+      if (!isFileDrag(event.dataTransfer)) {
+        return;
+      }
+      event.preventDefault();
+      if (!engine) {
+        return;
+      }
+      const files = [...event.dataTransfer.files];
+      const resolution = resolveControlFileDrop({
+        document,
+        engine,
+        files,
+        isCanvasLocked: isFileDropLocked,
+      });
+      if (resolution.status === 'refused') {
+        showNotice(resolution.notice);
+        return;
+      }
+      void uploadControlImageFile({
+        engine,
+        file: files[0]!,
+        layerId: resolution.layerId,
+        onUploaded: (owner) => void invalidateGallery(queryClient, owner),
+      }).then((outcome) => showNotice(getControlUploadNotice(outcome)));
+    },
+    [document, engine, isFileDropLocked, queryClient, showNotice]
+  );
   const handleSurfaceContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
       // Preserve native menus in inline editors. Canvas context actions target the selected layer without changing
@@ -239,7 +317,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
 
       const execute = async (): Promise<void> => {
         try {
-          const result = await executeCanvasImageDropImport({
+          const notice = await executeCanvasImageDropImport({
             destination: resolution.destination,
             canvas: canvasCommands,
             engine: mountedEngine,
@@ -247,7 +325,6 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
             imageNames: resolution.imageNames,
             project,
           });
-          const notice = getCanvasImportNotice(result);
           notifications.add({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}) });
         } catch (error: unknown) {
           recordCanvasImportError({
@@ -518,6 +595,8 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       position="relative"
       role="region"
       w="full"
+      onDragOver={handleFileDragOver}
+      onDrop={handleFileDrop}
     >
       {engine ? (
         <CanvasShortcutHintRegistration
@@ -542,6 +621,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         {engine ? (
           <>
             <ToolStrip engine={engine} isInteractionLocked={isInteractionLocked} />
+            <ControlLayerCanvasOverlay engine={engine} isInteractionLocked={isInteractionLocked} />
             <CanvasLayerContextMenu
               beforeDangerItems={compositeSubmenus}
               engine={engine}

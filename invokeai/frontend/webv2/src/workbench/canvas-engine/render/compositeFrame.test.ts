@@ -46,6 +46,7 @@ const documentOf = (layers: CanvasLayerContract[]): CanvasDocumentContractV3 =>
 
 interface Harness {
   deps: CreateCompositeFrameDeps;
+  controlView: ReturnType<CreateCompositeFrameDeps['getControlView']>;
   staging: { candidates: boolean };
   stores: ReturnType<typeof createEngineStores>;
   previews: PreviewStateController;
@@ -72,8 +73,9 @@ const makeHarness = (): Harness => {
   const beginFrame = vi.fn(() => FRAME_USAGE);
   const enforce = vi.fn(() => ({ evictedBaseLayerIds: [] as string[], overageBytes: 0 }));
   const staging = { candidates: false };
-  return {
+  const harness: Harness = {
     beginFrame,
+    controlView: null,
     staging,
     deps: {
       hasStagedCandidates: () => staging.candidates,
@@ -83,6 +85,7 @@ const makeHarness = (): Harness => {
       getAdjustedSurface: () => null,
       getGroupSurface: () => null,
       getCheckerboardTile: () => surface(8, 8),
+      getControlView: () => harness.controlView,
       getMaskPatternTile: () => null,
       layerCache: {
         byteSize: () => 0,
@@ -109,6 +112,7 @@ const makeHarness = (): Harness => {
     rasterizeLayer,
     stores,
   };
+  return harness;
 };
 
 const draw = (
@@ -165,7 +169,7 @@ describe('SAM isolation', () => {
     expect(lastCompositeOptions().clipRect).toEqual({ height: 8, width: 8, x: 0, y: 0 });
   });
 
-  it.each(['layerPreviews', 'stagedPreview', 'floatingSelection', 'transformOverrides'])(
+  it.each(['layerPreviews', 'stagedPreview', 'floatingSelection', 'controlView', 'transformOverrides'])(
     'suppresses %s so nothing but the isolated layer is judged',
     (field) => {
       harness.previews.publishFilter('a', harness.previews.beginGuardedFilter('a'), {
@@ -179,6 +183,7 @@ describe('SAM isolation', () => {
         width: 8,
       } as never);
       harness.overrides.set('a', { x: 5, y: 5 });
+      harness.controlView = controlViewOf('a');
       const float = { composite: { layerId: 'a' } } as unknown as FloatingSelectionFrame;
       draw(documentOf([layer('a')]), float, isolated());
       expect(lastCompositeOptions()[field]).toBeNull();
@@ -191,6 +196,26 @@ describe('SAM isolation', () => {
     const doc = composite.mock.calls.at(-1)?.[1] as CanvasDocumentContractV3;
     expect(getDocumentLeaves(doc).map((entry) => entry.id)).toEqual(['a', 'b']);
     expect(lastCompositeOptions().clipRect).toBeNull();
+  });
+});
+
+const controlViewOf = (layerId: string): Harness['controlView'] => ({
+  layerId,
+  matrix: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
+  rect: { height: 8, width: 8, x: 0, y: 0 },
+  surface: surface(8, 8),
+  view: 'original',
+});
+
+describe('the control layer view', () => {
+  it('hands the shown original to the compositor', () => {
+    draw();
+    expect(lastCompositeOptions().controlView).toBeNull();
+
+    const view = controlViewOf('a');
+    harness.controlView = view;
+    draw();
+    expect(lastCompositeOptions().controlView).toBe(view);
   });
 });
 

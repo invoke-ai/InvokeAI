@@ -49,7 +49,7 @@ import { clearLayerPropertiesRequest, requestLayerProperties } from './layerProp
 import { LayersTree, type LayersTreeEngine } from './LayersTree';
 import { buildLayerStackRows } from './layerTreeRows';
 
-vi.mock('./ControlLayerWarningIcon', () => ({ ControlLayerWarningIcon: () => null }));
+vi.mock('./ControlLayerStatusIcon', () => ({ ControlLayerStatusIcon: () => null }));
 vi.mock('./LayerThumbnail', () => ({ LayerThumbnail: () => <span data-testid="thumbnail" /> }));
 vi.mock('./LayerStackHeader', () => ({
   LayerStackHeader: ({

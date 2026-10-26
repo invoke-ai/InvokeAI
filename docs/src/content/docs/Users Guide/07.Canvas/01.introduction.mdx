@@ -1,7 +1,7 @@
 ---
 title: Crafting images with the Canvas
 description: An introduction to the Canvas — layers and masks, sending generations to the Canvas, inpainting, outpainting, regional prompts, control layers, drawing and adding gallery images.
-lastUpdated: 2026-10-19
+lastUpdated: 2026-10-24
 ---
 
 import { Image } from 'astro:assets';
@@ -132,26 +132,34 @@ Regional guidance works with SD 1.5, SDXL, FLUX.1, FLUX.2, Krea-2, Z-Image and A
 
 ## Control layers
 
-A control layer shapes the composition with a guide image: the edges of a sketch, the depth of a scene, or a person's pose. A control model makes the generated image follow it.
+A control layer shapes the composition with a guide image: the edges of a sketch, the depth of a scene, or a person's pose. A control model makes the generated image follow it. You choose what the layer controls, and InvokeAI detects the matching map from your image and picks the model.
 
-<Image src={controlLayer} alt="A control layer's settings in the Layer section of Properties: Adapter type ControlNet, Model Depth Map, and Weight 0.75." width={420} />
+<Image src={controlLayer} alt="A control layer's settings in the Layer section of Properties." width={420} />
 
 <Steps>
 
-1. **Put the guide image on a control layer.** A control layer's image is its own pixels; there is no separate image picker. Do one of these:
-   * Right-click a raster layer and choose **Copy to → Copy to control layer**, or **Convert to → Convert to control layer**.
-   * Drag an image from the Gallery onto the canvas and drop it on **Add as Control Layer** (see [below](#adding-a-gallery-image-to-a-layer)).
-   * Add an empty **Control layer** from the **+** menu and draw on it.
+1. **Add a control layer with an image.** Do one of these:
+   * Choose **+ → Control layer**, then **Upload** an image, use the **Frame** (what is visible inside the generation frame), or **Draw** the guide yourself. These buttons are in the layer's Properties, in its **Image** row.
+   * Right-click an image in the Gallery and choose **Use as Control**. It fills the selected control layer if that layer has no image yet, and otherwise adds a new control layer.
+   * Right-click a raster layer and choose **Use as control layer**, which copies its pixels to a new control layer.
+   * Drag an image from the Gallery onto the canvas and drop it on **Add as Control Layer**. As with **Use as Control**, it fills the selected control layer if that layer is still empty.
+   * Select an empty control layer and drop an image file from your computer onto the canvas, where the layer shows *Drop an image here*. The file is uploaded into that layer.
 
-2. **Choose the model.** Select the layer, open **Properties** and scroll to its **Layer** section. Choose the **Adapter type** (ControlNet, T2I Adapter, Control LoRA or Z-Image ControlNet) and the **Model**. A compatible installed model is chosen for you when the layer is created.
+2. **Choose the Type**: **Pose**, **Depth**, **Edges**, **Soft edges**, **Line art**, **Sketch**, **Color** or **Tile**. Next to each type, the menu says how many installed models are made for it, *via Union* when only a Union model covers it, or *Not installed*.
 
-3. **Process the image, if needed.** Most control models expect a processed image, such as an edge map or a depth map, rather than a photograph. Choosing a model starts its recommended **Filter** automatically; you can also click **Filter**, pick a filter, and **Apply** it.
+3. **Check the Detection.** The type's detector turns your image into the map the model expects, such as a depth map or an edge map, in the background. If your image is already such a map, choose the **None** option, for example *None: image is already a depth map*. See [Control layer](/users-guide/canvas/layers-panel/#control-layer) for the details.
 
-4. **Adjust the influence** with **Weight** (how strongly the guide is followed), **Step range** (which part of the generation it applies to) and, for ControlNet, **Control mode**. Then press Invoke.
+4. **Check the Model.** InvokeAI picks it for you, and the line under the **Model** row says why. Choose another model from the list if you prefer. A model made for the type, or a Union model that covers it, is then remembered for that type; any other model is used for this layer only.
+
+5. **Adjust the influence** with **Weight** (how strongly the guide is followed), **Steps** (which part of the generation it applies to) and, for ControlNet, **Priority**. Then press Invoke.
 
 </Steps>
 
-Control layers work with SD 1.5, SDXL, FLUX.1 and Z-Image, and need a control model for the same family, installed from the Model Manager's starter models. If the **Model** list is empty, no compatible model is installed for the model selected in the Generate panel. A control layer without a model stops Invoke with the message *Select a control model before generating.*
+Once a map has been detected, a switch above the canvas shows the layer as its **Original** image, the detected **Map**, or an **Overlay** of the two. The switch changes only what you see; generation always uses the map.
+
+An empty control layer, or one with neither a type nor a model, only shows a warning and contributes nothing; Invoke stays available. A control layer with an image blocks Invoke if no model can be chosen for it, or if its map is out of date. **Invoke** then shows the number of issues, for example *Invoke · 1 issue*; click it to select the first layer that needs attention.
+
+Control layers work with SD 1.5, SDXL, FLUX.1, FLUX.2 [dev], Qwen Image, Z-Image and Anima, and need a control model for the same family, installed from the Model Manager's starter models. If no model fits, the **Model** row says so, with a link to the Model Manager when you can manage models.
 
 ## Drawing on a raster layer
 

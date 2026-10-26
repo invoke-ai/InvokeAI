@@ -20,7 +20,9 @@ import type {
 
 import {
   getCanvasOperations,
+  IDLE_CONTROL_DETECTION_STATUS,
   type CanvasOperationState,
+  type ControlDetectionStatus,
   type FilterOperationSessionState,
   type SamSessionSnapshot,
 } from '@workbench/canvas-operations/api';
@@ -106,6 +108,10 @@ export const useCanvasZoom = (engine: CanvasCoreStoreCapability): number => useC
 export const useCanvasViewportReady = (engine: CanvasCoreStoreCapability): boolean =>
   useCanvasInteractionState(engine, 'viewportReady');
 
+/** The control layer the canvas shows as its original (or original under map); null while every map shows. */
+export const useControlLayerView = (engine: CanvasCoreStoreCapability): CanvasInteractionState['controlLayerView'] =>
+  useCanvasInteractionState(engine, 'controlLayerView');
+
 /** The active tool id for `engine`. */
 export const useCanvasActiveTool = (engine: CanvasCoreStoreCapability): ToolId =>
   useCanvasInteractionState(engine, 'activeTool');
@@ -140,6 +146,20 @@ export const useFilterSession = (engine: object): FilterOperationSessionState | 
     operations.getFilterSessionState,
     operations.getFilterSessionState
   );
+};
+
+/** One control layer's background detection status; a null engine reads as idle without subscribing. */
+export const useControlDetectionStatus = (engine: object | null, layerId: string): ControlDetectionStatus => {
+  const subscribe = useCallback(
+    (listener: () => void) =>
+      engine ? getCanvasOperations(engine).subscribeControlDetectionStatus(layerId, listener) : () => undefined,
+    [engine, layerId]
+  );
+  const getSnapshot = useCallback(
+    () => (engine ? getCanvasOperations(engine).getControlDetectionStatus(layerId) : IDLE_CONTROL_DETECTION_STATUS),
+    [engine, layerId]
+  );
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 };
 
 /** Whether the engine-owned canvas history has an entry to undo (enables the header undo button). */

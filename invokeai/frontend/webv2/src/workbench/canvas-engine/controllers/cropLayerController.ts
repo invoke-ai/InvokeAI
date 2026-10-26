@@ -11,6 +11,7 @@ import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/rend
 import type { Rect } from '@workbench/canvas-engine/types';
 
 import { compileDocumentLeaves, lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
+import { detachControlDerivation } from '@workbench/canvas-engine/document/controlDerivation';
 import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
@@ -130,8 +131,9 @@ const croppedLayerContract = (layer: CanvasLayerContract, rect: Rect): CanvasLay
     return { ...rest, source: { bitmap: null, offset, type: 'paint' }, transform: identity };
   }
   if (before.type === 'control') {
+    // The cropped pixels become the image itself: no original's frame survives the crop.
     const { filter: _filter, ...rest } = before;
-    return { ...rest, source: { bitmap: null, offset, type: 'paint' }, transform: identity };
+    return detachControlDerivation({ ...rest, source: { bitmap: null, offset, type: 'paint' }, transform: identity });
   }
   return { ...before, mask: { ...before.mask, bitmap: null, offset }, transform: identity };
 };

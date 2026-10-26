@@ -100,6 +100,39 @@ describe('CropLayerController', () => {
     expect(h.layers.get('paint')?.rect).toEqual(BBOX);
   });
 
+  it("keeps a control layer's type but drops the original its cropped pixels no longer derive from", async () => {
+    const depth = { settings: {}, type: 'depth_anything_depth_estimation' };
+    const control: CanvasLayerContract = {
+      adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+      blendMode: 'normal',
+      controlType: 'depth',
+      detection: depth,
+      filter: depth,
+      id: 'paint',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Depth 1',
+      opacity: 1,
+      original: { image: { height: 50, imageName: 'photo', width: 50 }, type: 'image' },
+      originalTransform: { rotation: 0, scaleX: 1, scaleY: 1, x: 2, y: 2 },
+      source: { bitmap: { height: 50, imageName: 'map', width: 50 }, offset: { x: -10, y: -10 }, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'control',
+      withTransparencyEffect: true,
+    };
+    const h = createHarness(undefined, { nodes: [control] });
+
+    await expect(h.controller.crop('paint')).resolves.toEqual({ status: 'cropped' });
+    const cropped = getDocumentLayer(h.document(), 'paint');
+    expect(cropped).toMatchObject({ controlType: 'depth', detection: null });
+    expect(cropped).not.toHaveProperty('original');
+    expect(cropped).not.toHaveProperty('originalTransform');
+    expect(cropped).not.toHaveProperty('filter');
+
+    await h.history.undo();
+    expect(getDocumentLayer(h.document(), 'paint')).toEqual(h.original);
+  });
+
   it('refuses a crop it could never undo before anything changes', async () => {
     const h = createHarness(1024);
     const before = h.document();
@@ -213,7 +246,13 @@ const createCropAllHarness = (
       lockedPaint('locked'),
       lockedPaint('lockedInside'),
       groupContract('lockedGroup', [lockedPaint('lockedByGroup', false)], { isLocked: true }),
-      layerContract('control', 'control', { isEnabled: false }),
+      // A depth layer keeping the original its map was detected from.
+      layerContract('control', 'control', {
+        controlType: 'depth',
+        detection: { settings: {}, type: 'depth_anything_depth_estimation' },
+        isEnabled: false,
+        original: { image: { height: 20, imageName: 'photo.png', width: 20 }, type: 'image' },
+      } as Partial<CanvasLayerContract>),
       groupContract('regions', [layerContract('region', 'regional_guidance')]),
       layerContract('mask', 'inpaint_mask', { isHidden: true } as Partial<CanvasLayerContract>),
     ]),
@@ -383,9 +422,13 @@ describe('CropLayerController: crop all layers', () => {
     expect(h.layers.get('mask')?.rect).toMatchObject({ height: 0, width: 0 });
     expect(getDocumentLayer(cropped, 'mask')).toMatchObject({ isHidden: true, mask: { bitmap: null } });
     expect(getDocumentLayer(cropped, 'control')).toMatchObject({
+      controlType: 'depth',
+      detection: null,
       isEnabled: false,
       source: { offset: { x: 5, y: 5 } },
     });
+    // The cropped map no longer derives from the original, so the original goes; undo brings it back.
+    expect(getDocumentLayer(cropped, 'control')).not.toHaveProperty('original');
     for (const id of ['inside', 'locked', 'lockedInside', 'lockedByGroup']) {
       expect(getDocumentLayer(cropped, id)).toBe(getDocumentLayer(h.original, id));
       expect(h.layers.get(id)?.rect).toEqual(CACHE_RECTS[id]);
