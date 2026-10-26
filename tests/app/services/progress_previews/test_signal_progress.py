@@ -87,3 +87,59 @@ def test_signal_progress_flushes_a_deferred_empty_cache(monkeypatch) -> None:
     assert len(flushes) == 1
     util.signal_progress("Denoising", 0.2, Image.new("RGB", (8, 8)), (64, 64))
     assert len(flushes) == 2
+
+
+class _Render:
+    """A preview render that counts its calls."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def __call__(self) -> tuple[Image.Image, tuple[int, int]]:
+        self.calls += 1
+        return Image.new("RGB", (8, 8)), (64, 64)
+
+
+def test_a_throttled_preview_frame_is_never_rendered() -> None:
+    clock = _Clock()
+    util, events, _previews = _util(clock)
+    first, throttled, later = _Render(), _Render(), _Render()
+
+    util._signal_preview("Denoising", 0.1, first)
+    clock.now += 0.01
+    util._signal_preview("Denoising", 0.2, throttled)
+    clock.now += 1
+    util._signal_preview("Denoising", 0.3, later)
+
+    assert (first.calls, throttled.calls, later.calls) == (1, 0, 1)
+    assert [call["percentage"] for call in events.emitted] == [0.1, 0.3]
+    assert [(call["image"].width, call["image"].height) for call in events.emitted] == [(64, 64), (64, 64)]
+
+
+def test_the_final_preview_frame_renders_inside_the_throttle_interval() -> None:
+    clock = _Clock()
+    util, events, previews = _util(clock)
+    final = _Render()
+
+    util._signal_preview("Denoising", 0.9, _Render())
+    clock.now += 0.01
+    util._signal_preview("Denoising", 1.0, final)
+
+    assert final.calls == 1
+    assert [call["revision"] for call in events.emitted] == [1, 2]
+    retained = previews.get(7)
+    assert retained is not None and retained.revision == 2
+
+
+def test_signal_preview_flushes_a_deferred_empty_cache_even_when_throttled(monkeypatch) -> None:
+    from invokeai.backend.util.devices import TorchDevice
+
+    flushes: list[int] = []
+    monkeypatch.setattr(TorchDevice, "flush_deferred_empty_cache", classmethod(lambda cls: flushes.append(1)))
+    clock = _Clock()
+    util, _events, _previews = _util(clock)
+
+    util._signal_preview("Denoising", 0.1, _Render())
+    util._signal_preview("Denoising", 0.2, _Render())  # throttled
+
+    assert len(flushes) == 2

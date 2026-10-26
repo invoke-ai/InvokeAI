@@ -303,7 +303,8 @@ class DefaultSessionRunner(SessionRunnerBase):
                     return
 
                 # Invoke the node, optionally on a borrowed idle GPU (text encoders only).
-                with self._maybe_offload_to_idle_gpu(invocation):
+                # Leaving `invocation_resources` releases what the context held for the run, however it ended.
+                with self._maybe_offload_to_idle_gpu(invocation), data.invocation_resources:
                     run_result = invocation.invoke_internal_with_effects(context=context, services=self._services)
                 output = run_result.output
                 control_collection = None

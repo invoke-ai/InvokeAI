@@ -10,7 +10,7 @@ the two rows are not interchangeable.
 import pytest
 import torch
 
-from invokeai.backend.architectures import generative_bases, resolve_latent_space
+from invokeai.backend.architectures import generative_bases, latent_space_with_channels, resolve_latent_space
 from invokeai.backend.architectures.facets import latent_space
 from invokeai.backend.architectures.facets.latent_space import (
     COGVIEW4_16,
@@ -201,6 +201,42 @@ class TestResolution:
         """
         facet = LatentSpaceFacet(WAN21_16)
         assert facet.resolve(torch.empty(0)) is WAN21_16
+
+
+class TestLookupByChannels:
+    """`latent_space_with_channels` pairs a model recorded as `(base, channels)` with a space."""
+
+    @pytest.mark.parametrize(
+        ("base", "expected"),
+        [
+            pytest.param(base, expected, id=base.value)
+            for base, expected in sorted(DECLARED_LATENT_SPACES.items(), key=lambda item: item[0].value)
+        ],
+    )
+    def test_every_declared_space_is_found_by_its_channel_count(
+        self, base: BaseModelType, expected: tuple[LatentSpace, ...]
+    ) -> None:
+        found = [latent_space_with_channels(base, space.channels) for space in expected]
+        assert [None if space is None else _name(space) for space in found] == [_name(space) for space in expected]
+
+    def test_an_unknown_channel_count_is_no_match_rather_than_the_primary(self) -> None:
+        """Unlike `resolve`: a fallback here would pair a 32-channel decoder with FLUX.1's 16-channel space."""
+        assert latent_space_with_channels(BaseModelType.Flux, 32) is None
+        assert latent_space_with_channels(BaseModelType.Wan, 7) is None
+
+    def test_a_base_without_an_architecture_has_no_space(self) -> None:
+        assert latent_space_with_channels(BaseModelType.Any, 4) is None
+
+    def test_architectures_sharing_a_vae_share_the_space_object(self) -> None:
+        assert latent_space_with_channels(BaseModelType.StableDiffusion1, 4) is latent_space_with_channels(
+            BaseModelType.StableDiffusion2, 4
+        )
+        assert latent_space_with_channels(BaseModelType.Flux, 16) is latent_space_with_channels(
+            BaseModelType.ZImage, 16
+        )
+        assert latent_space_with_channels(BaseModelType.Flux, 16) is not latent_space_with_channels(
+            BaseModelType.StableDiffusion3, 16
+        )
 
 
 class TestWhatArchitecturesDeclare:
