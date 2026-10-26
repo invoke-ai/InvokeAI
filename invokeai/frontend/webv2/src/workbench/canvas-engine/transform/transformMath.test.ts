@@ -8,6 +8,7 @@ import {
   applyRotate,
   applyScale,
   bakeMatrix,
+  composeLayerTransforms,
   IDENTITY_TRANSFORM,
   layerTransformMatrix,
   localHandlePoint,
@@ -503,5 +504,94 @@ describe('transformOverlayGeometry', () => {
 describe('IDENTITY_TRANSFORM', () => {
   it('is a true identity', () => {
     expect(IDENTITY_TRANSFORM).toEqual({ rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 });
+  });
+});
+
+describe('composeLayerTransforms', () => {
+  const points = [
+    { x: 0, y: 0 },
+    { x: 13, y: -7 },
+    { x: -4.5, y: 21 },
+  ];
+  const expectSameMapping = (composed: LayerTransform | null, outer: LayerTransform, inner: LayerTransform) => {
+    expect(composed).not.toBeNull();
+    for (const point of points) {
+      const expected = applyToPoint(layerTransformMatrix(outer), applyToPoint(layerTransformMatrix(inner), point));
+      const actual = applyToPoint(layerTransformMatrix(composed!), point);
+      expect(actual.x).toBeCloseTo(expected.x, 9);
+      expect(actual.y).toBeCloseTo(expected.y, 9);
+    }
+  };
+
+  it('is neutral with the identity on either side', () => {
+    const t = { rotation: 0.4, scaleX: 2, scaleY: 0.5, x: 10, y: -3 };
+    for (const composed of [
+      composeLayerTransforms(IDENTITY_TRANSFORM, t),
+      composeLayerTransforms(t, IDENTITY_TRANSFORM),
+    ]) {
+      expect(composed!.rotation).toBeCloseTo(t.rotation, 12);
+      expect(composed!.scaleX).toBeCloseTo(t.scaleX, 12);
+      expect(composed!.scaleY).toBeCloseTo(t.scaleY, 12);
+      expect(composed!.x).toBeCloseTo(t.x, 12);
+      expect(composed!.y).toBeCloseTo(t.y, 12);
+    }
+  });
+
+  it('scales the inner translation by the outer transform and adds rotations', () => {
+    expect(
+      composeLayerTransforms(
+        { rotation: 0, scaleX: 2, scaleY: 3, x: 5, y: 7 },
+        { rotation: 0, scaleX: 1, scaleY: 1, x: 10, y: 10 }
+      )
+    ).toEqual({ rotation: 0, scaleX: 2, scaleY: 3, x: 25, y: 37 });
+    const rotated = composeLayerTransforms(
+      { rotation: 0.3, scaleX: 1.5, scaleY: 1.5, x: 0, y: 0 },
+      { rotation: 0.2, scaleX: 2, scaleY: 1, x: 0, y: 0 }
+    );
+    expect(rotated!.rotation).toBeCloseTo(0.5, 12);
+    expect(rotated!.scaleX).toBeCloseTo(3, 12);
+    expect(rotated!.scaleY).toBeCloseTo(1.5, 12);
+  });
+
+  it('keeps a flip a flip instead of turning it into a half-turn', () => {
+    const flip = { rotation: 0, scaleX: -1, scaleY: 1, x: 0, y: 0 };
+    const composed = composeLayerTransforms(IDENTITY_TRANSFORM, flip);
+    expect(composed!.scaleX).toBe(-1);
+    expect(composed!.scaleY).toBe(1);
+    expect(composed!.rotation).toBeCloseTo(0, 12);
+  });
+
+  it.each([
+    [
+      'uniform scale around a rotation',
+      { rotation: 1.1, scaleX: 2, scaleY: 2, x: 4, y: -9 },
+      { rotation: -0.7, scaleX: 0.5, scaleY: 3, x: -6, y: 2 },
+    ],
+    [
+      'flips on both sides',
+      { rotation: 0.25, scaleX: -1.5, scaleY: 1.5, x: 1, y: 2 },
+      { rotation: 2.5, scaleX: 1, scaleY: -2, x: 3, y: 4 },
+    ],
+    [
+      'non-uniform scale over an unrotated inner',
+      { rotation: 0.9, scaleX: 3, scaleY: 0.25, x: 0, y: 8 },
+      { rotation: 0, scaleX: -2, scaleY: 5, x: 7, y: 1 },
+    ],
+    [
+      'a quarter turn swapping non-uniform axes',
+      { rotation: 0, scaleX: 2, scaleY: 3, x: 0, y: 0 },
+      { rotation: Math.PI / 2, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    ],
+  ] as const)('maps points exactly like inner then outer: %s', (_label, outer, inner) => {
+    expectSameMapping(composeLayerTransforms(outer, inner), outer, inner);
+  });
+
+  it('refuses a composite that shears', () => {
+    expect(
+      composeLayerTransforms(
+        { rotation: 0, scaleX: 2, scaleY: 1, x: 0, y: 0 },
+        { rotation: Math.PI / 4, scaleX: 1, scaleY: 1, x: 0, y: 0 }
+      )
+    ).toBeNull();
   });
 });

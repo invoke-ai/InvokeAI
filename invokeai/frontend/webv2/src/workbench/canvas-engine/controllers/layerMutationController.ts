@@ -88,8 +88,8 @@ export interface LayerMutationControllerOptions {
   readonly backend: RasterBackend;
   /** A layer's pixels with its own adjustments and transform baked in, disabled layers included. */
   readonly exportBaked: (layerId: string) => Promise<BakedExportResult>;
-  /** The main model's base and its default control model, for a converted control layer's adapter. */
-  readonly getControlModel: () => { readonly base: string | null; readonly model: string | null };
+  /** The main model's base, for a converted control layer's adapter kind and defaults. */
+  readonly getMainModelBase: () => string | null;
   readonly isGuardCurrent: (guard: LayerExportGuard) => boolean;
   /** Copies a layer's live cache; `admit` accounts its bytes first and refuses the copy as `over-budget`. */
   readonly captureCache: (
@@ -500,7 +500,7 @@ export class LayerMutationController {
     }
     if (baked.status === 'empty') {
       const plain = createControlLayerFrom(current, {
-        ...o.getControlModel(),
+        base: o.getMainModelBase(),
         content: { source: current.source },
         id: current.id,
         name: current.name,
@@ -543,7 +543,7 @@ export class LayerMutationController {
         const pixels = o.backend.createSurface(baked.rect.width, baked.rect.height);
         pixels.ctx.drawImage(baked.surface.canvas, 0, 0);
         const after = createControlLayerFrom(current, {
-          ...o.getControlModel(),
+          base: o.getMainModelBase(),
           content: { rect: baked.rect },
           id: current.id,
           name: current.name,
