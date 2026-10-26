@@ -62,6 +62,7 @@ export const FEATURE_HINTS = {
   referenceImage: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000159340-global-and-regional-reference-images-ip-adapters-',
   },
+  referenceImageStrength: {},
   referenceImageWeight: {},
   refinerAestheticScore: {},
   refinerCfgScale: {},
