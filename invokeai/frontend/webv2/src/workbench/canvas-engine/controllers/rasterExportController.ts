@@ -5,24 +5,42 @@ import type {
   LayerExportGuard,
 } from '@workbench/canvas-engine/capabilities';
 import type {
+  CanvasAdjustmentsContract,
   CanvasDocumentContractV3,
   CanvasLayerContract,
   CanvasLayerSourceContract,
 } from '@workbench/canvas-engine/contracts';
+import type { LayerRasterizationOutcome } from '@workbench/canvas-engine/layerRasterizer';
 import type { RasterReadLease } from '@workbench/canvas-engine/rasterTransactions';
 import type { CanvasTextSource } from '@workbench/canvas-engine/render/fontLoader';
 import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
-import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
+import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 
 import { lookupDocumentLayer, lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
+import { layerUnreadable, type LayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 import { fromTRS } from '@workbench/canvas-engine/math/mat2d';
 import { isEmpty, roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
-import { applyAdjustments, isIdentityAdjustments } from '@workbench/canvas-engine/render/adjustments';
+import { hasSpatialAdjustments, isIdentityAdjustments } from '@workbench/canvas-engine/render/adjustments';
+import {
+  type AdjustmentRefusal,
+  adjustmentRefusal,
+  adjustSurfaceExactly,
+  type SpatialRunner,
+} from '@workbench/canvas-engine/render/exactAdjustments';
 
+/**
+ * `not-ready`: the pixels are still loading, moved while they were read, or their image could not be fetched for now,
+ * so trying again can succeed. {@link LayerUnreadable}: rasterizing the layer's current source failed (an image that is
+ * gone or does not decode), so trying again cannot succeed until the source changes.
+ */
 export type ExportLayerPixelsResult =
   | ({ status: 'ok' } & RasterReadLease)
-  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' | 'aborted' };
+  | {
+      status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' | 'aborted';
+    }
+  | LayerUnreadable
+  | AdjustmentRefusal;
 
 export interface RasterExportControllerOptions {
   readonly backend: RasterBackend;
@@ -32,7 +50,7 @@ export interface RasterExportControllerOptions {
     layer: CanvasLayerContract,
     document: CanvasDocumentContractV3,
     signal?: AbortSignal
-  ) => Promise<'published' | 'stale' | 'error' | 'aborted'>;
+  ) => Promise<LayerRasterizationOutcome>;
   readonly isGuardCurrent: (guard: LayerExportGuard) => boolean;
   readonly isRasterizing: (layer: CanvasLayerContract) => boolean;
   readonly isSupportedSource: (source: CanvasLayerSourceContract) => boolean;
@@ -42,6 +60,17 @@ export interface RasterExportControllerOptions {
   ) =>
     | { status: 'ok'; lease: { release(): void } }
     | { status: 'over-budget'; requestedBytes: number; availableBytes: number };
+  /**
+   * The display's current, exact adjusted copy of `surface` when it is the layer's live cache, or null; never builds
+   * one. Bakes draw it instead of reserving and adjusting a layer-sized copy.
+   */
+  readonly peekAdjustedCacheSurface?: (
+    layerId: string,
+    surface: RasterSurface,
+    adjustments: CanvasAdjustmentsContract
+  ) => RasterSurface | null;
+  /** Evaluates spatial adjustment runs; without it a spatial stack refuses `error`. */
+  readonly runSpatial?: SpatialRunner;
   /** Keeps a layer resident and untrimmed for the lifetime of a read lease. */
   readonly pin: (layerId: string) => { release(): void };
   /** Resolves custom font bytes before an operation whose pixels leave the editor. */
@@ -64,10 +93,16 @@ const noReservedPixels = (result: ExportLayerPixelsResult): ReservedExportLayerP
 export class RasterExportController {
   constructor(private readonly options: RasterExportControllerOptions) {}
 
-  private applyAdjustments(
+  /**
+   * An owned, layer-local adjusted copy of the leased pixels, releasing the lease. A spatial stack is evaluated
+   * exactly (reusing the display's copy when it is exact for these pixels) or refused; its job yields, so the lease's
+   * guard is checked again afterwards.
+   */
+  private async adjustLease(
     result: Extract<ExportLayerPixelsResult, { status: 'ok' }>,
-    shouldApply: boolean
-  ): ExportLayerPixelsResult {
+    shouldApply: boolean,
+    signal?: AbortSignal
+  ): Promise<ExportLayerPixelsResult> {
     const layer = result.guard.layer;
     // Identity-aware: an emptied or all-disabled stack must not reserve or copy.
     if (!shouldApply || layer.type !== 'raster' || isIdentityAdjustments(layer.adjustments)) {
@@ -89,14 +124,36 @@ export class RasterExportController {
       }
     };
     try {
-      const surface = this.options.backend.createSurface(result.rect.width, result.rect.height);
-      const ctx = surface.ctx;
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, result.rect.width, result.rect.height);
-      ctx.drawImage(result.surface.canvas, 0, 0);
-      const imageData = ctx.getImageData(0, 0, result.rect.width, result.rect.height);
-      applyAdjustments(imageData, layer.adjustments);
-      ctx.putImageData(imageData, 0, 0);
+      const { backend } = this.options;
+      const displayed = hasSpatialAdjustments(layer.adjustments)
+        ? (this.options.peekAdjustedCacheSurface?.(layer.id, result.surface, layer.adjustments!) ?? null)
+        : null;
+      let surface: RasterSurface;
+      if (displayed) {
+        // A copy: the display repaints its own surface in place when the stack changes.
+        surface = backend.createSurface(result.rect.width, result.rect.height);
+        surface.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        surface.ctx.drawImage(displayed.canvas, 0, 0);
+      } else {
+        const adjusted = await adjustSurfaceExactly(
+          (width, height) => backend.createSurface(width, height),
+          result.surface,
+          result.rect,
+          layer.adjustments,
+          { run: this.options.runSpatial, signal }
+        );
+        if (adjusted.status !== 'ok') {
+          release();
+          return adjusted.status === 'aborted'
+            ? { status: 'aborted' }
+            : adjustmentRefusal(this.options.getDocument(), layer.id, adjusted.status);
+        }
+        surface = adjusted.surface;
+      }
+      if (!this.options.isGuardCurrent(result.guard)) {
+        release();
+        return { status: 'not-ready' };
+      }
       return { ...result, release, surface };
     } catch (error) {
       release();
@@ -143,7 +200,7 @@ export class RasterExportController {
     }
     const liveEntry = this.options.layers.get(layerId);
     if (liveEntry && !liveEntry.stale && !this.options.isRasterizing(layer) && !isEmpty(liveEntry.rect)) {
-      return this.applyAdjustments(this.lease(layer, liveEntry), options.applyAdjustments === true);
+      return this.adjustLease(this.lease(layer, liveEntry), options.applyAdjustments === true, options.signal);
     }
     const contentRect = getSourceContentRect(layer, document);
     if (isEmpty(contentRect)) {
@@ -158,6 +215,9 @@ export class RasterExportController {
     let leased = false;
     try {
       const rasterized = await this.options.getOrStartRasterization(layer, document, options.signal);
+      if (rasterized === 'error') {
+        return layerUnreadable(this.options.getDocument() ?? document, layerId);
+      }
       if (rasterized !== 'published') {
         return { status: rasterized === 'aborted' ? 'aborted' : 'not-ready' };
       }
@@ -182,7 +242,7 @@ export class RasterExportController {
       }
       const lease = this.lease(currentLayer, entry, pin);
       leased = true;
-      return this.applyAdjustments(lease, options.applyAdjustments === true);
+      return this.adjustLease(lease, options.applyAdjustments === true, options.signal);
     } finally {
       if (!leased) {
         pin.release();
@@ -208,10 +268,11 @@ export class RasterExportController {
     layerId: string,
     options: ExportBakedLayerPixelsOptions = {}
   ): Promise<ReservedExportLayerPixels> {
-    const raw = await this.rasterize(layerId, { ...options, applyAdjustments: false });
-    if (raw.status !== 'ok') {
-      return noReservedPixels(raw);
+    const leased = await this.rasterize(layerId, { ...options, applyAdjustments: false });
+    if (leased.status !== 'ok') {
+      return noReservedPixels(leased);
     }
+    let raw = leased;
     const layer = raw.guard.layer;
     const matrix = fromTRS(
       { x: layer.transform.x, y: layer.transform.y },
@@ -224,9 +285,19 @@ export class RasterExportController {
       raw.release();
       return noReservedPixels({ status: 'empty' });
     }
-    const appliesAdjustments =
-      options.applyAdjustments !== false && layer.type === 'raster' && !isIdentityAdjustments(layer.adjustments);
-    const reservation = this.options.reserve?.(rect.width * rect.height * (appliesAdjustments ? 8 : 4));
+    // The layer's own stack applies to layer-local pixels before the transform resamples them, as the display does,
+    // so bakes keep the displayed grain, detail and color for scaled and rotated layers too. The display's exact
+    // adjusted copy of the leased live cache is drawn as is (before anything yields); otherwise a layer-local copy is
+    // reserved and adjusted, spatial entries included, or the bake refuses.
+    if (options.applyAdjustments !== false && layer.type === 'raster' && !isIdentityAdjustments(layer.adjustments)) {
+      const displayed = this.options.peekAdjustedCacheSurface?.(layer.id, raw.surface, layer.adjustments!) ?? null;
+      const adjusted = displayed ? { ...raw, surface: displayed } : await this.adjustLease(raw, true, options.signal);
+      if (adjusted.status !== 'ok') {
+        return noReservedPixels(adjusted);
+      }
+      raw = adjusted;
+    }
+    const reservation = this.options.reserve?.(rect.width * rect.height * 4);
     if (reservation?.status === 'over-budget') {
       raw.release();
       return noReservedPixels({ status: 'over-budget' });
@@ -248,11 +319,6 @@ export class RasterExportController {
       ctx.clearRect(0, 0, rect.width, rect.height);
       ctx.setTransform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e - rect.x, matrix.f - rect.y);
       ctx.drawImage(raw.surface.canvas, raw.rect.x, raw.rect.y);
-      if (appliesAdjustments && layer.type === 'raster' && layer.adjustments) {
-        const imageData = ctx.getImageData(0, 0, rect.width, rect.height);
-        applyAdjustments(imageData, layer.adjustments);
-        ctx.putImageData(imageData, 0, 0);
-      }
       return { release, result: { guard: raw.guard, rect, release, status: 'ok', surface } };
     } catch (error) {
       release();

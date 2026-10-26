@@ -1,6 +1,7 @@
 import type { BrowserLockResult } from '@platform/browser/webLocks';
 import type * as accountLifecycleModule from '@platform/state/accountLifecycle';
 
+import { MAX_SUPPORTED_CANVAS_SCHEMA_VERSION } from '@workbench/canvasSchemaVersion';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as libraryModule from './library';
@@ -147,7 +148,10 @@ describe('refreshProjectLibrary', () => {
 
   it('identifies summaries that require a newer canvas reader without fetching the document', async () => {
     api.listProjects.mockResolvedValue([
-      { ...summaryDto('future', 'Future', '2026-06-10 10:00:00.000'), minimum_canvas_schema_version: 5 },
+      {
+        ...summaryDto('future', 'Future', '2026-06-10 10:00:00.000'),
+        minimum_canvas_schema_version: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION + 1,
+      },
     ]);
 
     await library.refreshProjectLibrary();

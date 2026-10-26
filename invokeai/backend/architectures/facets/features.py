@@ -121,8 +121,8 @@ class FeaturesFacet(Facet):
     control_kinds: frozenset[ControlKind] = frozenset()
     max_reference_images: int = 0
     reference_images_require_variant: str | None = None
-    """Qwen-Image accepts reference images only as the `edit` variant — the one feature in this
-    table that a base alone cannot answer."""
+    """The one variant that accepts reference images, where a base alone cannot answer: Qwen-Image
+    takes them only as `edit`, Anima only on its Qwen3-conditioned releases."""
 
     supports_regional_guidance: bool = False
     regional_negative: bool = False
