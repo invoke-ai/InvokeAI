@@ -1,6 +1,7 @@
 // @ts-check
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'astro/config';
+import { unified } from '@astrojs/markdown-remark';
 import starlight from '@astrojs/starlight';
 
 // Plugins
@@ -36,8 +37,10 @@ export default defineConfig({
   site,
   base: base || undefined,
   markdown: {
-    remarkPlugins: [[remarkSortPrefixSlug, { docsDir: fileURLToPath(new URL('./src/content/docs', import.meta.url)) }]],
-    rehypePlugins: [[rehypePrefixBaseToRootLinks, { base }]],
+    processor: unified({
+      remarkPlugins: [[remarkSortPrefixSlug, { docsDir: fileURLToPath(new URL('./src/content/docs', import.meta.url)) }]],
+      rehypePlugins: [[rehypePrefixBaseToRootLinks, { base }]],
+    }),
   },
   integrations: [
     starlight({
