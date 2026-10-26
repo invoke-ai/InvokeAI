@@ -1,0 +1,193 @@
+---
+import { Badge, Icon } from '@astrojs/starlight/components';
+import type { StarlightRouteData } from '@astrojs/starlight/route-data';
+import { getCollection } from 'astro:content';
+
+import { getSidebarSectionIcon } from '../../config/icons';
+import { fileDirectory, flattenLinks, makeHrefToId, sectionDirectory } from '../sidebar.mjs';
+
+type SidebarEntry = StarlightRouteData['sidebar'][number];
+type SidebarGroup = Extract<SidebarEntry, { type: 'group' }>;
+
+type Props = {
+  sublist: SidebarEntry[];
+  nested?: boolean;
+  /** Page id -> file directory; the top level reads it once for the whole tree. */
+  directories?: Map<string, string>;
+};
+
+// Starlight's `SidebarSublist`, with an icon on each section heading (from `config/icons.ts`).
+const { sublist, nested = false } = Astro.props;
+const directories =
+  Astro.props.directories ??
+  new Map((await getCollection('docs')).map((doc) => [doc.id, fileDirectory(doc.filePath)]));
+const hrefToId = makeHrefToId(import.meta.env.BASE_URL);
+
+const sectionIcon = (group: SidebarGroup) => {
+  const directory = sectionDirectory(group, directories, hrefToId);
+  if (!directory) throw new Error(`The sidebar section "${group.label}" has no pages to place it by.`);
+  return getSidebarSectionIcon(directory, group.label);
+};
+const hasCurrentPage = (group: SidebarGroup) => flattenLinks(group.entries).some((link) => link.isCurrent);
+---
+
+<ul class:list={{ 'top-level': !nested }}>
+  {
+    sublist.map((entry) => {
+      if (entry.type === 'link') {
+        const { class: className, ...attrs } = entry.attrs;
+        return (
+          <li>
+            <a
+              {...attrs}
+              href={entry.href}
+              aria-current={entry.isCurrent ? 'page' : undefined}
+              class:list={['link', className]}
+            >
+              <span>{entry.label}</span>
+              {entry.badge && <Badge variant={entry.badge.variant} class={entry.badge.class} text={entry.badge.text} />}
+            </a>
+          </li>
+        );
+      }
+      const SectionIcon = sectionIcon(entry);
+      return (
+        <li>
+          <details open={hasCurrentPage(entry) || !entry.collapsed}>
+            <summary class="section">
+              <span class="section-icon"><SectionIcon size={14} /></span>
+              <span class:list={['label', { 'docs-eyebrow': !nested }]}>{entry.label}</span>
+              {entry.badge && <Badge variant={entry.badge.variant} class={entry.badge.class} text={entry.badge.text} />}
+              <Icon name="right-caret" class="caret" size="1rem" />
+            </summary>
+            <Astro.self sublist={entry.entries} nested directories={directories} />
+          </details>
+        </li>
+      );
+    })
+  }
+</ul>
+
+<style>
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--sl-text-xs);
+  }
+
+  li {
+    overflow-wrap: anywhere;
+  }
+
+  .top-level > li + li {
+    margin-top: 1px;
+  }
+  /* Space around a topic's sections sits between items, not inside their headings. */
+  .top-level > li:has(> details):not(:first-child),
+  .top-level > li:has(> details) + li {
+    margin-top: 0.75rem;
+  }
+
+  /* A section's pages are indented, without tree guide lines. */
+  ul ul {
+    padding-inline-start: 0.75rem;
+  }
+
+  .link,
+  .section {
+    border-radius: var(--docs-radius);
+    line-height: 1.35;
+    transition: var(--docs-control-transition);
+
+    &:hover,
+    &:focus-visible {
+      background-color: var(--docs-hover);
+    }
+  }
+
+  .link {
+    display: block;
+    padding: 0.375rem 0.5rem;
+    color: var(--docs-text-muted);
+    text-decoration: none;
+
+    &:hover,
+    &:focus-visible {
+      color: var(--docs-text-strong);
+    }
+  }
+
+  /* The current page is the app's active row (`rowRecipe`'s `accent` tone): a solid accent fill with dark text that
+   * keeps its fill when pointed at. */
+  .link[aria-current='page'],
+  .link[aria-current='page']:hover,
+  .link[aria-current='page']:focus-visible {
+    background-color: var(--docs-accent);
+    color: var(--docs-accent-contrast);
+    font-weight: 600;
+  }
+
+  .section {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.5rem;
+    color: var(--docs-text-muted);
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+  }
+
+  .section-icon {
+    display: flex;
+    flex: none;
+    color: var(--docs-text-subtle);
+  }
+
+  .label {
+    flex: 1;
+    min-width: 0;
+  }
+
+
+  .caret {
+    flex: none;
+    color: var(--docs-text-subtle);
+    transition: transform 180ms ease-out;
+  }
+  [open] > .section .caret {
+    transform: rotate(90deg);
+  }
+
+  /* Sections open and close by animating their height; browsers without `::details-content` toggle instantly. */
+  details {
+    interpolate-size: allow-keywords;
+
+    &::details-content {
+      block-size: 0;
+      opacity: 0;
+      overflow: clip;
+      transition:
+        block-size 180ms ease-out,
+        opacity 180ms ease-out,
+        content-visibility 180ms ease-out allow-discrete;
+    }
+    &[open]::details-content {
+      block-size: auto;
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .caret,
+    details::details-content {
+      transition: none;
+    }
+  }
+</style>

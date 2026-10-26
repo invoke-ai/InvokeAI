@@ -66,10 +66,8 @@ export const selectCrossListings = (docs, isProduction) =>
  * @param {SidebarEntry[]} entries
  * @param {Map<string, string>} fileNames page id -> file name, which keeps the sorting prefix the id drops
  * @param {(href: string) => string} hrefToId
- * @returns {boolean} whether anything moved
  */
 export const sortAndRelabel = (entries, fileNames, hrefToId) => {
-  let changed = false;
   /** @param {SidebarEntry} entry */
   const sortKey = (entry) =>
     getSortPrefix(entry.type === 'group' ? entry.label : (fileNames.get(hrefToId(entry.href)) ?? '')) ??
@@ -84,7 +82,6 @@ export const sortAndRelabel = (entries, fileNames, hrefToId) => {
   for (const slots of slotsByDirectory.values()) {
     const sorted = slots.map((index) => entries[index]).sort((a, b) => sortKey(a) - sortKey(b));
     slots.forEach((slot, i) => {
-      if (entries[slot] !== sorted[i]) changed = true;
       entries[slot] = sorted[i];
     });
   }
@@ -92,9 +89,8 @@ export const sortAndRelabel = (entries, fileNames, hrefToId) => {
   for (const entry of entries) {
     if (entry.type !== 'group') continue;
     if ('autogenerate' in entry && entry.autogenerate) entry.label = stripSortPrefix(entry.label);
-    if (sortAndRelabel(entry.entries, fileNames, hrefToId)) changed = true;
+    sortAndRelabel(entry.entries, fileNames, hrefToId);
   }
-  return changed;
 };
 
 /**
@@ -133,10 +129,8 @@ export const findDirectoryGroup = (entries, directory, directories, hrefToId) =>
  * @param {CrossListing[]} crossListings
  * @param {Map<string, string>} directories page id -> file directory
  * @param {(href: string) => string} hrefToId
- * @returns {boolean} whether anything was added
  */
 export const addCrossListings = (sidebar, crossListings, directories, hrefToId) => {
-  if (crossListings.length === 0) return false;
   const linksById = new Map(flattenLinks(sidebar).map((link) => [hrefToId(link.href), link]));
   for (const { id, directory } of crossListings) {
     const link = linksById.get(id);
@@ -155,7 +149,6 @@ export const addCrossListings = (sidebar, crossListings, directories, hrefToId) 
     // The page's own link carries the current-page state, so the copy never does.
     group.splice(index, 0, { ...link, isCurrent: false, attrs: { ...link.attrs, [CROSS_LISTED_ATTR]: '' } });
   }
-  return true;
 };
 
 /**
@@ -189,4 +182,44 @@ export const paginate = (sidebar, data) => {
     prev: applyPrevNextConfig(links[current - 1], data.prev),
     next: applyPrevNextConfig(links[current + 1], data.next),
   };
+};
+
+/**
+ * The labels of the groups enclosing the current page's link, outermost first, and the link itself, for a breadcrumb.
+ * `undefined` when the current page is not in the sidebar.
+ * @param {SidebarEntry[]} entries
+ * @returns {{ groups: string[], link: SidebarLink } | undefined}
+ */
+export const findCurrentTrail = (entries) => {
+  for (const entry of entries) {
+    if (entry.type === 'link') {
+      if (entry.isCurrent) return { groups: [], link: entry };
+      continue;
+    }
+    const trail = findCurrentTrail(entry.entries);
+    if (trail) return { groups: [entry.label, ...trail.groups], link: trail.link };
+  }
+  return undefined;
+};
+
+/**
+ * The docs directory, as a URL path, that a sidebar section was generated from: the deepest directory holding all of
+ * its pages. Cross-listed copies belong to other directories and are ignored. `undefined` for a section without pages.
+ * @param {Extract<SidebarEntry, { type: 'group' }>} group
+ * @param {Map<string, string>} directories page id -> file directory
+ * @param {(href: string) => string} hrefToId
+ */
+export const sectionDirectory = (group, directories, hrefToId) => {
+  const paths = flattenLinks(group.entries)
+    .filter((link) => !(CROSS_LISTED_ATTR in link.attrs))
+    .map((link) => directories.get(hrefToId(link.href)))
+    .filter((directory) => directory !== undefined)
+    .map((directory) => directory.split('/'));
+  if (paths.length === 0) return undefined;
+  const [first, ...rest] = paths;
+  let length = first.length;
+  for (const path of rest) {
+    while (length > 0 && path.slice(0, length).join('/') !== first.slice(0, length).join('/')) length--;
+  }
+  return first.slice(0, length).join('/');
 };

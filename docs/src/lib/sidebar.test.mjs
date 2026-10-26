@@ -5,8 +5,10 @@ import {
   addCrossListings,
   CROSS_LISTED_ATTR,
   fileDirectory,
+  findCurrentTrail,
   makeHrefToId,
   paginate,
+  sectionDirectory,
   selectCrossListings,
   sortAndRelabel,
 } from './sidebar.mjs';
@@ -57,7 +59,7 @@ describe('sortAndRelabel', () => {
       { ...link('guide/a'), autogenerate: { directory: 'guide' } },
       { ...link('guide/intro'), autogenerate: { directory: 'guide' } },
     ];
-    assert.equal(sortAndRelabel(entries, fileNames, hrefToId), true);
+    sortAndRelabel(entries, fileNames, hrefToId);
     assert.deepEqual(labels(entries), ['intro', 'setup', 'b', 'a']);
   });
 
@@ -75,11 +77,6 @@ describe('sortAndRelabel', () => {
     sortAndRelabel(entries, fileNames, hrefToId);
     assert.deepEqual(labels(entries), ['Workbench', 'Models']);
     assert.deepEqual(labels(models.entries), ['introduction', 'zoo']);
-  });
-
-  it('reports no change when the order is already right', () => {
-    const entries = [{ ...link('x/a'), autogenerate: { directory: 'x' } }];
-    assert.equal(sortAndRelabel(entries, new Map([['x/a', '01.a.mdx']]), hrefToId), false);
   });
 });
 
@@ -134,7 +131,7 @@ describe('addCrossListings', () => {
       { id: 'video/wan', directory: 'models/local' },
       { id: 'video/ltx', directory: 'models/local' },
     ];
-    assert.equal(addCrossListings(sidebar, listings, directories, hrefToId), true);
+    addCrossListings(sidebar, listings, directories, hrefToId);
     const models = sidebar[0].entries;
     assert.deepEqual(labels(models), ['Anima', 'LTX-2', 'SDXL', 'Wan 2.2', 'Nested']);
     const ltxCopy = models[1];
@@ -157,7 +154,9 @@ describe('addCrossListings', () => {
   });
 
   it('does nothing without listings', () => {
-    assert.equal(addCrossListings(makeSidebar(), [], directories, hrefToId), false);
+    const sidebar = makeSidebar();
+    addCrossListings(sidebar, [], directories, hrefToId);
+    assert.deepEqual(sidebar, makeSidebar());
   });
 
   it('fails loudly on misconfiguration', () => {
@@ -217,5 +216,59 @@ describe('paginate', () => {
 
   it('returns null when the current page is not in the sidebar', () => {
     assert.equal(paginate([group('Models', 'models', [link('models/a')])], {}), null);
+  });
+});
+
+describe('findCurrentTrail', () => {
+  it('lists the groups enclosing the current page, outermost first', () => {
+    const sidebar = [
+      link('models/intro', 'Overview'),
+      group('Local Models', 'models', [group('FLUX', 'models/flux', [link('models/flux/two', 'FLUX.2', true)])]),
+    ];
+    const trail = findCurrentTrail(sidebar);
+    assert.deepEqual(trail.groups, ['Local Models', 'FLUX']);
+    assert.equal(trail.link.label, 'FLUX.2');
+  });
+
+  it('follows the page itself, not a cross-listed copy of it', () => {
+    const page = link('video/wan', 'Wan', true);
+    const sidebar = [
+      group('Models', 'models', [{ ...page, isCurrent: false, attrs: { [CROSS_LISTED_ATTR]: '' } }]),
+      group('Video', 'video', [page]),
+    ];
+    assert.deepEqual(findCurrentTrail(sidebar).groups, ['Video']);
+  });
+
+  it('is undefined when the current page is not in the sidebar', () => {
+    assert.equal(findCurrentTrail([group('Models', 'models', [link('models/a')])]), undefined);
+  });
+});
+
+describe('sectionDirectory', () => {
+  const directories = new Map([
+    ['guide/images/intro', 'guide/images'],
+    ['guide/images/advanced/hidiffusion', 'guide/images/advanced'],
+    ['guide/video/wan', 'guide/video'],
+  ]);
+
+  it("is the deepest directory holding all of a section's pages, nested ones included", () => {
+    const section = group('Images', 'guide', [
+      link('guide/images/intro'),
+      group('Advanced', 'guide', [link('guide/images/advanced/hidiffusion')]),
+    ]);
+    assert.equal(sectionDirectory(section, directories, hrefToId), 'guide/images');
+    assert.equal(sectionDirectory(section.entries[1], directories, hrefToId), 'guide/images/advanced');
+  });
+
+  it('ignores cross-listed copies, which live in other directories', () => {
+    const section = group('Images', 'guide', [
+      link('guide/images/intro'),
+      { ...link('guide/video/wan'), attrs: { [CROSS_LISTED_ATTR]: '' } },
+    ]);
+    assert.equal(sectionDirectory(section, directories, hrefToId), 'guide/images');
+  });
+
+  it('is undefined for a section without pages', () => {
+    assert.equal(sectionDirectory(group('Empty', 'guide', []), directories, hrefToId), undefined);
   });
 });

@@ -1,0 +1,413 @@
+---
+import Check from '@lucide/astro/icons/check';
+import ChevronsUpDown from '@lucide/astro/icons/chevrons-up-down';
+import Search from '@lucide/astro/icons/search';
+
+import { getTopicIcon } from '../../config/icons';
+import { docsTopics, topicGroups, type DocsTopic } from '../../config/topics';
+import { withBase } from '../base-path';
+
+type Props = {
+  current: DocsTopic;
+};
+
+const { current } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const CurrentIcon = getTopicIcon(current);
+const groups = topicGroups.map((group) => ({ group, topics: docsTopics.filter((topic) => topic.group === group) }));
+---
+
+<docs-topic-switcher class="topic-switcher">
+  <button
+    type="button"
+    class="trigger"
+    aria-expanded="false"
+    aria-controls="docs-topic-switcher-popup"
+    aria-haspopup="dialog"
+    aria-label={`Topic: ${current.label}. Change topic`}
+  >
+    <span class="tile tile--selected"><CurrentIcon size={16} /></span>
+    <span class="text">
+      <span class="title">{current.label}</span>
+      <span class="description">{current.description}</span>
+    </span>
+    <ChevronsUpDown class="chevrons" size={14} />
+  </button>
+
+  <div id="docs-topic-switcher-popup" class="popup docs-popup" role="dialog" aria-label="Choose a docs topic" hidden>
+    <div class="filter">
+      <Search size={14} />
+      <input
+        type="text"
+        role="combobox"
+        aria-label="Filter topics"
+        aria-controls="docs-topic-switcher-list"
+        aria-expanded="true"
+        aria-autocomplete="list"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="Filter topics"
+      />
+    </div>
+    <div id="docs-topic-switcher-list" class="list" role="listbox" aria-label="Topics">
+      {
+        groups.map(({ group, topics }) => (
+          <div class="group" role="group" aria-labelledby={`docs-topic-group-${group.toLowerCase()}`}>
+            <div class="group-label docs-eyebrow" id={`docs-topic-group-${group.toLowerCase()}`}>
+              {group}
+            </div>
+            {topics.map((topic) => {
+              const isCurrent = topic.id === current.id;
+              const TopicIcon = getTopicIcon(topic);
+              return (
+                <a
+                  id={`docs-topic-option-${topic.id}`}
+                  class="option"
+                  role="option"
+                  href={withBase(topic.link, base)}
+                  tabindex="-1"
+                  aria-selected="false"
+                  aria-current={isCurrent ? 'page' : undefined}
+                  data-filter-text={`${topic.label} ${topic.description}`.toLowerCase()}
+                >
+                  <span class="tile">
+                    <TopicIcon size={16} />
+                  </span>
+                  <span class="text">
+                    <span class="title">{topic.label}</span>
+                    <span class="description">{topic.description}</span>
+                  </span>
+                  {isCurrent && (
+                    <Check class="check" size={14} />
+                  )}
+                </a>
+              );
+            })}
+          </div>
+        ))
+      }
+    </div>
+    <p class="empty" role="status"></p>
+    <div class="hints" aria-hidden="true">
+      <span><kbd>↑</kbd><kbd>↓</kbd> move</span>
+      <span><kbd>↵</kbd> open</span>
+      <span><kbd>esc</kbd> close</span>
+    </div>
+  </div>
+</docs-topic-switcher>
+
+<script>
+  import { bindDisclosure } from '../disclosure';
+
+  const VIEWPORT_MARGIN_PX = 16;
+  const MIN_HEIGHT_PX = 240;
+
+  /**
+   * A filterable list of topics. Focus stays in the filter field, which points at the active option with
+   * `aria-activedescendant`; the active option is the selected one, the arrow keys move it and Enter follows its
+   * link. The current topic is marked with `aria-current` and a check.
+   */
+  class DocsTopicSwitcher extends HTMLElement {
+    connectedCallback() {
+      const input = this.querySelector('input')!;
+      const options = [...this.querySelectorAll<HTMLAnchorElement>('[role="option"]')];
+      const groups = [...this.querySelectorAll<HTMLElement>('[role="group"]')];
+      const empty = this.querySelector<HTMLElement>('.empty')!;
+      let active: HTMLAnchorElement | undefined;
+
+      const visibleOptions = () => options.filter((option) => !option.hidden);
+      /** `byKeyboard` rings the option, as the app's menus ring a keyboard-focused item. */
+      const setActive = (option: HTMLAnchorElement | undefined, byKeyboard = false) => {
+        active?.setAttribute('aria-selected', 'false');
+        active?.removeAttribute('data-keyboard');
+        active = option;
+        if (!option) {
+          input.removeAttribute('aria-activedescendant');
+          return;
+        }
+        option.setAttribute('aria-selected', 'true');
+        option.toggleAttribute('data-keyboard', byKeyboard);
+        input.setAttribute('aria-activedescendant', option.id);
+        option.scrollIntoView({ block: 'nearest' });
+      };
+      const filter = () => {
+        const query = input.value.trim().toLowerCase();
+        for (const option of options) option.hidden = !option.dataset.filterText!.includes(query);
+        for (const group of groups) group.hidden = !group.querySelector('[role="option"]:not([hidden])');
+        const matches = visibleOptions();
+        empty.textContent = matches.length > 0 ? '' : 'No topics match.';
+        setActive(matches.find((option) => option.getAttribute('aria-current') === 'page') ?? matches[0]);
+      };
+
+      const popup = this.querySelector<HTMLElement>('[role="dialog"]')!;
+      // Let the popup reach down to the bottom of the viewport, so every topic shows whenever there is room. Below a
+      // minimum, the list scrolls inside the popup and the sidebar scrolls to reveal the rest.
+      const fitToViewport = () => {
+        // From the layout position, not the box, which the opening animation shifts.
+        const top = this.getBoundingClientRect().top + popup.offsetTop;
+        const available = window.innerHeight - top - VIEWPORT_MARGIN_PX;
+        popup.style.maxHeight = `${Math.max(available, MIN_HEIGHT_PX)}px`;
+      };
+      const disclosure = bindDisclosure(this, this.querySelector('button')!, popup, {
+        onOpen: () => {
+          input.value = '';
+          filter();
+          fitToViewport();
+          input.focus();
+        },
+      });
+      window.addEventListener('resize', () => {
+        if (disclosure.isOpen()) fitToViewport();
+      });
+
+      input.addEventListener('input', filter);
+      input.addEventListener('keydown', (event) => {
+        const matches = visibleOptions();
+        if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && matches.length > 0) {
+          event.preventDefault();
+          const step = event.key === 'ArrowDown' ? 1 : -1;
+          const index = active ? matches.indexOf(active) : -1;
+          setActive(matches[(index + step + matches.length) % matches.length], true);
+        } else if (event.key === 'Enter' && active) {
+          event.preventDefault();
+          active.click();
+        }
+      });
+      for (const option of options) option.addEventListener('pointermove', () => setActive(option));
+    }
+  }
+  customElements.define('docs-topic-switcher', DocsTopicSwitcher);
+</script>
+
+<style>
+  .topic-switcher {
+    position: relative;
+    display: block;
+  }
+
+  .trigger,
+  .option {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    width: 100%;
+    padding: 0.5rem;
+    border-radius: 7px;
+    color: var(--docs-text-strong);
+    font-family: inherit;
+    text-align: start;
+    text-decoration: none;
+  }
+
+  /*
+   * Unfilled like a secondary button, with its hover fill. Tighter vertical padding than the rows: the two-line label
+   * is taller than the icon tile, and this leaves the tile as far from the top and bottom borders as from the left.
+   */
+  .trigger {
+    padding-block: 0.4375rem;
+    border: 1px solid var(--docs-border);
+    background: transparent;
+    cursor: pointer;
+    transition: var(--docs-control-transition);
+
+    &:is(:hover, [aria-expanded='true']) {
+      background: var(--docs-hover);
+    }
+    &[aria-expanded='true'] {
+      border-color: var(--docs-accent);
+    }
+  }
+
+  .tile {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 6px;
+    background: var(--docs-surface);
+    color: var(--docs-text-muted);
+  }
+  .trigger .tile {
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: var(--docs-radius);
+  }
+  .tile--selected {
+    background: var(--docs-accent);
+    color: var(--docs-accent-contrast);
+  }
+
+  .text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+  .title {
+    font-size: var(--sl-text-xs);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .description {
+    color: var(--docs-text-subtle);
+    font-size: 0.6875rem;
+    line-height: 1.3;
+  }
+  /* The trigger's label sits tighter, so the two lines read as one block centred on the tile. */
+  .trigger :is(.title, .description) {
+    line-height: 1.2;
+  }
+  .option .description {
+    font-size: 0.75rem;
+  }
+
+  .chevrons {
+    flex: none;
+    color: var(--docs-text-subtle);
+  }
+
+  .popup {
+    position: absolute;
+    inset-inline: 0;
+    top: calc(100% + 0.375rem);
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* The app's dropdown surface (`dropdownContent` in its theme recipes). */
+    border: 1px solid var(--docs-border-strong);
+    border-radius: 10px;
+    background: var(--docs-control);
+    box-shadow: var(--docs-shadow-popup);
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  .filter {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 0.5rem;
+    height: 2.5rem;
+    padding-inline: 0.625rem;
+    border-bottom: 1px solid var(--docs-border);
+    color: var(--docs-text-subtle);
+
+    input {
+      flex: 1;
+      min-width: 0;
+      height: 100%;
+      border: 0;
+      outline: none;
+      background: transparent;
+      color: var(--docs-text-strong);
+      font: 400 var(--sl-text-xs) var(--__sl-font);
+    }
+    &:focus-within {
+      box-shadow: inset 0 -1px 0 var(--docs-accent);
+    }
+  }
+
+  .list {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.375rem;
+  }
+
+  .group {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding-bottom: 0.25rem;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  .group-label {
+    padding: 0.5rem 0.5rem 0.25rem;
+  }
+
+  /*
+   * As the app's list rows and menu items: the option the pointer or keyboard is on gets the hover fill (`bg.hover`),
+   * ringed when reached by keyboard; the current topic is the active row, a solid accent fill with dark text that
+   * keeps its fill when pointed at.
+   */
+  .option {
+    transition:
+      background-color 120ms ease,
+      color 120ms ease;
+
+    &[hidden] {
+      display: none;
+    }
+    &[aria-selected='true'] {
+      background: var(--docs-hover);
+    }
+    &[data-keyboard] {
+      outline: 2px solid var(--docs-accent);
+      outline-offset: -2px;
+    }
+    &[aria-current='page'] {
+      background: var(--docs-accent);
+      color: var(--docs-accent-contrast);
+
+      .description {
+        color: var(--docs-accent-contrast);
+        opacity: 0.85;
+      }
+      .tile {
+        background: var(--docs-bg);
+        color: var(--docs-accent);
+      }
+      .check {
+        color: var(--docs-accent-contrast);
+      }
+    }
+    &[aria-current='page'][data-keyboard] {
+      outline-color: var(--docs-accent-contrast);
+    }
+  }
+
+  .check {
+    flex: none;
+    color: var(--docs-accent);
+  }
+
+  .empty {
+    margin: 0;
+    padding: 0 0.875rem;
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-xs);
+
+    &:empty {
+      display: none;
+    }
+    &:not(:empty) {
+      padding-block: 0.25rem 1rem;
+    }
+  }
+
+  .hints {
+    display: flex;
+    flex: none;
+    gap: 0.875rem;
+    padding: 0.5rem 0.75rem;
+    border-top: 1px solid var(--docs-border);
+    color: var(--docs-text-subtle);
+    font-size: 0.6875rem;
+
+    kbd {
+      font-family: var(--__sl-font-mono);
+    }
+  }
+</style>
