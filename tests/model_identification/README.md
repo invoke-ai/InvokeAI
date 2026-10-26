@@ -97,7 +97,7 @@ If the model is multi-file (e.g. diffusers-style), omit this key or set it to a 
 
 #### `"expected_config_attrs"`
 
-This field is a dict of expected configuration attributes for the model. It is required for all test cases except refusals (see `"expected_refusal"`).
+This field is a dict of expected configuration attributes for the model. It is required for all test cases except those with an `"expected_refusal"`.
 
 It is used to verify that the model's configuration matches expectations. The keys and values in this dict depend on the specific model and its configuration.
 
@@ -130,11 +130,11 @@ For example, for a SD1.5 main (pipeline) inpainting model in diffusers format, y
 
 #### `"expected_refusal"`
 
-For a model the installer must refuse rather than install, in place of `"expected_config_attrs"`: a substring of the reason. The test passes when identification matches nothing and one of the refusals (`InvalidMatchError`) contains it. This is for files that are recognised but unsupported, such as an LTX-2.3 transformer, which must not install as an unknown model.
+For a model that identification recognizes and refuses, so the install fails with a reason (an `InvalidMatchError`), set this to a substring of that reason instead of giving `"expected_config_attrs"` (setting both fails the test). The test then expects no config and exactly one refusal, containing the substring. This is for files that are recognised but unsupported, such as an LTX-2.3 transformer, which must not install as an unknown model.
 
 ```json
 {
-  "expected_refusal": "is an LTX-2.0/2.3 file"
+  "expected_refusal": "not supported in GGUF format"
 }
 ```
 

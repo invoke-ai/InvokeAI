@@ -80,6 +80,10 @@ def test_model_identification(model_path: Path):
     test_metadata_path = model_path / "__test_metadata__.json"
     test_metadata = json.loads(test_metadata_path.read_text())
 
+    expected_refusal = test_metadata.get("expected_refusal")
+    if expected_refusal and "expected_config_attrs" in test_metadata:
+        pytest.fail(f"{id}: set either expected_refusal or expected_config_attrs, not both")
+
     if file_name := test_metadata.get("file_name", ""):
         model_path = model_path / file_name
 
@@ -93,9 +97,13 @@ def test_model_identification(model_path: Path):
         print(mod.path)
         pytest.fail(f"{id}: Exception during model probing: {e}")
 
-    if expected_refusal := test_metadata.get("expected_refusal"):
-        if result.config is not None or not any(expected_refusal in str(e) for e in result.invalid_matches):
-            pytest.fail(f"{id}: expected a refusal naming {expected_refusal!r}, got:\n{pformat(result.details)}")
+    if expected_refusal:
+        # Exactly one: the installer shows the first refusal, and the order of the candidate configs is not fixed.
+        reasons = [str(e) for e in result.invalid_matches]
+        if result.config is not None or len(reasons) != 1 or expected_refusal not in reasons[0]:
+            pytest.fail(
+                f"{id}: expected exactly one refusal containing {expected_refusal!r}, got {result.config!r}, {reasons}"
+            )
         return
 
     if result.config is None:

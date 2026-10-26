@@ -37,7 +37,7 @@ import { RoutingControl } from './RoutingControl';
 const NOOP_INVOKE = () => Promise.resolve();
 const BASE_STATE = {
   batchCount: 1,
-  blockingReasons: [],
+  issues: [],
   invocation: {
     destination: 'gallery',
     destinationLocked: false,

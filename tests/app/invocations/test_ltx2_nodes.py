@@ -292,6 +292,7 @@ def test_fitting_an_image_to_the_canvas_crops_rather_than_stretches() -> None:
     assert fitted.getpixel((352, 352)) == (0, 0, 255)
 
 
+@pytest.mark.ffmpeg
 def test_the_crf_round_trip_returns_a_recompressed_frame_of_the_same_size() -> None:
     """The conditioning image has to carry codec artefacts; the round trip goes through ffmpeg,
     whose two-process pipe is easy to get subtly wrong."""
@@ -306,6 +307,7 @@ def test_the_crf_round_trip_returns_a_recompressed_frame_of_the_same_size() -> N
     assert recompress_h264(source, 0) is source
 
 
+@pytest.mark.ffmpeg
 def test_an_odd_sized_image_is_cropped_to_what_h264_can_encode() -> None:
     source = Image.new("RGB", (65, 33), "green")
     assert recompress_h264(source, 18).size == (64, 32)
@@ -1429,6 +1431,7 @@ def test_the_source_clip_is_streamed_rather_than_collected(monkeypatch: pytest.M
     assert decoded == 2
 
 
+@pytest.mark.ffmpeg
 def test_the_held_latents_are_not_decoded_when_the_source_clip_is_wired(monkeypatch: pytest.MonkeyPatch) -> None:
     """The whole point is to skip that work: decoding is a second tiled VAE pass over a clip whose
     pixels are already on disk."""

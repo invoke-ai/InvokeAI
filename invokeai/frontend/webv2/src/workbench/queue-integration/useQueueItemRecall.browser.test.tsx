@@ -47,7 +47,10 @@ vi.mock('@features/models', async (importOriginal) => ({
 vi.mock('@workbench/useNotify', () => ({
   useNotify: () => ({ error: vi.fn(), info: mocks.notifyInfo, success: mocks.notifySuccess }),
 }));
-vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => mocks.openWidget }));
+vi.mock('@workbench/useOpenWorkbenchWidget', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useOpenWorkbenchWidget: () => mocks.openWidget,
+}));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
 seedArchitectureCapabilities();

@@ -13,7 +13,9 @@ Widgets should provide component icons, not icon IDs or import strings:
 
 ```tsx
 import type { WidgetManifest } from '@workbench/widgetContracts';
+
 import { LayersIcon } from 'lucide-react';
+
 import { layerSettingsContribution } from './settingsContribution';
 
 export const manifest: WidgetManifest = {
