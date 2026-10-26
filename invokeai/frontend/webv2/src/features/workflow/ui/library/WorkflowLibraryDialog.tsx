@@ -19,6 +19,7 @@ import {
   type SystemStyleObject,
   Text,
 } from '@chakra-ui/react';
+import { useAuthSession } from '@features/identity';
 import {
   ensureWorkflowLibraryBrowseLoaded,
   getWorkflowLibraryBrowseSnapshot,
@@ -67,6 +68,7 @@ const TAB_ITEMS: ReadonlyArray<{ labelKey: string; value: WorkflowLibraryTab }> 
   { labelKey: 'workflowLibrary.thisProject', value: 'project' },
   { labelKey: 'workflowLibrary.browse', value: 'default' },
   { labelKey: 'workflowLibrary.yours', value: 'user' },
+  { labelKey: 'workflowLibrary.shared', value: 'shared' },
 ];
 
 const SORT_ITEMS: ReadonlyArray<{ labelKey: string; value: WorkflowLibrarySort }> = [
@@ -113,6 +115,7 @@ const selectBrowseView = (snapshot: WorkflowLibraryBrowseSnapshot) => ({
   category: snapshot.filter.category,
   entries: snapshot.entries,
   error: snapshot.error,
+  isPublic: snapshot.filter.isPublic,
   status: snapshot.status,
   tag: snapshot.filter.tag,
   tagCounts: snapshot.tagCounts,
@@ -132,7 +135,7 @@ const WorkflowLibraryBrowseSession = ({ sort }: { sort: WorkflowLibrarySort }) =
     void ensureWorkflowLibraryBrowseLoaded(sort).then(() => {
       const { filter, userTotal } = getWorkflowLibraryBrowseSnapshot();
 
-      if (userTotal === 0 && filter.category === 'user' && !filter.search) {
+      if (userTotal === 0 && filter.category === 'user' && !filter.isPublic && !filter.search) {
         setWorkflowLibraryBrowseFilter({ category: 'default', tag: null });
         setWorkflowLibraryTab('default');
       }
@@ -155,8 +158,10 @@ export const WorkflowLibraryDialog = ({
   onOpenChange: (isOpen: boolean) => void;
 }) => {
   const { t } = useTranslation();
-  const { category, entries, error, status, tag, tagCounts } = useWorkflowLibraryBrowseSelector(selectBrowseView);
+  const { category, entries, error, isPublic, status, tag, tagCounts } =
+    useWorkflowLibraryBrowseSelector(selectBrowseView);
   const { selection, tab } = workflowUiStore.useSelector(selectLibraryNavigation);
+  const authSession = useAuthSession();
   const projectId = useWorkflowProjectSelector((project) => project.id);
   const projectWorkflows = useWorkflowProjectSelector((project) => project.workflows);
   const templatesSnapshot = useInvocationTemplatesSnapshot();
@@ -192,6 +197,19 @@ export const WorkflowLibraryDialog = ({
     ? selectedWorkflowId
     : (entries[0]?.item.workflow_id ?? null);
   const activeEntry = entries.find((entry) => entry.item.workflow_id === activeWorkflowId) ?? null;
+  const isCurrentLibraryOwner =
+    authSession.phase === 'ready' &&
+    (authSession.multiuserEnabled
+      ? Boolean(activeEntry?.item.user_id && activeEntry.item.user_id === authSession.user?.user_id)
+      : true);
+  const canEditLibraryEntry = activeEntry?.item.category === 'user' && isCurrentLibraryOwner;
+  const isReadOnlyLibraryEntry = activeEntry?.item.category === 'user' && !isCurrentLibraryOwner;
+  const canChangeVisibility =
+    tab === 'user' &&
+    authSession.phase === 'ready' &&
+    authSession.multiuserEnabled &&
+    activeEntry?.item.category === 'user' &&
+    isCurrentLibraryOwner;
   // The project selection belongs to the project it was made in; another project starts from its active workflow.
   const projectSelectionId = selection?.projectId === projectId ? selection.workflowId : null;
 
@@ -278,15 +296,16 @@ export const WorkflowLibraryDialog = ({
         return;
       }
 
-      // The store applies filter patches literally, so clearing the tag when the
-      // category changes (its chips do not carry over) is the UI's job.
+      const nextCategory = value === 'default' ? 'default' : 'user';
+      const nextIsPublic = value === 'shared' ? true : undefined;
+
       setWorkflowLibraryTab(value);
 
-      if (category !== value) {
-        setWorkflowLibraryBrowseFilter({ category: value, tag: null });
+      if (category !== nextCategory || isPublic !== nextIsPublic) {
+        setWorkflowLibraryBrowseFilter({ category: nextCategory, isPublic: nextIsPublic, tag: null });
       }
     },
-    [category]
+    [category, isPublic]
   );
 
   const handleTagSelect = useCallback((nextTag: string | null) => setWorkflowLibraryBrowseFilter({ tag: nextTag }), []);
@@ -384,8 +403,15 @@ export const WorkflowLibraryDialog = ({
 
   const isProjectTab = tab === 'project';
   const tabsIdBase = useId();
-  const activeTab: WorkflowLibraryTab = isProjectTab ? 'project' : category;
-  const tabItems = useMemo(() => TAB_ITEMS.map((item) => ({ id: item.value, label: t(item.labelKey) })), [t]);
+  const activeTab: WorkflowLibraryTab = tab;
+  const tabItems = useMemo(
+    () =>
+      TAB_ITEMS.filter((item) => item.value !== 'shared' || authSession.multiuserEnabled).map((item) => ({
+        id: item.value,
+        label: t(item.labelKey),
+      })),
+    [authSession.multiuserEnabled, t]
+  );
 
   return (
     <>
@@ -520,6 +546,7 @@ export const WorkflowLibraryDialog = ({
                         error={error}
                         missingCounts={missingCounts}
                         openMenuAnchor={contextMenuPoint}
+                        showVisibilityStatus
                         selectedWorkflowId={activeWorkflowId}
                         status={status}
                         onContextMenu={handleCardContextMenu}
@@ -530,6 +557,8 @@ export const WorkflowLibraryDialog = ({
                         contextMenuPoint={contextMenuPoint}
                         contextMenuTriggerId={contextMenuTriggerId}
                         entry={activeEntry}
+                        canChangeVisibility={canChangeVisibility}
+                        isReadOnly={isReadOnlyLibraryEntry || !canEditLibraryEntry}
                         projectWorkflows={projectWorkflows}
                         onClose={closeDialog}
                         onContextMenuClose={closeContextMenu}

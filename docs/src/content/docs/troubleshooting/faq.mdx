@@ -48,7 +48,7 @@ Once v7 has run on an install, it has updated the database, and older versions c
 
 ## Triton error on startup
 
-This can be safely ignored. Invoke only uses Triton for [SageAttention](/configuration/optimization/sage-attention/), which is off unless you enable it. If you are on Linux and wish to dismiss the error, you can install Triton.
+Invoke only uses Triton for [SageAttention](/configuration/optimization/sage-attention/), which is off unless you enable it. Installs without Triton can ignore the error: CPU, macOS, AMD on Windows, Windows on ARM64, and a manual Windows install without the `cuda` extra (`--torch-backend=cu126` installs included). Other NVIDIA installs include Triton (on Windows the `triton-windows` package), so there the error means Triton is broken or does not match PyTorch; repair the install from the launcher, or rerun the manual install command.
 
 ## No ffmpeg exe could be found (Windows on ARM64)
 

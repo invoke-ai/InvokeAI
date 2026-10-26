@@ -202,7 +202,7 @@ test('the HTTP reset contract selects profiles explicitly and restores the start
     );
     assert.equal(projects.length, 40);
     assert.deepEqual(runtimeConfig, {
-      config: { generation_devices: 'auto', max_queue_history: null },
+      config: { generation_devices: 'auto', image_subfolder_strategy: 'flat', max_queue_history: null },
       set_fields: [],
     });
 
@@ -247,6 +247,16 @@ const getJson = async (backend, path, init) => {
 
   return body;
 };
+
+/** The representative queue holds pending and in-progress items, which refuse Start Move as on the real server. */
+const clearQueue = (backend) => getJson(backend, '/api/v1/queue/default/clear', { method: 'PUT' });
+
+const enqueueBatch = (backend) =>
+  fetch(`${backend.origin}/api/v1/queue/default/enqueue_batch`, {
+    body: JSON.stringify({ batch: { graph: { edges: [], id: 'pbr', nodes: {} }, runs: 1 }, prepend: false }),
+    headers: { 'content-type': 'application/json' },
+    method: 'POST',
+  });
 
 test('queue item ids take the backend limit: the head of the order, counted as returned, bounded', async () => {
   await withRepresentativeBackend(async (backend) => {
@@ -1211,6 +1221,243 @@ test('workflow thumbnails round-trip their bytes and refresh the listed URL on e
   });
 });
 
+test('image storage: the layout is patched alone and the move count follows it', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    assert.deepEqual(await getJson(backend, '/api/v1/image_moves/status'), {
+      active_job_id: null,
+      is_running: false,
+      last_error: null,
+      latest_job: null,
+      needs_move_count: 0,
+      operation: null,
+    });
+
+    const patched = await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ image_subfolder_strategy: 'date' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+
+    assert.deepEqual(patched, {
+      config: { generation_devices: 'auto', image_subfolder_strategy: 'date', max_queue_history: null },
+      set_fields: ['image_subfolder_strategy'],
+    });
+    assert.equal((await getJson(backend, '/api/v1/image_moves/status')).needs_move_count, 1_000);
+
+    const invalid = await fetch(`${backend.origin}/api/v1/app/runtime_config`, {
+      body: JSON.stringify({ image_subfolder_strategy: 'by_user' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+
+    assert.equal(invalid.status, 422);
+  });
+});
+
+test('image storage: a move runs across status polls, commits, and refuses to overlap', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ image_subfolder_strategy: 'hash' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+    await clearQueue(backend);
+
+    const accepted = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
+
+    assert.equal(accepted.status, 202);
+    assert.deepEqual(await accepted.json(), {
+      active_job_id: 1,
+      is_running: true,
+      last_error: null,
+      latest_job: { error_message: null, id: 1, state: 'moving' },
+      needs_move_count: 1_000,
+      operation: 'move_all',
+    });
+
+    const overlapping = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
+
+    assert.equal(overlapping.status, 409);
+
+    const inProgress = await getJson(backend, '/api/v1/image_moves/status');
+
+    assert.equal(inProgress.is_running, true);
+    assert.equal(inProgress.operation, 'move_all');
+
+    // Like the real maintenance guard: image files and media mutations refuse while the move runs, listings do not.
+    const listed = await getJson(backend, '/api/v1/images/?limit=1&offset=0');
+    const imageName = listed.items[0].image_name;
+    const thumbnail = await fetch(`${backend.origin}/api/v1/images/i/${imageName}/thumbnail`);
+
+    assert.equal(thumbnail.status, 409);
+    assert.deepEqual(await thumbnail.json(), { detail: 'Image storage maintenance is active' });
+    assert.equal((await fetch(`${backend.origin}/api/v1/images/i/${imageName}`)).status, 200);
+    assert.equal(
+      (
+        await fetch(`${backend.origin}/api/v1/images/star`, {
+          body: JSON.stringify({ image_names: [imageName] }),
+          headers: { 'content-type': 'application/json' },
+          method: 'POST',
+        })
+      ).status,
+      409
+    );
+    assert.equal((await fetch(`${backend.origin}/api/v1/board_images/`)).status, 409);
+    assert.equal((await fetch(`${backend.origin}/api/v1/boards/?all=true`)).status, 200);
+    assert.equal((await enqueueBatch(backend)).status, 409);
+
+    assert.deepEqual(await getJson(backend, '/api/v1/image_moves/status'), {
+      active_job_id: null,
+      is_running: false,
+      last_error: null,
+      latest_job: { error_message: null, id: 1, state: 'committed' },
+      needs_move_count: 0,
+      operation: null,
+    });
+    assert.equal((await fetch(`${backend.origin}/api/v1/images/i/${imageName}/thumbnail`)).status, 200);
+  });
+});
+
+test('image storage: an instant move commits inside the POST, and a failed job counts as finished', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ image_subfolder_strategy: 'type' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+    await getJson(backend, '/__faults?imageMoves=instant', { method: 'POST' });
+    await clearQueue(backend);
+
+    const accepted = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
+
+    assert.equal(accepted.status, 202);
+    assert.deepEqual(await accepted.json(), {
+      active_job_id: null,
+      is_running: false,
+      last_error: null,
+      latest_job: { error_message: null, id: 1, state: 'committed' },
+      needs_move_count: 0,
+      operation: null,
+    });
+
+    await getJson(backend, '/__faults?imageMoves=failed', { method: 'POST' });
+
+    const failed = await getJson(backend, '/api/v1/image_moves/status');
+
+    assert.equal(failed.active_job_id, null);
+    assert.equal(failed.is_running, false);
+    assert.equal(failed.latest_job.state, 'error');
+    assert.equal(failed.latest_job.error_message, 'Disk full while moving images');
+    assert.equal(failed.last_error, 'Disk full while moving images');
+    // A finished job needs no recovery, so another move may start.
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' })).status, 202);
+  });
+});
+
+test('image storage: Start Move waits for an idle queue, and recovery does not', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ image_subfolder_strategy: 'date' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+    await clearQueue(backend);
+    assert.equal((await enqueueBatch(backend)).status, 201);
+
+    // A queued item that has not run yet is active work, as `has_active_queue_work` counts it.
+    const refused = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
+
+    assert.equal(refused.status, 409);
+    assert.deepEqual(await refused.json(), { detail: 'Cannot start image move while queue work is active' });
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/recover`, { method: 'POST' })).status, 202);
+    await getJson(backend, '/api/v1/image_moves/status');
+    assert.equal((await getJson(backend, '/api/v1/image_moves/status')).is_running, false);
+
+    await clearQueue(backend);
+
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' })).status, 202);
+  });
+});
+
+test('image storage: faults seed an interrupted job for recovery and a non-admin caller', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/__faults?imageMoves=needs-recovery', { method: 'POST' });
+
+    const interrupted = await getJson(backend, '/api/v1/image_moves/status');
+
+    assert.equal(interrupted.active_job_id, 1);
+    assert.equal(interrupted.is_running, false);
+    assert.equal(interrupted.last_error, 'Server stopped during an image move');
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' })).status, 409);
+
+    // A job awaiting recovery keeps maintenance active, so the guard still refuses image files and enqueueing.
+    const imageName = (await getJson(backend, '/api/v1/images/?limit=1&offset=0')).items[0].image_name;
+
+    assert.equal((await fetch(`${backend.origin}/api/v1/images/i/${imageName}/thumbnail`)).status, 409);
+    assert.equal((await enqueueBatch(backend)).status, 409);
+
+    const recovering = await fetch(`${backend.origin}/api/v1/image_moves/recover`, { method: 'POST' });
+
+    assert.equal(recovering.status, 202);
+    assert.equal((await recovering.json()).operation, 'recovery');
+    await getJson(backend, '/api/v1/image_moves/status');
+
+    const recovered = await getJson(backend, '/api/v1/image_moves/status');
+
+    assert.equal(recovered.active_job_id, null);
+    assert.equal(recovered.is_running, false);
+    assert.equal(recovered.last_error, null);
+    assert.equal(recovered.latest_job.state, 'committed');
+    assert.equal((await fetch(`${backend.origin}/api/v1/images/i/${imageName}/thumbnail`)).status, 200);
+    assert.equal((await enqueueBatch(backend)).status, 201);
+
+    await getJson(backend, '/__faults?intermediatesCaller=user', { method: 'POST' });
+
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/status`)).status, 403);
+    assert.equal(
+      (
+        await fetch(`${backend.origin}/api/v1/app/runtime_config`, {
+          body: JSON.stringify({ image_subfolder_strategy: 'date' }),
+          headers: { 'content-type': 'application/json' },
+          method: 'PATCH',
+        })
+      ).status,
+      403
+    );
+
+    await getJson(backend, '/__reset', { method: 'POST' });
+
+    assert.equal((await getJson(backend, '/api/v1/image_moves/status')).active_job_id, null);
+  });
+});
+
+test('enqueue_batch accepts a utility graph as pending queue items with its origin', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const before = (await getJson(backend, '/api/v1/queue/default/item_ids')).total_count;
+    const response = await fetch(`${backend.origin}/api/v1/queue/default/enqueue_batch`, {
+      body: JSON.stringify({
+        batch: { graph: { edges: [], id: 'pbr', nodes: {} }, origin: 'utility:pbr-1', runs: 1 },
+        prepend: false,
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+
+    assert.equal(response.status, 201);
+
+    const enqueued = await response.json();
+
+    assert.equal(enqueued.enqueued, 1);
+    assert.equal(enqueued.item_ids.length, 1);
+
+    const item = await getJson(backend, `/api/v1/queue/default/i/${String(enqueued.item_ids[0])}`);
+
+    assert.equal(item.origin, 'utility:pbr-1');
+    assert.equal(item.status, 'pending');
+    assert.equal((await getJson(backend, '/api/v1/queue/default/item_ids')).total_count, before + 1);
+  });
+});
+
 test('shared boards answer as the backend role table does', async () => {
   const backend = await startMockBackend(0, { profile: 'representative' });
   const call = (path, init) =>
@@ -1442,10 +1689,60 @@ test('model seed sets are opt-in, and re-identify fills what the probe would rec
   });
 });
 
-test('runtime config PATCH keeps the other writable field and validates the queue history limit', async () => {
+test('control model seed sets cover both preprocessor id forms, and a PATCH changes their default settings', async () => {
+  const records = [...MODEL_SEED_SETS['control-sdxl'], ...MODEL_SEED_SETS['control-flux']].map(({ record }) => record);
+  const allKeys = Object.values(MODEL_SEED_SETS).flatMap((entries) => entries.map(({ record }) => record.key));
+  assert.equal(new Set(allKeys).size, allKeys.length);
+  const preprocessors = new Set(records.map((record) => record.default_settings?.preprocessor));
+  // Installed models name their preprocessor by the legacy processor id or by the detection node's id.
+  assert.ok(preprocessors.has('depth_anything_image_processor'));
+  assert.ok(preprocessors.has('depth_anything_depth_estimation'));
+  assert.deepEqual(
+    MODEL_SEED_SETS['control-flux'].map(({ record }) => [record.type, record.base]),
+    [
+      ['main', 'flux'],
+      ['control_lora', 'flux'],
+      ['controlnet', 'flux'],
+    ]
+  );
+
+  await withRepresentativeBackend(async (backend) => {
+    const listed = async () => (await getJson(backend, '/api/v2/models/')).models;
+    const before = (await listed()).length;
+    const sendJson = (path, init, body) =>
+      fetch(`${backend.origin}${path}`, {
+        ...init,
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    const post = (path, body) => sendJson(path, { method: 'POST' }, body);
+    const patch = (path, body) => sendJson(path, { method: 'PATCH' }, body);
+    for (const set of ['control-sdxl', 'control-flux']) {
+      assert.equal((await post('/__models', { set })).status, 200);
+    }
+    const byKey = new Map((await listed()).map((model) => [model.key, model]));
+    assert.equal(byKey.size, before + records.length);
+    assert.equal(byKey.get('seed-t2i-adapter-canny-sdxl-1.0').type, 't2i_adapter');
+    assert.equal(byKey.get('seed-my-sdxl-control').default_settings, null);
+
+    const patched = await patch('/api/v2/models/i/seed-my-sdxl-control', {
+      default_settings: { preprocessor: 'canny_image_processor' },
+    });
+    assert.equal(patched.status, 200);
+    assert.deepEqual((await getJson(backend, '/api/v2/models/i/seed-my-sdxl-control')).default_settings, {
+      preprocessor: 'canny_image_processor',
+    });
+    assert.equal((await patch('/api/v2/models/i/missing', { name: 'x' })).status, 404);
+
+    await getJson(backend, '/__reset', { method: 'POST' });
+    assert.equal((await listed()).length, before);
+  });
+});
+
+test('runtime config PATCH preserves other writable fields and validates the queue history limit', async () => {
   await withRepresentativeBackend(async (backend) => {
     await getJson(backend, '/api/v1/app/runtime_config', {
-      body: JSON.stringify({ generation_devices: ['cpu'] }),
+      body: JSON.stringify({ generation_devices: ['cpu'], image_subfolder_strategy: 'date' }),
       method: 'PATCH',
     });
     const withHistory = await getJson(backend, '/api/v1/app/runtime_config', {
@@ -1453,7 +1750,11 @@ test('runtime config PATCH keeps the other writable field and validates the queu
       method: 'PATCH',
     });
 
-    assert.deepEqual(withHistory.config, { generation_devices: ['cpu'], max_queue_history: 0 });
+    assert.deepEqual(withHistory.config, {
+      generation_devices: ['cpu'],
+      image_subfolder_strategy: 'date',
+      max_queue_history: 0,
+    });
 
     const invalid = await fetch(`${backend.origin}/api/v1/app/runtime_config`, {
       body: JSON.stringify({ max_queue_history: -1 }),
@@ -1466,6 +1767,168 @@ test('runtime config PATCH keeps the other writable field and validates the queu
     const cache = await getJson(backend, '/api/v1/app/invocation_cache/disable', { method: 'PUT' });
     assert.equal(cache, null);
     assert.equal((await getJson(backend, '/api/v1/app/invocation_cache/status')).enabled, false);
+  });
+});
+
+test('workflow creation defaults public for single-user callers and private for multiuser callers', async () => {
+  const backend = await startMockBackend(0, { profile: 'empty' });
+
+  try {
+    const createWorkflow = (name) =>
+      getJson(backend, '/api/v1/workflows', {
+        body: JSON.stringify({ workflow: { name, nodes: [], tags: 'local' } }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+      });
+
+    const singleUser = await createWorkflow('Single-user template');
+    assert.equal(singleUser.is_public, true);
+
+    await getJson(backend, '/__faults', {
+      body: JSON.stringify({ intermediatesCaller: 'user' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+
+    const multiuser = await createWorkflow('Multiuser template');
+    assert.equal(multiuser.is_public, false);
+  } finally {
+    await backend.close();
+  }
+});
+
+test('workflow visibility PATCH mirrors the shared tag without changing revision and filters lists', async () => {
+  const backend = await startMockBackend(0, { profile: 'empty' });
+
+  try {
+    const createWorkflow = (name) =>
+      getJson(backend, '/api/v1/workflows', {
+        body: JSON.stringify({ workflow: { name, nodes: [], tags: 'local' } }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+      });
+    const singleUser = await createWorkflow('Visible template');
+    const target = await createWorkflow('Toggle template');
+    const revision = target.revision;
+    const patchVisibility = (isPublic) =>
+      getJson(backend, `/api/v1/workflows/i/${encodeURIComponent(target.workflow_id)}/is_public`, {
+        body: JSON.stringify({ is_public: isPublic }),
+        headers: { 'content-type': 'application/json' },
+        method: 'PATCH',
+      });
+    const listNames = async (isPublic) => {
+      const params = new URLSearchParams({ categories: 'user', is_public: String(isPublic), per_page: '100' });
+
+      return (await getJson(backend, `/api/v1/workflows/?${params}`)).items.map((item) => item.name).sort();
+    };
+    const tagsOf = (value) =>
+      String(value ?? '')
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+        .sort();
+
+    const hidden = await patchVisibility(false);
+    assert.equal(hidden.is_public, false);
+    assert.equal(hidden.revision, revision);
+    assert.deepEqual(tagsOf(hidden.tags), ['local']);
+    assert.deepEqual(tagsOf(hidden.workflow.tags), ['local']);
+    assert.deepEqual(await listNames(true), ['Visible template']);
+    assert.deepEqual(await listNames(false), ['Toggle template']);
+
+    const shared = await patchVisibility(true);
+    assert.equal(shared.is_public, true);
+    assert.equal(shared.revision, revision);
+    assert.deepEqual(tagsOf(shared.tags), ['local', 'shared']);
+    assert.deepEqual(tagsOf(shared.workflow.tags), ['local', 'shared']);
+    assert.deepEqual(await listNames(true), ['Toggle template', 'Visible template']);
+    assert.deepEqual(await listNames(false), []);
+    assert.equal(singleUser.is_public, true);
+  } finally {
+    await backend.close();
+  }
+});
+
+test('hosted-provider credentials and the starter catalog agree with the hosted fixture records', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const { models } = await getJson(backend, '/api/v2/models/');
+    const hosted = models.filter((model) => model.type === 'external_image_generator');
+    const configs = await getJson(backend, '/api/v1/app/external_providers/config');
+
+    // Every backend provider is listed; those the hosted records route to have a key.
+    assert.deepEqual(
+      configs.map((config) => config.provider_id),
+      ['alibabacloud', 'atlascloud', 'gemini', 'openai', 'seedream']
+    );
+    assert.deepEqual(
+      configs.filter((config) => config.api_key_configured).map((config) => config.provider_id),
+      [...new Set(hosted.map((model) => model.provider_id))].sort()
+    );
+    assert.ok(configs.every((config) => config.base_url === null));
+
+    // Exactly one hosted record carries a starter's source, so the Model Manager shows it catalog-managed.
+    const { starter_models: starters } = await getJson(backend, '/api/v2/models/starter_models');
+    const starterSources = new Set(starters.map((starter) => starter.source));
+    const managed = hosted.filter((model) => starterSources.has(model.source));
+    assert.deepEqual(
+      managed.map((model) => model.key),
+      ['fixture-external-gemini-catalog']
+    );
+    // The editable OpenAI record routes to a GPT Image model, the only OpenAI models that take provider options.
+    assert.equal(hosted.find((model) => model.key === 'fixture-external-openai').provider_model_id, 'gpt-image-1');
+    assert.equal(starters.find((starter) => starter.source === managed[0].source).is_installed, true);
+    assert.ok(starters.filter((starter) => starter.type !== 'external_image_generator').every((s) => !s.is_installed));
+
+    // Removing a provider's key removes its hosted records, as the backend does.
+    const reset = await getJson(backend, '/api/v1/app/external_providers/config/openai', { method: 'DELETE' });
+    assert.deepEqual(reset, { api_key_configured: false, base_url: null, provider_id: 'openai' });
+    const remaining = (await getJson(backend, '/api/v2/models/')).models;
+    assert.equal(remaining.length, models.length - hosted.filter((model) => model.provider_id === 'openai').length);
+    assert.equal(
+      (await fetch(`${backend.origin}/api/v1/app/external_providers/config/unknown`, { method: 'DELETE' })).status,
+      404
+    );
+
+    // A body naming neither field is refused, and changes nothing.
+    const refused = await fetch(`${backend.origin}/api/v1/app/external_providers/config/gemini`, {
+      body: JSON.stringify({}),
+      method: 'POST',
+    });
+    assert.equal(refused.status, 400);
+    assert.equal(
+      (await getJson(backend, '/api/v1/app/external_providers/config')).find((c) => c.provider_id === 'gemini')
+        .api_key_configured,
+      true
+    );
+
+    // Saving an empty key removes the key and the provider's hosted records, like a reset.
+    const cleared = await getJson(backend, '/api/v1/app/external_providers/config/gemini', {
+      body: JSON.stringify({ api_key: '  ' }),
+      method: 'POST',
+    });
+    assert.equal(cleared.api_key_configured, false);
+    const afterClear = (await getJson(backend, '/api/v2/models/')).models;
+    assert.equal(afterClear.filter((model) => model.provider_id === 'gemini').length, 0);
+    assert.equal(afterClear.length, remaining.length - hosted.filter((model) => model.provider_id === 'gemini').length);
+
+    const empty = await startMockBackend(0, { profile: 'empty' });
+    try {
+      const emptyConfigs = await getJson(empty, '/api/v1/app/external_providers/config');
+      assert.equal(emptyConfigs.length, 5);
+      assert.ok(emptyConfigs.every((config) => !config.api_key_configured));
+    } finally {
+      await empty.close();
+    }
+
+    const configured = await getJson(backend, '/api/v1/app/external_providers/config/openai', {
+      body: JSON.stringify({ api_key: 'sk-fixture', base_url: 'https://example.invalid/v1' }),
+      method: 'POST',
+    });
+    assert.deepEqual(configured, {
+      api_key_configured: true,
+      base_url: 'https://example.invalid/v1',
+      provider_id: 'openai',
+    });
   });
 });
 

@@ -8,6 +8,7 @@ import type {
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
+import type { AdjustedSurfaceStatus } from '@workbench/canvas-engine/render/spatialDisplay';
 
 export type DecodeImageResult =
   | { status: 'ok'; surface: RasterSurface; decodedWidth: number; decodedHeight: number }
@@ -19,7 +20,7 @@ export interface RasterizationJob {
   version: number;
   documentGeneration: number;
   source: CanvasLayerSourceContract;
-  promise: Promise<'published' | 'stale' | 'error' | 'aborted'>;
+  promise: Promise<'published' | 'stale' | 'error' | 'unavailable' | 'aborted'>;
 }
 
 import {
@@ -33,6 +34,11 @@ import {
 } from '@workbench/canvas-engine/render/derivedSurfaceCache';
 import { createGroupSurfaceCache, type GroupSurfaceCache } from '@workbench/canvas-engine/render/groupSurfaceCache';
 import { createLayerCacheStore, DEFAULT_CACHE_BUDGET_BYTES } from '@workbench/canvas-engine/render/layerCache';
+import {
+  createSpatialAdjustmentService,
+  type SpatialAdjustmentExecutor,
+  type SpatialAdjustmentService,
+} from '@workbench/canvas-engine/render/spatial/spatialAdjustmentService';
 
 import { RasterMemoryBudgetController } from './rasterMemoryBudgetController';
 
@@ -47,6 +53,14 @@ export interface RasterControllerOptions {
   readonly isLayerHeld?: (layerId: string) => boolean;
   /** Layers whose live cache already includes their adjustments (an open pixel transaction), drawn raw. */
   readonly isAdjustmentBaked?: (layerId: string) => boolean;
+  /** A spatial adjustment result changed a layer's displayed pixels; its cache version did not change. */
+  readonly onAdjustedSurfaceSettled?: (layerId: string) => void;
+  /** A spatial adjustment result changed a group surface's displayed pixels; no member changed. */
+  readonly onGroupSurfaceSettled?: (groupId: string) => void;
+  /** A layer's or group's displayed spatial adjustments became inexact for `status`, or exact again (null). */
+  readonly onAdjustmentStatus?: (ownerId: string, status: AdjustedSurfaceStatus | null) => void;
+  /** Spatial worker factory; Node tests pass `createInlineSpatialExecutor`. Defaults to a module worker. */
+  readonly createSpatialExecutor?: () => SpatialAdjustmentExecutor;
 }
 
 /** Access clocks captured before a frame draws; artifacts read after them are that frame's working set. */
@@ -68,6 +82,8 @@ export class RasterController {
   readonly groups: GroupSurfaceCache;
   readonly memory: RasterMemoryBudgetController;
   readonly bitmaps: DecodedBitmapPool;
+  /** Evaluates spatial adjustments off the main thread; each job reserves its pixel buffer here. */
+  readonly spatial: SpatialAdjustmentService;
   private readonly diagnostics: CanvasDiagnostics;
   private readonly isLayerHeld: (layerId: string) => boolean;
   private readonly isAdjustmentBaked: (layerId: string) => boolean;
@@ -95,16 +111,33 @@ export class RasterController {
     this.getDocument = options.getDocument ?? (() => null);
     this.imageResolver = options.imageResolver ?? null;
     this.derived = createDerivedSurfaceCache(options.diagnostics, (bytes) => memory.setCategoryBytes('derived', bytes));
-    this.adjustments = createAdjustedSurfaceCache(options.backend, this.derived, (layerId, version) =>
-      this.layers.damageSince(layerId, version)
-    );
+    this.spatial = createSpatialAdjustmentService({
+      createExecutor: options.createSpatialExecutor,
+      reserve: (bytes) => memory.reserveOperation(bytes, { purpose: 'spatial-adjustment' }),
+    });
+    this.adjustments = createAdjustedSurfaceCache(options.backend, this.derived, {
+      damageSince: (layerId, version) => this.layers.damageSince(layerId, version),
+      spatial: {
+        onSettle: options.onAdjustedSurfaceSettled,
+        onStatus: options.onAdjustmentStatus,
+        run: (request) => this.spatial.run(request),
+      },
+    });
     this.groups = createGroupSurfaceCache({
       createSurface: (width, height) => options.backend.createSurface(width, height),
       damageSince: (layerId, version) => this.layers.damageSince(layerId, version),
       diagnostics: options.diagnostics,
-      getAdjustedSurface: (layer, entry) => this.getAdjustedSurface(layer, entry),
+      getAdjustedSurface: (layer, entry) => {
+        const surface = this.getAdjustedSurface(layer, entry);
+        return { state: surface ? this.adjustments.state(layer.id, entry, layer.adjustments) : 'exact', surface };
+      },
       getCacheEntry: (layerId) => this.layers.get(layerId),
       onBytesChange: (bytes) => memory.setCategoryBytes('group', bytes),
+      spatial: {
+        onSettle: options.onGroupSurfaceSettled,
+        onStatus: options.onAdjustmentStatus,
+        run: (request) => this.spatial.run(request),
+      },
     });
   }
 
@@ -150,9 +183,20 @@ export class RasterController {
     return { evictedBaseLayerIds, overageBytes };
   }
 
-  /** Drops every derived and group surface and each base cache nothing pins or holds. */
+  /**
+   * Abandons the display's queued and running spatial jobs, dropping the interims they would have replaced. Exact jobs
+   * of pixel-writing operations keep running: their own operation's signal governs them, and detached snapshots stay
+   * valid through cooldown.
+   */
+  cancelSpatialAdjustments(): void {
+    this.adjustments.cancelSpatial();
+    this.groups.cancelSpatial();
+  }
+
+  /** Drops every derived and group surface, the display's spatial work and each base cache nothing pins or holds. */
   releaseReconstructible(): void {
-    this.derived.dispose();
+    // The adjusted-surface cache stores its surfaces in `derived`: disposing it releases both.
+    this.adjustments.dispose();
     this.groups.clear();
     for (const layerId of this.layers.evict((candidate) => this.isProtected(candidate), 0)) {
       this.deleteDerivedSurfaces(layerId);
@@ -230,15 +274,29 @@ export class RasterController {
       : null;
   }
 
-  /** The adjusted copy of a layer's live cache (built and memoized on a miss), when `surface` is that cache and unbaked. */
-  getAdjustedCacheSurface(
+  /** The display's current, exact adjusted copy of a raster layer's cache, without building one on a miss. */
+  peekAdjustedSurface(layer: CanvasLayerContract, entry: LayerCacheEntry): RasterSurface | null {
+    return layer.type === 'raster' && !this.isAdjustmentBaked(layer.id)
+      ? this.adjustments.peek(layer.id, entry, layer.adjustments)
+      : null;
+  }
+
+  /** What the display shows for a raster layer's cache, a spatial interim included; never builds one. */
+  peekDisplayedAdjustedSurface(layer: CanvasLayerContract, entry: LayerCacheEntry): RasterSurface | null {
+    return layer.type === 'raster' && !this.isAdjustmentBaked(layer.id)
+      ? this.adjustments.peekDisplayed(layer.id, entry, layer.adjustments)
+      : null;
+  }
+
+  /** The display's current adjusted copy of a layer's live cache, when `surface` is that cache; never builds one. */
+  peekAdjustedCacheSurface(
     layerId: string,
     surface: RasterSurface,
     adjustments: CanvasAdjustmentsContract
   ): RasterSurface | null {
     const entry = this.layers.peek(layerId);
     return entry?.surface === surface && !this.isAdjustmentBaked(layerId)
-      ? this.adjustments.get(layerId, entry, adjustments)
+      ? this.adjustments.peek(layerId, entry, adjustments)
       : null;
   }
 
@@ -325,7 +383,8 @@ export class RasterController {
     this.cancelAllRasterization();
     this.clearThumbnailKeys();
     this.layers.dispose();
-    this.derived.dispose();
+    this.adjustments.dispose();
+    this.spatial.dispose();
     this.groups.clear();
     this.bitmaps.dispose();
     this.memory.dispose();

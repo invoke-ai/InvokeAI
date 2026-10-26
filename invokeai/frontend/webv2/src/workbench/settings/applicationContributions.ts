@@ -153,6 +153,7 @@ export const developerSettings = section('developer', 'Developer', [
 ]);
 export const serverSettings = section('server', 'Server', [
   custom('generationDevices', 'Generation devices', 'server'),
+  { ...custom('imageStorage', 'Image storage', 'server'), keywords: 'images folder subfolder layout move recover' },
   custom('maxQueueHistory', 'Queue history', 'server'),
 ]);
 export const workspaceSettings = section('workspace', 'Data & workspace', [

@@ -65,7 +65,7 @@ On a multi-user installation, only a board's owner or an administrator can delet
 
 Right-click an item, or several selected items, for its menu.
 
-<Image src={imageMenu} alt="The context menu for an image, with quick-action icons at the top followed by Load Workflow, Recall Metadata, Add to Current Canvas, New Project from Image, Send to Upscale, Send to Video, Use as Reference Image, Use as Prompt Template, Select for Compare, Find in Gallery, Change Board and Delete Image." width={420} />
+<Image src={imageMenu} alt="The context menu for an image, with quick-action icons at the top followed by Load Workflow, Recall Metadata, Add to Current Canvas, New Project from Image, Send to Upscale, Send to Video, Use as Reference Image, Use as Prompt Template, Select for Compare, Generate PBR Maps, Find in Gallery, Change Board and Delete Image." width={420} />
 
 For an image, the menu offers:
 
@@ -74,6 +74,7 @@ For an image, the menu offers:
 * **Add to Current Canvas** — add the image to the open project's canvas as a new layer of the kind you choose.
 * **New Project from Image** — start a new project whose canvas holds the image, sized to fit it.
 * **Send to Upscale**, **Send to Video**, **Use as Reference Image**, **Use as Prompt Template** and **Select for Compare** — use the image elsewhere in InvokeAI.
+* **Generate PBR Maps** — queue normal, roughness and displacement maps of the image. They are saved to the board the Gallery is auto-adding to, or to the project's Inbox if you can't add to that board (Uncategorized when there is neither), and a notice reports when they are ready. The first run downloads the PBR models.
 * **Change Board** and **Delete Image**.
 
 A video's menu has the equivalent actions for video, including **Extend in Video**, **Use as Reference Video** and **Use as Conditioning Clip**. With several items selected, the menu offers the actions that apply to all of them, such as **Star All**, **Download Selection**, **Change Board** and **Delete Selection**; for several images it also leads with **Add to Current Canvas** and **New Project from Images**.
