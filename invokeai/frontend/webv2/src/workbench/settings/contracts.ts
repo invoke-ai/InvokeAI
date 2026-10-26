@@ -113,6 +113,8 @@ export interface WorkbenchPreferences {
   workflowLibraryThumbnailFit: WorkflowLibraryThumbnailFit;
   /** Raise text and border contrast on every theme (a11y). */
   highContrast: boolean;
+  /** Select Object processes each prompt edit automatically; kept across sessions, Reset, and reloads. */
+  selectObjectAutoProcess: boolean;
   /** Account-bound overrides keyed by hotkey id (`app.invoke`, `gallery.galleryNavLeft`, etc.). */
   customHotkeys: Record<string, string[]>;
   /** Generate panel section open/closed overrides keyed by section id; absent = section default. */
@@ -127,6 +129,11 @@ export interface WorkbenchPreferences {
   krea2RebalancePresets: StoredRebalancePreset[];
   /** User-saved Generate settings snapshots ("recipes"), in the order they were saved. */
   generatePresets: StoredGeneratePreset[];
+  /**
+   * The last control model picked per main-model base and control type (`${base}:${controlType}` → model key);
+   * control layers left on automatic use it. Not shown in Settings.
+   */
+  controlModelMemory: Record<string, string>;
 }
 
 export type SettingsSectionId = string;

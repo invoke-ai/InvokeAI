@@ -435,7 +435,7 @@ describe('gallery layout shells', () => {
       );
       const filter = host?.querySelector<HTMLButtonElement>('[data-gallery-media-filter-menu]');
       const sortIndex = toolbarButtons.findIndex(
-        (button) => button.getAttribute('aria-label') === 'widgets.gallery.imageSort'
+        (button) => button.getAttribute('aria-label') === 'widgets.gallery.imageSortValue'
       );
 
       expect(filter, 'media filter did not render in the toolbar').not.toBeNull();

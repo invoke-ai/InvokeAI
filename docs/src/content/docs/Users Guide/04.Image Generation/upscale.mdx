@@ -43,7 +43,7 @@ The panel is split into sections, top to bottom:
   - **Scale**: the output size is the source size multiplied by this value. The panel shows the resulting input and output size and warns when the output is large enough to need much more time and VRAM.
   - **Treatment preset**, or **Creativity** and **Structure** directly. Higher Creativity invents more detail and gives the prompt more influence. Higher Structure keeps the source composition more strictly; it is only shown when a Tile ControlNet is in use.
 - **Detail guidance**: the prompt. It is the project prompt shared with Generate. For upscaling, describe the medium, texture and style rather than new content.
-- **Generation**: the **Main model** for the detail pass (**SD1.5**, **SDXL**, **FLUX.1**, **FLUX.2**, **Z-Image**, **Anima**, **Krea-2** or **Qwen Image**), steps, CFG scale, scheduler, seed, and LoRAs that match the main model. FLUX.1, FLUX.2, Z-Image, Krea-2 and Qwen Image always run **Euler**, so they show no scheduler.
+- **Generation**: the **Main model** for the detail pass (**SD1.5**, **SDXL**, **FLUX.1**, **FLUX.2**, **Z-Image**, **Anima**, **Krea-2** or **Qwen Image**), steps, CFG scale, scheduler, seed, and LoRAs that match the main model. The scheduler list only holds schedulers that work for upscaling (see below).
 - **Advanced**: the components the main model needs (see below), tile size and tile overlap, VAE and VAE precision, and CLIP skip for SD1.5.
 
 ## What each model family needs
@@ -68,7 +68,7 @@ Z-Image, Anima, Krea-2 and Qwen Image count the start of the detail pass in step
 
 FLUX.2 starts where FLUX.1 does and then spreads all of your Steps over the rest of the pass, so 30 steps run 30 times. Picking a FLUX.2 model therefore sets its own step count: 4 for Klein 4B and 9B, 28 for Klein Base and [dev]. Switching to another family afterwards sets Steps back to 30.
 
-The panel offers only schedulers that start where Creativity puts the pass: **Euler** on FLUX.1, FLUX.2, Z-Image, Krea-2 and Qwen Image, and **Euler**, **DPM++ 2M**, **DPM++ 2M SDE** and **ER-SDE** on Anima. Heun and LCM build their own noise schedule, so they would treat the enlarged image as pure noise or leave noise in it.
+The panel offers only schedulers that start where Creativity puts the pass: **Euler** and **Heun** on FLUX.1 and Z-Image, and **Euler**, **DPM++ 2M**, **DPM++ 2M SDE** and **ER-SDE** on Anima. LCM builds its own noise schedule, so it would treat the enlarged image as pure noise. Anima's Heun starts below that point and leaves noise in the image. FLUX.2, Krea-2 and Qwen Image always run **Euler**, so they show no scheduler.
 
 The Z-Image Tile ControlNet is optional because the detail pass runs over the whole image at once: there are no tile seams for it to hold together. Adding it lets **Structure** pull the result back toward the enlarged image, at the cost of a second network's memory and time.
 

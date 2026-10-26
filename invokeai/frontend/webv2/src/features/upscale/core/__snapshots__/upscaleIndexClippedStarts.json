@@ -1528,7 +1528,8 @@
       "euler"
     ],
     "z-image": [
-      "euler"
+      "euler",
+      "heun"
     ]
   }
 }
