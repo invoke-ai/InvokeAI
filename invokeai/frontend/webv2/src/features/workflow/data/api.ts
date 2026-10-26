@@ -92,11 +92,32 @@ export const listLibraryWorkflows = ({
   return apiFetchJson<WorkflowLibraryPage>(`/api/v1/workflows/?${params.toString()}`, { signal });
 };
 
-export interface WorkflowRecordDTO extends WorkflowLibraryListItem {
+export interface WorkflowRecordDTO {
   workflow_id: string;
   name: string;
+  created_at: string;
+  updated_at: string;
+  opened_at?: string | null;
+  last_run_at?: string | null;
+  user_id: string;
+  is_public: boolean;
+  revision: number;
+  thumbnail_url?: string | null;
+  call_saved_workflow_compatibility?: WorkflowCallCompatibility | null;
   workflow: Record<string, unknown>;
 }
+
+export const getWorkflowRecordCategory = (record: WorkflowRecordDTO): WorkflowLibraryCategory | undefined => {
+  const meta = record.workflow.meta;
+
+  if (typeof meta !== 'object' || meta === null) {
+    return undefined;
+  }
+
+  const category = (meta as { category?: unknown }).category;
+
+  return category === 'user' || category === 'default' ? category : undefined;
+};
 
 export const getLibraryWorkflowRecord = (workflowId: string, signal?: AbortSignal): Promise<WorkflowRecordDTO> =>
   apiFetchJson<WorkflowRecordDTO>(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}`, { signal });
@@ -220,6 +241,22 @@ export const updateLibraryWorkflow = async (
         workflow: { ...workflow, id: workflowId },
         ...(expectedRevision === undefined ? {} : { expected_revision: expectedRevision }),
       }),
+      method: 'PATCH',
+      signal,
+    });
+  } catch (error) {
+    return rethrowAsRefusal(error);
+  }
+};
+
+export const setLibraryWorkflowPublic = async (
+  workflowId: string,
+  isPublic: boolean,
+  signal?: AbortSignal
+): Promise<WorkflowRecordDTO> => {
+  try {
+    return await apiFetchJson<WorkflowRecordDTO>(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}/is_public`, {
+      body: JSON.stringify({ is_public: isPublic }),
       method: 'PATCH',
       signal,
     });

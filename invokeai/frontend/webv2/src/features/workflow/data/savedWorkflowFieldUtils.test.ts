@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import type { WorkflowRecordDTO } from './api';
+
 import {
   buildSavedWorkflowOptions,
+  getSavedWorkflowListItemFromRecord,
   getSavedWorkflowPickerOwnedQuery,
   getSavedWorkflowPickerSharedQuery,
   getSavedWorkflowSelectionState,
@@ -36,6 +39,32 @@ const workflows = [
 ];
 
 describe('savedWorkflowFieldUtils', () => {
+  it('maps a detail record’s nested category and content into a list item', () => {
+    const detail = {
+      created_at: '2026-10-20T00:00:00Z',
+      is_public: false,
+      name: 'Bundled workflow',
+      revision: 3,
+      updated_at: '2026-10-20T00:00:00Z',
+      user_id: 'system',
+      workflow: {
+        description: 'A bundled workflow',
+        meta: { category: 'default' },
+        name: 'Bundled workflow',
+        tags: 'starter',
+      },
+      workflow_id: 'workflow-default',
+    } satisfies WorkflowRecordDTO;
+
+    expect(getSavedWorkflowListItemFromRecord(detail)).toMatchObject({
+      category: 'default',
+      description: 'A bundled workflow',
+      tags: 'starter',
+      user_id: 'system',
+      workflow_id: 'workflow-default',
+    });
+  });
+
   it('builds named picker options and disables incompatible workflows', () => {
     expect(buildSavedWorkflowOptions(workflows)).toEqual([
       {

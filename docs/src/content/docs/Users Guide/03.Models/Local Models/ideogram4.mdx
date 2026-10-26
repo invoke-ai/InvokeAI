@@ -51,7 +51,7 @@ Both branches are resident at once, so double those figures for the pair.
 
 **Without the fp8 matmul, the fp8 build still works — through FP8 Storage.** That setting keeps the file's own fp8 weights and per-tensor scales instead of expanding them, and installation switches it on for these files by itself. Measured on a 4090 with `fp8_compute` off, 1024px: **40.6 s**, 22.9 GB peak, 8.7 GB resident per branch — against **45.7 s** for the int8 pair. With *neither* the matmul nor Storage the weights are expanded to bf16 on load, 17.3 GB per branch, and a 24 GB card runs out of memory during the first step.
 
-**Use int8 where FP8 Storage is not available.** It requires a CUDA or Intel XPU device; on anything else the fp8 build falls back to the expanded path, while int8 keeps its stored codes and dequantizes them per forward on any device with no setting to turn on.
+**Use int8 where FP8 Storage is not available.** It requires a CUDA or Intel XPU device; on anything else the fp8 build falls back to the expanded path, while int8 keeps its stored codes and dequantizes them per forward on any device with no setting to turn on. The int8 timings above are that dequantizing path; [int8 Compute](/configuration/optimization/int8-compute/) runs the int8 build's convrot layers on the int8 tensor cores of an NVIDIA GPU instead (not measured on Ideogram 4).
 
 On a 24 GB NVIDIA card without the fp8 matmul (RTX 30-series), the int8 pair plus the 8B encoder still adds up to more than the card holds, so the bundled [nf4 build](#installing-ideogram-4) or a [GGUF](#gguf) pair is the smaller option there.
 :::

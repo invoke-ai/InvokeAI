@@ -4,8 +4,17 @@ Used by Krea-2, Ideogram 4 and MiniMax H3. The visual-tower helpers live here ra
 one family's loader because three loaders in two files drop the tower, and because what counts as
 the tower has to agree with the key mapping that sits next to it -- two definitions would drift.
 MiniMax H3 deliberately does not use them: it runs the tower for its reference images.
+
+The same predicate also serves the opposite direction: Krea-2's edit mode loads the tower on its own, as a
+separate model-cache entry, and lends it to the text encoder for the forwards that read reference images
+(`read_qwen3vl_visual_tower_tensors`, `attach_qwen3vl_visual_tower`). Keeping both directions here is what
+guarantees the tower that is lent back is exactly the one that was dropped.
 """
 
+import json
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
+from pathlib import Path
 from typing import Any
 
 import torch
@@ -102,7 +111,99 @@ def drop_qwen3vl_visual_tower_keys(sd: dict[str, Any]) -> dict[str, Any]:
     does not enumerate (``scale_weight``/``scale_input`` as well as ``weight_scale``/``input_scale``,
     and ``comfy_quant``). Enumerating suffixes instead would silently start leaving orphans behind.
     """
-    return {k: v for k, v in sd.items() if not (isinstance(k, str) and qwen3vl_target_key(k).startswith("visual."))}
+    return {k: v for k, v in sd.items() if not is_qwen3vl_visual_key(k)}
+
+
+def is_qwen3vl_visual_key(key: Any) -> bool:
+    """Whether a checkpoint key (in either spelling) belongs to the visual tower, sidecars included."""
+    return isinstance(key, str) and qwen3vl_target_key(key).startswith("visual.")
+
+
+def qwen3vl_visual_tower_files(folder: Path) -> list[Path]:
+    """The safetensors files of a transformers-layout Qwen3-VL folder that hold visual-tower tensors.
+
+    A sharded folder names, per key, the shard holding it, so only the shards with tower keys are
+    returned; an unsharded folder returns its weight files.
+    """
+    index = folder / "model.safetensors.index.json"
+    if index.is_file():
+        weight_map: dict[str, str] = json.loads(index.read_text(encoding="utf-8"))["weight_map"]
+        return sorted({folder / name for key, name in weight_map.items() if is_qwen3vl_visual_key(key)})
+    # Assumes one weight set per folder: no Krea-2/Qwen3-VL folder ships variant duplicates (``*.fp16.safetensors``).
+    return sorted(folder.glob("*.safetensors"))
+
+
+def qwen3vl_visual_tower_nbytes(files: Iterable[Path]) -> int:
+    """Bytes the visual tower's tensors occupy in `files`, read from the headers alone.
+
+    What the model cache should reserve before loading the tower on its own: sizing that load by the whole
+    file would evict ten times what the tower needs.
+    """
+    from invokeai.backend.model_manager.model_on_disk import read_safetensors_header
+
+    total = 0
+    for path in files:
+        for key, entry in read_safetensors_header(path).items():
+            if is_qwen3vl_visual_key(key):
+                start, end = entry["data_offsets"]
+                total += end - start
+    return total
+
+
+def read_qwen3vl_visual_tower_tensors(files: Iterable[Path]) -> dict[str, torch.Tensor]:
+    """Read only the visual tower's tensors from `files`, keyed as the checkpoint spells them.
+
+    Filtered by key before anything is read, so the peak is the tower's size and not the encoder's: the
+    language tower of a 4B single file is ten times larger and is never touched.
+    """
+    from safetensors import safe_open
+
+    tensors: dict[str, torch.Tensor] = {}
+    for path in files:
+        with safe_open(str(path), framework="pt", device="cpu") as handle:
+            for key in handle.keys():
+                if is_qwen3vl_visual_key(key):
+                    tensors[key] = handle.get_tensor(key)
+    return tensors
+
+
+@contextmanager
+def attach_qwen3vl_visual_tower(model: torch.nn.Module, tower: torch.nn.Module) -> Iterator[torch.nn.Module]:
+    """Lend `tower` to a `Qwen3VLModel` whose own tower `drop_qwen3vl_visual_tower` replaced, for one forward.
+
+    Restores the parameter-free stub on exit, on success and on an exception alike, together with the 3-D rope
+    deltas the multimodal forward caches on the model, so the encoder leaves exactly as it came.
+
+    Invariant for the caller: both `model` and `tower` are separate model-cache entries, and both must be
+    locked on the device *before* entering and unlocked only *after* exiting. The cache sizes, moves and
+    offloads a model by walking its parameters; while attached, the tower's parameters are also the
+    encoder's, so an offload or VRAM accounting of either entry inside this window would count or move the
+    other's weights.
+
+    Refuses a model that still has a real tower (attaching would discard it, silently) and a tower whose
+    output width is not the language model's hidden size (its embeddings could not be scattered into the
+    token sequence).
+    """
+    existing = getattr(model, "visual", None)
+    if not isinstance(existing, torch.nn.Identity):
+        raise RuntimeError(
+            f"{type(model).__name__} has no dropped visual tower to replace (found {type(existing).__name__}); "
+            "attaching another would discard it."
+        )
+    text_hidden = getattr(getattr(model.config, "text_config", None), "hidden_size", None)
+    tower_out = getattr(getattr(tower, "config", None), "out_hidden_size", None)
+    if text_hidden is None or tower_out != text_hidden:
+        raise ValueError(
+            f"This Qwen3-VL vision tower emits {tower_out}-wide embeddings, but the text encoder's hidden size is "
+            f"{text_hidden}; the tower belongs to a different Qwen3-VL."
+        )
+    prior_rope_deltas = getattr(model, "rope_deltas", None)
+    model.visual = tower
+    try:
+        yield model
+    finally:
+        model.visual = existing
+        model.rope_deltas = prior_rope_deltas
 
 
 def drop_qwen3vl_unloaded_keys(sd: dict[str, Any]) -> dict[str, Any]:

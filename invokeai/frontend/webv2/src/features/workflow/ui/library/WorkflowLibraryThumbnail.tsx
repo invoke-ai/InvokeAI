@@ -28,7 +28,7 @@ import { Suspense, useCallback, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next';
 
 import { buildLibraryGraphPreviewSource, DeferredGraphPreviewSnapshot, loadGraphPreview } from './libraryPreviewSource';
-import { formatRelativeTime } from './relativeTime';
+import { formatTimeSince, useDataTimeSnapshot } from './relativeTime';
 import { WORKFLOW_THUMBNAIL_ASPECT_RATIO, WorkflowThumbnailImage } from './workflowThumbnail';
 
 const IMAGE_ONLY = ['image'] as const;
@@ -45,9 +45,11 @@ const WELL_CSS: SystemStyleObject = {
 
 /** Key by workflow id: an action in flight for one workflow must not show as busy on the next selection. */
 export const WorkflowLibraryThumbnail = ({
+  canEdit,
   item,
   workflowDocument,
 }: {
+  canEdit: boolean;
   /** The template's parsed workflow once its row has loaded; the snapshot renders its graph. */
   workflowDocument: ProjectGraphState | null;
   item: WorkflowLibraryListItem;
@@ -56,6 +58,7 @@ export const WorkflowLibraryThumbnail = ({
   const notify = useWorkflowNotifications();
   // Keyed by URL: a replaced image arrives under a fresh URL and re-arms the thumbnail.
   const [failedThumbnailUrl, setFailedThumbnailUrl] = useState<string | null>(null);
+  const dataTime = useDataTimeSnapshot(item);
   // Local rather than `useScopedAction`: the library ships in the editor boot graph, and a second importer of that
   // models-only hook splits it into its own startup chunk.
   const [isBusy, setIsBusy] = useState(false);
@@ -107,8 +110,7 @@ export const WorkflowLibraryThumbnail = ({
     },
     [t]
   );
-  // Bundled defaults are not the account's to change; the same rule gates rename and delete.
-  const isEditable = item.category === 'user';
+  const isEditable = canEdit;
   const workflowId = item.workflow_id;
 
   const handleThumbnailError = useCallback(() => setFailedThumbnailUrl(item.thumbnail_url ?? null), [item]);
@@ -224,7 +226,7 @@ export const WorkflowLibraryThumbnail = ({
   );
 
   const showThumbnail = Boolean(item.thumbnail_url) && item.thumbnail_url !== failedThumbnailUrl;
-  const lastRun = item.last_run_at ? formatRelativeTime(item.last_run_at, new Date()) : '';
+  const lastRun = item.last_run_at ? formatTimeSince(item.last_run_at, dataTime) : '';
   // A user template's thumbnail is always one someone set; only bundled defaults ship a sample output.
   const caption = lastRun
     ? t('workflowLibrary.lastRun', { when: lastRun })

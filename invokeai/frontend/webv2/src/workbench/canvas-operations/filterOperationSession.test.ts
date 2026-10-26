@@ -274,6 +274,23 @@ describe('createFilterOperationSession', () => {
     expect(deps.runFilter).not.toHaveBeenCalled();
   });
 
+  it.each(['too-large', 'over-budget', 'error'] as const)(
+    "publishes a filter source whose Clarity, Texture or Dehaze refused %s as the source's adjustment code",
+    async (reason) => {
+      const deps = createDeps({
+        exportPixels: vi.fn(() =>
+          Promise.resolve({ ownerId: 'layer', ownerName: 'Layer', reason, status: 'adjustment-refused' as const })
+        ),
+      });
+      const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+
+      expect(await session.process()).toBe('error');
+
+      expect(session.getSnapshot()).toMatchObject({ error: { code: `source-adjustment-${reason}` }, status: 'error' });
+      expect(deps.runFilter).not.toHaveBeenCalled();
+    }
+  );
+
   it('publishes a filter source the guard no longer matches as stale', async () => {
     const deps = createDeps({ isGuardCurrent: vi.fn(() => false) });
     const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;

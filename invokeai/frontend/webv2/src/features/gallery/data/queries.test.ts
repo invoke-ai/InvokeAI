@@ -2,7 +2,7 @@ import type { GalleryItem, GalleryItemsPage } from '@features/gallery/core/items
 import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 
 import { AccountScopeExpiredError, accountLifecycle } from '@platform/state/accountLifecycle';
-import { InfiniteQueryObserver, QueryClient, QueryObserver, type InfiniteData } from '@tanstack/react-query';
+import { hashKey, InfiniteQueryObserver, QueryClient, QueryObserver, type InfiniteData } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const backend = vi.hoisted(() => ({
@@ -31,6 +31,8 @@ import {
   galleryItemsInfiniteOptions,
   galleryStarredStripOptions,
   getGalleryItemListQueries,
+  getFreshGalleryItemsPage,
+  isGalleryItemsPageAwaitingRefresh,
   IMAGE_INDEX_UNAVAILABLE_POLL_MS,
   imageIndexAvailabilityOptions,
   getGalleryItemsFilterFromKey,
@@ -38,7 +40,7 @@ import {
   canonicalizeGalleryItemsFilter,
   type GalleryItemsFilter,
 } from './queries';
-import { invalidateGalleryItems } from './queryCache';
+import { invalidateGalleryItems, patchGalleryItemCaches } from './queryCache';
 
 const OFFSETS = Array.from({ length: 10 }, (_, index) => index * GALLERY_PAGE_SIZE);
 
@@ -123,6 +125,72 @@ describe('Gallery item query read model', () => {
     expect(backend.listGalleryBoards).toHaveBeenCalledOnce();
     expect(backend.listGalleryDateBoards).toHaveBeenCalledOnce();
   });
+
+  it.each(['invalidation', 'failed refresh'] as const)(
+    'requires a successful page read after %s despite patches, rollback, and cancellation',
+    async (suspension) => {
+      const client = createQueryClient();
+      const options = galleryItemsPageOptions(baseFilter, 0);
+      const queryHash = hashKey(options.queryKey);
+      const page = createPage({ count: 2, offset: 0, total: 2 });
+      backend.listGalleryItems.mockResolvedValue(page);
+      client.setQueryData(options.queryKey, page);
+      expect(getFreshGalleryItemsPage(client, queryHash)).toBeUndefined();
+      expect(isGalleryItemsPageAwaitingRefresh(client, queryHash)).toBe(false);
+      await client.fetchQuery({ ...options, staleTime: 0 });
+      const observer = new QueryObserver(client, options);
+      const unsubscribe = observer.subscribe(() => undefined);
+      const readFreshPage = () => getFreshGalleryItemsPage(client, queryHash);
+      expect(readFreshPage()?.items).toEqual(page.items);
+
+      if (suspension === 'invalidation') {
+        await client.invalidateQueries({ exact: true, queryKey: options.queryKey, refetchType: 'none' });
+      } else {
+        backend.listGalleryItems.mockRejectedValueOnce(new Error('page unavailable'));
+        await expect(client.fetchQuery({ ...options, staleTime: 0 })).rejects.toThrow('page unavailable');
+      }
+      expect(readFreshPage()).toBeUndefined();
+      expect(isGalleryItemsPageAwaitingRefresh(client, queryHash)).toBe(true);
+
+      const applyStar = () =>
+        patchGalleryItemCaches(client, {
+          kind: 'star',
+          result: { failed: [], succeeded: [{ kind: 'image', name: page.items[0]!.name }] },
+          starred: true,
+        });
+      const rollback = applyStar();
+      expect(client.getQueryData<GalleryItemsPage>(options.queryKey)?.items[0]?.starred).toBe(true);
+      expect(readFreshPage()).toBeUndefined();
+      rollback();
+      expect(client.getQueryData<GalleryItemsPage>(options.queryKey)?.items[0]?.starred).toBe(false);
+      expect(readFreshPage()).toBeUndefined();
+
+      let resolvePending: ((page: GalleryItemsPage) => void) | undefined;
+      backend.listGalleryItems.mockImplementationOnce(
+        () =>
+          new Promise<GalleryItemsPage>((resolve) => {
+            resolvePending = resolve;
+          })
+      );
+      const pending = client.fetchQuery({ ...options, staleTime: 0 }).catch(() => undefined);
+      const rollbackPending = applyStar();
+      await client.cancelQueries({ exact: true, queryKey: options.queryKey });
+      await pending;
+      resolvePending?.(page);
+      // Cancelling the read still preserves the optimistic write, but cannot make its old page authoritative.
+      expect(client.getQueryData<GalleryItemsPage>(options.queryKey)?.items[0]?.starred).toBe(true);
+      expect(readFreshPage()).toBeUndefined();
+      rollbackPending();
+      expect(readFreshPage()).toBeUndefined();
+
+      await client.fetchQuery({ ...options, staleTime: 0 });
+      expect(readFreshPage()?.items).toEqual(page.items);
+      expect(isGalleryItemsPageAwaitingRefresh(client, queryHash)).toBe(false);
+      unsubscribe();
+      client.clear();
+      expect(readFreshPage()).toBeUndefined();
+    }
+  );
 
   it('keys sparse pages by canonical account, listing, and absolute offset identity', () => {
     const page = galleryItemsPageOptions(baseFilter, 60);

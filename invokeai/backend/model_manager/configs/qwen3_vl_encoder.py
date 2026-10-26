@@ -261,8 +261,9 @@ def _raise_if_qwen3_vl_mmproj(mod: ModelOnDisk) -> None:
         return
     raise InvalidMatchError(
         "this is the Qwen3-VL visual tower ('mmproj'), not a text encoder. Install the language tower "
-        "instead (e.g. 'Qwen3VL-4B-Instruct-Q4_K_M.gguf'); Krea-2 and Ideogram 4 condition on text only "
-        "and never use the visual tower."
+        "instead (e.g. 'Qwen3VL-4B-Instruct-Q4_K_M.gguf'). GGUF encoders read text only; Krea-2 edit "
+        "reference images need a Qwen3-VL encoder with its vision weights, such as the Krea-2 Diffusers "
+        "model's encoder or a single-file Qwen3-VL checkpoint."
     )
 
 
@@ -308,9 +309,10 @@ class Qwen3VLEncoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
     """Configuration for a single-file GGUF Qwen3-VL encoder (llama.cpp, e.g.
     ``Qwen3VL-4B-Instruct-Q4_K_M.gguf``).
 
-    llama.cpp splits Qwen3-VL across two files: the language tower -- all Krea-2 and Ideogram 4
-    condition on -- and a companion ``mmproj-*.gguf`` holding the visual tower. Only the language
-    tower is accepted here; the ``mmproj`` file is turned away with its own reason.
+    llama.cpp splits Qwen3-VL across two files: the language tower -- all a text prompt needs -- and a
+    companion ``mmproj-*.gguf`` holding the visual tower, which reads Krea-2 edit reference images.
+    Only the language tower is accepted here; the ``mmproj`` file is turned away with its own reason,
+    so a GGUF encoder encodes text only.
 
     Identified by the ``general.architecture`` metadata, which is the only honest discriminator: a
     Qwen3-VL language tower is structurally indistinguishable from a text-only Qwen3 of the same
