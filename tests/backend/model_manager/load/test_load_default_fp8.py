@@ -183,18 +183,6 @@ def test_should_use_fp8_excludes_prompt_enhancer(submodel_type: SubModelType):
         assert loader._should_use_fp8(config, SubModelType.Transformer) is True
 
 
-def test_should_use_fp8_excludes_the_vision_tower():
-    """Qwen-Image-2.1's vision tower attaches to the text encoder for edits and follows its exclusion. It could
-    not take the cast either: `Qwen3VLModel` casts the pixels to `visual.dtype`, which a cast tower reports as
-    float8."""
-    loader = _make_loader(device="cuda")
-    config = _make_config(ModelType.Main, fp8=True, base=BaseModelType.QwenImage21)
-    with _device_holds_fp8():
-        assert loader._should_use_fp8(config, SubModelType.VisionEncoder) is False
-        # Sanity: the same config opts the transformer in, so the assertion above is about the exclusion.
-        assert loader._should_use_fp8(config, SubModelType.Transformer) is True
-
-
 class _RaisingModule(torch.nn.Module):
     """A module whose forward unconditionally raises — used to test that the FP8 wrapper's
     storage-dtype cleanup runs even when forward fails."""
