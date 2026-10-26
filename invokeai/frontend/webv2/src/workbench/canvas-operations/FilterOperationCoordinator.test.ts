@@ -87,7 +87,7 @@ describe('FilterOperationCoordinator', () => {
     expect(session.commit).toHaveBeenCalledWith('apply');
   });
 
-  it('rejects missing, unsupported, disabled, locked, and busy starts deterministically', () => {
+  it('rejects missing, unsupported (mask and control), disabled, locked, and busy starts deterministically', () => {
     const { coordinator, deps } = createHarness();
     deps.getDocument.mockReturnValueOnce(null);
     expect(coordinator.start(layer.id)).toBe('missing');
@@ -96,6 +96,12 @@ describe('FilterOperationCoordinator', () => {
       selectedLayerId: null,
     });
     expect(coordinator.start(layer.id)).toBe('unsupported');
+    deps.getDocument.mockReturnValueOnce({
+      stacks: stacksFrom([{ ...layer, type: 'control' } as unknown as CanvasLayerContract]),
+      selectedLayerId: null,
+    });
+    expect(coordinator.start(layer.id)).toBe('unsupported');
+    expect(deps.createSession).not.toHaveBeenCalled();
     deps.getDocument.mockReturnValueOnce({
       stacks: stacksFrom([{ ...layer, isEnabled: false } as unknown as CanvasLayerContract]),
       selectedLayerId: null,

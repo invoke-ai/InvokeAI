@@ -1212,3 +1212,15 @@ class TestSkippedModulesNeverKeepCheckpointFp8:
 
         assert out.dtype is torch.bfloat16
         assert torch.equal(out, reference(inp))
+
+
+@pytest.mark.parametrize("submodel", [SubModelType.TextEncoder, SubModelType.VisionEncoder])
+def test_a_krea2_pipelines_encoders_never_take_fp8_storage(submodel):
+    """FP8 Storage on a Krea-2 pipeline casts its transformer, never its Qwen3-VL text encoder or the vision
+    tower edit mode loads from it: both condition the image."""
+    loader = _make_loader("cuda")
+    config = _make_config(ModelType.Main, fp8=True, base=BaseModelType.Krea2)
+
+    with _device_holds_fp8():
+        assert loader._should_use_fp8(config, SubModelType.Transformer) is True
+        assert loader._should_use_fp8(config, submodel) is False

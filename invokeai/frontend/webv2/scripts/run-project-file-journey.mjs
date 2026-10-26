@@ -733,7 +733,11 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
     record.data.workflows.entries.map((entry) => entry.document.name),
     ['Empty Workflow', 'Journey Saved']
   );
-  assert.deepEqual(record.data.workflows.entries[1].source, { libraryWorkflowId: saved.workflow_id, revision: 1 });
+  assert.deepEqual(record.data.workflows.entries[1].source, {
+    libraryWorkflowId: saved.workflow_id,
+    ownerUserId: 'fixture-user',
+    revision: 1,
+  });
   assert.equal(record.workspace.data.workflows.activeWorkflowId, record.data.workflows.entries[1].document.id);
 
   // Restart: both workflows and the active selection come back from the server.

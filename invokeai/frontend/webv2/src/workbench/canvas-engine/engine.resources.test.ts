@@ -110,7 +110,20 @@ const offscreenDocument = () =>
 
 const createFramedEngine = (pendingLayerIds: ReadonlySet<string>) => {
   const document = offscreenDocument();
-  const canvas = { document, documentRevision: 0, snapshots: [], version: 3 };
+  const canvas = {
+    document,
+    documentRevision: 0,
+    snapshots: [],
+    stagingArea: {
+      areThumbnailsVisible: false,
+      autoSwitchMode: 'off' as const,
+      isVisible: false,
+      pendingImageIds: [],
+      pendingImages: [],
+      selectedImageIndex: 0,
+    },
+    version: 3,
+  };
   const store = {
     discardLayer: vi.fn(),
     dispose: vi.fn(),
@@ -222,6 +235,109 @@ describe('engine raster resource lifecycle', () => {
     });
     expect(raster.isProtected('layer')).toBe(false);
     expect(bitmap.close).toHaveBeenCalledOnce();
+  });
+});
+
+describe('engine raster composite export', () => {
+  // A 1000×1000 noisy layer at 0.1 scale: a 10×10 export samples only its 101×101 layer-local corner (with margin).
+  const LAYER_RECT = { height: 1_000, width: 1_000, x: 0, y: 0 };
+  const EXPORT_RECT = { height: 10, width: 10, x: 0, y: 0 };
+  const SAMPLED_SIZE: [number, number] = [101, 101];
+
+  const createNoisyEngine = () => {
+    const noisy = layerContract('noisy', 'raster', {
+      adjustments: [
+        {
+          amount: 0.2,
+          distribution: 'gaussian',
+          grain: 'monochrome',
+          id: 'grain',
+          isEnabled: true,
+          response: 'flat',
+          seed: 5,
+          size: 1,
+          type: 'noise',
+        },
+      ],
+      source: { bitmap: { height: 1_000, imageName: 'noisy', width: 1_000 }, offset: { x: 0, y: 0 }, type: 'paint' },
+      transform: { rotation: 0, scaleX: 0.1, scaleY: 0.1, x: 0, y: 0 },
+    });
+    const project = applyCanvasProjectMutation(createInitialWorkbenchState().projects[0]!, {
+      document: documentFrom([noisy]),
+      type: 'replaceCanvasDocument',
+    });
+    const stub = createTestStubRasterBackend();
+    const allocated: [number, number][] = [];
+    let recording = false;
+    const { engine } = createCanvasEngine({
+      backend: {
+        ...stub,
+        createSurface: (width, height) => {
+          if (recording) {
+            allocated.push([width, height]);
+          }
+          return stub.createSurface(width, height);
+        },
+      },
+      fonts: null,
+      imageResolver: () => Promise.resolve(new Blob()),
+      mutationPort: {
+        commitEdit: () => undefined,
+        dispatch: () => false,
+        getCanvasState: () => project.canvas,
+        subscribe: () => () => undefined,
+      } as unknown as CanvasProjectMutationPort,
+      projectId: 'project',
+      reportError: () => undefined,
+      uploadImage: () => Promise.resolve({ height: 10, imageName: 'unused', width: 10 }),
+      uploadIntermediateImage: () => Promise.resolve({ height: 10, imageName: 'unused', width: 10 }),
+    });
+    const raster = owners.raster!;
+    raster.layers.getOrCreateRect('noisy', LAYER_RECT);
+    raster.layers.publishPixels('noisy');
+    const reserved: number[] = [];
+    const reserveOperation = raster.memory.reserveOperation.bind(raster.memory);
+    vi.spyOn(raster.memory, 'reserveOperation').mockImplementation((bytes, options) => {
+      reserved.push(bytes);
+      return reserveOperation(bytes, options);
+    });
+    const exportRect = async () => {
+      recording = true;
+      try {
+        return await engine.exports.exportRasterComposite({ bounds: 'rect', rect: EXPORT_RECT });
+      } finally {
+        recording = false;
+      }
+    };
+    return { allocated, engine, exportRect, noisy, raster, reserved };
+  };
+
+  it('adjusts only the reserved sampled region of a downscaled noisy layer when the display has no adjusted copy', async () => {
+    const { allocated, engine, exportRect, raster, reserved } = createNoisyEngine();
+
+    await expect(exportRect()).resolves.toMatchObject({ status: 'ok' });
+
+    // The output and the sampled layer-local scratch, never a layer-sized adjusted copy outside the reservation.
+    expect(allocated).toEqual([[EXPORT_RECT.width, EXPORT_RECT.height], SAMPLED_SIZE]);
+    const [sampledWidth, sampledHeight] = SAMPLED_SIZE;
+    // Output surface, plus the scratch surface and its ImageData readback.
+    expect(reserved[0]).toBeGreaterThanOrEqual(
+      (EXPORT_RECT.width * EXPORT_RECT.height + sampledWidth * sampledHeight * 2) * 4
+    );
+    expect(raster.memory.snapshot()).toMatchObject({ derivedBytes: 0, reservedBytes: 0 });
+    engine.lifecycle.dispose();
+  });
+
+  it("draws the display's memoized adjusted copy without adjusting again", async () => {
+    const { allocated, engine, exportRect, noisy, raster } = createNoisyEngine();
+    raster.getAdjustedSurface(noisy, raster.layers.peek('noisy')!);
+    const derivedBytes = raster.memory.snapshot().derivedBytes;
+
+    await expect(exportRect()).resolves.toMatchObject({ status: 'ok' });
+
+    expect(allocated).toEqual([[EXPORT_RECT.width, EXPORT_RECT.height]]);
+    expect(raster.memory.snapshot().derivedBytes).toBe(derivedBytes);
+    engine.lifecycle.dispose();
   });
 });
 

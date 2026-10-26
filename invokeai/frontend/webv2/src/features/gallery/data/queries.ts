@@ -259,6 +259,7 @@ interface PendingPageFetch<T> {
 }
 
 interface GalleryPageLifecycle {
+  pageReadFreshness: WeakMap<object, boolean>;
   lastUse: WeakMap<Query, number>;
   nextUse: number;
   queue: PendingPageFetch<unknown>[];
@@ -300,6 +301,7 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
   }
 
   const lifecycle: GalleryPageLifecycle = {
+    pageReadFreshness: new WeakMap(),
     lastUse: new WeakMap(),
     nextUse: 0,
     queue: [],
@@ -360,6 +362,7 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
   seedExistingPages();
   lifecycle.unsubscribe = client.getQueryCache().subscribe((event) => {
     if (event.type === 'removed') {
+      lifecycle.pageReadFreshness.delete(event.query);
       return;
     }
 
@@ -367,6 +370,16 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
 
     if (!identity) {
       return;
+    }
+
+    // Local cache patches and rollbacks are manual successes in Query. They must not certify an invalidated
+    // page as fresh, including when cancellation restores the state captured by one of those manual writes.
+    if (event.type === 'updated') {
+      if (event.query.state.isInvalidated || event.action.type === 'error') {
+        lifecycle.pageReadFreshness.set(event.query, false);
+      } else if (event.action.type === 'success' && !event.action.manual) {
+        lifecycle.pageReadFreshness.set(event.query, true);
+      }
     }
 
     // A failed page waits for its own Retry only while it stays in view. Once nothing observes it, forget the failure
@@ -397,6 +410,25 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
   lifecycles.set(client, lifecycle);
 
   return lifecycle;
+};
+
+/** A successful page read remains authoritative through local patches, but only another read ends invalidation. */
+export const getFreshGalleryItemsPage = (client: QueryClient, queryHash: string): GalleryItemsPage | undefined => {
+  const query = client.getQueryCache().get<GalleryItemsPage>(queryHash);
+
+  return query &&
+    query.state.status === 'success' &&
+    !query.state.isInvalidated &&
+    lifecycles.get(client)?.pageReadFreshness.get(query) === true
+    ? query.state.data
+    : undefined;
+};
+
+/** Manual or unobserved cache seeds are unknown, not suspended; only an invalidation or failure requires a reread. */
+export const isGalleryItemsPageAwaitingRefresh = (client: QueryClient, queryHash: string): boolean => {
+  const query = client.getQueryCache().get(queryHash);
+
+  return query !== undefined && lifecycles.get(client)?.pageReadFreshness.get(query) === false;
 };
 
 const schedulePageFetch = <T>(

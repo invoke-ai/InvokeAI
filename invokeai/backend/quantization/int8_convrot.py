@@ -23,10 +23,11 @@ by ``1/sqrt(size)``. This ``H`` is symmetric and orthonormal (``H == H.T``,
 Comfy-Org/comfy-quants and comfy-kitchen ``tensor/int8_utils.py`` — reimplemented
 here, not copied.)
 
-Comfy's W8A8 kernels instead rotate activations at runtime and run int8 GEMMs.
-We target bf16 compute with int8 *storage*: ``Int8ConvrotLinear`` keeps the int8
-weight and scale resident (4.6x smaller than bf16) and materializes the
-dequantized, derotated bf16 weight per forward call. The derotation is a
+By default we target bf16 compute with int8 *storage*: ``Int8ConvrotLinear`` keeps
+the int8 weight and scale resident (4.6x smaller than bf16) and materializes the
+dequantized, derotated bf16 weight per forward call. With ``int8_compute`` on, a
+rotated layer instead rotates and quantizes the activation and runs an int8 GEMM, as
+Comfy's W8A8 kernels do (see ``int8_matmul``). The derotation is a
 ``[out, in/256, 256] @ [256, 256]`` matmul — a rounding error next to the
 transformer forward itself — and the transient bf16 weight (<= ~310 MB for H3's
 largest layer) has to fit inside the calling node's working-memory reservation:
@@ -46,6 +47,7 @@ at 0.06. A loader opts into the 4-bit layouts (``accept_int4``): without a check
 to check a model family against, it keeps refusing them.
 """
 
+import functools
 import json
 import struct
 from collections.abc import Callable, Iterable, Mapping
@@ -65,6 +67,15 @@ from invokeai.backend.quantization.fp8_scaled import (
     iter_weight_scale_pairs,
     strip_layer_path_prefix,
 )
+from invokeai.backend.quantization.int8_matmul import (
+    KERNEL_ROTATION_GROUP_SIZE,
+    can_use_int8_matmul,
+    int8_linear,
+    is_int8_compute_enabled,
+)
+from invokeai.backend.util.logging import InvokeAILogger
+
+logger = InvokeAILogger.get_logger(__name__)
 
 CONVROT_GROUP_SIZE = 256
 
@@ -306,6 +317,12 @@ class Int8ConvrotLinear(DequantizingLinear):
     (at half the bf16 byte count, being moved before they are widened) instead of failing outright. Fully-resident operation remains
     the intended regime (~20 GiB free VRAM for H3's pruned transformer); streamed layers pay a
     per-forward PCIe cost, and an unquantized model is still the better citizen on small cards.
+
+    With ``int8_compute`` on, :meth:`forward` runs the int8 kernels instead wherever
+    :meth:`_can_use_int8_matmul` allows -- rotated layers only -- and the dequantized path
+    otherwise. ``full_precision_matmul`` is the producer's ``full_precision_matrix_mult``
+    marker, which Comfy's quantized-layer config carries for every format: such a layer always
+    dequantizes.
     """
 
     def __init__(
@@ -315,6 +332,7 @@ class Int8ConvrotLinear(DequantizingLinear):
         convrot: bool,
         bias: torch.Tensor | None = None,
         group_size: int = CONVROT_GROUP_SIZE,
+        full_precision_matmul: bool = False,
     ) -> None:
         super().__init__()
         if weight.dtype != torch.int8:
@@ -322,6 +340,7 @@ class Int8ConvrotLinear(DequantizingLinear):
         self.out_features, self.in_features = weight.shape
         self.convrot = convrot
         self.group_size = group_size
+        self.full_precision_matmul = full_precision_matmul
         self.register_buffer("weight", weight)
         self.register_buffer("weight_scale", weight_scale.to(torch.float32))
         if convrot:
@@ -350,6 +369,27 @@ class Int8ConvrotLinear(DequantizingLinear):
             self.weight.to(device).to(dtype=dtype), self.weight_scale, self.convrot, self.group_size
         )
 
+    @property
+    def int8_matmul_eligible(self) -> bool:
+        """Whether the int8 kernels cover this layer at all: rotated in the group size they implement, and not
+        marked full precision by the producer."""
+        return self.convrot and self.group_size == KERNEL_ROTATION_GROUP_SIZE and not self.full_precision_matmul
+
+    def _can_use_int8_matmul(self, x: torch.Tensor) -> bool:
+        """Whether this forward may run on the int8 kernels; see :func:`can_use_int8_matmul` for the rest."""
+        return self.int8_matmul_eligible and can_use_int8_matmul(x, self.in_features)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if not self._can_use_int8_matmul(x):
+            return super().forward(x)
+        return int8_linear(
+            x,
+            self.weight,
+            self.weight_scale,
+            self.bias,
+            fallback=functools.partial(DequantizingLinear.forward, self),
+        )
+
     def dequant_transient_bytes(self, compute_dtype: torch.dtype) -> int:
         """Two weight-sized tensors in the compute dtype.
 
@@ -362,6 +402,10 @@ class Int8ConvrotLinear(DequantizingLinear):
         against the real `z_image_turbo_int8_convrot` checkpoint: exact for most shapes, and 2 MiB under on
         the two that make cuBLAS take a workspace (10240x3840 and 3840x10240), against a 3 GiB reservation
         floor.
+
+        This also bounds the int8 compute path: it quantizes at most ``2 * out_features`` rows at a
+        time, so its int8 activation copy plus a streamed int8 weight stay below these two weights
+        (see ``int8_matmul``).
         """
         return 2 * self.out_features * self.in_features * compute_dtype.itemsize
 
@@ -960,7 +1004,11 @@ def swap_in_int8_linears(model: torch.nn.Module, sd: dict[str, Any], quantized: 
 
     Pass only what :func:`split_int8_convrot_layers` returned: every layer refused below is one that
     split would have dequantized instead.
+
+    With ``int8_compute`` on, logs how many of the layers its kernels do not cover, so a model that
+    gains little from the setting says why.
     """
+    installed: list[Int8ConvrotLinear] = []
     for path, marker in quantized.items():
         fmt = marker.get("format")
         weight, scale = sd.get(f"{path}.weight"), sd.get(f"{path}.weight_scale")
@@ -995,13 +1043,29 @@ def swap_in_int8_linears(model: torch.nn.Module, sd: dict[str, Any], quantized: 
                 f"'{path}' is marked {fmt} and the {extra}'s Linear has a bias, but the "
                 f"{missing} has none. The checkpoint does not match this architecture."
             )
-        module_type = Int4ConvrotLinear if layout.packed_int4 else Int8ConvrotLinear
-        setattr(
-            parent,
-            attribute,
-            module_type(
+        layer: Int4ConvrotLinear | Int8ConvrotLinear
+        if layout.packed_int4:
+            layer = Int4ConvrotLinear(
                 weight=weight, weight_scale=scale, convrot=layout.convrot, bias=bias, group_size=layout.group_size
-            ),
+            )
+        else:
+            layer = Int8ConvrotLinear(
+                weight=weight,
+                weight_scale=scale,
+                convrot=layout.convrot,
+                bias=bias,
+                group_size=layout.group_size,
+                full_precision_matmul=bool(marker.get("full_precision_matrix_mult", False)),
+            )
+            installed.append(layer)
+        setattr(parent, attribute, layer)
+    uncovered = [layer for layer in installed if not layer.int8_matmul_eligible]
+    if uncovered and is_int8_compute_enabled():
+        marked = sum(layer.full_precision_matmul for layer in uncovered)
+        logger.info(
+            f"int8_compute: {len(uncovered)} of {len(installed)} int8 layer(s) keep dequantizing per forward "
+            f"({marked} marked full_precision_matrix_mult, {len(uncovered) - marked} not rotated in groups of "
+            f"{KERNEL_ROTATION_GROUP_SIZE})."
         )
 
 
