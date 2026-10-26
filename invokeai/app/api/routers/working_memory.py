@@ -23,8 +23,10 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     WorkingMemoryCalibrationServiceBase,
 )
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
+    CalibrationAttemptBusyError,
     CalibrationAttemptConflictError,
     CalibrationGraphError,
+    CalibrationModelChangedError,
     CalibrationQueueFullError,
     CalibrationRunNotFoundError,
     CalibrationStoreError,
@@ -65,6 +67,9 @@ def _service() -> WorkingMemoryCalibrationServiceBase:
 
 
 def _http_error(error: Exception) -> HTTPException:
+    if isinstance(error, (CalibrationAttemptBusyError, CalibrationModelChangedError)):
+        # Coded, as other routes' refusals a client acts on are: it tells these 409s from the others.
+        return HTTPException(status_code=409, detail={"code": error.code, "message": str(error)})
     if isinstance(error, (CalibrationRunNotFoundError, UnknownModelException)):
         return HTTPException(status_code=404, detail=str(error))
     if isinstance(error, CalibrationGraphError):
@@ -101,7 +106,10 @@ def _http_error(error: Exception) -> HTTPException:
             "class's store file is unusable and kept as it is (possibly after the items were queued, which then fail "
             "when they start), the queue has no room for all of the run's items (it then takes none), the "
             "idempotency key was used for another request, or attempt_steps differs from that of the attempt's runs "
-            "already stored (or of the run a repeated request names)"
+            "already stored (or of the run a repeated request names). Two of them carry a code, as "
+            '`{"code": ..., "message": ...}` in `detail`: `calibration_running`, another calibration attempt still '
+            "runs on this GPU; `model_changed`, a model the graph names changed or was removed since the graph was "
+            "compiled"
         },
         422: {
             "description": "The graph cannot be measured as a calibration run, or attempt_id and attempt_steps were "
@@ -119,8 +127,9 @@ async def calibrate_model_working_memory(
     key: str = Path(description="Key of the model the run calibrates"),
     request: WorkingMemoryCalibrationRequest = Body(description="The batch to measure"),
 ) -> WorkingMemoryCalibrationRunCreated:
-    """Start a working-memory calibration run: enqueue the batch with every node uncached and measure each node's
-    model operations on the generation device. Needs exactly one generation device, and it must be a GPU. The queue
+    """Start a working-memory calibration run: enqueue the batch with every node uncached, its images intermediates
+    on no board (never in the gallery; clearing intermediates removes them), and measure each node's model operations
+    on the generation device. Needs exactly one generation device, and it must be a GPU. The queue
     takes all of the batch's items or none.
 
     Once the items are queued, a request without an `idempotency_key` succeeds even when the store fails for a passing
@@ -144,6 +153,8 @@ async def calibrate_model_working_memory(
         CalibrationStoreError,
         CalibrationQueueFullError,
         CalibrationAttemptConflictError,
+        CalibrationAttemptBusyError,
+        CalibrationModelChangedError,
         EnqueueIdempotencyConflictError,
         EnqueueReceiptLimitError,
     ) as error:

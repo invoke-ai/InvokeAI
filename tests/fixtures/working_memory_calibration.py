@@ -8,7 +8,7 @@ them, without measuring anything.
 import threading
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Literal, Optional
 
 import pytest
 import torch
@@ -60,19 +60,22 @@ def calibration_service(
     device_class: DeviceClass = GPU_CLASS,
     environment_for: Callable[[torch.device, Mapping[str, SettingValue]], Environment] = fake_environment,
     untiled_decode_reservation: Optional[Callable[[str, int, int, str, torch.device], int]] = None,
-    device_memory: Optional[Callable[[torch.device], DeviceMemory]] = None,
+    device_memory: Optional[Callable[[torch.device], DeviceMemory]] | Literal["whole card"] = "whole card",
     vae_dtypes: VaeDtypes = GPU_VAE_DTYPES,
 ) -> WorkingMemoryCalibrationService:
     """A service storing under `root`; not started (call `start(invoker)`, and `stop(invoker)` once it registered
-    the user-fit provider estimates ask). The device memory this process can hold defaults to the whole card, with
-    nothing outside torch; the VAE dtypes to those of a GPU with bf16 under `precision: auto`."""
+    the user-fit provider estimates ask). What the cache can give a calibration's lock defaults to the whole card, with
+    nothing outside torch; None asks the model cache of the invoker's model manager, as the service does. The VAE
+    dtypes default to those of a GPU with bf16 under `precision: auto`."""
     extra = {} if untiled_decode_reservation is None else {"untiled_decode_reservation": untiled_decode_reservation}
     return WorkingMemoryCalibrationService(
         CalibrationStore(root / "working_memory"),
         generation_devices=devices or (lambda: [GPU]),
         device_class_for=lambda device: device_class,
         environment_for=environment_for,
-        device_memory=device_memory or (lambda device: DeviceMemory(device_class.total_mib * 2**20, 0)),
+        device_memory=(lambda device: DeviceMemory(device_class.total_mib * 2**20, 0))
+        if device_memory == "whole card"
+        else device_memory,
         vae_dtypes=lambda device, models_path: vae_dtypes,
         **extra,
     )

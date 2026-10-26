@@ -540,6 +540,26 @@ describe('WorkflowLibraryDetailPanel', () => {
     expect(models.ensureStartersLoaded).toHaveBeenCalled();
   });
 
+  it('ages a run after mount when refreshed workflow data arrives', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+
+    try {
+      vi.setSystemTime(new Date('2026-10-20T10:00:00Z'));
+      await renderPanel({ ...TEXT_TO_IMAGE, item: { ...TEXT_TO_IMAGE.item, last_run_at: null } });
+
+      vi.setSystemTime(new Date('2026-10-20T10:05:00Z'));
+      const ran = { ...TEXT_TO_IMAGE, item: { ...TEXT_TO_IMAGE.item, last_run_at: '2026-10-20T10:05:00Z' } };
+      await renderPanel(ran);
+      expect(panel()?.textContent).toContain('Your last run · now');
+
+      vi.setSystemTime(new Date('2026-10-20T12:00:00Z'));
+      await renderPanel({ ...ran, item: { ...ran.item } });
+      expect(panel()?.textContent).toContain('Your last run · 2 hours ago');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('changes visibility by keyboard, stays server-driven while pending, then reflects the response and invalidates', async () => {
     let resolveChange: (record: { is_public: boolean }) => void = NOOP;
     queries.setLibraryWorkflowPublic.mockImplementationOnce(

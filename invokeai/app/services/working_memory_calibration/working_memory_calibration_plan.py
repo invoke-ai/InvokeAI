@@ -344,18 +344,19 @@ def decode_budget(device_class: DeviceClass, capacity_bytes: Optional[int]) -> i
     return ceiling - VAE_WEIGHTS_ALLOWANCE_BYTES
 
 
-def case_sides(reservation: Callable[[int], int], budget_bytes: int) -> list[int]:
+def case_sides(reservation: Callable[[int], int], budget_bytes: int, floor_bytes: int = 0) -> list[int]:
     """The square sides of the three cases: about `AREA_FRACTIONS` of the largest area that decodes untiled here.
 
     The largest area is the largest square, in steps of `SIDE_MULTIPLE` and at most `MAX_SIDE`, whose calibration
-    reservation (the estimate plus calibration headroom, `probe.calibration_reservation`) fits `budget_bytes`
-    (`decode_budget`). A larger decode would be tiled or partly loaded, and neither fits a line. Each fraction of that
-    area is rounded down to a square side that is a multiple of `SIDE_MULTIPLE`; repeated sides are dropped. Returns
-    no sides when the largest is below `MIN_LARGEST_SIDE` or the sides do not span two sizes `MIN_AREA_RATIO` apart.
+    reservation (the estimate plus calibration headroom, `probe.calibration_reservation`, and never below
+    `floor_bytes`, `device_working_mem_gb`, as the lock reserves it) fits `budget_bytes` (`decode_budget`). A larger
+    decode would be tiled or partly loaded, and neither fits a line. Each fraction of that area is rounded down to a
+    square side that is a multiple of `SIDE_MULTIPLE`; repeated sides are dropped. Returns no sides when the largest is
+    below `MIN_LARGEST_SIDE` or the sides do not span two sizes `MIN_AREA_RATIO` apart.
     """
     largest = 0
     for side in range(SIDE_MULTIPLE, MAX_SIDE + 1, SIDE_MULTIPLE):
-        if calibration_reservation(reservation(side)) > budget_bytes:
+        if max(calibration_reservation(reservation(side)), floor_bytes) > budget_bytes:
             break
         largest = side
     if largest < MIN_LARGEST_SIDE:
@@ -505,6 +506,7 @@ def build_plan(
     reservation: ReservationFunction,
     specs: Mapping[str, EstimatorSpec],
     capacity_bytes: Optional[int] = None,
+    working_memory_floor_bytes: int = 0,
     force_tiled_decode: bool = False,
 ) -> WorkingMemoryCalibrationPlan:
     """The plan for calibrating `target`, among the installed `models`, on the GPU of `device_class`.
@@ -512,7 +514,8 @@ def build_plan(
     `unavailable` says why this machine cannot calibrate (no GPU, several generation devices); `device_class` and
     `platform` are then None. `reservation` prices an untiled decode on the calibration device; `precision` is the
     `precision` setting; `vae_dtypes` are the dtypes the VAE loaders choose on the device, so each case sizes the
-    decode in the dtype it runs in; `capacity_bytes` is what the cache can give on the device (`decode_budget`);
+    decode in the dtype it runs in; `capacity_bytes` is what the cache can give on the device (`decode_budget`), and
+    `working_memory_floor_bytes` the least working memory a lock reserves there (`device_working_mem_gb`);
     `force_tiled_decode` is the setting, under which the decode nodes of `FORCE_TILED_BASES` run no untiled decode.
     """
     covered = target.base in DECODE_LINES and (_is_main(target) or _is_vae(target))
@@ -611,7 +614,7 @@ def build_plan(
     # A standalone VAE target decodes as itself; a main model with a pipeline's own VAE, or what fills its slot.
     decoding = target if _is_vae(target) else main
     for dtype in decode_dtypes(decoding, precision, vae_dtypes, models):
-        sides = case_sides(partial(_square, reservation, lines.estimator, dtype), budget)
+        sides = case_sides(partial(_square, reservation, lines.estimator, dtype), budget, working_memory_floor_bytes)
         for side in sides:
             cases.append(
                 WorkingMemoryCalibrationCase(

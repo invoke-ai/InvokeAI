@@ -79,7 +79,11 @@ class Krea2SeedVarianceInvocation(BaseInvocation):
 
         new_data = ConditioningFieldData(
             conditionings=[
-                Krea2ConditioningInfo(prompt_embeds=embeds, prompt_embeds_mask=conditioning.prompt_embeds_mask)
+                Krea2ConditioningInfo(
+                    prompt_embeds=embeds,
+                    prompt_embeds_mask=conditioning.prompt_embeds_mask,
+                    num_reference_images=conditioning.num_reference_images,
+                )
             ]
         )
         conditioning_name = context.conditioning.save(new_data)

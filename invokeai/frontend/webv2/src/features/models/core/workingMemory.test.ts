@@ -8,6 +8,7 @@ import {
   describeFact,
   getCalibrationBlocker,
   isMeasurementMethodVerified,
+  modelCalibratingOnGpu,
   lineDisplayState,
   planCalibrationSteps,
   selectAttemptRuns,
@@ -60,6 +61,7 @@ const run = (
   attempt_steps: null,
   created_at: new Date(T0 + offsetSeconds * 1_000).toISOString(),
   error,
+  error_code: null,
   held_back: null,
   // As the server counts: a failed or canceled decode leaves its window too, as an invalid one.
   point_count: status === 'running' ? 0 : 1,
@@ -307,6 +309,29 @@ describe('deriveCalibrationProgress', () => {
     });
   });
 
+  it('names a step that failed because a model changed after planning, whatever else failed', () => {
+    const changed = { error_code: 'model_changed' as const };
+    const runs = [
+      run('r0', 0, 'completed'),
+      run('r1', 1, 'failed', 'CUDA out of memory'),
+      run('r2', 2, 'failed', 'This SDXL changed after this calibration was planned (hash).', 'attempt', changed),
+    ];
+
+    expect(deriveCalibrationProgress({ local: null, runs, steps }).outcome).toMatchObject({
+      error: 'This SDXL changed after this calibration was planned (hash).',
+      // The completed step measured a model that has changed since: no claim that it still counts.
+      kept: false,
+      kind: 'failed',
+      refusal: 'modelChanged',
+    });
+    // A failure without the code is not read as one by its text.
+    const worded = [run('r0', 0, 'failed', 'This SDXL changed after this calibration was planned (hash).')];
+    expect(deriveCalibrationProgress({ local: null, runs: worded, steps }).outcome).not.toHaveProperty(
+      'refusal',
+      'modelChanged'
+    );
+  });
+
   it('follows the server once the attempt settled, whatever this tab saw of its end', () => {
     const recorded = { attempt_steps: 6 };
     const finished = steps.map((_, index) => run(`r${String(index)}`, index, 'completed', null, 'mine', recorded));
@@ -406,8 +431,8 @@ describe('summarizeLineStates', () => {
   it('reports the most severe line, or null without lines', () => {
     expect(summarizeLineStates(['in_use', 'stale'])).toBe('stale');
     expect(summarizeLineStates(['insufficient', 'in_use'])).toBe('insufficient');
-    expect(summarizeLineStates(['stopped', 'in_use'])).toBe('stopped');
-    expect(summarizeLineStates(['stopped', 'insufficient'])).toBe('insufficient');
+    expect(summarizeLineStates(['interrupted', 'in_use'])).toBe('interrupted');
+    expect(summarizeLineStates(['interrupted', 'insufficient'])).toBe('insufficient');
     expect(summarizeLineStates(['stale', 'unusable'])).toBe('unusable');
     expect(summarizeLineStates(['in_use'])).toBe('in_use');
     expect(summarizeLineStates([])).toBeNull();
@@ -420,7 +445,7 @@ describe('lineDisplayState', () => {
     ({ sizes: reasons.map(size), state }) as Pick<WorkingMemoryLine, 'sizes' | 'state'>;
 
   it('reads a line only stopped attempts measured as stopped, not as short of sizes', () => {
-    expect(lineDisplayState(sized('insufficient', ['aborted_attempt', 'aborted_attempt']))).toBe('stopped');
+    expect(lineDisplayState(sized('insufficient', ['aborted_attempt', 'aborted_attempt']))).toBe('interrupted');
     // A size of its own, or one left out for another reason, makes it short of sizes after all.
     expect(lineDisplayState(sized('insufficient', ['aborted_attempt', null]))).toBe('insufficient');
     expect(lineDisplayState(sized('insufficient', ['aborted_attempt', 'fragmented']))).toBe('insufficient');
@@ -522,6 +547,28 @@ describe('getCalibrationBlocker', () => {
       kind: 'running',
     });
     expect(getCalibrationBlocker({ isRunning: false, plan: supported, status: available, summary: usable })).toBeNull();
+  });
+});
+
+describe('modelCalibratingOnGpu', () => {
+  const classOf = (
+    isCurrent: boolean,
+    runs: { attempt_id: string | null; model_key: string; status: WorkingMemoryRun['status'] }[]
+  ) => ({
+    is_current: isCurrent,
+    runs,
+  });
+  const statusOf = (...classes: ReturnType<typeof classOf>[]) =>
+    ({ device_classes: classes }) as unknown as Pick<WorkingMemoryStatus, 'device_classes'>;
+
+  it('names the model whose attempt runs on this GPU, as the server judges which run holds it', () => {
+    const running = { attempt_id: 'a', model_key: 'sdxl', status: 'running' as const };
+
+    expect(modelCalibratingOnGpu(statusOf(classOf(true, [running])))).toBe('sdxl');
+    // Another device class, a finished run, and a run without an attempt hold nothing here.
+    expect(modelCalibratingOnGpu(statusOf(classOf(false, [running])))).toBeNull();
+    expect(modelCalibratingOnGpu(statusOf(classOf(true, [{ ...running, status: 'completed' }])))).toBeNull();
+    expect(modelCalibratingOnGpu(statusOf(classOf(true, [{ ...running, attempt_id: null }])))).toBeNull();
   });
 });
 

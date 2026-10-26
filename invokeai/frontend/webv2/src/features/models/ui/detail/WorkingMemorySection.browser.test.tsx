@@ -35,6 +35,10 @@ const api = vi.hoisted(() => ({
 
 vi.mock('@features/models/data/workingMemoryApi', () => api);
 
+const notify = vi.hoisted(() => ({ error: vi.fn(), info: vi.fn(), success: vi.fn() }));
+
+vi.mock('@features/models/ui/useModelsNotify', () => ({ useNotify: () => notify }));
+
 /** The model records the server holds; a compile reads them again first. */
 const library = vi.hoisted(() => ({ failNext: null as Error | null, models: [] as unknown[] }));
 
@@ -124,6 +128,7 @@ const run = (
   attempt_steps: null,
   created_at: new Date(T0 + offset * 1_000).toISOString(),
   error,
+  error_code: null,
   held_back: null,
   // As the server counts: a failed or canceled decode leaves its window too, as an invalid one.
   point_count: runStatus === 'running' ? 0 : 1,
@@ -820,8 +825,8 @@ describe('WorkingMemorySection', () => {
       'models.workingMemory.size(height=1024,width=1024)models.workingMemory.notCountedAborted',
     ]);
     const stoppedLine = discarded!.closest('table')!.parentElement!.parentElement!;
-    expect(stoppedLine.textContent).toContain('models.workingMemory.stateStopped');
-    expect(stoppedLine.textContent).toContain('models.workingMemory.helpStopped');
+    expect(stoppedLine.textContent).toContain('models.workingMemory.stateInterrupted');
+    expect(stoppedLine.textContent).toContain('models.workingMemory.helpInterrupted');
     expect(stoppedLine.textContent).not.toContain('models.workingMemory.stateInsufficient');
     expect(sectionText()).not.toContain('Stop or an interrupted submission discarded the measurements of this line.');
     // The reason is part of the row header, so it is read with the size.
@@ -1431,6 +1436,283 @@ describe('WorkingMemorySection plan freshness', () => {
     await expect.poll(() => document.activeElement).toBe(sectionToggle());
     await act(() => userEvent.click(buttonNamed('common.retry')!));
     await expect.poll(() => buttonNamed('models.workingMemory.calibrate')?.disabled).toBe(false);
+  });
+
+  /** Another tab's attempt of the model, two of six steps done. */
+  const theirs = () =>
+    summary({
+      runs: [1, 2, 3, 4, 5, 6].map((number) =>
+        run(`theirs-${String(number)}`, number, number <= 2 ? 'completed' : 'running', null, 'theirs', {
+          attempt_steps: 6,
+          held_back: 'running',
+        })
+      ),
+    });
+
+  /**
+   * The GPU's status, a run of `modelKey` running on it: the server takes one attempt per GPU. With `isCurrent` false
+   * it runs on another device class.
+   */
+  const gpuBusyWith = (modelKey: string, { isCurrent = true }: { isCurrent?: boolean } = {}): WorkingMemoryStatus =>
+    status({
+      device_classes: [
+        {
+          device_class: {
+            arch: null,
+            backend: 'cuda',
+            id: DEVICE.id,
+            name: DEVICE.name,
+            total_mib: 24_576,
+            vendor: 'x',
+          },
+          device_class_id: DEVICE.id,
+          envs: [],
+          is_current: isCurrent,
+          measurement_method: 'allocator',
+          measurement_verified: true,
+          point_counts: [],
+          problem: null,
+          runs: [
+            {
+              attempt_id: 'theirs',
+              attempt_steps: 6,
+              created_at: new Date(T0).toISOString(),
+              env_id: 'env',
+              error: null,
+              error_code: null,
+              item_ids: [1],
+              model_hash: null,
+              model_key: modelKey,
+              point_count: 0,
+              run_id: 'theirs-1',
+              status: 'running',
+              user_id: 'other',
+            },
+          ],
+          usable: true,
+        },
+      ],
+    });
+
+  it('starts nothing when another tab started a calibration on this GPU while the dialog stood open', async () => {
+    await renderSection();
+    await expect.poll(sectionText).toContain('models.workingMemory.neverCalibrated');
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate')!));
+    await expect.poll(openDialog).not.toBeNull();
+
+    // Another model's calibration took the GPU: this section's summary cannot know, only a fresh status read can.
+    api.getWorkingMemoryStatus.mockImplementation(() => Promise.resolve(gpuBusyWith('other-model')));
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate', openDialog()!)!));
+
+    await expect.poll(openDialog).toBeNull();
+    expect(api.calibrateWorkingMemory).not.toHaveBeenCalled();
+    // Beside Calibrate, naming the model that holds the GPU; no toast, which only the server's refusal raises.
+    await expect.poll(sectionText).toContain('models.workingMemory.busyOnGpu(model=other-model)');
+    expect(notify.info).not.toHaveBeenCalled();
+    expect(notify.error).not.toHaveBeenCalled();
+    // Nothing of this model runs: Calibrate stays available, and focus returns to it.
+    expect(sectionText()).not.toContain('models.workingMemory.failed');
+    await expect.poll(() => document.activeElement?.textContent).toBe('models.workingMemory.calibrate');
+  });
+
+  it('names the model that holds the GPU when Calibrate finds it busy, and keeps focus on Calibrate', async () => {
+    library.models = [mainModel('sdxl'), { ...mainModel('sd-1'), key: 'other-model', name: 'Other SD1' }];
+    await refreshModels();
+    await renderSection();
+    await expect.poll(sectionText).toContain('models.workingMemory.neverCalibrated');
+    // The status read right before the start answers late, so the busy Calibrate has dropped its focus by then.
+    let answer = () => undefined as void;
+    api.getWorkingMemoryStatus.mockImplementation(
+      () =>
+        new Promise<WorkingMemoryStatus>((resolve) => {
+          answer = () => resolve(gpuBusyWith('other-model'));
+        })
+    );
+
+    const opener = buttonNamed('models.workingMemory.calibrate')!;
+    await act(() => userEvent.click(opener));
+    await expect.poll(() => document.activeElement).toBe(document.body);
+    await act(() => answer());
+
+    const reason = 'models.workingMemory.busyOnGpu(model=Other SD1)';
+    await expect.poll(sectionText).toContain(reason);
+    expect(openDialog()).toBeNull();
+    expect(api.calibrateWorkingMemory).not.toHaveBeenCalled();
+    expect(notify.info).not.toHaveBeenCalled();
+    expect(opener.disabled).toBe(false);
+    // Announced politely: a wait, not an error.
+    const described = document.getElementById(opener.getAttribute('aria-describedby')!);
+    expect(described?.textContent).toBe(reason);
+    expect(described?.getAttribute('role')).toBe('status');
+    await expect.poll(() => document.activeElement).toBe(opener);
+  });
+
+  it('shows this model’s own attempt with Stop when Calibrate finds it running, focusing Stop', async () => {
+    await renderSection();
+    await expect.poll(sectionText).toContain('models.workingMemory.neverCalibrated');
+    serveSummary(theirs());
+    api.getWorkingMemoryStatus.mockImplementation(() => Promise.resolve(gpuBusyWith(MODEL_KEY)));
+
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate')!));
+
+    await expect.poll(sectionText).toContain('models.workingMemory.running(done=2,total=6)');
+    expect(openDialog()).toBeNull();
+    expect(sectionText()).not.toContain('models.workingMemory.busyOnGpu');
+    await expect.poll(() => document.activeElement?.textContent).toBe('models.workingMemory.stop');
+  });
+
+  it('starts while another device class calibrates: the GPU this section names is free', async () => {
+    await renderSection();
+    await expect.poll(sectionText).toContain('models.workingMemory.neverCalibrated');
+    api.getWorkingMemoryStatus.mockImplementation(() =>
+      Promise.resolve(gpuBusyWith('other-model', { isCurrent: false }))
+    );
+
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate')!));
+    await expect.poll(openDialog).not.toBeNull();
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate', openDialog()!)!));
+
+    await expect.poll(() => api.calibrateWorkingMemory.mock.calls.length).toBe(6);
+    expect(sectionText()).not.toContain('models.workingMemory.busyOnGpu');
+  });
+
+  it('starts nothing when the status cannot be read right before the start, offering a retry', async () => {
+    await renderSection();
+    await expect.poll(sectionText).toContain('models.workingMemory.neverCalibrated');
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate')!));
+    await expect.poll(openDialog).not.toBeNull();
+
+    api.getWorkingMemoryStatus.mockImplementation(() =>
+      Promise.reject(new ApiError('{"detail":"The calibration store is locked"}', 503))
+    );
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate', openDialog()!)!));
+
+    await expect.poll(sectionText).toContain('models.workingMemory.loadFailed');
+    expect(sectionText()).toContain('The calibration store is locked');
+    expect(api.calibrateWorkingMemory).not.toHaveBeenCalled();
+    expect(buttonNamed('common.retry')).toBeDefined();
+  });
+
+  it('says the model changed when the server refuses a later step for it, in its own words', async () => {
+    await renderSection();
+    await expect.poll(sectionText).toContain('models.workingMemory.neverCalibrated');
+    const post = api.calibrateWorkingMemory.getMockImplementation()!;
+    const serverText = 'This SDXL changed after this calibration was planned (base). Calibrate again.';
+    api.calibrateWorkingMemory.mockImplementation((...args: unknown[]) =>
+      api.calibrateWorkingMemory.mock.calls.length === 3
+        ? Promise.reject(new ApiError(JSON.stringify({ detail: { code: 'model_changed', message: serverText } }), 409))
+        : post(...args)
+    );
+
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate')!));
+    await expect.poll(openDialog).not.toBeNull();
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate', openDialog()!)!));
+    await expect.poll(() => api.calibrateWorkingMemory.mock.calls.length).toBe(3);
+
+    // The server lists the two runs queued before the refusal.
+    const attemptId = (api.calibrateWorkingMemory.mock.calls[0]![1] as { attemptId: string }).attemptId;
+    serveSummary(
+      summary({
+        runs: [1, 2].map((number) =>
+          run(`run-${String(number)}`, number, 'completed', null, attemptId, { ...ABORTED, attempt_steps: 6 })
+        ),
+      })
+    );
+    await refreshSummary();
+    await expect.poll(sectionText).toContain('models.workingMemory.partial');
+    expect(sectionText()).toContain('models.workingMemory.modelChanged');
+    expect(sectionText()).not.toContain(serverText);
+  });
+
+  it('follows an attempt of this model another tab started, found right before the start', async () => {
+    await renderSection();
+    await expect.poll(sectionText).toContain('models.workingMemory.neverCalibrated');
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate')!));
+    await expect.poll(openDialog).not.toBeNull();
+
+    serveSummary(theirs());
+    api.getWorkingMemoryStatus.mockImplementation(() => Promise.resolve(gpuBusyWith(MODEL_KEY)));
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate', openDialog()!)!));
+
+    await expect.poll(openDialog).toBeNull();
+    expect(api.calibrateWorkingMemory).not.toHaveBeenCalled();
+    expect(notify.info).not.toHaveBeenCalled();
+    await expect.poll(sectionText).toContain('models.workingMemory.running(done=2,total=6)');
+    // Its own attempt shows as running, not as a reason naming it.
+    expect(sectionText()).not.toContain('models.workingMemory.busyOnGpu');
+    await expect.poll(() => document.activeElement?.textContent).toBe('models.workingMemory.stop');
+  });
+
+  it('says the model changed when its queued steps failed for it, offering to calibrate again', async () => {
+    // The record changed after queuing: the server failed the items as it admitted them.
+    const changed = { attempt_steps: 6, error_code: 'model_changed' as const };
+    serveSummary(
+      summary({
+        runs: [1, 2, 3, 4, 5, 6].map((number) =>
+          run(
+            `run-${String(number)}`,
+            number,
+            'failed',
+            'This SDXL changed after this calibration was planned (hash). Calibrate again.',
+            'attempt',
+            changed
+          )
+        ),
+      })
+    );
+    await renderSection();
+    await expect.poll(sectionText).toContain('models.workingMemory.failed');
+
+    expect(sectionText()).toContain('models.workingMemory.modelChanged');
+    expect(sectionText()).not.toContain('This SDXL changed after this calibration was planned');
+    expect(buttonNamed('common.retry')?.disabled).toBe(false);
+  });
+
+  it('follows the attempt the server says is already running, reading its refusal as no failure', async () => {
+    await renderSection();
+    await expect.poll(sectionText).toContain('models.workingMemory.neverCalibrated');
+    // Another tab started one between the fresh read and the first step: the server refuses this attempt.
+    api.calibrateWorkingMemory.mockImplementationOnce(() => {
+      serveSummary(theirs());
+      return Promise.reject(
+        new ApiError(
+          '{"detail":{"code":"calibration_running","message":"Another calibration is still running on this GPU. Wait until it has finished, or stop it, then calibrate again."}}',
+          409
+        )
+      );
+    });
+
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate')!));
+    await expect.poll(openDialog).not.toBeNull();
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate', openDialog()!)!));
+
+    await expect.poll(() => notify.info.mock.calls).toEqual([['models.workingMemory.alreadyRunning']]);
+    expect(api.calibrateWorkingMemory).toHaveBeenCalledTimes(1);
+    await expect.poll(sectionText).toContain('models.workingMemory.running(done=2,total=6)');
+    expect(sectionText()).not.toContain('models.workingMemory.failed');
+    expect(sectionText()).not.toContain('models.workingMemory.partial');
+  });
+
+  it('says the model changed when the server refuses a step for it, offering to calibrate again', async () => {
+    await renderSection();
+    await expect.poll(sectionText).toContain('models.workingMemory.neverCalibrated');
+    api.calibrateWorkingMemory.mockImplementationOnce(() =>
+      Promise.reject(
+        new ApiError(
+          '{"detail":{"code":"model_changed","message":"This SDXL changed after this calibration was planned (hash). Calibrate again."}}',
+          409
+        )
+      )
+    );
+
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate')!));
+    await expect.poll(openDialog).not.toBeNull();
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate', openDialog()!)!));
+
+    await expect.poll(sectionText).toContain('models.workingMemory.modelChanged');
+    expect(sectionText()).toContain('models.workingMemory.failed');
+    expect(api.calibrateWorkingMemory).toHaveBeenCalledTimes(1);
+    expect(buttonNamed('common.retry')?.disabled).toBe(false);
   });
 
   it('opens nothing when the model records cannot be read, naming why, and checks again on the next click', async () => {

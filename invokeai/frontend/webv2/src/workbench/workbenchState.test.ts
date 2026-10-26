@@ -111,6 +111,7 @@ const CANVAS_MUTATION_TYPES = new Set<CanvasProjectMutation['type']>([
   'reorderCanvasSiblings',
   'replaceCanvasDocument',
   'replaceCanvasLayer',
+  'replaceCanvasLayers',
   'rollbackStagedImageCommit',
   'resizeCanvasDocument',
   'restoreCanvasSnapshot',
@@ -8139,6 +8140,48 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
     expect(getCanvas(missing).document).toBe(getCanvas(replaced).document);
   });
 
+  it('replaces several leaves in place in one edit, and refuses them all when any entry is invalid', () => {
+    const state = withCanvasLayers(createInitialWorkbenchState(), [
+      createRasterLayer('a'),
+      createRasterLayer('b'),
+      createInpaintMaskLayer('m'),
+    ]);
+    const before = getCanvas(state).document;
+    const paintA = { ...createRasterLayer('a'), source: { bitmap: null, type: 'paint' as const } };
+    const emptiedMask = { ...getDocumentLeaves(before).find((layer) => layer.id === 'm')!, name: 'Emptied' };
+
+    const replaced = workbenchReducer(state, {
+      replacements: [
+        { layer: paintA, layerId: 'a' },
+        { layer: emptiedMask, layerId: 'm' },
+      ],
+      type: 'replaceCanvasLayers',
+    });
+    const leaves = getDocumentLeaves(getCanvas(replaced).document);
+    expect(leaves.map((layer) => layer.id)).toEqual(getDocumentLeaves(before).map((layer) => layer.id));
+    expect(leaves.find((layer) => layer.id === 'a')).toBe(paintA);
+    expect(leaves.find((layer) => layer.id === 'm')).toBe(emptiedMask);
+    expect(leaves.find((layer) => layer.id === 'b')).toBe(getDocumentLeaves(before).find((layer) => layer.id === 'b'));
+
+    const refusals = [
+      [
+        { layer: paintA, layerId: 'a' },
+        { layer: { ...paintA, id: 'missing' }, layerId: 'missing' },
+      ],
+      [
+        { layer: paintA, layerId: 'a' },
+        { layer: paintA, layerId: 'a' },
+      ],
+      [{ layer: paintA, layerId: 'b' }],
+      [{ layer: { ...createControlLayer('a') }, layerId: 'a' }],
+      [],
+    ];
+    for (const replacements of refusals) {
+      const refused = workbenchReducer(state, { replacements, type: 'replaceCanvasLayers' });
+      expect(refused).toBe(state);
+    }
+  });
+
   it('swaps a raster/control layer source but ignores mask-only layer types', () => {
     let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a')]);
     const newSource = { image: { height: 10, imageName: 'swapped.png', width: 10 }, type: 'image' } as const;
@@ -9362,5 +9405,56 @@ describe('auto invocation route switching', () => {
 
     // Editing the surface already routed as the source keeps the manual destination.
     expect(getRoute(state)).toMatchObject({ destination: 'canvas', sourceId: 'generate' });
+  });
+});
+
+describe('canvas schema adoption', () => {
+  const typedControl = (id: string): CanvasControlLayerContract => ({
+    ...createControlLayer(id),
+    controlType: 'depth',
+    detection: { settings: {}, type: 'depth_anything_depth_estimation' },
+    source: { image: { height: 64, imageName: 'photo.png', width: 64 }, type: 'image' },
+  });
+  const withV4Canvas = (layers: readonly CanvasLayerContract[]): WorkbenchState =>
+    workbenchReducer(createInitialWorkbenchState(), {
+      document: { ...createEmptyCanvasDocument(), stacks: stacksFrom([...layers]), version: 4 },
+      type: 'replaceCanvasDocument',
+    });
+  const versions = (state: WorkbenchState) => [getCanvas(state).version, getCanvas(state).document.version];
+
+  it('moves a v4 canvas to schema 6 when a control layer gains a type, and keeps 6 after it loses it', () => {
+    let state = withV4Canvas([createControlLayer('ctrl')]);
+    expect(versions(state)).toEqual([4, 4]);
+
+    state = workbenchReducer(state, { layer: typedControl('ctrl'), layerId: 'ctrl', type: 'replaceCanvasLayer' });
+    expect(versions(state)).toEqual([6, 6]);
+
+    state = workbenchReducer(state, { layer: createControlLayer('ctrl'), layerId: 'ctrl', type: 'replaceCanvasLayer' });
+    expect(versions(state)).toEqual([6, 6]);
+
+    state = workbenchReducer(state, { document: createEmptyCanvasDocument(), type: 'replaceCanvasDocument' });
+    expect(getCanvas(state).version).toBe(6);
+  });
+
+  it('adopts 4, not 5, for custom-font typography alone', () => {
+    const text: CanvasLayerContract = {
+      ...createRasterLayer('text'),
+      source: {
+        align: 'left',
+        color: '#fff',
+        content: 'hello',
+        fontFamily: 'Example',
+        fontRef: { contentHash: 'a'.repeat(64), family: 'Example', id: 'font-1', label: 'Example Regular' },
+        fontSize: 24,
+        fontWeight: 400,
+        lineHeight: 1.2,
+        type: 'text',
+      },
+    };
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('text')]);
+    expect(versions(state)).toEqual([3, 3]);
+
+    state = workbenchReducer(state, { layer: text, layerId: 'text', type: 'replaceCanvasLayer' });
+    expect(versions(state)).toEqual([4, 4]);
   });
 });

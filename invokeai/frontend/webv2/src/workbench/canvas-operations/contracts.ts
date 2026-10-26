@@ -18,6 +18,9 @@ import type {
   ComposeForGenerationResult,
 } from '@workbench/canvas-operations/generationComposite';
 import type {
+  ControlDetectionStatus,
+  ControlLayerIntent,
+  ControlLayerIntentResult,
   FilterCommitTarget,
   FilterOperationSessionState,
   LayerFilterSettings,
@@ -25,6 +28,7 @@ import type {
   SamModel,
   SamSessionError,
   SamSessionSnapshot,
+  RetryControlDetectionResult,
 } from '@workbench/canvas-operations/operationTypes';
 import type { BackendGraphContract } from '@workbench/graphContracts';
 import type { WorkbenchState } from '@workbench/projectContracts';
@@ -67,7 +71,7 @@ export interface CanvasOperationCapability {
   getSamSessionState(): SamSessionSnapshot | null;
   subscribeSamSession(listener: () => void): () => void;
   startSelectObject(layerId: string): StartSelectObjectSessionResult;
-  startFilterOperation(layerId: string, recommendedFilterType?: string | null): StartFilterOperationResult;
+  startFilterOperation(layerId: string): StartFilterOperationResult;
   updateFilterOperation(draft: LayerFilterSettings): CanvasOperationMutationResult;
   setFilterOperationAutoProcess(value: boolean): CanvasOperationMutationResult;
   processFilterOperation(): Promise<CanvasOperationActionResult>;
@@ -86,6 +90,12 @@ export interface CanvasOperationCapability {
   ): Promise<SaveSelectObjectSessionResult>;
   resetSelectObjectSession(): CanvasOperationMutationResult;
   cancelSelectObjectSession(): void;
+  /** Applies a Properties panel edit to a control layer, then detects its map in the background when needed. */
+  applyControlLayerIntent(layerId: string, intent: ControlLayerIntent): ControlLayerIntentResult;
+  /** Runs detection again for a layer whose map is stale (after a failure, or undo back to a stale state). */
+  retryControlDetection(layerId: string): RetryControlDetectionResult;
+  getControlDetectionStatus(layerId: string): ControlDetectionStatus;
+  subscribeControlDetectionStatus(layerId: string, listener: () => void): () => void;
 }
 
 /** Private composition shape; mutable stores and controller never cross the Canvas interface. */
@@ -165,7 +175,7 @@ export interface CanvasFilterCoordinatorDeps {
 }
 
 export interface CanvasFilterOperationCoordinator {
-  start(layerId: string, recommendedFilterType?: string | null): StartFilterOperationResult;
+  start(layerId: string): StartFilterOperationResult;
   updateDraft(draft: LayerFilterSettings): CanvasOperationMutationResult;
   setAutoProcess(value: boolean): CanvasOperationMutationResult;
   process(): Promise<CanvasOperationActionResult>;
@@ -196,6 +206,8 @@ export interface CanvasSelectObjectCoordinatorDeps {
   readonly controller: CanvasOperationController;
   readonly projectId: string;
   isInteractionLocked(): boolean;
+  /** Reads the account's Auto Process preference when a session starts; absent means off. */
+  readAutoProcessPreference?(): boolean;
   prepareStart(layerId: string): SelectObjectStartContext;
   selectLayer(layerId: string): void;
   clearOtherOperation(): void;
@@ -384,6 +396,7 @@ export interface CreateSelectObjectSessionOptions<T> {
     cleanupPreview(): void;
     isGuardCurrent(guard: LayerExportGuard): boolean;
   };
+  initialAutoProcess?: boolean;
   operation: CanvasOperationSession;
 }
 

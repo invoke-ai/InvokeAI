@@ -19,12 +19,15 @@ from unittest.mock import MagicMock
 
 import pytest
 import torch
+from PIL import Image
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
-from invokeai.app.invocations.fields import InputField
-from invokeai.app.invocations.primitives import IntegerOutput
+from invokeai.app.invocations.fields import BoardField, InputField, WithBoard
+from invokeai.app.invocations.primitives import ImageOutput, IntegerOutput
+from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.names.names_default import SimpleNameService
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.session_processor.session_processor_default import DefaultSessionRunner
 from invokeai.app.services.session_queue.session_queue_common import Batch, BatchDatum, SessionQueueItem
@@ -32,6 +35,7 @@ from invokeai.app.services.session_queue.session_queue_default import SessionQue
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.users.users_common import UserCreateRequest, UserUpdateRequest
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
     WorkingMemoryCalibrationRequest,
@@ -73,6 +77,20 @@ class CalibrationProbeNodeInvocation(BaseInvocation):
         return IntegerOutput(value=1)
 
 
+# The images each image node saved.
+_SAVED: list[str] = []
+
+
+@invocation("test_working_memory_calibration_image_node", version="1.0.0")
+class CalibrationImageNodeInvocation(BaseInvocation, WithBoard):
+    """Saves an image, as a decode node does."""
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.images.save(image=Image.new("RGB", (8, 8)))
+        _SAVED.append(image.image_name)
+        return ImageOutput.build(image)
+
+
 class _Stats:
     @contextmanager
     def collect_stats(self, invocation, graph_execution_state_id) -> Iterator[None]:
@@ -90,10 +108,12 @@ def _reset_seen() -> Iterator[None]:
     _SEEN.clear()
     _ON_CANCEL.clear()
     _WHILE_RUNNING.clear()
+    _SAVED.clear()
     yield
     _SEEN.clear()
     _ON_CANCEL.clear()
     _WHILE_RUNNING.clear()
+    _SAVED.clear()
 
 
 @pytest.fixture
@@ -146,6 +166,17 @@ def _run_next(queue: SessionQueue, runner: DefaultSessionRunner) -> SessionQueue
     assert item is not None
     runner.workflow_call_queue_lifecycle.run_queue_item(item)
     return queue.get_queue_item(item.item_id)
+
+
+@pytest.fixture
+def image_storage(tmp_path: Path, mock_invoker: Invoker) -> None:
+    """Images saved to disk under `tmp_path`, with their records in the test database."""
+    services = mock_invoker.services
+    services.image_files = DiskImageFileStorage(tmp_path / "images")
+    services.names = SimpleNameService()
+    services.urls = LocalUrlService()
+    services.image_files.start(mock_invoker)
+    services.images.start(mock_invoker)
 
 
 def _stored_points(tmp_path: Path) -> list[dict]:
@@ -300,6 +331,26 @@ def test_an_ordinary_item_runs_without_a_probe_scope(
     assert item.status == "completed"
     assert _SEEN == [None]
     assert not (tmp_path / "working_memory").exists()
+
+
+def test_a_calibration_items_images_are_intermediates_on_no_board(
+    service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, mock_invoker: Invoker, image_storage: None
+) -> None:
+    """The client sent the node as a gallery output on a board; the server made it an intermediate on none, which
+    Clear Intermediates removes like any other."""
+    services = mock_invoker.services
+    board = services.board_records.save("Gallery board", "system")
+    graph = Graph()
+    graph.add_node(
+        CalibrationImageNodeInvocation(id="image", board=BoardField(board_id=board.board_id), is_intermediate=False)
+    )
+    asyncio.run(service.create_run("model-key", WorkingMemoryCalibrationRequest(graph=graph), "system"))
+
+    assert _run_next(queue, runner[0]).status == "completed"
+    [name] = _SAVED
+    assert services.image_records.get(name).is_intermediate is True
+    assert services.board_image_records.get_board_for_image(name) is None
+    assert services.images.get_image_names(is_intermediate=False, is_admin=True).image_names == []
 
 
 _ESTIMATED: list[str] = []

@@ -122,9 +122,14 @@ export const enqueueWorkflow = async (request: QueueEnqueueWorkflowRequest): Pro
 export const enqueueUtility = async (request: {
   graph: QueueEnqueueWorkflowRequest['graph'];
   origin: string;
+  /** Put the item ahead of queued generations. */
+  prepend?: boolean;
 }): Promise<{ enqueued: number; itemIds: number[] }> => {
   const result = await apiFetchJson<{ enqueued?: number; item_ids?: number[] }>('/api/v1/queue/default/enqueue_batch', {
-    body: JSON.stringify({ batch: { graph: request.graph, origin: request.origin, runs: 1 }, prepend: false }),
+    body: JSON.stringify({
+      batch: { graph: request.graph, origin: request.origin, runs: 1 },
+      prepend: request.prepend === true,
+    }),
     method: 'POST',
   });
 

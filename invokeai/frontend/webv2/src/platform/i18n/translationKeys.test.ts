@@ -60,6 +60,19 @@ const I18N_KEY_PROP = new RegExp(String.raw`\bi18nKey\s*=\s*['"](${KEY_PATTERN})
 // `labelKey: 'a.b'` / `titleKey: 'a.b'` — keys held in const maps and passed to `t()` indirectly.
 const KEY_PROPERTY = new RegExp(String.raw`\b\w*[Kk]ey\s*:\s*['"](${KEY_PATTERN})['"]`, 'g');
 
+// `t('a.b')` with no options: nothing can fill the value's `{{placeholders}}`.
+const BARE_T_CALL = new RegExp(String.raw`\bt\(\s*['"](${KEY_PATTERN})['"]\s*\)`, 'g');
+
+const readCatalogString = (key: string): string | undefined => {
+  let value: unknown = en;
+
+  for (const segment of key.split('.')) {
+    value = typeof value === 'object' && value !== null ? (value as Record<string, unknown>)[segment] : undefined;
+  }
+
+  return typeof value === 'string' ? value : undefined;
+};
+
 const collectKeys = (source: string): string[] => {
   const found: string[] = [];
 
@@ -95,5 +108,18 @@ describe('translation keys', () => {
       .map(({ key, path }) => `${key} (${path.replace('../../', 'src/')})`);
 
     expect([...new Set(missing)].sort()).toEqual([]);
+  });
+
+  it('passes options wherever the English value interpolates', () => {
+    // A key shared by an interpolating caller and a bare one renders the literal `{{name}}` at the bare call.
+    const unfilled = Object.entries(sourceModules)
+      .filter(([path]) => !isTestModule(path))
+      .flatMap(([path, source]) =>
+        [...(source as string).matchAll(BARE_T_CALL)].flatMap(([, key]) =>
+          key && readCatalogString(key)?.includes('{{') ? [`${key} (${path.replace('../../', 'src/')})`] : []
+        )
+      );
+
+    expect([...new Set(unfilled)].sort()).toEqual([]);
   });
 });

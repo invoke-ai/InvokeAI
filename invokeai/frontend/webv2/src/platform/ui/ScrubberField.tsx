@@ -746,7 +746,7 @@ export const ScrubberField = ({
         ) : (
           <button
             ref={observeText}
-            aria-label={t('common.scrubber.editValue', { label })}
+            aria-label={t('common.scrubber.editValue', { label, value: formatted })}
             data-part="value"
             disabled={disabled}
             // One tab stop per field: the slider opens the editor with Enter or a digit.

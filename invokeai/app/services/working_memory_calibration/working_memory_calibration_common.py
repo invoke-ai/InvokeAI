@@ -9,7 +9,7 @@ model's runs measured.
 """
 
 import datetime
-from typing import Final, Literal, Optional
+from typing import Any, Final, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, SerializerFunctionWrapHandler, model_serializer, model_validator
 
@@ -104,14 +104,42 @@ class CalibrationPoint(MeasuredWindow):
     env_id: str
 
 
+CalibrationErrorCode = Literal["model_changed"]
+"""Why a run's item failed, where a client acts on it: model_changed, a model its graph names changed or was removed
+after the calibration was planned, so the item failed at admission; calibrate again."""
+
+MODEL_CHANGED: Final[CalibrationErrorCode] = "model_changed"
+CALIBRATION_RUNNING: Final = "calibration_running"
+"""The code of the 409 that refuses a new attempt while another one runs on the GPU's device class."""
+
+
 class ObservedItem(_StoreModel):
-    """What the session runner saw of one of the run's queue items. Kept so that a run's status survives the queue
-    pruning its items."""
+    """What the session runner saw of one of the run's queue items, or what the calibration service recorded of a
+    retry when the queue announced it. Kept so that a run's status survives the queue pruning its items."""
 
     status: QUEUE_ITEM_STATUS
     error_message: Optional[str] = None
+    error_code: Optional[CalibrationErrorCode] = None
     retried_from_item_id: Optional[int] = None
     observed_at: datetime.datetime
+
+    @model_serializer(mode="wrap")
+    def _omit_absent_fields(self, handler: SerializerFunctionWrapHandler) -> dict:
+        # Written only when set: an observation without it stays readable by a version that forbids the unknown field.
+        data = handler(self)
+        if data.get("error_code") is None:
+            data.pop("error_code", None)
+        return data
+
+
+class CalibrationModelIdentity(_StoreModel):
+    """What a calibration run's model was when the run was created, beside its hash (`CalibrationRun.model_hash`): the
+    facts that decide which decode the graph runs and which line it measures."""
+
+    base: Optional[str] = None
+    type: Optional[str] = None
+    format: Optional[str] = None
+    variant: Optional[str] = None
 
 
 class CalibrationRun(_StoreModel):
@@ -143,6 +171,11 @@ class CalibrationRun(_StoreModel):
         description="The soft facts of the environment the run was created under; absent in runs stored before they "
         "were recorded, which fall back to the environment's",
     )
+    model_identity: Optional[CalibrationModelIdentity] = Field(
+        default=None,
+        description="The model as it was when the run was created; an item fails at admission once it changed. Absent "
+        "in runs stored before it was recorded, which compare the hash alone",
+    )
 
     @model_validator(mode="after")
     def _steps_belong_to_an_attempt(self) -> "CalibrationRun":
@@ -154,15 +187,17 @@ class CalibrationRun(_StoreModel):
     def _omit_absent_fields(self, handler: SerializerFunctionWrapHandler) -> dict:
         # Written only when set: a run without them stays readable by a version that forbids the unknown fields.
         data = handler(self)
-        for name in ("attempt_id", "attempt_steps", "soft"):
+        for name in ("attempt_id", "attempt_steps", "soft", "model_identity"):
             if data.get(name) is None:
                 data.pop(name, None)
         return data
 
 
 class RemovedAttemptSteps(_StoreModel):
-    """What resets removed of one attempt (attempt_id): what judging the runs of it that are left needs."""
+    """What resets removed of one attempt, an owner's attempt_id: what judging the runs of it that are left needs."""
 
+    user_id: str = Field(description="The owner of the attempt's runs")
+    attempt_id: str
     removed: int = Field(ge=1, description="How many of the attempt's runs resets removed; they count as queued")
     aborted: bool = Field(
         default=False,
@@ -195,12 +230,28 @@ class CalibrationStoreFile(_StoreModel):
         description="Per model key, how often the model was reset. A node's points of a model reset after the node "
         "started are dropped",
     )
-    removed_attempt_steps: dict[str, RemovedAttemptSteps] = Field(
-        default_factory=dict,
-        description="Per attempt id, what resets removed of the attempt, so that the runs of it that are left are "
-        "judged on every run it queued. Kept while a stored run of the attempt is left, or a later step of it may "
-        "still come: the attempt was running when a reset removed a run of it",
+    removed_attempt_steps: list[RemovedAttemptSteps] = Field(
+        default_factory=list,
+        description="Per attempt (owner and attempt_id), what resets removed of it, so that the runs of it that are "
+        "left are judged on every run it queued. Kept while a stored run of the attempt is left, or a later step of it "
+        "may still come: the attempt was running when a reset removed a run of it",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _records_of_owners(cls, data: Any) -> Any:
+        # Development builds keyed the records by attempt id alone. Each becomes the record of every owner whose stored
+        # runs carry that attempt id; one no stored run carries any more judges nothing, and is dropped.
+        if not isinstance(data, dict) or not isinstance(data.get("removed_attempt_steps"), dict):
+            return data
+        runs = [run for run in data.get("runs") or [] if isinstance(run, dict)]
+        records = [
+            {**record, "user_id": owner, "attempt_id": attempt_id}
+            for attempt_id, record in data["removed_attempt_steps"].items()
+            for owner in sorted({run.get("user_id") for run in runs if run.get("attempt_id") == attempt_id})
+            if isinstance(record, dict) and isinstance(owner, str)
+        ]
+        return {**data, "removed_attempt_steps": records}
 
     @model_serializer(mode="wrap")
     def _omit_absent_fields(self, handler: SerializerFunctionWrapHandler) -> dict:
@@ -221,8 +272,9 @@ ATTEMPT_ID_DESCRIPTION: Final = (
     "so a client that enqueues one run per step can group them. Sent together with attempt_steps, never alone (422). No "
     "window of an attempt feeds an estimate until it queued attempt_steps runs and every one has finished; a run a "
     "reset removed still counts as queued, without its measurements. An aborted attempt never feeds one: an item of "
-    "it ended canceled (Stop, a queue clear), it ended before it queued all its runs (Stop, a failed submission), or "
-    "a reset removed a run of it while it ran. An item that failed ends that step, not the attempt. "
+    "it ended canceled (Stop, a queue clear) or failed because a model changed after the calibration was planned "
+    "(error_code model_changed), it ended before it queued all its runs (Stop, a failed submission), or a reset "
+    "removed a run of it while it ran. An item that failed ends that step, not the attempt. "
     "The run id derives from the idempotency_key, the request and the attempt, so an idempotency_key names one run: "
     "repeating the request under the same attempt returns that run, and reusing the key under another attempt is "
     "refused with 409 while the queue keeps the key's receipt. Make each key unique per run of an attempt."
@@ -245,7 +297,8 @@ MEASUREMENT_VERIFIED_DESCRIPTION: Final = (
 
 class WorkingMemoryCalibrationRequest(BaseModel):
     """The batch a calibration run enqueues, built by the client. The server sets origin, destination, runs and the
-    graph's id, and turns the node cache off."""
+    graph's id, turns the node cache off, and makes every node's images intermediates on no board: never in the
+    gallery, and removed by clearing intermediates."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -291,11 +344,15 @@ CalibrationRunStatus = Literal["running", "completed", "failed", "partial", "can
 
 CalibrationHoldBack = Literal["running", "aborted_attempt"]
 """Why no window of a run feeds a fit: running, the queue holds an unfinished item of it or of a run of its attempt;
-aborted_attempt, none is running and its attempt was aborted: an item of it ended canceled (Stop, a queue clear), it
-queued fewer runs than its attempt_steps (Stop, or a failed submission, ended it before it queued them all; a run a
-reset removed counts as queued), or a reset removed a run of it while it ran or after it was aborted. An aborted
-attempt never feeds a fit."""
+aborted_attempt, none is running and its attempt was aborted: an item of it ended canceled (Stop, a queue clear) or
+failed because a model changed after the calibration was planned (`model_changed`), it queued fewer runs than its
+attempt_steps (Stop, or a failed submission, ended it before it queued them all; a run a reset removed counts as
+queued), or a reset removed a run of it while it ran or after it was aborted. An aborted attempt never feeds a fit."""
 
+_RUN_ERROR_CODE_DESCRIPTION: Final = (
+    "Why the failed item failed, where a client acts on it (`CalibrationErrorCode`): model_changed, a model its graph "
+    "names changed or was removed after the calibration was planned. Null otherwise"
+)
 _RUN_ATTEMPT_STEPS_DESCRIPTION: Final = (
     "How many runs the run's attempt planned; null without an attempt, and for a run stored before it was sent"
 )
@@ -314,6 +371,7 @@ class WorkingMemoryCalibrationRunSummary(BaseModel):
         "valid points were recorded, else canceled"
     )
     error: Optional[str] = Field(description="The error of a failed item, when the run failed")
+    error_code: Optional[CalibrationErrorCode] = Field(description=_RUN_ERROR_CODE_DESCRIPTION)
     item_ids: list[int] = Field(description="Every queue item of the run known, retries and the items they retried")
     point_count: int
     attempt_id: Optional[str] = Field(description="The client's attempt the run belongs to; null when none was sent")
@@ -456,8 +514,8 @@ class WorkingMemoryCalibrationLineSize(BaseModel):
     excluded_reason: Optional[CalibrationSizeExclusion] = Field(
         description="Why a size is not counted: fragmented, its windows measured the allocator's fragmentation "
         "(`backend/working_memory/fragmentation.py`); partial_residency, the model was not fully on the device; "
-        "aborted_attempt, its windows come from aborted attempts (Stop, a queue clear, a failed submission), which "
-        "never feed a line. Null for a counted size"
+        "aborted_attempt, its windows come from aborted attempts (Stop, a queue clear, a failed submission, a model "
+        "changed after the calibration was planned), which never feed a line. Null for a counted size"
     )
     shipped_bytes: Optional[int] = Field(
         description="The shipped estimate at this size, priced with the line's estimator where one of its windows "
@@ -518,6 +576,7 @@ class WorkingMemoryCalibrationModelRun(BaseModel):
     run_id: str
     status: CalibrationRunStatus
     error: Optional[str]
+    error_code: Optional[CalibrationErrorCode] = Field(description=_RUN_ERROR_CODE_DESCRIPTION)
     created_at: datetime.datetime
     point_count: int
     attempt_id: Optional[str] = Field(description="The client's attempt the run belongs to; null when none was sent")
@@ -525,7 +584,8 @@ class WorkingMemoryCalibrationModelRun(BaseModel):
     held_back: Optional[CalibrationHoldBack] = Field(
         description="Why no window of the run feeds a fit: running, it or a run of its attempt is still in the queue, "
         "and its windows join once all have finished; aborted_attempt, its attempt was aborted, and its windows never "
-        "feed one: an item of it ended canceled (Stop, a queue clear), the attempt ended before it queued all "
+        "feed one: an item of it ended canceled (Stop, a queue clear) or failed because a model changed after "
+        "the calibration was planned (model_changed), the attempt ended before it queued all "
         "attempt_steps runs (Stop, a failed submission), or a reset removed a run of it while it ran. Null when its "
         "windows are judged like any finished run's"
     )
@@ -577,6 +637,20 @@ class CalibrationRunNotFoundError(KeyError):
 
 class CalibrationQueueFullError(Exception):
     """The queue had no room for all of the run's items, so it took none."""
+
+
+class CalibrationModelChangedError(Exception):
+    """A model the run's graph names is not the one it was planned with any more: changed, or removed. The route
+    answers 409 with `code` `model_changed`."""
+
+    code: Final = MODEL_CHANGED
+
+
+class CalibrationAttemptBusyError(Exception):
+    """Another calibration attempt still runs on the GPU's device class. The route answers 409 with `code`
+    `calibration_running`."""
+
+    code: Final = CALIBRATION_RUNNING
 
 
 class CalibrationAttemptConflictError(Exception):
