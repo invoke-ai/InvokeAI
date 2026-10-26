@@ -10,6 +10,8 @@
     "check-deploy-output": "node ./scripts/verify-deploy-output.mjs",
     "check-redirects": "node ./scripts/validate-redirect-targets.mjs",
     "refresh-launcher-release": "node ./scripts/refresh-launcher-release.mjs",
+    "sync-app-search-index": "node ./scripts/sync-app-search-index.mjs",
+    "check-app-search-index": "node ./scripts/sync-app-search-index.mjs --check",
     "test": "node --test \"src/**/*.test.mjs\" \"plugins/**/*.test.mjs\"",
     "build": "astro build",
     "preview": "astro preview",

@@ -275,6 +275,20 @@ The Invoke API is always evolving, and quite large. Documenting all this by hand
 
 These files are used for the [YAML Config](/configuration/invokeai-yaml) and [API Development](/development/guides/api-development) pages. If you're adding a feature that changes the yaml config, or the api then make sure to run `pnpm run generate-docs-data` to ensure tests pass, and that the docs are accurate in accordance to your updates.
 
+### App Search Index
+
+The app's command palette searches the docs from a copy of the docs index committed at `invokeai/frontend/webv2/src/workbench/palette/docsSearchIndex.json`. The build serves the index at `/app-search.json` (`src/pages/app-search.json.ts`). It lists the topics outside the Build group, with their labels, descriptions and landing pages, and each of their published pages, with its title, description, topic, and h2 and h3 headings. Developer and contributor pages are left out.
+
+Resync the copy whenever a change reaches the index: adding, removing, moving or renaming a page; changing a page's title, description, `draft` or `pagefind` frontmatter; adding, removing or renaming an h2 or h3 heading; or changing a topic in `src/config/topics.ts`. Rebuild, copy the index into the app, and commit the result:
+
+```sh
+cd docs
+pnpm build
+pnpm run sync-app-search-index
+```
+
+`pnpm run check-app-search-index` fails when the committed copy no longer matches a build.
+
 ## Testing
 
 The docs contain tests for the following:
@@ -284,6 +298,7 @@ The docs contain tests for the following:
 | Link Checker | Checks for invalid, malformed or misdirected internal link URLs | Dev Server, Build, Deploy |
 | Verify Deployment Output | Check to ensure the asset and page paths have the expected base paths dependent on deploy targets | Build, Deploy |
 | Check Docs Data | Checks to ensure the generated files are accurate | Deploy |
+| Check App Search Index | Checks that the app's copy of the docs search index matches the build | Deploy |
 
 ## GitHub Actions
 
