@@ -1,0 +1,55 @@
+name: Showcase submission
+description: Submit artwork you made with Invoke for the showcase on the docs site
+title: '[showcase]: '
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing your work. A maintainer reviews each submission before it appears on the [showcase](https://v7.invoke.ai/showcase/), credited to you.
+
+  - type: textarea
+    id: artwork
+    attributes:
+      label: Artwork
+      description: Drag your image into this box, or paste it. PNG, JPEG or WebP, ideally at least 2000 px on the long side. Upload the original, not a screenshot.
+    validations:
+      required: true
+
+  - type: input
+    id: title
+    attributes:
+      label: Title
+    validations:
+      required: true
+
+  - type: input
+    id: artist
+    attributes:
+      label: Artist name
+      description: The name to credit, exactly as it should appear.
+    validations:
+      required: true
+
+  - type: input
+    id: artist-link
+    attributes:
+      label: Artist link
+      description: Optional. Your portfolio, website or social profile.
+      placeholder: https://
+
+  - type: textarea
+    id: made-with
+    attributes:
+      label: Model and workflow
+      description: Optional. The model you used, such as FLUX.2 Klein, and anything notable about how you made it.
+
+  - type: checkboxes
+    id: permission
+    attributes:
+      label: Permission
+      options:
+        - label: I made this image.
+          required: true
+        - label: I grant Invoke permission to display it on the Invoke docs site with credit; I can ask for removal anytime.
+          required: true

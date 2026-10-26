@@ -1,0 +1,406 @@
+---
+// Showcase artwork in a slowly drifting strip, each tile linking to the artwork on `/showcase/`. Scrolling the page
+// speeds the drift up and turns it around (`src/lib/marquee.mjs`). The real tiles come once, first; the copies that
+// make the loop seamless are hidden from assistive technology and from the keyboard. With reduced motion, while a tile
+// has focus, or with too few entries to fill the strip, it is a still row instead. A button at its corner pauses and
+// resumes it, remembered for the session. Without JavaScript it drifts at a steady speed.
+import Pause from '@lucide/astro/icons/pause';
+import Play from '@lucide/astro/icons/play';
+import type { CollectionEntry } from 'astro:content';
+import { Image } from 'astro:assets';
+
+import { withBase } from '../base-path';
+
+type Props = {
+  /** In display order. */
+  entries: CollectionEntry<'showcase'>[];
+};
+
+const { entries } = Astro.props;
+const base = import.meta.env.BASE_URL;
+
+/** Row heights in CSS pixels; keep in step with `--row-height` below. */
+const rowHeight = { narrow: 160, wide: 240 };
+const tileGap = 12;
+/** Wide enough to cover a large desktop window with one loop unit. */
+const coverWidth = 3200;
+/** Fewer entries than this would repeat the same few images across the strip, so they stay still. */
+const minAnimatedEntries = 4;
+
+const ratio = (entry: CollectionEntry<'showcase'>) => entry.data.image.width / entry.data.image.height;
+const setWidth = entries.reduce((total, entry) => total + ratio(entry) * rowHeight.wide + tileGap, 0);
+const animated = entries.length >= minAnimatedEntries;
+// The loop unit is the real set plus as many hidden repeats as it takes to cover the strip; the track holds it twice
+// and moves by half its width, so the second unit takes the first one's place.
+const unitRepeats = animated ? Math.max(1, Math.ceil(coverWidth / setWidth)) : 1;
+const hiddenSets = animated ? unitRepeats * 2 - 1 : 0;
+/** The drift's speed in pixels a second; the script and the no-JavaScript keyframe share it. */
+const driftSpeed = 50;
+const duration = (setWidth * unitRepeats) / driftSpeed;
+
+const tiles = entries.map((entry) => {
+  const { image, title, artist } = entry.data;
+  const widths = [rowHeight.narrow, rowHeight.wide, rowHeight.wide * 2]
+    .map((height) => Math.round(ratio(entry) * height))
+    .filter((width) => width < image.width)
+    .concat(image.width);
+  return {
+    id: entry.id,
+    image,
+    title,
+    artist,
+    ratio: ratio(entry),
+    widths: [...new Set(widths)],
+    sizes: `(min-width: 50rem) ${Math.round(ratio(entry) * rowHeight.wide)}px, ${Math.round(ratio(entry) * rowHeight.narrow)}px`,
+  };
+});
+---
+
+<div class="marquee-wrap not-content">
+  <div
+    class:list={['marquee', animated ? 'marquee--animated' : 'marquee--still']}
+    style={`--duration: ${duration.toFixed(1)}s`}
+    data-showcase-marquee
+    data-drift-speed={driftSpeed}
+  >
+    <div class="track">
+      {
+        Array.from({ length: hiddenSets + 1 }, (_, setIndex) => (
+          <ul class:list={['set', { 'set--copy': setIndex > 0 }]} role="list" aria-hidden={setIndex > 0 ? 'true' : undefined} inert={setIndex > 0}>
+            {tiles.map((tile) => (
+              <li class="tile" style={`--ratio: ${tile.ratio}`}>
+                <a href={withBase(`/showcase/#showcase-${tile.id}`, base)}>
+                  {/* The caption names the artwork. */}
+                  <Image src={tile.image} alt="" widths={tile.widths} sizes={tile.sizes} />
+                  <span class="caption">
+                    <span class="caption__title">{tile.title}</span>
+                    <span class="caption__artist">{tile.artist}</span>
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        ))
+      }
+    </div>
+  </div>
+  {/* Shown by the script, which is what it controls. */}
+  {
+    animated && (
+      <button
+        type="button"
+        class="marquee-toggle docs-button docs-button--ghost docs-button--icon docs-button--md"
+        aria-pressed="false"
+        aria-label="Pause showcase animation"
+        data-marquee-toggle
+        hidden
+      >
+        <Pause class="marquee-toggle__pause" aria-hidden="true" />
+        <Play class="marquee-toggle__play" aria-hidden="true" />
+      </button>
+    )
+  }
+</div>
+
+<script>
+  import { stepSpring, velocityFactor, wrapOffset } from '../marquee.mjs';
+
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+  const pausedKey = 'docs-showcase-marquee-paused';
+  const readPaused = () => {
+    try {
+      return sessionStorage.getItem(pausedKey) === 'true';
+    } catch {
+      return false;
+    }
+  };
+
+  for (const marquee of document.querySelectorAll<HTMLElement>('[data-showcase-marquee].marquee--animated')) {
+    const track = marquee.querySelector<HTMLElement>('.track')!;
+    const toggle = marquee.parentElement!.querySelector<HTMLButtonElement>('[data-marquee-toggle]')!;
+    let paused = readPaused();
+    const driftSpeed = Number(marquee.dataset.driftSpeed);
+    // The track holds the loop unit twice.
+    let unit = track.offsetWidth / 2;
+    let offset = 0;
+    let direction = 1;
+    let pace = 1; // eases to 0 under the pointer
+    let paceTarget = 1;
+    const scrollSpring = { value: 0, velocity: 0 };
+    // On screen until the observer says otherwise, so a late report never leaves the strip still.
+    let onScreen = true;
+    let frame = 0;
+    let lastTime = 0;
+    let lastScrollY = 0;
+
+    const tick = (time: number) => {
+      // Long gaps (a hidden tab) count as one ordinary frame.
+      const dt = Math.min(Math.max((time - lastTime) / 1000, 0), 1 / 15) || 1 / 60;
+      const scrollY = window.scrollY;
+      stepSpring(scrollSpring, (scrollY - lastScrollY) / dt, dt);
+      lastTime = time;
+      lastScrollY = scrollY;
+
+      const factor = velocityFactor(scrollSpring.value);
+      // The drift keeps the direction of the last scroll: up runs it backwards.
+      if (factor < -0.01) direction = -1;
+      else if (factor > 0.01) direction = 1;
+      pace += (paceTarget - pace) * (1 - Math.exp(-dt * 8));
+
+      offset = wrapOffset(offset - direction * driftSpeed * (1 + Math.abs(factor)) * pace * dt, unit);
+      track.style.transform = `translate3d(${offset.toFixed(2)}px, 0, 0)`;
+      frame = requestAnimationFrame(tick);
+    };
+
+    const stop = () => {
+      cancelAnimationFrame(frame);
+      frame = 0;
+    };
+
+    // Runs only on screen, with motion allowed, not paused and no tile focused; the still row needs no transform.
+    const update = () => {
+      const run = onScreen && !paused && !reducedMotion.matches && !marquee.matches(':focus-within');
+      marquee.toggleAttribute('data-driven', !reducedMotion.matches);
+      marquee.toggleAttribute('data-user-paused', paused);
+      toggle.hidden = reducedMotion.matches;
+      // The name stays "Pause showcase animation"; pressed means paused.
+      toggle.setAttribute('aria-pressed', String(paused));
+      if (run && !frame) {
+        lastTime = performance.now();
+        lastScrollY = window.scrollY;
+        scrollSpring.value = scrollSpring.velocity = 0;
+        frame = requestAnimationFrame(tick);
+      } else if (!run && frame) {
+        stop();
+      }
+      if (!run && (reducedMotion.matches || marquee.matches(':focus-within'))) track.style.transform = '';
+    };
+
+    new IntersectionObserver(([entry]) => {
+      onScreen = entry.isIntersecting;
+      update();
+    }).observe(marquee);
+    new ResizeObserver(([entry]) => {
+      unit = entry.borderBoxSize[0].inlineSize / 2;
+    }).observe(track);
+    // A mouse over the strip slows it to a stop; a touch has no matching leave, so it does not.
+    marquee.addEventListener('pointerenter', (event) => event.pointerType === 'mouse' && (paceTarget = 0));
+    marquee.addEventListener('pointerleave', () => (paceTarget = 1));
+    toggle.addEventListener('click', () => {
+      paused = !paused;
+      try {
+        sessionStorage.setItem(pausedKey, String(paused));
+      } catch {
+        // Without storage the choice lasts for this page only.
+      }
+      update();
+    });
+    marquee.addEventListener('focusin', update);
+    marquee.addEventListener('focusout', () => requestAnimationFrame(update));
+    reducedMotion.addEventListener('change', update);
+    update();
+  }
+</script>
+
+<style>
+  /*
+   * Nearly full-bleed: the strip spans the viewport less the page gutters, so a classic scrollbar cannot push it past
+   * the edge. Vertical padding leaves room for focus rings.
+   */
+  .marquee-wrap {
+    --strip-width: calc(100vw - 2 * var(--sl-content-pad-x));
+    position: relative;
+    width: var(--strip-width);
+    margin-inline: calc((100% - var(--strip-width)) / 2);
+  }
+
+  .marquee {
+    --row-height: 160px;
+    padding-block: 0.375rem;
+    overflow: hidden;
+  }
+
+  /* Over the strip's faded top-right corner, outside the fade itself. */
+  .marquee-toggle {
+    position: absolute;
+    z-index: 1;
+    top: 0.75rem;
+    right: 0.75rem;
+
+    &:not(:hover, :active) {
+      background-color: color-mix(in oklab, var(--docs-bg) 80%, transparent);
+    }
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  .marquee-toggle[aria-pressed='false'] .marquee-toggle__play,
+  .marquee-toggle[aria-pressed='true'] .marquee-toggle__pause {
+    display: none;
+  }
+
+  @media (min-width: 50rem) {
+    .marquee {
+      --row-height: 240px;
+    }
+  }
+
+  .track {
+    display: flex;
+    width: max-content;
+  }
+
+  .set {
+    display: flex;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* The gap sits inside each tile, so half the track is exactly one loop unit. */
+  .tile {
+    flex: none;
+    padding-inline-end: 0.75rem;
+  }
+
+  .tile a {
+    position: relative;
+    display: block;
+    height: var(--row-height);
+    aspect-ratio: var(--ratio);
+    overflow: hidden;
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+    color: var(--docs-text-strong);
+    text-decoration: none;
+  }
+
+  .tile img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .caption {
+    position: absolute;
+    inset: auto 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 2rem 0.75rem 0.625rem;
+    background: linear-gradient(transparent, color-mix(in oklab, var(--docs-bg) 92%, transparent));
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    opacity: 0;
+  }
+
+  .tile a:is(:hover, :focus-visible) .caption {
+    opacity: 1;
+  }
+
+  /* Touch screens have no hover, so the caption always shows. */
+  @media (hover: none) {
+    .caption {
+      opacity: 1;
+    }
+  }
+
+  .caption__title {
+    font-weight: 600;
+  }
+
+  .caption__artist {
+    color: var(--docs-text-muted);
+  }
+
+  /*
+   * Moving: the strip fades out at both ends. The script moves it; without the script it drifts on a keyframe and
+   * pauses under the pointer.
+   */
+  @media (prefers-reduced-motion: no-preference) {
+    .marquee--animated {
+      mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
+
+      .track {
+        will-change: transform;
+      }
+
+      &:not([data-driven]) .track {
+        animation: showcase-marquee var(--duration) linear infinite;
+      }
+
+      &:not([data-driven]):is(:hover, [data-user-paused]) .track {
+        animation-play-state: paused;
+      }
+    }
+
+    .caption {
+      transition: opacity 150ms ease;
+    }
+  }
+
+  @keyframes showcase-marquee {
+    to {
+      translate: -50% 0;
+    }
+  }
+
+  /*
+   * Still: the real tiles only, in a row that scrolls sideways when it overflows and is centred when it does not. A
+   * moving strip becomes one while a tile has focus, so the focused tile scrolls into view.
+   */
+  .marquee--still,
+  .marquee--animated:focus-within {
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    mask-image: none;
+
+    .track {
+      width: auto;
+      min-width: 100%;
+      justify-content: safe center;
+      animation: none;
+    }
+
+    .set--copy {
+      display: none;
+    }
+
+    .tile {
+      scroll-snap-align: start;
+    }
+
+    .tile:last-child {
+      padding-inline-end: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .marquee--animated {
+      overflow-x: auto;
+      scroll-snap-type: x proximity;
+
+      .track {
+        width: auto;
+        min-width: 100%;
+        justify-content: safe center;
+      }
+
+      .set--copy {
+        display: none;
+      }
+
+      .tile {
+        scroll-snap-align: start;
+      }
+
+      .tile:last-child {
+        padding-inline-end: 0;
+      }
+    }
+  }
+</style>

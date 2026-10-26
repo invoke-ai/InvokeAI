@@ -1,0 +1,1259 @@
+---
+// An interactive miniature of the app's Gallery widget in its stacked layout, for the home page tour. It follows
+// `invokeai/frontend/webv2/src/features/gallery/ui/`: the widget header with its board breadcrumb
+// (`GalleryWidgetChrome.tsx`), the board search and the board list grouped into the open project and the Library
+// (`GalleryBoardsPanel.tsx`, `galleryBoardGroups.ts`), the Media and Uploads tabs with the starred filter, sort and item
+// search (`GalleryStackedLayout.tsx`), and the grid with its pinned Starred strip (`GalleryImageGrid.tsx`).
+//
+// The page renders the initial state, which is what shows without JavaScript; the script below applies the rules in
+// `gallery-demo.mjs` to every change. Controls the demo does not model (board filters, uploads, the media filter,
+// semantic search, settings) are drawn but are not focusable.
+import type { ImageMetadata } from 'astro';
+import { Image } from 'astro:assets';
+import ChevronDown from '@lucide/astro/icons/chevron-down';
+import ChevronRight from '@lucide/astro/icons/chevron-right';
+import ChevronsDownUp from '@lucide/astro/icons/chevrons-down-up';
+import ChevronsUpDown from '@lucide/astro/icons/chevrons-up-down';
+import CircleQuestionMark from '@lucide/astro/icons/circle-question-mark';
+import ImageIcon from '@lucide/astro/icons/image';
+import Layers from '@lucide/astro/icons/layers';
+import Plus from '@lucide/astro/icons/plus';
+import Search from '@lucide/astro/icons/search';
+import Settings from '@lucide/astro/icons/settings';
+import SlidersHorizontal from '@lucide/astro/icons/sliders-horizontal';
+import Sparkles from '@lucide/astro/icons/sparkles';
+import Star from '@lucide/astro/icons/star';
+import Upload from '@lucide/astro/icons/upload';
+import X from '@lucide/astro/icons/x';
+
+import car from '../../../assets/tour/gallery/car.webp';
+import espresso from '../../../assets/tour/gallery/espresso.webp';
+import house from '../../../assets/tour/gallery/house.webp';
+import lineart from '../../../assets/tour/gallery/lineart.webp';
+import market from '../../../assets/tour/gallery/market.webp';
+import mech from '../../../assets/tour/gallery/mech.webp';
+import mountains from '../../../assets/tour/gallery/mountains.webp';
+import planet from '../../../assets/tour/gallery/planet.webp';
+import portrait from '../../../assets/tour/gallery/portrait.webp';
+import rider from '../../../assets/tour/gallery/rider.webp';
+import scientist from '../../../assets/tour/gallery/scientist.webp';
+import sushi from '../../../assets/tour/gallery/sushi.webp';
+import wizard from '../../../assets/tour/gallery/wizard.webp';
+import GalleryDemoBoardRow from './GalleryDemoBoardRow.astro';
+import GalleryDemoTile from './GalleryDemoTile.astro';
+import {
+  GALLERY_DEMO_BOARDS,
+  GALLERY_DEMO_INITIAL_BOARD_ID,
+  GALLERY_DEMO_ITEMS,
+  GALLERY_DEMO_PROJECT,
+  getBoardCounts,
+  getBoardGroups,
+  getGridSections,
+} from './gallery-demo.mjs';
+
+interface Props {
+  /** Prefix for the demo's element ids; give each instance on a page its own. */
+  id?: string;
+  class?: string;
+}
+
+const { id = 'gallery-demo', class: className } = Astro.props;
+
+const IMAGES: Record<string, ImageMetadata> = {
+  car,
+  espresso,
+  house,
+  lineart,
+  market,
+  mech,
+  mountains,
+  planet,
+  portrait,
+  rider,
+  scientist,
+  sushi,
+  wizard,
+};
+
+const groups = getBoardGroups(GALLERY_DEMO_BOARDS, GALLERY_DEMO_PROJECT.id, '');
+const selectedBoard = GALLERY_DEMO_BOARDS.find((board) => board.id === GALLERY_DEMO_INITIAL_BOARD_ID)!;
+const selectedCounts = getBoardCounts(GALLERY_DEMO_ITEMS, selectedBoard.id);
+const { starred, listing } = getGridSections(GALLERY_DEMO_ITEMS, {
+  boardId: selectedBoard.id,
+  view: 'images',
+  starredOnly: false,
+  searchTerm: '',
+  order: 'DESC',
+});
+const listedIds = new Set(listing.map((entry) => entry.id));
+// Every item has a tile in the listing, hidden until its board, view and the filters show it; the listed ones first,
+// in order. The Starred strip shows copies of the listing's starred tiles.
+const pool = [...listing, ...GALLERY_DEMO_ITEMS.filter((entry) => !listedIds.has(entry.id))];
+const tabStopId = (starred[0] ?? listing[0])?.id;
+const ids = {
+  boards: `${id}-boards`,
+  project: `${id}-project`,
+  library: `${id}-library`,
+  strip: `${id}-starred`,
+  panel: `${id}-panel`,
+  tab: (view: string) => `${id}-tab-${view}`,
+};
+---
+
+<section
+  class:list={['gallery-demo', 'not-content', className]}
+  aria-label="Interactive gallery demo"
+  data-gallery-demo
+  data-project-id={GALLERY_DEMO_PROJECT.id}
+  data-selected-board={selectedBoard.id}
+>
+  <header class="gd-header">
+    <span class="gd-identity" aria-hidden="true"><ImageIcon size={12} /></span>
+    <span class="gd-title">Gallery</span>
+    <span class="gd-slash" aria-hidden="true">/</span>
+    <button
+      type="button"
+      class="gd-crumb"
+      data-crumb
+      aria-expanded="true"
+      aria-controls={ids.boards}
+      aria-label={`Toggle boards, currently ${selectedBoard.name}`}
+    >
+      <span class="gd-cover" data-crumb-cover>
+        {
+          selectedBoard.cover ? (
+            <Image src={IMAGES[selectedBoard.cover]} alt="" width={40} height={40} decoding="async" />
+          ) : (
+            <ImageIcon size={12} aria-hidden="true" />
+          )
+        }
+      </span>
+      <span class="gd-crumb-name" data-crumb-name>{selectedBoard.name}</span>
+      <ChevronsDownUp size={12} class="gd-crumb-open" aria-hidden="true" />
+      <ChevronsUpDown size={12} class="gd-crumb-closed" aria-hidden="true" />
+    </button>
+    <span class="gd-icon-button gd-icon-button--sm gd-header-action" aria-hidden="true"><Settings size={14} /></span>
+  </header>
+
+  <div class="gd-body">
+    <div class="gd-boards" id={ids.boards} data-boards-panel>
+      <div class="gd-board-filters">
+        <div class="gd-input-group">
+          <Search size={14} class="gd-input-icon" aria-hidden="true" />
+          <input
+            class="gd-input"
+            type="text"
+            data-board-search
+            aria-label="Search or create boards"
+            placeholder="Search or create boards"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button type="button" class="gd-icon-button gd-icon-button--sm gd-clear" data-clear-board-search aria-label="Clear search" hidden>
+            <X size={14} aria-hidden="true" />
+          </button>
+        </div>
+        <span class="gd-icon-button" aria-hidden="true"><SlidersHorizontal size={14} /></span>
+      </div>
+
+      <div class="gd-board-list gd-scroll">
+        {
+          (
+            [
+              { tier: 'project', label: GALLERY_DEMO_PROJECT.name, listId: ids.project, rows: groups.projectBoards, count: groups.projectCount },
+              { tier: 'library', label: 'Library', listId: ids.library, rows: groups.libraryBoards, count: groups.libraryCount },
+            ] as const
+          ).map(({ tier, label, listId, rows, count }) => (
+            <div class="gd-section" data-section={tier}>
+              <div class="gd-section-head">
+                <button type="button" class="gd-section-trigger" data-section-trigger aria-expanded="true" aria-controls={listId}>
+                  <ChevronRight size={12} class="gd-disclosure" aria-hidden="true" />
+                  <span class="gd-section-label">{label}</span>
+                  <span class="gd-section-count" data-section-count>{count}</span>
+                </button>
+                <span class="gd-icon-button gd-icon-button--sm" aria-hidden="true"><Plus size={14} /></span>
+              </div>
+              <div class="gd-section-rows" id={listId} data-section-rows>
+                {rows.map((board) => (
+                  <GalleryDemoBoardRow
+                    board={board}
+                    cover={board.cover ? IMAGES[board.cover] : undefined}
+                    counts={getBoardCounts(GALLERY_DEMO_ITEMS, board.id)}
+                    selected={board.id === selectedBoard.id}
+                  />
+                ))}
+                <div class="gd-row" data-create-row={tier} hidden>
+                  <button type="button" class="gd-row-button">
+                    <span class="gd-cover"><Plus size={12} aria-hidden="true" /></span>
+                    <span class="gd-row-label gd-row-label--strong" data-create-label />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        }
+        <p class="gd-no-boards" data-no-boards hidden>No boards match this search.</p>
+      </div>
+    </div>
+
+    <div class="gd-resize" data-resize aria-hidden="true"><span></span></div>
+
+    <div class="gd-controls">
+      <div class="gd-controls-row">
+        <div class="docs-segment-tabs gd-tabs" role="tablist" aria-label="View" data-tabs>
+          {
+            (
+              [
+                { view: 'images', label: 'Media', count: selectedCounts.media },
+                { view: 'assets', label: 'Uploads', count: selectedCounts.uploads },
+              ] as const
+            ).map(({ view, label, count }) => (
+              <button
+                type="button"
+                role="tab"
+                class="docs-segment-tab"
+                id={ids.tab(view)}
+                data-view={view}
+                aria-selected={view === 'images' ? 'true' : 'false'}
+                aria-controls={ids.panel}
+                tabindex={view === 'images' ? 0 : -1}
+              >
+                {label}
+                <span class="gd-tab-count" data-view-count>{count}</span>
+              </button>
+            ))
+          }
+        </div>
+        <div class="gd-tools">
+          <button type="button" class="gd-icon-button gd-toggle" data-starred-only aria-pressed="false" aria-label="Starred only">
+            <Star size={14} aria-hidden="true" />
+          </button>
+          <span class="gd-icon-button" aria-hidden="true"><Layers size={14} /></span>
+          <button type="button" class="gd-sort" data-sort aria-label="Image sort: Newest">
+            <span data-sort-label>Newest</span>
+            <ChevronDown size={12} aria-hidden="true" />
+          </button>
+          <span class="gd-icon-button" aria-hidden="true"><Upload size={14} /></span>
+        </div>
+      </div>
+      <div class="gd-input-group">
+        <Search size={14} class="gd-input-icon" aria-hidden="true" />
+        <input
+          class="gd-input"
+          type="text"
+          data-item-search
+          aria-label="Search gallery items"
+          placeholder="Search items"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <span class="gd-input-end">
+          <button type="button" class="gd-icon-button gd-icon-button--sm" data-clear-item-search aria-label="Clear search" hidden>
+            <X size={14} aria-hidden="true" />
+          </button>
+          <span class="gd-icon-button gd-icon-button--sm" aria-hidden="true"><Sparkles size={14} /></span>
+          <span class="gd-icon-button gd-icon-button--sm gd-subtle" aria-hidden="true"><CircleQuestionMark size={14} /></span>
+        </span>
+      </div>
+    </div>
+
+    <div class="gd-grid-scroll gd-scroll" role="tabpanel" id={ids.panel} aria-labelledby={ids.tab('images')} data-grid>
+      <div class="gd-strip" data-strip hidden={starred.length === 0}>
+        <div class="gd-strip-head">
+          <button type="button" class="gd-section-trigger" data-strip-trigger aria-expanded="true" aria-controls={ids.strip}>
+            <ChevronRight size={12} class="gd-disclosure" aria-hidden="true" />
+            <Star size={12} class="gd-filled" aria-hidden="true" />
+            <span class="gd-section-label">Starred</span>
+            <span class="gd-section-count" data-strip-count>{starred.length}</span>
+          </button>
+        </div>
+        <div class="gd-grid" role="list" aria-label="Starred" id={ids.strip} data-strip-list>
+          {starred.map((entry) => <GalleryDemoTile item={entry} image={IMAGES[entry.image]} tabStop={entry.id === tabStopId} />)}
+        </div>
+      </div>
+      <div class="gd-grid" role="list" aria-label="Gallery items" data-listing>
+        {
+          pool.map((entry) => (
+            <GalleryDemoTile
+              item={entry}
+              image={IMAGES[entry.image]}
+              hidden={!listedIds.has(entry.id)}
+              tabStop={starred.length === 0 && entry.id === tabStopId}
+            />
+          ))
+        }
+      </div>
+      <p class="gd-empty" data-empty hidden></p>
+      <div class="gd-dropzone" data-dropzone hidden>
+        <Upload size={16} aria-hidden="true" />
+        <span>Drop media here or click to upload</span>
+      </div>
+    </div>
+  </div>
+
+  <template data-new-row>
+    <GalleryDemoBoardRow
+      board={{ id: '', name: '', kind: 'board', projectId: null, cover: null }}
+      counts={{ media: 0, uploads: 0 }}
+    />
+  </template>
+</section>
+
+<script>
+  import {
+    createBoard,
+    GALLERY_DEMO_BOARDS,
+    GALLERY_DEMO_ITEMS,
+    getBoardCounts,
+    getBoardGroups,
+    getGridEmptyState,
+    getGridSections,
+    toggleStarred,
+  } from './gallery-demo.mjs';
+
+  type Section = 'strip' | 'listing';
+
+  const mount = (root: HTMLElement) => {
+    const $ = <T extends Element = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
+    const $$ = <T extends Element = HTMLElement>(selector: string, scope: ParentNode = root) => [
+      ...scope.querySelectorAll<T>(selector),
+    ];
+
+    const projectId = root.dataset.projectId!;
+    const state = {
+      boards: [...GALLERY_DEMO_BOARDS],
+      items: [...GALLERY_DEMO_ITEMS],
+      boardId: root.dataset.selectedBoard!,
+      boardSearch: '',
+      view: 'images' as 'images' | 'assets',
+      starredOnly: false,
+      itemSearch: '',
+      order: 'DESC' as 'DESC' | 'ASC',
+      selectedItemId: null as string | null,
+    };
+
+    const boardSearch = $<HTMLInputElement>('[data-board-search]');
+    const itemSearch = $<HTMLInputElement>('[data-item-search]');
+    const grid = $('[data-grid]');
+    const listing = $('[data-listing]');
+    const strip = $('[data-strip]');
+    const stripList = $('[data-strip-list]');
+    const tabs = $$<HTMLButtonElement>('[role="tab"]');
+    const poolTiles = new Map($$('[data-item-id]', listing).map((tile) => [tile.dataset.itemId!, tile]));
+    /** The tile holding the grid's one Tab stop. */
+    let activeTile: HTMLElement | null = $('[data-tile-select][tabindex="0"]')?.closest<HTMLElement>('[data-item-id]') ?? null;
+
+    const sectionOf = (tile: Element): Section => (strip.contains(tile) ? 'strip' : 'listing');
+    const rowOf = (boardId: string) => root.querySelector<HTMLElement>(`[data-board-row="${CSS.escape(boardId)}"]`);
+
+    // Boards
+
+    const renderBoards = () => {
+      const groups = getBoardGroups(state.boards, projectId, state.boardSearch);
+      const shown = new Set([...groups.projectBoards, ...groups.libraryBoards].map((board) => board.id));
+      for (const row of $$('[data-board-row]')) {
+        const isSelected = row.dataset.boardRow === state.boardId;
+        row.hidden = !shown.has(row.dataset.boardRow!);
+        row.toggleAttribute('data-selected', isSelected);
+        const button = row.querySelector('button')!;
+        if (isSelected) button.setAttribute('aria-current', 'true');
+        else button.removeAttribute('aria-current');
+      }
+      $('[data-section="project"] [data-section-count]').textContent = String(groups.projectCount);
+      $('[data-section="library"] [data-section-count]').textContent = String(groups.libraryCount);
+      const term = state.boardSearch.trim();
+      for (const createRow of $$('[data-create-row]')) {
+        createRow.hidden = !groups.canCreateFromSearch;
+        const destination = createRow.dataset.createRow === 'project' ? $('[data-section="project"] .gd-section-label').textContent : 'Library';
+        createRow.querySelector('[data-create-label]')!.textContent = `Create board "${term}" in ${destination}`;
+      }
+      $('[data-no-boards]').hidden = groups.hasAnyMatch || groups.canCreateFromSearch;
+      $('[data-clear-board-search]').hidden = state.boardSearch === '';
+    };
+
+    const renderHeader = () => {
+      const board = state.boards.find((entry) => entry.id === state.boardId)!;
+      $('[data-crumb-name]').textContent = board.name;
+      $('[data-crumb]').setAttribute('aria-label', `Toggle boards, currently ${board.name}`);
+      $('[data-crumb-cover]').replaceChildren(...[...rowOf(board.id)!.querySelector('.gd-cover')!.childNodes].map((node) => node.cloneNode(true)));
+      const counts = getBoardCounts(state.items, state.boardId);
+      for (const tab of tabs) {
+        const isSelected = tab.dataset.view === state.view;
+        tab.setAttribute('aria-selected', String(isSelected));
+        tab.tabIndex = isSelected ? 0 : -1;
+        tab.querySelector('[data-view-count]')!.textContent = String(tab.dataset.view === 'images' ? counts.media : counts.uploads);
+        if (isSelected) grid.setAttribute('aria-labelledby', tab.id);
+      }
+    };
+
+    const selectBoard = (boardId: string) => {
+      state.boardId = boardId;
+      // As in the app, picking a board ends the board search.
+      state.boardSearch = '';
+      boardSearch.value = '';
+      activeTile = null;
+      renderBoards();
+      renderHeader();
+      renderGrid();
+      grid.scrollTop = 0;
+    };
+
+    const createFromSearch = (tier: 'project' | 'library') => {
+      const name = state.boardSearch.trim();
+      if (!name) return;
+      const { boards, board } = createBoard(state.boards, name, tier === 'project' ? projectId : null);
+      state.boards = boards;
+      const template = $<HTMLTemplateElement>('template[data-new-row]');
+      const row = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
+      row.dataset.boardRow = board.id;
+      row.querySelector('[data-board-label]')!.textContent = board.name;
+      $(`[data-create-row="${tier}"]`).before(row);
+      selectBoard(board.id);
+      row.querySelector('button')!.focus();
+    };
+
+    // Grid
+
+    const setTabStop = (tile: HTMLElement | null) => {
+      activeTile = tile;
+      for (const button of $$<HTMLButtonElement>('[data-tile-select], [data-tile-star]', grid)) {
+        button.tabIndex = tile !== null && button.closest('[data-item-id]') === tile ? 0 : -1;
+      }
+    };
+
+    const visibleTiles = () => $$('[data-item-id]', grid).filter((tile) => !tile.hidden && !tile.closest('[hidden]'));
+
+    const renderGrid = () => {
+      const focused = document.activeElement?.closest<HTMLElement>('[data-item-id]');
+      const restore =
+        focused && grid.contains(focused)
+          ? {
+              id: focused.dataset.itemId!,
+              section: sectionOf(focused),
+              part: document.activeElement!.matches('[data-tile-star]') ? '[data-tile-star]' : '[data-tile-select]',
+            }
+          : null;
+      const active = activeTile ? { id: activeTile.dataset.itemId!, section: sectionOf(activeTile) } : null;
+
+      const filter = { boardId: state.boardId, view: state.view, starredOnly: state.starredOnly, searchTerm: state.itemSearch, order: state.order };
+      const sections = getGridSections(state.items, filter);
+      const listed = new Set(sections.listing.map((entry) => entry.id));
+
+      for (const entry of state.items) {
+        const tile = poolTiles.get(entry.id)!;
+        tile.hidden = !listed.has(entry.id);
+        tile.toggleAttribute('data-starred', entry.starred);
+        tile.toggleAttribute('data-selected', entry.id === state.selectedItemId);
+        tile.querySelector('[data-tile-select]')!.setAttribute('aria-pressed', String(entry.id === state.selectedItemId));
+        tile.querySelector('[data-tile-star]')!.setAttribute('aria-label', `${entry.starred ? 'Unstar' : 'Star'} ${entry.name}`);
+      }
+      // Moving a node drops its focus, so the listing is reordered only when its order changed.
+      const order = sections.listing.map((entry) => poolTiles.get(entry.id)!);
+      const current = [...listing.children].filter((tile) => !(tile as HTMLElement).hidden);
+      if (order.some((tile, index) => current[index] !== tile)) listing.prepend(...order);
+
+      stripList.replaceChildren(...sections.starred.map((entry) => poolTiles.get(entry.id)!.cloneNode(true) as HTMLElement));
+      strip.hidden = sections.starred.length === 0;
+      $('[data-strip-count]').textContent = String(sections.starred.length);
+
+      const empty = getGridEmptyState(sections.listing.length, filter);
+      const message = $('[data-empty]');
+      message.hidden = empty?.kind !== 'message';
+      message.textContent = empty?.kind === 'message' ? empty.text : '';
+      $('[data-dropzone]').hidden = empty?.kind !== 'upload';
+
+      const find = (id: string, section: Section) =>
+        visibleTiles().find((tile) => tile.dataset.itemId === id && sectionOf(tile) === section) ??
+        visibleTiles().find((tile) => tile.dataset.itemId === id) ??
+        null;
+      setTabStop((active && find(active.id, active.section)) ?? visibleTiles()[0] ?? null);
+      if (restore && !grid.contains(document.activeElement)) {
+        const tile = find(restore.id, restore.section) ?? activeTile;
+        tile?.querySelector<HTMLElement>(restore.part)?.focus();
+      }
+    };
+
+    const toggleStar = (itemId: string) => {
+      state.items = toggleStarred(state.items, itemId);
+      renderGrid();
+    };
+
+    const selectItem = (itemId: string) => {
+      state.selectedItemId = itemId;
+      for (const tile of $$('[data-item-id]', grid)) {
+        const isSelected = tile.dataset.itemId === itemId;
+        tile.toggleAttribute('data-selected', isSelected);
+        tile.querySelector('[data-tile-select]')!.setAttribute('aria-pressed', String(isSelected));
+      }
+    };
+
+    /** The nearest visible tile in an arrow's direction, by layout rather than DOM order; null at an edge. */
+    const tileInDirection = (from: HTMLElement, key: string): HTMLElement | null => {
+      const origin = from.getBoundingClientRect();
+      const horizontal = key === 'ArrowLeft' || key === 'ArrowRight';
+      const forward = key === 'ArrowRight' || key === 'ArrowDown';
+      let best: { tile: HTMLElement; score: number } | null = null;
+      for (const tile of visibleTiles()) {
+        if (tile === from) continue;
+        const rect = tile.getBoundingClientRect();
+        const gap = horizontal
+          ? forward ? rect.left - origin.right : origin.left - rect.right
+          : forward ? rect.top - origin.bottom : origin.top - rect.bottom;
+        if (gap < -1) continue;
+        const overlaps = horizontal
+          ? rect.top < origin.bottom - 1 && rect.bottom > origin.top + 1
+          : rect.left < origin.right - 1 && rect.right > origin.left + 1;
+        const offset = horizontal
+          ? Math.abs(rect.top + rect.height / 2 - (origin.top + origin.height / 2))
+          : Math.abs(rect.left + rect.width / 2 - (origin.left + origin.width / 2));
+        // Aligned tiles first, then the nearest with the perpendicular offset weighed in.
+        const score = (overlaps ? 0 : 1e6) + gap + offset * (overlaps ? 0.001 : 2);
+        if (!best || score < best.score) best = { tile, score };
+      }
+      return best?.tile ?? null;
+    };
+
+    // Events
+
+    boardSearch.addEventListener('input', () => {
+      state.boardSearch = boardSearch.value;
+      renderBoards();
+    });
+    boardSearch.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && boardSearch.value) {
+        event.preventDefault();
+        boardSearch.value = '';
+        state.boardSearch = '';
+        renderBoards();
+      } else if (event.key === 'Enter') {
+        // As in the app, Enter creates only when nothing matches, in the project.
+        event.preventDefault();
+        if (!getBoardGroups(state.boards, projectId, state.boardSearch).hasAnyMatch) createFromSearch('project');
+      }
+    });
+    itemSearch.addEventListener('input', () => {
+      state.itemSearch = itemSearch.value;
+      $('[data-clear-item-search]').hidden = state.itemSearch === '';
+      renderGrid();
+    });
+    itemSearch.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && itemSearch.value) {
+        event.preventDefault();
+        itemSearch.value = '';
+        itemSearch.dispatchEvent(new Event('input'));
+      }
+    });
+
+    root.addEventListener('click', (event) => {
+      const target = event.target as Element;
+      const control = target.closest<HTMLElement>('button');
+      if (!control || !root.contains(control)) return;
+
+      const boardRow = control.closest<HTMLElement>('[data-board-row]');
+      const createRow = control.closest<HTMLElement>('[data-create-row]');
+      const tile = control.closest<HTMLElement>('[data-item-id]');
+      if (boardRow) {
+        selectBoard(boardRow.dataset.boardRow!);
+      } else if (createRow) {
+        createFromSearch(createRow.dataset.createRow as 'project' | 'library');
+      } else if (tile && control.matches('[data-tile-star]')) {
+        toggleStar(tile.dataset.itemId!);
+      } else if (tile) {
+        selectItem(tile.dataset.itemId!);
+      } else if (control.matches('[role="tab"]')) {
+        state.view = control.dataset.view as 'images' | 'assets';
+        activeTile = null;
+        renderHeader();
+        renderGrid();
+      } else if (control.matches('[data-starred-only]')) {
+        state.starredOnly = !state.starredOnly;
+        control.setAttribute('aria-pressed', String(state.starredOnly));
+        renderGrid();
+      } else if (control.matches('[data-sort]')) {
+        state.order = state.order === 'DESC' ? 'ASC' : 'DESC';
+        const label = state.order === 'DESC' ? 'Newest' : 'Oldest';
+        $('[data-sort-label]').textContent = label;
+        control.setAttribute('aria-label', `Image sort: ${label}`);
+        renderGrid();
+      } else if (control.matches('[data-section-trigger], [data-strip-trigger]')) {
+        const isOpen = control.getAttribute('aria-expanded') !== 'true';
+        control.setAttribute('aria-expanded', String(isOpen));
+        document.getElementById(control.getAttribute('aria-controls')!)!.hidden = !isOpen;
+        if (control.matches('[data-strip-trigger]')) setTabStop(activeTile?.isConnected && !activeTile.closest('[hidden]') ? activeTile : visibleTiles()[0] ?? null);
+      } else if (control.matches('[data-crumb]')) {
+        const isOpen = control.getAttribute('aria-expanded') !== 'true';
+        control.setAttribute('aria-expanded', String(isOpen));
+        $('[data-boards-panel]').hidden = !isOpen;
+        $('[data-resize]').hidden = !isOpen;
+      } else if (control.matches('[data-clear-board-search]')) {
+        boardSearch.value = '';
+        state.boardSearch = '';
+        renderBoards();
+        boardSearch.focus();
+      } else if (control.matches('[data-clear-item-search]')) {
+        itemSearch.value = '';
+        itemSearch.dispatchEvent(new Event('input'));
+        itemSearch.focus();
+      }
+    });
+
+    // The segment tabs' roving focus: arrows cycle, Home and End jump; Enter or Space selects.
+    $('[data-tabs]').addEventListener('keydown', (event) => {
+      const index = tabs.indexOf(document.activeElement as HTMLButtonElement);
+      if (index === -1 || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const next =
+        event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length;
+      tabs[next]!.focus();
+    });
+
+    grid.addEventListener('focusin', (event) => {
+      const tile = (event.target as Element).closest<HTMLElement>('[data-item-id]');
+      if (tile && tile !== activeTile) setTabStop(tile);
+    });
+    grid.addEventListener('keydown', (event) => {
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      const target = event.target as HTMLElement;
+      const tile = target.closest<HTMLElement>('[data-item-id]');
+      if (!tile) return;
+      if (event.key === '.') {
+        // The app's star hotkey.
+        event.preventDefault();
+        toggleStar(tile.dataset.itemId!);
+        return;
+      }
+      if (!target.matches('[data-tile-select]') || !event.key.startsWith('Arrow')) return;
+      const next = tileInDirection(tile, event.key);
+      if (!next) return;
+      event.preventDefault();
+      setTabStop(next);
+      const button = next.querySelector<HTMLElement>('[data-tile-select]')!;
+      button.focus({ preventScroll: true });
+      button.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+  };
+
+  for (const root of document.querySelectorAll<HTMLElement>('[data-gallery-demo]')) mount(root);
+</script>
+
+<style is:global>
+  .gallery-demo {
+    /* The app's semantic colors (`platform/ui/theme/system.ts`) on the docs' copies of its Classic theme. */
+    --gd-bg: var(--invoke-neutral-950);
+    --gd-panel: var(--invoke-neutral-900);
+    --gd-fg: var(--invoke-neutral-50);
+    --gd-fg-muted: var(--invoke-neutral-300);
+    --gd-fg-subtle: var(--invoke-neutral-400);
+    --gd-border: var(--invoke-neutral-600);
+    --gd-border-emphasized: var(--invoke-border-emphasized);
+    --gd-hover: var(--invoke-bg-hover);
+    --gd-control: var(--invoke-control);
+    --gd-fill: var(--invoke-fill);
+    --gd-accent: var(--invoke-accent);
+    --gd-accent-contrast: var(--invoke-accent-contrast);
+    /* Chakra's `yellow.solid` and `yellow.contrast`, the starred button's fill; the theme has no yellow of its own. */
+    --gd-star: #fde047;
+    --gd-star-contrast: #000;
+    --gd-radius-control: 5px;
+    --gd-radius-sm: 4px;
+    --gd-radius-md: 6px;
+    --gd-motion-fast: 0s;
+    --gd-motion-medium: 0s;
+
+    container-type: inline-size;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    inline-size: 100%;
+    max-inline-size: 28.125rem;
+    block-size: 38.5rem;
+    overflow: hidden;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background: var(--gd-panel);
+    color: var(--gd-fg);
+    font: 400 0.75rem / 1rem var(--__sl-font, 'Inter Variable', system-ui, sans-serif);
+    text-align: start;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+
+    @media (prefers-reduced-motion: no-preference) {
+      --gd-motion-fast: 120ms;
+      --gd-motion-medium: 150ms;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    svg {
+      flex: none;
+      display: block;
+    }
+
+    /* Not the segment tabs, which take the docs' own chip styles. */
+    :where(button:not(.docs-segment-tab)) {
+      margin: 0;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+
+      &:focus-visible {
+        outline: 2px solid var(--gd-accent);
+        outline-offset: -2px;
+      }
+    }
+
+    .gd-sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    /* Ghost icon buttons: 28px (`md`) or 24px (`sm`), muted, with the app's translucent hover fill. */
+    .gd-icon-button {
+      display: inline-flex;
+      flex: none;
+      align-items: center;
+      justify-content: center;
+      width: 1.75rem;
+      height: 1.75rem;
+      border-radius: var(--gd-radius-control);
+      color: var(--gd-fg-muted);
+      transition: background-color var(--gd-motion-fast), color var(--gd-motion-fast);
+    }
+    .gd-icon-button--sm {
+      width: 1.5rem;
+      height: 1.5rem;
+    }
+    .gd-subtle {
+      color: var(--gd-fg-subtle);
+    }
+    button.gd-icon-button:hover {
+      background: var(--gd-hover);
+      color: var(--gd-fg);
+    }
+
+    .gd-badge {
+      display: inline-flex;
+      flex: none;
+      align-items: center;
+      min-height: 1rem;
+      padding: 0 0.25rem;
+      border-radius: var(--gd-radius-sm);
+      background: var(--gd-fill);
+      color: var(--gd-fg);
+      font-size: 0.6875rem;
+      font-weight: 500;
+      line-height: 1rem;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .gd-badge--solid {
+      background: var(--gd-fg);
+      color: var(--gd-bg);
+    }
+
+    .gd-cover {
+      display: flex;
+      flex: none;
+      align-items: center;
+      justify-content: center;
+      width: 1.25rem;
+      height: 1.25rem;
+      overflow: hidden;
+      border: 1px solid var(--gd-border);
+      border-radius: var(--gd-radius-sm);
+      background: var(--gd-control);
+      color: var(--gd-fg-subtle);
+
+      img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+    }
+
+    /* Header: `PanelHeader` with the widget identity and the board breadcrumb. */
+    .gd-header {
+      display: flex;
+      flex: none;
+      align-items: center;
+      gap: 0.25rem;
+      height: 2.5rem;
+      padding: 0 0.5rem 0 0.75rem;
+      border-bottom: 1px solid var(--gd-border);
+    }
+    .gd-identity {
+      color: var(--gd-fg);
+      margin-inline-end: 0.125rem;
+    }
+    .gd-title {
+      flex: none;
+      padding-inline-end: 0.5rem;
+      font-weight: 700;
+    }
+    .gd-slash {
+      flex: none;
+      color: var(--gd-fg-subtle);
+    }
+    .gd-crumb {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      min-width: 0;
+      max-width: 14rem;
+      height: 1.5rem;
+      padding: 0 0.5rem 0 0.125rem;
+      border-radius: var(--gd-radius-control);
+      transition: background-color var(--gd-motion-fast);
+
+      &:hover {
+        background: var(--gd-hover);
+      }
+      > svg {
+        color: var(--gd-fg-subtle);
+      }
+      &[aria-expanded='true'] .gd-crumb-closed,
+      &[aria-expanded='false'] .gd-crumb-open {
+        display: none;
+      }
+    }
+    .gd-crumb-name {
+      overflow: hidden;
+      font-weight: 600;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .gd-header-action {
+      margin-inline-start: auto;
+    }
+
+    .gd-body {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      gap: 0.5rem;
+      min-height: 0;
+      padding: 0.5rem;
+    }
+
+    /* Boards */
+    .gd-boards {
+      display: flex;
+      flex: none;
+      flex-direction: column;
+      gap: 0.25rem;
+      height: 15.75rem;
+      min-height: 0;
+    }
+    .gd-board-filters {
+      display: flex;
+      gap: 0.25rem;
+    }
+    .gd-input-group {
+      position: relative;
+      display: flex;
+      flex: 1;
+      align-items: center;
+      min-width: 0;
+    }
+    .gd-input-icon {
+      position: absolute;
+      inset-inline-start: 0.5rem;
+      color: var(--gd-fg-subtle);
+      pointer-events: none;
+    }
+    .gd-input {
+      width: 100%;
+      height: 1.75rem;
+      margin: 0;
+      padding: 0 1.75rem 0 1.75rem;
+      border: 1px solid var(--gd-border);
+      border-radius: var(--gd-radius-control);
+      outline: none;
+      background: transparent;
+      color: var(--gd-fg);
+      font: inherit;
+      transition: border-color var(--gd-motion-fast);
+
+      &::placeholder {
+        color: var(--gd-fg-muted);
+        opacity: 1;
+      }
+      &:hover {
+        border-color: var(--gd-border-emphasized);
+      }
+      &:focus-visible,
+      &:focus {
+        border-color: var(--gd-accent);
+      }
+    }
+    [data-item-search] {
+      padding-inline-end: 3.5rem;
+    }
+    .gd-clear,
+    .gd-input-end {
+      position: absolute;
+      inset-inline-end: 0.125rem;
+    }
+    .gd-input-end {
+      display: flex;
+    }
+    .gd-input-group:has([data-clear-item-search]:not([hidden])) [data-item-search] {
+      padding-inline-end: 5rem;
+    }
+
+    .gd-scroll {
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: thin;
+      scrollbar-color: var(--gd-border) transparent;
+    }
+    .gd-board-list {
+      flex: 1;
+      min-height: 0;
+      padding-block: 0.25rem;
+    }
+    .gd-section-head {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      min-height: 1.5rem;
+      padding: 0 0.25rem;
+    }
+    .gd-section-trigger {
+      display: flex;
+      flex: 1;
+      align-items: center;
+      gap: 0.25rem;
+      min-width: 0;
+      align-self: stretch;
+      border-radius: var(--gd-radius-sm);
+      color: var(--gd-fg-muted);
+      transition: color var(--gd-motion-fast);
+
+      &:hover {
+        color: var(--gd-fg);
+      }
+      .gd-disclosure {
+        transition: transform var(--gd-motion-medium);
+      }
+      &[aria-expanded='true'] .gd-disclosure {
+        transform: rotate(90deg);
+      }
+    }
+    .gd-section-label {
+      overflow: hidden;
+      font-size: 0.625rem;
+      font-weight: 600;
+      letter-spacing: 0.025em;
+      line-height: 1;
+      text-overflow: ellipsis;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .gd-section-count {
+      font-size: 0.625rem;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .gd-filled {
+      fill: currentColor;
+    }
+    .gd-section-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 0.125rem;
+      padding-bottom: 0.25rem;
+    }
+    .gd-no-boards {
+      margin: 0;
+      padding: 0.75rem 0;
+      color: var(--gd-fg-muted);
+      font-size: 0.625rem;
+      text-align: center;
+    }
+
+    .gd-row {
+      display: flex;
+      align-items: center;
+      padding-inline-end: 0.25rem;
+      border-radius: var(--gd-radius-sm);
+      transition: background-color var(--gd-motion-fast);
+
+      &:hover {
+        background: var(--gd-hover);
+      }
+      &[data-selected] {
+        background: var(--gd-accent);
+        color: var(--gd-accent-contrast);
+      }
+      &:is(:hover, :focus-within) .gd-row-actions {
+        opacity: 1;
+      }
+    }
+    .gd-row-button {
+      display: flex;
+      flex: 1;
+      align-items: center;
+      gap: 0.5rem;
+      min-width: 0;
+      min-height: 1.75rem;
+      padding: 0.25rem;
+      border-radius: var(--gd-radius-sm);
+      text-align: start;
+    }
+    /* The accent ring would vanish on the selected row's accent fill. */
+    .gd-row[data-selected] .gd-row-button:focus-visible {
+      outline-color: var(--gd-accent-contrast);
+    }
+    .gd-row-label {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      font-weight: 500;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .gd-row[data-selected] .gd-row-label,
+    .gd-row-label--strong {
+      font-weight: 600;
+    }
+    .gd-row-actions {
+      color: inherit;
+      opacity: 0;
+      transition: opacity var(--gd-motion-medium);
+    }
+
+    .gd-resize {
+      position: relative;
+      flex: none;
+      height: 1px;
+      background: var(--gd-border);
+
+      span {
+        position: absolute;
+        top: -4px;
+        left: calc(50% - 12px);
+        width: 24px;
+        height: 9px;
+        border: 1px solid var(--gd-border-emphasized);
+        border-radius: 999px;
+        background: var(--gd-panel);
+      }
+    }
+
+    /* View tabs, filters and item search */
+    .gd-controls {
+      display: flex;
+      flex: none;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .gd-controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem 0.25rem;
+    }
+    .gd-tabs {
+      flex: none;
+    }
+    /* The docs' chips are links and labels elsewhere; a button chip needs the browser's fill taken off. */
+    :where(.gd-tabs .docs-segment-tab) {
+      background-color: transparent;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .gd-tab-count {
+      opacity: 0.8;
+      font-variant-numeric: tabular-nums;
+    }
+    .gd-tools {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      margin-inline-start: auto;
+    }
+    .gd-toggle[aria-pressed='true'] {
+      background: var(--gd-fg);
+      color: var(--gd-bg);
+
+      &:hover {
+        background: var(--gd-fg);
+        color: var(--gd-bg);
+      }
+    }
+    .gd-sort {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      height: 1.75rem;
+      padding: 0 0.625rem;
+      border-radius: var(--gd-radius-control);
+      color: var(--gd-fg-muted);
+      font-weight: 500;
+      transition: background-color var(--gd-motion-fast), color var(--gd-motion-fast);
+
+      &:hover {
+        background: var(--gd-hover);
+        color: var(--gd-fg);
+      }
+    }
+
+    /* Grid */
+    .gd-grid-scroll {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .gd-strip {
+      flex: none;
+      margin-bottom: 0.5rem;
+      border-bottom: 1px solid var(--gd-border);
+    }
+    .gd-strip-head {
+      display: flex;
+      align-items: center;
+      height: 1.5rem;
+      padding: 0 0.25rem;
+    }
+    .gd-grid {
+      display: grid;
+      flex: none;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.25rem;
+    }
+    .gd-strip .gd-grid {
+      margin-bottom: 0.25rem;
+    }
+    @container (max-width: 22rem) {
+      .gd-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    .gd-tile {
+      position: relative;
+      aspect-ratio: 1;
+      min-width: 0;
+      overflow: hidden;
+      border: 2px solid var(--gd-border);
+      border-radius: var(--gd-radius-md);
+      background: var(--gd-bg);
+
+      &:focus-within {
+        outline: 2px solid var(--gd-accent);
+        outline-offset: -2px;
+      }
+      &[data-selected] {
+        border-color: var(--gd-accent);
+
+        &::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          z-index: 1;
+          border-radius: var(--gd-radius-sm);
+          box-shadow: inset 0 0 0 2px var(--gd-accent);
+          pointer-events: none;
+        }
+      }
+      &:is(:hover, :focus-within) .gd-overlay {
+        opacity: 1;
+      }
+    }
+    .gd-tile-select {
+      position: absolute;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+
+      &:focus-visible {
+        outline: none;
+      }
+      img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+    }
+    .gd-overlay {
+      position: absolute;
+      z-index: 2;
+      opacity: 0;
+      transition: opacity var(--gd-motion-medium);
+    }
+    .gd-tile-dims {
+      bottom: 0.25rem;
+      inset-inline-start: 0.25rem;
+      font-size: 0.625rem;
+      pointer-events: none;
+    }
+    .gd-tile-star {
+      top: 0.25rem;
+      inset-inline-end: 0.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.5rem;
+      height: 1.5rem;
+      border-radius: var(--gd-radius-control);
+      background: var(--gd-fg);
+      color: var(--gd-bg);
+
+      &:focus-visible {
+        outline: 2px solid var(--gd-accent);
+        outline-offset: 1px;
+      }
+    }
+    .gd-tile[data-starred] .gd-tile-star {
+      opacity: 1;
+      background: var(--gd-star);
+      color: var(--gd-star-contrast);
+
+      svg {
+        fill: currentColor;
+      }
+    }
+
+    .gd-empty,
+    .gd-dropzone {
+      display: flex;
+      flex: 1;
+      align-items: center;
+      justify-content: center;
+      min-height: 8rem;
+      margin: 0;
+      color: var(--gd-fg-muted);
+      text-align: center;
+    }
+    .gd-dropzone {
+      flex-direction: column;
+      gap: 0.25rem;
+      border: 1px dashed var(--gd-border-emphasized);
+      border-radius: var(--gd-radius-md);
+
+      svg {
+        color: var(--gd-fg-subtle);
+      }
+    }
+  }
+</style>

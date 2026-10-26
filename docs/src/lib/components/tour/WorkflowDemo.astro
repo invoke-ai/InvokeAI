@@ -1,0 +1,921 @@
+---
+// An interactive miniature of the app's workflow editor for the home page tour: three nodes and their edges, floating
+// on the page's own dotted background with no canvas, toolbar or frame of their own. Nodes drag by their headers (or
+// move with the arrow keys) and collapse, their field controls work, and edges can be rewired by dragging from an
+// output handle. Built at page build time from `workflow-demo.mjs`, so without JavaScript it renders the same graph,
+// static.
+import ChevronDown from '@lucide/astro/icons/chevron-down';
+import ChevronRight from '@lucide/astro/icons/chevron-right';
+import FileText from '@lucide/astro/icons/file-text';
+import Info from '@lucide/astro/icons/info';
+import Pin from '@lucide/astro/icons/pin';
+import PinOff from '@lucide/astro/icons/pin-off';
+import RotateCcw from '@lucide/astro/icons/rotate-ccw';
+import { Image } from 'astro:assets';
+
+import backgroundImage from '../../../assets/tour/workflow/compositor-background.webp';
+import {
+  WORLD,
+  createInitialGraph,
+  getConnectedInputs,
+  getEdgeId,
+  getEdgePath,
+  getFieldTypeColor,
+  getFieldTypeLabel,
+  getHandlePoint,
+  isAngularFieldType,
+  layoutNode,
+} from './workflow-demo.mjs';
+
+interface Props {
+  /** Prefixes the ids of the demo's form controls; give each demo on a page its own. */
+  id?: string;
+  /** The accessible name of the demo's region. */
+  label?: string;
+  class?: string;
+}
+
+const { id = 'workflow-demo', label = 'Interactive workflow demo', class: className } = Astro.props;
+
+const { nodes, edges } = createInitialGraph();
+const layouts = new Map(nodes.map((node) => [node.id, layoutNode(node, getConnectedInputs(edges, node.id))]));
+const nodeById = new Map(nodes.map((node) => [node.id, node]));
+
+const edgeViews = edges.map((edge) => {
+  const source = nodeById.get(edge.source)!;
+  const target = nodeById.get(edge.target)!;
+  const type = source.outputs.find((output) => output.name === edge.sourceHandle)!.type;
+  return {
+    ...edge,
+    id: getEdgeId(edge),
+    color: getFieldTypeColor(type),
+    title: getFieldTypeLabel(type),
+    d: getEdgePath(
+      getHandlePoint(source, layouts.get(source.id)!, 'output', edge.sourceHandle)!,
+      getHandlePoint(target, layouts.get(target.id)!, 'input', edge.targetHandle)!,
+    ),
+  };
+});
+
+const fieldId = (nodeId: string, name: string) => `${id}-${nodeId}-${name}`;
+
+// Fields shown as pinned to the workflow's form, as in the reference graph.
+const pinnedFields = new Set(['compositor.background', 'compositor.threshold']);
+const boardOptions = ['Auto', 'None (Uncategorized)', 'Landscapes', 'Concept Art'];
+---
+
+<section
+  class:list={['wf', 'not-content', className]}
+  aria-label={label}
+  aria-describedby={`${id}-hint`}
+  data-workflow-demo
+  style={`--wf-world-width: ${WORLD.width}px; --wf-world-height: ${WORLD.height}px;`}
+>
+  <div class="wf__stage" data-stage>
+    <svg
+      class="wf__edges"
+      width={WORLD.width}
+      height={WORLD.height}
+      viewBox={`0 0 ${WORLD.width} ${WORLD.height}`}
+      aria-hidden="true"
+    >
+      <g data-edges>
+        {
+          edgeViews.map((edge) => (
+            <g
+              class="wf-edge"
+              data-edge={edge.id}
+              data-source={edge.source}
+              data-source-handle={edge.sourceHandle}
+              data-target={edge.target}
+              data-target-handle={edge.targetHandle}
+              style={`--wf-edge-color: ${edge.color}`}
+            >
+              <title>{edge.title}</title>
+              <path class="wf-edge__path" d={edge.d} />
+              <path class="wf-edge__hit" d={edge.d} />
+            </g>
+          ))
+        }
+      </g>
+    </svg>
+
+
+    {
+      nodes.map((node) => {
+        const layout = layouts.get(node.id)!;
+        const connected = getConnectedInputs(edges, node.id);
+        return (
+          <div
+            class="wf-node"
+            data-node={node.id}
+            data-open={String(node.open)}
+            role="group"
+            aria-label={`${node.title} node`}
+            tabindex="0"
+            style={`translate: ${node.x}px ${node.y}px; width: ${node.width}px;`}
+          >
+            <div class="wf-node__header" data-drag-handle>
+              <button
+                class="wf-node__chevron"
+                type="button"
+                aria-expanded={String(node.open)}
+                aria-label={node.open ? 'Collapse node' : 'Expand node'}
+                data-collapse
+              >
+                <ChevronDown class="wf-node__chevron-open" size={14} aria-hidden="true" />
+                <ChevronRight class="wf-node__chevron-closed" size={14} aria-hidden="true" />
+              </button>
+              <span class="wf-node__title">{node.title}</span>
+              <Info class="wf-node__info" size={14} aria-hidden="true" />
+            </div>
+
+            <div class="wf-node__body">
+              {node.outputs.map((output) => (
+                <div class="wf-row wf-row--output">
+                  <span class="wf-row__output-label">{output.label}</span>
+                </div>
+              ))}
+              {node.inputs.map((input) => {
+                const controlId = fieldId(node.id, input.name);
+                const pinned = pinnedFields.has(`${node.id}.${input.name}`);
+                return (
+                  <div class="wf-row" data-input={input.name} data-connected={String(connected.has(input.name))}>
+                    <div class="wf-row__head">
+                      {input.widget && input.widget !== 'image' ? (
+                        <label class="wf-row__label" for={controlId}>
+                          {input.label}
+                          {input.required && <span class="wf-row__required"> *</span>}
+                        </label>
+                      ) : (
+                        <span class="wf-row__label">
+                          {input.label}
+                          {input.required && <span class="wf-row__required"> *</span>}
+                        </span>
+                      )}
+                      <span class="wf-row__tools" aria-hidden="true">
+                        {input.widget === 'image' && <RotateCcw size={12} />}
+                        <FileText size={12} />
+                        {!input.connectionOnly &&
+                          (pinned ? <PinOff class="wf-row__pinned" size={12} /> : <Pin size={12} />)}
+                      </span>
+                    </div>
+                    {input.widget === 'switch' && (
+                      <div class="wf-row__widget">
+                        <input class="wf-switch" id={controlId} type="checkbox" role="switch" />
+                      </div>
+                    )}
+                    {input.widget === 'number' && (
+                      <div class="wf-row__widget">
+                        <input
+                          class="wf-input"
+                          id={controlId}
+                          type="number"
+                          inputmode="numeric"
+                          value="50"
+                          min="0"
+                          max="255"
+                          step="1"
+                        />
+                      </div>
+                    )}
+                    {input.widget === 'select' && (
+                      <div class="wf-row__widget wf-select">
+                        <select id={controlId}>
+                          {boardOptions.map((option) => (
+                            <option>{option}</option>
+                          ))}
+                        </select>
+                        <ChevronDown class="wf-select__icon" size={14} aria-hidden="true" />
+                      </div>
+                    )}
+                    {input.widget === 'image' && (
+                      <div class="wf-row__widget wf-media">
+                        <div class="wf-media__well">
+                          <Image
+                            src={backgroundImage}
+                            alt="A mountain landscape"
+                            width={99}
+                            height={90}
+                            densities={[1, 2]}
+                            draggable="false"
+                          />
+                          <span class="wf-media__badge">704×640</span>
+                        </div>
+                        <div class="wf-media__actions" aria-hidden="true">
+                          <span class="wf-button wf-button--outline">Upload</span>
+                          <span class="wf-button">Clear</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {node.footer && (
+              <div class="wf-node__footer">
+                <label class="wf-check">
+                  <input type="checkbox" checked={node.id === 'compositor'} />
+                  Use Cache
+                </label>
+                <label class="wf-check">
+                  <input type="checkbox" checked={node.id === 'compositor'} />
+                  Save to Gallery
+                </label>
+              </div>
+            )}
+
+            {node.outputs.map((output) => (
+              <span
+                class:list={['wf-handle', { 'wf-handle--angular': isAngularFieldType(output.type) }]}
+                data-handle
+                data-kind="output"
+                data-name={output.name}
+                data-tooltip={getFieldTypeLabel(output.type)}
+                aria-hidden="true"
+                style={`top: ${layout.outputs[output.name]}px; --wf-handle-color: ${getFieldTypeColor(output.type)};`}
+              />
+            ))}
+            {node.inputs
+              .filter((input) => input.handle !== false)
+              .map((input) => (
+                <span
+                  class:list={['wf-handle', { 'wf-handle--angular': isAngularFieldType(input.type) }]}
+                  data-handle
+                  data-kind="input"
+                  data-name={input.name}
+                  data-tooltip={getFieldTypeLabel(input.type)}
+                  aria-hidden="true"
+                  style={`top: ${layout.inputs[input.name]}px; --wf-handle-color: ${getFieldTypeColor(input.type)};`}
+                />
+              ))}
+          </div>
+        );
+      })
+    }
+
+    <svg
+      class="wf__connection"
+      width={WORLD.width}
+      height={WORLD.height}
+      viewBox={`0 0 ${WORLD.width} ${WORLD.height}`}
+      aria-hidden="true"
+    >
+      <path data-connection d=""></path>
+    </svg>
+  </div>
+
+  <p class="wf__sr" id={`${id}-hint`}>
+    Drag a node by its title, or focus it and use the arrow keys to move it. Drag from an output dot to a matching input
+    to connect them.
+  </p>
+  <p class="wf__sr" aria-live="polite" data-announcer></p>
+</section>
+
+<script>
+  import { mountWorkflowDemo } from './workflow-demo-client';
+
+  for (const root of document.querySelectorAll<HTMLElement>('[data-workflow-demo]')) mountWorkflowDemo(root);
+</script>
+
+<style>
+  .wf {
+    /* The app's dark workbench tokens (`platform/ui/theme/system.ts`), mapped onto the docs' Classic theme colors. */
+    --wf-node-bg: var(--invoke-neutral-950);
+    --wf-node-subtle: var(--invoke-neutral-900);
+    --wf-node-surface: var(--invoke-neutral-800);
+    --wf-node-border: var(--invoke-neutral-500);
+    --wf-divider: var(--invoke-neutral-600);
+    --wf-control-border: var(--invoke-neutral-600);
+    --wf-control-fill: var(--invoke-control);
+    --wf-fg: var(--invoke-neutral-50);
+    --wf-fg-muted: var(--invoke-neutral-300);
+    --wf-fg-subtle: var(--invoke-neutral-400);
+    --wf-accent: var(--invoke-accent);
+    --wf-accent-contrast: var(--invoke-accent-contrast);
+    --wf-hover-fill: var(--invoke-bg-hover);
+    --wf-fast: 120ms;
+
+    container-type: inline-size;
+    /*
+     * Nodes can be dragged out of this box over the copy around it (see `data-workflow-bounds` in the client), so the
+     * demo stacks above its neighbours. The box itself takes no pointer input: only nodes, handles and edges do, and
+     * text beside or under the box stays selectable and clickable wherever no node covers it.
+     */
+    position: relative;
+    z-index: 1;
+    pointer-events: none;
+    width: 100%;
+    max-width: var(--wf-world-width);
+    aspect-ratio: 680 / 440;
+    margin-inline: auto;
+    color: var(--wf-fg);
+    font-size: 11px;
+    line-height: 1.25;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color-scheme: dark;
+  }
+
+  /*
+   * The graph is laid out at its full size and scaled to the container's width: `tan(atan2(a, b))` divides two
+   * lengths into a plain number, so narrow screens see the whole graph, smaller, with no script or overflow.
+   */
+  .wf__stage {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: var(--wf-world-width);
+    height: var(--wf-world-height);
+    scale: tan(atan2(100cqi, var(--wf-world-width)));
+    transform-origin: 0 0;
+  }
+
+  .wf__edges,
+  .wf__connection {
+    position: absolute;
+    inset: 0;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .wf__connection {
+    z-index: 1000;
+
+    path {
+      fill: none;
+      stroke: var(--wf-accent);
+      stroke-width: 1.5;
+      stroke-linecap: round;
+    }
+  }
+
+  /*
+   * Edges: dimmed until hovered or attached to the selected node, as the app's editor draws them. The app dims them to
+   * 0.38 on its canvas; on the page's background that leaves the red and violet edges under 3:1, so they rest at 0.6.
+   */
+  .wf__edges :global(.wf-edge__path) {
+    fill: none;
+    stroke: var(--wf-edge-color);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.6;
+    transition: opacity var(--wf-fast) ease;
+  }
+
+  .wf__edges :global(.wf-edge__hit) {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 20;
+    pointer-events: stroke;
+  }
+
+  .wf__edges :global(.wf-edge:hover .wf-edge__path),
+  .wf__edges :global(.wf-edge[data-hover] .wf-edge__path),
+  .wf__edges :global(.wf-edge[data-selected] .wf-edge__path) {
+    opacity: 1;
+  }
+
+  .wf__edges :global(.wf-edge[data-selected] .wf-edge__path) {
+    stroke-dasharray: 5;
+    animation: wf-dashdraw 0.5s linear infinite;
+  }
+
+  .wf__edges :global(.wf-edge[data-pending]) {
+    display: none;
+  }
+
+  @keyframes wf-dashdraw {
+    from {
+      stroke-dashoffset: 10;
+    }
+  }
+
+  /* Nodes (`features/workflow/ui/nodeChrome.tsx`). */
+  .wf-node {
+    position: absolute;
+    pointer-events: auto;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    box-sizing: border-box;
+    border: 1px solid var(--wf-node-border);
+    border-radius: 8px;
+    background-color: var(--wf-node-bg);
+    box-shadow: 0 1px 3px oklch(0 0 0 / 0.35);
+    transition:
+      border-color var(--wf-fast) ease,
+      box-shadow var(--wf-fast) ease;
+
+    &:hover:not([data-selected]) {
+      box-shadow:
+        0 0 0 2px color-mix(in oklab, var(--wf-accent) 50%, transparent),
+        0 4px 8px oklch(0 0 0 / 0.35);
+    }
+
+    &[data-selected] {
+      box-shadow:
+        0 0 0 2px var(--wf-accent),
+        0 4px 8px oklch(0 0 0 / 0.35);
+    }
+
+    /* Focus selects the node, so the selection ring is its focus indicator. */
+    &:focus {
+      outline: none;
+    }
+  }
+
+  .wf-node__header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    box-sizing: border-box;
+    height: 36px;
+    padding: 0 8px 0 4px;
+    border-bottom: 1px solid var(--wf-divider);
+    border-radius: 7px 7px 0 0;
+    background-color: var(--wf-node-subtle);
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Drag affordances only once the script can move the node. */
+  :global([data-workflow-demo][data-ready]) .wf-node__header {
+    cursor: grab;
+    touch-action: none;
+  }
+
+  :global([data-workflow-demo][data-ready]) .wf-node[data-dragging] .wf-node__header {
+    cursor: grabbing;
+  }
+
+  .wf-node__chevron {
+    display: grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    color: var(--wf-fg);
+    cursor: pointer;
+    transition: background-color var(--wf-fast) ease;
+
+    &:hover {
+      background-color: var(--wf-hover-fill);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--wf-accent);
+      outline-offset: 0;
+    }
+  }
+
+  .wf-node__chevron-closed,
+  .wf-node[data-open='false'] .wf-node__chevron-open {
+    display: none;
+  }
+
+  .wf-node[data-open='false'] .wf-node__chevron-closed {
+    display: block;
+  }
+
+  .wf-node__title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .wf-node__info {
+    flex-shrink: 0;
+    color: var(--wf-fg-subtle);
+  }
+
+  .wf-node__body {
+    padding-block: 4px;
+    background-color: var(--wf-node-surface);
+  }
+
+  .wf-node:not(:has(.wf-node__footer)) .wf-node__body {
+    border-radius: 0 0 7px 7px;
+  }
+
+  .wf-node__footer {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-sizing: border-box;
+    height: 32px;
+    padding: 0 10px;
+    border-top: 1px solid var(--wf-divider);
+    border-radius: 0 0 7px 7px;
+    background-color: var(--wf-node-subtle);
+  }
+
+  .wf-node[data-open='false'] {
+    .wf-node__header {
+      border-bottom: 0;
+      border-radius: 7px;
+    }
+
+    .wf-node__body,
+    .wf-node__footer {
+      display: none;
+    }
+
+    /* Collapsed nodes keep their handles mounted but invisible, so edges stay attached to the header. */
+    .wf-handle {
+      opacity: 0;
+      pointer-events: none;
+    }
+  }
+
+  /* Field rows (`features/workflow/ui/editor/InvocationFlowNode.tsx`): 2px row padding around a 20px label line. */
+  .wf-row {
+    padding: 2px 12px;
+  }
+
+  .wf-row--output {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    height: 24px;
+    box-sizing: border-box;
+  }
+
+  .wf-row__output-label {
+    color: var(--wf-fg-muted);
+  }
+
+  .wf-row__head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 20px;
+  }
+
+  .wf-row__label {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .wf-row[data-connected='true'] .wf-row__label {
+    color: var(--wf-fg-muted);
+  }
+
+  .wf-row__required {
+    color: var(--invoke-danger);
+  }
+
+  .wf-row__tools {
+    display: flex;
+    flex-shrink: 0;
+    gap: 8px;
+    margin-left: auto;
+    padding-right: 4px;
+    color: var(--wf-fg-subtle);
+  }
+
+  .wf-row__pinned {
+    color: var(--wf-accent);
+  }
+
+  .wf-row__widget {
+    margin-top: 2px;
+  }
+
+  .wf-row[data-connected='true'] .wf-row__widget {
+    display: none;
+  }
+
+  /* Controls: 28px md inputs, a switch, a select and the media well. */
+  .wf-input,
+  .wf-select select {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    height: 28px;
+    margin: 0;
+    padding: 0 10px;
+    border: 1px solid var(--wf-control-border);
+    border-radius: 5px;
+    background-color: transparent;
+    color: var(--wf-fg);
+    font: inherit;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    transition: border-color var(--wf-fast) ease;
+
+    &:hover {
+      border-color: var(--wf-node-border);
+    }
+
+    &:focus-visible {
+      border-color: var(--wf-accent);
+      outline: 1px solid var(--wf-accent);
+      outline-offset: 0;
+    }
+  }
+
+  .wf-input {
+    appearance: textfield;
+
+    &::-webkit-inner-spin-button,
+    &::-webkit-outer-spin-button {
+      margin: 0;
+      appearance: none;
+    }
+  }
+
+  .wf-select {
+    position: relative;
+
+    select {
+      appearance: none;
+      padding-right: 28px;
+      cursor: pointer;
+    }
+
+    option {
+      background-color: var(--wf-node-surface);
+      color: var(--wf-fg);
+    }
+  }
+
+  .wf-select__icon {
+    position: absolute;
+    top: 7px;
+    right: 8px;
+    color: var(--wf-fg-muted);
+    pointer-events: none;
+  }
+
+  .wf-switch {
+    position: relative;
+    display: block;
+    width: 32px;
+    height: 18px;
+    margin: 0;
+    border-radius: 9px;
+    background-color: var(--wf-control-fill);
+    cursor: pointer;
+    appearance: none;
+    transition: background-color var(--wf-fast) ease;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background-color: var(--wf-fg);
+      transition:
+        translate var(--wf-fast) ease,
+        background-color var(--wf-fast) ease;
+    }
+
+    &:checked {
+      background-color: var(--wf-accent);
+    }
+
+    &:checked::before {
+      translate: 14px 0;
+      background-color: var(--wf-node-bg);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--wf-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  .wf-media__well {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    height: 90px;
+    overflow: hidden;
+    border: 1px solid var(--wf-control-border);
+    border-radius: 4px;
+
+    img {
+      display: block;
+      max-height: 100%;
+      width: auto;
+      outline: 1px solid oklch(1 0 0 / 0.1);
+      outline-offset: -1px;
+      -webkit-user-drag: none;
+    }
+  }
+
+  .wf-media__badge {
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    padding: 1px 4px;
+    border-radius: 4px;
+    background-color: var(--wf-fg);
+    color: var(--wf-node-bg);
+    font-size: 10px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .wf-media__actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+  }
+
+  .wf-button {
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .wf-button--outline {
+    border: 1px solid var(--wf-control-border);
+  }
+
+  .wf-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    cursor: pointer;
+
+    input {
+      display: grid;
+      place-items: center;
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      border: 1px solid var(--wf-node-border);
+      border-radius: 3px;
+      appearance: none;
+      cursor: pointer;
+      transition:
+        background-color var(--wf-fast) ease,
+        border-color var(--wf-fast) ease;
+
+      &::after {
+        content: '';
+        width: 8px;
+        height: 4px;
+        margin-top: -2px;
+        border-bottom: 2px solid var(--wf-accent-contrast);
+        border-left: 2px solid var(--wf-accent-contrast);
+        rotate: -45deg;
+        opacity: 0;
+      }
+
+      &:checked {
+        border-color: var(--wf-accent);
+        background-color: var(--wf-accent);
+      }
+
+      &:checked::after {
+        opacity: 1;
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--wf-accent);
+        outline-offset: 2px;
+      }
+    }
+  }
+
+  /*
+   * Handles: 12px dots in the field type's color, ringed in the node surface (filled for single values, square for
+   * model fields). Centered on the node's edge at the row's label line.
+   */
+  .wf-handle {
+    position: absolute;
+    z-index: 2;
+    box-sizing: border-box;
+    width: 12px;
+    height: 12px;
+    /* `workflow-demo.mjs` measures handle positions from the node's border edge; these offsets are from inside it. */
+    margin-top: -1px;
+    border-radius: 50%;
+    background-color: var(--wf-handle-color);
+    box-shadow: 0 0 0 1.5px var(--wf-node-surface);
+
+    &[data-kind='input'] {
+      left: -1px;
+      translate: -50% -50%;
+    }
+
+    &[data-kind='output'] {
+      right: -1px;
+      translate: 50% -50%;
+    }
+
+    /* A larger hit area for pointers and touch. */
+    &::before {
+      content: '';
+      position: absolute;
+      inset: -8px;
+    }
+
+    /*
+     * The field type, as the app's handle tooltip names it. It opens above the handle, toward the node, so it neither
+     * covers the field's label nor runs off the canvas edge.
+     */
+    &::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      padding: 3px 7px;
+      border-radius: 4px;
+      background-color: var(--invoke-neutral-700);
+      box-shadow: var(--docs-shadow-popup);
+      color: var(--wf-fg);
+      font-size: 11px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity var(--wf-fast) ease;
+    }
+
+    &[data-kind='input']::after {
+      left: -2px;
+    }
+
+    &[data-kind='output']::after {
+      right: -2px;
+    }
+
+    &:hover::after {
+      opacity: 1;
+      transition-delay: 300ms;
+    }
+  }
+
+  .wf-handle--angular {
+    border-radius: 2px;
+  }
+
+  :global([data-workflow-demo][data-ready]) .wf-handle {
+    cursor: crosshair;
+    touch-action: none;
+  }
+
+  /* While a connection is dragged, the inputs that accept it are ringed and the tooltips stay out of the way. */
+  :global([data-workflow-demo][data-connecting]) .wf-handle {
+    &::after {
+      display: none;
+    }
+
+    &[data-valid] {
+      box-shadow:
+        0 0 0 1.5px var(--wf-node-surface),
+        0 0 0 3px color-mix(in oklab, var(--wf-accent) 60%, transparent);
+    }
+
+    &[data-snapped] {
+      box-shadow:
+        0 0 0 1.5px var(--wf-node-surface),
+        0 0 0 3.5px var(--wf-accent);
+    }
+  }
+
+  .wf__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wf *,
+    .wf *::before,
+    .wf *::after,
+    .wf__edges :global(*) {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+</style>

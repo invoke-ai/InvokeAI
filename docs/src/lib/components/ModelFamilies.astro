@@ -1,0 +1,372 @@
+---
+/*
+ * The home page's model families as a grid of link cards, with the external providers below. The section heading goes
+ * in the slot, so it shares the grid's width and left edge. A family's cover is `src/assets/model-families/<slug>.webp`
+ * when that file exists; without one the card paints a backdrop in the family's hue, under the same fade to the card
+ * surface, so cards with and without covers match.
+ */
+import ArrowRight from '@lucide/astro/icons/arrow-right';
+import type { ImageMetadata } from 'astro';
+import { Image } from 'astro:assets';
+
+import { externalProviders, modelFamilies } from '../../config/model-families';
+import { withBase } from '../base-path';
+
+const base = import.meta.env.BASE_URL;
+
+const covers = import.meta.glob<ImageMetadata>('../../assets/model-families/*.webp', { eager: true, import: 'default' });
+const coverFor = (slug: string) => covers[`../../assets/model-families/${slug}.webp`];
+---
+
+<div class="models">
+  <slot />
+  <ul class="grid" role="list">
+    {
+      modelFamilies.map(({ slug, name, link, kind, tagline, license, vram, formats, hue }) => {
+        const cover = coverFor(slug);
+        return (
+          <li>
+            <a
+              class="card"
+              href={withBase(link, base)}
+              style={`--hue: ${hue}`}
+              aria-labelledby={`model-${slug}`}
+              aria-describedby={`model-${slug}-tagline`}
+            >
+              {cover ? (
+                <Image
+                  class="cover"
+                  src={cover}
+                  alt=""
+                  widths={[400, 640, 960]}
+                  sizes="(min-width: 84rem) 20rem, (min-width: 48rem) 34vw, (min-width: 32rem) 50vw, 100vw"
+                />
+              ) : (
+                <span class="cover backdrop" aria-hidden="true" />
+              )}
+              <span class="body">
+                <span class="title">
+                  <span class="name" id={`model-${slug}`}>
+                    {name}
+                  </span>
+                  {kind === 'video' && <span class="tag tag--video">Video</span>}
+                  <ArrowRight class="arrow" size={16} aria-hidden="true" />
+                </span>
+                <span class="tagline" id={`model-${slug}-tagline`}>
+                  {tagline}
+                </span>
+                <span class="tags">
+                  <span class:list={['tag', `tag--${license.kind}`]}>
+                    <span class="sr-only">License: </span>
+                    {license.label}
+                  </span>
+                  {vram !== undefined && (
+                    <span class="tag tag--plain">
+                      {vram} GB+<span class="sr-only"> VRAM</span>
+                    </span>
+                  )}
+                  {formats.map((format) => (
+                    <span class="tag tag--plain">{format}</span>
+                  ))}
+                </span>
+              </span>
+            </a>
+          </li>
+        );
+      })
+    }
+  </ul>
+  <div class="external">
+    <p class="external__label" id="home-models-external">External providers, billed to your own account</p>
+    <ul class="external__links" role="list" aria-labelledby="home-models-external">
+      {
+        externalProviders.map(({ name, link }) => (
+          <li>
+            <a href={withBase(link, base)}>{name}</a>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</div>
+
+<style>
+  /* As wide as the What's new bento: up to 80rem, centred, inside the page gutters. */
+  .models {
+    --models-width: min(100vw - 2 * var(--sl-content-pad-x), 80rem);
+    container: models / inline-size;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    width: var(--models-width);
+    margin-inline: calc((100% - var(--models-width)) / 2);
+  }
+
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  @container models (min-width: 28rem) {
+    .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @container models (min-width: 44rem) {
+    .grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @container models (min-width: 64rem) {
+    .grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  .card {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    --fade-solid: 6.6rem;
+    --fade-reach: 7.2rem;
+    height: 15rem;
+    overflow: hidden;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+    color: var(--docs-text-strong);
+    text-decoration: none;
+    transition: border-color 150ms ease;
+
+    /* The fade to the card surface, which the text sits on. */
+    &::after {
+      position: absolute;
+      z-index: -1;
+      inset: 0;
+      background-image: linear-gradient(
+        to top,
+        var(--docs-surface) var(--fade-solid),
+        color-mix(in oklab, var(--docs-surface) 85%, transparent) calc(var(--fade-solid) + 0.23 * var(--fade-reach)),
+        color-mix(in oklab, var(--docs-surface) 45%, transparent) calc(var(--fade-solid) + 0.54 * var(--fade-reach)),
+        transparent calc(var(--fade-solid) + var(--fade-reach))
+      );
+      content: '';
+    }
+
+    &:is(:hover, :focus-visible) {
+      border-color: var(--docs-border-strong);
+      color: var(--docs-text-strong);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--docs-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  /* One column keeps the sixteen cards short; the fade's solid part still holds the text. */
+  @container models (width < 28rem) {
+    .card {
+      --fade-solid: 6rem;
+      --fade-reach: 4rem;
+      height: 10rem;
+    }
+  }
+
+  .cover {
+    position: absolute;
+    z-index: -2;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+  }
+
+  /* Without a cover: two soft lights in the family's hue over the page background and its dot grid. */
+  .backdrop {
+    background-color: var(--docs-bg);
+    background-image:
+      radial-gradient(70% 90% at 82% 4%, oklch(0.62 0.15 var(--hue) / 0.5), transparent 70%),
+      radial-gradient(60% 70% at 14% 30%, oklch(0.5 0.12 calc(var(--hue) + 50) / 0.4), transparent 70%),
+      radial-gradient(circle, var(--docs-grid-dot) 1px, transparent 1px);
+    background-size:
+      auto,
+      auto,
+      20px 20px;
+  }
+
+  .card:is(:hover, :focus-visible) .cover {
+    filter: brightness(1.08);
+  }
+
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 1rem;
+  }
+
+  .title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .name {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .arrow {
+    flex-shrink: 0;
+    margin-inline-start: auto;
+    color: var(--sl-color-gray-4);
+    transition: color 150ms ease-out;
+  }
+
+  .card:is(:hover, :focus-visible) .arrow {
+    color: var(--docs-accent);
+  }
+
+  .tagline {
+    overflow: hidden;
+    color: var(--docs-text-muted);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* One line of tags; a row too long for the card fades out over its last 2.5rem, to nothing at the edge. */
+  .tags {
+    display: flex;
+    gap: 0.375rem;
+    margin-top: 0.5rem;
+    overflow: hidden;
+    mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+  }
+
+  .tag {
+    flex: none;
+    padding: 0.125rem 0.375rem;
+    border-radius: var(--docs-radius);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+
+  .tag--open {
+    --tag: var(--invoke-success);
+  }
+
+  .tag--community {
+    --tag: var(--docs-accent);
+  }
+
+  .tag--noncommercial,
+  .tag--research,
+  .tag--restricted {
+    --tag: var(--invoke-warning);
+  }
+
+  .tag:not(.tag--plain, .tag--mixed, .tag--video) {
+    background-color: color-mix(in oklab, var(--tag) 14%, transparent);
+    color: var(--tag);
+  }
+
+  /* Not a license, so outlined rather than filled. */
+  .tag--video {
+    border: 1px solid var(--docs-border-strong);
+    color: var(--docs-text-muted);
+  }
+
+  .tag--plain,
+  .tag--mixed {
+    background-color: var(--docs-control);
+    color: var(--docs-text-muted);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .cover {
+      transition: filter 150ms ease;
+    }
+
+    .arrow {
+      transition:
+        color 150ms ease-out,
+        translate 150ms ease-out;
+    }
+
+    .card:is(:hover, :focus-visible) .arrow {
+      translate: 2px 0;
+    }
+  }
+
+  /* External providers */
+
+  .external {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1rem;
+  }
+
+  .external__label {
+    margin: 0;
+    color: var(--docs-text-subtle);
+    font-size: 0.8125rem;
+  }
+
+  .external__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+
+    a {
+      display: block;
+      padding: 0.375rem 0.75rem;
+      border: 1px solid var(--docs-border);
+      border-radius: var(--docs-radius);
+      background-color: var(--docs-surface);
+      color: var(--docs-text-strong);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      line-height: 1.4;
+      text-decoration: none;
+      transition:
+        border-color 150ms ease,
+        background-color 150ms ease;
+
+      &:hover {
+        border-color: var(--docs-border-strong);
+        background-color: var(--docs-control);
+        color: var(--docs-text-strong);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--docs-accent);
+        outline-offset: 2px;
+      }
+    }
+  }
+</style>

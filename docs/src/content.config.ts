@@ -1,4 +1,5 @@
 import { defineCollection } from 'astro:content';
+import { glob } from 'astro/loaders';
 import { z } from 'astro/zod';
 import { docsLoader, i18nLoader } from '@astrojs/starlight/loaders';
 import { docsSchema, i18nSchema } from '@astrojs/starlight/schema';
@@ -19,6 +20,24 @@ export const collections = {
     }),
   }),
   i18n: defineCollection({ loader: i18nLoader(), schema: i18nSchema() }),
+  // Community artwork for `/showcase/` and the home page. `src/content/showcase/README.md` explains how to add one.
+  showcase: defineCollection({
+    loader: glob({ pattern: '**/*.{yaml,yml,json}', base: './src/content/showcase' }),
+    schema: ({ image }) =>
+      z.object({
+        image: image(),
+        title: z.string(),
+        /** The artist's name as they asked to be credited. */
+        artist: z.string(),
+        /** Only http(s): it becomes a link, and its value comes from a public submission form. */
+        artistUrl: z.httpUrl().optional(),
+        /** Free text, such as "FLUX.2 Klein". */
+        model: z.string().optional(),
+        /** A short note on how it was made, such as "Canvas, regional guidance". */
+        createdWith: z.string().optional(),
+        date: z.coerce.date(),
+      }),
+  }),
   changelogs: defineCollection({
     loader: changelogsLoader([
       {

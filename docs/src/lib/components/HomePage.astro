@@ -1,0 +1,1103 @@
+---
+// The marketing home page below Starlight's hero, which renders the H1, the tagline and the beta pill from the
+// frontmatter of `src/content/docs/index.mdx`.
+import ArrowRight from '@lucide/astro/icons/arrow-right';
+import Download from '@lucide/astro/icons/download';
+import { Image } from 'astro:assets';
+import { getCollection } from 'astro:content';
+
+import { getSectionIcon, getTopicIcon } from '../../config/icons';
+import { docsTopics } from '../../config/topics';
+import { withBase } from '../base-path';
+import { sortShowcase } from '../showcase.mjs';
+import ModelFamilies from './ModelFamilies.astro';
+import ShowcaseMarquee from './ShowcaseMarquee.astro';
+import CanvasCompare from './tour/CanvasCompare.astro';
+import GalleryDemo from './tour/GalleryDemo.astro';
+import WorkflowDemo from './tour/WorkflowDemo.astro';
+import WhatsNewBento from './WhatsNewBento.astro';
+// A copy of the app's `invokeai/frontend/webv2/src/assets/V7Logo.webp`; `src/lib/app-assets.test.mjs` keeps them equal.
+import v7Logo from '../../assets/v7-logo.webp';
+import blacksmithLogo from '../../content/docs/assets/blacksmith-logo.png';
+import workbenchImage from '../../content/docs/Users Guide/assets/canvas-edit-layout.webp';
+
+const base = import.meta.env.BASE_URL;
+const href = (path: string) => withBase(path, base);
+
+const topic = (id: string) => {
+  const found = docsTopics.find((candidate) => candidate.id === id);
+  if (!found) throw new Error(`The home page links to the unknown docs topic "${id}".`);
+  return { label: found.label, description: found.description, link: found.link, Icon: getTopicIcon(found) };
+};
+
+/** A directory row for a page, with the icon of the sidebar section it belongs to. */
+const page = (label: string, description: string, link: string) => {
+  const Icon = getSectionIcon(link);
+  if (!Icon) throw new Error(`The home page directory links to ${link}, which belongs to no docs topic.`);
+  return { label, description, link, Icon };
+};
+
+const paths = [
+  {
+    kicker: 'Create',
+    title: 'Make images and video',
+    links: [topic('get-started'), topic('guide'), topic('models'), topic('troubleshooting'), topic('releases')],
+  },
+  {
+    kicker: 'Run',
+    title: 'Configure and deploy',
+    links: [
+      topic('configure'),
+      page('Docker', 'Run Invoke in a container', '/configuration/docker/'),
+      page('Multi-user mode', 'Accounts on a shared server', '/configuration/multi-user-mode/admin-guide/'),
+      page('Low-VRAM mode', 'Large models on smaller GPUs', '/configuration/optimization/low-vram-mode/'),
+    ],
+  },
+  {
+    kicker: 'Build',
+    title: 'Extend Invoke',
+    links: [
+      topic('developers'),
+      topic('contribute'),
+      page('Creating nodes', 'Write your own invocations', '/development/guides/creating-nodes/'),
+      page('Node packs', 'Share nodes as a Git repository', '/development/guides/creating-node-pack/'),
+    ],
+  },
+];
+
+// The header has no topic links, so this directory is how the home page leads into every topic.
+const listedTopics = new Set(paths.flatMap(({ links }) => links.map(({ link }) => link)));
+const unlistedTopics = docsTopics.filter(({ link }) => !listedTopics.has(link)).map(({ label }) => label);
+if (unlistedTopics.length > 0) {
+  throw new Error(`The home page directory does not link to these docs topics: ${unlistedTopics.join(', ')}.`);
+}
+
+/*
+ * The hero glow, as data for the styles below. Lengths are multiples of `--glow-unit`, which is 1px on wide screens and
+ * shrinks on narrow ones, so the glow keeps its proportions to the frame.
+ */
+const px = (value: number) => `calc(${+value.toFixed(1)} * var(--glow-unit))`;
+const alpha = (value: number) => `rgb(0 0 0 / ${value.toFixed(3)})`;
+const steps = (count: number) => Array.from({ length: count + 1 }, (_, i) => i / count);
+
+/**
+ * How light from the frame's edge fades with distance: a soft shoulder (a Gaussian, so the edge has no sharp, neon-like
+ * peak) over a long exponential tail, together windowed so they reach zero, with a flat slope, at `reach`.
+ */
+type Falloff = { reach: number; near: number; far: number; nearShare: number };
+const falloff =
+  ({ reach, near, far, nearShare }: Falloff) =>
+  (distance: number) =>
+    (1 - (distance / reach) ** 2) ** 2 *
+    (nearShare * Math.exp(-((distance / near) ** 2)) + (1 - nearShare) * Math.exp(-distance / far));
+
+/**
+ * A glow's shape: the frame blurred outwards, as a vertical and a horizontal gradient whose product is the mask. The
+ * top edge has full strength. Down the frame the light weakens towards `bottomLevel`, and across the outer quarters of
+ * the width it eases to `sideLevel`, so the sides are dimmer than the top without a seam at the corners.
+ */
+const glowShape = (top: Falloff, side: Falloff, bottom: Falloff, sideLevel: number, bottomLevel: number) => {
+  const [topAt, sideAt, bottomAt] = [falloff(top), falloff(side), falloff(bottom)];
+  const down = (f: number) => bottomLevel + (1 - bottomLevel) * (1 - f) ** 2;
+  const across = (f: number) => sideLevel + (1 - sideLevel) * (3 * f ** 2 - 2 * f ** 3);
+  // Stops crowd towards the frame, where the light changes fastest.
+  const fade = steps(16).map((f) => f ** 1.6);
+  const frameTop = (f: number) => `calc(${px(top.reach)} + (100% - ${px(top.reach + bottom.reach)}) * ${f.toFixed(3)})`;
+  const frameLeft = (f: number) => `calc(${px(side.reach)} + (100% - ${px(2 * side.reach)}) * ${f.toFixed(3)})`;
+  const vertical = [
+    ...fade.map((f) => `${alpha(topAt(top.reach * (1 - f)))} ${px(top.reach * f)}`),
+    ...steps(8)
+      .slice(1, -1)
+      .map((f) => `${alpha(down(f))} ${frameTop(f)}`),
+    ...fade
+      .map((f) => `${alpha(bottomLevel * bottomAt(bottom.reach * f))} calc(100% - ${px(bottom.reach * (1 - f))})`)
+      .reverse(),
+  ];
+  const left = [
+    ...fade.map((f) => [alpha(sideLevel * sideAt(side.reach * (1 - f))), px(side.reach * f)]),
+    ...steps(6)
+      .slice(1)
+      .map((f) => [alpha(across(f)), frameLeft(f / 4)]),
+  ];
+  const horizontal = [
+    ...left.map(([a, at]) => `${a} ${at}`),
+    ...left.map(([a, at]) => `${a} calc(100% - ${at})`).reverse(),
+  ];
+  return [
+    `--glow-mask: linear-gradient(to bottom, ${vertical.join(', ')}),
+      linear-gradient(to right, ${horizontal.join(', ')})`,
+    `--glow-inset: ${px(-top.reach)} ${px(-side.reach)} ${px(-bottom.reach)}`,
+  ].join('; ');
+};
+
+// The light near the frame, where the moving bands show, and a wide, dim, still halo around it.
+const glowNear = glowShape(
+  { reach: 110, near: 18, far: 40, nearShare: 0.6 },
+  { reach: 80, near: 13, far: 28, nearShare: 0.6 },
+  { reach: 60, near: 10, far: 20, nearShare: 0.6 },
+  0.6,
+  0.2
+);
+const glowHalo = glowShape(
+  { reach: 240, near: 60, far: 90, nearShare: 0.5 },
+  { reach: 170, near: 45, far: 60, nearShare: 0.5 },
+  { reach: 120, near: 32, far: 45, nearShare: 0.5 },
+  0.7,
+  0.3
+);
+
+/**
+ * The moving light seen through the near mask: soft, slanted bands of light with dark gaps between them, like the light
+ * around a door as people pass in front of it. A band layer repeats every `period` along its gradient and slides
+ * sideways by exactly one repeat per `drift` cycle, while its opacity swells between `low` and 1 on its own beat. Its
+ * brightness follows cosines with whole-number frequencies, so the repeat is seamless and no band has an edge; raising
+ * it to a power narrows the bright bands and widens the gaps. The layers slant both ways and slide in both directions
+ * at different speeds, so bright patches drift along the top and up and down the sides, and the cycles share no
+ * common beat.
+ */
+type BandLayer = {
+  period: number;
+  angle: number;
+  harmonics: [amplitude: number, frequency: number, phase: number][];
+  peak: number;
+  drift: number;
+  reverse?: boolean;
+  swell: number;
+  low: number;
+};
+const bandLayer = ({ period, angle, harmonics, peak, drift, reverse, swell, low }: BandLayer) => {
+  const wave = (t: number) =>
+    harmonics.reduce((sum, [size, f, phase]) => sum + size * Math.cos(2 * Math.PI * (f * t + phase)), 0);
+  const samples = steps(40).map(wave);
+  const [min, max] = [Math.min(...samples), Math.max(...samples)];
+  const stops = samples.map((value, i) => {
+    const level = peak * ((value - min) / (max - min)) ** 3;
+    return `color-mix(in oklab, var(--docs-brand) ${(level * 100).toFixed(1)}%, transparent) ${px((period * i) / 40)}`;
+  });
+  // Sliding sideways by this much moves the slanted pattern along its gradient by one period.
+  const shift = period / Math.sin((angle * Math.PI) / 180);
+  return [
+    `--light: repeating-linear-gradient(${angle}deg, ${stops.join(', ')})`,
+    `--shift: ${px(shift)}`,
+    `--drift: ${drift}s; --drift-direction: ${reverse ? 'reverse' : 'normal'}`,
+    `--swell: ${swell}s; --swell-low: ${low}`,
+  ].join('; ');
+};
+const glowBands = (
+  [
+    {
+      period: 980,
+      angle: 118,
+      harmonics: [[1, 1, 0], [0.6, 2, 0.31], [0.35, 3, 0.62]],
+      peak: 0.42,
+      drift: 47,
+      swell: 9.7,
+      low: 0.45,
+    },
+    {
+      period: 1620,
+      angle: 63,
+      harmonics: [[1, 1, 0.18], [0.7, 2, 0.77], [0.3, 4, 0.4]],
+      peak: 0.4,
+      drift: 61,
+      reverse: true,
+      swell: 13.1,
+      low: 0.4,
+    },
+    {
+      period: 610,
+      angle: 97,
+      harmonics: [[1, 1, 0.5], [0.5, 2, 0.05], [0.25, 3, 0.9]],
+      peak: 0.34,
+      drift: 23,
+      reverse: true,
+      swell: 6.9,
+      low: 0.3,
+    },
+  ] satisfies BandLayer[]
+).map(bandLayer);
+
+const showcase = sortShowcase(await getCollection('showcase')).slice(0, 12);
+
+const community = [
+  { label: 'Browse the community showcase', link: href('/showcase/') },
+  { label: 'Join the Discord', link: 'https://discord.gg/ZmtBAhwWhy' },
+  { label: 'Invoke on GitHub', link: 'https://github.com/invoke-ai/InvokeAI' },
+  { label: 'Become a sponsor', link: 'https://github.com/sponsors/invoke-ai' },
+  { label: 'Train LoRAs with Invoke Training', link: 'https://github.com/invoke-ai/invoke-training' },
+];
+
+---
+
+<div class="home not-content">
+  <div class="intro">
+    <div class="cta">
+      <div class="cta__buttons">
+        <a class="docs-button docs-button--primary docs-button--xl" href={href('/download/')}>
+          <Download aria-hidden="true" />
+          Download Invoke
+        </a>
+        <a class="docs-button docs-button--secondary docs-button--xl" href={href(topic('get-started').link)}>
+          Read the docs
+          <ArrowRight class="nudge" aria-hidden="true" />
+        </a>
+      </div>
+      <p class="cta__platforms">Windows · macOS · Linux · Apache 2.0</p>
+    </div>
+
+    <figure class="hero-shot" data-hero-shot>
+      <span class="hero-glow hero-glow--halo" style={glowHalo} aria-hidden="true"></span>
+      <span class="hero-glow hero-glow--near" style={glowNear} aria-hidden="true">
+        {glowBands.map((style) => <span class="hero-glow__light" style={style} />)}
+      </span>
+      <div class="frame frame--hero">
+        <Image
+          src={workbenchImage}
+          alt="The Invoke workbench in the Edit layout: the Generate panel with an SDXL model, prompt, size and guidance settings on the left, the Canvas with a mountain meadow in the center, and the color picker and Layers panel on the right."
+          widths={[640, 960, 1280, 1600, 2000, 2560, workbenchImage.width]}
+          sizes="(min-width: 50rem) min(calc(100vw - 3rem), 90rem), calc(100vw - 2rem)"
+          loading="eager"
+          fetchpriority="high"
+        />
+      </div>
+    </figure>
+  </div>
+
+  <section class="tour" aria-label="Product tour">
+    <div class="tour__item">
+      <div class="tour__intro">
+        <div class="heading">
+          <p class="eyebrow">Canvas</p>
+          <h2>Paint exactly where it matters</h2>
+        </div>
+        <div class="tour__text">
+          <p>
+            Mask an area, describe what belongs there and accept the result to a layer. Inpainting, outpainting, regional
+            prompts and control layers all work on one canvas.
+          </p>
+          <a class="more" href={href('/users-guide/canvas/introduction/')}>
+            Canvas introduction
+            <ArrowRight class="nudge" size={14} aria-hidden="true" />
+          </a>
+        </div>
+      </div>
+      <CanvasCompare />
+    </div>
+
+    <!-- The workflow demo's nodes can be dragged anywhere in this row, over its copy too. -->
+    <div class="tour__item tour__item--split tour__item--workflow" data-workflow-bounds>
+      <div class="tour__text">
+        <div class="heading">
+          <p class="eyebrow">Workflows</p>
+          <h2>Wire up your own pipeline</h2>
+        </div>
+        <p>
+          Chain steps into a node graph and run it from a simple form. Add community node packs with the Custom Node
+          Manager, or follow the ComfyUI migration guide to the nodes you already know.
+        </p>
+        <a class="more" href={href('/users-guide/workflows/introduction/')}>
+          Workflows guide
+          <ArrowRight class="nudge" size={14} aria-hidden="true" />
+        </a>
+      </div>
+      <WorkflowDemo />
+    </div>
+
+    <div class="tour__item tour__item--split tour__item--reverse tour__item--gallery">
+      <div class="tour__text">
+        <div class="heading">
+          <p class="eyebrow">Gallery</p>
+          <h2>Every image, easy to find</h2>
+        </div>
+        <p>
+          Boards and stars keep your images and videos in order. Each project collects its results in an Inbox and boards
+          of its own, and Library boards are there from every project. Search by prompt or, with image indexing turned on,
+          by what an image shows.
+        </p>
+        <a class="more" href={href('/users-guide/gallery/introduction/')}>
+          Gallery guide
+          <ArrowRight class="nudge" size={14} aria-hidden="true" />
+        </a>
+      </div>
+      <GalleryDemo class="gallery-demo-slot" />
+    </div>
+  </section>
+
+  {
+    showcase.length > 0 && (
+      <section class="section" aria-labelledby="home-showcase">
+        <div class="section__top">
+          <div class="heading">
+            <p class="eyebrow">Community</p>
+            <h2 id="home-showcase">Made with Invoke</h2>
+          </div>
+          <a class="more" href={href('/showcase/')}>
+            View the showcase
+            <ArrowRight class="nudge" size={14} aria-hidden="true" />
+          </a>
+        </div>
+        <ShowcaseMarquee entries={showcase} />
+      </section>
+    )
+  }
+
+  <section class="section" aria-labelledby="home-new">
+    <WhatsNewBento>
+      <div class="section__header">
+        <Image class="logo" src={v7Logo} alt="" widths={[96, 128, 256]} sizes="(min-width: 50rem) 7rem, 5rem" />
+        <div class="heading">
+          <p class="eyebrow">What's new in 7</p>
+          <h2 id="home-new">One workbench for every way you create</h2>
+        </div>
+      </div>
+    </WhatsNewBento>
+  </section>
+
+  <section class="section" aria-labelledby="home-models">
+    <ModelFamilies>
+      <div class="section__top">
+        <div class="heading">
+          <p class="eyebrow">Models</p>
+          <h2 id="home-models">The latest open models, on your own hardware</h2>
+          <p class="section__intro">
+            Each model family has a guide to its variants, hardware needs and settings. External providers add hosted
+            models such as GPT Image and Gemini, billed to your own account.
+          </p>
+        </div>
+        <a class="more" href={href('/users-guide/models/model-families/')}>
+          Compare model families
+          <ArrowRight class="nudge" size={14} aria-hidden="true" />
+        </a>
+      </div>
+    </ModelFamilies>
+  </section>
+
+  <section class="section" aria-labelledby="home-directory">
+    <div class="heading">
+      <p class="eyebrow">Documentation</p>
+      <h2 id="home-directory">Find your way in</h2>
+    </div>
+    <div class="paths">
+      {
+        paths.map(({ kicker, title, links }) => (
+          <div class="card path">
+            <div class="path__heading">
+              <p class="label">{kicker}</p>
+              <h3>{title}</h3>
+            </div>
+            <ul class="path__links" role="list">
+              {links.map(({ label, description, link, Icon }) => (
+                <li>
+                  <a href={href(link)}>
+                    <span class="path__icon">
+                      <Icon size={16} aria-hidden="true" />
+                    </span>
+                    <span class="path__label">{label}</span>
+                    <span class="path__description">{description}</span>
+                    <ArrowRight class="path__arrow nudge" size={16} aria-hidden="true" />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="card community" aria-labelledby="home-community">
+    <div class="community__text">
+      <div class="heading">
+        <p class="eyebrow">Community</p>
+        <h2 id="home-community">Built in the open</h2>
+      </div>
+      <p>
+        Invoke is free software under the Apache 2.0 license, made by <a href={href('/contributing/contributors/')}
+          >contributors around the world</a
+        >. The hosted Invoke.ai platform has shut down since its founding team joined Adobe. The open-source project
+        carries on, stewarded by long-time core maintainers Lincoln Stein (lstein) and Vic (Blessedcoolant).
+      </p>
+      <a class="sponsor" href="https://www.blacksmith.sh/">
+        <Image src={blacksmithLogo} alt="CI powered by Blacksmith" width={240} densities={[1, 2]} />
+      </a>
+    </div>
+    <ul class="community__links" role="list">
+      {
+        community.map(({ label, link }) => (
+          <li>
+            <a href={link}>
+              {label}
+              <ArrowRight class="nudge" size={16} aria-hidden="true" />
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <section class="card install" aria-labelledby="home-install">
+    <div class="install__text">
+      <h2 id="home-install">Install with the Invoke Launcher</h2>
+      <p>
+        The Launcher installs, updates and launches Invoke on Windows, macOS and Linux. Check the <a
+          href={href('/start-here/system-requirements/')}>system requirements</a
+        > first, or install <a href={href('/start-here/manual/')}>manually</a> or with <a
+          href={href('/configuration/docker/')}>Docker</a
+        >.
+      </p>
+    </div>
+    <div class="install__buttons">
+      <a class="docs-button docs-button--primary docs-button--lg" href={href('/download/')}>Download the Launcher</a>
+      <a class="docs-button docs-button--secondary docs-button--lg" href={href('/start-here/installation/')}>
+        Installation guide
+      </a>
+    </div>
+  </section>
+</div>
+
+<style>
+  /*
+   * Starlight's hero lays out an image beside the copy. Here its image slot holds the beta pill, so stack and centre
+   * everything; the spacing below the hero belongs to this component.
+   */
+  :global(.hero:has(.home-announcement)) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    padding-bottom: 0;
+    text-align: center;
+
+    > :global(.hero-html) {
+      order: 0;
+      width: auto;
+      max-width: 100%;
+      margin: 0;
+    }
+
+    :global(.stack) {
+      align-items: center;
+      gap: 1.25rem;
+      text-align: center;
+    }
+
+    :global(.copy) {
+      align-items: center;
+      gap: 1.25rem;
+    }
+
+    :global(.tagline) {
+      max-width: 40rem;
+      font-size: clamp(1rem, 0.9rem + 0.5vw, 1.125rem);
+      line-height: 1.6;
+    }
+  }
+
+  :global(.home-announcement) {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem 0.5rem;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid color-mix(in oklab, var(--docs-accent) 35%, transparent);
+    border-radius: 1rem;
+    background-color: var(--docs-accent-tint);
+    color: var(--docs-accent-text);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.5;
+    text-decoration: none;
+
+    &:hover {
+      border-color: color-mix(in oklab, var(--docs-accent) 60%, transparent);
+      background-color: color-mix(in oklab, var(--docs-accent) 22%, transparent);
+      color: var(--docs-text-strong);
+    }
+
+    > :global(span) {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+  }
+
+  /* Narrow screens put the call to action on a line of its own, without a separator to start it. */
+  @media (max-width: 23.99rem) {
+    :global(.home-announcement__separator) {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    :global(.home-announcement__arrow) {
+      transition: translate 150ms ease;
+    }
+
+    :global(.home-announcement:is(:hover, :focus-visible) .home-announcement__arrow) {
+      translate: 2px 0;
+    }
+  }
+
+  :global(.home-announcement__dot) {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background-color: var(--docs-accent);
+  }
+
+  .home {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(4.5rem, 2.5rem + 6vw, 7rem);
+    padding-bottom: clamp(1rem, 4vw, 3rem);
+    color: var(--docs-text-strong);
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  h2,
+  h3 {
+    margin: 0;
+    color: var(--docs-text-strong);
+  }
+
+  h2 {
+    font-size: clamp(1.75rem, 1.35rem + 1.6vw, 2.25rem);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+  }
+
+  .heading {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    max-width: 40rem;
+  }
+
+  .eyebrow {
+    color: var(--docs-accent);
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+
+  .label {
+    color: var(--docs-text-subtle);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+    text-transform: uppercase;
+  }
+
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* Buttons take their colors from the shared button styles in `custom.css`. */
+  a:not(.docs-button) {
+    color: var(--docs-accent);
+    text-decoration: none;
+
+    &:hover {
+      color: var(--docs-accent-text);
+    }
+  }
+
+  p a {
+    text-decoration: underline;
+    text-decoration-color: color-mix(in oklab, var(--docs-accent) 40%, transparent);
+    text-underline-offset: 0.2em;
+  }
+
+  .more {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  /* Arrows in links move a little towards their destination on hover and focus. */
+  @media (prefers-reduced-motion: no-preference) {
+    .nudge {
+      transition: translate 150ms ease;
+    }
+
+    a:is(:hover, :focus-visible) > .nudge {
+      translate: 2px 0;
+    }
+  }
+
+  .card {
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+  }
+
+  /* Hero actions and screenshot */
+
+  .intro {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(2.5rem, 2rem + 2vw, 3.5rem);
+  }
+
+  .cta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+  }
+
+  .cta__buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+
+  .cta__platforms {
+    color: var(--docs-text-subtle);
+    font-size: 0.8125rem;
+    text-align: center;
+  }
+
+  /* The screenshot sits inset by the padding and the border, with corners that nest inside the frame's. */
+  .frame {
+    --frame-inset: 0.375rem;
+    margin: 0;
+    padding: var(--frame-inset);
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+
+    img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: calc(var(--docs-radius-container) - var(--frame-inset) - 1px);
+    }
+  }
+
+  /*
+   * The workbench screenshot is wider than the splash column: up to 90rem, centred, keeping the page's gutters. Its
+   * edges stay inside the viewport, so it never adds horizontal scrolling.
+   */
+  .hero-shot {
+    --hero-width: min(100vw - 2 * var(--sl-content-pad-x), 90rem);
+    /* The glow's length unit: 1px on wide screens, down to 0.45px on phones. */
+    --glow-unit: clamp(0.45px, 0.1px + 0.0625vw, 1px);
+    position: relative;
+    isolation: isolate;
+    width: var(--hero-width);
+    margin: 0 calc((100% - var(--hero-width)) / 2);
+    border-radius: var(--docs-radius-container);
+  }
+
+  /*
+   * The glow reaches past the viewport's sides on most screens. The page clips it there, at the screen's own edge,
+   * instead of a box near the frame clipping it, and `clip` adds no scroll container.
+   */
+  :global(main:has([data-hero-shot])) {
+    overflow-x: clip;
+  }
+
+  /*
+   * Light from behind the frame, strongest along the top. Each layer's mask is its shape: the frame blurred outwards,
+   * fading to nothing well inside the layer's box. The near layer shows a faint steady light and slanted bands of light
+   * that slide past at different speeds and swell on their own beats, so bright patches wander around the frame. Only
+   * the bands' `transform` and `opacity` animate; the masks and gradients are painted once.
+   */
+  .hero-glow {
+    position: absolute;
+    z-index: -1;
+    inset: var(--glow-inset);
+    overflow: clip;
+    pointer-events: none;
+    mask-image: var(--glow-mask);
+    mask-composite: intersect;
+  }
+
+  /* The wide halo is still and lower in chroma, so the far glow reads as lit air rather than color. */
+  .hero-glow--halo {
+    background-color: color-mix(in oklab, color-mix(in oklab, var(--docs-brand) 70%, var(--docs-bg)) 16%, transparent);
+  }
+
+  .hero-glow--near {
+    background-color: color-mix(in oklab, var(--docs-brand) 3%, transparent);
+  }
+
+  .hero-glow__light {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: calc(100% + var(--shift));
+    background-image: var(--light);
+    animation:
+      hero-glow-drift var(--drift) linear infinite var(--drift-direction),
+      hero-glow-swell var(--swell) ease-in-out infinite alternate;
+  }
+
+  @keyframes hero-glow-drift {
+    to {
+      transform: translateX(calc(-1 * var(--shift)));
+    }
+  }
+
+  @keyframes hero-glow-swell {
+    from {
+      opacity: var(--swell-low);
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* The script marks the hero while it is off screen; without it the glow simply keeps moving. */
+  .hero-shot[data-paused] .hero-glow__light {
+    animation-play-state: paused;
+  }
+
+  /* Without motion, a steady, even light takes the bands' place. */
+  @media (prefers-reduced-motion: reduce) {
+    .hero-glow--near {
+      background-color: color-mix(in oklab, var(--docs-brand) 30%, transparent);
+    }
+
+    .hero-glow__light {
+      display: none;
+    }
+  }
+
+  /*
+   * The frame's border is translucent over a background that stops inside it, so the glow behind lights the rim where
+   * it is strongest.
+   */
+  .frame--hero {
+    --frame-inset: 0.5rem;
+    border-color: oklch(1 0 0 / 0.1);
+    background-clip: padding-box;
+  }
+
+  /* The gallery demo is framed like the app's panel and keeps that panel's width, centred in its column. */
+  .gallery-demo-slot {
+    align-self: center;
+    justify-self: center;
+  }
+
+  /* Product tour */
+
+  .tour {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(4.5rem, 2.5rem + 6vw, 7rem);
+  }
+
+  .tour__item {
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+  }
+
+  .tour__intro {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem 3rem;
+
+    > .heading {
+      flex: 1 1 22rem;
+    }
+
+    > .tour__text {
+      flex: 1 1 20rem;
+    }
+  }
+
+  .tour__text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+
+    > p {
+      color: var(--docs-text-muted);
+    }
+  }
+
+  @media (min-width: 56rem) {
+    .tour__item--split {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+      align-items: center;
+      gap: 4rem;
+    }
+
+    /* The workflow graph is drawn 680px wide; it gets up to that, and the text keeps at least 18rem. */
+    .tour__item--workflow {
+      grid-template-columns: minmax(18rem, 1fr) minmax(0, 680px);
+    }
+
+    /* The text stays first in reading order and moves to the right. */
+    .tour__item--reverse {
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+
+      > .tour__text {
+        grid-column: 2;
+        grid-row: 1;
+      }
+    }
+
+    /* The gallery panel is 450px wide at most. */
+    .tour__item--gallery {
+      grid-template-columns: minmax(0, 28.125rem) minmax(0, 1fr);
+    }
+  }
+
+  /* What's new */
+
+  .section {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  /* The V7 logo leads the heading, as in the app's What's new dialog. */
+  /* A heading with its link at the end of the row, or below it on narrow screens. */
+  .section__top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem 2rem;
+
+    > .more {
+      align-self: auto;
+    }
+  }
+
+  .section__intro {
+    color: var(--docs-text-muted);
+    font-size: 0.9375rem;
+  }
+
+  .section__header {
+    display: flex;
+    align-items: center;
+    gap: 1rem 1.5rem;
+  }
+
+  .logo {
+    flex-shrink: 0;
+    width: 5rem;
+    height: auto;
+  }
+
+  @media (min-width: 50rem) {
+    .logo {
+      width: 7rem;
+    }
+  }
+
+  /* Directory */
+
+  .paths {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+    gap: 1rem;
+  }
+
+  .path {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.5rem;
+
+    h3 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      line-height: 1.3;
+    }
+  }
+
+  .path__heading {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+
+  .path__links {
+    border-top: 1px solid var(--docs-border);
+
+    li {
+      border-bottom: 1px solid var(--docs-border-subtle);
+    }
+
+    li:last-child {
+      border-bottom: 0;
+    }
+
+    a {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      column-gap: 0.75rem;
+      padding-block: 0.75rem;
+      color: var(--docs-text-strong);
+
+      &:hover {
+        color: var(--docs-accent-text);
+
+        .path__icon,
+        .path__arrow {
+          color: var(--docs-accent);
+        }
+      }
+    }
+  }
+
+  /* The topic's or section's icon, in a tile like the topic switcher's. */
+  .path__icon {
+    display: flex;
+    grid-row: 1 / span 2;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--docs-radius);
+    background-color: var(--docs-control);
+    color: var(--docs-text-muted);
+  }
+
+  .path__arrow {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    color: var(--sl-color-gray-4);
+  }
+
+  .path__label {
+    grid-column: 2;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .path__description {
+    grid-column: 2;
+    color: var(--docs-text-subtle);
+    font-size: 0.8125rem;
+  }
+
+  /* Community and install */
+
+  .community,
+  .install {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem 3rem;
+    padding: clamp(1.5rem, 1rem + 2vw, 2.5rem);
+  }
+
+  .community__text {
+    display: flex;
+    flex: 1 1 24rem;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: 40rem;
+
+    > p {
+      color: var(--docs-text-muted);
+      font-size: 0.9375rem;
+    }
+  }
+
+  .sponsor {
+    align-self: flex-start;
+
+    img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border-radius: var(--docs-radius);
+    }
+  }
+
+  .community__links {
+    display: flex;
+    flex: 0 1 18rem;
+    flex-direction: column;
+
+    a {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding-block: 0.625rem;
+      border-bottom: 1px solid var(--docs-border-subtle);
+      color: var(--docs-text-strong);
+      font-size: 0.875rem;
+      font-weight: 500;
+
+      &:hover {
+        color: var(--docs-accent-text);
+      }
+    }
+
+    li:last-child a {
+      border-bottom: 0;
+    }
+
+    svg {
+      flex-shrink: 0;
+      color: var(--sl-color-gray-4);
+    }
+  }
+
+  .install__text {
+    display: flex;
+    flex: 1 1 22rem;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 36rem;
+
+    h2 {
+      font-size: clamp(1.5rem, 1.3rem + 0.8vw, 1.75rem);
+    }
+
+    > p {
+      color: var(--docs-text-muted);
+      font-size: 0.9375rem;
+    }
+  }
+
+  .install__buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+</style>
+
+<script>
+  // The hero glow pauses while the hero and the glow around it are off screen. It runs unless marked, so a late report
+  // (as in a background tab) never leaves it still. Each visit starts the light at a random point in its cycles.
+  const heroShot = document.querySelector<HTMLElement>('[data-hero-shot]');
+  if (heroShot) {
+    new IntersectionObserver(([entry]) => heroShot.toggleAttribute('data-paused', !entry.isIntersecting), {
+      rootMargin: '120px 0px',
+    }).observe(heroShot);
+    for (const animation of heroShot.getAnimations({ subtree: true })) {
+      const duration = Number(animation.effect?.getTiming().duration);
+      if (duration > 0) animation.currentTime = Math.random() * duration;
+    }
+  }
+</script>

@@ -1,0 +1,85 @@
+---
+import { getCollection } from 'astro:content';
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import ShowcaseGrid from '@components/ShowcaseGrid.astro';
+
+import { SHOWCASE_SUBMIT_URL, sortShowcase } from '../lib/showcase.mjs';
+
+const entries = sortShowcase(await getCollection('showcase'));
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Showcase',
+    description: 'Artwork made with Invoke by its community, credited to the artists who shared it.',
+    template: 'splash',
+    hero: {
+      title: 'Made with Invoke',
+      tagline: 'Artwork from the Invoke community, shown with permission and credited to the artists who made it.',
+      actions: [
+        {
+          text: 'Submit your artwork',
+          link: SHOWCASE_SUBMIT_URL,
+          variant: 'primary',
+          icon: 'external',
+          attrs: { class: 'docs-button docs-button--primary docs-button--xl' },
+        },
+      ],
+    },
+  }}
+>
+  {
+    entries.length > 0 ? (
+      <div class="wide">
+        <ShowcaseGrid entries={entries} />
+      </div>
+    ) : (
+      <div class="empty not-content">
+        <h2>Be the first</h2>
+        <p>
+          No artwork here yet. Made something with Invoke you are proud of? Send it in with the submission form, and
+          once a maintainer has reviewed it, it appears here with your name and a link to your work.
+        </p>
+        <a class="docs-button docs-button--primary docs-button--lg" href={SHOWCASE_SUBMIT_URL}>
+          Submit your artwork
+        </a>
+      </div>
+    )
+  }
+</StarlightPage>
+
+<style>
+  /* The grid is wider than the splash column, centred, with the page's gutters. */
+  .wide {
+    --wide-width: min(100vw - 2 * var(--sl-content-pad-x), 90rem);
+    width: var(--wide-width);
+    margin-inline: calc((100% - var(--wide-width)) / 2);
+  }
+
+  .empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    max-width: 36rem;
+    margin-inline: auto;
+    padding: clamp(1.5rem, 1rem + 3vw, 3rem);
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+    text-align: center;
+
+    h2 {
+      margin: 0;
+      color: var(--docs-text-strong);
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    p {
+      margin: 0;
+      color: var(--docs-text-muted);
+    }
+  }
+</style>
