@@ -14,7 +14,7 @@ import type {
 } from '@workbench/canvas-engine/render/spatial/spatialAdjustmentService';
 import type { Rect } from '@workbench/canvas-engine/types';
 
-import { getDocumentIndex } from '@workbench/canvas-engine/document/documentIndex';
+import { getDocumentNode } from '@workbench/canvas-engine/document/documentIndex';
 import {
   type AdjustablePixels,
   type AdjustmentOrigin,
@@ -68,7 +68,7 @@ export const adjustmentRefusal = (
   reason: AdjustmentRefusalReason
 ): AdjustmentRefusal => ({
   ownerId,
-  ownerName: (document && getDocumentIndex(document).byId.get(ownerId)?.node.name) || ownerId,
+  ownerName: getDocumentNode(document, ownerId)?.name || ownerId,
   reason,
   status: 'adjustment-refused',
 });
