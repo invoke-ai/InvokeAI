@@ -1,5 +1,6 @@
 import type { LayerExportGuard } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
@@ -21,11 +22,19 @@ import {
 } from './editSteps';
 
 export type BooleanRasterOperation = 'intersect' | 'cutout' | 'cutaway' | 'exclude';
-export type BooleanRasterResult = 'merged' | 'missing' | 'unsupported' | 'empty' | 'failed' | LayerEditRefusal;
+export type BooleanRasterResult =
+  | 'merged'
+  | 'missing'
+  | 'unsupported'
+  | 'empty'
+  | 'failed'
+  | LayerEditRefusal
+  | AdjustmentRefusal;
 
 type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
-  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' };
+  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | AdjustmentRefusal;
 
 export interface BooleanMergeControllerOptions {
   readonly ctx: LayerStepContext &
@@ -101,6 +110,9 @@ export class BooleanMergeController {
         return 'busy';
       }
       if (upperPixels.status !== 'ok' || belowPixels.status !== 'ok') {
+        if (upperPixels.status === 'adjustment-refused' || belowPixels.status === 'adjustment-refused') {
+          return upperPixels.status === 'adjustment-refused' ? upperPixels : (belowPixels as AdjustmentRefusal);
+        }
         if (upperPixels.status === 'over-budget' || belowPixels.status === 'over-budget') {
           return 'over-budget';
         }

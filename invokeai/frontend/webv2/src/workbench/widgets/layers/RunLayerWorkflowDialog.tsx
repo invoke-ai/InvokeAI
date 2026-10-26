@@ -28,6 +28,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { getCanvasOperations } from '@workbench/canvas-operations/api';
 import { getActiveProjectGraph } from '@workbench/projectWorkflows';
 import { useNotify } from '@workbench/useNotify';
+import { describeAdjustmentRefusal } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -164,7 +165,10 @@ const SUCCESS_KEYS: Record<LayerWorkflowDestination, string> = {
   staging: 'widgets.layers.runWorkflow.stagingSuccess',
 };
 
-const FAILURE_KEYS: Record<Exclude<RunLayerWorkflowResult['status'], 'completed' | 'failed'>, string> = {
+const FAILURE_KEYS: Record<
+  Exclude<RunLayerWorkflowResult['status'], 'completed' | 'failed' | 'adjustment-refused'>,
+  string
+> = {
   aborted: 'widgets.layers.runWorkflow.aborted',
   busy: 'widgets.layers.runWorkflow.busy',
   disabled: 'widgets.layers.runWorkflow.disabled',
@@ -433,7 +437,9 @@ export const RunLayerWorkflowDialog = ({
         return;
       }
 
-      setError(t(FAILURE_KEYS[result.status]));
+      setError(
+        result.status === 'adjustment-refused' ? describeAdjustmentRefusal(result, t) : t(FAILURE_KEYS[result.status])
+      );
     } catch (error) {
       if (session.isCurrent(request.token)) {
         setError(t('widgets.layers.runWorkflow.failed', { message: messageOf(error) }));

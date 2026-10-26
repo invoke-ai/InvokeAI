@@ -20,7 +20,7 @@ import type {
   CanvasViewportCapability,
   BooleanRasterOperation,
   BooleanRasterResult,
-  CopyLayerToRasterResult,
+  CopyLayerResult,
   CropLayerResult,
   ExportBakedLayerPixelsOptions,
   ExportLayerPixelsOptions,
@@ -82,10 +82,12 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 import type { CreatePath2D } from '@workbench/canvas-engine/freehand';
 import type { ColorSampleProviders, ColorSampler } from '@workbench/canvas-engine/render/colorSample';
+import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { CanvasFontRuntime, CanvasTextSource, FontLoadApi } from '@workbench/canvas-engine/render/fontLoader';
 import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { OverlayCursor } from '@workbench/canvas-engine/render/overlayRenderer';
 import type { RenderScheduler } from '@workbench/canvas-engine/render/scheduler';
+import type { SpatialAdjustmentExecutor } from '@workbench/canvas-engine/render/spatial/spatialAdjustmentService';
 import type { SamVisualInput } from '@workbench/canvas-engine/samInteraction';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect, RenderFlags, ToolId, Vec2 } from '@workbench/canvas-engine/types';
@@ -93,7 +95,9 @@ import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutation
 
 import { createItemId } from '@platform/browser/randomUuid';
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
+import { ControlDerivationController } from '@workbench/canvas-engine/controllers/controlDerivationController';
 import { PixelEditController } from '@workbench/canvas-engine/controllers/controlPixelController';
+import { ControlViewController } from '@workbench/canvas-engine/controllers/controlViewController';
 import { EditingController } from '@workbench/canvas-engine/controllers/editingController';
 import { FilterResultController } from '@workbench/canvas-engine/controllers/filterResultController';
 import { GeneratedResultController } from '@workbench/canvas-engine/controllers/generatedResultController';
@@ -135,19 +139,20 @@ import {
 import {
   createEngineStores,
   type EngineStores,
+  type LayerAdjustmentStatus,
   type ScalarStore,
   type TextStylePatch,
   type TextToolOptions,
 } from '@workbench/canvas-engine/engineStores';
 import {
   exportRasterComposite as exportRasterCompositeWithDeps,
-  RasterCompositeOverBudgetError,
   type RasterCompositeExportRequest,
   type RasterCompositeExportSnapshot,
 } from '@workbench/canvas-engine/exportRasterComposite';
 import { createPointerPipeline, type PointerPipeline } from '@workbench/canvas-engine/input/pointerPipeline';
 import { createWheelHandler } from '@workbench/canvas-engine/input/wheel';
 import { isEmpty, union } from '@workbench/canvas-engine/math/rect';
+import { hasSpatialAdjustments } from '@workbench/canvas-engine/render/adjustments';
 import { createColorSampler } from '@workbench/canvas-engine/render/colorSample';
 import {
   compositeDocument,
@@ -160,6 +165,7 @@ import { createMaskPatternTile } from '@workbench/canvas-engine/render/maskFill'
 import { colorLoupePixels, renderOverlay } from '@workbench/canvas-engine/render/overlayRenderer';
 import { trimPaintCacheToAlpha } from '@workbench/canvas-engine/render/paintCacheTrim';
 import { createDomRasterBackend, type RasterBackend, type RasterSurface } from '@workbench/canvas-engine/render/raster';
+import { RasterCompositeOverBudgetError } from '@workbench/canvas-engine/render/rasterComposite';
 import { rasterizeSource, type ImageResolver, type RasterizeDeps } from '@workbench/canvas-engine/render/rasterizers';
 import { fitThumbnailSize, getLayerThumbnailDisplayKey } from '@workbench/canvas-engine/render/thumbnail';
 import { documentDeltaToLocal, liftSelectedPixels } from '@workbench/canvas-engine/selection/floatingSelection';
@@ -188,7 +194,7 @@ import type { StrokeCommittedEvent, Tool, ToolContext } from './tools/tool';
 
 import { createBitmapStore, type BitmapStore } from './document/bitmapStore';
 import { createDocumentMirror, type DocumentMirror } from './document/documentMirror';
-import { decideLayerChange } from './document/layerChangeDecision';
+import { decideLayerChange, nextThumbnailDisplayToken } from './document/layerChangeDecision';
 import { getSourceBounds, getSourceContentRect, isRenderableLayer, renderableSourceOf } from './document/sources';
 import { collectCanvasFontReferences, replaceCanvasFontReferences } from './fontReferences';
 import { createLayerExportGuards, isSupportedExportSource } from './layerExportGuards';
@@ -267,8 +273,6 @@ export interface CanvasEngineOptions {
   uploadIntermediateImage(blob: Blob): Promise<{ height: number; imageName: string; width: number }>;
   /** Supplies the currently selected model base for core-created control layer contracts. */
   getMainModelBase?: () => string | null;
-  /** Supplies the default control model key for core-created control layer contracts. */
-  getDefaultControlModel?: (base: string | null) => string | null;
   /** Supplies the Layers panel's transient multi-selection for grouped moves. */
   getSelectedLayerIds?: () => readonly string[];
   /** Publishes engine history's transient multi-selection changes back to the Layers panel. */
@@ -287,6 +291,8 @@ export interface CanvasEngineOptions {
   fonts?: FontLoadApi | CanvasFontRuntime | null;
   /** Enables deterministic raster/render counters. Disabled by default. */
   enableDiagnostics?: boolean;
+  /** Spatial adjustment executor factory; defaults to a module worker. Node tests pass an inline one. */
+  createSpatialExecutor?: () => SpatialAdjustmentExecutor;
 }
 
 export interface CanvasEngineSelectionCapability extends CanvasSelectionCapability {}
@@ -353,7 +359,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     // the contract keeps them until commit; applying them again would double them and snap back on pointer-up.
     isAdjustmentBaked: (layerId) => pixelEditController?.isOpenFor([layerId]) === true,
     isLayerHeld: (layerId) => isLayerHeldBySession(layerId) || bitmapStore.hasPendingWork(layerId),
+    onAdjustedSurfaceSettled: (layerId) => onAdjustedSurfaceSettled(layerId),
+    onAdjustmentStatus: (ownerId, status) => onAdjustmentStatus(ownerId, status),
+    onGroupSurfaceSettled: (groupId) => onGroupSurfaceSettled(groupId),
     onVersionChange: (layerId) => editingController?.invalidateLayer(layerId),
+    createSpatialExecutor: opts.createSpatialExecutor,
   });
   const layerCache = rasterController.layers;
   const stores = createEngineStores();
@@ -373,6 +383,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     checkerColors: stores.checkerColors,
     clipToBbox: stores.clipToBbox,
     colorPair: stores.colorPair,
+    controlLayerView: stores.controlLayerView,
     documentEditingLocked: stores.documentEditingLocked,
     eraserOptions: stores.eraserOptions,
     gradientOptions: stores.gradientOptions,
@@ -404,6 +415,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     subscribe: (key, listener) => interactionStores[key].subscribe(listener),
     subscribeLayerThumbnailStatus: (layerId, listener) => stores.thumbnailStatus.subscribeKey(layerId, listener),
     subscribeLayerThumbnailVersion: (layerId, listener) => stores.thumbnailVersion.subscribeKey(layerId, listener),
+    getLayerAdjustmentStatus: (layerId) => stores.adjustmentStatus.get(layerId) ?? 'idle',
+    subscribeLayerAdjustmentStatus: (layerId, listener) => stores.adjustmentStatus.subscribeKey(layerId, listener),
   };
   // Undefined uses browser font readiness; explicit null disables it. Loaded fonts trigger text rerasterization.
   const fontLoader = createFontLoader(opts.fonts === undefined ? domFontLoadApi() : opts.fonts);
@@ -751,7 +764,86 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     if (renderController.previews.hasFilter(layerId)) {
       clearFilterPreview(layerId);
     }
+    controlView.clear((id) => id === layerId);
     scheduler.invalidate({ layers: [layerId] });
+  };
+
+  /** Marks every group surface holding `ownerId` for a full redraw; false when no group holds it. */
+  const invalidateAncestorGroups = (ownerId: string): boolean => {
+    const document = mirror.getDocument();
+    const ancestors = document ? (getDocumentIndex(document).byId.get(ownerId)?.path ?? []) : [];
+    if (ancestors.length === 0) {
+      return false;
+    }
+    groupSurfaces.invalidate(ancestors);
+    return true;
+  };
+
+  /**
+   * A spatial adjustment result changed what a layer displays, with no cache publication: recomposite the layer,
+   * redraw its thumbnail, the overview and the group surfaces holding it. Its own adjusted surface is current, so it
+   * stays.
+   */
+  const onAdjustedSurfaceSettled = (layerId: string): void => {
+    if (disposed) {
+      return;
+    }
+    stores.thumbnailVersion.set(layerId, nextThumbnailDisplayToken(stores.thumbnailVersion.get(layerId)));
+    stores.layerPixelEpoch.set(stores.layerPixelEpoch.get() + 1);
+    invalidateAncestorGroups(layerId);
+    scheduler.invalidate({ layers: [layerId] });
+  };
+
+  /**
+   * A group's spatial result landed: recomposite it, redraw the overview (groups have no row thumbnail) and the
+   * surfaces of the groups holding it. Never the landed group's own, or every landing would start its next job.
+   */
+  const onGroupSurfaceSettled = (groupId: string): void => {
+    if (disposed) {
+      return;
+    }
+    stores.layerPixelEpoch.set(stores.layerPixelEpoch.get() + 1);
+    invalidateAncestorGroups(groupId);
+    scheduler.invalidate({ layers: [groupId] });
+  };
+
+  /**
+   * Publishes a layer's or group's spatial status. A job that ended without landing (a failure, or a surface evicted
+   * meanwhile) changes no pixels, but groups holding the owner wait for it: redraw them so they see it finished.
+   */
+  const onAdjustmentStatus = (ownerId: string, status: LayerAdjustmentStatus | null): void => {
+    const wasComputing = stores.adjustmentStatus.get(ownerId) === 'computing';
+    if (status) {
+      stores.adjustmentStatus.set(ownerId, status);
+    } else {
+      stores.adjustmentStatus.delete(ownerId);
+    }
+    if (wasComputing && status !== 'computing' && !disposed && invalidateAncestorGroups(ownerId)) {
+      scheduler.invalidate({ layers: [ownerId] });
+    }
+  };
+
+  /**
+   * Drops the spatial display state of layers and groups that no longer draw a spatial stack (removed, edited or, for
+   * groups, disabled), clearing their status even while nothing draws them. Visits only owners holding that state.
+   */
+  const retainSpatialSurfaces = (): void => {
+    const document = mirror.getDocument();
+    const byId = document ? getDocumentIndex(document).byId : null;
+    rasterController.adjustments.retainSpatial((layerId) => {
+      const node = byId?.get(layerId)?.node;
+      return node?.type === 'raster' && hasSpatialAdjustments(node.adjustments);
+    });
+    groupSurfaces.retainSpatial((groupId) => {
+      const entry = byId?.get(groupId);
+      return (
+        entry?.stack === 'raster' &&
+        entry.node.type === 'group' &&
+        entry.node.isEnabled &&
+        entry.ancestorsEnabled &&
+        hasSpatialAdjustments(entry.node.adjustments)
+      );
+    });
   };
 
   /** Invalidates cached pixels and drops only previews tied to that exact cache version. */
@@ -762,6 +854,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     if (renderController.previews.hasFilter(layerId)) {
       clearFilterPreview(layerId);
     }
+    controlView.clear((id) => id === layerId);
   };
 
   // Engine-owned selection masks clip strokes and drive fill/erase. Marching ants redraw only the overlay while
@@ -1254,9 +1347,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     isSupportedSource: isSupportedExportSource,
     layers: layerCache,
     invalidateLayerCache,
+    peekAdjustedCacheSurface: (layerId, surface, adjustments) =>
+      rasterController.peekAdjustedCacheSurface(layerId, surface, adjustments),
     pin: (layerId) => rasterController.memory.pin(layerId),
     reserve: (bytes) =>
       rasterController.memory.reserve(bytes, { generation: lifecycleGeneration, purpose: 'raster-export' }),
+    runSpatial: (request) => rasterController.spatial.run(request),
     waitForFont: fontLoader.waitForReady,
   });
   const rasterizeLayerPixels = rasterExportController.rasterize.bind(rasterExportController);
@@ -1285,12 +1381,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const exportBakedLayerBlob = rasterExportController.blob.bind(rasterExportController);
   type StructuralExportLayerPixelsResult =
     | Extract<ExportLayerPixelsResult, { status: 'ok' }>
-    | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' };
+    | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+    | AdjustmentRefusal;
   const normalizeStructuralExport = async (
     result: Promise<ExportLayerPixelsResult>
   ): Promise<StructuralExportLayerPixelsResult> => {
     const resolved = await result;
-    if (resolved.status === 'ok') {
+    if (resolved.status === 'ok' || resolved.status === 'adjustment-refused') {
       return resolved;
     }
     return { status: resolved.status === 'aborted' ? 'not-ready' : resolved.status };
@@ -1313,8 +1410,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const cropLayerToBbox = (layerId: string): Promise<CropLayerResult> => layerController.crop.crop(layerId);
 
-  const copyLayerToRaster = (layerId: string): Promise<CopyLayerToRasterResult> =>
-    layerController.copy.copyToRaster(layerId);
+  const copyLayerToRaster = (layerId: string): Promise<CopyLayerResult> => layerController.copy.copy(layerId, 'raster');
+  const copyLayerToControl = (layerId: string): Promise<CopyLayerResult> =>
+    layerController.copy.copy(layerId, 'control');
 
   /**
    * Leases rasterized layer pixels for a composite export. Missing, ineligible or unsupported layers throw so
@@ -1402,9 +1500,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     derivedSurfaceCache,
     diagnostics,
     getAdjustedSurface,
-    getGroupSurface,
+    // The frame's reads decide each group's spatial status, so the overview's other keys never flip its row.
+    getGroupSurface: (scope, members, matrices, content) =>
+      groupSurfaces.get(scope, members, matrices, content, { frame: true }),
     getCheckerboardTile,
     getMaskPatternTile,
+    getControlView: () => controlView.get(),
     layerCache,
     previews: renderController.previews,
     raster: rasterController,
@@ -1460,6 +1561,16 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     setStagedPreview,
   } = previewPublisher;
 
+  const controlView = new ControlViewController({
+    getDocument: () => mirror.getDocument(),
+    invalidateLayer: (layerId) => scheduler.invalidate({ layers: [layerId] }),
+    isLocked: () => interactionLocked || stores.documentEditingLocked.get(),
+    publish: (view) => stores.controlLayerView.set(view),
+    rasterize: (source, document, signal) => rasterizeSource(source, rasterizeDeps(document, signal)),
+    reserve: (bytes) => rasterController.memory.reserveOperation(bytes, { purpose: 'layer-operation' }),
+    trackDetached: (bytes) => rasterController.memory.trackDetached(bytes),
+  });
+
   // ---- Document mirror ----------------------------------------------------
 
   /** Actual last non-null selection, retained across deselect/reselect and updated by engine selections too. */
@@ -1493,6 +1604,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       // document — a swap can reuse a layer id with different content, so
       // pruning only "missing" ids isn't enough; drop them all.
       cleanup.run(clearAllFilterPreviews);
+      cleanup.run(() => controlView.clear());
       // Drop document-scoped selection/lasso state and cancel outgoing floats; committing would target a replaced
       // layer.
       cleanup.run(() => floatingSelection.cancel());
@@ -1528,6 +1640,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       scheduler.invalidate({ all: true });
     },
     onLayersRecomposite: (ids) => {
+      retainSpatialSurfaces();
       scheduler.invalidate({ layers: ids });
     },
     onLayersChanged: (ids, sourceChangedIds, restructured) => {
@@ -1537,6 +1650,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         const doc = mirror.getDocument();
         cleanup.run(() => groupSurfaces.prune(doc ? new Set(getDocumentIndex(doc).byId.keys()) : new Set()));
       }
+      cleanup.run(retainSpatialSurfaces);
       const floatLayerId = floatingSelection.get()?.layerId;
       if (floatLayerId && ids.includes(floatLayerId)) {
         // The float's layer was replaced or removed. Drop the float rather than
@@ -1598,6 +1712,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
           cleanup.run(() => invalidateLayerCache(id));
         }
       }
+      // Any edit of the viewed layer (undo, redo and a detection commit included) returns it to its map.
+      cleanup.run(() => controlView.reconcile());
       cleanup.run(() => scheduler.invalidate({ layers: ids }));
       cleanup.throwIfFailed();
     },
@@ -1624,6 +1740,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       // A float belongs to exactly one layer; selecting another banks it rather
       // than leaving pixels in flight over a layer the user is no longer on.
       cleanup.run(() => floatingSelection.commit());
+      cleanup.run(() => controlView.clear((id) => id !== selectedLayerId));
       const session = stores.transformSession.get();
       if (session && session.layerId !== selectedLayerId) {
         cleanup.run(() => cancelTransform());
@@ -1698,6 +1815,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       for (const layerId of ids) {
         cleanup.run(() => clearFilterPreview(layerId));
       }
+      cleanup.run(() => controlView.clear());
       projectWasPresent = false;
       cleanup.throwIfFailed();
       return;
@@ -1732,6 +1850,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const unsubscribeBrushOptions = subscribeSizeChange(stores.brushOptions, 'brush');
   const unsubscribeEraserOptions = subscribeSizeChange(stores.eraserOptions, 'eraser');
   const unsubscribeCheckerboard = stores.checkerboard.subscribe(() => scheduler.invalidate({ all: true }));
+  // An operation taking the document (Filter, Select Object) works on the map; the original view ends with it.
+  const unsubscribeControlViewLock = stores.documentEditingLocked.subscribe(() => {
+    if (stores.documentEditingLocked.get()) {
+      controlView.clear();
+    }
+  });
   const unsubscribeCheckerColors = stores.checkerColors.subscribe(() => {
     checkerboardTile = null;
     scheduler.invalidate({ all: true });
@@ -1922,6 +2046,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     }
     interactionLocked = locked;
     if (locked) {
+      // A generation or staging holds the canvas; the user cannot switch the view back meanwhile.
+      controlView.clear();
       pipeline.cancelActiveGesture();
       setTool('view', { temporary: true });
     }
@@ -1963,8 +2089,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     editingController.cooldown();
     clearStagedPreview();
     clearStagedPreviewCache();
+    controlView.clear();
     detach();
     cancelAllLayerRasterizations();
+    rasterController.cancelSpatialAdjustments();
     cooldownPromise = persistenceController.flush().then(
       () => {
         if (disposed || lifecycleState !== 'cooling' || lifecycleGeneration !== generation) {
@@ -2078,9 +2206,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const getMainModelBase = (): string | null => {
     return opts.getMainModelBase?.() ?? null;
   };
-  const getDefaultControlModel = (base: string | null): string | null => {
-    return opts.getDefaultControlModel?.(base) ?? null;
-  };
 
   /** Conversion reducers clone contracts, so their publication postcondition compares by value. */
   const documentHasLayerContract = (
@@ -2100,6 +2225,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     deleteDerived: deleteDerivedSurfaces,
     getActiveProjectId: () => projectId,
     getAdjustedSurface,
+    getAdjustmentStatus: (layerId) => stores.adjustmentStatus.get(layerId),
+    peekAdjustedSurface: (layer, entry) => rasterController.peekAdjustedSurface(layer, entry),
     getDocument: () => mirror.getDocument(),
     getTransformSession: () => stores.transformSession.get(),
     installPrepared: installGeneratedPaintCache,
@@ -2124,7 +2251,15 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       }
     },
   });
-  const beginPixelEdit = pixelEditController.begin.bind(pixelEditController);
+  const pixelEdits = pixelEditController;
+  /** Strokes paint the map live, so a stroke on a viewed layer first returns it to the map. */
+  const beginPixelEdit: PixelEditController['begin'] = (layerId, options) => {
+    const transaction = pixelEdits.begin(layerId, options);
+    if (transaction) {
+      controlView.clear((id) => id === layerId);
+    }
+    return transaction;
+  };
 
   const captureLayerCache = (
     layer: CanvasLayerContract,
@@ -2196,12 +2331,16 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     renderableSourceOf(layer)?.type === 'paint';
 
   const layerMutationController = new LayerMutationController({
+    backend,
     captureCache: captureLayerCache,
     ctx: mutationContext,
     discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
+    exportBaked: (layerId) => exportBakedLayerPixelsForStructural(layerId, { includeDisabled: true }),
+    getMainModelBase,
     getDuplicateRasterPlan,
     getSelectedLayerIds: resolveSelectedLayerIds,
     hasPendingPixelWork: (layerId) => bitmapStore.hasPendingWork(layerId),
+    isGuardCurrent: isLayerExportGuardCurrent,
     needsPixelPersistence: layerNeedsPixelPersistence,
     prepareDuplicateRasterSource: prepareLayerRasterCache,
     pinDuplicateRasterSources: (layerIds) => {
@@ -2221,6 +2360,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   });
   const commitLayerCopy = layerMutationController.copy.bind(layerMutationController);
   const commitLayerConversion = layerMutationController.convert.bind(layerMutationController);
+  const convertLayerToControl = layerMutationController.convertToControl.bind(layerMutationController);
   const duplicateLayers = layerMutationController.duplicate.bind(layerMutationController);
 
   const replaceSelectionFromImage = editingController.selectionImage.replace.bind(editingController.selectionImage);
@@ -2233,11 +2373,20 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     ctx: mutationContext,
     decodeImage: (image, options) => rasterController.decodeImage(image, options),
     discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
-    getDefaultControlModel,
     getMainModelBase,
     needsPixelPersistence: layerNeedsPixelPersistence,
   });
   const commitRasterFilterResult = filterResultController.commit.bind(filterResultController);
+
+  const controlDerivationController = new ControlDerivationController({
+    captureCache: captureLayerCache,
+    ctx: mutationContext,
+    decodeImage: (image, options) => rasterController.decodeImage(image, options),
+    discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
+    getDocumentRevision: () => mutationPort.getCanvasState()?.documentRevision ?? null,
+    hasPendingPixelWork: (layerId) => bitmapStore.hasPendingWork(layerId),
+    isLayerSessionHeld: isLayerHeldBySession,
+  });
 
   const generatedResultController = new GeneratedResultController({
     captureCache: captureLayerCache,
@@ -2245,7 +2394,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     ctx: mutationContext,
     decodeImage: (image, options) => rasterController.decodeImage(image, options),
     discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
-    getDefaultControlModel,
     getMainModelBase,
     needsPixelPersistence: layerNeedsPixelPersistence,
   });
@@ -2267,7 +2415,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const extractMaskedArea = (maskLayerId: string): Promise<ExtractMaskedAreaResult> =>
     layerController.extractMaskedArea.extract(maskLayerId);
 
-  const mergeLayerDown = (upperLayerId: string): MergeDownResult => layerController.merge.mergeDown(upperLayerId);
+  const mergeLayerDown = (upperLayerId: string): Promise<MergeDownResult> =>
+    layerController.merge.mergeDown(upperLayerId);
   const mergeSelectedRasterLayers = (layerIds: readonly string[]): Promise<MergeVisibleResult> =>
     layerController.merge.mergeSelected(layerIds);
   const mergeVisibleRasterLayers = (): Promise<MergeVisibleResult> => layerController.merge.mergeVisible();
@@ -2293,10 +2442,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     isDocumentSnapshotCurrent,
     reserve: (bytes) =>
       rasterController.memory.reserve(bytes, { generation: lifecycleGeneration, purpose: 'psd-export' }),
+    runSpatial: (request) => rasterController.spatial.run(request),
   });
   const exportRasterLayersToPsd = (fileName: string): Promise<PsdExportResult> => psdExportController.export(fileName);
 
-  const rasterizeLayer = (layerId: string): RasterizeLayerResult => layerController.rasterize.rasterize(layerId);
+  const rasterizeLayer = (layerId: string): Promise<RasterizeLayerResult> =>
+    layerController.rasterize.rasterize(layerId);
 
   // Transform sessions span gestures. Apply records one undoable parameter edit for image layers or pixel bake for
   // paint; Cancel drops previews. Tools and public UI share the session API.
@@ -2419,6 +2570,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cleanup.run(cancelOpenPixelEdit);
     cleanup.run(() => pixelEditController?.dispose());
     cleanup.run(() => filterResultController.dispose());
+    cleanup.run(() => controlDerivationController.dispose());
     cleanup.run(() => generatedResultController.dispose());
     cleanup.run(() => stagedResultController.dispose());
     cleanup.run(() => editingController.dispose());
@@ -2439,6 +2591,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cleanup.run(unsubscribeBrushOptions);
     cleanup.run(unsubscribeEraserOptions);
     cleanup.run(unsubscribeCheckerboard);
+    cleanup.run(unsubscribeControlViewLock);
     cleanup.run(unsubscribeCheckerColors);
     cleanup.run(unsubscribeShowGrid);
     cleanup.run(unsubscribeBboxGrid);
@@ -2454,6 +2607,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cleanup.run(() => persistenceController.dispose());
     cleanup.run(() => mirror.dispose());
     cleanup.run(() => previewPublisher.dispose());
+    cleanup.run(() => controlView.dispose());
     cleanup.run(() => renderController.dispose());
     cleanup.run(() => rasterController.dispose());
     cleanup.run(() => fontLoader.dispose());
@@ -2535,6 +2689,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const getCompositeExecutorDeps = (): CanvasCompositeExecutorDeps => ({
     backend,
     reserve: (bytes) => rasterController.memory.reserveOperation(bytes, { purpose: 'invocation-composite' }),
+    runSpatial: (request) => rasterController.spatial.run(request),
     // Unreferenced generation inputs upload as reclaimable intermediates.
     uploadImage: (blob) => opts.uploadIntermediateImage(blob),
   });
@@ -2547,8 +2702,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         documentGeneration: rasterController.getDocumentGeneration(),
         lifecycleGeneration,
       }),
+      // Never builds the display's copy, and reuses only an exact one: a miss adjusts what the export reserved.
       adjustedSurface: (layerId, surface, adjustments) =>
-        rasterController.getAdjustedCacheSurface(layerId, surface, adjustments),
+        rasterController.peekAdjustedCacheSurface(layerId, surface, adjustments),
       getLayerSurface: requireLayerSurfaceForExport,
       isSnapshotCurrent: (snapshot) =>
         !disposed &&
@@ -2568,6 +2724,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         };
       },
       reserve: (bytes) => rasterController.memory.reserveOperation(bytes, { purpose: 'background-snapshot' }),
+      runSpatial: (request) => rasterController.spatial.run(request),
     });
   const surface: CanvasSurfaceCapability = { attach, detach, resize };
   const viewportCapability: CanvasViewportCapability = { fitToView, fitToViewOnFirstShow, getViewport, setBboxGrid };
@@ -2615,24 +2772,24 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     },
     copy: {
       backend,
+      commitLayerCopy,
       ctx: mutationContext,
       exportBaked: (layerId) => exportBakedLayerPixelsForStructural(layerId, { includeDisabled: true }),
+      getMainModelBase,
       isGuardCurrent: isLayerExportGuardCurrent,
     },
     extractMaskedArea: {
       backend,
       ctx: mutationContext,
-      derived: derivedSurfaceCache,
-      diagnostics,
       exportBaked: (layerId, includeDisabled) => exportBakedLayerPixelsForStructural(layerId, { includeDisabled }),
-      getAdjustedSurface,
-      getGroupSurface,
-      getMaskPattern: getMaskPatternTile,
       hasExportableContent: hasExportableLayerContent,
       isCacheReady: isLayerCacheReadyForOp,
       isGuardCurrent: isLayerExportGuardCurrent,
       layers: layerCache,
+      peekAdjustedCacheSurface: (layerId, surface, adjustments) =>
+        rasterController.peekAdjustedCacheSurface(layerId, surface, adjustments),
       rasterize: (layerId) => rasterizeLayerPixelsForStructural(layerId),
+      runSpatial: (request) => rasterController.spatial.run(request),
     },
     commitGeneratedImageResult,
     newRasterLayer: {
@@ -2660,12 +2817,15 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       isCacheReady: isLayerCacheReadyForOp,
       layers: layerCache,
       needsPixelPersistence: layerNeedsPixelPersistence,
+      peekAdjustedSurface: (layer, entry) => rasterController.peekAdjustedSurface(layer, entry),
       publishSelectedLayerIds: (primaryId, selectedIds) => opts.setSelectedLayerIds?.(primaryId, selectedIds),
+      runSpatial: (request) => rasterController.spatial.run(request),
     },
     rasterize: {
       backend,
       ctx: mutationContext,
       rasterizeDeps: (document) => rasterizeDeps(document),
+      runSpatial: (request) => rasterController.spatial.run(request),
     },
     structural: structuralController,
     thumbnail: {
@@ -2677,6 +2837,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       getMaskPattern: getMaskPatternTile,
       isDisposed: () => disposed,
       isSupportedSource: isSupportedExportSource,
+      peekDisplayedSurface: (layer, entry) => rasterController.peekDisplayedAdjustedSurface(layer, entry),
       pin: (layerId) => rasterController.memory.pin(layerId),
       projectId,
       rasterize: rasterizeLayerForThumbnail,
@@ -2779,6 +2940,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     commitRasterFilterResult,
     commitStagedImage,
     commitTextEdit,
+    convertLayerToControl,
+    copyLayerToControl,
     copyLayerToRaster,
     cropLayerToBbox,
     duplicateLayers,
@@ -2849,6 +3012,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     ...layerController.previews,
     drawDocumentOverview,
     preloadStagedPreview,
+    setControlLayerView: (layerId, view) => controlView.set(layerId, view),
     setGuardedFilterPreview,
     setStagedPreview,
   };
@@ -2859,9 +3023,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
 
   const applicationHost: CanvasApplicationHost = {
+    captureControlDetectionGuard: (layerId) => controlDerivationController.captureControlDetectionGuard(layerId),
     captureGuard: captureCurrentLayerExportGuard,
     clearFilterPreview,
     clearSamPreview,
+    commitControlLayerPatch: (options) => controlDerivationController.commitControlLayerPatch(options),
+    commitControlMap: (options) => controlDerivationController.commitControlMap(options),
     commitFilter: (options) => commitRasterFilterResult(options, documentEditOwner),
     commitGenerated: (options) => commitGeneratedImageResult(options, documentEditOwner),
     commitMask: (options) => commitMaskImageResult(options, documentEditOwner),
@@ -2869,6 +3036,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     encodeSurface: (surface) => backend.encodeSurface(surface, 'image/png'),
     exportBakedLayerBlob: (layerId) => exportBakedLayerBlob(layerId, { includeDisabled: true }),
     exportLayerPixels: rasterizeLayerPixelsForStructural,
+    flushLayerUploads: (layerId, options) => persistenceController.flushLayer(layerId, options),
     getCompositeExecutorDeps,
     getDocument: () => mirror.getDocument(),
     isGuardCurrent: isLayerExportGuardCurrent,

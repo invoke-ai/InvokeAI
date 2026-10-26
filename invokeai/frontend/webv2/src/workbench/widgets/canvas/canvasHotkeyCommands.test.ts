@@ -9,10 +9,9 @@ import type {
 } from '@workbench/canvas-engine/api';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
-import { createDocumentModel } from '@workbench/canvas-engine/api';
+import { createControlLayer, createDocumentModel } from '@workbench/canvas-engine/api';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
-import { createControlLayer } from '@workbench/widgets/layers/layerOps';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import { executeCanvasHotkeyCommand, type CanvasHotkeyContext } from './canvasHotkeyCommands';
@@ -78,7 +77,7 @@ const createEngine = (interaction: Partial<CanvasInteractionState> = {}) => {
           status: 'duplicated',
         })
       ),
-      mergeLayerDown: vi.fn((): MergeDownResult => 'merged'),
+      mergeLayerDown: vi.fn((): Promise<MergeDownResult> => Promise.resolve('merged')),
       nudgeSelectedLayer: vi.fn(() => ({ status: 'committed' as const })),
     },
     selection: {
@@ -161,7 +160,7 @@ describe('staging precedence', () => {
 describe('layer navigation without staging', () => {
   const select = (id: string): CanvasProjectMutation => ({ id, type: 'setCanvasSelectedLayer' });
   // Document order puts the control stack above the raster stack: b, a, c.
-  const layers = [rasterLayer('a'), createControlLayer('Control', 'b'), rasterLayer('c')];
+  const layers = [rasterLayer('a'), createControlLayer({ id: 'b', name: 'Control' }), rasterLayer('c')];
 
   it.each([
     ['canvas.nextEntity', 'a', 'c'],
@@ -586,12 +585,12 @@ describe('mergeDown', () => {
     expect(engine.layers.mergeLayerDown).not.toHaveBeenCalled();
   });
 
-  it('reports a merge the engine refused', () => {
+  it('reports a merge the engine refused', async () => {
     const engine = createEngine();
-    engine.layers.mergeLayerDown.mockReturnValue('over-budget');
+    engine.layers.mergeLayerDown.mockResolvedValue('over-budget');
     const reportLayerOperation = vi.fn();
     executeCanvasHotkeyCommand('canvas.mergeDown', contextOf({ engine, reportLayerOperation }));
-    expect(reportLayerOperation).toHaveBeenCalledExactlyOnceWith('over-budget');
+    await vi.waitFor(() => expect(reportLayerOperation).toHaveBeenCalledExactlyOnceWith('over-budget'));
   });
 });
 
@@ -659,7 +658,7 @@ describe('group selection', () => {
     ...documentOf([], selectedLayerId),
     stacks: stacksFrom(nodes),
   });
-  const control = (id: string): CanvasLayerContract => createControlLayer(id, id);
+  const control = (id: string): CanvasLayerContract => createControlLayer({ id, name: id });
 
   it('reorders, deletes and duplicates a selected group', () => {
     const document = nodeDocument([groupContract('g', [rasterLayer('a')]), rasterLayer('b')], 'g');

@@ -9,8 +9,8 @@ import type {
 } from '@chakra-ui/react';
 import type { Key, ReactNode } from 'react';
 
-import { Portal, Select as ChakraSelect, useFieldContext } from '@chakra-ui/react';
-import { useCallback, useRef } from 'react';
+import { Portal, Select as ChakraSelect, Separator, useFieldContext } from '@chakra-ui/react';
+import { Fragment, useCallback, useRef } from 'react';
 
 import { Scrollable } from './Scrollable';
 
@@ -56,7 +56,10 @@ export interface SelectProps<T extends CollectionItem> extends Omit<SelectRootPr
   itemsMaxH?: string | null;
   /** Only consecutive equal keys form a group; callers must order items by group. */
   groupBy?: (item: T) => string;
-  /** The visible header for a group key; defaults to the key itself. */
+  /**
+   * The visible header for a group key; defaults to the key itself. `null` renders the group without a header,
+   * under a divider unless it opens the list.
+   */
   renderGroupLabel?: (group: string) => ReactNode;
   getItemKey?: (item: T, index: number) => Key;
   indicatorGroupProps?: SelectIndicatorGroupProps;
@@ -122,19 +125,28 @@ export const Select = <T extends CollectionItem>({
           <ChakraSelect.Content {...contentProps}>
             <SelectItems ref={itemsRef} maxH={itemsMaxH ?? undefined}>
               {groupBy
-                ? partitionByGroup(collection.items, groupBy).map(({ group, items, startIndex }) => (
-                    <ChakraSelect.ItemGroup key={group}>
-                      <ChakraSelect.ItemGroupLabel>
-                        {renderGroupLabel ? renderGroupLabel(group) : group}
-                      </ChakraSelect.ItemGroupLabel>
-                      {items.map((item, offset) => (
-                        <ChakraSelect.Item key={getItemKey(item, startIndex + offset)} item={item}>
-                          <ChakraSelect.ItemText>{renderItem(item)}</ChakraSelect.ItemText>
-                          {itemIndicator ? <ChakraSelect.ItemIndicator /> : null}
-                        </ChakraSelect.Item>
-                      ))}
-                    </ChakraSelect.ItemGroup>
-                  ))
+                ? partitionByGroup(collection.items, groupBy).map(({ group, items, startIndex }) => {
+                    const label = renderGroupLabel ? renderGroupLabel(group) : group;
+                    const groupItems = items.map((item, offset) => (
+                      <ChakraSelect.Item key={getItemKey(item, startIndex + offset)} item={item}>
+                        <ChakraSelect.ItemText>{renderItem(item)}</ChakraSelect.ItemText>
+                        {itemIndicator ? <ChakraSelect.ItemIndicator /> : null}
+                      </ChakraSelect.Item>
+                    ));
+                    // A header-less group is not a labelled listbox group: its options follow a divider, which
+                    // stays out of the accessibility tree because a listbox owns only options and groups.
+                    return label === null ? (
+                      <Fragment key={group}>
+                        {startIndex > 0 ? <Separator aria-hidden borderColor="border.subtle" mx="-1" my="1" /> : null}
+                        {groupItems}
+                      </Fragment>
+                    ) : (
+                      <ChakraSelect.ItemGroup key={group}>
+                        <ChakraSelect.ItemGroupLabel>{label}</ChakraSelect.ItemGroupLabel>
+                        {groupItems}
+                      </ChakraSelect.ItemGroup>
+                    );
+                  })
                 : collection.items.map((item, index) => (
                     <ChakraSelect.Item key={getItemKey(item, index)} item={item}>
                       <ChakraSelect.ItemText>{renderItem(item)}</ChakraSelect.ItemText>

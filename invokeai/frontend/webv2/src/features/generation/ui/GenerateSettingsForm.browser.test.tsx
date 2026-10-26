@@ -338,6 +338,52 @@ describe('GenerateSettingsForm Anima inpaint adapter', () => {
 
     expect(storedValues().getSnapshot()).toMatchObject({ animaInpaintAdapterWeight: 1.05 });
   });
+
+  it('switches the adapter off and back on without losing the pick or the weight', async () => {
+    const switchLabel = 'widgets.generate.animaInpaintAdapterEnabled';
+    const offHelp = 'widgets.generate.animaInpaintAdapterOffHelp';
+    const adapterSwitch = () =>
+      [...host!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(
+        (input) => input.labels?.[0]?.textContent === switchLabel
+      );
+    stableGroups.models.catalog = [MODEL, ANIMA, ANIMA_INPAINT_ADAPTER];
+    await renderAdapter(buildAdapter());
+    await settle(() =>
+      storedValues().patchSnapshot({
+        ...getDefaultGenerateSettings(ANIMA as never),
+        animaInpaintAdapterModel: ANIMA_INPAINT_ADAPTER as never,
+        animaInpaintAdapterWeight: 0.6,
+        modelKey: ANIMA.key,
+      })
+    );
+
+    expect(adapterSwitch()?.checked).toBe(true);
+    expect(host!.textContent).not.toContain(offHelp);
+    expect(sliderNamed(weightLabel).getAttribute('aria-disabled')).toBeNull();
+
+    await userEvent.click(adapterSwitch()!.labels![0]!);
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({
+      animaInpaintAdapterEnabled: false,
+      animaInpaintAdapterModel: ANIMA_INPAINT_ADAPTER,
+      animaInpaintAdapterWeight: 0.6,
+    });
+    expect(adapterSwitch()?.checked).toBe(false);
+    expect(host!.textContent).toContain(offHelp);
+    expect(adapterSlot()?.getAttribute('data-component-value')).toBe(ANIMA_INPAINT_ADAPTER.key);
+    expect(sliderNamed(weightLabel).getAttribute('aria-disabled')).toBe('true');
+
+    await userEvent.click(adapterSwitch()!.labels![0]!);
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({
+      animaInpaintAdapterEnabled: true,
+      animaInpaintAdapterModel: ANIMA_INPAINT_ADAPTER,
+      animaInpaintAdapterWeight: 0.6,
+    });
+    expect(sliderNamed(weightLabel).getAttribute('aria-disabled')).toBeNull();
+  });
 });
 
 describe('GenerateSettingsForm Z-Image Qwen3 encoder', () => {
@@ -639,6 +685,25 @@ describe('GenerateSettingsForm render isolation', () => {
     expect(stepsValue()).toBe(31);
   });
 
+  it('switches at once when only the size moves, reporting the new size', async () => {
+    const info = vi.fn();
+    stableGroups.notifications.info = info;
+    stableGroups.models.catalog = [MODEL, FLUX];
+    await renderAdapter(buildAdapter());
+    // 1032 sits on SDXL's 8 px grid but not FLUX's 16 px one.
+    await pressRight(sliderNamed('widgets.generate.width'));
+
+    await settle(() => host!.querySelector<HTMLElement>('[data-model-pick="flux"]')?.click());
+
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+    expect(patches.at(-1)?.patch).toMatchObject({ modelKey: 'flux' });
+    expect((patches.at(-1)?.patch.width as number) % 16).toBe(0);
+    expect(info).toHaveBeenCalledWith(
+      'widgets.generate.dimensionsAdjusted',
+      'widgets.generate.dimensionsAdjustedDescription'
+    );
+  });
+
   it('confirms a lossy switch against the draft, pending edits included', async () => {
     stableGroups.models.catalog = [MODEL, FLUX, ink];
     storedValues().patchSnapshot({ loras: [{ isEnabled: true, model: ink, weight: 0.75 }] });
@@ -650,7 +715,9 @@ describe('GenerateSettingsForm render isolation', () => {
     await settle(() => host!.querySelector<HTMLElement>('[data-model-pick="flux"]')?.click());
 
     const dialog = document.querySelector<HTMLElement>('[role="alertdialog"]');
-    expect(dialog?.textContent).toContain('widgets.generate.switchModelBody: Dimensions and LoRAs');
+    // The size moves to the FLUX grid, which the dialog reports beside the loss rather than as one.
+    expect(dialog?.textContent).toContain('widgets.generate.switchModelBody: LoRAs');
+    expect(dialog?.textContent).toContain('widgets.generate.switchModelAdjustsDimensions');
     expect(patches).toEqual([]);
 
     const confirm = [...dialog!.querySelectorAll<HTMLButtonElement>('button')].find(
@@ -661,7 +728,7 @@ describe('GenerateSettingsForm render isolation', () => {
     // The switch lands as the dialog closes, and the dialog animates out still listing what was confirmed.
     expect(frames).not.toHaveLength(0);
     for (const frame of frames) {
-      expect(frame.text).toContain('widgets.generate.switchModelBody: Dimensions and LoRAs');
+      expect(frame.text).toContain('widgets.generate.switchModelBody: LoRAs');
     }
 
     await settle(noop, 400);

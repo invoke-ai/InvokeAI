@@ -9,6 +9,12 @@ export type { ProjectSortId, ProjectsViewId } from '@workbench/launchpad/project
 
 export type { WorkbenchLanguage } from '@platform/i18n/languages';
 
+/** What the workflow library's own templates are ordered by (dates newest first, names A to Z). */
+export type WorkflowLibrarySortId = 'updated' | 'opened' | 'created' | 'name';
+
+/** How workflow thumbnails fill their 3:2 box: cropped to fill it, or letterboxed to fit whole. */
+export type WorkflowLibraryThumbnailFit = 'cover' | 'contain';
+
 /**
  * Export document generation settings with the project; personal editor choices belong in {@link
  * WorkbenchPreferences} so imports cannot overwrite them.
@@ -75,6 +81,8 @@ export interface WorkbenchPreferences {
   notifyOnEnqueue: boolean;
   /** Project export carries the exporter's workspace (layout, generation settings, prompt history); the last choice. */
   exportIncludesWorkspace: boolean;
+  /** Add Models installs local files where they are instead of moving them into the models folder; the last choice. */
+  installInPlace: boolean;
   /** Write numeric attention weights (`(word)1.1`) when the attention hotkeys insert them. */
   preferNumericAttentionStyle: boolean;
   /** Color prompt syntax in prompt fields; changes rendering only. */
@@ -99,6 +107,10 @@ export interface WorkbenchPreferences {
   workflowEdgeStyle: 'curved' | 'square';
   /** Keep connections of a selected node beneath nodes instead of raising them over node controls. */
   workflowEdgesBehindNodes: boolean;
+  /** Order of the workflow library's own templates. */
+  workflowLibrarySort: WorkflowLibrarySortId;
+  /** How workflow library and project cards show their thumbnails. */
+  workflowLibraryThumbnailFit: WorkflowLibraryThumbnailFit;
   /** Raise text and border contrast on every theme (a11y). */
   highContrast: boolean;
   /** Account-bound overrides keyed by hotkey id (`app.invoke`, `gallery.galleryNavLeft`, etc.). */
@@ -115,6 +127,11 @@ export interface WorkbenchPreferences {
   krea2RebalancePresets: StoredRebalancePreset[];
   /** User-saved Generate settings snapshots ("recipes"), in the order they were saved. */
   generatePresets: StoredGeneratePreset[];
+  /**
+   * The last control model picked per main-model base and control type (`${base}:${controlType}` → model key);
+   * control layers left on automatic use it. Not shown in Settings.
+   */
+  controlModelMemory: Record<string, string>;
 }
 
 export type SettingsSectionId = string;

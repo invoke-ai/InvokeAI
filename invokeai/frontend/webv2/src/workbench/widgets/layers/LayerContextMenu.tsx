@@ -1,4 +1,5 @@
 import type {
+  AdjustmentRefusal,
   CanvasAdjustmentEntry,
   CanvasColorLabel,
   CanvasDocumentContractV3,
@@ -17,7 +18,6 @@ import type { ComponentProps, Dispatch, ReactNode } from 'react';
 
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { galleryTransfers } from '@features/gallery';
-import { useModelsSelector } from '@features/models';
 import { canCopyImage } from '@platform/browser/clipboard';
 import { IconButton, MenuActionItem, MenuContent, MenuIconItem, RenameDialog, Tooltip } from '@platform/ui';
 import { useQueryClient } from '@tanstack/react-query';
@@ -26,6 +26,7 @@ import {
   getDocumentIndex,
   getDocumentLayer,
   getSourceContentRect,
+  isAdjustmentRefusal,
   isGroupNode,
   isHideableLayer,
   isNodeHidden,
@@ -45,8 +46,12 @@ import {
   useCanvasEngineRead,
   useLayerQuickSwitch,
 } from '@workbench/widgets/canvas/engineStoreHooks';
-import { reportLayerOperation, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
-import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import {
+  describeAdjustmentRefusal,
+  reportLayerOperation,
+  usePreparedCommit,
+} from '@workbench/widgets/canvas/useStructuralCommit';
+import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import {
   ArrowRightLeftIcon,
   ArrowUpDownIcon,
@@ -73,7 +78,6 @@ import type {
 } from './layerContextMenuLayout';
 import type { LayerMenuDialogKind, LayerMenuDialogState } from './layerMenuState';
 
-import { resolveDefaultControlModelForBase } from './controlModelOptions';
 import {
   actionTargets,
   getLayerContextActions,
@@ -109,15 +113,16 @@ import {
   copyRasterToRegionalGuidance,
   copyRegionalGuidanceToInpaintMask,
   createLayerId,
-  createIdentityAdjustment,
+  createAdjustmentEntry,
   createRegionalReferenceImage,
   fitLayerTransformToBbox,
   getControlTransparencyEffectPatch,
   getRegionalGuidanceAutoNegativePatch,
   MASK_MODIFIER_DEFAULTS,
+  needsBakedControlPixels,
 } from './layerOps';
-import { requestLayerProperties } from './layerPropertiesRequestStore';
 import { LayerSaveToBoardSubmenu } from './LayerSaveToBoardSubmenu';
+import { useRevealLayerProperties } from './revealLayerProperties';
 import { RunLayerWorkflowDialog, useLayerWorkflowAvailability } from './RunLayerWorkflowDialog';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
@@ -234,12 +239,9 @@ const LayerMenu = ({
   const commitPrepared = usePreparedCommit(engine);
   const { t } = useTranslation();
   const projectId = useActiveProjectId();
-  const { widgets } = useWorkbenchCommands();
   const notify = useNotify();
   const queryClient = useQueryClient();
   const base = useSelectedModelBase();
-  const models = useModelsSelector((snapshot) => snapshot.models);
-  const defaultControlModel = useMemo(() => resolveDefaultControlModelForBase(models, base), [base, models]);
   const workflowAvailability = useLayerWorkflowAvailability();
   const canvas = useActiveProjectSelector((project) => project.canvas);
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
@@ -356,7 +358,8 @@ const LayerMenu = ({
   );
 
   const makeStatusError = useCallback(
-    (status: LayerActionErrorStatus): Error => new Error(t(LAYER_ACTION_ERROR_KEYS[status])),
+    (status: LayerActionErrorStatus | AdjustmentRefusal): Error =>
+      new Error(typeof status === 'string' ? t(LAYER_ACTION_ERROR_KEYS[status]) : describeAdjustmentRefusal(status, t)),
     [t]
   );
 
@@ -410,7 +413,9 @@ const LayerMenu = ({
       return;
     }
     void engine.layers.mergeSelectedRasterLayers(actionTargets({ layer, selectedIds })).then((result) => {
-      if (result === 'not-ready') {
+      if (isAdjustmentRefusal(result)) {
+        notify.error(t('widgets.layers.actions.actionFailed'), describeAdjustmentRefusal(result, t));
+      } else if (result === 'not-ready') {
         notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.groupActions.mergeNotReady'));
       } else if (result === 'over-budget') {
         notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.groupActions.mergeOverBudget'));
@@ -420,21 +425,21 @@ const LayerMenu = ({
     });
   }, [engine, layer, notify, selectedIds, t]);
 
-  const handleMerge = useCallback(() => {
+  const handleMerge = useCallback(async () => {
     if (!engine) {
       throw makeStatusError('not-ready');
     }
-    const result = engine.layers.mergeLayerDown(layer.id);
+    const result = await engine.layers.mergeLayerDown(layer.id);
     if (result !== 'merged') {
       throw makeStatusError(result);
     }
   }, [engine, layer.id, makeStatusError]);
 
-  const handleRasterize = useCallback(() => {
+  const handleRasterize = useCallback(async () => {
     if (!engine) {
       throw makeStatusError('not-ready');
     }
-    const result = engine.layers.rasterizeLayer(layer.id);
+    const result = await engine.layers.rasterizeLayer(layer.id);
     if (result !== 'rasterized') {
       throw makeStatusError(result);
     }
@@ -460,10 +465,20 @@ const LayerMenu = ({
   );
 
   const convert = useCallback(
-    (targetType: CanvasLayerContract['type'], label: string) => {
+    async (targetType: CanvasLayerContract['type'], label: string) => {
+      if (targetType === 'control' && needsBakedControlPixels(layer)) {
+        if (!engine) {
+          throw makeStatusError('not-ready');
+        }
+        const result = await engine.layers.convertLayerToControl(label, layer);
+        if (result !== 'converted') {
+          throw makeStatusError(result);
+        }
+        return;
+      }
       const converted =
         layer.type === 'raster' && targetType === 'control'
-          ? convertRasterToControl(layer, base, defaultControlModel)
+          ? convertRasterToControl(layer, base)
           : layer.type === 'raster' && targetType === 'inpaint_mask'
             ? convertRasterToInpaintMask(layer)
             : layer.type === 'raster' && targetType === 'regional_guidance'
@@ -480,7 +495,7 @@ const LayerMenu = ({
         throw makeStatusError('not-ready');
       }
     },
-    [base, defaultControlModel, engine, layer, makeStatusError]
+    [base, engine, layer, makeStatusError]
   );
 
   const handleToggleVisibility = useCallback(() => {
@@ -556,13 +571,7 @@ const LayerMenu = ({
     onDialogExitComplete?.();
   }, [onDialogExitComplete]);
   // Operations present their controls in the Properties pane, so starting one must bring that pane into view.
-  const revealProperties = useCallback(
-    (layerId: string) => {
-      widgets.open({ region: 'right', widgetId: 'layers' });
-      requestLayerProperties(layerId);
-    },
-    [widgets]
-  );
+  const revealProperties = useRevealLayerProperties();
   const startSelectObject = useCallback(
     (layerId: string) => {
       if (!engine) {
@@ -662,6 +671,8 @@ const LayerMenu = ({
       case 'not-ready':
       case 'over-budget':
         throw makeStatusError(result.status);
+      case 'adjustment-refused':
+        throw makeStatusError(result);
       case 'busy':
         throw new Error(t('widgets.layers.actions.cropBusy'));
       case 'unsupported':
@@ -679,7 +690,7 @@ const LayerMenu = ({
     }
     const result = await engine.exports.extractMaskedArea(layer.id);
     if (result.status !== 'extracted') {
-      throw makeStatusError(result.status);
+      throw makeStatusError(isAdjustmentRefusal(result) ? result : result.status);
     }
   }, [engine, layer.id, makeStatusError]);
 
@@ -712,18 +723,29 @@ const LayerMenu = ({
     }
     const result = await engine.layers.copyLayerToRaster(layer.id);
     if (result.status !== 'copied') {
-      throw makeStatusError(result.status);
+      throw makeStatusError(isAdjustmentRefusal(result) ? result : result.status);
     }
   }, [addCopy, engine, getActionLabel, layer, makeStatusError]);
 
-  const handleCopyToControl = useCallback(() => {
-    if (layer.type === 'raster') {
-      addCopy(
-        copyRasterToControl(layer, createLayerId(), base, defaultControlModel),
-        getActionLabel('copy-to-control')
-      );
+  const handleCopyToControl = useCallback(async () => {
+    if (layer.type !== 'raster') {
+      return;
     }
-  }, [addCopy, base, defaultControlModel, getActionLabel, layer]);
+    if (!needsBakedControlPixels(layer)) {
+      const id = createLayerId();
+      addCopy(copyRasterToControl(layer, id, base), getActionLabel('use-as-control-layer'));
+      revealProperties(id);
+      return;
+    }
+    if (!engine) {
+      throw makeStatusError('not-ready');
+    }
+    const result = await engine.layers.copyLayerToControl(layer.id);
+    if (result.status !== 'copied') {
+      throw makeStatusError(isAdjustmentRefusal(result) ? result : result.status);
+    }
+    revealProperties(result.layerId);
+  }, [addCopy, base, engine, getActionLabel, layer, makeStatusError, revealProperties]);
 
   const handleCopyToInpaintMask = useCallback(() => {
     const id = createLayerId();
@@ -827,7 +849,7 @@ const LayerMenu = ({
       if (layer.type !== 'raster') {
         return;
       }
-      const entry = createIdentityAdjustment(type);
+      const entry = createAdjustmentEntry(type);
       const before = layer.adjustments ?? [];
       commitPrepared(t('widgets.layers.menu.addAdjustment'), (model) =>
         model.prepare({
@@ -884,7 +906,7 @@ const LayerMenu = ({
               : target === 'inpaint_mask'
                 ? 'convert-to-inpaint-mask'
                 : 'convert-to-regional-guidance';
-        convert(target, getActionLabel(actionId));
+        return convert(target, getActionLabel(actionId));
       },
       copyTo: handleCopyTo,
       copyToClipboard: handleCopyToClipboard,

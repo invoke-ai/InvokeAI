@@ -136,7 +136,7 @@ If you see unexpected quality regressions, disable FP8 Storage on the affected m
 
 Everything above describes FP8 *Storage*, which changes how weights are **stored** while the math still runs in BF16. `fp8_compute` is a separate, global setting in `invokeai.yaml` that also does the **math** in FP8, on GPUs that have hardware for it. That makes generation faster, not just smaller.
 
-It is for models that were **already saved in FP8** by whoever published them — you'll often see these labelled "fp8" or "fp8_scaled" in the filename. Without either setting InvokeAI unpacks them back to BF16 while loading, which is why such a checkpoint has FP8 Storage switched on for it when it is installed. With `fp8_compute` on they stay as they are and run directly on the GPU's FP8 hardware; with FP8 Storage on they also stay as they are, but are unpacked layer by layer during the forward pass instead.
+It is for models that were **already saved in FP8** by whoever published them — you'll often see these labelled "fp8" or "fp8_scaled" in the filename. Without either setting InvokeAI unpacks them back to BF16 while loading, which is why such a checkpoint has FP8 Storage switched on for it when it is installed. With `fp8_compute` on they stay as they are and run directly on the GPU's FP8 hardware; with FP8 Storage on they also stay as they are, but are unpacked layer by layer during the forward pass instead. ComfyUI's int8 builds have a counterpart of their own, [int8 Compute](/configuration/optimization/int8-compute/).
 
 ### Checkpoints that are already FP8
 

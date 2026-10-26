@@ -1,5 +1,5 @@
 import type { CanvasEditRefusal, StructuralCommitResult } from '@workbench/canvas-engine/capabilities';
-import type { CanvasDocumentContractV3 } from '@workbench/canvas-engine/contracts';
+import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { TransformSession } from '@workbench/canvas-engine/engineStores';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { LayerCacheEntry } from '@workbench/canvas-engine/render/layerCache';
@@ -8,22 +8,27 @@ import type { LayerTransform } from '@workbench/canvas-engine/transform/transfor
 import type { Rect } from '@workbench/canvas-engine/types';
 
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
+import { rebaseControlOriginal } from '@workbench/canvas-engine/document/controlDerivation';
 import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
 import { isLeafEditable } from '@workbench/canvas-engine/document/layerEligibility';
 import { isRenderableLayer } from '@workbench/canvas-engine/document/sources';
-import { HISTORY_ENTRY_OVERHEAD_BYTES, NO_HELD_ASSET_REFS } from '@workbench/canvas-engine/history/history';
+import {
+  collectHistoryMediaRefs,
+  HISTORY_ENTRY_OVERHEAD_BYTES,
+  NO_HELD_ASSET_REFS,
+} from '@workbench/canvas-engine/history/history';
 import { isEmpty, roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
 import { hittableLayerSize } from '@workbench/canvas-engine/tools/moveHitTest';
 import { bakeMatrix } from '@workbench/canvas-engine/transform/transformMath';
 
 import type { CanvasMutationContext, EditStep } from './mutationContext';
 
-import { rgbaBytes, withReplayReservation } from './editSteps';
+import { replaceLayerStep, rgbaBytes, withReplayReservation } from './editSteps';
 
 export interface TransformEditingControllerOptions {
   readonly session: { get(): TransformSession | null; set(value: TransformSession | null): void };
   readonly backend: RasterBackend;
-  readonly ctx: Pick<CanvasMutationContext, 'applyStep' | 'begin' | 'reserveRaster'>;
+  readonly ctx: Pick<CanvasMutationContext, 'applyStep' | 'begin' | 'installPrepared' | 'reserveRaster'>;
   readonly getDocument: () => CanvasDocumentContractV3 | null;
   readonly getCache: (layerId: string) => LayerCacheEntry | null;
   readonly setOverride: (layerId: string, transform: LayerTransform | null) => void;
@@ -42,7 +47,20 @@ export interface TransformEditingControllerOptions {
 
 const IDENTITY: LayerTransform = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
 
-const isRefusal = (status: string): status is CanvasEditRefusal =>
+/**
+ * What a bake step changes on the layer: only its transform, or the whole contract when more than the transform moves
+ * with the pixels (a control layer's kept original).
+ */
+type BakeChange =
+  | { readonly kind: 'transform'; readonly from: LayerTransform; readonly to: LayerTransform }
+  | { readonly kind: 'contract'; readonly from: CanvasLayerContract; readonly to: CanvasLayerContract };
+
+const reversed = (change: BakeChange): BakeChange =>
+  change.kind === 'transform'
+    ? { from: change.to, kind: 'transform', to: change.from }
+    : { from: change.to, kind: 'contract', to: change.from };
+
+const isRefusal = (status: string): status is Extract<CanvasEditRefusal, string> =>
   status === 'busy' || status === 'gesture-active' || status === 'not-ready' || status === 'over-budget';
 
 const unchanged = (left: LayerTransform, right: LayerTransform): boolean =>
@@ -102,8 +120,12 @@ export class TransformEditingController {
     this.deps.invalidate({ layers: [session.layerId], overlay: true });
   }
 
-  /** A step that sets the layer's transform and installs matching whole-layer pixels, or rolls the transform back. */
-  private bakeStep(layerId: string, from: LayerTransform, to: LayerTransform, rect: Rect, pixels: ImageData): EditStep {
+  /** A step that makes `change` and installs matching whole-layer pixels, or rolls the change back. */
+  private bakeStep(layerId: string, change: BakeChange, rect: Rect, pixels: ImageData): EditStep {
+    const install = (): void => this.deps.restoreCache(layerId, rect, pixels);
+    if (change.kind === 'contract') {
+      return { ...replaceLayerStep(this.deps.ctx, change.to, null, { restore: change.from }), install };
+    }
     const hasTransform =
       (transform: LayerTransform) =>
       (document: CanvasDocumentContractV3 | null): boolean => {
@@ -111,12 +133,12 @@ export class TransformEditingController {
         return !!current && unchanged(current.transform, transform);
       };
     return {
-      accepted: hasTransform(to),
-      install: () => this.deps.restoreCache(layerId, rect, pixels),
-      mutation: { id: layerId, patch: { transform: to }, type: 'updateCanvasLayer' },
+      accepted: hasTransform(change.to),
+      install,
+      mutation: { id: layerId, patch: { transform: change.to }, type: 'updateCanvasLayer' },
       rollback: {
-        mutation: { id: layerId, patch: { transform: from }, type: 'updateCanvasLayer' },
-        restored: hasTransform(from),
+        mutation: { id: layerId, patch: { transform: change.from }, type: 'updateCanvasLayer' },
+        restored: hasTransform(change.from),
       },
     };
   }
@@ -190,12 +212,21 @@ export class TransformEditingController {
       context.drawImage(cache.surface.canvas, beforeRect.x, beforeRect.y);
       context.setTransform(1, 0, 0, 1, 0, 0);
       const after = context.getImageData(0, 0, afterRect.width, afterRect.height);
-      const oldTransform = { ...session.startTransform };
-      const forward = this.bakeStep(layer.id, oldTransform, IDENTITY, afterRect, after);
-      const backward = this.bakeStep(layer.id, IDENTITY, oldTransform, beforeRect, before);
+      // A kept control original moves with the baked pixels (detaching when its frame would shear), in the same step.
+      const rebased =
+        layer.type === 'control' && layer.original !== undefined
+          ? rebaseControlOriginal({ ...layer, transform: { ...IDENTITY } }, session.transform)
+          : null;
+      const change: BakeChange = rebased
+        ? { from: layer, kind: 'contract', to: rebased }
+        : { from: { ...session.startTransform }, kind: 'transform', to: IDENTITY };
+      const forward = this.bakeStep(layer.id, change, afterRect, after);
+      const backward = this.bakeStep(layer.id, reversed(change), beforeRect, before);
       const result = txn.publish('Transform layer', forward, {
         bytes: before.data.byteLength + after.data.byteLength + HISTORY_ENTRY_OVERHEAD_BYTES,
-        heldAssetRefs: NO_HELD_ASSET_REFS,
+        // A contract bake that detaches drops the original from the document; undo restores it, so the entry holds it.
+        heldAssetRefs:
+          change.kind === 'contract' ? collectHistoryMediaRefs(change.from, change.to) : NO_HELD_ASSET_REFS,
         redo: () => this.replay(forward, afterRect),
         undo: () => this.replay(backward, beforeRect),
       });

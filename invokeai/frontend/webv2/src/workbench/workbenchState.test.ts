@@ -251,6 +251,7 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   qwen3VLEncoderModel: null,
   qwen35EncoderModel: null,
   animaInpaintAdapterModel: null,
+  animaInpaintAdapterEnabled: true,
   animaInpaintAdapterWeight: 1,
   wanT5EncoderModel: null,
   wanLowNoiseModel: null,
@@ -261,6 +262,14 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   ideogram4GuidanceScale: null,
   ideogram4Mu: null,
   ideogram4ColorPalette: [],
+  externalImageSize: null,
+  openaiQuality: 'auto',
+  openaiBackground: 'auto',
+  openaiInputFidelity: null,
+  geminiTemperature: null,
+  geminiThinkingLevel: null,
+  seedreamWatermark: false,
+  seedreamOptimizePrompt: false,
   krea2RebalanceEnabled: false,
   krea2RebalanceMultiplier: 4,
   krea2RebalanceWeights: '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0',
@@ -641,6 +650,174 @@ describe('generation-device orchestration metadata', () => {
     });
 
     expect(getQueuedRandDevice(state)).toBe('xpu');
+  });
+});
+
+describe('model-only upscale submissions', () => {
+  const upscaler = {
+    ...createUpscaleModel('ultrasharp', 'spandrel_image_to_image', 'any', '4x-UltraSharp'),
+    scale: 4,
+    type: 'spandrel_image_to_image' as const,
+  };
+  const input = { height: 64, image_name: 'input.png', width: 48 };
+  const sourceMetadata = { height: 512, positive_prompt: 'a lighthouse', seed: 42, width: 384 };
+  const getQueued = (state: WorkbenchState) => {
+    const snapshot = getActiveProject(state).queue.items[0]?.snapshot;
+    const submission = snapshot?.backendSubmission;
+
+    return { nodes: submission?.kind === 'invalid' ? {} : (submission?.graph.nodes ?? {}), snapshot, submission };
+  };
+  const primeModelOnly = () => {
+    let state = workbenchReducer(createInitialWorkbenchState(), {
+      type: 'patchWidgetValues',
+      values: {
+        ...createDefaultUpscaleWidgetValues([upscaler]),
+        // Iterations would repeat one image: Model only runs once.
+        batchCount: 3,
+        inputImage: input,
+        mode: 'model-only',
+        seed: 10,
+        seedMode: 'increment',
+      },
+      widgetId: 'upscale',
+    });
+
+    // The shared prompt draft is not this run's: nothing reads a prompt.
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { positivePrompt: 'the Generate draft' },
+      widgetId: 'generate',
+    });
+
+    return state;
+  };
+  const submitRoute = (state: WorkbenchState, imageName = input.image_name) =>
+    workbenchReducer(state, {
+      backendSupportsCancellation: true,
+      models: [upscaler],
+      route: { destination: 'gallery', destinationLocked: false, sourceId: 'upscale', sourceLocked: false },
+      projectId: state.activeProjectId,
+      type: 'submitResolvedInvocationSnapshot',
+      upscaleSourceMetadata: { imageName, metadata: sourceMetadata },
+    });
+
+  it('queues the upscaler alone, once, with the input metadata, no main model, and leaves the Refine seed', () => {
+    const state = submitRoute(primeModelOnly());
+    const { nodes, snapshot, submission } = getQueued(state);
+
+    expect(Object.values(nodes).map((node) => node.type)).toEqual([
+      'string',
+      'string',
+      'integer',
+      'spandrel_image_to_image_autoscale',
+    ]);
+    expect(nodes.upscale_output).toMatchObject({
+      is_intermediate: false,
+      metadata: { ...sourceMetadata, upscale_scale: 4 },
+      scale: 4,
+    });
+    expect(submission).toMatchObject({
+      batchCount: 1,
+      kind: 'generate',
+      negativePrompt: '',
+      positivePrompt: '',
+      seedStep: 0,
+    });
+    expect(snapshot?.presentation).toEqual({ batchCount: 1, height: 256, width: 192 });
+    expect(getProjectWidgetValues(getActiveProject(state), 'upscale').seed).toBe(10);
+  });
+
+  it('queues nothing, and says why, with metadata read for an image that is no longer the input', () => {
+    const state = submitRoute(primeModelOnly(), 'earlier.png');
+
+    expect(getActiveProject(state).queue.items).toEqual([]);
+    expect(state.notifications[0]).toMatchObject({ kind: 'error', titleKey: 'widgets.upscale.inputChanged' });
+  });
+
+  it("queues the image menu's upscale to the gallery without touching the widget or the route", () => {
+    listGalleryBoardsInCache('auto-board');
+    let state = workbenchReducer(primeModelOnly(), {
+      settings: { autoAddBoardId: 'auto-board' },
+      type: 'updateGallerySettings',
+    });
+    state = workbenchReducer(state, { destination: 'canvas', type: 'setInvocationDestination' });
+    const before = getActiveProject(state);
+
+    state = workbenchReducer(state, {
+      backendSupportsCancellation: true,
+      // Odd sizes: 4x gives 404 x 324, which the result floors to multiples of 8 as the Upscale widget's does.
+      image: { height: 101, image_name: 'menu.png', width: 81 },
+      projectId: state.activeProjectId,
+      scale: 'native',
+      sourceMetadata,
+      type: 'submitModelOnlyUpscale',
+      upscaleModel: upscaler,
+    });
+
+    const after = getActiveProject(state);
+    const { nodes, snapshot, submission } = getQueued(state);
+
+    expect(after.queue.items).toHaveLength(1);
+    expect(snapshot).toMatchObject({ destination: 'gallery', galleryBoardId: 'auto-board', sourceId: 'upscale' });
+    expect(snapshot?.presentation).toEqual({ batchCount: 1, height: 400, width: 320 });
+    expect(submission).toMatchObject({ batchCount: 1, kind: 'generate', positivePrompt: '' });
+    expect(nodes.upscale_output).toMatchObject({
+      fit_to_multiple_of_8: true,
+      image: { image_name: 'menu.png' },
+      metadata: {
+        ...sourceMetadata,
+        upscale_initial_image: { height: 101, image_name: 'menu.png', width: 81 },
+        upscale_scale: 4,
+      },
+      scale: 4,
+      type: 'spandrel_image_to_image_autoscale',
+    });
+    expect(after.invocation).toEqual({ ...before.invocation, lastSubmittedRunId: after.queue.items[0]?.id });
+    expect(after.widgetInstances).toEqual(before.widgetInstances);
+    expect(after.widgetGraphs).toEqual(before.widgetGraphs);
+  });
+
+  it("runs the image menu's native entry for an upscaler of unknown native scale once, as a plain pass", () => {
+    const primed = primeModelOnly();
+    const { scale: _scale, ...legacy } = upscaler;
+    const state = workbenchReducer(primed, {
+      backendSupportsCancellation: true,
+      image: { height: 101, image_name: 'menu.png', width: 81 },
+      projectId: primed.activeProjectId,
+      scale: 'native',
+      sourceMetadata: null,
+      type: 'submitModelOnlyUpscale',
+      upscaleModel: legacy,
+    });
+    const { nodes } = getQueued(state);
+
+    expect(nodes.upscale_output).toMatchObject({ type: 'spandrel_image_to_image' });
+    expect(nodes.upscale_output).not.toHaveProperty('scale');
+    expect(nodes.upscale_output).not.toHaveProperty('fit_to_multiple_of_8');
+    expect(nodes.upscale_output?.metadata).not.toHaveProperty('upscale_scale');
+  });
+
+  it("runs the image menu's other factors as Model only plans them and sizes the result to that factor", () => {
+    const primed = primeModelOnly();
+    const state = workbenchReducer(primed, {
+      backendSupportsCancellation: true,
+      image: { height: 100, image_name: 'menu.png', width: 80 },
+      projectId: primed.activeProjectId,
+      scale: 1.5,
+      sourceMetadata: null,
+      type: 'submitModelOnlyUpscale',
+      upscaleModel: upscaler,
+    });
+    const { nodes, snapshot } = getQueued(state);
+
+    // One 4x pass, then the node resizes to 1.5x, floored to a multiple of 8: 150 x 120 becomes 144 x 120.
+    expect(snapshot?.presentation).toEqual({ batchCount: 1, height: 144, width: 120 });
+    expect(nodes.upscale_output).toMatchObject({
+      fit_to_multiple_of_8: true,
+      metadata: { upscale_scale: 1.5 },
+      scale: 1.5,
+      type: 'spandrel_image_to_image_autoscale',
+    });
   });
 });
 
@@ -9185,5 +9362,56 @@ describe('auto invocation route switching', () => {
 
     // Editing the surface already routed as the source keeps the manual destination.
     expect(getRoute(state)).toMatchObject({ destination: 'canvas', sourceId: 'generate' });
+  });
+});
+
+describe('canvas schema adoption', () => {
+  const typedControl = (id: string): CanvasControlLayerContract => ({
+    ...createControlLayer(id),
+    controlType: 'depth',
+    detection: { settings: {}, type: 'depth_anything_depth_estimation' },
+    source: { image: { height: 64, imageName: 'photo.png', width: 64 }, type: 'image' },
+  });
+  const withV4Canvas = (layers: readonly CanvasLayerContract[]): WorkbenchState =>
+    workbenchReducer(createInitialWorkbenchState(), {
+      document: { ...createEmptyCanvasDocument(), stacks: stacksFrom([...layers]), version: 4 },
+      type: 'replaceCanvasDocument',
+    });
+  const versions = (state: WorkbenchState) => [getCanvas(state).version, getCanvas(state).document.version];
+
+  it('moves a v4 canvas to schema 6 when a control layer gains a type, and keeps 6 after it loses it', () => {
+    let state = withV4Canvas([createControlLayer('ctrl')]);
+    expect(versions(state)).toEqual([4, 4]);
+
+    state = workbenchReducer(state, { layer: typedControl('ctrl'), layerId: 'ctrl', type: 'replaceCanvasLayer' });
+    expect(versions(state)).toEqual([6, 6]);
+
+    state = workbenchReducer(state, { layer: createControlLayer('ctrl'), layerId: 'ctrl', type: 'replaceCanvasLayer' });
+    expect(versions(state)).toEqual([6, 6]);
+
+    state = workbenchReducer(state, { document: createEmptyCanvasDocument(), type: 'replaceCanvasDocument' });
+    expect(getCanvas(state).version).toBe(6);
+  });
+
+  it('adopts 4, not 5, for custom-font typography alone', () => {
+    const text: CanvasLayerContract = {
+      ...createRasterLayer('text'),
+      source: {
+        align: 'left',
+        color: '#fff',
+        content: 'hello',
+        fontFamily: 'Example',
+        fontRef: { contentHash: 'a'.repeat(64), family: 'Example', id: 'font-1', label: 'Example Regular' },
+        fontSize: 24,
+        fontWeight: 400,
+        lineHeight: 1.2,
+        type: 'text',
+      },
+    };
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('text')]);
+    expect(versions(state)).toEqual([3, 3]);
+
+    state = workbenchReducer(state, { layer: text, layerId: 'text', type: 'replaceCanvasLayer' });
+    expect(versions(state)).toEqual([4, 4]);
   });
 });

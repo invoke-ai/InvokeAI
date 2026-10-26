@@ -44,7 +44,7 @@ export interface ListWorkflowsParams {
   tags?: string[];
   isPublic?: boolean;
   callable?: boolean;
-  orderBy?: 'updated_at' | 'name';
+  orderBy?: 'created_at' | 'name' | 'opened_at' | 'updated_at';
   direction?: 'ASC' | 'DESC';
   signal?: AbortSignal;
 }
@@ -92,11 +92,32 @@ export const listLibraryWorkflows = ({
   return apiFetchJson<WorkflowLibraryPage>(`/api/v1/workflows/?${params.toString()}`, { signal });
 };
 
-export interface WorkflowRecordDTO extends WorkflowLibraryListItem {
+export interface WorkflowRecordDTO {
   workflow_id: string;
   name: string;
+  created_at: string;
+  updated_at: string;
+  opened_at?: string | null;
+  last_run_at?: string | null;
+  user_id: string;
+  is_public: boolean;
+  revision: number;
+  thumbnail_url?: string | null;
+  call_saved_workflow_compatibility?: WorkflowCallCompatibility | null;
   workflow: Record<string, unknown>;
 }
+
+export const getWorkflowRecordCategory = (record: WorkflowRecordDTO): WorkflowLibraryCategory | undefined => {
+  const meta = record.workflow.meta;
+
+  if (typeof meta !== 'object' || meta === null) {
+    return undefined;
+  }
+
+  const category = (meta as { category?: unknown }).category;
+
+  return category === 'user' || category === 'default' ? category : undefined;
+};
 
 export const getLibraryWorkflowRecord = (workflowId: string, signal?: AbortSignal): Promise<WorkflowRecordDTO> =>
   apiFetchJson<WorkflowRecordDTO>(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}`, { signal });
@@ -228,6 +249,22 @@ export const updateLibraryWorkflow = async (
   }
 };
 
+export const setLibraryWorkflowPublic = async (
+  workflowId: string,
+  isPublic: boolean,
+  signal?: AbortSignal
+): Promise<WorkflowRecordDTO> => {
+  try {
+    return await apiFetchJson<WorkflowRecordDTO>(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}/is_public`, {
+      body: JSON.stringify({ is_public: isPublic }),
+      method: 'PATCH',
+      signal,
+    });
+  } catch (error) {
+    return rethrowAsRefusal(error);
+  }
+};
+
 export const deleteLibraryWorkflow = async (workflowId: string, signal?: AbortSignal): Promise<void> => {
   await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}`, { method: 'DELETE', signal });
 };
@@ -251,8 +288,20 @@ export const deleteLibraryWorkflowThumbnail = async (workflowId: string, signal?
   await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}/thumbnail`, { method: 'DELETE', signal });
 };
 
+const openedListeners = new Set<() => void>();
+
+/** Registers a listener fired once the server has recorded an open: lists ordered by last opened have moved. */
+export const onLibraryWorkflowOpened = (listener: () => void): (() => void) => {
+  openedListeners.add(listener);
+  return () => openedListeners.delete(listener);
+};
+
 export const touchLibraryWorkflowOpenedAt = async (workflowId: string, signal?: AbortSignal): Promise<void> => {
   await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}/opened_at`, { method: 'PUT', signal });
+
+  for (const listener of openedListeners) {
+    listener();
+  }
 };
 
 export interface GetWorkflowTagCountsParams {

@@ -1,13 +1,15 @@
-import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { CanvasControlLayerContract, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { TransformSession } from '@workbench/canvas-engine/engineStores';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 
 import { createCanvasMutationContext } from '@workbench/canvas-engine/controllers/mutationContext';
 import { documentFrom, layerContract } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { restoreControlOriginal, withDetectedMap } from '@workbench/canvas-engine/document/controlDerivation';
 import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
 import { createHistory } from '@workbench/canvas-engine/history/history';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
+import { composeLayerTransforms } from '@workbench/canvas-engine/transform/transformMath';
 import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { describe, expect, it, vi } from 'vitest';
@@ -183,5 +185,79 @@ describe('TransformEditingController', () => {
     expect(await h.history.undo()).toMatchObject({ status: 'failed' });
     expect(h.history.entries().past).toEqual(['Transform layer']);
     expect(h.calls.restoreCache).toHaveBeenCalledOnce();
+  });
+
+  it("moves a detected control layer's original with the baked map, in the same undo step", async () => {
+    const depth = { settings: {}, type: 'depth_anything_depth_estimation' };
+    const originalTransform = { rotation: 0, scaleX: 1, scaleY: 1, x: 2, y: 3 };
+    const detected: CanvasControlLayerContract = {
+      adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+      blendMode: 'normal',
+      controlType: 'depth',
+      detection: depth,
+      filter: depth,
+      id: 'control',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Depth 1',
+      opacity: 1,
+      original: { image: { height: 4, imageName: 'photo', width: 4 }, type: 'image' },
+      originalTransform,
+      source: { bitmap: { height: 4, imageName: 'map.png', width: 4 }, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 10, y: 0 },
+      type: 'control',
+      withTransparencyEffect: true,
+    };
+    const applied = { rotation: 0, scaleX: 2, scaleY: 2, x: 12, y: 4 };
+    const h = createHarness(detected);
+    h.controller.begin('control');
+    h.controller.update(applied);
+    h.controller.apply();
+
+    const baked = h.layer() as CanvasControlLayerContract;
+    expect(baked.transform).toEqual({ rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 });
+    expect(baked).toMatchObject({ controlType: 'depth', detection: depth, original: detected.original });
+    // Re-detection and "None" both land the original where the applied transform put it.
+    const placed = composeLayerTransforms(applied, originalTransform);
+    expect(restoreControlOriginal(baked).transform).toEqual(placed);
+    const map = { image: { height: 4, imageName: 'next-map', width: 4 }, rect: { height: 4, width: 4, x: 0, y: 0 } };
+    expect(withDetectedMap(baked, map, depth)?.transform).toEqual(placed);
+    expect(h.history.entries().past).toEqual(['Transform layer']);
+
+    await h.history.undo();
+    expect(h.layer()).toEqual(detected);
+  });
+
+  it('holds the original a shearing bake detaches, so undo can restore it', async () => {
+    const depth = { settings: {}, type: 'depth_anything_depth_estimation' };
+    const detected: CanvasControlLayerContract = {
+      adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+      blendMode: 'normal',
+      controlType: 'depth',
+      detection: depth,
+      filter: depth,
+      id: 'control',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Depth 1',
+      opacity: 1,
+      original: { image: { height: 4, imageName: 'photo', width: 4 }, type: 'image' },
+      originalTransform: { rotation: Math.PI / 4, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      source: { bitmap: { height: 4, imageName: 'map.png', width: 4 }, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'control',
+      withTransparencyEffect: true,
+    };
+    const h = createHarness(detected);
+    h.controller.begin('control');
+    h.controller.update({ rotation: 0, scaleX: 2, scaleY: 1, x: 0, y: 0 });
+    h.controller.apply();
+
+    expect(h.layer()).not.toHaveProperty('original');
+    expect(h.layer()).toMatchObject({ detection: null });
+    expect(h.history.heldAssetRefs().images).toContain('photo');
+
+    await h.history.undo();
+    expect(h.layer()).toEqual(detected);
   });
 });

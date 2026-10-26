@@ -21,6 +21,7 @@ import type {
 
 import {
   coerceSchedulerForGraph,
+  getExternalModeReason,
   getExternalProviderNodeType,
   getFlux2DiffusersComponentSource,
   getGenerationDimensions,
@@ -42,6 +43,12 @@ import {
   isZImageQwen3Encoder,
   type GenerateComponentFilter,
 } from './componentCompatibility';
+import {
+  getExternalProviderInvocationOptions,
+  getExternalProviderMetadata,
+  getExternalReferenceImages,
+  resolveExternalImageSize,
+} from './externalProvider';
 import {
   addEdge,
   addMetadata,
@@ -1591,18 +1598,29 @@ const buildWanGraph = (
   return graph;
 };
 
-const buildExternalGraph = (
+/** Canvas inputs per external mode: the composited bbox is the init image for img2img. */
+export type ExternalCanvasInputs = { mode: 'txt2img' } | { mode: 'img2img'; initImageName: string };
+
+/**
+ * Hosted providers take the whole request on one node: prompt, seed, size, provider options, and (on the canvas) the
+ * init image. The Canvas keep-mask does not match any provider's edit-mask contract, so inpaint is not compiled.
+ */
+export const buildExternalGraph = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
   outputIsIntermediate: boolean,
-  projectSettings: GenerationProjectSettings
+  projectSettings: GenerationProjectSettings,
+  canvas: ExternalCanvasInputs | null = null
 ): BackendGraphContract => {
   if (model.type !== 'external_image_generator') {
     throw new Error('Selected model is not an external image generator.');
   }
 
-  if (model.capabilities?.modes && !model.capabilities.modes.includes('txt2img')) {
-    throw new Error(`${model.name} does not support text-to-image generation.`);
+  const mode = canvas?.mode ?? 'txt2img';
+  const modeReason = getExternalModeReason(model, mode);
+
+  if (modeReason) {
+    throw new Error(modeReason);
   }
 
   const providerId = typeof model.provider_id === 'string' ? model.provider_id : '';
@@ -1617,14 +1635,16 @@ const buildExternalGraph = (
   const output = addNode(graph, {
     height: settings.height,
     id: 'canvas_output',
-    image_size: null,
+    image_size: resolveExternalImageSize(settings, model),
     is_intermediate: outputIsIntermediate,
-    mode: 'txt2img',
+    mode,
     model,
     num_images: 1,
     type: nodeType,
     use_cache: false,
     width: settings.width,
+    ...getExternalProviderInvocationOptions(settings, model),
+    ...(canvas?.mode === 'img2img' ? { init_image: { image_name: canvas.initImageName } } : {}),
   });
 
   addEdge(graph, positivePrompt, 'value', output, 'prompt');
@@ -1635,17 +1655,15 @@ const buildExternalGraph = (
   if (model.capabilities?.supports_seed === true) {
     addEdge(graph, seed, 'value', output, 'seed');
   }
-  if (model.capabilities?.supports_reference_images === true) {
-    const referenceImages = getEnabledReferenceImages(settings, 'external_reference_image')
-      .map((referenceImage) => referenceImage.config.image)
-      .filter((image): image is GenerateReferenceImageAsset => image !== null)
-      .map(toImageField);
+  const referenceImages = getExternalReferenceImages(settings, model).map(toImageField);
 
-    if (referenceImages.length > 0) {
-      (output as Record<string, unknown>).reference_images = referenceImages;
-    }
+  if (referenceImages.length > 0) {
+    (output as Record<string, unknown>).reference_images = referenceImages;
   }
-  addMetadata(graph, output, settings, model, null, projectSettings, { scheduler: undefined });
+  addMetadata(graph, output, settings, model, null, projectSettings, {
+    scheduler: undefined,
+    ...getExternalProviderMetadata(settings, model),
+  });
   addReferenceImageMetadata(graph, output, settings);
 
   return graph;

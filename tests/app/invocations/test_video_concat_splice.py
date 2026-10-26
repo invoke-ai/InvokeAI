@@ -33,6 +33,8 @@ from invokeai.app.util.video_encoding import (
 )
 from invokeai.app.util.video_thumbnails import probe_video
 
+pytestmark = pytest.mark.ffmpeg
+
 FPS = 16.0
 WIDTH, HEIGHT = 128, 96
 RATE = 32000

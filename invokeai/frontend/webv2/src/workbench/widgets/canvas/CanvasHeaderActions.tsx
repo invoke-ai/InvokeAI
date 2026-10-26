@@ -88,6 +88,7 @@ const CanvasHeaderActionsInner = ({
   const { t } = useTranslation();
   const notify = useNotify();
   const zoom = useCanvasZoom(engine);
+  const zoomLabel = formatZoomPercent(zoom);
   const canUndo = useCanvasCanUndo(engine);
   const canRedo = useCanvasCanRedo(engine);
   const editingLocked = useCanvasDocumentEditingLocked(engine);
@@ -161,9 +162,15 @@ const CanvasHeaderActionsInner = ({
     <HStack gap="0.5">
       <Menu.Root positioning={MENU_POSITIONING}>
         <Menu.Trigger asChild>
-          <IconButton aria-label={t('widgets.canvas.controls.zoomLevel')} minW="4rem" px="2" size="sm" variant="ghost">
+          <IconButton
+            aria-label={t('widgets.canvas.controls.zoomLevel', { zoom: zoomLabel })}
+            minW="4rem"
+            px="2"
+            size="sm"
+            variant="ghost"
+          >
             <HStack gap="1">
-              <Text fontVariantNumeric="tabular-nums">{formatZoomPercent(zoom)}</Text>
+              <Text fontVariantNumeric="tabular-nums">{zoomLabel}</Text>
               <ChevronDownIcon size={12} />
             </HStack>
           </IconButton>
@@ -173,7 +180,7 @@ const CanvasHeaderActionsInner = ({
             <MenuContent minW="7rem" py="1">
               {ZOOM_OPTIONS.map((option) => (
                 <Menu.Item key={option.value} value={option.label} onClick={() => setZoom(option.value)}>
-                  <CheckIcon size={12} opacity={formatZoomPercent(zoom) === option.label ? 1 : 0} />
+                  <CheckIcon size={12} opacity={zoomLabel === option.label ? 1 : 0} />
                   <Menu.ItemText>{option.label}</Menu.ItemText>
                 </Menu.Item>
               ))}

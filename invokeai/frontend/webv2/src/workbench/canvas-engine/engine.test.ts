@@ -1,4 +1,6 @@
+import type { CanvasEditRefusal } from '@workbench/canvas-engine/capabilities';
 import type {
+  CanvasAdjustmentsContract,
   CanvasControlLayerContract,
   CanvasDocumentContractV3,
   CanvasInpaintMaskLayerContract,
@@ -30,12 +32,15 @@ import {
 
 type EngineTestAction = WorkbenchAction | CanvasProjectMutation;
 
-import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
-import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
+import type { SpatialAdjustmentExecutor } from '@workbench/canvas-engine/render/spatial/spatialAdjustmentService';
+
+import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import { haveSameStructure } from '@workbench/canvas-engine/document/layerStacks';
 import { DEFAULT_CHECKER_COLORS } from '@workbench/canvas-engine/render/compositor';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
+import { createInlineSpatialExecutor } from '@workbench/canvas-engine/render/spatial/spatialAdjustmentService.testing';
 import { canvasApplicationPort } from '@workbench/canvas-operations/applicationPort';
 import {
   createCanvasEngine as createApplicationCanvasEngine,
@@ -172,8 +177,8 @@ vi.mock('@workbench/canvas-engine/render/adjustedSurfaceCache', async (importOri
   const actual = await importOriginal<typeof AdjustedSurfaceCacheModule>();
   return {
     ...actual,
-    createAdjustedSurfaceCache: (backend: Parameters<typeof actual.createAdjustedSurfaceCache>[0]) => {
-      const cache = actual.createAdjustedSurfaceCache(backend);
+    createAdjustedSurfaceCache: (...args: Parameters<typeof actual.createAdjustedSurfaceCache>) => {
+      const cache = actual.createAdjustedSurfaceCache(...args);
       return {
         ...cache,
         delete: (layerId: string) => {
@@ -1033,11 +1038,7 @@ describe('createCanvasEngine', () => {
     expect(engine.viewport.getViewport().getZoom()).toBe(1);
     expect(engine.stores.activeTool.get()).toBe('view');
     expect(engine.stores.viewportReady.get()).toBe(false);
-    expect(engine.surface.attach).toBe(engine.surface.attach);
-    expect(engine.viewport.getViewport).toBe(engine.viewport.getViewport);
     expect(engine.tools.setTool).toBeTypeOf('function');
-    expect(engine.history.undo).toBe(engine.history.undo);
-    expect(engine.lifecycle.beginCooldown).toBe(engine.lifecycle.beginCooldown);
     expect(engine.edits.tryAcquire).toBeTypeOf('function');
     engine.lifecycle.dispose();
   });
@@ -1564,7 +1565,7 @@ describe('createCanvasEngine', () => {
     engine.lifecycle.dispose();
   });
 
-  it('exportBakedLayerPixels bakes raster adjustments into the exported surface only', async () => {
+  it('exportBakedLayerPixels adjusts a layer-local copy before the transform, leaving the cache untouched', async () => {
     const layer = {
       ...rasterLayer('a'),
       adjustments: [
@@ -1572,8 +1573,17 @@ describe('createCanvasEngine', () => {
       ],
     };
     const { store } = createFakeStore({ ...makeDoc(), stacks: stacksFrom([layer]) });
+    const base = createTestStubRasterBackend();
+    const surfaces: StubRasterSurface[] = [];
     const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
+      backend: {
+        ...base,
+        createSurface: (width, height) => {
+          const surface = base.createSurface(width, height);
+          surfaces.push(surface);
+          return surface;
+        },
+      },
       imageResolver: () => Promise.resolve(new Blob()),
       projectId: 'p1',
       store,
@@ -1587,7 +1597,13 @@ describe('createCanvasEngine', () => {
     if (raw.status === 'ok' && baked.status === 'ok') {
       expect(baked.surface).not.toBe(raw.surface);
       expect((raw.surface as StubRasterSurface).callLog.some((entry) => entry.op === 'putImageData')).toBe(false);
-      expect((baked.surface as StubRasterSurface).callLog).toEqual(
+      const bakedLog = (baked.surface as StubRasterSurface).callLog;
+      // The baked surface only resamples; the adjusted pixels come from the layer-local copy it draws.
+      expect(bakedLog.some((entry) => entry.op === 'putImageData')).toBe(false);
+      const drawn = bakedLog.find((entry) => entry.op === 'drawImage')!.args[0];
+      const copy = surfaces.find((surface) => surface.canvas === drawn)!;
+      expect(copy).not.toBe(raw.surface);
+      expect(copy.callLog).toEqual(
         expect.arrayContaining([
           { args: [0, 0, 10, 10], op: 'getImageData' },
           expect.objectContaining({ op: 'putImageData' }),
@@ -4607,6 +4623,122 @@ describe('drawLayerThumbnail', () => {
     engine.lifecycle.dispose();
   });
 
+  it("publishes a spatial layer's adjustment status and redraws its thumbnail when the result lands", async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const layer = {
+      ...rasterLayer('a'),
+      adjustments: [{ amount: 40, id: 'adj-cl', isEnabled: true, size: 40, type: 'clarity' as const }],
+    } as CanvasRasterLayerContractV2;
+    const { store } = createReactiveStore({ ...makeDoc(), stacks: stacksFrom([layer]) });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      createSpatialExecutor: createInlineSpatialExecutor,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    engine.surface.attach(createInputCanvas().element, createInputCanvas().element);
+    raf.flush();
+    await flushMicrotasks();
+    const statuses: string[] = [];
+    engine.interaction.subscribeLayerAdjustmentStatus('a', () =>
+      statuses.push(engine.interaction.getLayerAdjustmentStatus('a'))
+    );
+    const thumbnailBefore = engine.interaction.getLayerThumbnailVersion('a');
+    raf.flush();
+    expect(engine.interaction.getLayerAdjustmentStatus('a')).toBe('computing');
+
+    await flushMicrotasks();
+    expect(statuses).toEqual(['computing', 'idle']);
+    const thumbnailAfter = engine.interaction.getLayerThumbnailVersion('a');
+    expect(thumbnailAfter).not.toBe(thumbnailBefore);
+    expect(thumbnailAfter).toBeLessThan(0);
+    engine.lifecycle.dispose();
+  });
+
+  it("clears a layer's status once its stack loses its spatial entries, though nothing draws it", async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const layer = {
+      ...rasterLayer('a'),
+      adjustments: [{ amount: 40, id: 'adj-cl', isEnabled: true, size: 40, type: 'clarity' as const }],
+    } as CanvasRasterLayerContractV2;
+    const reactive = createReactiveStore({ ...makeDoc(), stacks: stacksFrom([layer]) });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      createSpatialExecutor: createInlineSpatialExecutor,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store: reactive.store,
+    });
+    engine.surface.attach(createInputCanvas().element, createInputCanvas().element);
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    expect(engine.interaction.getLayerAdjustmentStatus('a')).toBe('computing');
+
+    reactive.setDocument({ ...makeDoc(), stacks: stacksFrom([{ ...layer, adjustments: [] }]) });
+    expect(engine.interaction.getLayerAdjustmentStatus('a')).toBe('idle');
+    engine.lifecycle.dispose();
+  });
+
+  describe('spatial group adjustments', () => {
+    const clarityGroup = (adjustments: CanvasAdjustmentsContract) =>
+      stacksFrom([groupContract('g', [rasterLayer('a')], { adjustments })]);
+    const CLARITY: CanvasAdjustmentsContract = [
+      { amount: 40, id: 'adj-cl', isEnabled: true, size: 40, type: 'clarity' },
+    ];
+
+    const startEngine = async () => {
+      const raf = createControllableRaf();
+      vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+      vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+      const reactive = createReactiveStore({ ...makeDoc(), stacks: clarityGroup(CLARITY) });
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        createSpatialExecutor: createInlineSpatialExecutor,
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId: 'p1',
+        store: reactive.store,
+      });
+      engine.surface.attach(createInputCanvas().element, createInputCanvas().element);
+      raf.flush();
+      await flushMicrotasks();
+      const statuses: string[] = [];
+      engine.interaction.subscribeLayerAdjustmentStatus('g', () =>
+        statuses.push(engine.interaction.getLayerAdjustmentStatus('g'))
+      );
+      return { engine, raf, reactive, statuses };
+    };
+
+    it('reports status by group id and redraws the overview when the result lands', async () => {
+      const { engine, raf, statuses } = await startEngine();
+      const epoch = engine.interaction.get('layerPixelEpoch');
+      raf.flush();
+      expect(engine.interaction.getLayerAdjustmentStatus('g')).toBe('computing');
+
+      await flushMicrotasks();
+      expect(statuses).toEqual(['computing', 'idle']);
+      expect(engine.interaction.get('layerPixelEpoch')).toBeGreaterThan(epoch);
+      engine.lifecycle.dispose();
+    });
+
+    it('clears the status of a group whose stack loses its spatial entries before its result lands', async () => {
+      const { engine, raf, reactive, statuses } = await startEngine();
+      raf.flush();
+      expect(engine.interaction.getLayerAdjustmentStatus('g')).toBe('computing');
+
+      reactive.setDocument({ ...makeDoc(), stacks: clarityGroup([]) });
+      expect(engine.interaction.getLayerAdjustmentStatus('g')).toBe('idle');
+      await flushMicrotasks();
+      expect(statuses).toEqual(['computing', 'idle']);
+      engine.lifecycle.dispose();
+    });
+  });
+
   it.each([
     ['control transparency', { ...controlLayerForThumbnail('a'), withTransparencyEffect: true }, 'getImageData'],
     ['inpaint mask fill', thumbnailMaskLayer('a', 'inpaint_mask'), 'source-in'],
@@ -5346,7 +5478,7 @@ describe('mergeLayerDown', () => {
     raf.flush();
 
     const surfacesBeforeMerge = surfaces.length;
-    expect(engine.layers.mergeLayerDown('upper')).toBe('merged');
+    expect(await engine.layers.mergeLayerDown('upper')).toBe('merged');
 
     // The reducer is asked to collapse the two layers into a paint layer.
     const mergeCall = dispatch.mock.calls
@@ -5409,7 +5541,7 @@ describe('mergeLayerDown', () => {
     engine.lifecycle.dispose();
   });
 
-  it('is a no-op for the bottom-most layer (nothing below)', () => {
+  it('is a no-op for the bottom-most layer (nothing below)', async () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
@@ -5427,7 +5559,7 @@ describe('mergeLayerDown', () => {
     engine.surface.attach(screen.element, overlay.element);
     raf.flush();
 
-    expect(engine.layers.mergeLayerDown('below')).toBe('unsupported');
+    expect(await engine.layers.mergeLayerDown('below')).toBe('unsupported');
     expect(dispatch.mock.calls.some((call) => (call[0] as EngineTestAction).type === 'mergeCanvasLayersDown')).toBe(
       false
     );
@@ -5437,7 +5569,7 @@ describe('mergeLayerDown', () => {
 
   it.each(['upper', 'below'] as const)(
     "is a no-op when the %s layer is locked (merge is not undoable; must mirror the paint tool's locked-target refusal)",
-    (lockedId) => {
+    async (lockedId) => {
       const raf = createControllableRaf();
       vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
       vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
@@ -5462,7 +5594,7 @@ describe('mergeLayerDown', () => {
       engine.surface.attach(screen.element, overlay.element);
       raf.flush();
 
-      expect(engine.layers.mergeLayerDown('upper')).toBe('unsupported');
+      expect(await engine.layers.mergeLayerDown('upper')).toBe('unsupported');
       expect(dispatch.mock.calls.some((call) => (call[0] as EngineTestAction).type === 'mergeCanvasLayersDown')).toBe(
         false
       );
@@ -5523,7 +5655,7 @@ describe('mergeLayerDown', () => {
       raf.flush();
 
       const surfacesBeforeMerge = surfaces.length;
-      expect(engine.layers.mergeLayerDown('upper')).toBe('merged');
+      expect(await engine.layers.mergeLayerDown('upper')).toBe('merged');
 
       // Single-dispatch collapse still happens (undo semantics unchanged).
       expect(dispatch.mock.calls.some((call) => (call[0] as EngineTestAction).type === 'mergeCanvasLayersDown')).toBe(
@@ -5594,7 +5726,7 @@ describe('mergeLayerDown', () => {
     raf.flush();
 
     const surfacesBeforeMerge = surfaces.length;
-    expect(engine.layers.mergeLayerDown('upper')).toBe('merged');
+    expect(await engine.layers.mergeLayerDown('upper')).toBe('merged');
 
     // The collapse still dispatches (the upper layer is removed).
     expect(dispatch.mock.calls.some((call) => (call[0] as EngineTestAction).type === 'mergeCanvasLayersDown')).toBe(
@@ -5616,7 +5748,7 @@ describe('mergeLayerDown', () => {
   it.each([
     { label: 'mask above a raster layer', maskId: 'upper' as const },
     { label: 'a raster layer above a mask', maskId: 'below' as const },
-  ])('is a no-op for $label (document unchanged, no dispatch)', ({ maskId }) => {
+  ])('is a no-op for $label (document unchanged, no dispatch)', async ({ maskId }) => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
@@ -5639,7 +5771,7 @@ describe('mergeLayerDown', () => {
     engine.surface.attach(screen.element, overlay.element);
     raf.flush();
 
-    expect(engine.layers.mergeLayerDown('upper')).toBe('unsupported');
+    expect(await engine.layers.mergeLayerDown('upper')).toBe('unsupported');
     expect(dispatch.mock.calls.some((call) => (call[0] as EngineTestAction).type === 'mergeCanvasLayersDown')).toBe(
       false
     );
@@ -5650,7 +5782,7 @@ describe('mergeLayerDown', () => {
     engine.lifecycle.dispose();
   });
 
-  it('is a no-op for mask-above-mask (document unchanged, no dispatch)', () => {
+  it('is a no-op for mask-above-mask (document unchanged, no dispatch)', async () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
@@ -5673,7 +5805,7 @@ describe('mergeLayerDown', () => {
     engine.surface.attach(screen.element, overlay.element);
     raf.flush();
 
-    expect(engine.layers.mergeLayerDown('upper')).toBe('unsupported');
+    expect(await engine.layers.mergeLayerDown('upper')).toBe('unsupported');
     expect(dispatch.mock.calls.some((call) => (call[0] as EngineTestAction).type === 'mergeCanvasLayersDown')).toBe(
       false
     );
@@ -6152,6 +6284,62 @@ describe('extract masked canvas area', () => {
 
     expect((await engine.exports.extractMaskedArea('mask')).status).toBe('extracted');
     engine.lifecycle.dispose();
+  });
+
+  describe('with a spatial stack', () => {
+    const spatialSetup = (createSpatialExecutor: () => SpatialAdjustmentExecutor) => {
+      const raf = createControllableRaf();
+      vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+      vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+      const document = maskedDoc();
+      const leaves = getDocumentLeaves(document);
+      document.stacks = stacksFrom(
+        leaves.map((layer) =>
+          layer.id === 'upper'
+            ? { ...layer, adjustments: [{ amount: 50, id: 'clarity', isEnabled: true, size: 10, type: 'clarity' }] }
+            : layer
+        )
+      );
+      const { projectId, store } = createReducerBackedStore(document);
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        createSpatialExecutor,
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      engine.surface.attach(createFakeCanvas().element, createFakeCanvas().element);
+      return { engine, leafCount: leaves.length, raf };
+    };
+
+    it('extracts a layer whose spatial stack runs', async () => {
+      const { engine, raf } = spatialSetup(createInlineSpatialExecutor);
+      raf.flush();
+      await flushMicrotasks();
+      raf.flush();
+
+      expect((await engine.exports.extractMaskedArea('mask')).status).toBe('extracted');
+      engine.lifecycle.dispose();
+    });
+
+    it('refuses with the layer name when the stack cannot run, extracting nothing', async () => {
+      const { engine, leafCount, raf } = spatialSetup(() => ({
+        dispose: () => undefined,
+        run: (job) => Promise.resolve({ buffer: job.buffer, status: 'too-large' }),
+      }));
+      raf.flush();
+      await flushMicrotasks();
+      raf.flush();
+
+      expect(await engine.exports.extractMaskedArea('mask')).toEqual({
+        ownerId: 'upper',
+        ownerName: expect.any(String),
+        reason: 'too-large',
+        status: 'adjustment-refused',
+      });
+      expect(getDocumentLeaves(engine.document.getDocument()!)).toHaveLength(leafCount);
+      engine.lifecycle.dispose();
+    });
   });
 
   it('does not extract stale contributor pixels after a source change during await', async () => {
@@ -7337,7 +7525,7 @@ describe('mergeVisibleRasterLayers', () => {
     raf.flush();
     expect(blendModeOf('upper')).toBe('screen');
 
-    expect(engine.layers.mergeLayerDown('upper')).toBe('merged');
+    expect(await engine.layers.mergeLayerDown('upper')).toBe('merged');
 
     expect(session.isActive()).toBe(false);
     expect(await engine.history.undo()).toBe('applied');
@@ -8168,11 +8356,11 @@ describe('rasterizeLayer (parametric → paint)', () => {
   const convertCalls = (dispatch: Mock): EngineTestAction[] =>
     dispatch.mock.calls.map((call) => call[0] as EngineTestAction).filter((a) => a.type === 'convertCanvasLayer');
 
-  it('bakes to a CONTENT-sized paint layer at identity and dispatches convertCanvasLayer with the offset', () => {
+  it('bakes to a CONTENT-sized paint layer at identity and dispatches convertCanvasLayer with the offset', async () => {
     const { dispatch, engine, surfaces } = setup(shapeLayerDoc());
     const before = surfaces.length;
 
-    expect(engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
+    expect(await engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
 
     const converts = convertCalls(dispatch);
     expect(converts).toHaveLength(1);
@@ -8199,7 +8387,7 @@ describe('rasterizeLayer (parametric → paint)', () => {
 
   it('undo re-converts to the ORIGINAL parametric source (no pixel snapshot)', async () => {
     const { dispatch, engine } = setup(shapeLayerDoc());
-    engine.layers.rasterizeLayer('shape1');
+    await engine.layers.rasterizeLayer('shape1');
 
     await engine.history.undo();
     const converts = convertCalls(dispatch);
@@ -8236,7 +8424,7 @@ describe('rasterizeLayer (parametric → paint)', () => {
     // memory budget.
     const { engine, surfaces } = setup(shapeLayerDoc());
 
-    expect(engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
+    expect(await engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
     const afterApply = surfaces.length;
 
     await engine.history.undo();
@@ -8253,22 +8441,22 @@ describe('rasterizeLayer (parametric → paint)', () => {
     engine.lifecycle.dispose();
   });
 
-  it('rasterizes a gradient layer', () => {
+  it('rasterizes a gradient layer', async () => {
     const doc = shapeLayerDoc();
     doc.stacks.raster[0] = {
       ...(doc.stacks.raster[0] as CanvasLayerContract),
       source: { angle: 45, kind: 'linear', stops: [{ color: '#000', offset: 0 }], type: 'gradient' },
     } as CanvasLayerContract;
     const { dispatch, engine } = setup(doc);
-    expect(engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
+    expect(await engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
     expect(convertCalls(dispatch)).toHaveLength(1);
     engine.lifecycle.dispose();
   });
 
-  it('is a no-op for a locked layer, a missing layer, and a non-parametric (paint) layer', () => {
+  it('is a no-op for a locked layer, a missing layer, and a non-parametric (paint) layer', async () => {
     const { dispatch, engine } = setup(shapeLayerDoc({ isLocked: true }));
-    expect(engine.layers.rasterizeLayer('shape1')).toBe('locked');
-    expect(engine.layers.rasterizeLayer('nope')).toBe('missing');
+    expect(await engine.layers.rasterizeLayer('shape1')).toBe('locked');
+    expect(await engine.layers.rasterizeLayer('nope')).toBe('missing');
     expect(convertCalls(dispatch)).toHaveLength(0);
     engine.lifecycle.dispose();
 
@@ -8278,7 +8466,7 @@ describe('rasterizeLayer (parametric → paint)', () => {
       source: { bitmap: null, type: 'paint' },
     } as CanvasLayerContract;
     const paint = setup(paintDoc);
-    expect(paint.engine.layers.rasterizeLayer('shape1')).toBe('unsupported');
+    expect(await paint.engine.layers.rasterizeLayer('shape1')).toBe('unsupported');
     paint.engine.lifecycle.dispose();
   });
 
@@ -8357,7 +8545,7 @@ describe('rasterizeLayer (parametric → paint)', () => {
       const harness = setupWithRealBitmapStore(doc);
       const { dispatch, engine, raf, setDocument } = harness;
 
-      expect(engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
+      expect(await engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
       doc = applyLastConvert(doc, dispatch);
       setDocument(doc);
       raf.flush();
@@ -8414,7 +8602,7 @@ describe('rasterizeLayer (parametric → paint)', () => {
       const { dispatch, engine, raf, setDocument, uploadImage } = setupWithRealBitmapStore(doc);
 
       // Rasterize → bake to paint → flush lands img-x.
-      expect(engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
+      expect(await engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
       doc = applyLastConvert(doc, dispatch);
       setDocument(doc);
       raf.flush();
@@ -8487,7 +8675,7 @@ describe('rasterizeLayer (parametric → paint)', () => {
       let doc = shapeLayerDoc();
       const { dispatch, engine, raf, setDocument, uploadImage } = setupWithRealBitmapStore(doc);
 
-      expect(engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
+      expect(await engine.layers.rasterizeLayer('shape1')).toBe('rasterized');
       doc = applyLastConvert(doc, dispatch);
       setDocument(doc);
       raf.flush();
@@ -9216,111 +9404,6 @@ describe('commitRasterFilterResult', () => {
     expect(engine.stores.canRedo.get()).toBe(false);
     engine.lifecycle.dispose();
   });
-
-  it('atomically applies a filter and nonzero local origin to a control layer with exact undo/redo', async () => {
-    const source: CanvasLayerContract = {
-      adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
-      blendMode: 'normal',
-      filter: { settings: { radius: 1 }, type: 'old_filter' },
-      id: 'control',
-      isEnabled: true,
-      isLocked: false,
-      name: 'Control',
-      opacity: 1,
-      source: { image: { height: 10, imageName: 'control-source', width: 10 }, type: 'image' },
-      transform: { rotation: 12, scaleX: 2, scaleY: 3, x: 40, y: 50 },
-      type: 'control',
-      withTransparencyEffect: true,
-    };
-    const { projectId, store } = createReducerBackedStore(filterDoc([source]));
-    const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
-      bitmapStore: createSpyBitmapStore(),
-      imageResolver: () => Promise.resolve(new Blob()),
-      projectId,
-      store,
-    });
-    const before = structuredClone(source);
-    const exported = await engine.exports.exportLayerPixels(source.id);
-    if (exported.status !== 'ok') {
-      throw new Error('expected a filterable control export');
-    }
-
-    const result = await engine.layers.commitRasterFilterResult({
-      filter: { settings: { radius: 8 }, type: 'content_shuffle' },
-      guard: exported.guard,
-      image: durableImage,
-      mode: 'replace',
-      rect: { height: 10, width: 10, x: 7, y: -3 },
-      target: 'apply',
-    });
-
-    expect(result).toEqual({ layerId: source.id, status: 'committed' });
-    const after = getDocumentLeaves(engine.document.getDocument()!)[0]!;
-    expect(after).toMatchObject({
-      filter: { settings: { radius: 8 }, type: 'content_shuffle' },
-      source: { bitmap: durableImage, offset: { x: 7, y: -3 }, type: 'paint' },
-      transform: source.transform,
-      type: 'control',
-    });
-    await engine.history.undo();
-    expect(getDocumentLeaves(engine.document.getDocument()!)[0]).toEqual(before);
-    await engine.history.redo();
-    expect(getDocumentLeaves(engine.document.getDocument()!)[0]).toEqual(after);
-    engine.lifecycle.dispose();
-  });
-
-  it.each(['raster', 'control'] as const)(
-    'saves a filtered result as a %s layer above a control source',
-    async (target) => {
-      const source: CanvasLayerContract = {
-        adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
-        blendMode: 'normal',
-        id: 'control',
-        isEnabled: true,
-        isLocked: false,
-        name: 'Control',
-        opacity: 1,
-        source: { image: { height: 10, imageName: 'control-source', width: 10 }, type: 'image' },
-        transform: { rotation: 12, scaleX: 2, scaleY: 3, x: 40, y: 50 },
-        type: 'control',
-        withTransparencyEffect: true,
-      };
-      const { projectId, store } = createReducerBackedStore(filterDoc([source]));
-      const engine = createCanvasEngine({
-        backend: createTestStubRasterBackend(),
-        bitmapStore: createSpyBitmapStore(),
-        imageResolver: () => Promise.resolve(new Blob()),
-        projectId,
-        store,
-      });
-      const exported = await engine.exports.exportLayerPixels(source.id);
-      if (exported.status !== 'ok') {
-        throw new Error('expected a filterable control export');
-      }
-
-      const result = await engine.layers.commitRasterFilterResult({
-        filter: { settings: {}, type: 'canny_edge_detection' },
-        guard: exported.guard,
-        image: durableImage,
-        mode: 'copy',
-        rect: { height: 10, width: 10, x: 7, y: -3 },
-        target,
-      });
-
-      expect(result.status).toBe('committed');
-      const saved = engine.document.getDocument()!.stacks[target][0]!;
-      expect(getDocumentLeaves(engine.document.getDocument()!).map((layer) => layer.id)).toEqual(
-        target === 'control' ? [saved.id, 'control'] : ['control', saved.id]
-      );
-      expect(saved).toMatchObject({
-        filter: { settings: {}, type: 'canny_edge_detection' },
-        source: { offset: { x: 7, y: -3 }, type: 'paint' },
-        transform: source.transform,
-      });
-      engine.lifecycle.dispose();
-    }
-  );
 
   it('preserves raster source placement when saving the filtered result as control', async () => {
     const source = filterLayer('source');
@@ -10766,45 +10849,11 @@ describe('commitGeneratedImageResult', () => {
       }
       const created = getDocumentLeaves(engine.document.getDocument()!).find((layer) => layer.id === result.layerId);
       expect(created?.type === 'control' ? created.adapter.kind : null).toBe(expectedKind);
-      // Without a getDefaultControlModel option the layer starts model-less.
+      // New control layers never carry a model; generation resolves it.
       expect(created?.type === 'control' ? created.adapter.model : 'wrong-type').toBeNull();
       engine.lifecycle.dispose();
     }
   );
-
-  it('seeds workflow Copy To Control layers with the injected default control model', async () => {
-    const source = workflowRaster();
-    const { projectId, store } = createReducerBackedStore(workflowDocument([source]), 'sd-1');
-    const getDefaultControlModel = vi.fn((base: string | null) => (base === 'sd-1' ? 'sd1-union' : null));
-    const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
-      bitmapStore: createSpyBitmapStore(),
-      getDefaultControlModel,
-      imageResolver: () => Promise.resolve(new Blob()),
-      projectId,
-      store,
-    });
-    const exported = await engine.exports.exportLayerPixels(source.id);
-    if (exported.status !== 'ok') {
-      throw new Error('expected an exportable workflow source');
-    }
-
-    const result = await engine.layers.commitGeneratedImageResult({
-      guard: exported.guard,
-      image: generatedImage,
-      origin: generatedOrigin,
-      target: 'copy-control',
-    });
-
-    expect(result.status).toBe('committed');
-    if (result.status !== 'committed') {
-      throw new Error('expected a committed control copy');
-    }
-    expect(getDefaultControlModel).toHaveBeenCalledWith('sd-1');
-    const created = getDocumentLeaves(engine.document.getDocument()!).find((layer) => layer.id === result.layerId);
-    expect(created?.type === 'control' ? created.adapter.model : null).toBe('sd1-union');
-    engine.lifecycle.dispose();
-  });
 
   it('replaces a raster at the generated origin and native size, clears baked adjustments, and replays exactly', async () => {
     const source = workflowRaster();
@@ -10869,8 +10918,13 @@ describe('commitGeneratedImageResult', () => {
     engine.lifecycle.dispose();
   });
 
-  it('replaces a control while preserving adapter, filter, transparency effect, and layer presentation', async () => {
+  it('replaces a control while preserving adapter, transparency effect, and layer presentation', async () => {
     const source = workflowControl();
+    if (source.type !== 'control') {
+      throw new Error('expected a control fixture');
+    }
+    // The result is the image itself, not a filter's map, so it drops the filter that made the old pixels.
+    const { filter: _filter, ...unfiltered } = source;
     const { projectId, store } = createReducerBackedStore(workflowDocument([source]));
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
@@ -10894,7 +10948,7 @@ describe('commitGeneratedImageResult', () => {
     ).resolves.toEqual({ layerId: source.id, status: 'committed' });
 
     expect(getDocumentLeaves(engine.document.getDocument()!)[0]).toEqual({
-      ...source,
+      ...unfiltered,
       source: { bitmap: generatedImage, offset: generatedOrigin, type: 'paint' },
       transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
     });
@@ -10902,8 +10956,7 @@ describe('commitGeneratedImageResult', () => {
     expect(getDocumentLeaves(engine.document.getDocument()!)[0]).toEqual(source);
     await engine.history.redo();
     expect(getDocumentLeaves(engine.document.getDocument()!)[0]).toMatchObject({
-      adapter: source.type === 'control' ? source.adapter : undefined,
-      filter: source.type === 'control' ? source.filter : undefined,
+      adapter: source.adapter,
       withTransparencyEffect: true,
     });
     engine.lifecycle.dispose();
@@ -12734,13 +12787,12 @@ describe('guarded filter previews', () => {
     engine.lifecycle.dispose();
   });
 
-  it('starts an unfiltered layer with a recommendation but preserves an existing manual filter and Cancel', async () => {
-    const unfiltered = guardableLayer('recommended');
+  it('starts a filtered layer from its existing filter, and Cancel leaves it as it was', async () => {
     const manual = {
       ...guardableLayer('manual'),
       filter: { settings: { coarse: true }, type: 'lineart_edge_detection' },
     };
-    const document = { ...emptyDoc(), stacks: stacksFrom([unfiltered, manual]) };
+    const document = { ...emptyDoc(), stacks: stacksFrom([manual]) };
     const { store } = createReactiveStore(document);
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
@@ -12748,15 +12800,7 @@ describe('guarded filter previews', () => {
       projectId: 'p1',
       store,
     });
-    expect((await engine.exports.exportLayerPixels('recommended')).status).toBe('ok');
-    expect(getCanvasOperations(engine).startFilterOperation('recommended', 'normal_map')).toBe('started');
-    expect(getCanvasOperations(engine).stores.filterSession.get()?.draft).toEqual({ settings: {}, type: 'normal_map' });
-    getCanvasOperations(engine).cancelFilterOperation();
-    expect(engine.document.getDocument()).toEqual({ ...document, selectedLayerId: 'recommended' });
-
     expect((await engine.exports.exportLayerPixels('manual')).status).toBe('ok');
-    expect(getCanvasOperations(engine).startFilterOperation('manual', 'normal_map')).toBe('not-ready');
-    expect(getCanvasOperations(engine).stores.filterSession.get()).toBeNull();
     expect(getCanvasOperations(engine).startFilterOperation('manual')).toBe('started');
     expect(getCanvasOperations(engine).stores.filterSession.get()?.draft).toEqual(manual.filter);
     getCanvasOperations(engine).cancelFilterOperation();
@@ -12764,112 +12808,26 @@ describe('guarded filter previews', () => {
     engine.lifecycle.dispose();
   });
 
-  it('does not replace another layer filter session with a recommendation', async () => {
-    const first = guardableLayer('first');
-    const second = guardableLayer('second');
-    const document = { ...emptyDoc(), stacks: stacksFrom([first, second]) };
-    const { store } = createReactiveStore(document);
-    const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
-      imageResolver: () => Promise.resolve(new Blob()),
-      projectId: 'p1',
-      store,
-    });
-    expect((await engine.exports.exportLayerPixels('first')).status).toBe('ok');
-    expect(getCanvasOperations(engine).startFilterOperation('first')).toBe('started');
-    getCanvasOperations(engine).updateFilterOperation({ settings: { coarse: true }, type: 'lineart_edge_detection' });
-    const active = getCanvasOperations(engine).stores.filterSession.get();
-
-    expect((await engine.exports.exportLayerPixels('second')).status).toBe('ok');
-    expect(getCanvasOperations(engine).startFilterOperation('second', 'normal_map')).toBe('not-ready');
-    expect(getCanvasOperations(engine).stores.filterSession.get()).toEqual(active);
-    engine.lifecycle.dispose();
+  // Filter starts only on raster layers; a control layer's map comes from detection.
+  const filterFlowLayer = (): Extract<CanvasLayerContract, { type: 'raster' }> => ({
+    blendMode: 'multiply',
+    filter: { settings: { radius: 2 }, type: 'content_shuffle' },
+    id: 'filter-source',
+    isEnabled: true,
+    isLocked: false,
+    name: 'Filter source',
+    opacity: 0.6,
+    source: {
+      bitmap: { height: 10, imageName: 'filter-source.png', width: 10 },
+      offset: { x: 7, y: -3 },
+      type: 'paint',
+    },
+    transform: { rotation: 12, scaleX: 2, scaleY: 3, x: 40, y: 50 },
+    type: 'raster',
   });
 
-  it('does not overwrite a same-layer draft or preview on rapid recommendations', async () => {
-    const layer = guardableLayer('recommended');
-    const document = { ...emptyDoc(), stacks: stacksFrom([layer]) };
-    const { store } = createReactiveStore(document);
-    const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
-      filterDeps: {
-        runGraph: vi.fn(() =>
-          Promise.resolve({ height: 10, imageName: 'filtered', origin: 'canvas', output: {}, width: 10 })
-        ),
-        uploadIntermediate: vi.fn(() => Promise.resolve({ imageName: 'input' })),
-      },
-      imageResolver: () => Promise.resolve(new Blob()),
-      projectId: 'p1',
-      store,
-    });
-    expect((await engine.exports.exportLayerPixels(layer.id)).status).toBe('ok');
-    expect(getCanvasOperations(engine).startFilterOperation(layer.id, 'normal_map')).toBe('started');
-    getCanvasOperations(engine).updateFilterOperation({ settings: { coarse: true }, type: 'lineart_edge_detection' });
-    await getCanvasOperations(engine).processFilterOperation();
-    const active = getCanvasOperations(engine).stores.filterSession.get();
-
-    expect(getCanvasOperations(engine).startFilterOperation(layer.id, 'canny_edge_detection')).toBe('not-ready');
-    expect(getCanvasOperations(engine).stores.filterSession.get()).toEqual(active);
-    engine.lifecycle.dispose();
-  });
-
-  it('does not replace a different active canvas operation with a recommendation', async () => {
-    const first = guardableLayer('first');
-    const second = guardableLayer('second');
-    const document = { ...emptyDoc(), stacks: stacksFrom([first, second]) };
-    const { store } = createReactiveStore(document);
-    const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
-      imageResolver: () => Promise.resolve(new Blob()),
-      projectId: 'p1',
-      store,
-    });
-    expect((await engine.exports.exportLayerPixels('first')).status).toBe('ok');
-    expect((await engine.exports.exportLayerPixels('second')).status).toBe('ok');
-    expect(getCanvasOperations(engine).startSelectObject('first')).toBe('started');
-    const operation = getCanvasOperations(engine).controller.getSnapshot();
-
-    expect(getCanvasOperations(engine).startFilterOperation('second', 'normal_map')).toBe('not-ready');
-    expect(getCanvasOperations(engine).controller.getSnapshot()).toEqual(operation);
-    expect(getCanvasOperations(engine).stores.samSession.get()?.sourceRect).toEqual({
-      height: 10,
-      width: 10,
-      x: 0,
-      y: 0,
-    });
-    engine.lifecycle.dispose();
-  });
-
-  const filterFlowLayer = (
-    type: 'raster' | 'control'
-  ): Extract<CanvasLayerContract, { type: 'raster' | 'control' }> => {
-    const base = {
-      blendMode: 'multiply' as const,
-      filter: { settings: { radius: 2 }, type: 'content_shuffle' },
-      id: 'filter-source',
-      isEnabled: true,
-      isLocked: false,
-      name: 'Filter source',
-      opacity: 0.6,
-      source: {
-        bitmap: { height: 10, imageName: 'filter-source.png', width: 10 },
-        offset: { x: 7, y: -3 },
-        type: 'paint' as const,
-      },
-      transform: { rotation: 12, scaleX: 2, scaleY: 3, x: 40, y: 50 },
-    };
-    return type === 'raster'
-      ? { ...base, type: 'raster' }
-      : {
-          ...base,
-          adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
-          type: 'control',
-          withTransparencyEffect: true,
-        };
-  };
-
-  const createFilterFlowHarness = async (sourceType: 'raster' | 'control') => {
-    const source = filterFlowLayer(sourceType);
+  const createFilterFlowHarness = async () => {
+    const source = filterFlowLayer();
     const document = { ...emptyDoc(), stacks: stacksFrom([source]), selectedLayerId: source.id };
     const { projectId, store } = createReducerBackedStore(document);
     const engine = createCanvasEngine({
@@ -12896,7 +12854,7 @@ describe('guarded filter previews', () => {
   };
 
   it('blocks Filter actions called directly after an external lock and still allows Cancel', async () => {
-    const { document, engine } = await createFilterFlowHarness('raster');
+    const { document, engine } = await createFilterFlowHarness();
     const makeDurable = vi.fn(() => Promise.resolve());
     const before = getCanvasOperations(engine).stores.filterSession.get();
 
@@ -12923,7 +12881,7 @@ describe('guarded filter previews', () => {
   });
 
   it('blocks Filter mutation when an external lock begins during durability', async () => {
-    const { document, engine } = await createFilterFlowHarness('raster');
+    const { document, engine } = await createFilterFlowHarness();
     const durable = createDeferred<void>();
     const pending = getCanvasOperations(engine).commitFilterOperation('apply', () => durable.promise);
     await vi.waitFor(() => expect(getCanvasOperations(engine).stores.filterSession.get()?.status).toBe('committing'));
@@ -12942,7 +12900,7 @@ describe('guarded filter previews', () => {
   });
 
   it('interrupts Filter processing on an external lock without losing the draft or operation', async () => {
-    const source = filterFlowLayer('raster');
+    const source = filterFlowLayer();
     const { projectId, store } = createReducerBackedStore({
       ...emptyDoc(),
       stacks: stacksFrom([source]),
@@ -13008,7 +12966,7 @@ describe('guarded filter previews', () => {
   ] as const)(
     'preserves $type/$target output geometry through preview, commit, and one-entry undo/redo',
     async ({ expectedRect, output, settings, target, type }) => {
-      const source = filterFlowLayer('raster');
+      const source = filterFlowLayer();
       const document = { ...emptyDoc(), stacks: stacksFrom([source]), selectedLayerId: source.id };
       const { projectId, store } = createReducerBackedStore(document);
       const engine = createCanvasEngine({
@@ -13058,63 +13016,60 @@ describe('guarded filter previews', () => {
     }
   );
 
-  it.each(['raster', 'control'] as const)(
-    'processes, retries durability, and applies %s with one origin-preserving history entry',
-    async (sourceType) => {
-      const { document, engine, source } = await createFilterFlowHarness(sourceType);
-      const makeDurable = vi
-        .fn<(imageName: string) => Promise<void>>()
-        .mockRejectedValueOnce(new Error('promotion failed'))
-        .mockResolvedValueOnce();
+  it('processes, retries durability, and applies with one origin-preserving history entry', async () => {
+    const { document, engine, source } = await createFilterFlowHarness();
+    const makeDurable = vi
+      .fn<(imageName: string) => Promise<void>>()
+      .mockRejectedValueOnce(new Error('promotion failed'))
+      .mockResolvedValueOnce();
 
-      await getCanvasOperations(engine).commitFilterOperation('apply', makeDurable);
-      expect(getCanvasOperations(engine).stores.filterSession.get()).toMatchObject({
-        error: { code: 'apply-failed', detail: 'promotion failed' },
-        preview: { imageName: 'filtered.png' },
-        status: 'error',
-      });
-      expect(getCanvasOperations(engine).controller.getSnapshot()).toMatchObject({
-        identity: { kind: 'filter' },
-        status: 'active',
-      });
+    await getCanvasOperations(engine).commitFilterOperation('apply', makeDurable);
+    expect(getCanvasOperations(engine).stores.filterSession.get()).toMatchObject({
+      error: { code: 'apply-failed', detail: 'promotion failed' },
+      preview: { imageName: 'filtered.png' },
+      status: 'error',
+    });
+    expect(getCanvasOperations(engine).controller.getSnapshot()).toMatchObject({
+      identity: { kind: 'filter' },
+      status: 'active',
+    });
 
-      await getCanvasOperations(engine).commitFilterOperation('apply', makeDurable);
-      expect(makeDurable).toHaveBeenCalledTimes(2);
-      expect(getCanvasOperations(engine).stores.filterSession.get()).toBeNull();
-      expect(getCanvasOperations(engine).controller.getSnapshot()).toEqual({ status: 'idle' });
-      expect(getDocumentLeaves(engine.document.getDocument()!)[0]).toMatchObject({
-        filter: source.filter,
-        opacity: source.opacity,
-        blendMode: source.blendMode,
-        source: { offset: { x: 7, y: -3 }, type: 'paint' },
-        transform: source.transform,
-        type: sourceType,
-      });
-      expect(engine.stores.canUndo.get()).toBe(true);
-      await engine.history.undo();
-      expect(engine.document.getDocument()).toEqual(document);
-      expect(engine.stores.canUndo.get()).toBe(false);
-      engine.lifecycle.dispose();
-    }
-  );
+    await getCanvasOperations(engine).commitFilterOperation('apply', makeDurable);
+    expect(makeDurable).toHaveBeenCalledTimes(2);
+    expect(getCanvasOperations(engine).stores.filterSession.get()).toBeNull();
+    expect(getCanvasOperations(engine).controller.getSnapshot()).toEqual({ status: 'idle' });
+    expect(getDocumentLeaves(engine.document.getDocument()!)[0]).toMatchObject({
+      filter: source.filter,
+      opacity: source.opacity,
+      blendMode: source.blendMode,
+      source: { offset: { x: 7, y: -3 }, type: 'paint' },
+      transform: source.transform,
+      type: 'raster',
+    });
+    expect(engine.stores.canUndo.get()).toBe(true);
+    await engine.history.undo();
+    expect(engine.document.getDocument()).toEqual(document);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    engine.lifecycle.dispose();
+  });
 
   it.each(['raster', 'control'] as const)(
     'processes and saves as %s above the source with one history entry',
     async (target) => {
-      const { engine, source } = await createFilterFlowHarness('control');
+      const { engine, source } = await createFilterFlowHarness();
 
       await getCanvasOperations(engine).commitFilterOperation(target, () => Promise.resolve());
 
       expect(getCanvasOperations(engine).stores.filterSession.get()).toBeNull();
       const saved = engine.document.getDocument()!.stacks[target][0]!;
-      expect(getDocumentLeaves(engine.document.getDocument()!).map((layer) => layer.id)).toEqual(
-        target === 'control' ? [saved.id, source.id] : [source.id, saved.id]
-      );
+      expect(getDocumentLeaves(engine.document.getDocument()!).map((layer) => layer.id)).toEqual([saved.id, source.id]);
       expect(saved).toMatchObject({
-        blendMode: source.blendMode,
-        opacity: source.opacity,
+        // A raster copy keeps the source's compositing; a control copy starts from a new control layer's.
+        ...(target === 'raster' ? { blendMode: source.blendMode, opacity: source.opacity } : { opacity: 1 }),
+        name: 'Filter source filtered',
         source: { offset: { x: 7, y: -3 }, type: 'paint' },
         transform: source.transform,
+        type: target,
       });
       expect(engine.stores.canUndo.get()).toBe(true);
       await engine.history.undo();
@@ -13125,7 +13080,7 @@ describe('guarded filter previews', () => {
   );
 
   it('cancels an in-flight promotion when a replacement operation starts', async () => {
-    const { engine, source } = await createFilterFlowHarness('raster');
+    const { engine, source } = await createFilterFlowHarness();
     let resolvePromotion!: () => void;
     const promotion = new Promise<void>((resolve) => {
       resolvePromotion = resolve;
@@ -13148,7 +13103,7 @@ describe('guarded filter previews', () => {
   });
 
   it('aborts an in-flight upload when a newer Process request wins', async () => {
-    const source = filterFlowLayer('raster');
+    const source = filterFlowLayer();
     const document = { ...emptyDoc(), stacks: stacksFrom([source]), selectedLayerId: source.id };
     const { projectId, store } = createReducerBackedStore(document);
     const uploadSignals: AbortSignal[] = [];
@@ -14206,6 +14161,167 @@ describe('document mirror wiring: prop vs source change (paint-pixel survival)',
     engine.lifecycle.dispose();
   });
 
+  describe('raster layers whose adjustments reach the control stack', () => {
+    const CLARITY: CanvasAdjustmentsContract = [
+      { amount: 50, id: 'clarity', isEnabled: true, size: 10, type: 'clarity' },
+    ];
+    const adjustedEngine = (createSpatialExecutor: () => SpatialAdjustmentExecutor) => {
+      // Disabled: conversions and copies act on the layer's own pixels whether or not it contributes.
+      const layer = { ...rasterLayer('a'), adjustments: CLARITY, isEnabled: false } as CanvasRasterLayerContractV2;
+      const { dispatch, projectId, store } = createReducerBackedStore({ ...makeDoc(), stacks: stacksFrom([layer]) });
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        createSpatialExecutor,
+        getMainModelBase: () => 'anima',
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      return { dispatch, engine, layer: getDocumentLayer(engine.document.getDocument(), 'a')! };
+    };
+    const tooLarge = () => ({
+      dispose: () => undefined,
+      run: (job: { buffer: ArrayBuffer }) => Promise.resolve({ buffer: job.buffer, status: 'too-large' as const }),
+    });
+
+    it('converts in place with baked pixels at an identity transform; undo restores the stack', async () => {
+      const { engine, layer } = adjustedEngine(createInlineSpatialExecutor);
+
+      expect(await engine.layers.convertLayerToControl('Convert to control', layer)).toBe('converted');
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).toMatchObject({
+        adapter: { kind: 'anima_lllite', model: null },
+        isEnabled: false,
+        source: { bitmap: null, offset: { x: 0, y: 0 }, type: 'paint' },
+        transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+        type: 'control',
+      });
+      expect(engine.history.getEntries().past.at(-1)).toBe('Convert to control');
+
+      await engine.history.undo();
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).toEqual(layer);
+      engine.lifecycle.dispose();
+    });
+
+    it('copies to a new control layer with baked pixels', async () => {
+      const { engine } = adjustedEngine(createInlineSpatialExecutor);
+
+      const copied = await engine.layers.copyLayerToControl('a');
+
+      expect(copied.status).toBe('copied');
+      const copyId = copied.status === 'copied' ? copied.layerId : '';
+      expect(getDocumentLayer(engine.document.getDocument(), copyId)).toMatchObject({
+        adapter: { kind: 'anima_lllite', model: null },
+        name: 'a copy',
+        source: { bitmap: null, type: 'paint' },
+        type: 'control',
+      });
+      engine.lifecycle.dispose();
+    });
+
+    it('converts and copies an empty layer as a plain clone, since there are no pixels to bake', async () => {
+      const transform = { rotation: 0.3, scaleX: 2, scaleY: 1, x: 7, y: -4 };
+      const empty = {
+        ...rasterLayer('a'),
+        adjustments: CLARITY,
+        source: { bitmap: null, type: 'paint' },
+        transform,
+      } as CanvasRasterLayerContractV2;
+      const { projectId, store } = createReducerBackedStore({ ...makeDoc(), stacks: stacksFrom([empty]) });
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        createSpatialExecutor: tooLarge,
+        getMainModelBase: () => 'sdxl',
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const plain = { source: { bitmap: null, type: 'paint' }, transform, type: 'control' };
+
+      const copied = await engine.layers.copyLayerToControl('a');
+      expect(copied.status).toBe('copied');
+      const copy = getDocumentLayer(engine.document.getDocument(), copied.status === 'copied' ? copied.layerId : '');
+      expect(copy).toMatchObject({ ...plain, name: 'a copy' });
+      expect(copy).not.toHaveProperty('adjustments');
+
+      const live = getDocumentLayer(engine.document.getDocument(), 'a')!;
+      expect(await engine.layers.convertLayerToControl('Convert to control', live)).toBe('converted');
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).toMatchObject(plain);
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).not.toHaveProperty('adjustments');
+
+      await engine.history.undo();
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).toEqual(empty);
+      engine.lifecycle.dispose();
+    });
+
+    it('copies an empty layer only while it is unchanged across the export', async () => {
+      const empty = { ...rasterLayer('a'), adjustments: CLARITY, source: { bitmap: null, type: 'paint' } };
+      const { dispatch, projectId, store } = createReducerBackedStore({
+        ...makeDoc(),
+        stacks: stacksFrom([empty as CanvasRasterLayerContractV2]),
+      });
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+
+      const copying = engine.layers.copyLayerToControl('a');
+      dispatch({ id: 'a', patch: { opacity: 0.3 }, type: 'updateCanvasLayer' });
+
+      expect(await copying).toEqual({ status: 'not-ready' });
+      expect(getDocumentLeaves(engine.document.getDocument()!)).toHaveLength(1);
+      expect(engine.stores.canUndo.get()).toBe(false);
+      engine.lifecycle.dispose();
+    });
+
+    it('converts an image layer with baked pixels; undo restores the image contract without persisting', async () => {
+      const image = {
+        ...rasterLayer('a', { imageName: 'held-source.png' }),
+        adjustments: [{ id: 'invert', isEnabled: true, type: 'invert' }],
+      } as CanvasRasterLayerContractV2;
+      const { projectId, store } = createReducerBackedStore({ ...makeDoc(), stacks: stacksFrom([image]) });
+      const bitmapStore = createSpyBitmapStore();
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        bitmapStore,
+        imageResolver: () => Promise.resolve(new Blob()),
+        projectId,
+        store,
+      });
+      const live = getDocumentLayer(engine.document.getDocument(), 'a')!;
+
+      expect(await engine.layers.convertLayerToControl('Convert to control', live)).toBe('converted');
+      // The baked control pixels are the layer's own now, so they persist.
+      expect(bitmapStore.markLayerDirty).toHaveBeenCalledExactlyOnceWith('a');
+      expect(engine.history.getHeldAssetRefs().images).toContain('held-source.png');
+      bitmapStore.markLayerDirty.mockClear();
+      vi.mocked(bitmapStore.discardLayer).mockClear();
+
+      await engine.history.undo();
+
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).toEqual(image);
+      // The baked pixels' pending upload is dropped; the image's reinstalled cache is never persisted.
+      expect(bitmapStore.discardLayer).toHaveBeenCalledWith('a');
+      expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+      expect((await engine.exports.exportLayerPixels('a')).status).toBe('ok');
+      expect(engine.history.getHeldAssetRefs().images).toContain('held-source.png');
+      engine.lifecycle.dispose();
+    });
+
+    it('refuses both, naming the layer, when its stack cannot run', async () => {
+      const { dispatch, engine, layer } = adjustedEngine(tooLarge);
+      dispatch.mockClear();
+      const refusal = { ownerId: 'a', ownerName: 'a', reason: 'too-large', status: 'adjustment-refused' };
+
+      expect(await engine.layers.copyLayerToControl('a')).toEqual(refusal);
+      expect(await engine.layers.convertLayerToControl('Convert to control', layer)).toEqual(refusal);
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(getDocumentLayer(engine.document.getDocument(), 'a')).toBe(layer);
+      engine.lifecycle.dispose();
+    });
+  });
+
   it('flushing after a prop-only change persists the painted (non-blank) surface', async () => {
     const { bitmapStore, engine, paintCache, raf, setDocument } = await paintOneStroke();
     const clearsBefore = fullClearCount(paintCache);
@@ -14642,14 +14758,14 @@ describe('gesture guard: nudge / commitStructural mid-stroke', () => {
     overlay.fire('pointermove', pointerAt(30, 30));
 
     // Mid-gesture merge is refused before anything changes, like commitStructural/nudge.
-    expect(engine.layers.mergeLayerDown('upper')).toBe('busy');
+    expect(await engine.layers.mergeLayerDown('upper')).toBe('busy');
     expect(dispatch.mock.calls.some((call) => (call[0] as EngineTestAction).type === 'mergeCanvasLayersDown')).toBe(
       false
     );
 
     // After the gesture ends, the merge lands.
     overlay.fire('pointerup', pointerAt(30, 30, { buttons: 0 }));
-    expect(engine.layers.mergeLayerDown('upper')).toBe('merged');
+    expect(await engine.layers.mergeLayerDown('upper')).toBe('merged');
     expect(dispatch.mock.calls.some((call) => (call[0] as EngineTestAction).type === 'mergeCanvasLayersDown')).toBe(
       true
     );
@@ -18856,7 +18972,7 @@ describe('refused strokes', () => {
       projectId: 'p1',
       store,
     });
-    const refusals: string[] = [];
+    const refusals: CanvasEditRefusal[] = [];
     engine.tools.onEditRefused((refusal) => refusals.push(refusal));
     const overlay = createInputCanvas();
     engine.surface.attach(createInputCanvas().element, overlay.element);
@@ -19271,6 +19387,47 @@ describe('color picker loupe', () => {
     for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointerleave', 'pointerenter', 'wheel']) {
       expect(overlay.listenerCount(type), type).toBe(0);
     }
+    engine.lifecycle.dispose();
+  });
+});
+
+describe('control derivation composition', () => {
+  it('commits control-layer patches without the operation lease, so a running operation refuses them', async () => {
+    const control: CanvasControlLayerContract = {
+      adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+      blendMode: 'normal',
+      id: 'control',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Control Layer 1',
+      opacity: 1,
+      source: { image: { height: 10, imageName: 'photo', width: 10 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'control',
+      withTransparencyEffect: true,
+    };
+    const { store } = createReactiveStore({ ...makeDoc(), stacks: stacksFrom([control]) });
+    const { applicationHost, engine } = createCoreCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      mutationPort: createTestMutationPort(store, 'p1'),
+      projectId: 'p1',
+      reportError: () => undefined,
+      uploadImage: () => Promise.resolve({ height: 1, imageName: 'durable', width: 1 }),
+      uploadIntermediateImage: () => Promise.resolve({ height: 1, imageName: 'transient', width: 1 }),
+    });
+    const patch = { expected: control, label: 'Set control type', next: { ...control, controlType: 'depth' as const } };
+
+    engine.stores.documentEditingLocked.set(true);
+    expect(applicationHost.commitControlLayerPatch(patch)).toEqual({ status: 'busy' });
+    engine.stores.documentEditingLocked.set(false);
+    expect(applicationHost.commitControlLayerPatch(patch)).toEqual({ status: 'committed' });
+    expect(applicationHost.captureControlDetectionGuard('control')).toMatchObject({
+      documentRevision: 0,
+      layerId: 'control',
+      projectId: 'p1',
+    });
+    await expect(applicationHost.flushLayerUploads('control', {})).resolves.toBe('clean');
     engine.lifecycle.dispose();
   });
 });
