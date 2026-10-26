@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { UpscaleWidgetValues } from './types';
 
-import { compileUpscaleGraph } from './graph';
+import { compileModelOnlyUpscaleGraph, compileUpscaleGraph } from './graph';
 import { createDefaultUpscaleWidgetValues, getUpscaleValidationReasons, UPSCALE_ARCHITECTURES } from './settings';
 
 seedArchitectureCapabilities();
@@ -125,6 +125,31 @@ const compileCase = ({ main, patch }: (typeof CASES)[number]): BackendGraphContr
   return compileUpscaleGraph(values, 'gallery', { useCpuNoise: true }).backendGraph;
 };
 
+/**
+ * Model only, at a Scale (the widget and the image menu) and at the native scale of an upscaler that never recorded
+ * it (the image menu's plain pass). It loads no main model, so it has no base of its own: its node types and fields
+ * join the contract without a `byBase` entry.
+ */
+const compileModelOnlyGraphs = (): BackendGraphContract[] => {
+  const image = { height: 101, image_name: 'input.png', width: 203 };
+
+  const runs: { nativeScale: number | null; scale: number | 'native' }[] = [
+    { nativeScale: 4, scale: 2 },
+    { nativeScale: null, scale: 'native' },
+  ];
+
+  return runs.map(
+    ({ nativeScale, scale }) =>
+      compileModelOnlyUpscaleGraph({
+        destination: 'gallery',
+        image,
+        scale,
+        sourceMetadata: { positive_prompt: 'source' },
+        upscaleModel: { ...INSTALLED[0], scale: nativeScale } as UpscaleWidgetValues['upscaleModel'] & object,
+      }).backendGraph
+  );
+};
+
 describe('upscale graph coverage', () => {
   it('covers every architecture the widget supports', () => {
     expect([...new Set(CASES.map(({ main }) => main.base))].sort()).toEqual(Object.keys(UPSCALE_ARCHITECTURES).sort());
@@ -140,14 +165,21 @@ describe('upscale graph coverage', () => {
     const fieldsFor = (nodeType: string) =>
       (fields[nodeType] ??= { inputs: new Set(), literals: new Map(), outputs: new Set() });
 
-    for (const testCase of CASES) {
-      const graph = compileCase(testCase);
-      const entry = (byBase[testCase.main.base] ??= { nodeTypes: [] });
+    const graphs = [
+      ...CASES.map((testCase) => {
+        const graph = compileCase(testCase);
+        const entry = (byBase[testCase.main.base] ??= { nodeTypes: [] });
 
-      entry.nodeTypes = [
-        ...new Set([...entry.nodeTypes, ...Object.values(graph.nodes).map((node) => node.type)]),
-      ].sort();
+        entry.nodeTypes = [
+          ...new Set([...entry.nodeTypes, ...Object.values(graph.nodes).map((node) => node.type)]),
+        ].sort();
 
+        return graph;
+      }),
+      ...compileModelOnlyGraphs(),
+    ];
+
+    for (const graph of graphs) {
       for (const node of Object.values(graph.nodes)) {
         const { literals } = fieldsFor(node.type);
 

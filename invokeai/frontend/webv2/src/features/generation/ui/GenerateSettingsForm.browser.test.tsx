@@ -141,6 +141,7 @@ let root: Root | null = null;
 let queryClient = new QueryClient();
 let projectValues = new Map<string, ExternalStoreCore<Record<string, unknown>>>();
 let patches: Array<{ patch: Record<string, unknown>; projectId: string | undefined }> = [];
+let sizeResets: Array<{ patch: Record<string, unknown>; projectId: string | undefined }> = [];
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const storedValues = (projectId = 'project-1') => {
@@ -182,6 +183,10 @@ const createStableGroups = () => ({
   settings: {
     patchGenerateSettings: (patch: Record<string, unknown>, projectId?: string) => {
       patches.push({ patch, projectId });
+      storedValues(projectId).patchSnapshot(patch);
+    },
+    resetDimensions: (patch: Record<string, unknown>, projectId?: string) => {
+      sizeResets.push({ patch, projectId });
       storedValues(projectId).patchSnapshot(patch);
     },
   },
@@ -279,6 +284,7 @@ beforeEach(async () => {
     ['project-2', createExternalStoreCore<Record<string, unknown>>({ ...INITIAL_VALUES, steps: 50 })],
   ]);
   patches = [];
+  sizeResets = [];
   stableGroups = createStableGroups();
   // Seeded, never-stale reads keep late responses from landing inside a counted window.
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
@@ -337,6 +343,52 @@ describe('GenerateSettingsForm Anima inpaint adapter', () => {
     await settle(flushGenerateDrafts);
 
     expect(storedValues().getSnapshot()).toMatchObject({ animaInpaintAdapterWeight: 1.05 });
+  });
+
+  it('switches the adapter off and back on without losing the pick or the weight', async () => {
+    const switchLabel = 'widgets.generate.animaInpaintAdapterEnabled';
+    const offHelp = 'widgets.generate.animaInpaintAdapterOffHelp';
+    const adapterSwitch = () =>
+      [...host!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(
+        (input) => input.labels?.[0]?.textContent === switchLabel
+      );
+    stableGroups.models.catalog = [MODEL, ANIMA, ANIMA_INPAINT_ADAPTER];
+    await renderAdapter(buildAdapter());
+    await settle(() =>
+      storedValues().patchSnapshot({
+        ...getDefaultGenerateSettings(ANIMA as never),
+        animaInpaintAdapterModel: ANIMA_INPAINT_ADAPTER as never,
+        animaInpaintAdapterWeight: 0.6,
+        modelKey: ANIMA.key,
+      })
+    );
+
+    expect(adapterSwitch()?.checked).toBe(true);
+    expect(host!.textContent).not.toContain(offHelp);
+    expect(sliderNamed(weightLabel).getAttribute('aria-disabled')).toBeNull();
+
+    await userEvent.click(adapterSwitch()!.labels![0]!);
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({
+      animaInpaintAdapterEnabled: false,
+      animaInpaintAdapterModel: ANIMA_INPAINT_ADAPTER,
+      animaInpaintAdapterWeight: 0.6,
+    });
+    expect(adapterSwitch()?.checked).toBe(false);
+    expect(host!.textContent).toContain(offHelp);
+    expect(adapterSlot()?.getAttribute('data-component-value')).toBe(ANIMA_INPAINT_ADAPTER.key);
+    expect(sliderNamed(weightLabel).getAttribute('aria-disabled')).toBe('true');
+
+    await userEvent.click(adapterSwitch()!.labels![0]!);
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({
+      animaInpaintAdapterEnabled: true,
+      animaInpaintAdapterModel: ANIMA_INPAINT_ADAPTER,
+      animaInpaintAdapterWeight: 0.6,
+    });
+    expect(sliderNamed(weightLabel).getAttribute('aria-disabled')).toBeNull();
   });
 });
 
@@ -510,6 +562,40 @@ describe('GenerateSettingsForm render isolation', () => {
     expect(patches).toEqual([{ patch: { steps: 31 }, projectId: 'project-1' }]);
   });
 
+  it('applies a size reset at once, superseding a pending size edit that can then never land after it', async () => {
+    await settle(() =>
+      storedValues().patchSnapshot({
+        aspectRatioId: '2:3',
+        aspectRatioIsLocked: true,
+        aspectRatioValue: 2 / 3,
+        height: 1216,
+        width: 832,
+      })
+    );
+    await settle(() =>
+      host!.querySelector<HTMLButtonElement>('button[aria-label="widgets.generate.resetSize"]')?.click()
+    );
+    const menu = document.querySelector<HTMLElement>('[role="menu"]');
+    // Highlights the first choice, Square at native size.
+    await settle(() => menu?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' })));
+
+    // A width step still inside its debounce window, then the reset.
+    await settle(() => {
+      sliderNamed('widgets.generate.width').dispatchEvent(
+        new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' })
+      );
+      menu?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+    });
+    await settle(noop, 400);
+
+    // SDXL is native at 1024.
+    expect(sizeResets).toEqual([
+      { patch: { aspectRatioId: '1:1', aspectRatioValue: 1, height: 1024, width: 1024 }, projectId: 'project-1' },
+    ]);
+    expect(patches).toEqual([]);
+    expect(storedValues().getSnapshot()).toMatchObject({ aspectRatioIsLocked: true, height: 1024, width: 1024 });
+  });
+
   it('batches fast edits to several fields into one patch on the project they were made in', async () => {
     await stepSteps();
     await stepSteps();
@@ -639,6 +725,25 @@ describe('GenerateSettingsForm render isolation', () => {
     expect(stepsValue()).toBe(31);
   });
 
+  it('switches at once when only the size moves, reporting the new size', async () => {
+    const info = vi.fn();
+    stableGroups.notifications.info = info;
+    stableGroups.models.catalog = [MODEL, FLUX];
+    await renderAdapter(buildAdapter());
+    // 1032 sits on SDXL's 8 px grid but not FLUX's 16 px one.
+    await pressRight(sliderNamed('widgets.generate.width'));
+
+    await settle(() => host!.querySelector<HTMLElement>('[data-model-pick="flux"]')?.click());
+
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+    expect(patches.at(-1)?.patch).toMatchObject({ modelKey: 'flux' });
+    expect((patches.at(-1)?.patch.width as number) % 16).toBe(0);
+    expect(info).toHaveBeenCalledWith(
+      'widgets.generate.dimensionsAdjusted',
+      'widgets.generate.dimensionsAdjustedDescription'
+    );
+  });
+
   it('confirms a lossy switch against the draft, pending edits included', async () => {
     stableGroups.models.catalog = [MODEL, FLUX, ink];
     storedValues().patchSnapshot({ loras: [{ isEnabled: true, model: ink, weight: 0.75 }] });
@@ -650,7 +755,9 @@ describe('GenerateSettingsForm render isolation', () => {
     await settle(() => host!.querySelector<HTMLElement>('[data-model-pick="flux"]')?.click());
 
     const dialog = document.querySelector<HTMLElement>('[role="alertdialog"]');
-    expect(dialog?.textContent).toContain('widgets.generate.switchModelBody: Dimensions and LoRAs');
+    // The size moves to the FLUX grid, which the dialog reports beside the loss rather than as one.
+    expect(dialog?.textContent).toContain('widgets.generate.switchModelBody: LoRAs');
+    expect(dialog?.textContent).toContain('widgets.generate.switchModelAdjustsDimensions');
     expect(patches).toEqual([]);
 
     const confirm = [...dialog!.querySelectorAll<HTMLButtonElement>('button')].find(
@@ -661,7 +768,7 @@ describe('GenerateSettingsForm render isolation', () => {
     // The switch lands as the dialog closes, and the dialog animates out still listing what was confirmed.
     expect(frames).not.toHaveLength(0);
     for (const frame of frames) {
-      expect(frame.text).toContain('widgets.generate.switchModelBody: Dimensions and LoRAs');
+      expect(frame.text).toContain('widgets.generate.switchModelBody: LoRAs');
     }
 
     await settle(noop, 400);

@@ -15,7 +15,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { commands, userEvent } from 'vitest/browser';
 
 import type * as SettingsStoreModule from './store';
@@ -180,6 +180,12 @@ describe('gallery maintenance in Data & workspace settings', () => {
   let root: Root;
   let queryClient: QueryClient;
 
+  // The settings page lazy-loads the maintenance section; load it up front so the first poll is not timing a cold
+  // chunk on a loaded machine.
+  beforeAll(async () => {
+    await import('./GalleryMaintenance');
+  });
+
   const renderSettings = async () => {
     await act(() =>
       root.render(
@@ -277,6 +283,7 @@ describe('gallery maintenance in Data & workspace settings', () => {
   afterEach(async () => {
     await act(() => root.unmount());
     await thumbnailRouteCommands.stopThumbnailRoute();
+    vi.restoreAllMocks();
     host.remove();
     queryClient.clear();
     accountLifecycle.invalidate();
@@ -517,6 +524,14 @@ describe('gallery maintenance in Data & workspace settings', () => {
     const owner = accountLifecycle.capture();
     const action = operations[2];
     await thumbnailRouteCommands.startThumbnailRoute(thumbnailItem.thumbnailUrl);
+    // The gallery's recovery probe asks about the failed thumbnail with fetch; answer it here as missing so it adds no
+    // request to the ones this test counts, and reloads nothing.
+    const browserFetch = globalThis.fetch;
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) =>
+      String(input).includes(thumbnailItem.thumbnailUrl)
+        ? Promise.resolve(new Response(null, { status: 404 }))
+        : browserFetch(input, init)
+    );
     mocks.apiFetchJson
       .mockResolvedValueOnce(preview(action.operation, action.fingerprint))
       .mockResolvedValueOnce(

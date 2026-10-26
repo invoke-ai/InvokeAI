@@ -1,14 +1,33 @@
 import type { ModelConfig } from '@features/models/core/types';
+import type { ModelSchedulerPolicy } from '@features/models/ui/ModelsUiContext';
 
 import { describe, expect, it } from 'vitest';
 
-import { getFieldsForModel, validateDefaults } from './defaultSettingsFields';
+import { getFieldsForModel, validateDefaults, type SchedulerFieldRules } from './defaultSettingsFields';
 
-const model = (base: string, type: string): Pick<ModelConfig, 'base' | 'type'> =>
-  ({ base, type }) as Pick<ModelConfig, 'base' | 'type'>;
+type FieldsModel = Pick<ModelConfig, 'base' | 'default_settings' | 'type'>;
 
-const fieldKeys = (candidate: Pick<ModelConfig, 'base' | 'type'>, fp8StorageSupported = true): string[] =>
-  getFieldsForModel(candidate, fp8StorageSupported).map((field) => String(field.key));
+const model = (base: string, type: string, defaultSettings: ModelConfig['default_settings'] = null): FieldsModel =>
+  ({ base, default_settings: defaultSettings, type }) as FieldsModel;
+
+const ANIMA_POLICY: ModelSchedulerPolicy = {
+  appliesToGraph: true,
+  defaultValue: 'euler',
+  options: [
+    { label: 'Euler', value: 'euler' },
+    { label: 'ER-SDE', value: 'er_sde' },
+  ],
+};
+const IGNORED_POLICY: ModelSchedulerPolicy = { ...ANIMA_POLICY, appliesToGraph: false };
+
+const fieldKeys = (
+  candidate: FieldsModel,
+  fp8StorageSupported = true,
+  schedulerRules: SchedulerFieldRules | null = ANIMA_POLICY
+): string[] => getFieldsForModel(candidate, fp8StorageSupported, schedulerRules).map((field) => String(field.key));
+
+const schedulerField = (candidate: FieldsModel, policy: ModelSchedulerPolicy) =>
+  getFieldsForModel(candidate, false, policy).find((field) => field.key === 'scheduler');
 
 describe('getFieldsForModel', () => {
   it('appends fp8_storage to the main-model fields without disturbing the existing ones', () => {
@@ -47,6 +66,48 @@ describe('getFieldsForModel', () => {
     // casts must not be offered a control that silently does nothing.
     expect(fieldKeys(model('flux', 'controlnet'), false)).toEqual(['preprocessor']);
     expect(fieldKeys(model('flux', 'main'), false)).not.toContain('fp8_storage');
+  });
+});
+
+describe('getFieldsForModel scheduler row', () => {
+  it("offers the injected policy's options and turns on at its default", () => {
+    const field = schedulerField(model('anima', 'main'), ANIMA_POLICY);
+
+    expect(field?.control).toEqual({
+      kind: 'combobox',
+      options: [
+        { label: 'Euler', value: 'euler' },
+        { label: 'ER-SDE', value: 'er_sde' },
+      ],
+    });
+    expect(field?.defaultValue).toBe('euler');
+  });
+
+  it('leaves the row out where the graph ignores the scheduler and nothing is stored', () => {
+    expect(fieldKeys(model('flux2', 'main'), false, IGNORED_POLICY)).not.toContain('scheduler');
+  });
+
+  it('keeps the row where the graph ignores the scheduler but a value is stored, so it can be cleared', () => {
+    expect(fieldKeys(model('flux2', 'main', { scheduler: 'euler_a' }), false, IGNORED_POLICY)).toContain('scheduler');
+  });
+
+  it.each(['loading', 'unavailable'] as const)(
+    'shows the row %s, keeping a stored value as its only choice',
+    (rules) => {
+      const pending = getFieldsForModel(model('flux2', 'main', { scheduler: 'euler_a' }), false, rules).find(
+        (field) => field.key === 'scheduler'
+      );
+
+      expect(pending).toMatchObject({
+        control: { kind: 'combobox', options: [{ label: 'euler_a', value: 'euler_a' }] },
+        pending: rules,
+      });
+      expect(fieldKeys(model('flux2', 'main'), false, rules)).toContain('scheduler');
+    }
+  );
+
+  it('keeps the row second, after the VAE', () => {
+    expect(fieldKeys(model('sdxl', 'main'), false).slice(0, 3)).toEqual(['vae', 'scheduler', 'steps']);
   });
 });
 

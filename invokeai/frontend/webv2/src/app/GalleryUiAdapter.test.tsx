@@ -70,6 +70,15 @@ describe('Gallery live-follow adapter', () => {
     expect(openWorkbenchWidget).toHaveBeenCalledExactlyOnceWith('preview');
   });
 
+  it('shows live frames in the Gallery only while Auto-switch is In progress', () => {
+    const modes = (['progress', 'latest', 'off'] as const).map((mode) => {
+      store.commands.account.updateProjectPreferences({ viewerAutoSwitch: mode });
+      return renderAdapter().liveFollowEnabled;
+    });
+
+    expect(modes).toEqual([true, false, false]);
+  });
+
   it('ignores a follow retained across an account change', () => {
     const owner = renderAdapter();
 

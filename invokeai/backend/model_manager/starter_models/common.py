@@ -205,6 +205,17 @@ siglip = StarterModel(
     type=ModelType.SigLIP,
 )
 
+# Dependency-only (like the IP-Adapter encoders above): not listed in STARTER_MODELS. Nothing but the
+# Anima IP-Adapter uses it, which declares it as a dependency, and `anima_ip_adapter` installs it on
+# first use when the adapter came from elsewhere.
+siglip2_base_512 = StarterModel(
+    name="SigLIP2 - google/siglip2-base-patch16-512",
+    base=BaseModelType.Any,
+    source="google/siglip2-base-patch16-512",
+    description="A SigLIP2 image encoder (used by the Anima IP-Adapter). ~1.5GB",
+    type=ModelType.SigLIP,
+)
+
 # region LlavaOnevisionModel (vision-language models for Image-to-Prompt)
 llava_onevision = StarterModel(
     name="LLaVA Onevision Qwen2 0.5B",

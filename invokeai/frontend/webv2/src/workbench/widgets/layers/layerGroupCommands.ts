@@ -1,4 +1,4 @@
-import type { CanvasDocumentModel } from '@workbench/canvas-engine/api';
+import type { CanvasDocumentContractV3, CanvasDocumentModel, DocumentCommand } from '@workbench/canvas-engine/api';
 import type { CanvasPreparedEngine, PreparedCommitOutcome } from '@workbench/widgets/canvas/useStructuralCommit';
 
 import { getDocumentIndex, isGroupNode } from '@workbench/canvas-engine/api';
@@ -78,4 +78,47 @@ export const ungroupLayers = (
       return !!node && isGroupNode(node);
     });
     return groupIds.length === 0 ? { status: 'unchanged' } : model.prepare({ ids: groupIds, type: 'ungroup' });
+  });
+
+/**
+ * The reparent that lifts `ids` out of their shared parent group to sit directly above it, in document order; null
+ * unless every id is a leaf of the same group.
+ */
+export const removeFromGroupCommand = (
+  document: CanvasDocumentContractV3,
+  ids: readonly string[]
+): Extract<DocumentCommand, { type: 'reparent' }> | null => {
+  const index = getDocumentIndex(document);
+  const entries = ids.flatMap((id) => index.byId.get(id) ?? []);
+  const groupId = entries[0]?.parentId ?? null;
+  if (
+    groupId === null ||
+    entries.length !== ids.length ||
+    entries.some((entry) => isGroupNode(entry.node) || entry.parentId !== groupId)
+  ) {
+    return null;
+  }
+  return {
+    beforeId: groupId,
+    ids: [...entries].sort((a, b) => a.order - b.order).map((entry) => entry.node.id),
+    parentId: index.byId.get(groupId)!.parentId,
+    type: 'reparent',
+  };
+};
+
+/** Whether the model would accept lifting `ids` out of their group; the same check the command runs. */
+export const canRemoveFromGroup = (model: CanvasDocumentModel | null, ids: readonly string[]): boolean => {
+  const command = model ? removeFromGroupCommand(model.document, ids) : null;
+  return !!model && !!command && model.refusalFor(command) === null;
+};
+
+/** Moves leaves of one group directly above it as one edit; an ineligible selection is a quiet no-op. */
+export const removeFromGroup = (
+  engine: CanvasPreparedEngine | null,
+  ids: readonly string[],
+  label: string
+): PreparedCommitOutcome =>
+  commitPreparedEdit(engine, label, (model) => {
+    const command = removeFromGroupCommand(model.document, ids);
+    return command ? model.prepare(command) : { status: 'unchanged' };
   });

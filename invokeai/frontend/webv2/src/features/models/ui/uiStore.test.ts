@@ -39,44 +39,45 @@ describe('models ui store', () => {
 
     // Clear prior scan, repo, and bundle results so the requested starter catalog remains visible.
     expect(snapshot.activeTab).toBe('add');
-    expect(store.getAddModelsSeed()).toBe('Juggernaut XL');
+    expect(snapshot.addModelsQuery).toBe('Juggernaut XL');
     expect(snapshot.hfLookup).toBeNull();
     expect(snapshot.scan).toBeNull();
     expect(snapshot.selectedBundleName).toBeNull();
   });
 
-  it('hands the Add Models seed over exactly once', async () => {
+  it('keeps the Add Models box text until a search request replaces it or the account changes', async () => {
     const store = await import('./uiStore');
+    const { accountLifecycle } = await import('@platform/state/accountLifecycle');
+    accountLifecycle.activate('account-a');
+    const query = () => store.getModelsUiSnapshotForTests().addModelsQuery;
 
-    expect(store.getAddModelsSeed()).toBe('');
+    expect(query()).toBe('');
+    store.setAddModelsQuery('/home/me/loras');
+    store.openModelManagerTab('keys');
+    expect(query()).toBe('/home/me/loras');
 
     store.requestAddModelsSearch('Juggernaut XL');
+    expect(query()).toBe('Juggernaut XL');
 
-    // Reading is pure — StrictMode double-invokes the initializer that reads it.
-    expect(store.getAddModelsSeed()).toBe('Juggernaut XL');
-    expect(store.getAddModelsSeed()).toBe('Juggernaut XL');
-
-    store.clearAddModelsSeeds();
-
-    // The next time Add Models opens on its own, the box is empty again.
-    expect(store.getAddModelsSeed()).toBe('');
+    accountLifecycle.activate('account-b');
+    expect(query()).toBe('');
   });
 
-  it('hands the starter type-filter seed over exactly once, and the two seeds displace each other', async () => {
+  it('hands the starter type-filter seed over exactly once, clearing a search that would hide it', async () => {
     const store = await import('./uiStore');
+    const query = () => store.getModelsUiSnapshotForTests().addModelsQuery;
 
+    store.requestAddModelsSearch('Juggernaut XL');
     store.requestAddModelsTypeFilter('text_llm');
     expect(store.getModelsUiSnapshotForTests().activeTab).toBe('add');
     expect(store.getAddModelsTypeSeed()).toBe('text_llm');
-    expect(store.getAddModelsSeed()).toBe('');
+    expect(query()).toBe('');
 
     store.requestAddModelsSearch('Juggernaut XL');
     expect(store.getAddModelsTypeSeed()).toBeNull();
 
     store.requestAddModelsTypeFilter('llava_onevision');
-    expect(store.getAddModelsSeed()).toBe('');
-
-    store.clearAddModelsSeeds();
+    store.clearAddModelsTypeSeed();
     expect(store.getAddModelsTypeSeed()).toBeNull();
   });
 

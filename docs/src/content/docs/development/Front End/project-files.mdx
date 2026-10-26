@@ -39,10 +39,24 @@ canvas v3 document rides this seam: every save sends the document together with 
 `minimum_canvas_schema_version` it requires (3 for any v3 canvas), so a client that still declares
 a maximum of v2 is refused before it can overwrite that document.
 
-The frontend derives the requested floor from the highest declared version among the live canvas
-and every queued canvas snapshot. It also retains the server's monotonic floor in the offline sync
-map, so importing, duplicating, conflict recovery, and deletion recovery cannot accidentally create
-a copy with weaker compatibility metadata than the document or its source project requires.
+A canvas adopts a newer schema only when its content needs one, that is, when an older reader
+would drop part of it on load and lose it on the next autosave. Schema 4 marks custom-font
+typography (a text source with `fontRef`, `fontStyle` or `fontVariations`). Schema 5 marks a noise,
+clarity, texture or dehaze adjustment, enabled or not, on any layer or group at any depth; an older
+reader would drop the
+whole adjustment stack holding it. Schema 6 marks a control layer carrying any derivation field
+(`controlType`, `detection`, `original` or `originalTransform`), which an older reader would strip,
+losing the kept original. The live document and each saved canvas snapshot are versioned
+this way, and the canvas state takes the newest of them. Adoption is sticky: removing the feature
+does not lower the version, as the server floor cannot be lowered either. A canvas with none of
+these stays at 3, so older builds keep opening it. A build refuses a canvas that declares a schema above
+its maximum as an unsupported version before parsing it, and once the floor is raised the server
+refuses the project to a client declaring a lower maximum.
+
+The frontend derives the requested floor from the live canvas state's version. It also retains the
+server's monotonic floor in the offline sync map, so importing, duplicating, conflict recovery, and
+deletion recovery cannot accidentally create a copy with weaker compatibility metadata than the
+document or its source project requires.
 
 If another client raises the floor while a project is already open, the next save becomes a
 terminal per-project schema refusal instead of a generic network failure. The local document still

@@ -1,9 +1,11 @@
 """Dropping the Qwen3-VL visual tower on the safetensors load paths.
 
 Krea-2 and Ideogram 4 condition on the language tower's hidden states; `Qwen3VLModel.forward`
-reaches `self.visual` only for `pixel_values`, which neither invocation passes, and Ideogram 4 does
-not go through `forward` at all. The tower is therefore never executed, and dropping it takes
-0.39-0.77 GiB off the 4B encoder depending on the container.
+reaches `self.visual` only for `pixel_values`, which text-only encoding never passes, and Ideogram 4
+does not go through `forward` at all. Krea-2 reference images do run the tower, but a separately
+loaded one (the `VisionEncoder` submodel) attached to the encoder for that call. The encoder's own
+tower is therefore never executed, and dropping it takes 0.39-0.77 GiB off the 4B encoder depending
+on the container.
 
 These tests use a real (tiny) `Qwen3VLModel`, so what disappears is the architecture's actual vision
 tower rather than a stand-in. MiniMax H3 does run this tower and loads through

@@ -23,6 +23,7 @@ export interface ActiveInvocationSubmissionArgs {
   destinationOverride?: ResultDestination;
   /** Words a control-layer rejection from the locale; its error message is for logs only. */
   formatControlLayerError: PrepareCanvasInvocationArgs['formatControlLayerError'];
+  formatUpscaleMetadataFailure: SubmitResolvedInvocationDeps['formatUpscaleMetadataFailure'];
   getModels: () => readonly ModelConfig[] | undefined;
   /** Invoke Front: the backend runs this batch ahead of the user's other pending work. */
   prepend?: boolean;
@@ -68,6 +69,7 @@ export const submitActiveInvocation = async (
     commands,
     destinationOverride,
     formatControlLayerError,
+    formatUpscaleMetadataFailure,
     getModels,
     prepend,
     queries,
@@ -104,6 +106,7 @@ export const submitActiveInvocation = async (
     await activeRuntime.submit({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models,
       owner,
       prepareCanvasInvocation,

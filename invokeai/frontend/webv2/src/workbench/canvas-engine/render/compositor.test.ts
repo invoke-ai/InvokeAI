@@ -919,3 +919,133 @@ describe('compositeDocument — damage', () => {
     expect(groupSurface).not.toHaveBeenCalled();
   });
 });
+
+describe('compositeDocument — control layer view', () => {
+  // The original sits 4px right of the map's frame and is drawn at half size.
+  const ORIGINAL_MATRIX: Mat2d = { a: 0.5, b: 0, c: 0, d: 0.5, e: 4, f: 0 };
+  const LAYER_AT = { rotation: 0, scaleX: 1, scaleY: 1, x: 10, y: 20 };
+
+  /** Each `drawImage` with the alpha, blend and transform in effect when it ran. */
+  const draws = (log: RasterCallLogEntry[]) => {
+    let alpha: unknown = 1;
+    let blend: unknown = 'source-over';
+    let transform: unknown[] = [];
+    const result: { source: unknown; alpha: unknown; blend: unknown; transform: unknown[] }[] = [];
+    for (const entry of log) {
+      if (entry.op === 'set' && entry.args[0] === 'globalAlpha') {
+        alpha = entry.args[1];
+      } else if (entry.op === 'set' && entry.args[0] === 'globalCompositeOperation') {
+        blend = entry.args[1];
+      } else if (entry.op === 'setTransform') {
+        transform = entry.args;
+      } else if (entry.op === 'drawImage') {
+        result.push({ alpha, blend, source: entry.args[0], transform });
+      }
+    }
+    return result;
+  };
+
+  const scene = (view: 'original' | 'overlay', layerOverrides: Record<string, unknown> = {}) => {
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    const map = caches.getOrCreate('control', 10, 10);
+    const original = backend.createSurface(40, 40);
+    const layer = {
+      ...controlLayer('control'),
+      blendMode: 'multiply',
+      opacity: 0.8,
+      transform: LAYER_AT,
+      withTransparencyEffect: true,
+      ...layerOverrides,
+    } as CanvasLayerContract;
+    const target = backend.createSurface(200, 200);
+    const controlView = {
+      layerId: 'control',
+      matrix: ORIGINAL_MATRIX,
+      rect: { height: 40, width: 40, x: 0, y: 0 },
+      surface: original,
+      view,
+    };
+    return { backend, caches, controlView, layer, map, original, target };
+  };
+
+  it('draws the original through the layer and original transforms in place of the map, without the effect', () => {
+    const { backend, caches, controlView, layer, original, target } = scene('original');
+    const derivedSurfaces = createDerivedSurfaceCache();
+
+    compositeDocument(target, makeDoc([layer]), caches, VIEW, { backend, controlView, derivedSurfaces });
+
+    expect(draws(target.callLog)).toEqual([
+      { alpha: 0.8, blend: 'multiply', source: original.canvas, transform: [0.5, 0, 0, 0.5, 14, 20] },
+    ]);
+    // The transparency effect is a property of the map; it never runs on the original.
+    expect(derivedSurfaces.byteSize()).toBe(0);
+  });
+
+  it('shows the original of a layer that has no map yet', () => {
+    const { backend, controlView, layer, original, target } = scene('original');
+
+    compositeDocument(target, makeDoc([layer]), createLayerCacheStore(backend), VIEW, { backend, controlView });
+
+    expect(draws(target.callLog).map((draw) => draw.source)).toEqual([original.canvas]);
+  });
+
+  it('draws the map over the original at half the layer opacity in the overlay view', () => {
+    const { backend, caches, controlView, layer, map, original, target } = scene('overlay', {
+      withTransparencyEffect: false,
+    });
+
+    compositeDocument(target, makeDoc([layer]), caches, VIEW, { backend, controlView });
+
+    expect(draws(target.callLog)).toEqual([
+      { alpha: 0.8, blend: 'multiply', source: original.canvas, transform: [0.5, 0, 0, 0.5, 14, 20] },
+      { alpha: 0.4, blend: 'multiply', source: map.surface.canvas, transform: [1, 0, 0, 1, 10, 20] },
+    ]);
+  });
+
+  it('keeps the transparency effect on the map in the overlay view', () => {
+    const { backend, caches, controlView, layer, map, original, target } = scene('overlay');
+    const derivedSurfaces = createDerivedSurfaceCache();
+
+    compositeDocument(target, makeDoc([layer]), caches, VIEW, { backend, controlView, derivedSurfaces });
+
+    const [under, over] = draws(target.callLog);
+    expect(under?.source).toBe(original.canvas);
+    // The map draws as its transparency-effect copy, not its raw cache.
+    expect(over?.source).not.toBe(map.surface.canvas);
+    expect(over?.alpha).toBe(0.4);
+    expect(derivedSurfaces.byteSize()).toBeGreaterThan(0);
+  });
+
+  it('repaints damage that reaches only the original, beyond the map', () => {
+    const { backend, caches, controlView, layer, original, target } = scene('original');
+    // The map covers document x 10..20; the original reaches x 14..34.
+    const damage = {
+      kind: 'regions' as const,
+      regions: [{ layerId: 'control', rect: { height: 4, width: 4, x: 20, y: 2 } }],
+    };
+
+    compositeDocument(target, makeDoc([layer]), caches, VIEW, { backend, damage });
+    expect(draws(target.callLog)).toEqual([]);
+
+    compositeDocument(target, makeDoc([layer]), caches, VIEW, { backend, controlView, damage });
+    expect(draws(target.callLog).map((draw) => draw.source)).toEqual([original.canvas]);
+  });
+
+  it('shows a grouped control layer the same way', () => {
+    const { backend, caches, controlView, layer, original, target } = scene('original');
+    const doc = makeDoc([], { stacks: stacksFrom([groupContract('g', [layer])]) });
+
+    compositeDocument(target, doc, caches, VIEW, { backend, controlView, groupSurface: () => null });
+
+    expect(draws(target.callLog).map((draw) => draw.source)).toEqual([original.canvas]);
+  });
+
+  it('is suppressed while a layer is isolated', () => {
+    const { backend, caches, controlView, layer, map, target } = scene('original', { withTransparencyEffect: false });
+
+    compositeDocument(target, makeDoc([layer]), caches, VIEW, { backend, controlView, isolationLayerId: 'control' });
+
+    expect(draws(target.callLog).map((draw) => draw.source)).toEqual([map.surface.canvas]);
+  });
+});
