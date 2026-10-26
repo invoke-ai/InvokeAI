@@ -179,6 +179,18 @@ describe('executeCanvasHeaderCommand', () => {
     expect(saveToGallery).toHaveBeenCalledWith(region);
   });
 
+  it.each([
+    ['canvas.setZoomTo100Percent', 1],
+    ['canvas.setZoomTo200Percent', 2],
+    ['canvas.setZoomTo400Percent', 4],
+    ['canvas.setZoomTo800Percent', 8],
+  ] as const)('%s zooms to %d× about the viewport centre', (commandId, scale) => {
+    const { engine, zoomAtPoint } = createEngine({ height: 600, width: 800 });
+    executeCanvasHeaderCommand(commandId, contextOf({ engine }));
+    expect(zoomAtPoint).toHaveBeenCalledExactlyOnceWith(scale, { x: 400, y: 300 });
+    expect(engine.layers.commitStructural).not.toHaveBeenCalled();
+  });
+
   it('ignores an unknown command id', () => {
     const openNewCanvas = vi.fn();
     const { engine } = createEngine();

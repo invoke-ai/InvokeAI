@@ -4,6 +4,7 @@ import type { GalleryBoard, GalleryView } from '@features/gallery/core/types';
 import { canOnBoard } from '@features/gallery/core/boardAccess';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import {
+  ALL_READABLE_BOARDS_ID,
   classifyGalleryUpload,
   compareGalleryItems,
   legacyGeneratedImageToGalleryItem,
@@ -70,6 +71,16 @@ export const useGalleryUploadAction = ({
       const readSelectedBoardId = () =>
         typeof selectedBoardIdOrGetter === 'function' ? selectedBoardIdOrGetter() : selectedBoardIdOrGetter;
       let selectedBoardId = readSelectedBoardId();
+
+      // A search of every board has no board of its own to upload to; Uncategorized would be a guess.
+      if (selectedBoardId === ALL_READABLE_BOARDS_ID) {
+        notifications.reportError({
+          area: 'gallery-upload',
+          message: t('widgets.gallery.uploadsUnavailableForAllBoards'),
+          namespace: 'gallery',
+        });
+        return [];
+      }
 
       // A board is judged from the listing of every readable board, never trusted as given: an upload to a board
       // that was deleted, archived out of reach or shared read-only since the panel listed it would only fail.

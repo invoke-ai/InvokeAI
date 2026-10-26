@@ -1,18 +1,19 @@
 /**
  * Shared brush/eraser gesture resolves or creates a target, drives a StrokeSession and commits/cancels. Only
  * gesture-start layer creation dispatches here; moves never dispatch. Fill/erase differ by blend and option
- * source.
+ * source. A Shift press on a layer with a remembered stroke end draws a straight segment from it; the end is kept
+ * layer-local, so moving or transforming the layer carries it.
  */
 
 import type { CanvasLayerContract, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
 import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
-import type { PointerInput } from '@workbench/canvas-engine/types';
+import type { Mat2d, PointerInput } from '@workbench/canvas-engine/types';
 
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { isLeafPaintable, isLayerTransparencyLocked } from '@workbench/canvas-engine/document/layerEligibility';
 import { isMaskLayer } from '@workbench/canvas-engine/document/sources';
-import { fromTRS, invert } from '@workbench/canvas-engine/math/mat2d';
+import { applyToPoint, fromTRS, invert } from '@workbench/canvas-engine/math/mat2d';
 
 import type { StrokeEdit, Tool, ToolContext } from './tool';
 
@@ -77,6 +78,12 @@ const editTarget = (
   ...extra,
 });
 
+/** The target layer's document matrix; null is identity (a new or materialized layer). */
+const targetMatrix = ({ transform }: PaintTarget): Mat2d | null =>
+  transform
+    ? fromTRS({ x: transform.x, y: transform.y }, transform.rotation, transform.scaleX, transform.scaleY)
+    : null;
+
 /** Resolves (or auto-creates) the paint target for a gesture, or `null` to no-op. */
 const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget | null => {
   const doc = ctx.getDocument();
@@ -112,17 +119,29 @@ const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget
       : null;
   }
 
-  if (leaf && selected?.type === 'raster' && selected.source.type === 'image' && tool === 'eraser') {
-    // Erase materializes image pixels as an undoable paint layer in place; locked, disabled or unready images
-    // refuse without spawning.
+  const imageSelected = leaf && selected?.type === 'raster' && selected.source.type === 'image';
+  if (imageSelected && tool === 'eraser') {
+    // Erasing materializes image pixels as an undoable paint layer in place; locked, disabled, unready or
+    // transparency-locked images refuse without spawning.
     if (!isLeafPaintable(leaf) || isLayerTransparencyLocked(selected)) {
       return null;
     }
     const transaction = ctx.beginPixelEdit?.(selected.id) ?? null;
+    // No transform on purpose: see the brush branch below.
+    return transaction ? editTarget(transaction, transaction.layerId) : null;
+  }
+  const imageCache = imageSelected ? ctx.layers.peek(selected.id) : undefined;
+  if (imageSelected && isLeafPaintable(leaf) && imageCache && !imageCache.stale) {
+    // The brush paints a paintable, rasterized image in place the same way, under its transparency lock; a locked,
+    // disabled or not yet rasterized image keeps the brush's auto-created paint layer below. A rasterized image whose
+    // spatial adjustments have not landed refuses `not-ready` (or names the stack that cannot run) and drops the
+    // stroke with a notice, as the eraser does.
+    const transparencyLocked = isLayerTransparencyLocked(selected);
+    const transaction = ctx.beginPixelEdit?.(selected.id) ?? null;
     // No transform on purpose: materialization BAKES the layer's placement
     // into document-space pixels and resets the layer to identity, so the
     // session's document coordinates already are the cache's coordinates.
-    return transaction ? editTarget(transaction, transaction.layerId) : null;
+    return transaction ? editTarget(transaction, transaction.layerId, { transparencyLocked }) : null;
   }
 
   if (leaf && selected && isMaskLayer(selected)) {
@@ -256,14 +275,7 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
         return;
       }
       const composite = resolvedTarget.transparencyLocked && spec.id === 'brush' ? 'source-atop' : spec.composite;
-      const layerTransform = resolvedTarget.transform
-        ? fromTRS(
-            { x: resolvedTarget.transform.x, y: resolvedTarget.transform.y },
-            resolvedTarget.transform.rotation,
-            resolvedTarget.transform.scaleX,
-            resolvedTarget.transform.scaleY
-          )
-        : null;
+      const layerTransform = targetMatrix(resolvedTarget);
       if (layerTransform && !invert(layerTransform)) {
         // A zero-scale layer has no paintable geometry to invert into.
         resolvedTarget.cancel();
@@ -297,7 +309,11 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
           thinning: spec.thinning(ctx),
           tool: spec.id,
         });
-        session.addPoints([input]);
+        // Shift continues from the layer's last stroke end, placed through the layer's current transform: both points
+        // take the press pressure, so the segment renders as a line rather than collapsing to a tap.
+        const localStart = input.modifiers.shift ? ctx.paintLineEnds?.get(target.layerId) : undefined;
+        const lineStart = localStart && layerTransform ? applyToPoint(layerTransform, localStart) : localStart;
+        session.addPoints(lineStart ? [{ ...input, documentPoint: lineStart }, input] : [input]);
       } catch {
         abortSession();
       }
@@ -326,7 +342,15 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
           throw error;
         }
         endSession();
-        if (!published) {
+        if (published) {
+          // Kept layer-local, in the space the stroke painted; the press already refused a non-invertible matrix.
+          const matrix = targetMatrix(activeTarget);
+          const toLocal = matrix ? invert(matrix) : null;
+          ctx.paintLineEnds?.set(
+            activeTarget.layerId,
+            toLocal ? applyToPoint(toLocal, input.documentPoint) : { ...input.documentPoint }
+          );
+        } else {
           activeTarget.cancel();
         }
       }

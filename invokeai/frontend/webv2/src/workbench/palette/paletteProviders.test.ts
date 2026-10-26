@@ -1,20 +1,29 @@
 import type { GalleryBoard, GalleryImage } from '@features/gallery/contracts';
 import type { GenerationModelCatalogItem } from '@features/generation/contracts';
+import type { GenerateModelSelectionResult } from '@features/generation/settings';
 import type { ModelConfig } from '@features/models';
 import type { TFunction } from 'i18next';
 
 import { ApiError } from '@platform/transport/http';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { ensureModelsLoaded, fetchQuery, getModelsSnapshot, listPaletteImages, listPaletteSemanticImages } = vi.hoisted(
-  () => ({
-    ensureModelsLoaded: vi.fn(() => Promise.resolve()),
-    fetchQuery: vi.fn(),
-    getModelsSnapshot: vi.fn(),
-    listPaletteImages: vi.fn(),
-    listPaletteSemanticImages: vi.fn(),
-  })
-);
+const {
+  ensureModelsLoaded,
+  fetchQuery,
+  getModelsSnapshot,
+  listPaletteImages,
+  listPaletteSemanticImages,
+  notifyGenerateDimensionsAdjusted,
+  notifyGenerateModelSelectionCleared,
+} = vi.hoisted(() => ({
+  ensureModelsLoaded: vi.fn(() => Promise.resolve()),
+  fetchQuery: vi.fn(),
+  getModelsSnapshot: vi.fn(),
+  listPaletteImages: vi.fn(),
+  listPaletteSemanticImages: vi.fn(),
+  notifyGenerateDimensionsAdjusted: vi.fn(),
+  notifyGenerateModelSelectionCleared: vi.fn(),
+}));
 
 vi.mock('@features/models', () => ({
   ensureModelsLoaded,
@@ -22,7 +31,11 @@ vi.mock('@features/models', () => ({
   getModelsSnapshot,
 }));
 
-vi.mock('@features/generation/react', () => ({ focusPositivePrompt: vi.fn() }));
+vi.mock('@features/generation/react', () => ({
+  focusPositivePrompt: vi.fn(),
+  notifyGenerateDimensionsAdjusted,
+  notifyGenerateModelSelectionCleared,
+}));
 vi.mock('@features/gallery/paletteSearch', () => ({
   ALL_READABLE_BOARDS_ID: 'all',
   listPaletteImages: (...args: unknown[]) => listPaletteImages(...args),
@@ -189,23 +202,51 @@ describe('createModelsProvider', () => {
       model('vae', 'sdxl', 'vae'),
     ];
     const order: string[] = [];
-    const applyModel = vi.fn((_selected: GenerationModelCatalogItem, _models: readonly ModelConfig[]) => {
-      order.push('apply');
+    const result = {
+      clearedLabels: ['LoRAs'],
+      dimensionsAdjusted: true,
+      settings: { height: 1600, width: 2848 },
+    } as unknown as GenerateModelSelectionResult;
+    const selectModel = vi.fn((_selected: GenerationModelCatalogItem, _models: readonly ModelConfig[]) => {
+      order.push('select');
+      return result;
     });
     const openGenerateWidget = vi.fn(() => {
       order.push('open');
     });
     const openModelManager = vi.fn();
+    const notifications = { info: vi.fn() };
     getModelsSnapshot.mockReturnValue({ models, status: 'loaded' });
-    const provider = createModelsProvider({ applyModel, openGenerateWidget, openModelManager, t });
+    const provider = createModelsProvider({
+      locale: 'en',
+      notifications,
+      openGenerateWidget,
+      openModelManager,
+      selectModel,
+      t,
+    });
 
     const entries = await provider.search({ text: '' }, searchContext());
 
     expect(entries.map((entry) => entry.title)).toEqual(['supported-sdxl', 'external-provider']);
 
     entries[0]?.run();
-    expect(applyModel).toHaveBeenCalledWith(supported, models);
-    expect(order).toEqual(['apply', 'open']);
+    expect(selectModel).toHaveBeenCalledWith(supported, models);
+    expect(order).toEqual(['select', 'open']);
+    // The switch reports what it cleared and the size it moved to, as the Generate widget's own picker does.
+    expect(notifyGenerateModelSelectionCleared).toHaveBeenCalledWith({
+      clearedLabels: ['LoRAs'],
+      locale: 'en',
+      modelName: 'supported-sdxl',
+      notifications,
+      t,
+    });
+    expect(notifyGenerateDimensionsAdjusted).toHaveBeenCalledWith({
+      modelName: 'supported-sdxl',
+      notifications,
+      result,
+      t,
+    });
 
     entries[0]?.secondary?.run();
     expect(openModelManager).toHaveBeenCalledOnce();
@@ -215,9 +256,11 @@ describe('createModelsProvider', () => {
     const models = [model('cinematic-xl', 'sdxl'), model('fast-flux', 'flux')];
     getModelsSnapshot.mockReturnValue({ models, status: 'loaded' });
     const provider = createModelsProvider({
-      applyModel: vi.fn(),
+      locale: 'en',
+      notifications: { info: vi.fn() },
       openGenerateWidget: vi.fn(),
       openModelManager: vi.fn(),
+      selectModel: vi.fn(),
       t,
     });
 

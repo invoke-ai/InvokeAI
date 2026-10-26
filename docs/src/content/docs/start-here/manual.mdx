@@ -1,6 +1,6 @@
 ---
 title: Manual Installation
-lastUpdated: 2026-07-14
+lastUpdated: 2026-10-19
 ---
 
 import { LinkCard, Tabs, TabItem, Steps, LinkButton } from '@astrojs/starlight/components'
@@ -95,10 +95,12 @@ The following commands vary depending on the version of Invoke being installed a
         View Releases
       </LinkButton>
 
-  6. Determine the package specifier to use when installing. This is a performance optimization.
+  6. Determine the package specifier to use when installing: `invokeai`, plus any of these extras in brackets, separated by commas.
 
-      - If you have an Nvidia 16xx or 20xx series GPU, use `invokeai[xformers]`.
-      - If you have an Nvidia 30xx series GPU or newer, or do not have an Nvidia GPU, use `invokeai`.
+      - `cuda`, if you use `--torch-backend=cu130` in the next step (Nvidia GPU on Windows x64 or Linux x86_64). It installs the PyTorch build Invoke is tested with and, on Windows, Triton. Add it only for Invoke 7 or newer, and never with another torch backend: it pins PyTorch's CUDA 13 build, which no other backend provides.
+      - `xformers`, if you have an Nvidia 16xx or 20xx series GPU. This is a performance optimization.
+
+      For example `invokeai[cuda]` for a 30xx series GPU or newer, `invokeai[cuda,xformers]` for a 16xx or 20xx series GPU, or `invokeai` without an Nvidia GPU.
 
   7. Determine the torch backend to use for installation, if any. This is necessary to get the right version of torch installed. This is achieved by using [UV's built in torch support.](https://docs.astral.sh/uv/guides/integration/pytorch/#automatic-backend-selection)
 
@@ -199,7 +201,7 @@ The following commands vary depending on the version of Invoke being installed a
         </TabItem>
         <TabItem label="With torch backend">
           ```sh
-          uv pip install <PACKAGE_SPECIFIER>==<VERSION> --python 3.12 --python-preference only-managed --torch-backend=<VERSION> --force-reinstall
+          uv pip install "<PACKAGE_SPECIFIER>==<VERSION>" --python 3.12 --python-preference only-managed --torch-backend=<VERSION> --force-reinstall
           ```
         </TabItem>
         <TabItem label="Windows on ARM64">
@@ -240,6 +242,8 @@ The following commands vary depending on the version of Invoke being installed a
           ```
         </TabItem>
       </Tabs>
+
+      To keep an existing install as it is, give v7 a directory of its own: see [Run v7 alongside v6](/start-here/upgrading/#run-v7-alongside-v6).
 </Steps>
 
 If you run Invoke on a headless server, you might want to install and run Invoke on the command line.

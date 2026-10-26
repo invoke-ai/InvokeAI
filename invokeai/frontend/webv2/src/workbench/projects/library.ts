@@ -200,13 +200,11 @@ export const deleteLibraryProject = async (
   boards: DeleteProjectBoards = 'release'
 ): Promise<void> => {
   const owner = captureAccountScope();
-  const [{ acquireProjectMutationLock }, { createAccountOwnedQueueRunJournal }] = await Promise.all([
-    import('./projectLifecycleLocks'),
-    import('@workbench/queue-integration/queueRunJournal'),
-  ]);
+  const [{ acquireProjectMutationLock, withSingleTabFallback }, { createAccountOwnedQueueRunJournal }] =
+    await Promise.all([import('./projectLifecycleLocks'), import('@workbench/queue-integration/queueRunJournal')]);
   assertAccountScopeCurrent(owner);
   const openProject = getOpenProject(projectId);
-  const mutationLock = await acquireProjectMutationLock(owner.storageSuffix, projectId);
+  const mutationLock = withSingleTabFallback(await acquireProjectMutationLock(owner.storageSuffix, projectId));
   if (mutationLock.kind === 'contended') {
     throw new Error('Wait for active queue runs to finish before deleting this project.');
   }

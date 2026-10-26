@@ -3,7 +3,7 @@ import type { ProjectGraphState, XYPosition } from '@features/workflow/contracts
 import type { WorkflowLibraryListItem } from '@features/workflow/queries';
 import type { WorkflowPreviewGraph } from '@features/workflow/ui/contracts';
 
-import { Box, Flex, HStack, Icon, Image, Spinner, Stack, Text, type SystemStyleObject } from '@chakra-ui/react';
+import { Box, Flex, HStack, Icon, Spinner, Stack, Text, type SystemStyleObject } from '@chakra-ui/react';
 import { GalleryPickerPopover } from '@features/gallery/picker';
 import { localizeForLoopValidationReason } from '@features/workflow/core/forLoops';
 import {
@@ -28,14 +28,14 @@ import { Suspense, useCallback, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next';
 
 import { buildLibraryGraphPreviewSource, DeferredGraphPreviewSnapshot, loadGraphPreview } from './libraryPreviewSource';
-import { formatRelativeTime } from './relativeTime';
+import { formatTimeSince, useDataTimeSnapshot } from './relativeTime';
+import { WORKFLOW_THUMBNAIL_ASPECT_RATIO, WorkflowThumbnailImage } from './workflowThumbnail';
 
-const THUMBNAIL_ASPECT_RATIO = 3 / 2;
 const IMAGE_ONLY = ['image'] as const;
 /** Busy controls stay focusable (`aria-disabled`), so the focus the picker returns to survives the action. */
 const preventClick = (event: MouseEvent) => event.preventDefault();
 const WELL_CSS: SystemStyleObject = {
-  aspectRatio: THUMBNAIL_ASPECT_RATIO,
+  aspectRatio: WORKFLOW_THUMBNAIL_ASPECT_RATIO,
   bg: 'bg.muted',
   overflow: 'hidden',
   position: 'relative',
@@ -45,9 +45,11 @@ const WELL_CSS: SystemStyleObject = {
 
 /** Key by workflow id: an action in flight for one workflow must not show as busy on the next selection. */
 export const WorkflowLibraryThumbnail = ({
+  canEdit,
   item,
   workflowDocument,
 }: {
+  canEdit: boolean;
   /** The template's parsed workflow once its row has loaded; the snapshot renders its graph. */
   workflowDocument: ProjectGraphState | null;
   item: WorkflowLibraryListItem;
@@ -56,6 +58,7 @@ export const WorkflowLibraryThumbnail = ({
   const notify = useWorkflowNotifications();
   // Keyed by URL: a replaced image arrives under a fresh URL and re-arms the thumbnail.
   const [failedThumbnailUrl, setFailedThumbnailUrl] = useState<string | null>(null);
+  const dataTime = useDataTimeSnapshot(item);
   // Local rather than `useScopedAction`: the library ships in the editor boot graph, and a second importer of that
   // models-only hook splits it into its own startup chunk.
   const [isBusy, setIsBusy] = useState(false);
@@ -107,8 +110,7 @@ export const WorkflowLibraryThumbnail = ({
     },
     [t]
   );
-  // Bundled defaults are not the account's to change; the same rule gates rename and delete.
-  const isEditable = item.category === 'user';
+  const isEditable = canEdit;
   const workflowId = item.workflow_id;
 
   const handleThumbnailError = useCallback(() => setFailedThumbnailUrl(item.thumbnail_url ?? null), [item]);
@@ -224,7 +226,7 @@ export const WorkflowLibraryThumbnail = ({
   );
 
   const showThumbnail = Boolean(item.thumbnail_url) && item.thumbnail_url !== failedThumbnailUrl;
-  const lastRun = item.last_run_at ? formatRelativeTime(item.last_run_at, new Date()) : '';
+  const lastRun = item.last_run_at ? formatTimeSince(item.last_run_at, dataTime) : '';
   // A user template's thumbnail is always one someone set; only bundled defaults ship a sample output.
   const caption = lastRun
     ? t('workflowLibrary.lastRun', { when: lastRun })
@@ -235,14 +237,7 @@ export const WorkflowLibraryThumbnail = ({
   const wellContent = (
     <>
       {showThumbnail ? (
-        <Image
-          alt=""
-          h="full"
-          objectFit="cover"
-          src={item.thumbnail_url ?? undefined}
-          w="full"
-          onError={handleThumbnailError}
-        />
+        <WorkflowThumbnailImage src={item.thumbnail_url} onError={handleThumbnailError} />
       ) : (
         <Flex align="center" direction="column" gap="1" h="full" justify="center" w="full">
           <Icon aria-hidden as={ImageOffIcon} boxSize="5" color="fg.subtle" opacity={0.6} />

@@ -48,10 +48,16 @@ All Seedream models share the same aspect ratio set: `1:1`, `2:3`, `3:2`, `3:4`,
 
 ## Provider-Specific Options
 
-Seedream exposes two provider-specific toggles in the parameters panel:
+Selecting a Seedream model adds a **Provider options** section to the Generate panel with two toggles:
 
 - **Watermark** — When enabled, BytePlus adds a small watermark to the output. Off by default.
 - **Optimize Prompt** — When enabled, BytePlus rewrites your prompt server-side for better generation quality. Useful for short prompts; disable if you want the exact wording preserved.
+
+Both are recorded in the image metadata and restored by **Recall All** and **Remix**. The Size section lists the provider's 2K sizes per aspect ratio under **Provider size**.
+
+## Canvas
+
+Seedream models advertise `img2img`, so they can generate from the Canvas: an empty bounding box runs text-to-image, and a filled one sends the composited bounding box as the init image. Invoke asks for the provider size whose aspect ratio is closest to the bounding box's. A text-to-image result is scaled to cover the bounding box and cropped to it from the center, so it is never stretched; when the shapes differ, a strip at two opposite edges is cut off. For image-to-image, the init image is resized to the provider size and the result is resized back to the exact bounding box. The render size, denoising strength, control layers and regional guidance do not apply and are not offered. Inpainting and outpainting are not available.
 
 **Seed** and **guidance scale** are not accepted by the 4.x / 5.x family.
 

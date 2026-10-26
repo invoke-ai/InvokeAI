@@ -12,6 +12,11 @@ import { describe, expect, it } from 'vitest';
 import {
   clearDeletedUpscaleInput,
   createDefaultUpscaleWidgetValues,
+  getModelOnlyUpscaleFactors,
+  getModelOnlyUpscalePlan,
+  isUpscaleBatchCountFixed,
+  resolveUpscaleSubmissionValues,
+  getSpandrelNativeScale,
   getUpscaleOutputDimensions,
   getUpscaleValidationReasons,
   normalizeUpscaleWidgetValues,
@@ -110,7 +115,12 @@ describe('upscale settings', () => {
       scale: 4,
       tileSize: 1024,
     });
-    expect(getUpscaleOutputDimensions({ height: 101, width: 203 }, 2.5, MODELS[0] as never)).toEqual({
+    expect(
+      getUpscaleOutputDimensions(
+        { height: 101, width: 203 },
+        { mode: 'refine', model: MODELS[0] as never, scale: 2.5, upscaleModel: null }
+      )
+    ).toEqual({
       height: 248,
       width: 504,
     });
@@ -654,9 +664,9 @@ describe('schedulers per architecture', () => {
     const offered = (base: string) =>
       upscaleSchedulerOptions(model(base, 'main', base) as never).map((option) => option.value);
 
-    // A single scheduler hides the field.
-    expect(offered('flux')).toEqual(['euler']);
-    expect(offered('z-image')).toEqual(['euler']);
+    // LCM builds its own schedule from pure noise, so it would ignore Creativity.
+    expect(offered('flux')).toEqual(['euler', 'heun']);
+    expect(offered('z-image')).toEqual(['euler', 'heun']);
     expect(offered('anima')).toEqual(['euler', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde']);
     // `krea2_denoise` and `qwen_image_denoise` have no scheduler input.
     expect(offered('krea-2')).toEqual(['euler']);
@@ -731,9 +741,132 @@ describe('upscaleDenoiseDimension', () => {
   it("shows the size the result comes out at, which a 16px pass makes smaller than Spandrel's", () => {
     // 1004 at 2x: Spandrel gives 2008, which FLUX.1 and Z-Image resize to 2000.
     const widths = ['sd-1', 'flux', 'z-image', 'anima'].map(
-      (base) => getUpscaleOutputDimensions({ height: 1004, width: 1004 }, 2, model(base, 'main', base) as never).width
+      (base) =>
+        getUpscaleOutputDimensions(
+          { height: 1004, width: 1004 },
+          { mode: 'refine', model: model(base, 'main', base) as never, scale: 2, upscaleModel: null }
+        ).width
     );
 
     expect(widths).toEqual([2008, 2000, 2000, 2008]);
+  });
+});
+
+describe('upscale model-only mode', () => {
+  const upscaler = (scale?: number | null) => ({
+    ...model('ultrasharp', 'spandrel_image_to_image', 'any', '4x-UltraSharp'),
+    type: 'spandrel_image_to_image' as const,
+    ...(scale === undefined ? {} : { scale }),
+  });
+  const image = { height: 101, image_name: 'source.png', width: 203 };
+  const modelOnly = (overrides = {}) => ({
+    ...createDefaultUpscaleWidgetValues(),
+    inputImage: image,
+    mode: 'model-only' as const,
+    upscaleModel: upscaler(4),
+    ...overrides,
+  });
+
+  it('opens projects saved before modes, and anything unknown, in Refine', () => {
+    expect(createDefaultUpscaleWidgetValues().mode).toBe('refine');
+    expect(normalizeUpscaleWidgetValues({})?.mode).toBe('refine');
+    expect(normalizeUpscaleWidgetValues({ mode: 'upscale-only' })?.mode).toBe('refine');
+    expect(normalizeUpscaleWidgetValues({ mode: 'model-only' })?.mode).toBe('model-only');
+  });
+
+  it('is ready with an image and an upscaler alone, even before the served table loads', () => {
+    resetArchitectureCapabilities();
+
+    try {
+      expect(getUpscaleValidationReasons(modelOnly({ model: null, tileControlnetModel: null, vae: null }))).toEqual([]);
+    } finally {
+      seedArchitectureCapabilities();
+    }
+  });
+
+  it('names only what the upscaler itself lacks', () => {
+    expect(
+      getUpscaleValidationReasons(modelOnly({ inputImage: null, model: null, scale: 32, upscaleModel: null }), MODELS)
+    ).toEqual([
+      'Upscale needs an input image. Upload one or send one from Gallery.',
+      'Upscale needs a Spandrel image-to-image model.',
+      'Scale must be between 1 and 16.',
+    ]);
+    expect(getUpscaleValidationReasons(modelOnly({ steps: 0, cfgScale: 99 }), [upscaler(4)])).toEqual([]);
+    expect(getUpscaleValidationReasons(modelOnly(), MODELS)).toEqual(['4x-UltraSharp is no longer installed.']);
+  });
+
+  it('reads a recorded native scale and treats anything else as unknown', () => {
+    expect(getSpandrelNativeScale(upscaler(4))).toBe(4);
+    expect(getSpandrelNativeScale(upscaler(1))).toBe(1);
+    expect(getSpandrelNativeScale(upscaler(null))).toBeNull();
+    expect(getSpandrelNativeScale(upscaler())).toBeNull();
+    expect(getSpandrelNativeScale(upscaler(0))).toBeNull();
+    expect(getSpandrelNativeScale(null)).toBeNull();
+  });
+
+  it('plans the passes the autoscale node runs and whether it resizes after them', () => {
+    expect(getModelOnlyUpscalePlan(4, 2)).toEqual({ kind: 'passes', passes: 1, resizes: true });
+    expect(getModelOnlyUpscalePlan(4, 4)).toEqual({ kind: 'passes', passes: 1, resizes: false });
+    expect(getModelOnlyUpscalePlan(4, 16)).toEqual({ kind: 'passes', passes: 2, resizes: false });
+    expect(getModelOnlyUpscalePlan(2, 4)).toEqual({ kind: 'passes', passes: 2, resizes: false });
+    expect(getModelOnlyUpscalePlan(2, 5)).toEqual({ kind: 'passes', passes: 3, resizes: true });
+    expect(getModelOnlyUpscalePlan(1, 4)).toEqual({ kind: 'no-enlarge' });
+    expect(getModelOnlyUpscalePlan(null, 4)).toBeNull();
+  });
+
+  it('offers one-click factors of 1.5x, 2x and the native scale, once each, and none while that scale is unknown', () => {
+    expect(getModelOnlyUpscaleFactors(upscaler(4))).toEqual([1.5, 2, 4]);
+    expect(getModelOnlyUpscaleFactors(upscaler(2))).toEqual([1.5, 2]);
+    expect(getModelOnlyUpscaleFactors(upscaler(3))).toEqual([1.5, 2, 3]);
+    // A 1x model enlarges nothing, so a larger factor would only be a resize.
+    expect(getModelOnlyUpscaleFactors(upscaler(1))).toEqual([1]);
+    expect(getModelOnlyUpscaleFactors(upscaler(null))).toBeNull();
+    expect(getModelOnlyUpscaleFactors(upscaler())).toBeNull();
+  });
+
+  it("sizes the output as Spandrel's frame, or the input for a model that does not enlarge", () => {
+    // A FLUX main model would floor Refine's output to 16; Model only runs no pass, so only the multiple of 8 applies.
+    const flux = model('flux', 'main', 'flux') as never;
+
+    expect(getUpscaleOutputDimensions({ height: 1004, width: 1004 }, modelOnly({ model: flux, scale: 2 }))).toEqual({
+      height: 2008,
+      width: 2008,
+    });
+    expect(getUpscaleOutputDimensions(image, modelOnly({ scale: 4, upscaleModel: upscaler(1) }))).toEqual({
+      height: 96,
+      width: 200,
+    });
+    expect(getUpscaleOutputDimensions(image, modelOnly({ scale: 4, upscaleModel: upscaler(null) }))).toEqual({
+      height: 400,
+      width: 808,
+    });
+  });
+
+  it('runs a Model only submission once, with no prompt and a fixed seed, for the input its metadata was read from', () => {
+    const draft = { negativePrompt: 'blur', negativePromptEnabled: true, positivePrompt: 'the Generate draft' };
+    const values = modelOnly({ batchCount: 3, seedMode: 'increment' as const });
+
+    expect(resolveUpscaleSubmissionValues(values, { promptDraft: draft, sourceImageName: 'source.png' })).toMatchObject(
+      { batchCount: 1, negativePrompt: '', positivePrompt: '', seedMode: 'fixed' }
+    );
+    expect(resolveUpscaleSubmissionValues(values, { promptDraft: draft, sourceImageName: 'earlier.png' })).toBeNull();
+    expect(resolveUpscaleSubmissionValues(values, { promptDraft: draft, sourceImageName: undefined })).toBeNull();
+  });
+
+  it('refines with the shared prompt draft and its own iterations, reading no source metadata', () => {
+    const draft = { negativePrompt: 'blur', negativePromptEnabled: false, positivePrompt: 'detail' };
+    const values = { ...modelOnly({ batchCount: 3, seedMode: 'increment' as const }), mode: 'refine' as const };
+
+    expect(resolveUpscaleSubmissionValues(values, { promptDraft: draft, sourceImageName: undefined })).toEqual({
+      ...values,
+      ...draft,
+    });
+  });
+
+  it('fixes the iteration count only for Model only, saved values included', () => {
+    expect(isUpscaleBatchCountFixed({ batchCount: 3, mode: 'model-only' })).toBe(true);
+    expect(isUpscaleBatchCountFixed({ batchCount: 3, mode: 'refine' })).toBe(false);
+    expect(isUpscaleBatchCountFixed({ batchCount: 3 })).toBe(false);
   });
 });

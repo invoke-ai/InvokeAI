@@ -594,10 +594,10 @@ class TestRunningQueueItemOwners:
         worker.queue_item = _queue_item()  # type: ignore[assignment]
         processor._workers = [worker]
 
-        stop_event, poll_now_event, resume_event = ThreadEvent(), ThreadEvent(), ThreadEvent()
+        stop_event, resume_event = ThreadEvent(), ThreadEvent()
         # `resume_event` is left clear, so the worker parks exactly where a paused
         # processor parks it: at the top of the loop, before any dequeue.
-        thread = Thread(target=processor._process, args=(worker, stop_event, poll_now_event, resume_event), daemon=True)
+        thread = Thread(target=processor._process, args=(worker, stop_event, resume_event), daemon=True)
         thread.start()
         try:
             deadline = time.monotonic() + 5

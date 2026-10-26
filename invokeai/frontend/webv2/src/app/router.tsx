@@ -7,10 +7,18 @@ import {
   LoginScreen,
   SetupScreen,
   useAuthSession,
+  useCapabilities,
   type Capabilities,
 } from '@features/identity';
-import { ModelInstallRuntime } from '@features/models';
+import {
+  ModelInstallRuntime,
+  ModelsUiProvider,
+  type ModelsUiAdapter,
+  type SchedulerPolicySource,
+  type SchedulerPolicyState,
+} from '@features/models';
 import { createLogger } from '@platform/logging/logger';
+import { createListenerChannel } from '@platform/state/externalStoreCore';
 import {
   createHashHistory,
   createRootRoute,
@@ -29,9 +37,15 @@ import { isLaunchpadIntentId } from '@workbench/launchpad/intents';
 import { Launchpad } from '@workbench/launchpad/Launchpad';
 import { ProjectFileOptionsProvider } from '@workbench/projects/components/ProjectFileOptionsProvider';
 import { peekOpenProjectIds, type WorkbenchSearch } from '@workbench/projects/session';
-import { loadWorkbenchSettings } from '@workbench/settings/store';
+import {
+  loadWorkbenchSettings,
+  patchWorkbenchPreferences,
+  useWorkbenchPreferenceSelector,
+} from '@workbench/settings/store';
 import { loadAppVersion } from '@workbench/shell/whatsNewStore';
-import { Fragment } from 'react';
+import { Fragment, useMemo, type ReactNode } from 'react';
+
+import type * as SchedulerRules from './modelSchedulerPolicyReader';
 
 import { SocketHubRuntime } from './SocketHubRuntime';
 
@@ -57,6 +71,72 @@ const RouterError = ({ error }: ErrorComponentProps) => {
 
 const rootRoute = createRootRoute({ component: Outlet, errorComponent: RouterError });
 
+const SCHEDULER_RULES_LOADING: SchedulerPolicyState = { status: 'loading' };
+const SCHEDULER_RULES_UNAVAILABLE: SchedulerPolicyState = { status: 'unavailable' };
+let schedulerPolicyState: SchedulerPolicyState = SCHEDULER_RULES_LOADING;
+let schedulerRules: Promise<typeof SchedulerRules> | null = null;
+const schedulerPolicyChannel = createListenerChannel();
+
+const publishSchedulerPolicy = (next: SchedulerPolicyState): void => {
+  schedulerPolicyState = next;
+  schedulerPolicyChannel.notify();
+};
+
+/**
+ * Generate's scheduler rules for the Model Manager's defaults. They and the architecture table they read live in
+ * Generation, which the Launchpad does not load at startup, so they arrive with the first Default settings section.
+ */
+const schedulerPolicySource: SchedulerPolicySource = {
+  getSnapshot: () => schedulerPolicyState,
+  load: () => {
+    if (!schedulerRules) {
+      if (schedulerPolicyState.status === 'unavailable') {
+        publishSchedulerPolicy(SCHEDULER_RULES_LOADING);
+      }
+      schedulerRules = import('./modelSchedulerPolicyReader').then((rules) => {
+        rules.startSchedulerPolicyReader(publishSchedulerPolicy);
+        return rules;
+      });
+    }
+    // Asked on every load: it retries a failed table, and an account change clears the table.
+    schedulerRules
+      .then((rules) => rules.ensureSchedulerRulesLoaded())
+      .catch(() => {
+        // The rules' chunk failed to load; the next load (Retry, or another section) imports it again.
+        schedulerRules = null;
+        publishSchedulerPolicy(SCHEDULER_RULES_UNAVAILABLE);
+      });
+  },
+  subscribe: schedulerPolicyChannel.subscribe,
+};
+
+const setInstallInPlace = (installInPlace: boolean) => void patchWorkbenchPreferences({ installInPlace });
+const NO_ACTIVE_PROJECT = () => false;
+
+/**
+ * The account's Models port for every authenticated route: the Model Manager renders on the Launchpad, and the editor
+ * narrows this with its active project. Composed here because a new module would enter the Launchpad's startup graph.
+ */
+export const AccountModelsUiProvider = ({ children }: { children: ReactNode }) => {
+  const enableModelDescriptions = useWorkbenchPreferenceSelector((value) => value.enableModelDescriptions);
+  const installInPlace = useWorkbenchPreferenceSelector((value) => value.installInPlace);
+  const { canManageModels } = useCapabilities();
+  const adapter = useMemo<ModelsUiAdapter>(
+    () => ({
+      canManageModels,
+      enableModelDescriptions,
+      installInPlace,
+      isProjectActive: NO_ACTIVE_PROJECT,
+      managerProjectId: null,
+      schedulerPolicy: schedulerPolicySource,
+      setInstallInPlace,
+    }),
+    [canManageModels, enableModelDescriptions, installInPlace]
+  );
+
+  return <ModelsUiProvider adapter={adapter}>{children}</ModelsUiProvider>;
+};
+
 /**
  * Keep socket and install progress alive across authenticated routes; mount heavier feature listeners only where
  * needed.
@@ -80,7 +160,9 @@ const AuthenticatedLayout = () => {
       <ModelInstallRuntime />
       <FontsRuntimeProvider>
         <ProjectFileOptionsProvider>
-          <Outlet />
+          <AccountModelsUiProvider>
+            <Outlet />
+          </AccountModelsUiProvider>
         </ProjectFileOptionsProvider>
       </FontsRuntimeProvider>
     </Fragment>
