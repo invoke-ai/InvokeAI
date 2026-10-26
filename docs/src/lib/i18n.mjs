@@ -3,6 +3,12 @@
 
 const PLURAL_CATEGORIES = ['zero', 'one', 'two', 'few', 'many', 'other'];
 
+/** The CLDR plural-category suffix of an i18next plural form's key, as in `search.resultCount_one`. */
+export const PLURAL_SUFFIX = new RegExp(`_(${PLURAL_CATEGORIES.join('|')})$`);
+
+/** An i18next `{{name}}` placeholder; the first group is the name. Global, so use it with `matchAll` or `replace`. */
+export const PLACEHOLDER = /\{\{\s*(\w+)\s*\}\}/g;
+
 /**
  * @typedef {{ text: string } | { tag: string, text: string }} MessagePart
  * @typedef {{ (key: string): string, exists: (key: string) => boolean }} Translate
@@ -49,7 +55,7 @@ export const pluralForms = (t, key) =>
  * @param {Record<string, string | number>} values
  */
 export const interpolate = (template, values) =>
-  template.replace(/\{\{\s*(\w+)\s*\}\}/g, (placeholder, name) =>
+  template.replace(PLACEHOLDER, (placeholder, name) =>
     Object.hasOwn(values, name) ? String(values[name]) : placeholder
   );
 

@@ -8,6 +8,7 @@ import { translatedLocales } from '../config/locales.mjs';
 import { modelFamilies } from '../config/model-families.ts';
 import { docsTopics, topicGroups } from '../config/topics.ts';
 import en from '../content/i18n/en.json' with { type: 'json' };
+import { PLURAL_SUFFIX } from './i18n.mjs';
 import { fileDirectory, sidebarGroupKey } from './sidebar.mjs';
 import { stripSortPrefix } from './sort-prefix.mjs';
 
@@ -18,7 +19,6 @@ const { default: builtInEnglish } = await import(
   new URL('./translations/en.js', import.meta.resolve('@astrojs/starlight/schema')).href
 );
 const srcDirectory = new URL('../', import.meta.url);
-const pluralSuffix = /_(zero|one|two|few|many|other)$/;
 
 /** Every source file's text, tests and content aside. */
 const sources = readdirSync(srcDirectory, { recursive: true, withFileTypes: true })
@@ -88,7 +88,7 @@ describe('en.json', () => {
     // Keys the code builds from ids, which the tests above match to those ids.
     const builtByCode = /^(topics\.|sidebar\.group\.|modelFamilies\.[^.]+\.tagline$)/;
     const unused = Object.keys(en)
-      .map((key) => key.replace(pluralSuffix, ''))
+      .map((key) => key.replace(PLURAL_SUFFIX, ''))
       .filter((key) => !usedKeys.has(key) && !builtByCode.test(key));
     assert.deepEqual(unused, []);
   });

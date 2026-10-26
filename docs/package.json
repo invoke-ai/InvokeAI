@@ -35,6 +35,7 @@
     "starlight-sidebar-topics": "^0.9.0"
   },
   "devDependencies": {
+    "@mdx-js/mdx": "3.1.1",
     "node-addon-api": "^8.9.2",
     "node-gyp": "^13.1.0"
   },

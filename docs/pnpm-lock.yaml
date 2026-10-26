@@ -54,6 +54,9 @@ importers:
         specifier: ^0.9.0
         version: 0.9.0(@astrojs/starlight@0.42.7(@astrojs/markdown-remark@7.3.4)(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1)))(astro@7.4.2(@astrojs/markdown-remark@7.3.4)(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.6.1)(yaml@2.9.1))
     devDependencies:
+      '@mdx-js/mdx':
+        specifier: 3.1.1
+        version: 3.1.1
       node-addon-api:
         specifier: ^8.9.2
         version: 8.9.2
