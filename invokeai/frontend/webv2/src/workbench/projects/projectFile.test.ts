@@ -1,4 +1,6 @@
+import { createControlLayer } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { MAX_SUPPORTED_CANVAS_SCHEMA_VERSION } from '@workbench/canvasSchemaVersion';
 import { createDraftProject } from '@workbench/workbenchState';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -658,7 +660,10 @@ describe('importing a project board', () => {
 
     const rewrittenEntries = new Map([...entries].map(([path, bytes]) => [path, binaryEntry(bytes)]));
 
-    rewrittenEntries.set('manifest.json', textEntry(JSON.stringify({ ...manifest, minimumCanvasSchemaVersion: 5 })));
+    rewrittenEntries.set(
+      'manifest.json',
+      textEntry(JSON.stringify({ ...manifest, minimumCanvasSchemaVersion: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION + 1 }))
+    );
     const archive = new File([await writeArchive(rewrittenEntries)], original.name);
 
     await expect(projectFile.importProjectFile(archive)).rejects.toMatchObject({ reason: 'unsupported-version' });
@@ -726,6 +731,93 @@ describe('importProjectFile', () => {
     };
 
     expect(createRequest.data.id).toBe(createRequest.project_id);
+  });
+
+  it('carries a noise adjustment through export and import at canvas schema 5', async () => {
+    const noise = {
+      amount: 0.2,
+      distribution: 'gaussian' as const,
+      grain: 'chroma' as const,
+      id: 'noise',
+      isEnabled: true,
+      response: 'midtones' as const,
+      seed: 12,
+      size: 2,
+      type: 'noise' as const,
+    };
+    const draft = createDraftProject([]);
+    const project = {
+      ...draft,
+      canvas: {
+        ...draft.canvas,
+        document: {
+          ...draft.canvas.document,
+          stacks: stacksFrom([
+            {
+              ...rasterImageLayer('grain', 'unused.png'),
+              adjustments: [noise],
+              source: { bitmap: null, type: 'paint' as const },
+            },
+          ]),
+          version: 5 as const,
+        },
+        version: 5 as const,
+      },
+      name: 'Grain',
+    };
+
+    acceptCreate();
+    await projectFile.exportOpenProject(project);
+    const { readArchive, readEntryText } = await import('./invk/archive');
+    const entries = await readArchive(new Uint8Array(await capturedArchive().arrayBuffer()));
+    expect(JSON.parse(readEntryText(entries.get('manifest.json')!))).toMatchObject({ minimumCanvasSchemaVersion: 5 });
+
+    await projectFile.importProjectFile(capturedArchive());
+
+    const createRequest = api.createProjectSettled.mock.calls[0]![0] as {
+      data: { canvas: { document: { stacks: { raster: { adjustments?: unknown }[] } }; version: number } };
+      minimum_canvas_schema_version: number;
+    };
+    expect(createRequest.minimum_canvas_schema_version).toBe(5);
+    expect(createRequest.data.canvas.version).toBe(5);
+    expect(createRequest.data.canvas.document.stacks.raster[0]?.adjustments).toEqual([noise]);
+  });
+
+  it('carries a typed control layer through export and import at canvas schema 6', async () => {
+    const typed = {
+      ...createControlLayer({ base: null, id: 'pose', name: 'Pose' }),
+      controlType: 'pose' as const,
+      detection: null,
+    };
+    const draft = createDraftProject([]);
+    const project = {
+      ...draft,
+      canvas: {
+        ...draft.canvas,
+        document: { ...draft.canvas.document, stacks: stacksFrom([typed]), version: 6 as const },
+        version: 6 as const,
+      },
+      name: 'Pose',
+    };
+
+    acceptCreate();
+    await projectFile.exportOpenProject(project);
+    const { readArchive, readEntryText } = await import('./invk/archive');
+    const entries = await readArchive(new Uint8Array(await capturedArchive().arrayBuffer()));
+    expect(JSON.parse(readEntryText(entries.get('manifest.json')!))).toMatchObject({ minimumCanvasSchemaVersion: 6 });
+
+    await projectFile.importProjectFile(capturedArchive());
+
+    const createRequest = api.createProjectSettled.mock.calls[0]![0] as {
+      data: { canvas: { document: { stacks: { control: Record<string, unknown>[] } }; version: number } };
+      minimum_canvas_schema_version: number;
+    };
+    expect(createRequest.minimum_canvas_schema_version).toBe(6);
+    expect(createRequest.data.canvas.version).toBe(6);
+    expect(createRequest.data.canvas.document.stacks.control[0]).toMatchObject({
+      controlType: 'pose',
+      detection: null,
+    });
   });
 
   describe('Auto-switch of an imported project', () => {

@@ -1,6 +1,6 @@
 import type { HotkeyContext, RegisteredHotkey } from './types';
 
-import { IS_MAC_OS, isEditableHotkeyTarget, normalizeHotkeyString } from './keys';
+import { IS_MAC_OS, isEditableHotkeyTarget, isNativeControlKeyPress, normalizeHotkeyString } from './keys';
 
 /**
  * The keys a binding presses on this platform: `mod` is Cmd on macOS and Ctrl elsewhere. The runtime fires the first
@@ -90,12 +90,13 @@ export const resolveHotkey = ({
   }
 
   const pressed = toPlatformHotkey(matchedKey);
-  const isEditable = isEditableHotkeyTarget(event.target);
+  // A focused text field, radio group or slider keeps the press unless the binding opts into editable targets.
+  const isOwnedByTarget = isEditableHotkeyTarget(event.target) || isNativeControlKeyPress(event);
 
   return (
     hotkeys
       .filter((hotkey) => hotkey.implemented !== false && hotkey.keys.some((key) => toPlatformHotkey(key) === pressed))
-      .filter((hotkey) => hotkey.allowInEditable || !isEditable)
+      .filter((hotkey) => hotkey.allowInEditable || !isOwnedByTarget)
       .filter((hotkey) => isClaimedTarget(hotkey, event.target))
       .filter((hotkey) => hotkey.allowInModal || !context.isModalPresent)
       .map((hotkey) => ({ hotkey, priority: getScopePriority(hotkey, context) }))

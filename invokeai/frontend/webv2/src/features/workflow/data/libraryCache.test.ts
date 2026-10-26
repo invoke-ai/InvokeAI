@@ -46,9 +46,15 @@ const buildPage = (items: WorkflowLibraryListItem[]): WorkflowLibraryPage => ({
 
 /** Revision `n` of a workflow holds `n` notes nodes, so the graph a caller receives names its revision. */
 const buildRecord = (workflowId: string, revision: number): WorkflowRecordDTO => ({
-  ...buildItem(workflowId, revision),
+  created_at: '2026-10-20T00:00:00Z',
+  is_public: false,
+  name: `Workflow ${workflowId}`,
+  revision,
+  updated_at: '2026-10-20T00:00:00Z',
+  user_id: 'user-a',
   workflow: {
     edges: [],
+    meta: { category: 'user' },
     name: `Workflow ${workflowId}`,
     nodes: Array.from({ length: revision }, (_unused, index) => ({
       data: { label: '', notes: '' },
@@ -57,6 +63,7 @@ const buildRecord = (workflowId: string, revision: number): WorkflowRecordDTO =>
       type: 'notes',
     })),
   },
+  workflow_id: workflowId,
 });
 
 const createDeferred = <T>() => {
@@ -343,13 +350,17 @@ describe('workflow library account ownership', () => {
     account.accountLifecycle.activate('user-b');
 
     expect(workflowSignal.aborted).toBe(true);
-    delayed.resolve({ ...buildRecord('shared-id', 1), workflow: { owner: 'a' } });
+    delayed.resolve({ ...buildRecord('shared-id', 1), workflow: { meta: { category: 'user' }, owner: 'a' } });
 
     await expect(oldWorkflow).rejects.toThrow('no longer active');
 
-    api.getLibraryWorkflowRecord.mockResolvedValueOnce({ ...buildRecord('shared-id', 1), workflow: { owner: 'b' } });
+    api.getLibraryWorkflowRecord.mockResolvedValueOnce({
+      ...buildRecord('shared-id', 1),
+      workflow: { meta: { category: 'user' }, owner: 'b' },
+    });
     await expect(cache.getLibraryWorkflowCached('shared-id', { expectedRevision: 1 })).resolves.toEqual({
       id: 'shared-id',
+      meta: { category: 'user' },
       owner: 'b',
     });
   });

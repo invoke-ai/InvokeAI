@@ -1,0 +1,21 @@
+{
+    "size": {
+        "longest_edge": 16777216,
+        "shortest_edge": 65536
+    },
+    "patch_size": 16,
+    "temporal_patch_size": 2,
+    "merge_size": 2,
+    "image_mean": [
+        0.5,
+        0.5,
+        0.5
+    ],
+    "image_std": [
+        0.5,
+        0.5,
+        0.5
+    ],
+    "processor_class": "Qwen3VLProcessor",
+    "image_processor_type": "Qwen2VLImageProcessorFast"
+}
