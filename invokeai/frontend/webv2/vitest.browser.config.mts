@@ -37,9 +37,14 @@ const imeCompose: BrowserCommand<[steps: readonly { kind: 'commit' | 'compose'; 
 };
 
 type ThumbnailRouteState = {
+  /** Requests still to be answered with `failureStatus`. */
+  failuresLeft: number;
+  failureStatus: number;
   handler: (route: Route) => Promise<void>;
-  pattern: string;
+  matches: (url: URL) => boolean;
   statuses: number[];
+  /** Playwright resource types: `image` for elements, `fetch` for scripted reads. */
+  types: string[];
   urls: string[];
 };
 
@@ -48,26 +53,35 @@ const thumbnailRoutes = new Map<string, ThumbnailRouteState>();
 const stopThumbnailRoute = async (context: BrowserContext, sessionId: string) => {
   const state = thumbnailRoutes.get(sessionId);
   if (state) {
-    await context.unroute(state.pattern, state.handler);
+    await context.unroute(state.matches, state.handler);
     thumbnailRoutes.delete(sessionId);
   }
 };
 
-const startThumbnailRoute: BrowserCommand<[pathname: string]> = async ({ context, sessionId }, pathname) => {
+/**
+ * Serves the images at `pathnames`, answering the first `failures` requests with `status` (default: one 404).
+ * `endThumbnailRouteFailures` serves every later request.
+ */
+const startThumbnailRoute: BrowserCommand<
+  [pathnames: string | string[], options?: { failures?: number; status?: number }]
+> = async ({ context, sessionId }, pathnames, { failures = 1, status: failureStatus = 404 } = {}) => {
   await stopThumbnailRoute(context, sessionId);
-  const path = new URL(pathname, 'http://localhost').pathname;
-  const pattern = `**${path}*`;
+  const paths = new Set(
+    (Array.isArray(pathnames) ? pathnames : [pathnames]).map(
+      (pathname) => new URL(pathname, 'http://localhost').pathname
+    )
+  );
   const state: ThumbnailRouteState = {
+    failuresLeft: failures,
+    failureStatus,
     handler: async (route) => {
-      if (new URL(route.request().url()).pathname !== path) {
-        await route.continue();
-        return;
-      }
-
-      state.urls.push(route.request().url());
-      const status = state.urls.length === 1 ? 404 : 200;
+      const request = route.request();
+      state.urls.push(request.url());
+      state.types.push(request.resourceType());
+      const status = state.failuresLeft > 0 ? state.failureStatus : 200;
+      state.failuresLeft = Math.max(0, state.failuresLeft - 1);
       state.statuses.push(status);
-      if (status === 404) {
+      if (status !== 200) {
         await route.fulfill({ body: 'thumbnail missing', contentType: 'text/plain', status });
       } else {
         await route.fulfill({
@@ -77,17 +91,27 @@ const startThumbnailRoute: BrowserCommand<[pathname: string]> = async ({ context
         });
       }
     },
-    pattern,
+    matches: (url) => paths.has(url.pathname),
     statuses: [],
+    types: [],
     urls: [],
   };
   thumbnailRoutes.set(sessionId, state);
-  await context.route(pattern, state.handler);
+  await context.route(state.matches, state.handler);
 };
 
-const getThumbnailRequests: BrowserCommand<[], { statuses: number[]; urls: string[] }> = ({ sessionId }) => {
+const endThumbnailRouteFailures: BrowserCommand<[]> = ({ sessionId }) => {
   const state = thumbnailRoutes.get(sessionId);
-  return { statuses: state?.statuses ?? [], urls: state?.urls ?? [] };
+  if (state) {
+    state.failuresLeft = 0;
+  }
+};
+
+const getThumbnailRequests: BrowserCommand<[], { statuses: number[]; types: string[]; urls: string[] }> = ({
+  sessionId,
+}) => {
+  const state = thumbnailRoutes.get(sessionId);
+  return { statuses: state?.statuses ?? [], types: state?.types ?? [], urls: state?.urls ?? [] };
 };
 
 const stopThumbnailRouteCommand: BrowserCommand<[]> = async ({ context, sessionId }) => {
@@ -117,6 +141,7 @@ export default mergeConfig(
     test: {
       browser: {
         commands: {
+          endThumbnailRouteFailures,
           getThumbnailRequests,
           imeCompose,
           resetBrowserPointer,

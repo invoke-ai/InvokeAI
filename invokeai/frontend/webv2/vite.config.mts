@@ -45,6 +45,10 @@ const ROUTE_SHARED_MODULES = [
   '/features/nodes/data/nodeExecutionStore.ts',
   '/features/nodes/index.ts',
   '/features/nodes/ui/NodesPage.tsx',
+  // Gallery tiles, the lazy Preview and the Launchpad's gallery picker share the failed-image recovery; alone it costs a
+  // startup request.
+  '/features/gallery/data/imageRecovery.ts',
+  '/features/gallery/ui/useGalleryImageRecovery.ts',
   '/platform/browser/downloadBlob.ts',
   // Editor search fields and the lazy pickers share the IME guard; alone it costs a startup request.
   '/platform/browser/imeComposition.ts',
