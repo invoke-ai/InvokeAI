@@ -24,7 +24,7 @@ from typing import ClassVar, Literal, Self
 from pydantic import Field
 from typing_extensions import Any
 
-from invokeai.backend.architectures import LatentSpace, latent_space_with_channels
+from invokeai.backend.architectures import latent_space_with_channels
 from invokeai.backend.model_manager.configs.backbone_names import name_components
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
@@ -34,7 +34,6 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     raise_if_not_file,
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
-from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.tiny_autoencoder.checkpoint import (
     TAELTX2_3,
@@ -144,8 +143,9 @@ def _unnamed_message(layout: TinyAutoencoderLayout, candidates: frozenset[BaseMo
         bases = " or ".join(sorted(b.value for b in candidates))
         reason = f"reads {layout.latent_channels}-channel latents, which {bases} share,"
     else:
-        twins = " and ".join(twin.label for twin in _TWINS[layout])
-        reason = f"has the network of {names} and of the {twins} decoders,"
+        twins = _TWINS[layout]
+        decoders = "decoders" if len(twins) > 1 else "decoder"
+        reason = f"has the network of {names} and of the {' and '.join(t.label for t in twins)} {decoders},"
     return (
         f"This preview decoder {reason} and nothing in its name says which it is. Install it from the starter "
         f"models, or, if it is {names}, name the file after it."
@@ -272,15 +272,3 @@ def _bases_fitting(layout: TinyAutoencoderLayout) -> frozenset[BaseModelType]:
         if config.ARCH == layout.arch and space is not None and space.spatial_compression == layout.spatial_compression:
             fitting.add(_base_of(config))
     return frozenset(fitting)
-
-
-def tiny_autoencoder_starters(space: LatentSpace) -> list[StarterModel]:
-    """The starter models that install a TAE for `space`, read from the catalog by the TAE each one installs."""
-    starters = []
-    for starter in STARTER_MODELS:
-        if starter.type is not ModelType.TinyAutoencoder:
-            continue
-        named = named_tiny_autoencoder((starter.source,))
-        if named is not None and latent_space_with_channels(starter.base, named[2]) is space:
-            starters.append(starter)
-    return starters

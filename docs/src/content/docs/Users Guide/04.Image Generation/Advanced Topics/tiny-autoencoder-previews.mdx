@@ -70,15 +70,15 @@ Only the preview frames that are actually sent to the UI are decoded, between tw
 capped on their long edge: at 512 pixels for TAEW2.1, whose decode would need about 2 GB of VRAM at 1024×1024, and
 at 1024 pixels for every other TAE. Larger generations are previewed at reduced resolution and shown at full size.
 
-Measured on an RTX 4090 at the cap:
+Measured on an RTX 4090 in fp16, decoding one latent at the cap:
 
-| TAE | Time per preview | VRAM while it decodes |
-|---|---|---|
-| TAESD, TAESDXL, TAESD3, TAEF1, TAEF2 | about 25 ms | about 0.65 GB |
-| TAEQI2.1 | about 25 ms | about 0.16 GB |
-| TAEW2.1 (512 pixels) | about 22 ms | about 0.54 GB |
-| TAEW2.2 | about 32 ms | about 0.54 GB |
-| TAELTX2.3 | about 29 ms | about 0.27 GB |
+| TAE | Cap | Time per preview | VRAM while it decodes |
+|---|---|---|---|
+| TAESD, TAESDXL, TAESD3, TAEF1, TAEF2 | 1024 pixels | about 25 ms | about 0.65 GB |
+| TAEQI2.1 | 1024 pixels | about 25 ms | about 0.16 GB |
+| TAEW2.1 | 512 pixels | about 10–20 ms | about 0.54 GB |
+| TAEW2.2 | 1024 pixels | about 24 ms | about 0.54 GB |
+| TAELTX2.3 | 1024 pixels | about 29 ms | about 0.27 GB |
 
 A Wan 2.2 video preview, which decodes two latent frames, takes under about 32 ms and about 0.6 GB of VRAM from
 832×480 to 1280×720, and up to about 1.06 GB at 1024×1024. Without a GPU a preview takes about 2 seconds, so TAE

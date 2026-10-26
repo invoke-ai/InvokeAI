@@ -10,10 +10,11 @@ import torch
 from PIL import Image
 
 from invokeai.app.util.step_callback import preview_frame, render_linear_preview
-from invokeai.backend.architectures import LatentSpace, resolve_latent_space
+from invokeai.backend.architectures import LatentSpace, latent_space_with_channels, resolve_latent_space
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.configs.tiny_autoencoder import tiny_autoencoder_starters
+from invokeai.backend.model_manager.configs.tiny_autoencoder import named_tiny_autoencoder
 from invokeai.backend.model_manager.load.load_base import LoadedModel
+from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.tiny_autoencoder.decoder import TinyAutoencoderDecoder
 from invokeai.backend.tiny_autoencoder.preview import decode_preview, select_tiny_autoencoder
@@ -40,6 +41,18 @@ RENDER_COST_INTERVAL_FACTOR = 20
 # Weight of the newest frame in the running render-cost estimate: recent enough to follow a change in
 # load, smooth enough that one slow frame does not stall the previews.
 RENDER_COST_SMOOTHING = 0.5
+
+
+def tiny_autoencoder_starters(space: LatentSpace) -> list[StarterModel]:
+    """The starter models that install a TAE for `space`, read from the catalog by the TAE each one installs."""
+    starters = []
+    for starter in STARTER_MODELS:
+        if starter.type is not ModelType.TinyAutoencoder:
+            continue
+        named = named_tiny_autoencoder((starter.source,))
+        if named is not None and latent_space_with_channels(starter.base, named[2]) is space:
+            starters.append(starter)
+    return starters
 
 
 def _first_report(key: Hashable) -> bool:

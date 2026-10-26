@@ -14,7 +14,6 @@ from invokeai.backend.model_manager.configs.tiny_autoencoder import (
     TinyAutoencoder_Checkpoint_SD3_Config,
     TinyAutoencoder_Checkpoint_SDXL_Config,
     TinyAutoencoder_Checkpoint_Wan_Config,
-    tiny_autoencoder_starters,
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.tiny_autoencoder.checkpoint import TAELTX2_3, TAEW2_1, TAEW2_2, build_taehv_decoder
@@ -199,24 +198,6 @@ def test_the_choice_among_fitting_taes_is_by_name_then_key_whatever_the_order() 
 
     assert select_tiny_autoencoder([b, a2, a1], space) is a1
     assert select_tiny_autoencoder([a1, b, a2], space) is a1
-
-
-@pytest.mark.parametrize(
-    ("base", "channels", "starters"),
-    [
-        (BaseModelType.StableDiffusion2, 4, ["TAESD (SD 1.x/2.x preview decoder)"]),
-        (BaseModelType.ZImage, 16, ["TAEF1 (FLUX.1 preview decoder)"]),
-        (BaseModelType.Ideogram4, 32, ["TAEF2 (FLUX.2 preview decoder)"]),
-        (BaseModelType.QwenImage21, 64, ["TAEQI2.1 (Qwen-Image-2.1 preview decoder)"]),
-        (BaseModelType.Anima, 16, ["TAEW2.1 (Wan 2.1 VAE preview decoder)"]),
-        (BaseModelType.Wan, 48, ["TAEW2.2 (Wan 2.2 TI2V-5B preview decoder)"]),
-        (BaseModelType.LTX2, 128, ["TAELTX2.3 (LTX-2.5 preview decoder)"]),
-        (BaseModelType.CogView4, 16, []),
-        (BaseModelType.MiniMaxH3, 24, []),
-    ],
-)
-def test_the_starters_that_install_a_tae_for_a_space(base: BaseModelType, channels: int, starters: list[str]) -> None:
-    assert [starter.name for starter in tiny_autoencoder_starters(_space(base, channels))] == starters
 
 
 @pytest.mark.parametrize(

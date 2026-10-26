@@ -13,7 +13,8 @@ from invokeai.app.services.session_processor.session_processor_common import Pro
 from invokeai.app.services.shared.invocation_context import InvocationContextData, UtilInterface
 from invokeai.app.util import tiny_autoencoder_previews
 from invokeai.app.util.step_callback import render_linear_preview
-from invokeai.app.util.tiny_autoencoder_previews import TinyAutoencoderPreviews
+from invokeai.app.util.tiny_autoencoder_previews import TinyAutoencoderPreviews, tiny_autoencoder_starters
+from invokeai.backend.architectures import resolve_latent_space
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.stable_diffusion.extensions.preview import PipelineIntermediateState
 from invokeai.backend.tiny_autoencoder.checkpoint import TAEW2_1, build_taehv_decoder
@@ -492,3 +493,25 @@ def test_a_missing_tae_names_the_starter_of_its_space_even_under_another_base(ca
     [info] = _messages(caplog, logging.INFO)
     assert "anima" in info
     assert "the TAEW2.1 (Wan 2.1 VAE preview decoder) starter model (listed under wan)" in info
+
+
+def _space_of(base: BaseModelType, channels: int):
+    return resolve_latent_space(base, torch.zeros(1, channels, 2, 2))
+
+
+@pytest.mark.parametrize(
+    ("base", "channels", "starters"),
+    [
+        (BaseModelType.StableDiffusion2, 4, ["TAESD (SD 1.x/2.x preview decoder)"]),
+        (BaseModelType.ZImage, 16, ["TAEF1 (FLUX.1 preview decoder)"]),
+        (BaseModelType.Ideogram4, 32, ["TAEF2 (FLUX.2 preview decoder)"]),
+        (BaseModelType.QwenImage21, 64, ["TAEQI2.1 (Qwen-Image-2.1 preview decoder)"]),
+        (BaseModelType.Anima, 16, ["TAEW2.1 (Wan 2.1 VAE preview decoder)"]),
+        (BaseModelType.Wan, 48, ["TAEW2.2 (Wan 2.2 TI2V-5B preview decoder)"]),
+        (BaseModelType.LTX2, 128, ["TAELTX2.3 (LTX-2.5 preview decoder)"]),
+        (BaseModelType.CogView4, 16, []),
+        (BaseModelType.MiniMaxH3, 24, []),
+    ],
+)
+def test_the_starters_that_install_a_tae_for_a_space(base: BaseModelType, channels: int, starters: list[str]) -> None:
+    assert [starter.name for starter in tiny_autoencoder_starters(_space_of(base, channels))] == starters
