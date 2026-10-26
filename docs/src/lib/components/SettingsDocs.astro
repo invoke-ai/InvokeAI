@@ -1,5 +1,6 @@
 ---
 import settingsData from '../../generated/settings.json';
+import { formatSettingType, formatSettingValue, settingAnchorId } from './settings-reference.mjs';
 
 const groupedSettings = Object.entries(
   settingsData.settings.reduce((groups, setting) => {
@@ -11,32 +12,6 @@ const groupedSettings = Object.entries(
     return groups;
   }, {}),
 );
-
-const formatValue = (value) => {
-  if (value === null) {
-    return 'null';
-  }
-  if (Array.isArray(value) || typeof value === 'object') {
-    return JSON.stringify(value);
-  }
-  return String(value);
-};
-
-/** Clean up Python type representations for display */
-const formatType = (typeStr) => {
-  // Strip <class '...'> wrapper
-  const classMatch = typeStr.match(/^<class '(.+)'>$/);
-  if (classMatch) {
-    const inner = classMatch[1];
-    // Strip module paths (e.g. pathlib.Path -> Path)
-    return inner.split('.').pop();
-  }
-  // Strip typing. prefix
-  let cleaned = typeStr.replace(/typing\./g, '');
-  // Strip module paths inside brackets
-  cleaned = cleaned.replace(/[a-z_][a-z0-9_.]*\.([A-Z][A-Za-z]*)/g, '$1');
-  return cleaned;
-};
 
 /** Format category name: "MODEL INSTALL" -> "Model Install" */
 const formatCategoryName = (category) => {
@@ -55,7 +30,7 @@ const formatCategoryName = (category) => {
     </summary>
     <dl class="settings-ref-list">
       {settings.map((setting) => (
-        <div class="settings-ref-entry">
+        <div class="settings-ref-entry" id={settingAnchorId(setting.name)}>
           <!-- Setting name -->
           <dt class="settings-ref-name-row">
             <code class="settings-ref-name">{setting.name}</code>
@@ -63,11 +38,11 @@ const formatCategoryName = (category) => {
           <!-- Granular details -->
           <dd class="settings-ref-col settings-ref-type-col">
             <span class="settings-ref-label">Type</span>
-            <code>{formatType(setting.type)}</code>
+            <code>{formatSettingType(setting.type)}</code>
           </dd>
           <dd class="settings-ref-col settings-ref-default-col">
             <span class="settings-ref-label">Default</span>
-            <code>{formatValue(setting.default)}</code>
+            <code>{formatSettingValue(setting.default)}</code>
           </dd>
           <dd class="settings-ref-col settings-ref-env-col">
             <span class="settings-ref-label">Env</span>
@@ -78,13 +53,13 @@ const formatCategoryName = (category) => {
             {setting.description}
             {setting.literal_values.length > 0 && (
               <span class="settings-ref-values">
-                Values: {setting.literal_values.map((v) => <code>{formatValue(v)}</code>).reduce((prev, curr) => [prev, ' ', curr])}
+                Values: {setting.literal_values.map((v) => <code>{formatSettingValue(v)}</code>).reduce((prev, curr) => [prev, ' ', curr])}
               </span>
             )}
             {Object.keys(setting.validation).length > 0 && (
               <span class="settings-ref-constraints">
                 {Object.entries(setting.validation).map(([key, value]) => (
-                  <code>{key}={formatValue(value)}</code>
+                  <code>{key}={formatSettingValue(value)}</code>
                 )).reduce((prev, curr) => [prev, ' ', curr])}
               </span>
             )}
@@ -95,13 +70,28 @@ const formatCategoryName = (category) => {
   </details>
 ))}
 
+<script>
+  // Search links to a setting by its id. Browsers that don't open a closed <details> for a fragment target would
+  // otherwise scroll to nothing.
+  const revealTarget = () => {
+    const id = decodeURIComponent(location.hash.slice(1));
+    const target = id ? document.getElementById(id) : null;
+    const details = target?.closest('details.settings-accordion');
+    if (!target || !(details instanceof HTMLDetailsElement) || details.open) return;
+    details.open = true;
+    target.scrollIntoView();
+  };
+  revealTarget();
+  window.addEventListener('hashchange', revealTarget);
+</script>
+
 <style>
   .settings-accordion {
     padding: 0;
     display: flex;
     flex-direction: column;
     border: 1px solid var(--sl-color-hairline);
-    border-radius: var(--radius, 0.35rem);
+    border-radius: var(--docs-radius-container);
     margin-bottom: 0.5rem;
     background: transparent;
   }
@@ -171,6 +161,10 @@ const formatCategoryName = (category) => {
 
   .settings-ref-entry:hover {
     background: var(--sl-color-bg-sidebar);
+  }
+
+  .settings-ref-entry:target {
+    background: var(--docs-accent-tint);
   }
 
   .settings-ref-name-row {

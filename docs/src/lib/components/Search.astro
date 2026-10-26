@@ -1,0 +1,932 @@
+---
+// Replaces Starlight's search with a command palette over the Pagefind index that Starlight builds: results scoped to
+// the current topic or all docs, grouped by topic, plus matching `invokeai.yaml` settings from a compact index
+// (`src/pages/settings-search.json.ts`). Pagefind and the settings index load on first use, not with the page.
+const label = Astro.locals.t('search.label');
+---
+
+<docs-search>
+  <button type="button" class="trigger" aria-label={label} aria-haspopup="dialog" aria-keyshortcuts="Control+K /">
+    <svg class="trigger__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"
+      ><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg
+    >
+    <span class="trigger__label" aria-hidden="true">{label}</span>
+    <kbd class="trigger__shortcut" aria-hidden="true" style="display: none;"><kbd>Ctrl</kbd><kbd>K</kbd></kbd>
+  </button>
+
+  <dialog class="modal" aria-label={label}>
+    <div class="field">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"
+        ><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg
+      >
+      <input
+        type="text"
+        role="combobox"
+        aria-label={label}
+        aria-autocomplete="list"
+        aria-controls="docs-search-results"
+        aria-expanded="false"
+        autocomplete="off"
+        autocapitalize="off"
+        spellcheck="false"
+        enterkeyhint="go"
+        placeholder="Search docs, settings, hotkeys, models…"
+      />
+      <kbd class="field__esc" aria-hidden="true">esc</kbd>
+      <button type="button" class="field__cancel">{Astro.locals.t('search.cancelLabel')}</button>
+    </div>
+
+    <div class="scopes" role="group" aria-label="Search scope">
+      <span class="scopes__label" aria-hidden="true">In</span>
+      <div class="docs-segment-tabs">
+        <button type="button" class="chip docs-segment-tab" data-scope="topic" aria-pressed="false" hidden></button>
+        <button type="button" class="chip docs-segment-tab" data-scope="all" aria-pressed="true">All docs</button>
+      </div>
+    </div>
+
+    <div class="body">
+      <div class="results" id="docs-search-results" role="listbox" aria-label="Search results"></div>
+      <p class="notice" hidden></p>
+      <button type="button" class="widen" hidden></button>
+    </div>
+
+    <div class="hints" aria-hidden="true">
+      <span><kbd>↑</kbd><kbd>↓</kbd> move</span>
+      <span><kbd>↵</kbd> open</span>
+      <span class="hints__credit">Search by Pagefind</span>
+    </div>
+    <p class="sr-only" role="status"></p>
+  </dialog>
+</docs-search>
+
+{
+  /* Inlined so the shortcut hint never shows the wrong modifier. `navigator.platform` stays truthful with devtools
+     open. */
+}
+<script is:inline>
+  (() => {
+    const trigger = document.querySelector('docs-search .trigger');
+    const shortcut = trigger?.querySelector('.trigger__shortcut');
+    if (!trigger || !(shortcut instanceof HTMLElement)) return;
+    if (/(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+      shortcut.firstElementChild.textContent = '⌘';
+      trigger.setAttribute('aria-keyshortcuts', 'Meta+K /');
+    }
+    shortcut.style.display = '';
+  })();
+</script>
+
+<script>
+  import {
+    RECENT_STORAGE_KEY,
+    addRecent,
+    groupByTopic,
+    matchSettings,
+    parseRecent,
+    resolveScope,
+    toPageRows,
+  } from './search.mjs';
+  import { settingAnchorId } from './settings-reference.mjs';
+
+  type RecentEntry = { title: string; section?: string; url: string };
+  type PageRow = { url: string; page: string; section?: string; excerpt: string; topic?: string };
+  type SettingEntry = { key: string; type: string; default: string; description: string; env?: string };
+  type SettingsIndex = { page: string; settings: SettingEntry[] };
+  type PagefindResponse = {
+    results: { data: () => Promise<Parameters<typeof toPageRows>[0]> }[];
+    unfilteredResultCount: number;
+  };
+  type Pagefind = {
+    options: (options: Record<string, unknown>) => Promise<void>;
+    preload: (term: string, options?: object) => Promise<void>;
+    search: (term: string, options?: object) => Promise<PagefindResponse | null>;
+  };
+  type Section = { label: string; rows: { element: HTMLAnchorElement; recent: RecentEntry }[] };
+
+  const BASE = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+  const DEBOUNCE_MS = 120;
+  const MAX_PAGES = 8;
+  const MAX_SECTIONS_PER_PAGE = 2;
+  const MAX_SETTINGS = 4;
+  const UNTITLED_TOPIC = 'Other pages';
+  const LOAD_ERROR = 'Search couldn’t load. Check your connection, then try again.';
+  const DEV_NOTICE = 'Search only works in a production build.\nRun pnpm build, then pnpm preview, to try it locally.';
+
+  const ICON_PAGE =
+    '<svg class="row__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M9 13h6M9 17h4"/></svg>';
+  const ICON_RECENT =
+    '<svg class="row__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 7v5l3 2M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></svg>';
+
+  let pagefindPromise: Promise<Pagefind> | undefined;
+  /** Pagefind's API, from the index Starlight builds under the site base. A failed load retries on the next search. */
+  const loadPagefind = () =>
+    (pagefindPromise ??= (async () => {
+      const pagefind: Pagefind = await import(/* @vite-ignore */ `${BASE}pagefind/pagefind.js`);
+      await pagefind.options({ baseUrl: BASE });
+      return pagefind;
+    })().catch((error) => {
+      pagefindPromise = undefined;
+      throw error;
+    }));
+
+  let settingsPromise: Promise<SettingsIndex | null> | undefined;
+  /** Settings results are extras: without the index, search still shows pages. */
+  const loadSettings = () =>
+    (settingsPromise ??= fetch(`${BASE}settings-search.json`)
+      .then((response) => (response.ok ? (response.json() as Promise<SettingsIndex>) : null))
+      .catch(() => null));
+
+  const readRecent = (): RecentEntry[] | undefined => {
+    try {
+      return parseRecent(localStorage.getItem(RECENT_STORAGE_KEY));
+    } catch {
+      return undefined;
+    }
+  };
+  const saveRecent = (entry: RecentEntry) => {
+    try {
+      localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(addRecent(readRecent() ?? [], entry)));
+    } catch {
+      // Storage is unavailable; recent searches are a convenience.
+    }
+  };
+
+  const make = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string) => {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    if (text !== undefined) element.textContent = text;
+    return element;
+  };
+
+  /** Setting descriptions are plain text with Markdown code spans. */
+  const appendWithCode = (parent: HTMLElement, text: string) => {
+    text.split('`').forEach((part, index) => {
+      if (part) parent.append(index % 2 === 1 ? make('code', undefined, part) : part);
+    });
+  };
+
+  const makeTitle = (title: string, section?: string) => {
+    const element = make('span', 'row__title', title);
+    if (section) element.append(' ', make('span', 'row__section', `› ${section}`));
+    return element;
+  };
+
+  const makeRow = (url: string, kind: string) => {
+    const row = make('a', `row row--${kind}`);
+    row.href = url;
+    row.tabIndex = -1;
+    row.setAttribute('role', 'option');
+    row.setAttribute('aria-selected', 'false');
+    return row;
+  };
+
+  const pageRow = (row: PageRow) => {
+    const element = makeRow(row.url, 'page');
+    element.insertAdjacentHTML('afterbegin', ICON_PAGE);
+    const text = make('span', 'row__text');
+    const excerpt = make('span', 'row__excerpt');
+    // Pagefind escapes the excerpt and marks the matches with <mark>.
+    excerpt.innerHTML = row.excerpt;
+    text.append(makeTitle(row.page, row.section), excerpt);
+    element.append(text);
+    return { element, recent: { title: row.page, section: row.section, url: row.url } };
+  };
+
+  const settingRow = (setting: SettingEntry, page: string) => {
+    const url = `${page}#${settingAnchorId(setting.key)}`;
+    const element = makeRow(url, 'setting');
+    const meta = make('span', 'row__meta');
+    meta.append(make('code', 'row__key', setting.key), make('span', 'pill', setting.type));
+    meta.append(make('span', 'pill', `default ${setting.default}`));
+    if (setting.env) meta.append(make('span', 'row__env', setting.env));
+    const description = make('span', 'row__excerpt');
+    appendWithCode(description, setting.description);
+    element.append(meta, description);
+    return { element, recent: { title: setting.key, section: 'invokeai.yaml', url } };
+  };
+
+  const recentRow = (entry: RecentEntry) => {
+    const element = makeRow(entry.url, 'recent');
+    element.insertAdjacentHTML('afterbegin', ICON_RECENT);
+    element.append(makeTitle(entry.title, entry.section));
+    return { element, recent: entry };
+  };
+
+  const isEditable = (target: EventTarget | null) =>
+    target instanceof HTMLElement && (target.isContentEditable || !!target.closest('input, textarea, select'));
+
+  /**
+   * The search modal. Focus stays in the query field, a combobox that points at the active result with
+   * `aria-activedescendant`. A new query or scope supersedes any search still in flight, so results never arrive out
+   * of order.
+   */
+  class DocsSearch extends HTMLElement {
+    connectedCallback() {
+      const trigger = this.querySelector<HTMLButtonElement>('.trigger')!;
+      const dialog = this.querySelector('dialog')!;
+      const input = dialog.querySelector('input')!;
+      const listbox = dialog.querySelector<HTMLElement>('[role="listbox"]')!;
+      const notice = dialog.querySelector<HTMLElement>('.notice')!;
+      const widen = dialog.querySelector<HTMLButtonElement>('.widen')!;
+      const status = dialog.querySelector<HTMLElement>('[role="status"]')!;
+      const chips = [...dialog.querySelectorAll<HTMLButtonElement>('.chip')];
+      const topicChip = chips.find((chip) => chip.dataset.scope === 'topic')!;
+
+      const topicMeta = document.querySelector<HTMLMetaElement>('meta[name="docs-topic"]');
+      const topic = topicMeta?.dataset.title ? { id: topicMeta.content, title: topicMeta.dataset.title } : undefined;
+      if (topic) topicChip.textContent = topic.title;
+      let state = resolveScope(topic);
+      /** The chips and every search read the scope from `state`. */
+      const applyScope = (next = state.scope) => {
+        state = resolveScope(topic, next);
+        for (const chip of chips) {
+          const chipState = state.chips.find((candidate) => candidate.scope === chip.dataset.scope)!;
+          chip.hidden = chipState.hidden;
+          chip.setAttribute('aria-pressed', String(chipState.pressed));
+        }
+      };
+      applyScope();
+
+      let options: { element: HTMLAnchorElement; recent: RecentEntry }[] = [];
+      let activeIndex = -1;
+      let searchId = 0;
+      let returnFocus: HTMLElement = trigger;
+      // Set when a control changes the scope, and announced with the results the change brings.
+      let scopeAnnouncement = '';
+
+      const setActive = (index: number, { scroll = true } = {}) => {
+        options[activeIndex]?.element.setAttribute('aria-selected', 'false');
+        activeIndex = index;
+        const option = options[index]?.element;
+        if (!option) {
+          input.removeAttribute('aria-activedescendant');
+          return;
+        }
+        option.setAttribute('aria-selected', 'true');
+        input.setAttribute('aria-activedescendant', option.id);
+        if (scroll) option.scrollIntoView({ block: 'nearest' });
+      };
+
+      const render = (
+        sections: Section[],
+        { message = '', widenLabel = '', announcement = '' }: Record<string, string> = {},
+      ) => {
+        options = sections.flatMap((section) => section.rows);
+        listbox.replaceChildren(
+          ...sections.map((section, sectionIndex) => {
+            const group = make('div', 'group');
+            group.setAttribute('role', 'group');
+            group.setAttribute('aria-label', section.label);
+            const heading = make('span', 'group__label', section.label);
+            heading.setAttribute('aria-hidden', 'true');
+            group.append(heading);
+            for (const [rowIndex, row] of section.rows.entries()) {
+              row.element.id = `docs-search-option-${sectionIndex}-${rowIndex}`;
+              group.append(row.element);
+            }
+            return group;
+          }),
+        );
+        listbox.hidden = options.length === 0;
+        listbox.removeAttribute('aria-busy');
+        input.setAttribute('aria-expanded', String(options.length > 0));
+        activeIndex = -1;
+        setActive(options.length > 0 ? 0 : -1);
+        notice.textContent = message;
+        notice.hidden = !message;
+        widen.textContent = widenLabel;
+        widen.hidden = !widenLabel;
+        status.textContent = [scopeAnnouncement, announcement].filter(Boolean).join(': ');
+        scopeAnnouncement = '';
+      };
+
+      const renderRecent = () => {
+        const recent = readRecent() ?? [];
+        render(recent.length > 0 ? [{ label: 'Recent', rows: recent.map(recentRow) }] : []);
+      };
+
+      const search = async ({ debounce }: { debounce: boolean }) => {
+        const id = ++searchId;
+        // Pagefind's index only exists after a build.
+        if (import.meta.env.DEV) return render([], { message: DEV_NOTICE });
+        const query = input.value.trim();
+        if (!query) return renderRecent();
+
+        listbox.setAttribute('aria-busy', 'true');
+        const { scoped, filters, showSettings } = state;
+        const searchOptions = filters ? { filters } : {};
+        try {
+          const pagefindReady = loadPagefind();
+          if (debounce) {
+            pagefindReady.then((pagefind) => pagefind.preload(query, searchOptions)).catch(() => {});
+            await new Promise((resolve) => setTimeout(resolve, DEBOUNCE_MS));
+            if (id !== searchId) return;
+          }
+          const [pagefind, settingsIndex] = await Promise.all([pagefindReady, loadSettings()]);
+          const response = id === searchId ? await pagefind.search(query, searchOptions) : null;
+          if (id !== searchId || !response) return;
+          const pages = await Promise.all(response.results.slice(0, MAX_PAGES).map((result) => result.data()));
+          if (id !== searchId) return;
+
+          const settings = settingsIndex ? matchSettings(settingsIndex.settings, query) : [];
+          const sections: Section[] = [];
+          if (showSettings && settings.length > 0) {
+            sections.push({
+              label: 'Settings · invokeai.yaml',
+              rows: settings.slice(0, MAX_SETTINGS).map((setting) => settingRow(setting, settingsIndex!.page)),
+            });
+          }
+          const rows = pages.flatMap((page) => toPageRows(page, MAX_SECTIONS_PER_PAGE));
+          for (const group of groupByTopic(rows, UNTITLED_TOPIC)) {
+            sections.push({ label: group.topic, rows: group.rows.map(pageRow) });
+          }
+
+          const found = response.results.length + (showSettings ? settings.length : 0);
+          const elsewhere = scoped
+            ? response.unfilteredResultCount - response.results.length + (showSettings ? 0 : settings.length)
+            : 0;
+          const plural = (count: number) => `${count} ${count === 1 ? 'result' : 'results'}`;
+          if (sections.length > 0) {
+            render(sections, {
+              widenLabel: elsewhere > 0 ? `${elsewhere} more ${elsewhere === 1 ? 'result' : 'results'} in All docs` : '',
+              announcement: plural(found),
+            });
+          } else {
+            const message = scoped
+              ? `No results for “${query}” in ${scoped.title}.`
+              : `No results for “${query}”. Try fewer or different words.`;
+            render([], {
+              message,
+              widenLabel: elsewhere > 0 ? `Show ${plural(elsewhere)} in All docs` : '',
+              announcement: message,
+            });
+          }
+        } catch (error) {
+          if (id !== searchId) return;
+          console.error('[docs-search]', error);
+          render([], { message: LOAD_ERROR, announcement: LOAD_ERROR });
+        }
+      };
+
+      const setScope = (next: typeof state.scope) => {
+        applyScope(next);
+        scopeAnnouncement = state.announcement;
+        search({ debounce: false });
+      };
+
+      const open = () => {
+        if (dialog.open) return;
+        const focused = document.activeElement;
+        returnFocus = focused instanceof HTMLElement && focused !== document.body ? focused : trigger;
+        dialog.showModal();
+        document.body.toggleAttribute('data-search-modal-open', true);
+        input.select();
+        search({ debounce: false });
+      };
+      const close = () => dialog.close();
+
+      trigger.addEventListener('click', open);
+      // Start loading on intent, so the first search does not wait for the index.
+      trigger.addEventListener('pointerenter', () => !import.meta.env.DEV && loadPagefind().catch(() => {}), {
+        once: true,
+      });
+      dialog.querySelector('.field__cancel')!.addEventListener('click', close);
+      dialog.addEventListener('close', () => {
+        searchId++;
+        document.body.toggleAttribute('data-search-modal-open', false);
+        returnFocus.focus({ preventScroll: true });
+      });
+      // Close on a click on the backdrop, which targets the dialog itself; the press must start there too, so a text
+      // selection dragged out of the field does not close it.
+      let pressedBackdrop = false;
+      dialog.addEventListener('pointerdown', (event) => (pressedBackdrop = event.target === dialog));
+      dialog.addEventListener('click', (event) => {
+        if (pressedBackdrop && event.target === dialog) close();
+      });
+
+      window.addEventListener('keydown', (event) => {
+        if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'k') {
+          event.preventDefault();
+          if (dialog.open) close();
+          else open();
+        } else if (
+          event.key === '/' &&
+          !event.metaKey &&
+          !event.ctrlKey &&
+          !event.altKey &&
+          !dialog.open &&
+          !isEditable(event.target)
+        ) {
+          event.preventDefault();
+          open();
+        }
+      });
+
+      input.addEventListener('input', () => search({ debounce: true }));
+      input.addEventListener('keydown', (event) => {
+        if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && options.length > 0) {
+          event.preventDefault();
+          const step = event.key === 'ArrowDown' ? 1 : -1;
+          setActive((activeIndex + step + options.length) % options.length);
+        } else if (event.key === 'Enter' && options[activeIndex] && !event.isComposing) {
+          event.preventDefault();
+          options[activeIndex].element.click();
+        }
+      });
+
+      // Keep Tab cycling through the dialog's controls instead of leaving for the browser's own.
+      dialog.addEventListener('keydown', (event) => {
+        if (event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey) return;
+        const focusable = [...dialog.querySelectorAll<HTMLElement>('input, button')].filter(
+          (element) => !element.hidden && element.getClientRects().length > 0,
+        );
+        const edge = event.shiftKey ? focusable[0] : focusable.at(-1);
+        if (document.activeElement !== edge) return;
+        event.preventDefault();
+        (event.shiftKey ? focusable.at(-1) : focusable[0])?.focus();
+      });
+
+      listbox.addEventListener('pointermove', (event) => {
+        const option = (event.target as Element).closest('[role="option"]');
+        const index = options.findIndex((candidate) => candidate.element === option);
+        if (index !== -1 && index !== activeIndex) setActive(index, { scroll: false });
+      });
+      listbox.addEventListener('click', (event) => {
+        const option = (event.target as Element).closest('[role="option"]');
+        const opened = options.find((candidate) => candidate.element === option);
+        if (!opened) return;
+        saveRecent(opened.recent);
+        // A link opened in a new tab or window leaves the modal open here.
+        if (!(event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0)) close();
+      });
+
+      for (const chip of chips) {
+        chip.addEventListener('click', (event) => {
+          setScope(chip.dataset.scope as typeof state.scope);
+          // A pointer returns to typing; a key press (no click count) keeps focus where the user tabbed to.
+          if (event.detail > 0) input.focus();
+        });
+      }
+      // The button hides once the scope widens, so focus moves to the field rather than being lost.
+      widen.addEventListener('click', () => {
+        setScope('all');
+        input.focus();
+      });
+    }
+  }
+  customElements.define('docs-search', DocsSearch);
+</script>
+
+<style>
+  docs-search {
+    display: contents;
+  }
+
+  /* Header trigger */
+
+  .trigger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: var(--docs-header-control-height);
+    height: var(--docs-header-control-height);
+    padding: 0;
+    border: 0;
+    border-radius: var(--docs-header-control-radius);
+    background: transparent;
+    color: var(--docs-text-subtle);
+    font: inherit;
+    cursor: pointer;
+    transition: var(--docs-control-transition);
+
+    /* An icon button on narrow screens, like the header's other ghost icon buttons. */
+    &:hover {
+      background: var(--docs-hover);
+      color: var(--docs-text-strong);
+    }
+  }
+
+  .trigger__icon {
+    flex: none;
+  }
+
+  .trigger__label,
+  .trigger__shortcut {
+    display: none;
+  }
+
+  /*
+   * Wide screens show a search field, styled as the app's search inputs (`InputShell`): a 1px border that emphasizes
+   * on hover, 8px start padding, 6px gaps, a 14px muted icon and 12px text. Its height and radius are the header
+   * controls' (`--docs-header-control-height`, 36px, the app's `control.xl`; `--docs-header-control-radius`, 7px).
+   */
+  @media (min-width: 50rem) {
+    .trigger {
+      justify-content: flex-start;
+      gap: 0.375rem;
+      width: 100%;
+      height: var(--docs-header-control-height);
+      padding-inline: 0.5rem 0.375rem;
+      border: 1px solid var(--invoke-neutral-600);
+      border-radius: var(--docs-header-control-radius);
+      background: transparent;
+      font-size: var(--docs-control-font-size);
+      transition: var(--docs-control-transition);
+
+      &:hover {
+        border-color: var(--docs-border-strong);
+        background: transparent;
+      }
+    }
+
+    .trigger__icon {
+      width: 0.875rem;
+      height: 0.875rem;
+      color: var(--invoke-neutral-400);
+    }
+
+    .trigger__label {
+      display: block;
+    }
+
+    .trigger__shortcut {
+      display: flex;
+      gap: 0.125rem;
+      margin-inline-start: auto;
+    }
+  }
+
+  kbd {
+    font: 500 0.6875rem var(--__sl-font-mono);
+  }
+
+  .trigger__shortcut,
+  .field__esc {
+    padding: 0.125rem 0.375rem;
+    border: 1px solid var(--docs-border);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    background: var(--docs-control);
+    color: var(--docs-text-muted);
+
+    kbd {
+      font: inherit;
+    }
+  }
+
+  /* Modal */
+
+  .modal {
+    flex-direction: column;
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    background: var(--docs-surface);
+    color: var(--docs-text-strong);
+    font-size: 0.8125rem;
+
+    &[open] {
+      display: flex;
+    }
+
+    &::backdrop {
+      background: var(--sl-color-backdrop-overlay);
+      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px);
+    }
+  }
+
+  :global([data-search-modal-open]) {
+    overflow: hidden;
+  }
+
+  .field {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 0.625rem;
+    height: 3.25rem;
+    padding-inline: 1rem;
+    border-bottom: 1px solid var(--docs-border);
+    color: var(--docs-text-subtle);
+
+    input {
+      flex: 1;
+      min-width: 0;
+      height: 100%;
+      border: 0;
+      outline: none;
+      background: transparent;
+      color: var(--docs-text-strong);
+      /* 16px keeps iOS from zooming into the field. */
+      font: 400 1rem var(--__sl-font);
+
+      &::placeholder {
+        color: var(--docs-text-subtle);
+      }
+    }
+  }
+
+  .field__esc {
+    display: none;
+  }
+
+  .field__cancel {
+    flex: none;
+    height: 2rem;
+    padding-inline: 0.5rem;
+    margin-inline-end: -0.5rem;
+    border: 0;
+    border-radius: var(--docs-radius);
+    background: transparent;
+    color: var(--docs-accent);
+    font: 500 0.8125rem var(--__sl-font);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--docs-hover);
+    }
+  }
+
+  .scopes {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--docs-border);
+  }
+
+  .scopes__label {
+    color: var(--docs-text-subtle);
+    font-size: var(--docs-control-font-size);
+  }
+
+  /* The chips are buttons: clear the browser's button look under the shared tab styles, which set no background. */
+  :global(:where(docs-search .chip)) {
+    background-color: transparent;
+    font-family: inherit;
+  }
+
+  /* The strip shows every child, so a page without a topic drops its chip and the divider after it here. */
+  .chip[hidden] {
+    display: none;
+  }
+  .chip[hidden] + .chip::before {
+    content: none;
+  }
+
+  .body {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.375rem;
+
+    &:has(.results[hidden]):has(.notice[hidden]):has(.widen[hidden]) {
+      display: none;
+    }
+  }
+
+  .results {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  .results :global(.group) {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .results :global(.group__label) {
+    padding: 0.625rem 0.625rem 0.25rem;
+    color: var(--docs-text-subtle);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .results :global(.row) {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.625rem;
+    border-radius: var(--docs-radius);
+    color: var(--docs-text-strong);
+    text-decoration: none;
+  }
+
+  .results :global(.row[aria-selected='true']) {
+    background: var(--docs-border);
+  }
+
+  .results :global(.row--setting) {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .results :global(.row--recent) {
+    align-items: center;
+    gap: 0.625rem;
+    padding-block: 0.5rem;
+  }
+
+  .results :global(.row__icon) {
+    flex: none;
+    color: var(--docs-text-subtle);
+  }
+
+  .results :global(.row--page .row__icon) {
+    margin-top: 0.125rem;
+  }
+
+  .results :global(.row__text) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1875rem;
+    min-width: 0;
+  }
+
+  .results :global(.row__title) {
+    min-width: 0;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  .results :global(.row--recent .row__title) {
+    font-weight: 400;
+  }
+
+  .results :global(.row__section) {
+    color: var(--docs-text-subtle);
+    font-weight: 400;
+  }
+
+  .results :global(.row__excerpt) {
+    display: -webkit-box;
+    overflow: hidden;
+    color: var(--docs-text-muted);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .results :global(.row__excerpt:empty) {
+    display: none;
+  }
+
+  .results :global(mark) {
+    background: transparent;
+    color: var(--docs-accent-text);
+    font-weight: 600;
+  }
+
+  .results :global(.row__excerpt code) {
+    padding: 0 0.25rem;
+    border-radius: 3px;
+    background: var(--docs-control);
+    font: 0.75rem var(--__sl-font-mono);
+  }
+
+  .results :global(.row__meta) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  .results :global(.row__key) {
+    min-width: 0;
+    color: var(--docs-accent);
+    font: 500 0.8125rem var(--__sl-font-mono);
+    overflow-wrap: anywhere;
+  }
+
+  .results :global(.pill) {
+    max-width: 100%;
+    overflow: hidden;
+    padding: 0.0625rem 0.375rem;
+    border-radius: 4px;
+    background: var(--docs-control);
+    color: var(--docs-text-muted);
+    font: 500 0.6875rem var(--__sl-font-mono);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .results :global(.row__env) {
+    color: var(--docs-text-subtle);
+    font: 0.6875rem var(--__sl-font-mono);
+  }
+
+  .notice {
+    margin: 0;
+    padding: 1.5rem 0.625rem 0.5rem;
+    color: var(--docs-text-muted);
+    text-align: center;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+
+  .widen {
+    align-self: flex-start;
+    flex: none;
+    height: 1.75rem;
+    margin: 0.5rem 0.625rem;
+    padding-inline: 0.625rem;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius);
+    background: var(--docs-control);
+    color: var(--docs-text-strong);
+    font: 500 0.75rem var(--__sl-font);
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--docs-border-strong);
+    }
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  .notice:not([hidden]) + .widen {
+    align-self: center;
+  }
+
+  .hints {
+    display: none;
+    flex: none;
+    flex-wrap: wrap;
+    gap: 0.875rem;
+    padding: 0.5rem 1rem;
+    border-top: 1px solid var(--docs-border);
+    color: var(--docs-text-subtle);
+    font-size: 0.6875rem;
+
+    kbd {
+      font-family: var(--__sl-font-mono);
+    }
+  }
+
+  .hints__credit {
+    margin-inline-start: auto;
+  }
+
+  @media (min-width: 50rem) {
+    .modal {
+      width: min(42.5rem, calc(100% - 2rem));
+      height: auto;
+      max-height: min(35rem, calc(100dvh - 8rem));
+      margin: 4rem auto auto;
+      border: 1px solid var(--docs-border);
+      border-radius: var(--docs-radius-lg);
+      box-shadow: var(--docs-shadow-popup);
+    }
+
+    .field__esc {
+      display: block;
+    }
+
+    .field__cancel {
+      display: none;
+    }
+
+    .hints {
+      display: flex;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) and (min-width: 50rem) {
+    .modal[open] {
+      transition:
+        opacity var(--docs-popup-duration) var(--docs-popup-easing),
+        translate var(--docs-popup-duration) var(--docs-popup-easing);
+
+      @starting-style {
+        opacity: 0;
+        translate: 0 var(--docs-popup-offset);
+      }
+    }
+  }
+</style>
