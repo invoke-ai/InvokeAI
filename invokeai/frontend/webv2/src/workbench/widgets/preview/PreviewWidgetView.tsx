@@ -31,7 +31,7 @@ import {
   toGalleryItemRef,
 } from '@features/gallery/contracts';
 import { galleryBoardsOptions, getGalleryListingBoardsQuery } from '@features/gallery/queries';
-import { useHostGalleryBoards } from '@features/gallery/react';
+import { useGalleryImageRecovery, useHostGalleryBoards } from '@features/gallery/react';
 import { createGenerateFormValuesSelector } from '@features/generation/react';
 import {
   consumeQueueItemSwapProgressImage,
@@ -720,12 +720,14 @@ const SelectedImagePreview = ({
   shouldAntialiasProgressImage,
   ...props
 }: SelectedMediaPreviewProps & { item: GalleryImageItem; shouldAntialiasProgressImage: boolean }) => {
+  // An image move refuses full image reads too; the image reloads by itself once the gallery sees the move end.
+  const { onError: handleSourceError, src: fullImageSrc } = useGalleryImageRecovery(item.fullUrl);
   const previewImage = useStreamingImageSource({
     fallbackImage: imageUrlToStreamingSource({
       alt: item.name,
       height: item.height,
       kind: 'fallback',
-      src: item.fullUrl,
+      src: fullImageSrc,
       width: item.width,
     }),
   });
@@ -757,6 +759,7 @@ const SelectedImagePreview = ({
       placeholderSrc={item.thumbnailUrl}
       shouldAntialiasHoldImage={shouldAntialiasProgressImage}
       source={source}
+      onSourceError={handleSourceError}
       onSourceLoaded={handleSourceLoaded}
     />
   );
@@ -829,6 +832,7 @@ const SelectedMediaPreview = ({
   item,
   loupeControlsRef,
   onCopyAvailabilityChange,
+  onSourceError,
   onSourceLoaded,
   placeholderSrc,
   shouldAntialiasHoldImage,
@@ -841,6 +845,7 @@ const SelectedMediaPreview = ({
   frameHeight: number;
   frameWidth: number;
   holdSource?: StreamingImageSource | null;
+  onSourceError?: () => void;
   onSourceLoaded?: (src: string) => void;
   placeholderSrc?: string;
   shouldAntialiasHoldImage?: boolean;
@@ -858,6 +863,7 @@ const SelectedMediaPreview = ({
         isItemCurrent={isItemCurrent}
         isLive={false}
         loupeControlsRef={loupeControlsRef}
+        onSourceError={onSourceError}
         onSourceLoaded={onSourceLoaded}
         onVideoCopyAvailabilityChange={onCopyAvailabilityChange}
         onZoomChange={setZoomReadout}

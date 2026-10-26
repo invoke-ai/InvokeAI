@@ -284,6 +284,7 @@ describe('gallery maintenance in Data & workspace settings', () => {
   afterEach(async () => {
     await act(() => root.unmount());
     await thumbnailRouteCommands.stopThumbnailRoute();
+    vi.restoreAllMocks();
     host.remove();
     queryClient.clear();
     accountLifecycle.invalidate();
@@ -524,6 +525,14 @@ describe('gallery maintenance in Data & workspace settings', () => {
     const owner = accountLifecycle.capture();
     const action = operations[2];
     await thumbnailRouteCommands.startThumbnailRoute(thumbnailItem.thumbnailUrl);
+    // The gallery's recovery probe asks about the failed thumbnail with fetch; answer it here as missing so it adds no
+    // request to the ones this test counts, and reloads nothing.
+    const browserFetch = globalThis.fetch;
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) =>
+      String(input).includes(thumbnailItem.thumbnailUrl)
+        ? Promise.resolve(new Response(null, { status: 404 }))
+        : browserFetch(input, init)
+    );
     mocks.apiFetchJson
       .mockResolvedValueOnce(preview(action.operation, action.fingerprint))
       .mockResolvedValueOnce(

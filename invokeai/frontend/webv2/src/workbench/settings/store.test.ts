@@ -1,6 +1,7 @@
 import type * as accountLifecycleModule from '@platform/state/accountLifecycle';
 
 import { LOG_NAMESPACES } from '@platform/logging/contracts';
+import { CONTROL_TYPES } from '@workbench/canvas-engine/api';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ProjectSettings } from './contracts';
@@ -554,5 +555,72 @@ describe('normalizeWorkbenchPreferences language', () => {
 
   it('heals unsupported languages to the default', () => {
     expect(store.normalizeWorkbenchPreferences({ language: 'missing' as never }).language).toBe('en');
+  });
+});
+
+describe('controlModelMemory preference', () => {
+  it('starts empty and keeps only well-formed picks', () => {
+    expect(store.normalizeWorkbenchPreferences({}).controlModelMemory).toEqual({});
+    expect(
+      store.normalizeWorkbenchPreferences({ controlModelMemory: ['sdxl:depth'] as never }).controlModelMemory
+    ).toEqual({});
+    expect(
+      store.normalizeWorkbenchPreferences({
+        controlModelMemory: {
+          ':depth': 'no-base',
+          'sdxl:depth': 'depth-model',
+          'sdxl:flux': 'unknown-type',
+          'sdxl:pose': '',
+          'sdxl:tile': 'x'.repeat(256),
+          'sd-1:edges': 7 as never,
+          sdxl: 'no-type',
+        },
+      }).controlModelMemory
+    ).toEqual({ 'sdxl:depth': 'depth-model' });
+  });
+
+  it('accepts every control type, so the spelled-out key pattern stays in step with the canvas contract', () => {
+    const memory = Object.fromEntries(CONTROL_TYPES.map((type) => [`sdxl:${type}`, `${type}-model`]));
+
+    expect(store.normalizeWorkbenchPreferences({ controlModelMemory: memory }).controlModelMemory).toEqual(memory);
+  });
+
+  it('keeps the newest 256 picks', () => {
+    const memory = Object.fromEntries(Array.from({ length: 300 }, (_, index) => [`base-${index}:depth`, `m${index}`]));
+    const kept = store.normalizeWorkbenchPreferences({ controlModelMemory: memory }).controlModelMemory;
+
+    expect(Object.keys(kept)).toHaveLength(256);
+    expect(kept['base-299:depth']).toBe('m299');
+    expect(kept['base-43:depth']).toBeUndefined();
+  });
+
+  it('keeps the same record across unrelated preference patches, so readers that compare it do not re-run', async () => {
+    await store.loadWorkbenchSettings();
+    await store.patchControlModelMemory('sdxl:depth', 'depth-a');
+    const memory = store.getWorkbenchPreferences().controlModelMemory;
+
+    await store.patchWorkbenchPreferences({ reduceMotion: true });
+
+    expect(store.getWorkbenchPreferences().controlModelMemory).toBe(memory);
+    expect(store.normalizeWorkbenchPreferences({ controlModelMemory: memory }).controlModelMemory).toBe(memory);
+  });
+
+  it('remembers, replaces and forgets a pick through the persisted preferences, and resets with the rest', async () => {
+    await store.loadWorkbenchSettings();
+
+    await store.patchControlModelMemory('sdxl:depth', 'depth-a');
+    await store.patchControlModelMemory('flux:pose', 'flux-union');
+    await store.patchControlModelMemory('sdxl:depth', 'depth-b');
+
+    expect(readBackendPreferences().controlModelMemory).toEqual({ 'flux:pose': 'flux-union', 'sdxl:depth': 'depth-b' });
+
+    await store.patchControlModelMemory('flux:pose', null);
+
+    expect(store.getWorkbenchPreferences().controlModelMemory).toEqual({ 'sdxl:depth': 'depth-b' });
+    expect(readBackendPreferences().controlModelMemory).toEqual({ 'sdxl:depth': 'depth-b' });
+
+    await store.clearWorkbenchSettings();
+
+    expect(store.getWorkbenchPreferences().controlModelMemory).toEqual({});
   });
 });

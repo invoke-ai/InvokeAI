@@ -44,10 +44,12 @@ would drop part of it on load and lose it on the next autosave. Schema 4 marks c
 typography (a text source with `fontRef`, `fontStyle` or `fontVariations`). Schema 5 marks a noise,
 clarity, texture or dehaze adjustment, enabled or not, on any layer or group at any depth; an older
 reader would drop the
-whole adjustment stack holding it. The live document and each saved canvas snapshot are versioned
+whole adjustment stack holding it. Schema 6 marks a control layer carrying any derivation field
+(`controlType`, `detection`, `original` or `originalTransform`), which an older reader would strip,
+losing the kept original. The live document and each saved canvas snapshot are versioned
 this way, and the canvas state takes the newest of them. Adoption is sticky: removing the feature
-does not lower the version, as the server floor cannot be lowered either. A canvas with neither
-stays at 3, so older builds keep opening it. A build refuses a canvas that declares a schema above
+does not lower the version, as the server floor cannot be lowered either. A canvas with none of
+these stays at 3, so older builds keep opening it. A build refuses a canvas that declares a schema above
 its maximum as an unsupported version before parsing it, and once the floor is raised the server
 refuses the project to a client declaring a lower maximum.
 

@@ -20,6 +20,7 @@ import {
   layerContract,
   stacksFrom,
 } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { IDLE_CONTROL_DETECTION_STATUS } from '@workbench/canvas-operations/api';
 import {
   createEngineRegistry,
   type EngineDeps,
@@ -179,6 +180,8 @@ const createFakeOperations = () => {
     subscribeOperation: subscribe,
     subscribeSamSession: subscribe,
     updateFilterOperation: vi.fn(),
+    getControlDetectionStatus: () => IDLE_CONTROL_DETECTION_STATUS,
+    subscribeControlDetectionStatus: () => () => undefined,
   };
 };
 
@@ -199,7 +202,7 @@ const settle = () =>
 
 const IDENTITY = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
 
-type Selection = 'none' | 'layer' | 'group' | 'mask' | 'shape' | 'stroked-shape' | 'gradient' | 'text';
+type Selection = 'none' | 'layer' | 'group' | 'mask' | 'control' | 'shape' | 'stroked-shape' | 'gradient' | 'text';
 
 const SHAPE_SOURCE = {
   fill: '#ff0000',
@@ -232,7 +235,7 @@ const GRADIENT_SOURCE = {
   width: 10,
 } satisfies Extract<CanvasLayerSourceContract, { type: 'gradient' }>;
 
-const mount = async (View: typeof PropertiesPane, selection: Selection = 'none') => {
+const mount = async (View: typeof PropertiesPane, selection: Selection = 'none', width = 450) => {
   const base = { ...createInitialWorkbenchState().projects[0]!, id: 'p' };
   const nodes =
     selection === 'none'
@@ -252,7 +255,9 @@ const mount = async (View: typeof PropertiesPane, selection: Selection = 'none')
               ? [layerContract('l0', 'raster', { name: 'My Text', source: TEXT_SOURCE })]
               : selection === 'mask'
                 ? [layerContract('m0', 'inpaint_mask', { name: 'Mask' })]
-                : [groupContract('g0', [layerContract('l0', 'raster', { name: 'Paint' })], { name: 'Folder' })];
+                : selection === 'control'
+                  ? [layerContract('l0', 'control', { name: 'Control Layer 1' })]
+                  : [groupContract('g0', [layerContract('l0', 'raster', { name: 'Paint' })], { name: 'Folder' })];
   harness.project = applyCanvasProjectMutation(base, {
     document: {
       ...createEmptyCanvasDocument(),
@@ -262,7 +267,7 @@ const mount = async (View: typeof PropertiesPane, selection: Selection = 'none')
     type: 'replaceCanvasDocument',
   });
   host = document.createElement('div');
-  host.style.cssText = 'width:450px;height:600px;';
+  host.style.cssText = `width:${width}px;height:600px;`;
   document.body.append(host);
   root = createRoot(host);
   registry = createEngineRegistry({ gracePeriodMs: 0 });
@@ -593,6 +598,23 @@ describe('Properties pane', () => {
     await act(() => operations!.start(false));
     await settle();
     expect(host!.querySelector('[inert]')).toBeNull();
+  });
+});
+
+describe('Control layer properties', () => {
+  it('fits a 320 px pane without horizontal overflow or clipped text', async () => {
+    await mount(PropertiesPane, 'control', 320);
+    await expect.element(page.getByRole('combobox', { exact: true, name: 'Type' })).toBeVisible();
+
+    const overflowing = [host!, ...host!.querySelectorAll<HTMLElement>('*')].filter(
+      (element) =>
+        element.scrollWidth > element.clientWidth + 1 &&
+        getComputedStyle(element).overflowX !== 'visible' &&
+        // Screen-reader-only labels are clipped on purpose.
+        getComputedStyle(element).position !== 'absolute'
+    );
+    expect(overflowing.map((element) => element.outerHTML.slice(0, 80))).toEqual([]);
+    expect(host!.scrollWidth).toBeLessThanOrEqual(320);
   });
 });
 

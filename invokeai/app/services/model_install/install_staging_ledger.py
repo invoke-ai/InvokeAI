@@ -52,6 +52,7 @@ from invokeai.app.services.model_install.model_install_common import (
 )
 from invokeai.app.services.model_records import ModelRecordChanges
 from invokeai.app.util.misc import get_iso_timestamp
+from invokeai.app.util.no_replace import publish_noreplace
 
 TMPDIR_PREFIX = "tmpinstall_"
 INSTALL_MARKER_FILENAME = ".invokeai_install.json"
@@ -125,8 +126,8 @@ def _publish_claim(root: Path) -> None:
             f.write(f"{payload}\n".encode("ascii"))
             f.flush()
             os.fsync(f.fileno())
-        # A hard link publishes the complete payload atomically and fails if another owner won.
-        os.link(temp_path, path)
+        # Publishes the complete payload atomically and fails if another owner won.
+        publish_noreplace(temp_path, path)
     except BaseException:
         try:
             temp_path.unlink(missing_ok=True)
@@ -134,7 +135,7 @@ def _publish_claim(root: Path) -> None:
             pass
         raise
     else:
-        # Once linked, cleanup cannot make publication fail for the owner.
+        # Once published, cleanup cannot make publication fail for the owner.
         try:
             temp_path.unlink(missing_ok=True)
         except OSError:
