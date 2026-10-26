@@ -1,0 +1,119 @@
+---
+// The download page's three launcher downloads as equal cards: its no-JS and unknown-platform hero, and the
+// Launcher tab of "Other ways to run it".
+import { Icon } from '@astrojs/starlight/components';
+import type { StarlightIcon } from '@astrojs/starlight/types';
+import Download from '@lucide/astro/icons/download';
+
+export type LauncherPlatform = {
+  id: string;
+  name: string;
+  /** Shown after the name, such as "Apple Silicon". */
+  qualifier?: string;
+  icon: StarlightIcon;
+  /** The file type on the button, such as "EXE". */
+  file: string;
+  note: string;
+  /** File size, version and date. */
+  meta: string;
+  href: string;
+};
+
+interface Props {
+  platforms: LauncherPlatform[];
+  /** The card titles' heading level in the page outline. */
+  level: 2 | 3 | 4;
+}
+
+const { platforms, level } = Astro.props;
+const Heading = `h${level}` as const;
+---
+
+<ul class="launcher-cards">
+  {
+    platforms.map((platform) => (
+      <li class="launcher-card">
+        <Icon name={platform.icon} size="1.5rem" class="launcher-card__icon" />
+        <Heading class="launcher-card__title">
+          {platform.name}
+          {platform.qualifier && <span class="launcher-card__qualifier">{platform.qualifier}</span>}
+        </Heading>
+        <p class="launcher-card__note">{platform.note}</p>
+        <p class="launcher-card__meta">{platform.meta}</p>
+        <a
+          class="docs-button docs-button--secondary launcher-card__button"
+          href={platform.href}
+          aria-label={`Download ${platform.file} for ${platform.name}`}
+        >
+          <Download aria-hidden="true" />
+          Download {platform.file}
+        </a>
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .launcher-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .launcher-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    margin: 0;
+    padding: 1rem;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+  }
+
+  .launcher-card :global(.launcher-card__icon) {
+    margin-bottom: 0.375rem;
+    color: var(--docs-text-muted);
+  }
+
+  .launcher-card__title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.375rem;
+    margin: 0;
+    color: var(--docs-text-strong);
+    font-size: var(--sl-text-base);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .launcher-card__qualifier {
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-xs);
+    font-weight: 500;
+  }
+
+  .launcher-card__note {
+    margin: 0;
+    color: var(--docs-text-muted);
+    font-size: var(--sl-text-sm);
+    line-height: 1.5;
+  }
+
+  .launcher-card__meta {
+    margin: 0 0 0.75rem;
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-xs);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The buttons line up at the bottom of a row of cards. */
+  .launcher-card__button {
+    align-self: stretch;
+    margin-top: auto;
+  }
+</style>
