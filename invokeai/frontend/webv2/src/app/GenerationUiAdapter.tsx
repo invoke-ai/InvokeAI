@@ -32,6 +32,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { createProjectedExternalStore } from '@platform/state/projectedExternalStore';
 import { shallowEqual } from '@platform/state/selectors';
 import { type QueryClient, QueryObserver, useQueryClient } from '@tanstack/react-query';
+import { resetGenerateDims } from '@workbench/canvasDimsSync';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import {
   getWorkbenchPreferences,
@@ -308,8 +309,11 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     [generation, promptHistoryItems]
   );
   const settingsGroup = useMemo<GenerationUiAdapter['settings']>(
-    () => ({ patchGenerateSettings: generation.patchSettings }),
-    [generation]
+    () => ({
+      patchGenerateSettings: generation.patchSettings,
+      resetDimensions: (values, projectId) => resetGenerateDims(store, values, projectId),
+    }),
+    [generation, store]
   );
   const { canManagePromptTemplates, canManageSharedSystemPrompts } = useCapabilities();
   const capabilitiesGroup = useMemo<GenerationUiAdapter['capabilities']>(

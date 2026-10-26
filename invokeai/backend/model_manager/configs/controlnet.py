@@ -22,6 +22,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     raise_if_not_file,
     state_dict_has_any_keys_starting_with,
 )
+from invokeai.backend.model_manager.configs.main import _bare_sd_unet_base, _has_ggml_tensors
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.qwen_image_controlnet_keys import is_qwen_image_instantx_controlnet
 from invokeai.backend.model_manager.taxonomy import (
@@ -173,8 +174,9 @@ class ControlNet_Checkpoint_Config_Base(Checkpoint_Config_Base):
 
     @classmethod
     def _validate_looks_like_controlnet(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
         if not state_dict_has_any_keys_starting_with(
-            mod.load_state_dict(),
+            state_dict,
             {
                 "controlnet",
                 "control_model",
@@ -188,6 +190,11 @@ class ControlNet_Checkpoint_Config_Base(Checkpoint_Config_Base):
             },
         ):
             raise NotAMatchError("state dict does not look like a ControlNet checkpoint")
+
+        # A bare SD UNet in GGUF has `input_blocks.*` keys too. The main-model configs refuse it with their reason;
+        # claimed here, it would install as a ControlNet that fails to load.
+        if _bare_sd_unet_base(state_dict) is not None and _has_ggml_tensors(state_dict):
+            raise NotAMatchError("state dict is a GGUF Stable Diffusion UNet, not a ControlNet")
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:

@@ -16,6 +16,8 @@ import {
   deriveAspectRatioId,
   getCompatibleReferenceImages,
   getDimensionGrid,
+  getExternalProviderOptionKeys,
+  getExternalResolutionPresets,
   getGenerateModelSelectionResult,
   getGenerationUiPolicy,
   isComponentCompatibleWithModel,
@@ -29,6 +31,12 @@ import {
   isMainModelConfig,
   isModelIdentifierConfig,
   isVaeCompatibleWithGenerateModel,
+  isGeminiThinkingLevel,
+  isOpenAIImageBackground,
+  isOpenAIImageQuality,
+  isOpenAIInputFidelity,
+  GEMINI_TEMPERATURE_MAX,
+  GEMINI_TEMPERATURE_MIN,
   isRefinerModel,
   isFluxDypePreset,
   isQwenImageEncoderQuantization,
@@ -91,6 +99,7 @@ type RecalledField =
   | 'loras'
   | 'referenceImages'
   | 'krea2Rebalance'
+  | 'externalProvider'
   | 'refiner'
   | 'krea2SeedVariance'
   | 'modelTuning'
@@ -571,6 +580,131 @@ const hasModelTuning = (metadata: unknown, model: GenerateModelConfig | undefine
 
 /** The canvas inpaint and outpaint graphs record the adapter key whenever the adapter ran. */
 const ANIMA_INPAINT_ADAPTER_MODES: readonly string[] = ['anima_inpaint', 'anima_outpaint'];
+
+/**
+ * Provider options and the named size, gated on what the effective model's provider accepts: the keys are recorded
+ * by the provider nodes (`openai_quality`, `gemini_temperature`, ...), so a value only applies to the same provider.
+ */
+const getMetadataExternalProvider = (
+  metadata: unknown,
+  model: GenerateModelConfig | undefined,
+  isCanvasFrame: boolean
+): Partial<GenerateWidgetValues> => {
+  // Local models advertise no provider options or presets, so every lookup below answers nothing for them.
+  const patch: Partial<GenerateWidgetValues> = {};
+  const imageSize = getString(metadata, 'image_size');
+
+  if (imageSize !== null) {
+    const width = getNumber(metadata, 'width');
+    const height = getNumber(metadata, 'height');
+    const ratio = getString(metadata, 'aspect_ratio');
+    const named = getExternalResolutionPresets(model).filter(
+      (preset) => preset.image_size === imageSize && (ratio === null || preset.aspect_ratio === ratio)
+    );
+    const exact = named.filter(
+      (preset) => (width === null || preset.width === width) && (height === null || preset.height === height)
+    );
+    // A Canvas output records its frame, not the provider size: the Canvas asked for the named size at the ratio
+    // nearest the frame, so Generate recall picks that one. A Canvas route keeps the recorded frame instead, and the
+    // Canvas derives the same named size from it.
+    const ratioDistance = (preset: { width: number; height: number }) =>
+      width !== null && height !== null && width > 0 && height > 0
+        ? Math.abs(Math.log(preset.width / preset.height / (width / height)))
+        : Number.NaN;
+    const nearest =
+      !isCanvasFrame && exact.length === 0 && named.length > 0 && !Number.isNaN(ratioDistance(named[0]!))
+        ? named.reduce((best, preset) => (ratioDistance(preset) < ratioDistance(best) ? preset : best))
+        : undefined;
+    const preset = exact.length === 1 ? exact[0] : nearest;
+
+    // A name alone can describe many aspect ratios. Restore only a size the record pins down, with its dimensions.
+    if (preset) {
+      patch.externalImageSize = preset.image_size;
+      patch.width = preset.width;
+      patch.height = preset.height;
+      patch.aspectRatioId = deriveAspectRatioId(preset.width, preset.height);
+      patch.aspectRatioValue = preset.width / preset.height;
+    }
+  }
+
+  // Provider outputs omit nullable fields when their default was used. The provider stamp distinguishes those
+  // omissions from partial or unrelated metadata, where the current choice should remain untouched.
+  const usesProviderDefaults = getString(metadata, 'external_provider') === model?.provider_id;
+  const isDefault = (key: string): boolean =>
+    isRecord(metadata) && (metadata[key] === null || (usesProviderDefaults && !(key in metadata)));
+
+  for (const key of getExternalProviderOptionKeys(model)) {
+    switch (key) {
+      case 'openaiQuality': {
+        const value = getString(metadata, 'openai_quality');
+
+        if (isOpenAIImageQuality(value)) {
+          patch.openaiQuality = value;
+        }
+        break;
+      }
+      case 'openaiBackground': {
+        const value = getString(metadata, 'openai_background');
+
+        if (isOpenAIImageBackground(value)) {
+          patch.openaiBackground = value;
+        }
+        break;
+      }
+      case 'openaiInputFidelity': {
+        const value = getString(metadata, 'openai_input_fidelity');
+
+        if (isOpenAIInputFidelity(value)) {
+          patch.openaiInputFidelity = value;
+        } else if (isDefault('openai_input_fidelity')) {
+          patch.openaiInputFidelity = null;
+        }
+        break;
+      }
+      case 'geminiTemperature': {
+        const value = getNumber(metadata, 'gemini_temperature');
+
+        if (value !== null && value >= GEMINI_TEMPERATURE_MIN && value <= GEMINI_TEMPERATURE_MAX) {
+          patch.geminiTemperature = value;
+        } else if (isDefault('gemini_temperature')) {
+          patch.geminiTemperature = null;
+        }
+        break;
+      }
+      case 'geminiThinkingLevel': {
+        const value = getString(metadata, 'gemini_thinking_level');
+
+        if (isGeminiThinkingLevel(value)) {
+          patch.geminiThinkingLevel = value;
+        } else if (isDefault('gemini_thinking_level')) {
+          patch.geminiThinkingLevel = null;
+        }
+        break;
+      }
+      case 'seedreamWatermark': {
+        const value = getBoolean(metadata, 'seedream_watermark');
+
+        if (value !== null) {
+          patch.seedreamWatermark = value;
+        }
+        break;
+      }
+      case 'seedreamOptimizePrompt': {
+        const value = getBoolean(metadata, 'seedream_optimize_prompt');
+
+        if (value !== null) {
+          patch.seedreamOptimizePrompt = value;
+        }
+        break;
+      }
+    }
+  }
+
+  return patch;
+};
+
+const hasExternalProvider = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
+  Object.keys(getMetadataExternalProvider(metadata, model, false)).length > 0;
 
 /**
  * The adapter switch and weight; only an Anima image can carry them. A recorded adapter means it ran, so the switch
@@ -1060,6 +1194,7 @@ export const getImageRecallCapabilities = ({
     recordedReferenceImages !== null &&
     (recordedReferenceImages.length > 0 || currentValues.referenceImages.length > 0);
   const hasModel = supportedMetadataModel !== null;
+  const hasProviderOptions = hasExternalProvider(metadata, clipSkipModel);
   const hasRebalance = hasKrea2Rebalance(metadata, clipSkipModel) || hasKrea2SeedVariance(metadata, clipSkipModel);
   const hasTuning = hasModelTuning(metadata, clipSkipModel);
   const hasRefiner =
@@ -1080,6 +1215,7 @@ export const getImageRecallCapabilities = ({
     hasReferenceImages ||
     hasConcepts ||
     hasRebalance ||
+    hasProviderOptions ||
     hasRefiner ||
     hasTuning ||
     hasAdapterSettings;
@@ -1095,6 +1231,7 @@ export const getImageRecallCapabilities = ({
     hasReferenceImages ||
     hasConcepts ||
     hasRebalance ||
+    hasProviderOptions ||
     hasRefiner ||
     hasTuning ||
     hasAdapterSettings;
@@ -1113,6 +1250,7 @@ export const getImageRecallCapabilities = ({
 export const buildImageRecallSettings = ({
   currentValues,
   image,
+  isCanvasFrame = false,
   kind,
   metadata,
   supportedModels,
@@ -1121,6 +1259,8 @@ export const buildImageRecallSettings = ({
 }: {
   currentValues: GenerateWidgetValues;
   image: GalleryImage;
+  /** The Generate size is the Canvas frame (a Canvas route), which recall sets as recorded. */
+  isCanvasFrame?: boolean;
   kind: ImageRecallKind;
   metadata: unknown;
   supportedModels: GenerateModelConfig[];
@@ -1134,6 +1274,8 @@ export const buildImageRecallSettings = ({
   const fields: RecalledField[] = [];
   const skipped: ImageRecallSkip[] = [];
   let values: GenerateWidgetValues = cloneGenerateWidgetValues(currentValues);
+  // A restored provider size is what the provider was asked for; the recorded size may be a Canvas frame instead.
+  let restoredProviderSize = false;
 
   if (kind === 'all' || kind === 'remix') {
     const model = getSupportedMetadataModel(metadata, supportedModels);
@@ -1165,6 +1307,14 @@ export const buildImageRecallSettings = ({
     if (Object.keys(rebalancePatch).length > 0) {
       values = { ...values, ...rebalancePatch };
       fields.push('krea2Rebalance');
+    }
+
+    const providerPatch = getMetadataExternalProvider(metadata, values.model, isCanvasFrame);
+
+    if (Object.keys(providerPatch).length > 0) {
+      values = { ...values, ...providerPatch };
+      fields.push('externalProvider');
+      restoredProviderSize = providerPatch.width !== undefined;
     }
 
     const seedVariancePatch = getMetadataKrea2SeedVariance(metadata, values.model);
@@ -1264,6 +1414,8 @@ export const buildImageRecallSettings = ({
       values = withDimensions(values, size);
       fields.push('size');
     }
+  } else if (restoredProviderSize) {
+    fields.push('size');
   } else if (kind === 'all' || kind === 'remix') {
     const size = getMetadataSize(metadata, values.model);
 

@@ -1,6 +1,7 @@
 import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 
 import { Badge, Box, Flex, HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { useAuthSession } from '@features/identity';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { MenuActionItem } from '@features/workflow/ui/MenuActionItem';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
@@ -31,7 +32,7 @@ import {
   isUpdatableSource,
   toProjectWorkflowLibraryEntries,
 } from './projectWorkflowEntries';
-import { formatRelativeTime } from './relativeTime';
+import { formatTimeSince, useDataTimeSnapshot } from './relativeTime';
 import {
   getWorkflowLibraryCardId,
   getWorkflowLibraryCardMenuContentId,
@@ -235,10 +236,12 @@ const ProjectWorkflowDetailPanel = ({
   onRename,
 }: ProjectWorkflowDetailPanelProps) => {
   const { t } = useTranslation();
+  const session = useAuthSession();
   const deps = useModelRequirementDeps();
   const templatesSnapshot = useInvocationTemplatesSnapshot();
   const openAddModels = useOpenAddModels();
   const [failedThumbnailUrl, setFailedThumbnailUrl] = useState<string | null>(null);
+  const dataTime = useDataTimeSnapshot(entry);
 
   const libraryEntry = useMemo(
     () =>
@@ -320,9 +323,9 @@ const ProjectWorkflowDetailPanel = ({
   const name = entryName;
   const thumbnailUrl = libraryEntry.item.thumbnail_url;
   const showThumbnail = Boolean(thumbnailUrl) && thumbnailUrl !== failedThumbnailUrl;
-  const lastRun = entry.lastRun ? formatRelativeTime(entry.lastRun.completedAt, new Date()) : '';
+  const lastRun = entry.lastRun ? formatTimeSince(entry.lastRun.completedAt, dataTime) : '';
   const source = entry.source;
-  const canUpdateSource = isUpdatableSource(source);
+  const canUpdateSource = isUpdatableSource(source, session);
 
   const actionItems = (
     <>

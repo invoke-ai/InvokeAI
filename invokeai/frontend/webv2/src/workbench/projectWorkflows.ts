@@ -113,9 +113,11 @@ const normalizeSource = (candidate: unknown): ProjectWorkflowSource | null | und
   }
 
   const revision = candidate.revision;
+  const ownerUserId = candidate.ownerUserId;
 
   return {
     libraryWorkflowId: candidate.libraryWorkflowId,
+    ...(typeof ownerUserId === 'string' && ownerUserId ? { ownerUserId } : {}),
     revision: Number.isSafeInteger(revision) && (revision as number) > 0 ? (revision as number) : null,
   };
 };
@@ -386,7 +388,11 @@ export const setProjectWorkflowSource = <Session extends ProjectWorkflowSession>
   source: ProjectWorkflowSource | undefined
 ): Session =>
   replaceEntry(project, workflowId, (entry) => {
-    if (entry.source?.libraryWorkflowId === source?.libraryWorkflowId && entry.source?.revision === source?.revision) {
+    if (
+      entry.source?.libraryWorkflowId === source?.libraryWorkflowId &&
+      entry.source?.ownerUserId === source?.ownerUserId &&
+      entry.source?.revision === source?.revision
+    ) {
       return entry;
     }
 

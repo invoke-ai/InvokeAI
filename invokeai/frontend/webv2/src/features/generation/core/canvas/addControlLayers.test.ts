@@ -198,6 +198,30 @@ describe('addControlLayers — controlnet on flux', () => {
   });
 });
 
+describe('addControlLayers — FLUX InstantX Union mode', () => {
+  it('sets instantx_control_mode on a FLUX controlnet layer that carries one, mode 0 included', () => {
+    const graph = run({
+      base: 'flux',
+      layers: [
+        layer({ id: 'depth', instantxControlMode: 2, model: model('flux') }),
+        layer({ id: 'canny', instantxControlMode: 0, model: model('flux') }),
+        layer({ id: 'dedicated', instantxControlMode: null, model: model('flux') }),
+      ],
+    });
+
+    expect(graph.nodes['control_net_depth']?.instantx_control_mode).toBe(2);
+    expect(graph.nodes['control_net_canny']?.instantx_control_mode).toBe(0);
+    expect(graph.nodes['control_net_dedicated']).not.toHaveProperty('instantx_control_mode');
+  });
+
+  it('never sets it outside FLUX, even when a layer carries one', () => {
+    const graph = run({ base: 'sdxl', layers: [layer({ instantxControlMode: 2, model: model('sdxl') })] });
+
+    expect(graph.nodes['control_net_layer1']?.type).toBe('controlnet');
+    expect(graph.nodes['control_net_layer1']).not.toHaveProperty('instantx_control_mode');
+  });
+});
+
 describe('addControlLayers — t2i_adapter on sdxl', () => {
   it('creates a t2i_adapter node with exact fields and wires collector to denoise.t2i_adapter', () => {
     const m = model('sdxl', 't2i_adapter');

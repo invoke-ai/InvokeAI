@@ -223,3 +223,49 @@ describe('damage-clipped compositing matches a full repaint', () => {
     expect(countDifferences(full, clipped)).toEqual({ differing: 0, worst: 0 });
   });
 });
+
+describe('overlay stacks switched off while a result is staged', () => {
+  it('draws the raster under a mask, a region and a regenerate region untinted, and tinted again after', () => {
+    const mask: CanvasLayerContract = {
+      blendMode: 'normal',
+      id: 'mask',
+      isEnabled: true,
+      isLocked: false,
+      mask: { bitmap: null, fill: { color: '#0000ff', style: 'solid' } },
+      name: 'mask',
+      opacity: 1,
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'inpaint_mask',
+    };
+    const region = rasterLayer('region', { inpaint: { fill: { color: '#00ff00', style: 'solid' }, isEnabled: true } });
+    const layers = [mask, region, rasterLayer('base')];
+    const rects = {
+      base: { height: 100, width: 300, x: 0, y: 0 },
+      mask: { height: 100, width: 100, x: 0, y: 0 },
+      region: { height: 100, width: 100, x: 200, y: 0 },
+    };
+    const { backend, caches } = scene(layers, rects, { base: '#ff0000', mask: '#ffffff', region: '#ff0000' });
+    const doc = { stacks: stacksFrom(layers) } as unknown as CanvasDocumentContractV3;
+    const screen = backend.createSurface(SCREEN_W, SCREEN_H);
+    const rgbAt = (x: number): number[] => Array.from(screen.ctx.getImageData(x, 50, 1, 1).data.slice(0, 3));
+    const draw = (staging: boolean) =>
+      compositeDocument(screen, doc, caches, identity(), {
+        backend,
+        imageSmoothing: false,
+        regionOverlays: !staging,
+        showOverlayStacks: staging ? { control: true, inpaint_mask: false, regional_guidance: false } : undefined,
+      });
+
+    draw(true);
+    expect([rgbAt(50), rgbAt(150), rgbAt(250)]).toEqual([
+      [255, 0, 0],
+      [255, 0, 0],
+      [255, 0, 0],
+    ]);
+
+    draw(false);
+    expect(rgbAt(50)).not.toEqual([255, 0, 0]);
+    expect(rgbAt(150)).toEqual([255, 0, 0]);
+    expect(rgbAt(250)).not.toEqual([255, 0, 0]);
+  });
+});
