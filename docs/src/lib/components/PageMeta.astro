@@ -1,0 +1,64 @@
+---
+import { Icon } from '@astrojs/starlight/components';
+import Pencil from '@lucide/astro/icons/pencil';
+
+import { getReportIssueUrl } from '../report-issue';
+
+const { editUrl, entry, lang, lastUpdated } = Astro.locals.starlightRoute;
+const reportIssueUrl = getReportIssueUrl(entry.data.title, new URL(Astro.url.pathname, Astro.site).href);
+---
+
+<div class="page-meta">
+  {
+    editUrl && (
+      <a href={editUrl} class="print:hidden">
+        <Pencil size={14} />
+        {Astro.locals.t('page.editLink')}
+      </a>
+    )
+  }
+  <a href={reportIssueUrl} class="print:hidden">
+    <Icon name="github" size="14px" />
+    Report an issue
+  </a>
+  {
+    lastUpdated && (
+      <p>
+        Updated{' '}
+        <time datetime={lastUpdated.toISOString()}>
+          {lastUpdated.toLocaleDateString(lang, { dateStyle: 'medium', timeZone: 'UTC' })}
+        </time>
+      </p>
+    )
+  }
+</div>
+
+<style>
+  .page-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    font-size: var(--sl-text-xs);
+  }
+
+  a {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--docs-text-muted);
+    text-decoration: none;
+
+    &:hover {
+      color: var(--docs-accent-text);
+    }
+
+    @media print {
+      display: none;
+    }
+  }
+
+  p {
+    margin: 0;
+    color: var(--docs-text-subtle);
+  }
+</style>

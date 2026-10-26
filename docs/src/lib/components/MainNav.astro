@@ -1,0 +1,101 @@
+---
+import BookOpenText from '@lucide/astro/icons/book-open-text';
+import Images from '@lucide/astro/icons/images';
+
+import { docsTopics, getCurrentTopic } from '../../config/topics';
+import { withBase } from '../base-path';
+
+type Props = {
+  /** `drawer` renders the copy shown in the mobile sidebar drawer, which stands in for the header's below `md`. */
+  placement: 'header' | 'drawer';
+};
+
+const { placement } = Astro.props;
+const { hasSidebar } = Astro.locals.starlightRoute;
+const base = import.meta.env.BASE_URL;
+const trimSlash = (path: string) => path.replace(/\/$/, '');
+const pathname = trimSlash(Astro.url.pathname);
+
+const docsLanding = docsTopics.find((topic) => topic.id === 'get-started');
+if (!docsLanding) throw new Error('The header links to the "get-started" docs topic, which no longer exists.');
+const docsHref = withBase(docsLanding.link, base);
+const showcaseHref = withBase('/showcase/', base);
+
+const items = [
+  {
+    label: 'Docs',
+    href: docsHref,
+    // The app's help menu links its documentation with this icon.
+    icon: BookOpenText,
+    // Every page in a docs topic belongs to the docs; only the landing page is the link's own page.
+    current: getCurrentTopic(Astro.locals) ? (pathname === trimSlash(docsHref) ? 'page' : 'true') : undefined,
+  },
+  {
+    label: 'Showcase',
+    href: showcaseHref,
+    icon: Images,
+    current: pathname === trimSlash(showcaseHref) ? 'page' : undefined,
+  },
+];
+
+const Wrapper = placement === 'header' ? 'nav' : 'div';
+const wrapperAttrs = placement === 'header' ? { 'aria-label': 'Site' } : {};
+---
+
+{/* The header copy is the site navigation landmark. The drawer copy sits inside Starlight's sidebar landmark, so it
+is a plain list, and only one of the two is displayed at any width. */}
+<Wrapper
+  {...wrapperAttrs}
+  class:list={[
+    'main-nav',
+    `main-nav--${placement}`,
+    // Pages with a sidebar move the links into its drawer on narrow screens.
+    { 'main-nav--in-drawer-when-narrow': placement === 'header' && hasSidebar },
+  ]}
+>
+  <ul class="docs-segment-tabs docs-segment-tabs--lg">
+    {
+      items.map(({ label, href, icon: Icon, current }) => (
+        <li>
+          <a class="docs-segment-tab" href={href} aria-current={current}>
+            <Icon size={14} />
+            {label}
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</Wrapper>
+
+<style>
+  .main-nav {
+    flex-shrink: 0;
+
+    @media print {
+      display: none;
+    }
+  }
+
+  .main-nav--drawer {
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--docs-border-subtle);
+  }
+
+  @media (max-width: 49.99rem) {
+    .main-nav--in-drawer-when-narrow {
+      display: none;
+    }
+
+    /* Splash pages have no drawer: their header keeps the links, tightened to fit beside the other controls. */
+    .main-nav--header .docs-segment-tabs .docs-segment-tab {
+      padding-inline: 0.5rem;
+    }
+  }
+
+  /* On the narrowest phones the header links drop their icons to fit. */
+  @media (max-width: 29.99rem) {
+    .main-nav--header :global(svg) {
+      display: none;
+    }
+  }
+</style>

@@ -1,0 +1,118 @@
+---
+import ThumbsDown from '@lucide/astro/icons/thumbs-down';
+import ThumbsUp from '@lucide/astro/icons/thumbs-up';
+
+import { getReportIssueUrl } from '../report-issue';
+
+type Props = {
+  /** Distinguishes the element ids of the copies in the right rail and the footer. */
+  instance: string;
+};
+
+const labelId = `docs-feedback-label-${Astro.props.instance}`;
+
+const { entry } = Astro.locals.starlightRoute;
+const reportIssueUrl = getReportIssueUrl(entry.data.title, new URL(Astro.url.pathname, Astro.site).href);
+---
+
+<docs-page-feedback class="feedback">
+  <div class="question" role="group" aria-labelledby={labelId}>
+    <p id={labelId}>Was this page helpful?</p>
+    <div class="answers">
+      <button type="button" class="docs-button docs-button--secondary" data-helpful="yes">
+        <ThumbsUp size={14} />
+        Yes
+      </button>
+      <button type="button" class="docs-button docs-button--secondary" data-helpful="no">
+        <ThumbsDown size={14} />
+        No
+      </button>
+    </div>
+  </div>
+  <div class="thanks" tabindex="-1" hidden>
+    <p>Thanks for your feedback.</p>
+    <p data-unhelpful hidden>
+      Tell us what was missing or wrong: <a href={reportIssueUrl}>Report an issue</a>
+    </p>
+  </div>
+</docs-page-feedback>
+
+<script>
+  type Plausible = (event: string, options: { props: Record<string, string> }) => void;
+
+  class DocsPageFeedback extends HTMLElement {
+    connectedCallback() {
+      const question = this.querySelector<HTMLElement>('.question')!;
+      const thanks = this.querySelector<HTMLElement>('.thanks')!;
+      for (const button of this.querySelectorAll<HTMLButtonElement>('button[data-helpful]')) {
+        button.addEventListener('click', () => {
+          const helpful = button.dataset.helpful!;
+          // Plausible loads only when the site is built with analytics enabled.
+          const { plausible } = window as Window & { plausible?: Plausible };
+          if (typeof plausible === 'function') {
+            plausible('Docs feedback', { props: { page: location.pathname, helpful } });
+          }
+          question.hidden = true;
+          thanks.hidden = false;
+          thanks.querySelector<HTMLElement>('[data-unhelpful]')!.hidden = helpful !== 'no';
+          // The answer buttons are gone, so move focus to the reply rather than letting it drop to the page.
+          thanks.focus();
+        });
+      }
+    }
+  }
+  customElements.define('docs-page-feedback', DocsPageFeedback);
+</script>
+
+<style>
+  .feedback {
+    display: block;
+    padding-top: 1rem;
+    border-top: 1px solid var(--docs-border);
+    font-size: var(--sl-text-xs);
+  }
+
+  p {
+    margin: 0;
+  }
+
+  .question {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    &[hidden] {
+      display: none;
+    }
+
+    > p {
+      color: var(--docs-text-muted);
+      font-size: var(--sl-text-2xs);
+      font-weight: 600;
+    }
+  }
+
+  .answers {
+    display: flex;
+    gap: 0.375rem;
+  }
+
+  button {
+    flex: 1;
+  }
+
+  .thanks {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    color: var(--docs-text-muted);
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  a {
+    color: var(--docs-accent);
+  }
+</style>

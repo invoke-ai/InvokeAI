@@ -1,0 +1,36 @@
+---
+import MobileTableOfContents from 'virtual:starlight/components/MobileTableOfContents';
+import TableOfContents from 'virtual:starlight/components/TableOfContents';
+
+import PageTools from './PageTools.astro';
+
+// Starlight's page sidebar with the page tools around its table of contents. Below the `lg` breakpoint the rail is
+// hidden, the table of contents collapses into the mobile control, and the footer shows the page tools instead.
+---
+
+{
+  Astro.locals.starlightRoute.toc && (
+    <>
+      <div class="lg:sl-hidden">
+        <MobileTableOfContents />
+      </div>
+      <div class="right-sidebar-panel sl-hidden lg:sl-block">
+        <div class="sl-container">
+          <PageTools instance="rail">
+            <TableOfContents />
+          </PageTools>
+        </div>
+      </div>
+    </>
+  )
+}
+
+<style>
+  .right-sidebar-panel {
+    padding: 2rem 1.25rem;
+  }
+
+  .sl-container {
+    width: calc(var(--docs-rail-width) - 2.5rem);
+  }
+</style>
