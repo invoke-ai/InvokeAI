@@ -322,7 +322,7 @@ describe('WorkflowFieldInput boolean', () => {
     const control = host.querySelector('[data-scope="switch"][data-part="control"]');
 
     if (!(control instanceof HTMLElement)) {
-      throw new Error('Switch control not rendered');
+      throw new TypeError('Switch control not rendered');
     }
 
     await act(async () => {
@@ -607,7 +607,7 @@ describe('WorkflowFieldInput saved workflows', () => {
     );
 
     if (!(sharedItem instanceof HTMLElement)) {
-      throw new Error('Shared workflow option not rendered');
+      throw new TypeError('Shared workflow option not rendered');
     }
 
     await act(async () => {

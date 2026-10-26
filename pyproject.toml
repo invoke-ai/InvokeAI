@@ -181,6 +181,9 @@ dependencies = [
 "cuda" = [
   "torch==2.13.0+cu130; (sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'win32' and platform_machine != 'ARM64')",
   "torchvision==0.28.0+cu130; (sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'win32' and platform_machine != 'ARM64')",
+  # The Linux torch wheel requires triton; the Windows wheel requires none. triton-windows is the Windows build
+  # (no win_arm64 wheel); its minor version must match the Triton that torch 2.13 is built against.
+  "triton-windows>=3.7,<3.8; sys_platform == 'win32' and platform_machine != 'ARM64'",
   # macOS / linux_aarch64 fallback, see note under "cpu"
   "torch==2.7.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
   "torchvision==0.22.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
@@ -652,6 +655,7 @@ markers = [
   "uses_database: Runs on the `empty_database` fixture, which targets INVOKEAI_TEST_DB_URL when it is set and SQLite otherwise. Applied by the collection hook in tests/conftest.py.",
   "sqlite_only: Depends on SQLite internals (query plans, PRAGMAs, the single connection); skipped when INVOKEAI_TEST_DB_URL targets another backend.",
   "platform_independent: The outcome cannot depend on the operating system for the same dependency set: import-graph boundaries in a fresh interpreter, static source scans, deterministic counts and shapes. Windows CI, which installs the linux dependency set, deselects them.",
+  "ffmpeg: Runs an ffmpeg binary or loads the libav libraries. The windows-cpu CI job, whose Server Core runner cannot load them, deselects them; windows-ffmpeg runs only these.",
 ]
 # A cache-key or other SQLAlchemy warning is a bug in the query layer, not noise.
 filterwarnings = ["error::sqlalchemy.exc.SAWarning"]

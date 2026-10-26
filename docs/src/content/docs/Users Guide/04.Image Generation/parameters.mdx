@@ -1,7 +1,7 @@
 ---
 title: Parameter Selection Guide
 description: How to choose steps, CFG or guidance, schedulers, seeds, size and denoising strength for the model you are using, with a historical study of sampler convergence.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-19
 sidebar:
   order: 5
 ---
@@ -54,7 +54,7 @@ The seed sets the starting noise, so the same model, prompt, seed and settings r
 
 ## Size
 
-Each model has an optimal image area, around one megapixel for most current models and less for SD 1.5. Results are best near that size; much larger images can repeat subjects or distort anatomy. Use **Set optimal size** in the Size section, and upscale afterwards for larger images.
+Each model has an optimal image area, around one megapixel for most current models and less for SD 1.5. Results are best near that size; much larger images can repeat subjects or distort anatomy. Use **Reset size → Optimal size for** *ratio* (for example **Optimal size for 3:2**) in the Size section, and upscale afterwards for larger images. At 1:1 that item is absent; use **Square at native size**, the model's optimal square.
 
 ## Denoising strength
 

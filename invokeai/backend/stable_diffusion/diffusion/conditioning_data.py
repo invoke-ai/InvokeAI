@@ -149,6 +149,13 @@ class Krea2ConditioningInfo:
     prompt_embeds_mask: torch.Tensor | None = None
     """Attention mask for prompt_embeds. Shape: (batch_size, seq_len). 1/True for valid, 0/False for padding."""
 
+    num_reference_images: int = 0
+    """How many reference images the prompt was encoded with (edit mode), as ``Picture 1..N`` in that order.
+
+    0 for a text-only prompt. A denoise that receives reference latents needs as many, in the same order: the
+    encoder and the transformer must see the same references, or the LoRA reads one image and edits another.
+    """
+
     def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
         self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
         if self.prompt_embeds_mask is not None:

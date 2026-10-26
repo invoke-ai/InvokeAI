@@ -83,22 +83,25 @@ def test_control_kinds_match_the_frontend_policy(kind: ControlKind, expected: se
     assert declared == expected
 
 
-def test_reference_images_and_the_one_variant_condition() -> None:
-    """Qwen-Image is the only base whose answer depends on the variant, so it is the only one with
-    `reference_images_require_variant` set."""
+def test_reference_images_and_their_variant_conditions() -> None:
+    """Qwen-Image and Anima are the bases whose answer depends on the variant: Qwen-Image takes
+    reference images only as `edit`, Anima only on the Qwen3-conditioned releases the IP-Adapter was
+    trained on (not Anima-3.8B's Qwen3.5 variant)."""
     supported = {
         b.value for b in generative_bases() if (f := get(b, FeaturesFacet)) is not None and f.supports_reference_images
     }
-    assert supported == {"flux", "flux2", "flux3", "sd-1", "sdxl", "qwen-image", "krea-2"}
+    assert supported == {"flux", "flux2", "flux3", "sd-1", "sdxl", "qwen-image", "krea-2", "anima"}
 
     conditional = {
-        b.value
+        b.value: f.reference_images_require_variant
         for b in generative_bases()
         if (f := get(b, FeaturesFacet)) is not None and f.reference_images_require_variant is not None
     }
-    assert conditional == {"qwen-image"}
-    qwen = get(BaseModelType.QwenImage, FeaturesFacet)
-    assert qwen is not None and qwen.reference_images_require_variant == "edit"
+    assert conditional == {"qwen-image": "edit", "anima": "anima_qwen3"}
+
+    # Up to four images, attended together by `anima_denoise` (experimental: the adapter was trained on one).
+    anima = get(BaseModelType.Anima, FeaturesFacet)
+    assert anima is not None and anima.max_reference_images == 4
 
 
 def test_regional_guidance_and_its_negative_subset() -> None:

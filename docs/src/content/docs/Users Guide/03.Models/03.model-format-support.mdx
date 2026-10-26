@@ -1,7 +1,7 @@
 ---
 title: Model Format Support
 description: Which file formats and quantizations InvokeAI loads for every model family, text encoder, VAE and adapter.
-lastUpdated: 2026-10-18
+lastUpdated: 2026-10-21
 sidebar:
   order: 3
 ---
@@ -27,7 +27,7 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
 
 | Family | Diffusers | Single file (bf16) | fp8 scaled | int8 | nvfp4 | MXFP8 | GGUF | SDNQ | NF4 |
 |---|---|---|---|---|---|---|---|---|---|
-| [SD 1.x / 2.x](/users-guide/models/local-models/stable-diffusion-1-2/), [SDXL](/users-guide/models/local-models/sdxl/) | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| [SD 1.x / 2.x](/users-guide/models/local-models/stable-diffusion-1-2/), [SDXL](/users-guide/models/local-models/sdxl/) | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | R | ✗ | ✗ |
 | [SD 3](/users-guide/models/local-models/sd-3/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | [FLUX.1](/users-guide/models/local-models/flux-1/) | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ |
 | [FLUX.2](/users-guide/models/local-models/flux-2/) | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | inside the Diffusers folder (FLUX.2 [dev]) |
@@ -44,7 +44,8 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
 | [LTX-2](/users-guide/video-generation/ltx-2/) (2.5 only) | official layout ✓, Diffusers layout ✗ | ✓ | L | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
 | [MiniMax H3](/users-guide/video-generation/minimax-h3/) | ✓ | ✓ | L | ✓ | L | ✗ | ✗ | ✗ | ✗ |
 
-- **int8** means ComfyUI's `int8_convrot` (`int8_tensorwise`) builds. **nvfp4** and **fp8 scaled** mean ComfyUI's
+- **int8** means ComfyUI's `int8_convrot` (`int8_tensorwise`) builds; on NVIDIA GPUs, [int8 Compute](/configuration/optimization/int8-compute/)
+  runs them on the int8 tensor cores. **nvfp4** and **fp8 scaled** mean ComfyUI's
   checkpoint layouts; other exports of the same schemes (AWQ, ModelOpt) fail when the model loads. For Qwen-Image-2.1,
   torchao exports such as unsloth's FP8 build are refused at install.
 - **GGUF** covers the llama.cpp types (Q4_0 through Q8_0, the K-quants, BF16). ComfyUI-GGUF's `Q8_CR` files load

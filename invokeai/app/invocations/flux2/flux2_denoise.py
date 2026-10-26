@@ -36,7 +36,6 @@ from invokeai.backend.flux2.extensions.regional_prompting_extension import Flux2
 from invokeai.backend.flux2.latent_norm import bn_denormalize, bn_normalize, read_vae_bn_stats
 from invokeai.backend.flux2.ref_image_extension import Flux2RefImageExtension
 from invokeai.backend.flux2.sampling_utils import (
-    FLUX2_TXT2IMG_SCHEDULER_KWARGS,
     compute_empirical_mu,
     generate_img_ids_flux2,
     get_noise_flux2,
@@ -325,36 +324,24 @@ class Flux2DenoiseInvocation(BaseInvocation):
         assert transformer_config.base == BaseModelType.Flux2 and transformer_config.type == ModelType.Main
         control_branch_info = self._load_control_branch(context, getattr(transformer_config, "variant", None), bn_stats)
 
-        # Calculate the timestep schedule using FLUX.2 specific schedule
-        # This matches diffusers' Flux2Pipeline implementation
-        # Note: Schedule shifting is handled by the scheduler via mu parameter
+        # The FLUX.2 schedule: diffusers' Flux2KleinPipeline linear sigmas with the exponential shift
+        # from mu, which its scheduler applies internally.
         image_seq_len = packed_h * packed_w
-        timesteps = get_schedule_flux2(
-            num_steps=self.num_steps,
-            image_seq_len=image_seq_len,
-        )
-        # Compute mu for dynamic schedule shifting (used by FlowMatchEulerDiscreteScheduler)
         mu = compute_empirical_mu(image_seq_len=image_seq_len, num_steps=self.num_steps)
+        timesteps = time_shift_flux2(get_schedule_flux2(num_steps=self.num_steps, image_seq_len=image_seq_len), mu)
 
-        # img2img and inpainting step this schedule manually (see the scheduler setup below), while
-        # txt2img hands it to the scheduler, which applies the exponential shift from mu itself. Apply
-        # the same shift here so both paths follow one schedule, and apply it before clipping so the
-        # clip selects from the schedule the model is actually run on. The clip works by sigma value,
-        # not by step count, so shifting first does not change what a given denoising_start means --
-        # it only changes how many steps fall below that sigma.
-        #
-        # Keyed on the same condition that decides whether a scheduler gets built below. Manual Euler
-        # also runs when the requested scheduler is unavailable (e.g. "lcm" when FlowMatchLCMScheduler
-        # cannot be imported); keying on denoise_mask/denoising_start alone would leave that run on the
-        # unshifted linear schedule -- the one this fix exists to avoid.
+        # Every path runs this shifted schedule, and it is shifted before clipping so the clip selects
+        # from the schedule the model is actually run on. That keeps denoising_start and denoising_end
+        # on one scale: a pass that ends at denoising_end = x stops at the sigma a later pass with
+        # denoising_start = x begins at. The clip works by sigma value, not by step count, so shifting
+        # first only changes how many steps fall below a given sigma.
+        timesteps = clip_timestep_schedule_fractional(timesteps, self.denoising_start, self.denoising_end)
+
+        # Manual Euler steps img2img and inpainting, and also runs when the requested scheduler is
+        # unavailable (e.g. "lcm" when FlowMatchLCMScheduler cannot be imported).
         uses_manual_euler = (
             self.denoise_mask is not None or self.denoising_start > 1e-5 or self.scheduler not in FLUX_SCHEDULER_MAP
         )
-        if uses_manual_euler:
-            timesteps = time_shift_flux2(timesteps, mu)
-
-        # Clip the timesteps schedule based on denoising_start and denoising_end
-        timesteps = clip_timestep_schedule_fractional(timesteps, self.denoising_start, self.denoising_end)
 
         # Clipping keeps only the sigmas that fall inside the denoising window, so a narrow window
         # runs fewer steps than were requested. Under the shift that is severe: at 4 steps and
@@ -370,13 +357,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
             if self.add_noise:
                 assert noise is not None
                 # Noise the init latents using the first timestep from the clipped
-                # InvokeAI schedule.
-                #
-                # Known limitation: if a scheduler later uses a different first
-                # effective timestep/sigma than this precomputed schedule, the
-                # img2img preblend below may not match that scheduler exactly.
-                # This is an existing pipeline limitation and applies to both
-                # seed-generated noise and externally supplied noise.
+                # InvokeAI schedule, which manual Euler steps from.
                 t_0 = timesteps[0]
                 x = t_0 * noise + (1.0 - t_0) * init_latents
             else:
@@ -441,27 +422,12 @@ class Flux2DenoiseInvocation(BaseInvocation):
         num_steps = len(timesteps) - 1
         cfg_scale_list = [self.cfg_scale] * num_steps
 
-        # Create scheduler with FLUX.2 Klein configuration
-        # For inpainting/img2img, use manual Euler stepping to preserve the exact
-        # clipped timestep schedule used for the initial latent/noise preblend.
-        # For txt2img, use the scheduler with dynamic shifting for optimal results.
-        #
-        # This split is intentional. Reusing a scheduler for img2img here can
-        # change the first effective timestep/sigma and break parity with the
-        # preblend computed above.
+        # txt2img uses the selected Diffusers scheduler; img2img and inpainting keep manual Euler on the
+        # respaced schedule above. The schedule is already shifted, so the scheduler must not shift it
+        # again: no dynamic shifting, and the default static shift of 1.0.
         scheduler = None
         if not uses_manual_euler:
-            # Only use scheduler for txt2img - use manual Euler for inpainting to preserve exact timesteps
-            scheduler_class = FLUX_SCHEDULER_MAP[self.scheduler]
-            # FlowMatchHeunDiscreteScheduler only supports num_train_timesteps and shift parameters
-            # FlowMatchEulerDiscreteScheduler and FlowMatchLCMScheduler support dynamic shifting
-            if self.scheduler == "heun":
-                scheduler = scheduler_class(
-                    num_train_timesteps=1000,
-                    shift=3.0,
-                )
-            else:
-                scheduler = scheduler_class(**FLUX2_TXT2IMG_SCHEDULER_KWARGS)
+            scheduler = FLUX_SCHEDULER_MAP[self.scheduler](num_train_timesteps=1000)
 
         # Prepare reference image extension for FLUX.2 Klein built-in editing
         ref_image_extension = None
@@ -612,7 +578,6 @@ class Flux2DenoiseInvocation(BaseInvocation):
                     neg_txt=neg_txt,
                     neg_txt_ids=neg_txt_ids,
                     scheduler=scheduler,
-                    mu=mu,
                     inpaint_extension=inpaint_extension,
                     img_cond_seq=img_cond_seq,
                     img_cond_seq_ids=img_cond_seq_ids,

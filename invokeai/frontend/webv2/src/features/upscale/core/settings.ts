@@ -308,8 +308,8 @@ export interface UpscaleArchitecture {
   readonly indexClipping: UpscaleIndexClipping | null;
   /**
    * The schedulers that start where Creativity puts the pass; null where all of the base's do. The
-   * img2img blend noises the frame to the clipped schedule's first sigma, but Heun and LCM on the
-   * flow models build their own schedule from pure noise and denoise the frame as if it were noise.
+   * img2img blend noises the frame to the clipped schedule's first sigma, but LCM on FLUX.1, Z-Image
+   * and Anima builds its own schedule from pure noise and denoises the frame as if it were noise.
    * Anima's Heun clips its own schedule, which runs from 1 to nearly 0, so it starts below the blend
    * and leaves noise behind. `test_upscale_index_clipped_starts.py` checks the index-clipped lists.
    */
@@ -369,8 +369,8 @@ export const UPSCALE_ARCHITECTURES = {
     label: 'FLUX.1',
     negativePrompt: 'never',
     // `flux/denoise.py` hands Heun and LCM to the same diffusers schedulers as `z_image_denoise`, so
-    // when the backend contract finds Z-Image's Heun starting at the blend, this list is due as well.
-    schedulers: ['euler'],
+    // this list follows the one the backend contract checks for Z-Image.
+    schedulers: ['euler', 'heun'],
     takesModelGuidance: false,
     takesModelSteps: false,
     tileControlNet: null,
@@ -408,7 +408,7 @@ export const UPSCALE_ARCHITECTURES = {
     },
     label: 'Z-Image',
     negativePrompt: 'cfg-gated',
-    schedulers: ['euler'],
+    schedulers: ['euler', 'heun'],
     takesModelGuidance: true,
     takesModelSteps: false,
     tileControlNet: { matchesName: nameIncludes('tile'), required: false },

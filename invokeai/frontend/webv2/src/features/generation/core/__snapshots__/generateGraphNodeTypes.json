@@ -15,6 +15,7 @@
         "img_nsfw",
         "img_watermark",
         "integer",
+        "ip_adapter",
         "l2i",
         "main_model_loader",
         "noise",
@@ -54,6 +55,7 @@
         "img_nsfw",
         "img_watermark",
         "integer",
+        "ip_adapter",
         "l2i",
         "noise",
         "sdxl_compel_prompt",
@@ -97,6 +99,7 @@
         "collect",
         "core_metadata",
         "flux_denoise",
+        "flux_ip_adapter",
         "flux_model_loader",
         "flux_text_encoder",
         "flux_vae_decode",
@@ -127,6 +130,7 @@
         "flux2_klein_model_loader",
         "flux2_klein_text_encoder",
         "flux2_vae_decode",
+        "flux_kontext",
         "img_nsfw",
         "img_watermark",
         "integer",
@@ -143,11 +147,13 @@
         "klein-base-diffusers": []
       },
       "nodeTypes": [
+        "collect",
         "core_metadata",
         "flux2_vae_decode",
         "flux3_denoise",
         "flux3_model_loader",
         "flux3_text_encoder",
+        "flux_kontext",
         "img_nsfw",
         "img_watermark",
         "integer",
@@ -331,6 +337,7 @@
       },
       "nodeTypes": [
         "anima_denoise",
+        "anima_ip_adapter",
         "anima_l2i",
         "anima_model_loader",
         "anima_text_encoder",
@@ -346,6 +353,7 @@
   "fieldsByNodeType": {
     "anima_denoise": {
       "inputs": [
+        "ip_adapter",
         "negative_conditioning",
         "positive_conditioning",
         "seed",
@@ -384,6 +392,31 @@
       },
       "outputs": [
         "latents"
+      ]
+    },
+    "anima_ip_adapter": {
+      "inputs": [],
+      "literalInputs": {
+        "begin_step_percent": [
+          0
+        ],
+        "end_step_percent": [
+          1
+        ],
+        "image": [],
+        "ip_adapter_model": [],
+        "is_intermediate": [
+          true
+        ],
+        "strength": [
+          1
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "ip_adapter"
       ]
     },
     "anima_l2i": {
@@ -776,6 +809,7 @@
     },
     "denoise_latents": {
       "inputs": [
+        "ip_adapter",
         "latents",
         "negative_conditioning",
         "noise",
@@ -927,6 +961,7 @@
     "flux_denoise": {
       "inputs": [
         "controlnet_vae",
+        "ip_adapter",
         "positive_text_conditioning",
         "seed",
         "transformer"
@@ -971,6 +1006,52 @@
       },
       "outputs": [
         "latents"
+      ]
+    },
+    "flux_ip_adapter": {
+      "inputs": [],
+      "literalInputs": {
+        "begin_step_percent": [
+          0
+        ],
+        "clip_vision_model": [
+          "ViT-L"
+        ],
+        "end_step_percent": [
+          1
+        ],
+        "image": [],
+        "ip_adapter_model": [],
+        "is_intermediate": [
+          true
+        ],
+        "method": [
+          "full"
+        ],
+        "use_cache": [
+          true
+        ],
+        "weight": [
+          1
+        ]
+      },
+      "outputs": [
+        "ip_adapter"
+      ]
+    },
+    "flux_kontext": {
+      "inputs": [],
+      "literalInputs": {
+        "image": [],
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "kontext_cond"
       ]
     },
     "flux_model_loader": {
@@ -1035,6 +1116,7 @@
     },
     "flux2_denoise": {
       "inputs": [
+        "kontext_conditioning",
         "positive_text_conditioning",
         "seed",
         "transformer",
@@ -1175,6 +1257,7 @@
     },
     "flux3_denoise": {
       "inputs": [
+        "kontext_conditioning",
         "negative_conditioning",
         "positive_conditioning",
         "seed",
@@ -1394,6 +1477,37 @@
       },
       "outputs": [
         "value"
+      ]
+    },
+    "ip_adapter": {
+      "inputs": [],
+      "literalInputs": {
+        "begin_step_percent": [
+          0
+        ],
+        "clip_vision_model": [
+          "ViT-H"
+        ],
+        "end_step_percent": [
+          1
+        ],
+        "image": [],
+        "ip_adapter_model": [],
+        "is_intermediate": [
+          true
+        ],
+        "method": [
+          "full"
+        ],
+        "use_cache": [
+          true
+        ],
+        "weight": [
+          1
+        ]
+      },
+      "outputs": [
+        "ip_adapter"
       ]
     },
     "krea2_denoise": {

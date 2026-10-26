@@ -4,8 +4,8 @@ import type { GenerateLora, GenerateModelConfig, LoraModelConfig } from '@featur
 
 import { Box, Stack, Text } from '@chakra-ui/react';
 import { isLoraSupported } from '@features/generation/core/baseGenerationPolicies';
+import { addConcept, type ConceptUpdate, removeConcept, updateConcept } from '@features/generation/core/conceptList';
 import {
-  getDefaultLoraWeight,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   syncGenerateLorasWithModels,
@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next';
 import type { GenerateSettingsUpdate } from './generateDebounce';
 
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from './GenerationUiContext';
-import { ConceptList, ConceptRow, type ConceptUpdate } from './shared/ConceptRow';
+import { ConceptList, ConceptRow } from './shared/ConceptRow';
 
 interface GenerateConceptsContentProps {
   loraModels: LoraModelConfig[];
@@ -43,49 +43,33 @@ export const GenerateConceptsContent = ({
   const loras = useMemo(() => syncGenerateLorasWithModels(draftLoras, loraModels), [draftLoras, loraModels]);
   const selectedLoraKeys = useMemo(() => new Set(loras.map((lora) => lora.model.key)), [loras]);
 
-  const addLora = (model: ModelConfig | null) => {
-    if (!isLoraModelConfig(model)) {
-      return;
-    }
-
-    onCommit((settings) => {
-      const latestLoras = syncGenerateLorasWithModels(settings.loras, loraModels);
-
-      if (latestLoras.some((lora) => lora.model.key === model.key)) {
-        return settings;
-      }
-
-      return {
-        ...settings,
-        loras: [...latestLoras, { isEnabled: true, model, weight: getDefaultLoraWeight(model) }],
-      };
-    });
-  };
-
-  const updateLora = useCallback(
-    (modelKey: string, patch: ConceptUpdate) => {
+  /** Edits the latest settings' list as the rows show it; an edit that changes nothing leaves the settings untouched. */
+  const commitLoras = useCallback(
+    (edit: (loras: GenerateLora[]) => GenerateLora[]) => {
       onCommit((settings) => {
-        const latestLoras = syncGenerateLorasWithModels(settings.loras, loraModels);
-        const hasLora = latestLoras.some((lora) => lora.model.key === modelKey);
+        const latest = syncGenerateLorasWithModels(settings.loras, loraModels);
+        const next = edit(latest);
 
-        if (!hasLora) {
-          return settings;
-        }
-
-        return {
-          ...settings,
-          loras: latestLoras.map((lora) => (lora.model.key === modelKey ? { ...lora, ...patch } : lora)),
-        };
+        return next === latest ? settings : { ...settings, loras: next };
       });
     },
     [loraModels, onCommit]
   );
 
+  const addLora = (model: ModelConfig | null) => {
+    if (selectedModel && isLoraSupported(selectedModel) && isLoraModelConfig(model)) {
+      commitLoras((latest) => addConcept(latest, model, selectedModel));
+    }
+  };
+
+  const updateLora = useCallback(
+    (modelKey: string, update: ConceptUpdate) => commitLoras((latest) => updateConcept(latest, modelKey, update)),
+    [commitLoras]
+  );
+
   const removeLora = useCallback(
-    (modelKey: string) => {
-      onCommit((settings) => ({ ...settings, loras: settings.loras.filter((lora) => lora.model.key !== modelKey) }));
-    },
-    [onCommit]
+    (modelKey: string) => commitLoras((latest) => removeConcept(latest, modelKey)),
+    [commitLoras]
   );
 
   const rows =
