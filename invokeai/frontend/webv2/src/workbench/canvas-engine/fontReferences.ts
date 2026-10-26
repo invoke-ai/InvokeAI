@@ -230,7 +230,9 @@ export const replaceCanvasFontReferences = (
       changed = true;
     }
   }
-  const nextDocument = changed ? { ...document, stacks, version: 4 as const } : document;
+  // Custom-font typography needs schema 4; never lower a document already on a newer one.
+  const version = Math.max(document.version, 4) as CanvasDocumentContractV3['version'];
+  const nextDocument = changed ? { ...document, stacks, version } : document;
   return {
     clampedAxisTags: [...clampedAxisTags].sort(),
     document: nextDocument,

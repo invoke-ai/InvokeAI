@@ -4,6 +4,7 @@ import type { Project } from '@workbench/projectContracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { createInstance } from 'i18next';
@@ -84,12 +85,14 @@ const renderView = (): string =>
   renderToStaticMarkup(
     <ChakraProvider value={system}>
       <I18nextProvider i18n={testI18n}>
-        <CanvasWidgetView
-          {...({
-            instance: harness.project!.widgetInstances.canvas,
-            runtime: { commands: {}, hotkeys: {} },
-          } as unknown as WidgetViewProps)}
-        />
+        <QueryClientProvider client={new QueryClient()}>
+          <CanvasWidgetView
+            {...({
+              instance: harness.project!.widgetInstances.canvas,
+              runtime: { commands: {}, hotkeys: {} },
+            } as unknown as WidgetViewProps)}
+          />
+        </QueryClientProvider>
       </I18nextProvider>
     </ChakraProvider>
   );

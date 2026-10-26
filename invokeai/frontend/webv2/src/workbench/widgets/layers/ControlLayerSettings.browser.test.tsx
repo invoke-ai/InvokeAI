@@ -4,83 +4,129 @@ import type {
   CanvasLayerContract,
   CanvasLayerPreviewMutation,
 } from '@workbench/canvas-engine/api';
+import type { ControlLayerIntent, ControlLayerIntentResult } from '@workbench/canvas-operations/api';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
 import { ensureArchitectureCapabilitiesLoaded } from '@features/generation/data/architectureCapabilitiesStore';
+import { auditAccessibility } from '@platform/browser/auditAccessibility.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { toaster } from '@platform/ui/toaster';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { applyThemeToRoot } from '@theme/applyTheme';
-import { system } from '@theme/system';
-import { createDocumentModel } from '@workbench/canvas-engine/api';
+import { DEFAULT_THEME_ID, system } from '@theme/system';
+import { createControlLayer, createDocumentModel } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { previewInverse } from '@workbench/canvas-engine/document-model/documentModel';
+import { createControlDetectionStatusStore } from '@workbench/canvas-operations/controlDetectionStatusStore';
 import { attachCanvasOperations } from '@workbench/canvas-operations/operationAccess';
 import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
+import { normalizeControlAdapter } from '@workbench/controlAdapters';
+import { resetPropertyGroupCollapse } from '@workbench/widgets/canvas/tool-presentation/propertyGroupStore';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { I18nextProvider, initReactI18next } from 'react-i18next';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { I18nextProvider } from 'react-i18next';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
 import { ControlLayerSettings } from './ControlLayerSettings';
-import { createControlLayer, createEmptyPaintLayer } from './layerOps';
 
-// Stable identities, as the real stores hand out, so only the table's arrival can re-read the policy.
-const catalog = vi.hoisted(() => ({
-  mainModel: { base: 'sd-1', key: 'sd1-main', name: 'SD 1.5', type: 'main' } as Record<string, unknown>,
-  models: [{ base: 'sd-1', key: 'sd1-controlnet', name: 'SD 1.5 ControlNet', type: 'controlnet' }] as Record<
-    string,
-    unknown
-  >[],
+const harness = vi.hoisted(() => ({
+  canManageModels: true,
+  mainModel: { base: 'sdxl', key: 'sdxl-main', name: 'SDXL', type: 'main' } as Record<string, unknown> | null,
+  memory: [] as [string, string | null][],
+  remembered: {} as Record<string, string>,
+  startersRequested: 0,
+  models: [] as Record<string, unknown>[],
+  navigate: [] as unknown[],
 }));
-// Tests that swap the catalog restore these identities afterwards.
-const SD1_CATALOG = { ...catalog };
 
 vi.mock('@features/models', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useModelsSelector: (selector: (snapshot: { models: typeof catalog.models }) => unknown) =>
-    selector({ models: catalog.models }),
+  // The real one fetches the starter catalog.
+  ensureStartersLoaded: () => {
+    harness.startersRequested += 1;
+  },
+  useModelsSelector: (selector: (snapshot: { models: typeof harness.models }) => unknown) =>
+    selector({ models: harness.models }),
 }));
-vi.mock('./useSelectedMainModel', () => ({ useSelectedMainModel: () => catalog.mainModel }));
-
+vi.mock('./useSelectedMainModel', () => ({ useSelectedMainModel: () => harness.mainModel }));
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useCapabilities: () => ({ canManageModels: harness.canManageModels, canManageNodes: true, canManageUsers: true }),
+}));
+vi.mock('@tanstack/react-router', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useNavigate: () => (options: unknown) => {
+    harness.navigate.push(options);
+    return Promise.resolve();
+  },
+}));
+vi.mock('@workbench/WorkbenchContext', () => ({
+  useActiveProjectId: () => 'test-project',
+  useOptionalWorkbenchCommands: () => null,
+}));
+vi.mock('@workbench/settings/store', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useWorkbenchPreferenceSelector: (
+    selector: (preferences: { controlModelMemory: Record<string, string> }) => unknown
+  ) => selector({ controlModelMemory: harness.remembered }),
+  // The real one pushes preferences to the server.
+  patchControlModelMemory: (key: string, model: string | null) => {
+    harness.memory.push([key, model]);
+    return Promise.resolve();
+  },
+}));
 const getArchitectureCapabilities = vi.fn<() => Promise<ArchitectureCapabilitiesRow[]>>();
 vi.mock('@features/generation/data/architectureCapabilitiesApi', () => ({
   getArchitectureCapabilities: () => getArchitectureCapabilities(),
 }));
 
 const i18n = createInstance();
-void i18n.use(initReactI18next).init({ fallbackLng: 'en', initAsync: false, lng: 'en', resources: {} });
+beforeAll(async () => {
+  const translation = (await (await fetch('/locales/en.json')).json()) as Record<string, unknown>;
+  await i18n.init({ initAsync: false, lng: 'en', resources: { en: { translation } } });
+});
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+const model = (key: string, type = 'controlnet', base = 'sdxl') => ({ base, key, name: key, source: key, type });
+const DEPTH_A = model('controlnet-depth-sdxl-1.0');
+const DEPTH_B = model('controlnet-zoe-depth-sdxl');
+const POSE = model('OpenPose XL');
+const T2I_CANNY = model('T2I Canny XL', 't2i_adapter');
+/** Nothing in its name or source says what it was made for. */
+const UNPURPOSED = model('Studio CN XL');
+
+const PHOTO = { image: { height: 64, imageName: 'photo.png', width: 96 }, type: 'image' } as const;
+
+const controlLayer = (overrides: Partial<CanvasControlLayerContract> = {}): CanvasControlLayerContract => {
+  const created = createControlLayer({ base: 'sdxl', id: 'control-1', name: 'Control Layer 1' });
+  return { ...created, ...overrides, adapter: { ...created.adapter, ...overrides.adapter } };
+};
+/** A typed layer detected from a photo, its map current. */
+const detectedLayer = (
+  controlType: CanvasControlLayerContract['controlType'],
+  detector: string,
+  overrides: Partial<CanvasControlLayerContract> = {}
+) =>
+  controlLayer({
+    controlType,
+    detection: { settings: {}, type: detector },
+    filter: { settings: {}, type: detector },
+    original: PHOTO,
+    source: PHOTO,
+    ...overrides,
+  });
+
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
+const queryClient = new QueryClient();
 
-const layer = {
-  adapter: {
-    beginEndStepPct: [0, 1],
-    controlMode: 'balanced',
-    kind: 'controlnet',
-    model: 'sd1-controlnet',
-    weight: 1,
-  },
-  filter: null,
-  id: 'control-1',
-  isEnabled: true,
-  isLocked: false,
-  name: 'Control 1',
-  opacity: 1,
-  type: 'control',
-  withTransparencyEffect: false,
-} as unknown as CanvasControlLayerContract;
-
-const ignoreOperationStarted = (): void => undefined;
-
-const settle = async (run: () => void = () => undefined) => {
+const settle = async (run: () => unknown = () => undefined) => {
   await act(async () => {
-    run();
+    await run();
     await new Promise<void>((resolve) => {
       globalThis.setTimeout(resolve, 0);
     });
@@ -89,52 +135,51 @@ const settle = async (run: () => void = () => undefined) => {
 
 type Engine = NonNullable<Parameters<typeof ControlLayerSettings>[0]['engine']>;
 
-/** Committed document edits, in order; each carries the adapter patch the panel prepared. */
 const commits: { label: string; edit: unknown }[] = [];
-
-/** Live previews the panel sent, and the baselines a cancelled gesture restored. */
 const previews: CanvasLayerPreviewMutation[] = [];
 const restores: CanvasLayerPreviewMutation[] = [];
-let editingLocked = false;
-let previewsRefused = false;
-/** Cleared when the engine ends the open session, as an undo landing mid-gesture does. */
-let sessionActive = true;
+const intents: ControlLayerIntent[] = [];
+const retries: string[] = [];
+let intentResult: ControlLayerIntentResult = 'updated';
+const statuses = createControlDetectionStatusStore();
 
-const modelOf = (layers: readonly CanvasLayerContract[], editRevision = 0) =>
-  createDocumentModel(
-    { ...createEmptyCanvasDocument(), stacks: stacksFrom(layers) },
-    { editRevision, projectId: 'test-project' }
-  );
-
-/**
- * Just enough engine for the panel's reads and commits: every layer has content and contributes, in order.
- * `replaceLayers` swaps the document the panel reads, as an undo landing mid-gesture would.
- */
-const engineWith = (
-  layers: CanvasControlLayerContract[],
-  { hasContent = true, operations = {} }: { hasContent?: boolean; operations?: object } = {}
-): Engine & { replaceLayers(next: CanvasLayerContract[]): void } => {
-  let revision = 0;
-  let model = modelOf(layers);
+const engineWith = (layers: CanvasLayerContract[], { hasContent = true } = {}): Engine => {
+  const document = { ...createEmptyCanvasDocument(), stacks: stacksFrom(layers) };
+  const context = { editRevision: 0, projectId: 'test-project' };
+  const documentModel = createDocumentModel(document, context);
+  // Previews show in the live document, as the engine's do, so an edit prepared without its baseline would see them.
+  let liveModel = documentModel;
+  const showPreview = (action: CanvasLayerPreviewMutation) => {
+    if (action.type !== 'updateCanvasLayerConfig' || action.config.layerType !== 'control') {
+      return;
+    }
+    const { adapter } = action.config;
+    const live = liveModel.document;
+    const shown = [...live.stacks.control].map((node) =>
+      node.id === action.id && node.type === 'control' ? { ...node, adapter: { ...node.adapter, ...adapter } } : node
+    );
+    liveModel = createDocumentModel({ ...live, stacks: { ...live.stacks, control: shown } }, context);
+  };
   const engine = {
-    document: { model: () => model },
-    exports: { hasExportableLayerContent: () => hasContent },
-    interaction: { get: () => editingLocked, subscribe: () => () => undefined },
+    document: { getDocument: () => document, model: () => liveModel },
+    exports: {
+      exportRasterComposite: () => ({ status: 'empty' }),
+      hasExportableLayerContent: () => hasContent,
+    },
+    interaction: { get: () => false, subscribe: () => () => undefined },
     layers: {
       beginStructuralPreview: () => {
-        if (previewsRefused) {
-          return null;
-        }
-        // As the engine's session: the first preview captures what it replaces, and cancel restores it.
         let baseline: CanvasLayerPreviewMutation | null = null;
         return {
           apply: (action: CanvasLayerPreviewMutation) => {
-            baseline ??= previewInverse(model.getNode(action.id)!, action);
+            baseline ??= previewInverse(documentModel.getNode(action.id)!, action);
             previews.push(action);
+            showPreview(action);
             return true;
           },
           baseline: () => baseline,
           cancel: () => {
+            liveModel = documentModel;
             if (baseline) {
               restores.push(baseline);
             }
@@ -143,7 +188,7 @@ const engineWith = (
             commits.push({ edit, label });
             return { status: 'committed' as const };
           },
-          isActive: () => sessionActive,
+          isActive: () => true,
         };
       },
       commitPrepared: (label: string, edit: unknown) => {
@@ -152,90 +197,641 @@ const engineWith = (
       },
       endStructuralPreview: () => undefined,
     },
-    replaceLayers: (next: CanvasLayerContract[]) => {
-      model = modelOf(next, (revision += 1));
+    lifecycle: { flushPendingUploads: () => Promise.resolve() },
+    projectId: 'test-project',
+    tools: { setTool: vi.fn() },
+  } as unknown as Engine;
+  attachCanvasOperations(engine, {
+    applyControlLayerIntent: (_layerId: string, intent: ControlLayerIntent) => {
+      intents.push(intent);
+      return intentResult;
     },
-  } as unknown as Engine & { replaceLayers(next: CanvasLayerContract[]): void };
-  attachCanvasOperations(engine, operations as never);
+    getControlDetectionStatus: statuses.get,
+    retryControlDetection: (layerId: string) => {
+      retries.push(layerId);
+      return 'scheduled';
+    },
+    subscribeControlDetectionStatus: statuses.subscribe,
+  } as never);
   return engine;
 };
 
-const render = async (controlLayer: CanvasControlLayerContract = layer, engine: Engine | null = null) => {
-  applyThemeToRoot('classic');
+const render = async (
+  layer: CanvasControlLayerContract,
+  { engine = engineWith([layer]), width = 320 }: { engine?: Engine | null; width?: number } = {}
+) => {
+  applyThemeToRoot(DEFAULT_THEME_ID);
   host = document.createElement('div');
-  host.style.width = '260px';
+  host.style.width = `${width}px`;
   document.body.append(host);
   root = createRoot(host);
   await settle(() =>
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
-          <ControlLayerSettings engine={engine} layer={controlLayer} onOperationStarted={ignoreOperationStarted} />
+          <QueryClientProvider client={queryClient}>
+            <ControlLayerSettings engine={engine} layer={layer} />
+          </QueryClientProvider>
         </ChakraProvider>
       </I18nextProvider>
     )
   );
 };
-
-/** The kind Select renders a hidden native select, so its offered kinds are readable without opening it. */
-const offersKind = (kind: string) => host!.querySelector(`option[value="${kind}"]`) !== null;
-const textOf = (role: 'alert' | 'status') =>
-  [...host!.querySelectorAll(`[role="${role}"]`)].map((element) => element.textContent).join(' ');
-const retryButton = () => [...host!.querySelectorAll('button')].find((button) => button.textContent === 'common.retry');
-/** The model Select's hidden native options, as the kind ones are read. */
-const offeredModels = () =>
-  [...host!.querySelectorAll('select')]
-    .flatMap((select) => [...select.options].map((option) => option.value))
-    .filter((value) => catalog.models.some((model) => model.key === value));
-
-/** Renders `layers.at(-1)` as the selected layer of a document holding all of them, each with content. */
-const renderWith = async (
-  mainModel: Record<string, unknown> | null,
-  models: Record<string, unknown>[],
-  ...layers: CanvasControlLayerContract[]
-) => {
-  catalog.mainModel = mainModel as Record<string, unknown>;
-  catalog.models = models;
-  commits.length = 0;
-  getArchitectureCapabilities.mockResolvedValueOnce(architectureCapabilitiesFixture);
-  await settle(ensureArchitectureCapabilitiesLoaded);
-  await render(layers.at(-1), engineWith(layers));
-};
-
-afterEach(async () => {
+const unmount = async () => {
   await act(() => root?.unmount());
   host?.remove();
   host = null;
   root = null;
+};
+
+const loadCapabilities = async () => {
+  getArchitectureCapabilities.mockResolvedValueOnce(architectureCapabilitiesFixture);
+  await settle(ensureArchitectureCapabilitiesLoaded);
+};
+
+beforeEach(async () => {
+  resetPropertyGroupCollapse();
+  harness.models = [DEPTH_A, POSE];
+  await loadCapabilities();
+});
+
+afterEach(async () => {
+  await unmount();
   getArchitectureCapabilities.mockReset();
-  Object.assign(catalog, SD1_CATALOG);
+  harness.canManageModels = true;
+  harness.mainModel = { base: 'sdxl', key: 'sdxl-main', name: 'SDXL', type: 'main' };
+  harness.memory.length = 0;
+  harness.remembered = {};
+  harness.startersRequested = 0;
+  harness.navigate.length = 0;
   commits.length = 0;
   previews.length = 0;
   restores.length = 0;
-  editingLocked = false;
-  previewsRefused = false;
-  sessionActive = true;
-  // Returns the capability store and the core registry to their unloaded state between tests.
+  intents.length = 0;
+  retries.length = 0;
+  intentResult = 'updated';
+  statuses.clear();
+  resetPropertyGroupCollapse();
   accountLifecycle.invalidate();
 });
 
-describe('ControlLayerSettings and the capability table', () => {
-  it('says the adapter is waiting for model capabilities rather than that it is unsupported', async () => {
-    await render();
+const ROW_LABELS = ['Image', 'Type', 'Detection', 'Model', 'Weight', 'Steps', 'Priority'];
+/** Where each row's label sits, relative to the panel. */
+const rowTops = () => {
+  const top = host!.getBoundingClientRect().top;
+  return ROW_LABELS.map((label) => {
+    const element = [...host!.querySelectorAll('p')].find((candidate) => candidate.textContent === label);
+    if (!element) {
+      throw new Error(`No row labelled ${label}`);
+    }
+    return Math.round(element.getBoundingClientRect().top - top);
+  });
+};
+const combobox = (name: string) => page.getByRole('combobox', { exact: true, name });
+const choose = async (name: string, option: string | RegExp) => {
+  await act(() => combobox(name).click());
+  await act(() => page.getByRole('option', { name: option }).click());
+  await settle();
+};
+const adapterOf = (index: number) =>
+  (commits[index]!.edit as { forward: { config: { adapter: Record<string, unknown> } } }).forward.config.adapter;
 
-    expect(textOf('status')).toContain('widgets.layers.control.capabilitiesLoading');
+describe('ControlLayerSettings rows', () => {
+  it('keeps every row where it is across the empty, ready, warning, choosing and detecting states', async () => {
+    const states: [CanvasControlLayerContract, () => void][] = [
+      [controlLayer({}), () => undefined],
+      [detectedLayer('depth', 'depth_anything_depth_estimation'), () => undefined],
+      [controlLayer({ source: PHOTO }), () => undefined],
+      [
+        detectedLayer('depth', 'depth_anything_depth_estimation'),
+        () => {
+          // Two depth models: the Model row asks, and its caption runs to two lines.
+          harness.models = [DEPTH_A, DEPTH_B, POSE];
+        },
+      ],
+      [
+        detectedLayer('depth', 'depth_anything_depth_estimation'),
+        () => statuses.set('control-1', { detector: 'depth_anything_depth_estimation', status: 'processing' }),
+      ],
+    ];
+    // Captions wrap differently at each width; the rows must not care.
+    for (const width of [320, 450]) {
+      const tops: number[][] = [];
+      harness.models = [DEPTH_A, POSE];
+      statuses.clear();
+      for (const [layer, prepare] of states) {
+        prepare();
+        await render(layer, { width });
+        tops.push(rowTops());
+        expect(host!.scrollWidth, 'no horizontal overflow').toBeLessThanOrEqual(host!.clientWidth);
+        await unmount();
+      }
+      expect(
+        tops.map((entry) => entry.join(',')),
+        `at ${width} px`
+      ).toEqual(tops.map(() => tops[0]!.join(',')));
+      // The fixed rows fit the Properties pane budget.
+      expect(tops[0]!.at(-1)!).toBeLessThan(281);
+    }
   });
 
-  it('keeps the retry and its focus through a retry that fails again, then offers the adapter kinds', async () => {
-    // Capability arrival must update kinds even when the model base is unchanged.
+  it('passes an accessibility audit empty, with a warning and ready', async () => {
+    for (const layer of [
+      controlLayer({}),
+      controlLayer({ source: PHOTO }),
+      detectedLayer('depth', 'depth_anything_depth_estimation'),
+    ]) {
+      await render(layer);
+      expect(await auditAccessibility(host!)).toEqual([]);
+      await unmount();
+    }
+  });
+
+  it('flags an image without a type and explains that the model follows the type', async () => {
+    await render(controlLayer({ source: PHOTO }));
+
+    const type = combobox('Type');
+    await expect.element(type).toHaveAttribute('aria-invalid', 'true');
+    await expect.element(type).toHaveAccessibleDescription('Choose a type and the model follows.');
+    await expect.element(combobox('Detection')).toBeDisabled();
+
+    // A missing type warns; it is not an error, so neither the border nor the focus ring turns red.
+    const trigger = type.element() as HTMLElement;
+    // The placeholder is written in the warning colour; the border matches it.
+    const warning = getComputedStyle(trigger.querySelector('[data-part="value-text"]')!).color;
+    expect(getComputedStyle(trigger).borderTopColor).toBe(warning);
+    // Keyboard focus, so the focus-visible ring applies.
+    trigger.focus();
+    await act(() => userEvent.keyboard('{Shift>}{Tab}{/Shift}{Tab}'));
+    expect(document.activeElement).toBe(trigger);
+    expect(getComputedStyle(trigger).borderTopColor).toBe(warning);
+  });
+});
+
+describe('ControlLayerSettings type and detection', () => {
+  it('hints each type with what is installed, and renames an auto-named layer after the type', async () => {
+    harness.models = [DEPTH_A, DEPTH_B, POSE];
+    await render(controlLayer({ source: PHOTO }));
+
+    await act(() => combobox('Type').click());
+    for (const name of ['Depth, 2 models', 'Pose, 1 model', 'Line art, Not installed']) {
+      await expect.element(page.getByRole('option', { exact: true, name })).toBeVisible();
+    }
+    await act(() => page.getByRole('option', { name: /^Depth/ }).click());
+    await settle();
+
+    expect(intents).toEqual([{ controlType: 'depth', kind: 'set-type', name: 'Depth 1' }]);
+  });
+
+  it('keeps a name the user gave the layer', async () => {
+    await render(controlLayer({ name: 'Background pose', source: PHOTO }));
+    await choose('Type', /^Pose/);
+
+    expect(intents).toEqual([{ controlType: 'pose', kind: 'set-type', name: undefined }]);
+  });
+
+  it("offers the type's detectors, then None after a divider", async () => {
+    await render(detectedLayer('depth', 'depth_anything_depth_estimation'));
+
+    await act(() => combobox('Detection').click());
+    const options = [...document.querySelectorAll<HTMLElement>('[role="option"]')].map((item) => item.textContent);
+    expect(options).toEqual(['Depth Anything', 'Normal map', 'None: image is already a depth map']);
+    await act(() => page.getByRole('option', { name: 'Normal map' }).click());
+    await settle();
+    await choose('Detection', 'None: image is already a depth map');
+
+    expect(intents).toEqual([
+      { detector: 'normal_map', kind: 'set-detector' },
+      { detector: null, kind: 'set-detector' },
+    ]);
+  });
+
+  it('shows a spinner while detection waits or runs, then offers Run again with the failure reason', async () => {
+    await render(detectedLayer('depth', 'depth_anything_depth_estimation'));
+
+    // Queued covers the debounce, the wait for a slot and a retry backoff: the row says it is on its way.
+    await settle(() => statuses.set('control-1', { status: 'queued' }));
+    expect(combobox('Detection').element().querySelector('.chakra-spinner')).not.toBeNull();
+    expect(page.getByRole('button', { name: 'Detect again' }).elements()).toHaveLength(0);
+
+    await settle(() =>
+      statuses.set('control-1', { detector: 'depth_anything_depth_estimation', status: 'processing' })
+    );
+    expect(combobox('Detection').element().querySelector('.chakra-spinner')).not.toBeNull();
+
+    await settle(() => statuses.set('control-1', { error: { code: 'process-failed' }, status: 'error' }));
+    expect(combobox('Detection').element().querySelector('.chakra-spinner')).toBeNull();
+    // The canvas announces runs; the row keeps the failure and its reason on the retry.
+    await userEvent.hover(page.getByRole('button', { name: 'Run again' }));
+    await expect.element(page.getByText('Depth Anything failed: the detector could not run')).toBeVisible();
+    await act(() => page.getByRole('button', { name: 'Run again' }).click());
+
+    expect(retries).toEqual(['control-1']);
+  });
+
+  it('offers Detect again for an out-of-date map once nothing is running', async () => {
+    // The map was detected with other settings, as after an undo of a settings change.
+    await render(
+      detectedLayer('depth', 'depth_anything_depth_estimation', {
+        filter: { settings: { model_size: 'large' }, type: 'depth_anything_depth_estimation' },
+      })
+    );
+    await act(() => page.getByRole('button', { name: 'Detect again' }).click());
+
+    expect(retries).toEqual(['control-1']);
+  });
+
+  it('opens the detector settings inline and sends one intent per scrub gesture', async () => {
+    await render(
+      detectedLayer('edges', 'canny_edge_detection', { detection: { settings: {}, type: 'canny_edge_detection' } })
+    );
+    const toggle = page.getByRole('button', { name: 'Detector settings' });
+    await expect.element(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    await act(() => toggle.click());
+    await expect.element(toggle).toHaveAttribute('aria-expanded', 'true');
+    const region = document.getElementById(toggle.element().getAttribute('aria-controls')!)!;
+    expect(region.getAttribute('role')).toBe('group');
+
+    const frame = region.querySelector<HTMLElement>('[data-scope="scrubber"]')!;
+    const rect = frame.getBoundingClientRect();
+    const pointer = (target: EventTarget, type: string, x: number) =>
+      settle(() =>
+        target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, clientX: x, pointerId: 1 }))
+      );
+    await pointer(frame, 'pointerdown', rect.left + 10);
+    await pointer(window, 'pointermove', rect.left + 40);
+    await pointer(window, 'pointermove', rect.left + 80);
+    await pointer(window, 'pointerup', rect.left + 80);
+
+    expect(intents.map((intent) => intent.kind)).toEqual(['set-detector-settings']);
+  });
+
+  it('leaves the detector of an empty layer to its first image', async () => {
+    const empty = controlLayer({ controlType: 'depth', detection: null });
+    await render(empty, { engine: engineWith([empty], { hasContent: false }) });
+
+    // None would change nothing: the first image gets the type's detector whatever is chosen now.
+    await expect.element(combobox('Detection')).toBeDisabled();
+    expect(combobox('Detection').element().textContent).toContain('Chosen when an image is added');
+    const toggle = page.getByRole('button', { name: 'Detector settings' });
+    await expect.element(toggle).toHaveAttribute('aria-disabled', 'true');
+    await expect.element(toggle).toHaveAccessibleDescription('Add an image first');
+  });
+
+  it('says why None has no settings', async () => {
+    await render(
+      detectedLayer('tile', 'canny_edge_detection', { detection: null, filter: undefined, original: undefined })
+    );
+
+    const toggle = page.getByRole('button', { name: 'Detector settings' });
+    await expect.element(toggle).toHaveAttribute('aria-disabled', 'true');
+    await expect.element(toggle).toHaveAccessibleDescription('No settings for None: Tile uses the image directly');
+  });
+});
+
+describe('ControlLayerSettings model', () => {
+  it('asks for a choice among several models, and records a pick for the layer and for later layers', async () => {
+    harness.models = [DEPTH_A, DEPTH_B];
+    await render(detectedLayer('depth', 'depth_anything_depth_estimation'));
+
+    expect(combobox('Model').element().textContent).toContain('Choose a depth model');
+    expect(host!.textContent).toContain('2 models fit: controlnet-depth-sdxl-1.0 or controlnet-zoe-depth-sdxl');
+    await act(() => combobox('Model').click());
+    expect(page.getByRole('group', { name: 'Made for depth' }).elements()).toHaveLength(1);
+    await act(() => page.getByRole('option', { name: /^controlnet-zoe-depth-sdxl/ }).click());
+    await settle();
+
+    expect(commits.map(({ label }) => label)).toEqual(['Model']);
+    expect(adapterOf(0)).toEqual({ kind: 'controlnet', model: 'controlnet-zoe-depth-sdxl' });
+    expect(harness.memory).toEqual([['sdxl:depth', 'controlnet-zoe-depth-sdxl']]);
+  });
+
+  it('asks for the starter catalog when the list opens, and leaves origins out until it arrives', async () => {
+    harness.models = [DEPTH_A, DEPTH_B];
+    await render(detectedLayer('depth', 'depth_anything_depth_estimation'));
+    expect(harness.startersRequested).toBe(0);
+
+    await act(() => combobox('Model').click());
+
+    expect(harness.startersRequested).toBe(1);
+    await expect
+      .element(page.getByRole('option', { exact: true, name: 'controlnet-zoe-depth-sdxl, ControlNet' }))
+      .toBeVisible();
+  });
+
+  it('describes the Model choice with its caption', async () => {
+    await render(detectedLayer('depth', 'depth_anything_depth_estimation'));
+
+    await expect.element(combobox('Model')).toHaveAccessibleDescription('ControlNet · your only depth model');
+  });
+
+  it("resets the layer's own pick back to automatic and returns focus to the model choice", async () => {
+    harness.models = [DEPTH_A, DEPTH_B];
+    const picked = detectedLayer('depth', 'depth_anything_depth_estimation', {
+      adapter: { ...controlLayer().adapter, model: 'controlnet-zoe-depth-sdxl' },
+    });
+    await render(picked);
+    expect(host!.textContent).toContain('ControlNet · your pick for depth');
+
+    await act(() => page.getByRole('button', { name: 'Reset' }).click());
+    await settle();
+
+    expect(adapterOf(0)).toEqual({ model: null });
+    // Nothing was remembered for depth, so there is nothing to forget.
+    expect(harness.memory).toEqual([]);
+    expect(document.activeElement).toBe(combobox('Model').element());
+  });
+
+  it('forgets the remembered pick with Reset when it is also the layer pick', async () => {
+    harness.models = [DEPTH_A, DEPTH_B];
+    harness.remembered = { 'sdxl:depth': 'controlnet-zoe-depth-sdxl' };
+    await render(
+      detectedLayer('depth', 'depth_anything_depth_estimation', {
+        adapter: { ...controlLayer().adapter, model: 'controlnet-zoe-depth-sdxl' },
+      })
+    );
+
+    await act(() => page.getByRole('button', { name: 'Reset' }).click());
+    await settle();
+
+    expect(adapterOf(0)).toEqual({ model: null });
+    expect(harness.memory).toEqual([['sdxl:depth', null]]);
+  });
+
+  it('keeps another remembered pick through Reset, which the layer then falls back to', async () => {
+    harness.models = [DEPTH_A, DEPTH_B];
+    harness.remembered = { 'sdxl:depth': 'controlnet-zoe-depth-sdxl' };
+    const picked = detectedLayer('depth', 'depth_anything_depth_estimation', {
+      adapter: { ...controlLayer().adapter, model: 'controlnet-depth-sdxl-1.0' },
+    });
+    await render(picked);
+    expect(host!.textContent).toContain('ControlNet · your pick for depth');
+
+    await act(() => page.getByRole('button', { name: 'Reset' }).click());
+    await settle();
+    expect(adapterOf(0)).toEqual({ model: null });
+    expect(harness.memory).toEqual([]);
+
+    await unmount();
+    const reset = { ...picked, adapter: { ...picked.adapter, ...adapterOf(0) } };
+    await render(reset, { engine: engineWith([reset]) });
+    expect(combobox('Model').element().textContent).toContain('controlnet-zoe-depth-sdxl');
+    expect(host!.textContent).toContain('ControlNet · remembered for depth');
+  });
+
+  it('names a remembered pick as remembered, and its Reset says it forgets it in every project', async () => {
+    harness.models = [DEPTH_A, DEPTH_B];
+    harness.remembered = { 'sdxl:depth': 'controlnet-zoe-depth-sdxl' };
+    await render(detectedLayer('depth', 'depth_anything_depth_estimation'));
+
+    expect(combobox('Model').element().textContent).toContain('controlnet-zoe-depth-sdxl');
+    expect(host!.textContent).toContain('ControlNet · remembered for depth');
+    await userEvent.hover(page.getByRole('button', { name: 'Reset' }));
+    await expect
+      .element(page.getByText('Reset also forgets the depth model remembered for SDXL, in every project.'))
+      .toBeVisible();
+
+    await act(() => page.getByRole('button', { name: 'Reset' }).click());
+    await settle();
+
+    // The layer has no pick of its own, so only the memory changes.
+    expect(harness.memory).toEqual([['sdxl:depth', null]]);
+  });
+
+  it('keeps a pick that does not fit the type to the layer, out of the memory undo cannot reach', async () => {
+    harness.models = [DEPTH_A, DEPTH_B, UNPURPOSED];
+    await render(detectedLayer('depth', 'depth_anything_depth_estimation'));
+
+    await choose('Model', /^Studio CN XL/);
+
+    expect(adapterOf(0)).toEqual({ kind: 'controlnet', model: 'Studio CN XL' });
+    expect(harness.memory).toEqual([]);
+  });
+
+  it('lists every usable model for a layer without a type, and picks one without remembering it', async () => {
+    harness.models = [DEPTH_A, POSE, model('flux-depth', 'controlnet', 'flux')];
+    await render(controlLayer({ source: PHOTO }));
+
+    await act(() => combobox('Model').click());
+    const group = page.getByRole('group', { name: 'Installed models' });
+    expect(
+      group
+        .getByRole('option')
+        .elements()
+        .map((option) => option.textContent)
+    ).toEqual([expect.stringContaining('controlnet-depth-sdxl-1.0'), expect.stringContaining('OpenPose XL')]);
+    await act(() => page.getByRole('option', { name: /^OpenPose XL/ }).click());
+    await settle();
+
+    expect(adapterOf(0)).toEqual({ kind: 'controlnet', model: 'OpenPose XL' });
+    expect(harness.memory).toEqual([]);
+  });
+
+  it('says there is nothing to pick for a layer without a type when no model is installed', async () => {
+    harness.models = [];
+    await render(controlLayer({ source: PHOTO }));
+
+    await expect.element(combobox('Model')).toBeDisabled();
+    expect(combobox('Model').element().textContent).toContain('No control models');
+  });
+
+  it('keeps the caption action beside a long caption, inside the two caption lines', async () => {
+    await render(detectedLayer('lineart', 'lineart_edge_detection'), { width: 280 });
+
+    const button = page.getByRole('button', { name: 'Find one' }).element();
+    const caption = combobox('Model').element().getAttribute('aria-describedby')!;
+    const text = document.getElementById(caption)!;
+    const row = text.parentElement!.getBoundingClientRect();
+    const box = button.getBoundingClientRect();
+    expect(box.width).toBeGreaterThan(0);
+    expect(box.left).toBeGreaterThanOrEqual(text.getBoundingClientRect().right);
+    expect(box.right).toBeLessThanOrEqual(row.right + 0.5);
+    expect(box.bottom).toBeLessThanOrEqual(row.bottom + 0.5);
+  });
+
+  it('names the only model, and points to the Model Manager when none fits', async () => {
+    await render(detectedLayer('depth', 'depth_anything_depth_estimation'));
+    expect(host!.textContent).toContain('ControlNet · your only depth model');
+    await unmount();
+
+    await render(detectedLayer('lineart', 'lineart_edge_detection'));
+    expect(combobox('Model').element().textContent).toContain('None for SDXL');
+    await act(() => page.getByRole('button', { name: 'Find one' }).click());
+    expect(harness.navigate).toEqual([{ search: { project: 'test-project' }, to: '/models' }]);
+    await unmount();
+
+    // Without the right to manage models, the caption says it without the link.
+    harness.canManageModels = false;
+    harness.models = [];
+    await render(detectedLayer('depth', 'depth_anything_depth_estimation'));
+    expect(host!.textContent).toContain('No control models are installed for SDXL.');
+    expect(page.getByRole('button', { name: 'Install starter models' }).elements()).toHaveLength(0);
+  });
+});
+
+describe('ControlLayerSettings adapter rows', () => {
+  const weightSlider = () => page.getByRole('slider', { name: 'Weight' });
+
+  it('records one step for a weight drag, from the weight it started at', async () => {
+    const layer = detectedLayer('depth', 'depth_anything_depth_estimation', {
+      adapter: { ...controlLayer().adapter, weight: 1 },
+    });
+    await render(layer);
+    const control = weightSlider()
+      .element()
+      .closest<HTMLElement>('[data-part="root"]')!
+      .querySelector<HTMLElement>('[data-part="control"]')!;
+    const rect = control.getBoundingClientRect();
+    const xAt = (weight: number) => rect.left + (rect.width * weight) / 2;
+    const pointer = (target: EventTarget, type: string, x: number) =>
+      settle(() =>
+        target.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            button: 0,
+            clientX: x,
+            clientY: rect.top + rect.height / 2,
+            pointerId: 1,
+          })
+        )
+      );
+    await pointer(control, 'pointerdown', xAt(1));
+    await pointer(document, 'pointermove', xAt(1.25));
+    await pointer(document, 'pointermove', xAt(1.5));
+    await pointer(document, 'pointerup', xAt(1.5));
+
+    expect(previews.length).toBeGreaterThanOrEqual(2);
+    expect(commits).toHaveLength(1);
+    const { forward, inverse } = commits[0]!.edit as Record<
+      'forward' | 'inverse',
+      { config: { adapter: { weight: number } } }
+    >;
+    // The release lands within a step of where the drag ended, recorded from where it began.
+    expect(forward.config.adapter.weight).toBeCloseTo(1.5, 0);
+    expect(forward.config.adapter.weight).toBe(
+      (previews.at(-1) as { config: { adapter: { weight: number } } }).config.adapter.weight
+    );
+    expect(inverse.config.adapter.weight).toBe(1);
+  });
+
+  it('clamps typed weights to the bounds the model allows', async () => {
+    await render(detectedLayer('depth', 'depth_anything_depth_estimation'));
+    const input = page.getByRole('spinbutton', { name: 'Weight' });
+    await act(async () => {
+      await userEvent.clear(input);
+      await userEvent.type(input, '-3{Enter}');
+    });
+    await act(async () => {
+      await userEvent.clear(input);
+      await userEvent.type(input, '9{Enter}');
+    });
+
+    expect(commits.map((_, index) => adapterOf(index).weight)).toEqual([-1, 2]);
+  });
+
+  it('reads out the step range', async () => {
+    await render(
+      detectedLayer('depth', 'depth_anything_depth_estimation', {
+        adapter: { ...controlLayer().adapter, beginEndStepPct: [0.1, 0.75] },
+      })
+    );
+
+    expect(host!.textContent).toContain('10–75%');
+  });
+
+  it('sets the priority for a ControlNet and dims it, with the reason, for a T2I Adapter', async () => {
+    await render(detectedLayer('depth', 'depth_anything_depth_estimation'));
+    expect(page.getByRole('radio').elements()).toHaveLength(3);
+    await act(() => page.getByRole('radiogroup', { name: 'Priority' }).getByText('Control', { exact: true }).click());
+    await settle();
+    expect(adapterOf(0)).toEqual({ controlMode: 'more_control' });
+    await unmount();
+
+    harness.models = [T2I_CANNY];
+    await render(detectedLayer('edges', 'canny_edge_detection'));
+    const group = page.getByRole('radiogroup', { name: 'Priority' });
+    await expect.element(group).toHaveAccessibleDescription('Priority applies to ControlNet models only.');
+    await expect.element(page.getByRole('radio', { name: 'Control' })).toBeDisabled();
+    // The disabled radios take no focus; the radiogroup itself does, once, and shows the reason.
+    expect(page.getByRole('group', { name: 'Priority' }).elements()).toHaveLength(0);
+    await act(() => userEvent.tab());
+    const reasonGroup = page.getByRole('radiogroup', { name: 'Priority' });
+    while (document.activeElement !== reasonGroup.element() && host!.contains(document.activeElement)) {
+      await act(() => userEvent.tab());
+    }
+    expect(document.activeElement).toBe(reasonGroup.element());
+    await expect.element(page.getByRole('tooltip')).toHaveTextContent('Priority applies to ControlNet models only.');
+  });
+
+  it('says on hover that FLUX ControlNets have no priority setting', async () => {
+    harness.mainModel = { base: 'flux', key: 'flux-main', name: 'FLUX', type: 'main' };
+    harness.models = [model('flux-controlnet-depth', 'controlnet', 'flux')];
+    await render(detectedLayer('depth', 'depth_anything_depth_estimation'));
+
+    await expect.element(page.getByRole('radio', { name: 'Control' })).toBeDisabled();
+    await expect
+      .element(page.getByRole('radiogroup', { name: 'Priority' }))
+      .toHaveAccessibleDescription('FLUX ControlNets have no priority setting.');
+    await userEvent.hover(page.getByRole('radiogroup', { name: 'Priority' }));
+    await expect.element(page.getByRole('tooltip')).toHaveTextContent('FLUX ControlNets have no priority setting.');
+  });
+
+  it('shows a stored legacy Unbalanced mode as a fourth segment the layer can leave', async () => {
+    await render(
+      detectedLayer('depth', 'depth_anything_depth_estimation', {
+        adapter: { ...controlLayer().adapter, controlMode: 'unbalanced' },
+      })
+    );
+
+    expect(page.getByRole('radio').elements()).toHaveLength(4);
+    await expect.element(page.getByRole('radio', { name: 'Unbalanced' })).toBeChecked();
+    await act(() => page.getByRole('radiogroup', { name: 'Priority' }).getByText('Balanced', { exact: true }).click());
+    await settle();
+
+    expect(adapterOf(0)).toEqual({ controlMode: 'balanced' });
+  });
+
+  it('sets the priority of a layer created as another kind, and a reload keeps it', async () => {
+    // Created under a Z-Image main model, now resolved to an SDXL ControlNet; no model of its own.
+    const layer = detectedLayer('depth', 'depth_anything_depth_estimation', {
+      adapter: { ...controlLayer().adapter, controlMode: null, kind: 'z_image_control', weight: -0.5 },
+    });
+    await render(layer);
+    await act(() => page.getByRole('radiogroup', { name: 'Priority' }).getByText('Control', { exact: true }).click());
+    await settle();
+
+    expect(adapterOf(0)).toEqual({ controlMode: 'more_control' });
+    // Load-time normalization leaves an automatic adapter's mode and negative weight to the kind it resolves to.
+    expect(normalizeControlAdapter({ ...layer.adapter, ...adapterOf(0) })).toMatchObject({
+      controlMode: 'more_control',
+      kind: 'z_image_control',
+      weight: -0.5,
+    });
+  });
+});
+
+describe('ControlLayerSettings and the capability table', () => {
+  const retryButton = () => [...host!.querySelectorAll('button')].find((button) => button.textContent === 'Retry');
+
+  it('says the layer is checked once model capabilities load', async () => {
+    accountLifecycle.invalidate();
+    await render(detectedLayer('depth', 'depth_anything_depth_estimation'));
+
+    expect(
+      page
+        .getByRole('status')
+        .elements()
+        .map((element) => element.textContent)
+    ).toContain('This layer is checked once model capabilities have loaded.');
+  });
+
+  it('keeps the retry and its focus through a retry that fails again, then hands focus to the panel', async () => {
+    accountLifecycle.invalidate();
     getArchitectureCapabilities.mockRejectedValueOnce(new Error('Fixture capability outage.'));
     await settle(ensureArchitectureCapabilitiesLoaded);
-    await render();
+    await render(detectedLayer('depth', 'depth_anything_depth_estimation'));
 
-    expect(textOf('alert')).toContain('widgets.layers.control.capabilitiesLoadFailed');
-    expect(offersKind('controlnet')).toBe(false);
-
-    // A retry that fails again: the button never unmounts, so a keyboard user's focus stays on it.
     let failLoad: (error: Error) => void = () => undefined;
     getArchitectureCapabilities.mockReturnValueOnce(
       new Promise((_, reject) => {
@@ -255,394 +851,28 @@ describe('ControlLayerSettings and the capability table', () => {
     getArchitectureCapabilities.mockResolvedValueOnce(architectureCapabilitiesFixture);
     await settle(() => retryButton()?.click());
 
-    expect(offersKind('controlnet')).toBe(true);
     expect(retryButton()).toBeUndefined();
-    // The button that held focus is gone; focus moved into the panel instead of falling to <body>.
-    expect(document.activeElement).not.toBe(document.body);
     expect(host!.contains(document.activeElement)).toBe(true);
   });
-
-  it('leaves focus where the user moved it while the retry was in flight', async () => {
-    getArchitectureCapabilities.mockRejectedValueOnce(new Error('Fixture capability outage.'));
-    await settle(ensureArchitectureCapabilitiesLoaded);
-    await render();
-
-    let finishLoad: (rows: ArchitectureCapabilitiesRow[]) => void = () => undefined;
-    getArchitectureCapabilities.mockReturnValueOnce(
-      new Promise((resolve) => {
-        finishLoad = resolve;
-      })
-    );
-    await settle(() => {
-      retryButton()?.focus();
-      retryButton()?.click();
-    });
-
-    // Someone starts typing elsewhere; the load landing must not pull them into this panel.
-    const elsewhere = document.createElement('input');
-    document.body.append(elsewhere);
-    elsewhere.focus();
-    try {
-      await settle(() => finishLoad(architectureCapabilitiesFixture));
-
-      expect(retryButton()).toBeUndefined();
-      expect(document.activeElement).toBe(elsewhere);
-    } finally {
-      elsewhere.remove();
-    }
-  });
 });
 
-describe('ControlLayerSettings on an Anima main model', () => {
-  const lllite = (key: string, name: string, cond_in_channels: number | null) => ({
-    base: 'anima',
-    cond_in_channels,
-    key,
-    name,
-    type: 'controlnet',
-  });
-  const ANIMA_MODELS = [
-    lllite('sketch', 'Anima LLLite Sketch', 3),
-    lllite('inpainting', 'Anima LLLite Inpainting', 4),
-    lllite('unidentified', 'Anima LLLite (old install)', null),
-  ];
-  const animaLayer = (
-    kind: string,
-    model: string | null,
-    id = 'control-1',
-    values: Partial<CanvasControlLayerContract['adapter']> = {}
-  ): CanvasControlLayerContract => {
-    const base = createControlLayer(id, id, 'anima', model);
-    return {
-      ...base,
-      adapter: { ...base.adapter, ...values, kind: kind as CanvasControlLayerContract['adapter']['kind'] },
-    };
-  };
-  const button = (name: string) => [...host!.querySelectorAll('button')].find((b) => b.textContent === name);
-  /** The adapter each commit wrote, read from the prepared edit's forward patch. */
-  const committedAdapters = () =>
-    commits
-      .map(({ edit }) => JSON.stringify(edit))
-      .map((json) => {
-        const match = /"adapter":(\{[^{}]*"beginEndStepPct":\[[^\]]*\][^{}]*\})/u.exec(json);
-        return match ? (JSON.parse(match[1]!) as Record<string, unknown>) : null;
-      });
-
-  const ANIMA_MAIN = { base: 'anima', key: 'anima-main', name: 'Anima', type: 'main' };
-  const renderAnima = (...layers: CanvasControlLayerContract[]) => renderWith(ANIMA_MAIN, ANIMA_MODELS, ...layers);
-
-  it('offers ControlNet-LLLite and its control adapters, and accepts one without a warning', async () => {
-    await renderAnima(animaLayer('anima_lllite', 'sketch'));
-
-    expect(offersKind('anima_lllite')).toBe(true);
-    expect(offersKind('controlnet')).toBe(false);
-    expect(offeredModels()).toEqual(['sketch']);
-    expect(host!.textContent).toContain('Anima LLLite Sketch');
-    expect(textOf('alert')).toBe('');
-  });
-
-  it('turns a layer saved as ControlNet into LLLite in one step, keeping its model, weight and steps', async () => {
-    await renderAnima(animaLayer('controlnet', 'sketch', 'old', { beginEndStepPct: [0.1, 0.7], weight: 0.6 }));
-
-    // The alert names the fix, and the model list does not present any model as usable under the wrong kind.
-    expect(textOf('alert')).toContain('widgets.layers.control.validation.switch_adapter_kind');
-    expect(offeredModels()).toEqual([]);
-    expect(host!.textContent).toContain('Anima LLLite Sketch');
-
-    await settle(() => button('widgets.layers.control.switchKind')?.click());
-
-    expect(committedAdapters()).toEqual([
-      { beginEndStepPct: [0.1, 0.7], controlMode: null, kind: 'anima_lllite', model: 'sketch', weight: 0.6 },
-    ]);
-  });
-
-  it('asks for the switch, not a model, on a model-less layer saved as ControlNet', async () => {
-    await renderAnima(animaLayer('controlnet', null));
-
-    expect(textOf('alert')).toContain('widgets.layers.control.validation.switch_adapter_kind');
-    expect(textOf('alert')).not.toContain('missing_model');
-  });
-
-  it('switches through the Adapter type select the same way', async () => {
-    await renderAnima(animaLayer('controlnet', 'sketch', 'old', { beginEndStepPct: [0.1, 0.7], weight: 0.6 }));
-
-    await act(() => page.getByRole('combobox', { name: 'widgets.layers.control.kind' }).click());
-    await act(() => page.getByRole('option', { name: 'widgets.layers.control.kinds.anima_lllite' }).click());
-    await settle();
-
-    expect(committedAdapters()).toEqual([
-      { beginEndStepPct: [0.1, 0.7], controlMode: null, kind: 'anima_lllite', model: 'sketch', weight: 0.6 },
-    ]);
-  });
-
-  it('explains an empty LLLite list instead of only asking for a model', async () => {
-    await renderWith(ANIMA_MAIN, ANIMA_MODELS.slice(1), animaLayer('anima_lllite', null));
-
-    expect(offeredModels()).toEqual([]);
-    expect(host!.textContent).toContain('widgets.layers.control.hiddenModels.lllite_inpaint_adapter');
-    expect(host!.textContent).toContain('widgets.layers.control.hiddenModels.lllite_channels_unknown');
-    expect(textOf('alert')).toBe('');
-  });
-
-  it('flags a second layer applying the same LLLite model, but not the first', async () => {
-    const first = animaLayer('anima_lllite', 'sketch', 'first');
-    const second = animaLayer('anima_lllite', 'sketch', 'second');
-    await renderAnima(first, second);
-    expect(textOf('alert')).toBe('widgets.layers.control.validation.duplicate_lllite_model');
-
-    await act(() => root?.unmount());
-    host?.remove();
-    await render(first, engineWith([first, second]));
-    expect(textOf('alert')).toBe('');
-  });
-
-  it('names an unusable adapter by its catalog name beside the alert about it', async () => {
-    await renderAnima(animaLayer('anima_lllite', 'inpainting'));
-
-    expect(textOf('alert')).toBe('widgets.layers.control.validation.lllite_inpaint_adapter');
-    expect(host!.textContent).toContain('Anima LLLite Inpainting');
-    expect(host!.textContent).not.toContain('widgets.layers.control.selectModel');
-  });
-
-  it('offers ControlNet for an LLLite layer once the main model is not Anima, dropping the LLLite model', async () => {
-    await renderWith(
-      { base: 'sdxl', key: 'sdxl-main', name: 'SDXL', type: 'main' },
-      [...ANIMA_MODELS, { base: 'sdxl', key: 'sdxl-control', name: 'SDXL ControlNet', type: 'controlnet' }],
-      animaLayer('anima_lllite', 'sketch', 'lllite', { beginEndStepPct: [0.2, 0.8], weight: 0.9 })
-    );
-    expect(textOf('alert')).toContain('widgets.layers.control.validation.switch_adapter_kind');
-
-    await settle(() => button('widgets.layers.control.switchKind')?.click());
-
-    expect(committedAdapters()).toEqual([
-      { beginEndStepPct: [0.2, 0.8], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 0.9 },
-    ]);
-  });
-
-  it('hides the base-bound LLLite kind while no main model is selected', async () => {
-    await renderWith(null, ANIMA_MODELS, animaLayer('controlnet', null));
-
-    expect(offersKind('controlnet')).toBe(true);
-    expect(offersKind('anima_lllite')).toBe(false);
-  });
-});
-
-describe('ControlLayerSettings on a Qwen Image main model', () => {
-  const QWEN_MAIN = { base: 'qwen-image', key: 'qwen-main', name: 'Qwen Image 2512', type: 'main' };
-  const QWEN_EDIT_MAIN = { ...QWEN_MAIN, key: 'qwen-edit', name: 'Qwen Image Edit 2511', variant: 'edit' };
-  const QWEN_MODELS = [
-    { base: 'qwen-image', key: 'qwen-union', name: 'Qwen Image ControlNet Union', type: 'controlnet' },
-    { base: 'z-image', key: 'z-union', name: 'Z-Image ControlNet Union', type: 'controlnet' },
-  ];
-  /** A layer as the Layers panel creates it under a Qwen Image main model. */
-  const qwenLayer = (id: string) => createControlLayer(id, id, 'qwen-image', 'qwen-union');
-
-  it('offers the Qwen Image ControlNet kind and its models, and accepts one without a warning', async () => {
-    await renderWith(QWEN_MAIN, QWEN_MODELS, qwenLayer('control-1'));
-
-    expect(offersKind('qwen_image_control')).toBe(true);
-    expect(offersKind('controlnet')).toBe(false);
-    expect(offersKind('z_image_control')).toBe(false);
-    expect(offeredModels()).toEqual(['qwen-union']);
-    expect(host!.textContent).toContain('Qwen Image ControlNet Union');
-    expect(textOf('alert')).toBe('');
-  });
-
-  it('says the control cannot run on a Qwen Image Edit model', async () => {
-    await renderWith(QWEN_EDIT_MAIN, QWEN_MODELS, qwenLayer('control-1'));
-
-    expect(textOf('alert')).toBe('widgets.layers.control.validation.qwen_image_edit_control');
-  });
-
-  it('flags the second of two controls, but not the first', async () => {
-    const first = qwenLayer('first');
-    const second = qwenLayer('second');
-    await renderWith(QWEN_MAIN, QWEN_MODELS, first, second);
-    expect(textOf('alert')).toBe('widgets.layers.control.validation.qwen_image_control_limit');
-
-    await act(() => root?.unmount());
-    host?.remove();
-    await render(first, engineWith([first, second]));
-    expect(textOf('alert')).toBe('');
-  });
-});
-
-describe('ControlLayerSettings on a FLUX.2 main model', () => {
-  const FLUX2_DEV_MAIN = { base: 'flux2', key: 'flux2-dev', name: 'FLUX.2 [dev]', type: 'main', variant: 'dev' };
-  const FLUX2_KLEIN_MAIN = { ...FLUX2_DEV_MAIN, key: 'flux2-klein', name: 'FLUX.2 Klein 9B', variant: 'klein_9b' };
-  const FLUX2_MODELS = [
-    { base: 'flux2', key: 'flux2-union', name: 'FLUX.2 [dev] ControlNet Union', type: 'controlnet' },
-    { base: 'flux', key: 'flux-union', name: 'FLUX.1 ControlNet Union', type: 'controlnet' },
-  ];
-
-  it('offers the FLUX.2 ControlNet kind and its models on [dev], and accepts one without a warning', async () => {
-    await renderWith(
-      FLUX2_DEV_MAIN,
-      FLUX2_MODELS,
-      createControlLayer('control-1', 'control-1', 'flux2', 'flux2-union')
-    );
-
-    expect(offersKind('flux2_control')).toBe(true);
-    expect(offersKind('controlnet')).toBe(false);
-    expect(offeredModels()).toEqual(['flux2-union']);
-    expect(host!.textContent).toContain('FLUX.2 [dev] ControlNet Union');
-    expect(textOf('alert')).toBe('');
-  });
-
-  it('tells a Klein user on a fresh, empty layer that the ControlNet cannot run, before asking for a model', async () => {
-    catalog.mainModel = FLUX2_KLEIN_MAIN;
-    catalog.models = FLUX2_MODELS;
-    getArchitectureCapabilities.mockResolvedValueOnce(architectureCapabilitiesFixture);
-    await settle(ensureArchitectureCapabilitiesLoaded);
-    const fresh = createControlLayer('control-1', 'control-1', 'flux2', null);
-    const engine = engineWith([fresh]);
-    engine.exports.hasExportableLayerContent = () => false;
-
-    await render(fresh, engine);
-
-    expect(textOf('alert')).toBe('widgets.layers.control.validation.flux2_klein_control');
-  });
-});
-
-describe('ControlLayerSettings weight', () => {
-  // A full document layer (the panel reads its leaf), weighted 1 so a drag can move either way.
-  const weighted = ((): CanvasControlLayerContract => {
-    const base = createControlLayer('Control 1', 'control-1', 'sd-1', 'sd1-controlnet');
-    return { ...base, adapter: { ...base.adapter, weight: 1 } };
-  })();
-  const weightSlider = () => page.getByRole('slider', { name: 'widgets.layers.control.weight' });
-  const weightOf = (edit: unknown, side: 'forward' | 'inverse') =>
-    (edit as Record<typeof side, { config: { adapter: { weight: number } } }>)[side].config.adapter.weight;
-  /**
-   * One drag on the weight scrubber through each offset (fractions of its 0–2 track), released at the last unless
-   * `release` is false.
-   */
-  const dragWeight = async (offsets: number[], release = true) => {
-    const frame = weightSlider().element().closest<HTMLElement>('[data-scope="scrubber"]')!;
-    const rect = frame.getBoundingClientRect();
-    const startX = rect.left + rect.width / 2;
-    const xAt = (offset: number) => startX + offset * (rect.width - 20);
-    const pointer = (target: EventTarget, type: string, x: number) =>
-      settle(() =>
-        target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, clientX: x, pointerId: 1 }))
-      );
-    await pointer(frame, 'pointerdown', startX);
-    for (const offset of offsets) {
-      await pointer(window, 'pointermove', xAt(offset));
-    }
-    if (release) {
-      await pointer(window, 'pointerup', xAt(offsets.at(-1) ?? 0));
-    }
-  };
-  const typeWeight = async (text: string) => {
-    await act(async () => {
-      (weightSlider().element() as HTMLElement).focus();
-      await userEvent.keyboard(`{Enter}${text}{Enter}`);
-    });
-  };
-
-  it('previews a drag and records it as one step from the weight it started at', async () => {
-    await render(weighted, engineWith([weighted]));
-    await dragWeight([0.1, 0.25]);
-
-    expect(previews.length).toBeGreaterThanOrEqual(2);
-    expect(commits).toHaveLength(1);
-    expect(weightOf(commits[0]!.edit, 'forward')).toBe(1.5);
-    expect(weightOf(commits[0]!.edit, 'inverse')).toBe(1);
-  });
-
-  it('says nothing when an undo mid-drag turns the layer back into raster and the panel unmounts', async () => {
-    const engine = engineWith([weighted]);
-    await render(weighted, engine);
-    await dragWeight([0.25], false);
-    expect(previews.length).toBeGreaterThan(0);
-
-    // The undo ends the engine's session and the document no longer holds a control layer, so the layer list
-    // unmounts this panel; the unmount settles the drag against a document that refuses it.
-    sessionActive = false;
-    engine.replaceLayers([createEmptyPaintLayer(weighted.name, weighted.id)]);
+describe('ControlLayerSettings intent refusals', () => {
+  it.each([
+    ['blocked', 'The canvas is busy. Try again when the current action finishes.'],
+    ['locked', 'Unlock the layer before using this action.'],
+    ['no-detection-input', 'Replace the image to detect again'],
+    ['over-budget', 'Layer action failed'],
+  ] as const)('says why a %s edit did not land', async (result, title) => {
     const created = vi.spyOn(toaster, 'create');
     try {
-      await act(() => root?.unmount());
-      root = null;
+      intentResult = result;
+      await render(detectedLayer('depth', 'depth_anything_depth_estimation'));
+      await choose('Detection', 'Normal map');
 
-      expect(commits).toHaveLength(0);
-      expect(created).not.toHaveBeenCalled();
+      expect(intents).toEqual([{ detector: 'normal_map', kind: 'set-detector' }]);
+      expect(created).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ title }));
     } finally {
       created.mockRestore();
     }
-  });
-
-  it('records nothing and restores the weight when a drag returns to where it started', async () => {
-    await render(weighted, engineWith([weighted]));
-    await dragWeight([0.25, 0]);
-
-    expect(commits).toHaveLength(0);
-    expect(restores).toEqual([
-      { config: { adapter: { weight: 1 }, layerType: 'control' }, id: 'control-1', type: 'updateCanvasLayerConfig' },
-    ]);
-  });
-
-  it('clamps typed weights to the typed bounds, which reach past the track', async () => {
-    await render(weighted, engineWith([weighted]));
-    await typeWeight('-3');
-
-    expect(commits.map(({ edit }) => weightOf(edit, 'forward'))).toEqual([-1]);
-
-    await typeWeight('9');
-
-    expect(commits.map(({ edit }) => weightOf(edit, 'forward'))).toEqual([-1, 2]);
-  });
-
-  it('still attempts a typed weight when previews are refused, so the refusal is reported', async () => {
-    previewsRefused = true;
-    await render(weighted, engineWith([weighted]));
-    await typeWeight('0.5');
-
-    expect(commits.map(({ edit }) => weightOf(edit, 'forward'))).toEqual([0.5]);
-  });
-
-  it('disables the weight while document editing is locked', async () => {
-    editingLocked = true;
-    await render(weighted, engineWith([weighted]));
-
-    await expect.element(weightSlider()).toHaveAttribute('aria-disabled', 'true');
-  });
-});
-
-describe('ControlLayerSettings model choice', () => {
-  const CANNY = {
-    base: 'sd-1',
-    default_settings: { preprocessor: 'canny_image_processor' },
-    key: 'sd1-canny',
-    name: 'SD 1.5 Canny',
-    type: 'controlnet',
-  };
-  const modelless = createControlLayer('Control 1', 'control-1', 'sd-1', null);
-
-  const chooseCanny = async (hasContent: boolean) => {
-    catalog.models = [CANNY];
-    getArchitectureCapabilities.mockResolvedValueOnce(architectureCapabilitiesFixture);
-    await settle(ensureArchitectureCapabilitiesLoaded);
-    const startFilterOperation = vi.fn(() => 'started' as const);
-    await render(modelless, engineWith([modelless], { hasContent, operations: { startFilterOperation } }));
-    await act(() => page.getByRole('combobox', { name: 'widgets.layers.control.model' }).click());
-    await act(() => page.getByRole('option', { name: 'SD 1.5 Canny' }).click());
-    await settle();
-    return startFilterOperation;
-  };
-
-  it("starts the model's recommended filter on a layer with pixels", async () => {
-    const startFilterOperation = await chooseCanny(true);
-
-    expect(commits.map(({ label }) => label)).toEqual(['widgets.layers.control.model']);
-    expect(startFilterOperation).toHaveBeenCalledExactlyOnceWith('control-1', 'canny_edge_detection');
-  });
-
-  it('only sets the model on a layer without pixels yet, leaving nothing to filter', async () => {
-    const startFilterOperation = await chooseCanny(false);
-
-    expect(commits.map(({ label }) => label)).toEqual(['widgets.layers.control.model']);
-    expect(startFilterOperation).not.toHaveBeenCalled();
   });
 });

@@ -48,6 +48,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     raise_if_not_dir,
     raise_if_not_file,
     state_dict_has_any_keys_exact,
+    state_dict_has_any_keys_starting_with,
 )
 from invokeai.backend.model_manager.configs.qwen3_encoder import _SDNQ_LOADABLE_QWEN_ARCHITECTURES
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
@@ -256,6 +257,54 @@ def _has_krea2_keys(state_dict: dict[str | int, Any]) -> bool:
     return has_text_fusion and has_corroborator
 
 
+_SD_GGUF_UNSUPPORTED = (
+    "Stable Diffusion 1.x, 2.x and SDXL models are not supported in GGUF format. Install the model's .safetensors "
+    "or .ckpt checkpoint, or its Diffusers folder, instead."
+)
+
+# A UNet's cross-attention takes its text encoder's width, which tells the bases apart: SD 1.x (768) and 2.x (1024)
+# at the first resolution level, where SDXL has no attention, and SDXL (2048) and its refiner (1280) at the second.
+# The keys are named as in the original checkpoint layout, and as in diffusers'.
+_SD_BASES_BY_CONTEXT_WIDTH = (
+    {768: BaseModelType.StableDiffusion1, 1024: BaseModelType.StableDiffusion2},
+    {2048: BaseModelType.StableDiffusionXL, 1280: BaseModelType.StableDiffusionXLRefiner},
+)
+_SD_CHECKPOINT_CONTEXT_KEYS = (
+    "input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight",
+    "input_blocks.4.1.transformer_blocks.0.attn2.to_k.weight",
+)
+_SD_DIFFUSERS_CONTEXT_KEYS = (
+    "down_blocks.0.attentions.1.transformer_blocks.0.attn2.to_k.weight",
+    "down_blocks.1.attentions.0.transformer_blocks.0.attn2.to_k.weight",
+)
+
+
+def _sd_unet_base(state_dict: dict[str | int, Any], context_keys: tuple[str, ...]) -> BaseModelType | None:
+    """The SD base whose context width the UNet's cross-attention at `context_keys` takes, or None."""
+    for key, bases in zip(context_keys, _SD_BASES_BY_CONTEXT_WIDTH, strict=True):
+        tensor = state_dict.get(key)
+        if tensor is not None and (base := bases.get(tensor.shape[-1])) is not None:
+            return base
+    return None
+
+
+def _bare_sd_unet_base(state_dict: dict[str | int, Any]) -> BaseModelType | None:
+    """The base of a whole SD UNet stored without the checkpoint's `model.diffusion_model.` prefix, or None.
+
+    ComfyUI-GGUF's converter writes SD GGUFs this way: the UNet alone, under the checkpoint's key names or diffusers'.
+    The decoder half (`output_blocks.` / `up_blocks.`) is required because a ControlNet copies the encoder half under
+    the same names.
+    """
+    for context_keys, decoder_prefix in (
+        (_SD_CHECKPOINT_CONTEXT_KEYS, "output_blocks."),
+        (_SD_DIFFUSERS_CONTEXT_KEYS, "up_blocks."),
+    ):
+        base = _sd_unet_base(state_dict, context_keys)
+        if base is not None:
+            return base if state_dict_has_any_keys_starting_with(state_dict, decoder_prefix) else None
+    return None
+
+
 class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
     """Model config for main checkpoint models."""
 
@@ -273,6 +322,11 @@ class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
         cls._validate_looks_like_main_model(mod)
 
         cls._validate_base(mod)
+
+        # No SD loader reads GGUF: a stable-diffusion.cpp conversion would install as a checkpoint and fail to load.
+        # Checked after the base, so only a file that is this base is refused.
+        if _has_ggml_tensors(mod.load_state_dict()):
+            raise InvalidMatchError(_SD_GGUF_UNSUPPORTED)
 
         prediction_type = override_fields.pop("prediction_type", None) or cls._get_scheduler_prediction_type_or_raise(
             mod
@@ -292,21 +346,11 @@ class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
-        state_dict = mod.load_state_dict()
-
-        key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
-        if key_name in state_dict and state_dict[key_name].shape[-1] == 768:
-            return BaseModelType.StableDiffusion1
-        if key_name in state_dict and state_dict[key_name].shape[-1] == 1024:
-            return BaseModelType.StableDiffusion2
-
-        key_name = "model.diffusion_model.input_blocks.4.1.transformer_blocks.0.attn2.to_k.weight"
-        if key_name in state_dict and state_dict[key_name].shape[-1] == 2048:
-            return BaseModelType.StableDiffusionXL
-        elif key_name in state_dict and state_dict[key_name].shape[-1] == 1280:
-            return BaseModelType.StableDiffusionXLRefiner
-
-        raise NotAMatchError("unable to determine base type from state dict")
+        context_keys = tuple(f"model.diffusion_model.{key}" for key in _SD_CHECKPOINT_CONTEXT_KEYS)
+        base = _sd_unet_base(mod.load_state_dict(), context_keys)
+        if base is None:
+            raise NotAMatchError("unable to determine base type from state dict")
+        return base
 
     @classmethod
     def _get_scheduler_prediction_type_or_raise(cls, mod: ModelOnDisk) -> SchedulerPredictionType:
@@ -351,9 +395,16 @@ class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
 
     @classmethod
     def _validate_looks_like_main_model(cls, mod: ModelOnDisk) -> None:
-        has_main_model_keys = _has_main_keys(mod.load_state_dict())
-        if not has_main_model_keys:
-            raise NotAMatchError("state dict does not look like a main model")
+        """Raise `NotAMatch` unless the state dict looks like a main model; refuse a bare GGUF UNet of this base.
+
+        That UNet has none of the checkpoint's prefixes, so without the refusal it would register as Unknown.
+        """
+        state_dict = mod.load_state_dict()
+        if _has_main_keys(state_dict):
+            return
+        if _bare_sd_unet_base(state_dict) is cls.model_fields["base"].default and _has_ggml_tensors(state_dict):
+            raise InvalidMatchError(_SD_GGUF_UNSUPPORTED)
+        raise NotAMatchError("state dict does not look like a main model")
 
 
 class Main_Checkpoint_SD1_Config(Main_SD_Checkpoint_Config_Base, Config_Base):

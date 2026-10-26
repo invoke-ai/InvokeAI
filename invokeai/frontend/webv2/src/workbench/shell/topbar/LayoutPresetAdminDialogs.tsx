@@ -3,7 +3,7 @@ import type { LayoutPreset } from '@workbench/layoutContracts';
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { getLayoutPresetSourceOptions } from '@workbench/layoutPresetRouting';
-import { layoutPresets } from '@workbench/layoutPresets';
+import { getLayoutPresetLabel, layoutPresets } from '@workbench/layoutPresets';
 import { resolveSavedLayoutPreset } from '@workbench/layoutPresetSnapshots';
 import { useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo } from 'react';
@@ -40,12 +40,14 @@ export const LayoutPresetAdminDialogs = () => {
   const submitEdit = useCallback(
     ({ defaultRoute, iconId, name }: LayoutPresetDialogValue) => {
       if (editTarget) {
+        const shipped = layoutPresets.find((preset) => preset.id === editTarget.id);
+
         layout.setPresetRoute(editTarget.id, defaultRoute);
-        layout.renamePreset(editTarget.id, name);
+        layout.renamePreset(editTarget.id, name, shipped ? getLayoutPresetLabel(shipped, t) : undefined);
         layout.setPresetIcon(editTarget.id, iconId);
       }
     },
-    [editTarget, layout]
+    [editTarget, layout, t]
   );
   const confirmDelete = useCallback(() => {
     if (deleteTarget) {
@@ -61,7 +63,7 @@ export const LayoutPresetAdminDialogs = () => {
           defaultRoute={editTarget.defaultRoute}
           iconId={editTarget.iconId}
           isOpen={editDialog.isOpen}
-          name={editTarget.label}
+          name={getLayoutPresetLabel(editTarget, t)}
           sourceOptions={sourceOptions}
           submitLabel={t('topbar.presets.save')}
           title={t('topbar.presets.edit')}

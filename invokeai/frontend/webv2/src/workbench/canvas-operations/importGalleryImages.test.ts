@@ -15,11 +15,10 @@ import {
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
-import { getDocumentLeaves } from '@workbench/canvas-engine/api';
+import { createControlLayer, getDocumentLeaves } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createTestInsertionAnchorCapture } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import {
-  createControlLayer,
   createEmptyPaintLayer,
   createInpaintMaskFromImage,
   createRegionalGuidanceFromImage,
@@ -112,6 +111,7 @@ const setModel = (project: Project, base: GenerateWidgetValues['model']['base'])
     qwen3VLEncoderModel: null,
     qwen35EncoderModel: null,
     animaInpaintAdapterModel: null,
+    animaInpaintAdapterEnabled: true,
     animaInpaintAdapterWeight: 1,
     wanT5EncoderModel: null,
     wanLowNoiseModel: null,
@@ -122,6 +122,14 @@ const setModel = (project: Project, base: GenerateWidgetValues['model']['base'])
     ideogram4GuidanceScale: null,
     ideogram4Mu: null,
     ideogram4ColorPalette: [],
+    externalImageSize: null,
+    openaiQuality: 'auto',
+    openaiBackground: 'auto',
+    openaiInputFidelity: null,
+    geminiTemperature: null,
+    geminiThinkingLevel: null,
+    seedreamWatermark: false,
+    seedreamOptimizePrompt: false,
     krea2RebalanceEnabled: false,
     krea2RebalanceMultiplier: 4,
     krea2RebalanceWeights: '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0',
@@ -217,7 +225,7 @@ const expectedLayer = (
       };
     case 'control':
       return {
-        ...createControlLayer(`Control Layer ${index + 1}`, 'expected', base),
+        ...createControlLayer({ base, id: 'expected', name: `Control Layer ${index + 1}` }),
         id: expect.any(String) as string,
         source: { image: ref, type: 'image' },
         transform: { rotation: 0, scaleX: 1, scaleY: 1, x: bbox.x, y: bbox.y },
@@ -304,13 +312,9 @@ describe('importGalleryImagesToCanvas', () => {
     });
   });
 
-  it('seeds new control layers with the default control model for the selected base', async () => {
+  it('imports control layers untyped and without a model, so generation resolves the model', async () => {
     const { project, state } = withProject((value) => setModel(value, 'sd-1'));
     const canvasEngine = engine(project.id);
-    const models = [
-      { base: 'sd-1', key: 'sd1-canny', name: 'Canny', type: 'controlnet' },
-      { base: 'sd-1', key: 'sd1-union', name: 'Union Pro', type: 'controlnet' },
-    ] as unknown as Parameters<typeof importGalleryImagesToCanvas>[0]['models'];
 
     const result = await importGalleryImagesToCanvas({
       destination: 'control',
@@ -318,14 +322,16 @@ describe('importGalleryImagesToCanvas', () => {
       engine: canvasEngine,
       ...queriesFor(() => state),
       images: [image('a.png')],
-      models,
       project,
     });
 
     expect(result.status).toBe('imported');
     const [, forward] = vi.mocked(canvasEngine.layers.commitStructural).mock.calls[0]!;
     const layer = getForwardLayers(forward)[0]!;
-    expect(layer.type === 'control' ? layer.adapter.model : null).toBe('sd1-union');
+    expect(layer).toMatchObject({ adapter: { kind: 'controlnet', model: null }, type: 'control' });
+    expect(layer).not.toHaveProperty('controlType');
+    expect(layer).not.toHaveProperty('detection');
+    expect(layer).not.toHaveProperty('original');
   });
 
   it('fetches and uploads each resized control once with optimal model dimensions and durable hidden policy', async () => {
@@ -354,10 +360,13 @@ describe('importGalleryImagesToCanvas', () => {
     });
 
     expect(result.status).toBe('imported');
-    expect(fetchImage.mock.calls.map(([url]) => url)).toEqual([
-      'https://images.example/wide.png',
-      'https://images.example/square.png',
+    // The fixture URLs name another origin, as a selection saved elsewhere does: the fetch derives from the name.
+    const fetchedUrls = fetchImage.mock.calls.map(([url]) => String(url));
+    expect(fetchedUrls).toEqual([
+      expect.stringMatching(/\/api\/v1\/images\/i\/wide\.png\/full$/),
+      expect.stringMatching(/\/api\/v1\/images\/i\/square\.png\/full$/),
     ]);
+    expect(fetchedUrls.join()).not.toContain('images.example');
     expect(uploadImage).toHaveBeenCalledTimes(2);
     expect(uploadImage.mock.calls.map(([, options]) => options)).toEqual([
       expect.objectContaining({
@@ -378,13 +387,13 @@ describe('importGalleryImagesToCanvas', () => {
     const layers = getForwardLayers(forward);
     expect(layers).toEqual([
       {
-        ...createControlLayer('Control Layer 1', 'expected', 'flux2'),
+        ...createControlLayer({ base: 'flux2', id: 'expected', name: 'Control Layer 1' }),
         id: expect.any(String),
         source: { image: { height: 768, imageName: 'resized-wide.png', width: 1360 }, type: 'image' },
         transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 31, y: 47 },
       },
       {
-        ...createControlLayer('Control Layer 2', 'expected', 'flux2'),
+        ...createControlLayer({ base: 'flux2', id: 'expected', name: 'Control Layer 2' }),
         id: expect.any(String),
         source: { image: { height: 1024, imageName: 'resized-square.png', width: 1024 }, type: 'image' },
         transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 31, y: 47 },
