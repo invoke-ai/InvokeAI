@@ -224,6 +224,7 @@ export const createSelectObjectOperationCoordinator = (
           runGraph: deps.runGraph,
           uploadIntermediate: deps.uploadIntermediate,
         },
+        initialAutoProcess: deps.readAutoProcessPreference?.() ?? false,
         operation,
       });
       const installed = session;

@@ -3,12 +3,16 @@ import type { ModelConfig, ModelTaxonomyType } from '@features/models';
 
 import { Stack, Text } from '@chakra-ui/react';
 import {
+  addConcept,
   ConceptList,
   type ConceptModelPort,
   ConceptRow,
+  type ConceptUpdate,
   GenerationSettingsSection,
+  removeConcept,
+  updateConcept,
 } from '@features/generation/components';
-import { getDefaultLoraWeight, isLoraCompatibleWithModel, isLoraModelConfig } from '@features/generation/settings';
+import { isLoraCompatibleWithModel, isLoraModelConfig } from '@features/generation/settings';
 import { getModelBaseColorPalette, getModelBaseLabel, getModelImageUrl, useOpenModelInManager } from '@features/models';
 import { ModelSelect } from '@features/models/react';
 import { memo, useCallback, useMemo } from 'react';
@@ -51,29 +55,18 @@ export const VideoConceptsSection = memo(
     );
     const addLora = useCallback(
       (candidate: ModelConfig | null) => {
-        if (!model || !isLoraModelConfig(candidate) || !isLoraCompatibleWithModel(candidate, model)) {
-          return;
+        if (isLoraModelConfig(candidate)) {
+          onChangeLoras((current) => addConcept(current, candidate, model));
         }
-
-        onChangeLoras((current) => [
-          ...current,
-          { isEnabled: true, model: candidate, weight: getDefaultLoraWeight(candidate) },
-        ]);
       },
       [model, onChangeLoras]
     );
     const updateLora = useCallback(
-      (key: string, update: Partial<GenerateLora>) =>
-        // A row removed mid-edit still flushes its draft; returning the list unchanged makes that a no-op.
-        onChangeLoras((current) =>
-          current.some((lora) => lora.model.key === key)
-            ? current.map((lora) => (lora.model.key === key ? { ...lora, ...update } : lora))
-            : current
-        ),
+      (key: string, update: ConceptUpdate) => onChangeLoras((current) => updateConcept(current, key, update)),
       [onChangeLoras]
     );
     const removeLora = useCallback(
-      (key: string) => onChangeLoras((current) => current.filter((candidate) => candidate.model.key !== key)),
+      (key: string) => onChangeLoras((current) => removeConcept(current, key)),
       [onChangeLoras]
     );
 

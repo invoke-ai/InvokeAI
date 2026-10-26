@@ -4,7 +4,8 @@ description: How to use InvokeAI in multi-user mode as an end user.
 sidebar:
   order: 3
 ---
-import { Steps } from '@astrojs/starlight/components'
+
+import { Steps } from '@astrojs/starlight/components';
 
 ## Overview
 
@@ -48,15 +49,17 @@ If you're the first person to access a fresh InvokeAI installation in multi-user
 Now:
 
 <Steps>
-1. Enter your email address (this will be your login name)
-2. Create a display name (this will be the name other users see)
-3. Choose a strong password. The following criteria are required with `strict_password_checking: true`.
-    - At least 8 characters long
-    - Contains uppercase letters
-    - Contains lowercase letters
-    - Contains numbers
-4. Confirm your password
-5. Click **Create Administrator Account**
+
+1. Enter your email address (this will be your login name).
+
+2. Create a display name (this will be the name other users see).
+
+3. Choose a strong password. With `strict_password_checking: true`, it must have at least 8 characters, including uppercase letters, lowercase letters, and numbers.
+
+4. Confirm your password.
+
+5. Click **Create Administrator Account**.
+
 </Steps>
 
 With `strict_password_checking` disabled, you'll be warned if you choose a
@@ -81,10 +84,15 @@ This will take you to the User Management screen...
 The User Management screen also allows you to:
 
 <Steps>
+
 1. Temporarily change a user's status to Inactive, preventing them from logging in to Invoke.
+
 2. Edit a user (by clicking on the pencil icon) to change the user's display name or password.
+
 3. Permanently delete a user.
+
 4. Grant a user Administrator privileges.
+
 </Steps>
 
 ---
@@ -119,7 +127,7 @@ As a regular user, you can:
 - Customize your UI preferences (theme, hotkeys, etc.)
 - View available models (read-only access to Model Manager)
 - Open boards other users have given them access to, and add to the ones they can contribute to
-- View and use workflows marked as shared by other users
+- Browse public workflows in the **Shared** library tab, including your own public workflows
 
 You cannot:
 
@@ -144,7 +152,7 @@ Administrators have all regular user capabilities, plus:
 - Full model management (add, delete, configure models)
 - Create and manage user accounts
 - View and manage all users' generation queues
-- View and manage all users' boards, images, and workflows (including system-owned legacy content)
+- View all users' workflows in the Library; rename, delete, and visibility controls are shown only to each workflow's owner
 - Access system configuration
 - Grant or revoke admin privileges
 
@@ -156,12 +164,12 @@ Administrators have all regular user capabilities, plus:
 
 In multi-user mode, each user can create an unlimited number of boards and organize their images and assets as they see fit, in the Library or inside a project. What another user may do with your board depends on their **role** on it:
 
-| Role | Can |
-| --- | --- |
-| **Viewer** | Browse the board, open and download its images and videos, copy them to their own boards, and use them in their own generations. |
+| Role            | Can                                                                                                                              |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **Viewer**      | Browse the board, open and download its images and videos, copy them to their own boards, and use them in their own generations. |
 | **Contributor** | Everything a viewer can, and add their own images and videos to the board. They can remove, star or delete only what they added. |
-| **Editor** | Everything a contributor can, and remove or star anyone's items, rename the board, set its cover and archive it. |
-| **Owner** | Everything, including changing who has access, moving the board between the Library and a project, and deleting it. |
+| **Editor**      | Everything a contributor can, and remove or star anyone's items, rename the board, set its cover and archive it.                 |
+| **Owner**       | Everything, including changing who has access, moving the board between the Library and a project, and deleting it.              |
 
 A board's **general access** sets the role every other user gets:
 
@@ -189,14 +197,16 @@ If an InvokeAI instance was in multiuser mode and then restarted in single user 
 
 ### Workflows
 
-Each user has their own private workflow library. Workflows you create are visible only to you by default.
+In multi-user mode, new workflows saved to the Library are private by default. To change a saved workflow's visibility, open **Yours**, select it, and use **Visibility** in the detail panel to choose **Private** or **Public**. A public workflow is visible to signed-in users of this same InvokeAI instance; it is not published to the public internet.
 
-You can share a workflow with other users by marking it as **shared** (public). Shared workflows appear in all users' workflow libraries and can be opened by anyone, but only the owner (or an administrator) can modify or delete them.
+You can also choose **Public workflow** when using **Save to Library** to create a public Library copy of a project workflow. This does not make the project-only workflow public. Changing a Library record's visibility does not publish unsaved project edits; use **Update Template** to update the Library copy's content. **Update Template** preserves that copy's visibility.
 
-To share a workflow, open it and use the sharing controls to toggle its public/shared status.
+Public workflows appear in **Shared**, including your own public workflows. Callable public workflows can also appear in the **Call Saved Workflow** picker.
 
-:::caution[Preexisting workflows after enabling multi-user mode]
-When you enable multi-user mode for the first time on an existing InvokeAI installation, all workflows that were created before multi-user mode was activated will appear in the **shared workflows** section. These preexisting workflows are owned by the internal "system" account and are visible to all users. Administrators can edit or delete these shared legacy workflows. Regular users can view and use them but cannot modify them.
+Other users can browse, open, duplicate, or download your public workflows. In the Library, only the workflow's owner is offered rename, delete, and visibility controls.
+
+:::note[Preexisting Library workflows]
+User workflows already in the Library before per-user workflow ownership was introduced are migrated as public records owned by the internal system account. They appear in **Shared**. The Library does not offer rename, delete, or visibility controls for these records to other accounts, but users can still open, duplicate, or download them.
 :::
 
 ### The Generation Queue
@@ -276,9 +286,13 @@ These settings are stored per-user and won't affect other users.
 **Possible Causes:**
 
 <Steps>
-1. **Filter Applied:** Check if a filter is hiding content
-2. **Wrong User:** Ensure you're logged in with the correct account
-3. **Archived Board:** Check the "Show Archived" option
+
+1. **Filter Applied:** Check if a filter is hiding content.
+
+2. **Wrong User:** Ensure you're logged in with the correct account.
+
+3. **Archived Board:** Check the "Show Archived" option.
+
 </Steps>
 
 **Solution:**
@@ -329,7 +343,7 @@ Not unless you give them access. Boards start **restricted**: only you and admin
 
 ### Can I share my workflows with others?
 
-Yes. You can mark any workflow as shared (public), which makes it visible to all users. Other users can view and use shared workflows, but only you or an administrator can modify or delete them.
+Yes. In multi-user mode, make a saved Library workflow public from **Yours**, or choose **Public workflow** when saving a new Library copy. Public workflows are visible to signed-in users of the same InvokeAI instance and appear in **Shared**. Other users can open, duplicate, or download them; only the owner is offered rename, delete, and visibility controls in the Library. For a project copy linked to a public workflow, its owner or a ready administrator can use **Update Template**; other users can choose **Save as new** to create their own Library workflow.
 
 ### How long do sessions last?
 

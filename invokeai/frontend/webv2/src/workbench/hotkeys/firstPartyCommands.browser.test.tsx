@@ -80,9 +80,7 @@ it('words a blocked control layer from the locale when Invoke runs from its hotk
   });
 
   const [args] = submitActiveInvocation.mock.calls[0] ?? [];
-  expect(
-    args?.formatControlLayerError({ code: 'switch_adapter_kind', layerName: 'Sketch', suggestedKind: 'anima_lllite' })
-  ).toBe(
-    'Control layer "Sketch": Switch the adapter type to Anima ControlNet-LLLite to use this layer with the selected model.'
+  expect(args?.formatControlLayerError({ code: 'switch_adapter_kind', layerName: 'Sketch' })).toBe(
+    'Control layer "Sketch": Choose a control type so a model for the selected main model can be picked.'
   );
 });

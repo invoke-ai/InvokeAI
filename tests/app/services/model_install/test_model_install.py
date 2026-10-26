@@ -75,6 +75,7 @@ from invokeai.app.services.model_install.model_install_common import (
     URLModelSource,
 )
 from invokeai.app.services.model_records import ModelRecordChanges, ModelRecordServiceSQL, UnknownModelException
+from invokeai.app.util import no_replace
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
 from invokeai.backend.model_manager.metadata import (
     HuggingFaceMetadata,
@@ -413,14 +414,14 @@ def test_rollback_restores_source_across_filesystems_without_overwriting(
         original.write_bytes(b"model weights")
     moved = destination_root / "model"
     shutil.move(original, moved)
-    real_rename_noreplace = ModelInstallService._rename_noreplace
+    real_rename_noreplace = model_install_default.rename_noreplace
 
     def raise_exdev_for_original(src: Path, dst: Path) -> None:
         if src == moved:
             raise OSError(errno.EXDEV, "cross-device link")
         real_rename_noreplace(src, dst)
 
-    monkeypatch.setattr(ModelInstallService, "_rename_noreplace", staticmethod(raise_exdev_for_original))
+    monkeypatch.setattr(model_install_default, "rename_noreplace", raise_exdev_for_original)
 
     ModelInstallService._restore_moved_path(moved, original)
 
@@ -486,7 +487,7 @@ def test_startup_cleanup_preserves_live_exdev_restore_lookalike(
     copy_started = threading.Event()
     finish_copy = threading.Event()
     real_copy2 = shutil.copy2
-    real_rename_noreplace = ModelInstallService._rename_noreplace
+    real_rename_noreplace = model_install_default.rename_noreplace
 
     def pause_copy(src: Path, dst: Path) -> Path:
         real_copy2(src, dst)
@@ -500,7 +501,7 @@ def test_startup_cleanup_preserves_live_exdev_restore_lookalike(
         real_rename_noreplace(src, dst)
 
     monkeypatch.setattr(model_install_default, "copy2", pause_copy)
-    monkeypatch.setattr(ModelInstallService, "_rename_noreplace", staticmethod(raise_exdev_for_managed_copy))
+    monkeypatch.setattr(model_install_default, "rename_noreplace", raise_exdev_for_managed_copy)
     errors: list[Exception] = []
 
     def restore() -> None:
@@ -747,7 +748,7 @@ def test_directory_install_rollback_race_preserves_both_source_artifacts(
     locked_item = items[-1]
     original_bytes = first_item.read_bytes()
     real_move = shutil.move
-    real_rename_noreplace = ModelInstallService._rename_noreplace
+    real_rename_noreplace = model_install_default.rename_noreplace
 
     def fail_later_move(src: Path, dst: Path):
         if src == locked_item:
@@ -760,7 +761,7 @@ def test_directory_install_rollback_race_preserves_both_source_artifacts(
         real_rename_noreplace(src, dst)
 
     _fake_move(monkeypatch, fail_later_move)
-    monkeypatch.setattr(ModelInstallService, "_rename_noreplace", staticmethod(recreate_after_absence_check))
+    monkeypatch.setattr(model_install_default, "rename_noreplace", recreate_after_absence_check)
 
     with pytest.raises(model_install_default.InstallRecoveryRequiredError, match="recovery required"):
         mm2_installer.install_path(diffusers_dir)
@@ -813,11 +814,7 @@ def test_directory_install_preserves_recreated_source_when_no_replace_rename_fai
         raise OSError(unsupported_errno, "atomic no-replace rename unsupported", str(dst))
 
     _fake_move(monkeypatch, fail_later_move)
-    monkeypatch.setattr(
-        ModelInstallService,
-        "_rename_noreplace",
-        staticmethod(fail_no_replace_after_source_recreation),
-    )
+    monkeypatch.setattr(model_install_default, "rename_noreplace", fail_no_replace_after_source_recreation)
 
     with pytest.raises(InstallRecoveryRequiredError, match="recovery required") as exc_info:
         mm2_installer.install_path(diffusers_dir)
@@ -1029,6 +1026,7 @@ def test_cancelling_leaves_staging_another_owner_claimed_untouched(
     mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
 ) -> None:
     assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
     tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}claimed-elsewhere-{uuid.uuid4().hex}"
     tmpdir.mkdir()
     partial = tmpdir / "model.safetensors.downloading"
@@ -1262,6 +1260,7 @@ def test_queue_rejection_during_shutdown_preserves_completed_download(
     mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
 ) -> None:
     assert isinstance(mm2_installer, ModelInstallService)
+    assert mm2_installer._wait_for_restore_complete(timeout=10)
     tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}queue-stop-{uuid.uuid4().hex}"
     partial_path = _write_remote_install_marker(mm2_installer, tmpdir, 9905, InstallStatus.DOWNLOADS_DONE)
     job = ModelInstallJob(
@@ -2184,6 +2183,27 @@ def test_simple_download(mm2_installer: ModelInstallServiceBase, mm2_app_config:
     assert isinstance(bus.events[2], ModelInstallDownloadsCompleteEvent)  # download completed
     assert isinstance(bus.events[3], ModelInstallStartedEvent)  # install started
     assert isinstance(bus.events[4], ModelInstallCompleteEvent)  # install completed
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_remote_install_completes_on_a_filesystem_without_hard_links(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refuse_link(src: Path, dst: Path) -> None:
+        # exFAT on Linux; Windows reports WinError 1 for the same refusal.
+        raise PermissionError(errno.EPERM, "Operation not permitted", str(dst))
+
+    monkeypatch.setattr(no_replace.os, "link", refuse_link)
+    source = URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors"))
+
+    job = mm2_installer.import_model(source)
+    mm2_installer.wait_for_installs(timeout=10)
+
+    assert job.complete, job.error_traceback
+    assert job.config_out
+    assert (mm2_app_config.models_path / job.config_out.path).exists()
+    assert not list(mm2_app_config.models_path.glob(f".*{INSTALL_ACTIVE_SENTINEL}"))
+    assert not list(mm2_app_config.models_path.glob(f"{TMPDIR_PREFIX}*"))
 
 
 @pytest.mark.timeout(timeout=10, method="thread")
