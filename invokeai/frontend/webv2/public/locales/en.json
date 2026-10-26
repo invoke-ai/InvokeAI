@@ -2063,6 +2063,50 @@
       "failed": "Database VACUUM failed.",
       "requestFailed": "The database could not be vacuumed."
     },
+    "imageStorage": {
+      "adminOnly": "Only an administrator can change where images are stored.",
+      "layoutLabel": "Folder layout for new images",
+      "layoutHelp": "Applies to images saved from now on. Existing images stay where they are until you run Start Move.",
+      "layoutLoadFailed": "The storage layout could not be loaded.",
+      "layoutSaveFailed": "The storage layout could not be saved.",
+      "layouts": {
+        "flat": "Flat (one folder)",
+        "date": "By date (YYYY/MM/DD)",
+        "type": "By image category",
+        "hash": "By name prefix (hashed)",
+        "unknown": "Unknown layout ({{layout}})"
+      },
+      "maintenanceHeading": "Move existing images",
+      "maintenanceDescription": "Moves every image and thumbnail into the current layout. Names, boards and metadata are unchanged. While the move runs, the gallery and the queue are paused.",
+      "statusLoadFailed": "The image move status could not be loaded.",
+      "statusIdle_zero": "All images are stored in the current layout.",
+      "statusIdle_one": "{{count}} image is stored outside the current layout.",
+      "statusIdle_other": "{{count}} images are stored outside the current layout.",
+      "statusMoving": "Moving images into the current layout…",
+      "statusRecovering": "Recovering an interrupted image move…",
+      "statusNeedsRecovery": "An image move was interrupted. Run Recover to finish it before starting another move.",
+      "latestJob": "Last move: {{state}}",
+      "jobStates": {
+        "planned": "planned",
+        "moving": "moving",
+        "moved": "moved",
+        "committed": "completed",
+        "error": "failed"
+      },
+      "startMove": "Start Move",
+      "startConfirmTitle": "Move all images into the current layout?",
+      "startConfirmBody": "InvokeAI pauses image reads, uploads, deletions and generation for everyone on this server until the move finishes. It cannot start while queue work is active.",
+      "startFailed": "The image move could not be started.",
+      "recover": "Recover",
+      "recoverConfirmTitle": "Recover the image move journal?",
+      "recoverConfirmBody": "Recovery finishes moves that were recorded before the server stopped. Items in an ambiguous state are left for manual repair and reported here.",
+      "recoverFailed": "Image move recovery could not be started.",
+      "unavailableStatus": "Start Move and Recover become available once the move status has loaded.",
+      "unavailableRunning": "Start Move and Recover become available again when the current job finishes.",
+      "unavailableSavingLayout": "Start Move and Recover become available once the new layout is saved.",
+      "recoverNotNeeded": "Recover is only needed after a move is interrupted.",
+      "nothingToDo": "Nothing to move, and no interrupted move to recover."
+    },
     "galleryMaintenance": {
       "heading": "Gallery maintenance",
       "removeMissing": "Remove records for missing images",
@@ -2202,6 +2246,10 @@
       "generationDevices": {
         "label": "Generation devices",
         "description": "Server-wide accelerator selection. Changes require a server restart."
+      },
+      "imageStorage": {
+        "label": "Image storage",
+        "description": "Where this server stores image files on disk, and the maintenance job that moves existing images into that layout."
       },
       "maxQueueHistory": {
         "label": "Queue history",
@@ -4844,6 +4892,18 @@
           "loadedLabelVideo": "Loaded “{{name}}” from video",
           "missing": "This image has no workflow embedded.",
           "missingVideo": "This video has no workflow embedded."
+        },
+        "pbrMaps": {
+          "canceled": "PBR maps canceled",
+          "canceledMessage": "The queue item generating maps for {{name}} was canceled.",
+          "completed": "PBR maps are ready",
+          "completedMessage": "Normal, roughness and displacement maps for {{name}} were added to the gallery.",
+          "failed": "Could not generate PBR maps",
+          "label": "Generate PBR Maps",
+          "queued": "Generating PBR maps",
+          "queuedMessage": "Normal, roughness and displacement maps for {{name}} are queued.",
+          "removed": "PBR maps removed from the queue",
+          "removedMessage": "The queue item generating maps for {{name}} was removed from the queue."
         },
         "delete": {
           "failure_one": "Could not delete {{count}} item.",
