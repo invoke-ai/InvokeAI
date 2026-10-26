@@ -37,6 +37,12 @@ import { createLogger } from '@platform/logging/logger';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 
+import {
+  createRemoteModelTransferToasts,
+  parseRemoteModelTransferProgress,
+  type RemoteModelTransferToastPort,
+} from './remoteModelTransferToasts';
+
 const GALLERY_REFRESH_COALESCE_MS = 400;
 const SAFETY_SWEEP_INTERVAL_MS = 30_000;
 /** Node-level detail supports the terminal queue-item failure the history owner records. */
@@ -228,6 +234,7 @@ export const createQueueCoordinator = (
     galleryRefreshCoalesceMs?: number;
     modelLoads: QueueModelLoadPort;
     nodeExecution: QueueNodeExecutionPort;
+    remoteModelTransferToaster?: RemoteModelTransferToastPort;
     progress?: QueueItemProgressSink;
     progressImage?: ProgressImageSink;
     sweepIntervalMs?: number;
@@ -242,6 +249,9 @@ export const createQueueCoordinator = (
   const progressImage = options.progressImage ?? progressImageStore;
   const galleryRefreshCoalesceMs = options.galleryRefreshCoalesceMs ?? GALLERY_REFRESH_COALESCE_MS;
   const sweepIntervalMs = options.sweepIntervalMs ?? SAFETY_SWEEP_INTERVAL_MS;
+  const remoteModelTransferToasts = options.remoteModelTransferToaster
+    ? createRemoteModelTransferToasts(options.remoteModelTransferToaster)
+    : null;
 
   const runs = new Map<string, RunState>();
   const runProgress = new Map<string, RunProgressState>();
@@ -872,6 +882,15 @@ export const createQueueCoordinator = (
       return;
     }
 
+    const transfer = parseRemoteModelTransferProgress(event.message);
+    if (transfer) {
+      if (owner.accountId !== 'single-user' && event.user_id !== owner.accountId) {
+        return;
+      }
+      remoteModelTransferToasts?.receive(transfer);
+      return;
+    }
+
     const backendItemId = getTrackedBackendItemId(event);
     const wait = waits.get(backendItemId);
 
@@ -1003,6 +1022,7 @@ export const createQueueCoordinator = (
 
   /** Detach generation listeners; the hub keeps the socket alive. */
   const dispose = (): void => {
+    remoteModelTransferToasts?.dispose();
     isDisposed = true;
     activeProgressTarget.clear();
     progressImage.clear();

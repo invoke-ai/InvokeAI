@@ -127,6 +127,7 @@ dependencies = [
   "pillow>=12.3.0",
   "prompt-toolkit",
   "pypatchmatch",
+  "pycryptodomex>=3.24.1,<4",  # AES-256-GCM Remote Worker vault; win_arm64 wheels
   "PyJWT>=2.15.0",
   "python-multipart",
   "requests",

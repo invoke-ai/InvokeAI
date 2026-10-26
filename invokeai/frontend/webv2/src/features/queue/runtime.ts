@@ -46,6 +46,10 @@ import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/acco
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
 import { ApiError, getApiErrorMessage } from '@platform/transport/http';
 
+import type { RemoteModelTransferToastPort } from './runtime/remoteModelTransferToasts';
+
+import { applyRemoteWorkersToGraph } from './data/remoteWorkersGraph';
+
 export interface QueueResultDestinationPort {
   addImagesToGalleryBoard(boardId: string, imageNames: string[]): Promise<void>;
   addVideosToGalleryBoard(boardId: string, videoNames: string[]): Promise<void>;
@@ -291,6 +295,14 @@ export const createQueueItemBackendSubmission = (
     return { error: 'Queue item backend submission has an invalid batch count.', kind: 'invalid' };
   }
 
+  // Only the submitted graph is modified: never write automatic nodes into
+  // the user's saved workflow document or change a recovered queue snapshot.
+  const graph = applyRemoteWorkersToGraph(
+    submission.graph,
+    queueItem.snapshot.galleryBoardId,
+    queueItem.snapshot.destination
+  );
+
   if (submission.kind === 'generate') {
     const seedStep = readSubmissionSeedStep(submission);
 
@@ -319,6 +331,7 @@ export const createQueueItemBackendSubmission = (
       kind: 'generate',
       request: {
         ...compiled,
+        graph,
         destination: queueItem.snapshot.destination,
         ...(isQueueSeedStep(submission.seedStep) ? {} : { legacySeedPlan: true as const }),
         ...(queueItem.snapshot.prepend === true ? { prepend: true } : {}),
@@ -354,6 +367,7 @@ export const createQueueItemBackendSubmission = (
     kind: 'workflow',
     request: {
       ...compiled,
+      graph,
       destination: queueItem.snapshot.destination,
       ...(queueItem.snapshot.prepend === true ? { prepend: true } : {}),
       projectId: project.id,
@@ -437,6 +451,7 @@ export const createQueueRuntime = ({
   locks,
   modelLoads,
   nodeExecution,
+  remoteModelTransferToaster,
   viewerUserId = null,
 }: {
   backend: QueueBackendPort;
@@ -448,6 +463,7 @@ export const createQueueRuntime = ({
   locks?: QueueRunLockPort;
   modelLoads: QueueModelLoadPort;
   nodeExecution: QueueNodeExecutionPort;
+  remoteModelTransferToaster?: RemoteModelTransferToastPort;
   /** The signed-in user on a multiuser server; null in single-user mode, where every item is the viewer's. */
   viewerUserId?: string | null;
 }): QueueRuntime => {
@@ -1364,7 +1380,7 @@ export const createQueueRuntime = ({
         }
       },
     },
-    { backend: coordinatorBackend, modelLoads, nodeExecution }
+    { backend: coordinatorBackend, modelLoads, nodeExecution, remoteModelTransferToaster }
   );
 
   /** Backend ids of reruns no run in this tab adopted. */

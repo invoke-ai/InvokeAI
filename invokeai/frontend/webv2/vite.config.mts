@@ -133,6 +133,8 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/features/gallery/ui/GalleryItemSearch.tsx',
   // The image menu (editor boot) and the lazy layer menu share the board destination list; alone it costs a request.
   '/workbench/image-actions/GalleryBoardDestinationGroups.tsx',
+  // The boot progress rail and lazy Queue UI share this hook; avoid a standalone editor startup chunk.
+  '/workbench/queue-integration/useActiveQueueProgress.ts',
   '/app/GalleryUiAdapter.tsx',
   '/features/generation/core/prompt/ast.ts',
   '/features/generation/core/prompt/attention.ts',
