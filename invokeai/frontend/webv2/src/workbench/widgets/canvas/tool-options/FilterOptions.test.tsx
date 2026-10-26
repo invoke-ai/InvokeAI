@@ -160,6 +160,7 @@ describe('getFilterErrorTranslationKey', () => {
     'source-adjustment-over-budget': true,
     'source-adjustment-too-large': true,
     'source-over-budget': true,
+    'source-unreadable': true,
     stale: true,
     unsupported: true,
   };
@@ -226,9 +227,11 @@ describe('filter operation form', () => {
 
     expect(footer).toContain('Portrait · Raster layer');
     expect(footer).toContain('role="status"');
-    // Auto-process on: no Process verb; Reset then Apply then Cancel.
+    // Auto-process on: no Process verb; Reset settings then Apply then Cancel.
     expect(footer).not.toContain('>Process<');
-    expect(footer.indexOf('>Reset<')).toBeLessThan(footer.indexOf('>Apply<'));
+    expect(footer).not.toContain('>Reset<');
+    expect(footer.indexOf('>Reset settings<')).toBeGreaterThan(-1);
+    expect(footer.indexOf('>Reset settings<')).toBeLessThan(footer.indexOf('>Apply<'));
     expect(footer.indexOf('>Apply<')).toBeLessThan(footer.indexOf('>Cancel<'));
   });
 

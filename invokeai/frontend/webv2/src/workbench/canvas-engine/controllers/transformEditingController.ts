@@ -1,11 +1,15 @@
-import type { CanvasEditRefusal, StructuralCommitResult } from '@workbench/canvas-engine/capabilities';
+import type {
+  BeginTransformResult,
+  CanvasEditRefusal,
+  StructuralCommitResult,
+} from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { TransformSession } from '@workbench/canvas-engine/engineStores';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { LayerCacheEntry } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
-import type { Rect } from '@workbench/canvas-engine/types';
+import type { Rect, ToolId } from '@workbench/canvas-engine/types';
 
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { rebaseControlOriginal } from '@workbench/canvas-engine/document/controlDerivation';
@@ -19,6 +23,7 @@ import {
 } from '@workbench/canvas-engine/history/history';
 import { isEmpty, roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
 import { hittableLayerSize } from '@workbench/canvas-engine/tools/moveHitTest';
+import { isTransformEligible } from '@workbench/canvas-engine/tools/transformTool';
 import { bakeMatrix } from '@workbench/canvas-engine/transform/transformMath';
 
 import type { CanvasMutationContext, EditStep } from './mutationContext';
@@ -27,13 +32,19 @@ import { replaceLayerStep, rgbaBytes, withReplayReservation } from './editSteps'
 
 export interface TransformEditingControllerOptions {
   readonly session: { get(): TransformSession | null; set(value: TransformSession | null): void };
+  /** A requested session waiting for its layer's pixels to persist; see {@link TransformEditingController.request}. */
+  readonly pending: { get(): string | null; set(value: string | null): void };
   readonly backend: RasterBackend;
   readonly ctx: Pick<CanvasMutationContext, 'applyStep' | 'begin' | 'installPrepared' | 'reserveRaster'>;
   readonly getDocument: () => CanvasDocumentContractV3 | null;
   readonly getCache: (layerId: string) => LayerCacheEntry | null;
+  /** The live cache extent, read without touching residency order. */
+  readonly peekCacheRect: (layerId: string) => Rect | undefined;
   readonly setOverride: (layerId: string, transform: LayerTransform | null) => void;
   /** Installs whole-layer pixels at a layer-local rect, marking them painted and dirty. */
   readonly restoreCache: (layerId: string, rect: Rect, pixels: ImageData) => void;
+  /** A paint layer's pixels were redrawn from `from`, the session's transform, into its new local space. */
+  readonly rebaseLineEnd: (layerId: string, from: LayerTransform) => void;
   readonly commitStructural: (
     label: string,
     forward: CanvasProjectMutation,
@@ -42,6 +53,14 @@ export interface TransformEditingControllerOptions {
   readonly reportRefusal: (refusal: CanvasEditRefusal) => void;
   readonly canEdit: () => boolean;
   readonly isGestureActive: () => boolean;
+  readonly isInteractionLocked: () => boolean;
+  readonly hasFloatingSelection: () => boolean;
+  /** The tool the user is on: a Space, Alt or C hold only lends the surface to another tool. */
+  readonly getUserToolId: () => ToolId;
+  /** Selects `layerId`; selecting cancels a session on another layer. */
+  readonly select: (layerId: string) => void;
+  /** Switches to the transform tool, which opens a session on an eligible selection. */
+  readonly enterTool: () => void;
   readonly invalidate: (payload: { layers: string[]; overlay: true }) => void;
 }
 
@@ -70,7 +89,10 @@ const unchanged = (left: LayerTransform, right: LayerTransform): boolean =>
   left.scaleY === right.scaleY &&
   left.rotation === right.rotation;
 
-/** Owns transform session state, previews, param commits, and paint bakes. */
+/**
+ * Owns transform session state, previews, param commits, paint bakes, and the wait of a session requested on pixels
+ * persistence has not acknowledged yet.
+ */
 export class TransformEditingController {
   private disposed = false;
 
@@ -98,6 +120,110 @@ export class TransformEditingController {
     this.deps.session.set({ layerId, startTransform: start, transform: start });
     this.deps.setOverride(layerId, start);
     this.deps.invalidate({ layers: [layerId], overlay: true });
+  }
+
+  /**
+   * Opens a session on `layerId` now, whatever tool is active: selects it, enters the tool and opens the session
+   * even when transform is already active, cancelling a session on another layer. Every refusal is decided before
+   * the selection or tool changes. A leaf whose only content is a stroke persistence has not acknowledged yet (a new
+   * paint layer's first upload) has no persisted extent to frame, so the request waits in `pending` and the session
+   * opens once the bitmap lands.
+   */
+  request(layerId: string): BeginTransformResult {
+    const document = this.deps.getDocument();
+    const leaf = lookupDocumentLeaf(document, layerId);
+    if (this.disposed || !document || !leaf) {
+      return this.disposed ? 'busy' : 'missing';
+    }
+    if (leaf.effectiveLocked) {
+      return 'locked';
+    }
+    const persisted = isTransformEligible(leaf.layer, document);
+    if (!persisted && !isTransformEligible(leaf.layer, document, this.deps.peekCacheRect(layerId))) {
+      return 'ineligible';
+    }
+    if (
+      this.deps.isInteractionLocked() ||
+      this.deps.isGestureActive() ||
+      this.deps.hasFloatingSelection() ||
+      !this.deps.canEdit()
+    ) {
+      return 'busy';
+    }
+    if (document.selectedLayerId !== layerId) {
+      this.deps.select(layerId);
+    }
+    this.deps.enterTool();
+    if (this.deps.session.get()?.layerId !== layerId) {
+      this.cancel();
+      if (persisted) {
+        this.begin(layerId);
+      }
+      if (this.deps.session.get()?.layerId !== layerId) {
+        this.deps.pending.set(layerId);
+      }
+    }
+    return 'started';
+  }
+
+  /**
+   * Every document change settles a wait: the session opens once the layer's pixels are persisted, if it is still
+   * the selection, transform is the tool the user is on and no session opened meanwhile; otherwise the wait ends.
+   */
+  onDocumentChanged(): void {
+    const layerId = this.deps.pending.get();
+    if (layerId === null) {
+      return;
+    }
+    const document = this.deps.getDocument();
+    const layer = getDocumentLayer(document, layerId);
+    if (
+      !document ||
+      !layer ||
+      document.selectedLayerId !== layerId ||
+      this.deps.getUserToolId() !== 'transform' ||
+      this.deps.session.get() !== null
+    ) {
+      this.deps.pending.set(null);
+    } else if (isTransformEligible(layer, document)) {
+      this.deps.pending.set(null);
+      this.begin(layerId);
+    }
+  }
+
+  /** A genuine switch to another tool ends the wait; temporary holds never reach here. */
+  onToolSwitch(to: ToolId): void {
+    if (to !== 'transform') {
+      this.deps.pending.set(null);
+    }
+  }
+
+  /** Escape ends a wait once no session is open; returns whether it did. */
+  onEscape(): boolean {
+    if (this.deps.pending.get() === null) {
+      return false;
+    }
+    this.deps.pending.set(null);
+    return true;
+  }
+
+  /** A replay lands on a document the request never saw, so the wait ends. */
+  onReplay(): void {
+    this.deps.pending.set(null);
+  }
+
+  /** A replaced document drops the session and the wait without restoring anything. */
+  onDocumentReplaced(): void {
+    this.deps.session.set(null);
+    this.deps.pending.set(null);
+  }
+
+  /** Pixels that could not be persisted, with no retry to follow, will not open a session; say so. */
+  onUploadFailed(layerId: string): void {
+    if (this.deps.pending.get() === layerId) {
+      this.deps.pending.set(null);
+      this.deps.reportRefusal('not-ready');
+    }
   }
 
   update(transform: LayerTransform): void {
@@ -230,6 +356,9 @@ export class TransformEditingController {
         redo: () => this.replay(forward, afterRect),
         undo: () => this.replay(backward, beforeRect),
       });
+      if (result.status === 'committed') {
+        this.deps.rebaseLineEnd(layer.id, session.transform);
+      }
       this.settle(result.status);
     } finally {
       txn.end();
@@ -254,6 +383,7 @@ export class TransformEditingController {
       return;
     }
     this.cancel();
+    this.deps.pending.set(null);
     this.disposed = true;
   }
 }

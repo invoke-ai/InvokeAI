@@ -4,6 +4,7 @@ import type {
   CanvasColorLabel,
   CanvasDocumentContractV3,
   CanvasLayerContract,
+  InpaintMaskMergeEligibility,
   LayerStackMoveKind,
 } from '@workbench/canvas-engine/api';
 import type { LucideIcon } from 'lucide-react';
@@ -52,6 +53,7 @@ import {
   SlidersVerticalIcon,
   SplineIcon,
   SunMediumIcon,
+  UngroupIcon,
   WavesIcon,
   SlidersHorizontalIcon,
   Trash2Icon,
@@ -59,6 +61,7 @@ import {
 } from 'lucide-react';
 
 import { COLOR_LABEL_ITEMS } from './colorLabels';
+import { removeFromGroupCommand } from './layerGroupCommands';
 import { canAddRegionalReferenceImage, canConvertRasterControl, canMergeLayerDown } from './layerOps';
 
 export type LayerContextActionId =
@@ -78,12 +81,14 @@ export type LayerContextActionId =
   | 'add-dehaze'
   | 'add-noise-adjustment'
   | 'merge-selected'
+  | 'merge-masks'
   | 'move-to-front'
   | 'move-forward'
   | 'move-backward'
   | 'move-to-back'
   | 'duplicate'
   | 'group'
+  | 'remove-from-group'
   | 'rename'
   | 'transform'
   | 'fit-to-bbox'
@@ -140,6 +145,10 @@ export interface LayerContextActionState {
   canDeleteSelection: boolean;
   /** Whether the whole multi-selection can merge into one raster, asked the same way. */
   canMergeSelection: boolean;
+  /** Whether merge masks would take `actionTargets`, and if not, whether only their generation settings differ. */
+  mergeMasksEligibility: InpaintMaskMergeEligibility;
+  /** The model's answer for lifting `actionTargets` out of their group. */
+  canRemoveFromGroup: boolean;
   /** A group above the layer hides it on the canvas; the layer's own flag cannot override that. */
   hiddenByAncestor: boolean;
   /** Whether Q jumps to this layer: the engine's transient quick-switch bookmark names it. */
@@ -150,7 +159,9 @@ export interface LayerContextActionEffects {
   reorder(kind: LayerStackMoveKind, actionId: LayerContextActionId): void;
   duplicate(): void;
   mergeSelected(): void;
+  mergeMasks(): Promise<void>;
   group(): void;
+  removeFromGroup(): void;
   openRename(): void;
   openRunWorkflow(): void;
   startSelectObject(layerId: string): void;
@@ -206,6 +217,10 @@ interface LayerContextActionDefinitionBase {
   tone?: 'danger';
   /** A raw hotkey string (e.g. `mod+]`) shown as a trailing hint on the item. */
   hint?: string;
+  /** A second line under the label explaining what the action does, shown whether or not it is enabled. */
+  descriptionKey?: string;
+  /** Why the disabled action cannot run here; asked only when `isEnabled` is false. */
+  getUnavailableReasonKey?(context: LayerContextActionState): string | undefined;
   isVisible(context: LayerContextActionState): boolean;
   isEnabled(context: LayerContextActionState): boolean;
   handler(context: LayerContextActionRuntimeContext): void | Promise<void>;
@@ -239,7 +254,10 @@ export interface LayerContextAction {
   order: number;
   tone?: 'danger';
   hint?: string;
+  descriptionKey?: string;
   isDisabled: boolean;
+  /** Set only on a disabled action whose reason is known; the menu keeps such an item reachable and says why. */
+  unavailableReasonKey?: string;
   handler(context: LayerContextActionRuntimeContext): void | Promise<void>;
 }
 
@@ -306,11 +324,23 @@ const allTargetsEnabled = (context: LayerContextActionState): boolean =>
   targetNodes(context).every((node) => node.isEnabled);
 const allTargetsLocked = (context: LayerContextActionState): boolean =>
   targetNodes(context).every((node) => node.isLocked);
+const allTargetsInpaintMasks = (context: LayerContextActionState): boolean =>
+  targetNodes(context).every((node) => node.type === 'inpaint_mask');
 /** Locked in its own right or by a group above it: content edits are refused either way. */
 const isLayerFrozen = (context: LayerContextActionState): boolean =>
   context.layer.isLocked || (layerEntry(context)?.ancestorsLocked ?? false);
 const isLayerMutable = (context: LayerContextActionState): boolean =>
   isInteractionFree(context) && !isLayerFrozen(context);
+const CANVAS_NOT_READY_REASON = 'widgets.layers.actions.canvasNotReady';
+const INTERACTION_LOCKED_REASON = 'widgets.layers.actions.interactionLocked';
+/** Any target locked, by itself or by a group above it: the model refuses to move it out. */
+const isAnyTargetFrozen = (context: LayerContextActionState): boolean => {
+  const index = getDocumentIndex(context.document);
+  return actionTargets(context).some((id) => {
+    const entry = index.byId.get(id);
+    return !!entry && (entry.node.isLocked || entry.ancestorsLocked);
+  });
+};
 const hasReadablePixels = (context: LayerContextActionState): boolean =>
   context.hasEngine && context.hasSupportedContent && !context.interactionLocked;
 const hasMutablePixels = (context: LayerContextActionState): boolean =>
@@ -468,6 +498,26 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
   {
+    defaultLabel: 'Remove from group',
+    getUnavailableReasonKey: (context) =>
+      !context.hasEngine
+        ? CANVAS_NOT_READY_REASON
+        : isAnyTargetFrozen(context)
+          ? 'widgets.layers.actions.removeFromGroupLocked'
+          : context.interactionLocked
+            ? INTERACTION_LOCKED_REASON
+            : undefined,
+    handler: ({ effects }) => effects.removeFromGroup(),
+    icon: UngroupIcon,
+    id: 'remove-from-group',
+    isEnabled: (context) => isInteractionFree(context) && context.canRemoveFromGroup,
+    isVisible: (context) => removeFromGroupCommand(context.document, actionTargets(context)) !== null,
+    labelKey: 'widgets.layers.actions.removeFromGroup',
+    order: 21,
+    section: 'quick',
+    supportedLayerTypes: ALL_LAYER_TYPES,
+  },
+  {
     defaultLabel: 'Transform',
     handler: ({ effects }) => effects.transform(),
     icon: SlidersHorizontalIcon,
@@ -492,7 +542,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
   {
-    defaultLabel: 'Fit to bbox',
+    defaultLabel: 'Fit to frame',
     handler: ({ effects }) => effects.fitToBbox(),
     icon: ImageIcon,
     id: 'fit-to-bbox',
@@ -620,6 +670,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
   },
   {
     defaultLabel: 'Add regenerate region',
+    descriptionKey: 'widgets.layers.actions.addRegenerateRegionDescription',
     handler: ({ effects }) => effects.addLayerRegion(),
     icon: WandSparklesIcon,
     id: 'add-regenerate-region',
@@ -684,11 +735,32 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     icon: MergeIcon,
     id: 'merge-selected',
     isEnabled: (context) => isInteractionFree(context) && context.canMergeSelection,
-    isVisible: isMultiTarget,
+    // A mask-only selection merges through Merge masks instead; raster merge never accepts masks.
+    isVisible: (context) => isMultiTarget(context) && !allTargetsInpaintMasks(context),
     labelKey: 'widgets.layers.actions.mergeSelected',
     order: 1,
     section: 'operations',
     supportedLayerTypes: ALL_LAYER_TYPES,
+  },
+  {
+    defaultLabel: 'Merge masks',
+    getUnavailableReasonKey: (context) =>
+      !context.hasEngine
+        ? CANVAS_NOT_READY_REASON
+        : context.mergeMasksEligibility === 'settings-differ'
+          ? 'widgets.layers.actions.mergeMasksSettingsDiffer'
+          : context.mergeMasksEligibility === 'ineligible'
+            ? 'widgets.layers.actions.mergeMasksIneligible'
+            : INTERACTION_LOCKED_REASON,
+    handler: ({ effects }) => effects.mergeMasks(),
+    icon: MergeIcon,
+    id: 'merge-masks',
+    isEnabled: (context) => isInteractionFree(context) && context.mergeMasksEligibility === 'eligible',
+    isVisible: (context) => isMultiTarget(context) && allTargetsInpaintMasks(context),
+    labelKey: 'widgets.layers.actions.mergeMasks',
+    order: 1,
+    section: 'operations',
+    supportedLayerTypes: INPAINT_ONLY,
   },
   {
     defaultLabel: 'Intersect with layer below',
@@ -860,7 +932,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     supportedLayerTypes: RASTER_ONLY,
   },
   {
-    defaultLabel: 'Crop layer to bbox',
+    defaultLabel: 'Crop layer to frame',
     handler: ({ effects }) => effects.cropToBbox(),
     icon: CropIcon,
     id: 'crop-to-bbox',
@@ -1042,19 +1114,24 @@ export const getLayerContextActionDefinition = (id: LayerContextActionId): Layer
 export const getLayerContextActions = (context: LayerContextActionState): LayerContextAction[] =>
   LAYER_CONTEXT_ACTION_DEFINITIONS.filter(
     (definition) => definition.supportedLayerTypes.includes(context.layer.type) && definition.isVisible(context)
-  ).map((definition) => ({
-    defaultLabel: definition.getDefaultLabel?.(context) ?? definition.defaultLabel,
-    handler: definition.handler,
-    hint: definition.hint,
-    icon: definition.getIcon?.(context) ?? definition.icon,
-    iconColor: definition.iconColor,
-    id: definition.id,
-    isDisabled: !definition.isEnabled(context),
-    labelCount: definition.getLabelCount?.(context),
-    labelKey: definition.getLabelKey?.(context) ?? definition.labelKey,
-    order: definition.order,
-    picker: definition.picker,
-    section: definition.section,
-    submenu: definition.submenu,
-    tone: definition.tone,
-  }));
+  ).map((definition) => {
+    const isDisabled = !definition.isEnabled(context);
+    return {
+      defaultLabel: definition.getDefaultLabel?.(context) ?? definition.defaultLabel,
+      descriptionKey: definition.descriptionKey,
+      handler: definition.handler,
+      hint: definition.hint,
+      icon: definition.getIcon?.(context) ?? definition.icon,
+      iconColor: definition.iconColor,
+      id: definition.id,
+      isDisabled,
+      labelCount: definition.getLabelCount?.(context),
+      labelKey: definition.getLabelKey?.(context) ?? definition.labelKey,
+      order: definition.order,
+      picker: definition.picker,
+      section: definition.section,
+      submenu: definition.submenu,
+      tone: definition.tone,
+      unavailableReasonKey: isDisabled ? definition.getUnavailableReasonKey?.(context) : undefined,
+    };
+  });

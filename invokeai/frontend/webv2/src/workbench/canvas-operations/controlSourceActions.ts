@@ -4,6 +4,7 @@ import type {
   CanvasDocumentCapability,
   CanvasDocumentContractV3,
   CanvasExportCapability,
+  LayerUnreadable,
 } from '@workbench/canvas-engine/api';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { Project } from '@workbench/projectContracts';
@@ -255,7 +256,8 @@ export const resolveControlFileDrop = (input: {
 export type FillControlFromBboxResult =
   | { status: 'applied'; result: ControlLayerIntentResult; imageName: string }
   | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' }
-  | AdjustmentRefusal;
+  | AdjustmentRefusal
+  | LayerUnreadable;
 
 /**
  * Uses the visible raster content inside the bbox as a control layer's image: the composite is uploaded as a control
