@@ -64075,6 +64075,39 @@
             "orig_required": false,
             "title": "Style Reference Prompt"
           },
+          "reference_latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LatentsField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Edit references for Krea-2 edit LoRAs, encoded by 'Image to Latents - Qwen Image' with 'reference' enabled. Up to 3. They join every transformer pass as clean (t=0) image tokens, about 4096 tokens per megapixel each; with Reference K/V Cache on they run once instead of in every pass. Not combinable with style reference or regional prompts.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Reference Latents"
+          },
+          "reference_kv_cache": {
+            "default": false,
+            "description": "For edit LoRAs trained with ai-toolkit's 'kv_cache' option, where reference tokens attend only to each other. The references then run through the transformer once per generation instead of in every pass, which is faster. Leave off for normal edit LoRAs. The LoRA file does not say which kind it is; check its model card. No effect without reference latents.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Reference K/V Cache",
+            "type": "boolean"
+          },
           "type": {
             "const": "krea2_denoise",
             "default": "krea2_denoise",
@@ -64087,7 +64120,7 @@
         "tags": ["image", "krea2", "krea-2"],
         "title": "Denoise - Krea-2",
         "type": "object",
-        "version": "1.3.1",
+        "version": "1.4.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -64964,7 +64997,7 @@
         "category": "conditioning",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Encodes a text prompt for Krea-2 using the Qwen3-VL text encoder.\n\nThe encoder taps 12 decoder hidden-state layers and stacks them per token, producing a 4D\nconditioning tensor (B, seq, 12, hidden) that the Krea-2 transformer's text-fusion stage consumes.",
+        "description": "Encodes a text prompt for Krea-2 using the Qwen3-VL text encoder.\n\nThe encoder taps 12 decoder hidden-state layers and stacks them per token, producing a 4D\nconditioning tensor (B, seq, 12, hidden) that the Krea-2 transformer's text-fusion stage consumes.\n\nWith reference images (edit mode, for edit LoRAs) the Qwen3-VL vision tower reads them into the prompt,\nahead of the text, and the conditioning has the prompt's natural length rather than 512 tokens.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -65040,6 +65073,20 @@
             "orig_required": true,
             "title": "Qwen3-VL Encoder"
           },
+          "reference_images": {
+            "default": [],
+            "description": "Up to three reference images for an edit LoRA, read by the Qwen3-VL vision tower in this order (Picture 1, 2, 3). Needs a safetensors or Diffusers encoder: a GGUF encoder has no vision tower.",
+            "field_kind": "input",
+            "input": "any",
+            "items": {
+              "$ref": "#/components/schemas/ImageField"
+            },
+            "maxItems": 3,
+            "orig_default": [],
+            "orig_required": false,
+            "title": "Reference Images",
+            "type": "array"
+          },
           "type": {
             "const": "krea2_text_encoder",
             "default": "krea2_text_encoder",
@@ -65052,7 +65099,7 @@
         "tags": ["prompt", "conditioning", "krea2", "krea-2"],
         "title": "Prompt - Krea-2",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/Krea2ConditioningOutput"
         }
@@ -96682,7 +96729,7 @@
           "cpu_only"
         ],
         "title": "Qwen3VLEncoder_GGUF_Config",
-        "description": "Configuration for a single-file GGUF Qwen3-VL encoder (llama.cpp, e.g.\n``Qwen3VL-4B-Instruct-Q4_K_M.gguf``).\n\nllama.cpp splits Qwen3-VL across two files: the language tower -- all Krea-2 and Ideogram 4\ncondition on -- and a companion ``mmproj-*.gguf`` holding the visual tower. Only the language\ntower is accepted here; the ``mmproj`` file is turned away with its own reason.\n\nIdentified by the ``general.architecture`` metadata, which is the only honest discriminator: a\nQwen3-VL language tower is structurally indistinguishable from a text-only Qwen3 of the same\nsize (both 36 layers at hidden 2560 for the 4B), so a shape probe would accept a stock Qwen3\nGGUF as a Krea-2 encoder. That file loads without error and produces silently wrong\nconditioning, which is precisely the failure identification exists to prevent."
+        "description": "Configuration for a single-file GGUF Qwen3-VL encoder (llama.cpp, e.g.\n``Qwen3VL-4B-Instruct-Q4_K_M.gguf``).\n\nllama.cpp splits Qwen3-VL across two files: the language tower -- all a text prompt needs -- and a\ncompanion ``mmproj-*.gguf`` holding the visual tower, which reads Krea-2 edit reference images.\nOnly the language tower is accepted here; the ``mmproj`` file is turned away with its own reason,\nso a GGUF encoder encodes text only.\n\nIdentified by the ``general.architecture`` metadata, which is the only honest discriminator: a\nQwen3-VL language tower is structurally indistinguishable from a text-only Qwen3 of the same\nsize (both 36 layers at hidden 2560 for the 4B), so a shape probe would accept a stock Qwen3\nGGUF as a Krea-2 encoder. That file loads without error and produces silently wrong\nconditioning, which is precisely the failure identification exists to prevent."
       },
       "Qwen3VLEncoder_Qwen3VLEncoder_Config": {
         "properties": {
@@ -98381,6 +98428,16 @@
             "orig_required": false,
             "title": "Height"
           },
+          "reference": {
+            "default": false,
+            "description": "Encode as a Krea-2 edit reference (for 'Denoise - Krea-2' reference latents), sized as ai-toolkit trains Krea-2 edit LoRAs: RGB with alpha dropped; an image above 1 megapixel is scaled to about 1 megapixel keeping its aspect ratio; each side is rounded to a multiple of 16; resized bilinearly. Not the Qwen-Image Edit path. Width and height must be left unset.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Reference",
+            "type": "boolean"
+          },
           "type": {
             "const": "qwen_image_i2l",
             "default": "qwen_image_i2l",
@@ -98393,7 +98450,7 @@
         "tags": ["image", "latents", "vae", "i2l", "qwen_image"],
         "title": "Image to Latents - Qwen Image",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -106778,6 +106835,7 @@
           "tokenizer_2",
           "tokenizer_3",
           "processor",
+          "vision_encoder",
           "pe",
           "pe_tokenizer",
           "vae",
