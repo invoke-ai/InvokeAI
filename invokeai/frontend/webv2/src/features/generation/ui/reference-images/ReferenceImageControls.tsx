@@ -277,7 +277,7 @@ export const IPAdapterControls = ({
               </Stack>
             ) : null}
             <Stack gap="1">
-              <FieldHeader label={t('widgets.generate.activeSteps')}>
+              <FieldHeader hint="stepRange" label={t('widgets.generate.activeSteps')}>
                 <Text color="fg.subtle" fontFamily="mono" fontSize="xs">
                   {formatPct(beginEndStepPct[0])} – {formatPct(beginEndStepPct[1])}
                 </Text>

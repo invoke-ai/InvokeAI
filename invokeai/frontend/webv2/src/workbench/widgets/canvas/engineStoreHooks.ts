@@ -8,6 +8,7 @@ import type {
   EraserOptions,
   GradientToolOptions,
   LassoToolOptions,
+  LayerQuickSwitchState,
   MarqueeToolOptions,
   ShapeToolOptions,
   TextEditSession,
@@ -19,11 +20,15 @@ import type {
 
 import {
   getCanvasOperations,
+  IDLE_CONTROL_DETECTION_STATUS,
   type CanvasOperationState,
+  type ControlDetectionStatus,
   type FilterOperationSessionState,
   type SamSessionSnapshot,
 } from '@workbench/canvas-operations/api';
 import { useCallback, useSyncExternalStore } from 'react';
+
+const EMPTY_LAYER_QUICK_SWITCH: LayerQuickSwitchState = { bookmarkedLayerId: null, previousLayerId: null };
 
 /** Subscribes the calling component to a single engine scalar store. */
 const useCanvasInteractionState = <K extends keyof CanvasInteractionState>(
@@ -103,6 +108,10 @@ export const useCanvasZoom = (engine: CanvasCoreStoreCapability): number => useC
 export const useCanvasViewportReady = (engine: CanvasCoreStoreCapability): boolean =>
   useCanvasInteractionState(engine, 'viewportReady');
 
+/** The control layer the canvas shows as its original (or original under map); null while every map shows. */
+export const useControlLayerView = (engine: CanvasCoreStoreCapability): CanvasInteractionState['controlLayerView'] =>
+  useCanvasInteractionState(engine, 'controlLayerView');
+
 /** The active tool id for `engine`. */
 export const useCanvasActiveTool = (engine: CanvasCoreStoreCapability): ToolId =>
   useCanvasInteractionState(engine, 'activeTool');
@@ -137,6 +146,20 @@ export const useFilterSession = (engine: object): FilterOperationSessionState | 
     operations.getFilterSessionState,
     operations.getFilterSessionState
   );
+};
+
+/** One control layer's background detection status; a null engine reads as idle without subscribing. */
+export const useControlDetectionStatus = (engine: object | null, layerId: string): ControlDetectionStatus => {
+  const subscribe = useCallback(
+    (listener: () => void) =>
+      engine ? getCanvasOperations(engine).subscribeControlDetectionStatus(layerId, listener) : () => undefined,
+    [engine, layerId]
+  );
+  const getSnapshot = useCallback(
+    () => (engine ? getCanvasOperations(engine).getControlDetectionStatus(layerId) : IDLE_CONTROL_DETECTION_STATUS),
+    [engine, layerId]
+  );
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 };
 
 /** Whether the engine-owned canvas history has an entry to undo (enables the header undo button). */
@@ -178,6 +201,19 @@ export const useBrushOptions = (engine: CanvasCoreStoreCapability): BrushOptions
 /** The eraser tool's current options (size / opacity). Write through `engine.interaction.set`. */
 export const useEraserOptions = (engine: CanvasCoreStoreCapability): EraserOptions =>
   useCanvasInteractionState(engine, 'eraserOptions');
+
+/** The Q quick-switch memory; a null engine reads as empty without subscribing. */
+export const useLayerQuickSwitch = (engine: CanvasCoreStoreCapability | null): LayerQuickSwitchState => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine?.interaction.subscribe('layerQuickSwitch', listener) ?? (() => undefined),
+    [engine]
+  );
+  const getSnapshot = useCallback(
+    () => engine?.interaction.get('layerQuickSwitch') ?? EMPTY_LAYER_QUICK_SWITCH,
+    [engine]
+  );
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+};
 
 /** The bbox tool's current options (aspect lock / ratio). Write through `engine.interaction.set`. */
 export const useBboxOptions = (engine: CanvasCoreStoreCapability): BboxToolOptions =>

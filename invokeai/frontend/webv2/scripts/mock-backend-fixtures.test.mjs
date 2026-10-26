@@ -12,6 +12,7 @@ import {
   MOCK_BACKEND_PROFILE_COUNTS,
   MOCK_BACKEND_PROFILE_NAMES,
   MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME,
+  MODEL_SEED_SETS,
   PROJECT_FILE_BOARD,
   PROJECT_FILE_BOARD_ID,
   validateMockBackendFixture,
@@ -201,7 +202,7 @@ test('the HTTP reset contract selects profiles explicitly and restores the start
     );
     assert.equal(projects.length, 40);
     assert.deepEqual(runtimeConfig, {
-      config: { generation_devices: 'auto', max_queue_history: null },
+      config: { generation_devices: 'auto', image_subfolder_strategy: 'flat', max_queue_history: null },
       set_fields: [],
     });
 
@@ -246,6 +247,16 @@ const getJson = async (backend, path, init) => {
 
   return body;
 };
+
+/** The representative queue holds pending and in-progress items, which refuse Start Move as on the real server. */
+const clearQueue = (backend) => getJson(backend, '/api/v1/queue/default/clear', { method: 'PUT' });
+
+const enqueueBatch = (backend) =>
+  fetch(`${backend.origin}/api/v1/queue/default/enqueue_batch`, {
+    body: JSON.stringify({ batch: { graph: { edges: [], id: 'pbr', nodes: {} }, runs: 1 }, prepend: false }),
+    headers: { 'content-type': 'application/json' },
+    method: 'POST',
+  });
 
 test('queue item ids take the backend limit: the head of the order, counted as returned, bounded', async () => {
   await withRepresentativeBackend(async (backend) => {
@@ -416,6 +427,52 @@ test('starred filter narrows gallery items, names, and date boards consistently'
     const datedStarred = await getJson(backend, `${dateQuery}&starred=true`);
     assert.equal(datedStarred.total_count, dated.starred_count);
     assert.ok(datedStarred.total_count > 0);
+  });
+});
+
+test('media_kind narrows gallery items, names, location, date boards, and the image map consistently', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const query = 'categories=general&is_intermediate=false&starred_first=false&limit=1000&offset=0';
+    const all = await getJson(backend, `/api/v1/gallery/items/?${query}`);
+    const videos = await getJson(backend, `/api/v1/gallery/items/?${query}&media_kind=video`);
+    const images = await getJson(backend, `/api/v1/gallery/items/?${query}&media_kind=image`);
+
+    assert.ok(videos.total > 0, 'the fixture listing should contain videos');
+    assert.ok(videos.items.every((item) => item.kind === 'video'));
+    assert.ok(images.items.every((item) => item.kind === 'image'));
+    assert.equal(videos.total + images.total, all.total);
+
+    const names = await getJson(
+      backend,
+      '/api/v1/gallery/items/names?categories=general&is_intermediate=false&starred_first=false&media_kind=video'
+    );
+    assert.equal(names.total_count, videos.total);
+
+    const video = videos.items[0];
+    const locationQuery = `categories=general&is_intermediate=false&starred_first=false&kind=video&name=${encodeURIComponent(video.name)}`;
+    const location = await getJson(backend, `/api/v1/gallery/items/location?${locationQuery}&media_kind=video`);
+    assert.deepEqual(location, { index: 0, kind: 'video', name: video.name, total: videos.total });
+    const excluded = await fetch(`${backend.origin}/api/v1/gallery/items/location?${locationQuery}&media_kind=image`);
+    assert.equal(excluded.status, 404);
+    await excluded.body?.cancel();
+
+    const dated = await getJson(
+      backend,
+      '/api/v1/virtual_boards/by_date/2026-01-15/item_names?categories=general&is_intermediate=false&media_kind=video'
+    );
+    assert.ok(dated.total_count > 0);
+    assert.ok(dated.items.every((item) => item.kind === 'video'));
+
+    const points = await getJson(backend, '/api/v1/image_map/points?include_videos=true&media_kind=video');
+    const labels = await getJson(backend, '/api/v1/image_map/cluster_labels?include_videos=true&media_kind=video');
+    const bothPoints = await getJson(backend, '/api/v1/image_map/points?include_videos=true');
+    const status = await getJson(backend, '/api/v1/image_map/status?include_videos=true&media_kind=video');
+
+    assert.ok(points.points.length > 0);
+    assert.ok(points.points.every((point) => point.kind === 'video'));
+    assert.equal(labels.visible_hash, points.visible_hash);
+    assert.notEqual(points.visible_hash, bothPoints.visible_hash);
+    assert.equal(status.projection.point_count, points.points.length);
   });
 });
 
@@ -858,6 +915,200 @@ test('copying media mints fresh identities and deleting a project keeps its medi
   });
 });
 
+test('a project claims only an unshared Library board of the caller’s own', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const call = (path, init) =>
+      fetch(`${backend.origin}${path}`, {
+        ...init,
+        headers: { 'content-type': 'application/json' },
+        ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+      });
+    const claim = (boardId) => call('/api/v1/projects/', { body: { board_id: boardId, data: {} }, method: 'POST' });
+    const listed = await getJson(backend, '/api/v1/boards/');
+    const staging = listed.find((board) => board.project_id === null && !board.is_inbox);
+
+    // Seeded boards carry their general access, and the deprecated visibility alias is derived from it.
+    assert.equal(staging.general_access, 'restricted');
+    assert.equal(staging.board_visibility, 'private');
+
+    // Shared with everyone: not claimable, until restricted again.
+    await call('/__board-access', {
+      body: { board_id: staging.board_id, general_access: 'contributor' },
+      method: 'POST',
+    });
+    assert.equal((await getJson(backend, `/api/v1/boards/${staging.board_id}`)).board_visibility, 'public');
+    assert.equal((await claim(staging.board_id)).status, 409);
+    await call('/__board-access', {
+      body: { board_id: staging.board_id, general_access: 'restricted' },
+      method: 'POST',
+    });
+
+    // Shared with a member: not claimable either.
+    await call('/__board-access', { body: { board_id: staging.board_id, member_role: 'viewer' }, method: 'POST' });
+    assert.equal((await claim(staging.board_id)).status, 409);
+    await call('/__board-access', { body: { board_id: staging.board_id, member_role: null }, method: 'POST' });
+
+    // Someone else's board, even one the caller may read, is never theirs to claim.
+    await call('/__faults', { body: { sharedBoards: true }, method: 'POST' });
+    assert.equal((await claim('shared-contributor')).status, 409);
+
+    const claimed = await claim(staging.board_id);
+    assert.equal(claimed.ok, true);
+    assert.equal((await claimed.json()).board_id, staging.board_id);
+  });
+});
+
+test('a project save may carry the caller’s workspace, stored with the content or refused with it', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const call = (path, init) =>
+      fetch(`${backend.origin}${path}`, {
+        ...init,
+        headers: { 'content-type': 'application/json' },
+        ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+      });
+    const [project] = await getJson(backend, '/api/v1/projects/');
+    const save = (body) =>
+      call(`/api/v1/projects/${project.project_id}`, {
+        body: { max_document_schema_version: 4, ...body },
+        method: 'PUT',
+      });
+
+    // Content alone: the answer names no workspace.
+    const contentOnly = await save({ data: project.data, expected_revision: project.revision });
+    assert.equal(contentOnly.status, 200);
+    const contentOnlyRecord = await contentOnly.json();
+    assert.equal(contentOnlyRecord.revision, project.revision + 1);
+    assert.equal(contentOnlyRecord.workspace, null);
+
+    // A workspace beside a whole document, or the split without one, is refused as the server refuses it.
+    const beforeSplit = await save({
+      data: project.data,
+      expected_revision: contentOnlyRecord.revision,
+      workspace: { data: { layout: 'early' }, expected_revision: null },
+    });
+    assert.equal(beforeSplit.status, 400);
+    assert.equal((await beforeSplit.json()).detail.code, 'workspace_needs_split_document');
+    const contentOnlySplit = await save({
+      data: project.data,
+      expected_revision: contentOnlyRecord.revision,
+      minimum_document_schema_version: 4,
+    });
+    assert.equal(contentOnlySplit.status, 400);
+    assert.deepEqual((await contentOnlySplit.json()).detail.code, 'split_needs_workspace');
+    assert.equal(
+      (await getJson(backend, `/api/v1/projects/${project.project_id}`)).revision,
+      contentOnlyRecord.revision
+    );
+
+    // Content and the first workspace, in one write.
+    const split = await save({
+      data: project.data,
+      expected_revision: contentOnlyRecord.revision,
+      minimum_document_schema_version: 4,
+      workspace: { data: { layout: 'split' }, expected_revision: null },
+    });
+    assert.equal(split.status, 200);
+    const splitRecord = await split.json();
+    assert.equal(splitRecord.revision, contentOnlyRecord.revision + 1);
+    assert.deepEqual(splitRecord.workspace.data, { layout: 'split' });
+    assert.equal(splitRecord.workspace.revision, 1);
+    assert.equal(typeof splitRecord.workspace.updated_at, 'string');
+    assert.equal(splitRecord.workspace_updated_at, splitRecord.workspace.updated_at);
+
+    // A stale workspace revision refuses the whole save: the content revision does not move either.
+    const stale = await save({
+      data: { ...project.data, changed: true },
+      expected_revision: splitRecord.revision,
+      workspace: { data: { layout: 'stale' }, expected_revision: null },
+    });
+    assert.equal(stale.status, 409);
+    assert.deepEqual(await stale.json(), {
+      detail: { current_revision: 1, message: 'Workspace revision conflict' },
+    });
+    const unchanged = await getJson(backend, `/api/v1/projects/${project.project_id}?max_document_schema_version=4`);
+    assert.equal(unchanged.revision, splitRecord.revision);
+    assert.deepEqual(unchanged.workspace.data, { layout: 'split' });
+
+    // A stale content revision answers with the current one, as the server does.
+    const staleContent = await save({ data: project.data, expected_revision: 0 });
+    assert.equal(staleContent.status, 409);
+    assert.deepEqual(await staleContent.json(), {
+      detail: { current_revision: splitRecord.revision, message: 'Revision conflict' },
+    });
+
+    // The workspace route answers the canvas floor as the content routes do.
+    const belowFloor = await call(`/api/v1/projects/${project.project_id}/workspace`, {
+      body: { data: {}, expected_revision: 1, max_canvas_schema_version: 1, max_document_schema_version: 4 },
+      method: 'PUT',
+    });
+    assert.equal(belowFloor.status, 412);
+    const refusal = await belowFloor.json();
+    assert.equal(refusal.detail.code, 'canvas_schema_unsupported');
+    assert.equal(refusal.detail.max_canvas_schema_version, 1);
+    assert.equal(refusal.detail.minimum_canvas_schema_version, unchanged.minimum_canvas_schema_version);
+    const saved = await call(`/api/v1/projects/${project.project_id}/workspace`, {
+      body: { data: { layout: 'own-route' }, expected_revision: 1, max_document_schema_version: 4 },
+      method: 'PUT',
+    });
+    assert.equal(saved.status, 200);
+    assert.equal((await saved.json()).revision, 2);
+  });
+});
+
+test('a project create may carry the caller’s first workspace, stored with the content', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const call = (path, init) =>
+      fetch(`${backend.origin}${path}`, {
+        ...init,
+        headers: { 'content-type': 'application/json' },
+        ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+      });
+    const create = (body) =>
+      call('/api/v1/projects/', { body: { max_document_schema_version: 4, ...body }, method: 'POST' });
+
+    // Content alone: the answer names no workspace.
+    const contentOnly = await create({ data: { documentSchemaVersion: 4 }, minimum_document_schema_version: 4 });
+    assert.equal(contentOnly.status, 200);
+    assert.equal((await contentOnly.json()).workspace, null);
+
+    // Both halves in one request, answered with the workspace it stored, which a read then carries.
+    const created = await create({
+      data: { documentSchemaVersion: 4 },
+      minimum_document_schema_version: 4,
+      project_id: 'created-with-workspace',
+      workspace: { layout: 'first' },
+    });
+    assert.equal(created.status, 200);
+    const record = await created.json();
+    assert.deepEqual(record.workspace.data, { layout: 'first' });
+    assert.equal(record.workspace.revision, 1);
+    assert.equal(record.workspace_updated_at, record.workspace.updated_at);
+    const read = await getJson(backend, '/api/v1/projects/created-with-workspace?max_document_schema_version=4');
+    assert.deepEqual(read.workspace, record.workspace);
+
+    // A workspace beside a whole document is refused, as the server refuses it, and the refused create claims no
+    // board: the staging board is still the caller's to delete or claim.
+    const staging = await getJson(backend, '/api/v1/boards/?board_name=Staging', { method: 'POST' });
+    const refused = await create({
+      board_id: staging.board_id,
+      data: { documentSchemaVersion: 3 },
+      minimum_document_schema_version: 3,
+      project_id: 'refused-whole',
+      workspace: { layout: 'early' },
+    });
+    assert.equal(refused.status, 400);
+    assert.deepEqual(await refused.json(), {
+      detail: {
+        code: 'workspace_needs_split_document',
+        message: 'A workspace is saved only with content at document schema 4 or newer.',
+        minimum_document_schema_version: 3,
+      },
+    });
+    assert.equal((await getJson(backend, `/api/v1/boards/${staging.board_id}`)).project_id, null);
+    assert.equal((await call('/api/v1/projects/refused-whole')).status, 404);
+  });
+});
+
 test('the image map serves videos only on request and keeps its two endpoints comparable', async () => {
   await withRepresentativeBackend(async (backend) => {
     const imagesOnly = await getJson(backend, '/api/v1/image_map/points');
@@ -896,6 +1147,34 @@ test('the image map serves videos only on request and keeps its two endpoints co
       `${backend.origin}/api/v1/image_map/image_labels?image_name=${video.image_name}&kind=image`
     );
     assert.equal(crossed.status, 404);
+  });
+});
+
+test('the workflow list orders as the server does: names ignoring case, dates with never-opened last', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    for (const name of ['charlie', 'Delta', 'alpha', 'Bravo']) {
+      await getJson(backend, '/api/v1/workflows/', {
+        body: JSON.stringify({ workflow: { name, tags: 'casing' } }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      });
+    }
+    const names = async (direction) =>
+      (await getJson(backend, `/api/v1/workflows/?tags=casing&order_by=name&direction=${direction}`)).items.map(
+        (item) => item.name
+      );
+
+    assert.deepEqual(await names('ASC'), ['alpha', 'Bravo', 'charlie', 'Delta']);
+    assert.deepEqual(await names('DESC'), ['Delta', 'charlie', 'Bravo', 'alpha']);
+
+    const opened = (
+      await getJson(backend, '/api/v1/workflows/?categories=user&order_by=opened_at&direction=DESC&per_page=100')
+    ).items.map((item) => item.opened_at);
+    const firstNever = opened.indexOf(null);
+
+    assert.ok(firstNever > 0);
+    assert.ok(opened.slice(firstNever).every((value) => value === null));
+    assert.deepEqual(opened.slice(0, firstNever), opened.slice(0, firstNever).sort().reverse());
   });
 });
 
@@ -940,6 +1219,311 @@ test('workflow thumbnails round-trip their bytes and refresh the listed URL on e
     await getJson(backend, path, { method: 'DELETE' });
     assert.equal(await listedUrl(), null);
   });
+});
+
+test('image storage: the layout is patched alone and the move count follows it', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    assert.deepEqual(await getJson(backend, '/api/v1/image_moves/status'), {
+      active_job_id: null,
+      is_running: false,
+      last_error: null,
+      latest_job: null,
+      needs_move_count: 0,
+      operation: null,
+    });
+
+    const patched = await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ image_subfolder_strategy: 'date' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+
+    assert.deepEqual(patched, {
+      config: { generation_devices: 'auto', image_subfolder_strategy: 'date', max_queue_history: null },
+      set_fields: ['image_subfolder_strategy'],
+    });
+    assert.equal((await getJson(backend, '/api/v1/image_moves/status')).needs_move_count, 1_000);
+
+    const invalid = await fetch(`${backend.origin}/api/v1/app/runtime_config`, {
+      body: JSON.stringify({ image_subfolder_strategy: 'by_user' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+
+    assert.equal(invalid.status, 422);
+  });
+});
+
+test('image storage: a move runs across status polls, commits, and refuses to overlap', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ image_subfolder_strategy: 'hash' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+    await clearQueue(backend);
+
+    const accepted = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
+
+    assert.equal(accepted.status, 202);
+    assert.deepEqual(await accepted.json(), {
+      active_job_id: 1,
+      is_running: true,
+      last_error: null,
+      latest_job: { error_message: null, id: 1, state: 'moving' },
+      needs_move_count: 1_000,
+      operation: 'move_all',
+    });
+
+    const overlapping = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
+
+    assert.equal(overlapping.status, 409);
+
+    const inProgress = await getJson(backend, '/api/v1/image_moves/status');
+
+    assert.equal(inProgress.is_running, true);
+    assert.equal(inProgress.operation, 'move_all');
+
+    // Like the real maintenance guard: image files and media mutations refuse while the move runs, listings do not.
+    const listed = await getJson(backend, '/api/v1/images/?limit=1&offset=0');
+    const imageName = listed.items[0].image_name;
+    const thumbnail = await fetch(`${backend.origin}/api/v1/images/i/${imageName}/thumbnail`);
+
+    assert.equal(thumbnail.status, 409);
+    assert.deepEqual(await thumbnail.json(), { detail: 'Image storage maintenance is active' });
+    assert.equal((await fetch(`${backend.origin}/api/v1/images/i/${imageName}`)).status, 200);
+    assert.equal(
+      (
+        await fetch(`${backend.origin}/api/v1/images/star`, {
+          body: JSON.stringify({ image_names: [imageName] }),
+          headers: { 'content-type': 'application/json' },
+          method: 'POST',
+        })
+      ).status,
+      409
+    );
+    assert.equal((await fetch(`${backend.origin}/api/v1/board_images/`)).status, 409);
+    assert.equal((await fetch(`${backend.origin}/api/v1/boards/?all=true`)).status, 200);
+    assert.equal((await enqueueBatch(backend)).status, 409);
+
+    assert.deepEqual(await getJson(backend, '/api/v1/image_moves/status'), {
+      active_job_id: null,
+      is_running: false,
+      last_error: null,
+      latest_job: { error_message: null, id: 1, state: 'committed' },
+      needs_move_count: 0,
+      operation: null,
+    });
+    assert.equal((await fetch(`${backend.origin}/api/v1/images/i/${imageName}/thumbnail`)).status, 200);
+  });
+});
+
+test('image storage: an instant move commits inside the POST, and a failed job counts as finished', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ image_subfolder_strategy: 'type' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+    await getJson(backend, '/__faults?imageMoves=instant', { method: 'POST' });
+    await clearQueue(backend);
+
+    const accepted = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
+
+    assert.equal(accepted.status, 202);
+    assert.deepEqual(await accepted.json(), {
+      active_job_id: null,
+      is_running: false,
+      last_error: null,
+      latest_job: { error_message: null, id: 1, state: 'committed' },
+      needs_move_count: 0,
+      operation: null,
+    });
+
+    await getJson(backend, '/__faults?imageMoves=failed', { method: 'POST' });
+
+    const failed = await getJson(backend, '/api/v1/image_moves/status');
+
+    assert.equal(failed.active_job_id, null);
+    assert.equal(failed.is_running, false);
+    assert.equal(failed.latest_job.state, 'error');
+    assert.equal(failed.latest_job.error_message, 'Disk full while moving images');
+    assert.equal(failed.last_error, 'Disk full while moving images');
+    // A finished job needs no recovery, so another move may start.
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' })).status, 202);
+  });
+});
+
+test('image storage: Start Move waits for an idle queue, and recovery does not', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/api/v1/app/runtime_config', {
+      body: JSON.stringify({ image_subfolder_strategy: 'date' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+    await clearQueue(backend);
+    assert.equal((await enqueueBatch(backend)).status, 201);
+
+    // A queued item that has not run yet is active work, as `has_active_queue_work` counts it.
+    const refused = await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' });
+
+    assert.equal(refused.status, 409);
+    assert.deepEqual(await refused.json(), { detail: 'Cannot start image move while queue work is active' });
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/recover`, { method: 'POST' })).status, 202);
+    await getJson(backend, '/api/v1/image_moves/status');
+    assert.equal((await getJson(backend, '/api/v1/image_moves/status')).is_running, false);
+
+    await clearQueue(backend);
+
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' })).status, 202);
+  });
+});
+
+test('image storage: faults seed an interrupted job for recovery and a non-admin caller', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    await getJson(backend, '/__faults?imageMoves=needs-recovery', { method: 'POST' });
+
+    const interrupted = await getJson(backend, '/api/v1/image_moves/status');
+
+    assert.equal(interrupted.active_job_id, 1);
+    assert.equal(interrupted.is_running, false);
+    assert.equal(interrupted.last_error, 'Server stopped during an image move');
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/start`, { method: 'POST' })).status, 409);
+
+    // A job awaiting recovery keeps maintenance active, so the guard still refuses image files and enqueueing.
+    const imageName = (await getJson(backend, '/api/v1/images/?limit=1&offset=0')).items[0].image_name;
+
+    assert.equal((await fetch(`${backend.origin}/api/v1/images/i/${imageName}/thumbnail`)).status, 409);
+    assert.equal((await enqueueBatch(backend)).status, 409);
+
+    const recovering = await fetch(`${backend.origin}/api/v1/image_moves/recover`, { method: 'POST' });
+
+    assert.equal(recovering.status, 202);
+    assert.equal((await recovering.json()).operation, 'recovery');
+    await getJson(backend, '/api/v1/image_moves/status');
+
+    const recovered = await getJson(backend, '/api/v1/image_moves/status');
+
+    assert.equal(recovered.active_job_id, null);
+    assert.equal(recovered.is_running, false);
+    assert.equal(recovered.last_error, null);
+    assert.equal(recovered.latest_job.state, 'committed');
+    assert.equal((await fetch(`${backend.origin}/api/v1/images/i/${imageName}/thumbnail`)).status, 200);
+    assert.equal((await enqueueBatch(backend)).status, 201);
+
+    await getJson(backend, '/__faults?intermediatesCaller=user', { method: 'POST' });
+
+    assert.equal((await fetch(`${backend.origin}/api/v1/image_moves/status`)).status, 403);
+    assert.equal(
+      (
+        await fetch(`${backend.origin}/api/v1/app/runtime_config`, {
+          body: JSON.stringify({ image_subfolder_strategy: 'date' }),
+          headers: { 'content-type': 'application/json' },
+          method: 'PATCH',
+        })
+      ).status,
+      403
+    );
+
+    await getJson(backend, '/__reset', { method: 'POST' });
+
+    assert.equal((await getJson(backend, '/api/v1/image_moves/status')).active_job_id, null);
+  });
+});
+
+test('enqueue_batch accepts a utility graph as pending queue items with its origin', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const before = (await getJson(backend, '/api/v1/queue/default/item_ids')).total_count;
+    const response = await fetch(`${backend.origin}/api/v1/queue/default/enqueue_batch`, {
+      body: JSON.stringify({
+        batch: { graph: { edges: [], id: 'pbr', nodes: {} }, origin: 'utility:pbr-1', runs: 1 },
+        prepend: false,
+      }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+
+    assert.equal(response.status, 201);
+
+    const enqueued = await response.json();
+
+    assert.equal(enqueued.enqueued, 1);
+    assert.equal(enqueued.item_ids.length, 1);
+
+    const item = await getJson(backend, `/api/v1/queue/default/i/${String(enqueued.item_ids[0])}`);
+
+    assert.equal(item.origin, 'utility:pbr-1');
+    assert.equal(item.status, 'pending');
+    assert.equal((await getJson(backend, '/api/v1/queue/default/item_ids')).total_count, before + 1);
+  });
+});
+
+test('shared boards answer as the backend role table does', async () => {
+  const backend = await startMockBackend(0, { profile: 'representative' });
+  const call = (path, init) =>
+    fetch(`${backend.origin}${path}`, {
+      ...init,
+      headers: { 'content-type': 'application/json' },
+      ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+    });
+
+  try {
+    await call('/__faults', { body: { intermediatesCaller: 'user', sharedBoards: true }, method: 'POST' });
+    const listed = await (await call('/api/v1/boards/')).json();
+    const byId = new Map(listed.map((board) => [board.board_id, board]));
+
+    // Membership, general access, and nothing for a restricted board of someone else's.
+    assert.deepEqual(byId.get('shared-editor').allowed_actions, [
+      'read',
+      'add_media',
+      'manage_items',
+      'rename',
+      'set_cover',
+      'archive',
+    ]);
+    assert.deepEqual(byId.get('shared-viewer').allowed_actions, ['read']);
+    assert.equal(byId.get('shared-contributor').my_role, 'contributor');
+    assert.equal(byId.has('others-private'), false);
+    // A board that exists but the caller may not read answers 403; only a missing board answers 404.
+    const unreadable = await call('/api/v1/boards/others-private');
+    assert.equal(unreadable.status, 403);
+    assert.deepEqual(await unreadable.json(), {
+      detail: { code: 'board_unreadable', message: 'Not authorized to access this board' },
+    });
+    assert.equal((await call('/api/v1/boards/no-such-board')).status, 404);
+    assert.equal(
+      (await call('/api/v1/images/copy', { body: { board_id: 'others-private', image_names: [] }, method: 'POST' }))
+        .status,
+      403
+    );
+
+    // The role is refused before anything else; an inbox's own refusal comes after it.
+    const forbidden = await call('/api/v1/boards/shared-viewer', { body: { board_name: 'x' }, method: 'PATCH' });
+    assert.equal(forbidden.status, 403);
+    assert.deepEqual(await forbidden.json(), {
+      detail: { code: 'board_action_denied', message: 'Not authorized to change this board' },
+    });
+    const inbox = listed.find((board) => board.is_inbox);
+    assert.equal(
+      (await call(`/api/v1/boards/${inbox.board_id}`, { body: { board_name: 'x' }, method: 'PATCH' })).status,
+      409
+    );
+
+    // A revocation behind the page's back makes the board unreadable: it still exists, so it answers 403.
+    await call('/__board-access', { body: { board_id: 'shared-editor', member_role: null }, method: 'POST' });
+    assert.equal(
+      (await call('/api/v1/boards/shared-editor', { body: { board_name: 'x' }, method: 'PATCH' })).status,
+      403
+    );
+    assert.equal((await call('/api/v1/boards/shared-editor')).status, 403);
+    const relisted = await (await call('/api/v1/boards/')).json();
+    assert.equal(
+      relisted.some((board) => board.board_id === 'shared-editor'),
+      false
+    );
+  } finally {
+    await backend.close();
+  }
 });
 
 test('queue retry clones failed or canceled roots once, cancel-by-batch spares other batches, prune keeps active work', async () => {
@@ -1069,10 +1653,96 @@ test('queue chain rules: prune keeps finished children of an active root, and ca
   });
 });
 
-test('runtime config PATCH keeps the other writable field and validates the queue history limit', async () => {
+test('model seed sets are opt-in, and re-identify fills what the probe would record', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const listed = async () => (await getJson(backend, '/api/v2/models/')).models;
+    const before = (await listed()).length;
+    const post = (path, body) =>
+      fetch(`${backend.origin}${path}`, {
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      });
+
+    assert.equal((await post('/__models', { set: 'nope' })).status, 400);
+    const seeded = await (await post('/__models', { set: 'anima-lllite' })).json();
+    await post('/__models', { set: 'spandrel' });
+    assert.equal((await listed()).length, before + seeded.keys.length + MODEL_SEED_SETS.spandrel.length);
+
+    const byKey = new Map((await listed()).map((model) => [model.key, model]));
+    assert.equal(byKey.get('seed-lllite-lineart').cond_in_channels, null);
+    assert.equal(byKey.get('seed-spandrel-4x').scale, 4);
+    assert.equal(byKey.get('seed-spandrel-legacy').scale, null);
+
+    const reidentify = async (key) => (await post(`/api/v2/models/i/${key}/reidentify`, {})).json();
+    assert.equal((await reidentify('seed-lllite-lineart')).cond_in_channels, 3);
+    assert.equal((await reidentify('seed-lllite-inpaint')).cond_in_channels, 4);
+    assert.equal((await reidentify('seed-spandrel-legacy')).scale, 4);
+    // A model with nothing left to record comes back unchanged, and the store serves the filled record.
+    assert.deepEqual(await reidentify('seed-spandrel-2x'), byKey.get('seed-spandrel-2x'));
+    assert.equal((await getJson(backend, '/api/v2/models/i/seed-lllite-lineart')).cond_in_channels, 3);
+    assert.equal((await post('/api/v2/models/i/missing/reidentify', {})).status, 404);
+
+    // A reset drops the seeds, keeping the profile's counts.
+    await getJson(backend, '/__reset', { method: 'POST' });
+    assert.equal((await listed()).length, before);
+  });
+});
+
+test('control model seed sets cover both preprocessor id forms, and a PATCH changes their default settings', async () => {
+  const records = [...MODEL_SEED_SETS['control-sdxl'], ...MODEL_SEED_SETS['control-flux']].map(({ record }) => record);
+  const allKeys = Object.values(MODEL_SEED_SETS).flatMap((entries) => entries.map(({ record }) => record.key));
+  assert.equal(new Set(allKeys).size, allKeys.length);
+  const preprocessors = new Set(records.map((record) => record.default_settings?.preprocessor));
+  // Installed models name their preprocessor by the legacy processor id or by the detection node's id.
+  assert.ok(preprocessors.has('depth_anything_image_processor'));
+  assert.ok(preprocessors.has('depth_anything_depth_estimation'));
+  assert.deepEqual(
+    MODEL_SEED_SETS['control-flux'].map(({ record }) => [record.type, record.base]),
+    [
+      ['main', 'flux'],
+      ['control_lora', 'flux'],
+      ['controlnet', 'flux'],
+    ]
+  );
+
+  await withRepresentativeBackend(async (backend) => {
+    const listed = async () => (await getJson(backend, '/api/v2/models/')).models;
+    const before = (await listed()).length;
+    const sendJson = (path, init, body) =>
+      fetch(`${backend.origin}${path}`, {
+        ...init,
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    const post = (path, body) => sendJson(path, { method: 'POST' }, body);
+    const patch = (path, body) => sendJson(path, { method: 'PATCH' }, body);
+    for (const set of ['control-sdxl', 'control-flux']) {
+      assert.equal((await post('/__models', { set })).status, 200);
+    }
+    const byKey = new Map((await listed()).map((model) => [model.key, model]));
+    assert.equal(byKey.size, before + records.length);
+    assert.equal(byKey.get('seed-t2i-adapter-canny-sdxl-1.0').type, 't2i_adapter');
+    assert.equal(byKey.get('seed-my-sdxl-control').default_settings, null);
+
+    const patched = await patch('/api/v2/models/i/seed-my-sdxl-control', {
+      default_settings: { preprocessor: 'canny_image_processor' },
+    });
+    assert.equal(patched.status, 200);
+    assert.deepEqual((await getJson(backend, '/api/v2/models/i/seed-my-sdxl-control')).default_settings, {
+      preprocessor: 'canny_image_processor',
+    });
+    assert.equal((await patch('/api/v2/models/i/missing', { name: 'x' })).status, 404);
+
+    await getJson(backend, '/__reset', { method: 'POST' });
+    assert.equal((await listed()).length, before);
+  });
+});
+
+test('runtime config PATCH preserves other writable fields and validates the queue history limit', async () => {
   await withRepresentativeBackend(async (backend) => {
     await getJson(backend, '/api/v1/app/runtime_config', {
-      body: JSON.stringify({ generation_devices: ['cpu'] }),
+      body: JSON.stringify({ generation_devices: ['cpu'], image_subfolder_strategy: 'date' }),
       method: 'PATCH',
     });
     const withHistory = await getJson(backend, '/api/v1/app/runtime_config', {
@@ -1080,7 +1750,11 @@ test('runtime config PATCH keeps the other writable field and validates the queu
       method: 'PATCH',
     });
 
-    assert.deepEqual(withHistory.config, { generation_devices: ['cpu'], max_queue_history: 0 });
+    assert.deepEqual(withHistory.config, {
+      generation_devices: ['cpu'],
+      image_subfolder_strategy: 'date',
+      max_queue_history: 0,
+    });
 
     const invalid = await fetch(`${backend.origin}/api/v1/app/runtime_config`, {
       body: JSON.stringify({ max_queue_history: -1 }),
@@ -1094,4 +1768,260 @@ test('runtime config PATCH keeps the other writable field and validates the queu
     assert.equal(cache, null);
     assert.equal((await getJson(backend, '/api/v1/app/invocation_cache/status')).enabled, false);
   });
+});
+
+test('workflow creation defaults public for single-user callers and private for multiuser callers', async () => {
+  const backend = await startMockBackend(0, { profile: 'empty' });
+
+  try {
+    const createWorkflow = (name) =>
+      getJson(backend, '/api/v1/workflows', {
+        body: JSON.stringify({ workflow: { name, nodes: [], tags: 'local' } }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+      });
+
+    const singleUser = await createWorkflow('Single-user template');
+    assert.equal(singleUser.is_public, true);
+
+    await getJson(backend, '/__faults', {
+      body: JSON.stringify({ intermediatesCaller: 'user' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+
+    const multiuser = await createWorkflow('Multiuser template');
+    assert.equal(multiuser.is_public, false);
+  } finally {
+    await backend.close();
+  }
+});
+
+test('workflow visibility PATCH mirrors the shared tag without changing revision and filters lists', async () => {
+  const backend = await startMockBackend(0, { profile: 'empty' });
+
+  try {
+    const createWorkflow = (name) =>
+      getJson(backend, '/api/v1/workflows', {
+        body: JSON.stringify({ workflow: { name, nodes: [], tags: 'local' } }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+      });
+    const singleUser = await createWorkflow('Visible template');
+    const target = await createWorkflow('Toggle template');
+    const revision = target.revision;
+    const patchVisibility = (isPublic) =>
+      getJson(backend, `/api/v1/workflows/i/${encodeURIComponent(target.workflow_id)}/is_public`, {
+        body: JSON.stringify({ is_public: isPublic }),
+        headers: { 'content-type': 'application/json' },
+        method: 'PATCH',
+      });
+    const listNames = async (isPublic) => {
+      const params = new URLSearchParams({ categories: 'user', is_public: String(isPublic), per_page: '100' });
+
+      return (await getJson(backend, `/api/v1/workflows/?${params}`)).items.map((item) => item.name).sort();
+    };
+    const tagsOf = (value) =>
+      String(value ?? '')
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+        .sort();
+
+    const hidden = await patchVisibility(false);
+    assert.equal(hidden.is_public, false);
+    assert.equal(hidden.revision, revision);
+    assert.deepEqual(tagsOf(hidden.tags), ['local']);
+    assert.deepEqual(tagsOf(hidden.workflow.tags), ['local']);
+    assert.deepEqual(await listNames(true), ['Visible template']);
+    assert.deepEqual(await listNames(false), ['Toggle template']);
+
+    const shared = await patchVisibility(true);
+    assert.equal(shared.is_public, true);
+    assert.equal(shared.revision, revision);
+    assert.deepEqual(tagsOf(shared.tags), ['local', 'shared']);
+    assert.deepEqual(tagsOf(shared.workflow.tags), ['local', 'shared']);
+    assert.deepEqual(await listNames(true), ['Toggle template', 'Visible template']);
+    assert.deepEqual(await listNames(false), []);
+    assert.equal(singleUser.is_public, true);
+  } finally {
+    await backend.close();
+  }
+});
+
+test('hosted-provider credentials and the starter catalog agree with the hosted fixture records', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const { models } = await getJson(backend, '/api/v2/models/');
+    const hosted = models.filter((model) => model.type === 'external_image_generator');
+    const configs = await getJson(backend, '/api/v1/app/external_providers/config');
+
+    // Every backend provider is listed; those the hosted records route to have a key.
+    assert.deepEqual(
+      configs.map((config) => config.provider_id),
+      ['alibabacloud', 'atlascloud', 'gemini', 'openai', 'seedream']
+    );
+    assert.deepEqual(
+      configs.filter((config) => config.api_key_configured).map((config) => config.provider_id),
+      [...new Set(hosted.map((model) => model.provider_id))].sort()
+    );
+    assert.ok(configs.every((config) => config.base_url === null));
+
+    // Exactly one hosted record carries a starter's source, so the Model Manager shows it catalog-managed.
+    const { starter_models: starters } = await getJson(backend, '/api/v2/models/starter_models');
+    const starterSources = new Set(starters.map((starter) => starter.source));
+    const managed = hosted.filter((model) => starterSources.has(model.source));
+    assert.deepEqual(
+      managed.map((model) => model.key),
+      ['fixture-external-gemini-catalog']
+    );
+    // The editable OpenAI record routes to a GPT Image model, the only OpenAI models that take provider options.
+    assert.equal(hosted.find((model) => model.key === 'fixture-external-openai').provider_model_id, 'gpt-image-1');
+    assert.equal(starters.find((starter) => starter.source === managed[0].source).is_installed, true);
+    assert.ok(starters.filter((starter) => starter.type !== 'external_image_generator').every((s) => !s.is_installed));
+
+    // Removing a provider's key removes its hosted records, as the backend does.
+    const reset = await getJson(backend, '/api/v1/app/external_providers/config/openai', { method: 'DELETE' });
+    assert.deepEqual(reset, { api_key_configured: false, base_url: null, provider_id: 'openai' });
+    const remaining = (await getJson(backend, '/api/v2/models/')).models;
+    assert.equal(remaining.length, models.length - hosted.filter((model) => model.provider_id === 'openai').length);
+    assert.equal(
+      (await fetch(`${backend.origin}/api/v1/app/external_providers/config/unknown`, { method: 'DELETE' })).status,
+      404
+    );
+
+    // A body naming neither field is refused, and changes nothing.
+    const refused = await fetch(`${backend.origin}/api/v1/app/external_providers/config/gemini`, {
+      body: JSON.stringify({}),
+      method: 'POST',
+    });
+    assert.equal(refused.status, 400);
+    assert.equal(
+      (await getJson(backend, '/api/v1/app/external_providers/config')).find((c) => c.provider_id === 'gemini')
+        .api_key_configured,
+      true
+    );
+
+    // Saving an empty key removes the key and the provider's hosted records, like a reset.
+    const cleared = await getJson(backend, '/api/v1/app/external_providers/config/gemini', {
+      body: JSON.stringify({ api_key: '  ' }),
+      method: 'POST',
+    });
+    assert.equal(cleared.api_key_configured, false);
+    const afterClear = (await getJson(backend, '/api/v2/models/')).models;
+    assert.equal(afterClear.filter((model) => model.provider_id === 'gemini').length, 0);
+    assert.equal(afterClear.length, remaining.length - hosted.filter((model) => model.provider_id === 'gemini').length);
+
+    const empty = await startMockBackend(0, { profile: 'empty' });
+    try {
+      const emptyConfigs = await getJson(empty, '/api/v1/app/external_providers/config');
+      assert.equal(emptyConfigs.length, 5);
+      assert.ok(emptyConfigs.every((config) => !config.api_key_configured));
+    } finally {
+      await empty.close();
+    }
+
+    const configured = await getJson(backend, '/api/v1/app/external_providers/config/openai', {
+      body: JSON.stringify({ api_key: 'sk-fixture', base_url: 'https://example.invalid/v1' }),
+      method: 'POST',
+    });
+    assert.deepEqual(configured, {
+      api_key_configured: true,
+      base_url: 'https://example.invalid/v1',
+      provider_id: 'openai',
+    });
+  });
+});
+
+test('board_id=all lists unboarded items and those on active readable boards, alike in items, names and location', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const query = 'categories=general&is_intermediate=false';
+    const everything = await getJson(backend, `/api/v1/gallery/items/?${query}&limit=5000`);
+    // A board of no project: a project's boards take their archived state from the project.
+    const looseBoards = new Set(
+      (await getJson(backend, '/api/v1/boards/?all=true'))
+        .filter((board) => board.project_id === null)
+        .map((board) => board.board_id)
+    );
+    const archivedBoardId = everything.items.find((item) => looseBoards.has(item.board_id)).board_id;
+    const archive = await fetch(`${backend.origin}/api/v1/boards/${archivedBoardId}`, {
+      body: JSON.stringify({ archived: true }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PATCH',
+    });
+    assert.equal(archive.ok, true);
+
+    const all = await getJson(backend, `/api/v1/gallery/items/?${query}&board_id=all&limit=5000`);
+    const names = await getJson(backend, `/api/v1/gallery/items/names?${query}&board_id=all`);
+    const expected = everything.items.filter((item) => item.board_id !== archivedBoardId);
+
+    assert.ok(expected.some((item) => item.board_id === null));
+    assert.ok(expected.some((item) => item.board_id !== null));
+    assert.deepEqual(all.items.map((item) => item.name).sort(), expected.map((item) => item.name).sort());
+    assert.equal(names.total_count, all.total);
+
+    const hidden = everything.items.find((item) => item.board_id === archivedBoardId);
+    const shown = all.items.at(-1);
+    const location = (item) =>
+      fetch(
+        `${backend.origin}/api/v1/gallery/items/location?${query}&board_id=all&kind=${item.kind}&name=${encodeURIComponent(item.name)}`
+      );
+    assert.equal((await location(hidden)).status, 404);
+    const found = await (await location(shown)).json();
+    assert.equal(found.total, all.total);
+  });
+});
+
+test('wildcards are stateful: create, rename, delete one, and delete a batch of up to 1000', async () => {
+  const backend = await startMockBackend(0, { profile: 'representative' });
+  const call = (path, init) =>
+    fetch(`${backend.origin}${path}`, {
+      ...init,
+      headers: { 'content-type': 'application/json' },
+      ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+    });
+
+  try {
+    const seeded = await getJson(backend, '/api/v1/wildcards/');
+    assert.deepEqual(
+      seeded.map((wildcard) => wildcard.name),
+      ['animals', 'colors', 'styles/painting']
+    );
+
+    const created = await (
+      await call('/api/v1/wildcards/', { body: { name: 'moods', values: ['calm'] }, method: 'POST' })
+    ).json();
+    assert.equal(
+      (await call('/api/v1/wildcards/', { body: { name: 'moods', values: [] }, method: 'POST' })).status,
+      409
+    );
+    const renamed = await (
+      await call(`/api/v1/wildcards/${created.id}`, { body: { name: 'feelings' }, method: 'PATCH' })
+    ).json();
+    assert.deepEqual(renamed.values, ['calm']);
+    assert.equal((await call(`/api/v1/wildcards/${created.id}`, { method: 'DELETE' })).status, 204);
+    assert.equal((await call(`/api/v1/wildcards/${created.id}`, { method: 'DELETE' })).status, 404);
+
+    await call('/__reset?wildcards=720', { method: 'POST' });
+    const many = await getJson(backend, '/api/v1/wildcards/');
+    assert.equal(many.length, 720);
+
+    const ids = many.map((wildcard) => wildcard.id);
+    const tooMany = await call('/api/v1/wildcards/delete', {
+      body: { wildcard_ids: Array.from({ length: 1001 }, (_, index) => `id-${String(index)}`) },
+      method: 'POST',
+    });
+    assert.equal(tooMany.status, 422);
+    assert.equal((await call('/api/v1/wildcards/delete', { body: { wildcard_ids: [] }, method: 'POST' })).status, 422);
+
+    const deleted = await (
+      await call('/api/v1/wildcards/delete', { body: { wildcard_ids: [...ids, ids[0], 'unknown'] }, method: 'POST' })
+    ).json();
+    assert.deepEqual(deleted.deleted_ids, ids);
+    assert.deepEqual(await getJson(backend, '/api/v1/wildcards/'), []);
+
+    await call('/__reset?profile=empty', { method: 'POST' });
+    assert.deepEqual(await getJson(backend, '/api/v1/wildcards/'), []);
+  } finally {
+    await backend.close();
+  }
 });

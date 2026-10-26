@@ -99,6 +99,13 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   pidDecoderModel: null,
   gemma2EncoderModel: null,
   pidSteps: 4,
+  refinerModel: null,
+  refinerSteps: 20,
+  refinerCfgScale: 7.5,
+  refinerScheduler: 'euler',
+  refinerPositiveAestheticScore: 6,
+  refinerNegativeAestheticScore: 2.5,
+  refinerStart: 0.8,
   cfgRescaleMultiplier: 0,
   cfgScale: 7,
   clipEmbedModel: null,
@@ -136,6 +143,7 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   qwen3VLEncoderModel: null,
   qwen35EncoderModel: null,
   animaInpaintAdapterModel: null,
+  animaInpaintAdapterEnabled: true,
   animaInpaintAdapterWeight: 1,
   wanT5EncoderModel: null,
   wanLowNoiseModel: null,
@@ -146,6 +154,14 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   ideogram4GuidanceScale: null,
   ideogram4Mu: null,
   ideogram4ColorPalette: [],
+  externalImageSize: null,
+  openaiQuality: 'auto',
+  openaiBackground: 'auto',
+  openaiInputFidelity: null,
+  geminiTemperature: null,
+  geminiThinkingLevel: null,
+  seedreamWatermark: false,
+  seedreamOptimizePrompt: false,
   krea2RebalanceEnabled: false,
   krea2RebalanceMultiplier: 4,
   krea2RebalanceWeights: '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0',
@@ -579,8 +595,9 @@ describe('image recall', () => {
     expect(result?.values.aspectRatioId).toBe('2:3');
   });
 
-  it('recalls the size for an external generator, which has no architecture row to wait for', () => {
-    // External providers have no capability row and must remain eligible for dimension recall.
+  it('recalls the exact size for an external generator, which has no architecture row or grid', () => {
+    // External providers have no capability row and must remain eligible for dimension recall; their providers
+    // bucket sizes themselves, so the image's pixel size is kept rather than snapped to a local model grid.
     const externalModel = {
       base: 'external',
       capabilities: { modes: ['txt2img'], supports_seed: true },
@@ -601,11 +618,11 @@ describe('image recall', () => {
         vaeModels: [],
       });
 
-    expect(recall()?.values).toMatchObject({ height: 768, width: 512 });
+    expect(recall()?.values).toMatchObject({ height: 770, width: 513 });
 
     resetArchitectureCapabilities();
     try {
-      expect(recall()?.values).toMatchObject({ height: 768, width: 512 });
+      expect(recall()?.values).toMatchObject({ height: 770, width: 513 });
     } finally {
       setArchitectureCapabilities(architectureCapabilitiesFixture);
     }
@@ -892,8 +909,8 @@ describe('image recall', () => {
       expect(result?.values.loras).toEqual([{ isEnabled: true, model: staleLora, weight: 0.9 }]);
       expect(result?.fields).not.toContain('loras');
       expect(result?.skipped).toEqual([
-        { name: 'Grain', reason: 'modelUnavailable' },
-        { name: 'Ink', reason: 'modelUnavailable' },
+        { name: 'Grain', reason: 'modelUnavailable', subject: 'concept' },
+        { name: 'Ink', reason: 'modelUnavailable', subject: 'concept' },
       ]);
     });
 
@@ -970,11 +987,11 @@ describe('image recall', () => {
 
       expect(result?.values.loras).toEqual([{ isEnabled: true, model: inkLora, weight: 0.5 }]);
       expect(result?.skipped).toEqual([
-        { name: 'Deleted', reason: 'unresolved' },
-        { name: 'Pixel', reason: 'incompatible' },
-        { name: null, reason: 'invalid' },
-        { name: null, reason: 'invalid' },
-        { name: 'Ink', reason: 'duplicate' },
+        { name: 'Deleted', reason: 'unresolved', subject: 'concept' },
+        { name: 'Pixel', reason: 'incompatible', subject: 'concept' },
+        { name: null, reason: 'invalid', subject: 'concept' },
+        { name: null, reason: 'invalid', subject: 'concept' },
+        { name: 'Ink', reason: 'duplicate', subject: 'concept' },
       ]);
     });
 
@@ -982,7 +999,7 @@ describe('image recall', () => {
       const result = recallConcepts('all', { loras: 'ink', model: { key: sdxlModel.key }, steps: 20 });
 
       expect(result?.values.loras).toEqual([{ isEnabled: true, model: staleLora, weight: 0.9 }]);
-      expect(result?.skipped).toEqual([{ name: null, reason: 'invalid' }]);
+      expect(result?.skipped).toEqual([{ name: null, reason: 'invalid', subject: 'concept' }]);
       expect(result?.fields).toContain('steps');
     });
 
@@ -999,7 +1016,7 @@ describe('image recall', () => {
 
       expect(result?.values.model).toEqual(sd1Model);
       expect(result?.values.loras).toEqual([{ isEnabled: true, model: sd1Lora, weight: 0.6 }]);
-      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'incompatible' }]);
+      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'incompatible', subject: 'concept' }]);
     });
 
     it('resolves a reinstalled LoRA by its content hash, or by name and base when no hash was recorded', () => {
@@ -1035,7 +1052,7 @@ describe('image recall', () => {
       );
 
       expect(result?.values.loras).toEqual([]);
-      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'ambiguous' }]);
+      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'ambiguous', subject: 'concept' }]);
     });
 
     it('does not substitute a same-named LoRA whose content differs from the recorded hash', () => {
@@ -1049,7 +1066,7 @@ describe('image recall', () => {
         [sdxlModel, { ...inkLora, hash: 'blake3:retrained', key: 'retrained-ink' }]
       );
 
-      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'unresolved' }]);
+      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'unresolved', subject: 'concept' }]);
     });
 
     it('offers Recall All and Remix for metadata that records only concepts it can restore', () => {
@@ -1189,6 +1206,283 @@ describe('image recall', () => {
         currentValues: createValues({ model: krea2Model }),
         image,
         metadata: { krea2_rebalance_enabled: true },
+        models: [],
+        supportedModels: [],
+        vaeModels: [],
+      });
+
+      expect(capabilities.all).toBe(true);
+      expect(capabilities.remix).toBe(true);
+    });
+  });
+
+  describe('external provider options', () => {
+    const openaiModel = {
+      base: 'external',
+      capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: true },
+      format: 'external_api',
+      key: 'gpt-image',
+      name: 'GPT Image',
+      provider_id: 'openai',
+      provider_model_id: 'gpt-image-1',
+      type: 'external_image_generator',
+    } as GenerateWidgetValues['model'];
+    const geminiModel = {
+      ...openaiModel,
+      capabilities: {
+        modes: ['txt2img'],
+        resolution_presets: [
+          { aspect_ratio: '1:1', height: 1024, image_size: '1K', label: '1:1 (1K)', width: 1024 },
+          { aspect_ratio: '1:1', height: 2048, image_size: '2K', label: '1:1 (2K)', width: 2048 },
+        ],
+      },
+      key: 'gemini-3',
+      name: 'Gemini 3',
+      provider_id: 'gemini',
+    } as GenerateWidgetValues['model'];
+    const seedreamModel = {
+      ...openaiModel,
+      capabilities: { modes: ['txt2img'] },
+      key: 'seedream',
+      name: 'Seedream',
+      provider_id: 'seedream',
+    } as GenerateWidgetValues['model'];
+    // What the provider nodes record (`_build_output_provider_metadata`) plus the named size the base node records.
+    const providerMetadata = {
+      gemini_temperature: 0.4,
+      gemini_thinking_level: 'high',
+      image_size: '2K',
+      openai_background: 'transparent',
+      openai_input_fidelity: 'high',
+      openai_quality: 'low',
+      seedream_optimize_prompt: true,
+      seedream_watermark: true,
+    };
+    const recall = (model: GenerateWidgetValues['model'], metadata: Record<string, unknown>, kind: 'all' | 'remix') =>
+      buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind,
+        metadata: { ...metadata, model: { key: model.key } },
+        models: [],
+        supportedModels: [model],
+        vaeModels: [],
+      });
+
+    it('restores only the options the recalled OpenAI model accepts', () => {
+      const result = recall(openaiModel, providerMetadata, 'all');
+
+      expect(result?.values).toMatchObject({
+        openaiBackground: 'transparent',
+        openaiInputFidelity: 'high',
+        openaiQuality: 'low',
+      });
+      // Another provider's keys and a named size the model does not list stay at the current values.
+      expect(result?.values).toMatchObject({
+        externalImageSize: null,
+        geminiTemperature: null,
+        geminiThinkingLevel: null,
+        seedreamOptimizePrompt: false,
+        seedreamWatermark: false,
+      });
+      expect(result?.fields).toContain('externalProvider');
+    });
+
+    it('restores Gemini sampling and the named size the model lists, on a remix too', () => {
+      const result = recall(geminiModel, providerMetadata, 'remix');
+
+      expect(result?.values).toMatchObject({
+        externalImageSize: '2K',
+        height: 2048,
+        width: 2048,
+        geminiTemperature: 0.4,
+        geminiThinkingLevel: 'high',
+        openaiQuality: 'auto',
+      });
+      expect(result?.fields).toContain('externalProvider');
+    });
+
+    it('skips a named size that is ambiguous without dimensions or an aspect ratio', () => {
+      const ambiguousModel = {
+        ...geminiModel,
+        capabilities: {
+          modes: ['txt2img'],
+          resolution_presets: [
+            { aspect_ratio: '1:1', height: 2048, image_size: '2K', label: '1:1 (2K)', width: 2048 },
+            { aspect_ratio: '16:9', height: 1152, image_size: '2K', label: '16:9 (2K)', width: 2048 },
+          ],
+        },
+      } as GenerateWidgetValues['model'];
+      const ambiguous = recall(ambiguousModel, { image_size: '2K' }, 'all');
+      const resolved = recall(ambiguousModel, { image_size: '2K', aspect_ratio: '16:9' }, 'all');
+
+      expect(ambiguous?.values.externalImageSize).toBeNull();
+      expect(ambiguous?.fields).not.toContain('externalProvider');
+      expect(resolved?.values).toMatchObject({ externalImageSize: '2K', height: 1152, width: 2048 });
+    });
+
+    it('restores the named size a Canvas output was generated at, though it records its frame', () => {
+      const canvasModel = {
+        ...geminiModel,
+        capabilities: {
+          modes: ['txt2img'],
+          resolution_presets: [
+            { aspect_ratio: '1:1', height: 1024, image_size: '1K', label: '1:1 (1K)', width: 1024 },
+            { aspect_ratio: '1:1', height: 2048, image_size: '2K', label: '1:1 (2K)', width: 2048 },
+            { aspect_ratio: '16:9', height: 1152, image_size: '2K', label: '16:9 (2K)', width: 2048 },
+          ],
+        },
+      } as GenerateWidgetValues['model'];
+
+      // A 2000×2000 frame asked for 2K at 1:1; a 1900×1000 one for 2K at 16:9, its nearest ratio.
+      expect(recall(canvasModel, { height: 2000, image_size: '2K', width: 2000 }, 'all')?.values).toMatchObject({
+        externalImageSize: '2K',
+        height: 2048,
+        width: 2048,
+      });
+      expect(recall(canvasModel, { height: 1000, image_size: '2K', width: 1900 }, 'all')?.values).toMatchObject({
+        externalImageSize: '2K',
+        height: 1152,
+        width: 2048,
+      });
+
+      // On a Canvas route the size is the frame: it is restored as recorded, and the Canvas asks for 2K from it.
+      const onCanvas = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        isCanvasFrame: true,
+        kind: 'all',
+        metadata: { height: 1000, image_size: '2K', model: { key: canvasModel.key }, width: 1900 },
+        models: [],
+        supportedModels: [canvasModel],
+        vaeModels: [],
+      });
+      expect(onCanvas?.values).toMatchObject({ height: 1000, width: 1900 });
+      expect(onCanvas?.fields).toContain('size');
+    });
+
+    it.each([0, 2])('recalls Gemini temperature boundary %s', (temperature) => {
+      expect(recall(geminiModel, { gemini_temperature: temperature }, 'all')?.values.geminiTemperature).toBe(
+        temperature
+      );
+    });
+
+    it('rejects a negative recalled Gemini temperature while preserving the current choice', () => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues({ model: geminiModel, modelKey: geminiModel.key, geminiTemperature: 0.4 }),
+        image,
+        kind: 'all',
+        metadata: { external_provider: 'gemini', gemini_temperature: -0.1 },
+        models: [],
+        supportedModels: [geminiModel],
+        vaeModels: [],
+      });
+
+      expect(result?.values.geminiTemperature).toBe(0.4);
+    });
+
+    it.each(['all', 'remix'] as const)('restores omitted nullable provider defaults during %s', (kind) => {
+      for (const model of [geminiModel, openaiModel]) {
+        const result = buildImageRecallSettings({
+          currentValues: createValues({
+            model,
+            modelKey: model.key,
+            geminiTemperature: 0.4,
+            geminiThinkingLevel: 'high',
+            openaiInputFidelity: 'high',
+          }),
+          image,
+          kind,
+          metadata: { external_provider: model.provider_id },
+          models: [],
+          supportedModels: [model],
+          vaeModels: [],
+        });
+
+        if (model.provider_id === 'gemini') {
+          expect(result?.values).toMatchObject({
+            geminiTemperature: null,
+            geminiThinkingLevel: null,
+            openaiInputFidelity: 'high',
+          });
+        } else {
+          expect(result?.values).toMatchObject({
+            geminiTemperature: 0.4,
+            geminiThinkingLevel: 'high',
+            openaiInputFidelity: null,
+          });
+        }
+        expect(result?.fields).toContain('externalProvider');
+      }
+    });
+
+    it('preserves optional provider choices when unrelated partial metadata omits them', () => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues({
+          model: geminiModel,
+          modelKey: geminiModel.key,
+          geminiTemperature: 0.4,
+          geminiThinkingLevel: 'high',
+        }),
+        image,
+        kind: 'all',
+        metadata: { positive_prompt: 'a sunset', external_provider: 'openai' },
+        models: [],
+        supportedModels: [geminiModel],
+        vaeModels: [],
+      });
+
+      expect(result?.values).toMatchObject({ geminiTemperature: 0.4, geminiThinkingLevel: 'high' });
+      expect(result?.fields).not.toContain('externalProvider');
+    });
+
+    it('restores Seedream toggles and drops values the node would reject', () => {
+      const result = recall(
+        seedreamModel,
+        { ...providerMetadata, seedream_optimize_prompt: 'yes', seedream_watermark: false },
+        'all'
+      );
+
+      expect(result?.values.seedreamWatermark).toBe(false);
+      expect(result?.values.seedreamOptimizePrompt).toBe(false);
+      expect(result?.fields).toContain('externalProvider');
+
+      const invalid = recall(geminiModel, { gemini_temperature: 9, gemini_thinking_level: 'max' }, 'all');
+
+      expect(invalid?.values.geminiTemperature).toBeNull();
+      expect(invalid?.values.geminiThinkingLevel).toBeNull();
+      expect(invalid?.fields).not.toContain('externalProvider');
+    });
+
+    it('skips provider metadata when the image was made with a local model', () => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind: 'all',
+        metadata: { ...providerMetadata, model: { key: sdxlModel.key } },
+        models: [],
+        supportedModels: [sdxlModel],
+        vaeModels: [],
+      });
+
+      expect(result?.values).toMatchObject({
+        externalImageSize: null,
+        geminiTemperature: null,
+        geminiThinkingLevel: null,
+        openaiBackground: 'auto',
+        openaiInputFidelity: null,
+        openaiQuality: 'auto',
+        seedreamOptimizePrompt: false,
+        seedreamWatermark: false,
+      });
+      expect(result?.fields).not.toContain('externalProvider');
+    });
+
+    it('offers recall for an image whose only recallable delta is a provider option', () => {
+      const capabilities = getImageRecallCapabilities({
+        currentValues: createValues({ model: seedreamModel, modelKey: seedreamModel.key }),
+        image,
+        metadata: { seedream_watermark: true },
         models: [],
         supportedModels: [],
         vaeModels: [],
@@ -1601,7 +1895,7 @@ describe('anima inpaint adapter', () => {
     expect(result?.fields).toContain('animaInpaintAdapterWeight');
   });
 
-  it('clears a stale adapter from an Anima inpaint record that lacks the key, which the backend persists for none', () => {
+  it('switches the adapter off but keeps the pick for an Anima inpaint record that lacks the key, which the backend persists for none', () => {
     const currentValues = createValues({ animaInpaintAdapterModel: inpaintAdapter, animaInpaintAdapterWeight: 0.5 });
     const {
       anima_inpaint_adapter: _adapter,
@@ -1620,26 +1914,57 @@ describe('anima inpaint adapter', () => {
       });
 
     for (const generation_mode of ['anima_inpaint', 'anima_outpaint']) {
-      const cleared = recall({ ...withoutAdapter, generation_mode });
-      expect(cleared?.values.animaInpaintAdapterModel).toBeNull();
-      expect(cleared?.values.animaInpaintAdapterWeight).toBe(0.5);
-      expect(cleared?.fields).toContain('components');
-      expect(cleared?.fields).not.toContain('animaInpaintAdapterWeight');
+      const switchedOff = recall({ ...withoutAdapter, generation_mode });
+      expect(switchedOff?.values.animaInpaintAdapterEnabled).toBe(false);
+      expect(switchedOff?.values.animaInpaintAdapterModel).toEqual(inpaintAdapter);
+      expect(switchedOff?.values.animaInpaintAdapterWeight).toBe(0.5);
+      expect(switchedOff?.fields).toContain('components');
+      expect(switchedOff?.fields).not.toContain('animaInpaintAdapterWeight');
     }
 
     // A record from a mode that never writes the key, or none at all, says nothing about the adapter.
-    expect(recall(withoutAdapter)?.values.animaInpaintAdapterModel).toEqual(inpaintAdapter);
-    expect(recall({ ...withoutAdapter, generation_mode: 'anima_img2img' })?.values.animaInpaintAdapterModel).toEqual(
-      inpaintAdapter
-    );
+    for (const metadata of [withoutAdapter, { ...withoutAdapter, generation_mode: 'anima_img2img' }]) {
+      const untouched = recall(metadata);
+      expect(untouched?.values.animaInpaintAdapterModel).toEqual(inpaintAdapter);
+      expect(untouched?.values.animaInpaintAdapterEnabled).toBe(true);
+    }
     const notAnima = recall({ generation_mode: 'inpaint', model: { key: sd1Model.key } }, [sd1Model, animaModel]);
     expect(notAnima?.values.model).toBe(sd1Model);
+    expect(notAnima?.values.animaInpaintAdapterEnabled).toBe(true);
     expect(notAnima?.fields).not.toContain('components');
+  });
 
-    // The key present on such a record still sets the adapter.
-    const restored = recall({ ...canvasInpaintMetadata, generation_mode: 'anima_inpaint' });
-    expect(restored?.values.animaInpaintAdapterModel).toBe(inpaintAdapter);
-    expect(restored?.values.animaInpaintAdapterWeight).toBe(0.7);
+  it('switches the adapter back on with the recorded pick when an inpaint record has the key', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ animaInpaintAdapterEnabled: false, animaInpaintAdapterModel: null }),
+      image,
+      kind: 'all',
+      metadata: { ...canvasInpaintMetadata, generation_mode: 'anima_inpaint' },
+      models,
+      supportedModels: [animaModel],
+      vaeModels: [qwenImageVae],
+    });
+
+    expect(result?.values.animaInpaintAdapterEnabled).toBe(true);
+    expect(result?.values.animaInpaintAdapterModel).toBe(inpaintAdapter);
+    expect(result?.values.animaInpaintAdapterWeight).toBe(0.7);
+    expect(result?.fields).toContain('components');
+  });
+
+  it('reports a switch-only change and offers Recall All for it', () => {
+    const currentValues = createValues({
+      animaInpaintAdapterModel: inpaintAdapter,
+      model: animaModel,
+      modelKey: animaModel.key,
+    });
+    const metadata = { generation_mode: 'anima_outpaint' };
+    const input = { currentValues, image, metadata, models, supportedModels: [animaModel], vaeModels: [qwenImageVae] };
+
+    expect(getImageRecallCapabilities(input).all).toBe(true);
+    const result = buildImageRecallSettings({ ...input, kind: 'all' });
+    expect(result?.values.animaInpaintAdapterEnabled).toBe(false);
+    expect(result?.values.animaInpaintAdapterModel).toEqual(inpaintAdapter);
+    expect(result?.fields).toEqual(['components']);
   });
 
   it.each([
@@ -1718,6 +2043,260 @@ describe('remix round trip', () => {
       'wanLowNoiseModel',
       'wanT5EncoderModel',
     ]);
+  });
+});
+
+describe('SDXL Refiner recall', () => {
+  const refiner: MainModelConfig = {
+    base: 'sdxl-refiner',
+    hash: 'blake3:refiner',
+    key: 'refiner-installed',
+    name: 'SDXL Refiner',
+    type: 'main',
+  };
+  const recordedRefiner = {
+    refiner_cfg_scale: 5,
+    refiner_model: { base: 'sdxl-refiner', hash: 'blake3:refiner', key: 'refiner-recorded', name: 'SDXL Refiner' },
+    refiner_negative_aesthetic_score: 2,
+    refiner_positive_aesthetic_score: 7,
+    refiner_scheduler: 'dpmpp_2m',
+    refiner_start: 0.7,
+    refiner_steps: 12,
+  };
+  const currentRefinerSettings = {
+    refinerCfgScale: 8,
+    refinerModel: refiner,
+    refinerNegativeAestheticScore: 3,
+    refinerPositiveAestheticScore: 9,
+    refinerScheduler: 'euler',
+    refinerStart: 0.9,
+    refinerSteps: 25,
+  };
+  const recall = (
+    metadata: Record<string, unknown>,
+    models: ComponentModelConfig[],
+    kind: ImageRecallKind = 'all',
+    currentValues = createValues()
+  ) =>
+    buildImageRecallSettings({
+      currentValues,
+      image,
+      kind,
+      metadata: { model: { key: sdxlModel.key }, ...metadata },
+      models,
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+  it.each(['all', 'remix'] as const)('restores the refiner and its tuning with %s, resolving by hash', (kind) => {
+    const result = recall(recordedRefiner, [refiner], kind);
+
+    expect(result?.values).toMatchObject({
+      refinerCfgScale: 5,
+      refinerModel: refiner,
+      refinerNegativeAestheticScore: 2,
+      refinerPositiveAestheticScore: 7,
+      refinerScheduler: 'dpmpp_2m',
+      refinerStart: 0.7,
+      refinerSteps: 12,
+    });
+    expect(result?.fields).toContain('refiner');
+  });
+
+  it('resolves the refiner by key, then by name and base, and only when that is unambiguous', () => {
+    const byKey = { ...refiner, hash: 'blake3:other', key: 'refiner-recorded' };
+
+    expect(recall(recordedRefiner, [byKey, refiner])?.values.refinerModel).toEqual(byKey);
+
+    const unhashed = { ...recordedRefiner, refiner_model: { base: 'sdxl-refiner', name: 'SDXL Refiner' } };
+
+    expect(recall(unhashed, [refiner])?.values.refinerModel).toEqual(refiner);
+    expect(recall(unhashed, [refiner])?.skipped).toEqual([]);
+  });
+
+  it.each([
+    { metadata: recordedRefiner, models: [], name: 'SDXL Refiner', reason: 'unresolved' },
+    {
+      metadata: { ...recordedRefiner, refiner_model: { base: 'sdxl-refiner', name: 'SDXL Refiner' } },
+      models: [refiner, { ...refiner, key: 'refiner-twin' }],
+      name: 'SDXL Refiner',
+      reason: 'ambiguous',
+    },
+    ...[{}, 'refiner', { key: 42 }, []].map((refiner_model) => ({
+      metadata: { ...recordedRefiner, refiner_model },
+      models: [refiner],
+      name: null,
+      reason: 'invalid',
+    })),
+  ])('keeps the model and all tuning together for a $reason refiner', ({ metadata, models, name, reason }) => {
+    for (const refinerModel of [refiner, null]) {
+      const current = { ...currentRefinerSettings, refinerModel };
+      const result = recall(metadata, models, 'all', createValues(current));
+
+      expect(result?.values).toMatchObject(current);
+      expect(result?.fields).not.toContain('refiner');
+      expect(result?.skipped).toEqual([{ name, reason, subject: 'refiner' }]);
+    }
+    expect(
+      getImageRecallCapabilities({
+        currentValues: createValues(),
+        image,
+        metadata,
+        models,
+        supportedModels: [sdxlModel],
+        vaeModels: [],
+      })
+    ).toMatchObject({ all: false, remix: false });
+  });
+
+  it.each(['all', 'remix'] as const)(
+    'keeps refiner settings during %s when the recorded main model is unavailable',
+    (kind) => {
+      // A persisted selection may still name the deleted main model's key.
+      for (const key of ['deleted-main', sdxlModel.key]) {
+        for (const refinerMetadata of [
+          recordedRefiner,
+          { refiner_model: {}, refiner_steps: 12 },
+          {},
+          { refiner_model: null },
+        ]) {
+          const metadata = { generation_mode: 'sdxl_txt2img', model: { key }, ...refinerMetadata };
+          const currentValues = createValues(currentRefinerSettings);
+          const result = buildImageRecallSettings({
+            currentValues,
+            image,
+            kind,
+            metadata,
+            models: [refiner],
+            supportedModels: [],
+            vaeModels: [],
+          });
+
+          if ('refiner_model' in refinerMetadata && refinerMetadata.refiner_model) {
+            expect(result?.values).toMatchObject(currentRefinerSettings);
+            expect(result?.fields).not.toContain('refiner');
+            expect(result?.skipped).toEqual([
+              {
+                name: refinerMetadata === recordedRefiner ? 'SDXL Refiner' : null,
+                reason: 'modelUnavailable',
+                subject: 'refiner',
+              },
+            ]);
+          } else {
+            // A record that ran without a refiner keeps the slot quietly: nothing to restore, nothing to report.
+            expect(result).toBeNull();
+          }
+          expect(
+            getImageRecallCapabilities({
+              currentValues,
+              image,
+              metadata,
+              models: [refiner],
+              supportedModels: [],
+              vaeModels: [],
+            })
+          ).toMatchObject({ all: false, remix: false });
+        }
+      }
+    }
+  );
+
+  it('does not treat a non-refiner model named by the record as the refiner', () => {
+    const result = recall({ ...recordedRefiner, refiner_model: { key: sdxlModel.key } }, [sdxlModel, refiner]);
+
+    expect(result?.values.refinerModel).toBeNull();
+    expect(result?.skipped).toEqual([{ name: sdxlModel.key, reason: 'unresolved', subject: 'refiner' }]);
+  });
+
+  it('clears the refiner for a generation record that ran without one and ignores refiner data on other families', () => {
+    const cleared = buildImageRecallSettings({
+      currentValues: createValues({ refinerModel: refiner }),
+      image,
+      kind: 'all',
+      metadata: { generation_mode: 'sdxl_txt2img', model: { key: sdxlModel.key } },
+      models: [refiner],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+    expect(cleared?.values.refinerModel).toBeNull();
+    expect(cleared?.fields).toContain('refiner');
+
+    // A canvas save names a model but is not a generation record, so it says nothing about the refiner.
+    const canvasSave = buildImageRecallSettings({
+      currentValues: createValues({ refinerModel: refiner }),
+      image,
+      kind: 'all',
+      metadata: { model: { key: sdxlModel.key }, positive_prompt: 'kept' },
+      models: [refiner],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+    expect(canvasSave?.values.refinerModel).toEqual(refiner);
+    expect(canvasSave?.fields).not.toContain('refiner');
+
+    const sd1 = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: { model: { key: sd1Model.key }, ...recordedRefiner },
+      models: [sd1Model, refiner],
+      supportedModels: [sd1Model],
+      vaeModels: [],
+    });
+
+    expect(sd1?.values.refinerModel).toBeNull();
+    expect(sd1?.fields).not.toContain('refiner');
+  });
+
+  it('drops out-of-range refiner tuning and unknown schedulers', () => {
+    const result = recall({ ...recordedRefiner, refiner_scheduler: 'bogus', refiner_start: 3, refiner_steps: 0 }, [
+      refiner,
+    ]);
+
+    expect(result?.values).toMatchObject({
+      refinerModel: refiner,
+      refinerScheduler: 'euler',
+      refinerStart: 0.8,
+      refinerSteps: 20,
+    });
+  });
+
+  it('round-trips the refiner a compiled SDXL graph records', () => {
+    const { model, settings } = satisfiedSettingsFor('sdxl', {
+      label: 'diffusers',
+      overrides: { format: 'diffusers' },
+    });
+    const graph = compileGenerateGraph({ ...settings, refinerModel: refiner, refinerStart: 0.65 }, model, 'gallery', {
+      useCpuNoise: true,
+      useNsfwChecker: false,
+      useWatermark: false,
+    }).backendGraph;
+    const metadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model: sd1Model, modelKey: sd1Model.key }),
+      image,
+      kind: 'remix',
+      metadata,
+      models: [refiner],
+      supportedModels: [model],
+      vaeModels: [],
+    });
+
+    expect(result?.values.model).toEqual(model);
+    expect(result?.values.refinerModel).toEqual(refiner);
+    expect(result?.values.refinerStart).toBe(0.65);
+    expect(
+      getImageRecallCapabilities({
+        currentValues: createValues(),
+        image,
+        metadata: { refiner_model: metadata?.refiner_model },
+        models: [refiner],
+        supportedModels: [model],
+        vaeModels: [],
+      })
+    ).toMatchObject({ all: true, remix: true });
   });
 });
 

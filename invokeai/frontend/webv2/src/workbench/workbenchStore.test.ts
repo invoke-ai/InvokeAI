@@ -63,12 +63,10 @@ describe('createWorkbenchStore', () => {
     configureLogging({ ...DEFAULT_LOGGING_CONFIG, level: 'trace' });
   });
 
-  it('exposes stable capability interfaces and initializes snapshot metadata', () => {
+  it('initializes snapshot metadata', () => {
     const store = createWorkbenchStore();
     const snapshot = store.getSnapshot();
 
-    expect(store.commands).toBe(store.commands);
-    expect(store.queries).toBe(store.queries);
     expect(snapshot.hasHydrated).toBe(false);
     expect(snapshot.projects).toHaveLength(1);
   });
@@ -489,7 +487,8 @@ describe('createWorkbenchStore', () => {
     const projectId = store.getSnapshot().activeProject.id;
 
     store.internal.persistence.saveStarted();
-    store.internal.persistence.savePending('Autosave requires your attention.');
+    store.internal.persistence.savePending('Autosave is pending and will retry.');
+    store.internal.persistence.saveNeedsAttention('2026-10-14T09:00:00.000Z');
     store.internal.persistence.saveFailed('Backend rejected the revision');
     store.commands.queue.setStatus({ error: 'Out of memory', projectId, queueItemId: 'missing', status: 'failed' });
 
@@ -507,9 +506,56 @@ describe('createWorkbenchStore', () => {
         name: 'persistence.autosave-failed',
         source: { area: 'autosave', namespace: 'persistence', projectId },
       },
-      { level: 'warn', name: 'persistence.autosave-pending' },
+      { level: 'warn', name: 'persistence.autosave-needs-attention' },
+      {
+        context: { reason: 'Autosave is pending and will retry.' },
+        level: 'warn',
+        name: 'persistence.autosave-pending',
+      },
       { level: 'debug', name: 'persistence.autosave-started' },
     ]);
+  });
+
+  it('warns once per retry cycle while autosave keeps retrying', () => {
+    const store = createWorkbenchStore();
+    const persistence = store.internal.persistence;
+    const pendingWarnings = () =>
+      getLogSnapshot().entries.filter((entry) => entry.name === 'persistence.autosave-pending');
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      persistence.saveStarted();
+      persistence.savePending('Autosave is pending and will retry.');
+    }
+    expect(pendingWarnings()).toHaveLength(1);
+    expect(store.getSnapshot().autosave.status).toBe('pending');
+
+    persistence.saveStarted();
+    persistence.saveSucceeded('2026-10-14T09:00:00.000Z');
+    persistence.saveStarted();
+    persistence.savePending('Autosave is pending and will retry.');
+
+    expect(pendingWarnings()).toHaveLength(2);
+  });
+
+  it('reports a retrying save as pending and a project awaiting a decision as attention, not as failures', () => {
+    const store = createWorkbenchStore();
+    const persistence = store.internal.persistence;
+
+    persistence.saveSucceeded('2026-10-14T09:00:00.000Z');
+    persistence.savePending('Autosave is pending and will retry.');
+
+    expect(store.getSnapshot().autosave).toEqual({
+      error: 'Autosave is pending and will retry.',
+      lastSavedAt: '2026-10-14T09:00:00.000Z',
+      status: 'pending',
+    });
+
+    persistence.saveStarted();
+    persistence.saveNeedsAttention('2026-10-14T09:00:05.000Z');
+
+    // Every other project did save, so the time stays visible while one project waits.
+    expect(store.getSnapshot().autosave).toEqual({ lastSavedAt: '2026-10-14T09:00:05.000Z', status: 'attention' });
+    expect(store.getSnapshot().notifications).toEqual([]);
   });
 
   it('records accepted widget failures into diagnostics once', () => {

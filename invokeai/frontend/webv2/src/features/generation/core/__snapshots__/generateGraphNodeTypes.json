@@ -45,7 +45,8 @@
     "sdxl": {
       "componentsFilled": {
         "diffusers": [],
-        "standalone-components": []
+        "standalone-components": [],
+        "diffusers-with-refiner": []
       },
       "nodeTypes": [
         "collect",
@@ -59,6 +60,8 @@
         "noise",
         "sdxl_compel_prompt",
         "sdxl_model_loader",
+        "sdxl_refiner_compel_prompt",
+        "sdxl_refiner_model_loader",
         "string"
       ]
     },
@@ -707,6 +710,25 @@
           "cpu"
         ],
         "ref_images": [],
+        "refiner_cfg_scale": [
+          7.5
+        ],
+        "refiner_model": [],
+        "refiner_negative_aesthetic_score": [
+          2.5
+        ],
+        "refiner_positive_aesthetic_score": [
+          6
+        ],
+        "refiner_scheduler": [
+          "euler"
+        ],
+        "refiner_start": [
+          0.8
+        ],
+        "refiner_steps": [
+          20
+        ],
         "scheduler": [
           "euler_a",
           "euler"
@@ -763,6 +785,7 @@
     "denoise_latents": {
       "inputs": [
         "ip_adapter",
+        "latents",
         "negative_conditioning",
         "noise",
         "positive_conditioning",
@@ -773,13 +796,16 @@
           0
         ],
         "cfg_scale": [
-          7
+          7,
+          7.5
         ],
         "denoising_end": [
+          0.8,
           1
         ],
         "denoising_start": [
-          0
+          0,
+          0.8
         ],
         "hidiffusion": [
           false
@@ -794,9 +820,11 @@
           true
         ],
         "scheduler": [
-          "euler_a"
+          "euler_a",
+          "euler"
         ],
         "steps": [
+          20,
           30
         ],
         "use_cache": [
@@ -1634,7 +1662,8 @@
         "negative_conditioning",
         "positive_conditioning",
         "seed",
-        "transformer"
+        "transformer",
+        "vae"
       ],
       "literalInputs": {
         "cfg_scale": [
@@ -1850,6 +1879,43 @@
         "clip2",
         "unet",
         "vae"
+      ]
+    },
+    "sdxl_refiner_compel_prompt": {
+      "inputs": [
+        "clip2",
+        "style"
+      ],
+      "literalInputs": {
+        "aesthetic_score": [
+          2.5,
+          6
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "conditioning"
+      ]
+    },
+    "sdxl_refiner_model_loader": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "model": [],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "clip2",
+        "unet"
       ]
     },
     "string": {

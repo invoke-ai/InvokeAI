@@ -1,7 +1,7 @@
 ---
 title: Organizing your media
 description: Use the Gallery to organize images and videos into boards, choose where new results go, search by metadata or by content, upload media, and move, star, download or delete it.
-lastUpdated: 2026-10-05
+lastUpdated: 2026-10-19
 sidebar:
   order: 1
 ---
@@ -32,7 +32,7 @@ The Gallery has three parts:
 
 When the Gallery is narrow, or docked in a side rail, the board list sits above the media grid. When it is wide, the board list becomes a column on the left. Drag the divider between them to resize the list.
 
-Each board shows its cover image, its name and a count such as **76 | 12**: 76 items on the Media tab and 12 on the Uploads tab. A project's Inbox is pinned at the top of its group with an inbox icon. On a multi-user installation, other people's boards show their owner's name.
+Each board shows its cover image, its name and a count such as **76 | 12**: 76 items on the Media tab and 12 on the Uploads tab. A project's Inbox is pinned at the top of its group with an inbox icon. On a multi-user installation, boards other people let you open are listed under **Shared with me**, each with its owner and what you can do, such as **Ana · Can view**; administrators also see **Other users' boards**.
 
 ## Boards
 
@@ -50,7 +50,8 @@ The new board is selected straight away, so it also becomes the destination for 
 
 * A new project starts with its Inbox selected. See [Projects](/users-guide/projects/introduction/#where-your-images-go).
 * If you select a date board (see below), results go to the project's Inbox, because date boards are only a view.
-* Uploads go to the selected board.
+* If you select a board someone else shares with you that you can only view, results go to the project's Inbox, which is marked **Auto** while that board is selected; the same goes for an auto-add board you can no longer add to.
+* Uploads go to the selected board; a board you can only view takes no uploads.
 * If you archive or delete the selected board, the selection, and with it the destination, moves to **Uncategorized**.
 
 To keep sending results to one board while you browse others, make it the **auto-add board**: choose **Auto-add to this board** from its menu. The board is marked **Auto**, and new generations, Canvas saves, pasted media and the results of workflow nodes whose **Board** is set to **Auto** all go there, whichever board you are viewing. Choose **Stop auto-adding here** from the same menu to go back to following the selected board. The setting behind this is **Send new results to the selected board**, in the [Gallery settings](/users-guide/gallery/gallery-reference/#gallery-settings).
@@ -66,10 +67,10 @@ The **Filter & sort boards** button beside the search field controls which board
 * **Board visibility**
   * **Date boards** — adds a **By Date** group with one board per day on which you created media. Date boards are read-only views: you cannot upload to them, drop media on them, or rename or delete them.
   * **Archived boards** — adds an **Archived** group listing the boards you have archived.
-  * **Other projects' boards** — adds an **Other projects** group with your other projects' boards, grouped by project. They are hidden by default to keep the list focused; the open project's boards are always shown.
+  * **Other projects' boards** — adds an **Other projects** group with your other projects' boards, grouped by project. They are hidden by default to keep the list focused; the open project's boards are always shown. Click a project's name, or focus it and press **Enter** or **Space**, to collapse or expand that project's boards on their own. While you search the boards, every project with a matching board is shown expanded, and collapsed projects stay collapsed afterwards. You can still drag a board onto a collapsed project's name to move it there.
 * **Sort by** — **Created** (the default) or **Name**, in descending or ascending order. Each project's **Inbox** and the Library's **Uncategorized** always stay at the top of their group.
 
-These choices are saved with the project, so each project can list boards differently.
+These choices, and which projects under **Other projects** are collapsed, are saved with the project, so each project can list boards differently.
 
 ### Renaming, archiving, downloading and deleting boards
 
@@ -77,7 +78,7 @@ Right-click a board, or hover over it and click its **⋯** button, to rename, m
 
 ## Finding media in a board
 
-Search, the starred filter and the sort order apply to the selected board and the current tab (Media or Uploads).
+Search, the starred filter and the sort order apply to the selected board and the current tab (Media or Uploads). A search can also look in every board; see [Searching all boards](#searching-all-boards).
 
 ### Searching by metadata
 
@@ -102,13 +103,21 @@ When image indexing is turned on, the Gallery can also search by what media *sho
 * **Search by text.** Click the sparkle button at the right end of the search field (**Search semantically**). The field changes to **Describe what to find…**; describe what you are looking for. Any text already in the field is used straight away.
 * **Search by image.** Drag an image onto the search field: a thumbnail from the Gallery, an image from the Preview, an image file from your computer, or an image from another browser tab. The Gallery then shows the media most similar to it, labelled **Similar to …**.
 
-Results are ranked by similarity, most similar first, up to 500 items from the selected board. Videos are included. The Media and Uploads tabs, the sort order, the starred filter and date tokens do not apply to ranked results.
+Results are ranked by similarity, most similar first, up to 500 items from the selected board, or from every board with [All boards](#searching-all-boards). Videos are included unless the media type filter hides them. The Media and Uploads tabs, the sort order, the starred filter and date tokens do not apply to ranked results.
 
 To leave semantic search, click the **✕** in the search field, click the sparkle button again (**Exit semantic search**), or switch tabs. If the index model is not installed, the Gallery says so when you try to search. Archived boards are not indexed.
 
-### Sorting and the starred filter
+### Searching all boards
 
-The sort menu orders media by creation time, **Newest** first (the default) or **Oldest** first. The star button next to it (**Starred only**) shows only starred items. Images and videos are always shown together.
+While a search is active, by metadata or by content, an **All boards** toggle appears inside the search field, beside the field's other buttons; its tooltip says where the search looks (**Search in: This board** or **Search in: All boards**). Turn it on to search everywhere you can see: your **Uncategorized** media and every board you can open that is not archived, including boards in other projects and boards others share with you. Everything else works as it does on one board: the tabs, the starred and media type filters, the sort order and date tokens apply to a metadata search as before. Selecting a result keeps you in the search: the arrow keys and the Preview step through its results.
+
+Searching all boards changes neither the selected board nor where new results go. You cannot upload while it is on, since the search has no board of its own. Clearing the search, or anything else that clears it, such as **Find in Gallery**, returns it to **This board**.
+
+### Sorting and filtering
+
+The sort menu orders media by creation time, **Newest** first (the default) or **Oldest** first. The star button (**Starred only**) shows only starred items.
+
+The media type button between them chooses which kinds of media the Gallery shows: **Both** (the default), **Images only**, or **Videos only**. Its icon shows the current choice, and it is highlighted while it hides one kind. The choice is saved with the project and also applies to the [Image Map](/users-guide/image-map/introduction/). If a board has nothing of the chosen kind, the Gallery says so and offers **Show all media**. Revealing an item the filter hides, for example with **Find in Gallery** from the Preview, switches the filter back to **Both**. The Gallery picker that chooses media for other features always lists both kinds.
 
 ### Browsing large boards
 

@@ -18,6 +18,7 @@ import {
 import { SEED_MAX } from '@platform/core/seed';
 
 import type {
+  ExternalGenerationMode,
   GenerateModelConfig,
   GenerateReferenceImage,
   GenerateReferenceImageAsset,
@@ -42,13 +43,22 @@ import {
   isQwen3Vl8bEncoder,
   isIdeogram4UnconditionalBranch,
   isKrea2Qwen3VlEncoder,
-  isNonAnimaQwen3Encoder,
   isSelfContainedSDNQFlux1Pipeline,
   isSelfContainedSDNQPipeline,
   isVaeAcceptedByBase,
+  isZImageQwen3Encoder,
   type GenerateComponentFilter,
 } from './componentCompatibility';
+import { MAX_DIMENSION, MIN_DIMENSION } from './dimensionLimits';
 import { DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS } from './dynamicPrompts';
+import {
+  getExternalAspectRatioSizes,
+  getExternalReferenceImages,
+  getExternalResolutionPresets,
+  isSeedreamBatchModel,
+  resolveExternalImageSize,
+  SEEDREAM_BATCH_MAX_TOTAL_IMAGES,
+} from './externalProvider';
 import {
   DEFAULT_PID_STEPS,
   getIsPidActive,
@@ -56,6 +66,17 @@ import {
   getPidDecoderBaseForMainBase,
   getPidDimensionOverrides,
 } from './pid';
+import {
+  DEFAULT_REFINER_CFG_SCALE,
+  DEFAULT_REFINER_NEGATIVE_AESTHETIC_SCORE,
+  DEFAULT_REFINER_POSITIVE_AESTHETIC_SCORE,
+  DEFAULT_REFINER_SCHEDULER,
+  DEFAULT_REFINER_START,
+  DEFAULT_REFINER_STEPS,
+  getRefinerValidationReasons,
+  getActiveRefiner,
+  isRefinerSupported,
+} from './sdxlRefiner';
 import {
   clampDimension,
   DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT,
@@ -84,8 +105,6 @@ import {
   isValidKrea2RebalanceWeights,
   isWanLoraTargetingMain,
   KREA2_REBALANCE_WEIGHT_COUNT,
-  MAX_DIMENSION,
-  MIN_DIMENSION,
   normalizeGenerateSettings,
 } from './settings';
 
@@ -199,11 +218,12 @@ const getBaseGenerationConfig = (
   return getArchitectureGenerationConfig(model.base, model.variant) ?? FALLBACK_GENERATION_CONFIG;
 };
 
-/** Use variant-aware grids; return null for undescribed local architectures. External providers use a generic grid. */
+/** Pixel-exact: hosted providers bucket requests to their own size tables, which are not grid-aligned. */
+const EXTERNAL_DIMENSION_GRID = 1;
+
+/** Use variant-aware grids; return null for undescribed local architectures. External providers have no grid. */
 export const getDimensionGrid = (base: string, variant?: unknown): number | null =>
-  base === 'external'
-    ? FALLBACK_GENERATION_CONFIG.dimensions.grid
-    : (getArchitectureFeatures(base, variant)?.dimension_grid ?? null);
+  base === 'external' ? EXTERNAL_DIMENSION_GRID : (getArchitectureFeatures(base, variant)?.dimension_grid ?? null);
 
 /** A served architecture row does not imply frontend graph support. */
 export const isArchitectureDescribed = (model: Pick<GenerateModelConfig, 'base' | 'type'>): boolean =>
@@ -226,7 +246,7 @@ export const getGenerationDimensions = (
   const { grid, optimalSide } = getPidDimensionOverrides(
     pidMode,
     model?.base,
-    config.dimensions.grid,
+    model?.type === 'external_image_generator' ? EXTERNAL_DIMENSION_GRID : config.dimensions.grid,
     config.dimensions.optimalSide
   );
 
@@ -363,6 +383,7 @@ export const getGenerationUiPolicy = (model: GenerateModelConfig | undefined) =>
     seedVisible,
     // Show PiD controls on supported bases even while PiD is disabled.
     pidVisible: getIsPidSupportedBase(model?.base),
+    refinerVisible: isRefinerSupported(model),
     // Both Qwen-Image text encoders take the quantization choice; no other family's encoder does.
     encoderQuantizationVisible: model?.type === 'main' && model.base === 'qwen-image',
   };
@@ -468,6 +489,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     qwen3VLEncoderModel: null,
     qwen35EncoderModel: null,
     animaInpaintAdapterModel: null,
+    animaInpaintAdapterEnabled: true,
     animaInpaintAdapterWeight: DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT,
     wanT5EncoderModel: null,
     ideogram4UnconditionalModel: null,
@@ -497,7 +519,22 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     pidDecoderModel: null,
     gemma2EncoderModel: null,
     pidSteps: DEFAULT_PID_STEPS,
+    externalImageSize: null,
+    openaiQuality: 'auto',
+    openaiBackground: 'auto',
+    openaiInputFidelity: null,
+    geminiTemperature: null,
+    geminiThinkingLevel: null,
+    seedreamWatermark: false,
+    seedreamOptimizePrompt: false,
     referenceImages: [],
+    refinerModel: null,
+    refinerSteps: DEFAULT_REFINER_STEPS,
+    refinerCfgScale: DEFAULT_REFINER_CFG_SCALE,
+    refinerScheduler: DEFAULT_REFINER_SCHEDULER,
+    refinerPositiveAestheticScore: DEFAULT_REFINER_POSITIVE_AESTHETIC_SCORE,
+    refinerNegativeAestheticScore: DEFAULT_REFINER_NEGATIVE_AESTHETIC_SCORE,
+    refinerStart: DEFAULT_REFINER_START,
     scheduler: defaults.scheduler,
     seamlessXAxis: false,
     seamlessYAxis: false,
@@ -576,6 +613,11 @@ export interface ComponentSlotPolicy {
   filter?: (candidate: ModelConfig, ctx: ComponentPolicyContext) => boolean;
   required?: (ctx: ComponentPolicyContext) => boolean;
   missingMessage?: string;
+  /**
+   * Reported whenever the selected value fails `filter`, required or not, so a saved selection the graph cannot use
+   * blocks Invoke by name instead of being dropped in favour of a component source.
+   */
+  incompatibleMessage?: string;
 }
 
 export interface ComponentSectionPolicy {
@@ -586,7 +628,10 @@ export interface ComponentSectionPolicy {
 
 export interface GenerateModelSelectionResult {
   settings: GenerateSettings;
+  /** Settings the switch turns off or removes, which callers confirm or report. */
   clearedLabels: readonly string[];
+  /** The size moved to the model's grid or provider sizes. Nothing is lost and it stays on screen, so it is reported. */
+  dimensionsAdjusted: boolean;
 }
 
 const TYPE_CLIP_EMBED: ModelTaxonomyType[] = ['clip_embed'];
@@ -866,12 +911,16 @@ const isBundledOrDiffusersSourceSatisfied = (ctx: ComponentPolicyContext): boole
 // Slot validation is shared by invocation readiness and graph preflight so picker requirements cannot drift.
 const validateSlots = (policy: Pick<ComponentSectionPolicy, 'slots'>, ctx: ComponentPolicyContext): string[] =>
   policy.slots.flatMap((slotPolicy) => {
+    const value = ctx.selectedComponents[slotPolicy.key];
+    const isValid = value && (!slotPolicy.filter || slotPolicy.filter(value as ModelConfig, ctx));
+
+    if (value && !isValid && slotPolicy.incompatibleMessage) {
+      return [slotPolicy.incompatibleMessage];
+    }
+
     if (!slotPolicy.required?.(ctx)) {
       return [];
     }
-
-    const value = ctx.selectedComponents[slotPolicy.key];
-    const isValid = value && (!slotPolicy.filter || slotPolicy.filter(value as ModelConfig, ctx));
 
     return isValid ? [] : [slotPolicy.missingMessage ?? `Generate needs a ${slotPolicy.label} for this model.`];
   });
@@ -985,9 +1034,15 @@ const getBaseComponentSectionPolicy = (
           'Select a bundled Z-Image pipeline to provide VAE and Qwen3 components.'
         ),
         {
-          ...qwen3EncoderSlot('Required unless a Diffusers component source is available.', isNonAnimaQwen3Encoder),
+          ...qwen3EncoderSlot(
+            'Z-Image conditions on the Qwen3 4B encoder, not the 8B one FLUX.2 Klein 9B uses. Required unless a ' +
+              'Diffusers component source is available.',
+            isZImageQwen3Encoder
+          ),
           required: (ctx) => !isBundledOrDiffusersSourceSatisfied(ctx),
-          missingMessage: 'Generate needs a Qwen3 Encoder for Z-Image models.',
+          missingMessage: 'Generate needs a Qwen3 4B Encoder for Z-Image models.',
+          incompatibleMessage:
+            'The selected Qwen3 Encoder is not the 4B one Z-Image conditions on. Select a Qwen3 4B Encoder or clear it.',
         },
         {
           ...vaeSlot(
@@ -1466,7 +1521,8 @@ export const getCompatibleReferenceImages = (
 const getSettingsWithCompatibleModelSelections = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
-  models: readonly ReferenceModelCandidate[]
+  models: readonly ReferenceModelCandidate[],
+  isCanvasFrame: boolean
 ): GenerateModelSelectionResult => {
   const nextSettings: GenerateSettings = { ...settings, modelKey: model.key };
   const clearedLabels: string[] = [];
@@ -1480,7 +1536,40 @@ const getSettingsWithCompatibleModelSelections = (
     nextSettings.height = height;
     nextSettings.aspectRatioId = deriveAspectRatioId(width, height);
     nextSettings.aspectRatioValue = height > 0 ? width / height : 1;
-    addClearedLabel(clearedLabels, 'Dimensions');
+  }
+
+  if (settings.modelKey !== model.key) {
+    const sizes = getExternalResolutionPresets(model);
+    const supportedSizes = sizes.length > 0 ? sizes : getExternalAspectRatioSizes(model).map(([, size]) => size);
+    const matchesSize = supportedSizes.some((size) => size.width === width && size.height === height);
+
+    // The Canvas frame is kept: the Canvas asks a provider for its own size nearest the frame and restores the result.
+    if (!matchesSize && supportedSizes.length > 0 && !isCanvasFrame) {
+      // Keep the frame's shape when possible, then its pixel budget within that shape.
+      const distance = (size: { width: number; height: number }) => ({
+        area: Math.abs(Math.log((size.width * size.height) / (width * height))),
+        ratio: Math.abs(Math.log(size.width / size.height / (width / height))),
+      });
+      // Rounded presets of one nominal ratio differ by ~0.02 in log ratio; distinct ratios by 0.1 or more.
+      const RATIO_TOLERANCE = 0.05;
+      const selected = supportedSizes.reduce((best, size) => {
+        const candidateDistance = distance(size);
+        const bestDistance = distance(best);
+        const sameRatio = Math.abs(candidateDistance.ratio - bestDistance.ratio) < RATIO_TOLERANCE;
+
+        return (!sameRatio && candidateDistance.ratio < bestDistance.ratio) ||
+          (sameRatio && candidateDistance.area < bestDistance.area)
+          ? size
+          : best;
+      });
+
+      nextSettings.width = selected.width;
+      nextSettings.height = selected.height;
+      nextSettings.aspectRatioId = deriveAspectRatioId(selected.width, selected.height);
+      nextSettings.aspectRatioValue = selected.width / selected.height;
+    }
+
+    nextSettings.externalImageSize = resolveExternalImageSize(nextSettings, model);
   }
 
   if (compatibleLoras.length !== settings.loras.length) {
@@ -1560,6 +1649,12 @@ const getSettingsWithCompatibleModelSelections = (
     addClearedLabel(clearedLabels, 'HiDiffusion');
   }
 
+  // The refiner only ever follows an SDXL base; its tuning values stay for the next SDXL pick.
+  if (!uiPolicy.refinerVisible && nextSettings.refinerModel) {
+    nextSettings.refinerModel = null;
+    addClearedLabel(clearedLabels, 'Refiner');
+  }
+
   if (!uiPolicy.seamlessVisible && (nextSettings.seamlessXAxis || nextSettings.seamlessYAxis)) {
     nextSettings.seamlessXAxis = false;
     nextSettings.seamlessYAxis = false;
@@ -1575,23 +1670,30 @@ const getSettingsWithCompatibleModelSelections = (
     }
   }
 
-  return { settings: nextSettings, clearedLabels };
+  return {
+    clearedLabels,
+    dimensionsAdjusted: nextSettings.width !== settings.width || nextSettings.height !== settings.height,
+    settings: nextSettings,
+  };
 };
 
 /** Normalize, reconcile, and apply component policy before persisting model selection. */
 export const getGenerateModelSelectionResult = ({
   currentValues,
+  isCanvasFrame = false,
   model,
   models,
 }: {
   currentValues: unknown;
+  /** The width and height are the Canvas frame (a Canvas source), which the Canvas sync resizes to follow them. */
+  isCanvasFrame?: boolean;
   model: GenerateModelConfig;
   models: readonly ModelConfig[];
 }): GenerateModelSelectionResult => {
   const currentSettings = isGenerateSettings(currentValues)
     ? currentValues
     : (normalizeGenerateSettings(currentValues) ?? getDefaultGenerateSettings(model));
-  const result = getSettingsWithCompatibleModelSelections(currentSettings, model, models);
+  const result = getSettingsWithCompatibleModelSelections(currentSettings, model, models, isCanvasFrame);
   const componentSourceModel = getAutoFlux2ComponentSourceModel(model, result.settings, models);
 
   if (componentSourceModel === undefined || componentSourceModel?.key === result.settings.componentSourceModel?.key) {
@@ -1624,6 +1726,11 @@ export const getGenerationModelAvailabilityReasons = (
     if (value && !hasModelKey(models, value.key, value.type)) {
       reasons.push(`${COMPONENT_SETTING_LABELS[key]} "${value.name}" is no longer installed.`);
     }
+  }
+
+  const refiner = getActiveRefiner(settings, model);
+  if (refiner && !hasModelKey(models, refiner.key, 'main')) {
+    reasons.push(`Refiner "${refiner.name}" is no longer installed.`);
   }
 
   for (const lora of settings.loras) {
@@ -1662,6 +1769,11 @@ const getDimensionValidationReasons = (model: GenerateModelConfig, settings: Gen
     reasons.push(`Generate height must be between ${dimensions.min} and ${dimensions.max}.`);
   } else if (settings.height % dimensions.grid !== 0) {
     reasons.push(`Generate height must be a multiple of ${dimensions.grid}.`);
+  }
+
+  const maxSize = model.type === 'external_image_generator' ? model.capabilities?.max_image_size : null;
+  if (maxSize && (settings.width > maxSize.width || settings.height > maxSize.height)) {
+    reasons.push(`${model.name} supports a maximum size of ${maxSize.width}×${maxSize.height}.`);
   }
 
   return reasons;
@@ -1796,7 +1908,24 @@ const getModelFamilyValidationReasons = (model: MainModelConfig, settings: Gener
   return reasons;
 };
 
-export const getGenerationValidationReasons = (model: GenerateModelConfig, settings: GenerateSettings): string[] => {
+const EXTERNAL_MODE_LABELS: Record<ExternalGenerationMode, string> = {
+  img2img: 'image-to-image generation',
+  inpaint: 'inpainting',
+  txt2img: 'text-to-image generation',
+};
+
+/** Why an external model cannot run `mode`, or null when it advertises it. */
+export const getExternalModeReason = (model: GenerateModelConfig, mode: ExternalGenerationMode): string | null =>
+  model.type === 'external_image_generator' && !(model.capabilities?.modes ?? ['txt2img']).includes(mode)
+    ? `${model.name} does not support ${EXTERNAL_MODE_LABELS[mode]}.`
+    : null;
+
+/** `mode` is the external generation mode being compiled; local models are validated the same way for every mode. */
+export const getGenerationValidationReasons = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  mode: ExternalGenerationMode = 'txt2img'
+): string[] => {
   // All compilers share this validator; check capabilities before model-specific policy.
   if (!hasArchitectureCapabilities()) {
     // Keep core independent of the load-state store; failures direct callers to retry.
@@ -1821,12 +1950,25 @@ export const getGenerationValidationReasons = (model: GenerateModelConfig, setti
   ];
 
   if (model.type === 'external_image_generator') {
-    if (model.capabilities?.modes && !model.capabilities.modes.includes('txt2img')) {
-      reasons.push(`${model.name} does not support text-to-image generation.`);
+    const modeReason = getExternalModeReason(model, mode);
+
+    if (modeReason) {
+      reasons.push(modeReason);
     }
 
     if (!getExternalProviderNodeType(model.provider_id)) {
       reasons.push(`No invocation node registered for external provider '${model.provider_id ?? ''}'.`);
+    }
+
+    // Every request emits one output, and the Canvas edit modes add the composite as one init image.
+    if (isSeedreamBatchModel(model)) {
+      const totalImages = getExternalReferenceImages(settings, model).length + (mode === 'txt2img' ? 0 : 1) + 1;
+
+      if (totalImages > SEEDREAM_BATCH_MAX_TOTAL_IMAGES) {
+        reasons.push(
+          `${model.name} supports at most ${SEEDREAM_BATCH_MAX_TOTAL_IMAGES} images total (reference + init + output), got ${totalImages}.`
+        );
+      }
     }
 
     return reasons;
@@ -1841,6 +1983,7 @@ export const getGenerationValidationReasons = (model: GenerateModelConfig, setti
   }
 
   reasons.push(...getModelFamilyValidationReasons(model, settings));
+  reasons.push(...getRefinerValidationReasons(model, settings));
 
   return reasons;
 };

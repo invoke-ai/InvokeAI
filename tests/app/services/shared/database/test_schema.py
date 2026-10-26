@@ -285,12 +285,7 @@ def test_omitted_columns_take_their_defaults(empty_database: Database) -> None:
         board = conn.execute(select(boards)).one()._mapping
         image = conn.execute(select(images.c.image_subfolder, images.c.is_intermediate, images.c.user_id)).one()
 
-    assert (board["archived"], board["user_id"], board["is_public"], board["board_visibility"]) == (
-        False,
-        "system",
-        False,
-        "private",
-    )
+    assert (board["archived"], board["user_id"], board["general_access"]) == (False, "system", "restricted")
     for timestamp in (board["created_at"], board["updated_at"]):
         assert re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}", timestamp)
     assert tuple(image) == ("", False, "system")

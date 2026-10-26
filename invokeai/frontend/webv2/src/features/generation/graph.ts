@@ -15,6 +15,7 @@ export {
   toModelIdentifier,
 } from './core/graphBuilder';
 export { detectCanvasMode } from './core/canvas/canvasMode';
+export { getCompelPromptNodeType, supportsPromptAttentionSyntax } from './core/prompt/compel';
 export {
   areControlAdapterValuesValid,
   CONTROL_ADAPTER_KINDS,
@@ -22,9 +23,9 @@ export {
   type ControlAdapterKind,
   type ControlValidationReason,
   createControlValidationSequence,
+  getControlAdapterMinWeight,
   getControlModelUnusableReason,
   getControlValidationReason,
-  getSuggestedControlKind,
   isControlKindSupportedForBase,
   isControlModelUsableForKind,
 } from './core/canvas/controlValidation';

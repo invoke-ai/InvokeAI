@@ -605,6 +605,17 @@
     },
     {
       "category": "CACHE",
+      "default": false,
+      "description": "Run the matmuls of ComfyUI int8 builds quantized with convrot ('int8_tensorwise' with 'convrot') on the int8 tensor cores instead of dequantizing their weights on every forward (requires an NVIDIA GPU with compute capability 8.0 or newer and Triton; falls back automatically otherwise, including on AMD, Apple and Intel GPUs and the CPU). Speeds up denoising with these builds, but quantizes activations per token as well, so images will differ from the dequantized path at the same seed. The kernels are tuned once per layer shape and token-count bucket: about 35 seconds for the first image after enabling it, about 1-5 seconds for a later size in a new token-count bucket, cached on disk across restarts.",
+      "env_var": "INVOKEAI_INT8_COMPUTE",
+      "literal_values": [],
+      "name": "int8_compute",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
       "default": null,
       "description": "DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.",
       "env_var": "INVOKEAI_RAM",
@@ -815,7 +826,7 @@
     {
       "category": "GENERATION",
       "default": false,
-      "description": "Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, Z-Image and Qwen-Image VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.",
+      "description": "Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, FLUX.2, Z-Image, Qwen-Image and Qwen-Image-2.1 VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.",
       "env_var": "INVOKEAI_FORCE_TILED_DECODE",
       "literal_values": [],
       "name": "force_tiled_decode",
@@ -826,7 +837,7 @@
     {
       "category": "GENERATION",
       "default": true,
-      "description": "Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, Z-Image, Qwen-Image, Krea-2 and Wan decodes). Turn off to decode untiled unless tiling is requested; the FLUX.1 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.",
+      "description": "Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, FLUX.2, Z-Image, Qwen-Image, Qwen-Image-2.1, Krea-2 and Wan decodes, and Qwen-Image-2.1 encodes). Turn off to decode untiled unless tiling is requested; the FLUX.1, FLUX.2 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.",
       "env_var": "INVOKEAI_AUTO_TILED_DECODE",
       "literal_values": [],
       "name": "auto_tiled_decode",

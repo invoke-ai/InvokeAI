@@ -88,6 +88,7 @@ const CanvasHeaderActionsInner = ({
   const { t } = useTranslation();
   const notify = useNotify();
   const zoom = useCanvasZoom(engine);
+  const zoomLabel = formatZoomPercent(zoom);
   const canUndo = useCanvasCanUndo(engine);
   const canRedo = useCanvasCanRedo(engine);
   const editingLocked = useCanvasDocumentEditingLocked(engine);
@@ -142,10 +143,11 @@ const CanvasHeaderActionsInner = ({
     const entries = [
       ['canvas.fitBboxToLayers', t('widgets.canvas.controls.fitBboxToLayers'), ['shift+n']],
       ['canvas.fitBboxToMasks', t('widgets.canvas.controls.fitBboxToMasks'), ['shift+b']],
-      // No default keys — assignable through the hotkeys settings.
+      // The gallery saves have no default keys; they are assignable through the hotkeys settings.
       ['canvas.saveToGallery', t('widgets.canvas.contextMenu.saveCanvasToGallery'), []],
       ['canvas.saveBboxToGallery', t('widgets.canvas.contextMenu.saveBboxToGallery'), []],
-      ['canvas.newSession', t('widgets.canvas.controls.newSession'), []],
+      // Clear canvas keeps its saved-binding id, `newSession`.
+      ['canvas.newSession', t('widgets.canvas.controls.clearCanvas'), ['mod+alt+n']],
     ] as const;
     const disposers = entries.flatMap(([id, title, defaultKeys]) => [
       runtime.commands.register({ handler: () => executeHeaderCommand(id), id, title }),
@@ -160,9 +162,15 @@ const CanvasHeaderActionsInner = ({
     <HStack gap="0.5">
       <Menu.Root positioning={MENU_POSITIONING}>
         <Menu.Trigger asChild>
-          <IconButton aria-label={t('widgets.canvas.controls.zoomLevel')} minW="4rem" px="2" size="sm" variant="ghost">
+          <IconButton
+            aria-label={t('widgets.canvas.controls.zoomLevel', { zoom: zoomLabel })}
+            minW="4rem"
+            px="2"
+            size="sm"
+            variant="ghost"
+          >
             <HStack gap="1">
-              <Text fontVariantNumeric="tabular-nums">{formatZoomPercent(zoom)}</Text>
+              <Text fontVariantNumeric="tabular-nums">{zoomLabel}</Text>
               <ChevronDownIcon size={12} />
             </HStack>
           </IconButton>
@@ -172,7 +180,7 @@ const CanvasHeaderActionsInner = ({
             <MenuContent minW="7rem" py="1">
               {ZOOM_OPTIONS.map((option) => (
                 <Menu.Item key={option.value} value={option.label} onClick={() => setZoom(option.value)}>
-                  <CheckIcon size={12} opacity={formatZoomPercent(zoom) === option.label ? 1 : 0} />
+                  <CheckIcon size={12} opacity={zoomLabel === option.label ? 1 : 0} />
                   <Menu.ItemText>{option.label}</Menu.ItemText>
                 </Menu.Item>
               ))}
@@ -289,39 +297,24 @@ const CanvasHeaderActionsInner = ({
         </Portal>
       </Menu.Root>
 
-      <Menu.Root positioning={MENU_POSITIONING}>
-        <Tooltip content={t('widgets.canvas.controls.newSession')}>
-          <span style={{ display: 'inline-flex' }}>
-            <Menu.Trigger asChild>
-              <IconButton
-                aria-label={t('widgets.canvas.controls.newSession')}
-                color="fg.muted"
-                disabled={editingLocked}
-                size="sm"
-                variant="ghost"
-              >
-                <FilePlusIcon />
-              </IconButton>
-            </Menu.Trigger>
-          </span>
-        </Tooltip>
-        <Portal>
-          <Menu.Positioner>
-            <MenuContent minW="11rem" py="1">
-              <Menu.Item value="new-canvas" onClick={openNewCanvas}>
-                <Icon as={FilePlusIcon} boxSize="3.5" color="fg.subtle" />
-                <Menu.ItemText>{t('widgets.canvas.controls.newCanvas')}</Menu.ItemText>
-              </Menu.Item>
-            </MenuContent>
-          </Menu.Positioner>
-        </Portal>
-      </Menu.Root>
+      <Tooltip content={t('widgets.canvas.controls.clearCanvas')}>
+        <IconButton
+          aria-label={t('widgets.canvas.controls.clearCanvas')}
+          color="fg.muted"
+          disabled={editingLocked}
+          size="sm"
+          variant="ghost"
+          onClick={openNewCanvas}
+        >
+          <FilePlusIcon />
+        </IconButton>
+      </Tooltip>
 
       <ConfirmDialog
         body={t('widgets.canvas.controls.newCanvasConfirm')}
-        confirmLabel={t('widgets.canvas.controls.newCanvas')}
+        confirmLabel={t('widgets.canvas.controls.clearCanvas')}
         isOpen={isNewCanvasOpen}
-        title={t('widgets.canvas.controls.newCanvas')}
+        title={t('widgets.canvas.controls.clearCanvas')}
         onClose={closeNewCanvas}
         onConfirm={confirmNewCanvas}
       />

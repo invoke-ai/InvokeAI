@@ -1,5 +1,8 @@
+import type { GalleryMediaFilter } from '@features/gallery/core/settings';
+
 import { Box, Flex, HStack, Spacer, Stack } from '@chakra-ui/react';
 import { GALLERY_BOARD_PANEL_MAX_WIDTH_PX, GALLERY_BOARD_PANEL_MIN_WIDTH_PX } from '@features/gallery/core/settings';
+import { IconRadioMenu } from '@platform/ui/Menu';
 import { ResizeHandle } from '@platform/ui/ResizeHandle';
 import { segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { useCallback, useId, useRef } from 'react';
@@ -11,6 +14,7 @@ import { GalleryItemSearch } from './GalleryItemSearch';
 import { GalleryItemSortMenu } from './GalleryItemSortMenu';
 import { GallerySelectionBar } from './GallerySelectionBar';
 import { GalleryStarredFilterToggle } from './GalleryStarredFilterToggle';
+import { getGalleryMediaFilterMenuProps } from './galleryStateView';
 import { GalleryUploadButton } from './GalleryUploadButton';
 import { GalleryViewTabs } from './GalleryViewTabs';
 import { useGalleryWidget } from './GalleryWidgetContext';
@@ -23,6 +27,13 @@ export const GalleryWideLayout = () => {
   const { boardPanelCollapsed, boardPanelWidthPx } = gallery.settings;
   const viewTabsIdBase = useId();
   const boardPanelRef = useRef<HTMLDivElement>(null);
+
+  // The grid's "Show all media" hands focus here when it removes itself.
+  const mediaFilterTriggerRef = useRef<HTMLButtonElement>(null);
+  const handleMediaFilterChange = useCallback(
+    (mediaFilter: GalleryMediaFilter) => actions.updateSettings({ mediaFilter }),
+    [actions]
+  );
 
   const handleCommitWidth = useCallback(
     (boardPanelWidthPx: number) => actions.updateSettings({ boardPanelWidthPx }),
@@ -66,10 +77,17 @@ export const GalleryWideLayout = () => {
             <GalleryItemSearch />
           </Box>
           <GalleryStarredFilterToggle />
+          <IconRadioMenu
+            {...getGalleryMediaFilterMenuProps(t, gallery.settings.mediaFilter)}
+            size="md"
+            triggerRef={mediaFilterTriggerRef}
+            value={gallery.settings.mediaFilter}
+            onValueChange={handleMediaFilterChange}
+          />
           <GalleryItemSortMenu />
           <GalleryUploadButton
             boards={gallery.boards}
-            selectedBoardId={gallery.selectedBoardId}
+            selectedBoardId={gallery.listingBoardId}
             onUploadFiles={actions.uploadFiles}
           />
         </HStack>
@@ -84,7 +102,7 @@ export const GalleryWideLayout = () => {
           ps="3"
           role="tabpanel"
         >
-          <GalleryImageGrid />
+          <GalleryImageGrid mediaFilterTriggerRef={mediaFilterTriggerRef} />
         </Box>
         <GallerySelectionBar />
       </Stack>

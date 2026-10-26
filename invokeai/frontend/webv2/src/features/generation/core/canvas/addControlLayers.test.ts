@@ -76,6 +76,20 @@ describe('isControlKindSupportedForBase', () => {
     expect(isControlKindSupportedForBase('anima', 'controlnet')).toBe(false);
   });
 
+  it('qwen_image_control is supported on qwen-image only, which supports nothing else', () => {
+    expect(isControlKindSupportedForBase('qwen-image', 'qwen_image_control')).toBe(true);
+    expect(isControlKindSupportedForBase('z-image', 'qwen_image_control')).toBe(false);
+    expect(isControlKindSupportedForBase('qwen-image', 'controlnet')).toBe(false);
+    expect(isControlKindSupportedForBase('qwen-image', 'z_image_control')).toBe(false);
+  });
+
+  it('flux2_control is supported on flux2 only, which supports nothing else', () => {
+    expect(isControlKindSupportedForBase('flux2', 'flux2_control')).toBe(true);
+    expect(isControlKindSupportedForBase('qwen-image', 'flux2_control')).toBe(false);
+    expect(isControlKindSupportedForBase('flux2', 'controlnet')).toBe(false);
+    expect(isControlKindSupportedForBase('flux2', 'qwen_image_control')).toBe(false);
+  });
+
   it('control_lora is supported on flux only', () => {
     expect(isControlKindSupportedForBase('flux', 'control_lora')).toBe(true);
     expect(isControlKindSupportedForBase('sd-1', 'control_lora')).toBe(false);
@@ -181,6 +195,30 @@ describe('addControlLayers — controlnet on flux', () => {
           e.destination.field === 'control'
       )
     ).toBe(true);
+  });
+});
+
+describe('addControlLayers — FLUX InstantX Union mode', () => {
+  it('sets instantx_control_mode on a FLUX controlnet layer that carries one, mode 0 included', () => {
+    const graph = run({
+      base: 'flux',
+      layers: [
+        layer({ id: 'depth', instantxControlMode: 2, model: model('flux') }),
+        layer({ id: 'canny', instantxControlMode: 0, model: model('flux') }),
+        layer({ id: 'dedicated', instantxControlMode: null, model: model('flux') }),
+      ],
+    });
+
+    expect(graph.nodes['control_net_depth']?.instantx_control_mode).toBe(2);
+    expect(graph.nodes['control_net_canny']?.instantx_control_mode).toBe(0);
+    expect(graph.nodes['control_net_dedicated']).not.toHaveProperty('instantx_control_mode');
+  });
+
+  it('never sets it outside FLUX, even when a layer carries one', () => {
+    const graph = run({ base: 'sdxl', layers: [layer({ instantxControlMode: 2, model: model('sdxl') })] });
+
+    expect(graph.nodes['control_net_layer1']?.type).toBe('controlnet');
+    expect(graph.nodes['control_net_layer1']).not.toHaveProperty('instantx_control_mode');
   });
 });
 
@@ -345,6 +383,212 @@ describe('addControlLayers — Z-Image control', () => {
         ],
       })
     ).toThrow(/z_image_control_limit/);
+  });
+});
+
+describe('addControlLayers — Qwen-Image control', () => {
+  const union = model('qwen-image', 'controlnet');
+  const qwenLayer = (id: string, overrides: Partial<ControlLayerGraphInput> = {}) =>
+    layer({
+      beginEndStepPct: [0, 1],
+      controlMode: null,
+      id,
+      imageName: `${id}.png`,
+      kind: 'qwen_image_control',
+      model: union,
+      weight: 0.85,
+      ...overrides,
+    });
+  const inpaint = { image: { image_name: 'composite.png' }, mask: { image_name: 'canvas-mask.png' } };
+
+  it('creates the exact backend node and connects it directly to the Qwen-Image denoise', () => {
+    const graph = run({
+      base: 'qwen-image',
+      layers: [qwenLayer('Q1', { beginEndStepPct: [0.2, 0.9], imageName: 'canny.png', weight: 0.7 })],
+    });
+
+    expect(graph.nodes.qwen_image_control_Q1).toEqual({
+      begin_step_percent: 0.2,
+      control_context_scale: 0.7,
+      control_model: union,
+      end_step_percent: 0.9,
+      id: 'qwen_image_control_Q1',
+      image: { image_name: 'canny.png' },
+      is_intermediate: true,
+      type: 'qwen_image_control',
+      use_cache: true,
+    });
+    expect(graph.edges).toEqual([
+      {
+        destination: { field: 'control', node_id: 'denoise_latents' },
+        source: { field: 'control', node_id: 'qwen_image_control_Q1' },
+      },
+    ]);
+    // Without inpaint inputs the control image is all the node gets: no collector, no mask node.
+    expect(Object.keys(graph.nodes)).toEqual(['denoise_latents', 'qwen_image_control_Q1']);
+  });
+
+  it('feeds the inpaint image and the inverted canvas mask from fixed image fields', () => {
+    const graph = run({ base: 'qwen-image', inpaint, layers: [qwenLayer('Q1')] });
+
+    expect(graph.nodes.qwen_image_control_Q1).toMatchObject({ inpaint_image: { image_name: 'composite.png' } });
+    // The canvas mask is white = keep; the node regenerates white, so 255 → 0 inverts it.
+    expect(graph.nodes.qwen_image_control_mask_Q1).toEqual({
+      id: 'qwen_image_control_mask_Q1',
+      image: { image_name: 'canvas-mask.png' },
+      is_intermediate: true,
+      max: 0,
+      min: 255,
+      type: 'img_lerp',
+      use_cache: true,
+    });
+    expect(edgesTo(graph, 'qwen_image_control_Q1', 'inpaint_mask').map((edge) => edge.source)).toEqual([
+      { field: 'image', node_id: 'qwen_image_control_mask_Q1' },
+    ]);
+    expect(edgesTo(graph, 'qwen_image_control_Q1', 'inpaint_image')).toEqual([]);
+  });
+
+  it('feeds the inpaint image and mask through edges when nodes produce them', () => {
+    const graph = baseGraph();
+    const resize = { id: 'resize', type: 'img_resize' };
+    const combine = { id: 'combine', type: 'mask_combine' };
+    graph.nodes.resize = resize;
+    graph.nodes.combine = combine;
+    addControlLayers(graph as never, {
+      base: 'qwen-image',
+      inpaint: { image: { field: 'image', node: resize }, mask: { field: 'image', node: combine } },
+      layers: [qwenLayer('Q1')],
+    });
+
+    expect(graph.nodes.qwen_image_control_Q1).not.toHaveProperty('inpaint_image');
+    expect(graph.nodes.qwen_image_control_mask_Q1).not.toHaveProperty('image');
+    expect(edgesTo(graph, 'qwen_image_control_Q1', 'inpaint_image').map((edge) => edge.source)).toEqual([
+      { field: 'image', node_id: 'resize' },
+    ]);
+    expect(edgesTo(graph, 'qwen_image_control_mask_Q1', 'image').map((edge) => edge.source)).toEqual([
+      { field: 'image', node_id: 'combine' },
+    ]);
+    expect(edgesTo(graph, 'qwen_image_control_Q1', 'inpaint_mask').map((edge) => edge.source)).toEqual([
+      { field: 'image', node_id: 'qwen_image_control_mask_Q1' },
+    ]);
+  });
+
+  it('leaves the inpaint inputs to the kinds that condition on the region', () => {
+    const graph = run({
+      base: 'z-image',
+      inpaint,
+      layers: [layer({ id: 'Z1', kind: 'z_image_control', model: model('z-image', 'controlnet') })],
+    });
+
+    expect(graph.nodes.z_image_control_Z1).not.toHaveProperty('inpaint_image');
+    expect(Object.values(graph.nodes).some((node) => node.type === 'img_lerp')).toBe(false);
+  });
+
+  it('rejects a second Qwen-Image control because denoise accepts a single field', () => {
+    expect(() => run({ base: 'qwen-image', layers: [qwenLayer('Q1'), qwenLayer('Q2')] })).toThrow(
+      /qwen_image_control_limit/
+    );
+  });
+
+  it('rejects the control on the Edit variant, whose transformer the denoise refuses to control', () => {
+    expect(() => run({ base: 'qwen-image', layers: [qwenLayer('Q1')], modelVariant: 'edit' })).toThrow(
+      /qwen_image_edit_control/
+    );
+  });
+
+  it.each([
+    [{ weight: -0.01 }, /invalid_adapter_values/],
+    [{ weight: 2.01 }, /invalid_adapter_values/],
+    [{ model: model('z-image', 'controlnet') }, /incompatible_base/],
+    [{ model: model('qwen-image', 'lora') }, /incompatible_adapter/],
+    [{ kind: 'controlnet' as const }, /switch_adapter_kind/],
+  ])('rejects %o', (overrides, reason) => {
+    expect(() => run({ base: 'qwen-image', layers: [qwenLayer('Q1', overrides)] })).toThrow(reason);
+  });
+});
+
+describe('addControlLayers — FLUX.2 control', () => {
+  const union = model('flux2', 'controlnet');
+  const flux2Layer = (id: string, overrides: Partial<ControlLayerGraphInput> = {}) =>
+    layer({
+      beginEndStepPct: [0, 1],
+      controlMode: null,
+      id,
+      imageName: `${id}.png`,
+      kind: 'flux2_control',
+      model: union,
+      weight: 0.75,
+      ...overrides,
+    });
+  const dev = { base: 'flux2', modelVariant: 'dev' } as const;
+
+  it('creates the exact backend node and connects it directly to the FLUX.2 denoise', () => {
+    const graph = run({
+      ...dev,
+      layers: [flux2Layer('F1', { beginEndStepPct: [0.1, 0.8], imageName: 'depth.png', weight: 0.65 })],
+    });
+
+    expect(graph.nodes.flux2_control_F1).toEqual({
+      begin_step_percent: 0.1,
+      control_context_scale: 0.65,
+      control_model: union,
+      end_step_percent: 0.8,
+      id: 'flux2_control_F1',
+      image: { image_name: 'depth.png' },
+      is_intermediate: true,
+      type: 'flux2_control',
+      use_cache: true,
+    });
+    expect(graph.edges).toEqual([
+      {
+        destination: { field: 'control', node_id: 'denoise_latents' },
+        source: { field: 'control', node_id: 'flux2_control_F1' },
+      },
+    ]);
+    expect(Object.keys(graph.nodes)).toEqual(['denoise_latents', 'flux2_control_F1']);
+  });
+
+  it('feeds the inpaint image and the inverted canvas mask, as the Qwen-Image union takes them', () => {
+    const graph = run({
+      ...dev,
+      inpaint: { image: { image_name: 'composite.png' }, mask: { image_name: 'canvas-mask.png' } },
+      layers: [flux2Layer('F1')],
+    });
+
+    expect(graph.nodes.flux2_control_F1).toMatchObject({ inpaint_image: { image_name: 'composite.png' } });
+    // The canvas mask is white = keep; the node regenerates white, so 255 → 0 inverts it.
+    expect(graph.nodes.flux2_control_mask_F1).toEqual({
+      id: 'flux2_control_mask_F1',
+      image: { image_name: 'canvas-mask.png' },
+      is_intermediate: true,
+      max: 0,
+      min: 255,
+      type: 'img_lerp',
+      use_cache: true,
+    });
+    expect(edgesTo(graph, 'flux2_control_F1', 'inpaint_mask').map((edge) => edge.source)).toEqual([
+      { field: 'image', node_id: 'flux2_control_mask_F1' },
+    ]);
+  });
+
+  it('rejects a second FLUX.2 control because the denoise accepts a single field', () => {
+    expect(() => run({ ...dev, layers: [flux2Layer('F1'), flux2Layer('F2')] })).toThrow(/flux2_control_limit/);
+  });
+
+  it.each(['klein_9b', 'klein_4b_base', undefined])(
+    'rejects the control on FLUX.2 variant %s, whose transformer the denoise refuses to control',
+    (modelVariant) => {
+      expect(() => run({ base: 'flux2', layers: [flux2Layer('F1')], modelVariant })).toThrow(/flux2_klein_control/);
+    }
+  );
+
+  it.each([
+    [{ weight: -0.01 }, /invalid_adapter_values/],
+    [{ model: model('flux', 'controlnet') }, /incompatible_base/],
+    [{ model: model('flux2', 'lora') }, /incompatible_adapter/],
+    [{ kind: 'qwen_image_control' as const }, /switch_adapter_kind/],
+  ])('rejects %o', (overrides, reason) => {
+    expect(() => run({ ...dev, layers: [flux2Layer('F1', overrides)] })).toThrow(reason);
   });
 });
 

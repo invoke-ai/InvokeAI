@@ -6,20 +6,42 @@ import type {
   VaeModelConfig,
 } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
-import type { CanvasControlLayerContract, CanvasLayerContract } from '@workbench/canvas-engine/api';
+import type {
+  CanvasControlLayerContract,
+  CanvasLayerContract,
+  CanvasNodeContract,
+  CanvasRasterLayerContractV2,
+} from '@workbench/canvas-engine/api';
 import type { InvocationRoute } from '@workbench/invocationContracts';
 import type { WidgetId } from '@workbench/widgetContracts';
 
+import { galleryKeys } from '@features/gallery/queries';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
 import { createDefaultUpscaleWidgetValues } from '@features/upscale';
 import { queryClient } from '@platform/query/client';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as settingsStoreModule from './settings/store';
+
 // Dynamic prompt expansion is the only transport `submitResolvedInvocation` touches.
 const parseDynamicPromptsMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@features/generation/data/promptUtilities', () => ({ parseDynamicPrompts: parseDynamicPromptsMock }));
+
+// Remembered control-model picks, which readiness reads imperatively from the account preferences.
+const preferences = vi.hoisted(() => ({ controlModelMemory: {} as Record<string, string> }));
+
+vi.mock('./settings/store', async (importOriginal) => {
+  const actual = await importOriginal<typeof settingsStoreModule>();
+  return {
+    ...actual,
+    getWorkbenchPreferences: () => ({
+      ...actual.getWorkbenchPreferences(),
+      controlModelMemory: preferences.controlModelMemory,
+    }),
+  };
+});
 
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 
@@ -35,6 +57,7 @@ import { createWorkbenchStore } from './workbenchStore';
 
 // Production words rejections from the locale; tests only need the structured rejection to reach the notice.
 const formatControlLayerError = ({ code, layerName }: { code: string; layerName: string }) => `${layerName}: ${code}`;
+const formatUpscaleMetadataFailure = (name: string) => `metadataFailed: ${name}`;
 
 const animaModel: MainModelConfig = { base: 'anima', key: 'anima-model', name: 'Anima', type: 'main' };
 const animaVae: VaeModelConfig = { base: 'qwen-image', key: 'anima-vae', name: 'Anima VAE', type: 'vae' };
@@ -233,7 +256,7 @@ describe('resolveInvocationRoute — upscale source', () => {
 
     expect(result.sourceValid).toBe(false);
     expect(result.validationReasons).toContain(
-      'Upscale supports only SD1.5, SDXL, FLUX.1, Z-Image or Anima main models.'
+      'Upscale supports only SD1.5, SDXL, FLUX.1, FLUX.2, Z-Image, Anima, Krea-2 or Qwen Image main models.'
     );
   });
 
@@ -269,6 +292,7 @@ describe('resolveInvocationRoute — canvas source', () => {
       mountedWidgetIds?: WidgetId[];
       bbox?: { width: number; height: number };
       layers?: CanvasLayerContract[];
+      rasterInFrame?: boolean;
     } = {}
   ) => {
     const project = getActiveProject(overrides.generateValues ?? validGenerateValues);
@@ -277,6 +301,7 @@ describe('resolveInvocationRoute — canvas source', () => {
       ...getInvocationRouteInput(project),
       canvasBbox: overrides.bbox ?? { height: 512, width: 512 },
       canvasLayers: overrides.layers ?? [],
+      canvasRasterInFrame: overrides.rasterInFrame ?? false,
       mountedWidgetIds: overrides.mountedWidgetIds ?? (['canvas', 'generate'] as WidgetId[]),
     };
   };
@@ -303,6 +328,173 @@ describe('resolveInvocationRoute — canvas source', () => {
 
     expect(route.sourceValid).toBe(true);
     expect(route.validationReasons).toEqual([]);
+  });
+
+  it('allows Canvas preparation for an img2img-only provider while Generate still requires txt2img', () => {
+    const model: GenerateModelConfig = {
+      ...unknownExternalModel,
+      provider_id: 'openai',
+      capabilities: { modes: ['img2img'] },
+    };
+    const input = canvasInputFor({ generateValues: createGenerateValues(model) });
+    expect(resolveInvocationRouteInput(input, 'global', canvasRoute).sourceValid).toBe(true);
+    expect(
+      resolveInvocationRouteInput(input, 'global', { ...canvasRoute, sourceId: 'generate' }).validationReasons
+    ).toContain('Unknown External Provider does not support text-to-image generation.');
+  });
+
+  it('names unsupported provider control layers in readiness even without a loaded adapter catalog', () => {
+    const model: GenerateModelConfig = { ...unknownExternalModel, provider_id: 'openai' };
+    const layer = modellessControlLayer();
+    const input = canvasInputFor({ generateValues: createGenerateValues(model), layers: [layer] });
+    expect(resolveInvocationRouteInput(input, 'global', canvasRoute).validationReasons).toEqual([
+      'Unknown External Provider does not support control layer "Control Layer 1". Disable it to generate.',
+    ]);
+    expect(
+      resolveInvocationRouteInput({ ...input, canvasLayers: [{ ...layer, isEnabled: false }] }, 'global', canvasRoute)
+        .sourceValid
+    ).toBe(true);
+  });
+
+  it('validates provider dimensions against the Canvas bbox rather than the Generate panel size', () => {
+    const model: GenerateModelConfig = {
+      ...unknownExternalModel,
+      provider_id: 'openai',
+      capabilities: { modes: ['txt2img'], max_image_size: { width: 1024, height: 1024 } },
+    };
+    const generateValues = createGenerateValues(model, { width: 2048, height: 2048 });
+    expect(resolveInvocationRouteInput(canvasInputFor({ generateValues }), 'global', canvasRoute).sourceValid).toBe(
+      true
+    );
+    expect(
+      resolveInvocationRouteInput(
+        canvasInputFor({ generateValues, bbox: { width: 1025, height: 512 } }),
+        'global',
+        canvasRoute
+      ).validationReasons
+    ).toContain('Unknown External Provider supports a maximum size of 1024×1024.');
+  });
+
+  it('validates a fixed-size provider against the size it is asked for, not the frame', () => {
+    const model: GenerateModelConfig = {
+      ...unknownExternalModel,
+      provider_id: 'openai',
+      capabilities: {
+        aspect_ratio_sizes: { '1:1': { height: 1024, width: 1024 } },
+        max_image_size: { height: 1024, width: 1024 },
+        modes: ['txt2img'],
+      },
+    };
+    const input = canvasInputFor({ bbox: { height: 3000, width: 3000 }, generateValues: createGenerateValues(model) });
+
+    expect(resolveInvocationRouteInput(input, 'global', canvasRoute).validationReasons).toEqual([]);
+  });
+
+  it('blocks a text-only provider while raster content overlaps the frame, naming the content', () => {
+    const textOnly: GenerateModelConfig = { ...unknownExternalModel, provider_id: 'openai' };
+    const editing: GenerateModelConfig = { ...textOnly, capabilities: { modes: ['txt2img', 'img2img'] } };
+
+    expect(
+      resolveInvocationRouteInput(
+        canvasInputFor({ generateValues: createGenerateValues(textOnly), rasterInFrame: true }),
+        'global',
+        canvasRoute
+      ).validationReasons
+    ).toEqual([
+      'Unknown External Provider cannot use image content in the generation frame. Hide or move raster content out of the frame to generate.',
+    ]);
+    expect(
+      resolveInvocationRouteInput(
+        canvasInputFor({ generateValues: createGenerateValues(textOnly) }),
+        'global',
+        canvasRoute
+      ).sourceValid
+    ).toBe(true);
+    expect(
+      resolveInvocationRouteInput(
+        canvasInputFor({ generateValues: createGenerateValues(editing), rasterInFrame: true }),
+        'global',
+        canvasRoute
+      ).sourceValid
+    ).toBe(true);
+  });
+
+  it('measures each visible raster layer against the frame, for a text-only provider on a Canvas route', () => {
+    const textOnly: GenerateModelConfig = { ...unknownExternalModel, provider_id: 'openai' };
+    let project = getActiveProject(createGenerateValues(textOnly));
+    const raster = (
+      x: number,
+      y: number,
+      overrides: Partial<CanvasRasterLayerContractV2> = {}
+    ): CanvasRasterLayerContractV2 => ({
+      blendMode: 'normal',
+      id: `raster-${x}-${y}`,
+      isEnabled: true,
+      isLocked: false,
+      name: `Raster ${x},${y}`,
+      opacity: 1,
+      source: { image: { height: 64, imageName: 'raster.png', width: 64 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x, y },
+      type: 'raster',
+      ...overrides,
+    });
+    const withRaster = (layers: CanvasNodeContract[], sourceId: InvocationRoute['sourceId'] = 'canvas') =>
+      getInvocationRouteInput({
+        ...project,
+        canvas: {
+          ...project.canvas,
+          document: {
+            ...project.canvas.document,
+            bbox: { height: 100, width: 100, x: 200, y: 0 },
+            stacks: { ...project.canvas.document.stacks, raster: layers },
+          },
+        },
+        invocation: { ...project.invocation, sourceId },
+      }).canvasRasterInFrame;
+
+    expect(withRaster([])).toBe(false);
+    expect(withRaster([raster(250, 50)])).toBe(true);
+    // Layers on either side of an empty frame: their union spans it, but neither reaches it.
+    expect(withRaster([raster(0, 0), raster(400, 200)])).toBe(false);
+    // Touching the frame's edge is not overlap; hidden or fully transparent content contributes nothing.
+    expect(withRaster([raster(300, 0)])).toBe(false);
+    expect(withRaster([raster(250, 50, { isEnabled: false })])).toBe(false);
+    expect(withRaster([raster(250, 50, { opacity: 0 })])).toBe(false);
+    expect(
+      withRaster([
+        {
+          children: [raster(250, 50)],
+          id: 'group',
+          isEnabled: true,
+          isLocked: false,
+          name: 'Group',
+          opacity: 0,
+          type: 'group',
+        },
+      ])
+    ).toBe(false);
+    // Readiness only estimates a text layer's extent, so it leaves text to the invoke-time pixel check.
+    expect(
+      withRaster([
+        raster(250, 50, {
+          source: {
+            align: 'left',
+            color: '#000',
+            content: 'Hello',
+            fontFamily: 'Inter',
+            fontSize: 32,
+            fontWeight: 400,
+            lineHeight: 1.2,
+            type: 'text',
+          },
+        }),
+      ])
+    ).toBe(false);
+
+    // Other routes and other models never measure.
+    expect(withRaster([raster(250, 50)], 'generate')).toBe(false);
+    project = getActiveProject(validGenerateValues);
+    expect(withRaster([raster(250, 50)])).toBe(false);
   });
 
   it('invalidates a zero-area generation frame', () => {
@@ -338,9 +530,9 @@ describe('resolveInvocationRoute — canvas source', () => {
     expect(route.validationReasons).toContain('The Canvas widget is not mounted in this project.');
   });
 
-  it('blocks a content-bearing control layer with no model once models are loaded', () => {
+  it('blocks a typed content-bearing control layer no model resolves once models are loaded', () => {
     const route = resolveInvocationRouteInput(
-      canvasInputFor({ layers: [modellessControlLayer()] }),
+      canvasInputFor({ layers: [{ ...modellessControlLayer(), controlType: 'depth', detection: null }] }),
       'global',
       canvasRoute,
       loadedModels
@@ -350,12 +542,41 @@ describe('resolveInvocationRoute — canvas source', () => {
     // Kept structured so the shell words it from the locale.
     expect(route.validationReasons).toContainEqual({
       controlLayerIssue: {
-        code: 'missing_model',
+        code: 'no_control_models',
         layerId: expect.any(String),
         layerName: 'Control Layer 1',
-        suggestedKind: null,
       },
     });
+  });
+
+  it('does not block on a content-bearing layer with neither a type nor a model', () => {
+    const route = resolveInvocationRouteInput(
+      canvasInputFor({ layers: [modellessControlLayer()] }),
+      'global',
+      canvasRoute,
+      loadedModels
+    );
+
+    expect(route.validationReasons).toEqual([]);
+  });
+
+  it('re-evaluates a choice between control models against the remembered pick', () => {
+    const lllite = (key: string) =>
+      ({ base: 'anima', cond_in_channels: 3, key, name: key, type: 'controlnet' }) as unknown as ModelConfig;
+    const models = [...loadedModels, lllite('anima-depth-a'), lllite('anima-depth-b')];
+    const input = canvasInputFor({ layers: [{ ...modellessControlLayer(), controlType: 'depth', detection: null }] });
+    const codes = () =>
+      resolveInvocationRouteInput(input, 'global', canvasRoute, models).validationReasons.map((reason) =>
+        typeof reason === 'object' && 'controlLayerIssue' in reason ? reason.controlLayerIssue.code : reason
+      );
+
+    try {
+      expect(codes()).toEqual(['choose_model']);
+      preferences.controlModelMemory = { 'anima:depth': 'anima-depth-b' };
+      expect(codes()).toEqual([]);
+    } finally {
+      preferences.controlModelMemory = {};
+    }
   });
 
   it('does not block content-less control layers or check layers before models load', () => {
@@ -383,12 +604,36 @@ describe('resolveInvocationRoute — canvas source', () => {
   });
 });
 
+/** A fresh listing of every readable board, as `ensureGalleryBoardDestinations` leaves it: the boards named are destinations. */
+const listGalleryBoardsInCache = (...boardIds: string[]) =>
+  queryClient.setQueryData(
+    galleryKeys.boards(captureAccountScope(), {
+      includeArchived: true,
+      includeDateBoards: false,
+      orderBy: 'created_at',
+      orderDir: 'DESC',
+    }),
+    boardIds.map((id) => ({
+      archived: false,
+      assetCount: 0,
+      assetVideoCount: 0,
+      id,
+      imageCount: 0,
+      isInbox: false,
+      kind: 'board' as const,
+      name: id,
+      projectId: null,
+      videoCount: 0,
+    }))
+  );
+
 describe('submitResolvedInvocation', () => {
   const routeFor = (project: Parameters<typeof resolveInvocationRoute>[0], route: InvocationRoute) =>
     resolveInvocationRoute(project, 'global', route);
 
   beforeEach(() => {
     queryClient.clear();
+    listGalleryBoardsInCache();
     parseDynamicPromptsMock.mockReset();
     parseDynamicPromptsMock.mockResolvedValue({ prompts: ['a red cat', 'a green cat'] });
   });
@@ -407,6 +652,7 @@ describe('submitResolvedInvocation', () => {
     submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner,
       prepareCanvasInvocation,
@@ -441,6 +687,7 @@ describe('submitResolvedInvocation', () => {
     const submission = submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -471,6 +718,7 @@ describe('submitResolvedInvocation', () => {
     submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -500,6 +748,7 @@ describe('submitResolvedInvocation', () => {
     submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -525,6 +774,7 @@ describe('submitResolvedInvocation', () => {
     submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -547,6 +797,7 @@ describe('submitResolvedInvocation', () => {
       submitResolvedInvocation({
         commands: store.commands,
         formatControlLayerError,
+        formatUpscaleMetadataFailure,
         models: undefined,
         owner: captureAccountScope(),
         prepareCanvasInvocation: vi.fn(),
@@ -598,6 +849,7 @@ describe('submitResolvedInvocation', () => {
     submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner,
       prepareCanvasInvocation,

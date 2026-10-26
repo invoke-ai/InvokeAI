@@ -13,7 +13,9 @@ export {
   getDefaultLoraWeight,
   getModelDefaultVae,
   hasModelDefaultVae,
+  isAspectRatioLocked,
   isFluxDypePreset,
+  isGenerateModelConfig,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
@@ -66,6 +68,19 @@ export {
 } from './core/baseGenerationPolicies';
 export { hasArchitectureCapabilities } from './core/architectureCapabilities';
 export {
+  describeExternalCanvasRefusal,
+  GEMINI_TEMPERATURE_MAX,
+  GEMINI_TEMPERATURE_MIN,
+  getExternalProviderOptionKeys,
+  getExternalResolutionPresets,
+  isExternalTextOnlyCanvasModel,
+  isGeminiThinkingLevel,
+  isOpenAIImageBackground,
+  isOpenAIImageQuality,
+  isOpenAIInputFidelity,
+  resolveExternalCanvasRequestSize,
+} from './core/externalProvider';
+export {
   resolveGenerateWidgetValues,
   type ResolvedGenerateWidgetValues,
   type ResolveGenerateWidgetValuesInput,
@@ -76,9 +91,12 @@ export {
   isAnimaQwen3Encoder,
   isBundledMainForBase,
   isDiffusersMainForBase,
-  isNonAnimaQwen3Encoder,
+  isFlux2MistralEncoder,
+  isFlux2Qwen3EncoderForModel,
+  isKrea2Qwen3VlEncoder,
   isVaeAcceptedByBase,
   isVaeCompatibleWithGenerateModel,
+  isZImageQwen3Encoder,
 } from './core/componentCompatibility';
 export {
   isValidKrea2RebalanceWeights,
@@ -86,6 +104,17 @@ export {
   type RebalancePreset,
 } from './core/conditioningRebalance';
 export { MIN_BATCH_COUNT, sanitizeBatchCount } from './core/batch';
+export {
+  getActiveRefiner,
+  isRefinerModel,
+  isRefinerSupported,
+  MAX_REFINER_AESTHETIC_SCORE,
+  MAX_REFINER_START,
+  MIN_REFINER_AESTHETIC_SCORE,
+  MIN_REFINER_CFG_SCALE,
+  MIN_REFINER_START,
+  MIN_REFINER_STEPS,
+} from './core/sdxlRefiner';
 export {
   createDynamicPromptsSampleSeed,
   DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,

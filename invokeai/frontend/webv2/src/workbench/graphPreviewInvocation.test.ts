@@ -5,18 +5,21 @@ import type {
   ComponentModelConfig,
 } from '@features/generation/contracts';
 
+import { galleryKeys } from '@features/gallery/queries';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { queryClient } from '@platform/query/client';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resolveAndSubmitGraphPreviewInvocation } from './graphPreviewInvocation';
 import { beginInvocationPreparation, endInvocationPreparation } from './invocationPreparation';
 
 // Production words rejections from the locale; tests only need the structured rejection to reach the notice.
 const formatControlLayerError = ({ code, layerName }: { code: string; layerName: string }) => `${layerName}: ${code}`;
+const formatUpscaleMetadataFailure = (name: string) => `metadataFailed: ${name}`;
 
 // Seed capabilities to match app boot; submission fails closed without them.
 seedArchitectureCapabilities();
@@ -65,7 +68,35 @@ const withCanvasWidgetMounted = (
   },
 });
 
+/** A fresh listing of every readable board, as `ensureGalleryBoardDestinations` leaves it: the boards named are destinations. */
+const listGalleryBoardsInCache = (...boardIds: string[]) =>
+  queryClient.setQueryData(
+    galleryKeys.boards(captureAccountScope(), {
+      includeArchived: true,
+      includeDateBoards: false,
+      orderBy: 'created_at',
+      orderDir: 'DESC',
+    }),
+    boardIds.map((id) => ({
+      archived: false,
+      assetCount: 0,
+      assetVideoCount: 0,
+      id,
+      imageCount: 0,
+      isInbox: false,
+      kind: 'board' as const,
+      name: id,
+      projectId: null,
+      videoCount: 0,
+    }))
+  );
+
 describe('resolveAndSubmitGraphPreviewInvocation', () => {
+  beforeEach(() => {
+    queryClient.clear();
+    listGalleryBoardsInCache();
+  });
+
   it('routes a canvas source through prepareCanvasInvocation and does not dispatch a resolved snapshot', () => {
     const project = withCanvasWidgetMounted(getActiveProject(createGenerateValues()));
     const commands = createWorkbenchStore().commands;
@@ -75,6 +106,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -97,6 +129,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -123,6 +156,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
       const submitted = resolveAndSubmitGraphPreviewInvocation({
         commands,
         formatControlLayerError,
+        formatUpscaleMetadataFailure,
         models: undefined,
         owner: captureAccountScope(),
         prepareCanvasInvocation: vi.fn(),
@@ -146,6 +180,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -167,6 +202,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,

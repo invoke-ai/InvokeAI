@@ -1,13 +1,48 @@
+import type { GalleryItemKind } from './items';
 import type { GalleryBoardOrderBy, GalleryOrderDir } from './types';
 
 export type GalleryThumbnailFit = 'square' | 'aspect';
 
 export type GalleryPaginationMode = 'infinite' | 'paginated';
 
+/** Which media kinds the gallery lists: both, or only one. */
+export type GalleryMediaFilter = 'all' | 'image' | 'video';
+
+/** Reads only the media filter, for subscribers that run on every Workbench change; unknown values read as both. */
+export const getGalleryMediaFilter = (values: Record<string, unknown>): GalleryMediaFilter =>
+  values.mediaFilter === 'image' || values.mediaFilter === 'video' ? values.mediaFilter : 'all';
+
+/** The listing's media-kind restriction; undefined lists both kinds. */
+export const toGalleryMediaKind = (filter: GalleryMediaFilter): GalleryItemKind | undefined =>
+  filter === 'all' ? undefined : filter;
+
+/**
+ * Where a search looks: the selected board, or every board the caller may read plus their Uncategorized items. It
+ * applies only while a search is active; clearing the search returns it to `board`.
+ */
+export type GallerySearchScope = 'board' | 'all';
+
+/** The most project groups under Other projects whose collapse is remembered; the newest are kept. */
+export const GALLERY_COLLAPSED_PROJECT_GROUPS_LIMIT = 200;
+
 /** The collapsible groups in the board panel, in render order. */
-export const GALLERY_BOARD_SECTION_IDS = ['project', 'library', 'other-projects', 'dates', 'archived'] as const;
+export const GALLERY_BOARD_SECTION_IDS = [
+  'project',
+  'library',
+  'shared',
+  'other-users',
+  'other-projects',
+  'dates',
+  'archived',
+] as const;
 
 export type GalleryBoardSectionId = (typeof GALLERY_BOARD_SECTION_IDS)[number];
+
+/**
+ * Groups that start collapsed, which the panel records as opened rather than collapsed: an admin's view of other
+ * users' boards stays out of the way of their own on a busy install.
+ */
+const GALLERY_BOARD_SECTIONS_COLLAPSED_BY_DEFAULT: readonly GalleryBoardSectionId[] = ['other-users'];
 
 /** Height in the stacked layout, width in the wide one — stored separately. */
 export const GALLERY_BOARD_PANEL_MIN_HEIGHT_PX = 120;
@@ -33,8 +68,15 @@ export interface GallerySettings {
   boardPanelHeightPx: number;
   boardPanelWidthPx: number;
   collapsedBoardSections: GalleryBoardSectionId[];
+  /** Project groups under Other projects that are collapsed, by project id; oldest first. */
+  collapsedProjectGroupIds: string[];
+  /** The groups that start collapsed which have been opened. */
+  expandedBoardSections: GalleryBoardSectionId[];
   imageDensityPercent: number;
   imageOrderDir: GalleryOrderDir;
+  mediaFilter: GalleryMediaFilter;
+  /** Opt-in: a middle click on a tile opens the media in a new browser tab instead of the browser default. */
+  middleClickOpensInNewTab: boolean;
   paginationMode: GalleryPaginationMode;
   showArchivedBoards: boolean;
   showDateBoards: boolean;
@@ -43,6 +85,7 @@ export interface GallerySettings {
   showOtherProjectBoards: boolean;
   showPendingItems: boolean;
   progressSectionCollapsed: boolean;
+  searchScope: GallerySearchScope;
   /** Disclosure of the starred strip at the top of the grid. */
   starredSectionCollapsed: boolean;
   thumbnailFit: GalleryThumbnailFit;
@@ -56,8 +99,12 @@ export const DEFAULT_GALLERY_SETTINGS: GallerySettings = {
   boardPanelHeightPx: 280,
   boardPanelWidthPx: 240,
   collapsedBoardSections: [],
+  collapsedProjectGroupIds: [],
+  expandedBoardSections: [],
   imageDensityPercent: 50,
   imageOrderDir: 'DESC',
+  mediaFilter: 'all',
+  middleClickOpensInNewTab: false,
   paginationMode: 'infinite',
   showArchivedBoards: false,
   showDateBoards: false,
@@ -65,6 +112,7 @@ export const DEFAULT_GALLERY_SETTINGS: GallerySettings = {
   showOtherProjectBoards: false,
   showPendingItems: true,
   progressSectionCollapsed: false,
+  searchScope: 'board',
   starredSectionCollapsed: false,
   thumbnailFit: 'square',
 };
@@ -84,12 +132,65 @@ const getBoundedSize = (
   typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, Math.round(value))) : fallback;
 
 /** Filtered to known ids: a stale one would close a section with no way back. */
-const getCollapsedBoardSections = (value: unknown): GalleryBoardSectionId[] =>
+const getBoardSections = (value: unknown, candidates: readonly GalleryBoardSectionId[]): GalleryBoardSectionId[] =>
   Array.isArray(value)
-    ? GALLERY_BOARD_SECTION_IDS.filter((sectionId) =>
-        value.some((entry) => isBoardSectionId(entry) && entry === sectionId)
-      )
-    : DEFAULT_GALLERY_SETTINGS.collapsedBoardSections;
+    ? candidates.filter((sectionId) => value.some((entry) => isBoardSectionId(entry) && entry === sectionId))
+    : [];
+
+/**
+ * Distinct strings, each at its last occurrence, at most the limit's newest. One pass from the end stops at the
+ * limit, so an imported workspace with a huge list costs no more than the ids it keeps.
+ */
+const getCollapsedProjectGroupIds = (value: unknown): string[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const kept = new Set<string>();
+
+  for (let index = value.length - 1; index >= 0 && kept.size < GALLERY_COLLAPSED_PROJECT_GROUPS_LIMIT; index--) {
+    const entry: unknown = value[index];
+
+    if (typeof entry === 'string') {
+      kept.add(entry);
+    }
+  }
+
+  return [...kept].reverse();
+};
+
+/** The settings change that collapses or expands one project's group under Other projects. */
+export const toggleGalleryProjectGroup = (
+  settings: GallerySettings,
+  projectId: string,
+  isOpen: boolean
+): Pick<GallerySettings, 'collapsedProjectGroupIds'> => {
+  const others = settings.collapsedProjectGroupIds.filter((id) => id !== projectId);
+
+  return {
+    collapsedProjectGroupIds: isOpen ? others : [...others, projectId].slice(-GALLERY_COLLAPSED_PROJECT_GROUPS_LIMIT),
+  };
+};
+
+export const isGalleryBoardSectionOpen = (settings: GallerySettings, sectionId: GalleryBoardSectionId): boolean =>
+  GALLERY_BOARD_SECTIONS_COLLAPSED_BY_DEFAULT.includes(sectionId)
+    ? settings.expandedBoardSections.includes(sectionId)
+    : !settings.collapsedBoardSections.includes(sectionId);
+
+/** The settings change that opens or closes a group. */
+export const toggleGalleryBoardSection = (
+  settings: GallerySettings,
+  sectionId: GalleryBoardSectionId,
+  isOpen: boolean
+): Pick<GallerySettings, 'collapsedBoardSections'> | Pick<GallerySettings, 'expandedBoardSections'> => {
+  const toggle = (sections: GalleryBoardSectionId[], include: boolean) =>
+    include
+      ? [...sections.filter((entry) => entry !== sectionId), sectionId]
+      : sections.filter((entry) => entry !== sectionId);
+  return GALLERY_BOARD_SECTIONS_COLLAPSED_BY_DEFAULT.includes(sectionId)
+    ? { expandedBoardSections: toggle(settings.expandedBoardSections, isOpen) }
+    : { collapsedBoardSections: toggle(settings.collapsedBoardSections, !isOpen) };
+};
 
 export const getGallerySettings = (values: Record<string, unknown>): GallerySettings => {
   const paginationMode: GalleryPaginationMode =
@@ -116,12 +217,19 @@ export const getGallerySettings = (values: Record<string, unknown>): GallerySett
       max: GALLERY_BOARD_PANEL_MAX_WIDTH_PX,
       min: GALLERY_BOARD_PANEL_MIN_WIDTH_PX,
     }),
-    collapsedBoardSections: getCollapsedBoardSections(values.collapsedBoardSections),
+    collapsedBoardSections: getBoardSections(
+      values.collapsedBoardSections,
+      GALLERY_BOARD_SECTION_IDS.filter((sectionId) => !GALLERY_BOARD_SECTIONS_COLLAPSED_BY_DEFAULT.includes(sectionId))
+    ),
+    collapsedProjectGroupIds: getCollapsedProjectGroupIds(values.collapsedProjectGroupIds),
+    expandedBoardSections: getBoardSections(values.expandedBoardSections, GALLERY_BOARD_SECTIONS_COLLAPSED_BY_DEFAULT),
     imageDensityPercent:
       typeof values.imageDensityPercent === 'number' && Number.isFinite(values.imageDensityPercent)
         ? Math.min(100, Math.max(0, values.imageDensityPercent))
         : DEFAULT_GALLERY_SETTINGS.imageDensityPercent,
     imageOrderDir: isOrderDir(values.imageOrderDir) ? values.imageOrderDir : DEFAULT_GALLERY_SETTINGS.imageOrderDir,
+    mediaFilter: getGalleryMediaFilter(values),
+    middleClickOpensInNewTab: values.middleClickOpensInNewTab === true,
     paginationMode,
     showArchivedBoards:
       typeof values.showArchivedBoards === 'boolean'
@@ -142,6 +250,7 @@ export const getGallerySettings = (values: Record<string, unknown>): GallerySett
         ? values.showPendingItems
         : DEFAULT_GALLERY_SETTINGS.showPendingItems,
     progressSectionCollapsed: values.progressSectionCollapsed === true,
+    searchScope: values.searchScope === 'all' ? 'all' : DEFAULT_GALLERY_SETTINGS.searchScope,
     starredSectionCollapsed:
       typeof values.starredSectionCollapsed === 'boolean'
         ? values.starredSectionCollapsed

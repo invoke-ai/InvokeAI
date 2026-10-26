@@ -4,9 +4,11 @@ import type {
   CanvasLayerContract,
   CanvasLayerSourceContract,
 } from '@workbench/canvas-engine/contracts';
+import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
+import { detachControlDerivation } from '@workbench/canvas-engine/document/controlDerivation';
 import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
 import { renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
@@ -27,11 +29,13 @@ import {
 export type CropLayerResult =
   | { status: 'cropped' }
   | { status: 'missing' | 'locked' | 'unsupported' | 'empty' | LayerEditRefusal }
-  | { status: 'failed'; message: string };
+  | { status: 'failed'; message: string }
+  | AdjustmentRefusal;
 
 type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
-  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' };
+  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | AdjustmentRefusal;
 
 export interface CropLayerControllerOptions {
   readonly ctx: Pick<
@@ -85,6 +89,9 @@ export class CropLayerController {
     }
     try {
       const exported = await this.deps.exportBaked(layerId);
+      if (exported.status === 'adjustment-refused') {
+        return exported;
+      }
       if (exported.status !== 'ok') {
         return { status: exported.status === 'disabled' ? 'not-ready' : exported.status };
       }
@@ -142,8 +149,9 @@ export class CropLayerController {
             const { adjustments: _adjustments, ...rest } = before;
             after = { ...rest, source: paint, transform: identity };
           } else if (before.type === 'control') {
+            // The cropped pixels become the image itself: no original's frame survives the crop.
             const { filter: _filter, ...rest } = before;
-            after = { ...rest, source: paint, transform: identity };
+            after = detachControlDerivation({ ...rest, source: paint, transform: identity });
           } else {
             after = { ...before, mask: { ...before.mask, bitmap: null, offset: paint.offset }, transform: identity };
           }

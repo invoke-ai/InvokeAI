@@ -284,6 +284,7 @@ const SeedVarianceFields = ({
     <>
       <Field
         helpText={t('widgets.generate.seedVarianceHelp')}
+        hint="seedVariance"
         label={t('widgets.generate.seedVariance')}
         labelEnd={
           <GenerateToggleSwitch
@@ -298,6 +299,7 @@ const SeedVarianceFields = ({
       {enabled ? (
         <>
           <ScrubberField
+            hint="seedVarianceStrength"
             label={t('widgets.generate.seedVarianceStrength')}
             max={maxStrength}
             min={0}
@@ -307,6 +309,7 @@ const SeedVarianceFields = ({
           />
           <ScrubberField
             formatValue={formatPercent}
+            hint="seedVarianceRandomize"
             label={t('widgets.generate.seedVarianceRandomize')}
             max={100}
             min={minRandomizePercent}
@@ -683,8 +686,9 @@ export const GenerateRenderSection = ({
     </GenerateCollapsibleSection>
   );
 
-  // Switching source remounts the section's subtree, as the Size section does.
-  return project.invocationSourceId === 'canvas' ? (
+  // Switching source remounts the section's subtree, as the Size section does. A hosted provider edits the canvas
+  // composite at its own strength, so the canvas adds none for it.
+  return project.invocationSourceId === 'canvas' && selectedModel?.type !== 'external_image_generator' ? (
     <CanvasDenoisingStrengthSlot>{renderSection}</CanvasDenoisingStrengthSlot>
   ) : (
     renderSection(null)

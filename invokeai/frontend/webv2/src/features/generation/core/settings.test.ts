@@ -279,6 +279,64 @@ describe('normalizeGenerateSettings', () => {
     expect(normalized?.vaePrecision).toBe('fp32');
   });
 
+  it('keeps valid hosted-provider options and drops the rest back to provider defaults', () => {
+    const kept = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      externalImageSize: '2K',
+      geminiTemperature: 0.5,
+      geminiThinkingLevel: 'minimal',
+      openaiBackground: 'opaque',
+      openaiInputFidelity: 'high',
+      openaiQuality: 'medium',
+      seedreamOptimizePrompt: true,
+      seedreamWatermark: true,
+    });
+
+    expect(kept).toMatchObject({
+      externalImageSize: '2K',
+      geminiTemperature: 0.5,
+      geminiThinkingLevel: 'minimal',
+      openaiBackground: 'opaque',
+      openaiInputFidelity: 'high',
+      openaiQuality: 'medium',
+      seedreamOptimizePrompt: true,
+      seedreamWatermark: true,
+    });
+
+    const dropped = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      externalImageSize: '',
+      geminiTemperature: 2.5,
+      geminiThinkingLevel: 'max',
+      openaiBackground: 'clear',
+      openaiInputFidelity: 'medium',
+      openaiQuality: 'ultra',
+      seedreamOptimizePrompt: 'yes',
+      seedreamWatermark: 1,
+    });
+
+    expect(dropped).toMatchObject({
+      externalImageSize: null,
+      geminiTemperature: null,
+      geminiThinkingLevel: null,
+      openaiBackground: 'auto',
+      openaiInputFidelity: null,
+      openaiQuality: 'auto',
+      seedreamOptimizePrompt: false,
+      seedreamWatermark: false,
+    });
+  });
+
+  it.each([0, 2])('preserves the Gemini temperature boundary %s', (geminiTemperature) => {
+    expect(normalizeGenerateSettings({ ...legacyStoredValues, geminiTemperature })?.geminiTemperature).toBe(
+      geminiTemperature
+    );
+  });
+
+  it('drops a negative Gemini temperature back to the provider default', () => {
+    expect(normalizeGenerateSettings({ ...legacyStoredValues, geminiTemperature: -0.1 })?.geminiTemperature).toBeNull();
+  });
+
   it('bounds the model-family tuning fields and defaults the rest', () => {
     const normalized = normalizeGenerateSettings({
       ...legacyStoredValues,
@@ -391,6 +449,17 @@ describe('the Anima inpaint adapter settings', () => {
         animaInpaintAdapterWeight: 'heavy',
       })
     ).toMatchObject({ animaInpaintAdapterModel: null, animaInpaintAdapterWeight: 1 });
+  });
+
+  it('keeps the adapter switched on unless a stored value turns it off', () => {
+    // Projects saved before the toggle existed wired a selected adapter, so a missing value means on.
+    expect(normalizeGenerateSettings(legacyStoredValues)?.animaInpaintAdapterEnabled).toBe(true);
+    const enabledFrom = (stored: unknown) =>
+      normalizeGenerateSettings({ ...legacyStoredValues, animaInpaintAdapterEnabled: stored })
+        ?.animaInpaintAdapterEnabled;
+    expect(enabledFrom(false)).toBe(false);
+    expect(enabledFrom(true)).toBe(true);
+    expect(enabledFrom('off')).toBe(true);
   });
 });
 
@@ -588,6 +657,8 @@ describe('dimension helpers', () => {
     expect(getGenerationDimensions({ base: 'flux2', type: 'main' }).grid).toBe(16);
     expect(getGenerationDimensions({ base: 'qwen-image', type: 'main' }).grid).toBe(16);
     expect(getGenerationDimensions({ base: 'cogview4', type: 'main' }).grid).toBe(32);
+    // Hosted providers bucket sizes themselves, so their presets (e.g. 1365 wide) are kept pixel-exact.
+    expect(getGenerationDimensions({ base: 'external', type: 'external_image_generator' }).grid).toBe(1);
     expect(clampDimension(888, getGenerationDimensions({ base: 'flux2', type: 'main' }).grid)).toBe(896);
   });
 });
@@ -689,5 +760,68 @@ describe('planSeedSubmission', () => {
         startSeed: 42,
       })
     ).toMatchObject({ lastSeed: 45, nextSeed: 46, sequenceLength: 4 });
+  });
+});
+
+describe('normalizeGenerateSettings refiner fields', () => {
+  const refiner: MainModelConfig = { base: 'sdxl-refiner', key: 'refiner', name: 'SDXL Refiner', type: 'main' };
+
+  it('defaults values saved before the refiner existed', () => {
+    expect(normalizeGenerateSettings(legacyStoredValues)).toMatchObject({
+      refinerCfgScale: 7.5,
+      refinerModel: null,
+      refinerNegativeAestheticScore: 2.5,
+      refinerPositiveAestheticScore: 6,
+      refinerScheduler: 'euler',
+      refinerStart: 0.8,
+      refinerSteps: 20,
+    });
+  });
+
+  it('keeps a refiner-family model and drops any other model stored in the slot', () => {
+    const stored = { ...legacyStoredValues, refinerModel: refiner };
+
+    expect(normalizeGenerateSettings(stored)?.refinerModel).toEqual(refiner);
+    expect(
+      normalizeGenerateSettings({
+        ...legacyStoredValues,
+        refinerModel: { base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' },
+      })?.refinerModel
+    ).toBeNull();
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, refinerModel: { key: 'refiner' } })?.refinerModel
+    ).toBeNull();
+  });
+
+  it('clamps the refiner tuning to its ranges and rounds steps', () => {
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      refinerCfgScale: 0,
+      refinerNegativeAestheticScore: -3,
+      refinerPositiveAestheticScore: 42,
+      refinerScheduler: 7,
+      refinerStart: 1.5,
+      refinerSteps: 2.6,
+    });
+
+    expect(normalized).toMatchObject({
+      refinerCfgScale: 1,
+      refinerNegativeAestheticScore: 1,
+      refinerPositiveAestheticScore: 10,
+      refinerScheduler: 'euler',
+      refinerStart: 1,
+      refinerSteps: 3,
+    });
+    expect(normalized && isGenerateSettings(normalized)).toBe(true);
+    expect(isGenerateSettings({ ...normalized, refinerStart: 2 })).toBe(false);
+  });
+
+  it('refreshes a stale refiner snapshot from the installed catalog', () => {
+    const sdxl: MainModelConfig = { base: 'sdxl', key: 'legacy-model', name: 'SDXL', type: 'main' };
+    const values = { ...normalizeGenerateSettings(legacyStoredValues)!, model: sdxl, refinerModel: refiner };
+    const renamed = { ...refiner, name: 'SDXL Refiner 1.0' };
+
+    expect(syncGenerateWidgetValuesWithModels(values, [sdxl, renamed]).refinerModel).toEqual(renamed);
+    expect(syncGenerateWidgetValuesWithModels(values, [sdxl, refiner])).toBe(values);
   });
 });

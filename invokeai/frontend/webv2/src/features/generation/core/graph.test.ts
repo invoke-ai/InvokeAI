@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type {
   ComponentModelConfig,
+  ExternalImageGeneratorModelConfig,
   GenerateModelConfig,
   GenerateSettings,
   LoraModelConfig,
@@ -448,6 +449,13 @@ describe('compileGenerateGraph', () => {
     expect(compile(zImageModel).nodes.model_loader?.type).toBe('z_image_model_loader');
   });
 
+  it('hands the Qwen Image denoise the loader VAE its ControlNet encodes with', () => {
+    expect(getEdge(compile(qwenImageModel), 'denoise_latents', 'vae')?.source).toEqual({
+      field: 'vae',
+      node_id: 'model_loader',
+    });
+  });
+
   it('builds complete SDNQ pipeline graphs without standalone component overrides', () => {
     const flux = compile({
       ...fluxModel,
@@ -472,6 +480,22 @@ describe('compileGenerateGraph', () => {
     });
     expect(flux2.nodes.model_loader).toMatchObject({ qwen3_encoder_model: undefined, vae_model: undefined });
     expect(zImage.nodes.model_loader).toMatchObject({ qwen3_encoder_model: undefined, vae_model: undefined });
+  });
+
+  it('sends a standalone Z-Image transformer the Qwen3 4B encoder and refuses the 8B one', () => {
+    const zImageGguf: MainModelConfig = { ...zImageModel, format: 'gguf_quantized' };
+    const qwen3_4b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-4b', variant: 'qwen3_4b' };
+    const qwen3_8b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-8b', variant: 'qwen3_8b' };
+    const graph = compile(zImageGguf, { qwen3EncoderModel: qwen3_4b, vae: fluxVae });
+
+    expect(graph.nodes.model_loader).toMatchObject({
+      qwen3_encoder_model: qwen3_4b,
+      type: 'z_image_model_loader',
+      vae_model: fluxVae,
+    });
+    expect(() => compile(zImageGguf, { qwen3EncoderModel: qwen3_8b, vae: fluxVae })).toThrow(
+      'The selected Qwen3 Encoder is not the 4B one Z-Image conditions on.'
+    );
   });
 
   it('builds FLUX.2 [dev] graphs with standalone components and dev LoRAs', () => {
@@ -735,6 +759,135 @@ describe('compileGenerateGraph', () => {
     );
 
     expect(graph.nodes.canvas_output?.reference_images).toEqual([{ image_name: 'reference.png' }]);
+  });
+
+  describe('external provider options', () => {
+    const providerSettings: Partial<GenerateSettings> = {
+      externalImageSize: '2K',
+      geminiTemperature: 0.4,
+      geminiThinkingLevel: 'high',
+      openaiBackground: 'transparent',
+      openaiInputFidelity: 'high',
+      openaiQuality: 'low',
+      seedreamOptimizePrompt: true,
+      seedreamWatermark: true,
+    };
+    const providerModel = (
+      providerId: string,
+      capabilities: ExternalImageGeneratorModelConfig['capabilities']
+    ): GenerateModelConfig =>
+      ({
+        ...externalModel,
+        capabilities,
+        provider_id: providerId,
+        provider_model_id: providerId === 'openai' ? 'gpt-image-1' : `${providerId}-model`,
+      }) as GenerateModelConfig;
+
+    it('compiles OpenAI quality, background and input fidelity, recording them in metadata', () => {
+      const model = providerModel('openai', { modes: ['txt2img', 'img2img'] });
+      const graph = compile(model, providerSettings);
+
+      expect(graph.nodes.canvas_output).toMatchObject({
+        background: 'transparent',
+        input_fidelity: 'high',
+        quality: 'low',
+      });
+      // Fields of other providers' nodes never reach this one.
+      expect(graph.nodes.canvas_output).not.toHaveProperty('temperature');
+      expect(graph.nodes.canvas_output).not.toHaveProperty('watermark');
+      expect(getNodeByType(graph, 'core_metadata')).toMatchObject({
+        openai_background: 'transparent',
+        openai_input_fidelity: 'high',
+        openai_quality: 'low',
+      });
+    });
+
+    it('omits OpenAI input fidelity for a model with no image inputs, and when unset', () => {
+      const noInputs = compile(providerModel('openai', { modes: ['txt2img'] }), providerSettings);
+
+      expect(noInputs.nodes.canvas_output).toMatchObject({ background: 'transparent', quality: 'low' });
+      expect(noInputs.nodes.canvas_output).not.toHaveProperty('input_fidelity');
+
+      const unset = compile(providerModel('openai', { modes: ['txt2img', 'img2img'] }), {
+        ...providerSettings,
+        openaiInputFidelity: null,
+      });
+
+      expect(unset.nodes.canvas_output).not.toHaveProperty('input_fidelity');
+      expect(getNodeByType(unset, 'core_metadata')).not.toHaveProperty('openai_input_fidelity');
+    });
+
+    it('compiles Gemini temperature and thinking level only when set', () => {
+      const model = providerModel('gemini', { modes: ['txt2img'] });
+      const graph = compile(model, providerSettings);
+
+      expect(graph.nodes.canvas_output).toMatchObject({ temperature: 0.4, thinking_level: 'high' });
+      expect(graph.nodes.canvas_output).not.toHaveProperty('quality');
+      expect(getNodeByType(graph, 'core_metadata')).toMatchObject({
+        gemini_temperature: 0.4,
+        gemini_thinking_level: 'high',
+      });
+
+      const defaults = compile(model, { ...providerSettings, geminiTemperature: null, geminiThinkingLevel: null });
+
+      expect(defaults.nodes.canvas_output).not.toHaveProperty('temperature');
+      expect(defaults.nodes.canvas_output).not.toHaveProperty('thinking_level');
+    });
+
+    it('compiles Seedream watermark and prompt optimization as explicit booleans', () => {
+      const model = providerModel('seedream', { modes: ['txt2img'] });
+
+      expect(compile(model, providerSettings).nodes.canvas_output).toMatchObject({
+        optimize_prompt: true,
+        watermark: true,
+      });
+      expect(
+        compile(model, { ...providerSettings, seedreamOptimizePrompt: false, seedreamWatermark: false }).nodes
+          .canvas_output
+      ).toMatchObject({ optimize_prompt: false, watermark: false });
+      expect(getNodeByType(compile(model, providerSettings), 'core_metadata')).toMatchObject({
+        seedream_optimize_prompt: true,
+        seedream_watermark: true,
+      });
+    });
+
+    it('sends the named size only when the model lists it in a resolution preset', () => {
+      const presets = [
+        { aspect_ratio: '1:1', height: 2048, image_size: '2K', label: '1:1 (2K)', width: 2048 },
+        { aspect_ratio: '1:1', height: 1024, image_size: '1K', label: '1:1 (1K)', width: 1024 },
+      ];
+      const listed = compile(providerModel('gemini', { modes: ['txt2img'], resolution_presets: presets }), {
+        ...providerSettings,
+        height: 2048,
+        width: 2048,
+      });
+
+      expect(listed.nodes.canvas_output).toMatchObject({ height: 2048, image_size: '2K', width: 2048 });
+      expect(getNodeByType(listed, 'core_metadata')).toMatchObject({ image_size: '2K' });
+
+      // A size picked for another model, or a provider without named sizes, falls back to the provider default.
+      const unlisted = compile(providerModel('gemini', { modes: ['txt2img'] }), providerSettings);
+
+      expect(unlisted.nodes.canvas_output?.image_size).toBeNull();
+      expect(getNodeByType(unlisted, 'core_metadata')).not.toHaveProperty('image_size');
+
+      // Dimensions typed after the pick are custom: the named size would otherwise override them at the provider.
+      const typed = compile(providerModel('gemini', { modes: ['txt2img'], resolution_presets: presets }), {
+        ...providerSettings,
+        height: 2048,
+        width: 1536,
+      });
+
+      expect(typed.nodes.canvas_output).toMatchObject({ height: 2048, image_size: null, width: 1536 });
+      expect(getNodeByType(typed, 'core_metadata')).not.toHaveProperty('image_size');
+    });
+
+    it('accepts provider sizes that are not multiples of a local model grid', () => {
+      const model = providerModel('gemini', { modes: ['txt2img'] });
+      const graph = compile(model, { height: 2048, width: 1365 });
+
+      expect(graph.nodes.canvas_output).toMatchObject({ height: 2048, width: 1365 });
+    });
   });
 
   it('wires SD IP Adapter reference images into denoise', () => {
@@ -1481,6 +1634,196 @@ describe('PiD decode', () => {
         width: 2032,
       })
     ).toThrow(/multiple of 64/);
+  });
+});
+
+describe('SDXL Refiner', () => {
+  const refinerModel: MainModelConfig = {
+    base: 'sdxl-refiner',
+    hash: 'blake3:refiner',
+    key: 'sdxl-refiner-model',
+    name: 'SDXL Refiner',
+    type: 'main',
+  };
+  const refinerSettings: Partial<GenerateSettings> = {
+    refinerCfgScale: 5,
+    refinerModel,
+    refinerNegativeAestheticScore: 2,
+    refinerPositiveAestheticScore: 7,
+    refinerScheduler: 'dpmpp_2m',
+    refinerStart: 0.7,
+    refinerSteps: 12,
+  };
+
+  it('leaves the SDXL graph unchanged without a refiner', () => {
+    const graph = compile(sdxlModel);
+
+    expect(graph.nodes.refiner_denoise_latents).toBeUndefined();
+    expect(graph.nodes.refiner_model_loader).toBeUndefined();
+    expect(graph.nodes.denoise_latents).toMatchObject({ denoising_end: 1, denoising_start: 0 });
+    expect(getEdge(graph, 'canvas_output', 'latents')?.source.node_id).toBe('denoise_latents');
+    expect(getNodeByType(graph, 'core_metadata')).not.toHaveProperty('refiner_model');
+  });
+
+  it('hands the base latents to a refiner stage that feeds the decode', () => {
+    const graph = compile(sdxlModel, refinerSettings);
+    const refinerDenoise = graph.nodes.refiner_denoise_latents;
+
+    expect(graph.nodes.denoise_latents).toMatchObject({ denoising_end: 0.7, denoising_start: 0 });
+    expect(graph.nodes.refiner_model_loader).toMatchObject({
+      model: { base: 'sdxl-refiner', hash: 'blake3:refiner', key: 'sdxl-refiner-model', type: 'main' },
+      type: 'sdxl_refiner_model_loader',
+    });
+    expect(refinerDenoise).toMatchObject({
+      cfg_scale: 5,
+      denoising_end: 1,
+      denoising_start: 0.7,
+      scheduler: 'dpmpp_2m',
+      steps: 12,
+      type: 'denoise_latents',
+    });
+    expect(graph.nodes.refiner_pos_cond).toMatchObject({ aesthetic_score: 7, type: 'sdxl_refiner_compel_prompt' });
+    expect(graph.nodes.refiner_neg_cond).toMatchObject({ aesthetic_score: 2, type: 'sdxl_refiner_compel_prompt' });
+
+    expect(getEdge(graph, 'refiner_denoise_latents', 'unet')?.source).toEqual({
+      field: 'unet',
+      node_id: 'refiner_model_loader',
+    });
+    expect(getEdge(graph, 'refiner_pos_cond', 'clip2')?.source.node_id).toBe('refiner_model_loader');
+    expect(getEdge(graph, 'refiner_neg_cond', 'clip2')?.source.node_id).toBe('refiner_model_loader');
+    expect(getEdge(graph, 'refiner_pos_cond', 'style')?.source.node_id).toBe('positive_prompt');
+    expect(getEdge(graph, 'refiner_neg_cond', 'style')?.source.node_id).toBe('negative_prompt');
+    expect(getEdge(graph, 'refiner_denoise_latents', 'positive_conditioning')?.source.node_id).toBe('refiner_pos_cond');
+    expect(getEdge(graph, 'refiner_denoise_latents', 'negative_conditioning')?.source.node_id).toBe('refiner_neg_cond');
+    expect(getEdge(graph, 'refiner_denoise_latents', 'latents')?.source.node_id).toBe('denoise_latents');
+    expect(getEdge(graph, 'canvas_output', 'latents')?.source.node_id).toBe('refiner_denoise_latents');
+    // The base VAE still decodes; the refiner has none of its own.
+    expect(getEdge(graph, 'canvas_output', 'vae')?.source.node_id).toBe('model_loader');
+  });
+
+  it('records the refiner and its tuning in metadata', () => {
+    const graph = compile(sdxlModel, refinerSettings);
+
+    expect(getNodeByType(graph, 'core_metadata')).toMatchObject({
+      refiner_cfg_scale: 5,
+      refiner_model: { base: 'sdxl-refiner', hash: 'blake3:refiner', key: 'sdxl-refiner-model', type: 'main' },
+      refiner_negative_aesthetic_score: 2,
+      refiner_positive_aesthetic_score: 7,
+      refiner_scheduler: 'dpmpp_2m',
+      refiner_start: 0.7,
+      refiner_steps: 12,
+    });
+  });
+
+  it('wraps the refiner UNet in its own seamless node when tiling is on', () => {
+    const graph = compile(sdxlModel, { ...refinerSettings, seamlessXAxis: true });
+
+    expect(graph.nodes.refiner_seamless).toMatchObject({ seamless_x: true, seamless_y: false, type: 'seamless' });
+    expect(getEdge(graph, 'refiner_seamless', 'unet')?.source.node_id).toBe('refiner_model_loader');
+    expect(getEdge(graph, 'refiner_denoise_latents', 'unet')?.source.node_id).toBe('refiner_seamless');
+  });
+
+  it('runs the refiner pass with the base HiDiffusion settings and coerces its scheduler', () => {
+    const graph = compile(sdxlModel, {
+      ...refinerSettings,
+      hiDiffusionEnabled: true,
+      hiDiffusionT1Ratio: 0.3,
+      refinerScheduler: 'not-a-scheduler',
+    });
+
+    expect(graph.nodes.refiner_denoise_latents).toMatchObject({
+      hidiffusion: true,
+      hidiffusion_t1_ratio: 0.3,
+      scheduler: 'euler_a',
+    });
+    expect(getNodeByType(graph, 'core_metadata')?.refiner_scheduler).toBe('euler_a');
+  });
+
+  it('ignores a stored refiner on a non-SDXL main model', () => {
+    const graph = compile(sd1Model, refinerSettings);
+
+    expect(graph.nodes.refiner_denoise_latents).toBeUndefined();
+    expect(getNodeByType(graph, 'core_metadata')).not.toHaveProperty('refiner_model');
+  });
+
+  it('rejects a refiner together with PiD decoding', () => {
+    const gemma2: ComponentModelConfig = { base: 'any', key: 'gemma2', name: 'Gemma 2 2B', type: 'gemma2_encoder' };
+
+    expect(() =>
+      compile(sdxlModel, {
+        ...refinerSettings,
+        gemma2EncoderModel: gemma2,
+        pidDecoderModel: { base: 'sdxl', key: 'pid-sdxl', name: 'PiD SDXL', type: 'pid_decoder' },
+        pidMode: 'fit',
+      })
+    ).toThrow('PiD decode is not compatible with the SDXL Refiner.');
+  });
+
+  it('refuses a non-refiner model stored in the refiner slot', () => {
+    expect(() => compile(sdxlModel, { ...refinerSettings, refinerModel: sdxlModel })).toThrow(
+      'SDXL is not an SDXL Refiner model.'
+    );
+  });
+
+  it('hands the whole schedule to the refiner at a start of 0', () => {
+    const graph = compile(sdxlModel, { ...refinerSettings, refinerStart: 0 });
+
+    // The base pass only seeds the latents from noise; the refiner denoises every step.
+    expect(graph.nodes.denoise_latents).toMatchObject({ denoising_end: 0, denoising_start: 0 });
+    expect(graph.nodes.refiner_denoise_latents).toMatchObject({ denoising_end: 1, denoising_start: 0 });
+    expect(getEdge(graph, 'canvas_output', 'latents')?.source.node_id).toBe('refiner_denoise_latents');
+    expect(getNodeByType(graph, 'core_metadata')?.refiner_start).toBe(0);
+  });
+
+  it('runs without the refiner at a start of 1, where its pass would be empty', () => {
+    const graph = compile(sdxlModel, {
+      ...refinerSettings,
+      gemma2EncoderModel: { base: 'any', key: 'gemma2', name: 'Gemma 2 2B', type: 'gemma2_encoder' },
+      pidDecoderModel: { base: 'sdxl', key: 'pid-sdxl', name: 'PiD SDXL', type: 'pid_decoder' },
+      pidMode: 'fit',
+      refinerStart: 1,
+    });
+
+    // Neither the refiner model nor its PiD conflict applies: the graph is the plain SDXL graph.
+    expect(graph.nodes.refiner_model_loader).toBeUndefined();
+    expect(graph.nodes.refiner_denoise_latents).toBeUndefined();
+    expect(graph.nodes.denoise_latents).toMatchObject({ denoising_end: 1, denoising_start: 0 });
+    expect(getNodeByType(graph, 'core_metadata')).not.toHaveProperty('refiner_model');
+  });
+
+  it('keeps IP Adapter reference images on the base pass', () => {
+    const sdxlIpAdapter: ComponentModelConfig = {
+      base: 'sdxl',
+      key: 'sdxl-ip-adapter',
+      name: 'SDXL IP Adapter',
+      type: 'ip_adapter',
+    };
+    const graph = compile(sdxlModel, {
+      ...refinerSettings,
+      referenceImages: [
+        {
+          id: 'ref-1',
+          isEnabled: true,
+          config: {
+            beginEndStepPct: [0, 1],
+            clipVisionModel: 'ViT-H',
+            image: refImage,
+            method: 'full',
+            model: sdxlIpAdapter,
+            type: 'ip_adapter',
+            weight: 1,
+          },
+        },
+      ],
+    });
+
+    expect(getEdge(graph, 'denoise_latents', 'ip_adapter')?.source.node_id).toContain('ip_adapter_collector');
+    expect(getEdge(graph, 'refiner_denoise_latents', 'ip_adapter')).toBeUndefined();
+    expect(
+      graph.edges
+        .filter((edge) => edge.destination.node_id === 'refiner_denoise_latents')
+        .map((e) => e.destination.field)
+    ).toEqual(['unet', 'positive_conditioning', 'negative_conditioning', 'latents']);
   });
 });
 

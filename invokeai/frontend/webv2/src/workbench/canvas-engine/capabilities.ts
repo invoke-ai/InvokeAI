@@ -1,4 +1,6 @@
 import type {
+  CanvasControlDetectionContract,
+  CanvasControlLayerContract,
   CanvasDocumentContractV3,
   CanvasImageRef,
   CanvasLayerContract,
@@ -6,15 +8,17 @@ import type {
   CanvasStagingCandidateContract,
   CanvasStateContractV3,
   CanvasTextFontRef,
+  ControlType,
 } from '@workbench/canvas-engine/contracts';
 import type { CanvasMutationOrigin } from '@workbench/canvas-engine/mutationContracts';
 import type { StrokeCommittedEvent } from '@workbench/canvas-engine/tools/tool';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 
 import type { BooleanRasterResult } from './controllers/booleanMergeController';
-import type { CopyLayerToRasterResult } from './controllers/copyLayerController';
+import type { CopyLayerResult } from './controllers/copyLayerController';
 import type { CropLayerResult } from './controllers/cropLayerController';
 import type { ExtractMaskedAreaResult } from './controllers/extractMaskedAreaController';
+import type { ConvertLayerToControlResult } from './controllers/layerMutationController';
 import type { MergeDownResult, MergeVisibleResult } from './controllers/mergeLayerController';
 import type { NewRasterLayerResult } from './controllers/newRasterLayerController';
 import type { RasterizeLayerResult } from './controllers/rasterizeLayerController';
@@ -28,12 +32,15 @@ import type { CanvasEditGate } from './editGate';
 import type {
   TextStylePatch,
   ActiveColorPairState,
+  ControlLayerView,
   BboxToolOptions,
   BrushOptions,
   CheckerColors,
   EraserOptions,
   GradientToolOptions,
   LassoToolOptions,
+  LayerAdjustmentStatus,
+  LayerQuickSwitchState,
   LayerThumbnailStatus,
   MarqueeToolOptions,
   ShapeToolOptions,
@@ -48,6 +55,7 @@ import type {
   CanvasFontReplacementTarget,
 } from './fontReferences';
 import type { CanvasLayerPreviewMutation, CanvasProjectMutation } from './mutationContracts';
+import type { AdjustmentRefusal } from './render/exactAdjustments';
 import type { Rect, ToolId, Vec2 } from './types';
 import type { Viewport } from './viewport';
 
@@ -91,8 +99,81 @@ export interface CommitRasterFilterOptions {
   mode: 'replace' | 'copy';
   filter?: RasterFilterSettings;
   target?: RasterFilterCommitTarget;
+  /**
+   * For `target: 'control'` copies: the control type the filter implies, or null for an untyped copy. A typed copy
+   * uses its pixels as-is (`detection: null`); either way the copy keeps no derivation of its source layer.
+   */
+  controlCopy?: { controlType: ControlType | null };
   requireExactImageDimensions?: boolean;
   signal?: AbortSignal;
+}
+
+/** What a control-map commit must still match: the document session and the detection input it ran on. */
+export interface ControlDetectionGuard {
+  readonly projectId: string;
+  readonly layerId: string;
+  readonly documentRevision: number;
+  /** `controlDetectionInputKey` of the layer when the run started. */
+  readonly inputKey: string;
+}
+
+export type ControlLayerPatchResult =
+  | { status: 'committed' }
+  | {
+      status: 'stale' | 'missing' | 'locked' | 'busy' | 'not-ready' | 'over-budget' | 'failed';
+      message?: string;
+    };
+
+export type ControlMapCommitResult =
+  | { status: 'committed' }
+  | {
+      status:
+        | 'stale'
+        | 'missing'
+        | 'locked'
+        | 'busy'
+        | 'not-ready'
+        | 'over-budget'
+        | 'aborted'
+        | 'unrepresentable'
+        | 'failed';
+      message?: string;
+    };
+
+/**
+ * Edits that keep a control layer's derived map in step with its type, detector and original. Neither commit takes
+ * the operation edit lease: both refuse `busy` while a modal operation, gesture, replay or layer session is running,
+ * and the caller retries later.
+ */
+export interface CanvasControlDerivationCapability {
+  /**
+   * Replaces one control layer's contract as one user-origin history entry; refused `stale` unless the live layer
+   * still equals `expected`. Consecutive patches of the same layer with the same `coalesceKey` replace the top entry.
+   */
+  commitControlLayerPatch(options: {
+    label: string;
+    expected: CanvasControlLayerContract;
+    next: CanvasControlLayerContract;
+    coalesceKey?: string;
+  }): ControlLayerPatchResult;
+  /** What a detection run must still match to commit; null when the layer is missing or not a control layer. */
+  captureControlDetectionGuard(layerId: string): ControlDetectionGuard | null;
+  /**
+   * Installs a detected map (a persisted image) as the layer's `source`, keeping the original, as a system-origin
+   * entry. Paired with the intent entry that requested it when that is still the newest step.
+   */
+  commitControlMap(options: {
+    guard: ControlDetectionGuard;
+    image: CanvasImageRef;
+    rect: Rect;
+    detection: CanvasControlDetectionContract;
+    /**
+     * Makes `image` durable. Awaited only once the guard holds and nothing holds the document, just before decoding,
+     * so a refused or stale result is never promoted; a rejection refuses the commit `failed`.
+     */
+    makeDurable(): Promise<void>;
+    signal?: AbortSignal;
+  }): Promise<ControlMapCommitResult>;
 }
 export type MaskImageResultTarget = 'inpaint_mask' | 'regional_guidance';
 export interface CommitMaskImageResultOptions {
@@ -117,6 +198,8 @@ export interface CanvasInteractionState {
   clipToBbox: boolean;
   /** The mirrored workbench pair; the engine reads it at gesture start, never writes it. */
   colorPair: ActiveColorPairState;
+  /** The control layer shown as its kept original or as original under its map; null shows every map. */
+  controlLayerView: ControlLayerView | null;
   documentEditingLocked: boolean;
   eraserOptions: EraserOptions;
   gradientOptions: GradientToolOptions;
@@ -126,6 +209,8 @@ export interface CanvasInteractionState {
   historyEpoch: number;
   invertBrushSizeScroll: boolean;
   lassoOptions: LassoToolOptions;
+  /** Q quick-switch memory; callers write the bookmark, the engine maintains the previous selection. */
+  layerQuickSwitch: LayerQuickSwitchState;
   marqueeOptions: MarqueeToolOptions;
   /** Monotonic signal: some layer published new cache pixels (thumbnails, overview). */
   layerPixelEpoch: number;
@@ -157,6 +242,7 @@ export type CanvasWritableInteractionKey = Extract<
   | 'gradientOptions'
   | 'invertBrushSizeScroll'
   | 'lassoOptions'
+  | 'layerQuickSwitch'
   | 'marqueeOptions'
   | 'ruleOfThirds'
   | 'shapeOptions'
@@ -174,6 +260,9 @@ export interface CanvasInteractionStateCapability {
   getLayerThumbnailVersion(layerId: string): number | undefined;
   subscribeLayerThumbnailStatus(layerId: string, listener: () => void): () => void;
   subscribeLayerThumbnailVersion(layerId: string, listener: () => void): () => void;
+  /** Whether the canvas shows a layer's or raster group's spatial adjustments exactly (`idle`), or why not. */
+  getLayerAdjustmentStatus(layerId: string): LayerAdjustmentStatus | 'idle';
+  subscribeLayerAdjustmentStatus(layerId: string, listener: () => void): () => void;
 }
 
 /**
@@ -230,6 +319,7 @@ export interface CanvasDocumentSnapshot {
 }
 
 export type PsdExportResult =
+  | AdjustmentRefusal
   | 'exported'
   | 'nothing'
   | 'too-large'
@@ -277,11 +367,13 @@ export interface CanvasHistoryCapability {
   stepBy(offset: number): Promise<CanvasHistoryReplayStatus>;
 }
 
-/** Why the engine refused an edit the user started without a caller to report to (a stroke, a shape). */
-export type CanvasEditRefusal = SubsetOf<
-  CanvasTransactionOutcome,
-  'busy' | 'gesture-active' | 'not-ready' | 'over-budget'
->;
+/**
+ * Why the engine refused an edit the user started without a caller to report to (a stroke, a shape). An
+ * `AdjustmentRefusal` names a layer whose spatial adjustments cannot run, so its pixels cannot be baked for painting.
+ */
+export type CanvasEditRefusal =
+  | SubsetOf<CanvasTransactionOutcome, 'busy' | 'gesture-active' | 'not-ready' | 'over-budget'>
+  | AdjustmentRefusal;
 
 export type LayerThumbnailRequestResult =
   | 'ready'
@@ -333,7 +425,8 @@ export type ExportBakedLayerBlobResult =
         | 'disabled'
         | 'empty'
         | 'over-budget';
-    };
+    }
+  | AdjustmentRefusal;
 
 export interface CanvasSelectionCapability {
   deselect(): void;
@@ -511,7 +604,8 @@ export type DuplicateLayersResult =
  */
 export type {
   BooleanRasterResult,
-  CopyLayerToRasterResult,
+  ConvertLayerToControlResult,
+  CopyLayerResult,
   CropLayerResult,
   ExtractMaskedAreaResult,
   MergeDownResult,
@@ -590,17 +684,29 @@ export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
   commitRasterFilterResult(options: CommitRasterFilterOptions): Promise<CommitRasterFilterResult>;
   /** `null` when there was nothing to commit: an empty creation or an unchanged edit. */
   commitTextEdit(content: string, styleChanges?: Partial<TextToolOptions>): StructuralCommitResult | null;
-  copyLayerToRaster(layerId: string): Promise<CopyLayerToRasterResult>;
+  /**
+   * Converts a raster image or paint layer to a control layer in place, baking its own adjustments (exactly, or
+   * refused) and transform into paint pixels; undo restores the raster layer with its adjustments and pixels. An empty
+   * layer converts as a plain clone of its source and transform. A layer whose stack changes nothing can use the
+   * cheaper `commitLayerConversion`, which keeps its source and transform.
+   */
+  convertLayerToControl(label: string, expectedLiveLayer: CanvasLayerContract): Promise<ConvertLayerToControlResult>;
+  /**
+   * Adds a control-layer copy holding the layer's baked pixels, as `copyLayerToRaster` does for raster copies; an empty
+   * raster layer's copy is a plain clone of its source and transform.
+   */
+  copyLayerToControl(layerId: string): Promise<CopyLayerResult>;
+  copyLayerToRaster(layerId: string): Promise<CopyLayerResult>;
   cropLayerToBbox(layerId: string): Promise<CropLayerResult>;
   duplicateLayers(layerIds: readonly string[]): Promise<DuplicateLayersResult>;
-  mergeLayerDown(upperLayerId: string): MergeDownResult;
+  mergeLayerDown(upperLayerId: string): Promise<MergeDownResult>;
   mergeSelectedRasterLayers(layerIds: readonly string[]): Promise<MergeVisibleResult>;
   mergeVisibleRasterLayers(): Promise<MergeVisibleResult>;
   /** `dispatch-rejected` also covers a selection with nothing eligible to move. */
   nudgeSelectedLayer(dx: number, dy: number): StructuralCommitResult;
   openTextCreate(docPoint: Vec2): void;
   openTextEdit(layerId: string): void;
-  rasterizeLayer(layerId: string): RasterizeLayerResult;
+  rasterizeLayer(layerId: string): Promise<RasterizeLayerResult>;
   setTextEditContentReader(reader: (() => string) | null): void;
   updateTextEditStyle(patch: TextStylePatch): void;
   updateTransformSession(transform: LayerTransform): void;
@@ -610,6 +716,16 @@ export interface CanvasEngineExportCapability extends CanvasExportCapability {
   exportRasterLayersToPsd(fileName: string): Promise<PsdExportResult>;
   extractMaskedArea(maskLayerId: string): Promise<ExtractMaskedAreaResult>;
 }
+
+/** How a control layer displays: its detected map (the default), the kept original, or the original under the map. */
+export type ControlLayerViewMode = 'original' | 'map' | 'overlay';
+
+/**
+ * `missing`: no control layer with a kept original; `locked`: an operation or a generation holds the canvas;
+ * `stale`: a newer request or an edit of the layer superseded it; `over-budget`: the original's pixels do not fit the
+ * raster budget; `failed`: the original could not be decoded.
+ */
+export type ControlLayerViewOutcome = 'shown' | 'missing' | 'locked' | 'stale' | 'over-budget' | 'failed';
 
 export interface CanvasEnginePreviewCapability extends CanvasPreviewCapability {
   /**
@@ -624,6 +740,13 @@ export interface CanvasEnginePreviewCapability extends CanvasPreviewCapability {
     guard: LayerExportGuard
   ): Promise<'shown' | SubsetOf<CanvasCommandRefusal, 'missing'> | SubsetOf<CanvasTransactionOutcome, 'stale'>>;
   setStagedPreview(input: StagedPreviewInput | null): void;
+  /**
+   * Display-only: shows a control layer as its kept original, the original under its map at half strength, or
+   * (`map`) as usual. One layer holds a view at a time; refused while the canvas is locked. Any edit or stroke on
+   * the layer, a selection change, a lock, a document replacement and the other resets in ARCHITECTURE.md return it
+   * to the map. Never recorded in history, persisted or exported.
+   */
+  setControlLayerView(layerId: string, view: ControlLayerViewMode): Promise<ControlLayerViewOutcome>;
 }
 
 /** Public capability-only handle. Construction and mutable stores are intentionally absent. */
@@ -658,10 +781,13 @@ export type {
   BboxToolOptions,
   BrushOptions,
   CheckerColors,
+  ControlLayerView,
   EraserOptions,
   GradientStop,
   GradientToolOptions,
   LassoToolOptions,
+  LayerAdjustmentStatus,
+  LayerQuickSwitchState,
   LayerThumbnailStatus,
   MarqueeToolOptions,
   ShapeToolKind,
@@ -688,11 +814,13 @@ export {
 export type { LayerTransform } from './transform/transformMath';
 export type { ImageResolver } from './render/rasterizers';
 export type { Rect, SelectionOp, ToolId, Vec2 } from './types';
-export { adjustmentsKey, buildCurveLut } from './render/adjustments';
+export { adjustmentsKey, buildCurveLut, isIdentityAdjustments } from './render/adjustments';
+export { isAdjustmentRefusal, type AdjustmentRefusal, type AdjustmentRefusalReason } from './render/exactAdjustments';
 export { DEFAULT_CHECKER_COLORS } from './render/compositor';
 export {
   getBaseRasterContentBounds,
   getCompositeLayerBounds,
+  isBaseRasterContentLayer,
   planBaseRasterComposite,
   type CompositeEntry,
   type CompositeLayerRef,

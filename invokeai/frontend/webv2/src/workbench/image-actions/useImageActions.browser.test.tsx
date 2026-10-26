@@ -1,4 +1,7 @@
 import type { GalleryImage, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
+import type * as QueueUtilityModule from '@features/queue/utility';
+import type { InvocationTemplatesSnapshot } from '@features/workflow/contracts';
+import type * as WorkflowReact from '@features/workflow/react';
 import type { CreateCanvasFromImagesResult } from '@workbench/canvas-operations/api';
 
 import {
@@ -9,7 +12,10 @@ import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
+import { parseOpenApiToTemplates } from '@features/workflow/react';
+import { clearLogs, getLogSnapshot } from '@platform/logging/logger';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { ApiError, getApiErrorMessage } from '@platform/transport/http';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createRef, type Ref, useImperativeHandle } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -21,6 +27,7 @@ import { useImageActions } from './useImageActions';
 
 const mocks = vi.hoisted(() => ({
   addToBoard: vi.fn(),
+  canAddToCachedGalleryBoard: vi.fn((..._args: unknown[]) => true),
   createCanvasFromImages: vi.fn((..._args: unknown[]): Promise<CreateCanvasFromImagesResult> =>
     Promise.resolve({ projectId: null, status: 'empty' })
   ),
@@ -28,6 +35,7 @@ const mocks = vi.hoisted(() => ({
   deleteImages: vi.fn(),
   downloadArchive: vi.fn(),
   downloadBlob: vi.fn(),
+  ensureGalleryBoardDestinations: vi.fn((): Promise<void> | null => null),
   galleryRemoveItems: vi.fn(),
   galleryPatchItems: vi.fn(),
   galleryWidgetsPatchValues: vi.fn(),
@@ -36,6 +44,8 @@ const mocks = vi.hoisted(() => ({
   getItemStarred: vi.fn((..._args: unknown[]) => new Map<string, boolean>()),
   getProject: vi.fn(),
   getSnapshot: vi.fn(),
+  getInvocationTemplatesSnapshot: vi.fn<() => InvocationTemplatesSnapshot>(),
+  refreshInvocationTemplates: vi.fn<() => Promise<void>>(),
   gallerySelectItem: vi.fn(),
   gallerySetItemMultiSelection: vi.fn(),
   imageMetadata: vi.fn(),
@@ -47,11 +57,13 @@ const mocks = vi.hoisted(() => ({
     Promise.resolve({ graph: null, workflow: null })
   ),
   requestWorkflowDocumentLoad: vi.fn(),
+  submitUtilityGraph: vi.fn((..._args: unknown[]): Promise<unknown> => Promise.reject(new Error('not submitted'))),
   videoMetadata: vi.fn((..._args: unknown[]) => Promise.resolve(null)),
   videoWorkflow: vi.fn((..._args: unknown[]): Promise<{ graph: string | null; workflow: string | null }> =>
     Promise.resolve({ graph: null, workflow: null })
   ),
   invalidateGallery: vi.fn(),
+  invalidateGalleryBoardDestinations: vi.fn(),
   invalidateGalleryItems: vi.fn(),
   itemDelete: vi.fn(),
   itemMoveToBoard: vi.fn(),
@@ -65,6 +77,8 @@ const mocks = vi.hoisted(() => ({
   patchGalleryItemCaches: vi.fn((..._args: unknown[]) => vi.fn()),
   removeFromBoard: vi.fn(),
   reportError: vi.fn(),
+  revealLayerProperties: vi.fn(),
+  sendGalleryImageAsControl: vi.fn(),
   requestDeletionConfirmation: vi.fn(),
   resolveItem: vi.fn(),
   setStarred: vi.fn(),
@@ -105,14 +119,32 @@ vi.mock('@features/gallery', () => ({
   toGalleryItemRef: ({ kind, name }: { kind: 'image' | 'video'; name: string }) => ({ kind, name }),
 }));
 
-vi.mock('@features/workflow/react', () => ({
+vi.mock('@features/queue/utility', async (importOriginal) => ({
+  ...(await importOriginal<typeof QueueUtilityModule>()),
+  submitUtilityGraph: (...args: unknown[]) => mocks.submitUtilityGraph(...args),
+}));
+vi.mock('@platform/transport/socketHub', () => ({ socketHub: { on: () => () => {} } }));
+
+vi.mock('@features/workflow/react', async (importOriginal) => ({
+  ...(await importOriginal<typeof WorkflowReact>()),
+  getInvocationTemplatesSnapshot: () => mocks.getInvocationTemplatesSnapshot(),
+  refreshInvocationTemplates: () => mocks.refreshInvocationTemplates(),
   requestWorkflowDocumentLoad: (...args: unknown[]) => mocks.requestWorkflowDocumentLoad(...args),
 }));
 
+vi.mock('@features/workflow/preview', async () => {
+  // Exercise the real conversion without mounting the preview UI's unrelated dependencies.
+  const { storedGraphToDocument } = await import('@features/workflow/core/graphToDocument');
+  return { storedGraphToDocument };
+});
+
 vi.mock('@features/gallery/queries', () => ({
+  canAddToCachedGalleryBoard: (...args: unknown[]) => mocks.canAddToCachedGalleryBoard(...args),
+  ensureGalleryBoardDestinations: () => mocks.ensureGalleryBoardDestinations(),
   getGalleryItemBoardIdsFromCaches: (...args: unknown[]) => mocks.getItemBoardIds(...args),
   getGalleryItemStarredFromCaches: (...args: unknown[]) => mocks.getItemStarred(...args),
   invalidateGallery: (...args: unknown[]) => mocks.invalidateGallery(...args),
+  invalidateGalleryBoardDestinations: (...args: unknown[]) => mocks.invalidateGalleryBoardDestinations(...args),
   invalidateGalleryItems: (...args: unknown[]) => mocks.invalidateGalleryItems(...args),
   patchGalleryItemCaches: (...args: unknown[]) => mocks.patchGalleryItemCaches(...args),
 }));
@@ -152,14 +184,21 @@ vi.mock('@platform/browser/downloadBlob', () => ({
 
 vi.mock('@workbench/canvas-operations/api', async () => {
   // The notice mapper is pure; the rest of the canvas-operations surface stays doubled.
-  const { getCanvasImportNotice } = await import('@workbench/canvas-operations/canvasImportNotice');
+  const { getCanvasImportNotice, getSendAsControlNotice } =
+    await import('@workbench/canvas-operations/canvasImportNotice');
   return {
     createCanvasFromImages: (...args: unknown[]) => mocks.createCanvasFromImages(...args),
     getCanvasEngine: (...args: unknown[]) => mocks.getCanvasEngine(...args),
     getCanvasImportNotice,
+    getSendAsControlNotice,
     importGalleryImagesToCanvas: (...args: unknown[]) => mocks.importGalleryImagesToCanvas(...args),
+    sendGalleryImageAsControl: (...args: unknown[]) => mocks.sendGalleryImageAsControl(...args),
   };
 });
+
+vi.mock('@workbench/widgets/layers/revealLayerProperties', () => ({
+  useRevealLayerProperties: () => mocks.revealLayerProperties,
+}));
 
 vi.mock('@workbench/WorkbenchContext', () => {
   // The workbench store owns one commands object, so it is the same on every read.
@@ -295,6 +334,29 @@ beforeEach(() => {
   });
   mocks.isActiveProject.mockImplementation(() => true);
   accountLifecycle.activate('user-a');
+  mocks.refreshInvocationTemplates.mockReset().mockResolvedValue(undefined);
+  mocks.getInvocationTemplatesSnapshot.mockReturnValue({
+    error: null,
+    status: 'loaded',
+    templates: parseOpenApiToTemplates({
+      components: {
+        schemas: {
+          IntegerInvocation: {
+            class: 'invocation',
+            properties: {
+              type: { default: 'integer' },
+              value: { type: 'integer', default: 0, input: 'any', field_kind: 'input' },
+            },
+            output: { $ref: '#/components/schemas/IntegerOutput' },
+            version: '1.0.0',
+          },
+          IntegerOutput: {
+            properties: { type: { default: 'integer_output' }, value: { type: 'integer', field_kind: 'output' } },
+          },
+        },
+      },
+    }),
+  });
   currentItemActionContext = null;
 });
 
@@ -412,6 +474,56 @@ describe('canvas destinations', () => {
     );
     expect(mocks.notificationsAdd).toHaveBeenCalledWith({ kind: 'success', title: 'widgets.canvas.import.success' });
     // The canvas the images went to is no longer on screen; the one that is must not be brought forward.
+    expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
+  });
+
+  it('names the control layer an image filled and shows its Properties', async () => {
+    mocks.getProject.mockImplementation((id: string) => makeMockProject(id));
+    mocks.sendGalleryImageAsControl.mockResolvedValueOnce({
+      layerId: 'control-1',
+      layerName: 'Depth 1',
+      status: 'filled',
+    });
+
+    await act(() => actionsRef.current!.sendImageAsControl(galleryImage('a.png')));
+
+    expect(mocks.sendGalleryImageAsControl).toHaveBeenCalledWith(
+      expect.objectContaining({ image: expect.objectContaining({ imageName: 'a.png' }) })
+    );
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'success',
+      title: 'widgets.canvas.import.controlFilled',
+    });
+    expect(mocks.revealLayerProperties).toHaveBeenCalledWith('control-1');
+    // The menu has no trigger to restore focus to: the focusing open hands it to the Canvas first.
+    expect(mocks.openWorkbenchWidget).toHaveBeenCalledWith('canvas', {
+      preferredRegions: ['center'],
+      requireCenterView: true,
+    });
+    expect(mocks.openWorkbenchWidget.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.revealLayerProperties.mock.invocationCallOrder[0]!
+    );
+  });
+
+  it('reports a new control layer as an import, and a refusal without moving the layout', async () => {
+    mocks.getProject.mockImplementation((id: string) => makeMockProject(id));
+    mocks.sendGalleryImageAsControl.mockResolvedValueOnce({ layerId: 'control-2', status: 'created' });
+
+    await act(() => actionsRef.current!.sendImageAsControl(galleryImage('a.png')));
+
+    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith({
+      kind: 'success',
+      title: 'widgets.canvas.import.success',
+    });
+    expect(mocks.revealLayerProperties).toHaveBeenLastCalledWith('control-2');
+
+    mocks.revealLayerProperties.mockClear();
+    mocks.openWorkbenchWidget.mockClear();
+    mocks.sendGalleryImageAsControl.mockResolvedValueOnce({ status: 'blocked' });
+    await act(() => actionsRef.current!.sendImageAsControl(galleryImage('a.png')));
+
+    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith({ kind: 'info', title: 'widgets.canvas.import.blocked' });
+    expect(mocks.revealLayerProperties).not.toHaveBeenCalled();
     expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
   });
 });
@@ -567,7 +679,7 @@ describe('load workflow from image', () => {
 
   it('hands the embedded workflow to the editor and opens it', async () => {
     mocks.imageWorkflow.mockResolvedValueOnce({
-      graph: null,
+      graph: 'invalid graph ignored when an authored workflow exists',
       workflow: JSON.stringify({ name: 'Embedded', nodes: [] }),
     });
 
@@ -583,6 +695,110 @@ describe('load workflow from image', () => {
       { name: 'Embedded', nodes: [] },
       'widgets.gallery.itemActions.loadWorkflow.loadedLabel:Embedded'
     );
+    expect(mocks.getInvocationTemplatesSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('loads the stored generation graph when the image has no authored workflow', async () => {
+    mocks.getInvocationTemplatesSnapshot.mockReturnValueOnce({ error: null, status: 'idle', templates: {} });
+    mocks.imageWorkflow.mockResolvedValueOnce({
+      graph: JSON.stringify({
+        id: 'generated',
+        nodes: { seed: { id: 'seed', type: 'integer', value: 42 } },
+        edges: [],
+      }),
+      workflow: null,
+    });
+
+    await act(async () => {
+      await actionsRef.current?.loadImageWorkflow({ ...image, hasWorkflow: true });
+    });
+
+    expect(mocks.notificationsAdd.mock.calls).toEqual([]);
+    expect(mocks.requestWorkflowDocumentLoad).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nodes: [
+          expect.objectContaining({
+            id: 'seed',
+            data: expect.objectContaining({
+              type: 'integer',
+              inputs: { value: expect.objectContaining({ value: 42 }) },
+            }),
+          }),
+        ],
+      }),
+      expect.any(String)
+    );
+    expect(mocks.openWorkbenchWidget).toHaveBeenCalled();
+    expect(mocks.refreshInvocationTemplates).toHaveBeenCalledOnce();
+  });
+
+  it.each(['{', JSON.stringify({ nodes: [], edges: [] }), JSON.stringify({ nodes: {}, edges: [] })])(
+    'reports an unusable generation graph without opening the editor: %s',
+    async (graph) => {
+      mocks.imageWorkflow.mockResolvedValueOnce({ graph, workflow: null });
+
+      await act(async () => {
+        await actionsRef.current?.loadImageWorkflow(image);
+      });
+
+      expect(mocks.requestWorkflowDocumentLoad).not.toHaveBeenCalled();
+      expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
+      expect(mocks.notificationsAdd).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'error', title: 'widgets.gallery.itemActions.loadWorkflow.failed' })
+      );
+    }
+  );
+
+  it.each(['account', 'project'] as const)(
+    'does not load the graph after the %s changes while templates load',
+    async (changedOwner) => {
+      mocks.imageWorkflow.mockResolvedValueOnce({
+        graph: JSON.stringify({ nodes: { seed: { id: 'seed', type: 'integer', value: 42 } }, edges: [] }),
+        workflow: null,
+      });
+      mocks.getInvocationTemplatesSnapshot.mockReturnValueOnce({ status: 'idle', templates: {}, error: null });
+      let finishLoading!: () => void;
+      mocks.refreshInvocationTemplates.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finishLoading = resolve;
+          })
+      );
+
+      const pendingLoad = actionsRef.current!.loadImageWorkflow(image);
+      await vi.waitFor(() => expect(mocks.refreshInvocationTemplates).toHaveBeenCalled());
+
+      await act(async () => {
+        if (changedOwner === 'account') {
+          accountLifecycle.activate('user-b');
+        } else {
+          mocks.isActiveProject.mockReturnValue(false);
+        }
+        finishLoading();
+        await pendingLoad;
+      });
+
+      expect(mocks.requestWorkflowDocumentLoad).not.toHaveBeenCalled();
+      expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
+      expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+    }
+  );
+
+  it('reports a template load failure instead of opening an empty workflow', async () => {
+    mocks.imageWorkflow.mockResolvedValueOnce({
+      graph: JSON.stringify({ nodes: { seed: { id: 'seed', type: 'integer', value: 42 } }, edges: [] }),
+      workflow: null,
+    });
+    mocks.getInvocationTemplatesSnapshot.mockReturnValue({ status: 'error', templates: {}, error: 'Offline' });
+
+    await act(async () => {
+      await actionsRef.current?.loadImageWorkflow(image);
+    });
+
+    expect(mocks.refreshInvocationTemplates).toHaveBeenCalledOnce();
+    expect(mocks.requestWorkflowDocumentLoad).not.toHaveBeenCalled();
+    expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith(expect.objectContaining({ kind: 'error', message: 'Offline' }));
   });
 
   it('says so, and leaves the editor alone, when the image embeds no workflow', async () => {
@@ -595,6 +811,261 @@ describe('load workflow from image', () => {
     expect(mocks.notificationsAdd).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'info', title: 'widgets.gallery.itemActions.loadWorkflow.missing' })
     );
+  });
+});
+
+describe('generate PBR maps', () => {
+  const image: GalleryImage = {
+    boardId: 'none',
+    height: 512,
+    imageCategory: 'general',
+    imageName: 'texture.png',
+    imageUrl: '/full/texture.png',
+    queuedAt: '2026-07-30T00:00:00.000Z',
+    sourceQueueItemId: 'backend-gallery',
+    starred: false,
+    thumbnailUrl: '/thumb/texture.png',
+    width: 512,
+  };
+  const createSettlement = () => {
+    let resolve!: () => void;
+    let reject!: (error: unknown) => void;
+    const settled = new Promise<void>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { reject, resolve, settled };
+  };
+
+  it('queues one pbr_maps graph into the project auto-add board, then refreshes the gallery when it completes', async () => {
+    const settlement = createSettlement();
+    mocks.getSnapshot.mockImplementation(() => {
+      const project = makeMockProject('project-1', {
+        autoAddBoardId: 'board-materials',
+        selectedBoardId: 'board-other',
+      });
+
+      return { activeProject: project, projects: [project] };
+    });
+    mocks.submitUtilityGraph.mockResolvedValueOnce({ itemIds: [41], origin: 'utility:1', settled: settlement.settled });
+
+    await act(async () => {
+      await actionsRef.current?.generatePbrMaps(image);
+    });
+
+    expect(mocks.submitUtilityGraph).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        prepend: true,
+        signal: expect.any(AbortSignal),
+        graph: expect.objectContaining({
+          nodes: {
+            pbr_maps: expect.objectContaining({
+              board: { board_id: 'board-materials' },
+              image: { image_name: 'texture.png' },
+              is_intermediate: false,
+              type: 'pbr_maps',
+            }),
+          },
+        }),
+      })
+    );
+    expect(mocks.notificationsAdd).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ kind: 'success', title: 'widgets.gallery.itemActions.pbrMaps.queued' })
+    );
+    expect(mocks.invalidateGallery).not.toHaveBeenCalled();
+
+    await act(async () => {
+      settlement.resolve();
+      await settlement.settled;
+    });
+
+    expect(mocks.invalidateGallery).toHaveBeenCalledTimes(1);
+    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith(
+      expect.objectContaining({ kind: 'success', title: 'widgets.gallery.itemActions.pbrMaps.completed' })
+    );
+  });
+
+  it('leaves the maps Uncategorized while the gallery follows no board', async () => {
+    mocks.getSnapshot.mockImplementation(() => {
+      const project = makeMockProject('project-1', { autoAddBoardId: 'none' });
+
+      return { activeProject: project, projects: [project] };
+    });
+    mocks.submitUtilityGraph.mockResolvedValueOnce({
+      itemIds: [42],
+      origin: 'utility:2',
+      settled: new Promise(() => {}),
+    });
+
+    await act(async () => {
+      await actionsRef.current?.generatePbrMaps(image);
+    });
+
+    const [request] = mocks.submitUtilityGraph.mock.calls[0] as [{ graph: { nodes: Record<string, unknown> } }];
+    expect(request.graph.nodes.pbr_maps).not.toHaveProperty('board');
+  });
+
+  it('waits for board permissions and leaves maps in the inbox when the destination is refused', async () => {
+    mocks.getSnapshot.mockImplementation(() => {
+      const project = makeMockProject('project-1', { autoAddBoardId: 'view-only' });
+
+      return { activeProject: project, projects: [project] };
+    });
+    const listing = createSettlement();
+    mocks.ensureGalleryBoardDestinations.mockReturnValueOnce(listing.settled);
+    mocks.canAddToCachedGalleryBoard.mockReturnValueOnce(false);
+    mocks.submitUtilityGraph.mockResolvedValueOnce({
+      itemIds: [48],
+      origin: 'utility:8',
+      settled: new Promise(() => {}),
+    });
+
+    await act(async () => {
+      const submission = actionsRef.current?.generatePbrMaps(image);
+
+      expect(mocks.submitUtilityGraph).not.toHaveBeenCalled();
+      listing.resolve();
+      await submission;
+    });
+
+    const [request] = mocks.submitUtilityGraph.mock.calls[0] as [{ graph: { nodes: Record<string, unknown> } }];
+    expect(request.graph.nodes.pbr_maps).not.toHaveProperty('board');
+    expect(mocks.canAddToCachedGalleryBoard).toHaveBeenCalledWith('view-only', expect.any(QueryClient));
+  });
+
+  it('does not submit if the account changes while board permissions load', async () => {
+    const listing = createSettlement();
+    mocks.ensureGalleryBoardDestinations.mockReturnValueOnce(listing.settled);
+
+    await act(async () => {
+      const submission = actionsRef.current?.generatePbrMaps(image);
+
+      accountLifecycle.activate('user-b');
+      listing.resolve();
+      await submission;
+    });
+
+    expect(mocks.submitUtilityGraph).not.toHaveBeenCalled();
+    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+  });
+
+  it('reports an enqueue failure and a failed run as logged PBR error notices', async () => {
+    const { UtilityQueueError } = await import('@features/queue/utility');
+    clearLogs();
+    // The runtime wraps the backend's JSON refusal as an ApiError cause and derives the readable message the way
+    // `submitUtilityGraph` does; the toast must show that detail, never the JSON.
+    const cause = new ApiError(JSON.stringify({ detail: 'queue paused' }), 409);
+    mocks.submitUtilityGraph.mockRejectedValueOnce(
+      new UtilityQueueError('enqueue', getApiErrorMessage(cause, 'Failed to enqueue utility graph.'), cause)
+    );
+
+    await act(async () => {
+      await actionsRef.current?.generatePbrMaps(image);
+    });
+
+    expect(mocks.notificationsAdd).toHaveBeenCalledExactlyOnceWith({
+      kind: 'error',
+      message: 'queue paused',
+      title: 'widgets.gallery.itemActions.pbrMaps.failed',
+    });
+
+    const settlement = createSettlement();
+    mocks.submitUtilityGraph.mockResolvedValueOnce({ itemIds: [43], origin: 'utility:3', settled: settlement.settled });
+    await act(async () => {
+      await actionsRef.current?.generatePbrMaps(image);
+    });
+    await act(async () => {
+      settlement.reject(new UtilityQueueError('failed', 'No PBR model'));
+      await settlement.settled.catch(() => {});
+    });
+
+    // A run that fails after it was queued names the action, as an enqueue failure does.
+    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith({
+      kind: 'error',
+      message: 'No PBR model',
+      title: 'widgets.gallery.itemActions.pbrMaps.failed',
+    });
+    expect(mocks.reportError).not.toHaveBeenCalled();
+    expect(
+      getLogSnapshot()
+        .entries.filter((entry) => entry.source.area === 'image-actions')
+        .map(({ level, message, namespace }) => ({ level, message, namespace }))
+    ).toEqual([
+      { level: 'error', message: 'No PBR model', namespace: 'gallery' },
+      { level: 'error', message: 'queue paused', namespace: 'gallery' },
+    ]);
+    expect(mocks.invalidateGallery).not.toHaveBeenCalled();
+  });
+
+  it('turns a canceled or removed item into an info notice, and says nothing once the watch is aborted', async () => {
+    const { UtilityQueueError } = await import('@features/queue/utility');
+    const canceled = createSettlement();
+    mocks.submitUtilityGraph.mockResolvedValueOnce({ itemIds: [44], origin: 'utility:4', settled: canceled.settled });
+    await act(async () => {
+      await actionsRef.current?.generatePbrMaps(image);
+    });
+    await act(async () => {
+      canceled.reject(new UtilityQueueError('canceled', 'The utility graph was canceled.'));
+      await canceled.settled.catch(() => {});
+    });
+
+    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith(
+      expect.objectContaining({ kind: 'info', title: 'widgets.gallery.itemActions.pbrMaps.canceled' })
+    );
+    expect(mocks.reportError).not.toHaveBeenCalled();
+
+    // A queue clear deletes a pending item without a terminal event; the watch reports it as removed.
+    const removed = createSettlement();
+    mocks.submitUtilityGraph.mockResolvedValueOnce({ itemIds: [47], origin: 'utility:7', settled: removed.settled });
+    await act(async () => {
+      await actionsRef.current?.generatePbrMaps(image);
+    });
+    await act(async () => {
+      removed.reject(new UtilityQueueError('removed', 'The utility graph item was removed from the queue.'));
+      await removed.settled.catch(() => {});
+    });
+
+    expect(mocks.notificationsAdd).toHaveBeenLastCalledWith({
+      kind: 'info',
+      message: 'widgets.gallery.itemActions.pbrMaps.removedMessage',
+      title: 'widgets.gallery.itemActions.pbrMaps.removed',
+    });
+    // The maps may already be in the gallery if the item completed before it was pruned.
+    expect(mocks.invalidateGallery).toHaveBeenCalledTimes(1);
+    expect(mocks.reportError).not.toHaveBeenCalled();
+
+    const aborted = createSettlement();
+    mocks.notificationsAdd.mockClear();
+    mocks.submitUtilityGraph.mockResolvedValueOnce({ itemIds: [45], origin: 'utility:5', settled: aborted.settled });
+    await act(async () => {
+      await actionsRef.current?.generatePbrMaps(image);
+    });
+    await act(async () => {
+      aborted.reject(new UtilityQueueError('aborted', 'The utility graph watch was aborted.'));
+      await aborted.settled.catch(() => {});
+    });
+
+    expect(mocks.notificationsAdd).toHaveBeenCalledTimes(1);
+    expect(mocks.reportError).not.toHaveBeenCalled();
+  });
+
+  it('suppresses every notice when the account changes while the graph is being accepted', async () => {
+    const settlement = createSettlement();
+    mocks.submitUtilityGraph.mockImplementationOnce(() => {
+      accountLifecycle.activate('user-b');
+      return Promise.resolve({ itemIds: [46], origin: 'utility:6', settled: settlement.settled });
+    });
+
+    await act(async () => {
+      await actionsRef.current?.generatePbrMaps(image);
+    });
+    await act(async () => {
+      settlement.resolve();
+      await settlement.settled;
+    });
+
+    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+    expect(mocks.invalidateGallery).not.toHaveBeenCalled();
   });
 });
 

@@ -9,10 +9,9 @@ import type {
 } from '@workbench/canvas-engine/api';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
-import { createDocumentModel } from '@workbench/canvas-engine/api';
+import { createControlLayer, createDocumentModel } from '@workbench/canvas-engine/api';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
-import { createControlLayer } from '@workbench/widgets/layers/layerOps';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import { executeCanvasHotkeyCommand, type CanvasHotkeyContext } from './canvasHotkeyCommands';
@@ -46,6 +45,7 @@ const createEngine = (interaction: Partial<CanvasInteractionState> = {}) => {
     activeTool: 'brush',
     hasSelection: false,
     lassoOptions: { shape: 'freehand' },
+    layerQuickSwitch: { bookmarkedLayerId: null, previousLayerId: null },
     marqueeOptions: { kind: 'rect' },
     ...interaction,
   };
@@ -77,7 +77,7 @@ const createEngine = (interaction: Partial<CanvasInteractionState> = {}) => {
           status: 'duplicated',
         })
       ),
-      mergeLayerDown: vi.fn((): MergeDownResult => 'merged'),
+      mergeLayerDown: vi.fn((): Promise<MergeDownResult> => Promise.resolve('merged')),
       nudgeSelectedLayer: vi.fn(() => ({ status: 'committed' as const })),
     },
     selection: {
@@ -155,11 +155,86 @@ describe('staging precedence', () => {
     expect(engine.layers.commitPrepared).not.toHaveBeenCalled();
     expect(engine.selection.eraseSelection).not.toHaveBeenCalled();
   });
+});
 
-  it('prevEntity does nothing at all without staging slots', () => {
-    const engine = run('canvas.prevEntity');
+describe('layer navigation without staging', () => {
+  const select = (id: string): CanvasProjectMutation => ({ id, type: 'setCanvasSelectedLayer' });
+  // Document order puts the control stack above the raster stack: b, a, c.
+  const layers = [rasterLayer('a'), createControlLayer({ id: 'b', name: 'Control' }), rasterLayer('c')];
+
+  it.each([
+    ['canvas.nextEntity', 'a', 'c'],
+    ['canvas.nextEntity', 'c', 'b'],
+    ['canvas.prevEntity', 'b', 'c'],
+    ['canvas.prevEntity', 'a', 'b'],
+  ] as const)('%s from %s selects %s, wrapping across every layer kind in layer order', (commandId, from, to) => {
+    const engine = run(commandId, { document: documentOf(layers, from), selectedLayerIds: [from] });
+    expect(dispatch).toHaveBeenCalledExactlyOnceWith(select(to));
+    expect(engine.layers.nudgeSelectedLayer).not.toHaveBeenCalled();
+  });
+
+  it('starts from either end when nothing is selected, and does nothing without layers', () => {
+    run('canvas.nextEntity', { document: documentOf(layers, null), selectedLayerIds: [] });
+    expect(dispatch).toHaveBeenLastCalledWith(select('b'));
+    run('canvas.prevEntity', { document: documentOf(layers, null), selectedLayerIds: [] });
+    expect(dispatch).toHaveBeenLastCalledWith(select('c'));
+    dispatch.mockClear();
+    run('canvas.nextEntity', { document: documentOf([], null), selectedLayerIds: [] });
     expect(dispatch).not.toHaveBeenCalled();
-    expect(engine.tools.setTool).not.toHaveBeenCalled();
+  });
+
+  it('enters a selected group at its first leaf and leaves it upward, skipping an empty group to the ends', () => {
+    const grouped = {
+      ...documentOf([], 'g'),
+      stacks: stacksFrom([
+        rasterLayer('a'),
+        groupContract('g', [rasterLayer('b'), rasterLayer('c')]),
+        rasterLayer('d'),
+      ]),
+    };
+    run('canvas.nextEntity', { document: grouped, selectedLayerIds: ['g'] });
+    expect(dispatch).toHaveBeenLastCalledWith(select('b'));
+    run('canvas.prevEntity', { document: grouped, selectedLayerIds: ['g'] });
+    expect(dispatch).toHaveBeenLastCalledWith(select('a'));
+
+    const empty = {
+      ...documentOf([], 'g'),
+      stacks: stacksFrom([rasterLayer('a'), groupContract('g'), rasterLayer('d')]),
+    };
+    run('canvas.nextEntity', { document: empty, selectedLayerIds: ['g'] });
+    expect(dispatch).toHaveBeenLastCalledWith(select('a'));
+    run('canvas.prevEntity', { document: empty, selectedLayerIds: ['g'] });
+    expect(dispatch).toHaveBeenLastCalledWith(select('d'));
+  });
+
+  it('stays put on the only layer and while interaction is locked', () => {
+    run('canvas.nextEntity', { document: documentOf([rasterLayer('a')], 'a') });
+    run('canvas.prevEntity', { document: documentOf(layers, 'a'), isInteractionLocked: true });
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('quick switch prefers the bookmark, falls back to the previous selection, and skips missing layers', () => {
+    const quickSwitch = (bookmarkedLayerId: string | null, previousLayerId: string | null, selected: string) =>
+      run('canvas.quickSwitch', {
+        document: documentOf(layers, selected),
+        engine: createEngine({ layerQuickSwitch: { bookmarkedLayerId, previousLayerId } }),
+        selectedLayerIds: [selected],
+      });
+
+    quickSwitch('c', 'b', 'a');
+    expect(dispatch).toHaveBeenLastCalledWith(select('c'));
+    // On the bookmark already: back to the previous layer.
+    quickSwitch('c', 'a', 'c');
+    expect(dispatch).toHaveBeenLastCalledWith(select('a'));
+    // A bookmark whose layer was removed is skipped, not an empty selection.
+    quickSwitch('gone', 'b', 'a');
+    expect(dispatch).toHaveBeenLastCalledWith(select('b'));
+    dispatch.mockClear();
+    quickSwitch(null, null, 'a');
+    quickSwitch(null, 'a', 'a');
+    quickSwitch('gone', 'gone', 'a');
+    executeCanvasHotkeyCommand('canvas.quickSwitch', contextOf({ engine: null }));
+    expect(dispatch).not.toHaveBeenCalled();
   });
 });
 
@@ -510,12 +585,12 @@ describe('mergeDown', () => {
     expect(engine.layers.mergeLayerDown).not.toHaveBeenCalled();
   });
 
-  it('reports a merge the engine refused', () => {
+  it('reports a merge the engine refused', async () => {
     const engine = createEngine();
-    engine.layers.mergeLayerDown.mockReturnValue('over-budget');
+    engine.layers.mergeLayerDown.mockResolvedValue('over-budget');
     const reportLayerOperation = vi.fn();
     executeCanvasHotkeyCommand('canvas.mergeDown', contextOf({ engine, reportLayerOperation }));
-    expect(reportLayerOperation).toHaveBeenCalledExactlyOnceWith('over-budget');
+    await vi.waitFor(() => expect(reportLayerOperation).toHaveBeenCalledExactlyOnceWith('over-budget'));
   });
 });
 
@@ -583,7 +658,7 @@ describe('group selection', () => {
     ...documentOf([], selectedLayerId),
     stacks: stacksFrom(nodes),
   });
-  const control = (id: string): CanvasLayerContract => createControlLayer(id, id);
+  const control = (id: string): CanvasLayerContract => createControlLayer({ id, name: id });
 
   it('reorders, deletes and duplicates a selected group', () => {
     const document = nodeDocument([groupContract('g', [rasterLayer('a')]), rasterLayer('b')], 'g');

@@ -24,15 +24,21 @@ import {
   ArrowDownToLineIcon,
   ArrowUpIcon,
   ArrowUpToLineIcon,
+  BookmarkIcon,
+  BookmarkMinusIcon,
   CircleIcon,
   CircleOffIcon,
   CopyIcon,
   CropIcon,
   DropletIcon,
   EyeIcon,
+  FilmIcon,
+  FingerprintPatternIcon,
+  FocusIcon,
   EyeOffIcon,
   FolderPlusIcon,
   GaugeIcon,
+  HazeIcon,
   ImageIcon,
   ImagePlusIcon,
   LockIcon,
@@ -67,6 +73,10 @@ export type LayerContextActionId =
   | 'add-hsl'
   | 'add-hue'
   | 'add-invert'
+  | 'add-texture'
+  | 'add-clarity'
+  | 'add-dehaze'
+  | 'add-noise-adjustment'
   | 'merge-selected'
   | 'move-to-front'
   | 'move-forward'
@@ -77,19 +87,19 @@ export type LayerContextActionId =
   | 'rename'
   | 'transform'
   | 'fit-to-bbox'
-  | 'save-to-assets'
+  | 'save-to-board'
   | 'copy-to-clipboard'
   | 'crop-to-bbox'
   | 'extract-masked-area'
   | 'filter'
   | 'select-object'
   | 'run-workflow'
+  | 'use-as-control-layer'
   | 'intersect'
   | 'cutout'
   | 'cutaway'
   | 'exclude'
   | 'copy-to-raster'
-  | 'copy-to-control'
   | 'copy-to-inpaint-mask'
   | 'copy-to-regional-guidance'
   | 'rasterize'
@@ -103,6 +113,7 @@ export type LayerContextActionId =
   | 'toggle-visibility'
   | 'toggle-hidden'
   | 'toggle-lock'
+  | 'bookmark-quick-switch'
   | 'color-label-none'
   | `color-label-${CanvasColorLabel}`
   | 'delete';
@@ -131,6 +142,8 @@ export interface LayerContextActionState {
   canMergeSelection: boolean;
   /** A group above the layer hides it on the canvas; the layer's own flag cannot override that. */
   hiddenByAncestor: boolean;
+  /** Whether Q jumps to this layer: the engine's transient quick-switch bookmark names it. */
+  isQuickSwitchBookmark: boolean;
 }
 
 export interface LayerContextActionEffects {
@@ -145,32 +158,41 @@ export interface LayerContextActionEffects {
   transform(): void;
   fitToBbox(): void;
   openProperties(): void;
-  saveToAssets(): Promise<void>;
+  saveToBoard(board: LayerContextBoardChoice): Promise<void>;
   copyToClipboard(): Promise<void>;
   cropToBbox(): Promise<void>;
   extractMaskedArea(): Promise<void>;
   booleanMerge(operation: BooleanRasterOperation): Promise<void>;
   copyTo(target: LayerType): void | Promise<void>;
-  rasterize(): void;
-  convertTo(target: LayerType): void;
+  rasterize(): Promise<void>;
+  convertTo(target: LayerType): void | Promise<void>;
   patchConfig(kind: LayerConfigPatchKind): void;
   addReferenceImage(): void;
   addMaskModifier(field: 'noise' | 'denoise'): void;
   addAdjustment(type: CanvasAdjustmentEntry['type']): void;
   addLayerRegion(): void;
   setColorLabel(label: CanvasColorLabel | null): void;
-  mergeDown(): void;
+  mergeDown(): Promise<void>;
   toggleVisibility(): void;
   toggleHidden(): void;
   toggleLock(): void;
+  toggleQuickSwitchBookmark(): void;
   delete(): void;
+}
+
+/** A gallery board picked in a `picker: 'board'` action's submenu; `id` is `'none'` for Uncategorized. */
+export interface LayerContextBoardChoice {
+  id: string;
+  label: string;
 }
 
 export interface LayerContextActionRuntimeContext extends LayerContextActionState {
   effects: LayerContextActionEffects;
+  /** The board a `picker: 'board'` action runs with; absent for every other action. */
+  board?: LayerContextBoardChoice;
 }
 
-export interface LayerContextActionDefinition {
+interface LayerContextActionDefinitionBase {
   id: LayerContextActionId;
   labelKey: string;
   defaultLabel: string;
@@ -179,7 +201,6 @@ export interface LayerContextActionDefinition {
   /** CSS color for the item's icon (label swatches); the theme tone otherwise. */
   iconColor?: string;
   section: LayerContextMenuSectionId;
-  submenu?: LayerContextSubmenuId;
   order: number;
   supportedLayerTypes: readonly LayerType[];
   tone?: 'danger';
@@ -194,6 +215,17 @@ export interface LayerContextActionDefinition {
   getLabelCount?(context: LayerContextActionState): number;
 }
 
+/**
+ * A picker action is its own submenu, so it cannot also sit in a static one: there it would render as a plain item
+ * that runs without a board.
+ */
+export type LayerContextActionDefinition = LayerContextActionDefinitionBase &
+  (
+    | { picker?: never; submenu?: LayerContextSubmenuId }
+    /** Renders the action as a submenu of the account's gallery boards; the chosen board runs it. */
+    | { picker: 'board'; submenu?: never }
+  );
+
 export interface LayerContextAction {
   id: LayerContextActionId;
   labelKey: string;
@@ -203,6 +235,7 @@ export interface LayerContextAction {
   iconColor?: string;
   section: LayerContextMenuSectionId;
   submenu?: LayerContextSubmenuId;
+  picker?: 'board';
   order: number;
   tone?: 'danger';
   hint?: string;
@@ -213,13 +246,15 @@ export interface LayerContextAction {
 export type LayerConfigPatchKind = 'control-transparency-effect' | 'regional-auto-negative';
 
 const ALL_LAYER_TYPES = ['raster', 'control', 'inpaint_mask', 'regional_guidance'] as const;
-/** The one add-adjustment catalog; the leaf action registry and the group menu both render from it. */
-export const ADJUSTMENT_ADD_ITEMS: readonly {
+type AdjustmentAddItem = {
   readonly defaultLabel: string;
   readonly icon: LucideIcon;
   readonly labelKey: string;
   readonly type: CanvasAdjustmentEntry['type'];
-}[] = [
+};
+
+/** The one add-adjustment catalog; the leaf action registry and the group menu both render from it. */
+export const ADJUSTMENT_ADD_ITEMS: readonly AdjustmentAddItem[] = [
   {
     defaultLabel: 'Brightness/Contrast',
     icon: SunMediumIcon,
@@ -232,7 +267,21 @@ export const ADJUSTMENT_ADD_ITEMS: readonly {
   { defaultLabel: 'Saturation', icon: DropletIcon, labelKey: 'widgets.layers.adjustments.saturation', type: 'hsl' },
   { defaultLabel: 'Hue', icon: RainbowIcon, labelKey: 'widgets.layers.adjustments.hue', type: 'hue' },
   { defaultLabel: 'Invert', icon: ContrastIcon, labelKey: 'widgets.layers.adjustments.invert', type: 'invert' },
+  // Detail adjustments, finest scale first.
+  {
+    defaultLabel: 'Texture',
+    icon: FingerprintPatternIcon,
+    labelKey: 'widgets.layers.adjustments.texture',
+    type: 'texture',
+  },
+  { defaultLabel: 'Clarity', icon: FocusIcon, labelKey: 'widgets.layers.adjustments.clarity', type: 'clarity' },
+  { defaultLabel: 'Dehaze', icon: HazeIcon, labelKey: 'widgets.layers.adjustments.dehaze', type: 'dehaze' },
+  { defaultLabel: 'Noise', icon: FilmIcon, labelKey: 'widgets.layers.adjustments.noise', type: 'noise' },
 ];
+
+/** An add-adjustment item's action id; noise is suffixed because `add-noise` is the inpaint mask's modifier. */
+export const adjustmentAddActionId = (item: AdjustmentAddItem): LayerContextActionId =>
+  item.type === 'noise' ? 'add-noise-adjustment' : (`add-${item.type}` as LayerContextActionId);
 
 const RASTER_ONLY = ['raster'] as const;
 const CONTROL_ONLY = ['control'] as const;
@@ -458,7 +507,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     defaultLabel: item.defaultLabel,
     handler: ({ effects }) => effects.addAdjustment(item.type),
     icon: item.icon,
-    id: `add-${item.type}` as LayerContextActionId,
+    id: adjustmentAddActionId(item),
     isEnabled: isLayerMutable,
     isVisible: alwaysVisible,
     labelKey: item.labelKey,
@@ -477,7 +526,8 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     labelKey: 'widgets.layers.control.filter',
     order: 40,
     section: 'primary',
-    supportedLayerTypes: RASTER_AND_CONTROL,
+    // A control layer's map comes from its Detection row; the Filter operation refuses control layers.
+    supportedLayerTypes: RASTER_ONLY,
   },
   {
     defaultLabel: 'Select object',
@@ -502,6 +552,19 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     order: 42,
     section: 'primary',
     supportedLayerTypes: RASTER_AND_CONTROL,
+  },
+  {
+    // Copies the pixels into a new control layer, whose Properties then ask what it should control.
+    defaultLabel: 'Use as control layer',
+    handler: ({ effects }) => effects.copyTo('control'),
+    icon: SlidersHorizontalIcon,
+    id: 'use-as-control-layer',
+    isEnabled: hasReadablePixels,
+    isVisible: (context) => isPixelBackedLayer(context.layer),
+    labelKey: 'widgets.layers.actions.useAsControlLayer',
+    order: 43,
+    section: 'primary',
+    supportedLayerTypes: RASTER_ONLY,
   },
   {
     defaultLabel: 'Toggle transparency effect',
@@ -706,19 +769,6 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     supportedLayerTypes: ['control', 'inpaint_mask', 'regional_guidance'],
   },
   {
-    defaultLabel: 'Copy to control layer',
-    handler: ({ effects }) => effects.copyTo('control'),
-    icon: CopyIcon,
-    id: 'copy-to-control',
-    isEnabled: hasReadablePixels,
-    isVisible: (context) => isPixelBackedLayer(context.layer),
-    labelKey: 'widgets.layers.actions.copyToControl',
-    order: 22,
-    section: 'operations',
-    submenu: 'copy-to',
-    supportedLayerTypes: RASTER_ONLY,
-  },
-  {
     defaultLabel: 'Copy to inpaint mask',
     handler: ({ effects }) => effects.copyTo('inpaint_mask'),
     icon: CopyIcon,
@@ -822,14 +872,20 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
   {
-    defaultLabel: 'Save layer to uploads',
-    handler: ({ effects }) => effects.saveToAssets(),
+    defaultLabel: 'Save layer to board',
+    handler: ({ board, effects }) => {
+      if (!board) {
+        throw new Error('Save layer to board runs with a chosen board');
+      }
+      return effects.saveToBoard(board);
+    },
     icon: SaveIcon,
-    id: 'save-to-assets',
+    id: 'save-to-board',
     isEnabled: hasReadablePixels,
     isVisible: alwaysVisible,
-    labelKey: 'widgets.layers.actions.saveLayerToAssets',
+    labelKey: 'widgets.layers.actions.saveLayerToBoard',
     order: 10,
+    picker: 'board',
     section: 'output',
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
@@ -907,6 +963,27 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     section: 'state',
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
+  // The bookmark is a transient engine preference, so a locked layer still takes one.
+  {
+    defaultLabel: 'Bookmark for quick switch',
+    getDefaultLabel: (context) =>
+      context.isQuickSwitchBookmark ? 'Remove quick switch bookmark' : 'Bookmark for quick switch',
+    getIcon: (context) => (context.isQuickSwitchBookmark ? BookmarkMinusIcon : BookmarkIcon),
+    getLabelKey: (context) =>
+      context.isQuickSwitchBookmark
+        ? 'widgets.layers.actions.removeQuickSwitchBookmark'
+        : 'widgets.layers.actions.bookmarkForQuickSwitch',
+    handler: ({ effects }) => effects.toggleQuickSwitchBookmark(),
+    hint: 'q',
+    icon: BookmarkIcon,
+    id: 'bookmark-quick-switch',
+    isEnabled: isInteractionFree,
+    isVisible: (context) => context.hasEngine,
+    labelKey: 'widgets.layers.actions.bookmarkForQuickSwitch',
+    order: 12,
+    section: 'state',
+    supportedLayerTypes: ALL_LAYER_TYPES,
+  },
   // Color labels are organizational, so a locked layer still takes one.
   ...COLOR_LABEL_ITEMS.map((item, index): LayerContextActionDefinition => ({
     defaultLabel: item.defaultLabel,
@@ -976,6 +1053,7 @@ export const getLayerContextActions = (context: LayerContextActionState): LayerC
     labelCount: definition.getLabelCount?.(context),
     labelKey: definition.getLabelKey?.(context) ?? definition.labelKey,
     order: definition.order,
+    picker: definition.picker,
     section: definition.section,
     submenu: definition.submenu,
     tone: definition.tone,

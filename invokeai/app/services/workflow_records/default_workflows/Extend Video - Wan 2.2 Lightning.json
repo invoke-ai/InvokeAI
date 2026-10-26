@@ -564,7 +564,7 @@
       "type": "invocation",
       "data": {
         "id": "4b32c22b-679d-4d5e-a167-c3309265fcd9",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "Joins the source clip and the generated continuation. Size Mismatch is 'match_first', so the generated clip is resampled onto the source clip's canvas -- the model renders onto its own fixed canvas family and will rarely match your footage, and without this the join fails outright. Your source keeps its own resolution; the generated segment is the part that gets rescaled.",
@@ -609,6 +609,12 @@
             "label": "",
             "description": "",
             "value": "match_first"
+          },
+          "smart_render": {
+            "name": "smart_render",
+            "label": "",
+            "description": "",
+            "value": true
           }
         },
         "isOpen": true,

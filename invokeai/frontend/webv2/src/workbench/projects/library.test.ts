@@ -1,10 +1,12 @@
 import type { BrowserLockResult } from '@platform/browser/webLocks';
 import type * as accountLifecycleModule from '@platform/state/accountLifecycle';
 
+import { MAX_SUPPORTED_CANVAS_SCHEMA_VERSION } from '@workbench/canvasSchemaVersion';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as libraryModule from './library';
 import type { ProjectPushOutcome } from './projectFlush';
+import type * as projectLifecycleLocksModule from './projectLifecycleLocks';
 import type * as syncStoreModule from './syncStore';
 
 const api = vi.hoisted(() => ({
@@ -37,7 +39,10 @@ const queueJournal = vi.hoisted(() => ({
 
 vi.mock('./api', () => api);
 vi.mock('./invk/duplicateProject', () => duplication);
-vi.mock('./projectLifecycleLocks', () => projectLocks);
+vi.mock('./projectLifecycleLocks', async (importOriginal) => ({
+  ...(await importOriginal<typeof projectLifecycleLocksModule>()),
+  ...projectLocks,
+}));
 vi.mock('@workbench/queue-integration/queueRunJournal', () => queueJournal);
 
 let library: typeof libraryModule;
@@ -143,12 +148,54 @@ describe('refreshProjectLibrary', () => {
 
   it('identifies summaries that require a newer canvas reader without fetching the document', async () => {
     api.listProjects.mockResolvedValue([
-      { ...summaryDto('future', 'Future', '2026-06-10 10:00:00.000'), minimum_canvas_schema_version: 5 },
+      {
+        ...summaryDto('future', 'Future', '2026-06-10 10:00:00.000'),
+        minimum_canvas_schema_version: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION + 1,
+      },
     ]);
 
     await library.refreshProjectLibrary();
 
     expect(library.isProjectSummaryCompatible(library.getProjectLibrary().summaries[0]!)).toBe(false);
+    expect(api.getProject).not.toHaveBeenCalled();
+  });
+
+  it('dates each project by when the caller last worked on it: the later of its content and their workspace', async () => {
+    api.listProjects.mockResolvedValue([
+      // Content saved last week, but the caller's own workspace saved since: worked on recently.
+      {
+        ...summaryDto('workspace', 'Workspace', '2026-06-03 10:00:00.000'),
+        workspace_updated_at: '2026-06-11 09:00:00.000',
+      },
+      {
+        ...summaryDto('content', 'Content', '2026-06-10 10:00:00.000'),
+        workspace_updated_at: '2026-06-01 10:00:00.000',
+      },
+      { ...summaryDto('none', 'None', '2026-06-09 10:00:00.000'), workspace_updated_at: null },
+    ]);
+
+    await library.refreshProjectLibrary();
+
+    const { summaries } = library.getProjectLibrary();
+    expect(summaries.map((summary) => [summary.id, summary.updatedAt])).toEqual([
+      ['workspace', '2026-06-11T09:00:00.000Z'],
+      ['content', '2026-06-10T10:00:00.000Z'],
+      ['none', '2026-06-09T10:00:00.000Z'],
+    ]);
+  });
+
+  it('identifies summaries that require a newer document reader without fetching the document', async () => {
+    api.listProjects.mockResolvedValue([
+      { ...summaryDto('split', 'Split', '2026-06-10 10:00:00.000'), minimum_document_schema_version: 4 },
+      { ...summaryDto('future', 'Future', '2026-06-10 10:00:00.000'), minimum_document_schema_version: 5 },
+    ]);
+
+    await library.refreshProjectLibrary();
+
+    const compatible = Object.fromEntries(
+      library.getProjectLibrary().summaries.map((summary) => [summary.id, library.isProjectSummaryCompatible(summary)])
+    );
+    expect(compatible).toEqual({ future: false, split: true });
     expect(api.getProject).not.toHaveBeenCalled();
   });
 
@@ -295,6 +342,42 @@ describe('library mutations', () => {
 
     expect(api.deleteProject).not.toHaveBeenCalled();
     expect(queueJournal.createAccountOwnedQueueRunJournal).not.toHaveBeenCalled();
+  });
+
+  it('deletes in this tab alone when Web Locks are unavailable, as on a plain-HTTP origin', async () => {
+    projectLocks.acquireProjectMutationLock.mockResolvedValueOnce({ kind: 'unavailable' });
+    api.deleteProject.mockResolvedValue(undefined);
+
+    await library.deleteLibraryProject('closed');
+
+    expect(api.deleteProject).toHaveBeenCalledWith('closed', expect.any(AbortSignal), 'release');
+  });
+
+  it('refuses to delete when the lock request fails although the browser has Web Locks', async () => {
+    // A secure context: other tabs can hold the lock, so a failed request is not single-tab mode.
+    vi.stubGlobal('navigator', { locks: {} });
+    projectLocks.acquireProjectMutationLock.mockResolvedValueOnce({ kind: 'unavailable' });
+
+    try {
+      await expect(library.deleteLibraryProject('closed')).rejects.toThrow('cross-tab coordination');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(api.deleteProject).not.toHaveBeenCalled();
+  });
+
+  it('still refuses without Web Locks while the project has journaled queue runs', async () => {
+    projectLocks.acquireProjectMutationLock.mockResolvedValueOnce({ kind: 'unavailable' });
+    queueJournal.createAccountOwnedQueueRunJournal.mockResolvedValueOnce({
+      close: vi.fn(),
+      deleteForProject: vi.fn(),
+      listForProject: vi.fn().mockResolvedValue({ entries: [{}], kind: 'available', removedCorrupt: 0 }),
+    });
+
+    await expect(library.deleteLibraryProject('closed')).rejects.toThrow('active queue runs');
+
+    expect(api.deleteProject).not.toHaveBeenCalled();
   });
 
   it('fails closed when durable queue runs cannot be verified', async () => {

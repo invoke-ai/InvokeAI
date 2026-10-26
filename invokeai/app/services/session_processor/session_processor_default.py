@@ -681,6 +681,7 @@ class _SessionWorker:
         self.device = device
         self.runner = runner
         self.cancel_event = ThreadEvent()
+        self.poll_now_event = ThreadEvent()
         self.queue_item: Optional[SessionQueueItem] = None
         self.thread: Optional[Thread] = None
         # Paged-out VRAM at the previous session's end and at the last warning; only this worker's thread uses them.
@@ -753,7 +754,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
         self._resume_event = ThreadEvent()
         self._stop_event = ThreadEvent()
-        self._poll_now_event = ThreadEvent()
 
         register_events(QueueClearedEvent, self._on_queue_cleared)
         register_events(BatchEnqueuedEvent, self._on_batch_enqueued)
@@ -766,7 +766,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
         # encoders on (see offload_text_encoders_to_idle_gpus). None means legacy single-device mode.
         GENERATION_DEVICE_POOL.set_generation_devices([d for d in devices if d is not None])
         # A worker that stood aside for a lent GPU re-polls as soon as that borrow ends.
-        GENERATION_DEVICE_POOL.set_release_listener(self._poll_now_event.set)
+        GENERATION_DEVICE_POOL.set_release_listener(self._poll_now)
 
         # With more than one CUDA/HIP generation device, torch's post-conv-algorithm-search global
         # emptyCache() convoys the peer GPU's in-flight step from C++, where the peer-aware
@@ -820,7 +820,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
                 kwargs={
                     "worker": worker,
                     "stop_event": self._stop_event,
-                    "poll_now_event": self._poll_now_event,
                     "resume_event": self._resume_event,
                 },
             )
@@ -835,11 +834,13 @@ class DefaultSessionProcessor(SessionProcessorBase):
         for worker in self._workers:
             worker.cancel_event.set()
         # Wake any worker sleeping in poll_now_event.wait() or blocked in resume_event.wait() (paused).
-        self._poll_now_event.set()
+        self._poll_now()
         self._resume_event.set()
 
     def _poll_now(self) -> None:
-        self._poll_now_event.set()
+        # Each consumer clears only its own notification, never another worker's wake-up.
+        for worker in self._workers:
+            worker.poll_now_event.set()
 
     async def _on_queue_cleared(self, event: FastAPIEvent[QueueClearedEvent]) -> None:
         # Cancel every worker currently running an item covered by the clear. A user-scoped
@@ -1103,7 +1104,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self,
         worker: _SessionWorker,
         stop_event: ThreadEvent,
-        poll_now_event: ThreadEvent,
         resume_event: ThreadEvent,
     ):
         try:
@@ -1126,7 +1126,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
             worker.cancel_event.clear()
 
             while not stop_event.is_set():
-                poll_now_event.clear()
+                worker.poll_now_event.clear()
 
                 # The previous item, if any, is finished with. Cleared here rather than
                 # after `run_queue_item` because the non-fatal error handler below needs it
@@ -1155,7 +1155,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     # While this GPU is lent to a borrower, a session claimed here would only wait for the
                     # borrow to end; leave the item for a free GPU. Every release wakes the workers.
                     if GENERATION_DEVICE_POOL.is_lent(worker.device):
-                        poll_now_event.wait(self._polling_interval)
+                        worker.poll_now_event.wait(self._polling_interval)
                         continue
 
                     # Get the next session to process. dequeue() atomically claims the item, so concurrent
@@ -1167,13 +1167,13 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
                     if not maintenance_inactive:
                         self._invoker.services.logger.debug("Image storage maintenance is active")
-                        poll_now_event.wait(self._polling_interval)
+                        worker.poll_now_event.wait(self._polling_interval)
                         continue
 
                     if worker.queue_item is None:
                         # The queue was empty, wait for next polling interval or event to try again
                         self._invoker.services.logger.debug("Waiting for next polling interval or event")
-                        poll_now_event.wait(self._polling_interval)
+                        worker.poll_now_event.wait(self._polling_interval)
                         continue
 
                     if device_pin_needed:
@@ -1269,7 +1269,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         error_traceback=error_traceback,
                     )
                     # Wait for next polling interval or event to try again
-                    poll_now_event.wait(self._polling_interval)
+                    worker.poll_now_event.wait(self._polling_interval)
                     continue
         except Exception as e:
             # Fatal error in this worker, log and pass - we're done here

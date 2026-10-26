@@ -506,16 +506,58 @@ describe('component policies', () => {
     ).toEqual([]);
   });
 
-  it('validates Z-Image non-anima Qwen3 and flux VAE requirements', () => {
+  describe('Z-Image Qwen3 encoder', () => {
     const model = createModel('z-image', { format: 'checkpoint' });
+    const qwen3_4b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-4b', name: 'Qwen3 4B', variant: 'qwen3_4b' };
+    const qwen3_8b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-8b', name: 'Qwen3 8B', variant: 'qwen3_8b' };
+    const source = createModel('z-image', { key: 'z-image-diffusers', format: 'diffusers' });
+    const incompatible =
+      'The selected Qwen3 Encoder is not the 4B one Z-Image conditions on. Select a Qwen3 4B Encoder or clear it.';
 
-    expect(getGenerationValidationReasons(model, createSettings(model))).toEqual([
-      'Generate needs a Qwen3 Encoder for Z-Image models.',
-      'Generate needs a VAE for Z-Image models.',
-    ]);
-    expect(
-      getGenerationValidationReasons(model, createSettings(model, { qwen3EncoderModel: qwen3Encoder, vae: fluxVae }))
-    ).toEqual([]);
+    it('requires a Qwen3 4B encoder and a FLUX VAE without a component source', () => {
+      expect(getGenerationValidationReasons(model, createSettings(model))).toEqual([
+        'Generate needs a Qwen3 4B Encoder for Z-Image models.',
+        'Generate needs a VAE for Z-Image models.',
+      ]);
+      expect(
+        getGenerationValidationReasons(model, createSettings(model, { qwen3EncoderModel: qwen3_4b, vae: fluxVae }))
+      ).toEqual([]);
+    });
+
+    it('names a saved 8B encoder as incompatible, with or without a component source to fall back on', () => {
+      expect(
+        getGenerationValidationReasons(model, createSettings(model, { qwen3EncoderModel: qwen3_8b, vae: fluxVae }))
+      ).toEqual([incompatible]);
+      expect(
+        getGenerationValidationReasons(
+          model,
+          createSettings(model, { componentSourceModel: source, qwen3EncoderModel: qwen3_8b })
+        )
+      ).toEqual([incompatible]);
+      expect(getGenerationValidationReasons(model, createSettings(model, { componentSourceModel: source }))).toEqual(
+        []
+      );
+    });
+
+    it('offers only the 4B encoder and clears an 8B one when switching to Z-Image', () => {
+      const settings = createSettings(model);
+      const slot = getComponentSectionPolicy(model, settings).slots.find((s) => s.key === 'qwen3EncoderModel');
+      const ctx = { model, selectedComponents: { ...settings }, settings };
+      const klein9b = createModel('flux2', { format: 'gguf_quantized', variant: 'klein_9b' });
+
+      expect(
+        [qwen3_4b, qwen3_8b, animaQwen3Encoder].map((encoder) => slot?.filter?.(encoder as GenerateModelConfig, ctx))
+      ).toEqual([true, false, false]);
+
+      const result = getGenerateModelSelectionResult({
+        currentValues: createSettings(klein9b, { qwen3EncoderModel: qwen3_8b, vae: fluxVae }),
+        model,
+        models: [],
+      });
+
+      expect(result.settings.qwen3EncoderModel).toBeNull();
+      expect(result.clearedLabels).toContain('Qwen3 Encoder');
+    });
   });
 
   it('offers FLUX.1 only CLIP-L encoders, the one its text encoder runs', () => {
@@ -595,6 +637,83 @@ describe('component policies', () => {
     );
   });
 
+  it('validates the external mode being compiled against the modes the model advertises', () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      capabilities: { modes: ['txt2img', 'inpaint'] },
+    };
+
+    expect(getGenerationValidationReasons(model, createSettings(model))).toEqual([]);
+    expect(getGenerationValidationReasons(model, createSettings(model), 'inpaint')).toEqual([]);
+    expect(getGenerationValidationReasons(model, createSettings(model), 'img2img')).toContain(
+      'External Model does not support image-to-image generation.'
+    );
+    // Modes default to txt2img only when the record omits them.
+    expect(
+      getGenerationValidationReasons({ ...externalModel, capabilities: null }, createSettings(externalModel), 'inpaint')
+    ).toContain('External Model does not support inpainting.');
+  });
+
+  it('accepts provider sizes off the local model grids for external generators', () => {
+    expect(getGenerationValidationReasons(externalModel, createSettings(externalModel, { width: 1365 }))).toEqual([]);
+  });
+
+  it('rejects dimensions above the provider maximum on either axis', () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      capabilities: { modes: ['txt2img'], max_image_size: { width: 2048, height: 1536 } },
+    };
+    expect(getGenerationValidationReasons(model, createSettings(model, { width: 2048, height: 1536 }))).toEqual([]);
+    for (const dimensions of [
+      { width: 2049, height: 1536 },
+      { width: 2048, height: 1537 },
+    ]) {
+      expect(getGenerationValidationReasons(model, createSettings(model, dimensions))).toContain(
+        'External Model supports a maximum size of 2048×1536.'
+      );
+    }
+  });
+
+  it('counts the canvas init and output against the Seedream total image budget', () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      provider_id: 'seedream',
+      provider_model_id: 'seedream-4-5-251128',
+      capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: true, max_reference_images: 14 },
+    };
+    const settings = createSettings(model, {
+      referenceImages: Array.from({ length: 14 }, (_, i) => ({
+        id: `reference-${i}`,
+        isEnabled: true,
+        config: {
+          type: 'external_reference_image',
+          image: {
+            imageName: `reference-${i}.png`,
+            width: 512,
+            height: 512,
+            original: { image: { image_name: `reference-${i}.png`, width: 512, height: 512 } },
+          },
+        },
+      })),
+    });
+    expect(getGenerationValidationReasons(model, settings, 'txt2img')).toEqual([]);
+    expect(getGenerationValidationReasons(model, settings, 'img2img')).toEqual([
+      'External Model supports at most 15 images total (reference + init + output), got 16.',
+    ]);
+    settings.referenceImages[0]!.isEnabled = false;
+    expect(getGenerationValidationReasons(model, settings, 'img2img')).toEqual([]);
+    settings.referenceImages[0]!.isEnabled = true;
+    // A record that does not take references sends none, so the budget counts none; the references are refused
+    // on their own terms instead.
+    const reasons = getGenerationValidationReasons(
+      { ...model, capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: false } },
+      settings,
+      'img2img'
+    );
+    expect(reasons).toContain('Reference Image #1 is not supported by external model.');
+    expect(reasons.filter((reason) => reason.includes('images total'))).toEqual([]);
+  });
+
   it('renders no component slots for bases without extra requirements', () => {
     expect(getComponentSectionPolicy(createModel('cogview4'), createSettings(createModel('cogview4'))).slots).toEqual(
       []
@@ -641,6 +760,86 @@ describe('component policies', () => {
     expect(result.settings.cfgRescaleMultiplier).toBe(0);
     expect(result.settings.seamlessXAxis).toBe(true);
     expect(result.clearedLabels).toEqual(['LoRAs', 'T5 Encoder', 'CLIP skip', 'CFG rescale']);
+  });
+
+  it('initializes a provider size on model changes while preserving supported and same-model dimensions', () => {
+    const model: GenerateModelConfig = {
+      base: 'external',
+      format: 'external_api',
+      key: 'gemini',
+      name: 'Gemini',
+      provider_id: 'gemini',
+      type: 'external_image_generator',
+      capabilities: {
+        modes: ['txt2img'],
+        resolution_presets: [
+          { aspect_ratio: '1:1', height: 1024, image_size: '1K', label: 'Square', width: 1024 },
+          { aspect_ratio: '16:9', height: 1152, image_size: '2K', label: 'Landscape', width: 2048 },
+        ],
+      },
+    };
+    const select = (settings: GenerateSettings) =>
+      getGenerateModelSelectionResult({ currentValues: settings, model, models: [] }).settings;
+
+    expect(select(createSettings(createModel('sd-1'), { height: 512, width: 512 }))).toMatchObject({
+      externalImageSize: '1K',
+      height: 1024,
+      width: 1024,
+    });
+    expect(select(createSettings(createModel('sdxl'), { height: 576, width: 1024 }))).toMatchObject({
+      aspectRatioId: '16:9',
+      aspectRatioValue: 2048 / 1152,
+      externalImageSize: '2K',
+      height: 1152,
+      width: 2048,
+    });
+    expect(
+      select(createSettings(createModel('sdxl'), { externalImageSize: 'stale', height: 1152, width: 2048 }))
+    ).toMatchObject({
+      externalImageSize: '2K',
+      height: 1152,
+      width: 2048,
+    });
+    expect(select(createSettings(model, { height: 1200, width: 1600 }))).toMatchObject({
+      externalImageSize: null,
+      height: 1200,
+      width: 1600,
+    });
+    const local = getGenerateModelSelectionResult({
+      currentValues: createSettings(model, { externalImageSize: '2K', height: 1152, width: 2048 }),
+      model: createModel('sdxl'),
+      models: [],
+    }).settings;
+
+    expect(local).toMatchObject({ externalImageSize: null, height: 1152, width: 2048 });
+  });
+
+  it('prefers the nearer pixel budget among presets of one nominal aspect ratio', () => {
+    // Rounded 16:9 presets have slightly different pixel ratios (1.75 vs 1.78), so an exact ratio tie never occurs.
+    const model: GenerateModelConfig = {
+      base: 'external',
+      format: 'external_api',
+      key: 'gemini',
+      name: 'Gemini',
+      provider_id: 'gemini',
+      type: 'external_image_generator',
+      capabilities: {
+        modes: ['txt2img'],
+        resolution_presets: [
+          { aspect_ratio: '16:9', height: 1152, image_size: '2K', label: '16:9 (2K)', width: 2048 },
+          { aspect_ratio: '16:9', height: 768, image_size: '1K', label: '16:9 (1K)', width: 1344 },
+          { aspect_ratio: '4:3', height: 768, image_size: '1K', label: '4:3 (1K)', width: 1024 },
+        ],
+      },
+    };
+
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), { height: 576, width: 1024 }),
+      model,
+      models: [],
+    });
+
+    expect(result.settings).toMatchObject({ externalImageSize: '1K', height: 768, width: 1344 });
   });
 
   it('turns HiDiffusion off when changing to an unsupported model family', () => {
@@ -723,14 +922,85 @@ describe('component policies', () => {
     expect(result.settings.componentSourceModel).toBe(devSource);
   });
 
-  it('reconciles dimensions to the new model grid when the selected model changes', () => {
+  it('reconciles dimensions to the new model grid as an adjustment, not a removed setting', () => {
     const model = createModel('cogview4');
     const settings = createSettings(createModel('sdxl'), { height: 520, width: 520 });
     const result = getGenerateModelSelectionResult({ currentValues: settings, model, models: [] });
 
     expect(result.settings.width).toBe(512);
     expect(result.settings.height).toBe(512);
-    expect(result.clearedLabels).toContain('Dimensions');
+    expect(result.clearedLabels).toEqual([]);
+    expect(result.dimensionsAdjusted).toBe(true);
+  });
+
+  it('reports a snap to a provider size as an adjustment, so the switch is not lossy', () => {
+    const seedream: GenerateModelConfig = {
+      ...externalModel,
+      key: 'seedream',
+      name: 'Seedream 4.5',
+      provider_id: 'seedream',
+      capabilities: {
+        modes: ['txt2img', 'img2img'],
+        aspect_ratio_sizes: {
+          '1:1': { width: 2048, height: 2048 },
+          '16:9': { width: 2848, height: 1600 },
+        },
+      },
+    };
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), { height: 1024, width: 1024 }),
+      model: seedream,
+      models: [],
+    });
+
+    expect(result.settings).toMatchObject({ height: 2048, width: 2048 });
+    expect(result.clearedLabels).toEqual([]);
+    expect(result.dimensionsAdjusted).toBe(true);
+  });
+
+  it('keeps the Canvas frame when switching to a provider with fixed sizes', () => {
+    const gptImage: GenerateModelConfig = {
+      ...externalModel,
+      key: 'gpt-image',
+      capabilities: {
+        modes: ['txt2img', 'img2img'],
+        aspect_ratio_sizes: { '1:1': { width: 1024, height: 1024 }, '3:2': { width: 1536, height: 1024 } },
+      },
+    };
+    const currentValues = createSettings(createModel('sdxl'), { height: 512, width: 640 });
+
+    // Generate snaps to the provider's size; the Canvas sync would carry that to the frame, so a frame is kept.
+    expect(getGenerateModelSelectionResult({ currentValues, model: gptImage, models: [] }).settings).toMatchObject({
+      height: 1024,
+      width: 1024,
+    });
+    const canvas = getGenerateModelSelectionResult({ currentValues, isCanvasFrame: true, model: gptImage, models: [] });
+    expect(canvas.settings).toMatchObject({ height: 512, width: 640 });
+    expect(canvas.dimensionsAdjusted).toBe(false);
+  });
+
+  it('reports the grid clamp from an off-grid provider size back to a local model as an adjustment', () => {
+    const provider: GenerateModelConfig = { ...externalModel, key: 'gemini', provider_id: 'gemini' };
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(provider, { height: 1024, width: 683 }),
+      model: createModel('sdxl'),
+      models: [],
+    });
+
+    expect(result.settings.width % 8).toBe(0);
+    expect(result.settings.height).toBe(1024);
+    expect(result.clearedLabels).toEqual([]);
+    expect(result.dimensionsAdjusted).toBe(true);
+  });
+
+  it('reports no adjustment when the size already fits the new model', () => {
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sd-1'), { height: 1024, width: 1024 }),
+      model: createModel('sdxl'),
+      models: [],
+    });
+
+    expect(result.dimensionsAdjusted).toBe(false);
   });
 
   it('keeps selected VAE when applying model defaults without a VAE override', () => {
@@ -1892,5 +2162,101 @@ describe('getGenerationDimensions and the variant it dispatches on', () => {
 
     expect(getGenerationDimensions({ base: 'flux', type: 'main', variant: 'schnell' }).optimal).toBe(512);
     expect(getGenerationDimensions({ base: 'flux', type: 'main' }).optimal).toBe(1024);
+  });
+});
+
+describe('SDXL Refiner policy', () => {
+  const refiner: MainModelConfig = { base: 'sdxl-refiner', key: 'refiner', name: 'SDXL Refiner', type: 'main' };
+
+  it('offers the refiner section for SDXL only and never lists refiners as main models', () => {
+    expect(getGenerationUiPolicy(createModel('sdxl')).refinerVisible).toBe(true);
+    expect(getGenerationUiPolicy(createModel('sd-1')).refinerVisible).toBe(false);
+    expect(getGenerationUiPolicy(createModel('flux')).refinerVisible).toBe(false);
+    expect(isGenerateModelSelectable(refiner)).toBe(false);
+    expect(isSupportedGenerateModel(refiner)).toBe(false);
+  });
+
+  it('clears the refiner when leaving SDXL but keeps its tuning for the next SDXL pick', () => {
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), { refinerModel: refiner, refinerStart: 0.6 }),
+      model: createModel('flux'),
+      models: [],
+    });
+
+    expect(result.settings.refinerModel).toBeNull();
+    expect(result.settings.refinerStart).toBe(0.6);
+    expect(result.clearedLabels).toContain('Refiner');
+
+    const kept = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), { refinerModel: refiner }),
+      model: createModel('sdxl', { key: 'sdxl-other' }),
+      models: [],
+    });
+
+    expect(kept.settings.refinerModel).toEqual(refiner);
+    expect(kept.clearedLabels).toEqual([]);
+  });
+
+  it('validates the refiner only on SDXL, rejecting PiD and out-of-range tuning', () => {
+    const sdxl = createModel('sdxl');
+    const withRefiner = (overrides: Partial<GenerateSettings> = {}) =>
+      getGenerationValidationReasons(sdxl, createSettings(sdxl, { refinerModel: refiner, ...overrides }));
+
+    expect(withRefiner()).toEqual([]);
+    expect(withRefiner({ refinerStart: 1.2, refinerSteps: 0 })).toEqual([
+      'Refiner steps must be a whole number of at least 1.',
+      'Refiner start must be between 0 and 1.',
+    ]);
+    expect(withRefiner({ refinerNegativeAestheticScore: 0 })).toEqual([
+      'Refiner negative aesthetic score must be between 1 and 10.',
+    ]);
+    expect(
+      withRefiner({
+        gemma2EncoderModel: { base: 'any', key: 'gemma2', name: 'Gemma 2', type: 'gemma2_encoder' },
+        pidDecoderModel: { base: 'sdxl', key: 'pid', name: 'PiD SDXL', type: 'pid_decoder' },
+        pidMode: 'fit',
+      })
+    ).toContain('PiD decode is not compatible with the SDXL Refiner. Turn PiD off or clear the refiner model.');
+    expect(withRefiner({ refinerModel: sdxl })).toEqual([
+      `${sdxl.name} is not an SDXL Refiner model. Pick a refiner or clear the slot.`,
+    ]);
+
+    const sd1 = createModel('sd-1');
+
+    expect(
+      getGenerationValidationReasons(sd1, createSettings(sd1, { refinerModel: refiner, refinerStart: 5 }))
+    ).toEqual([]);
+  });
+
+  it('ignores unavailable models and invalid tuning while the refiner is off, then validates reactivation', () => {
+    const sdxl = createModel('sdxl');
+    const settings = createSettings(sdxl, {
+      refinerModel: refiner,
+      refinerStart: 1,
+      refinerSteps: 0,
+      refinerCfgScale: Number.NaN,
+      refinerPositiveAestheticScore: 0,
+      refinerNegativeAestheticScore: 20,
+    });
+
+    expect(getGenerationValidationReasons(sdxl, settings)).toEqual([]);
+    expect(getGenerationModelAvailabilityReasons(sdxl, settings, [sdxl as never])).toEqual([]);
+    const reactivated = { ...settings, refinerStart: 0.8 };
+    expect(getGenerationValidationReasons(sdxl, reactivated)).toContain(
+      'Refiner steps must be a whole number of at least 1.'
+    );
+    expect(getGenerationModelAvailabilityReasons(sdxl, reactivated, [sdxl as never])).toEqual([
+      'Refiner "SDXL Refiner" is no longer installed.',
+    ]);
+  });
+
+  it('reports an uninstalled refiner', () => {
+    const sdxl = createModel('sdxl');
+    const settings = createSettings(sdxl, { refinerModel: refiner });
+
+    expect(getGenerationModelAvailabilityReasons(sdxl, settings, [sdxl as never])).toEqual([
+      'Refiner "SDXL Refiner" is no longer installed.',
+    ]);
+    expect(getGenerationModelAvailabilityReasons(sdxl, settings, [sdxl as never, refiner as never])).toEqual([]);
   });
 });

@@ -5,6 +5,7 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { createControlLayer } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -18,12 +19,7 @@ import {
   type LayerContextActionRuntimeContext,
   type LayerContextActionState,
 } from './layerContextActions';
-import {
-  createControlLayer,
-  createEmptyPaintLayer,
-  createInpaintMaskLayer,
-  createRegionalGuidanceLayer,
-} from './layerOps';
+import { createEmptyPaintLayer, createInpaintMaskLayer, createRegionalGuidanceLayer } from './layerOps';
 
 seedArchitectureCapabilities();
 
@@ -41,7 +37,7 @@ const paintLayer = (id: string, patch: Partial<CanvasRasterLayerContractV2> = {}
 
 const rasterLayer = paintLayer('raster');
 const nonEmptyControlLayer = {
-  ...createControlLayer('Control', 'control'),
+  ...createControlLayer({ id: 'control', name: 'Control' }),
   source: { image: { height: 10, imageName: 'control-image', width: 10 }, type: 'image' as const },
 };
 
@@ -78,6 +74,7 @@ const makeState = (
     document,
     hasEngine: true,
     hiddenByAncestor: false,
+    isQuickSwitchBookmark: false,
     hasSupportedContent: true,
     hasWorkflowBindings: true,
     interactionLocked: false,
@@ -106,7 +103,7 @@ const makeEffects = (): LayerContextActionEffects => ({
   extractMaskedArea: vi.fn(() => Promise.resolve()),
   fitToBbox: vi.fn(),
   group: vi.fn(),
-  mergeDown: vi.fn(),
+  mergeDown: vi.fn(() => Promise.resolve()),
   mergeSelected: vi.fn(),
   openProperties: vi.fn(),
   openRename: vi.fn(),
@@ -114,11 +111,12 @@ const makeEffects = (): LayerContextActionEffects => ({
   startSelectObject: vi.fn(),
   startFilter: vi.fn(),
   patchConfig: vi.fn(),
-  rasterize: vi.fn(),
+  rasterize: vi.fn(() => Promise.resolve()),
   reorder: vi.fn(),
   setColorLabel: vi.fn(),
-  saveToAssets: vi.fn(() => Promise.resolve()),
+  saveToBoard: vi.fn(() => Promise.resolve()),
   toggleLock: vi.fn(),
+  toggleQuickSwitchBookmark: vi.fn(),
   toggleVisibility: vi.fn(),
   transform: vi.fn(),
   convertTo: vi.fn(),
@@ -278,6 +276,17 @@ describe('layer context action registry', () => {
     expect(transform).toHaveBeenCalledOnce();
   });
 
+  it('saves the layer to the board chosen in its picker', async () => {
+    const effects = makeEffects();
+    const board = { id: 'board-7', label: 'Sketches' };
+    const definition = getLayerContextActionDefinition('save-to-board');
+
+    await definition.handler(makeRuntimeContext(rasterLayer, { board, effects }));
+
+    expect(effects.saveToBoard).toHaveBeenCalledWith(board);
+    expect(() => definition.handler(makeRuntimeContext(rasterLayer, { effects }))).toThrow();
+  });
+
   it('starts Select Object for the action layer through the registry', () => {
     const effects = makeEffects();
     const context = makeRuntimeContext(rasterLayer, { effects });
@@ -306,14 +315,18 @@ describe('layer context action registry', () => {
 
     getLayerContextActionDefinition('move-to-front').handler(context);
     getLayerContextActionDefinition('add-curves').handler(context);
+    getLayerContextActionDefinition('add-noise-adjustment').handler(context);
+    getLayerContextActionDefinition('add-clarity').handler(context);
     getLayerContextActionDefinition('filter').handler(context);
     getLayerContextActionDefinition('intersect').handler(context);
-    getLayerContextActionDefinition('copy-to-control').handler(context);
+    getLayerContextActionDefinition('use-as-control-layer').handler(context);
     getLayerContextActionDefinition('convert-to-control').handler(context);
     getLayerContextActionDefinition('regional-auto-negative').handler(context);
 
     expect(effects.reorder).toHaveBeenCalledWith('front', 'move-to-front');
     expect(effects.addAdjustment).toHaveBeenCalledWith('curves');
+    expect(effects.addAdjustment).toHaveBeenCalledWith('noise');
+    expect(effects.addAdjustment).toHaveBeenCalledWith('clarity');
     expect(effects.startFilter).toHaveBeenCalledWith(rasterLayer.id);
     expect(effects.booleanMerge).toHaveBeenCalledWith('intersect');
     expect(effects.copyTo).toHaveBeenCalledWith('control');
@@ -412,7 +425,7 @@ describe('getLayerContextActions', () => {
     expect(byId(rasterActions, 'crop-to-bbox').isDisabled).toBe(true);
     expect(byId(rasterActions, 'filter').isDisabled).toBe(true);
     expect(byId(rasterActions, 'transform').isDisabled).toBe(true);
-    expect(byId(controlActions, 'filter').isDisabled).toBe(true);
+    expect(byId(controlActions, 'select-object').isDisabled).toBe(true);
     expect(byId(rasterActions, 'copy-to-clipboard').isDisabled).toBe(true);
   });
 
@@ -467,20 +480,24 @@ describe('getLayerContextActions', () => {
       'add-hsl',
       'add-hue',
       'add-invert',
+      'add-texture',
+      'add-clarity',
+      'add-dehaze',
+      'add-noise-adjustment',
       'add-regenerate-region',
-      'save-to-assets',
+      'save-to-board',
       'copy-to-clipboard',
       'crop-to-bbox',
       'extract-masked-area',
       'filter',
       'select-object',
       'run-workflow',
+      'use-as-control-layer',
       'intersect',
       'cutout',
       'cutaway',
       'exclude',
       'copy-to-raster',
-      'copy-to-control',
       'copy-to-inpaint-mask',
       'copy-to-regional-guidance',
       'rasterize',
@@ -498,6 +515,7 @@ describe('getLayerContextActions', () => {
       'toggle-visibility',
       'toggle-hidden',
       'toggle-lock',
+      'bookmark-quick-switch',
       'color-label-red',
       'color-label-orange',
       'color-label-yellow',
@@ -512,6 +530,31 @@ describe('getLayerContextActions', () => {
     expect(actionIds).toHaveLength(LAYER_CONTEXT_ACTION_DEFINITIONS.length);
     expect(actionIds.filter((id) => !actionsById.has(id))).toEqual([]);
     expect([...new Set(actions.filter((action) => !action.isDisabled).map((action) => action.id))]).toEqual([]);
+  });
+
+  it('offers the quick-switch bookmark on every layer type whenever an engine exists, and toggles its label', () => {
+    for (const type of ['raster', 'control', 'inpaint_mask', 'regional_guidance'] as const) {
+      const layer = makeLayer(type);
+      expect(idsFor(layer)).toContain('bookmark-quick-switch');
+      expect(idsFor(layer, [layer], { hasEngine: false })).not.toContain('bookmark-quick-switch');
+    }
+    const lockedRaster = { ...rasterLayer, isLocked: true };
+    const plain = byId(getLayerContextActions(makeState(lockedRaster)), 'bookmark-quick-switch');
+    expect(plain).toMatchObject({
+      hint: 'q',
+      isDisabled: false,
+      labelKey: 'widgets.layers.actions.bookmarkForQuickSwitch',
+    });
+    const bookmarked = byId(
+      getLayerContextActions(makeState(lockedRaster, { isQuickSwitchBookmark: true })),
+      'bookmark-quick-switch'
+    );
+    expect(bookmarked.labelKey).toBe('widgets.layers.actions.removeQuickSwitchBookmark');
+    expect(getEnglishTranslation(bookmarked.labelKey)).toBe('Remove quick switch bookmark');
+
+    const effects = makeEffects();
+    bookmarked.handler(makeRuntimeContext(lockedRaster, { effects }));
+    expect(effects.toggleQuickSwitchBookmark).toHaveBeenCalledOnce();
   });
 
   it('offers color labels on every layer type, locked layers included, and routes to the effect', () => {
@@ -553,6 +596,8 @@ describe('getLayerContextActions', () => {
   it('offers add-noise and add-denoise-limit only while the mask lacks that modifier', () => {
     const bare = getLayerContextActions(makeState(makeLayer('inpaint_mask')));
     expect(byId(bare, 'add-noise').isDisabled).toBe(false);
+    // The mask's noise modifier and the raster noise adjustment are separate actions.
+    expect(bare.some((action) => action.id === 'add-noise-adjustment')).toBe(false);
     expect(byId(bare, 'add-denoise-limit').isDisabled).toBe(false);
     const configured = getLayerContextActions(
       makeState({
@@ -568,7 +613,7 @@ describe('getLayerContextActions', () => {
   it('still allows non-destructive copy and export from a locked layer when interaction is free', () => {
     const actions = getLayerContextActions(makeState({ ...rasterLayer, isLocked: true }));
     expect(byId(actions, 'copy-to-clipboard').isDisabled).toBe(false);
-    expect(byId(actions, 'save-to-assets').isDisabled).toBe(false);
+    expect(byId(actions, 'save-to-board').isDisabled).toBe(false);
   });
 
   it('disables locked-layer mutations but keeps toggle lock enabled', () => {
@@ -588,6 +633,10 @@ describe('getLayerContextActions', () => {
       'add-hsl',
       'add-hue',
       'add-invert',
+      'add-texture',
+      'add-clarity',
+      'add-dehaze',
+      'add-noise-adjustment',
       'add-regenerate-region',
       'filter',
       'select-object',
@@ -604,7 +653,7 @@ describe('getLayerContextActions', () => {
 
     const lockedControl = { ...nonEmptyControlLayer, isLocked: true };
     const controlActions = getLayerContextActions(makeState(lockedControl));
-    expect(byId(controlActions, 'filter').isDisabled).toBe(true);
+    expect(byId(controlActions, 'select-object').isDisabled).toBe(true);
     expect(byId(controlActions, 'control-transparency-effect').isDisabled).toBe(true);
     expect(byId(controlActions, 'convert-to-raster').isDisabled).toBe(true);
 
@@ -638,10 +687,10 @@ describe('getLayerContextActions', () => {
     const noEngine = getLayerContextActions(makeState(rasterLayer, { hasEngine: false }));
     const empty = getLayerContextActions(makeState(rasterLayer, { hasSupportedContent: false }));
 
-    for (const id of ['transform', 'filter', 'save-to-assets', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
+    for (const id of ['transform', 'filter', 'save-to-board', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
       expect(byId(noEngine, id).isDisabled, id).toBe(true);
     }
-    for (const id of ['save-to-assets', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
+    for (const id of ['save-to-board', 'copy-to-clipboard', 'crop-to-bbox'] as const) {
       expect(byId(empty, id).isDisabled, id).toBe(true);
     }
   });
@@ -650,7 +699,7 @@ describe('getLayerContextActions', () => {
     const cacheOnly = createEmptyPaintLayer('Cache only', 'cache-only');
     const actions = getLayerContextActions(makeState(cacheOnly, { hasSupportedContent: true }));
 
-    expect(byId(actions, 'save-to-assets').isDisabled).toBe(false);
+    expect(byId(actions, 'save-to-board').isDisabled).toBe(false);
     expect(byId(actions, 'fit-to-bbox').isDisabled).toBe(true);
   });
 
@@ -668,8 +717,12 @@ describe('getLayerContextActions', () => {
         'add-hsl',
         'add-hue',
         'add-invert',
+        'add-texture',
+        'add-clarity',
+        'add-dehaze',
+        'add-noise-adjustment',
         'add-regenerate-region',
-        'save-to-assets',
+        'save-to-board',
         'copy-to-clipboard',
         'crop-to-bbox',
         'merge-down',
@@ -716,7 +769,7 @@ describe('getLayerContextActions', () => {
 
     expect(idsFor(paint)).toEqual(
       expect.arrayContaining([
-        'copy-to-control',
+        'use-as-control-layer',
         'copy-to-inpaint-mask',
         'copy-to-regional-guidance',
         'convert-to-control',
@@ -725,11 +778,12 @@ describe('getLayerContextActions', () => {
       ])
     );
     expect(idsFor(text)).not.toContain('convert-to-control');
+    expect(idsFor(text)).not.toContain('use-as-control-layer');
     expect(idsFor(text)).not.toContain('copy-to-inpaint-mask');
   });
 
-  it('exposes control-only transparency and raster conversion actions while filtering supported control content', () => {
-    const empty = createControlLayer('Control', 'control-empty');
+  it('exposes control-only transparency and raster conversion actions, and leaves filtering to the Detection row', () => {
+    const empty = createControlLayer({ id: 'control-empty', name: 'Control' });
 
     expect(idsFor(empty, [empty], { hasSupportedContent: false })).toEqual(
       expect.arrayContaining([
@@ -740,9 +794,9 @@ describe('getLayerContextActions', () => {
         'copy-to-regional-guidance',
       ])
     );
-    expect(idsFor(empty, [empty], { hasSupportedContent: false })).not.toContain('filter');
-    expect(idsFor(empty, [empty], { hasSupportedContent: true })).toContain('filter');
-    expect(idsFor(nonEmptyControlLayer)).toContain('filter');
+    expect(idsFor(empty, [empty], { hasSupportedContent: true })).not.toContain('filter');
+    expect(idsFor(nonEmptyControlLayer)).not.toContain('filter');
+    expect(idsFor({ ...nonEmptyControlLayer, controlType: 'depth' })).not.toContain('filter');
   });
 
   it('exposes filter for every supported raster source', () => {
@@ -853,7 +907,7 @@ describe('getLayerContextActions', () => {
 
     expect(idsFor(layer)).toContain('copy-to-inpaint-mask');
     expect(idsFor(layer)).not.toContain('convert-to-inpaint-mask');
-    expect(idsFor(layer)).not.toContain('copy-to-control');
+    expect(idsFor(layer)).not.toContain('use-as-control-layer');
   });
 
   it('exposes boolean raster actions only for an adjacent mergeable raster pair', () => {

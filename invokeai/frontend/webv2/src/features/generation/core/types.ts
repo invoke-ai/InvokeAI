@@ -30,18 +30,43 @@ export type MainModelConfig = ModelIdentifierConfig & {
   } | null;
 };
 
+export type ExternalGenerationMode = 'txt2img' | 'img2img' | 'inpaint';
+
+export interface ExternalImageSize {
+  width: number;
+  height: number;
+}
+
+/** A provider's named size at one aspect ratio, e.g. Gemini's `1K` at `16:9`. */
+export interface ExternalResolutionPreset {
+  label: string;
+  aspect_ratio: string;
+  image_size: string;
+  width: number;
+  height: number;
+}
+
+/** The capability matrix the backend records for an external model (`ExternalModelCapabilities`). */
+export interface ExternalModelCapabilities {
+  modes?: string[];
+  supports_seed?: boolean;
+  supports_negative_prompt?: boolean;
+  supports_reference_images?: boolean;
+  max_reference_images?: number | null;
+  max_images_per_request?: number | null;
+  max_image_size?: ExternalImageSize | null;
+  allowed_aspect_ratios?: string[] | null;
+  /** Fixed output size per aspect ratio, for providers that accept no free-form dimensions. */
+  aspect_ratio_sizes?: Record<string, ExternalImageSize> | null;
+  resolution_presets?: ExternalResolutionPreset[] | null;
+}
+
 export type ExternalImageGeneratorModelConfig = ModelIdentifierConfig & {
   base: 'external';
   type: 'external_image_generator';
   format: 'external_api';
   provider_id?: string;
-  capabilities?: {
-    modes?: string[];
-    supports_seed?: boolean;
-    supports_negative_prompt?: boolean;
-    supports_reference_images?: boolean;
-    max_reference_images?: number | null;
-  } | null;
+  capabilities?: ExternalModelCapabilities | null;
   default_settings?: {
     width?: number | null;
     height?: number | null;
@@ -240,6 +265,8 @@ export interface GenerateSettings {
    * inpaint mask while inpainting or outpainting; Generate and the other canvas modes ignore it.
    */
   animaInpaintAdapterModel: ComponentModelConfig | null;
+  /** Off skips the adapter on the canvas and keeps the selected model and weight. */
+  animaInpaintAdapterEnabled: boolean;
   animaInpaintAdapterWeight: number;
   /** Wan 2.2's UMT5-XXL text encoder. */
   wanT5EncoderModel: ComponentModelConfig | null;
@@ -292,7 +319,33 @@ export interface GenerateSettings {
   /** The shared Gemma-2 caption encoder PiD conditions its decode on. */
   gemma2EncoderModel: ComponentModelConfig | null;
   pidSteps: number;
+  /** A provider's named size (e.g. `1K`); sent only when the selected model lists it in a resolution preset. */
+  externalImageSize: string | null;
+  openaiQuality: OpenAIImageQuality;
+  openaiBackground: OpenAIImageBackground;
+  /** Null lets OpenAI pick; only meaningful with image inputs. */
+  openaiInputFidelity: OpenAIInputFidelity | null;
+  /** Null uses the provider default. */
+  geminiTemperature: number | null;
+  geminiThinkingLevel: GeminiThinkingLevel | null;
+  seedreamWatermark: boolean;
+  seedreamOptimizePrompt: boolean;
+  /** SDXL only: a refiner-family main model that finishes the schedule from `refinerStart`; null runs none. */
+  refinerModel: MainModelConfig | null;
+  refinerSteps: number;
+  refinerCfgScale: number;
+  refinerScheduler: string;
+  /** Aesthetic-score conditioning for the refiner's positive and negative prompts, 1 to 10. */
+  refinerPositiveAestheticScore: number;
+  refinerNegativeAestheticScore: number;
+  /** Fraction of the schedule at which the base model hands its latents to the refiner. */
+  refinerStart: number;
 }
+
+export type OpenAIImageQuality = 'auto' | 'high' | 'medium' | 'low';
+export type OpenAIImageBackground = 'auto' | 'transparent' | 'opaque';
+export type OpenAIInputFidelity = 'low' | 'high';
+export type GeminiThinkingLevel = 'minimal' | 'high';
 
 /**
  * - `off`: ordinary VAE decode.

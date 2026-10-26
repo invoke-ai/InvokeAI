@@ -21,6 +21,7 @@ import type {
 
 import {
   coerceSchedulerForGraph,
+  getExternalModeReason,
   getExternalProviderNodeType,
   getFlux2DiffusersComponentSource,
   getGenerationDimensions,
@@ -38,11 +39,17 @@ import {
   isFlux2Qwen3EncoderForModel,
   isQwen3Vl8bEncoder,
   isKrea2Qwen3VlEncoder,
-  isNonAnimaQwen3Encoder,
   isSelfContainedSDNQFlux1Pipeline,
   isVaeCompatibleWithGenerateModel,
+  isZImageQwen3Encoder,
   type GenerateComponentFilter,
 } from './componentCompatibility';
+import {
+  getExternalProviderInvocationOptions,
+  getExternalProviderMetadata,
+  getExternalReferenceImages,
+  resolveExternalImageSize,
+} from './externalProvider';
 import {
   addEdge,
   addMetadata,
@@ -55,7 +62,10 @@ import {
 } from './graphBuilder';
 import { addKrea2ConditioningEnhancers } from './krea2Conditioning';
 import { addPidDecode, getPidDenoiseSize, getPidMetadata, isPidDecodeNodeType, shouldUsePidDecode } from './pidGraph';
+import { getCompelPromptNodeType } from './prompt/compel';
 import { getEffectiveReferenceImage } from './referenceImage';
+import { getActiveRefiner, getBaseDenoisingRange } from './sdxlRefiner';
+import { addSDXLRefinerStage, getRefinerMetadata } from './sdxlRefinerGraph';
 
 const getCompatibleComponentSource = (
   settings: GenerateSettings,
@@ -327,7 +337,7 @@ const buildSDGraph = (
 ): BackendGraphContract => {
   const graph: BackendGraphContract = { edges: [], id: createId(`${model.base}_graph`), nodes: {} };
   const modelLoaderType = model.base === 'sdxl' ? 'sdxl_model_loader' : 'main_model_loader';
-  const compelType = model.base === 'sdxl' ? 'sdxl_compel_prompt' : 'compel';
+  const compelType = getCompelPromptNodeType(model.base);
   const activeLoras = getActiveCompatibleLoras(settings, model);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
   const colorCompensation = settings.colorCompensation ? 'SDXL' : 'None';
@@ -352,8 +362,7 @@ const buildSDGraph = (
   const denoise = addNode(graph, {
     cfg_rescale_multiplier: settings.cfgRescaleMultiplier,
     cfg_scale: settings.cfgScale,
-    denoising_end: 1,
-    denoising_start: 0,
+    ...getBaseDenoisingRange(settings, model, 0),
     id: 'denoise_latents',
     ...(supportsHiDiffusion
       ? {
@@ -442,9 +451,14 @@ const buildSDGraph = (
   addEdge(graph, unetSource, 'unet', denoise, 'unet');
   addEdge(graph, noise, 'noise', denoise, 'noise');
   addIPAdapterReferenceImages(graph, settings, model, denoise);
+  // Validation rejects PiD alongside a refiner, so the refiner always feeds the ordinary VAE decode.
+  const refiner = getActiveRefiner(settings, model);
+  const refinerDenoise = refiner
+    ? addSDXLRefinerStage({ denoise, graph, model, negativePrompt, positivePrompt, refiner, seamless, settings })
+    : null;
   // Create decode only after resolving the final VAE source.
   const output = addDecodeOutput({
-    denoise,
+    denoise: refinerDenoise ?? denoise,
     graph,
     l2iProps: { color_compensation: colorCompensation, fp32: settings.vaePrecision === 'fp32' },
     l2iType: 'l2i',
@@ -467,6 +481,7 @@ const buildSDGraph = (
         }
       : {}),
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
+    ...(refiner ? getRefinerMetadata(settings, model, refiner) : {}),
     scheduler,
   });
   addReferenceImageMetadata(graph, output, settings);
@@ -1027,6 +1042,8 @@ const buildQwenImageGraph = (
   });
 
   addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
+  // The denoise encodes a ControlNet's control and inpaint images with this VAE; without one the input is idle.
+  addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, modelLoader, 'qwen_vl_encoder', posCond, 'qwen_vl_encoder');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
@@ -1103,9 +1120,7 @@ const buildZImageGraph = (
 ): BackendGraphContract => {
   const sourceModel = getDiffusersSource(settings, model);
   const qwen3EncoderModel =
-    settings.qwen3EncoderModel && isNonAnimaQwen3Encoder(settings.qwen3EncoderModel)
-      ? settings.qwen3EncoderModel
-      : null;
+    settings.qwen3EncoderModel && isZImageQwen3Encoder(settings.qwen3EncoderModel) ? settings.qwen3EncoderModel : null;
   const vaeModel = getCompatibleVae(settings, model);
 
   if (!sourceModel && (!vaeModel || !qwen3EncoderModel)) {
@@ -1596,18 +1611,29 @@ const buildWanGraph = (
   return graph;
 };
 
-const buildExternalGraph = (
+/** Canvas inputs per external mode: the composited bbox is the init image for img2img. */
+export type ExternalCanvasInputs = { mode: 'txt2img' } | { mode: 'img2img'; initImageName: string };
+
+/**
+ * Hosted providers take the whole request on one node: prompt, seed, size, provider options, and (on the canvas) the
+ * init image. The Canvas keep-mask does not match any provider's edit-mask contract, so inpaint is not compiled.
+ */
+export const buildExternalGraph = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
   outputIsIntermediate: boolean,
-  projectSettings: GenerationProjectSettings
+  projectSettings: GenerationProjectSettings,
+  canvas: ExternalCanvasInputs | null = null
 ): BackendGraphContract => {
   if (model.type !== 'external_image_generator') {
     throw new Error('Selected model is not an external image generator.');
   }
 
-  if (model.capabilities?.modes && !model.capabilities.modes.includes('txt2img')) {
-    throw new Error(`${model.name} does not support text-to-image generation.`);
+  const mode = canvas?.mode ?? 'txt2img';
+  const modeReason = getExternalModeReason(model, mode);
+
+  if (modeReason) {
+    throw new Error(modeReason);
   }
 
   const providerId = typeof model.provider_id === 'string' ? model.provider_id : '';
@@ -1622,14 +1648,16 @@ const buildExternalGraph = (
   const output = addNode(graph, {
     height: settings.height,
     id: 'canvas_output',
-    image_size: null,
+    image_size: resolveExternalImageSize(settings, model),
     is_intermediate: outputIsIntermediate,
-    mode: 'txt2img',
+    mode,
     model,
     num_images: 1,
     type: nodeType,
     use_cache: false,
     width: settings.width,
+    ...getExternalProviderInvocationOptions(settings, model),
+    ...(canvas?.mode === 'img2img' ? { init_image: { image_name: canvas.initImageName } } : {}),
   });
 
   addEdge(graph, positivePrompt, 'value', output, 'prompt');
@@ -1640,17 +1668,15 @@ const buildExternalGraph = (
   if (model.capabilities?.supports_seed === true) {
     addEdge(graph, seed, 'value', output, 'seed');
   }
-  if (model.capabilities?.supports_reference_images === true) {
-    const referenceImages = getEnabledReferenceImages(settings, 'external_reference_image')
-      .map((referenceImage) => referenceImage.config.image)
-      .filter((image): image is GenerateReferenceImageAsset => image !== null)
-      .map(toImageField);
+  const referenceImages = getExternalReferenceImages(settings, model).map(toImageField);
 
-    if (referenceImages.length > 0) {
-      (output as Record<string, unknown>).reference_images = referenceImages;
-    }
+  if (referenceImages.length > 0) {
+    (output as Record<string, unknown>).reference_images = referenceImages;
   }
-  addMetadata(graph, output, settings, model, null, projectSettings, { scheduler: undefined });
+  addMetadata(graph, output, settings, model, null, projectSettings, {
+    scheduler: undefined,
+    ...getExternalProviderMetadata(settings, model),
+  });
   addReferenceImageMetadata(graph, output, settings);
 
   return graph;
