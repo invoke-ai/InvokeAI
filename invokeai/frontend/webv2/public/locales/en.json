@@ -1076,6 +1076,13 @@
       "heading": "Global Reference Image",
       "paragraphs": ["Applies a reference image to influence the entire generation."]
     },
+    "referenceImageStrength": {
+      "heading": "Reference Image Strength",
+      "paragraphs": [
+        "How much of the reference character the generation carries. 0 turns the reference off.",
+        "Higher values carry more of the character's hair, outfit and accessories, and also more of the reference's composition and content."
+      ]
+    },
     "referenceImageWeight": {
       "heading": "Reference Image Weight",
       "paragraphs": [
@@ -2942,6 +2949,7 @@
       "size": "Size",
       "sizeRecommended": "Recommended ✓",
       "steps": "Steps",
+      "strength": "Strength",
       "styleVariant": "Style variant",
       "styleVariantPrecise": "Precise",
       "styleVariantPreciseDesc": "Applies a precise visual style, eliminating subject influence.",
