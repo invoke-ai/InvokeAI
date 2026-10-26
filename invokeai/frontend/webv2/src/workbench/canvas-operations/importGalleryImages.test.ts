@@ -15,11 +15,10 @@ import {
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
-import { getDocumentLeaves } from '@workbench/canvas-engine/api';
+import { createControlLayer, getDocumentLeaves } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createTestInsertionAnchorCapture } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import {
-  createControlLayer,
   createEmptyPaintLayer,
   createInpaintMaskFromImage,
   createRegionalGuidanceFromImage,
@@ -226,7 +225,7 @@ const expectedLayer = (
       };
     case 'control':
       return {
-        ...createControlLayer(`Control Layer ${index + 1}`, 'expected', base),
+        ...createControlLayer({ base, id: 'expected', name: `Control Layer ${index + 1}` }),
         id: expect.any(String) as string,
         source: { image: ref, type: 'image' },
         transform: { rotation: 0, scaleX: 1, scaleY: 1, x: bbox.x, y: bbox.y },
@@ -313,13 +312,9 @@ describe('importGalleryImagesToCanvas', () => {
     });
   });
 
-  it('seeds new control layers with the default control model for the selected base', async () => {
+  it('imports control layers untyped and without a model, so generation resolves the model', async () => {
     const { project, state } = withProject((value) => setModel(value, 'sd-1'));
     const canvasEngine = engine(project.id);
-    const models = [
-      { base: 'sd-1', key: 'sd1-canny', name: 'Canny', type: 'controlnet' },
-      { base: 'sd-1', key: 'sd1-union', name: 'Union Pro', type: 'controlnet' },
-    ] as unknown as Parameters<typeof importGalleryImagesToCanvas>[0]['models'];
 
     const result = await importGalleryImagesToCanvas({
       destination: 'control',
@@ -327,14 +322,16 @@ describe('importGalleryImagesToCanvas', () => {
       engine: canvasEngine,
       ...queriesFor(() => state),
       images: [image('a.png')],
-      models,
       project,
     });
 
     expect(result.status).toBe('imported');
     const [, forward] = vi.mocked(canvasEngine.layers.commitStructural).mock.calls[0]!;
     const layer = getForwardLayers(forward)[0]!;
-    expect(layer.type === 'control' ? layer.adapter.model : null).toBe('sd1-union');
+    expect(layer).toMatchObject({ adapter: { kind: 'controlnet', model: null }, type: 'control' });
+    expect(layer).not.toHaveProperty('controlType');
+    expect(layer).not.toHaveProperty('detection');
+    expect(layer).not.toHaveProperty('original');
   });
 
   it('fetches and uploads each resized control once with optimal model dimensions and durable hidden policy', async () => {
@@ -390,13 +387,13 @@ describe('importGalleryImagesToCanvas', () => {
     const layers = getForwardLayers(forward);
     expect(layers).toEqual([
       {
-        ...createControlLayer('Control Layer 1', 'expected', 'flux2'),
+        ...createControlLayer({ base: 'flux2', id: 'expected', name: 'Control Layer 1' }),
         id: expect.any(String),
         source: { image: { height: 768, imageName: 'resized-wide.png', width: 1360 }, type: 'image' },
         transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 31, y: 47 },
       },
       {
-        ...createControlLayer('Control Layer 2', 'expected', 'flux2'),
+        ...createControlLayer({ base: 'flux2', id: 'expected', name: 'Control Layer 2' }),
         id: expect.any(String),
         source: { image: { height: 1024, imageName: 'resized-square.png', width: 1024 }, type: 'image' },
         transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 31, y: 47 },

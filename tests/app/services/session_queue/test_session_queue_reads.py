@@ -384,25 +384,6 @@ class TestServiceReads:
             "TOOL_RUN:upper",
         }
 
-    def test_origins_since_are_those_of_the_items_queued_after_the_id_with_the_prefix(
-        self, database: Database, service: SessionQueue
-    ) -> None:
-        earlier = _item(database, origin="tool_run:earlier")
-        assert service.get_origins_since(QUEUE, None, "tool_run:") == (earlier, set())
-
-        _item(database, status="completed", origin="tool_run:finished")
-        _item(database, origin="TOOL_RUN:upper")
-        _item(database, origin="toolXrun:lookalike")
-        _item(database, origin="canvas")
-        newest = _item(database, origin="tool_run:other-queue", queue_id="other")
-
-        # Every new item with the prefix, whatever its status; the newest id of any queue.
-        assert service.get_origins_since(QUEUE, earlier, "tool_run:") == (
-            newest,
-            {"tool_run:finished", "TOOL_RUN:upper"},
-        )
-        assert service.get_origins_since(QUEUE, newest, "tool_run:") == (newest, set())
-
     def test_batch_status_and_destination_counts(self, database: Database, service: SessionQueue) -> None:
         _item(database, batch_id="b", status="pending", origin="canvas", destination="gallery")
         _item(database, batch_id="b", status="completed", origin="canvas", destination="gallery")

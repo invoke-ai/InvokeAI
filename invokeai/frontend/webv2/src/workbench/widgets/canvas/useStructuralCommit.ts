@@ -8,6 +8,7 @@ import type {
   CanvasLayerPreviewMutation,
   CanvasDocumentModel,
   DocumentRefusal,
+  LayerUnreadable,
   MaskEditResult,
   PrepareEditResult,
   StructuralCommitResult,
@@ -53,15 +54,21 @@ const ADJUSTMENT_REFUSAL_KEYS: Record<AdjustmentRefusalReason, string> = {
 export const describeAdjustmentRefusal = (refusal: AdjustmentRefusal, t: TFunction): string =>
   t(ADJUSTMENT_REFUSAL_KEYS[refusal.reason], { name: refusal.ownerName });
 
+/** Words a refusal that names its layer: an image that could not be read, or adjustments that could not run. */
+export const describeNamedRefusal = (refusal: AdjustmentRefusal | LayerUnreadable, t: TFunction): string =>
+  refusal.status === 'unreadable'
+    ? t('widgets.layers.actions.unreadable', { name: refusal.layerName })
+    : describeAdjustmentRefusal(refusal, t);
+
 /** Explains a refused layer pixel operation; nothing changed in the document, pixels or history. */
 export const reportLayerOperation = (
-  refusal: LayerOperationRefusal | AdjustmentRefusal,
+  refusal: LayerOperationRefusal | AdjustmentRefusal | LayerUnreadable,
   reportError: (title: string, message: string) => void,
   t: TFunction
 ): void =>
   reportError(
     t('widgets.layers.actions.actionFailed'),
-    typeof refusal === 'string' ? t(LAYER_OPERATION_KEYS[refusal]) : describeAdjustmentRefusal(refusal, t)
+    typeof refusal === 'string' ? t(LAYER_OPERATION_KEYS[refusal]) : describeNamedRefusal(refusal, t)
   );
 
 /** Explains a refused mask clear or invert; `busy` and a mask with nothing to change stay silent. */

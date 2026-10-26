@@ -45,6 +45,10 @@ const ROUTE_SHARED_MODULES = [
   '/features/nodes/data/nodeExecutionStore.ts',
   '/features/nodes/index.ts',
   '/features/nodes/ui/NodesPage.tsx',
+  // Gallery tiles, the lazy Preview and the Launchpad's gallery picker share the failed-image recovery; alone it costs a
+  // startup request.
+  '/features/gallery/data/imageRecovery.ts',
+  '/features/gallery/ui/useGalleryImageRecovery.ts',
   '/platform/browser/downloadBlob.ts',
   // Editor search fields and the lazy pickers share the IME guard; alone it costs a startup request.
   '/platform/browser/imeComposition.ts',
@@ -151,6 +155,11 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/widgets/canvas/invoke/canvasScaling.ts',
   // The Preview (open at boot) and the Canvas staging bar share the Auto-switch menu; alone it costs a boot request.
   '/workbench/widgets/shared/AutoSwitchMenu.tsx',
+  // Invoke, the image menu (editor boot) and the lazy layer menu reveal a layer's Properties through these.
+  '/workbench/widgets/layers/layerPropertiesRequestStore.ts',
+  '/workbench/widgets/layers/revealLayerProperties.ts',
+  // The reveal opens widgets through this; its own imports (focus regions, context, widget registry) boot already.
+  '/workbench/useOpenWorkbenchWidget.ts',
 ] as const;
 
 // The workflow core, its UI barrel and the project workflow collection are one chunk: the editor boots with all of
@@ -272,8 +281,11 @@ const CANVAS_LAYER_SHARED_MODULES = [
   '/workbench/canvasProjectMutationPort.ts',
   '/workbench/useCanvasProjectMutationDispatch.ts',
   '/workbench/widgets/canvas/canvasInteractionLock.ts',
+  '/workbench/widgets/canvas/canvasToolCommands.ts',
   '/workbench/widgets/canvas/color-system/colorPair.ts',
+  '/workbench/widgets/canvas/color-system/maskTintTarget.ts',
   '/workbench/widgets/canvas/color-system/useActiveColors.ts',
+  '/workbench/widgets/canvas/color-system/useMaskTintEditor.ts',
   '/workbench/widgets/canvas/engineStoreHooks.ts',
   '/workbench/widgets/canvas/textFontStyle.tsx',
   '/workbench/widgets/canvas/tool-presentation/FormControls.tsx',
@@ -292,7 +304,6 @@ const CANVAS_LAYER_SHARED_MODULES = [
   '/workbench/widgets/layers/layerExportActions.ts',
   '/workbench/widgets/layers/layerGroupCommands.ts',
   '/workbench/widgets/layers/layerMenuState.ts',
-  '/workbench/widgets/layers/layerPropertiesRequestStore.ts',
   '/workbench/widgets/layers/runLayerWorkflow.ts',
   '/workbench/widgets/layers/useSelectedModelBase.ts',
 ];

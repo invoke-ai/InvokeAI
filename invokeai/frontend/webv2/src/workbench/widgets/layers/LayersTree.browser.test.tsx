@@ -49,7 +49,7 @@ import { clearLayerPropertiesRequest, requestLayerProperties } from './layerProp
 import { LayersTree, type LayersTreeEngine } from './LayersTree';
 import { buildLayerStackRows } from './layerTreeRows';
 
-vi.mock('./ControlLayerWarningIcon', () => ({ ControlLayerWarningIcon: () => null }));
+vi.mock('./ControlLayerStatusIcon', () => ({ ControlLayerStatusIcon: () => null }));
 vi.mock('./LayerThumbnail', () => ({ LayerThumbnail: () => <span data-testid="thumbnail" /> }));
 vi.mock('./LayerStackHeader', () => ({
   LayerStackHeader: ({
@@ -690,6 +690,7 @@ describe('LayersTree selection, surfaces and structure', () => {
       hasSelectedStagedCandidate: false,
       isInteractionLocked: false,
       copySelection: vi.fn(),
+      cropAllLayers: vi.fn(),
       swapActiveColors: vi.fn(),
       resetActiveColors: vi.fn(),
       pasteFromClipboard: vi.fn(),
@@ -697,6 +698,7 @@ describe('LayersTree selection, surfaces and structure', () => {
       reportStructuralCommit: vi.fn(),
       reportPreparedCommit: vi.fn(),
       reportLayerOperation: vi.fn(),
+      reportTransformRefusal: vi.fn(),
       t: (key) => key,
     };
     await act(() => executeCanvasHotkeyCommand('canvas.nextEntity', ctx));

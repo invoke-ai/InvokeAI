@@ -760,6 +760,9 @@ def test_a_retry_key_names_one_run_per_attempt(tmp_path: Path, mock_invoker: Inv
 
     assert replay.run_id == first.run_id and replay.item_ids == first.item_ids
     assert [run.run_id for run in service.get_status().device_classes[0].runs] == [first.run_id]
+    # Once the first attempt finished, the other one may start.
+    for item_id in first.item_ids:
+        queue.complete_queue_item(item_id)
     assert asyncio.run(service.create_run("model-a", _attempt_request("b", "other-key"), "system")).run_id not in {
         first.run_id
     }
@@ -1255,6 +1258,20 @@ def test_repeats_in_one_process_leave_one_worker_waiting_for_the_file_lock(
 
     assert most_while_held == 1
     assert all(repeat == first for repeat in repeats) and _calibration_item_ids(queue) == first.item_ids
+
+
+def test_an_attempts_creation_lock_never_waits_for_its_runs_creation_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A creation of an attempt's run holds the attempts' lock and then its run's: whatever the run's id, the second
+    must not wait for the first. 2048 ids land on every one of the run ids' 256 lock files."""
+    monkeypatch.setattr(working_memory_calibration_store, "LOCK_TIMEOUT_S", 0.2)
+    store = CalibrationStore(tmp_path)
+
+    with store.attempts_lock():
+        for n in range(2048):
+            with store.creation_lock(f"run-{n}"):
+                pass
 
 
 def test_a_model_reset_covers_its_submodels_windows(tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue) -> None:

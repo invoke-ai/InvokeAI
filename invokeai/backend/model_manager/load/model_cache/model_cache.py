@@ -2422,6 +2422,23 @@ class ModelCache:
         """
         return self._get_vram_available(None, honor_cap=False)
 
+    def calibration_capacity(self) -> int:
+        """What the measured lock of a working-memory calibration can get on the execution device, its working memory
+        and the model it locks together: `_get_vram_available` without a working-memory reserve, which the calibration
+        sizes itself, as it stands once the calibration's pre-lock offload (`offload_unlocked_models_from_vram`) ran.
+
+        On a device with dedicated VRAM that offload moves every other unlocked model out, so what the cache holds now
+        counts as available. On one whose memory is system RAM (MPS, an integrated GPU) it moves nothing, so what is
+        allocated now stays subtracted, as the lock subtracts it. Within `max_vram_cache_size_gb` (the lock budgets
+        against the cap; the device must still hold it), less `reserve_vram_gb`. Without the allocator's reclaimable
+        credit: a plan does not count on blocks the offload's `empty_cache` returns only when it runs.
+        """
+        live = 0 if device_has_dedicated_vram(self._execution_device) else self._get_vram_in_use()
+        available = TorchDevice.memory_available_to_process(self._execution_device) - live
+        if self._max_vram_cache_size_gb is not None:
+            available = min(available, int(self._max_vram_cache_size_gb * GB) - live)
+        return available - int(self._reserve_vram_gb * GB)
+
     def _get_vram_in_use(self) -> int:
         """Get the amount of VRAM currently in use by the cache."""
         if self._execution_device.type == "cuda":

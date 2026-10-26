@@ -1058,12 +1058,6 @@ class SessionQueue(SessionQueueBase):
     def get_unfinished_origins(self, queue_id: str, origin_prefix: str) -> set[str]:
         return set(self._queries.session_queue.unfinished_origins(queue_id, origin_prefix))
 
-    def get_origins_since(
-        self, queue_id: str, after_item_id: Optional[int], origin_prefix: str
-    ) -> tuple[Optional[int], set[str]]:
-        last_item_id, origins = self._queries.session_queue.origins_since(queue_id, after_item_id, origin_prefix)
-        return last_item_id, set(origins)
-
     def get_queue_item_summaries_by_ids(self, queue_id: str, item_ids: list[int]) -> list[SessionQueueItemSummary]:
         if not item_ids:
             return []

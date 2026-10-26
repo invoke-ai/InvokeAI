@@ -14,20 +14,18 @@ from diffusers import AutoencoderKL, AutoencoderKLFlux2
 
 from invokeai.app.services.config import get_config
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import (
-    DeviceMemory,
-    _device_memory,
-    _vae_dtypes,
-)
+from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import _vae_dtypes
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_plan import (
     DECODE_LINES,
     FLUX2_PIPELINE_VAE_DTYPE,
     FORCE_TILED_BASES,
     SDNQ_PIPELINE_VAE_DTYPE,
+    VAE_WEIGHTS_ALLOWANCE_BYTES,
     VaeDtypes,
     build_plan,
     case_sides,
 )
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loaders.flux import (
     Flux2DiffusersModel,
     Flux2SDNQCheckpointModel,
@@ -45,14 +43,17 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.util import devices, vae_working_memory
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.vae_working_memory import dtype_name
 from invokeai.backend.working_memory import counters
 from invokeai.backend.working_memory.fingerprint import DeviceClass
 from invokeai.backend.working_memory.platform import Platform
+from invokeai.backend.working_memory.probe import calibration_reservation
 from invokeai.backend.working_memory.spec import import_estimator_modules
 from tests.fixtures.working_memory_calibration import GPU, GPU_VAE_DTYPES, calibration_service
 
 GIB = 2**30
+MIB = 2**20
 CARD = DeviceClass(vendor="nvidia", name="Test GPU 24GB", total_mib=24 * 1024, backend="cuda", arch="sm_89")
 CUDNN = Platform("cudnn", "native", "linux")
 BYTES_PER_PIXEL = {"fp16": 1000, "bf16": 1000, "fp32": 2000}
@@ -383,80 +384,113 @@ def test_on_a_16gb_card_the_largest_size_leaves_the_vae_fully_resident_beside_it
     ]
 
 
+def _cache(device: str, *, reserve_gb: float = 0.0, cap_gb: float | None = None) -> ModelCache:
+    """A model cache whose execution device is `device`, built on the CPU: every memory query is patched out."""
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=True,
+        keep_ram_copy_of_weights=True,
+        max_vram_cache_size_gb=cap_gb,
+        reserve_vram_gb=reserve_gb,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=MagicMock(),
+    )
+    cache._execution_device = torch.device(device)
+    return cache
+
+
+def _plan_with_cache(tmp_path: Path, mock_invoker: Invoker, device: torch.device, device_class: DeviceClass, cache):
+    sdxl = _model("sdxl", BaseModelType.StableDiffusionXL)
+    model_manager = MagicMock()
+    model_manager.store.get_model.return_value = sdxl
+    model_manager.store.all_models.return_value = [sdxl]
+    model_manager.load.ram_caches = {str(device): cache}
+    mock_invoker.services.model_manager = model_manager
+    service = calibration_service(
+        tmp_path,
+        devices=lambda: [device],
+        device_class=device_class,
+        untiled_decode_reservation=lambda estimator, height, width, dtype, device: _sd_16gb(
+            estimator, height, width, dtype
+        ),
+        device_memory=None,
+    )
+    service.start(mock_invoker)
+    try:
+        return service.get_plan("sdxl")
+    finally:
+        service.stop(mock_invoker)
+
+
 @pytest.mark.parametrize(
     "process_mib, reserve_gb, cap_gb",
     [(16304 - OUTSIDE_MIB, 0.0, None), (16304, OUTSIDE_MIB / 1024, None), (16304, 0.0, (16304 - OUTSIDE_MIB) / 1024)],
     ids=["outside-use", "reserve-vram", "cache-cap"],
 )
-def test_the_plan_sizes_for_what_this_process_holds_less_the_cache_reserves(
-    tmp_path: Path, mock_invoker: Invoker, process_mib: int, reserve_gb: float, cap_gb: float | None
+def test_the_plan_sizes_for_what_the_cache_gives_a_calibration_lock(
+    tmp_path: Path, mock_invoker: Invoker, monkeypatch: pytest.MonkeyPatch, process_mib: int, reserve_gb, cap_gb
 ) -> None:
-    sdxl = _model("sdxl", BaseModelType.StableDiffusionXL)
-    model_manager = MagicMock()
-    model_manager.store.get_model.return_value = sdxl
-    model_manager.store.all_models.return_value = [sdxl]
-    mock_invoker.services.model_manager = model_manager
-    mock_invoker.services.configuration.reserve_vram_gb = reserve_gb
-    mock_invoker.services.configuration.max_cache_vram_gb = cap_gb
-    service = calibration_service(
-        tmp_path,
-        device_class=CARD_16GB,
-        untiled_decode_reservation=lambda estimator, height, width, dtype, device: _sd_16gb(
-            estimator, height, width, dtype
-        ),
-        device_memory=lambda device: DeviceMemory(process_mib * 2**20, 0),
+    """A dedicated card: the calibration's offload moves every other model out, so what they hold counts; the cache's
+    reserve and cap apply."""
+    monkeypatch.setattr(
+        TorchDevice, "cuda_mem_get_info", classmethod(lambda cls, device: ((process_mib - 2048) * MIB, 16304 * MIB))
     )
-    service.start(mock_invoker)
-    try:
-        plan = service.get_plan("sdxl")
-    finally:
-        service.stop(mock_invoker)
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device=None: 2048 * MIB)
+    cache = _cache("cuda:0", reserve_gb=reserve_gb, cap_gb=cap_gb)
+
+    plan = _plan_with_cache(tmp_path, mock_invoker, GPU, CARD_16GB, cache)
 
     assert max(case.width for case in plan.cases if case.line == "decode_fp16") == 2048
     assert max(case.width for case in plan.cases if case.line == "decode_fp32") == 1152
+
+
+def test_a_working_memory_floor_beyond_what_the_cache_gives_leaves_nothing_to_plan(
+    tmp_path: Path, mock_invoker: Invoker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A lock never reserves less than `device_working_mem_gb`. Set beyond what the cache can give a calibration on
+    the card (the 16 GB card of the test above, 2048px at the default), even the smallest case's lock would leave the
+    VAE partly loaded: the plan says the card cannot calibrate rather than queue cases whose windows fit no line."""
+    monkeypatch.setattr(TorchDevice, "cuda_mem_get_info", classmethod(lambda cls, device: (14256 * MIB, 16304 * MIB)))
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device=None: 2048 * MIB)
+    monkeypatch.setattr(mock_invoker.services.configuration, "device_working_mem_gb", 15.0)
+
+    plan = _plan_with_cache(tmp_path, mock_invoker, GPU, CARD_16GB, _cache("cuda:0"))
+
+    assert plan.cases == []
+    assert plan.supported is False
 
 
 @pytest.mark.parametrize("device", ["mps", "xpu:0"], ids=["mps", "integrated-xpu"])
 def test_a_device_that_shares_system_memory_sizes_for_the_ram_the_host_has_available(
     tmp_path: Path, mock_invoker: Invoker, monkeypatch: pytest.MonkeyPatch, device: str
 ) -> None:
-    """32 GiB of unified memory, of which the host has 10 GiB available and the backend holds 2 GiB for this process:
-    the cache can give 12 GiB, as `ModelCache._get_vram_available` counts it, so a case may take 11 GiB beside the
-    VAE's 1 GiB. At 2100 B/px (fp16) the largest square is 1920px, at 6000 B/px (fp32) 1088px. 90% of the total, what
-    the plan read before, would have allowed 3072px and 1792px."""
+    """32 GiB of unified memory: the host has 10 GiB available, the backend holds 2 GiB for this process, and models
+    and tensors take 3 GiB of that now. The calibration's offload moves nothing on such a device, so the lock gets 9
+    GiB, as the cache counts it, and a case may take 8 GiB beside the VAE's 1 GiB: at 2100 B/px (fp16) the largest
+    square is 1600px, at 6000 B/px (fp32) 960px. Without the live allocations taken off: 1920px and 1088px; with 90%
+    of the total, what the plan read first: 3072px and 1792px."""
     gpu = torch.device(device)
     shared = DeviceClass(vendor="test", name="Unified 32GB", total_mib=32 * 1024, backend=gpu.type, arch=None)
     monkeypatch.setattr(psutil, "virtual_memory", lambda: SimpleNamespace(total=32 * GIB, available=10 * GIB))
     monkeypatch.setattr(torch.mps, "driver_allocated_memory", lambda: 2 * GIB)
-    monkeypatch.setattr(torch.mps, "current_allocated_memory", lambda: GIB)
+    monkeypatch.setattr(torch.mps, "current_allocated_memory", lambda: 3 * GIB)
     monkeypatch.setattr(torch.xpu, "memory_reserved", lambda device=None: 2 * GIB, raising=False)
+    monkeypatch.setattr(torch.xpu, "memory_allocated", lambda device=None: 3 * GIB, raising=False)
     monkeypatch.setattr(torch.xpu, "memory_stats", lambda device=None: {}, raising=False)
     monkeypatch.setattr(counters, "xpu_memory_info", lambda device: None)
     monkeypatch.setattr(devices, "xpu_device_is_integrated", lambda device: True)
-    sdxl = _model("sdxl", BaseModelType.StableDiffusionXL)
-    model_manager = MagicMock()
-    model_manager.store.get_model.return_value = sdxl
-    model_manager.store.all_models.return_value = [sdxl]
-    mock_invoker.services.model_manager = model_manager
-    mock_invoker.services.configuration.reserve_vram_gb = 0.0
-    mock_invoker.services.configuration.max_cache_vram_gb = None
-    service = calibration_service(
-        tmp_path,
-        devices=lambda: [gpu],
-        device_class=shared,
-        untiled_decode_reservation=lambda estimator, height, width, dtype, device: _sd_16gb(
-            estimator, height, width, dtype
-        ),
-        device_memory=_device_memory,
-    )
-    service.start(mock_invoker)
-    try:
-        plan = service.get_plan("sdxl")
-    finally:
-        service.stop(mock_invoker)
+    cache = _cache(device)
 
-    assert max(case.width for case in plan.cases if case.line == "decode_fp16") == 1920
-    assert max(case.width for case in plan.cases if case.line == "decode_fp32") == 1088
+    plan = _plan_with_cache(tmp_path, mock_invoker, gpu, shared, cache)
+
+    assert cache.calibration_capacity() == 9 * GIB
+    assert max(case.width for case in plan.cases if case.line == "decode_fp16") == 1600
+    assert max(case.width for case in plan.cases if case.line == "decode_fp32") == 960
+    # Beside each case's working memory the lock still has room for the VAE, as the cache budgets it.
+    for case in plan.cases:
+        reservation = calibration_reservation(_sd_16gb(case.estimator, case.height, case.width, case.line[7:]))
+        assert cache._get_vram_available(reservation) >= VAE_WEIGHTS_ALLOWANCE_BYTES
 
 
 def test_the_largest_size_is_capped_at_what_generate_accepts() -> None:

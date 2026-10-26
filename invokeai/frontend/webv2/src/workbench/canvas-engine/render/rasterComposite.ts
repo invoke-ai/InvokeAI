@@ -7,6 +7,7 @@ import type {
   CanvasRasterLayerContractV2,
 } from '@workbench/canvas-engine/contracts';
 import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
+import type { LayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 import type { GroupCompositeScope } from '@workbench/canvas-engine/render/groupCompositeScopes';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Mat2d, Rect } from '@workbench/canvas-engine/types';
@@ -105,6 +106,25 @@ export class RasterCompositeOverBudgetError extends Error {
   constructor() {
     super('The canvas composite exceeds the available raster memory budget.');
     this.name = 'RasterCompositeOverBudgetError';
+  }
+}
+
+/**
+ * Thrown when a contributor's pixels cannot be read (its image is gone or does not decode); export reports its
+ * `unreadable` refusal, which names the layer.
+ */
+export class RasterCompositeUnreadableError extends Error {
+  constructor(readonly refusal: LayerUnreadable) {
+    super(`The pixels of layer ${refusal.layerId} could not be read.`);
+    this.name = 'RasterCompositeUnreadableError';
+  }
+}
+
+/** Thrown when a contributor's pixels are still loading or could not be fetched for now; export maps it to `not-ready`. */
+export class RasterCompositeNotReadyError extends Error {
+  constructor(readonly layerId: string) {
+    super(`The pixels of layer ${layerId} are not ready.`);
+    this.name = 'RasterCompositeNotReadyError';
   }
 }
 

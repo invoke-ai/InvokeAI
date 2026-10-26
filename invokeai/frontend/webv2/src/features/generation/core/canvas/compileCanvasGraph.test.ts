@@ -773,13 +773,13 @@ describe('compileCanvasGraph', () => {
 
     it('rejects a zero-area bbox', () => {
       expect(() => compile(sd1Model, 'txt2img', { bbox: { height: 0, width: 512, x: 0, y: 0 } })).toThrow(
-        'Canvas bounding box must have a positive area.'
+        'Canvas frame must have a positive area.'
       );
     });
 
     it('rejects fractional bbox dimensions before emitting backend resize fields', () => {
       expect(() => compile(flux2Model, 'txt2img', { bbox: { height: 888, width: 1024.5, x: 0, y: 0 } })).toThrow(
-        'Canvas bounding box dimensions must be whole pixels.'
+        'Canvas frame dimensions must be whole pixels.'
       );
     });
 
@@ -1172,6 +1172,27 @@ describe('compileCanvasGraph — control layers (integration)', () => {
     model: { base: 'sd-1', key: 'canny-controlnet', name: 'Canny ControlNet', type: 'controlnet' },
     weight: 0.65,
   };
+
+  it('carries the InstantX mode of a FLUX union layer onto its flux_controlnet node, and none onto other bases', () => {
+    const unionLayer: ControlLayerGraphInput = {
+      ...controlNetLayer,
+      controlMode: null,
+      instantxControlMode: 4,
+      model: { base: 'flux', key: 'flux-union', name: 'FLUX ControlNet Union Pro', type: 'controlnet' },
+    };
+    const flux = compile(fluxModel, 'txt2img', { controlLayers: [unionLayer] }).backendGraph;
+    const sd1 = compile(sd1Model, 'img2img', {
+      controlLayers: [{ ...controlNetLayer, instantxControlMode: 4 }],
+    }).backendGraph;
+
+    expect(flux.nodes['control_net_control-layer-1']).toMatchObject({
+      instantx_control_mode: 4,
+      type: 'flux_controlnet',
+    });
+    expect(flux.nodes['control_net_control-layer-1']).not.toHaveProperty('control_mode');
+    expect(sd1.nodes['control_net_control-layer-1']?.type).toBe('controlnet');
+    expect(sd1.nodes['control_net_control-layer-1']).not.toHaveProperty('instantx_control_mode');
+  });
 
   it('grafts an enabled control layer through a real compiled canvas graph: control node args, collector → denoise.control wiring, base graph intact', () => {
     const { backendGraph, graph, mode } = compile(sd1Model, 'img2img', { controlLayers: [controlNetLayer] });

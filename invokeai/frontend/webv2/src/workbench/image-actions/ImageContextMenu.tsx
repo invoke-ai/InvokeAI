@@ -28,6 +28,7 @@ import {
   ClapperboardIcon,
   AsteriskIcon,
   AudioLinesIcon,
+  BoxIcon,
   ChevronRightIcon,
   CopyIcon,
   CrosshairIcon,
@@ -47,6 +48,7 @@ import {
   ScanIcon,
   ScissorsIcon,
   ShuffleIcon,
+  SlidersHorizontalIcon,
   SproutIcon,
   StarIcon,
   Trash2Icon,
@@ -769,7 +771,9 @@ const SingleImageMenuItems = ({
   const handleSelectForCompare = useSelectForCompareHandler(actions, image);
   const handleSavePromptAsTemplate = useCallback(() => void actions.savePromptAsTemplate(image), [actions, image]);
   const handleUseAsReferenceImage = useUseAsReferenceImageHandler(actions, image);
+  const handleUseAsControl = useCallback(() => void actions.sendImageAsControl(image), [actions, image]);
   const handleLoadWorkflow = useCallback(() => void actions.loadImageWorkflow(image), [actions, image]);
+  const handleGeneratePbrMaps = useCallback(() => void actions.generatePbrMaps(image), [actions, image]);
   const { generation, widgets } = useWorkbenchCommands();
   const openWidget = useOpenWorkbenchWidget();
   const handleSendToUpscale = useCallback(() => {
@@ -869,6 +873,12 @@ const SingleImageMenuItems = ({
         onClick={handleUseAsReferenceImage}
       />
       <ContextMenuItem
+        icon={SlidersHorizontalIcon}
+        label={t('widgets.gallery.itemActions.useAsControl')}
+        value="use-as-control"
+        onClick={handleUseAsControl}
+      />
+      <ContextMenuItem
         // Use the same availability signal as Use Prompt to disable empty recall upfront.
         disabled={isLoadingRecallCapabilities || !recallCapabilities.prompts}
         icon={TypeIcon}
@@ -881,6 +891,12 @@ const SingleImageMenuItems = ({
         label="Select for Compare"
         value="select-for-compare"
         onClick={handleSelectForCompare}
+      />
+      <ContextMenuItem
+        icon={BoxIcon}
+        label={t('widgets.gallery.itemActions.pbrMaps.label')}
+        value="generate-pbr-maps"
+        onClick={handleGeneratePbrMaps}
       />
       <Menu.Separator borderColor="border.subtle" />
       <FindInGalleryMenuItem itemRef={imageItemRef} />
