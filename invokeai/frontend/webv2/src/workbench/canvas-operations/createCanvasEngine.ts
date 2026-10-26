@@ -30,6 +30,8 @@ export interface CanvasEngineOptions extends Omit<
    */
   ensureProjectOnServer(): Promise<void>;
   getMainModelBase?: () => string | null;
+  /** The account's Select Object Auto Process preference; the widget layer injects the settings read. */
+  readSelectObjectAutoProcess?: () => boolean;
   selectObjectDeps?: {
     uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ height: number; imageName: string; width: number }>;
     runGraph(options: {
@@ -70,7 +72,14 @@ export type CanvasEngine = CoreCanvasEngineImplementation;
 
 /** Application composition root: owns SAM/filter sessions, queues, uploads, and their core capability adapters. */
 export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine => {
-  const { controlDetectionDeps, ensureProjectOnServer, filterDeps, selectObjectDeps, ...coreOptions } = options;
+  const {
+    controlDetectionDeps,
+    ensureProjectOnServer,
+    filterDeps,
+    readSelectObjectAutoProcess,
+    selectObjectDeps,
+    ...coreOptions
+  } = options;
   const owner = captureAccountScope();
   const uploadLifetime = new AbortController();
   let projectMissingAt = -Infinity;
@@ -179,6 +188,7 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     isSamToolActive: host.isSamToolActive,
     prepareStart: host.prepareSelectObjectStart,
     projectId: options.projectId,
+    readAutoProcessPreference: readSelectObjectAutoProcess,
     publishPreview: (preview) => host.publishSamPreview(preview),
     replaceSelection: (preview, signal) => host.replaceSelection(preview.guard, preview.image, preview.rect, signal),
     replaceTemporaryRestoreTool: host.replaceTemporaryRestoreTool,

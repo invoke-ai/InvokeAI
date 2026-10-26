@@ -18,7 +18,9 @@ export interface SelectObjectReadyResult {
 
 export type SelectObjectRunResult =
   | SelectObjectReadyResult
-  | { status: 'aborted' | 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | {
+      status: 'aborted' | 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'unreadable' | 'over-budget';
+    }
   | AdjustmentRefusal
   | { status: 'invalid-input' }
   | { status: 'dimension-mismatch'; message: string }

@@ -128,6 +128,7 @@ class SubModelType(str, Enum):
     Tokenizer2 = "tokenizer_2"
     Tokenizer3 = "tokenizer_3"
     Processor = "processor"
+    VisionEncoder = "vision_encoder"
     PromptEnhancer = "pe"
     PromptEnhancerTokenizer = "pe_tokenizer"
     VAE = "vae"
