@@ -2,12 +2,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from invokeai.app.invocations.math import AddInvocation, RandomIntInvocation
 from invokeai.app.services.board_access.board_access_common import (
     BoardAccessDeniedError,
     BoardAction,
     ItemAccessDeniedError,
     ItemAction,
 )
+from invokeai.app.services.shared.graph import Edge, EdgeConnection, Graph, GraphExecutionState
 from invokeai.app.services.shared.invocation_context import ImagesInterface
 
 
@@ -151,3 +153,104 @@ def test_images_save_attributes_the_output_to_the_queue_items_project() -> None:
     images.save(MagicMock())
 
     assert services.images.create.call_args.kwargs["project_id"] == "project-1"
+
+
+def test_image_save_graph_records_resolved_runtime_inputs() -> None:
+    graph = Graph()
+    graph.add_node(RandomIntInvocation(id="random", low=17, high=18))
+    graph.add_node(AddInvocation(id="add", b=1))
+    graph.add_node(AddInvocation(id="downstream", b=2))
+    graph.add_edge(
+        Edge(
+            source=EdgeConnection(node_id="random", field="value"),
+            destination=EdgeConnection(node_id="add", field="a"),
+        )
+    )
+    graph.add_edge(
+        Edge(
+            source=EdgeConnection(node_id="add", field="value"),
+            destination=EdgeConnection(node_id="downstream", field="a"),
+        )
+    )
+    source_graph_json = graph.model_dump_json()
+    session = GraphExecutionState(graph=graph)
+
+    random_node = session.next()
+    assert isinstance(random_node, RandomIntInvocation)
+    session.complete(random_node.id, random_node.invoke(MagicMock()))
+    runtime_add_node = session.next()
+    assert isinstance(runtime_add_node, AddInvocation)
+    assert runtime_add_node.a == 17
+
+    services = MagicMock()
+    services.configuration.multiuser = False
+    data = MagicMock()
+    data.queue_item.user_id = "queue-user"
+    data.queue_item.workflow = None
+    data.queue_item.root_item_id = None
+    data.queue_item._workflow_json_loaded = False
+    data.queue_item._workflow_json_snapshot = None
+    data.queue_item.session = session
+    data.queue_item.session_id = "session"
+    data.queue_item.project_id = "project-1"
+    data.invocation = runtime_add_node
+    images = ImagesInterface(services, data, MagicMock())
+
+    images.save(MagicMock())
+
+    saved_kwargs = services.images.create.call_args.kwargs
+    saved_graph = Graph.model_validate_json(saved_kwargs["graph"])
+    saved_add_node = saved_graph.nodes[next(iter(session.source_prepared_mapping["add"]))]
+    assert isinstance(saved_add_node, AddInvocation)
+    assert saved_add_node.a == 17
+    assert saved_kwargs["node_id"] == saved_add_node.id
+    downstream_id = next(iter(session.source_prepared_mapping["downstream"]))
+    assert set(saved_graph.nodes) == {random_node.id, runtime_add_node.id, downstream_id}
+    saved_downstream_node = saved_graph.nodes[downstream_id]
+    assert isinstance(saved_downstream_node, AddInvocation)
+    assert saved_downstream_node.b == 2
+    assert sorted(
+        (edge.source.node_id, edge.source.field, edge.destination.node_id, edge.destination.field)
+        for edge in saved_graph.edges
+    ) == sorted(
+        [
+            (random_node.id, "value", runtime_add_node.id, "a"),
+            (runtime_add_node.id, "value", downstream_id, "a"),
+        ]
+    )
+    assert graph.nodes["add"].a == 0
+    assert session.graph.model_dump_json() == source_graph_json
+    assert graph.model_dump_json() == source_graph_json
+    assert saved_kwargs["workflow"] is None
+    assert data.queue_item.workflow is None
+
+
+def test_image_save_graph_falls_back_to_source_graph_before_materialization() -> None:
+    graph = Graph()
+    graph.add_node(AddInvocation(id="add", a=2, b=3))
+    session = GraphExecutionState(graph=graph)
+    assert not session.execution_graph.nodes
+
+    services = MagicMock()
+    services.configuration.multiuser = False
+    data = MagicMock()
+    data.queue_item.user_id = "queue-user"
+    data.queue_item.workflow = None
+    data.queue_item.root_item_id = None
+    data.queue_item._workflow_json_loaded = False
+    data.queue_item._workflow_json_snapshot = None
+    data.queue_item.session = session
+    data.queue_item.session_id = "session"
+    data.queue_item.project_id = "project-1"
+    data.invocation = graph.nodes["add"]
+    images = ImagesInterface(services, data, MagicMock())
+
+    images.save(MagicMock())
+
+    saved_graph_json = services.images.create.call_args.kwargs["graph"]
+    saved_graph = Graph.model_validate_json(saved_graph_json)
+    saved_add_node = saved_graph.nodes["add"]
+    assert isinstance(saved_add_node, AddInvocation)
+    assert (saved_add_node.a, saved_add_node.b) == (2, 3)
+    assert saved_graph == graph
+    assert not session.execution_graph.nodes

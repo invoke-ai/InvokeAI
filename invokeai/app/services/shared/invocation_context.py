@@ -323,7 +323,9 @@ class ImagesInterface(InvocationContextInterface):
 
         graph_ = None
         if self._data.queue_item.session.graph:
-            graph_ = self._data.queue_item.session.graph.model_dump_json()
+            session = self._data.queue_item.session
+            graph = session.execution_graph if session.execution_graph.nodes else session.graph
+            graph_ = graph.model_dump_json()
 
         return self._services.images.create(
             image=image,
