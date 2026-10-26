@@ -704,6 +704,22 @@ describe('runCanvasInvocation', () => {
     ]);
   });
 
+  it.each([
+    [
+      { layerId: 'layer-7', layerName: 'Sky', status: 'unreadable' } as const,
+      '“Sky” could not be read (its image may have been deleted or damaged). Disable or delete that layer, then invoke again.',
+    ],
+    [{ status: 'not-ready' } as const, 'Some layers are still loading. Wait a moment, then invoke again.'],
+  ])('explains a %o capture and dispatches nothing', async (result, message) => {
+    const harness = makeHarness();
+    harness.deps.composeForGeneration = () => Promise.resolve(result);
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual([message]);
+  });
+
   it('uses the frozen canvas and detached pixels after edits at composite, upload, and queue-dispatch boundaries', async () => {
     let liveDocument = makeDoc([rasterLayer('frozen-layer')], 96);
     liveDocument.bbox = { height: 64, width: 64, x: 7, y: 11 };
