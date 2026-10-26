@@ -9,11 +9,13 @@ and shapes, which no single test file of a few megabytes could carry, so they ar
 import json
 from pathlib import Path
 
+import pytest
 import torch
 from safetensors.torch import save_file
 
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
+from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError
 from invokeai.backend.model_manager.configs.ip_adapter import IPAdapter_Checkpoint_Anima_Config
 from invokeai.backend.model_manager.configs.siglip import SigLIP_Diffusers_Config
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
@@ -39,10 +41,10 @@ class _CheckpointOnDisk(ModelOnDisk):
         return self._file_metadata
 
 
-def _identify(tmp_path: Path, state_dict: dict[str, torch.Tensor]):
+def _identify(tmp_path: Path, state_dict: dict[str, torch.Tensor], file_metadata: dict[str, str] = metadata):
     path = tmp_path / "ip_adapter-Character_Reference-10.safetensors"
     save_file({"placeholder": torch.zeros(1)}, path)
-    return ModelConfigFactory.from_model_on_disk(_CheckpointOnDisk(path, state_dict, metadata), allow_unknown=False)
+    return ModelConfigFactory.from_model_on_disk(_CheckpointOnDisk(path, state_dict, file_metadata), allow_unknown=True)
 
 
 def _released_checkpoint() -> dict[str, torch.Tensor]:
@@ -69,6 +71,31 @@ def test_an_ip_adapter_for_another_width_is_not_an_anima_one(tmp_path: Path) -> 
     result = _identify(tmp_path, state_dict)
 
     assert not isinstance(result.details[IPAdapter_Checkpoint_Anima_Config.__name__], Config_Base)
+
+
+@pytest.mark.parametrize(
+    ("extra_key", "extra_metadata", "message"),
+    [
+        ("null_tokens", {}, "null_tokens"),
+        ("blocks.0.ip_self_attn.q.weight", {}, "ip_self_attn"),
+        ("siglip_norm.weight", {}, "siglip_norm"),
+        ("siglip_compressor.0.weight", {}, "siglip_compressor"),
+        (None, {"ip_norm_keys": "True"}, "ip_norm_keys"),
+        (None, {"ip_inject_before_mlp": "true"}, "ip_inject_before_mlp"),
+    ],
+)
+def test_a_variant_the_loader_refuses_is_refused_at_install_with_its_message(
+    tmp_path: Path, extra_key, extra_metadata, message
+) -> None:
+    state_dict = _released_checkpoint()
+    if extra_key is not None:
+        state_dict[extra_key] = torch.empty(4, device="meta")
+
+    result = _identify(tmp_path, state_dict, {**metadata, **extra_metadata})
+
+    assert result.config is None, "a recognised but unusable adapter must not fall back to an unknown model"
+    outcome = result.details[IPAdapter_Checkpoint_Anima_Config.__name__]
+    assert isinstance(outcome, InvalidMatchError) and message in str(outcome)
 
 
 def _siglip_dir(tmp_path: Path, config: dict) -> Path:

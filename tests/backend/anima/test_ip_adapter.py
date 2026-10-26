@@ -6,6 +6,7 @@ node's own reshapes, its `scale_mask`, and its `_LoRALinear` wrappers on the cro
 """
 
 import copy
+import logging
 
 import accelerate
 import pytest
@@ -34,6 +35,7 @@ from invokeai.backend.model_manager.load.model_loaders.anima import (
     ANIMA_TRANSFORMER_CONFIG,
     AnimaIPAdapterModelLoader,
 )
+from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_TRANSFORMER_PREFIX
@@ -357,6 +359,15 @@ def test_a_variant_this_adapter_does_not_compute_is_refused(extra_key, extra_met
 
     with pytest.raises(ValueError, match=message):
         AnimaIPAdapter.from_state_dict(sd, {**metadata, **extra_metadata})
+
+
+def test_the_model_cache_size_counts_the_bundled_lora() -> None:
+    sd = _tiny_checkpoint()
+    adapter = AnimaIPAdapter.from_state_dict(sd, metadata)
+
+    # Every tensor of the checkpoint but the self-attention LoRA, which is not applied and so not kept.
+    expected = sum(t.numel() * t.element_size() for key, t in sd.items() if ".self_attn." not in key)
+    assert calc_model_size_by_data(logging.getLogger(__name__), adapter) == expected
 
 
 def test_the_reference_image_is_letterboxed_on_black_and_normalized() -> None:

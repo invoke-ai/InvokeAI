@@ -55,6 +55,7 @@ from invokeai.backend.anima.control_net_lllite import (
 from invokeai.backend.anima.ip_adapter import AnimaIPAdapter, AnimaIPAdapterExtension, combine_block_fns
 from invokeai.backend.anima.regional_prompting import AnimaRegionalPromptingExtension
 from invokeai.backend.anima.scheduler_driver import AnimaSchedulerDriver
+from invokeai.backend.architectures import FeaturesFacet, require
 from invokeai.backend.flux.schedulers import (
     ANIMA_SCHEDULER_LABELS,
     ANIMA_SCHEDULER_NAME_VALUES,
@@ -365,7 +366,8 @@ class AnimaDenoiseInvocation(BaseInvocation):
         Strength 0 drops an image entirely; a model left with no image is not loaded and its bundled LoRA is not
         applied, so it generates exactly what no adapter does. The images of one model are attended together and
         its LoRA is applied once. Sorted, as in `_normalize_control_lllite`, so the result does not depend on collect
-        order across models; within a model the images keep their input order.
+        order, which follows execution order: across models by key, and within a model by image and settings, since
+        the order of the concatenated tokens changes the attention's reduction order and so the low bits.
         """
         if ip_adapter is None:
             fields: list[AnimaIPAdapterField] = []
@@ -378,6 +380,14 @@ class AnimaDenoiseInvocation(BaseInvocation):
         for field in fields:
             if field.strength > 0:
                 groups.setdefault(field.ip_adapter_model.key, []).append(field)
+        max_images = require(BaseModelType.Anima, FeaturesFacet).max_reference_images
+        for group in groups.values():
+            if len(group) > max_images:
+                raise ValueError(
+                    f"The Anima IP-Adapter '{group[0].ip_adapter_model.name}' has {len(group)} reference images; "
+                    f"at most {max_images} can share one adapter."
+                )
+            group.sort(key=lambda f: (f.image_name, f.strength, f.begin_step_percent, f.end_step_percent))
         return [groups[key] for key in sorted(groups)]
 
     @staticmethod
@@ -832,6 +842,11 @@ class AnimaDenoiseInvocation(BaseInvocation):
             # Anima-3.8B's semantic connector conditions the context on the timestep, so its context
             # is recomputed at every step; every other Anima model's context is computed once here.
             uses_connector = bool(getattr(transformer, "has_semantic_connector", False))
+            if uses_connector and ip_adapters:
+                context.logger.warning(
+                    "The Anima IP-Adapter is for the Qwen3 Anima models (2B and 2.9B), not Anima-3.8B; its effect on "
+                    "this model is untested."
+                )
             self._check_qwen3_5_conditioning(
                 context, uses_connector, pos_text_conditionings, neg_text_conditionings or []
             )

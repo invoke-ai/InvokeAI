@@ -1512,7 +1512,26 @@ export const getCompatibleReferenceImages = (
     }
 
     didChange = true;
-    return { ...referenceImage, config: getDefaultReferenceImageConfig(model, models, referenceImage.config.image) };
+    const { config } = referenceImage;
+    const defaults = getDefaultReferenceImageConfig(model, models, config.image);
+
+    // A strength-only base keeps the user's step window and strength; only the adapter and the hidden SD fields reset.
+    if (config.type === 'ip_adapter' && defaults.type === 'ip_adapter' && isStrengthOnlyIPAdapterBase(model.base)) {
+      // Clamping a negative SD weight to 0 would switch the reference off, so it takes the default strength instead.
+      const weight =
+        Number.isFinite(config.weight) && config.weight >= 0 ? Math.min(config.weight, 2) : defaults.weight;
+      return {
+        ...referenceImage,
+        config: {
+          ...defaults,
+          beginEndStepPct: config.beginEndStepPct,
+          model: config.model?.base === model.base ? config.model : defaults.model,
+          weight,
+        },
+      };
+    }
+
+    return { ...referenceImage, config: defaults };
   });
 
   return didChange ? next : referenceImages;

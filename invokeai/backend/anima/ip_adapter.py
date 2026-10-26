@@ -16,7 +16,7 @@ per adapter; with one image this is exactly its computation.
 
 import re
 from functools import partial
-from typing import TYPE_CHECKING, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Sequence
 
 import accelerate
 import torch
@@ -91,6 +91,22 @@ def encode_image_tokens(encoder: "SiglipVisionModel", pixel_values: torch.Tensor
     return outputs.last_hidden_state
 
 
+def validate_anima_ip_adapter(keys: Iterable[str], metadata: Optional[Mapping[str, str]]) -> None:
+    """Raise `ValueError` for a checkpoint of a reference variant `AnimaIPAdapter` does not compute.
+
+    Shared by model identification and the loader, so such a file is refused at install rather than at generation.
+    """
+    for flag in _UNSUPPORTED_METADATA_FLAGS:
+        if (metadata or {}).get(flag, "False").lower() == "true":
+            raise ValueError(f"Unsupported Anima IP-Adapter: it was trained with `{flag}`, which is not supported.")
+    unsupported = [key for key in keys if not _IP_KEY_RE.match(key) and not key.startswith(_LORA_KEY_PREFIX)]
+    if unsupported:
+        raise ValueError(
+            "Unsupported Anima IP-Adapter: it has weights this adapter does not use, e.g. "
+            f"{', '.join(sorted(unsupported)[:3])}."
+        )
+
+
 class AnimaIPAdapterBlock(nn.Module):
     def __init__(self, token_dim: int, inner_dim: int, x_dim: int):
         super().__init__()
@@ -125,26 +141,16 @@ class AnimaIPAdapter(nn.Module):
             lora_model_from_anima_state_dict,
         )
 
-        for flag in _UNSUPPORTED_METADATA_FLAGS:
-            if (metadata or {}).get(flag, "False").lower() == "true":
-                raise ValueError(f"Unsupported Anima IP-Adapter: it was trained with `{flag}`, which is not supported.")
+        validate_anima_ip_adapter(sd.keys(), metadata)
 
         ip_sd: dict[str, torch.Tensor] = {}
         lora_pairs: dict[str, dict[str, torch.Tensor]] = {}
-        unsupported: list[str] = []
         for key, tensor in sd.items():
             if _IP_KEY_RE.match(key):
                 ip_sd[key] = tensor
             elif match := _CROSS_ATTN_LORA_KEY_RE.match(key):
                 block, projection, side = match.groups()
                 lora_pairs.setdefault(f"blocks.{block}.cross_attn.{projection}", {})[side] = tensor
-            elif not key.startswith(_LORA_KEY_PREFIX):
-                unsupported.append(key)
-        if unsupported:
-            raise ValueError(
-                "Unsupported Anima IP-Adapter: it has weights this adapter does not use, e.g. "
-                f"{', '.join(sorted(unsupported)[:3])}."
-            )
 
         block_indices = sorted({int(_IP_KEY_RE.match(key).group(1)) for key in ip_sd})  # type: ignore[union-attr]
         if not block_indices:

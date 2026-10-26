@@ -121,7 +121,9 @@ includes text-encoder layers, to the Qwen3 encoder. In the workflow editor use *
 The **Anima IP-Adapter (Character Reference)** starter model, by LuciferTC (~500 MB), carries a character
 from reference images into the generation. It was trained on anime images. Installing it also installs
 the **SigLIP2** image encoder it reads the reference with (google/siglip2-base-patch16-512, ~1.5 GB). If the
-adapter came from somewhere else, Invoke installs the encoder the first time a reference is used.
+adapter came from somewhere else, Invoke installs the encoder the first time a reference is used; in
+multi-user mode only an administrator's generation does, and anyone else is asked to have it installed
+from the Model Manager.
 
 To use it, select an Anima model and add a reference image in the **Guidance** section; the first installed
 Anima IP-Adapter is selected for it. The card has one main control, **Strength**, from 0 to 2 (default 1),

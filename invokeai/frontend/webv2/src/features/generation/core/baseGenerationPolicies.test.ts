@@ -1635,7 +1635,7 @@ describe('Anima IP-Adapter references', () => {
     ]);
   });
 
-  it('re-targets an SD reference that never had an adapter, leaking none of its SD settings', () => {
+  it('re-targets an SD reference that never had an adapter, keeping its step window and taking the default strength', () => {
     const sdxlModel = createModel('sdxl');
     const sdxlReference = {
       config: {
@@ -1659,7 +1659,7 @@ describe('Anima IP-Adapter references', () => {
     const animaDefault = (model: ComponentModelConfig | null) => [
       {
         config: {
-          beginEndStepPct: [0, 1],
+          beginEndStepPct: [0.2, 0.8],
           clipVisionModel: 'ViT-H',
           image: referenceImage,
           method: 'full',
@@ -1688,6 +1688,58 @@ describe('Anima IP-Adapter references', () => {
       getGenerateModelSelectionResult({ currentValues: withoutAdapter, model: animaQwen3, models: [sdxlIpAdapter] })
         .settings.referenceImages
     ).toBe(withoutAdapter.referenceImages);
+  });
+
+  it('fills in the adapter of an Anima reference once one is installed, keeping its strength and step window', () => {
+    const settings = createSettings(animaQwen3, {
+      referenceImages: [
+        {
+          ...animaReference('ref-1'),
+          config: { ...animaReference('ref-1').config, beginEndStepPct: [0.3, 0.7], model: null, weight: 1.5 },
+        },
+      ],
+    });
+
+    const result = getGenerateModelSelectionResult({
+      currentValues: settings,
+      model: animaQwen3,
+      models: [sdxlIpAdapter, animaIpAdapter, secondAnimaIpAdapter],
+    });
+
+    expect(result.settings.referenceImages).toEqual([
+      {
+        config: {
+          beginEndStepPct: [0.3, 0.7],
+          clipVisionModel: 'ViT-H',
+          image: referenceImage,
+          method: 'full',
+          model: animaIpAdapter,
+          type: 'ip_adapter',
+          weight: 1.5,
+        },
+        id: 'ref-1',
+        isEnabled: true,
+      },
+    ]);
+  });
+
+  it('keeps the chosen Anima adapter while clamping an out-of-range strength to 2', () => {
+    const settings = createSettings(animaQwen3, {
+      referenceImages: [
+        {
+          ...animaReference('ref-1'),
+          config: { ...animaReference('ref-1').config, model: secondAnimaIpAdapter, weight: 3 },
+        },
+      ],
+    });
+
+    const [reference] = getGenerateModelSelectionResult({
+      currentValues: settings,
+      model: animaQwen3,
+      models: [animaIpAdapter, secondAnimaIpAdapter],
+    }).settings.referenceImages;
+
+    expect(reference?.config).toMatchObject({ model: secondAnimaIpAdapter, weight: 2 });
   });
 
   it('keeps an SD reference without an adapter as it is on SDXL', () => {

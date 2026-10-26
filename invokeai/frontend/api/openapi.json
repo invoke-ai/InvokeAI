@@ -19046,6 +19046,11 @@
             "title": "Tokens Name",
             "type": "string"
           },
+          "image_name": {
+            "description": "The name of the reference image the tokens encode",
+            "title": "Image Name",
+            "type": "string"
+          },
           "ip_adapter_model": {
             "$ref": "#/components/schemas/ModelIdentifierField",
             "description": "The Anima IP-Adapter model"
@@ -19075,7 +19080,7 @@
             "type": "number"
           }
         },
-        "required": ["tokens_name", "ip_adapter_model"],
+        "required": ["tokens_name", "image_name", "ip_adapter_model"],
         "title": "AnimaIPAdapterField",
         "type": "object"
       },

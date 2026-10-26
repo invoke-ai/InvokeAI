@@ -74,6 +74,7 @@ def _identifier(key: str) -> ModelIdentifierField:
 
 
 def _field(key: str = "ipa", tokens_name: str = "tokens", **kwargs) -> AnimaIPAdapterField:
+    kwargs.setdefault("image_name", f"{tokens_name}.png")
     return AnimaIPAdapterField(tokens_name=tokens_name, ip_adapter_model=_identifier(key), **kwargs)
 
 
@@ -86,7 +87,16 @@ def _attended(block_fn) -> torch.Tensor:
     return block_fn.args[-1]
 
 
-def _denoise(monkeypatch, ip_adapter, *, steps: int = 4, scheduler: str = "euler", transformer_depth: int = _DEPTH):
+def _denoise(
+    monkeypatch,
+    ip_adapter,
+    *,
+    steps: int = 4,
+    scheduler: str = "euler",
+    transformer_depth: int = _DEPTH,
+    semantic_connector: bool = False,
+    context: MagicMock | None = None,
+):
     module = "invokeai.app.invocations.anima.anima_denoise"
     monkeypatch.setattr(f"{module}.TorchDevice.choose_torch_device", lambda: torch.device("cpu"))
     monkeypatch.setattr(f"{module}.TorchDevice.choose_anima_inference_dtype", lambda _d: torch.float32)
@@ -99,6 +109,7 @@ def _denoise(monkeypatch, ip_adapter, *, steps: int = 4, scheduler: str = "euler
     monkeypatch.setattr(f"{module}.LayerPatcher.apply_smart_model_patches", apply_smart_model_patches)
     monkeypatch.setattr(f"{module}.patch_anima_for_regional_prompting", lambda *_a: nullcontext())
     transformer = _FakeTransformer(transformer_depth)
+    transformer.has_semantic_connector = semantic_connector
     adapters: dict[str, AnimaIPAdapter] = {}
     transformer_id = object()
 
@@ -108,10 +119,16 @@ def _denoise(monkeypatch, ip_adapter, *, steps: int = 4, scheduler: str = "euler
         assert identifier.key not in adapters, f"adapter '{identifier.key}' loaded twice"
         return _Loaded(adapters.setdefault(identifier.key, _adapter()))
 
-    context = MagicMock()
+    context = context or MagicMock()
     context.models.load.side_effect = load
     context.conditioning.load.side_effect = lambda _name: ConditioningFieldData(
-        conditionings=[AnimaConditioningInfo(qwen3_embeds=torch.zeros(3, 1024), t5xxl_ids=torch.zeros(3).long())]
+        conditionings=[
+            AnimaConditioningInfo(
+                qwen3_embeds=torch.zeros(3, 1024),
+                t5xxl_ids=torch.zeros(3).long(),
+                qwen35_states=torch.zeros(4, 3, 2560) if semantic_connector else None,
+            )
+        ]
     )
     context.tensors.load.side_effect = lambda name: torch.full((1, 3, 4), _TOKEN_VALUES[name])
 
@@ -225,6 +242,50 @@ def test_a_strength_zero_image_leaves_the_other_image_of_its_adapter(monkeypatch
     assert all(torch.equal(_attended(blocks[0]), torch.full((1, 3, 4), 2.0)) for blocks in transformer.calls[0::2])
 
 
+def test_more_images_than_an_adapter_takes_are_refused(monkeypatch) -> None:
+    fields = [_field(tokens_name="first", image_name=f"{n}.png") for n in range(5)]
+
+    with pytest.raises(ValueError, match="'ipa' has 5 reference images; at most 4 can share one adapter"):
+        _denoise(monkeypatch, fields)
+    # The cap counts the images that do something: a strength-0 one is dropped first.
+    _denoise(monkeypatch, [*fields[:4], _field(image_name="off.png", strength=0.0)])
+
+
+def test_the_images_of_an_adapter_are_attended_in_the_same_order_whatever_the_collect_order(monkeypatch) -> None:
+    fields = [
+        _field(tokens_name="second", image_name="b.png"),
+        _field(tokens_name="first", image_name="a.png", strength=0.5),
+        _field(tokens_name="first", image_name="a.png"),
+    ]
+    orders = []
+    for permutation in (fields, fields[::-1], fields[1:] + fields[:1]):
+        (group,) = AnimaDenoiseInvocation._normalize_ip_adapters(permutation)
+        orders.append([(f.image_name, f.strength) for f in group])
+
+    assert orders == [[("a.png", 0.5), ("a.png", 1.0), ("b.png", 1.0)]] * 3
+    transformer, _, _ = _denoise(monkeypatch, fields[::-1])
+    expected = torch.cat([torch.full((1, 3, 4), 0.5), torch.full((1, 3, 4), 1.0), torch.full((1, 3, 4), 2.0)], 1)
+    assert torch.equal(_attended(transformer.calls[0][0]), expected)
+
+
+def test_anima_3_8b_runs_the_adapter_with_a_warning(monkeypatch) -> None:
+    context = MagicMock()
+
+    transformer, _, _ = _denoise(monkeypatch, [_field()], semantic_connector=True, context=context)
+
+    assert all(blocks is not None for blocks in transformer.calls[0::2])
+    warnings = [call.args[0] for call in context.logger.warning.call_args_list]
+    assert any("for the Qwen3 Anima models (2B and 2.9B), not Anima-3.8B" in w for w in warnings)
+
+
+def test_a_qwen3_anima_runs_the_adapter_without_that_warning(monkeypatch) -> None:
+    context = MagicMock()
+
+    _denoise(monkeypatch, [_field()], context=context)
+
+    assert not any("Qwen3 Anima" in call.args[0] for call in context.logger.warning.call_args_list)
+
+
 # --- encoder node -------------------------------------------------------------------------------------
 
 
@@ -259,9 +320,29 @@ def test_the_encoder_node_saves_the_tokens_without_strength(monkeypatch) -> None
     (saved,), _ = context.tensors.save.call_args
     assert torch.equal(saved, tokens) and saved.device.type == "cpu"
     field = output.ip_adapter
-    assert field.tokens_name == "saved-tokens"
+    assert (field.tokens_name, field.image_name) == ("saved-tokens", "ref")
     assert (field.strength, field.begin_step_percent, field.end_step_percent) == (1.5, 0.1, 0.9)
     assert field.ip_adapter_model.key == "ipa"
+
+
+def test_a_strength_zero_node_encodes_nothing_and_denoise_ignores_it(monkeypatch) -> None:
+    context = MagicMock()
+    context.tensors.save.return_value = "placeholder"
+    invocation = AnimaIPAdapterInvocation.model_construct(
+        image=SimpleNamespace(image_name="ref"),
+        ip_adapter_model=_identifier("ipa"),
+        strength=0.0,
+        begin_step_percent=0.0,
+        end_step_percent=1.0,
+    )
+
+    field = invocation.invoke(context).ip_adapter
+
+    context.models.load.assert_not_called()
+    context.models.search_by_attrs.assert_not_called()
+    context.images.get_pil.assert_not_called()
+    transformer, patches, adapters = _denoise(monkeypatch, [field])
+    assert all(blocks is None for blocks in transformer.calls) and patches == [] and adapters == {}
 
 
 def _siglip_record(name: str, source: str) -> SimpleNamespace:
@@ -280,9 +361,57 @@ def test_the_encoder_is_found_by_its_source_and_not_confused_with_the_redux_sigl
 def test_a_missing_encoder_is_installed_from_its_starter_source() -> None:
     installed = _siglip_record(siglip2_base_512.name, siglip2_base_512.source)
     context = MagicMock()
+    context._services.configuration.multiuser = False
     context.models.search_by_attrs.side_effect = [[], [installed]]
 
     assert AnimaIPAdapterInvocation._get_siglip_model(context) is installed
     (source,), kwargs = context._services.model_manager.install.heuristic_import.call_args
     assert source == siglip2_base_512.source
     assert kwargs["config"].type == ModelType.SigLIP
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "https://huggingface.co/google/siglip2-base-patch16-512",
+        "https://huggingface.co/google/siglip2-base-patch16-512/",
+        "google/siglip2-base-patch16-512:fp16",
+        "Google/SigLIP2-base-patch16-512",
+    ],
+)
+def test_the_encoder_is_found_under_another_spelling_of_its_repo(source) -> None:
+    record = _siglip_record("my siglip2", source)
+    context = MagicMock()
+    context.models.search_by_attrs.return_value = [record]
+
+    assert AnimaIPAdapterInvocation._get_siglip_model(context) is record
+    context._services.model_manager.install.heuristic_import.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "source", ["google/siglip2-base-patch16-512::vision_model", "google/siglip2-base-patch16-224", "/models/siglip2"]
+)
+def test_another_siglip_source_is_not_taken_for_the_encoder(source) -> None:
+    context = MagicMock()
+    context._services.configuration.multiuser = False
+    context.models.search_by_attrs.side_effect = [[_siglip_record("other", source)], []]
+
+    with pytest.raises(RuntimeError, match="Could not install"):
+        AnimaIPAdapterInvocation._get_siglip_model(context)
+
+
+@pytest.mark.parametrize(("is_admin", "installs"), [(False, False), (True, True)])
+def test_in_multiuser_mode_only_an_administrator_installs_a_missing_encoder(is_admin, installs) -> None:
+    installed = _siglip_record(siglip2_base_512.name, siglip2_base_512.source)
+    context = MagicMock()
+    context._services.configuration.multiuser = True
+    context._services.users.get.return_value = SimpleNamespace(is_admin=is_admin)
+    context.models.search_by_attrs.side_effect = [[], [installed]]
+
+    if installs:
+        assert AnimaIPAdapterInvocation._get_siglip_model(context) is installed
+    else:
+        with pytest.raises(RuntimeError, match="Ask an administrator to install it from the Model Manager"):
+            AnimaIPAdapterInvocation._get_siglip_model(context)
+    assert context._services.model_manager.install.heuristic_import.called is installs
+    context._services.users.get.assert_called_once_with(context._data.queue_item.user_id)

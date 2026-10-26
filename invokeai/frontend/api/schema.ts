@@ -5098,6 +5098,11 @@ export type components = {
              * @description The name of the SigLIP2 image tokens tensor (strength not applied)
              */
             tokens_name: string;
+            /**
+             * Image Name
+             * @description The name of the reference image the tokens encode
+             */
+            image_name: string;
             /** @description The Anima IP-Adapter model */
             ip_adapter_model: components["schemas"]["ModelIdentifierField"];
             /**

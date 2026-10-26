@@ -7,9 +7,11 @@ from typing import (
 from pydantic import BaseModel, Field
 from typing_extensions import Any
 
+from invokeai.backend.anima.ip_adapter import validate_anima_ip_adapter
 from invokeai.backend.flux.ip_adapter.state_dict_utils import is_state_dict_xlabs_ip_adapter
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
+    InvalidMatchError,
     NotAMatchError,
     raise_for_override_fields,
     raise_if_not_dir,
@@ -211,6 +213,10 @@ class IPAdapter_Checkpoint_Anima_Config(IPAdapter_Checkpoint_Config_Base, Config
             tensor = state_dict.get(key)
             if tensor is None or tuple(tensor.shape) != shape:
                 raise NotAMatchError(f"model does not match Anima IP Adapter heuristics ({key})")
+        try:
+            validate_anima_ip_adapter(state_dict.keys(), mod.metadata())
+        except ValueError as e:
+            raise InvalidMatchError(str(e)) from None
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
