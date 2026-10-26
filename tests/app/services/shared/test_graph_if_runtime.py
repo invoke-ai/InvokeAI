@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from invokeai.app.invocations.collections import CollectionConcatInvocation
 from invokeai.app.invocations.logic import BooleanLogicInvocation, IfInvocation
 from invokeai.app.invocations.loops import ForInvocation
 from invokeai.app.invocations.math import AddInvocation
@@ -13,6 +14,7 @@ from invokeai.app.services.shared.graph_iterator_ancestry import _IteratorAncest
 from invokeai.app.services.shared.graph_runtime_records import _ApplyTransaction
 from invokeai.app.services.shared.graph_validation import CollectInvocation, IterateInvocation
 from tests.app.services.shared.import_test_utils import assert_module_imports_without_graph
+from tests.test_nodes import AnyTypeTestInvocation
 
 
 @pytest.fixture
@@ -239,6 +241,86 @@ def test_resolved_literal_if_uses_root_frame_path() -> None:
     assert graph_if_runtime._get_if_iteration_paths_with_ancestry(
         state, "if", set(), lambda _: set(), lambda *_: (), _IteratorAncestry(state)
     ) == [()]
+
+
+def test_if_branch_frame_axes_deduplicates_stably_with_linear_comparisons(monkeypatch: pytest.MonkeyPatch) -> None:
+    comparisons = 0
+
+    class Axis(str):
+        def __eq__(self, other: object) -> bool:
+            nonlocal comparisons
+            comparisons += 1
+            return super().__eq__(other)
+
+        __hash__ = str.__hash__
+
+    axes = [Axis(f"axis-{index}") for index in range(1000)]
+    graph = Graph(nodes={"if": IfInvocation(id="if")})
+    for index in range(2):
+        source_id = f"source{index}"
+        graph.add_node(AddInvocation(id=source_id))
+        graph.add_edge(
+            Edge(
+                source=EdgeConnection(node_id=source_id, field="value"),
+                destination=EdgeConnection(node_id="if", field="true_input" if index == 0 else "false_input"),
+            )
+        )
+    state = SimpleNamespace(graph=graph)
+    axis_tuple = tuple(axes)
+    monkeypatch.setattr(graph_if_runtime, "_get_edge_frame_axes", lambda _state, _ancestry, edge, _cache: axis_tuple)
+
+    result = graph_if_runtime._get_if_branch_frame_axes(
+        state, _IteratorAncestry(GraphExecutionState(graph=Graph())), "if", {}
+    )
+
+    assert tuple(result["true_input"]) == tuple(f"axis-{index}" for index in range(1000))
+    assert result["true_input"] == result["false_input"]
+    assert comparisons < 10_000
+
+
+def test_edge_frame_axis_traversal_visits_long_passthrough_chain_linearly(monkeypatch: pytest.MonkeyPatch) -> None:
+    chain_length = 1000
+    graph = Graph()
+    graph.nodes["source"] = CollectionConcatInvocation(id="source", first=["x"])
+    graph.nodes["iterate"] = IterateInvocation(id="iterate")
+    graph.nodes["if"] = IfInvocation(id="if")
+    graph.add_edge(
+        Edge(
+            source=EdgeConnection(node_id="source", field="collection"),
+            destination=EdgeConnection(node_id="iterate", field="collection"),
+        )
+    )
+    previous = ("iterate", "item")
+    for index in range(chain_length):
+        node_id = f"pass{index}"
+        graph.nodes[node_id] = AnyTypeTestInvocation(id=node_id)
+        graph.add_edge(
+            Edge(
+                source=EdgeConnection(node_id=previous[0], field=previous[1]),
+                destination=EdgeConnection(node_id=node_id, field="value"),
+            )
+        )
+        previous = (node_id, "value")
+    edge = Edge(
+        source=EdgeConnection(node_id=previous[0], field=previous[1]),
+        destination=EdgeConnection(node_id="if", field="true_input"),
+    )
+    graph.add_edge(edge)
+    state = GraphExecutionState(graph=graph)
+    get_input_edges = graph._get_input_edges
+    visits = 0
+
+    def counted_get_input_edges(node_id: str, *args: object, **kwargs: object) -> list[Edge]:
+        nonlocal visits
+        visits += 1
+        return get_input_edges(node_id, *args, **kwargs)
+
+    monkeypatch.setattr(graph, "_get_input_edges", counted_get_input_edges)
+
+    axes = graph_if_runtime._get_edge_frame_axes(state, _IteratorAncestry(state), edge, {})
+
+    assert axes == ("iterate",)
+    assert visits < chain_length * 3
 
 
 @pytest.mark.parametrize("executed", [False, True])

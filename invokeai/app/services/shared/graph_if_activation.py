@@ -61,7 +61,7 @@ class _IfActivationController:
                 if (
                     for_id not in branch_sources
                     or for_id in direct_sources
-                    and not self._state.graph._get_input_edges(if_node_id, "condition")
+                    and branch_field == self._get_source_level_selected_field(if_node_id)
                     or any(
                         for_id in body_ids_by_for[enclosing_id] and enclosing_id not in for_by_return_id.values()
                         for enclosing_id in body_ids_by_for

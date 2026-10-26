@@ -2505,6 +2505,10 @@ class _ExecutionNodeBuilder:
                     or not isinstance(self._state.graph.get_node(node_id), IfInvocation)
                 )
                 and not self._should_defer_shared_collect_if(node_id, iterator_ancestry)
+                and not (
+                    isinstance(self._state.graph.get_node(node_id), IfInvocation)
+                    and graph_if_runtime._has_unresolved_if_frame_axes(self._state, node_id, iterator_ancestry)
+                )
                 and self._has_admitted_source_mapping(node_id, g, iterator_ancestry)
                 and not self._should_defer_sibling_if_collect_iterate(node_id)
                 and (
@@ -2565,6 +2569,12 @@ class _ExecutionNodeBuilder:
                                 or iteration_path[: len(condition_path or ())] == (condition_path or ())
                             )
                         ]
+                        if not matching_mappings and not iteration_path:
+                            matching_mappings = list(
+                                self._get_parent_iteration_mappings(
+                                    next_node_id, g, input_edges=condition_edges, iterator_node_ids=[]
+                                )
+                            )
                         for iteration_mapping in matching_mappings:
                             create_results = self.create_execution_node(
                                 next_node_id,

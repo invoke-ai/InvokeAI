@@ -838,12 +838,14 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
     the upstream axis over its reopening pairs it with per-group frames; both would drop or invent frames.
   - A branch whose open axes, or the axes a branch `Collect` keeps, are deeper than a per-item condition's, unless
     both branches carry the same deeper axes. Each `Collect.item` closes its innermost axis and keeps the outer axes;
-    this identity is followed through chained `Collect`s and ordinary passthrough nodes. A shared deeper axis lets the
-    `If` run once per available innermost frame. When both branches are Collect-backed, they must share a Collect in
-    that chain; matching axis names or equal collection lengths alone are insufficient. An asymmetric Collect chain
-    is rejected before invocation. A downstream `Collect` retains empty outer groups.
-  - A root-frame condition choosing between branches with different deeper axes. When both branches share nested
-    deeper axes, a root-frame condition runs the `If` once per frame of the innermost one.
+    this identity is followed through chained `Collect`s and ordinary passthrough nodes. Separate branch Collect chains
+    may retain the same axis identities and frames; sharing a Collect node is not required. Matching lengths alone do
+    not establish alignment. An asymmetric or distinct-axis Collect chain is rejected before invocation. A downstream
+    `Collect` retains empty outer groups.
+  - A root-frame condition choosing between branches with different deeper axes. When both branches retain the same
+    nested axes, a root-frame condition runs the `If` once per available frame of the innermost axis. Selecting a root
+    value over an axis reached only through an unselected `For` final output is the root-frame exception described
+    above; literal and computed root conditions have the same result cardinality.
   Selected-branch frame cardinality is not supported.
 - A completed `Collect` on a branch closes its item axis; the `If` does not wait for an `Iterate` that only that
   `Collect` consumes. When the `Collect` keeps an outer frame open and is selected, the `If` runs once per preserved
