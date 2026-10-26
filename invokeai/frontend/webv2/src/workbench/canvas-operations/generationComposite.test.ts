@@ -343,6 +343,7 @@ describe('composeForGeneration', () => {
     expect(detectMode).toHaveBeenCalledWith({
       bbox: { height: 64, width: 64, x: 0, y: 0 },
       bboxFullyCovered: true,
+      bboxHasContent: true,
       contentBounds: { height: 64, width: 64, x: 0, y: 0 },
       hasActiveInpaintMask: false,
     });
@@ -610,6 +611,33 @@ describe('composeForGeneration', () => {
       expect(second.composites.baseImageName).toBe(first.composites.baseImageName);
       expect(second.composites.controlImages).toEqual(first.composites.controlImages);
     }
+  });
+
+  it("refuses with the layer's name when its spatial adjustments cannot run, uploading nothing", async () => {
+    const layer = {
+      ...rasterLayer('base'),
+      adjustments: [{ amount: 60, id: 'dehaze', isEnabled: true, type: 'dehaze' as const }],
+      name: 'Portrait',
+    };
+    const harness = makeHost(makeDoc([layer]));
+    const executorDeps = harness.host.getCompositeExecutorDeps();
+    const runSpatial = vi.fn(() => Promise.resolve({ status: 'too-large' as const }));
+    harness.host.getCompositeExecutorDeps = () => ({ ...executorDeps, runSpatial });
+    const signal = new AbortController().signal;
+
+    const result = await compose(harness.host, { signal });
+
+    expect(result).toEqual({
+      ownerId: 'base',
+      ownerName: 'Portrait',
+      reason: 'too-large',
+      status: 'adjustment-refused',
+    });
+    // The job is cancellable with the invocation.
+    expect(runSpatial).toHaveBeenCalledWith(expect.objectContaining({ priority: 'now', signal }));
+    expect(harness.uploadImage).not.toHaveBeenCalled();
+    expect(harness.release).toHaveBeenCalledOnce();
+    expect(harness.host.dedupe.byKey.size).toBe(0);
   });
 
   it('releases the raster snapshot on success', async () => {

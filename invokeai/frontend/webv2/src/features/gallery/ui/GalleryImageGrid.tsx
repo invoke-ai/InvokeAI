@@ -223,9 +223,9 @@ const GalleryStarredSectionHeader = ({
 
   return (
     <Flex align="center" gap="1" h={`${GALLERY_STARRED_HEADER_HEIGHT_PX}px`} px="1" w="full">
+      {/* A disclosure named by its visible heading and count; aria-expanded carries the open state. */}
       <chakra.button
         aria-expanded={isOpen}
-        aria-label={t(isOpen ? 'widgets.gallery.collapseStarredItems' : 'widgets.gallery.expandStarredItems')}
         alignItems="center"
         color="fg.muted"
         display="flex"

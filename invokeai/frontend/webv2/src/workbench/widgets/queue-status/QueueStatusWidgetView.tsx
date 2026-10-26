@@ -45,6 +45,7 @@ export const QueueStatusWidgetView = ({ presentation }: WidgetViewProps) => {
 
   return (
     <StatusWidgetChip
+      hiddenLabel={t('widgets.labels.queueStatus')}
       icon={chip.tone === 'paused' ? PauseIcon : ListOrderedIcon}
       progress={getQueueStatusProgress(chip, progress?.percentage)}
     >

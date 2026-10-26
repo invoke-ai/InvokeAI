@@ -72,6 +72,15 @@ const centerAreaMocks = vi.hoisted(() => {
   };
 });
 
+const identity = vi.hoisted(() => ({
+  session: { multiuserEnabled: true, phase: 'ready', user: { is_admin: true, user_id: 'admin-user' } },
+}));
+
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useAuthSession: () => identity.session,
+}));
+
 vi.mock('@features/models', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useModelLoads: () => [],
@@ -305,12 +314,13 @@ describe('CenterArea with the workflow editor chrome at a narrow width', () => {
       ]);
     const implementation = await loadWorkflowWidgetImplementation();
     const document = { id: 'workflow-1', name: 'A workflow whose name is far too long for a narrow center view' };
+    const linkedSource = source ? { ...source, ownerUserId: 'another-user' } : undefined;
     const snapshot = {
-      activeWorkflow: { document, source },
+      activeWorkflow: { document, source: linkedSource },
       activeWorkflowId: document.id,
       id: 'project-1',
       projectGraph: document,
-      workflows: [{ document, source }],
+      workflows: [{ document, source: linkedSource }],
     };
     const port = <T,>(value: T) => ({ getSnapshot: () => value, subscribe: () => () => {} });
     const adapter = {

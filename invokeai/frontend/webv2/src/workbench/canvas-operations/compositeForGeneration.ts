@@ -6,6 +6,7 @@
  */
 
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
+import type { SpatialRunner } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Mat2d, Rect } from '@workbench/canvas-engine/types';
 import type {
@@ -17,7 +18,11 @@ import type {
 import { sha256Hex } from '@platform/browser/sha256';
 import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { alphaBounds } from '@workbench/canvas-engine/render/alphaBounds';
-import { renderRasterComposite } from '@workbench/canvas-engine/render/rasterComposite';
+import {
+  compositeScratchPixels,
+  RasterCompositeOverBudgetError,
+  renderRasterComposite,
+} from '@workbench/canvas-engine/render/rasterComposite';
 import { getCompositeLayerBounds } from '@workbench/canvas-operations/generationCompositePlan';
 
 type Ctx = RasterSurface['ctx'];
@@ -51,6 +56,8 @@ export interface CompositeCacheEntry {
   height: number;
   pixelHash: string;
   bboxFullyCovered: boolean;
+  /** Whether any pixel is not fully transparent; masks store their coverage here too. */
+  bboxHasContent: boolean;
   /** A regional mask's alpha bounds in bbox pixels; only regional entries have them. */
   bounds?: Rect;
 }
@@ -106,7 +113,10 @@ export interface ExecuteCompositePlanDeps {
   hashBlob?(blob: Blob): Promise<string>;
   /** Reads a surface region's pixels for the coverage scan (default `getImageData`). */
   readImageData?(surface: RasterSurface, rect: Rect): ImageData;
-  /** Reserves transient raster bytes for the complete composite operation. */
+  /**
+   * Reserves transient raster bytes: once per composite for its planned buffers, and again while rendering for any
+   * layer whose rasterized pixels need more than planned. Over budget refuses with `RasterCompositeOverBudgetError`.
+   */
   reserve?(
     bytes: number
   ):
@@ -114,28 +124,28 @@ export interface ExecuteCompositePlanDeps {
     | { status: 'over-budget'; requestedBytes: number; availableBytes: number };
   /** Writes pixels back to a surface (default `putImageData`; injectable for tests). */
   writeImageData?(surface: RasterSurface, imageData: ImageData, x: number, y: number): void;
-}
-
-export class CompositeOverBudgetError extends Error {
-  constructor() {
-    super('The canvas composite exceeds the available raster memory budget.');
-    this.name = 'CompositeOverBudgetError';
-  }
+  /**
+   * Evaluates spatial adjustment runs. Without it a spatial stack refuses with `AdjustmentRefusedError` instead of
+   * compositing without its spatial entries.
+   */
+  runSpatial?: SpatialRunner;
+  /** Cancels spatial jobs; an aborted composite throws an `AbortError`. */
+  signal?: AbortSignal;
 }
 
 const reserveComposite = (
   entry: CompositeEntry,
   deps: ExecuteCompositePlanDeps,
-  layerCount: number
+  scratchPixels: number
 ): { release(): void } => {
   const pixels = Math.max(0, entry.bbox.width) * Math.max(0, entry.bbox.height);
   // Final/accumulator surface plus a final scan ImageData (except for control
-  // layers, which are made opaque by construction), plus one temporary surface
-  // and one ImageData buffer for every adjusted/mask layer.
+  // layers, which are made opaque by construction), plus a temporary surface
+  // and an ImageData buffer for every scratch pixel.
   const finalBuffers = entry.kind === 'control-layer' ? 1 : 2;
-  const reservation = deps.reserve?.(pixels * 4 * (finalBuffers + layerCount * 2));
+  const reservation = deps.reserve?.((pixels * finalBuffers + scratchPixels * 2) * 4);
   if (reservation?.status === 'over-budget') {
-    throw new CompositeOverBudgetError();
+    throw new RasterCompositeOverBudgetError();
   }
   return reservation?.status === 'ok' ? reservation.lease : { release: () => undefined };
 };
@@ -161,6 +171,8 @@ export interface CompositeResult {
   contentBounds: Rect | null;
   /** Whether the composited bbox surface is fully opaque (no transparent holes). */
   bboxFullyCovered: boolean;
+  /** Whether any composited pixel in the bbox is not fully transparent. */
+  bboxHasContent: boolean;
 }
 
 /** Document→bbox translate matrix (the "view" the entry is composited under). */
@@ -199,18 +211,20 @@ export const computeCompositeContentBounds = (
   return getCompositeLayerBounds(layers);
 };
 
-/** True when every pixel of `imageData` is fully opaque (alpha === 255). Empty → false. */
-const isFullyOpaque = (imageData: ImageData): boolean => {
+/** One alpha pass: every pixel fully opaque (empty → false), and any pixel not fully transparent. */
+const scanCoverage = (imageData: ImageData): { fullyOpaque: boolean; hasContent: boolean } => {
   const { data, height, width } = imageData;
   if (width <= 0 || height <= 0) {
-    return false;
+    return { fullyOpaque: false, hasContent: false };
   }
-  for (let i = 3; i < data.length; i += 4) {
-    if (data[i] < 255) {
-      return false;
-    }
+  let fullyOpaque = true;
+  let hasContent = false;
+  for (let i = 3; i < data.length && (fullyOpaque || !hasContent); i += 4) {
+    const alpha = data[i] ?? 0;
+    fullyOpaque &&= alpha === 255;
+    hasContent ||= alpha > 0;
   }
-  return true;
+  return { fullyOpaque, hasContent };
 };
 
 /**
@@ -229,7 +243,11 @@ const flattenControlSurfaceOverBlack = (surface: RasterSurface): void => {
 };
 
 /** A raster entry's upload plus its coverage scan; `bounds` is measured for regional masks only. */
-type RasterEntryResult = CompositeEntryResult & { bboxFullyCovered: boolean; bounds: Rect | null };
+type RasterEntryResult = CompositeEntryResult & {
+  bboxFullyCovered: boolean;
+  bboxHasContent: boolean;
+  bounds: Rect | null;
+};
 
 /**
  * Share raster composition, coverage scanning, encoding, and plan-key/content-hash upload deduplication between
@@ -246,6 +264,7 @@ const executeRasterEntry = async (
   if (cached) {
     return {
       bboxFullyCovered: cached.bboxFullyCovered,
+      bboxHasContent: cached.bboxHasContent,
       bounds: cached.bounds ?? null,
       height: cached.height,
       imageName: cached.imageName,
@@ -256,25 +275,23 @@ const executeRasterEntry = async (
     };
   }
 
-  const countGroupScopes = (scopes: typeof entry.groupScopes): number =>
-    (scopes ?? []).reduce((total, scope) => total + 1 + countGroupScopes(scope.children), 0);
-  const reservation = reserveComposite(
-    entry,
-    deps,
-    entry.layers.filter((layer) => layer.adjustments !== undefined).length + countGroupScopes(entry.groupScopes)
-  );
+  const reservation = reserveComposite(entry, deps, compositeScratchPixels(entry));
   try {
     const surface = await renderRasterComposite(entry, deps);
     let bboxFullyCovered: boolean;
+    let bboxHasContent: boolean;
     let bounds: Rect | null = null;
     if (entry.kind === 'control-layer') {
       flattenControlSurfaceOverBlack(surface);
       bboxFullyCovered = surface.width > 0 && surface.height > 0;
+      bboxHasContent = bboxFullyCovered;
     } else {
       const fullRect: Rect = { height: surface.height, width: surface.width, x: 0, y: 0 };
       // One readback serves both scans; the surface is bbox-sized, so the bounds are bbox pixels.
       const pixels = readImageData(surface, fullRect);
-      bboxFullyCovered = isFullyOpaque(pixels);
+      const coverage = scanCoverage(pixels);
+      bboxFullyCovered = coverage.fullyOpaque;
+      bboxHasContent = coverage.hasContent;
       bounds = entry.kind === 'regional-mask' ? alphaBounds(pixels) : null;
     }
 
@@ -291,6 +308,7 @@ const executeRasterEntry = async (
 
     deps.dedupe.byKey.set(entry.key, {
       bboxFullyCovered,
+      bboxHasContent,
       ...(bounds ? { bounds } : {}),
       height: upload.height,
       imageName: upload.imageName,
@@ -300,6 +318,7 @@ const executeRasterEntry = async (
 
     return {
       bboxFullyCovered,
+      bboxHasContent,
       bounds,
       height: upload.height,
       imageName: upload.imageName,
@@ -323,9 +342,9 @@ export const executeCompositePlan = async (
   }
 
   const contentBounds = getCompositeLayerBounds(entry.layers);
-  const { bboxFullyCovered, bounds: _bounds, ...base } = await executeRasterEntry(entry, deps);
+  const { bboxFullyCovered, bboxHasContent, bounds: _bounds, ...base } = await executeRasterEntry(entry, deps);
 
-  return { base, bboxFullyCovered, contentBounds };
+  return { base, bboxFullyCovered, bboxHasContent, contentBounds };
 };
 
 /** Composite one control layer over the bbox; the shared cache avoids re-uploading unchanged controls. */
@@ -333,7 +352,12 @@ export const executeControlComposite = async (
   entry: CompositeEntry,
   deps: ExecuteCompositePlanDeps
 ): Promise<CompositeEntryResult> => {
-  const { bboxFullyCovered: _bboxFullyCovered, bounds: _bounds, ...result } = await executeRasterEntry(entry, deps);
+  const {
+    bboxFullyCovered: _bboxFullyCovered,
+    bboxHasContent: _bboxHasContent,
+    bounds: _bounds,
+    ...result
+  } = await executeRasterEntry(entry, deps);
   return result;
 };
 
@@ -350,7 +374,12 @@ export const executeRegionalMaskComposite = async (
   entry: CompositeEntry,
   deps: ExecuteCompositePlanDeps
 ): Promise<RegionalMaskCompositeResult> => {
-  const { bboxFullyCovered: _bboxFullyCovered, bounds, ...result } = await executeRasterEntry(entry, deps);
+  const {
+    bboxFullyCovered: _bboxFullyCovered,
+    bboxHasContent: _bboxHasContent,
+    bounds,
+    ...result
+  } = await executeRasterEntry(entry, deps);
   if (!bounds) {
     throw new Error(`executeRegionalMaskComposite: a ${entry.kind} entry is not a regional mask.`);
   }
@@ -487,7 +516,11 @@ export const executeMaskComposite = async (
     };
   }
 
-  const reservation = reserveComposite(entry, deps, entry.maskLayers?.length ?? 0);
+  const reservation = reserveComposite(
+    entry,
+    deps,
+    (entry.maskLayers?.length ?? 0) * Math.max(0, entry.bbox.width) * Math.max(0, entry.bbox.height)
+  );
   try {
     const surface = await compositeMaskEntry(entry, deps, writeImageData, readImageData);
     const hasContent = hasNonWhitePixel(
@@ -508,6 +541,7 @@ export const executeMaskComposite = async (
     // Reuse the `bboxFullyCovered` slot to persist `hasContent` for this key.
     deps.dedupe.byKey.set(entry.key, {
       bboxFullyCovered: hasContent,
+      bboxHasContent: hasContent,
       height: upload.height,
       imageName: upload.imageName,
       pixelHash,

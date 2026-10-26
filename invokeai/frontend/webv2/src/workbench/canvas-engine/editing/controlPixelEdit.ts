@@ -5,6 +5,7 @@ import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/seman
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
+import { rebaseControlOriginal } from '@workbench/canvas-engine/document/controlDerivation';
 import { isLeafEditable } from '@workbench/canvas-engine/document/layerEligibility';
 import { isEmptyPolygonShape } from '@workbench/canvas-engine/document/sources';
 import { roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
@@ -70,12 +71,19 @@ export const decidePixelEdit = ({
   return { status: 'materialize' };
 };
 
+/**
+ * The layer after its transform is baked into paint pixels at `rect`. A control layer's kept original moves with the
+ * bake, or detaches when the bake would shear its frame.
+ */
 export const buildMaterializedPixelLayer = (layer: PixelEditableLayer, rect: Rect): PixelEditableLayer => {
   const materialized: PixelEditableLayer = {
     ...structuredClone(layer),
     source: { bitmap: null, offset: { x: rect.x, y: rect.y }, type: 'paint' },
     transform: { ...IDENTITY_TRANSFORM },
   };
+  if (materialized.type === 'control') {
+    return rebaseControlOriginal(materialized, layer.transform);
+  }
   if (materialized.type === 'raster') {
     // Raster adjustments are applied before the layer transform by the normal
     // compositor. Materialization bakes those displayed pixels so the eraser

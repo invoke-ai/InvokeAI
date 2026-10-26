@@ -187,6 +187,10 @@ SILENTLY_IGNORED: dict[str, dict[str, set[str]]] = {
         # extra fields rather than rejecting them, which is why this never surfaced as an enqueue
         # error.
         "l2i": {"color_compensation"},
+        # `flux_ip_adapter` has no `method`: the FLUX adapter applies the whole image. webv2 shares
+        # the SD reference-image card with FLUX, so its Full/Style/Composition mode is offered there
+        # and sent, and changes nothing.
+        "flux_ip_adapter": {"method"},
     },
 }
 """Inputs webv2 writes that the invocation does not declare, per contract.

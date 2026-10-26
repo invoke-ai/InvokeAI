@@ -3,7 +3,12 @@ import type { GallerySemanticReference } from '@features/gallery/core/semanticIm
 import type { GallerySearchScope, GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryBoard, GalleryView, GeneratedImageContract } from '@features/gallery/core/types';
 
-import { compareGalleryItems, legacyGeneratedImageToGalleryItem, toGalleryItemKey } from '@features/gallery/core/items';
+import {
+  compareCreatedAt,
+  compareGalleryItems,
+  legacyGeneratedImageToGalleryItem,
+  toGalleryItemKey,
+} from '@features/gallery/core/items';
 import { GALLERY_RECENT_IMAGE_LIMIT } from '@features/gallery/core/recentImages';
 import { ALL_READABLE_BOARDS_ID, isDateBoardId } from '@features/gallery/data/backend';
 import {
@@ -15,18 +20,21 @@ import {
   galleryItemsPageOptions,
   galleryItemsTotalOptions,
   getGalleryListingBoardsQuery,
+  getFreshGalleryItemsPage,
+  isGalleryItemsPageAwaitingRefresh,
   type GalleryItemsFilter,
 } from '@features/gallery/data/queries';
 import { parseDateTokens } from '@platform/search/dateTokens';
 import {
   hashKey,
   keepPreviousData,
+  notifyManager,
   useInfiniteQuery,
   useQueries,
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import { planGalleryPageOffsets } from './galleryGridLayout';
 import {
@@ -83,7 +91,10 @@ export interface GallerySparsePageState {
 export interface GallerySparseListing {
   itemSlots: ReadonlyMap<number, GalleryItem>;
   pageStates: ReadonlyMap<number, GallerySparsePageState>;
-  /** Project-local outputs stay in separate virtual rows and never change backend item indexes. */
+  /**
+   * Project-local outputs created after the listing's newest item. They stay in separate virtual rows beside the
+   * listing's newest end and never change backend item indexes.
+   */
   recentItems: GalleryItem[];
   total: number | null;
 }
@@ -172,23 +183,21 @@ const isRecentItemVisible = (item: GalleryItem, filter: GalleryItemsFilter): boo
   return hasMatchingBoard && hasMatchingCategory;
 };
 
-export const mergeGalleryItemWindow = ({
+/** Merges an already resolved recent overlay into the backend window in listing order. */
+const mergeRecentItemsIntoWindow = ({
   backendItems,
   filter,
-  knownBackendItemKeys,
   maxRows,
-  recentImages,
+  recentItems,
 }: {
   backendItems: readonly GalleryItem[];
   filter: GalleryItemsFilter;
-  knownBackendItemKeys?: ReadonlySet<ReturnType<typeof toGalleryItemKey>>;
   maxRows: number;
-  recentImages: readonly GeneratedImageContract[];
+  recentItems: readonly GalleryItem[];
 }): GalleryItem[] => {
-  const missingRecentItems = getGalleryRecentItems({ backendItems, filter, knownBackendItemKeys, recentImages });
   const seenItemKeys = new Set<string>();
 
-  const mergedItems = [...missingRecentItems, ...backendItems].filter((item) => {
+  const mergedItems = [...recentItems, ...backendItems].filter((item) => {
     const key = toGalleryItemKey(item);
 
     if (seenItemKeys.has(key)) {
@@ -209,16 +218,49 @@ export const mergeGalleryItemWindow = ({
   return mergedItems.slice(0, maxRows);
 };
 
+/** Interleaves the recent overlay with the loaded backend window by listing order. */
+export const mergeGalleryItemWindow = ({
+  backendItems,
+  filter,
+  maxRows,
+  recentImages,
+}: {
+  backendItems: readonly GalleryItem[];
+  filter: GalleryItemsFilter;
+  maxRows: number;
+  recentImages: readonly GeneratedImageContract[];
+}): GalleryItem[] =>
+  mergeRecentItemsIntoWindow({
+    backendItems,
+    filter,
+    maxRows,
+    recentItems: getGalleryRecentItems({ backendItems, filter, recentImages }),
+  });
+
+const getNewestCreatedAt = (items: readonly GalleryItem[]): string | undefined =>
+  items.reduce<string | undefined>(
+    (newest, { createdAt }) => (newest === undefined || compareCreatedAt(createdAt, newest) > 0 ? createdAt : newest),
+    undefined
+  );
+
 /** Returns the bounded local recent overlay without assigning it a backend position. */
 export const getGalleryRecentItems = ({
   backendItems,
   knownBackendItemKeys,
   filter,
+  newerThan,
   recentImages,
 }: {
   backendItems: readonly GalleryItem[];
   knownBackendItemKeys?: ReadonlySet<ReturnType<typeof toGalleryItemKey>>;
   filter: GalleryItemsFilter;
+  /**
+   * Also drop recents created no later than this instant, the listing's newest item. Sparse viewports render recents
+   * as rows beside the listing's newest end and cannot interleave them, so an older recent belongs inside the listing
+   * range: the listing places it, or the post-run gallery refresh does once its board attach lands. The dense window
+   * interleaves instead.
+   */
+  newerThan?: string;
   recentImages: readonly GeneratedImageContract[];
 }): GalleryItem[] => {
   const backendItemKeys = new Set(backendItems.map(toGalleryItemKey));
@@ -229,6 +271,7 @@ export const getGalleryRecentItems = ({
       (item) =>
         !backendItemKeys.has(toGalleryItemKey(item)) &&
         !knownBackendItemKeys?.has(toGalleryItemKey(item)) &&
+        (newerThan === undefined || compareCreatedAt(item.createdAt, newerThan) > 0) &&
         isRecentItemVisible(item, filter)
     );
 
@@ -493,11 +536,28 @@ export const useGalleryData = ({
     totalCheckOffsets.delete(selectedPageOffset);
   }
 
+  // Paginated and anchored windows cannot place recent rows beside unrelated backend offsets.
+  const shouldOverlayRecentItems = !isPaginated && page === 0;
+  const newestPageOffset =
+    filter.orderDir === 'ASC'
+      ? Math.floor(Math.max(0, (knownTotal ?? 0) - 1) / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE
+      : 0;
   const toPageOptions = (offset: number) => {
     const options = galleryItemsPageOptions(filter, offset);
 
     // Failed pages wait for their own Retry; broad invalidation must not silently retry visible failures.
-    return { ...options, enabled: queryClient.getQueryState(options.queryKey)?.status !== 'error' };
+    return {
+      ...options,
+      enabled: queryClient.getQueryState(options.queryKey)?.status !== 'error',
+      // Manual patches reset Query's freshness clock. Refresh a suspended page on return, without retrying a
+      // mounted failed page merely because a patch changed its status back to success.
+      refetchOnMount:
+        shouldOverlayRecentItems &&
+        offset === newestPageOffset &&
+        isGalleryItemsPageAwaitingRefresh(queryClient, hashKey(options.queryKey))
+          ? ('always' as const)
+          : true,
+    };
   };
   const pageOptions = sparseViewport ? pageOffsets.map(toPageOptions) : [];
   const observedPageOptions = [...pageOptions, ...[...totalCheckOffsets].map(toPageOptions)];
@@ -665,56 +725,64 @@ export const useGalleryData = ({
         : new Map<number, GalleryItem>(),
     [isPaginated, pageOffsets, pageResults, selectedPageOffset, sparseViewport]
   );
-  // Recents belong at the top of the listing; overlaying them onto a window
-  // anchored mid-board would sort them into a part of the list they are
-  // nowhere near.
-  const shouldOverlayRecentItems = !isPaginated && page === 0;
   const maxRows = isPaginated ? GALLERY_PAGE_SIZE : GALLERY_MAX_ROWS;
+  // Read the newest-end page without observing it: scrolling may release or evict it normally. Its cached state
+  // remains the authority for the cutoff, so invalidation/removal suspends the overlay until that page is fresh.
+  const newestPageHash =
+    sparseViewport && shouldOverlayRecentItems
+      ? hashKey(galleryItemsPageOptions(filter, newestPageOffset).queryKey)
+      : null;
+  const queryCache = queryClient.getQueryCache();
+  const subscribeNewestPage = useCallback(
+    (onStoreChange: () => void) => {
+      if (newestPageHash === null) {
+        return () => undefined;
+      }
+      // Read after all cache listeners have applied the page lifecycle's fetch evidence.
+      const notify = notifyManager.batchCalls(onStoreChange);
+      return queryCache.subscribe((event) => {
+        if (event.query.queryHash === newestPageHash) {
+          notify();
+        }
+      });
+    },
+    [newestPageHash, queryCache]
+  );
+  const getNewestPageSnapshot = useCallback(
+    () => (newestPageHash ? getFreshGalleryItemsPage(queryClient, newestPageHash) : undefined),
+    [newestPageHash, queryClient]
+  );
+  const newestPage = useSyncExternalStore(subscribeNewestPage, getNewestPageSnapshot);
+  const hasListingNewest =
+    newestPage !== undefined &&
+    (filter.orderDir !== 'ASC' ||
+      newestPageOffset === Math.floor(Math.max(0, newestPage.total - 1) / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE);
+  const listingNewestCreatedAt = hasListingNewest ? getNewestCreatedAt(newestPage.items) : undefined;
   const recentItems = useMemo(
     () =>
-      sparseViewport && shouldOverlayRecentItems
+      hasListingNewest
         ? getGalleryRecentItems({
             backendItems,
             filter,
             knownBackendItemKeys: reconciledBackendRecentKeys,
+            newerThan: listingNewestCreatedAt,
             recentImages,
           })
         : [],
-    [backendItems, filter, recentImages, reconciledBackendRecentKeys, shouldOverlayRecentItems, sparseViewport]
+    [backendItems, filter, hasListingNewest, listingNewestCreatedAt, recentImages, reconciledBackendRecentKeys]
   );
+  // The sparse rows render `recentItems`, so selection and navigation merge exactly that overlay.
   const sparseItems = useMemo(
     () =>
-      sparseViewport
-        ? pageResults.some((result) => result.data) || recentItems.length > 0 || knownTotal === 0
-          ? mergeGalleryItemWindow({
-              backendItems,
-              filter,
-              knownBackendItemKeys: reconciledBackendRecentKeys,
-              maxRows: Math.max(GALLERY_MAX_ROWS, backendItems.length + GALLERY_RECENT_IMAGE_LIMIT),
-              recentImages: shouldOverlayRecentItems ? recentImages : [],
-            })
-          : null
-        : queryData || (shouldOverlayRecentItems && recentImages.length > 0)
-          ? mergeGalleryItemWindow({
-              backendItems,
-              filter,
-              maxRows,
-              recentImages: shouldOverlayRecentItems ? recentImages : [],
-            })
-          : null,
-    [
-      backendItems,
-      filter,
-      knownTotal,
-      maxRows,
-      pageResults,
-      queryData,
-      recentItems.length,
-      recentImages,
-      reconciledBackendRecentKeys,
-      shouldOverlayRecentItems,
-      sparseViewport,
-    ]
+      sparseViewport && (pageResults.some((result) => result.data) || recentItems.length > 0 || knownTotal === 0)
+        ? mergeRecentItemsIntoWindow({
+            backendItems,
+            filter,
+            maxRows: Math.max(GALLERY_MAX_ROWS, backendItems.length + GALLERY_RECENT_IMAGE_LIMIT),
+            recentItems,
+          })
+        : null,
+    [backendItems, filter, knownTotal, pageResults, recentItems, sparseViewport]
   );
   const scopedItems = useMemo(
     () =>

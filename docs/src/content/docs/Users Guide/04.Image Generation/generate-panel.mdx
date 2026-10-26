@@ -1,7 +1,7 @@
 ---
 title: Generate Panel Reference
 description: Every section of the Generate panel in detail — size, render settings, negative prompts, advanced options, resetting to defaults, concepts, reference images and the prompt tools.
-lastUpdated: 2026-10-18
+lastUpdated: 2026-10-19
 sidebar:
   order: 1
 ---
@@ -17,7 +17,13 @@ The **Size** section sets the width and height of the image.
 * **Width** and **Height** can be set by dragging, by typing a value, or by dragging the corner of the small size preview. Sizes run from 64 to 4096 pixels and snap to a multiple the model requires, usually 8, 16 or 32.
 * **Aspect ratio** offers common shapes: 21:9, 16:9, 3:2, 4:3, 1:1, 3:4, 2:3, 9:16 and 9:21, or **Free**. Choosing a ratio locks it, so changing the width changes the height to match. The lock button between the two fields locks or unlocks the current ratio.
 * **Swap width and height** turns a landscape image into a portrait one and back.
-* Each model has an optimal image area, typically about one megapixel for newer models and less for SD 1.5. The line under the fields shows the image's size in megapixels, marks the recommended size, and estimates the run time from your recent runs. **Set optimal size** resizes the image to the model's optimal area at the current aspect ratio.
+* Each model has an optimal image area, typically about one megapixel for newer models and less for SD 1.5. The line under the fields shows the image's size in megapixels, marks the recommended size, and estimates the run time from your recent runs.
+* **Reset size**, the button beside **Swap width and height**, opens a menu. Each item shows the size it sets, and the item matching the current size is checked; choosing it again changes nothing:
+  * **Square at native size** — a 1:1 square at the model's native size, such as 1024×1024 for SDXL and FLUX or 512×512 for SD 1.5, with the ratio locked.
+  * **Optimal size for** the current ratio — the model's optimal area at the current aspect ratio. It is absent at 1:1, where it would be the native square.
+  * **Model defaults** — the size set in the model's default settings. It appears only when the model sets one.
+
+  Right-clicking the width and height and choosing **Reset to model default** also resets the size this way. On the Canvas, these resets keep the generation frame centered on the same point; typing or dragging a new width or height resizes the frame from its top-left corner. Size resets are not canvas edits, so they do not appear in the canvas's undo history.
 
 Models produce their best results near their optimal size. Much larger images can show repeated subjects or distorted anatomy. To make a large image, generate at the optimal size and then upscale.
 
@@ -120,11 +126,12 @@ What a reference does, and what options it has, depends on the model family:
 |---|---|---|
 | **SD 1.5, SDXL** | An IP-Adapter model carries the reference's look into the image. | **Mode**: **Style**, **Composition** or **Both**. **Weight**. Under **Advanced**: the IP-Adapter model, a **Style variant** and the **Active steps** range. |
 | **FLUX.1** | An IP-Adapter, or a **FLUX Redux** model, which transfers the reference's content. | IP-Adapter options as above, or **Image influence** (Lowest to Highest) for Redux. |
+| **Anima** (not Anima-3.8B) | An Anima IP-Adapter carries a character's appearance (hair, outfit, accessories) into the image. Up to four references (experimental); images of one character combine well, different characters blend. | **Strength** (0 to 2; 0 turns it off), per reference. Under **Advanced**: the IP-Adapter model and the **Active steps** range. |
 | **FLUX.1 Kontext** | Kontext edits or recombines the reference images according to your prompt. | None beyond the model. |
 | **FLUX.2, Qwen Image Edit** | The model reads the references directly and uses them as your prompt instructs, for example *put the jacket from the first image on the person in the second*. | None. |
 | **Krea-2** | One reference's look — palette, texture, rendering — is transferred into the image while the prompt keeps driving the content; see [Krea-2](/users-guide/models/local-models/krea-2/#style-reference). | **Style strength** (0–2; 0 turns the reference off). |
 
-Reference images require an extra model for SD 1.5, SDXL and FLUX.1 (an IP-Adapter or FLUX Redux model). These are available as starter models in the Model Manager, and an installed IP-Adapter is selected automatically.
+Reference images require an extra model for SD 1.5, SDXL, FLUX.1 and Anima (an IP-Adapter or FLUX Redux model). These are available as starter models in the Model Manager, and an installed IP-Adapter is selected automatically.
 
 ## Prompt tools
 

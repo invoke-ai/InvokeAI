@@ -153,6 +153,7 @@ interface HarnessOptions {
   generateValues?: Record<string, unknown>;
   /** Replaces the uniform-alpha coverage readback. */
   readImageData?: GenerationCompositeExecutorDeps['readImageData'];
+  controlModelMemory?: RunCanvasInvocationDeps['controlModelMemory'];
 }
 
 const makeHarness = (options: HarnessOptions = {}): Harness => {
@@ -260,6 +261,7 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
 
   const deps: RunCanvasInvocationDeps = {
     composeForGeneration: (composeOptions) => composeForGeneration(host, composeOptions),
+    controlModelMemory: options.controlModelMemory ?? {},
     compositing: {
       ...DEFAULT_CANVAS_COMPOSITING,
       outputOnlyMaskedRegions: options.outputOnlyMaskedRegions ?? true,
@@ -277,8 +279,7 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
     },
     flushPendingUploads: flushPendingUploads as () => Promise<void>,
     // Production words rejections from the locale; the harness records the structured rejection it was handed.
-    formatControlLayerError: ({ code, layerName, suggestedKind }) =>
-      `${layerName}: ${code}${suggestedKind ? ` -> ${suggestedKind}` : ''}`,
+    formatControlLayerError: ({ code, layerName }) => `${layerName}: ${code}`,
     generateValues: { ...generateValuesFor(model), ...options.generateValues },
     inFlight: options.inFlight ?? new Set<string>(),
     models: options.models,
@@ -692,6 +693,35 @@ describe('runCanvasInvocation', () => {
     expect(harness.notices()).toHaveLength(0);
   });
 
+  it('names the layer or group whose Clarity, Texture or Dehaze refused generation, and dispatches nothing', async () => {
+    const harness = makeHarness();
+    harness.deps.composeForGeneration = () =>
+      Promise.resolve({ ownerId: 'g', ownerName: 'Sky', reason: 'too-large', status: 'adjustment-refused' });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual([
+      'Clarity, Texture and Dehaze can’t run on “Sky”: its content is larger than 16.8 megapixels (4096 × 4096 px). Disable or remove them, or crop the content, then invoke again.',
+    ]);
+  });
+
+  it.each([
+    [
+      { layerId: 'layer-7', layerName: 'Sky', status: 'unreadable' } as const,
+      '“Sky” could not be read (its image may have been deleted or damaged). Disable or delete that layer, then invoke again.',
+    ],
+    [{ status: 'not-ready' } as const, 'Some layers are still loading. Wait a moment, then invoke again.'],
+  ])('explains a %o capture and dispatches nothing', async (result, message) => {
+    const harness = makeHarness();
+    harness.deps.composeForGeneration = () => Promise.resolve(result);
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual([message]);
+  });
+
   it('uses the frozen canvas and detached pixels after edits at composite, upload, and queue-dispatch boundaries', async () => {
     let liveDocument = makeDoc([rasterLayer('frozen-layer')], 96);
     liveDocument.bbox = { height: 64, width: 64, x: 7, y: 11 };
@@ -794,7 +824,8 @@ describe('runCanvasInvocation', () => {
   );
 
   it('records a notice and dispatches no snapshot when the graph fails validation', async () => {
-    // External image generators are rejected by the graph compiler.
+    // The raster snapshot makes this an image-to-image run, and the record lists text-to-image only, so the notice
+    // names the frame's content as the cause.
     const harness = makeHarness({ model: externalModel });
 
     await runCanvasInvocation(harness.deps);
@@ -802,10 +833,134 @@ describe('runCanvasInvocation', () => {
     expect(harness.submittedGraphs()).toHaveLength(0);
     const notices = harness.notices();
     expect(notices).toHaveLength(1);
-    expect(notices[0]?.message).toContain('does not support canvas generation');
+    expect(notices[0]?.message).toBe(
+      'OpenAI Image cannot use image content in the generation frame. Hide or move raster content out of the frame to generate.'
+    );
     expect(harness.dedupe.byKey).toHaveLength(0);
     expect(harness.dedupe.byHash).toHaveLength(0);
     expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('generates from text for a text-only provider when the frame holds no visible pixels', async () => {
+    // The raster layer's bounds overlap the frame, but every composited pixel there is transparent.
+    const harness = makeHarness({ alpha: 0, model: externalModel });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.notices()).toEqual([]);
+    const submitted = harness.submittedGraphs();
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]?.graph.backendGraph?.nodes.canvas_processing_output).toMatchObject({ mode: 'txt2img' });
+    expect(submitted[0]?.graph.backendGraph?.nodes.canvas_processing_output).not.toHaveProperty('init_image');
+  });
+
+  it('generates from text for an editing provider when the frame holds no visible pixels', async () => {
+    // Without this, the partial bounds overlap would read as outpaint, which hosted providers refuse.
+    const model: GenerateModelConfig = { ...externalModel, capabilities: { modes: ['txt2img', 'img2img'] } };
+    const harness = makeHarness({ alpha: 0, model });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.notices()).toEqual([]);
+    expect(harness.submittedGraphs()[0]?.graph.backendGraph?.nodes.canvas_processing_output).toMatchObject({
+      mode: 'txt2img',
+    });
+  });
+
+  it('refuses a text-only provider when any pixel in the frame is visible, even partly', async () => {
+    const harness = makeHarness({ alpha: 1, model: externalModel });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual([
+      'OpenAI Image cannot use image content in the generation frame. Hide or move raster content out of the frame to generate.',
+    ]);
+  });
+
+  it.each(['control', 'regional'] as const)(
+    'rejects contributing external %s layers by name before enqueue',
+    async (kind) => {
+      const layer = kind === 'control' ? controlLayer('Canny guide') : regionalLayer('Hat region');
+      const harness = makeHarness({ model: externalModel, document: docWithLayers([layer]) });
+      await runCanvasInvocation(harness.deps);
+      expect(harness.submittedGraphs()).toHaveLength(0);
+      expect(harness.notices().map((notice) => notice.message)).toEqual([
+        kind === 'control'
+          ? 'OpenAI Image does not support control layer "Canny guide". Disable it to generate.'
+          : 'OpenAI Image does not support regional guidance layer "Hat region". Disable it to generate.',
+      ]);
+      expect(harness.dedupe.byKey.size).toBe(0);
+      expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each(['control', 'regional'] as const)('ignores disabled external %s layers', async (kind) => {
+    const layer = kind === 'control' ? controlLayer('Canny guide') : regionalLayer('Hat region');
+    const harness = makeHarness({ model: externalModel, document: docWithLayers([{ ...layer, isEnabled: false }]) });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.notices()).toEqual([]);
+    expect(harness.submittedGraphs()).toHaveLength(1);
+  });
+
+  it('submits an img2img-only provider through the real preparation path', async () => {
+    const model: GenerateModelConfig = { ...externalModel, capabilities: { modes: ['img2img'] } };
+    const harness = makeHarness({ model });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.notices()).toEqual([]);
+    expect(harness.submittedGraphs()).toHaveLength(1);
+  });
+
+  it('blocks advertised provider inpainting before enqueue', async () => {
+    const model: GenerateModelConfig = { ...externalModel, capabilities: { modes: ['inpaint', 'img2img'] } };
+    const harness = makeHarness({ model, document: docWithLayers([rasterLayer('base'), inpaintMaskLayer('mask')]) });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual([
+      'OpenAI Image does not support inpainting on the canvas yet. Remove or disable the inpaint mask.',
+    ]);
+  });
+
+  it('blocks oversized provider requests before enqueue', async () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      capabilities: { modes: ['img2img'], max_image_size: { width: 32, height: 64 } },
+    };
+    const harness = makeHarness({ model });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual([
+      'OpenAI Image supports a maximum size of 32×64.',
+    ]);
+  });
+
+  it('counts the captured init image against the Seedream budget before enqueue', async () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      name: 'Seedream',
+      provider_id: 'seedream',
+      provider_model_id: 'seedream-4-5-251128',
+      capabilities: { modes: ['txt2img', 'img2img'], max_reference_images: 14, supports_reference_images: true },
+    };
+    const harness = makeHarness({
+      model,
+      generateValues: {
+        ...generateValuesFor(model),
+        referenceImages: Array.from({ length: 14 }, (_, i) => ({
+          id: `reference-${i}`,
+          isEnabled: true,
+          config: {
+            type: 'external_reference_image',
+            image: { imageName: `reference-${i}.png`, width: 64, height: 64 },
+          },
+        })),
+      },
+    });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual([
+      'Seedream supports at most 15 images total (reference + init + output), got 16.',
+    ]);
   });
 
   it('discards provisional dedupe entries when synchronous queue dispatch fails', async () => {
@@ -841,11 +996,147 @@ describe('runCanvasInvocation', () => {
     expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
   });
 
-  it('blocks invocation and hands a nonempty model-less control layer to the formatter', async () => {
+  it('records the raster memory notice and dispatches nothing when the composite is over budget', async () => {
+    const harness = makeHarness();
+    harness.executorDeps.reserve = (bytes) => ({ availableBytes: 0, requestedBytes: bytes, status: 'over-budget' });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual([
+      'The canvas composite exceeds the available raster memory budget.',
+    ]);
+    expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks a content-bearing control layer while the model list is still loading', async () => {
     const harness = makeHarness({ document: docWithLayers([controlLayer('control')]) });
     await runCanvasInvocation(harness.deps);
     expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual(['control: models_unavailable']);
+  });
+
+  it('blocks an untyped control layer whose model is no longer installed', async () => {
+    const harness = makeHarness({
+      document: docWithLayers([controlLayer('control', { model: 'uninstalled' })]),
+      models: [],
+    });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.submittedGraphs()).toHaveLength(0);
     expect(harness.notices().map((notice) => notice.message)).toEqual(['control: missing_model']);
+  });
+
+  it('leaves out a nonempty control layer with neither a type nor a model, without blocking', async () => {
+    const harness = makeHarness({ document: docWithLayers([controlLayer('control')]), models: [] });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.notices()).toHaveLength(0);
+    expect(harness.submittedGraphs()).toHaveLength(1);
+    expect(harness.submittedGraphs()[0]?.graph.backendGraph?.nodes).not.toHaveProperty('control_net_control');
+  });
+
+  describe('typed control layers', () => {
+    const controlModel = (key: string, base: string, type = 'controlnet', name = key) => ({
+      base,
+      file_size: 1,
+      format: 'checkpoint',
+      hash: `${key}-hash`,
+      key,
+      name,
+      path: key,
+      source: key,
+      source_type: 'path' as const,
+      type,
+    });
+    const typed = (
+      id: string,
+      controlType: NonNullable<CanvasControlLayerContract['controlType']>,
+      detection: CanvasControlLayerContract['detection'] = null
+    ): CanvasControlLayerContract => ({ ...controlLayer(id), controlType, detection });
+    const fluxMain = { ...sd1Model, base: 'flux' as const, key: 'flux', name: 'FLUX' };
+
+    it('runs the only model made for the type, as the kind that model runs', async () => {
+      const harness = makeHarness({
+        document: docWithLayers([typed('depth-layer', 'depth')]),
+        models: [controlModel('sd1-depth', 'sd-1', 'controlnet', 'control_v11f1p_sd15_depth')],
+      });
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.notices()).toHaveLength(0);
+      expect(harness.submittedGraphs()[0]?.graph.backendGraph?.nodes['control_net_depth-layer']).toMatchObject({
+        control_model: { key: 'sd1-depth' },
+        type: 'controlnet',
+      });
+    });
+
+    it('runs the remembered pick when several models fit, and asks without one', async () => {
+      const models = [
+        controlModel('depth-a', 'sd-1', 'controlnet', 'depth a'),
+        controlModel('depth-b', 'sd-1', 'controlnet', 'depth b'),
+      ];
+      const asking = makeHarness({ document: docWithLayers([typed('depth-layer', 'depth')]), models });
+      await runCanvasInvocation(asking.deps);
+      expect(asking.submittedGraphs()).toHaveLength(0);
+      expect(asking.notices()[0]?.message).toBe('depth-layer: choose_model');
+
+      const remembered = makeHarness({
+        controlModelMemory: { 'sd-1:depth': 'depth-b' },
+        document: docWithLayers([typed('depth-layer', 'depth')]),
+        models,
+      });
+      await runCanvasInvocation(remembered.deps);
+      expect(remembered.notices()).toHaveLength(0);
+      expect(
+        remembered.submittedGraphs()[0]?.graph.backendGraph?.nodes['control_net_depth-layer']?.control_model
+      ).toMatchObject({ key: 'depth-b' });
+    });
+
+    it('gives a FLUX union model the InstantX mode of the layer type', async () => {
+      const components = {
+        clipEmbedModel: { base: 'any', key: 'clip', name: 'CLIP Embed', type: 'clip_embed', variant: 'large' },
+        t5EncoderModel: { base: 'any', key: 't5', name: 'T5 Encoder', type: 't5_encoder' },
+        vae: { base: 'flux', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' },
+      };
+      const harness = makeHarness({
+        document: docWithLayers([typed('pose-layer', 'pose')]),
+        generateValues: components,
+        model: fluxMain,
+        models: [
+          controlModel('flux-union', 'flux', 'controlnet', 'FLUX.1-dev-Controlnet-Union-Pro'),
+          ...(Object.values(components) as unknown as NonNullable<RunCanvasInvocationDeps['models']>),
+        ],
+      });
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.notices()).toEqual([]);
+      expect(harness.submittedGraphs()[0]?.graph.backendGraph?.nodes['control_net_pose-layer']).toMatchObject({
+        instantx_control_mode: 4,
+        type: 'flux_controlnet',
+      });
+    });
+
+    it('blocks a layer whose type has no installed model', async () => {
+      const harness = makeHarness({
+        document: docWithLayers([typed('pose-layer', 'pose')]),
+        models: [controlModel('sd1-depth', 'sd-1', 'controlnet', 'sd15 depth')],
+      });
+      await runCanvasInvocation(harness.deps);
+      expect(harness.submittedGraphs()).toHaveLength(0);
+      expect(harness.notices()[0]?.message).toBe('pose-layer: no_model_for_type');
+    });
+
+    it('blocks a layer whose map detection has not caught up', async () => {
+      const harness = makeHarness({
+        document: docWithLayers([
+          typed('depth-layer', 'depth', { settings: {}, type: 'depth_anything_depth_estimation' }),
+        ]),
+        models: [controlModel('sd1-depth', 'sd-1', 'controlnet', 'sd15 depth')],
+      });
+      await runCanvasInvocation(harness.deps);
+      expect(harness.submittedGraphs()).toHaveLength(0);
+      expect(harness.notices()[0]?.message).toBe('depth-layer: detection_pending');
+    });
   });
 
   it('blocks invocation when a nonempty control layer has malformed numeric settings', async () => {
@@ -1251,9 +1542,9 @@ describe('runCanvasInvocation', () => {
       ['the same model twice', () => [lllite('a', sketch.key), lllite('b', sketch.key)], 'b: duplicate_lllite_model'],
       ['an inpainting adapter', () => [lllite('a', inpainting.key)], 'a: lllite_inpaint_adapter'],
       [
-        'a layer saved as ControlNet before LLLite was supported, naming the kind to switch to',
+        'a layer saved as ControlNet before LLLite was supported',
         () => [controlLayer('old', { kind: 'controlnet', model: sketch.key })],
-        'old: switch_adapter_kind -> anima_lllite',
+        'old: switch_adapter_kind',
       ],
     ])('blocks %s before submitting', async (_label, layers, message) => {
       const harness = await run(layers());

@@ -268,6 +268,7 @@ MINIMAL_WORKFLOW = {
 }
 
 
+@pytest.mark.ffmpeg
 def test_extract_from_tagged_video_returns_the_embedded_strings(mock_logger, tagged_mp4):
     """Through the real workflow validator: the video entry point is not mocked."""
     from invokeai.app.api.extract_metadata import extract_metadata_from_video
@@ -282,6 +283,7 @@ def test_extract_from_tagged_video_returns_the_embedded_strings(mock_logger, tag
     )
 
 
+@pytest.mark.ffmpeg
 def test_extract_from_video_prefers_the_client_metadata_over_the_embedded_copy(mock_logger, tagged_mp4):
     from invokeai.app.api.extract_metadata import extract_metadata_from_video
 
@@ -295,6 +297,7 @@ def test_extract_from_video_prefers_the_client_metadata_over_the_embedded_copy(m
     assert result.invokeai_graph == tags["invokeai_graph"]
 
 
+@pytest.mark.ffmpeg
 def test_extract_from_untagged_or_non_mp4_video_is_all_none(mock_logger, tagged_mp4, tmp_path):
     from invokeai.app.api.extract_metadata import extract_metadata_from_video
 

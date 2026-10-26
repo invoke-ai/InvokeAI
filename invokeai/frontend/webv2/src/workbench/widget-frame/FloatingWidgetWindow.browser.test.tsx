@@ -1022,11 +1022,42 @@ describe('FloatingWidgetWindow gestures', () => {
     await act(() =>
       titleBar().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown', shiftKey: true }))
     );
+    // A vertical step leaves x alone: the clamped 552px on screen is the viewport's, not the user's.
     expect(windowMocks.setFloatingGeometry).toHaveBeenLastCalledWith('image-map-instance', {
       heightPx: 300,
       widthPx: 900,
-      x: 552,
+      x: 5000,
       y: 72,
+    });
+
+    // A step right, into the edge that holds the window at 552px, moves nothing on screen and commits nothing.
+    await act(() => titleBar().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' })));
+    expect(windowMocks.setFloatingGeometry).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the stored position of the axis a pointer move leaves alone, without jumping to it', async () => {
+    await page.viewport(500, 260);
+    // Stored far off the bottom-right; shown at (452, 212).
+    await renderWindow({ ...state, heightPx: 300, widthPx: 400, x: 1000, y: 800 });
+
+    await drag(titleBar(), 0, -40, { release: false });
+    // The preview carries the stored x, which the viewport still clamps: no jump towards it.
+    expect(rect()).toMatchObject({ left: 452, top: 172 });
+    await release(0, -40);
+    expect(windowMocks.setFloatingGeometry).toHaveBeenLastCalledWith('image-map-instance', {
+      heightPx: 300,
+      widthPx: 400,
+      x: 1000,
+      y: 172,
+    });
+
+    await nextFrame();
+    await drag(titleBar(), -50, 0);
+    expect(windowMocks.setFloatingGeometry).toHaveBeenLastCalledWith('image-map-instance', {
+      heightPx: 300,
+      widthPx: 400,
+      x: 402,
+      y: 800,
     });
   });
 
@@ -1173,6 +1204,51 @@ describe('FloatingWidgetWindow gestures', () => {
     await act(() => corner().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' })));
 
     expect(windowMocks.setFloatingGeometry).not.toHaveBeenCalled();
+  });
+
+  it('clamps against the viewport CSS uses at a fractional zoom, so a push into an edge stores nothing', async () => {
+    // At 80% zoom a 598x498 frame is 478x398 device pixels: a 597.5x497.5 viewport. CSS holds a wide window
+    // between -549.5px and 549.5px from the left and at most 449.5px from the top. `innerWidth` and `innerHeight`
+    // are whole pixels; an engine that rounds half up reports 598x498, half a pixel past those edges.
+    await page.viewport(598, 498);
+    const frame = window.frameElement as HTMLElement;
+    frame.style.setProperty('zoom', '0.8');
+    const innerWidth = vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(598);
+    const innerHeight = vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(498);
+
+    try {
+      const key = (target: HTMLElement, name: string) =>
+        act(() => target.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: name })));
+
+      // Stored for a larger display: wider than this viewport and past its bottom-right corner.
+      await renderWindow({ ...state, heightPx: 300, widthPx: 900, x: 1400, y: 1400 });
+      expect(rect().left).toBeCloseTo(549.5, 1);
+      expect(rect().top).toBeCloseTo(449.5, 1);
+      expect(rect().width).toBeCloseTo(597.5, 1);
+
+      // Steps into the right and bottom edges, a drag into that corner, and a grow against the width cap.
+      await key(titleBar(), 'ArrowRight');
+      await key(titleBar(), 'ArrowDown');
+      await drag(titleBar(), 40, 40);
+      await key(corner(), 'ArrowRight');
+      // Past the left edge instead, where the sliver bound is the viewport's width too.
+      await renderWindow({ ...state, heightPx: 300, widthPx: 900, x: -1400, y: 40 });
+      expect(rect().left).toBeCloseTo(-549.5, 1);
+      await key(titleBar(), 'ArrowLeft');
+      expect(windowMocks.setFloatingGeometry).not.toHaveBeenCalled();
+
+      // A step away from the edge still moves the window, and only on its own axis: 16px right of -549.5px, in
+      // whole pixels.
+      await key(titleBar(), 'ArrowRight');
+      expect(windowMocks.setFloatingGeometry).toHaveBeenCalledOnce();
+      const [, moved] = windowMocks.setFloatingGeometry.mock.calls[0]!;
+      expect(moved).toMatchObject({ heightPx: 300, widthPx: 900, y: 40 });
+      expect(Math.abs(moved.x - -533.5)).toBeLessThanOrEqual(0.5);
+    } finally {
+      innerWidth.mockRestore();
+      innerHeight.mockRestore();
+      frame.style.removeProperty('zoom');
+    }
   });
 
   it('moves a collapsed window by its title bar and keeps its stored height', async () => {
