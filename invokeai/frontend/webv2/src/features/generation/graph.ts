@@ -27,7 +27,6 @@ export {
   getControlAdapterMinWeight,
   getControlModelUnusableReason,
   getControlValidationReason,
-  getSuggestedControlKind,
   isControlKindSupportedForBase,
   isControlModelUsableForKind,
 } from './core/canvas/controlValidation';

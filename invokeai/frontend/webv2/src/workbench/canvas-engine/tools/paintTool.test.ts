@@ -2,6 +2,7 @@ import type {
   CanvasControlLayerContract,
   CanvasDocumentContractV3,
   CanvasLayerContract,
+  CanvasRasterLayerContractV2,
 } from '@workbench/canvas-engine/contracts';
 import type { StubRasterBackend, StubRasterSurface } from '@workbench/canvas-engine/render/raster.testStub';
 import type {
@@ -49,6 +50,21 @@ const imageLayer = (id: string): CanvasLayerContract => ({
   source: { image: { height: 10, imageName: id, width: 10 }, type: 'image' },
   transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
   type: 'raster',
+});
+
+/** A raster the brush cannot edit in place, so a stroke auto-creates a paint layer above it. */
+const textLayer = (id: string): CanvasLayerContract => ({
+  ...(imageLayer(id) as CanvasRasterLayerContractV2),
+  source: {
+    align: 'left',
+    color: '#000000',
+    content: id,
+    fontFamily: 'sans-serif',
+    fontSize: 12,
+    fontWeight: 400,
+    lineHeight: 1.2,
+    type: 'text',
+  },
 });
 
 const inpaintMaskLayer = (id: string): CanvasLayerContract => ({
@@ -100,10 +116,14 @@ const makeDoc = (layers: CanvasLayerContract[], selectedLayerId: string | null):
   width: 100,
 });
 
-const pointer = (x: number, y: number, opts: { pressure?: number; buttons?: number } = {}): PointerInput => ({
+const pointer = (
+  x: number,
+  y: number,
+  opts: { pressure?: number; buttons?: number; shift?: boolean } = {}
+): PointerInput => ({
   buttons: opts.buttons ?? 1,
   documentPoint: { x, y },
-  modifiers: { alt: false, ctrl: false, meta: false, shift: false },
+  modifiers: { alt: false, ctrl: false, meta: false, shift: opts.shift ?? false },
   pointerType: 'mouse',
   pressure: opts.pressure ?? 0.5,
   screenPoint: { x, y },
@@ -328,19 +348,66 @@ describe('eraser tool', () => {
     expect(erasedHeight(0.1, false)).toBe(erasedHeight(1, false));
   });
 
-  it('edits a selected image layer through a materializing pixel transaction', () => {
+  it.each([
+    ['eraser', createEraserTool],
+    ['brush', createBrushTool],
+  ] as const)('%s edits a selected image layer through a materializing pixel transaction', (_, createTool) => {
     const transaction = controlTransaction('img1');
     const h = createHarness(makeDoc([imageLayer('img1')], 'img1'), transaction);
-    const eraser = createEraserTool();
+    h.layers.getOrCreateRect('img1', { height: 10, width: 10, x: 0, y: 0 }).stale = false;
+    const tool = createTool();
 
-    down(eraser, h.ctx, pointer(2, 2));
-    move(eraser, h.ctx, pointer(6, 6), [pointer(6, 6)]);
-    up(eraser, h.ctx, pointer(6, 6));
+    down(tool, h.ctx, pointer(2, 2));
+    move(tool, h.ctx, pointer(6, 6), [pointer(6, 6)]);
+    up(tool, h.ctx, pointer(6, 6));
 
     expect(h.beginPixelEdit).toHaveBeenCalledWith('img1');
     expect(transaction.commit).toHaveBeenCalledOnce();
     expect(h.dispatched).toHaveLength(0);
     expect(h.createdIds).toHaveLength(0);
+  });
+
+  it.each([
+    ['locked', { isLocked: true }, true],
+    ['disabled', { isEnabled: false }, true],
+    ['not rasterized yet', {}, false],
+  ] as const)('brushes a %s image layer onto an auto-created paint layer instead', (_, overrides, cached) => {
+    const transaction = controlTransaction('img1');
+    const h = createHarness(
+      makeDoc([{ ...imageLayer('img1'), ...overrides } as CanvasLayerContract], 'img1'),
+      transaction
+    );
+    if (cached) {
+      h.layers.getOrCreateRect('img1', { height: 10, width: 10, x: 0, y: 0 }).stale = false;
+    }
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(2, 2));
+    up(brush, h.ctx, pointer(2, 2));
+
+    expect(h.beginPixelEdit).not.toHaveBeenCalled();
+    expect(h.dispatched.map((action) => action.type)).toEqual(['addCanvasLayer']);
+    expect(h.strokes.map((stroke) => stroke.layerId)).toEqual([h.createdIds[0]]);
+  });
+
+  it('brushes a transparency-locked image layer in place with source-atop, but refuses to erase it', () => {
+    const locked = { ...imageLayer('img1'), isTransparencyLocked: true } as CanvasLayerContract;
+    const transaction = controlTransaction('img1');
+    const h = createHarness(makeDoc([locked], 'img1'), transaction);
+    h.layers.getOrCreateRect('img1', { height: 100, width: 100, x: 0, y: 0 }).stale = false;
+
+    const eraser = createEraserTool();
+    down(eraser, h.ctx, pointer(2, 2));
+    up(eraser, h.ctx, pointer(2, 2));
+    expect(h.beginPixelEdit).not.toHaveBeenCalled();
+
+    const brush = createBrushTool();
+    down(brush, h.ctx, pointer(2, 2));
+    move(brush, h.ctx, pointer(6, 6), [pointer(6, 6)]);
+    expect(lastCompositeOp(cacheSurface(h, 'img1'))).toBe('source-atop');
+    up(brush, h.ctx, pointer(6, 6));
+    expect(transaction.commit).toHaveBeenCalledOnce();
+    expect(h.dispatched).toHaveLength(0);
   });
 });
 
@@ -529,7 +596,7 @@ describe('paint tool: target resolution', () => {
   });
 
   it('auto-creates a paint layer (one dispatch) when the selection is not paintable', () => {
-    const doc = makeDoc([imageLayer('img1')], 'img1');
+    const doc = makeDoc([textLayer('img1')], 'img1');
     const h = createHarness(doc);
     const brush = createBrushTool();
 
@@ -714,7 +781,7 @@ describe('auto-created layer rollback (a gesture that commits nothing leaves no 
   const kinds = (h: { dispatched: CanvasProjectMutation[] }): string[] => h.dispatched.map((action) => action.type);
 
   it('removes the layer and restores the prior selection when the stroke is fully clipped away', () => {
-    const h = clipped(makeDoc([imageLayer('img1'), paintLayer('p1')], 'img1'));
+    const h = clipped(makeDoc([textLayer('img1'), paintLayer('p1')], 'img1'));
     const brush = createBrushTool();
 
     down(brush, h.ctx, pointer(80, 80));
@@ -731,7 +798,7 @@ describe('auto-created layer rollback (a gesture that commits nothing leaves no 
   });
 
   it('drops the provisional cache entry too', () => {
-    const h = clipped(makeDoc([imageLayer('img1')], 'img1'));
+    const h = clipped(makeDoc([textLayer('img1')], 'img1'));
     const brush = createBrushTool();
 
     down(brush, h.ctx, pointer(80, 80));
@@ -742,7 +809,7 @@ describe('auto-created layer rollback (a gesture that commits nothing leaves no 
   });
 
   it('rolls back on pointercancel mid-drag', () => {
-    const h = createHarness(makeDoc([imageLayer('img1')], 'img1'));
+    const h = createHarness(makeDoc([textLayer('img1')], 'img1'));
     const brush = createBrushTool();
 
     down(brush, h.ctx, pointer(20, 20));
@@ -755,7 +822,7 @@ describe('auto-created layer rollback (a gesture that commits nothing leaves no 
   });
 
   it('rolls back when the tool is switched away mid-drag', () => {
-    const h = createHarness(makeDoc([imageLayer('img1')], 'img1'));
+    const h = createHarness(makeDoc([textLayer('img1')], 'img1'));
     const brush = createBrushTool();
 
     down(brush, h.ctx, pointer(20, 20));
@@ -766,7 +833,7 @@ describe('auto-created layer rollback (a gesture that commits nothing leaves no 
   });
 
   it('does NOT roll back for a temporary tool switch (space/alt hold keeps the gesture)', () => {
-    const h = createHarness(makeDoc([imageLayer('img1')], 'img1'));
+    const h = createHarness(makeDoc([textLayer('img1')], 'img1'));
     const brush = createBrushTool();
 
     down(brush, h.ctx, pointer(20, 20));
@@ -789,7 +856,7 @@ describe('auto-created layer rollback (a gesture that commits nothing leaves no 
   });
 
   it('keeps the layer when the stroke DOES commit pixels', () => {
-    const h = createHarness(makeDoc([imageLayer('img1')], 'img1'));
+    const h = createHarness(makeDoc([textLayer('img1')], 'img1'));
     const brush = createBrushTool();
 
     down(brush, h.ctx, pointer(20, 20));
@@ -808,5 +875,140 @@ describe('auto-created layer rollback (a gesture that commits nothing leaves no 
     up(brush, h.ctx, pointer(80, 80));
 
     expect(h.dispatched).toHaveLength(0);
+  });
+});
+
+describe('Shift-click straight lines', () => {
+  /**
+   * A harness with an engine-owned line memory and a path recorder: `span()` is the horizontal extent of the stroke
+   * outlines traced since the last call, so a dab and a line read apart regardless of cache growth chunks.
+   */
+  const lineHarness = (layers: CanvasLayerContract[], selectedLayerId: string | null) => {
+    const h = createHarness(makeDoc(layers, selectedLayerId));
+    const paintLineEnds = new Map<string, { x: number; y: number }>();
+    let xs: number[] = [];
+    const record = (x: number): void => {
+      xs.push(x);
+    };
+    const ctx: ToolContext = {
+      ...h.ctx,
+      createPath2D: () =>
+        ({
+          closePath: () => {},
+          lineTo: record,
+          moveTo: record,
+          quadraticCurveTo: (_cx: number, _cy: number, x: number) => record(x),
+        }) as unknown as Path2D,
+      paintLineEnds,
+    };
+    ctx.stores.brushOptions.set({ ...ctx.stores.brushOptions.get(), size: 4 });
+    ctx.stores.eraserOptions.set({ ...ctx.stores.eraserOptions.get(), size: 4 });
+    const span = (): number => {
+      const extent = Math.max(...xs) - Math.min(...xs);
+      xs = [];
+      return extent;
+    };
+    return { ...h, ctx, paintLineEnds, span };
+  };
+
+  it('draws from the last stroke end to a Shift press, as one committed stroke', () => {
+    const h = lineHarness([paintLayer('paint1')], 'paint1');
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(10, 10));
+    up(brush, h.ctx, pointer(10, 10));
+    expect(h.paintLineEnds.get('paint1')).toEqual({ x: 10, y: 10 });
+    // A 4 px dab is about one brush wide.
+    expect(h.span()).toBeLessThanOrEqual(5);
+
+    down(brush, h.ctx, pointer(60, 10, { shift: true }));
+    up(brush, h.ctx, pointer(60, 10, { shift: true }));
+
+    expect(h.strokes).toHaveLength(2);
+    // The line runs 50 px from x=10 to x=60, plus the brush radius at each end.
+    expect(h.span()).toBeGreaterThanOrEqual(50);
+    expect(h.paintLineEnds.get('paint1')).toEqual({ x: 60, y: 10 });
+  });
+
+  it('keeps the line start on the layer when the layer moves', () => {
+    const layer = paintLayer('paint1');
+    const h = lineHarness([layer], 'paint1');
+    const brush = createBrushTool();
+    down(brush, h.ctx, pointer(10, 10));
+    up(brush, h.ctx, pointer(10, 10));
+    h.span();
+
+    // Nudge the layer 100 px right: its last stroke end now sits at document x=110.
+    const nudged = makeDoc([{ ...layer, transform: { ...layer.transform, x: 100 } }], 'paint1');
+    const ctx: ToolContext = { ...h.ctx, getDocument: () => nudged };
+    down(brush, ctx, pointer(160, 10, { shift: true }));
+    up(brush, ctx, pointer(160, 10, { shift: true }));
+
+    // 50 px from x=110 to x=160 plus the brush radius at each end, not 150 px from where the end used to be.
+    const span = h.span();
+    expect(span).toBeGreaterThanOrEqual(50);
+    expect(span).toBeLessThan(60);
+    expect(h.paintLineEnds.get('paint1')).toEqual({ x: 60, y: 10 });
+  });
+
+  it('paints a dab on a Shift press without a remembered point, or on a layer with none', () => {
+    const h = lineHarness([paintLayer('paint1'), paintLayer('paint2')], 'paint2');
+    h.paintLineEnds.set('paint1', { x: 10, y: 10 });
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(60, 10, { shift: true }));
+    up(brush, h.ctx, pointer(60, 10, { shift: true }));
+
+    expect(h.strokes).toHaveLength(1);
+    expect(h.span()).toBeLessThanOrEqual(5);
+  });
+
+  it('ignores the memory on a press without Shift', () => {
+    const h = lineHarness([paintLayer('paint1')], 'paint1');
+    h.paintLineEnds.set('paint1', { x: 10, y: 10 });
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(60, 10));
+    up(brush, h.ctx, pointer(60, 10));
+
+    expect(h.span()).toBeLessThanOrEqual(5);
+  });
+
+  it('shares one point per layer between brush and eraser', () => {
+    const h = lineHarness([paintLayer('paint1')], 'paint1');
+    h.layers.getOrCreateRect('paint1', { height: 100, width: 100, x: 0, y: 0 }).stale = false;
+    const brush = createBrushTool();
+    const eraser = createEraserTool();
+
+    down(brush, h.ctx, pointer(10, 10));
+    up(brush, h.ctx, pointer(10, 10));
+    // Switching tools keeps the memory; only the engine's lifecycle events forget it.
+    brush.onDeactivate?.(h.ctx, undefined);
+    h.span();
+    down(eraser, h.ctx, pointer(60, 10, { shift: true }));
+    up(eraser, h.ctx, pointer(60, 10, { shift: true }));
+
+    expect(h.strokes.map((stroke) => stroke.tool)).toEqual(['brush', 'eraser']);
+    expect(h.span()).toBeGreaterThanOrEqual(50);
+  });
+
+  it('remembers the end of a stroke that auto-created its layer under the new id', () => {
+    const h = lineHarness([textLayer('text1')], 'text1');
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(20, 20));
+    up(brush, h.ctx, pointer(25, 20));
+
+    expect([...h.paintLineEnds]).toEqual([[h.createdIds[0], { x: 25, y: 20 }]]);
+  });
+
+  it('remembers nothing for a cancelled stroke', () => {
+    const h = lineHarness([paintLayer('paint1')], 'paint1');
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(20, 20));
+    cancel(brush, h.ctx);
+
+    expect(h.paintLineEnds.size).toBe(0);
   });
 });

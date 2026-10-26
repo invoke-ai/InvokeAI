@@ -9,9 +9,9 @@
  * down.
  */
 
-import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { LayerTransform, TransformRect, TransformTarget } from '@workbench/canvas-engine/transform/transformMath';
-import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
+import type { PointerInput, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
@@ -81,18 +81,26 @@ interface TransformSubject {
 
 const identityPoint = (point: Vec2): Vec2 => point;
 
+/**
+ * Whether a transform session may open on `layer`: an editable, non-empty leaf that is not a mask. `liveRect` also
+ * counts pixels the live cache holds but persistence has not acknowledged yet.
+ */
+export const isTransformEligible = (
+  layer: CanvasLayerContract,
+  doc: CanvasDocumentContractV3,
+  liveRect?: Rect
+): boolean =>
+  // Masks lack an applyTransform bake path, so reject sessions that would preview but fail to apply.
+  isLeafEditable(lookupDocumentLeaf(doc, layer.id)) &&
+  layer.type !== 'inpaint_mask' &&
+  layer.type !== 'regional_guidance' &&
+  hittableLayerRect(layer, doc, liveRect) !== null;
+
 /** Creates a fresh transform tool with its own session/gesture state. */
 export const createTransformTool = (): Tool => {
   let gesture: GestureState | null = null;
   // The cursor for the target under the pointer while idle (session but no drag).
   let hoverCursor: string | null = null;
-
-  const isEligible = (layer: CanvasLayerContract, doc: NonNullable<ReturnType<ToolContext['getDocument']>>): boolean =>
-    // Masks lack an applyTransform bake path, so reject sessions that would preview but fail to apply.
-    isLeafEditable(lookupDocumentLeaf(doc, layer.id)) &&
-    layer.type !== 'inpaint_mask' &&
-    layer.type !== 'regional_guidance' &&
-    hittableLayerRect(layer, doc) !== null;
 
   /** Live floats take precedence over layer sessions so the frame follows detached pixels. */
   const subjectOf = (ctx: ToolContext): TransformSubject | null => {
@@ -219,7 +227,7 @@ export const createTransformTool = (): Tool => {
       const doc = ctx.getDocument();
       const selectedId = doc?.selectedLayerId;
       const selected = selectedId ? getDocumentLayer(doc, selectedId) : undefined;
-      if (doc && selected && isEligible(selected, doc)) {
+      if (doc && selected && isTransformEligible(selected, doc)) {
         ctx.beginTransformSession?.(selected.id);
       }
     },
@@ -303,7 +311,7 @@ export const createTransformTool = (): Tool => {
       // Open an unframed session on panel selection and begin movement without retargeting.
       const selectedId = doc.selectedLayerId;
       const selected = selectedId ? getDocumentLayer(doc, selectedId) : undefined;
-      if (!selected || !isEligible(selected, doc)) {
+      if (!selected || !isTransformEligible(selected, doc)) {
         return;
       }
       const rect = hittableLayerRect(selected, doc);

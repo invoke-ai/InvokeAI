@@ -10,8 +10,10 @@ import type { MainModelConfig, ModelIdentifierConfig, VaeModelConfig } from './t
 
 import {
   getComponentSectionPolicy,
+  getDefaultReferenceImageConfig,
   getGenerationValidationReasons,
   isLoraSupported,
+  isReferenceImageSupported,
   SUPPORTED_GENERATE_BASES,
 } from './baseGenerationPolicies';
 import { compileGenerateGraph, GRAPH_BUILDERS } from './graph';
@@ -33,12 +35,34 @@ const compileForShape = (
   shape: ModelShape,
   tuned = false
 ): { filled: GenerateComponentValueKey[]; graph: BackendGraphContract } => {
-  const { filled, model, projectSettings, settings } = tuned
+  const {
+    filled,
+    model,
+    projectSettings,
+    settings: satisfied,
+  } = tuned
     ? tunedSettingsFor(base, shape)
     : {
         ...satisfiedSettingsFor(base, shape),
         projectSettings: { useCpuNoise: true, useNsfwChecker: false, useWatermark: false },
       };
+  // One enabled reference image wherever the model takes one, so reference nodes and their fields enter the contract.
+  const settings = isReferenceImageSupported(model)
+    ? {
+        ...satisfied,
+        referenceImages: [
+          {
+            config: getDefaultReferenceImageConfig(
+              model,
+              [{ base, key: `${base}-ip-adapter`, name: `${base} IP Adapter`, type: 'ip_adapter' }],
+              { original: { image: { height: 512, image_name: 'reference.png', width: 512 } } }
+            ),
+            id: 'coverage-reference',
+            isEnabled: true,
+          },
+        ],
+      }
+    : satisfied;
 
   // Assert every requirement before compilation for complete diagnostics.
   expect(getGenerationValidationReasons(model, settings), `${base}/${shape.label} is not satisfiable`).toEqual([]);

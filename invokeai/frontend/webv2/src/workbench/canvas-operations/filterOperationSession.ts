@@ -184,9 +184,11 @@ export const createFilterOperationSession = (
               ? `source-adjustment-${exported.reason}`
               : exported.status === 'over-budget'
                 ? 'source-over-budget'
-                : exported.status === 'aborted'
-                  ? 'not-ready'
-                  : exported.status;
+                : exported.status === 'unreadable'
+                  ? 'source-unreadable'
+                  : exported.status === 'aborted'
+                    ? 'not-ready'
+                    : exported.status;
           throw new Error(`The filter source is ${exported.status}.`);
         }
         try {

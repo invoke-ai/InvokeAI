@@ -22,10 +22,26 @@ import { queryClient } from '@platform/query/client';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as settingsStoreModule from './settings/store';
+
 // Dynamic prompt expansion is the only transport `submitResolvedInvocation` touches.
 const parseDynamicPromptsMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@features/generation/data/promptUtilities', () => ({ parseDynamicPrompts: parseDynamicPromptsMock }));
+
+// Remembered control-model picks, which readiness reads imperatively from the account preferences.
+const preferences = vi.hoisted(() => ({ controlModelMemory: {} as Record<string, string> }));
+
+vi.mock('./settings/store', async (importOriginal) => {
+  const actual = await importOriginal<typeof settingsStoreModule>();
+  return {
+    ...actual,
+    getWorkbenchPreferences: () => ({
+      ...actual.getWorkbenchPreferences(),
+      controlModelMemory: preferences.controlModelMemory,
+    }),
+  };
+});
 
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 
@@ -514,9 +530,9 @@ describe('resolveInvocationRoute — canvas source', () => {
     expect(route.validationReasons).toContain('The Canvas widget is not mounted in this project.');
   });
 
-  it('blocks a content-bearing control layer with no model once models are loaded', () => {
+  it('blocks a typed content-bearing control layer no model resolves once models are loaded', () => {
     const route = resolveInvocationRouteInput(
-      canvasInputFor({ layers: [modellessControlLayer()] }),
+      canvasInputFor({ layers: [{ ...modellessControlLayer(), controlType: 'depth', detection: null }] }),
       'global',
       canvasRoute,
       loadedModels
@@ -526,12 +542,41 @@ describe('resolveInvocationRoute — canvas source', () => {
     // Kept structured so the shell words it from the locale.
     expect(route.validationReasons).toContainEqual({
       controlLayerIssue: {
-        code: 'missing_model',
+        code: 'no_control_models',
         layerId: expect.any(String),
         layerName: 'Control Layer 1',
-        suggestedKind: null,
       },
     });
+  });
+
+  it('does not block on a content-bearing layer with neither a type nor a model', () => {
+    const route = resolveInvocationRouteInput(
+      canvasInputFor({ layers: [modellessControlLayer()] }),
+      'global',
+      canvasRoute,
+      loadedModels
+    );
+
+    expect(route.validationReasons).toEqual([]);
+  });
+
+  it('re-evaluates a choice between control models against the remembered pick', () => {
+    const lllite = (key: string) =>
+      ({ base: 'anima', cond_in_channels: 3, key, name: key, type: 'controlnet' }) as unknown as ModelConfig;
+    const models = [...loadedModels, lllite('anima-depth-a'), lllite('anima-depth-b')];
+    const input = canvasInputFor({ layers: [{ ...modellessControlLayer(), controlType: 'depth', detection: null }] });
+    const codes = () =>
+      resolveInvocationRouteInput(input, 'global', canvasRoute, models).validationReasons.map((reason) =>
+        typeof reason === 'object' && 'controlLayerIssue' in reason ? reason.controlLayerIssue.code : reason
+      );
+
+    try {
+      expect(codes()).toEqual(['choose_model']);
+      preferences.controlModelMemory = { 'anima:depth': 'anima-depth-b' };
+      expect(codes()).toEqual([]);
+    } finally {
+      preferences.controlModelMemory = {};
+    }
   });
 
   it('does not block content-less control layers or check layers before models load', () => {
