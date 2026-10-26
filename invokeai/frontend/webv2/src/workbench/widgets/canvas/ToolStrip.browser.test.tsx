@@ -357,6 +357,52 @@ describe('tool strip family slots', () => {
     }
   });
 
+  /** Hover the slot fresh, so its tooltip opens with the current title. */
+  const hoverSlot = async (slot: HTMLElement) => {
+    await act(() => userEvent.unhover(slot));
+    await act(() => userEvent.hover(slot));
+  };
+  const tooltipText = () => document.querySelector('[role="tooltip"]')?.textContent ?? null;
+  const MARQUEE_HELP =
+    "Drag a rectangle or ellipse to select pixels on the active layer. Fill, erase, or move them to a new layer. Doesn't change the generation frame.";
+  const LASSO_HELP =
+    "Draw a freehand or polygon outline to select pixels on the active layer. Fill, erase, or move them to a new layer. Doesn't change the generation frame.";
+
+  it('titles the selection slot with the current tool’s effective key and its help line, remaps included', async () => {
+    accountLifecycle.activate('tool-strip-test');
+    await patchWorkbenchPreferences({ customHotkeys: { 'canvas.tool.lasso': ['k'] } });
+    const extensions = createExtensionRegistry();
+    const source = { instanceId: 'canvas', projectId: 'project-1', region: 'center', typeId: 'canvas' } as const;
+    for (const [id, key] of [
+      ['canvas.tool.marquee', 'u'],
+      ['canvas.tool.lasso', 'l'],
+    ] as const) {
+      extensions.hotkeys.register({ commandId: id, defaultKeys: [key], id, source, title: id });
+    }
+    workbench.extensions = extensions;
+
+    try {
+      await renderStrip();
+      const marquee = (await button('Marquee select').element()) as HTMLElement;
+      await hoverSlot(marquee);
+      await expect.poll(tooltipText).toBe(`Marquee select (U)${MARQUEE_HELP}`);
+
+      await openByContextMenu(marquee);
+      await act(() => userEvent.click(page.getByRole('menuitemradio', { name: /^Lasso select/ })));
+      // The lasso key was remapped from L to K; the title follows the effective binding.
+      await hoverSlot((await button('Lasso select').element()) as HTMLElement);
+      await expect.poll(tooltipText).toBe(`Lasso select (K)${LASSO_HELP}`);
+    } finally {
+      await patchWorkbenchPreferences({ customHotkeys: {} });
+    }
+  });
+
+  it('titles a slot without a binding by its label alone', async () => {
+    await renderStrip();
+    await hoverSlot((await button('Marquee select').element()) as HTMLElement);
+    await expect.poll(tooltipText).toBe(`Marquee select${MARQUEE_HELP}`);
+  });
+
   it('remembers the last-used selection tool across tool switches', async () => {
     const fake = await renderStrip();
     await act(() => userEvent.click(button('Marquee select')));

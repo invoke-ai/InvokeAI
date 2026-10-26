@@ -105,6 +105,9 @@ export class PsdExportController {
         layers.map((layer) => layer.id),
         { includeDisabled: true, signal: abortController.signal }
       );
+      if (capture.status === 'unreadable') {
+        return capture;
+      }
       if (capture.status !== 'ok') {
         return capture.status;
       }

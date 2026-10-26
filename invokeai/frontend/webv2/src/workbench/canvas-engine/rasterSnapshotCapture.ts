@@ -151,6 +151,9 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
           emptyLayerIds.add(layerId);
           continue;
         }
+        if (liveResult.status === 'unreadable') {
+          return liveResult;
+        }
         if (liveResult.status !== 'ok') {
           return {
             status:
