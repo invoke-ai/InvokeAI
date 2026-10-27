@@ -9,6 +9,8 @@ model's runs measured.
 """
 
 import datetime
+from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any, Final, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, SerializerFunctionWrapHandler, model_serializer, model_validator
@@ -120,7 +122,7 @@ attempt began."""
 
 class ObservedItem(_StoreModel):
     """What the session runner saw of one of the run's queue items, or what the calibration service recorded of a
-    retry when the queue announced it. Kept so that a run's status survives the queue pruning its items."""
+    retry as the queue committed it. Kept so that a run's status survives the queue pruning its items."""
 
     status: QUEUE_ITEM_STATUS
     error_message: Optional[str] = None
@@ -145,6 +147,28 @@ class CalibrationModelIdentity(_StoreModel):
     type: Optional[str] = None
     format: Optional[str] = None
     variant: Optional[str] = None
+
+
+class CalibrationGraphModel(CalibrationModelIdentity):
+    """A model a calibration run's graph names, as it was when the run was created: its identity and its hash."""
+
+    hash: Optional[str] = None
+
+    def changes(self, current: "CalibrationGraphModel") -> list[str]:
+        """The facts in which `current` differs from this record. A hash this record lacks (stored before hashes were
+        recorded) is not compared."""
+        return [
+            fact
+            for fact in type(self).model_fields
+            if (value := getattr(self, fact)) != getattr(current, fact) and (fact != "hash" or value is not None)
+        ]
+
+    @model_serializer(mode="wrap")
+    def _omit_absent_hash(self, handler: SerializerFunctionWrapHandler) -> dict:
+        data = handler(self)
+        if data.get("hash") is None:
+            data.pop("hash", None)
+        return data
 
 
 class CalibrationRun(_StoreModel):
@@ -181,11 +205,22 @@ class CalibrationRun(_StoreModel):
         description="The model as it was when the run was created; an item fails at admission once it changed. Absent "
         "in runs stored before it was recorded, which compare the hash alone",
     )
-    graph_models: dict[str, CalibrationModelIdentity] = Field(
+    graph_models: dict[str, CalibrationGraphModel] = Field(
         default_factory=dict,
         description="Per model key, each model the run's graph names as it was when the run was created: the graph's "
         "own identifiers carry hash, base and type, not format or variant. An item fails at admission once one "
-        "changed. Absent in runs stored before it was recorded",
+        "changed, and a later run of the attempt is refused once one differs from what this run recorded. Absent in "
+        "runs stored before it was recorded",
+    )
+    retries_in_flight: int = Field(
+        default=0,
+        ge=0,
+        description="How many retry operations of the queue that retry items of this run are in flight, however many "
+        "items each retries: counted up before the operation commits and down once its retries are recorded or it "
+        "rolled back (`retries_starting`, `retries_committed`). One left over means the server stopped, the commit "
+        "failed in a way that may have committed, or the store could not be written, between the count and the "
+        "record: a retry may exist that the run does not record, so the run's attempt never feeds a fit until a reset "
+        "removes the run",
     )
 
     @model_validator(mode="after")
@@ -203,6 +238,8 @@ class CalibrationRun(_StoreModel):
                 data.pop(name, None)
         if not data.get("graph_models"):
             data.pop("graph_models", None)
+        if not data.get("retries_in_flight"):
+            data.pop("retries_in_flight", None)
         return data
 
 
@@ -223,6 +260,17 @@ class RemovedAttemptSteps(_StoreModel):
         description="The attempt_steps the removed runs sent, which a later run of the attempt must send too; null "
         "for runs stored before it was sent",
     )
+
+
+@dataclass(frozen=True)
+class RetriesInFlight:
+    """The calibration runs a retry is committing items of, as `retries_starting` counted them
+    (`CalibrationRun.retries_in_flight`), for `retries_committed` to record the retries on and count down again."""
+
+    runs: Mapping[str, frozenset[str]]
+    """Per device class, the runs counted on its file."""
+    lineages: Mapping[int, tuple[str, int]]
+    """Per item a retry is made of: its run, and the item the lineage started from, which the retry stands for."""
 
 
 class CalibrationStoreFile(_StoreModel):
@@ -685,6 +733,10 @@ class CalibrationStoreError(Exception):
 
 class CalibrationStoreUnusableError(CalibrationStoreError):
     """The device class's file has an unknown schema or is invalid; it is kept untouched and not written."""
+
+
+class CalibrationStoreLockTimeoutError(CalibrationStoreError):
+    """Another holder kept a store lock past `LOCK_TIMEOUT_S`; the same change may pass once it let go."""
 
 
 # endregion

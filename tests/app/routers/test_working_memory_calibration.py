@@ -23,6 +23,7 @@ from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
     CALIBRATION_DESTINATION,
+    CalibrationStoreLockTimeoutError,
     calibration_origin,
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
@@ -223,6 +224,28 @@ def test_retrying_a_calibration_item_keeps_its_origin_and_owner(
     retried = queue.dequeue()
     assert retried is not None and retried.retried_from_item_id == item_id
     assert (retried.origin, retried.user_id) == (calibration_origin(created["run_id"]), item.user_id)
+
+
+def test_a_retry_the_calibration_store_cannot_count_is_refused_with_503_naming_no_path(
+    client: TestClient, admin_token: str, calibration, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    queue, service = calibration
+    [item_id] = _calibrate(client, admin_token).json()["item_ids"]
+    assert queue.dequeue() is not None
+    queue.fail_queue_item(item_id, "ValueError", "failed", "traceback")
+    lock = str(service._store.directory / "abc.json.lock")
+
+    def timed_out(*args: Any, **kwargs: Any) -> None:
+        raise CalibrationStoreLockTimeoutError(f"Timed out waiting for the lock on {lock}")
+
+    monkeypatch.setattr(service._store, "change", timed_out)
+    response = client.put("/api/v1/queue/default/retry_items_by_id", json=[item_id], headers=_auth(admin_token))
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "The working-memory calibration store cannot be written now, so no item was retried. Try again."
+    )
+    assert queue.dequeue() is None
 
 
 def test_status_reset_and_export_for_admins(client: TestClient, admin_token: str, calibration) -> None:
