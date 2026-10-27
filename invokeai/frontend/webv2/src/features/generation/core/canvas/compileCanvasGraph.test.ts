@@ -2365,3 +2365,64 @@ describe('compileCanvasGraph — Krea-2 style reference', () => {
     );
   });
 });
+
+describe('compileCanvasGraph — Krea-2 edit references', () => {
+  const editReference = (imageName: string, isEnabled = true) => ({
+    config: {
+      image: { original: { image: { height: 768, image_name: imageName, width: 512 } } },
+      type: 'krea2_edit_reference_image' as const,
+    },
+    id: imageName,
+    isEnabled,
+  });
+  const region: RegionalGuidanceInput = {
+    autoNegative: false,
+    id: 'r1',
+    maskImageName: 'r1-mask.png',
+    negativePrompt: null,
+    positivePrompt: 'a cat',
+    referenceImages: [],
+  };
+
+  it('inpaints with the edit references alongside the encoded canvas image', () => {
+    const { backendGraph } = compile(krea2Model, 'inpaint', {
+      settings: { referenceImages: [editReference('pose.png'), editReference('depth.png')] },
+    });
+    const referenceEncoders = Object.values(backendGraph.nodes).filter(
+      (node) => node.type === 'qwen_image_i2l' && node.reference === true
+    );
+
+    // The canvas image is still what gets denoised under the mask; the references only join as clean tokens.
+    expect(getEdge(backendGraph, 'denoise_latents', 'latents')?.source.node_id).toBe('canvas_i2l');
+    expect(backendGraph.nodes.canvas_i2l).not.toHaveProperty('reference');
+    expect(getEdge(backendGraph, 'denoise_latents', 'denoise_mask')).toBeDefined();
+    expect(referenceEncoders.map((node) => node.image)).toEqual([
+      { image_name: 'pose.png' },
+      { image_name: 'depth.png' },
+    ]);
+    expect(getEdge(backendGraph, 'denoise_latents', 'reference_latents')).toBeDefined();
+    expect(backendGraph.nodes.pos_cond?.reference_images).toEqual([
+      { image_name: 'pose.png' },
+      { image_name: 'depth.png' },
+    ]);
+  });
+
+  it('refuses edit references together with regional guidance, which the denoise cannot place them in', () => {
+    expect(() =>
+      compile(krea2Model, 'txt2img', {
+        regionalGuidance: [region],
+        settings: { referenceImages: [editReference('pose.png')] },
+      })
+    ).toThrow(
+      'Krea-2 edit references cannot be combined with regional guidance. Turn off the edit references or disable the regional guidance layers.'
+    );
+
+    const { backendGraph } = compile(krea2Model, 'txt2img', {
+      regionalGuidance: [region],
+      settings: { referenceImages: [editReference('pose.png', false)] },
+    });
+
+    expect(backendGraph.nodes.rg_pos_cond_r1).toBeDefined();
+    expect(getEdge(backendGraph, 'denoise_latents', 'reference_latents')).toBeUndefined();
+  });
+});
