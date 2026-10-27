@@ -38,8 +38,10 @@ def return_to_counted_dtypes(
     The tensors are re-pointed through `Parameter.data` and `Module._buffers`, never `load_state_dict(assign=True)`:
     assignment goes through `register_parameter`, which a construction on another thread
     (`accelerate.init_empty_weights` patches it process-wide) would route to the meta device, and this runs without
-    MODEL_LOAD_LOCK. Parameter objects and devices stay as they are, and one weight at a time holds both dtypes. Packed
-    tensors (GGUF, SDNQ) refuse a dtype change, so a cast never changed theirs and nothing here re-points them.
+    MODEL_LOAD_LOCK. Parameter objects stay as they are, and one weight at a time holds both dtypes. Every weight keeps
+    its device, except that the names of a tied weight found on different devices all get the tensor of the first name
+    visited, on its device; the cache moves a group as a unit, so that takes a group someone else split. Packed tensors
+    (GGUF, SDNQ) refuse a dtype change, so a cast never changed theirs and nothing here re-points them.
     """
     # The tensor all names of a tied weight hold after the restore, keyed by the group's first key.
     group_tensors: dict[str, torch.Tensor] = {}

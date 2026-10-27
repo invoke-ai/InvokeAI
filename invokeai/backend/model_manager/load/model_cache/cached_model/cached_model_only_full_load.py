@@ -221,9 +221,9 @@ class CachedModelOnlyFullLoad:
     def restore_counted_dtypes(self) -> None:
         """Return every weight a holder cast in place to the dtype the cache counts it in.
 
-        `ModelCache.unlock` calls this when the last lock ends; see `return_to_counted_dtypes`. The cache charges the
-        model `total_bytes` in RAM and as the room it makes in VRAM, and a `cpu_only` model is never moved, so nothing
-        else would put it back.
+        The cache calls this when the last lock ends (see `ModelCache._unpin`); see `return_to_counted_dtypes`. The
+        cache charges the model `total_bytes` in RAM and as the room it makes in VRAM, and a `cpu_only` model is never
+        moved, so nothing else would put it back.
         """
         if self._counted_dtypes is not None:
             return_to_counted_dtypes(self._model, self._counted_dtypes, self._alias_groups, self._cpu_state_dict)

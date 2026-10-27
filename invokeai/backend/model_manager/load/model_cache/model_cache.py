@@ -1880,9 +1880,20 @@ class ModelCache:
 
     def _unpin(self, cache_entry: CacheRecord) -> None:
         """Release a lock `_pin` took. Caller holds the lock. The record refuses an unlock it has no lock for before
-        either count changes, so a double unlock leaves `locks_held` right."""
+        either count changes, so a double unlock leaves `locks_held` right.
+
+        The last release, an unlock or a failed `lock`/`continue_lock` alike, returns weights a holder cast in place to
+        their counted dtypes (see `_restore_counted_dtypes`). A record that is detached or stale is skipped: it leaves
+        the cache, and a restore would only allocate on the device outside any reservation.
+        """
         cache_entry.unlock()
         self._locks_held -= 1
+        if (
+            not cache_entry.is_locked
+            and not cache_entry.is_stale
+            and self._cached_models.get(cache_entry.key) is cache_entry
+        ):
+            self._restore_counted_dtypes(cache_entry)
 
     @synchronized
     @record_activity
@@ -2025,8 +2036,7 @@ class ModelCache:
     def unlock(self, cache_entry: CacheRecord) -> None:
         """Unlock a model.
 
-        The last unlock returns weights a holder cast in place to the dtypes the cache counts them in (see
-        `_restore_counted_dtypes`).
+        The last unlock returns weights a holder cast in place to the dtypes the cache counts them in (see `_unpin`).
         """
         if cache_entry.key not in self._cached_models:
             self._logger.info(
@@ -2037,8 +2047,6 @@ class ModelCache:
             )
         # cache_entry = self._cached_models[key]
         self._unpin(cache_entry)
-        if not cache_entry.is_locked:
-            self._restore_counted_dtypes(cache_entry)
         self._logger.debug(
             f"Unlocked model {cache_entry.key} (Type: {cache_entry.cached_model.model.__class__.__name__})"
         )
@@ -2090,7 +2098,8 @@ class ModelCache:
         The SD VAE nodes cast the cached VAE to the dtype they run, fp16 to fp32 for an upcast. The cache counts every
         weight in the dtype it was cached with, and the next decode's estimate prices its upcast from the dtype the VAE
         holds before its lock, so a VAE left in fp32 holds more than the cache charges and gets nothing reserved for the
-        next cast. Only the last unlock restores: until then another holder may be running the model in its cast dtype.
+        next cast. Only the last release of a pin restores (see `_unpin`): until then another holder may be running the
+        model in its cast dtype.
         The passes do not restore on purpose; only an offload with a RAM copy puts the RAM copy back for the weights it
         moves, and with it their counted dtype, even while the model is held, as it always has.
         """
@@ -2098,7 +2107,8 @@ class ModelCache:
             cache_entry.cached_model.restore_counted_dtypes()
         except Exception as e:
             # As after a failed move: partly restored, the model no longer matches its counts, and dropping it contains
-            # that. Not raised: the unlock runs in the `finally` of a finished run, whose result is not saved yet.
+            # that. Not raised: an unlock runs in the `finally` of a finished run, whose result is not saved yet, and a
+            # failed lock raises its own error.
             self._logger.warning(
                 f"Could not return the weights of '{cache_entry.key}' to the dtypes the cache counts them in ({e}); "
                 "dropped it from the cache."

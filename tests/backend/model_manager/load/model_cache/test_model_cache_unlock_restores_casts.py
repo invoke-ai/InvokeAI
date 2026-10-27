@@ -235,7 +235,7 @@ def test_a_cast_round_trip_leaves_a_tied_weight_adopted_from_another_device_one_
     which gives each name of the tied matrix its own `Parameter` over the one tensor. A cast and a cast back give each of
     them its own copy in the counted dtype: two copies of the matrix in RAM where the store counts one."""
     store = SharedCpuWeightsStore()
-    _put(
+    first = _put(
         make_cache(True, enable_partial_loading=partial_loading, shared_cpu_weights=store),
         TiedWeightsModule().to(torch.float16),
         partial_loading,
@@ -244,7 +244,10 @@ def test_a_cast_round_trip_leaves_a_tied_weight_adopted_from_another_device_one_
     model = TiedWeightsModule().to(torch.float16)
     record = _put(cache, model, partial_loading)
     cpu_state_dict = record.cached_model.get_cpu_state_dict()
-    assert cpu_state_dict is not None
+    # Adopted: the second model's weights are the first device's RAM copy, its tied names two `Parameter`s over it.
+    assert cpu_state_dict is not None and cpu_state_dict is first.cached_model.get_cpu_state_dict()
+    for key, t in model.state_dict().items():
+        assert t.untyped_storage().data_ptr() == cpu_state_dict[key].untyped_storage().data_ptr(), key
     assert model.embed.weight is not model.head.weight and _is_tied(model)
     cache.lock_in_ram(record)
     _upcast_and_back(model)
@@ -318,6 +321,46 @@ def test_an_inner_unlock_keeps_the_cast_an_outer_holder_runs_with(make_cache):
 
     cache.unlock(record)
     assert {p.dtype for p in model.parameters()} == {torch.float16}
+
+
+def test_a_paced_lock_failing_after_the_holders_unlock_returns_the_cast(make_cache, monkeypatch: pytest.MonkeyPatch):
+    """A holder that unlocks while another lock is still streaming the model in leaves its cast to that lock. When a
+    later pass of the stream fails, the failed lock releases the last pin, and the cast is returned there."""
+    cache = make_cache(keep_ram_copy=False)
+    model = TiedWeightsModule().to(torch.float16)
+    record = _put(cache, model, partial_loading=True)
+    cache.lock_in_ram(record)
+    model.to(dtype=torch.float32)
+    # The stream's first pass stops at its cap, the next one fails.
+    monkeypatch.setattr(cache, "_load_locked_model", MagicMock(side_effect=[False, RuntimeError("stream failed")]))
+    assert cache.lock(record, None, max_move_bytes=1) is False
+    cache.unlock(record)
+    assert {t.dtype for t in model.state_dict().values()} == {torch.float32}
+
+    with pytest.raises(RuntimeError, match="stream failed"):
+        cache.continue_lock(record, None, max_move_bytes=1)
+
+    assert not record.is_locked
+    assert cache.get("vae") is record
+    assert {t.dtype for t in model.state_dict().values()} == {torch.float16}
+    assert _is_tied(model)
+
+
+def test_a_record_evicted_as_stale_at_its_unlock_is_not_restored_first(make_cache, monkeypatch: pytest.MonkeyPatch):
+    """Restoring a model the same unlock evicts would only allocate on its device outside any reservation."""
+    cache = make_cache(keep_ram_copy=False)
+    record = _put(cache, TiedWeightsModule().to(torch.float16), partial_loading=True)
+    cache.lock_in_ram(record)
+    record.cached_model.model.to(dtype=torch.float32)
+    restore = MagicMock()
+    monkeypatch.setattr(record.cached_model, "restore_counted_dtypes", restore)
+    assert cache.drop_model("vae") == 0
+
+    cache.unlock(record)
+
+    restore.assert_not_called()
+    with pytest.raises(IndexError):
+        cache.get("vae")
 
 
 @partial_loading

@@ -299,8 +299,9 @@ class CachedModelWithPartialLoad:
     def restore_counted_dtypes(self) -> None:
         """Return every weight a holder cast in place to the dtype `cur_vram_bytes()` and `total_bytes()` count it in.
 
-        `ModelCache.unlock` calls this when the last lock ends; see `return_to_counted_dtypes`. No weight changes device,
-        so a VRAM count already taken stays true.
+        The cache calls this when the last lock ends (see `ModelCache._unpin`) and `return_to_counted_dtypes` does the
+        work. Weights keep their devices, so a VRAM count already taken stays true, unless a tied weight's names were
+        split across devices: they all get the tensor of the first name visited, on its device.
         """
         return_to_counted_dtypes(self._model, self._state_dict_dtypes, self._aliases, self._cpu_state_dict)
 
