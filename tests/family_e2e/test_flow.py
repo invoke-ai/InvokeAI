@@ -307,3 +307,26 @@ def test_a_run_stopped_between_steps_ends_before_the_next_step_and_stays_stopped
     assert not runner.is_alive(runner.read_heartbeat(run_dir)["server"])
     assert not (data_dir / "scratch-roots" / f"{run_dir.name}-default").exists()
     assert not (run_dir / "report.html").exists()
+
+
+def test_a_run_stopped_during_the_graph_export_is_not_put_back_to_running(
+    setup: tuple[Path, Path], isolated_runner: None
+) -> None:
+    manifest_path, data_dir = setup
+    gpu = FakeGpu()
+    run_dir = runner.new_run(manifest_path, [], [])
+    stopped: list[bytes] = []
+
+    def export(request: dict, work_dir: Path) -> dict:
+        # `stop` marks the run during the export, which takes tens of seconds, and its kill misses the runner.
+        assert runner.finish_run(run_dir, "stopped")
+        stopped.append((run_dir / RUN_INFO_FILE).read_bytes())
+        batch = {"graph": _graph(), "data": [], "origin": "test", "destination": "test"}
+        return {"version": 1, "cases": [{"id": request["cases"][0]["id"], "batch": batch, "components": {}}]}
+
+    with pytest.raises(runner.RunStopped):
+        runner.run(run_dir, gpu_factory=lambda _: gpu.gpu(), export=export)
+
+    assert (run_dir / RUN_INFO_FILE).read_bytes() == stopped[0]
+    assert load_records(run_dir) == []
+    assert not (data_dir / "scratch-roots" / f"{run_dir.name}-default").exists()
