@@ -25,6 +25,7 @@ import {
   FieldHeader,
   FluxReduxControls,
   IPAdapterControls,
+  Krea2ReferenceModeControl,
   Krea2StyleReferenceControls,
 } from './ReferenceImageControls';
 import { ReferenceImageCropDialog } from './ReferenceImageCropDialog';
@@ -165,6 +166,11 @@ const ReferenceImageCardBase = ({
                     {formatWeight(config.styleStrength)}
                   </Text>
                 </>
+              ) : config.type === 'krea2_edit_reference_image' ? (
+                <>
+                  {' · '}
+                  {t('widgets.generate.modeEdit')}
+                </>
               ) : null}
             </Text>
           </HStack>
@@ -276,8 +282,13 @@ const ReferenceImageCardBase = ({
                 selectedBase={selectedBase}
                 onConfigChange={changeConfig}
               />
-            ) : config.type === 'krea2_reference_image' ? (
-              <Krea2StyleReferenceControls config={config} disabled={!isEnabled} onChange={changeConfig} />
+            ) : config.type === 'krea2_reference_image' || config.type === 'krea2_edit_reference_image' ? (
+              <>
+                <Krea2ReferenceModeControl config={config} onChange={changeConfig} />
+                {config.type === 'krea2_reference_image' ? (
+                  <Krea2StyleReferenceControls config={config} disabled={!isEnabled} onChange={changeConfig} />
+                ) : null}
+              </>
             ) : null}
           </Stack>
         </HStack>

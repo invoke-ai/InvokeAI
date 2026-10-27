@@ -1,7 +1,7 @@
 ---
 title: Media Metadata
 description: How generation metadata travels inside PNG and MP4 files, the versioned record schema, and what a recall can restore on another install.
-lastUpdated: 2026-09-19
+lastUpdated: 2026-10-18
 ---
 
 Every image and video InvokeAI produces carries its generation record **inside the file**, so a
@@ -60,7 +60,7 @@ H3Reference     = { kind: "image" | "video", image_name?, video_name?, detail?, 
 
 | Key | Type | Meaning |
 |---|---|---|
-| `metadata_version` | semver string | The record schema version, currently `1.0.0`. Absent on records written before versioning; they are read with the same rules plus the aliases listed below. |
+| `metadata_version` | semver string | The record schema version, currently `1.1.0`. Absent on records written before versioning; they are read with the same rules plus the aliases listed below. |
 | `app_version` | string | The InvokeAI release that wrote the record. Informational. |
 
 The version is over the **record**, not the node that writes it. A **minor** bump adds keys or

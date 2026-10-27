@@ -1,7 +1,7 @@
 ---
 title: Anima
 description: Generate anime-style images with Anima, a 2B Cosmos Predict2 diffusion transformer with an LLM adapter, including its schedulers, regional prompting, character-reference IP-Adapter and ControlNet-LLLite adapters.
-lastUpdated: 2026-10-16
+lastUpdated: 2026-10-18
 sidebar:
   order: 1
 ---
@@ -64,7 +64,8 @@ Both finetunes keep Anima's VAE, schedulers and Canvas support, and install from
 | **Anima-3.8B** (v1.1) | 52 blocks, plus a **semantic connector** bundled in the checkpoint that adds a second text encoder, **Qwen3.5 4B**, for better prompt adherence, multi-character binding and mixed natural-language/tag prompts. | Qwen3 0.6B **and** Qwen3.5 4B encoder, VAE |
 
 With an Anima-3.8B model selected, the **Components** section shows a third picker, **Qwen3.5 Encoder**,
-and generation needs it. Its starter model (~4.8 GB) installs together with Anima-3.8B. The connector
+and generation needs it. Its starter model (~4.8 GB) installs together with Anima-3.8B. The picker lists
+only Qwen3.5 4B encoders: MOSS-Image's Qwen3.5 9B installs under the same type but does not work with Anima-3.8B. The connector
 runs once per denoising step, so Anima-3.8B is slower per step than Anima-2.9B (about 1.3 against 1.7
 iterations per second at 832×1216 on an RTX 4090), and its Qwen3.5 encoder adds memory while the prompt
 is encoded. **Reset all to model defaults** sets 40 steps at CFG 6, the settings of the author's reference
