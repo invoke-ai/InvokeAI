@@ -39,6 +39,7 @@ import {
   isFlux2Qwen3EncoderForModel,
   isQwen3Vl8bEncoder,
   isKrea2Qwen3VlEncoder,
+  isMossImageQwen35Encoder,
   isSelfContainedSDNQFlux1Pipeline,
   isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
@@ -1530,9 +1531,157 @@ const buildQwenImage21Graph = (
   }
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
-  addMetadata(graph, output, settings, model, 'qwen_image_2_1_txt2img', projectSettings, {
+  addQwenImage21ReferenceImages(graph, settings, {
+    conditionings: negCond ? [posCond, negCond] : [posCond],
+    denoise,
+    modelLoader,
+  });
+  // The denoise adds the prefix-cache mode it ran to the record, which changes the image, so the metadata passes
+  // through it on the way to the decoder.
+  addMetadata(graph, denoise, settings, model, 'qwen_image_2_1_txt2img', projectSettings, {
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
     vae: vaeModel ?? undefined,
+  });
+  addEdge(graph, denoise, 'metadata', output, 'metadata');
+  addReferenceImageMetadata(graph, output, settings);
+
+  return graph;
+};
+
+/**
+ * Qwen-Image-2.1 reads each reference twice, at one size: the prompt encoder sees it through the vision tower, and
+ * the denoise node places its clean latents in the prompt's image slots. Both prompts are encoded with the
+ * references, and the latents follow in the same order.
+ */
+const addQwenImage21ReferenceImages = (
+  graph: BackendGraphContract,
+  settings: GenerateSettings,
+  nodes: {
+    conditionings: BackendInvocationContract[];
+    denoise: BackendInvocationContract;
+    modelLoader: BackendInvocationContract;
+  }
+): void => {
+  const referenceImages = getEnabledReferenceImages(settings, 'qwen_image_2_1_reference_image');
+  if (referenceImages.length === 0) {
+    return;
+  }
+
+  let imageCollect: BackendInvocationContract | null = null;
+  let latentsCollect: BackendInvocationContract | null = null;
+
+  for (const { config } of referenceImages) {
+    if (!config.image) {
+      continue;
+    }
+
+    const imageNode = addNode(graph, {
+      id: createId('qwen21_ref_img'),
+      image: toImageField(config.image),
+      type: 'image',
+    });
+    const i2l = addNode(graph, { id: createId('qwen21_ref_i2l'), reference: true, type: 'qwen_image_2_1_i2l' });
+    addEdge(graph, imageNode, 'image', i2l, 'image');
+    addEdge(graph, nodes.modelLoader, 'vae', i2l, 'vae');
+
+    const nextImageCollect = addNode(graph, { id: createId('qwen21_ref_img_collect'), type: 'collect' });
+    addEdge(graph, imageNode, 'image', nextImageCollect, 'item');
+    if (imageCollect) {
+      addEdge(graph, imageCollect, 'collection', nextImageCollect, 'collection');
+    }
+    imageCollect = nextImageCollect;
+
+    const nextLatentsCollect = addNode(graph, { id: createId('qwen21_ref_latents_collect'), type: 'collect' });
+    addEdge(graph, i2l, 'latents', nextLatentsCollect, 'item');
+    if (latentsCollect) {
+      addEdge(graph, latentsCollect, 'collection', nextLatentsCollect, 'collection');
+    }
+    latentsCollect = nextLatentsCollect;
+  }
+
+  if (!imageCollect || !latentsCollect) {
+    return;
+  }
+  for (const conditioning of nodes.conditionings) {
+    addEdge(graph, imageCollect, 'collection', conditioning, 'reference_images');
+  }
+  addEdge(graph, latentsCollect, 'collection', nodes.denoise, 'reference_latents');
+};
+
+const buildMossImageGraph = (
+  settings: GenerateSettings,
+  model: MainModelConfig,
+  outputIsIntermediate: boolean,
+  projectSettings: GenerationProjectSettings
+): BackendGraphContract => {
+  // A Diffusers pipeline brings its encoder and VAE; a single-file transformer needs both. The filter drops a stale
+  // Qwen3.5 4B selection left over from Anima-3.8B, which shares the setting.
+  const isDiffusers = model.format === 'diffusers';
+  const vaeModel = getCompatibleVae(settings, model);
+  const qwen35EncoderModel = getCompatibleComponent(settings.qwen35EncoderModel, isMossImageQwen35Encoder);
+
+  if (!isDiffusers) {
+    requireComponent(qwen35EncoderModel, 'Qwen3.5 9B Encoder');
+    requireComponent(vaeModel, 'MOSS-Image VAE');
+  }
+
+  const graph: BackendGraphContract = { edges: [], id: createId('moss_image_graph'), nodes: {} };
+  const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);
+  // The negative branch runs only above CFG 1, where the node requires its conditioning.
+  const useCfg = settings.cfgScale > 1;
+  const modelLoader = addNode(graph, {
+    id: 'model_loader',
+    model,
+    qwen3_5_encoder_model: qwen35EncoderModel ?? undefined,
+    type: 'moss_image_model_loader',
+    vae_model: vaeModel ?? undefined,
+  });
+  const posCond = addNode(graph, { id: 'pos_cond', type: 'moss_image_text_encoder' });
+  const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'moss_image_text_encoder' }) : null;
+  const denoiseSize = getDenoiseSize(settings, model);
+  const denoise = addNode(graph, {
+    cfg_scale: settings.cfgScale,
+    denoising_end: 1,
+    denoising_start: 0,
+    height: denoiseSize.height,
+    id: 'denoise_latents',
+    steps: settings.steps,
+    type: 'moss_image_denoise',
+    uncond_skip_layers: [...settings.mossImageUncondSkipLayers],
+    width: denoiseSize.width,
+  });
+  // MOSS-Image denoises into the FLUX.2 VAE's raw latent layout, so it decodes, and PiD-decodes, as FLUX.2 does.
+  const output = addDecodeOutput({
+    denoise,
+    graph,
+    l2iType: 'flux2_vae_decode',
+    model,
+    outputIsIntermediate,
+    positivePrompt,
+    seed,
+    settings,
+    vaeSource: modelLoader,
+  });
+
+  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  // The denoise node reads the VAE's BatchNorm statistics, which define the latent space it works in.
+  addEdge(graph, modelLoader, 'vae', denoise, 'vae');
+  addEdge(graph, modelLoader, 'qwen3_5_encoder', posCond, 'qwen3_5_encoder');
+  addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
+  addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
+
+  if (negCond) {
+    addEdge(graph, modelLoader, 'qwen3_5_encoder', negCond, 'qwen3_5_encoder');
+    addEdge(graph, negativePrompt, 'value', negCond, 'prompt');
+    addEdge(graph, negCond, 'conditioning', denoise, 'negative_conditioning');
+  }
+
+  addEdge(graph, seed, 'value', denoise, 'seed');
+  addMetadata(graph, output, settings, model, 'moss_image_txt2img', projectSettings, {
+    moss_image_uncond_skip_layers: [...settings.mossImageUncondSkipLayers],
+    qwen3_5_encoder: qwen35EncoderModel ?? undefined,
+    vae: vaeModel ?? undefined,
+    ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
 
   return graph;
@@ -1776,6 +1925,7 @@ export const GRAPH_BUILDERS = {
   'krea-2': buildKrea2Graph,
   'qwen-image-2-1': buildQwenImage21Graph,
   anima: buildAnimaGraph,
+  'moss-image': buildMossImageGraph,
   wan: buildWanGraph,
 } satisfies Record<SupportedGenerateBase, GenerateGraphBuilder>;
 

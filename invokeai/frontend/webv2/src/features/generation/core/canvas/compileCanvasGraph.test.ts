@@ -67,6 +67,13 @@ const qwenImage21Model: MainModelConfig = {
   name: 'Qwen-Image-2.1',
   type: 'main',
 };
+const mossImageModel: MainModelConfig = {
+  base: 'moss-image',
+  format: 'diffusers',
+  key: 'moss-image-model',
+  name: 'MOSS-Image',
+  type: 'main',
+};
 const externalModel: GenerateModelConfig = {
   base: 'external',
   capabilities: { modes: ['txt2img'], supports_seed: true },
@@ -182,7 +189,7 @@ interface BaseCase {
   denoiseType: string;
   txt2imgMode: string;
   img2imgMode: string;
-  /** sd-3 / flux / flux2 rescale strength with an exponent of 0.2 (legacy parity). */
+  /** sd-3 / flux / flux2 / moss-image rescale strength with an exponent of 0.2 (legacy parity for the first three). */
   optimizedDenoising: boolean;
 }
 
@@ -289,6 +296,15 @@ const BASE_CASES: BaseCase[] = [
     txt2imgMode: 'qwen_image_2_1_txt2img',
     img2imgMode: 'qwen_image_2_1_img2img',
     optimizedDenoising: false,
+  },
+  {
+    model: mossImageModel,
+    encodeType: 'flux2_vae_encode',
+    outputType: 'flux2_vae_decode',
+    denoiseType: 'moss_image_denoise',
+    txt2imgMode: 'moss_image_txt2img',
+    img2imgMode: 'moss_image_img2img',
+    optimizedDenoising: true,
   },
 ];
 
@@ -1015,6 +1031,22 @@ describe('compileCanvasGraph — inpaint per base', () => {
       (edge) => edge.source.node_id === metadata.id && edge.destination.field === 'metadata'
     );
     expect(metaEdge?.destination.node_id).toBe('canvas_output');
+  });
+
+  // Qwen-Image-2.1's denoise adds its cache mode to the record, so the record still passes through it once the blend
+  // takes over the output.
+  it('routes Qwen-Image-2.1 inpaint metadata through the denoise onto the final blend output', () => {
+    const { backendGraph } = compile(qwenImage21Model, 'inpaint');
+    const metadata = getNodeByType(backendGraph, 'core_metadata');
+    const metadataEdges = backendGraph.edges.filter(
+      (edge) => edge.source.field === 'metadata' || edge.destination.field === 'metadata'
+    );
+
+    expect(backendGraph.nodes.canvas_output?.type).toBe('invokeai_img_blend');
+    expect(metadataEdges.map(({ destination, source }) => [source.node_id, destination.node_id])).toEqual([
+      [metadata?.id, 'denoise_latents'],
+      ['denoise_latents', 'canvas_output'],
+    ]);
   });
 
   it('outputs only the generated mask region with transparency when requested', () => {

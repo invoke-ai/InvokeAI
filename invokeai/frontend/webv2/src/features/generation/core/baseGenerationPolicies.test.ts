@@ -29,12 +29,14 @@ import {
   getGenerationValidationReasons,
   getKrea2EditLoraState,
   getMaxReferenceImages,
+  getMissingReferenceImageFormat,
   getPromptPolicy,
   getSchedulerOptions,
   getSettingsWithModelDefaults,
   isReferenceImageSupported,
   isGenerateModelSelectable,
   isSupportedGenerateModel,
+  QWEN_IMAGE_21_STANDALONE_ENCODER_REASON,
   withAddedReferenceImages,
 } from './baseGenerationPolicies';
 import { SUPPORTED_GENERATE_BASES } from './supportedBases';
@@ -1665,6 +1667,29 @@ describe('component policies', () => {
     expect(isReferenceImageSupported(undefined)).toBe(false);
   });
 
+  it('offers Qwen-Image-2.1 reference images only on its Diffusers pipeline, whose encoder reads images', () => {
+    const diffusers = createModel('qwen-image-2-1', { format: 'diffusers' });
+
+    expect(isReferenceImageSupported(diffusers)).toBe(true);
+    expect(getMaxReferenceImages(diffusers)).toBe(4);
+    expect(isReferenceImageSupported(createModel('qwen-image-2-1', { format: 'gguf_quantized' }))).toBe(false);
+    expect(isReferenceImageSupported(createModel('qwen-image-2-1', { format: 'checkpoint' }))).toBe(false);
+  });
+
+  // The UI names the missing format only when switching to it would enable references.
+  it('names the format a model lacks for reference images only when the format alone blocks them', () => {
+    expect(getMissingReferenceImageFormat(createModel('qwen-image-2-1', { format: 'gguf_quantized' }))).toBe(
+      'diffusers'
+    );
+    expect(getMissingReferenceImageFormat(createModel('qwen-image-2-1', { format: 'checkpoint' }))).toBe('diffusers');
+    expect(getMissingReferenceImageFormat(createModel('qwen-image-2-1', { format: 'diffusers' }))).toBeNull();
+    // Qwen-Image needs the Edit variant, not a format; CogView4 takes no references at all.
+    expect(getMissingReferenceImageFormat(createModel('qwen-image', { format: 'gguf_quantized' }))).toBeNull();
+    expect(getMissingReferenceImageFormat(createModel('cogview4', { format: 'gguf_quantized' }))).toBeNull();
+    expect(getMissingReferenceImageFormat(externalModel)).toBeNull();
+    expect(getMissingReferenceImageFormat(undefined)).toBeNull();
+  });
+
   it('derives the reference image limit from external provider capabilities', () => {
     expect(getMaxReferenceImages(createModel('sdxl'))).toBe(5);
     expect(getMaxReferenceImages(createModel('cogview4'))).toBe(0);
@@ -1728,6 +1753,31 @@ describe('component policies', () => {
         })
       )
     ).toContain('Reference Image #1 is not supported by sd-3 model.');
+  });
+
+  it('blocks Qwen-Image-2.1 references while a standalone encoder replaces the one that reads them', () => {
+    const model = createModel('qwen-image-2-1', { format: 'diffusers' });
+    const encoder = {
+      base: 'any',
+      key: 'qwen3-vl-8b',
+      name: 'Qwen3-VL 8B',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    } as const;
+    const referenceImages = [
+      {
+        config: { image: referenceImage, type: 'qwen_image_2_1_reference_image' as const },
+        id: 'ref-1',
+        isEnabled: true,
+      },
+    ];
+
+    expect(
+      getGenerationValidationReasons(model, createSettings(model, { qwen3VLEncoderModel: encoder, referenceImages }))
+    ).toContain(QWEN_IMAGE_21_STANDALONE_ENCODER_REASON);
+    expect(getGenerationValidationReasons(model, createSettings(model, { referenceImages }))).not.toContain(
+      QWEN_IMAGE_21_STANDALONE_ENCODER_REASON
+    );
   });
 
   it('reports missing reference image model dependencies', () => {
@@ -1831,6 +1881,62 @@ describe('Anima inpaint adapter slot', () => {
       getGenerateModelSelectionResult({ currentValues: settings, model: anima, models: [] }).settings
         .animaInpaintAdapterModel
     ).toBe(inpaintAdapter);
+  });
+});
+
+describe('the Qwen3.5 encoder slots of Anima-3.8B and MOSS-Image', () => {
+  const qwen35Encoder = (variant: string): ComponentModelConfig => ({
+    base: 'any',
+    key: `qwen35-${variant}`,
+    name: `Qwen3.5 ${variant}`,
+    type: 'qwen3_5_encoder',
+    variant,
+  });
+  const anima38 = createModel('anima', { format: 'checkpoint', variant: 'anima_qwen35' });
+  const mossSingleFile = createModel('moss-image', { format: 'checkpoint' });
+  const offers = (model: MainModelConfig, candidate: ComponentModelConfig): boolean | undefined => {
+    const settings = createSettings(model);
+    const slot = getComponentSectionPolicy(model, settings).slots.find((s) => s.key === 'qwen35EncoderModel');
+
+    return slot?.filter?.(candidate, { model, selectedComponents: settings, settings });
+  };
+
+  it('offers each model only the encoder size it was trained on, though both share the setting', () => {
+    expect(offers(anima38, qwen35Encoder('qwen3_5_4b'))).toBe(true);
+    expect(offers(anima38, qwen35Encoder('qwen3_5_9b'))).toBe(false);
+    expect(offers(mossSingleFile, qwen35Encoder('qwen3_5_9b'))).toBe(true);
+    expect(offers(mossSingleFile, qwen35Encoder('qwen3_5_4b'))).toBe(false);
+  });
+
+  it('requires the encoder and VAE for a single-file MOSS-Image, and nothing for a Diffusers one', () => {
+    expect(getGenerationValidationReasons(mossSingleFile, createSettings(mossSingleFile))).toEqual([
+      'Generate needs a Qwen3.5 9B Encoder for non-Diffusers MOSS-Image models.',
+      'Generate needs a VAE for non-Diffusers MOSS-Image models.',
+    ]);
+    expect(
+      getGenerationValidationReasons(
+        mossSingleFile,
+        createSettings(mossSingleFile, { qwen35EncoderModel: qwen35Encoder('qwen3_5_9b'), vae: flux2Vae })
+      )
+    ).toEqual([]);
+
+    const mossDiffusers = createModel('moss-image', { format: 'diffusers' });
+
+    expect(getComponentSectionPolicy(mossDiffusers, createSettings(mossDiffusers)).defaultOpen).toBe(false);
+    expect(getGenerationValidationReasons(mossDiffusers, createSettings(mossDiffusers))).toEqual([]);
+  });
+
+  it('clears an Anima-3.8B encoder, and names it, when the model changes to MOSS-Image', () => {
+    const settings = createSettings(anima38, {
+      qwen35EncoderModel: qwen35Encoder('qwen3_5_4b'),
+      qwen3EncoderModel: animaQwen3Encoder,
+      vae: qwenImageVae,
+    });
+
+    const result = getGenerateModelSelectionResult({ currentValues: settings, model: mossSingleFile, models: [] });
+
+    expect(result.settings.qwen35EncoderModel).toBeNull();
+    expect(result.clearedLabels).toContain('Qwen3.5 Encoder');
   });
 });
 

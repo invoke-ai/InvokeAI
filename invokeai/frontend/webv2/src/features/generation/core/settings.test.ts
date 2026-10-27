@@ -29,8 +29,10 @@ import {
   hasModelDefaultVae,
   isLoraCompatibleWithModel,
   isGenerateSettings,
+  isValidMossImageSkipLayers,
   moveReferenceImage,
   normalizeGenerateSettings,
+  parseMossImageSkipLayers,
   syncGenerateWidgetValuesWithModels,
   syncGenerateLorasWithModels,
 } from './settings';
@@ -189,6 +191,46 @@ describe('normalizeGenerateSettings', () => {
         ],
       })
     ).toBe(false);
+  });
+
+  // Qwen-Image-2.1 references are their own flavor, so a stored one must not fold into Qwen-Image Edit's.
+  it('keeps persisted Qwen-Image-2.1 reference images as their own flavor', () => {
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      referenceImages: [
+        {
+          id: 'edit-1',
+          isEnabled: false,
+          config: {
+            type: 'qwen_image_2_1_reference_image',
+            image: {
+              height: 640,
+              imageName: 'edit.png',
+              imageUrl: '/api/v1/images/i/edit.png/full',
+              queuedAt: '2026-01-01T00:00:00.000Z',
+              sourceQueueItemId: 'backend-gallery',
+              thumbnailUrl: '/api/v1/images/i/edit.png/thumbnail',
+              width: 480,
+            },
+          },
+        },
+        { id: 'empty', isEnabled: true, config: { type: 'qwen_image_2_1_reference_image', image: null } },
+        { id: 'broken', isEnabled: true, config: { type: 'qwen_image_2_1_reference_image', image: { width: 1 } } },
+      ],
+    });
+
+    expect(normalized?.referenceImages).toEqual([
+      {
+        config: {
+          image: { original: { image: { height: 640, image_name: 'edit.png', width: 480 } } },
+          type: 'qwen_image_2_1_reference_image',
+        },
+        id: 'edit-1',
+        isEnabled: false,
+      },
+      { config: { image: null, type: 'qwen_image_2_1_reference_image' }, id: 'empty', isEnabled: true },
+    ]);
+    expect(normalized && isGenerateSettings(normalized)).toBe(true);
   });
 
   it('keeps more than five valid persisted reference images for provider-specific caps', () => {
@@ -484,6 +526,43 @@ describe('the Anima inpaint adapter settings', () => {
     expect(enabledFrom(false)).toBe(false);
     expect(enabledFrom(true)).toBe(true);
     expect(enabledFrom('off')).toBe(true);
+  });
+});
+
+describe('the MOSS-Image skip layers', () => {
+  it('parses comma-separated block indices into unique ascending ones, an empty field into none', () => {
+    expect(parseMossImageSkipLayers(' 26, 22,24 ,22')).toEqual([22, 24, 26]);
+    // A trailing comma is a list being typed, not a mistake.
+    expect(parseMossImageSkipLayers('22, ')).toEqual([22]);
+    expect(parseMossImageSkipLayers('')).toEqual([]);
+    expect(parseMossImageSkipLayers(' , ')).toEqual([]);
+  });
+
+  it('rejects an entry that is not a whole number, and leaves the range to the validator', () => {
+    for (const text of ['22, x', '2.5', '-1', '1e1', '22 24']) {
+      expect(parseMossImageSkipLayers(text)).toBeNull();
+    }
+    expect(parseMossImageSkipLayers('42')).toEqual([42]);
+    expect(isValidMossImageSkipLayers([42])).toBe(false);
+    expect(isValidMossImageSkipLayers([0, 41])).toBe(true);
+    expect(isValidMossImageSkipLayers([])).toBe(true);
+  });
+
+  it('defaults to block 22, keeps an empty list, and normalizes a stored list without dropping its blocks', () => {
+    expect(normalizeGenerateSettings(legacyStoredValues)?.mossImageUncondSkipLayers).toEqual([22]);
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, mossImageUncondSkipLayers: [] })?.mossImageUncondSkipLayers
+    ).toEqual([]);
+    // An out-of-range block stays, so validation names it instead of the list changing behind the user's back.
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, mossImageUncondSkipLayers: [26, 22, 26, 50] })
+        ?.mossImageUncondSkipLayers
+    ).toEqual([22, 26, 50]);
+    // A list that is not all integers is not one the user chose, so the default takes its place.
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, mossImageUncondSkipLayers: [24, 'x'] })
+        ?.mossImageUncondSkipLayers
+    ).toEqual([22]);
   });
 });
 

@@ -2,7 +2,11 @@ import type { GenerationModelCatalogItem as ModelConfig } from '@features/genera
 import type { GenerateModelConfig, GenerateSettings, LoraModelConfig } from '@features/generation/core/types';
 
 import { Badge, Separator, Stack, Text } from '@chakra-ui/react';
-import { getKrea2EditLoraState, isReferenceImageSupported } from '@features/generation/core/baseGenerationPolicies';
+import {
+  getKrea2EditLoraState,
+  getMissingReferenceImageFormat,
+  isReferenceImageSupported,
+} from '@features/generation/core/baseGenerationPolicies';
 import {
   type GenerateDraft,
   type GenerateSettingsUpdate,
@@ -91,7 +95,9 @@ export const GenerateGuidanceSection = ({
             {t('widgets.generate.krea2EditReferencesNeedLora')}
           </Text>
         ) : null}
-        {referenceImagesSupported || referenceImageCount > 0 ? <Separator borderColor="bg.subtle" /> : null}
+        {referenceImagesSupported || referenceImageCount > 0 || getMissingReferenceImageFormat(selectedModel) ? (
+          <Separator borderColor="bg.subtle" />
+        ) : null}
         <GenerateConceptsContent
           loraModels={loraModels}
           loras={settings.loras}
