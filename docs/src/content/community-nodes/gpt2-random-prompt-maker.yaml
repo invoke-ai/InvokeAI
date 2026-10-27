@@ -1,0 +1,7 @@
+title: GPT2RandomPromptMaker
+author: mickr777
+repo: https://github.com/mickr777/GPT2RandomPromptMaker
+summary: Generate random prompts with the GPT-2 language model from a seed and a context.
+description: >-
+  Example output: "An enchanted weapon will be usable by any character regardless of their alignment."
+categories: [prompts, language-models]

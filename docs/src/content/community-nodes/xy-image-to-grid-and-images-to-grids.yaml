@@ -1,0 +1,23 @@
+title: XY Image to Grid and Images to Grids
+author: skunkworxdark
+repo: https://github.com/skunkworxdark/XYGrid_nodes
+summary: Image grids, labeled XY parameter grids, and tiled upscaling with seamless recombining.
+description: >-
+  Makes grids of images from several inputs, labeled XY grids from parameters, and overlapping tiles for
+  super-resolution workflows, which it recombines into one image, blending the seams.
+categories: [compositing, sizing]
+nodes:
+  - name: Images To Grids
+    description: Combines multiple images into a grid of images.
+  - name: XYImages To Grids
+    description: Takes X and Y parameters and creates a labeled image grid.
+  - name: XYImage Tiles
+    description: Super-resolution (embiggen) style tiled resizing.
+  - name: Image To XYImages
+    description: Cuts an image into a number of columns and rows.
+  - name: Supporting nodes
+    description: Helpers for data wrangling and building `XYImage` collections.
+thumbnail: ./xy-image-to-grid-and-images-to-grids.webp
+images:
+  - src: https://raw.githubusercontent.com/skunkworxdark/XYGrid_nodes/refs/heads/main/images/collage.png
+    alt: A collage of XY grids and tiled images

@@ -1,0 +1,914 @@
+---
+/*
+ * The Community Nodes page's catalog: every pack in `src/content/community-nodes/` as a card with a thumbnail, its
+ * categories, a repository link and a button that copies its Git URL, with nodes, examples and links in a disclosure.
+ * A search field and category chips filter the cards; the count of shown packs is announced. Without JavaScript the
+ * controls and copy buttons stay hidden and every card shows. Pack text is English, as its authors wrote it; the
+ * interface strings are translated.
+ *
+ * Thumbnails are small local WebPs that astro:assets resizes, so the grid fetches nothing remote; a pack without one
+ * shows its first category's icon. The example images in a disclosure are hot-linked from the packs' repositories and
+ * load only when it first opens (without JavaScript, a `<noscript>` copy loads lazily); one that fails to load hides,
+ * leaving its caption.
+ */
+import ArrowUpRight from '@lucide/astro/icons/arrow-up-right';
+import Blocks from '@lucide/astro/icons/blocks';
+import ChevronDown from '@lucide/astro/icons/chevron-down';
+import Clapperboard from '@lucide/astro/icons/clapperboard';
+import Copy from '@lucide/astro/icons/copy';
+import Layers from '@lucide/astro/icons/layers';
+import MessageSquareText from '@lucide/astro/icons/message-square-text';
+import PersonStanding from '@lucide/astro/icons/person-standing';
+import Scaling from '@lucide/astro/icons/scaling';
+import Search from '@lucide/astro/icons/search';
+import Sparkles from '@lucide/astro/icons/sparkles';
+import SquareDashed from '@lucide/astro/icons/square-dashed';
+import TextCursorInput from '@lucide/astro/icons/text-cursor-input';
+import Wrench from '@lucide/astro/icons/wrench';
+import { Image } from 'astro:assets';
+import { getCollection } from 'astro:content';
+
+import {
+  ALL_CATEGORIES,
+  NODE_PACK_CATEGORIES,
+  codeSpans,
+  gitCloneUrl,
+  paragraphs,
+  searchText,
+  sortNodePacks,
+} from '../community-nodes.mjs';
+import { pluralForms } from '../i18n.mjs';
+import Trans from './Trans.astro';
+
+const { t } = Astro.locals;
+// The plural rules' language. `llms-full.txt` renders this page outside a Starlight route, in English.
+let lang = 'en';
+try {
+  lang = Astro.locals.starlightRoute.lang;
+} catch {}
+const packs = sortNodePacks(await getCollection('communityNodes'));
+const categoryLabels = new Map<string, string>(NODE_PACK_CATEGORIES.map(({ id, labelKey }) => [id, t(labelKey)]));
+const placeholderIcons: Record<string, typeof Blocks> = {
+  'image-effects': Sparkles,
+  masks: SquareDashed,
+  compositing: Layers,
+  prompts: TextCursorInput,
+  'language-models': MessageSquareText,
+  control: PersonStanding,
+  'video-3d': Clapperboard,
+  sizing: Scaling,
+  utility: Wrench,
+};
+const packId = (id: string) => `node-pack-${id}`;
+const total = pluralForms(t, 'communityNodes.total');
+// The script's strings. Templates keep their `{{placeholders}}` for the script to fill (`../i18n.mjs`).
+const i18n = {
+  total,
+  shown: pluralForms(t, 'communityNodes.shown'),
+  copy: t('communityNodes.copyGitUrl'),
+  copied: t('communityNodes.copyDone'),
+  copiedStatus: t('communityNodes.copyDoneStatus'),
+  copyFailed: t('communityNodes.copyFailed'),
+  copyFailedStatus: t('communityNodes.copyFailedStatus'),
+};
+const totalText = t('communityNodes.total', { count: packs.length });
+---
+
+<div class="community-nodes not-content" data-community-nodes data-i18n={JSON.stringify(i18n)} data-lang={lang}>
+  {/* Marks the catalog before first paint, so readers with JavaScript never see it without its controls. */}
+  <script is:inline>
+    document.currentScript.parentElement.dataset.js = '';
+  </script>
+  <div class="controls" role="search" aria-label={t('communityNodes.filtersLabel')} data-pagefind-ignore data-llms-ignore>
+    <div class="field">
+      <Search class="field__icon" size={16} aria-hidden="true" />
+      <input
+        type="search"
+        aria-label={t('communityNodes.searchLabel')}
+        aria-controls="community-node-packs"
+        placeholder={t('communityNodes.searchPlaceholder')}
+        autocomplete="off"
+        spellcheck="false"
+        data-query
+      />
+    </div>
+    <fieldset class="chips">
+      <legend class="sr-only">{t('communityNodes.categoryLegend')}</legend>
+      {
+        [{ id: ALL_CATEGORIES, label: t('communityNodes.allCategories') }, ...NODE_PACK_CATEGORIES.map(({ id }) => ({ id, label: categoryLabels.get(id) }))].map(
+          ({ id, label }) => (
+            <label class="chip">
+              <input type="radio" name="community-node-category" value={id} checked={id === ALL_CATEGORIES} />
+              {label}
+            </label>
+          )
+        )
+      }
+    </fieldset>
+  </div>
+  <p class="count" role="status" data-count data-pagefind-ignore data-llms-ignore>{totalText}</p>
+
+  <ul class="grid" role="list" id="community-node-packs" aria-label={t('communityNodes.listLabel')}>
+    {
+      packs.map(({ id, data: pack }) => {
+        const Placeholder = placeholderIcons[pack.categories[0]] ?? Blocks;
+        const labels = pack.categories.map((category) => categoryLabels.get(category) ?? category);
+        const gitUrl = gitCloneUrl(pack.repo);
+        return (
+          <li class="card" data-pack data-categories={pack.categories.join(' ')} data-search={searchText(pack, labels)}>
+            <div class="thumb">
+              {pack.thumbnail ? (
+                <Image
+                  src={pack.thumbnail}
+                  alt={pack.images[0].alt}
+                  widths={[400, 800].filter((width) => width < pack.thumbnail.width).concat(pack.thumbnail.width)}
+                  sizes="(min-width: 72rem) 24rem, (min-width: 50rem) 45vw, calc(100vw - 2rem)"
+                />
+              ) : (
+                <Placeholder class="thumb__placeholder" size={28} aria-hidden="true" />
+              )}
+            </div>
+
+            <div class="main">
+              <h3 class="title" id={packId(id)}>
+                {pack.title}
+              </h3>
+              <p class="author">{t('communityNodes.byAuthor', { author: pack.author, interpolation: { escapeValue: false } })}</p>
+              <p class="summary">{codeSpans(pack.summary).map((part) => (part.code ? <code>{part.text}</code> : part.text))}</p>
+              <ul class="tags" role="list">
+                {labels.map((label) => (
+                  <li class="tag">{label}</li>
+                ))}
+                {pack.archived && <li class="tag tag--warning">{t('communityNodes.archived')}</li>}
+                {pack.install === 'manual' && <li class="tag tag--warning">{t('communityNodes.manualInstall')}</li>}
+                {pack.dependencies && <li class="tag tag--outline">{t('communityNodes.dependencies')}</li>}
+              </ul>
+            </div>
+
+            <div class="actions">
+              {/* Each card's controls name its pack for screen readers, which list 48 of each otherwise alike. */}
+              <a class="docs-button docs-button--secondary" href={pack.repo}>
+                {t('communityNodes.repository')}
+                <span class="sr-only">: {pack.title}</span>
+                <ArrowUpRight aria-hidden="true" />
+              </a>
+              {pack.install === 'manager' && (
+                <button type="button" class="copy docs-button docs-button--ghost" data-copy={gitUrl} data-title={pack.title} data-llms-ignore>
+                  <Copy aria-hidden="true" />
+                  <span data-label>{i18n.copy}</span>
+                  <span class="sr-only">: {pack.title}</span>
+                </button>
+              )}
+            </div>
+
+            <details class="details">
+              <summary>
+                {t('communityNodes.details')}
+                <span class="sr-only">: {pack.title}</span>
+                <ChevronDown class="details__chevron" size={14} aria-hidden="true" />
+              </summary>
+              <div class="details__body">
+                {paragraphs(pack.description).map((paragraph) => (
+                  <p>{codeSpans(paragraph).map((part) => (part.code ? <code>{part.text}</code> : part.text))}</p>
+                ))}
+                {pack.install === 'manual' ? (
+                  <p class="note note--warning">
+                    <Trans message={t('communityNodes.manualInstallNote')}>{(text: string) => <code>{text}</code>}</Trans>
+                  </p>
+                ) : (
+                  <div class="git-url">
+                    {/* The separators keep label and value apart for screen readers and llms-full.txt. */}
+                    <span class="label">{t('communityNodes.gitUrl')}</span>
+                    <span class="sr-only">: </span>
+                    <code>{gitUrl}</code>
+                  </div>
+                )}
+                {pack.archived && <p class="note note--warning">{t('communityNodes.archivedNote')}</p>}
+                {pack.dependencies && <p class="note">{t('communityNodes.dependenciesNote')}</p>}
+                {pack.nodes.length > 0 && (
+                  <section>
+                    <h4>{t('communityNodes.nodes')}</h4>
+                    <ul class="nodes" role="list">
+                      {pack.nodes.map((node) => (
+                        <li>
+                          <span class="nodes__name">{node.name}</span>
+                          {node.description && (
+                            <span class="nodes__description">
+                              <span class="sr-only">: </span>
+                              {codeSpans(node.description).map((part) => (part.code ? <code>{part.text}</code> : part.text))}
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                {pack.links.length > 0 && (
+                  <section>
+                    <h4>{t('communityNodes.links')}</h4>
+                    <ul class="links" role="list">
+                      {pack.links.map((link) => (
+                        <li>
+                          <a href={link.url}>{link.label}</a>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                {pack.images.length > 0 && (
+                  <section>
+                    <h4>{t('communityNodes.examples')}</h4>
+                    <ul class="gallery" role="list">
+                      {pack.images.map((image) => (
+                        <li>
+                          <figure>
+                            <a class="shot" href={image.src}>
+                              <img data-src={image.src} alt={image.alt} decoding="async" referrerpolicy="no-referrer" data-llms-ignore />
+                              <noscript>
+                                <img src={image.src} alt={image.alt} loading="lazy" decoding="async" referrerpolicy="no-referrer" />
+                              </noscript>
+                            </a>
+                            {image.caption && <figcaption>{image.caption}</figcaption>}
+                          </figure>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+              </div>
+            </details>
+          </li>
+        );
+      })
+    }
+  </ul>
+
+  <div class="empty" data-empty hidden data-llms-ignore>
+    <p>{t('communityNodes.noResults')}</p>
+    <button type="button" class="docs-button docs-button--secondary" data-clear>{t('communityNodes.clearFilters')}</button>
+  </div>
+  <span class="sr-only" role="status" data-copy-status></span>
+</div>
+
+<script>
+  import { ALL_CATEGORIES, packMatches } from '../community-nodes.mjs';
+  import { formatPlural, interpolate } from '../i18n.mjs';
+
+  const RESET_DELAY_MS = 2000;
+
+  const mount = (root: HTMLElement) => {
+    const i18n = JSON.parse(root.dataset.i18n!) as {
+      total: Record<string, string>;
+      shown: Record<string, string>;
+      copy: string;
+      copied: string;
+      copiedStatus: string;
+      copyFailed: string;
+      copyFailedStatus: string;
+    };
+    const lang = root.dataset.lang!;
+    const query = root.querySelector<HTMLInputElement>('[data-query]')!;
+    const radios = [...root.querySelectorAll<HTMLInputElement>('input[name="community-node-category"]')];
+    const count = root.querySelector<HTMLElement>('[data-count]')!;
+    const empty = root.querySelector<HTMLElement>('[data-empty]')!;
+    const copyStatus = root.querySelector<HTMLElement>('[data-copy-status]')!;
+    const cards = [...root.querySelectorAll<HTMLElement>('[data-pack]')].map((element) => ({
+      element,
+      text: element.dataset.search!,
+      categories: element.dataset.categories!.split(' '),
+    }));
+
+    const apply = () => {
+      const filter = {
+        query: query.value,
+        category: radios.find((radio) => radio.checked)?.value ?? ALL_CATEGORIES,
+      };
+      let shown = 0;
+      for (const card of cards) {
+        const matches = packMatches(card, filter);
+        card.element.hidden = !matches;
+        if (matches) shown += 1;
+      }
+      empty.hidden = shown > 0;
+      const text =
+        shown === cards.length
+          ? formatPlural(i18n.total, cards.length, lang)
+          : interpolate(formatPlural(i18n.shown, cards.length, lang), { shown });
+      // Rewriting the same text would make some screen readers announce it again.
+      if (count.textContent !== text) count.textContent = text;
+    };
+
+    const clear = () => {
+      query.value = '';
+      radios.forEach((radio) => (radio.checked = radio.value === ALL_CATEGORIES));
+      apply();
+    };
+
+    // Marks the edges of the chip row that have more chips past them, for its fades on narrow screens.
+    const chips = root.querySelector<HTMLElement>('.chips')!;
+    const updateChipFades = () => {
+      const end = chips.scrollWidth - chips.clientWidth;
+      chips.toggleAttribute('data-more-start', chips.scrollLeft > 1);
+      chips.toggleAttribute('data-more-end', chips.scrollLeft < end - 1);
+    };
+    chips.addEventListener('scroll', updateChipFades, { passive: true });
+    new ResizeObserver(updateChipFades).observe(chips);
+
+    query.addEventListener('input', apply);
+    for (const radio of radios) radio.addEventListener('change', apply);
+    root.querySelector('[data-clear]')?.addEventListener('click', () => {
+      clear();
+      query.focus();
+    });
+
+    // A link to a pack (`#node-pack-<id>`, as search results use) shows it even when the filters hid it.
+    const reveal = () => {
+      // A malformed hash such as `#%` names no pack; decoding it would throw and stop the rest of the setup.
+      let id = '';
+      try {
+        id = decodeURIComponent(location.hash.slice(1));
+      } catch {}
+      const target = id ? document.getElementById(id) : null;
+      const card = target?.closest<HTMLElement>('[data-pack]');
+      if (!target || !card?.hidden) return;
+      clear();
+      target.scrollIntoView();
+    };
+    window.addEventListener('hashchange', reveal);
+
+    // A browser that restores the search or the chosen chip on Back filters to match them, unless the URL names a pack
+    // they would hide.
+    if (query.value || !radios.find((radio) => radio.value === ALL_CATEGORIES)?.checked) {
+      apply();
+      reveal();
+    }
+
+    for (const button of root.querySelectorAll<HTMLButtonElement>('[data-copy]')) {
+      const label = button.querySelector<HTMLElement>('[data-label]')!;
+      let resetTimer: number | undefined;
+      const report = (text: string, announcement: string) => {
+        label.textContent = text;
+        copyStatus.textContent = announcement;
+        clearTimeout(resetTimer);
+        resetTimer = window.setTimeout(() => {
+          label.textContent = i18n.copy;
+          copyStatus.textContent = '';
+        }, RESET_DELAY_MS);
+      };
+      button.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(button.dataset.copy!);
+          report(i18n.copied, interpolate(i18n.copiedStatus, { title: button.dataset.title! }));
+        } catch (error) {
+          console.error('Could not copy the Git URL:', error);
+          report(i18n.copyFailed, i18n.copyFailedStatus);
+        }
+      });
+    }
+
+    // A disclosure's hot-linked examples load when it first opens. One that fails hides, leaving its caption.
+    for (const details of root.querySelectorAll<HTMLDetailsElement>('details')) {
+      details.addEventListener('toggle', () => {
+        if (!details.open) return;
+        for (const image of details.querySelectorAll<HTMLImageElement>('img[data-src]')) {
+          image.addEventListener('error', () => image.closest('li')?.setAttribute('data-broken', ''), { once: true });
+          image.src = image.dataset.src!;
+          image.removeAttribute('data-src');
+        }
+      });
+    }
+  };
+
+  for (const root of document.querySelectorAll<HTMLElement>('[data-community-nodes]')) mount(root);
+</script>
+
+<style>
+  .community-nodes {
+    --card-pad: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+  }
+
+  /* Without JavaScript the filters and copy buttons can't work, so they stay hidden and every card shows. */
+  .community-nodes:not([data-js]) {
+    .controls,
+    .count,
+    .copy,
+    /* The `<noscript>` copy beside it shows instead. */
+    .shot img[data-src] {
+      display: none;
+    }
+  }
+
+  /* Controls */
+
+  .controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+  }
+
+  .field {
+    position: relative;
+    display: flex;
+    align-items: center;
+
+    input {
+      width: 100%;
+      height: var(--docs-header-control-height);
+      padding: 0 0.75rem 0 2.25rem;
+      border: 1px solid var(--docs-border);
+      border-radius: var(--docs-header-control-radius);
+      background-color: var(--docs-surface);
+      color: var(--docs-text-strong);
+      font: inherit;
+      font-size: var(--sl-text-sm);
+      transition: var(--docs-control-transition);
+
+      &::placeholder {
+        color: var(--docs-text-subtle);
+      }
+
+      &:hover {
+        border-color: var(--docs-border-strong);
+      }
+
+      &:focus-visible {
+        border-color: var(--docs-accent);
+        outline: none;
+        box-shadow: 0 0 0 1px var(--docs-accent);
+      }
+    }
+  }
+
+  .field__icon {
+    position: absolute;
+    inset-inline-start: 0.75rem;
+    color: var(--docs-text-subtle);
+    pointer-events: none;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    /* A fieldset is at least as wide as its content by default, which would stop the phone row from scrolling. */
+    min-inline-size: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  /*
+   * On narrow screens the chips stay in one row that scrolls sideways, fading out at an edge with more chips past it.
+   * The padding leaves room for the focus ring, which the scrolling would clip; arrow keys scroll the chosen chip in.
+   */
+  @media (max-width: 49.99rem) {
+    .chips {
+      --fade-start: 0px;
+      --fade-end: 0px;
+      flex-wrap: nowrap;
+      margin: -0.25rem;
+      padding: 0.25rem;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+      mask-image: linear-gradient(
+        to right,
+        transparent,
+        #000 var(--fade-start),
+        #000 calc(100% - var(--fade-end)),
+        transparent
+      );
+
+      &::-webkit-scrollbar {
+        display: none;
+      }
+
+      &[data-more-start] {
+        --fade-start: 2.5rem;
+      }
+
+      &[data-more-end] {
+        --fade-end: 2.5rem;
+      }
+    }
+
+    .chip {
+      flex: none;
+    }
+  }
+
+  /* Hover: the strong border and the control fill. Chosen: the solid accent fill. */
+  .chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    height: var(--docs-tab-height);
+    padding: 0 var(--docs-tab-pad-x);
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius);
+    color: var(--docs-text-muted);
+    font-size: var(--docs-control-font-size);
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: var(--docs-control-transition);
+
+    /* The radio is the control: invisible, but covering the chip so it takes the clicks. */
+    input {
+      position: absolute;
+      inset: 0;
+      margin: 0;
+      opacity: 0;
+      cursor: inherit;
+    }
+
+    &:hover {
+      border-color: var(--docs-border-strong);
+      background-color: var(--docs-control);
+      color: var(--docs-text-strong);
+    }
+
+    &:has(input:checked) {
+      border-color: var(--docs-accent);
+      background-color: var(--docs-accent);
+      color: var(--docs-accent-contrast);
+    }
+
+    &:has(input:focus-visible) {
+      outline: 2px solid var(--docs-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  .count {
+    margin: 0;
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-xs);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Cards */
+
+  /*
+   * Each card spans four rows of the grid as a subgrid, so the thumbnails, texts, buttons and disclosures of a row
+   * line up whatever each card's text length. An open disclosure grows only its row's last track.
+   */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .card {
+    display: grid;
+    grid-row: span 4;
+    grid-template-rows: subgrid;
+    row-gap: 0;
+    min-width: 0;
+    overflow: clip;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  .thumb {
+    position: relative;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 16 / 10;
+    border-bottom: 1px solid var(--docs-border-subtle);
+    background-color: var(--docs-bg);
+
+    img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      /* Covers the dot grid, which would show through a transparent image. */
+      background-color: var(--docs-bg);
+    }
+  }
+
+  /* Without a thumbnail: the category's icon on a tile over the page's dot grid. */
+  .thumb {
+    background-image: radial-gradient(circle, var(--docs-grid-dot) 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
+
+  .thumb__placeholder {
+    box-sizing: content-box;
+    padding: 0.875rem;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-lg);
+    background-color: var(--docs-surface);
+    color: var(--docs-text-subtle);
+  }
+
+  .main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.875rem var(--card-pad) 0;
+  }
+
+  .title {
+    margin: 0;
+    color: var(--docs-text-strong);
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+    scroll-margin-top: calc(var(--sl-nav-height) + 1rem);
+  }
+
+  .author {
+    margin: 0;
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-xs);
+  }
+
+  .summary {
+    margin: 0.25rem 0 0;
+    color: var(--docs-text-muted);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .tag {
+    padding: 0.125rem 0.375rem;
+    border-radius: var(--docs-radius);
+    background-color: var(--docs-control);
+    color: var(--docs-text-muted);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+
+  .tag--warning {
+    background-color: color-mix(in oklab, var(--invoke-warning) 14%, transparent);
+    color: var(--invoke-warning);
+  }
+
+  .tag--outline {
+    box-shadow: inset 0 0 0 1px var(--docs-border-strong);
+    background-color: transparent;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 0.375rem;
+    padding: 0.875rem var(--card-pad);
+  }
+
+  /* Disclosure */
+
+  .details {
+    border-top: 1px solid var(--docs-border-subtle);
+
+    summary {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.5rem var(--card-pad);
+      color: var(--docs-text-muted);
+      font-size: var(--docs-control-font-size);
+      font-weight: 500;
+      list-style: none;
+      cursor: pointer;
+      transition: var(--docs-control-transition);
+
+      &::-webkit-details-marker {
+        display: none;
+      }
+
+      &:hover {
+        background-color: var(--docs-control);
+        color: var(--docs-text-strong);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--docs-accent);
+        outline-offset: -2px;
+      }
+    }
+
+    &[open] .details__chevron {
+      rotate: 180deg;
+    }
+  }
+
+  .details__chevron {
+    margin-inline-start: auto;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .details__chevron {
+      transition: rotate 150ms ease-out;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .field input,
+    .chip,
+    .details summary {
+      transition: none;
+    }
+  }
+
+  .details__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.25rem var(--card-pad) var(--card-pad);
+    color: var(--docs-text-muted);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+
+    p {
+      margin: 0;
+    }
+
+    h4 {
+      margin: 0 0 0.375rem;
+      color: var(--docs-text-subtle);
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    a {
+      color: var(--docs-accent);
+
+      &:hover {
+        color: var(--docs-accent-text);
+      }
+    }
+
+    code {
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .summary code,
+  .details__body code {
+    padding: 0.0625rem 0.25rem;
+    border-radius: 3px;
+    background-color: var(--docs-control);
+    color: var(--docs-text);
+    font-family: var(--__sl-font-mono);
+    font-size: 0.9em;
+  }
+
+  .note {
+    padding-inline-start: 0.625rem;
+    border-inline-start: 2px solid var(--docs-border-strong);
+  }
+
+  .note--warning {
+    border-inline-start-color: var(--invoke-warning);
+  }
+
+  .git-url {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+
+    .label {
+      color: var(--docs-text-subtle);
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    code {
+      align-self: start;
+      user-select: all;
+    }
+  }
+
+  .nodes,
+  .links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .nodes li {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .nodes__name {
+    color: var(--docs-text-strong);
+    font-weight: 500;
+  }
+
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    figure {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      margin: 0;
+    }
+
+    figcaption {
+      color: var(--docs-text-subtle);
+      font-size: 0.6875rem;
+      line-height: 1.35;
+    }
+
+    li[data-broken] .shot {
+      display: none;
+    }
+  }
+
+  .shot {
+    display: block;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius);
+    background-color: var(--docs-bg);
+    transition: var(--docs-control-transition);
+
+    &:hover {
+      border-color: var(--docs-border-strong);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--docs-accent);
+      outline-offset: 2px;
+    }
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      color: var(--docs-text-subtle);
+      font-size: 0.6875rem;
+    }
+  }
+
+  /* Empty state */
+
+  .empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 2rem 1rem;
+    border: 1px dashed var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    color: var(--docs-text-muted);
+    font-size: var(--sl-text-sm);
+    text-align: center;
+
+    &[hidden] {
+      display: none;
+    }
+
+    p {
+      margin: 0;
+    }
+  }
+</style>

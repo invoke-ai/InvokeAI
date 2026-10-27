@@ -1,0 +1,23 @@
+title: Halftone
+author: JPPhoto
+repo: https://github.com/JPPhoto/halftone-node
+summary: Grayscale and CMYK halftoning, for a magazine or newspaper print look.
+description: >-
+  Both nodes let you set the angles and the halftone dot spacing.
+categories: [image-effects]
+nodes:
+  - name: Halftone
+    description: Converts the image to grayscale, then halftones it.
+  - name: CMYK Halftone
+    description: Converts the image to CMYK and halftones each channel.
+thumbnail: ./halftone.webp
+images:
+  - src: https://github.com/invoke-ai/InvokeAI/assets/34005131/c59c578f-db8e-4d66-8c66-2851752d75ea
+    alt: A portrait rendered as a CMYK halftone
+    caption: CMYK Halftone output
+  - src: https://github.com/invoke-ai/InvokeAI/assets/34005131/fd5efb9f-4355-4409-a1c2-c1ca99e0cab4
+    alt: The input portrait
+    caption: Input
+  - src: https://github.com/invoke-ai/InvokeAI/assets/34005131/7e606f29-e68f-4d46-b3d5-97f799a4ec2f
+    alt: The portrait rendered as a grayscale halftone
+    caption: Halftone output

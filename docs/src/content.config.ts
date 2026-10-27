@@ -7,6 +7,7 @@ import { docsSchema, i18nSchema } from '@astrojs/starlight/schema';
 import { changelogsLoader } from 'starlight-changelogs/loader';
 
 import en from './content/i18n/en.json';
+import { NODE_PACK_CATEGORIES } from './lib/community-nodes.mjs';
 import { generateDocsId } from './lib/sort-prefix.mjs';
 
 // `en.json` declares the site's own UI strings (and the few Starlight strings it rewords), which Crowdin translates
@@ -49,6 +50,49 @@ export const collections = {
         createdWith: z.string().optional(),
         date: z.coerce.date(),
       }),
+  }),
+  // Node packs on the Community Nodes page. `src/content/community-nodes/README.md` explains how to add one.
+  communityNodes: defineCollection({
+    loader: glob({ pattern: '*.yaml', base: './src/content/community-nodes' }),
+    // Strict objects, so a misspelt field (`dependency`, `thumbnial`) fails the build instead of being dropped.
+    schema: ({ image }) =>
+      z
+        .strictObject({
+          title: z.string(),
+          /** The repository owner's name, as on GitHub or GitLab. */
+          author: z.string(),
+          /** The repository's web page. With `.git` appended it is the URL the Nodes manager and `git clone` take. */
+          repo: z.httpUrl(),
+          /** One sentence for the card. */
+          summary: z.string().max(120),
+          /** More about the pack: paragraphs separated by a blank line. `code` spans are the only markup. */
+          description: z.string().optional(),
+          categories: z
+            .array(z.enum(NODE_PACK_CATEGORIES.map(({ id }) => id) as [string, ...string[]]))
+            .min(1),
+          /** `manual` when the repository is not a pack folder (no top-level `__init__.py`), so the manager can't install it. */
+          install: z.enum(['manager', 'manual']).default('manager'),
+          /** The pack ships a `requirements.txt` or `pyproject.toml`, whose packages you install yourself. */
+          dependencies: z.boolean().default(false),
+          /** The repository is archived: read-only, with no further updates. */
+          archived: z.boolean().default(false),
+          nodes: z.array(z.strictObject({ name: z.string(), description: z.string().optional() })).default([]),
+          /** Further reading, such as example workflows. */
+          links: z.array(z.strictObject({ label: z.string(), url: z.httpUrl() })).default([]),
+          /**
+           * The card's image: a small WebP of the first example beside this file (see the README), so the grid loads no
+           * remote images. The build fails when the file is missing. Its alt text is the first example's.
+           */
+          thumbnail: image().optional(),
+          /** Hosted by the pack's author and loaded only when a reader opens the card's details. */
+          images: z
+            .array(z.strictObject({ src: z.httpUrl(), alt: z.string().min(1), caption: z.string().optional() }))
+            .default([]),
+        })
+        .refine((pack) => !pack.thumbnail || pack.images.length > 0, {
+          message: 'A thumbnail takes its alt text from the first image, so `images` needs at least one entry.',
+          path: ['thumbnail'],
+        }),
   }),
   changelogs: defineCollection({
     loader: changelogsLoader([

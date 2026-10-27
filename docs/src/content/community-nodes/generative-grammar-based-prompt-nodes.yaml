@@ -1,0 +1,19 @@
+title: Generative Grammar-Based Prompt Nodes
+author: dwringer
+repo: https://github.com/dwringer/generative-grammar-prompt-nodes
+summary: Generate prompts from simple grammar rules that you define in YAML files.
+description: >-
+  The prompts are made by recursively expanding a template string, replacing nonterminal "parts of speech" until none
+  remain. The repository includes example rule files.
+categories: [prompts]
+nodes:
+  - name: Lookup Table from File
+    description: Loads the "prompt" section of a YAML file, or of a whole folder of YAML files, into a JSON-ified dictionary (Lookups output).
+  - name: Lookups Entry from Prompt
+    description: Places a single entry in a new Lookups output under the specified heading.
+  - name: Prompt from Lookup Table
+    description: Uses a collection of Lookups as grammar rules from which to randomly generate prompts.
+thumbnail: ./generative-grammar-based-prompt-nodes.webp
+images:
+  - src: https://raw.githubusercontent.com/dwringer/generative-grammar-prompt-nodes/main/lookuptables_usage.jpg
+    alt: A workflow generating prompts from lookup tables

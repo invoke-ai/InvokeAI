@@ -1,0 +1,25 @@
+title: Image Export
+author: veeliks
+repo: https://github.com/veeliks/invoke_image_export
+summary: Save images as AVIF, JPEG, PNG, TIFF or WebP with format-specific compression and quality options.
+categories: [utility]
+dependencies: true
+archived: true
+nodes:
+  - name: Save Image as AVIF
+  - name: Save Image as JPEG
+  - name: Save Image as PNG
+  - name: Save Image as TIFF
+  - name: Save Image as WebP
+thumbnail: ./image-export.webp
+images:
+  - src: https://raw.githubusercontent.com/veeliks/invoke_image_export/main/.readme/node_webp.png
+    alt: The Save Image as WebP node
+  - src: https://raw.githubusercontent.com/veeliks/invoke_image_export/main/.readme/node_avif.png
+    alt: The Save Image as AVIF node
+  - src: https://raw.githubusercontent.com/veeliks/invoke_image_export/main/.readme/node_jpeg.png
+    alt: The Save Image as JPEG node
+  - src: https://raw.githubusercontent.com/veeliks/invoke_image_export/main/.readme/node_png.png
+    alt: The Save Image as PNG node
+  - src: https://raw.githubusercontent.com/veeliks/invoke_image_export/main/.readme/node_tiff.png
+    alt: The Save Image as TIFF node

@@ -1,0 +1,9 @@
+title: Image Dominant Color
+author: VeyDlin
+repo: https://github.com/VeyDlin/image-dominant-color-node
+summary: Find the dominant color of an image with k-means clustering.
+categories: [utility]
+thumbnail: ./image-dominant-color.webp
+images:
+  - src: https://raw.githubusercontent.com/VeyDlin/image-dominant-color-node/master/.readme/node.png
+    alt: The Image Dominant Color node

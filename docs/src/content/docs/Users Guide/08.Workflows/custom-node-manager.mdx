@@ -1,76 +1,77 @@
 ---
 title: Custom Node Manager
+description: Install, browse and uninstall community node packs from the Nodes manager, or add them to the nodes folder yourself.
+lastUpdated: 2026-10-26
 sidebar:
   order: 5
 ---
 
 import { Steps } from '@astrojs/starlight/components';
 
-The Custom Node Manager installs, updates, and removes community node packs directly from the InvokeAI UI — no manual file copying, no restart required.
+The Nodes manager installs node packs from a Git URL, lists the packs you have and the nodes each one adds, and
+uninstalls them. Open **Nodes** in the Launchpad, or **Nodes Manager** in the app menu. When multi-user mode is on,
+only administrators see it. [Community Nodes](/users-guide/workflows/community-nodes/) lists packs to install.
 
-## Opening the Custom Node Manager
-
-Click the **Nodes** tab (circuit icon) in the left sidebar, between **Models** and **Queue**.
-
-The page is split into two panels:
-
-- **Left:** the list of installed node packs, with each pack's node count, type badges, and on-disk path.
-- **Right:** the install UI, with tabs for **Git Repository URL** and **Scan Folder**, plus an install log at the bottom.
-
-## Installing a node pack
-
-<Steps>
-1. On the right panel, choose the **Git Repository URL** tab.
-2. Paste the Git URL of the pack, e.g. `https://github.com/user/my-node-pack.git`.
-3. Click **Install**.
-</Steps>
-
-What happens during install:
-
-- The repo is cloned into your `nodes` directory.
-- The nodes are loaded into the running InvokeAI process immediately — **no restart needed**.
-- Any workflow `.json` files found in the repo are imported into your workflow library and tagged with `node-pack:<pack-name>` so you can filter for them.
-- The install log at the bottom of the panel shows the result for each step.
-
-:::caution[Security]
-Custom nodes execute arbitrary Python on your machine. **Only install node packs from authors you trust.** A malicious pack could harm your system or exfiltrate data.
+:::caution[Only install packs you trust]
+A node pack runs Python code on your machine with InvokeAI's permissions.
 :::
 
-### Python dependencies
+## Install from a Git URL
 
-The Custom Node Manager **does not** automatically run `pip install` for a pack's `requirements.txt` or `pyproject.toml`. Auto-installing into the running InvokeAI environment risks pulling in incompatible package versions and breaking the application.
+<Steps>
 
-If a pack ships extra dependencies, you'll see a warning toast after installation. Install them yourself — typically `pip install -r requirements.txt` from inside an activated InvokeAI environment, but check the pack's README first. After installing, click **Reload** so the new dependencies take effect.
+1. Click **Add Nodes**.
 
-## Managing installed packs
+2. Paste the pack's repository URL into **Git URL**, such as `https://github.com/JPPhoto/curves-node.git`, and click
+   **Install** or press Enter. The field rejects a pack you already have.
 
-Each entry in the left panel has actions for managing the pack:
+3. InvokeAI clones the repository into your nodes directory, in a folder named after the URL's last part, and loads
+   its nodes without a restart. Every workflow `.json` in the repository is added to the workflow library, shared with
+   all users and tagged `node-pack:<pack name>`.
 
-- **Reload** — re-scans the `nodes` directory. Use this after manually adding a pack via `git clone`, or after installing extra Python dependencies.
-- **Uninstall** — removes the pack from disk, unregisters its nodes from the running process, and removes any workflows that were imported from the pack. No restart needed.
+</Steps>
 
-## Scan Folder tab
+Install fails when the repository has no `__init__.py` at its top level, because InvokeAI loads only folders that have
+one. The activity bar at the bottom of the manager keeps each install's result and message.
 
-The **Scan Folder** tab shows the path of your `nodes` directory. Anything placed there manually (for example, by `git clone`-ing a pack directly) is detected automatically at startup. Use **Reload** to pick up packs added at runtime.
+InvokeAI doesn't install a pack's Python dependencies, since that could break its own environment. When the pack has a
+`requirements.txt` or `pyproject.toml`, a **Dependencies required** notice stays on screen: install the packages into
+InvokeAI's environment as the pack's README describes, then restart InvokeAI.
 
-## Troubleshooting
+## Install manually
 
-### Install fails
+The **Install manually** section of **Add Nodes** shows the **Nodes Directory** with a button that copies its path. It
+is the `nodes` folder of your InvokeAI root unless the `custom_nodes_dir` setting changes it.
 
-- Confirm the Git URL is correct and reachable.
-- The repo must contain an `__init__.py` at its root.
-- Read the install log — it surfaces the underlying error.
+<Steps>
 
-### Nodes don't appear after install
+1. Clone a pack there with `git clone <url>`, or extract its ZIP into its own folder there.
 
-- Click **Reload**.
-- Check that the pack's `__init__.py` imports the node classes.
-- Check the server console for import errors.
+2. Click **Reload** above the pack list, or restart InvokeAI.
 
-### Workflows show errors after uninstalling
+</Steps>
 
-User-created workflows that reference nodes from an uninstalled pack will show errors for the missing node types. Either reinstall the pack or remove the affected nodes from the workflow.
+To update a pack you cloned, run `git pull` in its folder and restart InvokeAI.
 
-## Authoring a node pack
+## Manage installed packs
 
-If you want to publish your own pack so it can be installed by URL, see the [Creating a Node Pack](/development/guides/creating-nodes/) developer guide for the required repository layout, `__init__.py` requirements, and conventions for shipping workflows alongside your nodes.
+| Where | What it does |
+| --- | --- |
+| **Node Packs** list | Each pack's name and node count. Search by name or path; filter to **Packs with no nodes**; sort by name, node count or path. |
+| A pack's page | Its node count, path, **Uninstall**, and a preview of every node it adds, with each node's fields. |
+| Right-click a pack | **Copy path** and **Uninstall**. |
+| **Reload** | Scans the nodes directory again and loads packs added since startup. |
+
+A pack with no nodes usually failed to import: reload or restart, check its dependencies, and read the server console
+for the error.
+
+## Uninstall a pack
+
+**Uninstall** deletes the pack's folder, removes its nodes from the editor, and deletes the workflows it imported.
+Workflows you made yourself stay, but show errors for the pack's nodes until you reinstall it or remove those nodes.
+Restart InvokeAI for the removal to take full effect: the pack's Python code stays loaded until then.
+
+## Publish your own pack
+
+[Creating Nodes](/development/guides/creating-nodes/) explains how to build a pack, and how to list it on
+[Community Nodes](/users-guide/workflows/community-nodes/).

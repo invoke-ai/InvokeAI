@@ -97,3 +97,8 @@ After the first sync, paste these into each string's context in Crowdin.
 | `imageCompare.valueText` | A slider's spoken value: `{{before}}` and `{{after}}` are percentages, `{{beforeLabel}}` and `{{afterLabel}}` the two images' labels, such as "Before" and "After". |
 | `workflowDemo.field` | `{{field}}` and `{{node}}` stay English mock names. |
 | `workflowDemo.connected`, `workflowDemo.disconnected` | `{{source}}` and `{{target}}` are filled with the `workflowDemo.field` message. |
+| `communityNodes.manualInstallNote` | Keep the `<code>` tags; `nodes` and `__init__.py` stay as they are. |
+| `communityNodes.shown_*` | `{{shown}}` packs match the filters, of `{{count}}` in all; the plural form follows `{{count}}`, the total. |
+| `communityNodes.copyDone`, `communityNodes.copyFailed` | Short button states. |
+| `communityNodes.byAuthor` | `{{author}}` is a GitHub or GitLab user name. |
+| `communityNodes.dependencies`, `communityNodes.manualInstall` | Short badge text on a node pack card. |

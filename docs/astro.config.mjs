@@ -146,7 +146,10 @@ export default defineConfig({
           // routes. They are built, but the validator rejects them by default.
           errorOnFallbackPages: false,
         }),
-        starlightLlmsText(),
+        starlightLlmsText({
+          // Interactive controls rendered into a page, such as a filter's search field and chips, are noise as text.
+          customSelectors: { all: ['[data-llms-ignore]'] },
+        }),
         starlightChangelogsAtRoot(),
         // Each docs page's Markdown source at `<page>/index.md`, for the page actions in the right rail.
         starlightMarkdown(),

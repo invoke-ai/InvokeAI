@@ -1,0 +1,7 @@
+title: Average Images
+author: JPPhoto
+repo: https://github.com/JPPhoto/average-images-node
+summary: Average a collection of images of the same size into one image.
+description: >-
+  Converts every image to RGB first.
+categories: [compositing]

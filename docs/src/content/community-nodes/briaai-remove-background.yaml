@@ -1,0 +1,9 @@
+title: BriaAI Remove Background
+author: blessedcoolant
+repo: https://github.com/blessedcoolant/invoke_bria_rmbg
+summary: One-click background removal with BriaAI's RMBG 1.4 model.
+categories: [masks]
+thumbnail: ./briaai-remove-background.webp
+images:
+  - src: https://raw.githubusercontent.com/blessedcoolant/invoke_bria_rmbg/main/assets/preview.jpg
+    alt: The BriaAI Remove Background node and its result in the workflow editor

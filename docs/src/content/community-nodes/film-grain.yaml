@@ -1,0 +1,7 @@
+title: Film Grain
+author: JPPhoto
+repo: https://github.com/JPPhoto/film-grain-node
+summary: Add film grain to an image, set by weights, seeds and blur radii.
+description: >-
+  Works with RGB input images only.
+categories: [image-effects]

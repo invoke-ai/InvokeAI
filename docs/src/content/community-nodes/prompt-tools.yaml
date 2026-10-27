@@ -1,0 +1,25 @@
+title: Prompt Tools
+author: skunkworxdark
+repo: https://github.com/skunkworxdark/prompt-tools
+summary: Prompt (string) manipulation tools, to use with Prompts From File and other prompt generators.
+description: >-
+  Prompt Join, Prompt Join Three, Prompt Replace and Prompt Split Neg moved into InvokeAI as `String Join`,
+  `String Join Three`, `String Replace` and `String Split Neg`, and are no longer in this pack.
+categories: [prompts]
+nodes:
+  - name: Prompt To File
+    description: Saves a prompt or collection of prompts to a file, one per line, appending or overwriting.
+  - name: PTFields Collect
+    description: Converts image generation fields into a JSON string that can be passed to Prompt To File.
+  - name: PTFields Expand
+    description: Converts a JSON string into individual generation parameters. Can be fed from Prompt To File.
+  - name: Prompt Strength
+    description: Formats a prompt with a strength, like Compel's weighted format.
+  - name: Prompt Strength Combine
+    description: Combines weighted prompts for `.and()` and `.blend()`.
+  - name: CSV To Index String
+    description: Gets a string from a CSV by index, with a random index option.
+thumbnail: ./prompt-tools.webp
+images:
+  - src: https://raw.githubusercontent.com/skunkworxdark/prompt-tools/refs/heads/main/images/CSVToIndexStringNode.png
+    alt: A workflow using the CSV To Index String node

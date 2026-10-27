@@ -1,0 +1,51 @@
+title: Image and Mask Composition Pack
+author: dwringer
+repo: https://github.com/dwringer/composition-nodes
+summary: Compose images and masks, with Clipseg text masks, color separations, noise and wrapping offsets.
+description: >-
+  The image and latent offsets wrap around, so they can be used with seamless tiling to progressively generate centered
+  on different parts of a seamless image.
+categories: [compositing, masks]
+nodes:
+  - name: 2D Noise Image
+    description: Creates an image of 2D noise approximating the desired characteristics.
+  - name: Add Noise (Flux)
+    description: Adds noise to a FLUX latents tensor using the appropriate ratio given the denoising schedule timestep.
+  - name: Clipseg Mask Hierarchy
+    description: Creates a segmentation hierarchy of mutually exclusive masks from Clipseg text prompts.
+  - name: CMYK Color Separation
+    description: Gets color images from a base color and two others that subtractively mix to obtain it.
+  - name: CMYK Merge
+    description: Merges subtractive color channels (CMYK and alpha).
+  - name: CMYK Split
+    description: Splits an image into subtractive color channels (CMYK and alpha).
+  - name: Flatten Histogram (Grayscale)
+    description: Scales the values of an L-mode image to the full range 0–255 in equal proportions.
+  - name: Frequency Spectrum Match Latents
+    description: Generates latent noise with the frequency spectrum of target latents, masked by a mask image.
+  - name: Image Quantize (Kohonen map)
+    description: Quantizes the pixel values of an image with a Kohonen self-organizing map.
+  - name: Image Search to Mask (Clipseg)
+    description: Generates an image mask from an image prompt with the Clipseg model.
+  - name: Latent Quantize (Kohonen map)
+    description: Quantizes the values of a latents tensor with a self-organizing map.
+  - name: Noise (Spectral characteristics)
+    description: Creates a latents tensor of 2D noise channels approximating the desired characteristics.
+  - name: Offset Image
+    description: Offsets an image by a percentage or pixel amount, wrapping it around.
+  - name: Offset Latents
+    description: Offsets a latents tensor by a percentage of its height and width, wrapping it around.
+  - name: RGB Merge
+    description: Merges RGB color channels and alpha.
+  - name: RGB Split
+    description: Splits an image into RGB color channels and alpha.
+  - name: Rotate/Flip Image
+    description: Rotates an image by an angle in degrees clockwise, or flips it.
+  - name: Shadows/Highlights/Midtones
+    description: Extracts shadows, midtones and highlights masks from an image.
+  - name: Text Mask
+    description: Renders a text mask in 2D from a given font.
+  - name: Text to Mask (Clipseg)
+    description: Generates an image mask from a text prompt with the Clipseg model.
+  - name: Text to Mask Advanced (Clipseg)
+    description: Generates image masks from several text prompts with the Clipseg model.
