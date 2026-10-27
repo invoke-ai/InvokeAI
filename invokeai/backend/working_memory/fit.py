@@ -13,8 +13,10 @@ in choosing it: the fresh-process points cap a line. A line is fitted only once 
 two sizes `MIN_AREA_RATIO` apart (`fitted_pair`); until then it stays a stand-in, which the other points bound from
 below.
 
-`tests/backend/working_memory/test_shipped_coefficients.py` holds every carried value that is not a declared stand-in
-to `fitted_values` of the shipped points, so a new point that moves a fit fails there with the value to ship.
+`tests/backend/working_memory/test_shipped_coefficients.py` holds every carried value on such a line that is not a
+declared stand-in to `fitted_values` of the shipped points, so a new point that moves a fit fails there with the value
+to ship. A value on no pixel line (`line_values`) is hand-set: the MOSS-Image denoise's `k_token`, bytes per attended
+token with no base. Its points still decide and bound it (`bounds.py`); this module fits pixel lines only.
 
 A user's own calibration fits the same lines from its windows (`user_pair`, read by `user_fit.py`), with
 `USER_MARGIN`, the same margin.
@@ -161,6 +163,16 @@ def _pairs(entry: CoefficientEntry) -> set[str]:
     """The `<operation>_<dtype>` suffixes an entry carries both halves of a convolution line for."""
     names = set(entry.values or {})
     return {name[2:] for name in names if name.startswith("k_") and f"b_{name[2:]}" in names}
+
+
+def line_values(entry: CoefficientEntry) -> set[str]:
+    """The values of `entry` that `fitted_values` reproduces: both halves of each pixel line it carries, stand-ins
+    included. Any other value is hand-set (see the module docstring), which the data test allows only for an estimator
+    keyed by no platform trait.
+
+    Where per-estimator lines take over (`EstimatorSpec.line`, PR #9919), a line in attended tokens such as the
+    MOSS-Image denoise's is fitted too, and this distinction goes."""
+    return {f"{part}_{suffix}" for suffix in _pairs(entry) for part in ("k", "b")}
 
 
 def fit_points(data: Iterable[WorkingMemoryData]) -> Mapping[tuple[EntryKey, str], list[FitPoint]]:

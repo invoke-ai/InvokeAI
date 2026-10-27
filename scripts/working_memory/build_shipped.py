@@ -51,6 +51,7 @@ from invokeai.backend.working_memory.fit import (
     fit_points,
     fitted_values,
     line_of,
+    line_values,
     shipped_pair,
 )
 from invokeai.backend.working_memory.fragmentation import Measurement, fragmented
@@ -434,7 +435,8 @@ def review_lines(
         old_entries = {entry_key(entry): entry for entry in before[name].coefficients}
         for entry in file.coefficients:
             old_values, values = old_entries[entry_key(entry)].values or {}, entry.values or {}
-            for suffix in sorted(key[2:] for key in values if key.startswith("k_")):
+            # The pixel lines only: a hand-set value on no line (`line_values`) is not refitted, so it never moves.
+            for suffix in sorted({name[2:] for name in line_values(entry)}):
                 old = (old_values[f"k_{suffix}"], old_values[f"b_{suffix}"])
                 new = (values[f"k_{suffix}"], values[f"b_{suffix}"])
                 if old == new:

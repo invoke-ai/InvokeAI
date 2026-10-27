@@ -288,7 +288,7 @@ def _probe_point(measured_bytes: int) -> MeasuredPoint:
     "shipped, new, kept", [(5 * GIB, 4 * GIB, 5 * GIB), (4 * GIB, 5 * GIB, 5 * GIB)], ids=["lower", "higher"]
 )
 def test_a_remeasured_point_keeps_the_larger_demand(shipped: int, new: int, kept: int) -> None:
-    [data] = coefficients.shipped_data().values()
+    data = coefficients.shipped_data()["vae.json"]
     with_point = {"vae.json": data.model_copy(update={"points": [*data.points, _probe_point(shipped)]})}
 
     merged = merge_points(with_point, [_probe_point(new)])["vae.json"]

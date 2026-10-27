@@ -51,6 +51,9 @@ _FP8_PROBE_FAILURE_REPORTED: set[str] = set()
 # quality, which fp8 rounding degrades. Its tokenizer is listed for symmetry (it is not an nn.Module,
 # so casting is a no-op today only by accident).
 #
+# The vision tower follows the text encoder it attaches to. It also could not take the cast as it stands:
+# `Qwen3VLModel` casts the pixels to `visual.dtype`, which a cast tower reports as float8.
+#
 # Unlike the model-kind rules in `fp8_capability.py`, these are about which *component* of a model is
 # being loaded, which no client can see and nothing outside this file asks about.
 _FP8_EXCLUDED_SUBMODEL_TYPES: frozenset[SubModelType] = frozenset(

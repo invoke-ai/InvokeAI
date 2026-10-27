@@ -894,13 +894,18 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                     run_id=run_id, device_class_id=device_class_id, item_ids=list(run.queue_item_ids)
                 )
             # An earlier attempt may have queued the batch without recording its items. While the queue keeps the
-            # key's receipt, enqueuing the batch again answers with the items it names, all of them. That needs
-            # neither the model, which may have been removed since, nor the device. Without the receipt, enqueuing
-            # again would queue the batch a second time: the items carrying the run's origin, and those the runner
-            # saw, are taken over instead.
-            if self._services.session_queue.get_enqueue_receipt(DEFAULT_QUEUE_ID, key, user_id) is not None:
-                # The attempt that queued them marked the run, and the mark stays whatever this replay finds.
-                return _Enqueue(self._batch(request, run_id), device_class_id, created=False, marks=False)
+            # key's receipt, it names them, all of them; that needs neither the model, which may have been removed
+            # since, nor the device. Read in one step, and never by enqueuing again: a receipt the queue collects
+            # between a lookup and a repeated enqueue would let the batch in a second time. Without the receipt, the
+            # items carrying the run's origin, and those the runner saw, are taken over instead.
+            replayed = self._services.session_queue.replay_enqueue(
+                DEFAULT_QUEUE_ID, self._batch(request, run_id), False, user_id
+            )
+            if replayed is not None:
+                self._record_items(device_class_id, run_id, list(replayed.item_ids))
+                return WorkingMemoryCalibrationRunCreated(
+                    run_id=run_id, device_class_id=device_class_id, item_ids=list(replayed.item_ids)
+                )
             item_ids = sorted(set(self._queued_item_ids(run_id)) | set(run.observed))
             if item_ids:
                 self._record_items(device_class_id, run_id, item_ids)
