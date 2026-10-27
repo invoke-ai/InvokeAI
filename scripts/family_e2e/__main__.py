@@ -10,6 +10,7 @@ import logging
 import os
 import signal
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -25,22 +26,28 @@ from scripts.family_e2e.report import write_report
 from scripts.family_e2e.runner import (
     SERVER_ROLES,
     RunnerError,
+    RunStopped,
+    finish_run,
     gpu_lock,
     is_alive,
     kill_identified,
     load_run_manifest,
     new_run,
-    now_iso,
     open_gpu,
     preflight,
     read_heartbeat,
     remaining_steps,
     remove_scratch_roots,
     run,
+    run_lock,
+    wait_for_runner,
 )
 from scripts.family_e2e.server import ServerError
 
 logger = logging.getLogger("family_e2e")
+# Windows refuses to open heartbeat.json for a moment while the runner replaces it.
+STOP_HEARTBEAT_WAIT_S = 1.0
+STOP_HEARTBEAT_POLL_S = 0.02
 EXPECTED_ERRORS = (
     ManifestError,
     RunnerError,
@@ -99,10 +106,16 @@ def _print_started(run_dir: Path, pid: int) -> None:
     print(f"status  python -m scripts.family_e2e status {run_dir}")
 
 
+def _start_runner(run_dir: Path) -> int:
+    """Starts the runner in the background and returns its pid once it registered: from then on `stop` finds it."""
+    previous = read_heartbeat(run_dir).get("runner")
+    return int(wait_for_runner(run_dir, spawn_runner(run_dir), previous)[0])
+
+
 def cmd_start(args: argparse.Namespace) -> int:
     _check_startable(load_manifest(args.manifest))
     run_dir = new_run(args.manifest, args.family, args.case)
-    _print_started(run_dir, spawn_runner(run_dir))
+    _print_started(run_dir, _start_runner(run_dir))
     return 0
 
 
@@ -116,6 +129,9 @@ def cmd_run(args: argparse.Namespace) -> int:
     signal.signal(signal.SIGTERM, _interrupt)
     try:
         return run(args.run_dir.resolve())
+    except RunStopped as e:
+        logger.info("%s", e)
+        return 130
     except KeyboardInterrupt:
         return 130
     except Exception:
@@ -127,10 +143,11 @@ def cmd_resume(args: argparse.Namespace) -> int:
     run_dir = _resolve_run(args.run, args.manifest)
     if is_alive(read_heartbeat(run_dir).get("runner")):
         raise UsageError(f"the runner of {run_dir.name} is still running")
-    info = load_run_info(run_dir)
-    _check_startable(load_run_manifest(info))
-    write_run_info(run_dir, info.model_copy(update={"status": "running", "finished_at": None}))
-    _print_started(run_dir, spawn_runner(run_dir))
+    _check_startable(load_run_manifest(load_run_info(run_dir)))
+    with run_lock(run_dir):
+        info = load_run_info(run_dir)
+        write_run_info(run_dir, info.model_copy(update={"status": "running", "finished_at": None}))
+    _print_started(run_dir, _start_runner(run_dir))
     return 0
 
 
@@ -161,7 +178,15 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 def cmd_stop(args: argparse.Namespace) -> int:
     run_dir = _resolve_run(args.run, args.manifest)
+    # Marked before the heartbeat is read, under the run lock a runner registers under: a runner registered before is
+    # in the heartbeat and is killed, one that registers after finds the run stopped and leaves it untouched.
+    was_running = finish_run(run_dir, "stopped")
     heartbeat = read_heartbeat(run_dir)
+    # A running run has a registered runner, so an empty read is most likely one that met the runner's replace.
+    deadline = time.monotonic() + STOP_HEARTBEAT_WAIT_S
+    while was_running and not heartbeat and time.monotonic() < deadline:
+        time.sleep(STOP_HEARTBEAT_POLL_S)
+        heartbeat = read_heartbeat(run_dir)
     # The runner first: it would otherwise notice its server dying and record a crash.
     for role in ("runner", *SERVER_ROLES):
         if kill_identified(heartbeat.get(role)):
@@ -170,11 +195,6 @@ def cmd_stop(args: argparse.Namespace) -> int:
     # Nothing of the run is alive any more, so its scratch roots are unused.
     for leftover in remove_scratch_roots(_data_dir(run_dir), info):
         print(f"could not remove {leftover}")
-    if info.status == "running":
-        write_run_info(
-            run_dir,
-            info.model_copy(update={"status": "stopped", "finished_at": now_iso()}),
-        )
     print(f"{info.run_id} stopped; continue with: python -m scripts.family_e2e resume {run_dir}")
     return 0
 

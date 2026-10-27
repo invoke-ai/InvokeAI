@@ -17,7 +17,14 @@ from PIL import Image
 
 from scripts.family_e2e import client, runner, server
 from scripts.family_e2e.gpu_memory import Adapter, MemoryTrace, ProcessUsage
-from scripts.family_e2e.records import ModelIdentity, load_records, load_run_info, write_run_info
+from scripts.family_e2e.records import (
+    RUN_INFO_FILE,
+    ModelIdentity,
+    Record,
+    load_records,
+    load_run_info,
+    write_run_info,
+)
 
 GIB = 2**30
 CASE_KEY = "fake-cn@64x48"
@@ -266,3 +273,37 @@ def test_run_survives_a_server_crash_retries_foreign_load_and_resumes(
     assert all(r.valid_timing and r.valid_memory for r in resumed)
     assert resumed[0].graph_hash == records[0].graph_hash
     assert runner.remaining_steps(info.plan, load_records(run_dir)) == []
+
+
+def test_a_run_stopped_between_steps_ends_before_the_next_step_and_stays_stopped(
+    setup: tuple[Path, Path], isolated_runner: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest_path, data_dir = setup
+    gpu = FakeGpu()
+    monkeypatch.setattr(client.InvokeClient, "enqueue", gpu.watch_enqueue(client.InvokeClient.enqueue))
+
+    def export(request: dict, work_dir: Path) -> dict:
+        batch = {"graph": _graph(), "data": [], "origin": "test", "destination": "test"}
+        return {"version": 1, "cases": [{"id": request["cases"][0]["id"], "batch": batch, "components": {}}]}
+
+    run_dir = runner.new_run(manifest_path, [], [])
+    store = runner._Session.store
+    stopped: list[bytes] = []
+
+    def store_then_stop(session: runner._Session, record: Record) -> None:
+        store(session, record)
+        if not stopped:
+            # `stop` marks the run after the first record, and the kill does not reach the runner.
+            info = load_run_info(run_dir)
+            write_run_info(run_dir, info.model_copy(update={"status": "stopped", "finished_at": "2026-10-25T01:00:00"}))
+            stopped.append((run_dir / RUN_INFO_FILE).read_bytes())
+
+    monkeypatch.setattr(runner._Session, "store", store_then_stop)
+    with pytest.raises(runner.RunStopped):
+        runner.run(run_dir, gpu_factory=lambda _: gpu.gpu(), export=export)
+
+    assert [(r.kind, r.rep) for r in load_records(run_dir)] == [("warmup", 0)]
+    assert (run_dir / RUN_INFO_FILE).read_bytes() == stopped[0]
+    assert not runner.is_alive(runner.read_heartbeat(run_dir)["server"])
+    assert not (data_dir / "scratch-roots" / f"{run_dir.name}-default").exists()
+    assert not (run_dir / "report.html").exists()

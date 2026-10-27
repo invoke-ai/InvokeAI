@@ -5,7 +5,7 @@ import socket
 import subprocess
 import sys
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -18,6 +18,7 @@ from scripts.family_e2e.__main__ import main
 from scripts.family_e2e.gpu_memory import Adapter, MemoryTrace, ProcessUsage, UnsupportedPlatformError
 from scripts.family_e2e.manifest import DEFAULT_ARM, Manifest
 from scripts.family_e2e.records import (
+    RUN_INFO_FILE,
     NodeTiming,
     PlannedStep,
     Record,
@@ -25,6 +26,7 @@ from scripts.family_e2e.records import (
     Timing,
     append_record,
     load_records,
+    load_run_info,
     write_run_info,
 )
 from scripts.family_e2e.runner import (
@@ -324,9 +326,13 @@ def _fake_gpu(description: str) -> Gpu:
 def killed_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """The run directory of a runner that was killed: a step is left, and its scratch root is still there.
 
-    The template's port is free, so a new session of the run would pass preflight and go on to rebuild that root.
+    The template's port is free, so a new session of the run would pass preflight and go on to rebuild that root. Its
+    server script is empty: a server it launched would exit at once.
     """
     monkeypatch.setattr(runner, "LOCK_DIR", tmp_path / "locks")
+    monkeypatch.setattr(server, "PORT_PROBE_TIMEOUT_S", 0.01)
+    (tmp_path / "code" / "scripts").mkdir(parents=True)
+    (tmp_path / "code" / "scripts" / "invokeai-web.py").write_text("")
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         free = s.getsockname()[1]
@@ -339,7 +345,7 @@ def killed_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
                 "profile": "box",
                 "data_dir": "data",
                 "gpu": "Fake",
-                "server": {"template_root": "template", "python": sys.executable},
+                "server": {"template_root": "template", "python": sys.executable, "code_dir": "code"},
                 "defaults": {"prompt": "a fox"},
                 "families": [{"family": "f", "cases": [{"id": "a", "model": "m", "steps": 1, "sizes": [[8, 8]]}]}],
             }
@@ -375,11 +381,9 @@ def _scratch_file(run_dir: Path) -> Path:
     return runner.scratch_root(run_dir.parent.parent, RUN_ID, DEFAULT_ARM) / "invokeai.yaml"
 
 
-def _write_heartbeat(run_dir: Path, **identities: list[float]) -> bytes:
+def _write_heartbeat(run_dir: Path, **identities: list[float]) -> None:
     data = {"runner": None, "server": None, "server_launcher": None, "step": "a@8x8 warmup 0 attempt 1"}
-    encoded = json.dumps({**data, **identities, "updated_at": runner.now_iso()}).encode()
-    (run_dir / HEARTBEAT_FILE).write_bytes(encoded)
-    return encoded
+    (run_dir / HEARTBEAT_FILE).write_text(json.dumps({**data, **identities, "updated_at": runner.now_iso()}))
 
 
 @pytest.fixture
@@ -401,6 +405,25 @@ class _FirstHeartbeat(Exception):
     pass
 
 
+def _trap_first_replacing_write(
+    monkeypatch: pytest.MonkeyPatch, run_dir: Path, check: Callable[[Path], object]
+) -> list[object]:
+    """Lets the runner's writes through until the first one that replaces the server entries of the heartbeat (its
+    registration keeps them); records `check(path)` there and raises _FirstHeartbeat."""
+    recorded = {role: runner.read_heartbeat(run_dir).get(role) for role in SERVER_ROLES}
+    write_bytes_atomic = runner.write_bytes_atomic
+    seen: list[object] = []
+
+    def write(path: Path, data: bytes) -> None:
+        if path.name == HEARTBEAT_FILE and {role: json.loads(data).get(role) for role in SERVER_ROLES} == recorded:
+            return write_bytes_atomic(path, data)
+        seen.append(check(path))
+        raise _FirstHeartbeat
+
+    monkeypatch.setattr(runner, "write_bytes_atomic", write)
+    return seen
+
+
 @pytest.mark.parametrize("role", SERVER_ROLES)
 def test_a_runner_stops_the_server_a_killed_runner_left_before_it_replaces_the_heartbeat(
     killed_run: Path, surviving_server: list[float], monkeypatch: pytest.MonkeyPatch, role: str
@@ -411,14 +434,12 @@ def test_a_runner_stops_the_server_a_killed_runner_left_before_it_replaces_the_h
         reused = [unrelated.pid, psutil.Process(unrelated.pid).create_time() - 100.0]
         other = next(r for r in SERVER_ROLES if r != role)
         _write_heartbeat(killed_run, **{role: surviving_server, other: reused})
-        seen: list[tuple[str, bool, bool]] = []
-
-        def first_write(path: Path, data: bytes) -> None:
-            # The runner's first write; the scratch root is rebuilt only after it.
-            seen.append((path.name, runner.is_alive(surviving_server), _scratch_file(killed_run).is_file()))
-            raise _FirstHeartbeat
-
-        monkeypatch.setattr(runner, "write_bytes_atomic", first_write)
+        # The scratch root is rebuilt only after that write.
+        seen = _trap_first_replacing_write(
+            monkeypatch,
+            killed_run,
+            lambda path: (path.name, runner.is_alive(surviving_server), _scratch_file(killed_run).is_file()),
+        )
         with pytest.raises(_FirstHeartbeat):
             runner.run(killed_run, gpu_factory=_fake_gpu)
 
@@ -434,7 +455,7 @@ def test_a_runner_refuses_and_keeps_heartbeat_and_scratch_root_while_a_left_serv
     killed_run: Path, surviving_server: list[float], monkeypatch: pytest.MonkeyPatch, failure: str
 ) -> None:
     # A process stuck in the GPU driver outlives SIGKILL until it leaves the kernel; another user's refuses it.
-    heartbeat = _write_heartbeat(killed_run, server=surviving_server, server_launcher=surviving_server)
+    _write_heartbeat(killed_run, server=surviving_server, server_launcher=surviving_server)
 
     def kill_process(process: psutil.Process) -> None:
         if failure == "kill refused":
@@ -452,7 +473,9 @@ def test_a_runner_refuses_and_keeps_heartbeat_and_scratch_root_while_a_left_serv
         with pytest.raises(RunnerError, match=rf"cannot be stopped: pid {int(surviving_server[0])} \("):
             runner.run(killed_run, gpu_factory=_fake_gpu)
 
-    assert (killed_run / HEARTBEAT_FILE).read_bytes() == heartbeat
+    # What names the server for `stop`; the refusing runner adds only itself.
+    heartbeat = runner.read_heartbeat(killed_run)
+    assert {role: heartbeat[role] for role in SERVER_ROLES} == dict.fromkeys(SERVER_ROLES, surviving_server)
     assert _scratch_file(killed_run).read_text() == "left by the killed runner"
     assert runner.is_alive(surviving_server)
 
@@ -528,13 +551,9 @@ def test_an_unreaped_server_counts_as_gone_but_a_worker_left_in_its_group_is_kil
         assert not runner.is_alive(identity)
         _write_heartbeat(killed_run, server=identity, server_launcher=identity)
         if command == "resume":
-            worker_running: list[bool] = []
-
-            def first_write(path: Path, data: bytes) -> None:
-                worker_running.append(worker is not None and not _gone(worker))
-                raise _FirstHeartbeat
-
-            monkeypatch.setattr(runner, "write_bytes_atomic", first_write)
+            worker_running = _trap_first_replacing_write(
+                monkeypatch, killed_run, lambda path: worker is not None and not _gone(worker)
+            )
             with pytest.raises(_FirstHeartbeat):  # not refused
                 runner.run(killed_run, gpu_factory=_fake_gpu)
             assert worker_running == [False]
@@ -544,3 +563,50 @@ def test_an_unreaped_server_counts_as_gone_but_a_worker_left_in_its_group_is_kil
             # A zombie alone has nothing to kill; a worker in its group is killed through it.
             assert ("killed server_launcher" in capsys.readouterr().out) == orphan
         assert worker is None or _gone(worker)
+
+
+STOPPED_AT = "2026-10-25T01:00:00+00:00"
+
+
+def _mark_stopped(run_dir: Path) -> bytes:
+    """What `stop` writes before it kills the runner; returns run.json as it is then."""
+    info = load_run_info(run_dir)
+    write_run_info(run_dir, info.model_copy(update={"status": "stopped", "finished_at": STOPPED_AT}))
+    return (run_dir / RUN_INFO_FILE).read_bytes()
+
+
+def test_a_runner_stopped_after_it_registered_leaves_before_the_server_and_keeps_the_run_stopped(
+    killed_run: Path,
+) -> None:
+    # `stop` marked the run after the runner registered, and the kill did not reach the runner.
+    stopped: list[bytes] = []
+
+    def open_gpu(description: str) -> Gpu:
+        stopped.append(_mark_stopped(killed_run))
+        return _fake_gpu(description)
+
+    with pytest.raises(runner.RunStopped):
+        runner.run(killed_run, gpu_factory=open_gpu)
+
+    assert (killed_run / RUN_INFO_FILE).read_bytes() == stopped[0]
+    assert runner.read_heartbeat(killed_run).get("server") is None
+    assert not (killed_run / "server-default.log").exists()
+    assert _scratch_file(killed_run).read_text() == "left by the killed runner"  # `stop` removes it
+    assert not (killed_run / "report.html").exists()
+
+
+def test_a_runner_that_finishes_after_a_stop_keeps_the_run_stopped(
+    killed_run: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    append_record(killed_run, _record(load_run_info(killed_run).plan[0], 1))  # nothing left to run
+    stop_surviving_server = runner.stop_surviving_server
+
+    def stop_arrives(run_dir: Path) -> None:
+        stop_surviving_server(run_dir)
+        _mark_stopped(run_dir)
+
+    monkeypatch.setattr(runner, "stop_surviving_server", stop_arrives)
+    runner.run(killed_run, gpu_factory=_fake_gpu)
+
+    info = load_run_info(killed_run)
+    assert (info.status, info.finished_at) == ("stopped", STOPPED_AT)

@@ -17,7 +17,7 @@ It is a developer tool. It runs on Windows with NVIDIA and AMD (ROCm) GPUs, wher
    - The tool overrides a few settings: a free port on `127.0.0.1`, a plain-format log file in the run directory, the image index off, and the queue cleared at startup. SSL and `base_url` are dropped. On Linux the server sees only the selected GPU, as `cuda:0`, so a `device` of `cuda:N` becomes `cuda:0` and a `generation_devices` list with a CUDA device becomes `auto`.
    - `INVOKEAI_*` variables of the calling environment are not passed on. Put settings the server needs into the manifest's `server.env`.
 2. **Server.** The tool checks that `server.python` imports `invokeai` from `server.code_dir`. It then starts `<python> <code_dir>/scripts/invokeai-web.py --root <scratch root>` and reads the actual port from the server log. Multiuser mode is refused.
-   - On Windows the server runs in a job object of the runner, so it dies with the runner however the runner ends. On Linux it runs in a session of its own. `stop`, an interrupt or a plain kill (SIGTERM) of the runner ends it; a runner killed with SIGKILL leaves it running. While it holds more than 1 GiB on that GPU, `start` and `resume` name it as foreign load and refuse; `stop RUN` ends it. Otherwise the resumed runner stops it first, before it replaces `heartbeat.json`, which names the server for `stop`, or touches the scratch root. If it cannot stop the server, the runner refuses and leaves both as they are; `runner.log` names the pid and the run shows as failed.
+   - On Windows the server runs in a job object of the runner, so it dies with the runner however the runner ends. On Linux it runs in a session of its own. `stop`, an interrupt or a plain kill (SIGTERM) of the runner ends it; a runner killed with SIGKILL leaves it running. While it holds more than 1 GiB on that GPU, `start` and `resume` name it as foreign load and refuse; `stop RUN` ends it. Otherwise the resumed runner stops it first, before it replaces `heartbeat.json`, which names the server for `stop`, or touches the scratch root. If it cannot stop the server, the runner refuses and leaves the scratch root and the server's entries in `heartbeat.json` as they are; `runner.log` names the pid and the run shows as failed.
 3. **Graphs.** The real webv2 graph builders produce each case's batch through `pnpm graphs:export`, run in the tool checkout. Run `pnpm install` in `invokeai/frontend/webv2` there first.
    - The runner disables the invocation cache on every node and saves the batch as `graphs/<case_key>.json`.
    - It hashes the graph and its batch data. Uploaded image names are replaced by the input file's hash, so the graph hash changes only when the graph or an input changes.
@@ -34,7 +34,7 @@ It is a developer tool. It runs on Windows with NVIDIA and AMD (ROCm) GPUs, wher
 <data_dir>/inputs/                          input images the manifest refers to
 <data_dir>/references/<profile>/<case_key>/ image.png, reference.json (written by `accept` only)
 <data_dir>/runs/<run_id>/                   run.json, records.jsonl, heartbeat.json, runner.log, server-default.log,
-                                            graphs/, images/, traces/<record_id>.csv.gz, report.html, summary.md,
+                                            run.lock, graphs/, images/, traces/<record_id>.csv.gz, report.html, summary.md,
                                             <run_id>.zip (written by `bundle` only)
 <data_dir>/scratch-roots/<run_id>-default/
 ```
@@ -69,16 +69,18 @@ Run the tool from the repository root with the checkout's environment, for examp
 
 | Command | What it does |
 | --- | --- |
-| `start --manifest M [--family F]… [--case ID]…` | Checks the GPU lock, the template's server, unfinished model installs and foreign GPU load. It then creates the run and starts its runner in the background, and prints the run id and paths. |
+| `start --manifest M [--family F]… [--case ID]…` | Checks the GPU lock, the template's server, unfinished model installs and foreign GPU load. It then creates the run, starts its runner in the background, waits until the runner has registered, and prints the run id, the runner's pid and paths. |
 | `status [RUN]` | Shows progress, the current step, the heartbeat age and whether the runner is alive. |
-| `stop [RUN]` | Kills the runner and its server, removes the run's scratch roots and marks the run stopped. |
-| `resume [RUN]` | Starts the runner of a stopped or crashed run again. On Linux the runner first stops a server its killed predecessor left running (see [How a run works](#how-a-run-works)). |
+| `stop [RUN]` | Marks the run stopped, then kills the runner and its server and removes the run's scratch roots. |
+| `resume [RUN]` | Starts the runner of a stopped or crashed run again, and waits until it has registered. Refuses while the run's runner is alive. On Linux the runner first stops a server its killed predecessor left running (see [How a run works](#how-a-run-works)). |
 | `report [RUN]` | Writes `report.html` and `summary.md` again. |
 | `accept [RUN] [--case KEY]…` | Makes the run's measured results the references of its profile. Nothing else writes references. |
 | `bundle [RUN] [--output PATH]` | Packs the run into a zip without this machine's paths, to attach to a PR or an issue (see [Bundle](#bundle)). |
-| `run --run-dir D` | The runner in the foreground: what `start` and `resume` launch. |
+| `run --run-dir D` | The runner in the foreground: what `start` and `resume` launch. It leaves a run that is not `running` as it is and exits with 130, also when `stop` marks the run while it runs. |
 
 `RUN` is a run directory, or a run id together with `--manifest M`. Without it, the profile's latest run is used.
+
+A runner registers before it does anything else: it writes its process into `heartbeat.json`, which `stop`, `status` and `resume` read. `stop` marks the run stopped before it reads that file. The mark and a registration each hold `run.lock`, so they cannot interleave: a runner registered before `stop` is killed, and one that registers after it finds the run stopped and exits without touching it. A runner that `stop` could not kill exits before its next server or step. It never overwrites a status other than `running`.
 
 On Windows the background runner breaks away from the caller's job object, so a terminal or an agent harness that kills its job's processes does not end a long run. Where breakaway is refused, the runner is created through WMI. It then starts with the user's default environment instead of the caller's.
 
