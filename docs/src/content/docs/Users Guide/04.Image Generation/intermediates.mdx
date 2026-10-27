@@ -1,43 +1,76 @@
 ---
 title: Intermediates
 description: Reclaim disk space by deleting the temporary images and videos generation leaves behind, per project and per account.
+lastUpdated: 2026-10-26
 sidebar:
   order: 7
 ---
 
-Generation produces intermediate images and videos: canvas composites, filter previews, staging candidates and other temporary files that were never saved to the gallery. The **Intermediates** section of Settings lists them per project, shows how much space deleting them would reclaim, and deletes them safely. It is also reachable from a project's actions menu, from the Users page (administrators) and from **Data & workspace**.
+import { Steps } from '@astrojs/starlight/components';
+import Callout from '@components/annotated/Callout.astro';
+import IntermediatesSettingsSketch from '@components/annotated/IntermediatesSettingsSketch.astro';
 
-## What the page shows
+Generation leaves temporary images and videos behind: canvas composites, filter previews, staging candidates and other files that never reached the gallery. These **intermediates** take up disk space. **Settings › Intermediates** shows how much space each project could reclaim and deletes only what nothing needs any more.
 
-Each row is one of your projects, or **Unassigned** for intermediates without a known project. Deleted projects' leftovers appear under Unassigned. A row shows the project's cover, its **Used** count (intermediates a cleanup keeps) and its **Unused** count (intermediates nothing needs any more), with the measured reclaimable size underneath. Sizes are measured in the background after upgrading; the section says so while measurement is still running and never counts an unmeasured file as empty.
+Open it from Settings, or from:
 
-Select rows, or **Select all**, and press **Delete**. Select all covers every project the current search matches, including projects on other pages; untick a row to leave it out (up to 1,000 rows). A selection that matches more than 10,000 rows is refused; narrow the search. The confirmation explains why kept items are kept: referenced by a saved document, used by queued or running work, or created recently.
+- a project's actions menu: **Delete intermediates…** opens the section filtered to that project. Remove the project tag (**Show all projects**) to see the others;
+- **Data & workspace** in Settings: **Manage intermediates…**;
+- the Users page (administrators): the brush button on an account's row opens the section on that account.
 
-Administrators start on their own account. **Show everyone** expands the view to every account; they can search accounts as well as project names and can open one account from the Users page. Opening the section from a project action shows that project directly, even when it is outside the first results page.
+## The Intermediates section
 
-## Safe and force deletion
+<IntermediatesSettingsSketch label="Sketch of Settings, Intermediates section: a header with a Refresh button, a search field and account filter, a select-all bar with a Delete button, and one row per project with Used and Unused counts. Numbered callouts mark the controls described below.">
+  <Callout x={91.25} y={15.25} labelSide="left" label="Refresh">Reloads the counts, and picks up a deletion that is running but not shown, for example one started in another tab.</Callout>
+  <Callout x={68.75} y={20} labelSide="left" label="Search">Filters the rows by project name. Administrators can also search account names and emails.</Callout>
+  <Callout x={82.8} y={19} labelSide="top" label="Account filter">Administrators only. The section starts on your own account; remove the filter (**Show everyone**) to list every account, and **My account** returns to yours.</Callout>
+  <Callout x={39.4} y={33.25} labelSide="right" label="Select all">Selects every row the search, account and project filters match, including rows on other pages; untick a row to leave it out. The text beside it estimates what a delete reclaims.</Callout>
+  <Callout x={96.56} y={33.25} labelSide="top" label="Delete">Opens the confirmation for the selected rows. It waits while a deletion is still running.</Callout>
+  <Callout x={60} y={44} labelSide="right" label="Project row">One row per project, with its cover, name and reclaimable size; with every account shown, the owner comes first. Files whose size is still being measured are counted separately, never as empty.</Callout>
+  <Callout x={77.5} y={42.5} labelSide="left" label="Used">Intermediates a normal delete keeps: referenced by a saved document, used by queued or running work, held by an open editor, or created recently.</Callout>
+  <Callout x={87.2} y={42.5} labelSide="bottom" label="Unused">Intermediates nothing needs any more: what a normal delete removes.</Callout>
+  <Callout x={60.3} y={82.5} labelSide="right" label="Unassigned">Intermediates without a known project, marked **No project**. Leftovers of deleted projects appear here.</Callout>
+</IntermediatesSettingsSketch>
 
-A normal delete removes only safe items. It always keeps:
+Rows are sorted by reclaimable size, 50 to a page. Sizes are measured in the background, for example after an upgrade; while that runs, a spinner shows beside **Delete** and the figures grow as measurement finishes.
 
-- anything a pending, waiting or running job produced or uses as an input, including cached images and videos reused from an earlier job and completed child-workflow media until the root workflow finishes;
-- anything created in the last 30 minutes, so an upload the browser is about to reference or enqueue is never collected, and cached media for 30 minutes after the job that reused it ends;
-- anything the open webv2 editor still references, including unsaved edits and available undo history; the browser refreshes this temporary hold while it is open;
-- anything a saved document still names: a project or library workflow (canvas staging candidates, cropped reference images), the legacy editor's saved canvas and reference images, or a project set aside for repair when project boards were introduced;
-- anything that is no longer an intermediate.
+## Clean up
 
-The advanced option in the confirmation, **also delete items that saved projects or workflows still reference**, turns it into a force delete. The confirmation lists the documents it would break (the first 200, with a count of any others); those projects will show missing images and undo may no longer restore them. Confirming acknowledges exactly those documents: a document saved after the check keeps its media, while a document on the list may lose more of its references if it names further items while the deletion runs. A force delete never touches active, browser-held or recent work and cannot be undone; it asks for an acknowledgement and for the word `DELETE` to be typed. A regular user's force delete also keeps anything another account's document names, such as a shared workflow. The same applies when an administrator loses administrator rights while their force delete runs. A force delete that would break more than 10,000 documents is refused; narrow the selection.
+<Steps>
 
-Every confirmation is based on a fresh server check that fixes the moment recency is judged at. Files created after the check are never included, and every batch re-checks its targets at the moment of deletion: an intermediate that was promoted, referenced or picked up by a job in the meantime is kept. Items that became unused after the check are collected too, so the deleted count can exceed the estimate.
+1. Open **Settings › Intermediates**.
 
-An open editor refreshes its browser hold every five minutes and when the tab becomes visible again. It releases names removed from the current projects and undo history, and releases the whole hold when the tab closes or you sign out. If the tab crashes instead, the hold expires 15 minutes after its last refresh. Each account holds media for at most eight open editors (tabs) at once; past that, the editor refreshed longest ago stops protecting its media until its next refresh. A single editor holds up to 50,000 images and 50,000 videos. Reopen an unsaved browser-only draft before deleting old intermediates.
+2. Tick the projects to clean up, or **Select all**.
 
-## Progress and results
+3. Press **Delete**. The confirmation runs a fresh check on the server and shows how many images and videos it will delete, roughly how much space that frees, and how many in-use items it keeps and why.
 
-Cleanup runs on the server, so you can navigate away while it works. The page reports deleted, kept and failed items separately, along with files whose records are gone but whose bytes could not be removed yet; those are purged on the next server start and are not counted as reclaimed. Reloading the page, or opening the section with no deletion shown, picks up a deletion that is still running. When a deletion stops early or leaves failed items, **Delete again** repeats the same request, in the same mode; the check runs afresh, so it picks up exactly what remains.
+4. Press **Delete** in the confirmation. The deletion runs on the server, so you can leave the section; its progress shows above the list and picks up again when you come back or reload.
 
-Running deletions live in the server's memory. If the server restarts while one runs, the section still showing it reports that its status is no longer known; after a reload the interrupted run is simply gone. Either way, refresh the list and delete again if anything remains. The server keeps each account's last few finished deletions until it restarts.
+5. Read the result: **Deleted**, **Kept** (items that became needed after the check), **Failed** and **Reclaimed**. Files whose records are gone but whose bytes could not be removed yet show as **Awaiting removal from disk**; they are removed on the next server start and are not counted as reclaimed.
 
-The server accepts one running deletion per account and at most eight at a time. Wait for one to finish before confirming another delete if a limit is reached. Cleanup is refused while [image storage maintenance](/users-guide/gallery/image-storage-maintenance/) is active.
+6. If the deletion stopped early or some items failed, press **Delete again**. It opens the confirmation for the same selection and mode, with a fresh check, so it picks up exactly what remains.
+
+</Steps>
+
+## What a normal delete always keeps
+
+| Kept | Why |
+| --- | --- |
+| Media a pending, waiting or running job produced or uses | Including cached images and videos a job reuses from an earlier job, and the results of finished steps of a workflow that is still running, until the whole workflow finishes. |
+| Anything created in the last 30 minutes | An upload the browser is about to reference or enqueue must not disappear first. Cached media stays protected for 30 minutes after the job that reused it ends. |
+| Media an open editor still uses | Unsaved edits and undo history in an open tab. The tab keeps a hold on them while it is open; see [Limits and edge cases](#limits-and-edge-cases). |
+| Media a saved document names | Projects and their workspaces, library workflows (canvas staging candidates, cropped reference images), the legacy editor's saved canvas and reference images, and recovered projects set aside for repair when project boards were introduced. Only a force delete removes these. |
+| Anything that is no longer an intermediate | It was saved to the gallery in the meantime. |
+
+The confirmation sums these up, for example "12 in-use items will be kept. 9 items referenced by saved documents and 3 items created recently."
+
+:::danger[Force delete breaks saved documents]
+In the confirmation, **Also delete items that saved documents still reference (advanced)** turns the delete into a force delete. It also removes intermediates that saved projects, workflows, legacy editor state and recovered projects still name: those documents show missing images, and undo may no longer restore them. It cannot be undone.
+
+- The confirmation lists the documents that will lose references (the first 200, and a count of the rest). To confirm, tick the acknowledgement and type `DELETE`.
+- It still keeps queued, running, browser-held and recent work.
+- A regular user's force delete keeps anything another account's document names, such as a shared workflow.
+:::
 
 ## Permissions
 
@@ -48,10 +81,64 @@ The server accepts one running deletion per account and at most eight at a time.
 | Delete everyone's intermediates | No | Yes |
 | Force delete referenced intermediates | Own files that only your own documents name | Any authorized scope |
 
-## Legacy endpoint
+## Limits and edge cases
 
-The older `DELETE /api/v1/images/intermediates` route remains available to administrators. It applies the same safety policy as a normal delete, so it keeps referenced, active and recent images and returns the number of images it deleted. It does not touch videos. `GET /api/v1/images/intermediates` counts exactly the images that route would delete, so the legacy button settles at zero after it runs.
+<details>
+<summary>Limits</summary>
 
-## Limitations
+| Limit | Value |
+| --- | --- |
+| Recently created items, always kept | 30 minutes |
+| A confirmation's check stays valid for | 10 minutes; after that, check again |
+| Confirmations open at once, per account | 4; opening another makes the oldest one expire |
+| Rows in one delete | Up to 1,000 ticked rows, or **Select all** with up to 1,000 rows left out |
+| Rows **Select all** may match | 10,000; narrow the search |
+| Documents one force delete may break | 10,000; narrow the selection |
+| An open editor refreshes its hold | Every 5 minutes, and when its tab comes back to the foreground after missing a refresh |
+| A hold after its tab crashes | Expires 15 minutes after its last refresh |
+| Open editors (tabs) holding media, per account | 8; past that, the one refreshed longest ago stops protecting its media until its next refresh |
+| Media one editor holds | 50,000 images and 50,000 videos |
+| Running deletions | 1 per account, 8 on the server |
+| Finished deletions the server remembers | Each account's last 5, until it restarts |
 
-- Canvas uploads made before the server accepted the project they belong to are stored without a project and are never re-associated with it. They are still protected by saved references and browser holds, but they appear under **Unassigned**.
+</details>
+
+<details>
+<summary>What the check fixes, and what each batch re-checks</summary>
+
+The confirmation's check fixes the moment "recent" is judged at: files created after it are never included. Each batch then re-checks its items at the moment of deletion, so an intermediate that was saved to the gallery, referenced, or picked up by a job in the meantime is kept. Items that became unused after the check are deleted too, so the deleted count can exceed the estimate.
+
+A force delete acknowledges exactly the documents its confirmation listed. A document saved after the check keeps its media; a document on the list may lose further references if it names more items while the deletion runs.
+
+</details>
+
+<details>
+<summary>Open editors and browser-only drafts</summary>
+
+An open editor holds the media its unsaved content and undo history use. It releases names that leave the current projects and undo history, and releases the whole hold when the tab closes or you sign out. An unsaved draft that lives only in a closed tab is therefore not protected: reopen it before deleting old intermediates.
+
+</details>
+
+<details>
+<summary>When a deletion stops</summary>
+
+- A running deletion stops at the next batch if the server shuts down, if [image storage maintenance](/users-guide/gallery/image-storage-maintenance/) starts, or if the confirming account is deactivated. Cleanup is refused while that maintenance is active.
+- An administrator who loses administrator rights during a deletion of other accounts' intermediates stops at the next batch. During a force delete of their own, they stop breaking other accounts' documents.
+- Running deletions live in the server's memory. After a restart the section reports that the server no longer knows the deletion, or, after a reload, no longer shows it. Refresh the list and delete again if anything remains.
+- One account runs one deletion at a time, and the server eight. If a limit is reached, wait for a deletion to finish before confirming another.
+
+</details>
+
+<details>
+<summary>Legacy endpoint</summary>
+
+The older `DELETE /api/v1/images/intermediates` route remains available to administrators. It applies the same rules as a normal delete across every account, so it keeps referenced, active and recent images, and returns the number of images it deleted. It does not touch videos. `GET /api/v1/images/intermediates` counts the images that route would delete, so the legacy button settles at zero after it runs; for a regular user it counts only their own.
+
+</details>
+
+<details>
+<summary>Known limitations</summary>
+
+- Canvas uploads made before the server accepted the project they belong to are stored without a project and are never re-associated with it. Saved references and editor holds still protect them, but they appear under **Unassigned**.
+
+</details>

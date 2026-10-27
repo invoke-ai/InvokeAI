@@ -241,5 +241,6 @@
   "workflowDemo.field": "{{field}} of {{node}}",
   "workflowDemo.connected": "Connected {{source}} to {{target}}.",
   "workflowDemo.disconnected": "Removed the connection to {{target}}.",
-  "galleryDemo.label": "Interactive gallery demo"
+  "galleryDemo.label": "Interactive gallery demo",
+  "annotated.legend": "Callouts"
 }
