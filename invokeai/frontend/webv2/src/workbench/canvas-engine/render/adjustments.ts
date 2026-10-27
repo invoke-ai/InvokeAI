@@ -1,4 +1,5 @@
 import type { CanvasAdjustmentEntry, CanvasAdjustmentsContract } from '@workbench/canvas-engine/contracts';
+import type { SpatialAdjustmentStep } from '@workbench/canvas-engine/render/spatial/spatialSteps';
 
 const LUT_SIZE = 256;
 
@@ -137,6 +138,9 @@ export const isIdentityAdjustmentEntry = (entry: CanvasAdjustmentEntry): boolean
     case 'invert':
       return false;
     case 'noise':
+    case 'clarity':
+    case 'texture':
+    case 'dehaze':
       return entry.amount === 0;
     case 'curves':
       return isIdentityCurve(entry.curves.r) && isIdentityCurve(entry.curves.g) && isIdentityCurve(entry.curves.b);
@@ -155,6 +159,60 @@ export const isIdentityAdjustments = (adjustments: CanvasAdjustmentsContract | u
  */
 export const isPositionDependentAdjustments = (adjustments: CanvasAdjustmentsContract | undefined): boolean =>
   adjustments?.some((entry) => entry.type === 'noise' && contributes(entry)) ?? false;
+
+type SpatialAdjustmentEntry = Extract<CanvasAdjustmentEntry, { type: 'clarity' | 'texture' | 'dehaze' }>;
+
+/**
+ * Spatial entries read a neighborhood across the owner's whole surface (its alpha bounds), so they are neither
+ * region independent nor resample-commuting. `compileAdjustments` and `applyAdjustments` skip them: they run in the
+ * spatial worker on the owner's full source.
+ */
+export const isSpatialAdjustmentEntry = (entry: CanvasAdjustmentEntry): entry is SpatialAdjustmentEntry =>
+  entry.type === 'clarity' || entry.type === 'texture' || entry.type === 'dehaze';
+
+/** True when any contributing entry is spatial. */
+export const hasSpatialAdjustments = (adjustments: CanvasAdjustmentsContract | undefined): boolean =>
+  adjustments?.some((entry) => isSpatialAdjustmentEntry(entry) && contributes(entry)) ?? false;
+
+/** The stack without its spatial entries: what `applyAdjustments` evaluates, and the display's interim. */
+export const perPixelAdjustments = (adjustments: CanvasAdjustmentsContract | undefined): CanvasAdjustmentsContract =>
+  (adjustments ?? []).filter((entry) => !isSpatialAdjustmentEntry(entry));
+
+/** One run of a {@link toSpatialPlan}: per-pixel entries for `applyAdjustments`, or steps for one spatial job. */
+export type SpatialPlanRun =
+  | { readonly kind: 'per-pixel'; readonly adjustments: CanvasAdjustmentsContract }
+  | { readonly kind: 'spatial'; readonly steps: readonly SpatialAdjustmentStep[] };
+
+const spatialStep = (entry: SpatialAdjustmentEntry): SpatialAdjustmentStep =>
+  entry.type === 'dehaze'
+    ? { amount: entry.amount, kind: 'dehaze' }
+    : { amount: entry.amount, kind: entry.type, size: entry.size };
+
+/**
+ * Splits the contributing entries into ordered alternating runs, so evaluating them in turn equals the stack in list
+ * order. Consecutive spatial entries share one run (one worker job); empty means identity.
+ */
+export const toSpatialPlan = (adjustments: CanvasAdjustmentsContract | undefined): SpatialPlanRun[] => {
+  const runs: SpatialPlanRun[] = [];
+  for (const entry of adjustments ?? []) {
+    if (!contributes(entry)) {
+      continue;
+    }
+    const last = runs[runs.length - 1];
+    if (isSpatialAdjustmentEntry(entry)) {
+      if (last?.kind === 'spatial') {
+        runs[runs.length - 1] = { kind: 'spatial', steps: [...last.steps, spatialStep(entry)] };
+      } else {
+        runs.push({ kind: 'spatial', steps: [spatialStep(entry)] });
+      }
+    } else if (last?.kind === 'per-pixel') {
+      runs[runs.length - 1] = { adjustments: [...last.adjustments, entry], kind: 'per-pixel' };
+    } else {
+      runs.push({ adjustments: [entry], kind: 'per-pixel' });
+    }
+  }
+  return runs;
+};
 
 /**
  * One step of the compiled pixel pass. Per-channel entries fold into LUT
@@ -423,13 +481,13 @@ const entryLuts = (
 };
 
 /**
- * Compiles enabled nonidentity entries in order, folding adjacent per-channel operations into LUT trios. Empty
- * means identity.
+ * Compiles enabled nonidentity per-pixel entries in order (spatial entries are skipped), folding adjacent per-channel
+ * operations into LUT trios. Empty means identity.
  */
 export const compileAdjustments = (adjustments: CanvasAdjustmentsContract | undefined): CompiledAdjustmentSegment[] => {
   const segments: CompiledAdjustmentSegment[] = [];
   for (const entry of adjustments ?? []) {
-    if (!contributes(entry)) {
+    if (!contributes(entry) || isSpatialAdjustmentEntry(entry)) {
       continue;
     }
     if (entry.type === 'hsl') {
@@ -486,6 +544,12 @@ export const adjustmentsKey = (adjustments: CanvasAdjustmentsContract | undefine
           return 'inv';
         case 'noise':
           return `nz:${entry.distribution},${entry.grain},${entry.response},${entry.size},${entry.amount},${entry.seed}`;
+        case 'clarity':
+          return `cl:${entry.amount},${entry.size}`;
+        case 'texture':
+          return `tx:${entry.amount},${entry.size}`;
+        case 'dehaze':
+          return `dh:${entry.amount}`;
         case 'curves':
           return `cv:${curveKey(entry.curves.r)}|${curveKey(entry.curves.g)}|${curveKey(entry.curves.b)}`;
       }
@@ -891,13 +955,21 @@ const applyNoise = (
   );
 };
 
+/** Unpremultiplied RGBA8 pixels, row-major: an `ImageData` or a worker result viewed the same way. */
+export interface AdjustablePixels {
+  readonly data: Uint8ClampedArray;
+  readonly width: number;
+  readonly height: number;
+}
+
 /**
  * Applies the compiled stack in place, preserving alpha; identity is a no-op. `origin` places the pixels in the
- * stack's reference space. Every entry is region independent: adjusting a sub-rectangle with its matching origin
- * yields exactly the pixels a whole-surface pass would there.
+ * stack's reference space. Spatial entries are skipped (see {@link isSpatialAdjustmentEntry}); every entry applied is
+ * region independent: adjusting a sub-rectangle with its matching origin yields exactly the pixels a whole-surface
+ * pass would there.
  */
 export const applyAdjustments = (
-  imageData: ImageData,
+  imageData: AdjustablePixels,
   adjustments: CanvasAdjustmentsContract | undefined,
   origin: AdjustmentOrigin
 ): void => {

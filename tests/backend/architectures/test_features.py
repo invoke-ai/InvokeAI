@@ -24,6 +24,7 @@ DENOISE_NODE = {
     BaseModelType.QwenImage21: "qwen_image_2_1_denoise",
     BaseModelType.Wan: "wan_denoise",
     BaseModelType.MiniMaxH3: "minimax_h3_denoise",
+    BaseModelType.MossImage: "moss_image_denoise",
 }
 
 
@@ -82,22 +83,33 @@ def test_control_kinds_match_the_frontend_policy(kind: ControlKind, expected: se
     assert declared == expected
 
 
-def test_reference_images_and_the_one_variant_condition() -> None:
-    """Qwen-Image is the only base whose answer depends on the variant, so it is the only one with
-    `reference_images_require_variant` set."""
+def test_reference_images_and_the_conditions_on_them() -> None:
+    """Qwen-Image and Anima are the bases whose answer depends on the variant: Qwen-Image takes
+    reference images only as `edit`, Anima only on the Qwen3-conditioned releases the IP-Adapter was
+    trained on (not Anima-3.8B's Qwen3.5 variant). Qwen-Image-2.1 is the only one whose answer depends
+    on the format."""
     supported = {
         b.value for b in generative_bases() if (f := get(b, FeaturesFacet)) is not None and f.supports_reference_images
     }
-    assert supported == {"flux", "flux2", "sd-1", "sdxl", "qwen-image", "krea-2"}
+    assert supported == {"flux", "flux2", "sd-1", "sdxl", "qwen-image", "krea-2", "anima", "qwen-image-2-1"}
+
+    by_format = {
+        b.value: f.reference_images_require_format
+        for b in generative_bases()
+        if (f := get(b, FeaturesFacet)) is not None and f.reference_images_require_format is not None
+    }
+    assert by_format == {"qwen-image-2-1": "diffusers"}
 
     conditional = {
-        b.value
+        b.value: f.reference_images_require_variant
         for b in generative_bases()
         if (f := get(b, FeaturesFacet)) is not None and f.reference_images_require_variant is not None
     }
-    assert conditional == {"qwen-image"}
-    qwen = get(BaseModelType.QwenImage, FeaturesFacet)
-    assert qwen is not None and qwen.reference_images_require_variant == "edit"
+    assert conditional == {"qwen-image": "edit", "anima": "anima_qwen3"}
+
+    # Up to four images, attended together by `anima_denoise` (experimental: the adapter was trained on one).
+    anima = get(BaseModelType.Anima, FeaturesFacet)
+    assert anima is not None and anima.max_reference_images == 4
 
 
 def test_regional_guidance_and_its_negative_subset() -> None:
@@ -137,6 +149,7 @@ def test_the_negative_prompt_policy_follows_the_guidance_model() -> None:
         "z-image",
         "ernie-image",
         "ltx-2",
+        "moss-image",
     }
     # Nothing declares a visible box it never uses, or an invisible one it does.
     for base in generative_bases():

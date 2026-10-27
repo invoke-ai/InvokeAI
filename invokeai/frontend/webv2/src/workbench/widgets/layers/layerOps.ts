@@ -7,9 +7,9 @@ import type {
   CanvasInpaintMaskLayerContract,
   CanvasLayerBaseContract,
   CanvasLayerContract,
-  CanvasLayerSourceContract,
   CanvasMaskContract,
   CanvasMaskFillContract,
+  CanvasPixelSourceContract,
   CanvasRasterLayerContractV2,
   CanvasRegionalGuidanceLayerContract,
   RegionalGuidanceReferenceImage,
@@ -20,8 +20,14 @@ export type { CanvasStructuralEngine } from '@workbench/canvas-engine/api';
 
 import { getRegionalGuidanceSupport } from '@features/generation/graph';
 import { createItemId } from '@platform/browser/randomUuid';
-import { getSourceContentRect, isMergeableRasterLayer, mergeDownEligibility } from '@workbench/canvas-engine/api';
-import { CONTROL_ADAPTER_DEFAULTS, createDefaultControlAdapter } from '@workbench/controlAdapters';
+import {
+  createControlLayer,
+  getSourceContentRect,
+  isIdentityAdjustments,
+  isMergeableRasterLayer,
+  mergeDownEligibility,
+} from '@workbench/canvas-engine/api';
+import { CONTROL_ADAPTER_DEFAULTS } from '@workbench/controlAdapters';
 
 type LayerTransform = CanvasLayerBaseContract['transform'];
 
@@ -115,6 +121,32 @@ export const nextGroupName = (existingNames: readonly string[]): string => {
   }
   return `Group ${n}`;
 };
+
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** The number in a "<prefix> N" name (N ≥ 1), or null. */
+const numberedSuffix = (prefix: string, name: string): number | null => {
+  const match = new RegExp(`^${escapeRegExp(prefix)} (\\d+)$`).exec(name.trim());
+  const number = Number(match?.[1]);
+  return Number.isInteger(number) && number > 0 ? number : null;
+};
+
+/** The next free "<Type> N" name for a control layer that just got a type, given the other layers' names. */
+export const nextControlTypeLayerName = (typeLabel: string, existingNames: readonly string[]): string => {
+  const used = new Set(existingNames.map((name) => numberedSuffix(typeLabel, name)));
+  let n = 1;
+  while (used.has(n)) {
+    n += 1;
+  }
+  return `${typeLabel} ${n}`;
+};
+
+/**
+ * Whether a control layer still has a name the app gave it ("Control Layer N", or "<Type> N" from a type change), so
+ * choosing a type may rename it; a name the user typed is kept.
+ */
+export const isAutoControlLayerName = (name: string, typeLabels: readonly string[]): boolean =>
+  ['Control Layer', ...typeLabels].some((prefix) => numberedSuffix(prefix, name) !== null);
 
 /** Builds an empty inpaint mask layer with the legacy-default fill (no bitmap yet). */
 export const createInpaintMaskLayer = (name: string, id: string = createLayerId()): CanvasInpaintMaskLayerContract => ({
@@ -232,6 +264,10 @@ export const DEFAULT_NOISE_AMOUNT = 0.1;
 /** A new noise entry's grain size: one independent sample per pixel, the finest grain. */
 export const DEFAULT_NOISE_SIZE = 1;
 
+/** Clarity's and Texture's default feature sizes in owner pixels, matching the backend nodes' defaults. */
+export const DEFAULT_CLARITY_SIZE = 40;
+export const DEFAULT_TEXTURE_SIZE = 8;
+
 /** A fresh uint32 pattern seed for a noise entry. */
 export const createNoiseSeed = (): number => crypto.getRandomValues(new Uint32Array(1))[0]!;
 
@@ -269,6 +305,12 @@ export const createAdjustmentEntry = (type: CanvasAdjustmentEntry['type']): Canv
         size: DEFAULT_NOISE_SIZE,
         type,
       };
+    case 'clarity':
+      return { amount: 0, id, isEnabled: true, size: DEFAULT_CLARITY_SIZE, type };
+    case 'texture':
+      return { amount: 0, id, isEnabled: true, size: DEFAULT_TEXTURE_SIZE, type };
+    case 'dehaze':
+      return { amount: 0, id, isEnabled: true, type };
   }
 };
 
@@ -334,46 +376,6 @@ export const DEFAULT_CONTROL_ADAPTER = CONTROL_ADAPTER_DEFAULTS.controlnet;
 /** A new mask modifier's magnitude (legacy defaults): noise level and denoise limit. */
 export const MASK_MODIFIER_DEFAULTS = { denoise: 0.8, noise: 0.25 } as const;
 
-/** The next free "Control Layer N" name given the existing layer names (N ≥ 1, first gap). */
-export const nextControlLayerName = (existingNames: readonly string[]): string => {
-  const used = new Set<number>();
-  for (const name of existingNames) {
-    const match = /^Control Layer (\d+)$/.exec(name.trim());
-    if (match) {
-      const n = Number(match[1]);
-      if (Number.isInteger(n) && n > 0) {
-        used.add(n);
-      }
-    }
-  }
-  let n = 1;
-  while (used.has(n)) {
-    n += 1;
-  }
-  return `Control Layer ${n}`;
-};
-
-export const createControlLayer = (
-  name: string,
-  id: string = createLayerId(),
-  base?: string | null,
-  model?: string | null
-): CanvasControlLayerContract => {
-  return {
-    adapter: createDefaultControlAdapter(base, model ?? null),
-    blendMode: 'normal',
-    id,
-    isEnabled: true,
-    isLocked: false,
-    name,
-    opacity: 1,
-    source: { bitmap: null, type: 'paint' },
-    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
-    type: 'control',
-    withTransparencyEffect: true,
-  };
-};
-
 /** Returns the transform that fits the layer's unrotated local content into the bbox. */
 export const fitLayerTransformToBbox = (
   layer: CanvasLayerContract,
@@ -413,11 +415,18 @@ export const canConvertRasterControl = (layer: CanvasLayerContract): boolean => 
 };
 
 type PixelLayer = CanvasRasterLayerContractV2 | CanvasControlLayerContract;
-type PixelSource = Extract<CanvasLayerSourceContract, { type: 'image' | 'paint' }>;
+
+/**
+ * Whether a raster layer's adjustments change its pixels. Control layers carry no adjustments, so such a layer reaches
+ * the control stack only with its pixels baked by the engine (`copyLayerToControl`, `convertLayerToControl`); its
+ * alpha, all a mask conversion reads, no adjustment changes.
+ */
+export const needsBakedControlPixels = (layer: CanvasLayerContract): boolean =>
+  layer.type === 'raster' && !isIdentityAdjustments(layer.adjustments);
 
 const cloneTransform = (layer: CanvasLayerContract): LayerTransform => ({ ...layer.transform });
 
-const clonePixelSource = (layer: PixelLayer): PixelSource | null => {
+const clonePixelSource = (layer: PixelLayer): CanvasPixelSourceContract | null => {
   if (layer.source.type === 'image') {
     return { image: { ...layer.source.image }, type: 'image' };
   }
@@ -463,24 +472,22 @@ const destinationBase = (layer: CanvasLayerContract, id: string, isCopy: boolean
   transform: cloneTransform(layer),
 });
 
+/**
+ * An untyped, model-less control layer over the same pixels; generation resolves its model. Null for a layer
+ * {@link needsBakedControlPixels}, which no clone represents.
+ */
 const pixelLayerToControl = (
   layer: PixelLayer,
   id: string,
   isCopy: boolean,
-  base?: string | null,
-  model?: string | null
+  base?: string | null
 ): CanvasControlLayerContract | null => {
-  const source = clonePixelSource(layer);
+  const source = needsBakedControlPixels(layer) ? null : clonePixelSource(layer);
   if (!source) {
     return null;
   }
-  return {
-    ...destinationBase(layer, id, isCopy),
-    adapter: createDefaultControlAdapter(base, model ?? null),
-    source,
-    type: 'control',
-    withTransparencyEffect: true,
-  };
+  const destination = destinationBase(layer, id, isCopy);
+  return { ...createControlLayer({ base, id, name: destination.name, source }), ...destination };
 };
 
 const pixelLayerToInpaintMask = (
@@ -514,9 +521,8 @@ const pixelLayerToRegionalGuidance = (
 export const copyRasterToControl = (
   layer: CanvasRasterLayerContractV2,
   id: string,
-  base?: string | null,
-  model?: string | null
-): CanvasControlLayerContract | null => pixelLayerToControl(layer, id, true, base, model);
+  base?: string | null
+): CanvasControlLayerContract | null => pixelLayerToControl(layer, id, true, base);
 
 export const copyRasterToInpaintMask = (
   layer: CanvasRasterLayerContractV2,
@@ -530,9 +536,8 @@ export const copyRasterToRegionalGuidance = (
 
 export const convertRasterToControl = (
   layer: CanvasRasterLayerContractV2,
-  base?: string | null,
-  model?: string | null
-): CanvasControlLayerContract | null => pixelLayerToControl(layer, layer.id, false, base, model);
+  base?: string | null
+): CanvasControlLayerContract | null => pixelLayerToControl(layer, layer.id, false, base);
 
 export const convertRasterToInpaintMask = (layer: CanvasRasterLayerContractV2): CanvasInpaintMaskLayerContract | null =>
   pixelLayerToInpaintMask(layer, layer.id, false);
@@ -588,14 +593,13 @@ export const copyRegionalGuidanceToInpaintMask = (
 export const convertRasterControlLayer = (
   layer: CanvasLayerContract,
   targetType: 'raster' | 'control',
-  base?: string | null,
-  model?: string | null
+  base?: string | null
 ): CanvasLayerContract | null => {
   if (layer.type === targetType || !canConvertRasterControl(layer)) {
     return null;
   }
   if (layer.type === 'raster' && targetType === 'control') {
-    return convertRasterToControl(layer, base, model);
+    return convertRasterToControl(layer, base);
   }
   if (layer.type === 'control' && targetType === 'raster') {
     const source = clonePixelSource(layer);

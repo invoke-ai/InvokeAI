@@ -1,6 +1,5 @@
 """Model installation class."""
 
-import ctypes
 import errno
 import filecmp
 import gc
@@ -8,7 +7,6 @@ import locale
 import os
 import re
 import ssl
-import sys
 import threading
 import time
 from copy import deepcopy
@@ -61,6 +59,7 @@ from invokeai.app.services.model_install.model_install_common import (
 )
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase, UnknownModelException
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
+from invokeai.app.util.no_replace import rename_noreplace
 from invokeai.app.util.path_safety import is_plain_filename
 from invokeai.app.util.ssrf import UnsafeDownloadURLException
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
@@ -918,45 +917,12 @@ class ModelInstallService(ModelInstallServiceBase):
                 time.sleep(delay)
                 delay *= 2  # Exponential backoff
 
-    @staticmethod
-    def _rename_noreplace(src: Path, dst: Path) -> None:
-        """Atomically restore a path only if its destination is still absent."""
-        if sys.platform.startswith("linux"):
-            libc = ctypes.CDLL(None, use_errno=True)
-            renameat2 = getattr(libc, "renameat2", None)
-            if renameat2 is None:
-                raise OSError("atomic no-replace rename is unavailable")
-            renameat2.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
-            renameat2.restype = ctypes.c_int
-            result = renameat2(-100, os.fsencode(src), -100, os.fsencode(dst), 1)  # AT_FDCWD, RENAME_NOREPLACE
-            if result != 0:
-                error = ctypes.get_errno()
-                raise OSError(error, os.strerror(error), str(dst))
-            return
-        if sys.platform == "darwin":
-            libc = ctypes.CDLL(None, use_errno=True)
-            renamex_np = getattr(libc, "renamex_np", None)
-            if renamex_np is None:
-                raise OSError("atomic no-replace rename is unavailable")
-            renamex_np.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
-            renamex_np.restype = ctypes.c_int
-            result = renamex_np(os.fsencode(src), os.fsencode(dst), 0x00000004)  # RENAME_EXCL
-            if result != 0:
-                error = ctypes.get_errno()
-                raise OSError(error, os.strerror(error), str(dst))
-            return
-        if os.name == "nt":
-            # Windows rename fails when the destination already exists.
-            os.rename(src, dst)
-            return
-        raise OSError("atomic no-replace rename is unavailable on this platform")
-
     @classmethod
     def _restore_moved_path(cls, src: Path, dst: Path) -> None:
         if dst.exists() or dst.is_symlink():
             raise FileExistsError(f"Refusing to overwrite recreated source {dst}")
         try:
-            cls._rename_noreplace(src, dst)
+            rename_noreplace(src, dst)
         except OSError as e:
             if e.errno != errno.EXDEV:
                 raise
@@ -973,7 +939,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     copy2(src, staged_path)
                 else:
                     raise OSError(f"Cannot restore unsupported filesystem object {src}")
-                cls._rename_noreplace(staged_path, dst)
+                rename_noreplace(staged_path, dst)
                 if src.is_dir() and not src.is_symlink():
                     rmtree(src)
                 else:

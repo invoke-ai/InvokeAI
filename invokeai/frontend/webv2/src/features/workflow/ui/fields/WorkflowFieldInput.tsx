@@ -974,7 +974,6 @@ const ImageCollectionInput = ({
           // The empty state keeps the drop target tall enough to hit and doubles as the picker trigger.
           <GalleryPickerPopover accept={IMAGE_ONLY} label={pickerLabel} selection={pickerSelection} onPick={onPick}>
             <chakra.button
-              aria-label={pickerLabel}
               className="nodrag"
               display="block"
               h="20"
@@ -1108,7 +1107,8 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
       <Box ref={setNodeRef} className="nodrag group" h="32" position="relative" rounded="sm" w="full">
         <GalleryPickerPopover accept={pickerAccept} label={pickerLabel} onPick={onPick}>
           <chakra.button
-            aria-label={pickerLabel}
+            // A chosen item shows only its thumbnail; the empty face names itself with its visible text.
+            aria-label={mediaName ? pickerLabel : undefined}
             className="nodrag"
             display="block"
             h="full"
