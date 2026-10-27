@@ -158,14 +158,24 @@ def dtype_name(dtype: torch.dtype) -> str:
 
 
 def _compute_dtype(vae: torch.nn.Module) -> torch.dtype:
-    """The dtype a VAE no node casts computes in: that of its first floating-point parameter wider than a byte.
+    """The dtype a VAE no node casts computes in.
 
-    Narrower or integer weights (fp8 storage, an SDNQ VAE's packed ones) are what a layer dequantizes from, not what
-    its activations are.
+    An SDNQ VAE computes in its packed weights' `compute_dtype`: they dequantize to it, and the layer casts every other
+    operand to it, an fp32 bias included. Otherwise it is that of the first floating-point parameter wider than a byte:
+    narrower weights (fp8 storage) are what a layer dequantizes from, not what its activations are.
+
+    A packed parameter's `compute_dtype` wins over any floating-point one, so an SDNQ VAE that kept whole layers
+    unquantized in fp32 would be priced below its real cost; that case is not verified for the shipped SDNQ VAEs.
     """
+    first_wide_float: torch.dtype | None = None
     for param in vae.parameters():
-        if param.is_floating_point() and param.element_size() > 1:
-            return param.dtype
+        packed_compute_dtype = getattr(param, "compute_dtype", None)
+        if isinstance(packed_compute_dtype, torch.dtype):
+            return packed_compute_dtype
+        if first_wide_float is None and param.is_floating_point() and param.element_size() > 1:
+            first_wide_float = param.dtype
+    if first_wide_float is not None:
+        return first_wide_float
     raise ValueError(f"{type(vae).__name__} has no floating-point parameters to compute in.")
 
 
@@ -265,8 +275,8 @@ def sd_vae_run_dtype(operation: Literal["encode", "decode"], fp32: bool, device:
     `estimate_vae_working_memory_sd15_sdxl` prices it, so the two cannot drift.
 
     fp32 when the node asks for it, and for a decode on the CPU; fp16 otherwise, on every GPU and for every
-    `precision`, so bf16 never runs. The cached VAE's own dtype says nothing about it: it is whatever the previous run
-    cast it to.
+    `precision`, so bf16 never runs. The cached VAE's own dtype says nothing about it: it is the one the VAE was loaded
+    in, which the model cache returns it to when the node's lock ends.
     """
     if fp32 or (operation == "decode" and device.type == "cpu"):
         return torch.float32
@@ -277,10 +287,11 @@ def _upcast_weight_bytes(vae: torch.nn.Module, run_dtype: torch.dtype) -> int:
     """What the node's in-place cast to `run_dtype` adds to the VAE's resident weights.
 
     The cast runs once the cache has placed the VAE, so the growth comes out of the reservation: 160 MiB for the 83.7M
-    parameters of the SD1/SDXL VAE going from fp16 to fp32, nothing for a VAE a previous run left in fp32. Measured
-    points exclude resident weights by construction (they record 0 here), so the fitted line does not cover it. An
-    upcast encode casts the decoder's mid-block and post-quant conv back, so for it this counts a little more than
-    grows: conservative.
+    parameters of the SD1/SDXL VAE going from fp16 to fp32, nothing for a VAE loaded in fp32. Read before the lock,
+    the VAE holds the dtype it was loaded in: the model cache returns it there when the previous node's lock ended.
+    Measured points exclude resident weights by construction (they record 0 here), so the fitted line does not cover
+    it. An upcast encode casts the decoder's mid-block and post-quant conv back, so for it this counts a little more
+    than grows: conservative.
     """
     return sum(p.numel() * max(0, run_dtype.itemsize - p.element_size()) for p in vae.parameters())
 
