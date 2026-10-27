@@ -3607,10 +3607,7 @@ def test_root_condition_if_with_for_output_branch_under_iterate_completes(
         assert not {"for", "body", "ret", "mid"} & set(trace)
 
 
-@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
-def test_computed_root_if_selecting_root_value_over_unselected_for_emits_one_result(
-    force_compatibility_scheduler: bool,
-) -> None:
+def test_computed_root_if_selecting_root_value_over_unselected_for_emits_one_result() -> None:
     graph = _graph_from(
         [
             CollectionConcatInvocation(id="src", first=[["c"], ["d"], ["e"]]),
@@ -3636,9 +3633,7 @@ def test_computed_root_if_selecting_root_value_over_unselected_for_emits_one_res
         ],
     )
 
-    trace, state = _run_graph(
-        GraphExecutionState(graph=graph), force_compatibility_scheduler=force_compatibility_scheduler
-    )
+    trace, state = _run_graph(GraphExecutionState(graph=graph), force_compatibility_scheduler=True)
 
     assert state.is_complete(), f"graph stalled after {trace}"
     assert _source_values(state, "collect") == {(): ["R"]}
@@ -3646,10 +3641,7 @@ def test_computed_root_if_selecting_root_value_over_unselected_for_emits_one_res
     assert not {"for", "body", "ret"} & set(trace)
 
 
-@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
-def test_computed_root_if_selecting_root_value_over_empty_unselected_for_emits_one_result(
-    force_compatibility_scheduler: bool,
-) -> None:
+def test_computed_root_if_selecting_root_value_over_empty_unselected_for_emits_one_result() -> None:
     graph = _graph_from(
         [
             CollectionConcatInvocation(id="src", first=[]),
@@ -3675,14 +3667,376 @@ def test_computed_root_if_selecting_root_value_over_empty_unselected_for_emits_o
         ],
     )
 
-    trace, state = _run_graph(
-        GraphExecutionState(graph=graph), force_compatibility_scheduler=force_compatibility_scheduler
-    )
+    trace, state = _run_graph(GraphExecutionState(graph=graph), force_compatibility_scheduler=True)
 
     assert state.is_complete(), f"graph stalled after {trace}"
     assert _source_values(state, "collect") == {(): ["R"]}
     assert trace.count("if") == 1
     assert not {"for", "body", "ret"} & set(trace)
+
+
+def test_literal_nested_if_collect_preserves_sibling_collection_input() -> None:
+    nodes = [
+        CollectionConcatInvocation(id="src", first=[["a"], ["b"]]),
+        IterateInvocation(id="iterate"),
+        ForInvocation(id="for"),
+        AnyTypeTestInvocation(id="body"),
+        ForReturnInvocation(id="ret"),
+        BooleanInvocation(id="inner_condition", value=True),
+        IfInvocation(id="inner"),
+        AnyTypeTestInvocation(id="inner_fallback", value="inner"),
+        IfInvocation(id="outer", condition=True),
+        AnyTypeTestInvocation(id="outer_fallback", value="outer"),
+        CollectionConcatInvocation(id="sibling_collection", first=["sibling"]),
+        CollectInvocation(id="collect"),
+    ]
+    edges = [
+        ("src", "collection", "iterate", "collection"),
+        ("iterate", "item", "for", "collection"),
+        ("for", "item", "body", "value"),
+        ("body", "value", "ret", "output"),
+        create_loop_linkage("for", "ret"),
+        ("for", "output_collection", "inner", "true_input"),
+        ("inner_fallback", "value", "inner", "false_input"),
+        ("inner_condition", "value", "inner", "condition"),
+        ("inner", "value", "outer", "true_input"),
+        ("outer_fallback", "value", "outer", "false_input"),
+        ("outer", "value", "collect", "item"),
+        ("sibling_collection", "collection", "collect", "collection"),
+    ]
+    trace, state = _run_graph(
+        GraphExecutionState(graph=_graph_from(nodes, edges)),
+        force_compatibility_scheduler=True,
+    )
+
+    assert not state.has_error(), trace
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == {
+        (0,): ["sibling", ["a"]],
+        (1,): ["sibling", ["b"]],
+    }
+
+
+@pytest.mark.parametrize("computed_outer_condition", [False, True], ids=["literal-outer", "computed-outer"])
+def test_empty_literal_nested_if_collect_with_sibling_collection_completes(
+    computed_outer_condition: bool,
+) -> None:
+    nodes = [
+        CollectionConcatInvocation(id="src", first=[]),
+        IterateInvocation(id="iterate"),
+        ForInvocation(id="for"),
+        AnyTypeTestInvocation(id="body"),
+        ForReturnInvocation(id="ret"),
+        BooleanInvocation(id="inner_condition", value=True),
+        IfInvocation(id="inner"),
+        AnyTypeTestInvocation(id="inner_fallback", value="inner"),
+        IfInvocation(id="outer", condition=True),
+        AnyTypeTestInvocation(id="outer_fallback", value="outer"),
+        CollectionConcatInvocation(id="sibling_collection", first=["sibling"]),
+        CollectInvocation(id="collect"),
+    ]
+    if computed_outer_condition:
+        nodes.insert(-4, BooleanInvocation(id="outer_condition", value=True))
+    edges = [
+        ("src", "collection", "iterate", "collection"),
+        ("iterate", "item", "for", "collection"),
+        ("for", "item", "body", "value"),
+        ("body", "value", "ret", "output"),
+        create_loop_linkage("for", "ret"),
+        ("for", "output_collection", "inner", "true_input"),
+        ("inner_fallback", "value", "inner", "false_input"),
+        ("inner_condition", "value", "inner", "condition"),
+        ("inner", "value", "outer", "true_input"),
+        ("outer_fallback", "value", "outer", "false_input"),
+        ("outer", "value", "collect", "item"),
+        ("sibling_collection", "collection", "collect", "collection"),
+    ]
+    if computed_outer_condition:
+        edges.insert(-3, ("outer_condition", "value", "outer", "condition"))
+    trace, state = _run_graph(
+        GraphExecutionState(graph=_graph_from(nodes, edges)),
+        force_compatibility_scheduler=True,
+    )
+
+    assert not state.has_error(), trace
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == {(): ["sibling"]}
+
+
+def test_literal_nested_if_collect_preserves_all_sibling_iterate_items() -> None:
+    nodes = [
+        CollectionConcatInvocation(id="src", first=[["a", "b"], ["c", "d"]]),
+        IterateInvocation(id="iterate"),
+        ForInvocation(id="for"),
+        AnyTypeTestInvocation(id="body"),
+        ForReturnInvocation(id="ret"),
+        BooleanInvocation(id="inner_condition", value=True),
+        IfInvocation(id="inner"),
+        AnyTypeTestInvocation(id="inner_fallback", value="inner"),
+        IfInvocation(id="outer", condition=True),
+        AnyTypeTestInvocation(id="outer_fallback", value="outer"),
+        IterateInvocation(id="sibling_iterate"),
+        AnyTypeTestInvocation(id="sibling_value"),
+        CollectInvocation(id="collect"),
+    ]
+    edges = [
+        ("src", "collection", "iterate", "collection"),
+        ("iterate", "item", "for", "collection"),
+        ("for", "item", "body", "value"),
+        ("body", "value", "ret", "output"),
+        create_loop_linkage("for", "ret"),
+        ("for", "output_collection", "inner", "true_input"),
+        ("inner_fallback", "value", "inner", "false_input"),
+        ("inner_condition", "value", "inner", "condition"),
+        ("inner", "value", "outer", "true_input"),
+        ("outer_fallback", "value", "outer", "false_input"),
+        ("outer", "value", "collect", "item"),
+        ("for", "output_collection", "sibling_iterate", "collection"),
+        ("sibling_iterate", "item", "sibling_value", "value"),
+        ("sibling_value", "value", "collect", "item"),
+    ]
+    trace, state = _run_graph(
+        GraphExecutionState(graph=_graph_from(nodes, edges)),
+        force_compatibility_scheduler=True,
+    )
+
+    assert not state.has_error(), trace
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == {
+        (0,): [["a", "b"], "a", "b"],
+        (1,): [["c", "d"], "c", "d"],
+    }
+
+
+@pytest.mark.parametrize("reverse_collect_items", [False, True], ids=["first-narrow", "first-wide"])
+def test_nested_literal_if_collect_uses_union_of_item_frame_paths(reverse_collect_items: bool) -> None:
+    nodes = [
+        CollectionConcatInvocation(id="src", first=[[], ["a"]]),
+        IterateInvocation(id="outer_iterate"),
+        PolymorphicStringTestInvocation(id="inner_collection"),
+        IterateInvocation(id="inner_iterate"),
+        FixedCollectionTestInvocation(id="for_collection"),
+        ForInvocation(id="for"),
+        AnyTypeTestInvocation(id="body", value="for"),
+        ForReturnInvocation(id="ret"),
+        IfInvocation(id="first_inner", condition=True),
+        AnyTypeTestInvocation(id="first_inner_fallback", value="first-inner-fallback"),
+        IfInvocation(id="first_outer", condition=True),
+        AnyTypeTestInvocation(id="first_outer_fallback", value="first-outer-fallback"),
+        IfInvocation(id="second_inner", condition=True),
+        AnyTypeTestInvocation(id="second_inner_fallback", value="second-inner-fallback"),
+        IfInvocation(id="second_outer", condition=True),
+        AnyTypeTestInvocation(id="second_outer_fallback", value="second-outer-fallback"),
+        CollectInvocation(id="collect"),
+    ]
+    edges = [
+        ("src", "collection", "outer_iterate", "collection"),
+        ("outer_iterate", "item", "inner_collection", "value"),
+        ("inner_collection", "collection", "inner_iterate", "collection"),
+        ("inner_iterate", "item", "for_collection", "value"),
+        ("for_collection", "collection", "for", "collection"),
+        ("for", "item", "body", "value"),
+        ("body", "value", "ret", "output"),
+        create_loop_linkage("for", "ret"),
+        ("for", "output_collection", "first_inner", "true_input"),
+        ("first_inner_fallback", "value", "first_inner", "false_input"),
+        ("first_inner", "value", "first_outer", "true_input"),
+        ("first_outer_fallback", "value", "first_outer", "false_input"),
+        ("outer_iterate", "item", "second_inner", "true_input"),
+        ("second_inner_fallback", "value", "second_inner", "false_input"),
+        ("second_inner", "value", "second_outer", "true_input"),
+        ("second_outer_fallback", "value", "second_outer", "false_input"),
+    ]
+    collect_item_edges = [
+        ("first_outer", "value", "collect", "item"),
+        ("second_outer", "value", "collect", "item"),
+    ]
+    if reverse_collect_items:
+        collect_item_edges.reverse()
+    edges.extend(collect_item_edges)
+    trace, state = _run_graph(
+        GraphExecutionState(graph=_graph_from(nodes, edges)),
+        force_compatibility_scheduler=True,
+    )
+
+    assert not state.has_error(), trace
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert len(state.source_prepared_mapping["collect"]) == 2
+    assert set(_source_values(state, "collect")) == {(0,), (1, 0)}
+    assert _source_values(state, "collect") == {
+        (0,): [[]],
+        (1, 0): [["a"], [0, 1]],
+    }
+
+
+@pytest.mark.parametrize("computed_inner_condition", [False, True], ids=["literal-inner", "computed-inner"])
+@pytest.mark.parametrize("inner_condition", [False, True], ids=["inner-false", "inner-true"])
+@pytest.mark.parametrize("source_data", [[], [["a"], ["b"]]], ids=["empty", "nonempty"])
+def test_nested_root_if_ignores_empty_unselected_for_branch(
+    computed_inner_condition: bool,
+    inner_condition: bool,
+    source_data: list[list[str]],
+) -> None:
+    """Nested selected-branch cardinality is outside the README's direct root-If promise."""
+    nodes = [
+        CollectionConcatInvocation(id="src", first=source_data),
+        IterateInvocation(id="iterate"),
+        ForInvocation(id="for"),
+        AnyTypeTestInvocation(id="body"),
+        ForReturnInvocation(id="ret"),
+        AnyTypeTestInvocation(id="inner_fallback", value="inner"),
+        IfInvocation(id="inner", condition=inner_condition),
+        AnyTypeTestInvocation(id="outer_fallback", value="outer"),
+        BooleanInvocation(id="outer_condition", value=True),
+        IfInvocation(id="outer"),
+        CollectInvocation(id="collect"),
+    ]
+    edges = [
+        ("src", "collection", "iterate", "collection"),
+        ("iterate", "item", "for", "collection"),
+        ("for", "item", "body", "value"),
+        ("body", "value", "ret", "output"),
+        create_loop_linkage("for", "ret"),
+        ("for", "output_collection", "inner", "true_input"),
+        ("inner_fallback", "value", "inner", "false_input"),
+        ("inner", "value", "outer", "true_input"),
+        ("outer_fallback", "value", "outer", "false_input"),
+        ("outer_condition", "value", "outer", "condition"),
+        ("outer", "value", "collect", "item"),
+    ]
+    if computed_inner_condition:
+        nodes.append(BooleanInvocation(id="inner_condition", value=inner_condition))
+        edges.append(("inner_condition", "value", "inner", "condition"))
+
+    trace, state = _run_graph(
+        GraphExecutionState(graph=_graph_from(nodes, edges)),
+        force_compatibility_scheduler=True,
+    )
+
+    assert not state.has_error(), trace
+    assert state.is_complete(), f"graph stalled after {trace}"
+    if not source_data:
+        assert all(not state.source_prepared_mapping.get(node_id) for node_id in ("for", "body", "ret"))
+    if not inner_condition:
+        assert not {"for", "body", "ret"} & set(trace)
+        assert all(not state.source_prepared_mapping.get(node_id) for node_id in ("for", "body", "ret"))
+    expected = (
+        {(): []}
+        if inner_condition and not source_data
+        else {(0,): [["a"]], (1,): [["b"]]}
+        if inner_condition and computed_inner_condition
+        else {(): [["a"], ["b"]]}
+        if inner_condition
+        else {(): ["inner"]}
+    )
+    assert _source_values(state, "collect") == expected
+    if inner_condition and source_data:
+        for node_id in ("inner", "outer"):
+            assert sorted(state._get_iteration_path(exec_id) for exec_id in state.source_prepared_mapping[node_id]) == (
+                [(0,), (1,)]
+            )
+
+
+@pytest.mark.parametrize("outer_computed", [False, True], ids=["literal-outer", "computed-outer"])
+@pytest.mark.parametrize("source_data", [[], [["a"], ["b"]]], ids=["empty", "nonempty"])
+def test_literal_and_computed_outer_if_match_empty_nested_selection(
+    outer_computed: bool,
+    source_data: list[list[str]],
+) -> None:
+    nodes = [
+        CollectionConcatInvocation(id="src", first=source_data),
+        IterateInvocation(id="iterate"),
+        ForInvocation(id="for"),
+        AnyTypeTestInvocation(id="body"),
+        ForReturnInvocation(id="ret"),
+        BooleanInvocation(id="inner_condition", value=True),
+        IfInvocation(id="inner"),
+        AnyTypeTestInvocation(id="inner_fallback", value="inner"),
+        IfInvocation(id="outer", condition=True),
+        AnyTypeTestInvocation(id="outer_fallback", value="outer"),
+        CollectInvocation(id="collect"),
+    ]
+    edges = [
+        ("src", "collection", "iterate", "collection"),
+        ("iterate", "item", "for", "collection"),
+        ("for", "item", "body", "value"),
+        ("body", "value", "ret", "output"),
+        create_loop_linkage("for", "ret"),
+        ("for", "output_collection", "inner", "true_input"),
+        ("inner_fallback", "value", "inner", "false_input"),
+        ("inner_condition", "value", "inner", "condition"),
+        ("inner", "value", "outer", "true_input"),
+        ("outer_fallback", "value", "outer", "false_input"),
+        ("outer", "value", "collect", "item"),
+    ]
+    if outer_computed:
+        nodes.append(BooleanInvocation(id="outer_condition", value=True))
+        edges.append(("outer_condition", "value", "outer", "condition"))
+
+    trace, state = _run_graph(
+        GraphExecutionState(graph=_graph_from(nodes, edges)),
+        force_compatibility_scheduler=True,
+    )
+
+    assert not state.has_error(), trace
+    assert state.is_complete(), (
+        f"graph stalled after {trace}; executed={state.executed}; mappings={state.source_prepared_mapping}"
+    )
+    assert _source_values(state, "collect") == ({(): []} if not source_data else {(0,): [["a"]], (1,): [["b"]]})
+
+
+@pytest.mark.parametrize("source_data", [[], [["a"], ["b"]]], ids=["empty", "nonempty"])
+def test_three_level_computed_if_chain_preserves_for_frames(
+    source_data: list[list[str]],
+) -> None:
+    """Compatibility fallback guard; this nested selected-branch shape is outside direct root-If cardinality guarantees."""
+    nodes = [
+        CollectionConcatInvocation(id="src", first=source_data),
+        IterateInvocation(id="iterate"),
+        ForInvocation(id="for"),
+        AnyTypeTestInvocation(id="body"),
+        ForReturnInvocation(id="ret"),
+        BooleanInvocation(id="deep_condition", value=True),
+        IfInvocation(id="deep"),
+        BooleanInvocation(id="middle_condition", value=True),
+        IfInvocation(id="middle"),
+        BooleanInvocation(id="outer_condition", value=True),
+        IfInvocation(id="outer"),
+        AnyTypeTestInvocation(id="deep_fallback", value="deep"),
+        AnyTypeTestInvocation(id="middle_fallback", value="middle"),
+        AnyTypeTestInvocation(id="outer_fallback", value="outer"),
+        CollectInvocation(id="collect"),
+    ]
+    edges = [
+        ("src", "collection", "iterate", "collection"),
+        ("iterate", "item", "for", "collection"),
+        ("for", "item", "body", "value"),
+        ("body", "value", "ret", "output"),
+        create_loop_linkage("for", "ret"),
+        ("for", "output_collection", "deep", "true_input"),
+        ("deep_fallback", "value", "deep", "false_input"),
+        ("deep_condition", "value", "deep", "condition"),
+        ("deep", "value", "middle", "true_input"),
+        ("middle_fallback", "value", "middle", "false_input"),
+        ("middle_condition", "value", "middle", "condition"),
+        ("middle", "value", "outer", "true_input"),
+        ("outer_fallback", "value", "outer", "false_input"),
+        ("outer_condition", "value", "outer", "condition"),
+        ("outer", "value", "collect", "item"),
+    ]
+    trace, state = _run_graph(
+        GraphExecutionState(graph=_graph_from(nodes, edges)),
+        force_compatibility_scheduler=True,
+    )
+    assert not state.has_error(), trace
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == ({(): []} if not source_data else {(0,): [["a"]], (1,): [["b"]]})
+    if source_data:
+        for node_id in ("deep", "middle", "outer"):
+            assert sorted(state._get_iteration_path(exec_id) for exec_id in state.source_prepared_mapping[node_id]) == [
+                (0,),
+                (1,),
+            ]
 
 
 @pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])

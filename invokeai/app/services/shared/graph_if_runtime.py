@@ -268,11 +268,50 @@ def _get_edge_frame_axes(
     outer axes. A result that is not one nested chain has no frame order to pair with and yields None. Results are
     cached for one validation run; Collect chains are resolved with an explicit stack.
     """
-    source_node = state.graph.get_node(edge.source.node_id)
-    if isinstance(source_node, (IfInvocation, ForInvocation, IterateInvocation)):
+    source_id = edge.source.node_id
+    if source_id in frame_axes_cache:
+        return frame_axes_cache[source_id]
+    source_node = state.graph.get_node(source_id)
+    if isinstance(source_node, IfInvocation):
+        # Seed shared If sources before descending both branches; nested branch fan-in otherwise repeats the chain.
+        frame_axes_cache[source_id] = ()
+        condition_edges = state.graph._get_input_edges(source_node.id, "condition")
+        branch_axes = _get_if_branch_frame_axes(state, iterator_ancestry, source_node.id, frame_axes_cache)
+        if not condition_edges and not any(branch_axes.values()):
+            axes = iterator_ancestry.get_frame_axes_for_edge(edge)
+            frame_axes_cache[source_id] = axes
+            return axes
+        if not condition_edges:
+            axes = set(branch_axes["true_input" if source_node.condition else "false_input"])
+        else:
+            condition_axes: set[str] = set()
+            for condition_edge in condition_edges:
+                try:
+                    condition_axes.update(iterator_ancestry.get_frame_axes_for_edge(condition_edge))
+                except nx.NetworkXError:
+                    # A filtered preparation view can omit unresolved condition sources.
+                    continue
+            if condition_axes:
+                axes = condition_axes | set(branch_axes["true_input"]) | set(branch_axes["false_input"])
+            else:
+                # A root condition resolves the nested If's branch before its output is consumed. Shared axes
+                # broadcast; an axis present only on one branch must not create a wait cycle for the other branch.
+                selected_fields = {
+                    state._resolved_if_exec_branches.get(prepared_id)
+                    for prepared_id in state.source_prepared_mapping.get(source_node.id, ())
+                }
+                selected_fields.discard(None)
+                if selected_fields:
+                    axes = set().union(*(branch_axes[field] for field in selected_fields))
+                else:
+                    axes = set(branch_axes["true_input"]).intersection(branch_axes["false_input"])
+        ordered = tuple(
+            sorted(axes, key=lambda axis_id: (len(iterator_ancestry.get_frame_iterators(axis_id)), axis_id))
+        )
+        frame_axes_cache[source_id] = ordered
+        return ordered
+    if isinstance(source_node, (ForInvocation, IterateInvocation)):
         return iterator_ancestry.get_frame_axes_for_edge(edge)
-    if edge.source.node_id in frame_axes_cache:
-        return frame_axes_cache[edge.source.node_id]
     pending: list[tuple[Edge, bool]] = [(edge, False)]
     while pending:
         current_edge, exiting = pending.pop()
@@ -344,13 +383,13 @@ def _get_if_branch_frame_axes(
 def _get_if_static_frame_analysis(
     state: "GraphExecutionState", iterator_ancestry: _IteratorAncestry, node_id: str
 ) -> tuple[dict[str, tuple[str, ...]], dict[str, set[str]]]:
-    """Cache branch axes and the axes reached through For final outputs for this graph traversal."""
+    """Recompute dynamic branch axes and cache only topology-static For-final axes."""
     cache = getattr(iterator_ancestry, "_if_static_frame_analysis", None)
     if cache is None:
         cache = {}
         iterator_ancestry._if_static_frame_analysis = cache
     if node_id in cache:
-        return cache[node_id]
+        return _get_if_branch_frame_axes(state, iterator_ancestry, node_id, {}), cache[node_id]
 
     branch_axes = _get_if_branch_frame_axes(state, iterator_ancestry, node_id, {})
     final_axes: dict[str, set[str]] = {}
@@ -374,9 +413,8 @@ def _get_if_static_frame_analysis(
                 pending.extend(state.graph._get_input_edges(source_id))
         final_axes[branch_field] = branch_final_axes
 
-    analysis = (branch_axes, final_axes)
-    cache[node_id] = analysis
-    return analysis
+    cache[node_id] = final_axes
+    return branch_axes, final_axes
 
 
 def _get_effective_iteration_paths_for_edge(
