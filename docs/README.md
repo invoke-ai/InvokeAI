@@ -82,7 +82,7 @@ After the first sync, paste these into each string's context in Crowdin.
 | `settingsReference.allowedValues` | A list of allowed values follows. |
 | `topics.group.*` | One-word imperative group headings. |
 | `pageActions.copyDone`, `pageActions.copyFailed` | Short button states. |
-| `page.updated`, `setupPicker.summary`, `footer.credit`, `pageFeedback.reportPrompt` | Keep the `<time>`, `<setup>` and `<link>` tags around the matching words. |
+| `page.updated`, `setupPicker.summary`, `setupPicker.summaryNotes`, `footer.credit`, `pageFeedback.reportPrompt` | Keep the `<time>`, `<setup>` and `<link>` tags around the matching words. |
 | `nav.siteNavLabel` | Landmark name for screen readers. |
 | `sidebar.group.*` | Navigation section names. |
 | `home.hero.announcement` | Keep "Invoke V7". |

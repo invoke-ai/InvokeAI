@@ -1,0 +1,122 @@
+---
+// One measured run in a `BenchmarkChart`: its time with the setting off and on, in seconds, drawn to the chart's
+// scale. The bars are for sighted readers; the chart reads the row's data attributes and gives screen readers a table.
+import { formatMeasure, speedup } from './benchmark-chart.mjs';
+import { pageLang } from './page-lang.mjs';
+
+type Props = {
+  /** What was measured: the model, steps and size. */
+  label: string;
+  /** Seconds with the setting off. */
+  before: number;
+  /** Seconds with the setting on. */
+  after: number;
+};
+
+const { label, before, after } = Astro.props as Props;
+const { t } = Astro.locals;
+const lang = pageLang(Astro.locals);
+const seconds = (value: number) => t('benchmarkChart.seconds', { value: formatMeasure(value, lang) });
+const ratio = formatMeasure(speedup(before, after), lang);
+---
+
+<div
+  class="bench-row"
+  aria-hidden="true"
+  data-bench-row
+  data-bench-label={label}
+  data-bench-before={before}
+  data-bench-after={after}
+  style={`--before: ${before}; --after: ${after}`}
+>
+  <p class="bench-row__label">{label}</p>
+  <div class="bench-row__bars">
+    <div class="bench-row__track">
+      <span class="bench-row__bar bench-row__bar--before"></span>
+      <span class="bench-row__value">{seconds(before)}</span>
+    </div>
+    <div class="bench-row__track">
+      <span class="bench-row__bar bench-row__bar--after"></span>
+      <span class="bench-row__value bench-row__value--after">{seconds(after)}</span>
+    </div>
+  </div>
+  <p class="bench-row__speedup">{t('benchmarkChart.speedup', { ratio })}</p>
+</div>
+
+<style>
+  .bench-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'label speedup'
+      'bars bars';
+    align-items: baseline;
+    gap: 0.25rem 0.75rem;
+    padding-block: 0.625rem;
+    border-top: 1px solid var(--docs-border-subtle);
+  }
+
+  .bench-row:first-child {
+    border-top: 0;
+  }
+
+  .bench-row__label {
+    grid-area: label;
+    margin: 0;
+    color: var(--docs-text);
+    font-size: var(--sl-text-sm);
+    line-height: 1.4;
+  }
+
+  .bench-row__speedup {
+    grid-area: speedup;
+    margin: 0;
+    color: var(--docs-accent-text);
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bench-row__bars {
+    grid-area: bars;
+    display: grid;
+    gap: 3px;
+  }
+
+  /* 100% of the scale is the track minus room for the value after the longest bar. */
+  .bench-row__track {
+    --value-room: 4.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: 0.875rem;
+  }
+
+  .bench-row__bar {
+    flex: none;
+    height: 100%;
+    border-radius: 3px;
+  }
+
+  .bench-row__bar--before {
+    width: calc((100% - var(--value-room)) * var(--before) / var(--bench-max));
+    background-color: var(--docs-border-strong);
+  }
+
+  .bench-row__bar--after {
+    width: calc((100% - var(--value-room)) * var(--after) / var(--bench-max));
+    background-color: var(--docs-accent);
+  }
+
+  .bench-row__value {
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-xs);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .bench-row__value--after {
+    color: var(--docs-text-strong);
+  }
+</style>

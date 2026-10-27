@@ -9,7 +9,23 @@ import {
 } from './setup-picker.mjs';
 import Trans from './Trans.astro';
 
+type Props = {
+  /**
+   * What the setup variants below the picker hold, for its fallback and summary: install `commands` (the default) or
+   * platform `notes`.
+   */
+  shows?: 'commands' | 'notes';
+  /**
+   * For a component that builds the picker into its own panel and words its own fallback and summary: drops the
+   * picker's border, fallback and summary.
+   */
+  embedded?: boolean;
+};
+
+const { shows = 'commands', embedded = false } = Astro.props as Props;
 const { t } = Astro.locals;
+const fallback = shows === 'notes' ? t('setupPicker.fallbackNotes') : t('setupPicker.fallback');
+const summary = shows === 'notes' ? t('setupPicker.summaryNotes', { setup: '' }) : t('setupPicker.summary', { setup: '' });
 const options = localizeSetupOptions(SETUP_OPTIONS, t);
 
 // One radio per GPU id; its label text and availability follow the selected OS.
@@ -32,8 +48,8 @@ const mountScript = `(${mountSetupPicker})(document.currentScript.parentElement,
 
 <Fragment set:html={`<style>${visibilityCss}</style>`} />
 
-<div class="setup-picker not-content" data-pagefind-ignore>
-  <p class="setup-picker__fallback">{t('setupPicker.fallback')}</p>
+<div class:list={['setup-picker not-content', embedded && 'setup-picker--embedded']} data-pagefind-ignore>
+  {!embedded && <p class="setup-picker__fallback">{fallback}</p>}
   <div class="setup-picker__panel">
     <fieldset class="setup-picker__row">
       <legend class="docs-eyebrow">{t('setupPicker.os')}</legend>
@@ -65,12 +81,16 @@ const mountScript = `(${mountSetupPicker})(document.currentScript.parentElement,
         }
       </div>
     </fieldset>
-    <p class="setup-picker__summary" aria-live="polite" aria-atomic="true">
-      {/* The script fills in the setup. */}
-      <Trans message={t('setupPicker.summary', { setup: '' })}>
-        {(text: string) => <strong data-setup-summary>{text}</strong>}
-      </Trans>
-    </p>
+    {
+      !embedded && (
+        <p class="setup-picker__summary" aria-live="polite" aria-atomic="true">
+          {/* The script fills in the setup. */}
+          <Trans message={summary}>
+            {(text: string) => <strong data-setup-summary>{text}</strong>}
+          </Trans>
+        </p>
+      )
+    }
   </div>
   <script is:inline set:html={mountScript} />
 </div>
@@ -88,6 +108,14 @@ const mountScript = `(${mountSetupPicker})(document.currentScript.parentElement,
     border: 1px solid var(--docs-border);
     border-radius: var(--docs-radius-container);
     background-color: var(--docs-surface);
+  }
+
+  /* The host's panel draws the border; the rows keep their insets so they line up with the host's own rows. */
+  .setup-picker--embedded .setup-picker__panel {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
   }
 
   .setup-picker__fallback {

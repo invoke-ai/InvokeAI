@@ -1,0 +1,153 @@
+---
+/*
+ * The VRAM budget formula as a card: with `max_cache_vram_gb` set, the model cache gets that cap minus the working
+ * memory and the reserve (`ModelCache._get_vram_available` in invokeai/backend/model_manager/load/model_cache). The
+ * example row works it through for the given values.
+ */
+import { formatMeasure } from './benchmark-chart.mjs';
+import { pageLang } from './page-lang.mjs';
+
+type Props = {
+  /** The card's heading. */
+  title: string;
+  /** Example `max_cache_vram_gb`, in GB. */
+  cap: number;
+  /** Example `device_working_mem_gb`, in GB. */
+  working?: number;
+  /** Example `reserve_vram_gb`, in GB. */
+  reserve?: number;
+};
+
+const { title, cap, working = 3, reserve = 0 } = Astro.props as Props;
+const { t } = Astro.locals;
+const lang = pageLang(Astro.locals);
+const gb = (value: number) =>
+  t('vramBudget.gigabytes', { value: Number.isInteger(value) ? value : formatMeasure(value, lang) });
+const left = Math.max(0, cap - working - reserve);
+
+const terms = [
+  { setting: 'max_cache_vram_gb', label: t('vramBudget.cap'), value: gb(cap) },
+  { setting: 'device_working_mem_gb', label: t('vramBudget.working'), value: gb(working), operator: '−' },
+  { setting: 'reserve_vram_gb', label: t('vramBudget.reserve'), value: gb(reserve), operator: '−' },
+];
+---
+
+<figure class="budget not-content">
+  <figcaption class="budget__title">{title}</figcaption>
+  <div class="budget__formula" aria-hidden="true">
+    {
+      terms.map(({ setting, label, value, operator }) => (
+        <>
+          {operator && <span class="budget__operator">{operator}</span>}
+          <div class="budget__term">
+            <code>{setting}</code>
+            <span class="budget__label">{label}</span>
+            <span class="budget__value">{value}</span>
+          </div>
+        </>
+      ))
+    }
+    <span class="budget__operator">=</span>
+    <div class="budget__term budget__term--result">
+      <span class="budget__result-name">{t('vramBudget.result')}</span>
+      <span class="budget__label">{t('vramBudget.resultHint')}</span>
+      <span class="budget__value">{gb(left)}</span>
+    </div>
+  </div>
+  {/* The formula reads as one sentence to screen readers. */}
+  <p class="sr-only">
+    {t('vramBudget.summary', { cap: gb(cap), working: gb(working), reserve: gb(reserve), left: gb(left) })}
+  </p>
+</figure>
+
+<style>
+  .budget {
+    container-type: inline-size;
+    margin: 0;
+    padding: 6px;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+  }
+
+  .budget__title {
+    padding: 0.375rem var(--docs-tab-pad-x) 0.5rem;
+    color: var(--docs-text-strong);
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+  }
+
+  /* Terms in a row with their operators between; labels wrap, the setting names do not. */
+  .budget__formula {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(min-content, 1fr) auto) minmax(min-content, 1fr);
+    gap: 0.375rem;
+  }
+
+  .budget__term {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+    padding: 0.5rem var(--docs-tab-pad-x);
+    border-radius: var(--docs-radius-lg);
+    background-color: var(--docs-control);
+
+    code {
+      padding: 0;
+      background: none;
+      color: var(--docs-text-strong);
+      font-size: var(--sl-text-xs);
+      white-space: nowrap;
+    }
+  }
+
+  /* The answer takes the app's selected-row look: solid accent, dark text. */
+  .budget__term--result {
+    background-color: var(--docs-accent);
+    color: var(--docs-accent-contrast);
+
+    .budget__label,
+    .budget__value {
+      color: inherit;
+    }
+  }
+
+  .budget__result-name {
+    font-size: var(--sl-text-xs);
+    font-weight: 600;
+  }
+
+  .budget__label {
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-xs);
+    line-height: 1.35;
+  }
+
+  .budget__value {
+    margin-top: auto;
+    padding-top: 0.25rem;
+    color: var(--docs-text-strong);
+    font-size: var(--sl-text-lg);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .budget__operator {
+    display: grid;
+    place-items: center;
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-lg);
+  }
+
+  /* Too narrow for the terms in a row (a phone, or a narrow content column): one term per line. */
+  @container (width < 40rem) {
+    .budget__formula {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .budget__operator {
+      line-height: 1;
+    }
+  }
+</style>

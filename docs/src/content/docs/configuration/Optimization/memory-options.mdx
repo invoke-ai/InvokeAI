@@ -1,0 +1,127 @@
+---
+title: Which memory option do I need?
+description: Pick your GPU, VRAM and model format to see which of Invoke's memory options apply, and compare GGUF, int8, nvfp4, SDNQ, NF4 and FP8 in one table.
+lastUpdated: 2026-10-26
+sidebar:
+  label: Which option do I need?
+  order: 1
+---
+
+import MemoryOption from '@components/memory/MemoryOption.astro';
+import MemoryPicker from '@components/memory/MemoryPicker.astro';
+
+Invoke has several ways to run models larger than your GPU's memory. Most are automatic; a few are worth turning on
+for your GPU and the model files you use. Pick your setup to see which apply, in the order to read them. Your OS and GPU
+choice is shared with the install guides.
+
+<MemoryPicker>
+<MemoryOption id="system-memory" title="Apple silicon and CPU: shrink the model, not the VRAM">
+On Apple silicon and on the CPU, models load whole into system memory. Partial loading, the VRAM settings, FP8 Storage
+and the compute settings don't apply. What saves memory is a smaller build of the model, such as int8, GGUF, SDNQ or
+nvfp4: see the [format comparison](#format-comparison).
+</MemoryOption>
+<MemoryOption id="nf4-support" title="NF4: use another format on Apple silicon, Intel GPUs and the CPU">
+NF4 models need bitsandbytes. The macOS install leaves it out, so NF4 doesn't load on Apple silicon; on Intel GPUs and
+the CPU, NF4 is untested and not supported. Pick a GGUF, int8 or SDNQ build of the model instead.
+</MemoryOption>
+<MemoryOption id="sysmem-fallback" title="Windows with NVIDIA: turn off the sysmem fallback">
+The Windows driver moves memory that doesn't fit in VRAM into system RAM, which slows generation down massively. Set
+**CUDA - Sysmem Fallback Policy** to **Prefer No Sysmem Fallback**: [steps](/configuration/optimization/low-vram-mode/#platform-notes).
+</MemoryOption>
+<MemoryOption id="rocm-windows" title="Windows with AMD: keep other programs off the GPU">
+With ROCm on Windows, an allocation that doesn't fit moves to slow shared memory instead of failing. Invoke plans
+around it; close games and other GPU programs while generating, and read the
+[AMD notes](/configuration/optimization/low-vram-mode/#platform-notes) if the log warns about shared memory.
+</MemoryOption>
+<MemoryOption id="low-vram-mode" title="Low-VRAM mode is already on">
+On NVIDIA, AMD and Intel GPUs, Invoke streams the layers of a model too large for your VRAM from RAM as they are needed.
+Nothing to turn on; [Low-VRAM mode](/configuration/optimization/low-vram-mode/) lists the settings that tune it.
+</MemoryOption>
+<MemoryOption id="fp8-storage" title="Turn on FP8 Storage for full-precision models that don't fit">
+On NVIDIA, AMD and Intel GPUs (not Apple silicon or the CPU), with a full-precision model: a per-model setting in the
+Model Manager that halves the model's VRAM, with near-identical images. Worth it for large
+models such as FLUX, large SDXL checkpoints and ControlNet-XL; not for small SD1 and SD2 models.
+[FP8 Storage](/configuration/optimization/fp8-storage/).
+</MemoryOption>
+<MemoryOption id="fp8-storage-installed" title="FP8 Storage is already on for fp8 checkpoints">
+On NVIDIA, AMD and Intel GPUs: installing a checkpoint that stores fp8 weights switches FP8 Storage on, so it stays at
+fp8 size instead of being unpacked to twice that. Leave it on. (On Apple silicon and the CPU these checkpoints are
+unpacked to BF16.) [Checkpoints that are already FP8](/configuration/optimization/fp8-storage/#checkpoints-that-are-already-fp8).
+</MemoryOption>
+<MemoryOption id="fp8-compute" title="Try FP8 Compute for a speedup">
+With an fp8 checkpoint, `fp8_compute: true` runs it on the GPU's FP8 tensor cores: NVIDIA RTX 40-series and newer, or
+an AMD GPU that passes Invoke's FP8 test (it falls back by itself otherwise). Images change, and only repeat at the same seed while the
+model is fully in VRAM. [FP8 Compute](/configuration/optimization/fp8-compute/).
+</MemoryOption>
+<MemoryOption id="mxfp8-off" title="Turn FP8 Storage off for MXFP8 checkpoints">
+With an MXFP8 checkpoint on an NVIDIA, AMD or Intel GPU: installing switches FP8 Storage on, but for MXFP8 it
+re-encodes the weights without their scales and costs quality. Turn it off under **Default Settings** in the Model
+Manager. [By file format](/configuration/optimization/fp8-storage/#by-file-format).
+</MemoryOption>
+<MemoryOption id="int8-compute" title="Turn on int8 Compute for a speedup">
+With an int8 build on an NVIDIA RTX 30-series or newer GPU, `int8_compute: true` runs it on the int8 tensor cores: up
+to twice as fast fully in VRAM, nearly four times when streamed from RAM. Images change slightly but stay repeatable.
+[int8 Compute](/configuration/optimization/int8-compute/).
+</MemoryOption>
+<MemoryOption id="int8-unpacked" title="int8 builds: smaller, not faster, on this GPU">
+int8 builds stay int8 in memory on every device, so they take about half the memory of full precision. The speedup of
+[int8 Compute](/configuration/optimization/int8-compute/) needs an NVIDIA RTX 30-series or newer GPU with Triton; on
+older NVIDIA GPUs, AMD, Intel, Apple silicon, the CPU and Windows on ARM64, each layer is unpacked before it runs, at
+0.75–0.97× the speed of full precision. Nothing to turn on.
+</MemoryOption>
+<MemoryOption id="already-quantized" title="Your model is already quantized">
+GGUF, SDNQ and nvfp4 files on every device, and NF4 on NVIDIA and AMD GPUs, stay packed in memory and are unpacked
+layer by layer, so there is nothing extra to turn on: FP8 Storage does not apply to them. On a GPU, Low-VRAM mode still
+streams them if they don't fit.
+</MemoryOption>
+<MemoryOption id="quantized-build" title="Consider a smaller build of the model">
+With a full-precision model on a GPU with 12GB or less, or on Apple silicon or the CPU: a FLUX-class model needs far
+more memory than that. An int8, GGUF, SDNQ or nvfp4 build needs a half to
+about a quarter of it, at a small cost in quality; each family's page lists the builds Invoke loads. Compare them in the
+[format comparison](#format-comparison).
+</MemoryOption>
+<MemoryOption id="tiled-decode" title="Large images: tiled decoding">
+On a GPU with 16GB or less, Invoke tiles FLUX, Z-Image, Qwen-Image, Krea-2, Anima and Wan decodes by itself when they
+would not fit. SD 1.5 and SDXL decodes are never tiled automatically: for large SD 1.5 or SDXL images, set
+`force_tiled_decode: true`, or turn on **Tiled** in the node.
+[Tiled VAE decode and encode](/configuration/optimization/low-vram-mode/#tiled-vae-decode-and-encode).
+</MemoryOption>
+<MemoryOption id="fits-in-vram" title="Plenty of VRAM: keep models loaded">
+With 24GB or more: if you alternate between architectures that fit in VRAM together, `offload_on_architecture_switch: false` saves a few
+seconds per switch. If every model you use fits, `enable_partial_loading: false` loads them whole.
+[Settings](/configuration/optimization/low-vram-mode/#settings).
+</MemoryOption>
+<MemoryOption id="still-oom" title="Still out of memory?">
+On a GPU, raise `device_working_mem_gb` to 4, or set `clear_vram_after_session: true` if only repeated generations fail.
+[Troubleshooting by symptom](/configuration/optimization/low-vram-mode/#troubleshooting).
+</MemoryOption>
+<MemoryOption id="page-file" title="Windows: keep the page file system-managed">
+Invoke needs a lot of virtual memory. If Invoke exits with error `3221225477`, the page file ran out:
+[Windows page file](/configuration/optimization/low-vram-mode/#windows-page-file).
+</MemoryOption>
+</MemoryPicker>
+
+## Format comparison
+
+The same model often comes in several formats. The fewer bits per weight, the less memory its weights take, in VRAM and
+in RAM.
+
+| Format | Bits per weight | In memory | LoRAs | Speed | Runs on | Same seed, same image |
+| --- | --- | --- | --- | --- | --- | --- |
+| Full precision (FP16, BF16) | 16 | Full size | Yes | Baseline | Every device | Yes |
+| [FP8 Storage](/configuration/optimization/fp8-storage/), on a full-precision model | 8 on the GPU | About half | Yes | Same or slightly slower | NVIDIA, AMD and Intel GPUs | Yes |
+| fp8, scaled fp8 | 8 | About half, with FP8 Storage (on after install) | Yes | Unpacked per layer; faster with [FP8 Compute](/configuration/optimization/fp8-compute/) on RTX 40 and newer | Every device; unpacked to BF16 on the CPU and Apple silicon | Yes; with FP8 Compute only while fully in VRAM |
+| MXFP8 | 8.25 | Full size: unpacked at load | Yes | Baseline | Every device | Yes |
+| int8 (`int8_convrot`) | 8 | About half | Yes, except DoRA | 0.75–0.97×; 1.3–2× with [int8 Compute](/configuration/optimization/int8-compute/) on RTX 30 and newer | Every device | Yes |
+| nvfp4 | 4.5 | About 28% | Yes, except DoRA | Unpacked per layer; no FP4 math | Every device | Yes |
+| GGUF | 4.5 (Q4_K) to 8.5 (Q8_0) | About 28–53% | Yes | Unpacked per layer | Every device | Yes |
+| [SDNQ](/configuration/optimization/sdnq-quantization/) | 4–5, plus the SVD correction | About a third | Yes | Unpacked per layer | Every device | Yes |
+| NF4 (bitsandbytes) | 4, plus block scales | About 28% | Yes, except DoRA | Unpacked per layer | NVIDIA and AMD GPUs; not macOS; untested on Intel GPUs and the CPU | Yes |
+
+- **Same seed, same image** means a format reproduces its own images. Every quantized format gives a slightly different
+  image than full precision at the same seed.
+- **Which models come in which format** is listed in [Model Format Support](/users-guide/models/model-format-support/).
+  Sizes, starter models and measured speeds are on each model family's page.
+- **LoRAs** run beside the quantized layers rather than being merged into them, so a LoRA works on every format; DoRA
+  patches fail on int8, nvfp4 and NF4.
+- On a GPU, every format works with Low-VRAM mode, which streams from RAM whatever doesn't fit in VRAM.

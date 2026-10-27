@@ -1,0 +1,125 @@
+---
+/*
+ * A before/after timing chart: one `BenchmarkRow` per measured run, each with a muted bar for the default path and an
+ * accent bar for the setting, drawn to one scale (the slowest time in the chart), so give runs measured under very
+ * different conditions a chart of their own. Static HTML and CSS: it reads the same without JavaScript. The bars are
+ * hidden from screen readers, which get the same data as a table.
+ *
+ *   <BenchmarkChart title="Denoising time on an RTX 4090" setting="int8_compute">
+ *     <BenchmarkRow label="Z-Image Turbo, 8 steps, 1024²" before={5.04} after={2.93} />
+ *   </BenchmarkChart>
+ */
+import { chartScale, formatMeasure, rowsInHtml, speedup } from './benchmark-chart.mjs';
+import { pageLang } from './page-lang.mjs';
+
+type Props = {
+  /** The caption: what was measured, and on what. */
+  title: string;
+  /** The setting the accent bars show, as written in `invokeai.yaml`. */
+  setting: string;
+};
+
+const { title, setting } = Astro.props as Props;
+const { t } = Astro.locals;
+const lang = pageLang(Astro.locals);
+const html = await Astro.slots.render('default');
+const rows = rowsInHtml(html);
+const scale = chartScale(rows);
+const seconds = (value: number) => t('benchmarkChart.seconds', { value: formatMeasure(value, lang) });
+---
+
+<figure class="bench not-content" style={`--bench-max: ${scale}`}>
+  <figcaption class="bench__caption">
+    <span class="bench__title">{title}</span>
+    <span class="bench__legend" aria-hidden="true">
+      <span class="bench__key bench__key--before">{t('benchmarkChart.default')}</span>
+      <span class="bench__key bench__key--after"><code>{setting}</code></span>
+    </span>
+  </figcaption>
+  <div class="bench__rows">
+    <Fragment set:html={html} />
+  </div>
+  <table class="sr-only">
+    <thead>
+      <tr>
+        <th scope="col">{t('benchmarkChart.run')}</th>
+        <th scope="col">{t('benchmarkChart.default')}</th>
+        <th scope="col"><code>{setting}</code></th>
+        <th scope="col">{t('benchmarkChart.ratio')}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {
+        rows.map((row) => (
+          <tr>
+            <th scope="row">{row.label}</th>
+            <td>{seconds(row.before)}</td>
+            <td>{seconds(row.after)}</td>
+            <td>{t('benchmarkChart.speedup', { ratio: formatMeasure(speedup(row.before, row.after), lang) })}</td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</figure>
+
+<style>
+  .bench {
+    margin: 0;
+    padding: 0.75rem 1rem 0.375rem;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+  }
+
+  .bench__caption {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.25rem 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--docs-border);
+  }
+
+  .bench__title {
+    color: var(--docs-text-strong);
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+  }
+
+  .bench__legend {
+    display: flex;
+    gap: 0.875rem;
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-xs);
+  }
+
+  .bench__key {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+
+    &::before {
+      content: '';
+      width: 0.625rem;
+      height: 0.625rem;
+      border-radius: 2px;
+    }
+
+    code {
+      padding: 0;
+      background: none;
+      color: var(--docs-text-strong);
+      font-size: inherit;
+    }
+  }
+
+  .bench__key--before::before {
+    background-color: var(--docs-border-strong);
+  }
+
+  .bench__key--after::before {
+    background-color: var(--docs-accent);
+  }
+</style>

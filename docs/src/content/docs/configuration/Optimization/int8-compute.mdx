@@ -1,51 +1,66 @@
 ---
 title: int8 Compute
+description: Run ComfyUI int8 builds on the int8 tensor cores of RTX 30-series and newer NVIDIA GPUs, up to twice as fast.
+lastUpdated: 2026-10-26
 sidebar:
   order: 6
 ---
 
+import BenchmarkChart from '@components/memory/BenchmarkChart.astro';
+import BenchmarkRow from '@components/memory/BenchmarkRow.astro';
+
 ComfyUI's **int8** builds (`int8_tensorwise`, see [Model Format Support](/users-guide/models/model-format-support/))
 store every large layer as 8-bit integers. By default InvokeAI keeps those weights in int8 and unpacks each layer to
-BF16 or FP16 just before it runs, which gives the memory saving but no speedup: each layer runs at 0.75–0.97× the speed
-of a full-precision one.
+BF16 or FP16 just before it runs: you get the memory saving, but each layer runs at 0.75–0.97× the speed of a
+full-precision one.
 
-`int8_compute` is a global setting that does the **math** in int8 as well, on the GPU's int8 tensor cores, for int8
-builds **quantized with convrot** — the `comfy_quant` marker of each layer says `"convrot": true`, which is what the
-published builds use. Each layer then rotates and quantizes its input to int8 per token and multiplies int8 by int8.
-Measured on an RTX 4090 (BF16, model fully in VRAM), the denoising step takes:
+`int8_compute` is a global setting that does the **math** in int8 too, on the GPU's int8 tensor cores, for int8 builds
+**quantized with convrot**: each layer's `comfy_quant` marker says `"convrot": true`, as in the published builds. Each
+layer then rotates and quantizes its input to int8 per token and multiplies int8 by int8.
 
-| Model (int8 convrot build) | Steps | 1024² | 1536² | 2048² |
-| --- | --- | --- | --- | --- |
-| Z-Image Turbo | 8 | 5.04 s → 2.93 s (1.72×) | 12.78 s → 8.95 s (1.43×) | 26.62 s → 20.71 s (1.29×) |
-| FLUX.1 dev | 20 | 15.25 s → 7.85 s (1.94×) | 36.20 s → 23.88 s (1.52×) | |
-| Krea-2 Turbo | 8 | 9.22 s → 4.51 s (2.04×) | 21.64 s → 12.32 s (1.76×) | |
+<BenchmarkChart title="Denoising time on an RTX 4090, BF16, int8 convrot builds fully in VRAM" setting="int8_compute">
+  <BenchmarkRow label="Z-Image Turbo, 8 steps, 1024²" before={5.04} after={2.93} />
+  <BenchmarkRow label="Z-Image Turbo, 8 steps, 1536²" before={12.78} after={8.95} />
+  <BenchmarkRow label="Z-Image Turbo, 8 steps, 2048²" before={26.62} after={20.71} />
+  <BenchmarkRow label="FLUX.1 dev, 20 steps, 1024²" before={15.25} after={7.85} />
+  <BenchmarkRow label="FLUX.1 dev, 20 steps, 1536²" before={36.2} after={23.88} />
+  <BenchmarkRow label="Krea-2 Turbo, 8 steps, 1024²" before={9.22} after={4.51} />
+  <BenchmarkRow label="Krea-2 Turbo, 8 steps, 1536²" before={21.64} after={12.32} />
+</BenchmarkChart>
 
 The gain shrinks at higher resolutions because attention, which `int8_compute` does not touch, takes a larger share of
-each step. Other int8 families use the same layers but have not been measured. A convrot int8 text encoder
-(`qwen_3_8b_int8_convrot` with FLUX.2 Klein 9B) works with it as well; its speed has not been measured.
+each step.
 
 **Partially loaded models gain the most.** A layer still in system RAM is copied to the GPU as int8 for each step, half
-the bytes of the unpacked weight, and computed exactly like a resident one. With the Z-Image Turbo transformer fully
-streamed (`max_cache_vram_gb: 3`, 0 % in VRAM), 8 steps at 1024² took 34.43 s by default and 9.04 s with
-`int8_compute` (3.81×), and the image was bit-identical to the fully resident one.
+the bytes of the unpacked weight, and computed exactly like a resident one. With the whole transformer streamed
+(`max_cache_vram_gb: 3`, 0% in VRAM), the image was bit-identical to the fully resident one:
 
-It is **opt-in**, because quantizing the inputs changes the numbers: images made with `int8_compute` are not
+<BenchmarkChart title="Denoising time on an RTX 4090, BF16, transformer streamed from RAM" setting="int8_compute">
+  <BenchmarkRow label="Z-Image Turbo, 8 steps, 1024²" before={34.43} after={9.04} />
+</BenchmarkChart>
+
+Other int8 families use the same layers but have not been measured. A convrot int8 text encoder
+(`qwen_3_8b_int8_convrot` with FLUX.2 Klein 9B) works with it as well; its speed has not been measured.
+
+It is **opt-in** because quantizing the inputs changes the numbers: images made with `int8_compute` are not
 pixel-identical to the default path at the same seed. In the measurements above they were visually equivalent (PSNR
-30–46 dB against the default path). Each path is bit-identical from run to run, and how much of the model is in VRAM
-does not change the image.
+30–46dB against the default path). Each path is bit-identical from run to run, and how much of the model is in VRAM does
+not change the image.
 
 ## Requirements
 
-- **An NVIDIA GPU with compute capability 8.0 or newer** — RTX 30-series, RTX 40-series, RTX 50-series, A100, H100.
-  Measured on an RTX 4090.
-- **Triton**, which InvokeAI's NVIDIA install on Windows x64 and Linux includes (on Windows the `triton-windows`
-  package). A [manual install](/start-here/manual/) on Windows without the `cuda` extra has none; install the
+- **An NVIDIA GPU with compute capability 8.0 or newer**: RTX 30-series, RTX 40-series, RTX 50-series, A100,
+  H100. Measured on an RTX 4090.
+- **Triton.** InvokeAI's NVIDIA install on Windows x64 and Linux includes it (on Windows, the `triton-windows`
+  package). A [manual install](/start-here/manual/) on Windows without the `cuda` extra has none: install the
   `triton-windows` version matching InvokeAI's PyTorch as described under
   [SageAttention](/configuration/optimization/sage-attention/#windows).
-- Everything else falls back to the default path automatically: AMD (ROCm), Apple Silicon (MPS), Intel (XPU), the CPU,
-  and older NVIDIA GPUs.
+- **An int8 build quantized with convrot**, as every published build is.
 
-## Enabling
+Everything else falls back to the default path automatically: AMD (ROCm), Apple silicon (MPS), Intel (XPU), the CPU,
+older NVIDIA GPUs, and Windows on ARM64, whose install has no Triton.
+
+## Turning it on
 
 Set it in your [`invokeai.yaml`](/configuration/invokeai-yaml/) and restart InvokeAI:
 
@@ -59,43 +74,52 @@ The first generation that uses it logs, once per GPU:
 int8 compute: rotated int8_tensorwise layers on cuda:0 run on the int8 tensor cores.
 ```
 
-If it cannot be used on a device, the log says why once — for example that Triton is missing — and that device keeps
-the default path. When a model loads with layers it does not cover, the log counts them, for example
-`int8_compute: 2 of 264 int8 layer(s) keep dequantizing per forward (2 marked full_precision_matrix_mult, ...)`.
+If a device can't use it, the log says why, once (for example that Triton is missing:
+`int8_compute is enabled, but not used on <device>: <reason>. int8 layers there dequantize.`), and that device keeps the
+default path. When a model loads with layers it does not cover, the log counts them, for example
+`int8_compute: 2 of 264 int8 layer(s) keep dequantizing per forward (2 marked full_precision_matrix_mult, 0 not rotated in groups of 256).`
 
-### The first generation pauses
-
-The kernels are tuned once per layer shape and token-count bucket. The first image after enabling it takes about
-**35 seconds** longer; a later size that falls into a new token-count bucket adds about 1–5 seconds. The results are
-cached on disk in Triton's cache directory (`~/.triton/cache`, or `TRITON_CACHE_DIR`), so after a restart the tuning
-comes from that cache, and other sizes in the same bucket do not pay it again.
+:::note[The first image pauses]
+The kernels are tuned once per layer shape and token-count bucket. The first image after turning it on takes about
+**35 seconds** longer; a later size that falls into a new token-count bucket adds about 1–5 seconds. Triton caches the
+results on disk (`~/.triton/cache`, or `TRITON_CACHE_DIR`), so after a restart the tuning comes from the cache, and other
+sizes in the same bucket don't pay it again.
+:::
 
 ## What stays on the default path
 
-`int8_compute` only changes how rotated int8 layers multiply. These keep unpacking the weights:
+`int8_compute` only changes how rotated int8 layers multiply. These keep unpacking their weights:
 
-- **Layers quantized without convrot.** Without the rotation, a single outlier channel sets the scale for a whole
-  token, which is where per-token quantization loses the most; no such build has been measured.
-- **Layers the checkpoint marks as full precision** (`full_precision_matrix_mult`).
-- **Layers rotated in groups other than 256.** Every published build uses 256.
-- **FP32 compute.** The kernels run in BF16 and FP16 only.
+| Layer | Why |
+| --- | --- |
+| Quantized without convrot | Without the rotation, one outlier channel sets the scale for a whole token, where per-token quantization loses the most. No such build has been measured. |
+| Marked full precision by the checkpoint (`full_precision_matrix_mult`) | The model's author flagged it as sensitive. |
+| Rotated in groups other than 256 | The kernels are built for 256, which every published build uses. |
+| Running in FP32 | The kernels run in BF16 and FP16 only. |
 
-LoRAs work as usual: they are applied beside the int8 layer in the compute precision, never quantized, and do not
-change which path the layer takes.
+LoRAs work as usual: they are applied beside the int8 layer in the compute precision, never quantized, and do not change
+which path the layer takes. DoRA patches don't load on int8 builds, with or without `int8_compute`.
 
-## Memory
+<details>
+<summary>Memory</summary>
 
 Once tuned, the kernels never need more working memory than the default path already reserves for unpacking a layer:
-they quantize the input in slices of at most twice the layer's output width, and copy a layer that is still in system
-RAM to the GPU as int8, at half the size of the unpacked weight. The first call for each layer shape and token-count
-bucket may briefly need a little more: tuning uses a buffer the size of the GPU's L2 cache (72 MB on an RTX 4090), and
-the check against the default path afterwards keeps 256 rows of the layer's output from each path.
+they quantize the input in slices of at most twice the layer's output width, and copy a layer still in system RAM to the
+GPU as int8, at half the size of the unpacked weight. The first call for each layer shape and token-count bucket may
+briefly need a little more: tuning uses a buffer the size of the GPU's L2 cache (72MB on an RTX 4090), and the check
+against the default path afterwards keeps 256 rows of the layer's output from each path.
 
-## When something goes wrong
+</details>
+
+<details>
+<summary>When something goes wrong</summary>
 
 InvokeAI checks the first result for each layer shape and token-count bucket against the default path. If it does not
 match, or a kernel fails, the log shows one warning and that GPU uses the default path until restart. Usually the
 generation continues; a fault that leaves the GPU unusable (such as an illegal memory access) fails it, and the default
-path cannot recover from that either. Running out of memory is not caught: once the kernels are tuned, the default path
-would not fit either. If an out-of-memory error appears only on the first image at a new size, set `int8_compute: false`
-to rule the tuning out.
+path cannot recover from that either.
+
+Running out of memory is not caught: once the kernels are tuned, the default path would not fit either. If an
+out-of-memory error appears only on the first image at a new size, set `int8_compute: false` to rule the tuning out.
+
+</details>
