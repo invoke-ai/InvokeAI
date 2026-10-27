@@ -1,5 +1,8 @@
 """Rendering a preview with a TAE, and choosing the installed TAE that renders a latent space."""
 
+import copy
+import math
+
 import numpy as np
 import pytest
 import torch
@@ -16,7 +19,11 @@ from invokeai.backend.model_manager.configs.tiny_autoencoder import (
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.tiny_autoencoder import preview
-from invokeai.backend.tiny_autoencoder.preview import decode_preview, select_tiny_autoencoder
+from invokeai.backend.tiny_autoencoder.preview import (
+    decode_preview,
+    decode_working_memory_bytes,
+    select_tiny_autoencoder,
+)
 from invokeai.backend.tiny_autoencoder.taesd import Decoder, F16Decoder, TaesdDecoder
 
 
@@ -72,6 +79,53 @@ def test_the_cap_bounds_the_longest_edge_of_any_aspect(taesd: TaesdDecoder, monk
     image = decode_preview(taesd, _latent(4, 6, 16))
 
     assert image.size == (64, 24)
+
+
+def _area_pool(latent: torch.Tensor, height: int, width: int) -> torch.Tensor:
+    """Area downsampling written out: output cell i averages input cells floor(i * n / m) to ceil((i + 1) * n / m)."""
+
+    def windows(n: int, m: int) -> list[tuple[int, int]]:
+        return [(math.floor(i * n / m), math.ceil((i + 1) * n / m)) for i in range(m)]
+
+    rows = windows(latent.shape[-2], height)
+    cols = windows(latent.shape[-1], width)
+    return torch.stack(
+        [torch.stack([latent[..., r0:r1, c0:c1].mean(dim=(-2, -1)) for c0, c1 in cols], dim=-1) for r0, r1 in rows],
+        dim=-2,
+    )
+
+
+@pytest.mark.parametrize("pooled_on_cpu", [False, True], ids=["pooled on its device", "pooled on the CPU, as on MPS"])
+def test_a_latent_the_cap_does_not_divide_is_area_downsampled(
+    taesd: TaesdDecoder, monkeypatch, pooled_on_cpu: bool
+) -> None:
+    """Scaled by 2/3, as a 1536px SDXL latent (192) is to the 1024 cap (128): no output cell covers whole input cells.
+
+    MPS pools such a size on the CPU. The decoder here is float64, which that detour pools at float32 and must hand
+    back at the decoder's own width.
+    """
+    monkeypatch.setattr(preview, "MAX_PREVIEW_EDGE", 48)
+    if pooled_on_cpu:
+        monkeypatch.setattr(preview, "_POOLING_NEEDS_DIVISIBLE_SIZES", frozenset({"cpu"}))
+    decoder = copy.deepcopy(taesd).double()
+    large = _latent(4, 6, 9).double()
+
+    capped = decode_preview(decoder, large)
+
+    assert capped.size == (48, 32)
+    reference = np.asarray(decode_preview(decoder, _area_pool(large, 4, 6))).astype(int)
+    assert np.abs(np.asarray(capped).astype(int) - reference).max() <= 1
+
+
+def test_a_decode_reserves_its_full_resolution_activations_at_the_capped_size(taesd: TaesdDecoder, monkeypatch) -> None:
+    monkeypatch.setattr(preview, "MAX_PREVIEW_EDGE", 48)
+    half = copy.deepcopy(taesd).half()
+
+    # Five 64-channel activations per output pixel, at the decoder's element size.
+    assert decode_working_memory_bytes(taesd, _latent(4, 3, 5)) == 5 * 64 * (24 * 40) * 4
+    assert decode_working_memory_bytes(half, _latent(4, 3, 5)) == 5 * 64 * (24 * 40) * 2
+    # 12 x 18 latents exceed the cap and are decoded at 4 x 6.
+    assert decode_working_memory_bytes(taesd, _latent(1, 4, 12, 18)) == 5 * 64 * (32 * 48) * 4
 
 
 @pytest.fixture(scope="module")

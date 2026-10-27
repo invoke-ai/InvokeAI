@@ -1,7 +1,7 @@
 ---
 title: New Model Type Integration Checklist
 description: A step-by-step checklist for integrating a new model architecture into InvokeAI, from the model manager to the webv2 frontend and the tests that enforce completeness.
-lastUpdated: 2026-10-26
+lastUpdated: 2026-10-28
 ---
 
 import { Steps, FileTree } from '@astrojs/starlight/components';
@@ -909,6 +909,8 @@ A new latent space gets TAE previews only if a TAE exists for it. Then:
 - **Decoder:** a network the vendored code in `backend/tiny_autoencoder/` does not have is vendored there, and `checkpoint.py` learns its fingerprint, so that identification and the loader keep accepting exactly the same files.
 
 The TAE decodes the latent the denoise node hands to the step callback, so check that this is the latent the TAE was trained on, with the same normalization and channel order. The previews must also go through `context.util.sd_step_callback` (or `flux_step_callback`/`flux2_step_callback`); a node that renders its own preview image does not get TAE previews.
+
+Send the first step callback, step 0 included, only once the denoise model is locked (`model_on_device`). The TAE is loaded at the first preview and locked only if it fits next to the models already in VRAM; before the main model is locked, it always fits.
 
 ---
 

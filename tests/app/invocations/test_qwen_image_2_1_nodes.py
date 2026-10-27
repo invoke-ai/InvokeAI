@@ -64,27 +64,36 @@ class _Transformer:
 
 
 class _TransformerInfo:
-    def __init__(self, transformer: _Transformer) -> None:
+    def __init__(self, transformer: _Transformer, events: list[str]) -> None:
         self.model = transformer
+        self.events = events
 
     @contextmanager
     def model_on_device(self, **_kwargs):
+        self.events.append("lock")
         yield ({}, self.model)
+        self.events.append("unlock")
 
 
-def _context(transformer: _Transformer, variant: QwenImage21VariantType, init_latents: torch.Tensor | None = None):
+def _context(
+    transformer: _Transformer,
+    variant: QwenImage21VariantType,
+    init_latents: torch.Tensor | None = None,
+    events: list[str] | None = None,
+):
+    events = [] if events is None else events
     conditionings = {
         "pos": ConditioningFieldData(conditionings=[QwenImage21ConditioningInfo(prompt_embeds=torch.ones(1, 3, 8))]),
         "neg": ConditioningFieldData(conditionings=[QwenImage21ConditioningInfo(prompt_embeds=-torch.ones(1, 2, 8))]),
     }
     return SimpleNamespace(
         models=SimpleNamespace(
-            load=lambda _identifier: _TransformerInfo(transformer),
+            load=lambda _identifier: _TransformerInfo(transformer, events),
             get_config=lambda _identifier: SimpleNamespace(variant=variant),
         ),
         conditioning=SimpleNamespace(load=lambda name: conditionings[name]),
         tensors=SimpleNamespace(load=lambda _name: init_latents),
-        util=SimpleNamespace(sd_step_callback=lambda *_args: None),
+        util=SimpleNamespace(sd_step_callback=lambda *_args: events.append("preview")),
     )
 
 
@@ -129,6 +138,15 @@ def test_each_guidance_branch_prefills_its_own_cache_on_the_first_step() -> None
     ]
     caches = {prompt: {cache for p, cache, _m, _t in transformer.calls if p == prompt} for prompt in ("pos", "neg")}
     assert len(caches["pos"]) == len(caches["neg"]) == 1 and caches["pos"] != caches["neg"]
+
+
+def test_every_preview_is_sent_while_the_transformer_is_locked() -> None:
+    """A Tiny AutoEncoder preview places its TAE next to the locked model; before the lock there is none to fit."""
+    events: list[str] = []
+
+    _denoise(steps=3)._run_diffusion(_context(_Transformer(), QwenImage21VariantType.Base, events=events))
+
+    assert events == ["lock", "preview", "preview", "preview", "preview", "unlock"]
 
 
 def test_without_guidance_the_negative_prompt_is_never_run() -> None:

@@ -40,11 +40,13 @@ class _LoadedModel:
 
     def __init__(self, decoder: torch.nn.Module, device: str = "cpu", resident_fraction_when_locked: float = 1.0):
         self.decoder = decoder
+        self.model = decoder
         self.compute_device = torch.device(device)
         self.weight_bytes = sum(p.numel() * p.element_size() for p in decoder.parameters())
         self._resident_when_locked = int(self.weight_bytes * resident_fraction_when_locked)
         self.locks_taken = 0
         self.locks_held = 0
+        self.working_mem_requests: list[int | None] = []
 
     @property
     def resident_weight_bytes(self) -> int:
@@ -53,7 +55,8 @@ class _LoadedModel:
         return self._resident_when_locked
 
     @contextmanager
-    def model_on_device(self):
+    def model_on_device(self, working_mem_bytes: int | None = None):
+        self.working_mem_requests.append(working_mem_bytes)
         self.locks_taken += 1
         self.locks_held += 1
         try:
@@ -91,8 +94,8 @@ class _Events:
         )
 
 
-def _tae_config(base: BaseModelType = BaseModelType.StableDiffusion1) -> SimpleNamespace:
-    return SimpleNamespace(key="tae-key", name="TAESD", type=ModelType.TinyAutoencoder, base=base, latent_channels=4)
+def _tae_config(base: BaseModelType = BaseModelType.StableDiffusion1, key: str = "tae-key") -> SimpleNamespace:
+    return SimpleNamespace(key=key, name="TAESD", type=ModelType.TinyAutoencoder, base=base, latent_channels=4)
 
 
 def _decoder() -> torch.nn.Module:
@@ -204,6 +207,17 @@ def test_the_tae_is_locked_once_per_invocation_and_released_with_its_resources()
 
     assert len(decodes) == 8
     assert all((call["image"].width, call["image"].height) == (64, 64) for call in services.events.emitted)
+
+
+def test_the_tae_lock_reserves_the_working_memory_of_a_decode() -> None:
+    load = _load()
+    previews = _previews(_services(_Store([_tae_config()]), load))
+
+    previews.render(BaseModelType.StableDiffusion1, _sample(height=16, width=24))
+    previews.render(BaseModelType.StableDiffusion1, _sample(height=16, width=24))
+
+    # One lock for the invocation, keeping five 64-channel float32 activations of the 128 x 192 image free.
+    assert load.loaded.working_mem_requests == [5 * 64 * (128 * 192) * 4]
 
 
 def test_tae_frame_is_full_resolution_and_reports_the_linear_display_size() -> None:
@@ -337,6 +351,48 @@ def test_tae_that_would_not_fit_in_vram_is_never_locked(caplog: pytest.LogCaptur
     assert len(_messages(caplog, logging.INFO)) == 1
 
 
+def test_a_tae_that_does_not_fit_is_reported_once_per_process_and_another_tae_again(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    def generation(config: SimpleNamespace) -> None:
+        loaded = _LoadedModel(_decoder(), device="cuda")  # only read by the residency decision
+        load = _Load(loaded, vram_available=0)
+        _previews(_services(_Store([config]), load)).render(BaseModelType.StableDiffusion1, _sample())
+
+    generation(_tae_config())
+    generation(_tae_config())
+    assert len(_messages(caplog, logging.INFO)) == 1
+    assert len(_messages(caplog, logging.DEBUG)) == 1
+
+    generation(_tae_config(key="another-tae"))
+    assert len(_messages(caplog, logging.INFO)) == 2
+
+
+def test_a_decode_failure_warns_with_its_traceback_once_per_process_and_a_new_failure_again(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    def generation(error: Exception) -> None:
+        decoder = _decoder()
+
+        def fail(*_args) -> None:
+            raise error
+
+        decoder.register_forward_pre_hook(fail)
+        _previews(_services(_Store([_tae_config()]), _load(decoder))).render(BaseModelType.StableDiffusion1, _sample())
+
+    def warnings() -> list[logging.LogRecord]:
+        return [r for r in caplog.records if r.name == LOGGER_NAME and r.levelno == logging.WARNING]
+
+    generation(torch.OutOfMemoryError("CUDA out of memory"))
+    generation(torch.OutOfMemoryError("CUDA out of memory"))
+    assert [w.exc_info is not None for w in warnings()] == [True]
+    [repeat] = [r for r in caplog.records if r.name == LOGGER_NAME and r.levelno == logging.DEBUG]
+    assert repeat.exc_info is None
+
+    generation(RuntimeError("MPS backend failure"))
+    assert [w.exc_info is not None for w in warnings()] == [True, True]
+
+
 def test_close_releases_the_lock_and_later_frames_render_linear() -> None:
     load = _load()
     previews = _previews(_services(_Store([_tae_config()]), load))
@@ -435,6 +491,8 @@ def test_frames_after_the_tae_fell_back_to_linear_return_to_the_stores_interval(
 
     decoder.register_forward_pre_hook(decode_then_fail)
     _slow_linear_frames(monkeypatch, clock, seconds=1.0)
+    syncs: list[torch.device] = []
+    monkeypatch.setattr(tiny_autoencoder_previews.TorchDevice, "synchronize", syncs.append)
     services = _services(_Store([_tae_config()]), _load(decoder), previews=MemoryProgressPreviews(clock=clock))
     util, _data = _invocation(services)
 
@@ -446,3 +504,5 @@ def test_frames_after_the_tae_fell_back_to_linear_return_to_the_stores_interval(
     # it are 0.15 s apart again, with each linear frame's 1 s of waiting not counted as a cost.
     assert [call["percentage"] for call in services.events.emitted] == [0.0, 0.1, 0.2, 0.3, 0.4]
     assert len(decodes) == 3
+    # Only the frames after a TAE frame wait for the TAE's device; once it fell back, there is none to wait for.
+    assert len(syncs) == 2
