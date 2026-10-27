@@ -66,11 +66,25 @@ class _LoadedModel:
 
 
 class _Load:
-    def __init__(self, loaded: _LoadedModel, vram_available: int = 0, error: Exception | None = None) -> None:
+    """The model load service. Its cache's `make_room_in_vram` reports `vram_available` beyond the configured
+    working-memory reserve, `working_mem_floor`; a larger requested reserve takes the difference from it, as the
+    cache's own does."""
+
+    def __init__(
+        self,
+        loaded: _LoadedModel,
+        vram_available: int = 0,
+        error: Exception | None = None,
+        working_mem_floor: int = 3 * 2**30,
+    ) -> None:
         self.loaded = loaded
         self.loads = 0
         self.error = error
-        self.ram_cache = SimpleNamespace(make_room_in_vram=lambda _needed: vram_available)
+
+        def make_room_in_vram(_needed: int, working_mem_bytes: int | None = None) -> int:
+            return vram_available - max(0, (working_mem_bytes or 0) - working_mem_floor)
+
+        self.ram_cache = SimpleNamespace(make_room_in_vram=make_room_in_vram)
 
     def load_model(self, config, submodel_type=None, user_id=None) -> _LoadedModel:
         self.loads += 1
@@ -216,8 +230,9 @@ def test_the_tae_lock_reserves_the_working_memory_of_a_decode() -> None:
     previews.render(BaseModelType.StableDiffusion1, _sample(height=16, width=24))
     previews.render(BaseModelType.StableDiffusion1, _sample(height=16, width=24))
 
-    # One lock for the invocation, keeping five 64-channel float32 activations of the 128 x 192 image free.
-    assert load.loaded.working_mem_requests == [5 * 64 * (128 * 192) * 4]
+    # One lock for the invocation, keeping three live 64-channel float32 activations of the 128 x 192 image and two
+    # of convolution workspace free.
+    assert load.loaded.working_mem_requests == [(3 + 2) * 64 * (128 * 192) * 4]
 
 
 def test_tae_frame_is_full_resolution_and_reports_the_linear_display_size() -> None:
@@ -351,6 +366,19 @@ def test_tae_that_would_not_fit_in_vram_is_never_locked(caplog: pytest.LogCaptur
     assert len(_messages(caplog, logging.INFO)) == 1
 
 
+def test_tae_whose_decode_would_not_fit_next_to_it_is_never_locked(caplog: pytest.LogCaptureFixture) -> None:
+    """With `device_working_mem_gb` below the decode's reservation, the room the lock would keep decides, not the
+    weights alone: locking anyway would partially load the TAE, with the cache's warning, on every generation."""
+    loaded = _LoadedModel(_decoder(), device="cuda")  # only read by the residency decision
+    load = _Load(loaded, vram_available=loaded.weight_bytes + 2**20, working_mem_floor=2**20)
+    previews = _previews(_services(_Store([_tae_config()]), load))
+    sample = _sample()
+
+    assert _is_linear(previews.render(BaseModelType.StableDiffusion1, sample), sample)
+    assert loaded.locks_taken == 0
+    assert len(_messages(caplog, logging.INFO)) == 1
+
+
 def test_a_tae_that_does_not_fit_is_reported_once_per_process_and_another_tae_again(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -371,14 +399,15 @@ def test_a_tae_that_does_not_fit_is_reported_once_per_process_and_another_tae_ag
 def test_a_decode_failure_warns_with_its_traceback_once_per_process_and_a_new_failure_again(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    def generation(error: Exception) -> None:
+    def generation(error: Exception, key: str = "tae-key") -> None:
         decoder = _decoder()
 
         def fail(*_args) -> None:
             raise error
 
         decoder.register_forward_pre_hook(fail)
-        _previews(_services(_Store([_tae_config()]), _load(decoder))).render(BaseModelType.StableDiffusion1, _sample())
+        services = _services(_Store([_tae_config(key=key)]), _load(decoder))
+        _previews(services).render(BaseModelType.StableDiffusion1, _sample())
 
     def warnings() -> list[logging.LogRecord]:
         return [r for r in caplog.records if r.name == LOGGER_NAME and r.levelno == logging.WARNING]
@@ -391,6 +420,9 @@ def test_a_decode_failure_warns_with_its_traceback_once_per_process_and_a_new_fa
 
     generation(RuntimeError("MPS backend failure"))
     assert [w.exc_info is not None for w in warnings()] == [True, True]
+
+    generation(torch.OutOfMemoryError("CUDA out of memory"), key="another-tae")  # another TAE for the same space
+    assert [w.exc_info is not None for w in warnings()] == [True, True, True]
 
 
 def test_close_releases_the_lock_and_later_frames_render_linear() -> None:

@@ -137,8 +137,10 @@ class TinyAutoencoderPreviews:
             except Exception as error:
                 # OOM included: the preview is optional, the denoise around it is not.
                 self._disable()
+                # The TAE that failed is the one `_resolve` selected for the space (None if the lookup itself failed).
+                config = select_tiny_autoencoder(self._configs or [], space)
                 self._log_once(
-                    ("failed", id(space), type(error)),
+                    ("failed", None if config is None else config.key, id(space), type(error)),
                     logging.WARNING,
                     "Tiny AutoEncoder preview failed; using linear previews for the rest of this invocation.",
                     exc_info=True,
@@ -182,16 +184,17 @@ class TinyAutoencoderPreviews:
             self._report_unloadable(config, error)
             return None
 
-        if not self._fits_in_vram(loaded):
-            self._report_not_resident(config)
-            return None
-
         decoder = loaded.model  # the very module the lock moves and yields
         if not isinstance(decoder, TaesdDecoder):
             raise TypeError(f"expected a TaesdDecoder, the loader returned {type(decoder).__name__}")
         # Reserved once, with the lock: a denoise keeps its size, so every later frame decodes the same.
+        working_mem_bytes = decode_working_memory_bytes(decoder, sample)
+        if not self._fits_in_vram(loaded, working_mem_bytes):
+            self._report_not_resident(config)
+            return None
+
         lock = ExitStack()
-        lock.enter_context(loaded.model_on_device(working_mem_bytes=decode_working_memory_bytes(decoder, sample)))
+        lock.enter_context(loaded.model_on_device(working_mem_bytes=working_mem_bytes))
         if loaded.compute_device.type != "cpu" and loaded.resident_weight_bytes < loaded.weight_bytes:
             # The cache's own budget (which `max_vram_cache_size_gb` caps) left the TAE partly in RAM. A CPU
             # model reports no resident bytes at all: its lock does not move it.
@@ -202,20 +205,22 @@ class TinyAutoencoderPreviews:
         self._locks.push(lock)
         return _HeldDecoder(decoder=decoder, device=loaded.compute_device)
 
-    def _fits_in_vram(self, loaded: LoadedModel) -> bool:
-        """Whether locking `loaded` would make it fully resident, asked before locking it.
+    def _fits_in_vram(self, loaded: LoadedModel, working_mem_bytes: int) -> bool:
+        """Whether locking `loaded` with `working_mem_bytes` reserved would make it fully resident, asked before
+        locking it.
 
-        `make_room_in_vram` offloads unlocked models by the policy a lock applies and keeps the same
-        working-memory reserve, so a TAE that would not fit is refused without the lock's "VRAM budget
-        short" warning -- under partial loading, on every generation. It measures the device, not the
-        cache's cap, so `_resolve` checks residency again after locking.
+        `make_room_in_vram` offloads unlocked models by the policy a lock applies and keeps the reserve the
+        lock will keep, so a TAE that would not fit is refused without the lock's "VRAM budget short"
+        warning -- under partial loading, on every generation. It measures the device, not the cache's cap,
+        so `_resolve` checks residency again after locking.
         """
         if loaded.compute_device.type == "cpu":
             return True
         missing = loaded.weight_bytes - loaded.resident_weight_bytes
         if missing <= 0:
             return True
-        return self._services.model_manager.load.ram_cache.make_room_in_vram(missing) >= missing
+        ram_cache = self._services.model_manager.load.ram_cache
+        return ram_cache.make_room_in_vram(missing, working_mem_bytes=working_mem_bytes) >= missing
 
     def _report_missing(self, base_model: BaseModelType, space: LatentSpace) -> None:
         if is_tiny_autoencoder_supported(space):

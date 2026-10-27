@@ -109,9 +109,19 @@ def test_a_latent_the_cap_does_not_divide_is_area_downsampled(
         monkeypatch.setattr(preview, "_POOLING_NEEDS_DIVISIBLE_SIZES", frozenset({"cpu"}))
     decoder = copy.deepcopy(taesd).double()
     large = _latent(4, 6, 9).double()
+    pooled: list[tuple[torch.device, torch.dtype]] = []
+    interpolate = torch.nn.functional.interpolate
+
+    def spy(input: torch.Tensor, *args, **kwargs) -> torch.Tensor:
+        if kwargs.get("mode") == "area":
+            pooled.append((input.device, input.dtype))
+        return interpolate(input, *args, **kwargs)
+
+    monkeypatch.setattr(torch.nn.functional, "interpolate", spy)
 
     capped = decode_preview(decoder, large)
 
+    assert pooled == [(torch.device("cpu"), torch.float32 if pooled_on_cpu else torch.float64)]
     assert capped.size == (48, 32)
     reference = np.asarray(decode_preview(decoder, _area_pool(large, 4, 6))).astype(int)
     assert np.abs(np.asarray(capped).astype(int) - reference).max() <= 1
@@ -121,11 +131,11 @@ def test_a_decode_reserves_its_full_resolution_activations_at_the_capped_size(ta
     monkeypatch.setattr(preview, "MAX_PREVIEW_EDGE", 48)
     half = copy.deepcopy(taesd).half()
 
-    # Five 64-channel activations per output pixel, at the decoder's element size.
-    assert decode_working_memory_bytes(taesd, _latent(4, 3, 5)) == 5 * 64 * (24 * 40) * 4
-    assert decode_working_memory_bytes(half, _latent(4, 3, 5)) == 5 * 64 * (24 * 40) * 2
+    # Three live 64-channel activations and two of convolution workspace per output pixel, at the element size.
+    assert decode_working_memory_bytes(taesd, _latent(4, 3, 5)) == (3 + 2) * 64 * (24 * 40) * 4
+    assert decode_working_memory_bytes(half, _latent(4, 3, 5)) == (3 + 2) * 64 * (24 * 40) * 2
     # 12 x 18 latents exceed the cap and are decoded at 4 x 6.
-    assert decode_working_memory_bytes(taesd, _latent(1, 4, 12, 18)) == 5 * 64 * (32 * 48) * 4
+    assert decode_working_memory_bytes(taesd, _latent(1, 4, 12, 18)) == (3 + 2) * 64 * (32 * 48) * 4
 
 
 @pytest.fixture(scope="module")

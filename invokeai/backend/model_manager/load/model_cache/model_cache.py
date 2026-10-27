@@ -2436,9 +2436,9 @@ class ModelCache:
         except Exception:
             return 0
 
-    def _get_physical_vram_available(self) -> int:
-        """VRAM a load *outside* the cache can still take on the execution device, less the configured working-memory
-        reserve.
+    def _get_physical_vram_available(self, working_mem_bytes: Optional[int] = None) -> int:
+        """VRAM a load *outside* the cache can still take on the execution device, less the working-memory reserve
+        (`working_mem_bytes`, never less than the configured one).
 
         Unlike `_get_vram_available`, this ignores `max_vram_cache_size_gb`: the cap limits how much of the card the
         cache may occupy, but an out-of-cache model (e.g. the BitsAndBytes-quantized Qwen encoder) is not subject to
@@ -2450,7 +2450,7 @@ class ModelCache:
         trailing `empty_cache()`. Crediting the raw reserved-minus-allocated figure instead over-reports under
         expandable segments and by intra-segment slack — the measured-OOM cases that helper exists to exclude.
         """
-        return self._get_vram_available(None, honor_cap=False)
+        return self._get_vram_available(working_mem_bytes, honor_cap=False)
 
     def _get_vram_in_use(self) -> int:
         """Get the amount of VRAM currently in use by the cache."""
@@ -3108,7 +3108,7 @@ class ModelCache:
         return len(dropped)
 
     @synchronized
-    def make_room_in_vram(self, vram_bytes_needed: int) -> int:
+    def make_room_in_vram(self, vram_bytes_needed: int, working_mem_bytes: Optional[int] = None) -> int:
         """Offload unlocked models from VRAM to RAM until `vram_bytes_needed` bytes are free on the execution device.
 
         This is the entry point for code that has to put a model on the GPU *outside* the cache - e.g. a
@@ -3119,8 +3119,10 @@ class ModelCache:
 
         The same policy as `lock()` is used (`_offload_unlocked_models`): unlocked models are offloaded to RAM until
         the availability check is satisfied, and kept in the cache so a later use re-streams weights instead of
-        rebuilding from disk. Locked (in-use) models are never touched. The configured working-memory reserve is
-        kept free on top of the request, exactly as in `lock()`. The availability check is the device's *physical*
+        rebuilding from disk. Locked (in-use) models are never touched. The working-memory reserve is kept free on
+        top of the request, exactly as in `lock()`: `working_mem_bytes`, but never less than `device_working_mem_gb`.
+        A caller that will lock a model with `working_mem_bytes` can thus ask beforehand whether the lock would fit
+        it. The availability check is the device's *physical*
         free memory (`_get_physical_vram_available`), not the cache's own budget: `max_vram_cache_size_gb` caps what
         the cache may occupy, not what an out-of-cache model may.
 
@@ -3133,8 +3135,12 @@ class ModelCache:
         """
         if self._execution_device.type == "cpu":
             return 0
-        self._offload_unlocked_models(vram_bytes_needed, vram_available_fn=self._get_physical_vram_available)
-        return self._get_physical_vram_available()
+
+        def vram_available() -> int:
+            return self._get_physical_vram_available(working_mem_bytes)
+
+        self._offload_unlocked_models(vram_bytes_needed, vram_available_fn=vram_available)
+        return vram_available()
 
     @synchronized
     def offload_model_from_vram(self, model_key: str) -> int:

@@ -21,13 +21,25 @@ scaling down would look better (SDXL 36.3 vs 30.7 dB against the VAE) but carrie
 is why the latent is area-downsampled before the decode instead.
 """
 
-DECODE_ACTIVATION_CHANNELS: Final = 5 * 64
-"""Activation channels a TAE decode holds at once at output resolution: five tensors of the 64-channel last stage.
+_LAST_STAGE_CHANNELS: Final = 64
+"""Width of a TAESD decoder's full-resolution stage, the last `Block` and the convolution before it."""
 
-A decode costs what its full-resolution stage costs, so this times the output pixels and the decoder's element size
-bounds its working memory: 640 MiB at 1024x1024 in fp16, as measured for the 8x TAEs on an RTX 4090. TAEQI2.1 runs
-that stage at half resolution and needs a quarter of it (~160 MiB); the bound reserves it the same.
+_LIVE_ACTIVATIONS: Final = 3
+"""Full-resolution activations a TAESD decode holds at once, read off the vendored decoder.
+
+The peak is in the last `Block`, the only one at full resolution. Its input stays referenced while its conv branch
+runs, and `nn.ReLU` is not in place, so each layer of the branch has its own input and output live next to the block's
+input: three tensors. Adding the branch's output to the input (the skip is an identity) and fusing the sum holds three
+again. Every earlier stage runs at half resolution or less. TAEQI2.1's last stage runs at half resolution and holds a
+quarter of this; the bound reserves it the same.
 """
+
+_CONV_WORKSPACE_ACTIVATIONS: Final = 2
+"""The convolutions' workspace on top, in activation-sized buffers. Measured, and it depends on the algorithm the
+backend picks: on an RTX 4090 in fp16, `max_memory_allocated` grew by 640 MiB over a 1024x1024 decode, five
+activations, two more than the structure holds.
+"""
+
 
 _POOLING_NEEDS_DIVISIBLE_SIZES: Final = frozenset({"mps"})
 """Device types whose adaptive average pooling, behind `F.interpolate(mode="area")`, refuses an output size that does
@@ -46,10 +58,16 @@ def _preview_latent_size(decoder: TaesdDecoder, height: int, width: int) -> tupl
 
 
 def decode_working_memory_bytes(decoder: TaesdDecoder, sample: torch.Tensor) -> int:
-    """The working memory `decode_preview(decoder, sample)` needs on its device besides the decoder's weights."""
+    """The working memory `decode_preview(decoder, sample)` needs on its device besides the decoder's weights.
+
+    The live activations plus the convolutions' workspace, at the capped output size and the decoder's element size:
+    640 MiB at 1024x1024 in fp16. The cache's working-memory floor (`device_working_mem_gb`, 3 GB by default) covers
+    it, so the reservation matters only where that floor is set lower.
+    """
     height, width = _preview_latent_size(decoder, *sample.shape[-2:])
-    pixels = height * width * decoder.spatial_compression**2
-    return DECODE_ACTIVATION_CHANNELS * pixels * next(decoder.parameters()).element_size()
+    activation_bytes = height * width * decoder.spatial_compression**2 * _LAST_STAGE_CHANNELS
+    activation_bytes *= next(decoder.parameters()).element_size()
+    return (_LIVE_ACTIVATIONS + _CONV_WORKSPACE_ACTIVATIONS) * activation_bytes
 
 
 def _area_downsample(latents: torch.Tensor, size: tuple[int, int]) -> torch.Tensor:
