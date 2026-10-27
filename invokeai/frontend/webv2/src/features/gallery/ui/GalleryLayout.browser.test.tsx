@@ -30,8 +30,17 @@ vi.mock('@features/queue/react', () => ({
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     i18n: { language: 'en' },
-    t: (key: string, values?: Record<string, unknown>) =>
-      key === 'widgets.gallery.selectionCount' ? `${String(values?.count)} selected` : key,
+    t: (key: string, values?: Record<string, unknown>) => {
+      if (key === 'widgets.gallery.selectionCount') {
+        return `${String(values?.count)} selected`;
+      }
+
+      if (key === 'widgets.gallery.filterAndSortMediaValue') {
+        return `${key}: ${String(values?.media)}, ${String(values?.order)}`;
+      }
+
+      return key;
+    },
   }),
 }));
 
@@ -423,9 +432,11 @@ describe('gallery layout shells', () => {
     }
   });
 
-  it('places the media filter between the starred filter and the sort menu in both shells, operable by keyboard', async () => {
+  it('offers one media filter and sort menu beside the separate starred toggle in both shells', async () => {
+    const updateSettings = contextBase.actions.updateSettings as ReturnType<typeof vi.fn>;
+
     for (const Layout of [GalleryStackedLayout, GalleryWideLayout]) {
-      (contextBase.actions.updateSettings as ReturnType<typeof vi.fn>).mockClear();
+      updateSettings.mockClear();
       setGallery(createGallery());
       await renderLayout(Layout);
 
@@ -433,50 +444,79 @@ describe('gallery layout shells', () => {
       const starIndex = toolbarButtons.findIndex(
         (button) => button.getAttribute('aria-label') === 'widgets.gallery.starredOnly'
       );
-      const filter = host?.querySelector<HTMLButtonElement>('[data-gallery-media-filter-menu]');
-      const sortIndex = toolbarButtons.findIndex(
-        (button) => button.getAttribute('aria-label') === 'widgets.gallery.imageSortValue'
+      const trigger = toolbarButtons[starIndex + 1];
+
+      // The starred filter stays a toggle of its own; one menu trigger follows it, then upload.
+      expect(toolbarButtons[starIndex]?.getAttribute('aria-pressed')).toBe('false');
+      expect(trigger?.getAttribute('aria-label')).toBe(
+        'widgets.gallery.filterAndSortMediaValue: widgets.gallery.mediaFilterAll, widgets.gallery.newest'
+      );
+      expect(toolbarButtons[starIndex + 2]?.getAttribute('aria-label')).toMatch(/^widgets\.gallery\.upload/);
+
+      trigger?.focus();
+      await userEvent.keyboard('{Enter}');
+
+      const show = page.getByRole('group', { name: 'widgets.gallery.showMedia' });
+      const sort = page.getByRole('group', { name: 'widgets.gallery.sortBy' });
+      const videos = show.getByRole('menuitemradio', { name: 'widgets.gallery.mediaFilterVideos' });
+      const oldest = sort.getByRole('menuitemradio', { name: 'widgets.gallery.oldest' });
+
+      await expect
+        .element(show.getByRole('menuitemradio', { name: 'widgets.gallery.mediaFilterAll' }))
+        .toHaveAttribute('aria-checked', 'true');
+      await expect
+        .element(show.getByRole('menuitemradio', { name: 'widgets.gallery.mediaFilterImages' }))
+        .toBeVisible();
+      await expect
+        .element(sort.getByRole('menuitemradio', { name: 'widgets.gallery.newest' }))
+        .toHaveAttribute('aria-checked', 'true');
+
+      await userEvent.click(videos);
+      expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ mediaFilter: 'video' });
+
+      // The menu stays open, so the sort can be set in the same visit.
+      setGallery(createGallery({ settings: { ...DEFAULT_GALLERY_SETTINGS, mediaFilter: 'video' } }));
+      await renderLayout(Layout);
+      await expect.element(videos).toHaveAttribute('aria-checked', 'true');
+
+      await userEvent.click(oldest);
+      expect(updateSettings).toHaveBeenCalledTimes(2);
+      expect(updateSettings).toHaveBeenLastCalledWith({ imageOrderDir: 'ASC' });
+
+      setGallery(
+        createGallery({ settings: { ...DEFAULT_GALLERY_SETTINGS, imageOrderDir: 'ASC', mediaFilter: 'video' } })
+      );
+      await renderLayout(Layout);
+      await expect.element(oldest).toHaveAttribute('aria-checked', 'true');
+      expect(trigger?.getAttribute('aria-label')).toBe(
+        'widgets.gallery.filterAndSortMediaValue: widgets.gallery.mediaFilterVideos, widgets.gallery.oldest'
       );
 
-      expect(filter, 'media filter did not render in the toolbar').not.toBeNull();
-      expect(toolbarButtons.indexOf(filter!)).toBe(starIndex + 1);
-      expect(sortIndex).toBe(starIndex + 2);
-      expect(filter?.getAttribute('aria-label')).toBe('widgets.gallery.mediaFilterTrigger');
-
-      filter?.focus();
-      await userEvent.keyboard('{Enter}');
-      const videosOnly = page.getByRole('menuitemradio', { name: 'widgets.gallery.mediaFilterVideos' });
-
-      await expect.element(videosOnly).toBeVisible();
-      await expect
-        .element(page.getByRole('menuitemradio', { name: 'widgets.gallery.mediaFilterAll' }))
-        .toHaveAttribute('aria-checked', 'true');
-      await userEvent.keyboard('{ArrowDown}{ArrowDown}{Enter}');
-
-      expect(contextBase.actions.updateSettings).toHaveBeenCalledExactlyOnceWith({ mediaFilter: 'video' });
-      await expect.element(videosOnly).not.toBeInTheDocument();
+      await userEvent.keyboard('{Escape}');
+      await expect.element(videos).not.toBeInTheDocument();
+      expect(document.activeElement).toBe(trigger);
     }
   });
 
-  it('shows a restricted media filter as an active control', async () => {
-    const triggerBackground = () =>
-      getComputedStyle(host!.querySelector<HTMLElement>('[data-gallery-media-filter-menu]')!).backgroundColor;
+  it('brightens the media menu trigger while a media kind is restricted, not for the sort order', async () => {
+    const triggerColor = () =>
+      getComputedStyle(
+        host!.querySelector<HTMLElement>('button[aria-label^="widgets.gallery.filterAndSortMediaValue"]')!
+      ).color;
 
     await renderLayout(GalleryWideLayout);
-    const inactiveBackground = triggerBackground();
+    const defaultColor = triggerColor();
+
+    setGallery(createGallery({ settings: { ...DEFAULT_GALLERY_SETTINGS, imageOrderDir: 'ASC' } }));
+    await renderLayout(GalleryWideLayout);
+    expect(triggerColor()).toBe(defaultColor);
 
     setGallery(createGallery({ settings: { ...DEFAULT_GALLERY_SETTINGS, mediaFilter: 'image' } }));
     await renderLayout(GalleryWideLayout);
-
-    const trigger = host?.querySelector('[data-gallery-media-filter-menu]');
-
-    expect(trigger?.getAttribute('data-media-filter')).toBe('image');
-    expect(trigger?.hasAttribute('data-active')).toBe(true);
-    // The cue is visible, not just an attribute: a ghost trigger has no fill.
-    expect(triggerBackground()).not.toBe(inactiveBackground);
+    expect(triggerColor()).not.toBe(defaultColor);
   });
 
-  it('moves focus to the media filter when Show all media removes the empty state, in both shells', async () => {
+  it('moves focus to the media menu trigger when Show all media removes the empty state, in both shells', async () => {
     for (const Layout of [GalleryStackedLayout, GalleryWideLayout]) {
       (contextBase.actions.updateSettings as ReturnType<typeof vi.fn>).mockClear();
       setGallery(createGallery({ items: [], settings: { ...DEFAULT_GALLERY_SETTINGS, mediaFilter: 'video' } }));
@@ -493,7 +533,7 @@ describe('gallery layout shells', () => {
       });
 
       expect(contextBase.actions.updateSettings).toHaveBeenCalledExactlyOnceWith({ mediaFilter: 'all' });
-      expect(document.activeElement?.hasAttribute('data-gallery-media-filter-menu')).toBe(true);
+      expect(document.activeElement?.getAttribute('aria-label')).toMatch(/^widgets\.gallery\.filterAndSortMediaValue:/);
     }
   });
 

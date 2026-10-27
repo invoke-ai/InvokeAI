@@ -23,7 +23,7 @@ export interface GalleryUnloadedNavigationRequest {
 
 const GALLERY_HOTKEYS = [
   ['gallery.selectAllOnPage', 'widgets.gallery.commands.selectAllOnPage', null, ['mod+a']],
-  ['gallery.clearSelection', 'widgets.gallery.commands.clearSelection', null, ['esc']],
+  ['gallery.clearSelection', 'widgets.gallery.commands.clearSelection', null, []],
   ['gallery.galleryNavUp', 'widgets.gallery.commands.navigationUp', ['up', 'select'], ['arrowup']],
   ['gallery.galleryNavRight', 'widgets.gallery.commands.navigationRight', ['right', 'select'], ['arrowright']],
   ['gallery.galleryNavDown', 'widgets.gallery.commands.navigationDown', ['down', 'select'], ['arrowdown']],

@@ -320,7 +320,9 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('viewer', 'useSize', ['d'], { scope: selectedImageScope }),
   hotkey('viewer', 'toggleMetadata', ['i'], { title: 'Toggle Details' }),
   hotkey('gallery', 'selectAllOnPage', ['mod+a']),
-  hotkey('gallery', 'clearSelection', ['esc']),
+  // No default key: Esc in the Gallery is left to Preview interactions, and the Preview label's clear button
+  // deselects. Users can still assign one.
+  hotkey('gallery', 'clearSelection', []),
   hotkey('gallery', 'galleryNavUp', ['up']),
   hotkey('gallery', 'galleryNavRight', ['right']),
   hotkey('gallery', 'galleryNavDown', ['down']),

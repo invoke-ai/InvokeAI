@@ -37,9 +37,9 @@ const GALLERY_MEDIA_FILTER_OPTIONS = [
 ] as const;
 
 /**
- * The media-type menu's content for `IconRadioMenu`, shared by every surface that edits the Gallery's per-project
- * media filter (its titlebar and the Image Map header). It lives in this boot-loaded view module, exported through
- * `contracts`, so those lazily loaded widgets add no module of their own.
+ * The media-type menu's content for `IconRadioMenu`, for surfaces outside the Gallery that edit its per-project
+ * media filter (the Image Map header). It lives in this boot-loaded view module, exported through `contracts`, so
+ * those lazily loaded widgets add no module of their own.
  */
 export const getGalleryMediaFilterMenuProps = (
   t: TFunction,

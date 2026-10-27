@@ -4957,7 +4957,6 @@
       "imageCount_other": "{{count}} images",
       "imageSize": "Image size",
       "imageSort": "Image Sort",
-      "imageSortValue": "Image sort: {{order}}",
       "infinite": "Infinite",
       "middleClickOpensInNewTab": "Middle-click opens media in a new tab",
       "itemActions": {
@@ -4971,6 +4970,8 @@
           "missing": "This image has no workflow embedded.",
           "missingVideo": "This video has no workflow embedded."
         },
+      "filterAndSortMedia": "Filter & sort media",
+      "filterAndSortMediaValue": "Filter & sort media: {{media}}, {{order}}",
         "pbrMaps": {
           "canceled": "PBR maps canceled",
           "canceledMessage": "The queue item generating maps for {{name}} was canceled.",
@@ -5163,6 +5164,7 @@
       "mediaFilterTrigger": "Media type: {{option}}",
       "noMatchingImages": "No images match this board, tab, or search.",
       "noMatchingVideos": "No videos match this board, tab, or search.",
+      "showMedia": "Show",
       "showAllMedia": "Show all media",
       "starSelection": "Star selection",
       "statusChip_one": "Gallery: {{count}} item",
