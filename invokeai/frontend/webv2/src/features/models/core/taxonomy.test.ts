@@ -47,6 +47,11 @@ describe('variant options', () => {
     expect(getVariantOptionsFor('flux2', 'qwen3_encoder')).toEqual(['qwen3_4b', 'qwen3_8b', 'qwen3_06b']);
   });
 
+  it('offers both Qwen3.5 sizes, which condition different architectures', () => {
+    expect(getVariantOptionsFor('any', 'qwen3_5_encoder')).toEqual(['qwen3_5_4b', 'qwen3_5_9b']);
+    expect(getModelVariantLabel('qwen3_5_9b')).toBe('Qwen3.5 9B (MOSS-Image)');
+  });
+
   it('offers both Qwen3-VL sizes, because the field is required on the config', () => {
     // Required variants must not offer None, which would send invalid null during save.
     expect(getVariantOptionsFor('any', 'qwen3_vl_encoder')).toEqual(['qwen3_vl_4b', 'qwen3_vl_8b']);

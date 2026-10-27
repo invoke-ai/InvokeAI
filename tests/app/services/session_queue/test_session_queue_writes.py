@@ -24,6 +24,7 @@ from invokeai.app.services.events.events_common import (
     QueueItemStatusChangedEvent,
 )
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.session_queue import session_queue_default
 from invokeai.app.services.session_queue.session_queue_common import Batch, EnqueueProjectNotFoundError
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.database.database import Database
@@ -502,6 +503,32 @@ class TestRaces:
 
         assert errors == []
         assert queue.get_queue_status(QUEUE).pending == 2
+
+    def test_an_all_or_none_enqueue_takes_no_place_once_its_items_no_longer_fit(
+        self, database: Database, events: TestEventService, accounts: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Another admission takes two of three places between the enqueue's survey and its own admission, where one of
+        # its two items would still fit. Committed in between, the fill is seen only by the recount, on every backend.
+        queue = _service(database, events, max_queue_size=3)
+        prepare = session_queue_default.prepare_values_to_insert
+
+        def fill(q: Queries) -> None:
+            q.locks.acquire(DatabaseLock.SESSION_QUEUE_ADMISSION)
+            for _ in range(2):
+                q.session_queue.insert_item(_pending_values())
+
+        def prepare_while_another_admits(*args: Any, **kwargs: Any) -> Any:
+            database.queries.run(fill)
+            return prepare(*args, **kwargs)
+
+        monkeypatch.setattr(session_queue_default, "prepare_values_to_insert", prepare_while_another_admits)
+        batch = _batch(runs=2, key="whole")
+
+        result = asyncio.run(queue.enqueue_batch(QUEUE, batch, False, "alice", all_or_none=True))
+
+        assert (result.requested, result.enqueued, result.item_ids) == (2, 0, [])
+        assert queue.get_queue_status(QUEUE).pending == 2
+        assert queue.get_enqueue_receipt(QUEUE, "whole", "alice") is None
 
     @pytest.mark.parametrize("lock", [DatabaseLock.SESSION_QUEUE_ADMISSION, DatabaseLock.MEDIA_PROTECTION])
     def test_a_retry_waits_for_the_admission_and_the_cleanup(

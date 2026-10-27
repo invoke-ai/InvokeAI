@@ -68,6 +68,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ZImageVariantType,
 )
 from invokeai.backend.patches.lora_conversions.sd3_lora_constants import sd3_variant_from_width
+from invokeai.backend.quantization.fp8_scaled import FP8_WEIGHT_DTYPES, is_scale_metadata_key
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.int8_convrot import INT8_TENSORWISE_FORMAT, read_comfy_quant_markers
 from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
@@ -4103,5 +4104,133 @@ class Main_GGUF_ErnieImage_Config(Checkpoint_Config_Base, Main_Config_Base, Conf
 
         if not _has_ggml_tensors(state_dict):
             raise NotAMatchError("state dict does not look like GGUF quantized")
+
+        return cls(**override_fields)
+
+
+# ---------------------------------------------------------------------------------------------
+# MOSS-Image
+# ---------------------------------------------------------------------------------------------
+
+# What a MOSS-Image pipeline folder must hold besides its `model_index.json`. The scheduler is not listed: the
+# denoise node builds the schedule itself and never reads `scheduler/`.
+_MOSS_IMAGE_REQUIRED_COMPONENT_FILES = {
+    "transformer": ("config.json", "*.safetensors"),
+    "text_encoder": ("config.json", "*.safetensors"),
+    # The chat template is its own file here, not a `tokenizer_config.json` key, and the prompt encoding needs it.
+    "tokenizer": ("tokenizer_config.json", "tokenizer.json", "chat_template.jinja"),
+    "vae": ("config.json", "*.safetensors"),
+}
+
+
+class Main_Diffusers_MossImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for MOSS-Image diffusers pipelines (MOSS-Image Base and SFT).
+
+    The folder bundles the transformer, the Qwen3.5-9B text encoder with its tokenizer, and a FLUX.2 VAE. Base and SFT
+    differ only in their transformer weights, so there is no variant.
+    """
+
+    base: Literal[BaseModelType.MossImage] = Field(BaseModelType.MossImage)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # The pipeline class name implies the base.
+        raise_for_class_name(common_config_paths(mod.path), {"MOSSImagePipeline"})
+
+        # From here on the folder is a MOSS-Image pipeline, so what is missing is a broken download, not another
+        # model: refuse it with what to fetch rather than registering a model that fails at its first generation.
+        missing = [
+            f"{component}/{pattern}"
+            for component, patterns in _MOSS_IMAGE_REQUIRED_COMPONENT_FILES.items()
+            for pattern in patterns
+            if not any((mod.path / component).glob(pattern))
+        ]
+        if missing:
+            raise InvalidMatchError(
+                f"this MOSS-Image pipeline folder is incomplete; missing: {', '.join(missing)}. "
+                "Download the whole repository again."
+            )
+        transformer_class = get_config_dict_or_raise(mod.path / "transformer" / "config.json").get("_class_name")
+        if transformer_class != "MOSSImageTransformer":
+            raise InvalidMatchError(
+                f"this MOSS-Image pipeline's transformer is a {transformer_class!r}, not a MOSSImageTransformer"
+            )
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        return cls(**override_fields, repo_variant=repo_variant)
+
+
+def _has_moss_image_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Whether the state dict is a MOSS-Image transformer, and not a LoRA for one.
+
+    The modulation shared by every block, the video head and the text refiner's fused qkv: no other architecture
+    probed here spells any of them. The diffusers shards and the ComfyUI single-file export use the same names.
+    """
+    keys = {_strip_comfyui_key_prefix(k) for k in state_dict.keys() if isinstance(k, str)}
+    if any(k.endswith(_LORA_KEY_SUFFIXES) for k in keys):
+        return False
+    return all(
+        key in keys
+        for key in (
+            "shared_block_modulation.weight",
+            "final_linear_video.weight",
+            "text_embedder.blocks.0.qkv.weight",
+        )
+    )
+
+
+def _moss_image_quantized_key(state_dict: dict[str | int, Any]) -> str | None:
+    """The first key that shows the checkpoint is quantized, or None for a dense one.
+
+    A side channel (`weight_scale`, `input_scale`, `.comfy_quant` markers) or a weight stored as fp8 or as packed
+    integer codes. Identification reads the header on the meta device, so the dtype is all there is to go on.
+    """
+    quantized_dtypes = (*FP8_WEIGHT_DTYPES, torch.uint8, torch.int8)
+    for key, value in state_dict.items():
+        if not isinstance(key, str):
+            continue
+        if is_scale_metadata_key(key) or getattr(value, "dtype", None) in quantized_dtypes:
+            return key
+    return None
+
+
+class Main_Checkpoint_MossImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for MOSS-Image single-file transformers (safetensors), such as the ComfyUI export.
+
+    The file holds the transformer alone; the Qwen3.5-9B encoder and the FLUX.2 VAE are separate models, selected on
+    the loader node. Only dense (bf16/fp16/fp32) files load. A quantized one is refused at install with
+    `InvalidMatchError`: the loader has no quantization path, and `NotAMatchError` would let it register as an unknown
+    model instead.
+    """
+
+    base: Literal[BaseModelType.MossImage] = Field(default=BaseModelType.MossImage)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+        if not _has_moss_image_keys(state_dict):
+            raise NotAMatchError("state dict does not look like a MOSS-Image transformer")
+
+        if _has_ggml_tensors(state_dict):
+            raise InvalidMatchError(
+                "GGUF-quantized MOSS-Image checkpoints are not supported yet. Install the bf16 transformer instead."
+            )
+
+        quantized_key = _moss_image_quantized_key(state_dict)
+        if quantized_key is not None:
+            raise InvalidMatchError(
+                f"quantized MOSS-Image checkpoints are not supported yet (found '{quantized_key}'). "
+                "Install the bf16 transformer instead."
+            )
 
         return cls(**override_fields)
