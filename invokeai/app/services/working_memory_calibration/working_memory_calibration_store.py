@@ -26,6 +26,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     CalibrationDeviceClass,
     CalibrationStoreError,
     CalibrationStoreFile,
+    CalibrationStoreLockTimeoutError,
     CalibrationStoreUnusableError,
 )
 
@@ -87,7 +88,7 @@ def _os_lock(handle: IO[bytes]) -> Iterator[None]:
                 break
             except OSError:
                 if time.monotonic() > deadline:
-                    raise CalibrationStoreError(f"Timed out waiting for the lock on {handle.name}") from None
+                    raise CalibrationStoreLockTimeoutError(f"Timed out waiting for the lock on {handle.name}") from None
                 time.sleep(LOCK_RETRY_S)
         try:
             yield
@@ -104,7 +105,7 @@ def _os_lock(handle: IO[bytes]) -> Iterator[None]:
                 break
             except BlockingIOError:
                 if time.monotonic() > deadline:
-                    raise CalibrationStoreError(f"Timed out waiting for the lock on {handle.name}") from None
+                    raise CalibrationStoreLockTimeoutError(f"Timed out waiting for the lock on {handle.name}") from None
                 time.sleep(LOCK_RETRY_S)
         try:
             yield

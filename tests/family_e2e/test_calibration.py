@@ -8,7 +8,7 @@ import pytest
 
 from scripts.family_e2e import calibration, runner
 from scripts.family_e2e.calibration import PROBE_REASON, CalibrationError
-from scripts.family_e2e.records import load_records, load_run_info, write_run_info
+from scripts.family_e2e.records import Record, load_records, load_run_info, write_run_info
 from tests.family_e2e.test_flow import FOREIGN_PID, MODEL, FakeGpu, isolated_runner, setup  # noqa: F401 - fixtures
 
 DEVICE_CLASS_ID = "0123456789abcdef"
@@ -215,7 +215,7 @@ def test_a_stop_whose_store_cannot_be_saved_ends_stopped_and_keeps_the_root(
         # A Ctrl-C, or the SIGTERM `__main__` turns into one, while the runner saves the export.
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(calibration, "save_exports", stopped)
+    monkeypatch.setattr(calibration, "fetch_exports", stopped)
 
     with pytest.raises(KeyboardInterrupt):
         runner.run(run_dir, gpu_factory=lambda _: gpu.gpu(), export=_export)
@@ -225,6 +225,48 @@ def test_a_stop_whose_store_cannot_be_saved_ends_stopped_and_keeps_the_root(
     assert "could not save the calibration store" in caplog.text and "kept the scratch root" in caplog.text
     root = runner.scratch_root(manifest_path.parent / "data", info.run_id, runner.DEFAULT_ARM)
     assert (root / "databases" / "working_memory" / f"{DEVICE_CLASS_ID}.json").is_file()
+
+
+@pytest.mark.parametrize("save", ["works", "fails"])
+def test_a_runner_that_finds_the_run_stopped_saves_its_store_and_keeps_the_stop(
+    save: str,
+    setup: tuple[Path, Path],  # noqa: F811 - fixture
+    isolated_runner: None,  # noqa: F811 - fixture
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path, data_dir = setup
+    gpu = FakeGpu()
+    run_dir = runner.new_run(manifest_path, [], [], calibrate=True)
+    if save == "fails":
+        # A file where the run's calibration/ directory goes: the copy raises, as on a full disk.
+        (run_dir / "calibration").write_text("")
+    store = runner._Session.store
+
+    def store_then_stop(session: runner._Session, record: Record) -> None:
+        store(session, record)
+        # `stop` marks the run after the first record, and its kill has not reached the runner yet.
+        runner.finish_run(run_dir, "stopped")
+
+    monkeypatch.setattr(runner._Session, "store", store_then_stop)
+    with pytest.raises(runner.RunStopped):
+        runner.run(run_dir, gpu_factory=lambda _: gpu.gpu(), export=_export)
+
+    records = load_records(run_dir)
+    assert [(r.kind, r.rep) for r in records] == [("warmup", 0)]
+    info = load_run_info(run_dir)
+    # The store is recorded, or kept with its root, without undoing the stop.
+    assert info.status == "stopped"
+    assert not (run_dir / "report.html").exists()
+    root = data_dir / "scratch-roots" / f"{run_dir.name}-default"
+    if save == "works":
+        [export] = info.calibration_exports
+        assert (export.lifetime, export.source) == (1, "store_file")
+        assert [p["queue_item_id"] for p in _store(run_dir, export.export)["points"]] == [records[0].queue_item_id]
+        assert not root.exists()
+    else:
+        assert info.calibration_exports == []
+        kept = json.loads((root / "databases" / "working_memory" / f"{DEVICE_CLASS_ID}.json").read_text())
+        assert [p["queue_item_id"] for p in kept["points"]] == [records[0].queue_item_id]
 
 
 def test_a_server_that_cannot_calibrate_fails_the_run_before_any_step(

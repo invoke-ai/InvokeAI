@@ -32,6 +32,10 @@ import {
 } from './referenceImageConfig';
 
 type IPAdapterConfig = Extract<GenerateReferenceImageConfig, { type: 'ip_adapter' }>;
+type Krea2ReferenceConfig = Extract<
+  GenerateReferenceImageConfig,
+  { type: 'krea2_reference_image' | 'krea2_edit_reference_image' }
+>;
 type ClipVisionOption = { label: ClipVisionModel; value: ClipVisionModel };
 type StyleVariantOption = { description: string; label: string; value: StyleMethod };
 type FluxReduxImageInfluenceOption = { label: string; value: FluxReduxImageInfluence };
@@ -388,6 +392,55 @@ export const FluxReduxControls = <T extends { imageInfluence: FluxReduxImageInfl
 };
 
 const STYLE_STRENGTH_MARKS = [DEFAULT_KREA2_STYLE_STRENGTH];
+
+const KREA2_MODE_SEGMENTS = [
+  { labelKey: 'widgets.generate.modeStyle', value: 'style' },
+  { labelKey: 'widgets.generate.modeEdit', value: 'edit' },
+] as const;
+
+/**
+ * Switches a Krea-2 reference between Style and Edit; the image stays and Style restarts at its default strength. It
+ * stays live while the card is off, so switched-off cards can be turned into the set they will join before they run.
+ */
+export const Krea2ReferenceModeControl = ({
+  config,
+  onChange,
+}: {
+  config: Krea2ReferenceConfig;
+  onChange: (config: Krea2ReferenceConfig) => void;
+}) => {
+  const { t } = useTranslation();
+  const mode = config.type === 'krea2_edit_reference_image' ? 'edit' : 'style';
+  const handleModeChange = useCallback(
+    ({ value }: SegmentGroup.ValueChangeDetails) => {
+      if (value === mode) {
+        return;
+      }
+
+      if (value === 'edit') {
+        onChange({ image: config.image, type: 'krea2_edit_reference_image' });
+      } else if (value === 'style') {
+        onChange({ image: config.image, styleStrength: DEFAULT_KREA2_STYLE_STRENGTH, type: 'krea2_reference_image' });
+      }
+    },
+    [config.image, mode, onChange]
+  );
+
+  return (
+    <Stack gap="1">
+      <FieldHeader hint="krea2ReferenceMode" label={t('widgets.generate.mode')} />
+      <SegmentGroup.Root aria-label={t('widgets.generate.mode')} value={mode} w="full" onValueChange={handleModeChange}>
+        <SegmentGroup.Indicator />
+        {KREA2_MODE_SEGMENTS.map((segment) => (
+          <SegmentGroup.Item key={segment.value} flex="1" justifyContent="center" value={segment.value}>
+            <SegmentGroup.ItemText fontSize="xs">{t(segment.labelKey)}</SegmentGroup.ItemText>
+            <SegmentGroup.ItemHiddenInput />
+          </SegmentGroup.Item>
+        ))}
+      </SegmentGroup.Root>
+    </Stack>
+  );
+};
 
 /** Krea-2 style transfer has one knob; 0 bypasses the reference entirely. */
 export const Krea2StyleReferenceControls = <T extends { styleStrength: number; type: 'krea2_reference_image' }>({
