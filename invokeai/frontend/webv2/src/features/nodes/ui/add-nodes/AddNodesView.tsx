@@ -1,19 +1,11 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import { Alert, Box, HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
 import { validateInstallSource } from '@features/nodes/core/installSource';
-import { installCustomNodePack } from '@features/nodes/data/api';
-import {
-  addCustomNodeInstallLogEntry,
-  updateCustomNodeInstallLogEntry,
-  useCustomNodeInstallLog,
-} from '@features/nodes/data/installLogStore';
-import { refreshCustomNodePacks, useCustomNodesSelector } from '@features/nodes/data/nodesStore';
+import { useCustomNodesSelector } from '@features/nodes/data/nodesStore';
 import { updateNodesUi, useNodesUiSelector } from '@features/nodes/ui/nodesUiStore';
+import { useNodePackInstall } from '@features/nodes/ui/shared/useNodePackInstall';
 import { useNotify } from '@features/nodes/ui/useNodesNotify';
 import { canCopyText, copyText } from '@platform/browser/clipboard';
-import { useScopedAction } from '@platform/react/useScopedAction';
-import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
-import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, Field, IconButton, Scrollable } from '@platform/ui';
 import { ClipboardCopyIcon, FolderOpenIcon } from 'lucide-react';
 import { useMemo, type ChangeEvent, type KeyboardEvent } from 'react';
@@ -29,8 +21,7 @@ export const AddNodesView = () => {
   const source = useNodesUiSelector((snapshot) => snapshot.installSource);
   const customNodesPath = useCustomNodesSelector((snapshot) => snapshot.customNodesPath);
   const nodePacks = useCustomNodesSelector((snapshot) => snapshot.nodePacks);
-  const log = useCustomNodeInstallLog();
-  const { isBusy, run } = useScopedAction();
+  const { install, isInstalling } = useNodePackInstall();
 
   const trimmedSource = source.trim();
   const installedPackNames = useMemo(() => new Set(nodePacks.map((pack) => pack.name)), [nodePacks]);
@@ -38,7 +29,6 @@ export const AddNodesView = () => {
     () => validateInstallSource(trimmedSource, installedPackNames),
     [installedPackNames, trimmedSource]
   );
-  const isInstalling = isBusy || log.some((entry) => entry.status === 'installing');
   const fieldError =
     trimmedSource === '' || validation.issue === null
       ? undefined
@@ -47,68 +37,9 @@ export const AddNodesView = () => {
         : t('nodes.invalidSourceName');
 
   const handleInstall = () => {
-    if (validation.issue !== null || isInstalling) {
-      return;
+    if (validation.issue === null) {
+      install(trimmedSource, { onInstalled: () => updateNodesUi({ installSource: '' }) });
     }
-
-    let logEntryId: number | null = null;
-
-    void run(
-      async (owner) => {
-        // Resolved in place below so the activity badge settles with the install.
-        const logEntry = addCustomNodeInstallLogEntry({ name: trimmedSource, status: 'installing' });
-
-        logEntryId = logEntry.id;
-
-        const result = await installCustomNodePack(trimmedSource, owner.signal);
-
-        assertAccountScopeCurrent(owner);
-
-        if (!result.success) {
-          updateCustomNodeInstallLogEntry(logEntry.id, { message: result.message, name: result.name, status: 'error' });
-          notify.error(t('nodes.installFailedTitle'), result.message);
-
-          return;
-        }
-
-        updateCustomNodeInstallLogEntry(logEntry.id, {
-          message: result.message,
-          name: result.name,
-          status: 'completed',
-        });
-        notify.success(
-          t('nodes.installComplete'),
-          result.workflows_imported > 0
-            ? t('nodes.installCompleteWithWorkflows', { count: result.workflows_imported, name: result.name })
-            : result.name
-        );
-        updateNodesUi({ installSource: '' });
-        await refreshCustomNodePacks(owner);
-        assertAccountScopeCurrent(owner);
-
-        if (result.requires_dependencies) {
-          // Sticky: this demands a manual pip install + restart; a toast that
-          // expires quietly buries the instruction.
-          notify.warning(
-            t('nodes.dependenciesRequired'),
-            t('nodes.dependenciesRequiredDescription', {
-              dependencyFile: result.dependency_file ?? 'requirements.txt',
-              name: result.name,
-            }),
-            { sticky: true }
-          );
-        }
-      },
-      (_message, error) => {
-        const message = getApiErrorMessage(error, t('nodes.installFailed'));
-
-        if (logEntryId !== null) {
-          updateCustomNodeInstallLogEntry(logEntryId, { message, status: 'error' });
-        }
-
-        notify.error(t('nodes.installFailedTitle'), message);
-      }
-    );
   };
 
   const canCopyPath = canCopyText();

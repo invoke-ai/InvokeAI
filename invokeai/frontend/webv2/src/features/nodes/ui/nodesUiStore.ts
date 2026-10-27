@@ -9,7 +9,6 @@ export type NodesManagerTab = 'details' | 'add';
 export interface NodesUiSnapshot {
   activeTab: NodesManagerTab;
   activePackName: string | null;
-  activityExpanded: boolean;
   /**
    * Whether the detail, not the library, is the pane shown when the manager is too narrow for both; null until the
    * user opens or leaves one, when the manager decides from whether the library is empty.
@@ -18,16 +17,21 @@ export interface NodesUiSnapshot {
   filters: NodePackFilters;
   /** Typed install source; survives the detail tabs unmounting their content. */
   installSource: string;
+  /** Whether the always-visible install queue footer is expanded. */
+  queueExpanded: boolean;
+  /** Whether the expanded queue fills the manager instead of docking as a footer. */
+  queueMaximized: boolean;
 }
 
 const INITIAL_NODES_UI_SNAPSHOT: NodesUiSnapshot = {
   // Default to Add so empty installs offer an actionable entry point.
   activeTab: 'add',
   activePackName: null,
-  activityExpanded: false,
   detailOpen: null,
   filters: { ...DEFAULT_NODE_PACK_FILTERS },
   installSource: '',
+  queueExpanded: false,
+  queueMaximized: false,
 };
 
 const store = createExternalStore<NodesUiSnapshot>(INITIAL_NODES_UI_SNAPSHOT);
@@ -64,12 +68,14 @@ const withDetailOpen = (current: NodesUiSnapshot, next: Partial<NodesUiSnapshot>
 export const updateNodesUi = (next: Partial<NodesUiSnapshot>): void =>
   store.patchSnapshot(withDetailOpen(store.getSnapshot(), next));
 
+// Revealing a pack or tab must also restore the pane a maximized queue is covering.
+
 export const openNodePackDetail = (activePackName: string): void => {
-  updateNodesUi({ activePackName, activeTab: 'details' });
+  updateNodesUi({ activePackName, activeTab: 'details', queueMaximized: false });
 };
 
 export const openNodesManagerTab = (activeTab: NodesManagerTab): void => {
-  updateNodesUi({ activeTab });
+  updateNodesUi({ activeTab, queueMaximized: false });
 };
 
 /** Return a single-pane manager to its library; side by side nothing changes. */
@@ -87,8 +93,12 @@ export const settleInitialNodesPane = (isLibraryEmpty: boolean): void => {
   }
 };
 
-export const setNodeActivityExpanded = (activityExpanded: boolean): void => {
-  updateNodesUi({ activityExpanded });
+export const setNodeQueueExpanded = (queueExpanded: boolean): void => {
+  updateNodesUi({ queueExpanded });
+};
+
+export const setNodeQueueMaximized = (queueMaximized: boolean): void => {
+  updateNodesUi({ queueMaximized });
 };
 
 export const useNodesUiSelector = store.useSelector;

@@ -1,13 +1,18 @@
-import type { LucideIcon } from 'lucide-react';
-
-import { Badge, Box, HStack, Icon, Spinner, Stack, Table, Text } from '@chakra-ui/react';
+import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { getModelTypeLabel } from '@features/models/core/taxonomy';
 import { useInstallProgress } from '@features/models/data/installsStore';
 import { useModelsSelector } from '@features/models/data/modelsStore';
 import { openModelDetail, openModelManagerTab } from '@features/models/ui/uiStore';
 import { useConnectionStatusSelector } from '@platform/transport/connectionStore';
-import { Button, IconButton, Tooltip } from '@platform/ui';
+import { Button } from '@platform/ui/Button';
+import {
+  ManagerQueueErrorDetail,
+  ManagerQueueRow,
+  ManagerQueueRowAction,
+  type ManagerQueueGlyph,
+} from '@platform/ui/ManagerQueue';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { Tooltip } from '@platform/ui/Tooltip';
 import {
   CheckIcon,
   ClockIcon,
@@ -25,7 +30,7 @@ import { useTranslation } from 'react-i18next';
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { InstallQueueRow, InstallRowStatus } from './queueModel';
 
-import { InstallProgressCell } from './InstallProgressCell';
+import { hasInstallProgressBar, InstallProgressBar, useInstallProgressCaption } from './InstallProgressCell';
 import {
   canRestartFailedParts,
   canResumeInstall,
@@ -40,56 +45,16 @@ import {
 } from './queueModel';
 import { useInstallJobActions } from './useInstallJobActions';
 
-const STATUS_ICONS: Record<
-  Exclude<InstallRowStatus, 'downloading' | 'installing'>,
-  { icon: LucideIcon; color: string }
-> = {
+const STATUS_GLYPHS: Record<InstallRowStatus, ManagerQueueGlyph> = {
   cancelled: { color: 'fg.muted', icon: MinusIcon },
+  downloading: 'active',
   failed: { color: 'fg.error', icon: TriangleAlertIcon },
   installed: { color: 'fg.success', icon: CheckIcon },
+  installing: 'active',
   paused: { color: 'fg.muted', icon: PauseIcon },
   queued: { color: 'fg.muted', icon: ClockIcon },
   unauthorized: { color: 'fg.warning', icon: LockIcon },
 };
-
-const CELL_PROPS = { borderColor: 'border.subtle', py: '2', verticalAlign: 'top' } as const;
-
-const StatusGlyph = ({ status }: { status: InstallRowStatus }) => {
-  if (isActiveRowStatus(status)) {
-    return <Spinner borderWidth="1.5px" boxSize="3.5" color="accent.solid" />;
-  }
-
-  const { color, icon } = STATUS_ICONS[status];
-
-  return <Icon as={icon} boxSize="3.5" color={color} />;
-};
-
-const RowAction = ({
-  disabled,
-  icon,
-  label,
-  onClick,
-  tone,
-}: {
-  disabled: boolean;
-  icon: LucideIcon;
-  label: string;
-  onClick: () => void;
-  tone?: 'danger';
-}) => (
-  <Tooltip content={label}>
-    <IconButton
-      aria-label={label}
-      colorPalette={tone === 'danger' ? 'danger' : undefined}
-      disabled={disabled}
-      size="sm"
-      variant="ghost"
-      onClick={onClick}
-    >
-      <Icon as={icon} boxSize="3" />
-    </IconButton>
-  </Tooltip>
-);
 
 export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
   const { job, queuePosition, status } = row;
@@ -108,38 +73,38 @@ export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
   const sourceLabel = getInstallJobSourceLabel(job);
   const problemParts = getProblemDownloadParts(job);
   const typeLabel = job.config_out?.type ? getModelTypeLabel(job.config_out.type) : null;
+  const caption = useInstallProgressCaption({ progress, queuePosition, status, typeLabel });
   const showDisconnected = connectionStatus !== 'connected' && isActiveRowStatus(status);
   const tone = status === 'failed' ? 'error' : status === 'unauthorized' ? 'warning' : undefined;
 
   return (
-    <Table.Row data-install-status={status} data-tone={tone}>
-      <Table.Cell {...CELL_PROPS} ps="3" pt="2.5">
-        <StatusGlyph status={status} />
-      </Table.Cell>
-
-      <Table.Cell {...CELL_PROPS}>
-        <Stack gap="0" minW="0">
-          <MiddleTruncate
-            color={status === 'installed' ? 'fg.muted' : 'fg'}
-            fontSize="md"
-            fontWeight="600"
-            lineHeight="short"
-            text={displayName}
-          />
-          {sourceLabel !== displayName ? (
-            <MiddleTruncate color="fg.muted" fontFamily="mono" fontSize="xs" text={sourceLabel} />
-          ) : null}
+    <ManagerQueueRow
+      caption={caption}
+      data-install-status={status}
+      glyph={STATUS_GLYPHS[status]}
+      name={displayName}
+      nameMuted={status === 'installed'}
+      progressBar={
+        hasInstallProgressBar(status) ? (
+          <InstallProgressBar label={t('models.downloadProgress')} progress={progress} status={status} />
+        ) : null
+      }
+      status={{ label: t(presentation.labelKey), palette: presentation.palette }}
+      statusAdornment={
+        showDisconnected ? (
+          <Tooltip content={t('models.backendDisconnectedProgressStale')}>
+            <Box display="inline-flex">
+              <Icon as={TriangleAlertIcon} boxSize="3" color="fg.warning" />
+            </Box>
+          </Tooltip>
+        ) : null
+      }
+      subtitle={sourceLabel !== displayName ? sourceLabel : null}
+      tone={tone}
+      details={
+        <>
           {status === 'failed' && job.error ? (
-            <HStack align="baseline" flexWrap="wrap" gap="1.5" pt="0.5">
-              {job.error_reason ? (
-                <Badge colorPalette="red" fontFamily="mono" size="lg" variant="surface">
-                  {job.error_reason}
-                </Badge>
-              ) : null}
-              <Text color="fg" fontSize="xs" lineClamp={2} overflowWrap="anywhere">
-                {job.error}
-              </Text>
-            </HStack>
+            <ManagerQueueErrorDetail message={job.error} reason={job.error_reason} />
           ) : null}
           {status === 'unauthorized' ? (
             <HStack align="baseline" flexWrap="wrap" gap="1.5" pt="0.5">
@@ -173,7 +138,7 @@ export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
                   {part.resumeRequired ? t('models.resumeRequired') : t('common.failed')}
                 </Text>
                 {part.url ? (
-                  <RowAction
+                  <ManagerQueueRowAction
                     disabled={actions.isBusy}
                     icon={RotateCcwIcon}
                     label={t('models.restartThisFile')}
@@ -188,40 +153,12 @@ export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
               ) : null}
             </Stack>
           ))}
-        </Stack>
-      </Table.Cell>
-
-      <Table.Cell {...CELL_PROPS}>
-        <InstallProgressCell progress={progress} queuePosition={queuePosition} status={status} typeLabel={typeLabel} />
-      </Table.Cell>
-
-      <Table.Cell {...CELL_PROPS}>
-        <HStack gap="1.5">
-          <Badge
-            colorPalette={presentation.palette}
-            fontSize="xs"
-            fontWeight="700"
-            letterSpacing="wider"
-            size="lg"
-            textTransform="uppercase"
-            variant="surface"
-          >
-            {t(presentation.labelKey)}
-          </Badge>
-          {showDisconnected ? (
-            <Tooltip content={t('models.backendDisconnectedProgressStale')}>
-              <Box display="inline-flex">
-                <Icon as={TriangleAlertIcon} boxSize="3" color="fg.warning" />
-              </Box>
-            </Tooltip>
-          ) : null}
-        </HStack>
-      </Table.Cell>
-
-      <Table.Cell {...CELL_PROPS} pe="2">
-        <HStack gap="0.5" justify="flex-end">
+        </>
+      }
+      actions={
+        <>
           {status === 'downloading' ? (
-            <RowAction
+            <ManagerQueueRowAction
               disabled={actions.isBusy}
               icon={PauseIcon}
               label={t('models.pauseDownload')}
@@ -229,7 +166,7 @@ export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
             />
           ) : null}
           {canResumeInstall(job) ? (
-            <RowAction
+            <ManagerQueueRowAction
               disabled={actions.isBusy}
               icon={PlayIcon}
               label={t('models.resumeDownload')}
@@ -237,7 +174,7 @@ export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
             />
           ) : null}
           {status === 'paused' && canRestartFailedParts(job) ? (
-            <RowAction
+            <ManagerQueueRowAction
               disabled={actions.isBusy}
               icon={RotateCcwIcon}
               label={t('models.retryFailedDownload')}
@@ -245,7 +182,7 @@ export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
             />
           ) : null}
           {isSettledRowStatus(status) && status !== 'installed' ? (
-            <RowAction
+            <ManagerQueueRowAction
               disabled={actions.isBusy}
               icon={RotateCcwIcon}
               label={t('models.retryInstall')}
@@ -253,7 +190,7 @@ export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
             />
           ) : null}
           {status === 'installed' && isInLibrary && installedKey !== null ? (
-            <RowAction
+            <ManagerQueueRowAction
               disabled={false}
               icon={SquareArrowOutUpRightIcon}
               label={t('models.openModel')}
@@ -261,9 +198,14 @@ export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
             />
           ) : null}
           {isSettledRowStatus(status) ? (
-            <RowAction disabled={false} icon={XIcon} label={t('models.removeFromList')} onClick={actions.dismiss} />
+            <ManagerQueueRowAction
+              disabled={false}
+              icon={XIcon}
+              label={t('models.removeFromList')}
+              onClick={actions.dismiss}
+            />
           ) : (
-            <RowAction
+            <ManagerQueueRowAction
               disabled={actions.isBusy}
               icon={XIcon}
               label={t('models.cancelInstall')}
@@ -271,8 +213,8 @@ export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
               onClick={actions.cancel}
             />
           )}
-        </HStack>
-      </Table.Cell>
-    </Table.Row>
+        </>
+      }
+    />
   );
 };
