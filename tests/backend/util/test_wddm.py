@@ -123,7 +123,7 @@ def windows_rocm(monkeypatch: pytest.MonkeyPatch):
     """A Windows ROCm build whose device 0 sits at PCI bus 3 with 16 GiB. Returns an installer for a fake gdi32."""
     monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setattr(torch.version, "hip", "7.14.0")
-    props = SimpleNamespace(pci_bus_id=OUR_BUS, pci_device_id=OUR_DEVICE, total_memory=16 * GIB)
+    props = SimpleNamespace(pci_domain_id=0, pci_bus_id=OUR_BUS, pci_device_id=OUR_DEVICE, total_memory=16 * GIB)
     monkeypatch.setattr(torch.cuda, "get_device_properties", lambda index: props)
     wddm.reset_cache()
 
@@ -211,6 +211,40 @@ def test_reset_closes_the_cached_handle(windows_rocm):
     assert gdi32.closed == [20]
 
 
+@pytest.mark.parametrize("hip", ["7.14.0", None], ids=["rocm", "cuda"])
+def test_process_usage_is_read_on_either_windows_build(windows_rocm, monkeypatch, hip):
+    """The working-memory probe measures on CUDA too; the adapter is found by PCI location there just the same."""
+    gdi32 = windows_rocm(_FakeGdi32([(10, 7, 0), (20, OUR_BUS, OUR_DEVICE)], usage=5 * GIB))
+    monkeypatch.setattr(torch.version, "hip", hip)
+
+    assert wddm.process_local_usage(DEVICE) == 5 * GIB
+    assert gdi32.closed == [10]
+
+
+@pytest.mark.parametrize(
+    "kwargs", [{"usage": 17 * GIB}, {"query_status": -1073741823}], ids=["usage-beyond-the-card", "query-fails"]
+)
+def test_process_usage_is_unknown_rather_than_guessed(windows_rocm, monkeypatch, kwargs):
+    windows_rocm(_FakeGdi32([(20, OUR_BUS, OUR_DEVICE)], **kwargs))
+    monkeypatch.setattr(torch.version, "hip", None)
+
+    assert wddm.process_local_usage(DEVICE) is None
+
+
+def test_the_ungated_readers_elsewhere_never_touch_the_os(monkeypatch):
+    def loader():
+        raise AssertionError("no Windows library may be loaded off Windows")
+
+    monkeypatch.setattr(wddm, "_load_gdi32", functools.lru_cache(maxsize=1)(loader))
+    monkeypatch.setattr(wddm, "_load_pdh", functools.lru_cache(maxsize=1)(loader))
+    monkeypatch.setattr(sys, "platform", "linux")
+
+    assert wddm.process_local_usage(DEVICE) is None
+    assert wddm.process_paged_bytes(DEVICE) is None
+    monkeypatch.setattr(sys, "platform", "win32")
+    assert wddm.process_local_usage(torch.device("cpu")) is None
+
+
 def _instance(pid: int, handle: int) -> str:
     return f"pid_{pid}_luid_0x00000000_0x{_luid_low(handle):08X}_phys_0"
 
@@ -261,6 +295,17 @@ def test_paged_bytes_is_unknown_before_this_process_used_the_adapter(windows_roc
     pdh = _FakePdh({_instance(os.getpid() + 1, 20): GIB})
     monkeypatch.setattr(wddm, "_load_pdh", functools.lru_cache(maxsize=1)(lambda: pdh))
 
+    assert wddm.paged_bytes(DEVICE) is None
+
+
+def test_on_windows_cuda_only_the_ungated_reader_answers_the_paged_amount(windows_rocm, monkeypatch):
+    """The model cache's spill warning stays a ROCm affair; the probe's spill check needs the figure on CUDA too."""
+    windows_rocm(_FakeGdi32([(20, OUR_BUS, OUR_DEVICE)]))
+    monkeypatch.setattr(torch.version, "hip", None)
+    pdh = _FakePdh({_instance(os.getpid(), 20): 3 * GIB})
+    monkeypatch.setattr(wddm, "_load_pdh", functools.lru_cache(maxsize=1)(lambda: pdh))
+
+    assert wddm.process_paged_bytes(DEVICE) == 3 * GIB
     assert wddm.paged_bytes(DEVICE) is None
 
 

@@ -2,7 +2,7 @@ import sys
 import threading
 from collections import Counter, defaultdict
 from functools import wraps
-from typing import Dict, Literal, Optional, Union
+from typing import Dict, Literal, Optional, Protocol, Union
 
 import torch
 from deprecated import deprecated
@@ -23,6 +23,19 @@ MPS_DEVICE = torch.device("mps")
 # Devices for which the blind free-VRAM estimate has already been reported, so the
 # warning is emitted once per device rather than on every cache query.
 _XPU_MEM_FALLBACK_WARNED: set[str] = set()
+
+
+class EmptyCacheObserver(Protocol):
+    def before_empty_cache(self) -> None: ...
+
+    def after_empty_cache(self) -> None: ...
+
+
+EMPTY_CACHE_OBSERVERS: list[EmptyCacheObserver] = []
+"""Told about every `TorchDevice.empty_cache` that releases memory, just before and just after the release, in
+registration order. The working-memory probe registers here while a calibration scope is open, so that a release inside
+a measured window ends a segment there (`invokeai.backend.working_memory.probe`); otherwise the list is empty and a
+release pays one truth test for it. Observers must not raise."""
 
 
 def _xpu_is_available() -> bool:
@@ -470,14 +483,21 @@ class TorchDevice:
         # Clear before running: a skip that races in after this point re-sets the flag, so a
         # request is never lost, only (harmlessly) repeated.
         cls._empty_cache_deferred.clear()
-        if torch.backends.mps.is_available():
-            torch.mps.empty_cache()
-        if torch.cuda.is_available():
-            # A forced call must get past `install_peer_aware_empty_cache`'s wrapper, which would defer it again.
-            cuda_empty_cache = torch.cuda.empty_cache
-            (getattr(cuda_empty_cache, "__wrapped__", cuda_empty_cache) if force else cuda_empty_cache)()
-        if _xpu_is_available():
-            torch.xpu.empty_cache()
+        observers = tuple(EMPTY_CACHE_OBSERVERS) if EMPTY_CACHE_OBSERVERS else ()
+        for observer in observers:
+            observer.before_empty_cache()
+        try:
+            if torch.backends.mps.is_available():
+                torch.mps.empty_cache()
+            if torch.cuda.is_available():
+                # A forced call must get past `install_peer_aware_empty_cache`'s wrapper, which would defer it again.
+                cuda_empty_cache = torch.cuda.empty_cache
+                (getattr(cuda_empty_cache, "__wrapped__", cuda_empty_cache) if force else cuda_empty_cache)()
+            if _xpu_is_available():
+                torch.xpu.empty_cache()
+        finally:
+            for observer in observers:
+                observer.after_empty_cache()
         return True
 
     @classmethod
