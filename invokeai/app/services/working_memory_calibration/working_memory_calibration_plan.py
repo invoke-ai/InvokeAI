@@ -21,8 +21,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     WorkingMemoryCalibrationRepetitions,
     WorkingMemoryCalibrationSharedModel,
 )
-from invokeai.backend.architectures import VaeFacet
-from invokeai.backend.architectures import get as get_facet
+from invokeai.backend.architectures import accepts_vae
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     Flux2VariantType,
@@ -227,7 +226,7 @@ def default_vae(model: ModelConfig, models: Sequence[ModelConfig]) -> Optional[M
     key = getattr(getattr(model, "default_settings", None), "vae", None)
     if not key:
         return None
-    return next((vae for vae in models if vae.key == key and _is_vae(vae) and _accepts(model.base, vae.base)), None)
+    return next((vae for vae in models if vae.key == key and _is_vae(vae) and _accepts(model, vae)), None)
 
 
 _KLEIN_QWEN3: Final = {variant.value: encoder.value for variant, encoder in KLEIN_TO_QWEN3_VARIANT.items()}
@@ -340,11 +339,10 @@ def _runs_on_gpu(vae: ModelConfig) -> bool:
     return getattr(vae, "cpu_only", None) is not True
 
 
-def _accepts(main_base: BaseModelType, vae_base: BaseModelType) -> bool:
-    facet = get_facet(main_base, VaeFacet)
-    if facet is None:
-        return main_base == vae_base
-    return any(compatibility.base == vae_base for compatibility in facet.accepted)
+def _accepts(main: ModelConfig, vae: ModelConfig) -> bool:
+    """Whether the main model can decode with the VAE, by the rule its model loader node and Generate's VAE picker
+    read (`accepts_vae`): base, latent channels where they matter, and the main model's variant."""
+    return accepts_vae(main.base, vae.base, getattr(vae, "latent_channels", None), getattr(main, "variant", None))
 
 
 def _is_main(config: ModelConfig) -> bool:
@@ -482,7 +480,7 @@ _STANDALONE_VAE_BASES: Final = frozenset({BaseModelType.Flux, BaseModelType.Flux
 
 
 def _accepted_vaes(main: ModelConfig, models: Sequence[ModelConfig]) -> list[ModelConfig]:
-    return [model for model in models if _is_vae(model) and _accepts(main.base, model.base)]
+    return [model for model in models if _is_vae(model) and _accepts(main, model)]
 
 
 def _needs_gpu_vae(main: ModelConfig, models: Sequence[ModelConfig]) -> bool:
@@ -596,7 +594,7 @@ def build_plan(
             (
                 model
                 for model in models
-                if _plannable_main(model) and _accepts(model.base, target.base) and not _ignores_vae_pick(model)
+                if _plannable_main(model) and _accepts(model, target) and not _ignores_vae_pick(model)
             ),
             key=lambda model: (model.name, model.key),
         )
