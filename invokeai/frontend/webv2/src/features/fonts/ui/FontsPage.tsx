@@ -2,20 +2,7 @@
 import type { ListRowProps } from '@platform/ui/list/List';
 import type { ChangeEvent } from 'react';
 
-import {
-  Badge,
-  Box,
-  Flex,
-  HStack,
-  Icon,
-  Input,
-  InputGroup,
-  Menu,
-  Portal,
-  Spinner,
-  Stack,
-  Text,
-} from '@chakra-ui/react';
+import { Badge, Box, Flex, HStack, Icon, Menu, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import {
   deleteFont,
   fontKeys,
@@ -44,7 +31,7 @@ import { List } from '@platform/ui/list/List';
 import { ListItem } from '@platform/ui/list/ListItem';
 import { ListPager } from '@platform/ui/list/ListPager';
 import { listRowsFromItems } from '@platform/ui/list/listRows';
-import { ManagerColumn, ManagerDetailHeader, ManagerLayout } from '@platform/ui/ManagerLayout';
+import { ManagerColumn, ManagerDetailHeader, ManagerLayout, ManagerSearchField } from '@platform/ui/ManagerLayout';
 import { MenuContent } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -72,7 +59,6 @@ const PREVIEW_TEXT_SX = { textWrap: 'pretty' } as const;
 const ERROR_ICON = <CircleAlertIcon />;
 const EMPTY_ICON = <Icon as={PackageOpenIcon} />;
 const EMPTY_SEARCH_ICON = <Icon as={SearchIcon} />;
-const SEARCH_ICON = <Icon as={SearchIcon} boxSize="3.5" color="fg.subtle" />;
 let nextUploadId = 1;
 
 type FontFilter = 'all' | 'private' | 'shared';
@@ -627,17 +613,15 @@ const FontLibrary = () => {
             title={t('fonts.title')}
           >
             <HStack gap="1.5" p="3">
-              <InputGroup startElement={SEARCH_ICON}>
-                <Input
-                  aria-label={t('fonts.searchLabel')}
-                  placeholder={t('fonts.searchPlaceholder')}
-                  value={search}
-                  onChange={(event) => {
-                    setSearch(event.currentTarget.value);
-                    setOffset(0);
-                  }}
-                />
-              </InputGroup>
+              <ManagerSearchField
+                label={t('fonts.searchLabel')}
+                placeholder={t('fonts.searchPlaceholder')}
+                value={search}
+                onChange={(value) => {
+                  setSearch(value);
+                  setOffset(0);
+                }}
+              />
               <Menu.Root closeOnSelect={false} positioning={FILTER_POSITION}>
                 <Menu.Trigger asChild>
                   <IconButton

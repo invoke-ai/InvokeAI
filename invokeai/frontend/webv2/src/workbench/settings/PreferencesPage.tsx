@@ -16,7 +16,6 @@ import type { SettingsSection } from './catalog';
 
 import { browseSettings } from './catalog';
 import { SettingsBrowseBody, SettingsSearchField } from './SettingsBrowseBody';
-import { focusSettingsSearchOnSlash } from './settingsSearchShortcut';
 import { useAvailableSettings } from './useAvailableSettings';
 
 const GROUPS = ['application', 'project', 'widgets', 'system'] as const;
@@ -152,14 +151,7 @@ export const PreferencesPage = () => {
   }
 
   return (
-    <Flex
-      aria-label={t('launchpad.sections.preferences')}
-      role="region"
-      h="full"
-      minH="0"
-      w="full"
-      onKeyDown={focusSettingsSearchOnSlash}
-    >
+    <Flex aria-label={t('launchpad.sections.preferences')} role="region" h="full" minH="0" w="full">
       <ManagerLayout
         backLabel={t('settingsDialog.backToList')}
         detail={
