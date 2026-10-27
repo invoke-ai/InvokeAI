@@ -1195,6 +1195,140 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/models/i/{key}/working_memory/calibrate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Calibrate Model Working Memory
+         * @description Start a working-memory calibration run: enqueue the batch with every node uncached and measure each node's
+         *     model operations on the generation device. Needs exactly one generation device, and it must be a GPU. The queue
+         *     takes all of the batch's items or none.
+         *
+         *     Once the items are queued, a request without an `idempotency_key` succeeds even when the store fails for a passing
+         *     reason (an unwritable root, a lock timeout) to record them: they run all the same, and the status finds them by
+         *     their origin. With a key, that failure is a 503 although the items are queued. A run removed meanwhile (404) or an
+         *     unusable store file (409) fails the request with or without a key; its queued items then fail when they start.
+         *
+         *     With a key, repeating the request (also after a lost response) records the queued items and returns the run; it
+         *     enqueues nothing new. The items come from the queue's enqueue receipt for the key while it exists, otherwise from
+         *     the queue items that carry the run's origin and those the runner saw. Once a reset removed the run, a repeat is
+         *     refused (404). Acknowledge the key through the queue's enqueue_batch/acknowledge route once the response
+         *     arrived.
+         */
+        post: operations["calibrate_model_working_memory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/models/working_memory/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Working Memory Calibration Status
+         * @description Every device class's calibration runs, with their derived status, point counts and environments.
+         */
+        get: operations["get_working_memory_calibration_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/models/working_memory/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Working Memory Calibration Run
+         * @description Remove a calibration run and its measurements. Its queue items that have not run yet fail when they start.
+         */
+        delete: operations["delete_working_memory_calibration_run"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/models/i/{key}/working_memory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Reset Model Working Memory Calibration
+         * @description Remove a model's calibration runs with all their measurements, and every measurement of the model taken in
+         *     other runs (a VAE measured inside a transformer's run, say), from one device class.
+         */
+        delete: operations["reset_model_working_memory_calibration"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/models/working_memory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Reset Working Memory Calibration
+         * @description Remove every calibration run and measurement of one device class.
+         */
+        delete: operations["reset_working_memory_calibration"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/models/working_memory/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Working Memory Calibration
+         * @description The device class's calibration store file as it is on disk, readable by this version or not.
+         */
+        get: operations["export_working_memory_calibration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/image_moves/start": {
         parameters: {
             query?: never;
@@ -5901,6 +6035,11 @@ export type components = {
              */
             reference_images_require_variant?: string | null;
             /**
+             * Reference Images Require Format
+             * @description If set, reference images are only accepted for models of this format.
+             */
+            reference_images_require_format?: string | null;
+            /**
              * Supports Regional Guidance
              * @default false
              */
@@ -8127,6 +8266,30 @@ export type components = {
              * @constant
              */
             type: "calculate_image_tiles_output";
+        };
+        /**
+         * CalibrationDeviceClass
+         * @description A `fingerprint.DeviceClass` with its id as a plain field, as it is stored and returned.
+         */
+        CalibrationDeviceClass: {
+            /**
+             * Id
+             * @description A short stable hash of the other fields
+             */
+            id: string;
+            /** Vendor */
+            vendor: string;
+            /** Name */
+            name: string;
+            /** Total Mib */
+            total_mib: number;
+            /**
+             * Backend
+             * @enum {string}
+             */
+            backend: "cuda" | "hip" | "mps" | "xpu";
+            /** Arch */
+            arch: string | null;
         };
         /**
          * Call Saved Workflow
@@ -23307,7 +23470,7 @@ export type components = {
             pidi_edge_detection: components["schemas"]["ImageOutput"];
             prompt_from_file: components["schemas"]["StringCollectionOutput"];
             prompt_template: components["schemas"]["PromptTemplateOutput"];
-            qwen_image_2_1_denoise: components["schemas"]["LatentsOutput"];
+            qwen_image_2_1_denoise: components["schemas"]["LatentsMetaOutput"];
             qwen_image_2_1_i2l: components["schemas"]["LatentsOutput"];
             qwen_image_2_1_l2i: components["schemas"]["ImageOutput"];
             qwen_image_2_1_model_loader: components["schemas"]["QwenImage21ModelLoaderOutput"];
@@ -42462,6 +42625,12 @@ export type components = {
              */
             denoise_mask?: components["schemas"]["DenoiseMaskField"] | null;
             /**
+             * Reference Latents
+             * @description Latents of the reference images an edit reads, from Image to Latents in reference mode, in the order the prompts were encoded with them.
+             * @default null
+             */
+            reference_latents?: components["schemas"]["LatentsField"] | components["schemas"]["LatentsField"][] | null;
+            /**
              * Denoising Start
              * @description When to start denoising, expressed a percentage of total steps
              * @default 0
@@ -42528,7 +42697,10 @@ export type components = {
         };
         /**
          * Image to Latents - Qwen-Image-2.1
-         * @description Encodes an image into Qwen-Image-2.1 latents. The image is encoded opaque; its alpha is not read.
+         * @description Encodes an image into Qwen-Image-2.1 latents.
+         *
+         *     For image-to-image and the canvas, the image is encoded opaque at its own size; its alpha is not read. As a
+         *     reference for an edit, it is resized to the area the text encoder reads it at and keeps its alpha.
          */
         QwenImage21ImageToLatentsInvocation: {
             /**
@@ -42580,6 +42752,12 @@ export type components = {
              * @default 0
              */
             tile_size?: number;
+            /**
+             * Reference
+             * @description Encode as a reference image for the denoise node's reference latents: resized to ~1 megapixel, as the text encoder reads it, with its alpha kept.
+             * @default false
+             */
+            reference?: boolean;
             /**
              * type
              * @default qwen_image_2_1_i2l
@@ -42726,7 +42904,10 @@ export type components = {
         };
         /**
          * Prompt - Qwen-Image-2.1
-         * @description Encodes a text prompt for Qwen-Image-2.1 with its Qwen3-VL-8B encoder.
+         * @description Encodes a prompt for Qwen-Image-2.1 with its Qwen3-VL-8B encoder, with the reference images an edit reads.
+         *
+         *     Each reference also goes to the denoise node, encoded by Image to Latents in its reference mode, in the same
+         *     order.
          */
         QwenImage21TextEncoderInvocation: {
             /**
@@ -42758,6 +42939,12 @@ export type components = {
              * @default null
              */
             qwen3_vl_encoder?: components["schemas"]["Qwen3VLEncoderField"] | null;
+            /**
+             * Reference Images
+             * @description Reference images to edit or draw from, in the order the denoise node receives their latents, at most 4. Needs a Qwen-Image-2.1 Diffusers model's own encoder.
+             * @default []
+             */
+            reference_images?: components["schemas"]["ImageField"][];
             /**
              * type
              * @default qwen_image_2_1_text_encoder
@@ -44222,10 +44409,10 @@ export type components = {
          *
          *     Used for reference images that feed directly into the main model rather
          *     than through a separate IP-Adapter / ControlNet model — for example
-         *     FLUX.2 Klein, FLUX Kontext, and Qwen Image Edit. The receiving frontend
-         *     picks the correct config type (``flux2_reference_image`` /
-         *     ``qwen_image_reference_image`` / ``flux_kontext_reference_image``) based
-         *     on the currently-selected main model.
+         *     FLUX.2 Klein, FLUX Kontext, Qwen Image Edit and Qwen-Image-2.1. The
+         *     receiving frontend picks the correct config type (``flux2_reference_image`` /
+         *     ``qwen_image_reference_image`` / ``qwen_image_2_1_reference_image`` /
+         *     ``flux_kontext_reference_image``) based on the currently-selected main model.
          */
         ReferenceImageRecallParameter: {
             /**
@@ -54140,6 +54327,156 @@ export type components = {
                 [key: string]: components["schemas"]["JsonValue"];
             } | null;
         };
+        /** WorkingMemoryCalibrationDeviceClass */
+        WorkingMemoryCalibrationDeviceClass: {
+            /** Device Class Id */
+            device_class_id: string;
+            /** @description Null when the file is unusable */
+            device_class: components["schemas"]["CalibrationDeviceClass"] | null;
+            /** Usable */
+            usable: boolean;
+            /**
+             * Problem
+             * @description Why the file is unusable. It is kept as it is and never written
+             */
+            problem: string | null;
+            /** Is Current */
+            is_current: boolean;
+            /** Runs */
+            runs: components["schemas"]["WorkingMemoryCalibrationRunSummary"][];
+            /** Point Counts */
+            point_counts: components["schemas"]["WorkingMemoryCalibrationPointCount"][];
+            /** Envs */
+            envs: components["schemas"]["WorkingMemoryCalibrationEnvironment"][];
+        };
+        /** WorkingMemoryCalibrationEnvironment */
+        WorkingMemoryCalibrationEnvironment: {
+            /** Id */
+            id: string;
+            /** Hard */
+            hard: {
+                [key: string]: string;
+            };
+            /** Soft */
+            soft: {
+                [key: string]: string | null;
+            };
+            /**
+             * Hard Matches Current
+             * @description Whether the current environment has the same hard facts; null off the current device class
+             */
+            hard_matches_current: boolean | null;
+            /**
+             * Soft Matches Current
+             * @description Whether the current environment has the same soft facts; null off the current device class
+             */
+            soft_matches_current: boolean | null;
+            /** Point Count */
+            point_count: number;
+        };
+        /** WorkingMemoryCalibrationPointCount */
+        WorkingMemoryCalibrationPointCount: {
+            /** Estimator */
+            estimator: string;
+            /** Version */
+            version: number;
+            /** Valid */
+            valid: boolean;
+            /** Fit Eligible */
+            fit_eligible: boolean;
+            /** Count */
+            count: number;
+        };
+        /**
+         * WorkingMemoryCalibrationRequest
+         * @description The batch a calibration run enqueues, built by the client. The server sets origin, destination, runs and the
+         *     graph's id, and turns the node cache off.
+         */
+        WorkingMemoryCalibrationRequest: {
+            /** @description The graph to measure */
+            graph: components["schemas"]["Graph"];
+            /**
+             * Data
+             * @description The batch data collection
+             */
+            data?: components["schemas"]["BatchDatum"][][] | null;
+            /**
+             * Idempotency Key
+             * @description A caller-owned retry key. Repeating the request with it returns the run it created and enqueues nothing new; once a reset removed that run, the repeat is refused. Reusing the key for another request (another model, graph or batch data) is rejected while the queue keeps the key's enqueue receipt.
+             */
+            idempotency_key?: string | null;
+        };
+        /** WorkingMemoryCalibrationResetResult */
+        WorkingMemoryCalibrationResetResult: {
+            /** Runs Removed */
+            runs_removed: number;
+            /** Points Removed */
+            points_removed: number;
+        };
+        /** WorkingMemoryCalibrationRunCreated */
+        WorkingMemoryCalibrationRunCreated: {
+            /** Run Id */
+            run_id: string;
+            /** Device Class Id */
+            device_class_id: string;
+            /**
+             * Item Ids
+             * @description The queue items the run enqueued. A repeat of the request that finds them unrecorded takes over every queue item carrying the run's origin, retries included; none when the queue no longer has them and the runner never saw them
+             */
+            item_ids: number[];
+        };
+        /** WorkingMemoryCalibrationRunSummary */
+        WorkingMemoryCalibrationRunSummary: {
+            /** Run Id */
+            run_id: string;
+            /** Model Key */
+            model_key: string;
+            /** Model Hash */
+            model_hash: string | null;
+            /** User Id */
+            user_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Env Id */
+            env_id: string;
+            /**
+             * Status
+             * @description Derived from the run's queue items, a retry standing in for the item it retried: running while any is pending or running; failed when any failed; completed when all completed; otherwise partial when valid points were recorded, else canceled
+             * @enum {string}
+             */
+            status: "running" | "completed" | "failed" | "partial" | "canceled";
+            /**
+             * Error
+             * @description The error of a failed item, when the run failed
+             */
+            error: string | null;
+            /**
+             * Item Ids
+             * @description Every queue item of the run known, retries and the items they retried
+             */
+            item_ids: number[];
+            /** Point Count */
+            point_count: number;
+        };
+        /** WorkingMemoryCalibrationStatus */
+        WorkingMemoryCalibrationStatus: {
+            /**
+             * Available
+             * @description Whether a calibration run can start now: one GPU generation device whose store file is usable and can be written
+             */
+            available: boolean;
+            /** Unavailable Reason */
+            unavailable_reason: string | null;
+            /** Current Device Class Id */
+            current_device_class_id: string | null;
+            /** Current Env Id */
+            current_env_id: string | null;
+            /** Device Classes */
+            device_classes: components["schemas"]["WorkingMemoryCalibrationDeviceClass"][];
+        };
         /**
          * ZImageConditioningField
          * @description A Z-Image conditioning tensor primitive value
@@ -57290,6 +57627,296 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    calibrate_model_working_memory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Key of the model the run calibrates */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkingMemoryCalibrationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkingMemoryCalibrationRunCreated"];
+                };
+            };
+            /** @description The model could not be found; the run was removed while it was being created, whose items are queued then and fail when they start; or a reset removed the run the idempotency key started */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description This machine cannot calibrate now (no GPU, or several generation devices), the device class's store file is unusable and kept as it is (possibly after the items were queued, which then fail when they start), the queue has no room for all of the run's items (it then takes none), or the idempotency key was used for another request */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The graph cannot be measured as a calibration run */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many unacknowledged idempotency keys; acknowledge or wait, then retry */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The calibration store cannot be read or written (unwritable root, lock timeout); with an idempotency key, possibly after the items were queued */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_working_memory_calibration_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkingMemoryCalibrationStatus"];
+                };
+            };
+            /** @description The calibration store cannot be read or written (unwritable root, lock timeout) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_working_memory_calibration_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The calibration run to remove */
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkingMemoryCalibrationResetResult"];
+                };
+            };
+            /** @description No usable store file holds the run */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The run's store file became unusable after the run was found; it is kept as it is */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The calibration store cannot be read or written (unwritable root, lock timeout) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    reset_model_working_memory_calibration: {
+        parameters: {
+            query?: {
+                /** @description The device class to act on; the current generation device's by default */
+                device_class_id?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description Key of the model whose runs and measurements to remove */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkingMemoryCalibrationResetResult"];
+                };
+            };
+            /** @description No device_class_id was given and there is no current one (no GPU, or several generation devices), or the device class's store file is unusable and kept as it is */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The calibration store cannot be read or written (unwritable root, lock timeout) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    reset_working_memory_calibration: {
+        parameters: {
+            query?: {
+                /** @description The device class to act on; the current generation device's by default */
+                device_class_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkingMemoryCalibrationResetResult"];
+                };
+            };
+            /** @description No device_class_id was given and there is no current one (no GPU, or several generation devices), or the device class's store file is unusable and kept as it is */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The calibration store cannot be read or written (unwritable root, lock timeout) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    export_working_memory_calibration: {
+        parameters: {
+            query?: {
+                /** @description The device class to act on; the current generation device's by default */
+                device_class_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The device class's store file byte for byte: a CalibrationStoreFile (schema_version 1) when this version can read it, otherwise whatever the file holds */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description The device class has no store file */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No device_class_id was given and there is no current one */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The calibration store cannot be read or written (unwritable root, lock timeout) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -60986,6 +61613,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["EnqueueBatchResult"];
                 };
+            };
+            /** @description The batch's origin starts with 'invokeai:wm-calibration:' (in any case), which is reserved for working-memory calibration runs */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

@@ -1308,6 +1308,55 @@ const buildAnimaGraph = (
   return graph;
 };
 
+/**
+ * Edit references reach the model twice, in the same order: each prompt the denoise checks reads them through the
+ * encoder's vision tower, and their latents join the denoise as clean image tokens. Chained collects keep that order,
+ * which a single collect would take from execution order.
+ */
+const addKrea2EditReferences = (
+  graph: BackendGraphContract,
+  {
+    denoise,
+    prompts,
+    referenceImages,
+    referenceKvCache,
+    vaeSource,
+  }: {
+    denoise: BackendInvocationContract;
+    prompts: readonly BackendInvocationContract[];
+    referenceImages: readonly { image_name: string }[];
+    /** Unset leaves the denoise default. */
+    referenceKvCache: boolean | undefined;
+    vaeSource: BackendInvocationContract;
+  }
+) => {
+  for (const prompt of prompts) {
+    prompt.reference_images = referenceImages.map((image) => ({ ...image }));
+  }
+
+  let previousCollect: BackendInvocationContract | null = null;
+
+  for (const image of referenceImages) {
+    // `reference` sizes the image as ai-toolkit trains edit LoRAs, so width and height stay unset.
+    const encode = addNode(graph, { id: createId('krea2_ref_i2l'), image, reference: true, type: 'qwen_image_i2l' });
+    const collect = addNode(graph, { id: createId('krea2_ref_latents_collect'), type: 'collect' });
+
+    addEdge(graph, vaeSource, 'vae', encode, 'vae');
+    addEdge(graph, encode, 'latents', collect, 'item');
+    if (previousCollect) {
+      addEdge(graph, previousCollect, 'collection', collect, 'collection');
+    }
+    previousCollect = collect;
+  }
+
+  if (previousCollect) {
+    addEdge(graph, previousCollect, 'collection', denoise, 'reference_latents');
+  }
+  if (referenceKvCache !== undefined) {
+    denoise.reference_kv_cache = referenceKvCache;
+  }
+};
+
 const buildKrea2Graph = (
   settings: GenerateSettings,
   model: MainModelConfig,
@@ -1379,11 +1428,33 @@ const buildKrea2Graph = (
 
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
-  // Shared-KV reference attention takes exactly one reference; zero strength is a full bypass, so it is not run.
-  const styleReference = getEnabledReferenceImages(settings, 'krea2_reference_image').find(
-    (referenceImage) => referenceImage.config.styleStrength > 0
+  // Validation keeps edit and style references apart; the denoise refuses the two together.
+  const editReferenceImages = getEnabledReferenceImages(settings, 'krea2_edit_reference_image').flatMap(({ config }) =>
+    config.image ? [toImageField(config.image)] : []
   );
-  if (styleReference?.config.image) {
+  // Shared-KV reference attention takes exactly one reference; zero strength is a full bypass, so it is not run.
+  const styleReference =
+    editReferenceImages.length > 0
+      ? undefined
+      : getEnabledReferenceImages(settings, 'krea2_reference_image').find(
+          (referenceImage) => referenceImage.config.styleStrength > 0
+        );
+
+  // The cache changes how edit references run, and only an edit LoRA trained with it (ai-toolkit's `kv_cache`) reads
+  // them that way; the base model alone sees them through attention it never learned. Without a LoRA the stored
+  // switch is kept but not sent, so the denoise runs its default and the record says nothing about it.
+  const referenceKvCache =
+    editReferenceImages.length > 0 && activeLoras.length > 0 ? settings.krea2ReferenceKvCache : undefined;
+
+  if (editReferenceImages.length > 0) {
+    addKrea2EditReferences(graph, {
+      denoise,
+      prompts: negCond ? [posCond, negCond] : [posCond],
+      referenceImages: editReferenceImages,
+      referenceKvCache,
+      vaeSource: modelLoader,
+    });
+  } else if (styleReference?.config.image) {
     const styleReferenceNode = addNode(graph, {
       // The reference's image tokens are appended to the target's, so both must be the same size.
       height: settings.height,
@@ -1405,6 +1476,7 @@ const buildKrea2Graph = (
     krea2_seed_variance_randomize_percent: settings.krea2SeedVarianceRandomizePercent,
     krea2_seed_variance_strength: settings.krea2SeedVarianceStrength,
     ...(styleReference ? { krea2_style_strength: styleReference.config.styleStrength } : {}),
+    ...(referenceKvCache === undefined ? {} : { krea2_reference_kv_cache: referenceKvCache }),
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
     vae: vaeModel ?? undefined,
   });
@@ -1459,12 +1531,81 @@ const buildQwenImage21Graph = (
   }
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
-  addMetadata(graph, output, settings, model, 'qwen_image_2_1_txt2img', projectSettings, {
+  addQwenImage21ReferenceImages(graph, settings, {
+    conditionings: negCond ? [posCond, negCond] : [posCond],
+    denoise,
+    modelLoader,
+  });
+  // The denoise adds the prefix-cache mode it ran to the record, which changes the image, so the metadata passes
+  // through it on the way to the decoder.
+  addMetadata(graph, denoise, settings, model, 'qwen_image_2_1_txt2img', projectSettings, {
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
     vae: vaeModel ?? undefined,
   });
+  addEdge(graph, denoise, 'metadata', output, 'metadata');
+  addReferenceImageMetadata(graph, output, settings);
 
   return graph;
+};
+
+/**
+ * Qwen-Image-2.1 reads each reference twice, at one size: the prompt encoder sees it through the vision tower, and
+ * the denoise node places its clean latents in the prompt's image slots. Both prompts are encoded with the
+ * references, and the latents follow in the same order.
+ */
+const addQwenImage21ReferenceImages = (
+  graph: BackendGraphContract,
+  settings: GenerateSettings,
+  nodes: {
+    conditionings: BackendInvocationContract[];
+    denoise: BackendInvocationContract;
+    modelLoader: BackendInvocationContract;
+  }
+): void => {
+  const referenceImages = getEnabledReferenceImages(settings, 'qwen_image_2_1_reference_image');
+  if (referenceImages.length === 0) {
+    return;
+  }
+
+  let imageCollect: BackendInvocationContract | null = null;
+  let latentsCollect: BackendInvocationContract | null = null;
+
+  for (const { config } of referenceImages) {
+    if (!config.image) {
+      continue;
+    }
+
+    const imageNode = addNode(graph, {
+      id: createId('qwen21_ref_img'),
+      image: toImageField(config.image),
+      type: 'image',
+    });
+    const i2l = addNode(graph, { id: createId('qwen21_ref_i2l'), reference: true, type: 'qwen_image_2_1_i2l' });
+    addEdge(graph, imageNode, 'image', i2l, 'image');
+    addEdge(graph, nodes.modelLoader, 'vae', i2l, 'vae');
+
+    const nextImageCollect = addNode(graph, { id: createId('qwen21_ref_img_collect'), type: 'collect' });
+    addEdge(graph, imageNode, 'image', nextImageCollect, 'item');
+    if (imageCollect) {
+      addEdge(graph, imageCollect, 'collection', nextImageCollect, 'collection');
+    }
+    imageCollect = nextImageCollect;
+
+    const nextLatentsCollect = addNode(graph, { id: createId('qwen21_ref_latents_collect'), type: 'collect' });
+    addEdge(graph, i2l, 'latents', nextLatentsCollect, 'item');
+    if (latentsCollect) {
+      addEdge(graph, latentsCollect, 'collection', nextLatentsCollect, 'collection');
+    }
+    latentsCollect = nextLatentsCollect;
+  }
+
+  if (!imageCollect || !latentsCollect) {
+    return;
+  }
+  for (const conditioning of nodes.conditionings) {
+    addEdge(graph, imageCollect, 'collection', conditioning, 'reference_images');
+  }
+  addEdge(graph, latentsCollect, 'collection', nodes.denoise, 'reference_latents');
 };
 
 const buildMossImageGraph = (

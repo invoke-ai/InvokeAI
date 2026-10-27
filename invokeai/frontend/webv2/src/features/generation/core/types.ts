@@ -167,6 +167,12 @@ export type GenerateReferenceImageConfig =
   | { type: 'qwen_image_reference_image'; image: GenerateReferenceImageAsset | null }
   /** Krea-2 training-free style transfer: no adapter model, a single reference, `styleStrength` 0–2 (0 bypasses). */
   | { type: 'krea2_reference_image'; image: GenerateReferenceImageAsset | null; styleStrength: number }
+  /**
+   * Krea-2 edit reference for ai-toolkit edit LoRAs, read by the encoder's vision tower and joined to the denoise as
+   * clean image tokens. Up to three, in list order; never combined with a style reference.
+   */
+  | { type: 'krea2_edit_reference_image'; image: GenerateReferenceImageAsset | null }
+  | { type: 'qwen_image_2_1_reference_image'; image: GenerateReferenceImageAsset | null }
   | { type: 'external_reference_image'; image: GenerateReferenceImageAsset | null };
 
 export interface GenerateReferenceImage {
@@ -297,6 +303,8 @@ export interface GenerateSettings {
   krea2SeedVarianceEnabled: boolean;
   krea2SeedVarianceStrength: number;
   krea2SeedVarianceRandomizePercent: number;
+  /** Runs Krea-2 edit references once through the transformer, for edit LoRAs trained with isolated references. */
+  krea2ReferenceKvCache: boolean;
   /** FLUX.1 DyPE position extrapolation for sizes above the training resolution. `off` sends nothing. */
   fluxDypePreset: FluxDypePreset;
   /** DyPE magnitude (λs) and decay speed (λt); the denoise node reads them only under the `manual` preset. */

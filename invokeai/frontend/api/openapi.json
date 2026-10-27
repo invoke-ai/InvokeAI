@@ -5753,6 +5753,351 @@
         ]
       }
     },
+    "/api/v2/models/i/{key}/working_memory/calibrate": {
+      "post": {
+        "tags": ["model_manager"],
+        "summary": "Calibrate Model Working Memory",
+        "description": "Start a working-memory calibration run: enqueue the batch with every node uncached and measure each node's\nmodel operations on the generation device. Needs exactly one generation device, and it must be a GPU. The queue\ntakes all of the batch's items or none.\n\nOnce the items are queued, a request without an `idempotency_key` succeeds even when the store fails for a passing\nreason (an unwritable root, a lock timeout) to record them: they run all the same, and the status finds them by\ntheir origin. With a key, that failure is a 503 although the items are queued. A run removed meanwhile (404) or an\nunusable store file (409) fails the request with or without a key; its queued items then fail when they start.\n\nWith a key, repeating the request (also after a lost response) records the queued items and returns the run; it\nenqueues nothing new. The items come from the queue's enqueue receipt for the key while it exists, otherwise from\nthe queue items that carry the run's origin and those the runner saw. Once a reset removed the run, a repeat is\nrefused (404). Acknowledge the key through the queue's enqueue_batch/acknowledge route once the response\narrived.",
+        "operationId": "calibrate_model_working_memory",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Key of the model the run calibrates",
+              "title": "Key"
+            },
+            "description": "Key of the model the run calibrates"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkingMemoryCalibrationRequest",
+                "description": "The batch to measure"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingMemoryCalibrationRunCreated"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The model could not be found; the run was removed while it was being created, whose items are queued then and fail when they start; or a reset removed the run the idempotency key started"
+          },
+          "409": {
+            "description": "This machine cannot calibrate now (no GPU, or several generation devices), the device class's store file is unusable and kept as it is (possibly after the items were queued, which then fail when they start), the queue has no room for all of the run's items (it then takes none), or the idempotency key was used for another request"
+          },
+          "422": {
+            "description": "The graph cannot be measured as a calibration run"
+          },
+          "429": {
+            "description": "Too many unacknowledged idempotency keys; acknowledge or wait, then retry"
+          },
+          "503": {
+            "description": "The calibration store cannot be read or written (unwritable root, lock timeout); with an idempotency key, possibly after the items were queued"
+          }
+        }
+      }
+    },
+    "/api/v2/models/working_memory/status": {
+      "get": {
+        "tags": ["model_manager"],
+        "summary": "Get Working Memory Calibration Status",
+        "description": "Every device class's calibration runs, with their derived status, point counts and environments.",
+        "operationId": "get_working_memory_calibration_status",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingMemoryCalibrationStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The calibration store cannot be read or written (unwritable root, lock timeout)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v2/models/working_memory/runs/{run_id}": {
+      "delete": {
+        "tags": ["model_manager"],
+        "summary": "Delete Working Memory Calibration Run",
+        "description": "Remove a calibration run and its measurements. Its queue items that have not run yet fail when they start.",
+        "operationId": "delete_working_memory_calibration_run",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The calibration run to remove",
+              "title": "Run Id"
+            },
+            "description": "The calibration run to remove"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingMemoryCalibrationResetResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No usable store file holds the run"
+          },
+          "409": {
+            "description": "The run's store file became unusable after the run was found; it is kept as it is"
+          },
+          "503": {
+            "description": "The calibration store cannot be read or written (unwritable root, lock timeout)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/models/i/{key}/working_memory": {
+      "delete": {
+        "tags": ["model_manager"],
+        "summary": "Reset Model Working Memory Calibration",
+        "description": "Remove a model's calibration runs with all their measurements, and every measurement of the model taken in\nother runs (a VAE measured inside a transformer's run, say), from one device class.",
+        "operationId": "reset_model_working_memory_calibration",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Key of the model whose runs and measurements to remove",
+              "title": "Key"
+            },
+            "description": "Key of the model whose runs and measurements to remove"
+          },
+          {
+            "name": "device_class_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{16}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The device class to act on; the current generation device's by default",
+              "title": "Device Class Id"
+            },
+            "description": "The device class to act on; the current generation device's by default"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingMemoryCalibrationResetResult"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No device_class_id was given and there is no current one (no GPU, or several generation devices), or the device class's store file is unusable and kept as it is"
+          },
+          "503": {
+            "description": "The calibration store cannot be read or written (unwritable root, lock timeout)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/models/working_memory": {
+      "delete": {
+        "tags": ["model_manager"],
+        "summary": "Reset Working Memory Calibration",
+        "description": "Remove every calibration run and measurement of one device class.",
+        "operationId": "reset_working_memory_calibration",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_class_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{16}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The device class to act on; the current generation device's by default",
+              "title": "Device Class Id"
+            },
+            "description": "The device class to act on; the current generation device's by default"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingMemoryCalibrationResetResult"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No device_class_id was given and there is no current one (no GPU, or several generation devices), or the device class's store file is unusable and kept as it is"
+          },
+          "503": {
+            "description": "The calibration store cannot be read or written (unwritable root, lock timeout)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/models/working_memory/export": {
+      "get": {
+        "tags": ["model_manager"],
+        "summary": "Export Working Memory Calibration",
+        "description": "The device class's calibration store file as it is on disk, readable by this version or not.",
+        "operationId": "export_working_memory_calibration",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_class_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{16}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The device class to act on; the current generation device's by default",
+              "title": "Device Class Id"
+            },
+            "description": "The device class to act on; the current generation device's by default"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The device class's store file byte for byte: a CalibrationStoreFile (schema_version 1) when this version can read it, otherwise whatever the file holds",
+            "content": {
+              "application/json": {}
+            }
+          },
+          "404": {
+            "description": "The device class has no store file"
+          },
+          "409": {
+            "description": "No device_class_id was given and there is no current one"
+          },
+          "503": {
+            "description": "The calibration store cannot be read or written (unwritable root, lock timeout)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/image_moves/start": {
       "post": {
         "tags": ["image_moves"],
@@ -12649,6 +12994,9 @@
               }
             },
             "description": "Created"
+          },
+          "400": {
+            "description": "The batch's origin starts with 'invokeai:wm-calibration:' (in any case), which is reserved for working-memory calibration runs"
           },
           "422": {
             "description": "Validation Error",
@@ -21090,6 +21438,18 @@
             "title": "Reference Images Require Variant",
             "description": "If set, reference images are only accepted for models of this variant."
           },
+          "reference_images_require_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Images Require Format",
+            "description": "If set, reference images are only accepted for models of this format."
+          },
           "supports_regional_guidance": {
             "type": "boolean",
             "title": "Supports Regional Guidance",
@@ -24981,6 +25341,48 @@
         "required": ["output_meta", "tiles", "type", "type"],
         "title": "CalculateImageTilesOutput",
         "type": "object"
+      },
+      "CalibrationDeviceClass": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "A short stable hash of the other fields"
+          },
+          "vendor": {
+            "type": "string",
+            "title": "Vendor"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "total_mib": {
+            "type": "integer",
+            "title": "Total Mib"
+          },
+          "backend": {
+            "type": "string",
+            "enum": ["cuda", "hip", "mps", "xpu"],
+            "title": "Backend"
+          },
+          "arch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arch"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["id", "vendor", "name", "total_mib", "backend", "arch"],
+        "title": "CalibrationDeviceClass",
+        "description": "A `fingerprint.DeviceClass` with its id as a plain field, as it is stored and returned."
       },
       "CallSavedWorkflowInvocation": {
         "category": "workflow",
@@ -58552,7 +58954,7 @@
             "$ref": "#/components/schemas/PromptTemplateOutput"
           },
           "qwen_image_2_1_denoise": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "qwen_image_2_1_i2l": {
             "$ref": "#/components/schemas/LatentsOutput"
@@ -98140,6 +98542,29 @@
             "orig_default": null,
             "orig_required": false
           },
+          "reference_latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LatentsField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents of the reference images an edit reads, from Image to Latents in reference mode, in the order the prompts were encoded with them.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Reference Latents"
+          },
           "denoising_start": {
             "default": 0.0,
             "description": "When to start denoising, expressed a percentage of total steps",
@@ -98288,16 +98713,16 @@
         "tags": ["image", "qwen_image_2_1", "qwen-image-2.1"],
         "title": "Denoise - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.1.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "QwenImage21ImageToLatentsInvocation": {
         "category": "image",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Encodes an image into Qwen-Image-2.1 latents. The image is encoded opaque; its alpha is not read.",
+        "description": "Encodes an image into Qwen-Image-2.1 latents.\n\nFor image-to-image and the canvas, the image is encoded opaque at its own size; its alpha is not read. As a\nreference for an edit, it is resized to the area the text encoder reads it at and keeps its alpha.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -98408,6 +98833,16 @@
             "title": "Tile Size",
             "type": "integer"
           },
+          "reference": {
+            "default": false,
+            "description": "Encode as a reference image for the denoise node's reference latents: resized to ~1 megapixel, as the text encoder reads it, with its alpha kept.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Reference",
+            "type": "boolean"
+          },
           "type": {
             "const": "qwen_image_2_1_i2l",
             "default": "qwen_image_2_1_i2l",
@@ -98420,7 +98855,7 @@
         "tags": ["image", "latents", "vae", "i2l", "qwen_image_2_1"],
         "title": "Image to Latents - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -98694,7 +99129,7 @@
         "category": "conditioning",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Encodes a text prompt for Qwen-Image-2.1 with its Qwen3-VL-8B encoder.",
+        "description": "Encodes a prompt for Qwen-Image-2.1 with its Qwen3-VL-8B encoder, with the reference images an edit reads.\n\nEach reference also goes to the denoise node, encoded by Image to Latents in its reference mode, in the same\norder.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -98754,6 +99189,19 @@
             "orig_required": true,
             "title": "Qwen3-VL Encoder"
           },
+          "reference_images": {
+            "default": [],
+            "description": "Reference images to edit or draw from, in the order the denoise node receives their latents, at most 4. Needs a Qwen-Image-2.1 Diffusers model's own encoder.",
+            "field_kind": "input",
+            "input": "any",
+            "items": {
+              "$ref": "#/components/schemas/ImageField"
+            },
+            "orig_default": [],
+            "orig_required": false,
+            "title": "Reference Images",
+            "type": "array"
+          },
           "type": {
             "const": "qwen_image_2_1_text_encoder",
             "default": "qwen_image_2_1_text_encoder",
@@ -98766,7 +99214,7 @@
         "tags": ["prompt", "conditioning", "qwen_image_2_1", "qwen-image-2.1"],
         "title": "Prompt - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/QwenImage21ConditioningOutput"
         }
@@ -101582,7 +102030,7 @@
         "type": "object",
         "required": ["image_name"],
         "title": "ReferenceImageRecallParameter",
-        "description": "Global reference-image configuration for recall.\n\nUsed for reference images that feed directly into the main model rather\nthan through a separate IP-Adapter / ControlNet model \u2014 for example\nFLUX.2 Klein, FLUX Kontext, and Qwen Image Edit. The receiving frontend\npicks the correct config type (``flux2_reference_image`` /\n``qwen_image_reference_image`` / ``flux_kontext_reference_image``) based\non the currently-selected main model."
+        "description": "Global reference-image configuration for recall.\n\nUsed for reference images that feed directly into the main model rather\nthan through a separate IP-Adapter / ControlNet model \u2014 for example\nFLUX.2 Klein, FLUX Kontext, Qwen Image Edit and Qwen-Image-2.1. The\nreceiving frontend picks the correct config type (``flux2_reference_image`` /\n``qwen_image_reference_image`` / ``qwen_image_2_1_reference_image`` /\n``flux_kontext_reference_image``) based on the currently-selected main model."
       },
       "RemoteModelFile": {
         "properties": {
@@ -119634,6 +120082,380 @@
           "edges"
         ],
         "title": "WorkflowWithoutID"
+      },
+      "WorkingMemoryCalibrationDeviceClass": {
+        "properties": {
+          "device_class_id": {
+            "type": "string",
+            "title": "Device Class Id"
+          },
+          "device_class": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationDeviceClass"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the file is unusable"
+          },
+          "usable": {
+            "type": "boolean",
+            "title": "Usable"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem",
+            "description": "Why the file is unusable. It is kept as it is and never written"
+          },
+          "is_current": {
+            "type": "boolean",
+            "title": "Is Current"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationRunSummary"
+            },
+            "type": "array",
+            "title": "Runs"
+          },
+          "point_counts": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationPointCount"
+            },
+            "type": "array",
+            "title": "Point Counts"
+          },
+          "envs": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationEnvironment"
+            },
+            "type": "array",
+            "title": "Envs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_class_id",
+          "device_class",
+          "usable",
+          "problem",
+          "is_current",
+          "runs",
+          "point_counts",
+          "envs"
+        ],
+        "title": "WorkingMemoryCalibrationDeviceClass"
+      },
+      "WorkingMemoryCalibrationEnvironment": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "hard": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Hard"
+          },
+          "soft": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Soft"
+          },
+          "hard_matches_current": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hard Matches Current",
+            "description": "Whether the current environment has the same hard facts; null off the current device class"
+          },
+          "soft_matches_current": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Soft Matches Current",
+            "description": "Whether the current environment has the same soft facts; null off the current device class"
+          },
+          "point_count": {
+            "type": "integer",
+            "title": "Point Count"
+          }
+        },
+        "type": "object",
+        "required": ["id", "hard", "soft", "hard_matches_current", "soft_matches_current", "point_count"],
+        "title": "WorkingMemoryCalibrationEnvironment"
+      },
+      "WorkingMemoryCalibrationPointCount": {
+        "properties": {
+          "estimator": {
+            "type": "string",
+            "title": "Estimator"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "fit_eligible": {
+            "type": "boolean",
+            "title": "Fit Eligible"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": ["estimator", "version", "valid", "fit_eligible", "count"],
+        "title": "WorkingMemoryCalibrationPointCount"
+      },
+      "WorkingMemoryCalibrationRequest": {
+        "properties": {
+          "graph": {
+            "$ref": "#/components/schemas/Graph",
+            "description": "The graph to measure"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "$ref": "#/components/schemas/BatchDatum"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data",
+            "description": "The batch data collection"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key",
+            "description": "A caller-owned retry key. Repeating the request with it returns the run it created and enqueues nothing new; once a reset removed that run, the repeat is refused. Reusing the key for another request (another model, graph or batch data) is rejected while the queue keeps the key's enqueue receipt."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["graph"],
+        "title": "WorkingMemoryCalibrationRequest",
+        "description": "The batch a calibration run enqueues, built by the client. The server sets origin, destination, runs and the\ngraph's id, and turns the node cache off."
+      },
+      "WorkingMemoryCalibrationResetResult": {
+        "properties": {
+          "runs_removed": {
+            "type": "integer",
+            "title": "Runs Removed"
+          },
+          "points_removed": {
+            "type": "integer",
+            "title": "Points Removed"
+          }
+        },
+        "type": "object",
+        "required": ["runs_removed", "points_removed"],
+        "title": "WorkingMemoryCalibrationResetResult"
+      },
+      "WorkingMemoryCalibrationRunCreated": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "device_class_id": {
+            "type": "string",
+            "title": "Device Class Id"
+          },
+          "item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Item Ids",
+            "description": "The queue items the run enqueued. A repeat of the request that finds them unrecorded takes over every queue item carrying the run's origin, retries included; none when the queue no longer has them and the runner never saw them"
+          }
+        },
+        "type": "object",
+        "required": ["run_id", "device_class_id", "item_ids"],
+        "title": "WorkingMemoryCalibrationRunCreated"
+      },
+      "WorkingMemoryCalibrationRunSummary": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "model_key": {
+            "type": "string",
+            "title": "Model Key"
+          },
+          "model_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Hash"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "env_id": {
+            "type": "string",
+            "title": "Env Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["running", "completed", "failed", "partial", "canceled"],
+            "title": "Status",
+            "description": "Derived from the run's queue items, a retry standing in for the item it retried: running while any is pending or running; failed when any failed; completed when all completed; otherwise partial when valid points were recorded, else canceled"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "The error of a failed item, when the run failed"
+          },
+          "item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Item Ids",
+            "description": "Every queue item of the run known, retries and the items they retried"
+          },
+          "point_count": {
+            "type": "integer",
+            "title": "Point Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "model_key",
+          "model_hash",
+          "user_id",
+          "created_at",
+          "env_id",
+          "status",
+          "error",
+          "item_ids",
+          "point_count"
+        ],
+        "title": "WorkingMemoryCalibrationRunSummary"
+      },
+      "WorkingMemoryCalibrationStatus": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "description": "Whether a calibration run can start now: one GPU generation device whose store file is usable and can be written"
+          },
+          "unavailable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Reason"
+          },
+          "current_device_class_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Device Class Id"
+          },
+          "current_env_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Env Id"
+          },
+          "device_classes": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationDeviceClass"
+            },
+            "type": "array",
+            "title": "Device Classes"
+          }
+        },
+        "type": "object",
+        "required": ["available", "unavailable_reason", "current_device_class_id", "current_env_id", "device_classes"],
+        "title": "WorkingMemoryCalibrationStatus"
       },
       "ZImageConditioningField": {
         "description": "A Z-Image conditioning tensor primitive value",
