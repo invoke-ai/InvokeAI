@@ -20,9 +20,9 @@ class DoRALayer(LoRALayerBase):
       ``.magnitude``, shape ``(out_features,)``), and the ``.dora_scale`` that LyCORIS writes by default
       (``wd_on_out=True``) and OneTrainer writes with "DoRA on output axis": shape ``(out_features, 1)``.
 
-    Applying one convention's magnitude with the other's math silently produces wrong weights on square layers
-    and raises a broadcast error on non-square ones, so the orientation is carried explicitly. A ``.dora_scale``
-    can hold either, and its stored shape tells which (see ``_dora_scale_is_out_dim``).
+    Applying one convention's magnitude with the other's math silently produces wrong weights, so the orientation
+    is carried explicitly. A ``.dora_scale`` can hold either, and its stored shape tells which (see
+    ``_dora_scale_is_out_dim``).
     """
 
     def __init__(
