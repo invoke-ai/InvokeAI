@@ -108,6 +108,37 @@ def _decode_enqueue_receipt(batch_id: str, requested: int, enqueued: int, item_i
     return EnqueueBatchReceipt(batch_id=batch_id, requested=requested, enqueued=enqueued, item_ids=item_ids)
 
 
+def _payload_hash(batch: Batch, prepend: bool) -> str:
+    """What a key's receipt matches a repeat of its enqueue by."""
+    return hashlib.sha256(
+        json.dumps(
+            {"batch": batch.model_dump(mode="json", exclude={"batch_id", "idempotency_key"}), "prepend": prepend},
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _settled_result(
+    queue_id: str, batch: Batch, payload_hash: Optional[str], receipt: SettledReceipt
+) -> EnqueueBatchResult:
+    """The result a repeat of `batch`'s enqueue answers with: its key's settled receipt."""
+    if receipt.payload_hash != payload_hash:
+        raise EnqueueIdempotencyConflictError(
+            f"Idempotency key {batch.idempotency_key} is already used by another submission"
+        )
+    result = _decode_enqueue_receipt(receipt.batch_id, receipt.requested, receipt.enqueued, receipt.item_ids)
+    return EnqueueBatchResult(
+        queue_id=queue_id,
+        requested=result.requested,
+        enqueued=result.enqueued,
+        batch=batch.model_copy(update={"batch_id": result.batch_id}),
+        priority=receipt.priority,
+        item_ids=result.item_ids,
+    )
+
+
 class SessionQueue(SessionQueueBase):
     __invoker: Invoker
 
@@ -160,39 +191,24 @@ class SessionQueue(SessionQueueBase):
         receipt = self._queries.session_queue.enqueue_receipt(queue_id, user_id, idempotency_key)
         return _decode_enqueue_receipt(*receipt) if receipt is not None else None
 
+    def replay_enqueue(
+        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system"
+    ) -> Optional[EnqueueBatchResult]:
+        key = batch.idempotency_key
+        if key is None:
+            raise ValueError("Only a batch with an idempotency key can be replayed")
+        receipt = self._queries.session_queue.settled_receipt(queue_id, user_id, key)
+        return _settled_result(queue_id, batch, _payload_hash(batch, prepend), receipt) if receipt is not None else None
+
     def _enqueue_batch(
         self, queue_id: str, batch: Batch, prepend: bool, user_id: str, all_or_none: bool = False
     ) -> EnqueueBatchResult:
         requested_count = calc_session_count(batch=batch)
-        payload_hash = (
-            hashlib.sha256(
-                json.dumps(
-                    {
-                        "batch": batch.model_dump(mode="json", exclude={"batch_id", "idempotency_key"}),
-                        "prepend": prepend,
-                    },
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                    sort_keys=True,
-                ).encode("utf-8")
-            ).hexdigest()
-            if batch.idempotency_key is not None
-            else None
-        )
+        payload_hash = _payload_hash(batch, prepend) if batch.idempotency_key is not None else None
         key = batch.idempotency_key
 
         def settle(receipt: SettledReceipt) -> EnqueueBatchResult:
-            if receipt.payload_hash != payload_hash:
-                raise EnqueueIdempotencyConflictError(f"Idempotency key {key} is already used by another submission")
-            result = _decode_enqueue_receipt(receipt.batch_id, receipt.requested, receipt.enqueued, receipt.item_ids)
-            return EnqueueBatchResult(
-                queue_id=queue_id,
-                requested=result.requested,
-                enqueued=result.enqueued,
-                batch=batch.model_copy(update={"batch_id": result.batch_id}),
-                priority=receipt.priority,
-                item_ids=result.item_ids,
-            )
+            return _settled_result(queue_id, batch, payload_hash, receipt)
 
         def require_project(q: Queries) -> None:
             if batch.project_id is not None and q.projects.summary(user_id, batch.project_id) is None:
@@ -661,6 +677,7 @@ class SessionQueue(SessionQueueBase):
         error_type: str,
         error_message: str,
         error_traceback: str,
+        queue_item: Optional[SessionQueueItem] = None,
     ) -> SessionQueueItem:
         return self._set_queue_item_status(
             item_id=item_id,
@@ -668,6 +685,7 @@ class SessionQueue(SessionQueueBase):
             error_type=error_type,
             error_message=error_message,
             error_traceback=error_traceback,
+            queue_item=queue_item,
         )
 
     def cancel_by_batch_ids(

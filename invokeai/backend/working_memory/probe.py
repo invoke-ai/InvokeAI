@@ -41,16 +41,16 @@ reset or a synchronization, at the window's open as much as later; a failed lock
 windows, since its lock bookkeeping is suspect), and when no counter could be read. A model less than fully resident at
 open keeps the window valid but not `fit_eligible`: streamed weights are working memory the estimate does not price.
 
-`weights_left` covers what the model cache moves off the device, and the weights of records it drops, while a scope is
-armed. Three things it does not cover or covers coarsely: a record dropped while no scope was armed (between nodes, or
-racing the arming) whose weights die during a window; device tensors something else still references when the cache
-moves a model, which go only when that reference does; and a co-lock of a nested window, which only the window in the
-co-lock offsets, so that what it moves off the device voids that window's suspended ancestors (what it moves on leaves
-them reading high).
+`weights_left` covers what the model cache moves off the device while a scope is armed, and the weights of records it
+drops, whenever they were dropped. Two things it does not cover or covers coarsely: device tensors something else still
+references when the cache moves a model, which go only when that reference does; and a co-lock of a nested window,
+which only the window in the co-lock offsets, so that what it moves off the device voids that window's suspended
+ancestors (what it moves on leaves them reading high).
 
 Without a scope, the probe costs a context-variable read per estimated `model_on_device`, an entry in `locking` and a
-read of `armed` per lock in the loader, a read of `armed` per pass of a lock onto a GPU (`lock`, each `continue_lock`)
-in the model cache and per offload or drop there, a read of `armed` per unlock, and a truth test of
+read of `armed` per lock in the loader, a dictionary lookup per pass of a lock onto a GPU (`lock`, each
+`continue_lock`) and a read of `armed` per offload in the model cache, a residency check per drop there and a finalizer
+per drop of a model with weights on the device, a read of `armed` per unlock, and a truth test of
 `devices.EMPTY_CACHE_OBSERVERS` per `empty_cache`.
 """
 
@@ -217,10 +217,12 @@ another thread's lock is in progress on its cache is void. A list, so that the l
 each atomic under the GIL, and takes no lock."""
 
 _freed_weights: list[int] = []
-"""The cache (by id) of each record dropped while armed whose weights on the device have died since, in the order they
-died. Appended by a finalizer, which runs on whatever thread drops the last reference or collects the garbage, so the
+"""The cache (by id) of each dropped record whose weights on the device died while a window was open, in the order they
+died. Appended by `_weights_died`, which runs on whatever thread drops the last reference or collects the garbage, so the
 append is the whole of it: atomic under the GIL, and no lock. A window voids itself at close if its cache is among the
-entries appended while it was open."""
+entries appended while it was open. Emptied when the last open window leaves, and again when one registers while none
+is open (an append can race the last one leaving): it holds no more than the deaths during one stretch of open
+windows."""
 
 _watched_models: "weakref.WeakSet[object]" = weakref.WeakSet()
 """The models whose finalizer feeds `_freed_weights`, so that each is registered once. Changed under `_state_lock`."""
@@ -258,6 +260,15 @@ def _krea2_sdpa_benchmark_active() -> bool:
 
     # Any non-empty value runs the benchmark (`_Krea2StepBenchmark.create`), or fails the node if it is invalid.
     return bool(os.environ.get(KREA2_SDPA_BACKEND_ENV_VAR, "").strip())
+
+
+def _deregister(window: "_Window") -> None:
+    """Take `window` out of the open ones. The last to leave empties `_freed_weights`, which only open windows read.
+    Call with `_state_lock` held."""
+    if window in _open_windows:
+        _open_windows.remove(window)
+    if not _open_windows:
+        _freed_weights.clear()
 
 
 class _Window:
@@ -443,8 +454,7 @@ class _Window:
             InvokeAILogger.get_logger(__name__).debug("Working-memory probe could not record", exc_info=True)
 
     def _unregister(self) -> None:
-        if self in _open_windows:
-            _open_windows.remove(self)
+        _deregister(self)
         if self in self.scope._stack:
             self.scope._stack.remove(self)
         if self.counters is not None:
@@ -475,8 +485,7 @@ class _Window:
                     self.add_reason("foreign_device_load")
             if any(cache_id == id(self.cache) for cache_id in _freed_weights[self.freed_seen :]):
                 self.add_reason("weights_left")
-            if self in _open_windows:
-                _open_windows.remove(self)
+            _deregister(self)
             if self in self.scope._stack:
                 self.scope._stack.remove(self)
         duration_s = time.perf_counter() - self.opened_at
@@ -556,6 +565,8 @@ class ProbeScope:
         # `locks_held()`; so do weights leaving the device (`offloading`, `dropped`). Its counters are not open yet, so
         # releases pass it by.
         with _state_lock:
+            if not _open_windows:
+                _freed_weights.clear()
             _open_windows.append(window)
             window.freed_seen = len(_freed_weights)
         try:
@@ -665,8 +676,6 @@ def _arm() -> None:
     with _state_lock:
         _armed_scopes += 1
         if _armed_scopes == 1:
-            # No window is open: what an earlier scope's drops left behind concerns none.
-            _freed_weights.clear()
             devices.EMPTY_CACHE_OBSERVERS.append(_observer)
             armed = True
 
@@ -815,6 +824,13 @@ def _void_on(cache: object, reason: Reason) -> None:
             window.add_reason(reason)
 
 
+def _weights_died(cache_id: int) -> None:
+    """A dropped model died: its weights left the device. Runs at any garbage collection on any thread, so it takes no
+    lock; with no window open, nothing needs to know."""
+    if _open_windows:
+        _freed_weights.append(cache_id)
+
+
 def offloading(cache: object, record: "CacheRecord") -> None:
     """`record`'s weights are about to move from its device to RAM on this thread. Called by the model cache while
     `armed`, under its lock, before they go, so that a window closing meanwhile already knows.
@@ -838,13 +854,15 @@ def offloading(cache: object, record: "CacheRecord") -> None:
 def dropped(cache: object, record: "CacheRecord") -> None:
     """The cache no longer holds `record`: it drops it now (a load making room in RAM, Clear Model Cache, a changed model
     setting, the keep-alive timeout), or a lock moved weights of a record it dropped earlier onto the device. Called by
-    the model cache while `armed`, under its lock.
+    the model cache under its lock, whether or not a scope is armed: weights dropped between nodes can die during the
+    next node's window.
 
     Weights the record has on the device leave with its model's last reference, which may outlive the cache's call: a
     reference cycle waits for a garbage collection, a handle a node keeps waits for the node. So the model's finalizer,
-    registered once per model, tells the probe (`_freed_weights`), and every window open on the cache when the weights
+    registered once per model, tells the probe (`_weights_died`), and every window open on the cache when the weights
     died is void at its close (`weights_left`). A model that cannot be weakly referenced voids the windows open now, as
-    an offload does."""
+    an offload does. A drop of a record with weights on the device costs one finalizer; any other drop, a residency
+    check."""
     try:
         if not _on_device(record):
             return
@@ -853,7 +871,7 @@ def dropped(cache: object, record: "CacheRecord") -> None:
             if model in _watched_models:
                 return
             try:
-                weakref.finalize(model, _freed_weights.append, id(cache)).atexit = False
+                weakref.finalize(model, _weights_died, id(cache)).atexit = False
                 _watched_models.add(model)
             except TypeError:
                 _void_on(cache, "weights_left")

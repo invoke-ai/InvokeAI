@@ -2167,7 +2167,7 @@ class ModelCache:
         # We add 1 MB to the available VRAM to account for small errors in memory tracking (e.g. off-by-one). A fully
         # loaded model is much faster than a 95% loaded model.
         model_bytes_loaded, truncated = self._move_model_to_vram(cache_entry, vram_available + MB, max_move_bytes)
-        if probe.armed and self._cached_models.get(cache_entry.key) is not cache_entry:
+        if self._cached_models.get(cache_entry.key) is not cache_entry:
             # A record dropped earlier (see `lock`): no later drop reports the weights this put on the device.
             probe.dropped(self, cache_entry)
 
@@ -3009,8 +3009,8 @@ class ModelCache:
         # itself idempotent, but the budget debit is not).
         if self._cached_models.get(cache_entry.key) is not cache_entry:
             return
-        if probe.armed:
-            probe.dropped(self, cache_entry)
+        # Armed or not: the weights may die during a later calibration window.
+        probe.dropped(self, cache_entry)
         self._cache_stack = [key for key in self._cache_stack if key != cache_entry.key]
         del self._cached_models[cache_entry.key]
         # Drop this device's reference to the shared canonical CPU weights so they can be freed once
