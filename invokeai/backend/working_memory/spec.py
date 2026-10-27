@@ -13,7 +13,7 @@ from invokeai.backend.working_memory.platform import platform_for
 TermsFunction = Callable[[Mapping[str, FeatureValue], Mapping[str, float]], tuple[WorkingMemoryTerm, ...]]
 """An estimator's pure part: its features and its coefficient values in, its terms out."""
 
-ESTIMATOR_MODULES: Final = ("invokeai.backend.util.vae_working_memory",)
+ESTIMATOR_MODULES: Final = ("invokeai.backend.qwen_image_2_1.vae", "invokeai.backend.util.vae_working_memory")
 """Every module that registers an `EstimatorSpec`. The registry holds only the specs of modules imported so far, so a
 caller that needs all of them imports these (`import_estimator_modules`); `tests/backend/working_memory/` fails on a
 module that declares a spec without being listed here."""

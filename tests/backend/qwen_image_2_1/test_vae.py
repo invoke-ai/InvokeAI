@@ -1,5 +1,7 @@
 """Qwen-Image-2.1's RGBA VAE: how a decode becomes an image, what an encode reads, and the tile geometry it runs in."""
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 import torch
@@ -11,9 +13,11 @@ from invokeai.backend.qwen_image_2_1.vae import (
     MIN_TILE_SIZE,
     SPATIAL_SCALE,
     choose_tile_size,
+    default_tile_size,
+    estimate_working_memory,
     to_image,
     to_vae_input,
-    working_memory_bytes,
+    untiled_peak_bytes,
 )
 from invokeai.backend.util.qwen_image_vae import patch_qwen_image_vae_tiling
 
@@ -88,30 +92,120 @@ def test_the_geometry_is_restored_when_the_decode_fails(vae: AutoencoderKLQwenIm
 
 
 CPU = torch.device("cpu")
+GPU = torch.device("cuda")
 
 
-def test_a_float32_vae_is_priced_at_twice_the_bfloat16_memory() -> None:
-    fixed = working_memory_bytes(0, 0, None, 2)
-    assert working_memory_bytes(1024, 1024, None, 4) - fixed == 2 * (working_memory_bytes(1024, 1024, None, 2) - fixed)
+def _reserved(operation: str, size: int, tile: int | None, element_size: int, device: torch.device) -> int:
+    return estimate_working_memory(operation, size, size, tile, element_size, device).reservation_bytes
+
+
+GIB = 1024**3
+
+
+@pytest.mark.parametrize("operation", ["decode", "encode"])
+def test_on_cuda_both_operations_keep_the_original_pricing(operation: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    # The pricing shipped before the working-memory data: 4000 bytes per pixel per element byte, plus 0.6 GiB.
+    monkeypatch.setattr(torch.version, "hip", None)
+    for size, element_size in [(1024, 2), (1536, 4)]:
+        original = size * size * 4000 * element_size + int(0.6 * GIB)
+        assert _reserved(operation, size, None, element_size, GPU) == original
+        # The tiling decision prices the same figure there: CUDA tiles exactly the frames it tiled before.
+        assert untiled_peak_bytes(operation, size, size, element_size, GPU) == original
+    # A tile covering the frame runs the single pass, and is priced as one.
+    assert _reserved(operation, 1024, 1024, 2, GPU) == _reserved(operation, 1024, None, 2, GPU)
+
+
+def test_on_rocm_a_decode_is_priced_above_the_original_and_an_encode_below_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(torch.version, "hip", "10.0.0")
+    original = 1024 * 1024 * 4000 * 2 + int(0.6 * GIB)
+    assert _reserved("encode", 1024, None, 2, GPU) < original < _reserved("decode", 1024, None, 2, GPU)
+    # A VAE on the CPU of a ROCm build is not on MIOpen.
+    assert _reserved("decode", 1024, None, 2, CPU) == original
+
+
+def test_a_frame_is_tiled_when_either_side_exceeds_the_tile(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(torch.version, "hip", "10.0.0")
+    assert "k_tiled_1024" in _coefficients(1024, 1536, 1024)
+    assert "k_tiled_1024" not in _coefficients(1024, 1024, 1024)
+
+
+def _coefficients(height: int, width: int, tile: int | None) -> set[str | None]:
+    return {term.coefficient for term in estimate_working_memory("decode", height, width, tile, 2, GPU).terms}
+
+
+@pytest.mark.parametrize(
+    ("tile", "coefficient"),
+    [(1024, "k_tiled_1024"), (1536, "k_tiled_1024"), (768, "k_tiled_768"), (640, "k_tiled_768"), (384, "k_tiled_512")],
+)
+def test_a_tile_takes_the_coefficient_of_the_next_default_size_up(tile: int, coefficient: str, monkeypatch) -> None:
+    monkeypatch.setattr(torch.version, "hip", "10.0.0")
+    assert {"k_tiled_pixel", coefficient} <= _coefficients(4096, 4096, tile)
+
+
+# W7900 bf16 untiled peaks, as measured (reserved bytes).
+_ROCM_DECODE_1024 = 12683575296
+_ROCM_DECODE_1088 = 14847836160
+_ROCM_ENCODE_1536 = 11362369536
+
+
+def test_on_rocm_the_tiling_decision_follows_the_measured_untiled_curve(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(torch.version, "hip", "10.0.0")
+    # Measured points are their measured bytes; between two, the chord in bytes.
+    assert untiled_peak_bytes("decode", 1024, 1024, 2, GPU) == _ROCM_DECODE_1024
+    between = (1024 * 1088 - 1024 * 1024) / (1088 * 1088 - 1024 * 1024)
+    expected = _ROCM_DECODE_1024 + (_ROCM_DECODE_1088 - _ROCM_DECODE_1024) * between
+    assert untiled_peak_bytes("decode", 1024, 1088, 2, GPU) == pytest.approx(expected, abs=1)
+    # Past the last measured area it is the reservation.
+    assert untiled_peak_bytes("decode", 2048, 2048, 2, GPU) == _reserved("decode", 2048, None, 2, GPU)
+
+    # On a card that holds 12.5 GiB a measured 11.81 GiB decode stays whole, though it reserves ~15 GiB; and an encode
+    # reads its own curve (10.58 GiB at 1536px), not the decode's (32.6 GiB).
+    monkeypatch.setattr(vae_module, "should_pretile_vae_decode", lambda device, needed: needed > 12.5 * GIB)
+    assert _reserved("decode", 1024, None, 2, GPU) > 12.5 * GIB
+    assert choose_tile_size("decode", 1024, 1024, 2, GPU, tiled=False, tile_size=768, auto_tile=True) is None
+    assert untiled_peak_bytes("encode", 1536, 1536, 2, GPU) == _ROCM_ENCODE_1536
+    assert choose_tile_size("encode", 1536, 1536, 2, GPU, tiled=False, tile_size=768, auto_tile=True) is None
+    assert choose_tile_size("decode", 1536, 1536, 2, GPU, tiled=False, tile_size=768, auto_tile=True) == 768
 
 
 def test_nothing_is_tiled_unless_asked_or_too_large(monkeypatch: pytest.MonkeyPatch) -> None:
     # Stand in for the device: it holds 12 GiB of working memory.
-    monkeypatch.setattr(vae_module, "should_pretile_vae_decode", lambda device, needed: needed > 12 * 1024**3)
+    monkeypatch.setattr(vae_module, "should_pretile_vae_decode", lambda device, needed: needed > 12 * GIB)
 
     def choose(size: int, **kwargs) -> int | None:
-        return choose_tile_size(size, size, 2, CPU, **({"tiled": False, "tile_size": 0, "auto_tile": True} | kwargs))
+        defaults = {"tiled": False, "tile_size": 0, "auto_tile": True}
+        return choose_tile_size("decode", size, size, 2, CPU, **(defaults | kwargs))
 
     assert choose(1024) is None
-    # 2048x2048 untiled needs ~32 GiB: tiled, at the device's tile size, encode and decode alike.
+    # 2048x2048 untiled needs ~32 GiB: tiled, at the device's tile size.
     assert choose(2048) == 1024
     assert choose(2048, auto_tile=False) is None
     assert choose(1024, tiled=True) == 1024
 
 
+def test_the_default_tile_is_the_largest_whose_working_memory_fits_half_the_device(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(torch.version, "hip", "10.0.0")
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda device: SimpleNamespace(total_memory=42 * GIB))
+    # On a 42 GiB MIOpen card a 1024px fp32 decode tile reserves ~22.5 GiB, over half of it -- priced as a tile: as an
+    # untiled 1024px frame it would be ~20.1 GiB, and fit. A 1024px encode tile fits.
+    assert default_tile_size("decode", GPU, 4) == 768
+    assert default_tile_size("encode", GPU, 4) == 1024
+
+
+@pytest.mark.parametrize(("dedicated", "expected"), [(True, 512), (False, 1024)], ids=["discrete", "integrated"])
+def test_a_discrete_xpu_picks_its_tile_from_its_memory(dedicated: bool, expected: int, monkeypatch) -> None:
+    monkeypatch.setattr(vae_module, "device_has_dedicated_vram", lambda device: dedicated)
+    monkeypatch.setattr(torch.xpu, "get_device_properties", lambda device: SimpleNamespace(total_memory=8 * GIB))
+    # Priced as cuDNN: on 8 GiB only a 512px bf16 decode tile (~2.7 GiB) fits in half. An integrated XPU shares system
+    # RAM and keeps the largest tile.
+    assert default_tile_size("decode", torch.device("xpu"), 2) == expected
+
+
 def test_a_tile_size_field_below_the_floor_is_raised_to_it() -> None:
-    assert choose_tile_size(2048, 2048, 2, CPU, tiled=True, tile_size=16, auto_tile=False) == MIN_TILE_SIZE
-    assert choose_tile_size(2048, 2048, 2, CPU, tiled=True, tile_size=768, auto_tile=False) == 768
+    assert choose_tile_size("decode", 2048, 2048, 2, CPU, tiled=True, tile_size=16, auto_tile=False) == MIN_TILE_SIZE
+    assert choose_tile_size("decode", 2048, 2048, 2, CPU, tiled=True, tile_size=768, auto_tile=False) == 768
 
 
 @pytest.mark.parametrize(
@@ -121,8 +215,6 @@ def test_a_tile_size_field_below_the_floor_is_raised_to_it() -> None:
 def test_the_pipelines_vae_loads_at_the_configured_precision_but_never_float16(
     precision: torch.dtype, expected: torch.dtype, tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from types import SimpleNamespace
-
     from invokeai.backend.model_manager.load.model_loaders.qwen_image_2_1 import QwenImage21DiffusersModel
     from invokeai.backend.model_manager.taxonomy import SubModelType
 

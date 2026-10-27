@@ -14,7 +14,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.qwen_image_2_1.vae import SPATIAL_SCALE, choose_tile_size, to_vae_input, working_memory_bytes
+from invokeai.backend.qwen_image_2_1.vae import SPATIAL_SCALE, choose_tile_size, estimate_working_memory, to_vae_input
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.qwen_image_vae import patch_qwen_image_vae_tiling
 
@@ -52,9 +52,10 @@ class QwenImage21ImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoar
         device = vae_info.compute_device
         config = context.config.get()
         element_size = next(vae_info.model.parameters()).element_size()
-        # Encodes are tiled up front like decodes: priced like the decoder, an untiled 2048x2048 canvas box would
+        # Encodes are tiled up front like decodes: priced like the decoder on cuDNN, an untiled 2048x2048 canvas box would
         # ask for ~32 GiB.
         tile_size = choose_tile_size(
+            "encode",
             height,
             width,
             element_size,
@@ -63,9 +64,9 @@ class QwenImage21ImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoar
             tile_size=self.tile_size,
             auto_tile=config.auto_tiled_decode,
         )
-        working_memory = working_memory_bytes(height, width, tile_size, element_size)
+        working_memory = estimate_working_memory("encode", height, width, tile_size, element_size, device)
 
-        with vae_info.model_on_device(working_mem_bytes=working_memory) as (_, vae):
+        with vae_info.model_on_device(working_memory=working_memory) as (_, vae):
             pixels = to_vae_input(image).to(device=device, dtype=vae.dtype).unsqueeze(2)
             with torch.inference_mode(), patch_qwen_image_vae_tiling(vae, tile_size, SPATIAL_SCALE):
                 z = vae.encode(pixels).latent_dist.mode().float()[:, :, 0]
