@@ -67,6 +67,9 @@ DECLARED_LATENT_SPACES: dict[BaseModelType, tuple[LatentSpace, ...]] = {
     BaseModelType.Krea2: (WAN21_16,),
     BaseModelType.LTX2: (LTX2_128,),
     BaseModelType.MiniMaxH3: (MINIMAX_H3_24,),
+    # No old branch to corroborate: MOSS-Image arrived after the dispatch was gone. Its VAE's encoder and
+    # BatchNorm are FLUX.2's, and it denoises in FLUX.2's normalized latent.
+    BaseModelType.MossImage: (FLUX2_32,),
     BaseModelType.QwenImage: (WAN21_16,),
     BaseModelType.QwenImage21: (QWEN_IMAGE21_64,),
     BaseModelType.StableDiffusion1: (SD15_4,),

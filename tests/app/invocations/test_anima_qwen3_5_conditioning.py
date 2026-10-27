@@ -82,11 +82,15 @@ def test_qwen3_5_is_read_at_the_trained_layers_with_an_attention_only_last_layer
 
 
 @pytest.mark.platform_independent
-def test_the_prompt_node_does_not_import_transformers_qwen3_5_at_startup() -> None:
-    """Every app start imports every node module; transformers' qwen3_5 modeling costs ~0.25 s of it."""
+def test_the_qwen3_5_prompt_nodes_do_not_import_transformers_qwen3_5_at_startup() -> None:
+    """Every app start imports every node module; transformers' qwen3_5 modeling costs ~0.25 s of it.
+
+    Anima's and MOSS-Image's prompt nodes share the one cold interpreter this needs.
+    """
     program = (
         "import sys\n"
         "import invokeai.app.invocations.text_encoder.anima_text_encoder\n"
+        "import invokeai.app.invocations.text_encoder.moss_image_text_encoder\n"
         "loaded = [m for m in sys.modules if m.startswith('transformers.models.qwen3_5')]\n"
         "assert not loaded, loaded\n"
         "print('OK')\n"
