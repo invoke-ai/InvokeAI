@@ -5840,7 +5840,7 @@
         "title": "Redesigned interface"
       },
       "models": {
-        "description": "New video models like Wan-2.2, MiniMax H3, and LTX-2.5, plus larger Anima models.",
+        "description": "New image models MOSS-Image, Qwen-Image-2.1, and FLUX.3 Klein; video models like Wan-2.2, MiniMax H3, and LTX-2.5; and larger Anima models.",
         "title": "Expanded model support"
       },
       "projects": {
