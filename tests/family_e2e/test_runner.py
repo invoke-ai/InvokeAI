@@ -14,6 +14,7 @@ import psutil
 import pytest
 import yaml
 
+import scripts.family_e2e.__main__ as cli
 from scripts.family_e2e import calibration, runner, server
 from scripts.family_e2e.__main__ import main
 from scripts.family_e2e.gpu_memory import Adapter, MemoryTrace, ProcessUsage, UnsupportedPlatformError
@@ -511,7 +512,8 @@ def test_stop_keeps_the_run_while_a_recorded_process_survives_the_kill(
         capsys.readouterr()
         assert main(["stop", str(killed_run)]) == 2
 
-    assert f"survived the kill: pid {int(surviving_server[0])} (" in capsys.readouterr().err
+    cause = "the kill was refused: AccessDenied" if failure == "kill refused" else "0.05s after the kill; still running"
+    assert f"survived the kill: pid {int(surviving_server[0])} ({cause}" in capsys.readouterr().err
     assert runner.is_alive(surviving_server)
     # The server may still write to its scratch root and store: neither is saved nor removed.
     assert _scratch_file(killed_run).read_text() == "left by the killed runner"
@@ -524,6 +526,43 @@ def test_stop_keeps_the_run_while_a_recorded_process_survives_the_kill(
     assert not runner.is_alive(surviving_server)
     assert not _scratch_file(killed_run).exists()
     assert [e.source for e in load_run_info(killed_run).calibration_exports] == ["store_file"]
+
+
+def test_stop_reads_the_heartbeat_again_once_the_runner_is_dead_and_kills_the_server_it_names(
+    killed_run: Path,
+    surviving_server: list[float],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # The runner launched its server after `stop` had read the heartbeat, and recorded it before it was killed.
+    _write_heartbeat(killed_run, server_launcher=surviving_server)
+    reads = [{**runner.read_heartbeat(killed_run), "server_launcher": None}]
+    monkeypatch.setattr(cli, "read_heartbeat", lambda d: reads.pop() if reads else runner.read_heartbeat(d))
+
+    capsys.readouterr()
+    assert main(["stop", str(killed_run)]) == 0
+
+    assert not runner.is_alive(surviving_server)
+    assert f"killed server_launcher (pid {int(surviving_server[0])})" in capsys.readouterr().out
+    assert not _scratch_file(killed_run).exists()
+
+
+def test_the_heartbeat_names_the_serving_process_as_captured_at_its_start(killed_run: Path, tmp_path: Path) -> None:
+    # Once the serving process has exited, its pid can name an unrelated process that `stop` would then kill.
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    serving = psutil.Process(process.pid)
+    captured = [process.pid, serving.create_time()]
+    session = runner._Session(killed_run, runner.load_run_manifest(load_run_info(killed_run)), _fake_gpu("Fake"), None)
+    with open(tmp_path / "console.log", "wb") as console:
+        session.server = server.ServerProcess(
+            process, console, tmp_path / "server.log", "http://127.0.0.1:1", serving, [], "", None
+        )
+        process.kill()
+        process.wait()
+
+        session.heartbeat()
+
+    assert runner.read_heartbeat(killed_run)["server"] == captured
 
 
 class _ServerStarting(Exception):

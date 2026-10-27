@@ -412,21 +412,21 @@ def kill_identified(identity: list[float] | None) -> bool:
     return True
 
 
-def kill_recorded(heartbeat: dict[str, Any], roles: Sequence[str]) -> tuple[list[str], str]:
-    """Kills the processes `heartbeat` names under `roles`, in that order, then checks that each has exited.
+def kill_recorded(processes: Sequence[tuple[str, list[float] | None]]) -> tuple[list[tuple[str, int]], str]:
+    """Kills the processes given as (role, identity), in that order, then checks that each has exited.
 
-    Returns the roles whose process ran, and what still runs, per recorded pid with the cause; empty once all exited.
-    A process stuck in the GPU driver outlives SIGKILL until it leaves the kernel, and another user's refuses it.
+    Returns the roles and pids of the processes that ran, and what still runs, per pid with the cause; empty once all
+    exited. A process stuck in the GPU driver outlives SIGKILL until it leaves the kernel, and another user's refuses it.
     """
-    ran: list[str] = []
+    ran: list[tuple[str, int]] = []
     refused: dict[int, str] = {}
-    for role in roles:
+    for role, identity in processes:
         try:
-            if kill_identified(heartbeat.get(role)):
-                ran.append(role)
+            if kill_identified(identity):
+                ran.append((role, int(identity[0])))
         except psutil.Error as e:
-            refused[int(heartbeat[role][0])] = f"the kill was refused: {type(e).__name__} {e}"
-    left = {int(heartbeat[role][0]): running for role in roles if (running := still_running(heartbeat.get(role)))}
+            refused[int(identity[0])] = f"the kill was refused: {type(e).__name__} {e}"
+    left = {int(identity[0]): running for _, identity in processes if (running := still_running(identity))}
     waited = f"{KILL_WAIT_S:g}s after the kill"
     survivors = ", ".join(
         f"pid {pid} ({refused.get(pid, waited)}; still running: {', '.join(str(p) for p in running)})"
@@ -547,7 +547,7 @@ def stop_surviving_server(run_dir: Path) -> None:
     for pid, running in survivors.items():
         pids = ", ".join(str(p) for p in running)
         logger.warning("an earlier runner of this run left its server running (pid %d: %s); stopping it", pid, pids)
-    _, left = kill_recorded(heartbeat, SERVER_ROLES)
+    _, left = kill_recorded([(role, heartbeat.get(role)) for role in SERVER_ROLES])
     if left:
         raise RunnerError(
             f"the server an earlier runner left running cannot be stopped: {left}. heartbeat.json and the scratch "
@@ -795,7 +795,8 @@ class _Session:
             self.step_label = step_label
         data = {
             "runner": process_identity(os.getpid()),
-            "server": process_identity(self.server.pid) if self.server else None,
+            # The create time captured with the serving process, as for the launcher.
+            "server": [self.server.pid, self.server.serving.create_time()] if self.server else None,
             "server_launcher": self.launcher,
             "step": self.step_label,
             "updated_at": now_iso(),
