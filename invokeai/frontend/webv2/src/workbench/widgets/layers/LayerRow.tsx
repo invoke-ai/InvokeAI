@@ -24,7 +24,7 @@ import type { LayerTreeRow } from './layerTreeRows';
 
 import { AdjustmentStatusIcon, useAdjustmentStatus } from './AdjustmentStatusIcon';
 import { colorLabelHex } from './colorLabels';
-import { ControlLayerWarningIcon } from './ControlLayerWarningIcon';
+import { ControlLayerStatusIcon } from './ControlLayerStatusIcon';
 import { LayerActiveDot, TREE_ROW_FOCUS } from './LayerActiveDot';
 import { recordLayerRowCommit } from './layerPanelDiagnostics';
 import { LAYER_TREE_INDENT_PX } from './layerPanelRows';
@@ -442,7 +442,9 @@ const LayerRowComponent = ({
           )}
         </Box>
         <AdjustmentStatusIcon descriptionId={adjustmentStatusId} status={adjustmentStatus} />
-        {layer ? <ControlLayerWarningIcon contributing={vm.contributionEnabled} layer={layer} /> : null}
+        {layer?.type === 'control' ? (
+          <ControlLayerStatusIcon contributing={vm.contributionEnabled} engine={engine} layer={layer} />
+        ) : null}
         {/* One control cluster on the same rhythm as the stack header; slots a row cannot use are held open. */}
         <HStack flexShrink="0" gap="0.5" onClick={stopPropagation} onMouseDown={keepRowFocus}>
           {hideable ? (

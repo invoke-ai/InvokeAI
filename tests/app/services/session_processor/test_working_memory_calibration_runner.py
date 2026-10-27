@@ -494,6 +494,63 @@ def test_a_refused_item_the_queue_pruned_before_the_runner_recorded_it_keeps_its
     assert run.status == "failed" and "administrators only" in (run.error or "")
 
 
+@pytest.mark.parametrize("announcement", ["announced", "raises"])
+@pytest.mark.parametrize("failure", ["refused-at-admission", "measurements-unsaved"])
+def test_a_calibration_failure_pruned_between_its_commit_and_read_back_stays_failed(
+    mock_invoker: Invoker,
+    service: WorkingMemoryCalibrationService,
+    queue: SessionQueue,
+    runner,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+    announcement: str,
+) -> None:
+    """The queue commits the failure, a prune removes the item, and only then would the queue read the row back; or
+    the announcement raises after the prune. The snapshot the queue updated keeps the failure, and its error."""
+    if failure == "refused-at-admission":
+        mock_invoker.services.configuration.multiuser = True
+        owner, expected = _user(mock_invoker, "user@test.com", is_admin=False), "administrators only"
+    else:
+        owner, expected = "system", "Could not save the working-memory measurements"
+
+        def refuse(run_id: str, windows, model_reset_epochs) -> None:
+            raise OSError("read-only file system")
+
+        monkeypatch.setattr(service, "record_windows", refuse)
+    run_id, _ = _create(service, owner, "complete")
+    queries = queue._queries.session_queue
+    transition = queries.transition
+
+    def pruned_after_the_commit(item_id: int, status: str, **kwargs):
+        committed = transition(item_id, status, **kwargs)
+        if status == "failed":
+            queue.prune("default")
+        return committed
+
+    monkeypatch.setattr(queries, "transition", pruned_after_the_commit)
+    if announcement == "raises":
+        events = mock_invoker.services.events
+        emit = events.emit_queue_item_status_changed
+
+        def announce(queue_item, *args, **kwargs):
+            if queue_item.status == "failed":
+                raise RuntimeError("the event bus is gone")
+            return emit(queue_item, *args, **kwargs)
+
+        monkeypatch.setattr(events, "emit_queue_item_status_changed", announce)
+    item = queue.dequeue()
+    assert item is not None
+    if announcement == "raises":
+        with pytest.raises(RuntimeError, match="event bus"):
+            runner[0].run(item)
+    else:
+        runner[0].workflow_call_queue_lifecycle.run_queue_item(item)
+
+    assert queue.get_queue_item_ids("default").item_ids == []
+    [run] = service.get_status().device_classes[0].runs
+    assert (run.run_id, run.status) == (run_id, "failed") and expected in (run.error or "")
+
+
 def test_a_failed_node_whose_item_the_queue_pruned_before_the_session_ended_keeps_its_failure(
     service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, monkeypatch
 ) -> None:

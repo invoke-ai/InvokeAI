@@ -2,10 +2,10 @@ import type { CanvasEngine, ImageResolver } from '@workbench/canvas-engine/api';
 
 import { useFontRuntime } from '@features/fonts/react';
 import { galleryImageUrls } from '@features/gallery/utility';
-import { getModelsSnapshot } from '@features/models';
+import { CanvasImageMissingError } from '@workbench/canvas-engine/api';
 import { createCanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
 import { publishLayerPanelSelection, readLayerPanelState } from '@workbench/layerPanelState';
-import { resolveDefaultControlModelForBase } from '@workbench/widgets/layers/controlModelOptions';
+import { getWorkbenchPreferences } from '@workbench/settings/store';
 import { getSelectedModelBase } from '@workbench/widgets/layers/selectedModel';
 import {
   useActiveProjectId,
@@ -27,9 +27,16 @@ export interface CanvasEngineResource {
   subscribe(listener: () => void): () => void;
 }
 
-/** Fetches a persisted image asset to a Blob for the engine rasterizers. */
-const createImageResolver = (): ImageResolver => async (imageName, signal) => {
+/**
+ * Fetches a persisted image asset to a Blob for the engine rasterizers. 404 and 410 say the image does not exist and
+ * 403 that this user may not read it (access to its board was lost), which lasts too. A network error, an expired
+ * session (401) or any other status may pass, so the engine treats it as transient.
+ */
+export const createImageResolver = (): ImageResolver => async (imageName, signal) => {
   const response = await fetch(galleryImageUrls.full(imageName), { signal });
+  if (response.status === 403 || response.status === 404 || response.status === 410) {
+    throw new CanvasImageMissingError(imageName);
+  }
   if (!response.ok) {
     throw new Error(`Failed to load canvas image "${imageName}" (${response.status})`);
   }
@@ -86,7 +93,6 @@ export const useCanvasEngine = (): CanvasEngineHandle | null => {
           }
         },
         liveEngines,
-        getDefaultControlModel: (base) => resolveDefaultControlModelForBase(getModelsSnapshot().models, base),
         getMainModelBase: () => {
           const project = store.getState().projects.find((candidate) => candidate.id === projectId);
           return project ? getSelectedModelBase(project) : null;
@@ -100,6 +106,7 @@ export const useCanvasEngine = (): CanvasEngineHandle | null => {
         imageResolver: createImageResolver(),
         fonts,
         mutationPort: createCanvasProjectMutationPort(store, projectId),
+        readSelectObjectAutoProcess: () => getWorkbenchPreferences().selectObjectAutoProcess,
         reportError: notifications.reportError,
       }),
     [fonts, liveEngines, notifications.reportError, persistence, projectId, store]

@@ -5,6 +5,7 @@ import type {
   ComponentModelConfig,
   ExternalImageGeneratorModelConfig,
   GenerateModelConfig,
+  GenerateReferenceImage,
   GenerateSettings,
   LoraModelConfig,
   MainModelConfig,
@@ -595,6 +596,132 @@ describe('compileGenerateGraph', () => {
     expect(graph.nodes.canvas_output?.type).toBe('anima_l2i');
   });
 
+  describe('Anima IP-Adapter', () => {
+    const animaQwen3Model: MainModelConfig = { ...animaModel, format: 'checkpoint', variant: 'anima_qwen3' };
+    const animaIpAdapter: ComponentModelConfig = {
+      base: 'anima',
+      key: 'anima-ip-adapter',
+      name: 'Anima IP-Adapter',
+      type: 'ip_adapter',
+    };
+    const animaReference = (overrides: { isEnabled?: boolean; weight?: number } = {}) => ({
+      config: {
+        beginEndStepPct: [0.2, 0.9] as [number, number],
+        // Carried by every ip_adapter config; Anima must never send them.
+        clipVisionModel: 'ViT-H' as const,
+        image: refImage,
+        method: 'style' as const,
+        model: animaIpAdapter,
+        type: 'ip_adapter' as const,
+        weight: overrides.weight ?? 1.5,
+      },
+      id: 'anima-ref',
+      isEnabled: overrides.isEnabled ?? true,
+    });
+    const compileAnima = (model: MainModelConfig, referenceImages: GenerateSettings['referenceImages']) =>
+      compile(model, { qwen3EncoderModel: qwen3Encoder, referenceImages, vae: qwenImageVae });
+
+    it('sends the reference through anima_ip_adapter with a strength and no encoder or method', () => {
+      const graph = compileAnima(animaQwen3Model, [animaReference()]);
+      const adapter = getNodeByType(graph, 'anima_ip_adapter');
+
+      expect(adapter).toEqual({
+        begin_step_percent: 0.2,
+        end_step_percent: 0.9,
+        id: adapter?.id,
+        image: { image_name: 'reference.png' },
+        ip_adapter_model: animaIpAdapter,
+        is_intermediate: true,
+        strength: 1.5,
+        type: 'anima_ip_adapter',
+        use_cache: true,
+      });
+      expect(getNodeByType(graph, 'ip_adapter')).toBeUndefined();
+
+      const collector = getEdge(graph, 'denoise_latents', 'ip_adapter')?.source.node_id;
+      expect(graph.nodes[collector!]?.type).toBe('collect');
+      expect(getEdge(graph, collector!, 'item')?.source).toEqual({ field: 'ip_adapter', node_id: adapter?.id });
+      expect(getNodeByType(graph, 'core_metadata')?.ref_images).toMatchObject([
+        { config: { model: animaIpAdapter, type: 'ip_adapter', weight: 1.5 }, id: 'anima-ref' },
+      ]);
+    });
+
+    it('sends nothing for a strength-0 reference, but still records it for recall', () => {
+      const graph = compileAnima(animaQwen3Model, [animaReference({ weight: 0 })]);
+
+      expect(getNodeByType(graph, 'anima_ip_adapter')).toBeUndefined();
+      expect(getEdge(graph, 'denoise_latents', 'ip_adapter')).toBeUndefined();
+      expect(Object.keys(graph.nodes).filter((id) => id.startsWith('ip_adapter_collector'))).toEqual([]);
+      expect(getNodeByType(graph, 'core_metadata')?.ref_images).toMatchObject([
+        { config: { model: animaIpAdapter, type: 'ip_adapter', weight: 0 }, id: 'anima-ref' },
+      ]);
+    });
+
+    it('sends every enabled reference, each with its own settings, through one collector', () => {
+      const second = {
+        ...animaReference({ weight: 0.6 }),
+        config: {
+          ...animaReference().config,
+          beginEndStepPct: [0, 0.5] as [number, number],
+          image: { original: { image: { height: 512, image_name: 'second.png', width: 512 } } },
+          weight: 0.6,
+        },
+        id: 'anima-ref-2',
+      };
+      const graph = compileAnima(animaQwen3Model, [
+        animaReference(),
+        second,
+        { ...second, id: 'off', isEnabled: false },
+      ]);
+      const adapters = Object.values(graph.nodes).filter((node) => node.type === 'anima_ip_adapter');
+      const collector = getEdge(graph, 'denoise_latents', 'ip_adapter')?.source.node_id;
+      const fedIn = graph.edges
+        .filter((edge) => edge.destination.node_id === collector && edge.destination.field === 'item')
+        .map((edge) => edge.source.node_id);
+
+      expect(
+        adapters.map(({ begin_step_percent, end_step_percent, image, strength }) => ({
+          begin_step_percent,
+          end_step_percent,
+          image,
+          strength,
+        }))
+      ).toEqual([
+        { begin_step_percent: 0.2, end_step_percent: 0.9, image: { image_name: 'reference.png' }, strength: 1.5 },
+        { begin_step_percent: 0, end_step_percent: 0.5, image: { image_name: 'second.png' }, strength: 0.6 },
+      ]);
+      expect(fedIn).toEqual(adapters.map((node) => node.id));
+      expect(graph.edges.filter((edge) => edge.destination.field === 'ip_adapter')).toHaveLength(1);
+    });
+
+    it('leaves the denoiser alone when the reference is disabled', () => {
+      const graph = compileAnima(animaQwen3Model, [animaReference({ isEnabled: false })]);
+
+      expect(getNodeByType(graph, 'anima_ip_adapter')).toBeUndefined();
+      expect(getEdge(graph, 'denoise_latents', 'ip_adapter')).toBeUndefined();
+    });
+
+    it('refuses a reference on Anima-3.8B, whose Qwen3.5 variant the adapter was not trained for', () => {
+      const anima38b: MainModelConfig = { ...animaModel, format: 'checkpoint', variant: 'anima_qwen35' };
+      const qwen35Encoder: ComponentModelConfig = {
+        base: 'any',
+        key: 'qwen35',
+        name: 'Qwen3.5 Encoder',
+        type: 'qwen3_5_encoder',
+        variant: 'qwen3_5_4b',
+      };
+
+      expect(() =>
+        compile(anima38b, {
+          qwen35EncoderModel: qwen35Encoder,
+          qwen3EncoderModel: qwen3Encoder,
+          referenceImages: [animaReference()],
+          vae: qwenImageVae,
+        })
+      ).toThrow('Reference Image #1 is not supported by anima model.');
+    });
+  });
+
   it('builds an external provider graph', () => {
     const graph = compile(externalModel);
 
@@ -896,6 +1023,65 @@ describe('compileGenerateGraph', () => {
 
     expect(getEdge(graph, 'pos_cond', 'reference_images')).toBeDefined();
     expect(getEdge(graph, 'denoise_latents', 'reference_latents')).toBeDefined();
+  });
+
+  describe('Qwen-Image-2.1 reference images', () => {
+    const qwenImage21Model: MainModelConfig = {
+      base: 'qwen-image-2-1',
+      format: 'diffusers',
+      key: 'qwen21',
+      name: 'Qwen-Image-2.1',
+      type: 'main',
+    };
+    const references = (...names: string[]): GenerateReferenceImage[] =>
+      names.map((name) => ({
+        config: {
+          image: { original: { image: { height: 768, image_name: name, width: 512 } } },
+          type: 'qwen_image_2_1_reference_image',
+        },
+        id: name,
+        isEnabled: true,
+      }));
+
+    it('reads each reference in both prompts and, in the same order, as latents in denoise', () => {
+      const graph = compile(qwenImage21Model, { cfgScale: 4, referenceImages: references('a.png', 'b.png') });
+
+      const nameOf = (imageNode: string) =>
+        (graph.nodes[imageNode]?.image as { image_name: string } | undefined)?.image_name;
+      // Each chain is followed back from its end: the last collect holds b, the one before it a.
+      const chain = (lastCollect: string) => [
+        getEdge(graph, lastCollect, 'collection')?.source.node_id ?? '',
+        lastCollect,
+      ];
+
+      const imagesInto = getEdge(graph, 'pos_cond', 'reference_images')?.source.node_id ?? '';
+      expect(getEdge(graph, 'neg_cond', 'reference_images')?.source.node_id).toBe(imagesInto);
+      expect(chain(imagesInto).map((collect) => nameOf(getEdge(graph, collect, 'item')?.source.node_id ?? ''))).toEqual(
+        ['a.png', 'b.png']
+      );
+
+      const latentsInto = getEdge(graph, 'denoise_latents', 'reference_latents')?.source.node_id ?? '';
+      const latentImages = chain(latentsInto).map((collect) => {
+        const i2l = getEdge(graph, collect, 'item')?.source.node_id ?? '';
+        expect(graph.nodes[i2l]).toMatchObject({ reference: true, type: 'qwen_image_2_1_i2l' });
+        return nameOf(getEdge(graph, i2l, 'image')?.source.node_id ?? '');
+      });
+      expect(latentImages).toEqual(['a.png', 'b.png']);
+    });
+
+    // The denoise records whether it reused the prompt's attention cache, which changes the image in bf16.
+    it('passes the image metadata through the denoise to the decoder that saves the image', () => {
+      const graph = compile(qwenImage21Model);
+      const metadata = getNodeByType(graph, 'core_metadata');
+      const metadataEdges = graph.edges.filter(
+        (edge) => edge.source.field === 'metadata' || edge.destination.field === 'metadata'
+      );
+
+      expect(metadataEdges.map(({ destination, source }) => [source.node_id, destination.node_id])).toEqual([
+        [metadata?.id, 'denoise_latents'],
+        ['denoise_latents', 'canvas_output'],
+      ]);
+    });
   });
 });
 
@@ -1321,6 +1507,114 @@ describe('ERNIE-Image graphs', () => {
   });
 });
 
+describe('MOSS-Image graphs', () => {
+  const mossDiffusers: MainModelConfig = {
+    base: 'moss-image',
+    format: 'diffusers',
+    key: 'moss-diffusers',
+    name: 'MOSS-Image Base',
+    type: 'main',
+  };
+  const mossSingleFile: MainModelConfig = { ...mossDiffusers, format: 'checkpoint', key: 'moss-single-file' };
+  const qwen35Encoder = (variant: string): ComponentModelConfig => ({
+    base: 'any',
+    key: `qwen35-${variant}`,
+    name: `Qwen3.5 ${variant}`,
+    type: 'qwen3_5_encoder',
+    variant,
+  });
+
+  it('builds a Diffusers pipeline graph that conditions without a collector and decodes as FLUX.2', () => {
+    const graph = compile(mossDiffusers);
+
+    expect(graph.nodes.model_loader).toMatchObject({ type: 'moss_image_model_loader' });
+    expect(graph.nodes.model_loader?.qwen3_5_encoder_model).toBeUndefined();
+    expect(graph.nodes.model_loader?.vae_model).toBeUndefined();
+    expect(graph.nodes.denoise_latents).toMatchObject({
+      cfg_scale: 3,
+      height: 1024,
+      steps: 50,
+      type: 'moss_image_denoise',
+      width: 1024,
+    });
+    // The denoise node takes one conditioning field, not a collection.
+    expect(getNodeByType(graph, 'collect')).toBeUndefined();
+    expect(getEdge(graph, 'denoise_latents', 'positive_conditioning')?.source).toEqual({
+      field: 'conditioning',
+      node_id: 'pos_cond',
+    });
+    expect(getEdge(graph, 'pos_cond', 'qwen3_5_encoder')?.source).toEqual({
+      field: 'qwen3_5_encoder',
+      node_id: 'model_loader',
+    });
+    // The VAE reaches the denoise node, which reads its BatchNorm statistics, and the FLUX.2 decode.
+    expect(graph.nodes.canvas_output?.type).toBe('flux2_vae_decode');
+    expect(getEdge(graph, 'canvas_output', 'vae')?.source).toEqual({ field: 'vae', node_id: 'model_loader' });
+    expect(getEdge(graph, 'denoise_latents', 'vae')?.source).toEqual({ field: 'vae', node_id: 'model_loader' });
+    expect(getNodeByType(graph, 'core_metadata')?.generation_mode).toBe('moss_image_txt2img');
+  });
+
+  it('encodes the negative prompt only while CFG runs the negative branch', () => {
+    const withCfg = compile(mossDiffusers, { cfgScale: 4 });
+
+    expect(withCfg.nodes.neg_cond?.type).toBe('moss_image_text_encoder');
+    expect(getEdge(withCfg, 'neg_cond', 'prompt')?.source.node_id).toBe('negative_prompt');
+    expect(getEdge(withCfg, 'neg_cond', 'qwen3_5_encoder')?.source.node_id).toBe('model_loader');
+    expect(getEdge(withCfg, 'denoise_latents', 'negative_conditioning')?.source).toEqual({
+      field: 'conditioning',
+      node_id: 'neg_cond',
+    });
+
+    const withoutCfg = compile(mossDiffusers, { cfgScale: 1 });
+
+    expect(withoutCfg.nodes.neg_cond).toBeUndefined();
+    expect(getEdge(withoutCfg, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
+    expect(withoutCfg.nodes.denoise_latents?.cfg_scale).toBe(1);
+  });
+
+  it('requires the Qwen3.5 9B encoder and a VAE for a single-file transformer', () => {
+    // Anima-3.8B's 4B encoder shares the setting but not the hidden size MOSS-Image reads.
+    expect(() => compile(mossSingleFile, { qwen35EncoderModel: qwen35Encoder('qwen3_5_4b'), vae: flux2Vae })).toThrow(
+      'Generate needs a Qwen3.5 9B Encoder for non-Diffusers MOSS-Image models.'
+    );
+    expect(() => compile(mossSingleFile, { qwen35EncoderModel: qwen35Encoder('qwen3_5_9b') })).toThrow(
+      'Generate needs a VAE for non-Diffusers MOSS-Image models.'
+    );
+
+    const graph = compile(mossSingleFile, { qwen35EncoderModel: qwen35Encoder('qwen3_5_9b'), vae: flux2Vae });
+
+    expect(graph.nodes.model_loader).toMatchObject({
+      qwen3_5_encoder_model: { key: 'qwen35-qwen3_5_9b' },
+      vae_model: { key: 'flux2-vae' },
+    });
+    expect(getNodeByType(graph, 'core_metadata')).toMatchObject({
+      qwen3_5_encoder: { key: 'qwen35-qwen3_5_9b' },
+      vae: { key: 'flux2-vae' },
+    });
+  });
+
+  it('keeps a Qwen3.5 4B selection left over from Anima out of a Diffusers graph', () => {
+    const graph = compile(mossDiffusers, { qwen35EncoderModel: qwen35Encoder('qwen3_5_4b') });
+
+    expect(graph.nodes.model_loader?.qwen3_5_encoder_model).toBeUndefined();
+    expect(getNodeByType(graph, 'core_metadata')?.qwen3_5_encoder).toBeUndefined();
+  });
+
+  it.each([[[22]], [[22, 26]], [[]]])('sends and records the skip layers %j', (layers) => {
+    const graph = compile(mossDiffusers, { mossImageUncondSkipLayers: layers });
+
+    expect(graph.nodes.denoise_latents?.uncond_skip_layers).toEqual(layers);
+    expect(getNodeByType(graph, 'core_metadata')?.moss_image_uncond_skip_layers).toEqual(layers);
+  });
+
+  it('refuses a skip layer MOSS-Image has no block for, unless CFG leaves the negative branch off', () => {
+    expect(() => compile(mossDiffusers, { mossImageUncondSkipLayers: [22, 42] })).toThrow(
+      'MOSS-Image skip layers must be whole numbers from 0 to 41.'
+    );
+    expect(() => compile(mossDiffusers, { cfgScale: 1, mossImageUncondSkipLayers: [22, 42] })).not.toThrow();
+  });
+});
+
 describe('PiD decode', () => {
   const pidDecoder = (base: string): ComponentModelConfig => ({
     base,
@@ -1434,6 +1728,25 @@ describe('PiD decode', () => {
 
     expect(getNodeByType(graph, 'z_image_pid_decode')).toBeDefined();
     expect(getNodeByType(graph, 'pid_decoder_loader')).toMatchObject({ pid_decoder_model: pidDecoder('flux') });
+  });
+
+  it('decodes MOSS-Image through the FLUX.2 PiD decoder, with the VAE whose constants it reads', () => {
+    const mossImageModel: MainModelConfig = {
+      base: 'moss-image',
+      format: 'diffusers',
+      key: 'moss-image',
+      name: 'MOSS-Image',
+      type: 'main',
+    };
+    const graph = compile(mossImageModel, { ...pidSettings('flux2') });
+    const decode = getNodeByType(graph, 'flux2_pid_decode');
+
+    expect(decode).toBeDefined();
+    expect(getNodeByType(graph, 'flux2_vae_decode')).toBeUndefined();
+    expect(getEdge(graph, decode!.id, 'latents')?.source.node_id).toBe('denoise_latents');
+    expect(getEdge(graph, decode!.id, 'vae')?.source).toEqual({ field: 'vae', node_id: 'model_loader' });
+    expect(getNodeByType(graph, 'pid_decoder_loader')).toMatchObject({ pid_decoder_model: pidDecoder('flux2') });
+    expect(getNodeByType(graph, 'core_metadata')?.pid_mode).toBe('fit');
   });
 
   it('decodes through PiD for SDXL, sizing the noise node instead of the denoise node', () => {
@@ -1888,7 +2201,10 @@ describe('output filters', () => {
       node_id: 'canvas_unfiltered_output',
     });
     expect(getEdge(graph, 'canvas_output', 'image')?.source).toEqual({ field: 'image', node_id: 'canvas_img_nsfw' });
-    expect(getEdge(graph, 'canvas_output', 'metadata')?.source.node_id).toBe(getNodeByType(graph, 'core_metadata')?.id);
+    // Qwen-Image-2.1's denoise adds its cache mode to the record on the way, so the record reaches the result from it.
+    const metadataSource =
+      base === 'qwen-image-2-1' ? 'denoise_latents' : (getNodeByType(graph, 'core_metadata')?.id ?? '');
+    expect(getEdge(graph, 'canvas_output', 'metadata')?.source).toEqual({ field: 'metadata', node_id: metadataSource });
     expect(getEdge(graph, 'canvas_unfiltered_output', 'metadata')).toBeUndefined();
   });
 

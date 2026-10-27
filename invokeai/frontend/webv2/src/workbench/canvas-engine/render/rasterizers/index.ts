@@ -13,7 +13,7 @@ import { rasterizeTextSource } from './textRasterizer';
 
 export type { ImageResolver, RasterizeDeps, RasterizeResult } from './types';
 export { rasterizeGradientSource } from './gradientRasterizer';
-export { rasterizeImageSource } from './imageRasterizer';
+export { CanvasImageMissingError, rasterizeImageSource } from './imageRasterizer';
 export { rasterizePaintSource } from './paintRasterizer';
 export { rasterizeShapeSource } from './shapeRasterizer';
 export { rasterizeTextSource, textFontString, textFontVariationSettings } from './textRasterizer';

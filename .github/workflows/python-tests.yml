@@ -54,6 +54,7 @@ jobs:
           - linux-cpu
           - macos-default
           - windows-cpu
+          - windows-ffmpeg
           - windows-arm64
         include:
           - platform: linux-cpu
@@ -68,20 +69,30 @@ jobs:
             pytest-workers: logical
             timeout-minutes: 30
           - platform: windows-cpu
-            os: windows-2022
+            os: blacksmith-8vcpu-windows-2025
             github-env: $env:GITHUB_ENV
-            # Half the vCPUs, not one worker each. The tests that spawn helper processes --
-            # ffmpeg decoders, installer subprocesses -- bring their own threads, which the
-            # per-worker `OMP_NUM_THREADS=1` below does not cap, so a full-width run leaves this
-            # runner with no spare core and the deadline-sensitive tests miss their budgets
-            # non-deterministically. Two workers keep that headroom.
-            pytest-workers: '2'
+            pytest-workers: logical
+            # This runner is Windows Server 2025 Core, which lacks the Video for Windows DLLs
+            # (AVICAP32, MSVFW32) every standard Windows ffmpeg build links against, so ffmpeg
+            # cannot start here. The `ffmpeg` tests run in windows-ffmpeg instead.
             # Windows installs linux's dependency set, so a `platform_independent` test cannot fail differently
             # here than on linux, which runs it. macOS runs a different torch without bitsandbytes and keeps them.
-            pytest-markers: 'not slow and not platform_independent'
-            # Roughly 1.5x the pytest step's four-worker wall time (~13.5 min), plus the job's
-            # ~1.5 min of checkout and install, plus margin.
-            timeout-minutes: 45
+            pytest-markers: 'not slow and not platform_independent and not ffmpeg'
+            prepare-server-core: true
+            # Job takes 10-15 min (runner prep ~3.5, pytest startup ~2, tests ~5-8); 30 leaves linux's and macOS's room.
+            timeout-minutes: 30
+          - platform: windows-ffmpeg
+            os: windows-2022
+            github-env: $env:GITHUB_ENV
+            # Half the vCPUs, not one worker each. The ffmpeg tests spawn decoders and encoders that
+            # bring their own threads, which the per-worker `OMP_NUM_THREADS=1` below does not cap,
+            # so a full-width run leaves this runner with no spare core and the deadline-sensitive
+            # tests miss their budgets non-deterministically. Two workers keep that headroom.
+            pytest-workers: '2'
+            pytest-markers: 'not slow and not platform_independent and ffmpeg'
+            # Roughly 1.5x the pytest step's two-worker wall time (~6 min), plus the job's ~1 min
+            # of checkout and install, plus margin.
+            timeout-minutes: 15
           # Windows on ARM64 (NVIDIA RTX Spark). The lockfile's ARM64 fork is exercised nowhere else:
           # torch 2.14.0+cu134 from NVIDIA's index (a 1.85 GB wheel, CPU-only on this runner), numpy 2,
           # onnxruntime 1.31, sentencepiece 0.2.2 and the self-built opencv/blake3/tiktoken wheels. uv
@@ -90,7 +101,7 @@ jobs:
             os: windows-11-arm
             uv-python: cpython-3.12-windows-aarch64-none
             github-env: $env:GITHUB_ENV
-            # Two workers for the same reason as windows-cpu. The job also downloads the NVIDIA torch
+            # Two workers for the same reason as windows-ffmpeg. The job also downloads the NVIDIA torch
             # wheel and builds imageio-ffmpeg from its sdist (~18 min at four workers).
             pytest-workers: '2'
             # A per-test timeout turns a hang into a failure with a traceback, so pytest still reaches its summary
@@ -100,8 +111,7 @@ jobs:
             timeout-minutes: 60
     name: 'py${{ matrix.python-version }}: ${{ matrix.platform }}'
     runs-on: ${{ matrix.os }}
-    # Per platform: expected run time is 8-14 min on linux and macos, longer on windows, which
-    # runs fewer workers. See the matrix.
+    # Per platform: expected run time is 8-14 min on linux and macos. See the matrix for windows.
     timeout-minutes: ${{ matrix.timeout-minutes }}
     env:
       PIP_USE_PEP517: '1'
@@ -186,6 +196,22 @@ jobs:
           UV_INDEX: ${{ matrix.extra-index-url }}
         run: uv sync --no-progress --locked --extra test
 
+      # Windows Server Core lacks two things the suite imports. The non-headless opencv build needs
+      # Media Foundation at `import cv2`; the feature installs in ~30 s without a reboot. There is
+      # no audio stack either, so `import sounddevice` raises PortAudioError, which mediapipe does
+      # not catch (only ImportError/OSError). Removing the module turns that into the ImportError
+      # mediapipe falls back on. No test needs a real audio device.
+      - name: prepare server core
+        if: ${{ matrix.prepare-server-core && (steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true) }}
+        run: |
+          $result = Install-WindowsFeature -Name Server-Media-Foundation
+          Write-Output "Success: $($result.Success)  RestartNeeded: $($result.RestartNeeded)"
+          $result.FeatureResult | Format-Table -AutoSize | Out-String | Write-Output
+          if (-not $result.Success) { throw 'Installing Server-Media-Foundation failed' }
+          Remove-Item .venv\Lib\site-packages\sounddevice.py
+          uv run --no-sync python -c "import cv2, mediapipe; print(cv2.__version__, mediapipe.__version__)"
+          if ($LASTEXITCODE -ne 0) { throw 'cv2 or mediapipe still fails to import after preparing the runner' }
+
       - name: import the self-built and platform-specific wheels
         if: ${{ matrix.platform == 'windows-arm64' && (steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true) }}
         # The suite never imports tiktoken, so a broken self-built wheel would otherwise pass unnoticed.
@@ -196,7 +222,7 @@ jobs:
         # `logical`, not `auto`: xdist's `auto` asks psutil for *physical* cores, which is half
         # the vCPUs a standard runner exposes. Much of the suite waits on timers and polls, so
         # one worker per vCPU is the right level where the runner has the headroom for it. The
-        # matrix carries the count, because windows needs a lower one.
+        # matrix carries the count, because windows-ffmpeg and windows-arm64 need a lower one.
         run: uv run --no-sync pytest -n ${{ matrix.pytest-workers }} --max-worker-restart=0 -m "${{ matrix.pytest-markers || 'not slow' }}" ${{ matrix.pytest-args }}
 
   # Decides whether the external-database job runs. That job's service containers start before any of its

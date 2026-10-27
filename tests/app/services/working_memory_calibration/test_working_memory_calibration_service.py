@@ -10,7 +10,7 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Optional
+from typing import Callable, Optional
 from unittest.mock import MagicMock
 
 import pytest
@@ -926,18 +926,18 @@ def test_a_failed_replay_of_the_keys_receipt_keeps_the_runs_mark(
     mock_sqlite_database: Database,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The first attempt queued the batch and could not record its items, which were pruned. A repeat replays the
-    receipt and its enqueue raises: that attempt queued nothing, but the first may have."""
+    """The first attempt queued the batch and could not record its items, which were pruned. A repeat's read of the
+    receipt raises: that attempt queued nothing, but the first may have."""
     service = _service(tmp_path, mock_invoker)
     with pytest.raises(CalibrationStoreError):
         _create_while_recording_fails(service, monkeypatch, _request(key="replayed"))
     queue.delete_queue_items_by_id(_calibration_item_ids(queue))
 
-    async def failing_enqueue(*args: object, **kwargs: object) -> None:
+    def failing_replay(*args: object, **kwargs: object) -> None:
         raise RuntimeError("the connection dropped")
 
     with monkeypatch.context() as patch:
-        patch.setattr(queue, "enqueue_batch", failing_enqueue)
+        patch.setattr(queue, "replay_enqueue", failing_replay)
         with pytest.raises(RuntimeError):
             _create(service, key="replayed")
     _collect_receipt(queue, mock_sqlite_database, "replayed")
@@ -945,6 +945,39 @@ def test_a_failed_replay_of_the_keys_receipt_keeps_the_runs_mark(
     repeat = _create(service, key="replayed")
 
     assert repeat.item_ids == [] and _calibration_item_ids(queue) == []
+
+
+def test_a_receipt_the_queue_collects_once_a_repeat_read_it_does_not_let_the_batch_in_again(
+    tmp_path: Path,
+    mock_invoker: Invoker,
+    queue: SessionQueue,
+    mock_sqlite_database: Database,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The repeat reads the key's receipt, and the queue collects it before the repeat is done with it. Enqueuing
+    again to replay the receipt would find none, and admit the batch a second time."""
+    service = _service(tmp_path, mock_invoker)
+    with pytest.raises(CalibrationStoreError):
+        _create_while_recording_fails(service, monkeypatch, _request(key="collected-meanwhile"))
+    queued = _calibration_item_ids(queue)
+    collected: list[str] = []
+
+    def collected_after(read: Callable[..., object]) -> Callable[..., object]:
+        def reading(*args: object, **kwargs: object) -> object:
+            answer = read(*args, **kwargs)
+            if answer is not None and not collected:
+                collected.append(read.__name__)
+                _collect_receipt(queue, mock_sqlite_database, "collected-meanwhile")
+            return answer
+
+        return reading
+
+    for name in ("get_enqueue_receipt", "replay_enqueue"):
+        monkeypatch.setattr(queue, name, collected_after(getattr(queue, name)))
+
+    repeat = _create(service, key="collected-meanwhile")
+
+    assert collected and repeat.item_ids == queued and _calibration_item_ids(queue) == queued
 
 
 def test_a_found_run_whose_enqueue_found_no_room_is_enqueued_by_a_later_repeat(

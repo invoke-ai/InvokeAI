@@ -75,6 +75,16 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def replay_enqueue(
+        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system"
+    ) -> Optional[EnqueueBatchResult]:
+        """What `enqueue_batch` answers a repeat of `batch` (which has an idempotency key) with, from the key's receipt;
+        None once the queue has collected the receipt. Never admits items: unlike a repeat of the enqueue, a receipt
+        collected meanwhile cannot let the batch in a second time. A receipt of another payload raises
+        `EnqueueIdempotencyConflictError`."""
+        pass
+
+    @abstractmethod
     def get_current(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
         """Gets the currently-executing session queue item"""
         pass
@@ -201,9 +211,15 @@ class SessionQueueBase(ABC):
 
     @abstractmethod
     def fail_queue_item(
-        self, item_id: int, error_type: str, error_message: str, error_traceback: str
+        self,
+        item_id: int,
+        error_type: str,
+        error_message: str,
+        error_traceback: str,
+        queue_item: Optional[SessionQueueItem] = None,
     ) -> SessionQueueItem:
-        """Fails a session queue item"""
+        """Fails a session queue item. A supplied `queue_item`, the item's own, takes the committed failure before it is
+        announced, as with `complete_queue_item`."""
         pass
 
     @abstractmethod

@@ -14,7 +14,7 @@ from dataclasses import asdict, dataclass
 from importlib.resources import files
 from importlib.resources.abc import Traversable
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Final, Literal, Self
+from typing import TYPE_CHECKING, Final, Literal, Optional, Self
 
 from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 
@@ -83,7 +83,7 @@ class MeasuredPoint(_DataModel):
     platform: dict[str, str]
     features: dict[str, FeatureValue]
     measured_bytes: int
-    method: Literal["reserved_peak", "driver_peak", "demand_peak", "probe_demand"]
+    method: Literal["reserved_peak", "driver_peak", "demand_peak", "probe_demand", "device_peak"]
     """How `measured_bytes` was read, each as a peak over its value just before the operation:
 
     - ``reserved_peak``: the caching allocator's reserved bytes, one fresh process per point. Reserved rather than
@@ -93,6 +93,9 @@ class MeasuredPoint(_DataModel):
     - ``demand_peak``: the largest of the driver-level, the reserved and the allocated peak, the larger of two runs,
       one fresh process per point. The driver-level figure is what reserved misses: on HIP the first operation of a
       process maps ~300 MiB beyond ``max_memory_reserved``.
+    - ``device_peak``: the drop in the driver's free memory (`torch.cuda.mem_get_info`, polled during the operation)
+      below its value just before it, the larger over the forwards measured. It counts the allocator's reserve and
+      whatever is allocated around it, so it is at least the reserved peak.
     - ``probe_demand``: the working-memory probe's ``demand_bytes`` (`probe.MeasuredWindow`), the largest over the
       valid, fit-eligible windows of calibration runs in a running server, warm-ups included.
       `scripts/working_memory/build_shipped.py` builds these points from calibration store exports. A lower bound
@@ -166,7 +169,8 @@ def shipped_data() -> Mapping[str, WorkingMemoryData]:
 
 
 def _where(keys: Mapping[str, str]) -> str:
-    return ",".join(f"{key}={value}" for key, value in keys.items())
+    # An estimator keyed by no platform trait (`platform_keys=()`) has one entry for every platform.
+    return ",".join(f"{key}={value}" for key, value in keys.items()) or "any platform"
 
 
 def find_entry(
@@ -197,7 +201,7 @@ def find_entry(
 
 
 def resolve_coefficients(
-    data: Iterable[WorkingMemoryData], spec: "EstimatorSpec", platform: Platform, origin: str
+    data: Iterable[WorkingMemoryData], spec: "EstimatorSpec", platform: Optional[Platform], origin: str
 ) -> ResolvedCoefficients:
     """The values `spec` takes on `platform`, and a `source` that says how they were found.
 
@@ -206,9 +210,15 @@ def resolve_coefficients(
     entry of another estimator that applies on the same platform. No other fallback: an estimate priced with
     coefficients fitted for something else is the shortfall this data exists to prevent, so a missing, ambiguous,
     chained or mismatched entry raises, naming what is wrong. `origin` prefixes the `source`.
+
+    An estimator keyed by no platform trait (`platform_keys=()`) is priced alike everywhere: nothing is priced as
+    anything else, and its points, which record no platform, are priced with `platform=None`. Any other estimator
+    needs a platform.
     """
-    measured = priced_as(platform)
-    full = {key: str(value) for key, value in asdict(measured).items()}
+    if platform is None and spec.platform_keys:
+        raise ValueError(f"Estimator '{spec.id}' is keyed by {list(spec.platform_keys)}: price it on a platform.")
+    measured = priced_as(platform) if platform is not None else None
+    full = {key: str(value) for key, value in asdict(measured).items()} if measured is not None else {}
     keys = {key: full[key] for key in spec.platform_keys}
     requested = {key: getattr(platform, key) for key in spec.platform_keys}
     where = _where(keys) if keys == requested else f"{_where(keys)} (priced for {_where(requested)})"
@@ -239,12 +249,13 @@ def resolve_coefficients(
     shown = list(dict.fromkeys(shown))
     read = {name: values[name] for name in sorted(spec.coefficients)}
     notes = [f"values of {lender}"] if lender else []
-    if measured != platform:
+    if measured != platform and spec.platform_keys:
         floors = {name: floor for name, floor in carrier.unmeasured_floor.items() if name in read}
         read |= {name: max(read[name], floor) for name, floor in floors.items()}
         notes.insert(0, f"priced as {_where({key: full[key] for key in shown})}{', floored' if floors else ''}")
     note = f" ({', '.join(notes)})" if notes else ""
-    source = f"{origin}:{_where({key: str(getattr(platform, key)) for key in shown})}{note}"
+    named = asdict(platform) if platform is not None else {}
+    source = f"{origin}:{_where({key: str(named[key]) for key in shown})}{note}"
     return ResolvedCoefficients(values=MappingProxyType(read), source=source)
 
 

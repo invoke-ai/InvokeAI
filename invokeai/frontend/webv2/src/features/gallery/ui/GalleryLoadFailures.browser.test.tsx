@@ -10,11 +10,11 @@ import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
-import { act, useMemo, useState, type ReactNode } from 'react';
+import { act, StrictMode, useMemo, useState, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { commands, userEvent } from 'vitest/browser';
 
 import { GalleryWidgetView } from './GalleryWidgetView';
 
@@ -91,6 +91,12 @@ const image = (name: string, boardId: string, day = 1): GalleryItem => ({
 });
 const page = (items: GalleryItem[], total = items.length): Promise<GalleryItemsPage> =>
   Promise.resolve({ items, total });
+const thumbnailRouteCommands = commands as typeof commands & {
+  endThumbnailRouteFailures: () => Promise<void>;
+  getThumbnailRequests: () => Promise<{ statuses: number[]; types: string[]; urls: string[] }>;
+  startThumbnailRoute: (pathnames: string[], options?: { failures?: number; status?: number }) => Promise<void>;
+  stopThumbnailRoute: () => Promise<void>;
+};
 const fail = (): Promise<never> => Promise.reject(new Error('Service Unavailable'));
 
 /** A just-generated image on another board, the kind the old fallback showed in place of a failed listing. */
@@ -211,23 +217,24 @@ const PROGRESS_SESSION: QueueProgressSession = {
 const renderGallery = async (
   values: Record<string, unknown> = {},
   region: 'bottom' | 'center' = 'center',
-  progressSessions = NO_SESSIONS
+  progressSessions = NO_SESSIONS,
+  { strict = false }: { strict?: boolean } = {}
 ) => {
-  await act(() =>
-    root?.render(
-      <I18nextProvider i18n={i18n}>
-        <ChakraProvider value={system}>
-          <QueryClientProvider client={queryClient!}>
-            <Harness
-              initialValues={{ selectedBoardId: 'dogs', ...values }}
-              progressSessions={progressSessions}
-              region={region}
-            />
-          </QueryClientProvider>
-        </ChakraProvider>
-      </I18nextProvider>
-    )
+  const tree = (
+    <I18nextProvider i18n={i18n}>
+      <ChakraProvider value={system}>
+        <QueryClientProvider client={queryClient!}>
+          <Harness
+            initialValues={{ selectedBoardId: 'dogs', ...values }}
+            progressSessions={progressSessions}
+            region={region}
+          />
+        </QueryClientProvider>
+      </ChakraProvider>
+    </I18nextProvider>
   );
+
+  await act(() => root?.render(strict ? <StrictMode>{tree}</StrictMode> : tree));
 };
 
 const listing = () => host?.querySelector('[role="list"][aria-label="Gallery items"]') ?? null;
@@ -361,6 +368,85 @@ describe('Gallery listing failures', () => {
     // Focus went to the grid that replaced the Retry, not the document body.
     await waitFor(() => expect(host?.contains(document.activeElement)).toBe(true));
   });
+
+  it('reloads every thumbnail a long image move refused, once, probing one image per interval meanwhile', async () => {
+    // The real guard answers every image read with 409 while the files move; nothing tells this tab when it ends.
+    const moving = Array.from({ length: 6 }, (_, index) => ({
+      ...image(`moving-${String(index)}.png`, 'dogs', 10 - index),
+      thumbnailUrl: `/api/v1/images/i/moving-${String(index)}.png/thumbnail`,
+    }));
+    const paths = moving.map((item) => item.thumbnailUrl);
+    const pathOf = (url: string) => new URL(url, window.location.href).pathname;
+    const countByPath = (urls: string[]) =>
+      Object.fromEntries(paths.map((path) => [path, urls.filter((url) => pathOf(url) === path).length]));
+    const eachPath = (count: number) => Object.fromEntries(paths.map((path) => [path, count]));
+    const imageRequests = async () => {
+      const log = await thumbnailRouteCommands.getThumbnailRequests();
+      return log.urls.filter((_, index) => log.types[index] === 'image');
+    };
+    // The probe's reads are answered in the page, so they settle within the fake clock's steps; the tiles' own
+    // image reads go to the network route.
+    let isMoving = true;
+    const browserFetch = globalThis.fetch;
+    const probes = vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) =>
+      paths.includes(pathOf(String(input)))
+        ? Promise.resolve(
+            isMoving
+              ? new Response('moving', { status: 409 })
+              : new Response('<svg xmlns="http://www.w3.org/2000/svg"/>', {
+                  headers: { 'content-type': 'image/svg+xml' },
+                })
+          )
+        : browserFetch(input, init)
+    );
+    const probedPaths = () => probes.mock.calls.map(([input]) => pathOf(String(input)));
+    await thumbnailRouteCommands.startThumbnailRoute(paths, { failures: 1_000_000, status: 409 });
+    transport.listItems.mockImplementation(() => page(moving));
+    // Real time keeps flowing for Query and the image loads; the test jumps the clock through the move.
+    vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout'] });
+
+    try {
+      // StrictMode rehearses each tile's unmount; recovery must survive it as it does in the app.
+      await renderGallery({}, 'center', NO_SESSIONS, { strict: true });
+      await waitFor(() => expect(thumbnailNames()).toHaveLength(6));
+      const thumbnails = moving.map((item) => host!.querySelector<HTMLImageElement>(`img[alt="${item.name}"]`)!);
+      await expect.poll(() => thumbnails.every((thumbnail) => thumbnail.complete)).toBe(true);
+      expect(thumbnails.every((thumbnail) => thumbnail.naturalWidth === 0)).toBe(true);
+      expect(countByPath(await imageRequests())).toEqual(eachPath(1));
+
+      // Through six minutes of move the probe keeps asking about one image for the whole grid every 15 to 30 s,
+      // never one per tile.
+      for (let interval = 1; interval <= 12; interval += 1) {
+        const before = probes.mock.calls.length;
+        await act(() => vi.advanceTimersByTimeAsync(30_000));
+        expect(probes.mock.calls.length - before).toBeGreaterThanOrEqual(1);
+        expect(probes.mock.calls.length - before).toBeLessThanOrEqual(2);
+      }
+      expect(new Set(probedPaths()).size).toBe(1);
+      expect(await imageRequests()).toHaveLength(6);
+      expect(thumbnails.every((thumbnail) => thumbnail.naturalWidth === 0)).toBe(true);
+
+      // The move ends: the next probe sees an image served and every failed tile reloads by itself.
+      isMoving = false;
+      await thumbnailRouteCommands.endThumbnailRouteFailures();
+      await act(() => vi.advanceTimersByTimeAsync(30_000));
+      await expect
+        .poll(() =>
+          moving.map((item) => host!.querySelector<HTMLImageElement>(`img[alt="${item.name}"]`)!.naturalWidth)
+        )
+        .toEqual(moving.map(() => 64));
+
+      // Each tile asked twice in all: the refused read and one reload. Nothing asks again afterwards.
+      const probeCount = probes.mock.calls.length;
+      await act(() => vi.advanceTimersByTimeAsync(5 * 60_000));
+      expect(countByPath(await imageRequests())).toEqual(eachPath(2));
+      expect(probes.mock.calls.length).toBe(probeCount);
+    } finally {
+      vi.useRealTimers();
+      probes.mockRestore();
+      await thumbnailRouteCommands.stopThumbnailRoute();
+    }
+  }, 30_000);
 
   it('shows an anchored window that failed as failed, never the unfiltered recents', async () => {
     transport.listItems.mockImplementation(fail);

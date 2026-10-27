@@ -20,6 +20,7 @@ export const GalleryItemSortMenu = () => {
   // (wrapping `Menu.Trigger` swallows the anchor ref — see RoutingControl).
   const triggerId = useId();
   const triggerIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
+  const orderLabel = imageOrderDir === 'DESC' ? t('widgets.gallery.newest') : t('widgets.gallery.oldest');
 
   const handleOrderDirChange = useCallback(
     (event: { value: string }) => actions.updateSettings({ imageOrderDir: event.value as GalleryOrderDir }),
@@ -30,8 +31,14 @@ export const GalleryItemSortMenu = () => {
     <Menu.Root ids={triggerIds} positioning={SORT_POSITIONING}>
       <Tooltip content={t('widgets.gallery.sortBy')} ids={triggerIds}>
         <Menu.Trigger asChild>
-          <Button aria-label={t('widgets.gallery.imageSort')} color="fg.muted" flexShrink={0} gap="1" variant="ghost">
-            {imageOrderDir === 'DESC' ? t('widgets.gallery.newest') : t('widgets.gallery.oldest')}
+          <Button
+            aria-label={t('widgets.gallery.imageSortValue', { order: orderLabel })}
+            color="fg.muted"
+            flexShrink={0}
+            gap="1"
+            variant="ghost"
+          >
+            {orderLabel}
             <Icon as={ChevronDownIcon} boxSize="3" />
           </Button>
         </Menu.Trigger>

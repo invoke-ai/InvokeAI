@@ -44,7 +44,14 @@ from invokeai.backend.working_memory.coefficients import (
 from invokeai.backend.working_memory.counters import backend_for
 from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate
 from invokeai.backend.working_memory.fingerprint import environment_for
-from invokeai.backend.working_memory.fit import capping_spans, carrier_of, entry_key, fit_points, fitted_values
+from invokeai.backend.working_memory.fit import (
+    capping_spans,
+    carrier_of,
+    entry_key,
+    fit_points,
+    fitted_values,
+    line_values,
+)
 from invokeai.backend.working_memory.platform import (
     MEASURED,
     Platform,
@@ -138,6 +145,10 @@ def test_an_unmeasured_platform_is_priced_as_the_measured_one_at_least_and_says_
         measured = priced_as(platform)
         assert is_measured(measured) and measured.os == platform.os
         resolved = shipped_coefficients(spec, platform)
+        if not spec.platform_keys:
+            # Keyed by no platform trait: nothing is priced as anything else, and the source says so.
+            assert resolved.source == "shipped:any platform"
+            continue
         borrowed = shipped_coefficients(spec, measured)
         assert all(resolved.values[name] >= value for name, value in borrowed.values.items())
         where = ",".join(f"{key}={value}" for key, value in _keys(measured, spec).items())
@@ -166,7 +177,8 @@ def test_every_fitted_value_is_decided_by_an_in_fit_point() -> None:
 
 def test_every_fitted_value_is_the_shipped_fit_of_its_points() -> None:
     """The values are reproducible from the points rather than hand-tuned. A new point that moves a fit fails here,
-    naming the values to ship."""
+    naming the values to ship. Values on no pixel line (`fit.line_values`) are hand-set, held by their points' bounds
+    only."""
     fitted = fitted_values(shipped_data().values())
     stale = {}
     for entry in ENTRIES:
@@ -176,7 +188,7 @@ def test_every_fitted_value_is_the_shipped_fit_of_its_points() -> None:
         differs = {
             name: expected.get(name)
             for name, value in entry.values.items()
-            if name not in entry.stand_ins and expected.get(name) != value
+            if name in line_values(entry) and name not in entry.stand_ins and expected.get(name) != value
         }
         if differs:
             stale[f"{entry.estimator} {entry.platform}"] = differs

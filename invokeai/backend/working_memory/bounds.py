@@ -47,22 +47,28 @@ cannot stay within 1.3x of all of them. Windows ROCm defaults to expandable segm
 
 
 def point_id(point: MeasuredPoint) -> str:
-    """A readable id of a point: estimator, platform, operation, dtype, size, tile, batch, card and method."""
+    """A readable id of a point: estimator, platform, operation, dtype, size, tile, batch, prompt tokens, card and
+    method. The platform, operation and dtype show where the point names them: an estimator keyed by no platform trait
+    records none, and one whose features name no operation or dtype (the MOSS-Image denoise) none of those."""
     features = point.features
+    platform = ",".join(point.platform.values())
+    head = [point.estimator, *([platform] if platform else [])]
+    head += [str(features[name]) for name in ("operation", "dtype") if name in features]
     shape = f"{features.get('height')}x{features.get('width')}"
     tile = f"-tile{features['tile']}" if features.get("tile") is not None else ""
     batch = f"-b{features['batch_size']}" if features.get("batch_size", 1) != 1 else ""
+    text = f"-text{features['text_tokens']}" if "text_tokens" in features else ""
     out_of_fit = "-outfit" if not point.in_fit else ""
-    platform = ",".join(point.platform.values())
     card = point.device.split(" (")[0].replace(" ", "")
-    return (
-        f"{point.estimator}-{platform}-{features.get('operation')}-{features.get('dtype')}-{shape}{tile}{batch}"
-        f"{out_of_fit}-{card}-{point.method}"
-    )
+    return f"{'-'.join(head)}-{shape}{tile}{batch}{text}{out_of_fit}-{card}-{point.method}"
 
 
-def platform_of(point: MeasuredPoint) -> Platform:
-    """The platform a point is evaluated on. One that names no OS measured what holds on every OS."""
+def platform_of(point: MeasuredPoint) -> Optional[Platform]:
+    """The platform a point is evaluated on. One that names no OS measured what holds on every OS. One that names no
+    trait at all is of an estimator keyed by none (`platform_keys=()`), which every platform prices alike: None, which
+    `resolve_coefficients` accepts for such an estimator only."""
+    if not point.platform:
+        return None
     return Platform(**({"os": "other"} | point.platform))  # type: ignore[arg-type]
 
 
