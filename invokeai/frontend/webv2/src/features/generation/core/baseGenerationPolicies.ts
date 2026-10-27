@@ -43,6 +43,7 @@ import {
   isQwen3Vl8bEncoder,
   isIdeogram4UnconditionalBranch,
   isKrea2Qwen3VlEncoder,
+  isMossImageQwen35Encoder,
   isSelfContainedSDNQFlux1Pipeline,
   isSelfContainedSDNQPipeline,
   isVaeAcceptedByBase,
@@ -90,6 +91,7 @@ import {
   DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT,
   DEFAULT_KREA2_SEED_VARIANCE_STRENGTH,
   DEFAULT_KREA2_STYLE_STRENGTH,
+  DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS,
   DEFAULT_REFERENCE_IMAGE_LIMIT,
   DEFAULT_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
   DEFAULT_ZIMAGE_SEED_VARIANCE_STRENGTH,
@@ -103,8 +105,10 @@ import {
   isGenerateSettings,
   isLoraCompatibleWithModel,
   isValidKrea2RebalanceWeights,
+  isValidMossImageSkipLayers,
   isWanLoraTargetingMain,
   KREA2_REBALANCE_WEIGHT_COUNT,
+  MAX_MOSS_IMAGE_SKIP_LAYER,
   normalizeGenerateSettings,
 } from './settings';
 
@@ -515,6 +519,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     zImageSeedVarianceRandomizePercent: DEFAULT_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
     qwenImageShift: null,
     qwenImageEncoderQuantization: 'none',
+    mossImageUncondSkipLayers: [...DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS],
     pidMode: 'off',
     pidDecoderModel: null,
     gemma2EncoderModel: null,
@@ -706,14 +711,14 @@ const qwen3VlEncoderSlot = (helpText: string, filter: GenerateComponentFilter): 
     filter,
   });
 
-const qwen35EncoderSlot = (helpText: string): ComponentSlotPolicy =>
+const qwen35EncoderSlot = (helpText: string, filter: GenerateComponentFilter): ComponentSlotPolicy =>
   slot({
     key: 'qwen35EncoderModel',
     label: 'Qwen3.5 Encoder',
     modelTypes: TYPE_QWEN35,
     valueKind: 'component',
     helpText,
-    filter: wrapFilter(isAnimaQwen35Encoder),
+    filter: wrapFilter(filter),
   });
 
 /** Optional; only the canvas inpaint/outpaint graphs read it, so it is never required. */
@@ -1111,6 +1116,28 @@ const getBaseComponentSectionPolicy = (
           missingMessage: 'Generate needs a VAE for non-Diffusers ERNIE-Image models.',
         },
       ]);
+    case 'moss-image':
+      // A Diffusers pipeline brings its encoder and VAE; a single-file transformer needs both.
+      return createPolicy(model.format !== 'diffusers', [
+        {
+          ...qwen35EncoderSlot(
+            'MOSS-Image conditions on the Qwen3.5 9B encoder, not the 4B one Anima-3.8B uses. Required for ' +
+              'non-Diffusers MOSS-Image models.',
+            isMossImageQwen35Encoder
+          ),
+          required: (ctx) => ctx.model.format !== 'diffusers',
+          missingMessage: 'Generate needs a Qwen3.5 9B Encoder for non-Diffusers MOSS-Image models.',
+        },
+        {
+          ...vaeSlot(
+            'MOSS-Image decodes with the 32-channel FLUX.2 VAE, which is the base it installs under. Required for ' +
+              'non-Diffusers MOSS-Image models.',
+            isAcceptedVae
+          ),
+          required: (ctx) => ctx.model.format !== 'diffusers',
+          missingMessage: 'Generate needs a VAE for non-Diffusers MOSS-Image models.',
+        },
+      ]);
     case 'ideogram-4':
       // Standalone Ideogram needs the other branch, encoder, and VAE.
       return createPolicy(model.format !== 'diffusers', [
@@ -1171,7 +1198,10 @@ const getBaseComponentSectionPolicy = (
         ...(model.variant === 'anima_qwen35'
           ? [
               {
-                ...qwen35EncoderSlot('Anima-3.8B reads Qwen3.5 4B beside Qwen3 0.6B. Required for this model.'),
+                ...qwen35EncoderSlot(
+                  'Anima-3.8B reads Qwen3.5 4B beside Qwen3 0.6B. Required for this model.',
+                  isAnimaQwen35Encoder
+                ),
                 required: () => true,
                 missingMessage: 'Generate needs a Qwen3.5 Encoder for Anima-3.8B.',
               },
@@ -1362,6 +1392,14 @@ export const getMaxReferenceImages = (model: GenerateModelConfig | undefined): n
   return getArchitectureFeatures(model.base)?.max_reference_images ?? DEFAULT_REFERENCE_IMAGE_LIMIT;
 };
 
+const IP_ADAPTER_BASES: ReadonlySet<string> = new Set(['sd-1', 'sdxl', 'flux', 'anima']);
+
+/**
+ * Anima's IP-Adapter node takes a strength alone: it has no method choice and brings its own SigLIP2 encoder, so the
+ * UI hides those controls and the graph never sends them.
+ */
+export const isStrengthOnlyIPAdapterBase = (base: string | undefined): boolean => base === 'anima';
+
 export const createReferenceImageId = (): string =>
   `reference_image_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
@@ -1424,7 +1462,8 @@ const getReferenceImageConfigSupported = (
     case 'flux_redux':
       return model.type !== 'external_image_generator' && model.base === 'flux';
     case 'ip_adapter':
-      return model.type !== 'external_image_generator' && ['sd-1', 'sdxl', 'flux'].includes(model.base);
+      // `isReferenceImageSupported` applies the backend's variant gate: Anima only on its Qwen3 releases.
+      return IP_ADAPTER_BASES.has(model.base) && isReferenceImageSupported(model);
   }
 };
 
@@ -1450,6 +1489,33 @@ export const isReferenceImageCompatibleWithModel = (
 };
 
 /**
+ * An SD reference that never had an adapter (model null) passes the base check, so a switch to a strength-only base
+ * would keep its unset adapter and its SD weight, which may be negative. Re-target it when that leaves it unusable and
+ * re-targeting can help: a weight the node rejects, or no adapter while one is installed. Without an installed adapter
+ * the re-targeted config is stable, so a repeated switch changes nothing.
+ */
+const needsStrengthOnlyRetarget = (
+  model: GenerateModelConfig,
+  referenceImage: GenerateReferenceImage,
+  models: readonly ReferenceModelCandidate[]
+): boolean => {
+  const { config } = referenceImage;
+
+  if (config.type !== 'ip_adapter' || !isStrengthOnlyIPAdapterBase(model.base)) {
+    return false;
+  }
+
+  if (!(config.weight >= 0 && config.weight <= 2)) {
+    return true;
+  }
+
+  return (
+    config.model === null &&
+    models.some((candidate) => candidate.type === 'ip_adapter' && candidate.base === model.base)
+  );
+};
+
+/**
  * Drop unsupported references; retarget incompatible ones while preserving image/enabled state. No changes return
  * the same array.
  */
@@ -1468,12 +1534,34 @@ export const getCompatibleReferenceImages = (
 
   let didChange = false;
   const next = referenceImages.map((referenceImage) => {
-    if (isReferenceImageCompatibleWithModel(model, referenceImage)) {
+    if (
+      isReferenceImageCompatibleWithModel(model, referenceImage) &&
+      !needsStrengthOnlyRetarget(model, referenceImage, models)
+    ) {
       return referenceImage;
     }
 
     didChange = true;
-    return { ...referenceImage, config: getDefaultReferenceImageConfig(model, models, referenceImage.config.image) };
+    const { config } = referenceImage;
+    const defaults = getDefaultReferenceImageConfig(model, models, config.image);
+
+    // A strength-only base keeps the user's step window and strength; only the adapter and the hidden SD fields reset.
+    if (config.type === 'ip_adapter' && defaults.type === 'ip_adapter' && isStrengthOnlyIPAdapterBase(model.base)) {
+      // Clamping a negative SD weight to 0 would switch the reference off, so it takes the default strength instead.
+      const weight =
+        Number.isFinite(config.weight) && config.weight >= 0 ? Math.min(config.weight, 2) : defaults.weight;
+      return {
+        ...referenceImage,
+        config: {
+          ...defaults,
+          beginEndStepPct: config.beginEndStepPct,
+          model: config.model?.base === model.base ? config.model : defaults.model,
+          weight,
+        },
+      };
+    }
+
+    return { ...referenceImage, config: defaults };
   });
 
   return didChange ? next : referenceImages;
@@ -1788,6 +1876,12 @@ const getReferenceImageValidationReasons = (model: GenerateModelConfig, settings
       if (!referenceImage.config.model || referenceImage.config.model.base !== model.base) {
         reasons.push(`${prefix} needs a compatible IP Adapter model.`);
       }
+
+      // A weight recalled from an SD reference can be negative; `anima_ip_adapter.strength` rejects it at enqueue.
+      const { weight } = referenceImage.config;
+      if (isStrengthOnlyIPAdapterBase(model.base) && !(weight >= 0 && weight <= 2)) {
+        reasons.push(`${prefix} strength must be between 0 and 2.`);
+      }
     }
 
     if (referenceImage.config.type === 'flux_redux') {
@@ -1835,6 +1929,17 @@ const getModelFamilyValidationReasons = (model: MainModelConfig, settings: Gener
     !isValidKrea2RebalanceWeights(settings.krea2RebalanceWeights)
   ) {
     reasons.push(`Krea-2 rebalance weights must be ${KREA2_REBALANCE_WEIGHT_COUNT} comma-separated numbers.`);
+  }
+
+  // The field commits only lists in range, but a persisted one can still name a block MOSS-Image lacks, which would fail
+  // the queue item. Without CFG the negative branch never runs, so the list has no effect and its disabled field cannot
+  // be fixed.
+  if (
+    model.base === 'moss-image' &&
+    settings.cfgScale > 1 &&
+    !isValidMossImageSkipLayers(settings.mossImageUncondSkipLayers)
+  ) {
+    reasons.push(`MOSS-Image skip layers must be whole numbers from 0 to ${MAX_MOSS_IMAGE_SKIP_LAYER}.`);
   }
 
   // Finite persisted Ideogram overrides still need range validation.

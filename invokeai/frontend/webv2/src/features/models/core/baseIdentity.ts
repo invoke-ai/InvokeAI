@@ -17,6 +17,7 @@ export type ModelBaseColorPalette =
   | 'green'
   | 'ice'
   | 'lavender'
+  | 'lime'
   | 'mint'
   | 'orange'
   | 'periwinkle'
@@ -123,6 +124,11 @@ export const MODEL_BASES = {
     base: 'anima',
     label: 'Anima',
     colorPalette: 'pink',
+  },
+  'moss-image': {
+    base: 'moss-image',
+    label: 'MOSS-Image',
+    colorPalette: 'lime',
   },
   wan: {
     base: 'wan',

@@ -24,20 +24,27 @@ The tool strip on the left edge of the canvas holds the drawing and editing tool
 |---|---|---|
 | **View** | **H** | Pan by dragging. Hold **Space** to pan from any tool. |
 | **Move** | **V** | Move the selected layers. **Shift** locks the direction. Dragging inside a selection lifts the selected pixels so you can move them; **Enter** places them. |
-| **Transform** | **Ctrl+T** | Scale and rotate the selected layer with handles. See [Transforming layers](#transforming-layers). |
+| **Transform** | **Shift+T** | Scale and rotate the selected layer with handles. See [Transforming layers](#transforming-layers). |
 | **Generation frame** | **C** | Move and resize the generation frame. Tap **C** to switch to it, or hold **C** to use it briefly. |
-| **Brush** | **B** | Paint on the selected raster layer, or paint a mask or region on the selected inpaint mask or regional guidance layer. |
-| **Eraser** | **E** | Erase paint or mask. |
+| **Brush** | **B** | Paint on the selected raster layer, or paint a mask or region on the selected inpaint mask or regional guidance layer. **Shift**-click draws a straight line from the end of the last stroke on that layer. |
+| **Eraser** | **E** | Erase paint or mask. **Shift**-click erases a straight line, as with the Brush. |
 | **Shape** | **R** | Draw a rectangle, ellipse, triangle, star, polygon or freehand shape on a raster layer, or add a shaped area to the selected inpaint mask or regional guidance layer. Press **R** again to cycle through the shapes. |
 | **Gradient** | **G** | Create a linear or radial gradient. |
 | **Text** | **T** | Add editable text. |
 | **Marquee select** / **Lasso select** | **U** / **L** | Select an area of pixels. Press **U** again to switch between rectangle and ellipse, or **L** again for freehand and polygon. |
 
-The Shape and Select buttons hold several tools. Click to use the current one, or press and hold (or right-click, or press **→** on) the button to choose another from a menu that lists each tool with its shortcut. To pick a color from the canvas, hold **Alt** with any painting tool and click. While you pick, a round **loupe** follows the pointer: it magnifies the pixels around it, boxes the pixel that will be picked in the center, and shows that pixel's RGB values. The pointer itself is hidden, so aim with the boxed pixel. You can drag to sample as you go; the color is set when you release.
+The Shape and Select buttons hold several tools. Click to use the current one, or press and hold (or right-click, or press **→** on) the button to choose another from a menu that lists each tool with its shortcut. To pick a color from the canvas, hold **Alt** with any painting tool and click. While you pick, a round **loupe** follows the pointer: it magnifies the pixels around it, boxes the pixel that will be picked in the center, and shows that pixel's RGB values. The pointer itself is hidden, so aim with the boxed pixel. You can drag to sample as you go; the color is set when you release, and **Escape** cancels the pick and restores the previous color. The picked color goes to what you are editing:
+
+* the selected mask's tint, while **Mask tint** is chosen in the [Color](/users-guide/canvas/layers-panel/#color) tab;
+* the selected shape layer's fill when the foreground chip is active, or its stroke when the background chip is active. A pick never turns on a fill or stroke the shape doesn't have; it sets the active color instead;
+* the selected text layer's color;
+* otherwise the active foreground or background color.
+
+A pick that changes a layer is one undoable step. Gradient stops are not picked into; with the Gradient tool, the pick sets the foreground or background color.
 
 ### Tool options
 
-* **Brush** — **Size**, **Opacity** and **Hardness**; the **Foreground** color; and, under **Dynamics**, whether pen pressure affects the width or the opacity. **[** and **]** make the brush smaller or larger, and so does **Ctrl**+scroll.
+* **Brush** — **Size**, **Opacity** and **Hardness**; the **Foreground** color; and, under **Dynamics**, whether pen pressure affects the width or the opacity. **[** and **]** make the brush smaller or larger, and so does **Ctrl**+scroll. Painting on an image layer, such as an accepted result or an added picture, paints on that layer itself instead of adding a new one; one undo restores the original image. **Shift**-click joins the click to the end of the last Brush or Eraser stroke on the same layer with a straight line. The line follows the selection and the frame clipping like any stroke, and one undo removes it. Undo, redo or deleting the layer clears the remembered point, so the next **Shift**-click paints a dot.
 * **Eraser** — **Size**, **Opacity** and **Hardness**; and, under **Dynamics**, whether pen pressure affects the width. Pressure never changes how strongly the eraser erases. Eraser settings are temporary and are not saved in the project; they can reset when the canvas is released or the page reloads.
 * **Shape** — the **Kind** of shape; **Place on**, which draws on the **Selected layer** or on a **New layer** of its own; **Fill** and **Stroke**, each with a color; and the stroke **Width**. **Shift** constrains the proportions. For polygons, click to place points and double-click, press **Enter** or click the first point to close the shape. With an inpaint mask or regional guidance layer selected, the shape is added to the mask or region, which makes shapes a quick way to mark rectangular or geometric areas; the colors are ignored.
 * **Gradient** — **Kind** (Linear or Radial), **Angle**, and the color **Stops**, which can be added and removed or follow the foreground and background colors. Dragging creates a gradient layer the size of the generation frame, or repositions the selected gradient layer.
@@ -60,7 +67,7 @@ In InvokeAI 6, the Lasso drew directly into an inpaint mask, and created one if 
 
 ## Navigating the canvas
 
-* **Zoom** with the mouse wheel, which zooms around the pointer, or choose a level from the zoom menu in the header (25% to 500%).
+* **Zoom** with the mouse wheel, which zooms around the pointer, or choose a level from the zoom menu in the header (25% to 500%). **Ctrl+1**, **Ctrl+2**, **Ctrl+3** and **Ctrl+4** zoom to 100%, 200%, 400% and 800% around the center of the view. Many browsers use these keys to switch tabs and do not pass them to the page; there, choose **Zoom to 100%**, **Zoom to 200%**, **Zoom to 400%** or **Zoom to 800%** from the command palette (**Ctrl+K**), or assign other keys in **Settings → Hotkeys**.
 * **Pan** with the View tool, by holding **Space**, or by dragging with the middle mouse button.
 * **Fit to view** (header) fits the generation frame and all layers into the window.
 
@@ -69,10 +76,10 @@ In InvokeAI 6, the Lasso drew directly into an inpaint mask, and created one if 
 The buttons along the top of the canvas, from left to right:
 
 * **Zoom level** and **Fit to view**.
-* **Fit frame to layers** (**Shift+N**) — resizes the generation frame to enclose all layers.
-* **Fit frame to masks** (**Shift+B**) — resizes the generation frame to enclose the inpaint masks.
+* **Fit frame to layers** (**Shift+N**) — resizes the generation frame to the area all layers cover. With **Snap to grid** on, the frame then shrinks inward to the model's grid, so it can trim up to one grid step less one pixel from each edge of the layers.
+* **Fit frame to masks** (**Shift+B**) — resizes the generation frame to enclose the inpaint masks, with a margin of the **Mask blur** (in the Generate panel's **Compositing** section) plus 8 pixels, so the blurred edge of the mask stays inside the frame. With the default blur of 16, the margin is 24 pixels. With **Snap to grid** on, the frame then grows outward to the model's grid, so the margin can be wider but never narrower.
 * **Undo canvas edit** (**Ctrl+Z**) and **Redo canvas edit** (**Ctrl+Shift+Z** or **Ctrl+Y**).
-* **Save Canvas to Gallery** — saves the visible canvas as an image on the board new results go to: the auto-add board, or the selected board when none is set (see [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes)). Its arrow offers **Save BBox to Gallery**, which saves only what is inside the generation frame. A message names the board the image went to; its **Show in Gallery** button selects the image in the Gallery and keeps the Canvas in the center.
+* **Save Canvas to Gallery** — saves the visible canvas as an image on the board new results go to: the auto-add board, or the selected board when none is set (see [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes)). Its arrow offers **Save Frame to Gallery**, which saves only what is inside the generation frame. A message names the board the image went to; its **Show in Gallery** button selects the image in the Gallery and keeps the Canvas in the center.
 * **Clear canvas** (**Ctrl+Alt+N**, **Cmd+Option+N** on macOS) — after you confirm, clears all layers and starts a fresh canvas with an empty inpaint mask. This cannot be undone.
 * **Canvas settings** — see [below](#canvas-settings).
 
@@ -100,7 +107,7 @@ The frame is the final footprint of the generation on the canvas. With **Render 
 
 ## Transforming layers
 
-Choose **Transform** from a layer's menu, or press **Ctrl+T**, to scale and rotate the selected layer:
+Choose **Transform** from a layer's menu, or press **Shift+T**, to scale and rotate the selected layer. The handles appear at once, even when the Transform tool is already active; if a brush stroke is still being saved, the tool switches straight away and the handles appear when the stroke is saved. Transform works on enabled raster and control layers with content.
 
 * Drag a corner or edge handle to scale. **Shift** scales proportionally and **Alt** scales from the center.
 * Drag just outside a corner to rotate. **Shift** rotates in 15° steps.
@@ -108,7 +115,7 @@ Choose **Transform** from a layer's menu, or press **Ctrl+T**, to scale and rota
 
 Press **Enter** or click **Apply** to finish, or **Escape** or **Cancel** to undo the transform. The **Transform** tab of the Layers panel sets the position, scale and rotation numerically. A negative scale flips the layer.
 
-To crop a layer to the generation frame, choose **Crop layer to bbox** from its menu. **Fit to bbox** scales a layer to fit inside the frame.
+To crop a layer to the generation frame, choose **Crop layer to frame** from its menu; a layer entirely outside the frame is left alone. **Fit to frame** scales a layer to fit inside the frame. To crop every layer at once, use **Crop all layers to frame** in the [canvas menu](#the-canvas-menu).
 
 ## Filters and object selection
 
@@ -151,16 +158,19 @@ When the Canvas is the destination, results appear in the staging area at the bo
 
 Right-click a result's thumbnail to recall its settings into the Generate panel. While results are staged or a canvas generation is running, only the View tool works.
 
+While a progress image or a staged result is shown, and while results stay staged with their preview hidden for comparison, inpaint masks, regional guidance and regenerate regions are hidden from view so they do not cover the result. They still take part in generation, and they reappear when you accept or discard the results.
+
 ## The canvas menu
 
-Right-click the canvas to open the menu of the selected layer, the same menu as in the Layers panel (see the [Layers panel guide](/users-guide/canvas/layers-panel/#the-layer-menu)), with two extra submenus:
+Right-click the canvas to open the menu of the selected layer, the same menu as in the Layers panel (see the [Layers panel guide](/users-guide/canvas/layers-panel/#the-layer-menu)), with an extra **Canvas** section:
 
-<Image src={contextMenu} alt="The canvas right-click menu for a raster layer, with the layer actions followed by a Canvas section with Save to Gallery and Create From BBox." width={420} />
+<Image src={contextMenu} alt="The canvas right-click menu for a raster layer, with the layer actions followed by a Canvas section with Save to Gallery and Create From Frame." width={420} />
 
-* **Save to Gallery** — **Save Canvas to Gallery** or **Save BBox to Gallery**.
-* **Create From BBox** — copy what is inside the generation frame into a **New Global Reference Image**, **New Regional Reference Image**, **New Control Layer** or **New Raster Layer**.
+* **Save to Gallery** — **Save Canvas to Gallery** or **Save Frame to Gallery**.
+* **Create From Frame** — copy what is inside the generation frame into a **New Global Reference Image**, **New Regional Reference Image**, **New Control Layer** or **New Raster Layer**.
+* **Crop all layers to frame** — crops every raster layer, control layer, inpaint mask and regional guidance layer to the generation frame, including hidden and disabled layers and layers inside groups, as one undoable step. Groups, layer order and visibility are unchanged. A layer entirely outside the frame is emptied rather than deleted. Locked layers, and layers in a locked group, are skipped, and so are layers whose image could not be read, for example because it was deleted from the Gallery; the other layers are still cropped. If an image cannot be fetched for now, for example while the server restarts, nothing is cropped and the notice asks you to try again. A brush stroke still being saved is saved first. A notice says how many layers were cropped, counting only the ones that changed, and how many locked layers were skipped; it names a layer that could not be read and counts any others. When every layer is locked, or there are no layers, the item is unavailable; highlighting it shows why.
 
-With no layer selected, the menu has only these two submenus.
+With no layer selected, the menu has only the Canvas section.
 
 ## Canvas settings
 
@@ -170,11 +180,11 @@ The gear button in the header opens the canvas settings. They are saved with the
 
 * **Behavior**
   * **Invert scroll for brush size** — reverses **Ctrl**+scroll brush sizing.
-  * **Clip strokes to bbox** — keeps painting inside the generation frame.
+  * **Clip strokes to frame** — keeps painting inside the generation frame.
   * **Output only generated regions** — when on, an inpainting or outpainting result contains only the regenerated area, with the rest transparent; when off, it includes the whole frame.
 * **Display**
   * **Show progress on canvas** — shows the image forming while it generates.
-  * **Show bbox overlay** — dims everything outside the generation frame.
+  * **Dim outside frame** — dims everything outside the generation frame.
   * **Show generation frame** — shows the frame's dashed outline.
   * **Checkerboard background** — shows transparent areas as a checkerboard.
 * **Grid**
@@ -184,7 +194,7 @@ The gear button in the header opens the canvas settings. They are saved with the
 
 ## Saving and sharing a canvas
 
-The canvas belongs to its project and is saved with it automatically. To keep a finished image, use **Save Canvas to Gallery** or **Save BBox to Gallery**, or accept results and save individual layers to a board with **Save layer to board**. To share a whole canvas, with its layers, masks and settings, export the project as an `.invk` file; see [Projects](/users-guide/projects/introduction/#exporting-and-importing).
+The canvas belongs to its project and is saved with it automatically. To keep a finished image, use **Save Canvas to Gallery** or **Save Frame to Gallery**, or accept results and save individual layers to a board with **Save layer to board**. To share a whole canvas, with its layers, masks and settings, export the project as an `.invk` file; see [Projects](/users-guide/projects/introduction/#exporting-and-importing).
 
 ## Copying and pasting
 
@@ -196,9 +206,11 @@ The canvas belongs to its project and is saved with it automatically. To keep a 
 
 These shortcuts work while the canvas has focus. On macOS, use **Cmd** in place of **Ctrl**.
 
+The tool keys, **Shift+T**, **[** and **]**, and **X** and **D** also work after you click in the Layers panel or its Color pane, so you can pick a layer or a color and switch tools without clicking back on the canvas. **Escape** and holding or tapping **C** work from the Layers panel too, but **Enter** applies a transform, text or filter only while the canvas has focus. None of these keys act while you type in a text field.
+
 | Shortcut | Action |
 |---|---|
-| **H**, **V**, **Ctrl+T**, **C**, **B**, **E**, **R**, **G**, **T**, **U**, **L** | Select a tool (see [Tools](#tools)) |
+| **H**, **V**, **Shift+T**, **C**, **B**, **E**, **R**, **G**, **T**, **U**, **L** | Select a tool (see [Tools](#tools)) |
 | Hold **Space** | Pan temporarily |
 | Hold **Alt** | Pick a color |
 | **[** / **]** | Smaller / larger brush or eraser |
@@ -210,12 +222,13 @@ These shortcuts work while the canvas has focus. On macOS, use **Cmd** in place 
 | **Shift+C** | Clear the selected mask |
 | Arrow keys (**Shift**: 10 px) | Nudge the selected layer |
 | **Ctrl+J** / **Ctrl+E** | Duplicate layer / merge layer down |
-| **Ctrl+G** / **Ctrl+Shift+G** | Group / ungroup layers |
+| **Ctrl+G** / **Ctrl+Shift+G** | Group / ungroup layers. With layers of one group selected, **Ctrl+Shift+G** moves them out of the group |
 | **Ctrl+]** / **Ctrl+[** (add **Shift** for front / back) | Move layer forward / backward |
 | **Alt+[** / **Alt+]** | Previous / next layer (wrapping, in the order of the Layers panel), or staged result while results are staged |
 | **Q** | Switch to the layer bookmarked with **Bookmark for quick switch** in its menu, or back to the previously selected layer |
 | **Shift+H** | Hide control, guidance and mask layers |
 | **Shift+N** / **Shift+B** | Fit the generation frame to the layers / to the masks |
+| **Ctrl+1** / **Ctrl+2** / **Ctrl+3** / **Ctrl+4** | Zoom to 100% / 200% / 400% / 800%, where the browser passes these keys to the page |
 | **Enter** / **Escape** | Apply / cancel a transform, text or filter |
 
 Some canvas commands listed in **Settings → Hotkeys** are marked *Pending*; they are not available yet.

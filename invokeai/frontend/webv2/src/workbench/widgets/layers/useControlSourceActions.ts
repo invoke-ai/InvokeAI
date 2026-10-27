@@ -128,6 +128,12 @@ export const useControlSourceActions = ({
         case 'adjustment-refused':
           notify.error(t('widgets.layers.control.source.frameFailed'), describeAdjustmentRefusal(filled, t));
           return;
+        case 'unreadable':
+          notify.error(
+            t('widgets.layers.control.source.frameFailed'),
+            t('widgets.canvas.contextMenu.unreadable', { name: filled.layerName })
+          );
+          return;
         case 'stale':
         // The account changed on the way; the result belongs to nobody here.
       }

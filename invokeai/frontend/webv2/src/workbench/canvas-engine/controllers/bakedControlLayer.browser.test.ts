@@ -107,7 +107,7 @@ const scene = (runSpatial?: SpatialRunner) => {
   });
   const exportBaked: CopyLayerControllerOptions['exportBaked'] = async (layerId) => {
     const result = await exporter.baked(layerId, { includeDisabled: true });
-    if (result.status === 'ok' || result.status === 'adjustment-refused') {
+    if (result.status === 'ok' || result.status === 'adjustment-refused' || result.status === 'unreadable') {
       return result;
     }
     return { status: result.status === 'aborted' ? 'not-ready' : result.status };

@@ -67,6 +67,13 @@ const qwenImage21Model: MainModelConfig = {
   name: 'Qwen-Image-2.1',
   type: 'main',
 };
+const mossImageModel: MainModelConfig = {
+  base: 'moss-image',
+  format: 'diffusers',
+  key: 'moss-image-model',
+  name: 'MOSS-Image',
+  type: 'main',
+};
 const externalModel: GenerateModelConfig = {
   base: 'external',
   capabilities: { modes: ['txt2img'], supports_seed: true },
@@ -182,7 +189,7 @@ interface BaseCase {
   denoiseType: string;
   txt2imgMode: string;
   img2imgMode: string;
-  /** sd-3 / flux / flux2 rescale strength with an exponent of 0.2 (legacy parity). */
+  /** sd-3 / flux / flux2 / moss-image rescale strength with an exponent of 0.2 (legacy parity for the first three). */
   optimizedDenoising: boolean;
 }
 
@@ -289,6 +296,15 @@ const BASE_CASES: BaseCase[] = [
     txt2imgMode: 'qwen_image_2_1_txt2img',
     img2imgMode: 'qwen_image_2_1_img2img',
     optimizedDenoising: false,
+  },
+  {
+    model: mossImageModel,
+    encodeType: 'flux2_vae_encode',
+    outputType: 'flux2_vae_decode',
+    denoiseType: 'moss_image_denoise',
+    txt2imgMode: 'moss_image_txt2img',
+    img2imgMode: 'moss_image_img2img',
+    optimizedDenoising: true,
   },
 ];
 
@@ -773,13 +789,13 @@ describe('compileCanvasGraph', () => {
 
     it('rejects a zero-area bbox', () => {
       expect(() => compile(sd1Model, 'txt2img', { bbox: { height: 0, width: 512, x: 0, y: 0 } })).toThrow(
-        'Canvas bounding box must have a positive area.'
+        'Canvas frame must have a positive area.'
       );
     });
 
     it('rejects fractional bbox dimensions before emitting backend resize fields', () => {
       expect(() => compile(flux2Model, 'txt2img', { bbox: { height: 888, width: 1024.5, x: 0, y: 0 } })).toThrow(
-        'Canvas bounding box dimensions must be whole pixels.'
+        'Canvas frame dimensions must be whole pixels.'
       );
     });
 
