@@ -75,13 +75,15 @@ def submit(client: InvokeClient, model_key: str, batch: dict[str, Any]) -> tuple
     return created["item_ids"][0], submission
 
 
-def _save(
-    run_dir: Path,
-    info: RunInfo,
-    stores: Iterable[tuple[str, bytes]],
-    status: bytes | None,
-    source: Literal["api", "store_file"],
-) -> list[CalibrationExport]:
+Stores = list[tuple[str, bytes]]
+"""(device class id, store bytes) per saved store."""
+
+
+def save(run_dir: Path, info: RunInfo, stores: Stores, status: bytes | None) -> list[CalibrationExport]:
+    """Writes one lifetime's stores into the run's `calibration/` and lists them in `info`, which it writes to run.json.
+    Stores from the export routes come with the status; store files copied from a scratch root come without one. Hold
+    the run lock with `info` read under it: `runner.save_calibration` does."""
+    source: Literal["api", "store_file"] = "store_file" if status is None else "api"
     lifetime = max((e.lifetime for e in info.calibration_exports), default=0) + 1
     (run_dir / CALIBRATION_DIR).mkdir(exist_ok=True)
     status_path = None
@@ -108,21 +110,17 @@ def _save(
     return exports
 
 
-def save_exports(
-    client: InvokeClient, run_dir: Path, info: RunInfo, device_class_ids: Iterable[str]
-) -> list[CalibrationExport]:
-    """Saves the store of every device class the lifetime's runs were created for, and the status, into run.json."""
+def fetch_exports(client: InvokeClient, device_class_ids: Iterable[str]) -> tuple[Stores, bytes]:
+    """The store of every device class the lifetime's runs were created for, and the status, from the export routes."""
     stores = [
         (device_class_id, client.get_bytes(EXPORT_PATH, device_class_id=device_class_id))
         for device_class_id in sorted(set(device_class_ids))
     ]
-    return _save(run_dir, info, stores, client.get_bytes(STATUS_PATH), "api")
+    return stores, client.get_bytes(STATUS_PATH)
 
 
-def save_store_files(run_dir: Path, info: RunInfo, scratch_root: Path) -> list[CalibrationExport]:
-    """Copies the store files of a scratch root whose server is gone; nothing when it has none."""
+def read_store_files(scratch_root: Path) -> Stores:
+    """The store files of a scratch root whose server is gone; none when it has none."""
     store_dir = scratch_root / SCRATCH_PATHS["db_dir"] / STORE_DIR
     files = sorted(p for p in store_dir.glob("*.json") if STORE_FILE.match(p.name)) if store_dir.is_dir() else []
-    if not files:
-        return []
-    return _save(run_dir, info, [(path.stem, path.read_bytes()) for path in files], None, "store_file")
+    return [(path.stem, path.read_bytes()) for path in files]

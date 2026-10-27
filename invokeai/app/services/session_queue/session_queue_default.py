@@ -1261,18 +1261,51 @@ class SessionQueue(SessionQueueBase):
 
         clones = self._queries.run(survey, read_only=True)
 
+        # Whether the last run of `admit` reached its end: a run that raises before it rolls back. `run` repeats it
+        # after a conflict, so each run starts it over.
+        admit_ended = False
+
         def admit(q: Queries) -> Optional[list[tuple[int, str, int]]]:
             """The clones the queue had room for, inserted one by one for their ids; None when it is full."""
+            nonlocal admit_ended
+            admit_ended = False
             q.locks.acquire(*_ADMISSION, also_shared=_PROTECTING_MEDIA)
             max_new_queue_items = max_queue_size - q.session_queue.pending_count(queue_id)
-            if max_new_queue_items <= 0:
-                return None
-            return [
-                (root_item_id, user_id, q.session_queue.insert_item(dict(zip(ITEM_COLUMNS, values, strict=True))))
-                for root_item_id, user_id, values in clones[:max_new_queue_items]
-            ]
+            inserted = (
+                None
+                if max_new_queue_items <= 0
+                else [
+                    (root_item_id, user_id, q.session_queue.insert_item(dict(zip(ITEM_COLUMNS, values, strict=True))))
+                    for root_item_id, user_id, values in clones[:max_new_queue_items]
+                ]
+            )
+            admit_ended = True
+            return inserted
 
-        admitted = self._queries.run(admit)
+        # A calibration attempt feeds a fit only if its store knows every retry of its items, also one canceled and
+        # pruned before anything else saw it. Announcing a retry cannot promise that: the server may stop before the
+        # announcement is handled. So the store counts the retries in flight before they commit and records them
+        # after, and a count left over keeps the attempt out.
+        calibration = self.__invoker.services.working_memory_calibration
+        in_flight = None
+        if calibration is not None:
+            origin_at, retried_from_at = ITEM_COLUMNS.index("origin"), ITEM_COLUMNS.index("retried_from_item_id")
+            in_flight = calibration.retries_starting(
+                {root_item_id: (values[origin_at], values[retried_from_at]) for root_item_id, _, values in clones}
+            )
+        try:
+            admitted = self._queries.run(admit)
+        except Exception:
+            if calibration is not None and in_flight is not None:
+                # A failure once `admit` ended can be the commit's own, which may have committed all the same (a lost
+                # connection to MySQL or MariaDB): which retries exist is unknown, and the count stays.
+                calibration.retries_committed(in_flight, None if admit_ended else [])
+            raise
+        if calibration is not None and in_flight is not None:
+            calibration.retries_committed(
+                in_flight,
+                [RetriedQueueItem(source_item_id=root, item_id=item_id) for root, _, item_id in admitted or []],
+            )
         if admitted is None:
             return RetryItemsResult(queue_id=queue_id, retried_item_ids=[])
         retried_item_ids_by_user: dict[str, list[int]] = {}
