@@ -1361,6 +1361,58 @@ test('working-memory calibration: a run per request, replayed by its key, advanc
   );
 });
 
+test('working-memory calibration: an open attempt holds the GPU, and a step after another calibration is refused', async () => {
+  let now = 0;
+
+  await withRepresentativeBackend(
+    async (backend) => {
+      const calibrate = async (modelKey, attempt_id, index) => {
+        const base = `/api/v2/models/i/${modelKey}/working_memory`;
+        const plan = await getJson(backend, `${base}/plan`);
+        const response = await fetch(`${backend.origin}${base}/calibrate`, {
+          body: JSON.stringify({
+            attempt_id,
+            attempt_steps: 3,
+            data: [],
+            graph: { edges: [], id: plan.cases[0].id, nodes: {} },
+            idempotency_key: `${attempt_id}:${String(index)}`,
+          }),
+          method: 'POST',
+        });
+        const body = await response.json();
+        return [response.status, body.detail?.code ?? null];
+      };
+      const summaryOf = (modelKey) => getJson(backend, `/api/v2/models/i/${modelKey}/working_memory/summary`);
+
+      // The first of three steps runs, then finishes: the attempt is between its steps.
+      assert.deepEqual(await calibrate('fixture-model-061', 'mine', 0), [201, null]);
+      for (const _ of [0, 1]) {
+        now += 1_050;
+        await summaryOf('fixture-model-061');
+      }
+      assert.deepEqual(
+        (await summaryOf('fixture-model-061')).runs.map((run) => run.status),
+        ['completed']
+      );
+
+      // Open, it still holds the GPU: another attempt is refused, on any model.
+      assert.deepEqual(await calibrate('fixture-model-021', 'theirs', 0), [409, 'calibration_running']);
+
+      // Idle past the grace, it is taken for abandoned and holds nothing.
+      now += 120_001;
+      assert.deepEqual(await calibrate('fixture-model-021', 'theirs', 0), [201, null]);
+
+      // Another calibration ran since its first step: its next step is refused, and it stays short, so aborted.
+      assert.deepEqual(await calibrate('fixture-model-061', 'mine', 1), [409, 'calibration_interleaved']);
+      assert.deepEqual(
+        (await summaryOf('fixture-model-061')).runs.map((run) => run.held_back),
+        ['aborted_attempt']
+      );
+    },
+    { clock: () => now }
+  );
+});
+
 test('working-memory calibration: seeded model states and device scenarios', async () => {
   await withRepresentativeBackend(async (backend) => {
     const summaryOf = (key) => getJson(backend, `/api/v2/models/i/${key}/working_memory/summary`);

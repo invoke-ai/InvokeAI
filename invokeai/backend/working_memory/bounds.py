@@ -57,18 +57,23 @@ instead. All are the native allocator, never expandable segments or `cudaMallocA
 
 def point_id(point: MeasuredPoint, spec: "EstimatorSpec") -> str:
     """A readable id of a point: estimator, platform, its features as its estimator's line labels them (`fit.Line`:
-    operation, dtype, size, tile and batch of a VAE operation), card and method. Features that name no line show as
-    they are."""
+    operation, dtype, size, tile and batch of a VAE operation; size and prompt tokens of a MOSS-Image denoise), card
+    and method. Features that name no line show as they are. An estimator keyed by no platform trait records none."""
     found = spec.line(point.features)
     label = found.label if found is not None else json.dumps(point.features, sort_keys=True, separators=(",", ":"))
-    out_of_fit = "-outfit" if not point.in_fit else ""
     platform = ",".join(point.platform.values())
+    out_of_fit = "-outfit" if not point.in_fit else ""
     card = point.device.split(" (")[0].replace(" ", "")
-    return f"{point.estimator}-{platform}-{label}{out_of_fit}-{card}-{point.method}"
+    head = f"{point.estimator}-{platform}" if platform else point.estimator
+    return f"{head}-{label}{out_of_fit}-{card}-{point.method}"
 
 
-def platform_of(point: MeasuredPoint) -> Platform:
-    """The platform a point is evaluated on. One that names no OS measured what holds on every OS."""
+def platform_of(point: MeasuredPoint) -> Optional[Platform]:
+    """The platform a point is evaluated on. One that names no OS measured what holds on every OS. One that names no
+    trait at all is of an estimator keyed by none (`platform_keys=()`), which every platform prices alike: None, which
+    `resolve_coefficients` accepts for such an estimator only."""
+    if not point.platform:
+        return None
     return Platform(**({"os": "other"} | point.platform))  # type: ignore[arg-type]
 
 

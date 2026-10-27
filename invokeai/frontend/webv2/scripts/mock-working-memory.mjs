@@ -12,8 +12,10 @@
  * with `stoppedCalibration: <model key>` replaces that main model's runs with an attempt Stop aborted, with
  * `runningCalibration: <model key>` with one still running, which holds the GPU, and with
  * `modelChangedCalibration: <model key>` with one whose later steps failed because the model changed after queuing.
- * A calibrate request with an attempt is refused (409, coded) while another attempt runs on the GPU, and for a graph
- * naming a model whose hash, base or type changed since it compiled, or that was removed.
+ * A calibrate request with an attempt is refused (409, coded) while another attempt runs on the GPU or is open (between
+ * its steps, short of them, not aborted, active within the last two minutes of `clock`), for a later step once another
+ * run was created since the attempt's first (`calibration_interleaved`), and for a graph naming a model whose hash,
+ * base or type changed since it compiled, or that was removed.
  * Calibration items live here rather than in the fixture queue, so profile counts stay fixed. Tests pass their own
  * `clock` to advance runs without waiting.
  */
@@ -117,6 +119,16 @@ const RUNNING_REFUSAL = {
     'Another calibration is still running on this GPU. Wait until it has finished, or stop it, then calibrate again.',
 };
 
+/** The server's refusal of a later step once another calibration ran on the GPU since the attempt began. */
+const INTERLEAVED_REFUSAL = {
+  code: 'calibration_interleaved',
+  message:
+    'Another calibration ran on this GPU after this calibration started, so its measurements can no longer be combined. Calibrate again.',
+};
+
+/** How long an attempt between its steps holds the GPU after its last activity, as the server waits. */
+const ATTEMPT_IDLE_GRACE_MS = 120_000;
+
 /** The model identifiers a graph names: the nodes' fields that carry a model's key, hash, base and type. */
 const modelIdentifiersOf = (graph) =>
   Object.values(graph.nodes ?? {}).flatMap((node) =>
@@ -176,6 +188,8 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
       attempt_steps: attemptSteps,
       created_at: createdAt,
       items: steps.map((step) => ({ case: step, error: null, item_id: nextItemId++, status: 'pending' })),
+      // When the run last did something, on `clock`: its creation, then each item that settles.
+      lastActivityAt: clock(),
       run_id: `mock-wm-run-${String(nextRunNumber++).padStart(4, '0')}`,
     };
     const list = runs.get(modelKey) ?? [];
@@ -197,6 +211,9 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
     settledRuns.forEach((run, index) => {
       const [item] = run.items;
       const isRunning = scenario === 'running' && index >= 4;
+
+      // Seeded a month ago: a short seeded attempt is long abandoned, never open.
+      run.lastActivityAt = Number.NEGATIVE_INFINITY;
 
       if (scenario === 'failed' && index === 7) {
         item.status = 'failed';
@@ -312,6 +329,30 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
    * the model changed after it was planned, or it holds fewer runs than it planned (Stop, a failed submission). Any
    * other failed run ends that run, not the attempt; a run without an attempt is never aborted.
    */
+  const statusesOf = (attempt) => attempt.map((run) => runStatus(run, pointCountOf(run)).status);
+  const isShort = (attempt) => attempt.length < Math.max(...attempt.map((run) => run.attempt_steps ?? 0));
+  /** A run of the attempt ended canceled (Stop, a queue clear) or failed because the model changed. */
+  const endedEarly = (attempt) =>
+    statusesOf(attempt).some((status) => status === 'canceled' || status === 'partial') ||
+    attempt.some((run) => run.items.some((item) => item.status === 'failed' && item.errorCode === 'model_changed'));
+  /**
+   * Whether another attempt than `attemptId` holds the GPU, as the server's `_attempt_blocks` judges it: a run of it is
+   * running, or it is open: between its steps, short of them, nothing ended it early, and active within the grace.
+   */
+  const attemptBlocks = (attemptId) =>
+    [
+      ...Map.groupBy(
+        [...runs.values()].flat().filter((run) => run.attempt_id !== null && run.attempt_id !== attemptId),
+        (run) => run.attempt_id
+      ).values(),
+    ].some(
+      (attempt) =>
+        statusesOf(attempt).includes('running') ||
+        (isShort(attempt) &&
+          !endedEarly(attempt) &&
+          clock() - Math.max(...attempt.map((run) => run.lastActivityAt)) <= ATTEMPT_IDLE_GRACE_MS)
+    );
+
   const heldBack = () => {
     const reasons = new Map();
 
@@ -319,17 +360,8 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
       const attempts = Map.groupBy(list, (run) => run.attempt_id ?? `run:${run.run_id}`);
 
       for (const attempt of attempts.values()) {
-        const statuses = attempt.map((run) => runStatus(run, pointCountOf(run)).status);
-        const planned = Math.max(...attempt.map((run) => run.attempt_steps ?? 0));
-        const modelChanged = attempt.some((run) =>
-          run.items.some((item) => item.status === 'failed' && item.errorCode === 'model_changed')
-        );
-        const aborted =
-          attempt[0].attempt_id !== null &&
-          (attempt.length < planned ||
-            modelChanged ||
-            statuses.some((status) => status === 'canceled' || status === 'partial'));
-        const reason = statuses.includes('running') ? 'running' : aborted ? 'aborted_attempt' : null;
+        const aborted = attempt[0].attempt_id !== null && (isShort(attempt) || endedEarly(attempt));
+        const reason = statusesOf(attempt).includes('running') ? 'running' : aborted ? 'aborted_attempt' : null;
 
         for (const run of attempt) {
           reasons.set(run.run_id, reason);
@@ -370,6 +402,7 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
 
     if (running) {
       running.item.status = 'completed';
+      running.run.lastActivityAt = clock();
       addPoint(modelKey, running.run, running.item);
     }
 
@@ -662,20 +695,25 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
     const existing = known && (runs.get(model.key) ?? []).find((run) => run.run_id === known);
 
     if (!existing) {
-      // One attempt per device class, as the server judges it: a request with an attempt is refused while a running
-      // run of another attempt, of any model, holds the GPU. A run without an attempt holds nothing, and a request
-      // without one is never refused for it.
-      const other =
-        attemptId === null
-          ? undefined
-          : [...runs.values()]
-              .flat()
-              .find(
-                (run) =>
-                  run.attempt_id !== null && run.attempt_id !== attemptId && runStatus(run, 0).status === 'running'
-              );
+      // A later step after another run, of any model or none, was created since the attempt's first: it would measure
+      // the GPU after that calibration. The attempt stays short, and so aborted.
+      const ownFirst = [...runs.values()]
+        .flat()
+        .filter((run) => attemptId !== null && run.attempt_id === attemptId)
+        .map((run) => run.created_at)
+        .sort()[0];
 
-      if (other) {
+      if (
+        ownFirst !== undefined &&
+        [...runs.values()].flat().some((run) => run.attempt_id !== attemptId && run.created_at > ownFirst)
+      ) {
+        return { body: { detail: INTERLEAVED_REFUSAL }, status: 409 };
+      }
+
+      // One attempt per device class, as the server judges it: a request with an attempt is refused while another
+      // attempt, of any model, runs or is open (`attemptBlocks`). A run without an attempt holds nothing, and a
+      // request without one is never refused for it.
+      if (attemptId !== null && attemptBlocks(attemptId)) {
         return { body: { detail: RUNNING_REFUSAL }, status: 409 };
       }
 

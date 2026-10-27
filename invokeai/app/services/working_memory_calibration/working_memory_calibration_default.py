@@ -6,13 +6,16 @@ import os
 import threading
 import uuid
 import weakref
+from bisect import bisect_left, bisect_right
+from collections import OrderedDict
 from collections.abc import AsyncIterator, Callable, Iterable, Iterator, Mapping
+from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import AbstractContextManager, ExitStack, asynccontextmanager
 from dataclasses import dataclass
 from functools import partial
 from itertools import chain
 from pathlib import Path
-from types import SimpleNamespace
+from types import MappingProxyType, SimpleNamespace
 from typing import TYPE_CHECKING, Any, Final, NamedTuple, Optional
 
 import torch
@@ -49,6 +52,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     STORE_SCHEMA_VERSION,
     CalibrationAttemptBusyError,
     CalibrationAttemptConflictError,
+    CalibrationAttemptInterleavedError,
     CalibrationDeviceClass,
     CalibrationEnvironment,
     CalibrationErrorCode,
@@ -135,6 +139,29 @@ _RUN_ID_NAMESPACE: Final = uuid.UUID("3c1f6a52-8d0e-4b6f-9a57-2f0d5c8e41b3")
 _RUNNING: Final[frozenset[QUEUE_ITEM_STATUS]] = frozenset({"pending", "in_progress", "waiting"})
 
 _RESET: Final = "was reset; a repeat of the request that started it cannot start it again"
+
+ATTEMPT_IDLE_GRACE: Final = datetime.timedelta(minutes=2)
+"""How long an attempt between its steps stays open (`_attempt_blocks`) after its last activity: its newest run's
+creation, or the latest observation of one of its items. The client posts the next step as soon as the last one
+finished, within seconds; a step that runs long (a large model's largest decode) is running, and its items' last
+observation, as the runner settles them, starts the wait. Past it the attempt is taken for abandoned: a client that
+went away. It no longer blocks another attempt, and it never feeds a fit, being short of steps."""
+
+_UNRESOLVED_RETRIES_LIMIT: Final = 256
+"""How many announced retries `record_retries` keeps while their source is unknown and their row is gone."""
+
+_RUNNING_ELSEWHERE: Final = (
+    "Another calibration is still running on this GPU. Wait until it has finished, or stop it, then calibrate again."
+)
+
+_BETWEEN_STEPS: Final = (
+    "Another calibration on this GPU is between its steps. Try again in a moment, or once it has finished."
+)
+
+_INTERLEAVED: Final = (
+    "Another calibration ran on this GPU after this calibration started, so its measurements can no longer be "
+    "combined. Calibrate again."
+)
 
 _ATTEMPTS_LOCK: Final = "calibration-attempts"
 """This process's gate in front of the lock every attempt's creation takes (`_attempt_lock`)."""
@@ -352,6 +379,63 @@ def _lineage_outcomes(
     return item_ids, {item_id: status_of(item_id) for item_id in sorted(latest.values())}
 
 
+def _record_retry_of(source_item_id: int, item_id: int, file: CalibrationStoreFile) -> tuple[bool, bool]:
+    """A store change: record the retry `item_id` on the run one of whose recorded items is `source_item_id`, pending
+    and standing for the source's lineage (as the queue links a retry of a retry: to the item it all started from).
+    Returns whether the file changed, and whether a run holds the source."""
+    for run in file.runs:
+        if source_item_id not in run.queue_item_ids and source_item_id not in run.observed:
+            continue
+        if item_id in run.observed:
+            # The runner saw it already, or another announcement brought it.
+            return False, True
+        source = run.observed.get(source_item_id)
+        lineage = source.retried_from_item_id if source is not None else None
+        run.observed[item_id] = ObservedItem(
+            status="pending",
+            retried_from_item_id=lineage if lineage is not None else source_item_id,
+            observed_at=_now(),
+        )
+        return True, True
+    return False, False
+
+
+def _last_activity(runs: Iterable[CalibrationRun]) -> datetime.datetime:
+    """When an attempt last did something: its newest run's creation, or the latest observation of its items."""
+    return max(
+        chain(
+            (run.created_at for run in runs),
+            (observed.observed_at for run in runs for observed in run.observed.values()),
+        )
+    )
+
+
+def _cut_off(file: CalibrationStoreFile, key: AttemptKey) -> bool:
+    """Whether another run (another attempt's, or one without an attempt: a script, the family E2E tool) was created
+    on the device class after the first run of attempt `key`: a later step of it would measure the GPU after that run,
+    so none is accepted (`CalibrationAttemptInterleavedError`)."""
+    own = [run.created_at for run in file.runs if _attempt_key(run) == key]
+    return bool(own) and any(_attempt_key(run) != key and run.created_at > min(own) for run in file.runs)
+
+
+def _interleaved_attempts(file: CalibrationStoreFile) -> set[AttemptKey]:
+    """The attempts another run was created between the first and the last run of: their later steps measured the GPU
+    after that run, not after their own earlier steps. The calibrate route refuses such a step
+    (`CalibrationAttemptInterleavedError`), so only a store written otherwise holds one."""
+    created = sorted(run.created_at for run in file.runs)
+    spans: dict[AttemptKey, list[datetime.datetime]] = {}
+    for run in file.runs:
+        if (key := _attempt_key(run)) is not None:
+            spans.setdefault(key, []).append(run.created_at)
+    interleaved: set[AttemptKey] = set()
+    for key, times in spans.items():
+        first, last = min(times), max(times)
+        between = bisect_left(created, last) - bisect_right(created, first)
+        if between > sum(1 for time in times if first < time < last):
+            interleaved.add(key)
+    return interleaved
+
+
 def _record_retry(run_id: str, item: SessionQueueItem, file: CalibrationStoreFile) -> tuple[bool, None]:
     """A store change: record the retry `item` on the run `run_id`, pending, unless the runner already observed it
     (admitted, or even settled it before the announcement came)."""
@@ -507,8 +591,13 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         # The status of each calibration item `_canceled_runs` found finished in the queue: item ids are never reused,
         # and a finished item never changes, so an entry holds for the process's lifetime.
         self._item_outcomes: dict[int, QUEUE_ITEM_STATUS] = {}
-        # Whether a started service records the retries the queue announces (`_on_queue_items_retried`).
+        # Whether a started service records the retries the queue announces (`_on_queue_items_retried`), and the
+        # one thread that records them, one announcement after the other.
         self._listening = False
+        self._retry_worker: Optional[ThreadPoolExecutor] = None
+        # Announced retries whose source no run records yet and whose row is gone, by source item id: recorded once
+        # the source is (`record_retries`). Only the retry worker touches it.
+        self._unresolved_retries: OrderedDict[int, list[int]] = OrderedDict()
         # One object, so that `stop` unregisters exactly what `start` registered.
         self._provider: user_fit.UserFitProvider = self._user_fit_for
 
@@ -516,12 +605,17 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         self._invoker = invoker
         user_fit.set_user_fit_provider(self._provider)
         self._listening = True
+        self._retry_worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="wm-calibration-retries")
         register_events(QueueItemsRetriedEvent, _retry_listener(self))
 
     def stop(self, invoker: "Invoker") -> None:
         # The listener stays registered (the event bus keeps no unregister); it does nothing once stopped, and holds
         # the service only weakly.
         self._listening = False
+        if self._retry_worker is not None:
+            # What was announced is recorded before the store is let go.
+            self._retry_worker.shutdown(wait=True)
+            self._retry_worker = None
         user_fit.clear_user_fit_provider(self._provider)
 
     @property
@@ -800,13 +894,18 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                     run_id=run_id, device_class_id=device_class_id, item_ids=list(run.queue_item_ids)
                 )
             # An earlier attempt may have queued the batch without recording its items. While the queue keeps the
-            # key's receipt, enqueuing the batch again answers with the items it names, all of them. That needs
-            # neither the model, which may have been removed since, nor the device. Without the receipt, enqueuing
-            # again would queue the batch a second time: the items carrying the run's origin, and those the runner
-            # saw, are taken over instead.
-            if self._services.session_queue.get_enqueue_receipt(DEFAULT_QUEUE_ID, key, user_id) is not None:
-                # The attempt that queued them marked the run, and the mark stays whatever this replay finds.
-                return _Enqueue(self._batch(request, run_id), device_class_id, created=False, marks=False)
+            # key's receipt, it names them, all of them; that needs neither the model, which may have been removed
+            # since, nor the device. Read in one step, and never by enqueuing again: a receipt the queue collects
+            # between a lookup and a repeated enqueue would let the batch in a second time. Without the receipt, the
+            # items carrying the run's origin, and those the runner saw, are taken over instead.
+            replayed = self._services.session_queue.replay_enqueue(
+                DEFAULT_QUEUE_ID, self._batch(request, run_id), False, user_id
+            )
+            if replayed is not None:
+                self._record_items(device_class_id, run_id, list(replayed.item_ids))
+                return WorkingMemoryCalibrationRunCreated(
+                    run_id=run_id, device_class_id=device_class_id, item_ids=list(replayed.item_ids)
+                )
             item_ids = sorted(set(self._queued_item_ids(run_id)) | set(run.observed))
             if item_ids:
                 self._record_items(device_class_id, run_id, item_ids)
@@ -833,6 +932,11 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         config = self._services.model_manager.store.get_model(model_key)
         if (changed := self._changed_models(request.graph)) is not None:
             raise CalibrationModelChangedError(changed)
+        store = self._services.model_manager.store
+        # As they are now: `_changed_models` just found every one of them as the graph names it.
+        graph_models = {
+            named.key: _model_identity(store.get_model(named.key)) for named in _model_identifiers(request.graph)
+        }
         batch = self._batch(request, run_id)
         if found is not None:
             # The run is recorded without items and unmarked, and nothing of it is queued: enqueue its batch.
@@ -850,6 +954,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             attempt_steps=request.attempt_steps,
             soft=env.soft,
             model_identity=_model_identity(config),
+            graph_models=graph_models,
             # Marked as it is recorded: the enqueue follows, and nothing else is written in between.
             enqueue_attempted=True,
         )
@@ -860,16 +965,26 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             if any(known.run_id == run_id for known in file.runs):
                 return False, False
             if (key := _attempt_key(run)) is not None:
+                if _cut_off(file, key):
+                    # Its next step would measure the GPU after that other calibration: the attempt stays short, and
+                    # so aborted.
+                    raise CalibrationAttemptInterleavedError(_INTERLEAVED)
                 # The queue is read under the file's lock; no queue path takes it.
-                if self._other_attempt_running(file, key):
-                    raise CalibrationAttemptBusyError(
-                        "Another calibration is still running on this GPU. Wait until it has finished, or stop it, "
-                        "then calibrate again."
-                    )
+                if (busy := self._attempt_blocks(file, key)) is not None:
+                    raise CalibrationAttemptBusyError(busy)
                 # The attempt's earlier steps measured the model as it was then.
                 for known in file.runs:
                     if _attempt_key(known) == key and known.model_key == model_key:
                         facts = _identity_changes(known, run.model_hash, _model_identity(config))
+                        facts += sorted(
+                            {
+                                fact
+                                for model in known.graph_models.keys() & graph_models.keys()
+                                for fact, value in known.graph_models[model].model_dump().items()
+                                if getattr(graph_models[model], fact) != value
+                            }
+                            - set(facts)
+                        )
                         if facts:
                             raise CalibrationModelChangedError(
                                 f"{getattr(config, 'name', model_key)} changed after this calibration was planned "
@@ -892,19 +1007,76 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         self._run_files[run_id] = device_class.id
         return _Enqueue(batch, device_class.id, created=created, marks=created)
 
-    def _other_attempt_running(self, file: CalibrationStoreFile, key: AttemptKey) -> bool:
-        """Whether a run of another attempt than `key` (`_held_back`'s running: an item of it pending, in progress or
-        waiting) is in the file. One attempt runs on a device class at a time: its runs measure the GPU back to back,
-        each step on what the last one left, and another attempt's items in between would measure neither."""
+    def _attempt_blocks(self, file: CalibrationStoreFile, key: AttemptKey) -> Optional[str]:
+        """Why another attempt than `key` holds the device class, or None: one of its runs is running (an item pending,
+        in progress or waiting), or another owner's attempt is open. One attempt runs on a device class at a time: its
+        runs measure the GPU back to back, each step on what the last one left, and another attempt's items in between
+        would measure neither.
+
+        Open: between its steps, short of `attempt_steps` runs (those resets removed included), not aborted (no item
+        of it canceled or failed for a changed model, no reset that stopped it, no other run since its first), its
+        model as its runs recorded it (`_can_continue`: a later step would be refused otherwise), and active within
+        `ATTEMPT_IDLE_GRACE`. Past that it is taken for abandoned and blocks nothing; it can never feed a fit, being
+        short. The owner's own open attempt blocks nothing: its client posts each step as soon as the last one
+        finished, so an open attempt is almost always one whose submission stopped partway (a full queue, a lost
+        connection, a closed tab), and its owner's new attempt replaces it. The replaced attempt stays short, so
+        aborted, and a later step of it is refused (`_cut_off`).
+
+        The grace is measured on the stored times against the clock now: a jump of the wall clock lengthens or
+        shortens it once."""
         origins = self._services.session_queue.get_unfinished_origins(DEFAULT_QUEUE_ID, CALIBRATION_ORIGIN_PREFIX)
         running = {run_id for origin in origins if (run_id := calibration_run_id(origin)) is not None}
-        return any(
-            (other := _attempt_key(run)) is not None and other != key and run.run_id in running for run in file.runs
-        )
+        attempts: dict[AttemptKey, list[CalibrationRun]] = {}
+        for run in file.runs:
+            if (other := _attempt_key(run)) is not None and other != key:
+                attempts.setdefault(other, []).append(run)
+        notes = _removed_steps(file)
+        interleaved = _interleaved_attempts(file)
+        now = _now()
+        between_steps: list[list[CalibrationRun]] = []
+        for other, runs in attempts.items():
+            if any(run.run_id in running for run in runs):
+                return _RUNNING_ELSEWHERE
+            removed = notes.get(other)
+            queued, planned = _queued_runs(runs, removed)
+            if (
+                other[0] == key[0]
+                or queued >= planned
+                or (removed is not None and removed.aborted)
+                or other in interleaved
+                or _cut_off(file, other)
+            ):
+                continue
+            if now - _last_activity(runs) <= ATTEMPT_IDLE_GRACE and self._can_continue(runs):
+                between_steps.append(runs)
+        if not between_steps:
+            return None
+        canceled, started = self._canceled_runs([run for runs in between_steps for run in runs])
+        for runs in between_steps:
+            if any(run.run_id in started for run in runs):
+                return _RUNNING_ELSEWHERE
+            if not any(run.run_id in canceled for run in runs):
+                return _BETWEEN_STEPS
+        return None
 
-    def _changed_models(self, graph: Graph) -> Optional[str]:
+    def _can_continue(self, runs: list[CalibrationRun]) -> bool:
+        """Whether a later step of the attempt of `runs` could still be accepted as far as its model goes: its newest
+        run's model is still installed as that run recorded it. Otherwise every later step is refused
+        (`CalibrationModelChangedError`), and the attempt holds nothing open."""
+        newest = max(runs, key=lambda run: run.created_at)
+        try:
+            config = self._services.model_manager.store.get_model(newest.model_key)
+        except UnknownModelException:
+            return False
+        return not _identity_changes(newest, getattr(config, "hash", None), _model_identity(config))
+
+    def _changed_models(
+        self, graph: Graph, recorded: Mapping[str, CalibrationModelIdentity] = MappingProxyType({})
+    ) -> Optional[str]:
         """Why a model the graph names is not the one the graph was compiled against any more, or None: its record is
-        gone, or names another hash, base or type than the graph does."""
+        gone, or names another hash, base or type than the graph does, or, for one `recorded` (`graph_models`, as the
+        run's creation found them), another base, type, format or variant. The graph's identifiers carry no format or
+        variant, so a change of those between compiling the graph and posting it goes unseen."""
         store = self._services.model_manager.store
         for named in _model_identifiers(graph):
             try:
@@ -920,6 +1092,13 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                 )
                 if planned != current
             ]
+            if (identity := recorded.get(named.key)) is not None:
+                now = _model_identity(config)
+                facts += [
+                    fact
+                    for fact, value in identity.model_dump().items()
+                    if getattr(now, fact) != value and fact not in facts
+                ]
             if facts:
                 return f"{named.name} changed after this calibration was planned ({', '.join(facts)}). Calibrate again."
         return None
@@ -1044,7 +1223,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         if facts:
             return f"{name} changed after this calibration was planned ({', '.join(facts)}). Calibrate again."
         session = getattr(queue_item, "session", None)
-        return self._changed_models(session.graph) if session is not None else None
+        return self._changed_models(session.graph, run.graph_models) if session is not None else None
 
     def _observe(self, run_id: str, item_id: int, observation: ObservedItem) -> None:
         found = self._find_run(run_id)
@@ -1115,47 +1294,150 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         )
 
     async def _on_queue_items_retried(self, event: FastAPIEvent[QueueItemsRetriedEvent]) -> None:
-        """Record the calibration retries the queue announces on their runs (`record_retries`), off the event loop."""
+        """Hand the retries the queue announces to the retry worker (`record_retries`), which records them one
+        announcement after the other, off the event loop."""
         retried = list(event[1].retried_items)
-        if not self._listening or not retried:
+        worker = self._retry_worker
+        if not self._listening or not retried or worker is None:
             return
         try:
-            await asyncio.to_thread(self.record_retries, retried)
-        except Exception:
-            self._services.logger.warning("Could not record the retries of calibration items", exc_info=True)
+            recording = worker.submit(self.record_retries, retried)
+        except RuntimeError:
+            # `stop` shut the worker down since: nothing records any more.
+            if self._listening:
+                raise
+            return
+        recording.add_done_callback(self._log_retry_failure)
+
+    def _log_retry_failure(self, recording: "Future[None]") -> None:
+        if not recording.cancelled() and (error := recording.exception()) is not None:
+            self._services.logger.warning("Could not record the retries of calibration items", exc_info=error)
 
     def record_retries(self, retried: Iterable[RetriedQueueItem]) -> None:
         """Record each retry of a calibration item on its run, as an item pending that stands for the retried item's
         lineage, under the store file's lock. So the store knows every item of every run: a retry canceled and pruned
         before anything else saw it still reads as canceled (`_canceled_runs`), and its attempt as aborted.
 
-        A retry belongs to the run whose origin it carries: only the server creates items with a calibration origin, and
-        a retry inherits its source's, so the origin alone names the run. Not the source: a retry of a retry comes from
-        the earlier retry, whose announcement may be handled after its own. A retry the runner already saw keeps its
-        observation. A retry announced while this process was down, or whose event was lost to a crash between the
-        retry's commit and this handler, is recorded once the runner admits it (`admit`); one canceled before that
-        leaves its run on the outcome of the item it retried.
+        From the announcement alone, never from the retry's row, which a cancel and a prune may already have removed:
+        the retry belongs to the run that records its source (`_record_retry_of`). Unless the source's row says
+        otherwise: a recreated or restored database gives a recorded id to an unrelated item, whose retry is not the
+        run's. Per announcement: one read of the sources' rows, which also passes over every retry whose source is no
+        calibration's (a bulk retry of generations reads no store file); and each store file read at most once, for
+        the rest (`_source_holders`).
 
-        One read of the retries' origins; only a calibration retry is read whole, for the item it retried. A retry that
-        cannot be recorded is logged and the others still are."""
+        A retry whose source no run records (a retry of a retry whose own announcement has not been handled yet, an
+        announcement lost to a crash, a store from before retries were recorded) is found by its own row's origin, as
+        only the server creates items with a calibration origin and a retry inherits its source's. With that row gone
+        too it waits (`_unresolved_retries`, the latest `_UNRESOLVED_RETRIES_LIMIT` of them, for the process's life)
+        until its source is recorded: the event bus does not hand announcements over in the order they were made,
+        since other handlers of the same event await before this service's runs. A retry whose source is never
+        recorded, and whose row is gone, leaves its run on the outcome of the item it retried; one the runner admits
+        is recorded then (`admit`). A retry the runner already saw keeps its observation.
+
+        Runs on the retry worker, one announcement at a time; tests call it directly. A retry that cannot be recorded
+        is logged and the others still are."""
         queue = self._services.session_queue
-        retried_ids = [retry.item_id for retry in retried]
-        for summary in queue.get_queue_item_summaries_by_ids(DEFAULT_QUEUE_ID, retried_ids):
+        retries = list(retried)
+        try:
+            sources = {
+                summary.item_id: summary.origin
+                for summary in queue.get_queue_item_summaries_by_ids(
+                    DEFAULT_QUEUE_ID, sorted({retry.source_item_id for retry in retries})
+                )
+            }
+        except Exception:
+            self._services.logger.warning("Could not read the sources of retried queue items", exc_info=True)
+            return
+        # A retry inherits its source's origin: one whose source row says it is no calibration's is none, and needs
+        # no store read. That is nearly every retry of a bulk retry.
+        retries = [
+            retry
+            for retry in retries
+            if (origin := sources.get(retry.source_item_id)) is None or calibration_run_id(origin) is not None
+        ]
+        if not retries:
+            return
+        try:
+            holders = self._source_holders()
+        except Exception:
+            self._services.logger.warning("Could not read the calibration store for retried items", exc_info=True)
+            return
+        unknown: list[RetriedQueueItem] = []
+        for retry in retries:
+            try:
+                origin = sources.get(retry.source_item_id)
+                holder = holders.get(retry.source_item_id)
+                # The source's row, while it exists, must be that run's: a recreated database reuses ids.
+                if holder is None or (origin is not None and origin != calibration_origin(holder[1])):
+                    unknown.append(retry)
+                    continue
+                self._store.change(holder[0], partial(_record_retry_of, retry.source_item_id, retry.item_id))
+                self._record_waiting_for(retry.item_id)
+            except Exception:
+                self._services.logger.warning(f"Could not record the retry {retry.item_id}", exc_info=True)
+        if unknown:
+            self._record_by_origin(unknown)
+
+    def _source_holders(self) -> dict[int, tuple[str, str]]:
+        """Per item a run records (its batch's, and those observed: retries included), its device class and run:
+        each store file read once."""
+        holders: dict[int, tuple[str, str]] = {}
+        for device_class_id in self._store.device_class_ids():
+            read = self._store.read(device_class_id)
+            if read is None or read.file is None:
+                continue
+            for run in read.file.runs:
+                for item_id in chain(run.queue_item_ids, run.observed):
+                    holders.setdefault(item_id, (device_class_id, run.run_id))
+        return holders
+
+    def _record_by_origin(self, retries: list[RetriedQueueItem]) -> None:
+        """Record retries no run knows the source of by their own rows' origin; keep those whose row is gone until
+        their source is recorded."""
+        queue = self._services.session_queue
+        try:
+            found = {
+                summary.item_id: summary
+                for summary in queue.get_queue_item_summaries_by_ids(
+                    DEFAULT_QUEUE_ID, [retry.item_id for retry in retries]
+                )
+            }
+        except Exception:
+            self._services.logger.warning("Could not read retried queue items", exc_info=True)
+            return
+        for retry in retries:
+            summary = found.get(retry.item_id)
+            if summary is None:
+                self._unresolved_retries.setdefault(retry.source_item_id, []).append(retry.item_id)
+                while len(self._unresolved_retries) > _UNRESOLVED_RETRIES_LIMIT:
+                    self._unresolved_retries.popitem(last=False)
+                continue
             run_id = calibration_run_id(summary.origin)
             if run_id is None:
                 continue
             try:
-                found = self._find_run(run_id)
-                if found is None:
+                located = self._find_run(run_id)
+                if located is None:
                     continue
                 item = queue.get_queue_item(summary.item_id)
-                self._store.change(found[0], partial(_record_retry, run_id, item))
+                self._store.change(located[0], partial(_record_retry, run_id, item))
+                self._record_waiting_for(item.item_id)
             except SessionQueueItemNotFoundError:
                 continue
             except Exception:
                 self._services.logger.warning(
-                    f"Could not record the retry {summary.item_id} of calibration run {run_id}", exc_info=True
+                    f"Could not record the retry {retry.item_id} of calibration run {run_id}", exc_info=True
                 )
+
+    def _record_waiting_for(self, source_item_id: int) -> None:
+        """Record the retries that waited for `source_item_id` to be recorded, and those that waited for them."""
+        waiting = [(source_item_id, item_id) for item_id in self._unresolved_retries.pop(source_item_id, [])]
+        while waiting:
+            source, item_id = waiting.pop()
+            for device_class_id in self._store.device_class_ids():
+                if self._store.change(device_class_id, partial(_record_retry_of, source, item_id)):
+                    break
+            waiting.extend((item_id, later) for later in self._unresolved_retries.pop(item_id, []))
 
     def model_reset_epochs(self, run_id: str) -> dict[str, int]:
         found = self._find_run(run_id)
@@ -1425,7 +1707,9 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
           an item of it ended canceled (`_canceled_runs`: Stop cancels what the queue still holds, and a queue clear
           removes it); or it queued fewer runs than it planned (`_queued_runs`): Stop, or a submission that failed,
           ended it before it queued them all; or a reset removed a run of it while it ran or after it was aborted
-          (`RemovedAttemptSteps.aborted`). Either way it measured only some of its sizes, and it never feeds a fit. A
+          (`RemovedAttemptSteps.aborted`); or another run was created between its first and its last
+          (`_interleaved_attempts`). Either way it measured only some of its sizes, or measured them around another
+          calibration, and it never feeds a fit. A
           step not posted yet looks the same until it is. An item that failed (an out-of-memory error at the largest
           size) ends that step, not the attempt. A run without an attempt is never aborted: canceled, it feeds what it
           measured, as before.
@@ -1445,6 +1729,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             key = _attempt_key(run)
             attempts.setdefault((key, "" if key is not None else run.run_id), []).append(run)
         notes = _removed_steps(file)
+        interleaved = _interleaved_attempts(file)
         held_back: dict[str, CalibrationHoldBack] = {}
 
         def hold(runs: list[CalibrationRun], reason: CalibrationHoldBack) -> None:
@@ -1457,7 +1742,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             queued, planned = _queued_runs(runs, removed)
             if any(run.run_id in running for run in runs):
                 hold(runs, "running")
-            elif (removed is not None and removed.aborted) or queued < planned:
+            elif (removed is not None and removed.aborted) or queued < planned or key in interleaved:
                 hold(runs, "aborted_attempt")
             elif is_attempt:
                 # A run without an attempt is judged on its own, as before: a canceled one feeds what it measured.

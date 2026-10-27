@@ -100,10 +100,12 @@ export const useLocalAttempt = (modelKey: string): LocalAttempt | null =>
 
 /**
  * The refusals of a step the section explains, by the `code` of the server's structured 409 detail: another attempt
- * runs on this GPU, or a model the graph names changed (hash, base, type) or was removed since it compiled. Every
- * other 409 has a plain detail, which names no code.
+ * runs on this GPU or is between its steps, another calibration ran on it since this attempt began, or a model the
+ * graph names changed or was removed since it compiled (or since an earlier step). Every other 409 has a plain detail,
+ * which names no code. Each ends the attempt where it stands.
  */
 const REFUSAL_CODES: Readonly<Record<string, CalibrationRefusal>> = {
+  calibration_interleaved: 'interleaved',
   calibration_running: 'alreadyRunning',
   model_changed: 'modelChanged',
 };

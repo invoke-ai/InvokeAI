@@ -177,6 +177,7 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   zImageSeedVarianceRandomizePercent: 50,
   qwenImageShift: null,
   qwenImageEncoderQuantization: 'none',
+  mossImageUncondSkipLayers: [22],
   referenceImages: [],
   scheduler: 'euler_a',
   seamlessXAxis: false,
@@ -347,6 +348,48 @@ describe('image recall', () => {
       type: 'ip_adapter',
     });
     expect(result?.fields).toContain('referenceImages');
+  });
+
+  // Only the Diffusers pipeline reads Qwen-Image-2.1 references, so the recalled flavor survives there and nowhere else.
+  it('recalls Qwen-Image-2.1 reference images onto a Diffusers model and drops them on a GGUF one', () => {
+    const recall = (model: MainModelConfig) =>
+      buildImageRecallSettings({
+        currentValues: createValues({ model, modelKey: model.key }),
+        image,
+        kind: 'all',
+        metadata: {
+          positive_prompt: 'swap the jacket',
+          ref_images: [
+            {
+              config: {
+                image: { height: 640, image_name: 'edit.png', width: 480 },
+                type: 'qwen_image_2_1_reference_image',
+              },
+              id: 'edit-1',
+              isEnabled: true,
+            },
+          ],
+        },
+        models: [],
+        supportedModels: [model],
+        vaeModels: [],
+      });
+    const diffusers = recall({ base: 'qwen-image-2-1', format: 'diffusers', key: 'q21', name: 'Q21', type: 'main' });
+    const gguf = recall({ base: 'qwen-image-2-1', format: 'gguf_quantized', key: 'q21-q4', name: 'Q4', type: 'main' });
+
+    expect(diffusers?.values.referenceImages).toEqual([
+      {
+        config: {
+          image: { original: { image: { height: 640, image_name: 'edit.png', width: 480 } } },
+          type: 'qwen_image_2_1_reference_image',
+        },
+        id: 'edit-1',
+        isEnabled: true,
+      },
+    ]);
+    expect(diffusers?.fields).toContain('referenceImages');
+    expect(gguf?.values.referenceImages).toEqual([]);
+    expect(gguf?.fields).not.toContain('referenceImages');
   });
 
   it('preserves canonical original and crop provenance from legacy metadata', () => {
@@ -1206,6 +1249,81 @@ describe('image recall', () => {
         currentValues: createValues({ model: krea2Model }),
         image,
         metadata: { krea2_rebalance_enabled: true },
+        models: [],
+        supportedModels: [],
+        vaeModels: [],
+      });
+
+      expect(capabilities.all).toBe(true);
+      expect(capabilities.remix).toBe(true);
+    });
+  });
+
+  describe('MOSS-Image skip layers', () => {
+    const mossImageModel: MainModelConfig = {
+      base: 'moss-image',
+      format: 'diffusers',
+      key: 'moss-image-model',
+      name: 'MOSS-Image',
+      type: 'main',
+    };
+    const recall = (layers: unknown, kind: ImageRecallKind = 'all', model: MainModelConfig = mossImageModel) =>
+      buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind,
+        metadata: { model: { key: model.key }, moss_image_uncond_skip_layers: layers },
+        models: [],
+        supportedModels: [mossImageModel, sdxlModel],
+        vaeModels: [],
+      });
+
+    it.each([[[22, 26]], [[]]])('restores the skip layers %j a generated image records', (layers) => {
+      // Recorded by the graph, so the round trip covers the metadata key as well as the reader.
+      const generated = compileGenerateGraph(
+        createValues({ model: mossImageModel, modelKey: mossImageModel.key, mossImageUncondSkipLayers: layers }),
+        mossImageModel,
+        'gallery',
+        { useCpuNoise: true, useNsfwChecker: false, useWatermark: false }
+      ).backendGraph;
+      const result = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind: 'all',
+        metadata: Object.values(generated.nodes).find((node) => node.type === 'core_metadata'),
+        models: [],
+        supportedModels: [mossImageModel],
+        vaeModels: [],
+      });
+
+      expect(result?.values.mossImageUncondSkipLayers).toEqual(layers);
+      expect(result?.fields).toContain('mossImageSkipLayers');
+    });
+
+    it('recalls the skip layers on a remix too', () => {
+      expect(recall([24], 'remix')?.values.mossImageUncondSkipLayers).toEqual([24]);
+    });
+
+    it.each([[[22, 42]], [[2.5]], ['22']])('keeps the current skip layers for a recorded %j', (layers) => {
+      // A block MOSS-Image lacks would block every generation until edited, so the current list stays.
+      const result = recall(layers);
+
+      expect(result?.values.mossImageUncondSkipLayers).toEqual([22]);
+      expect(result?.fields).not.toContain('mossImageSkipLayers');
+    });
+
+    it('ignores the skip layers when the recalled model is not MOSS-Image', () => {
+      const result = recall([], 'all', sdxlModel);
+
+      expect(result?.values.mossImageUncondSkipLayers).toEqual([22]);
+      expect(result?.fields).not.toContain('mossImageSkipLayers');
+    });
+
+    it('offers recall for an image whose only recallable delta is the skip layers', () => {
+      const capabilities = getImageRecallCapabilities({
+        currentValues: createValues({ model: mossImageModel }),
+        image,
+        metadata: { moss_image_uncond_skip_layers: [] },
         models: [],
         supportedModels: [],
         vaeModels: [],

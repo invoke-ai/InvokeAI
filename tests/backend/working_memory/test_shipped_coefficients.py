@@ -52,6 +52,7 @@ from invokeai.backend.working_memory.fit import (
     entry_key,
     fit_points,
     fitted_values,
+    line_values,
 )
 from invokeai.backend.working_memory.platform import (
     MEASURED,
@@ -158,6 +159,10 @@ def test_an_unmeasured_platform_is_priced_as_the_measured_one_at_least_and_says_
         measured = priced_as(platform)
         assert is_measured(measured) and measured.os == platform.os
         resolved = shipped_coefficients(spec, platform)
+        if not spec.platform_keys:
+            # Keyed by no platform trait: nothing is priced as anything else, and the source says so.
+            assert resolved.source == "shipped:any platform"
+            continue
         borrowed = shipped_coefficients(spec, measured)
         assert all(resolved.values[name] >= value for name, value in borrowed.values.items())
         where = ",".join(f"{key}={value}" for key, value in _keys(measured, spec).items())
@@ -186,7 +191,8 @@ def test_every_fitted_value_is_decided_by_an_in_fit_point() -> None:
 
 def test_every_fitted_value_is_the_shipped_fit_of_its_points() -> None:
     """The values are reproducible from the points rather than hand-tuned. A new point that moves a fit fails here,
-    naming the values to ship."""
+    naming the values to ship. Values on no line their entry carries (`fit.line_values`) are hand-set, held by their
+    points' bounds only."""
     fitted = fitted_values(shipped_data().values(), SPECS)
     stale = {}
     for entry in ENTRIES:
@@ -196,7 +202,7 @@ def test_every_fitted_value_is_the_shipped_fit_of_its_points() -> None:
         differs = {
             name: expected.get(name)
             for name, value in entry.values.items()
-            if name not in entry.stand_ins and expected.get(name) != value
+            if name in line_values(entry) and name not in entry.stand_ins and expected.get(name) != value
         }
         if differs:
             stale[f"{entry.estimator} {entry.platform}"] = differs
@@ -208,6 +214,17 @@ def test_only_the_listed_entries_ship_hand_set_values() -> None:
     quiet flag in the data, and shipping an entry's fit has to remove it."""
     legacy = {(entry.estimator, tuple(sorted(entry.platform.items()))) for entry in ENTRIES if entry.legacy}
     assert legacy == LEGACY_ENTRIES
+
+
+def test_only_an_estimator_keyed_by_no_platform_trait_carries_values_off_a_line() -> None:
+    """The fit check above holds the lines an entry carries. An estimator keyed by a platform trait prices lines whose
+    every value is half of one, so a value off one there is a typo or a term the fit would never check."""
+    off_line = {
+        f"{entry.estimator} {entry.platform}": sorted(set(entry.values) - line_values(entry))
+        for entry in ENTRIES
+        if entry.values is not None and SPECS[entry.estimator].platform_keys
+    }
+    assert not {where: names for where, names in off_line.items() if names}, off_line
 
 
 def test_a_stand_in_is_a_whole_line_its_fresh_process_points_cannot_fit() -> None:
@@ -433,6 +450,15 @@ def _data(*entries: CoefficientEntry) -> list[WorkingMemoryData]:
 
 
 CUDNN = Platform("cudnn", "native", "linux")
+
+
+def test_only_an_estimator_keyed_by_no_platform_trait_is_priced_without_a_platform() -> None:
+    """A point of an estimator keyed by no platform trait records none and is priced without one; any other estimator's
+    values differ by platform, so pricing it without one refuses rather than picking an entry."""
+    spec = _spec("test.estimator")
+
+    with pytest.raises(ValueError, match=r"'test\.estimator' is keyed by \['conv_backend'\]"):
+        resolve_coefficients(_data(_entry(spec.id, values={"k": 7.0})), spec, None, origin="test")
 
 
 def test_a_missing_or_stale_entry_names_the_estimator_and_platform() -> None:

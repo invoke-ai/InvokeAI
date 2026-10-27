@@ -25,6 +25,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
     CalibrationAttemptBusyError,
     CalibrationAttemptConflictError,
+    CalibrationAttemptInterleavedError,
     CalibrationGraphError,
     CalibrationModelChangedError,
     CalibrationQueueFullError,
@@ -67,7 +68,9 @@ def _service() -> WorkingMemoryCalibrationServiceBase:
 
 
 def _http_error(error: Exception) -> HTTPException:
-    if isinstance(error, (CalibrationAttemptBusyError, CalibrationModelChangedError)):
+    if isinstance(
+        error, (CalibrationAttemptBusyError, CalibrationAttemptInterleavedError, CalibrationModelChangedError)
+    ):
         # Coded, as other routes' refusals a client acts on are: it tells these 409s from the others.
         return HTTPException(status_code=409, detail={"code": error.code, "message": str(error)})
     if isinstance(error, (CalibrationRunNotFoundError, UnknownModelException)):
@@ -106,10 +109,13 @@ def _http_error(error: Exception) -> HTTPException:
             "class's store file is unusable and kept as it is (possibly after the items were queued, which then fail "
             "when they start), the queue has no room for all of the run's items (it then takes none), the "
             "idempotency key was used for another request, or attempt_steps differs from that of the attempt's runs "
-            "already stored (or of the run a repeated request names). Two of them carry a code, as "
+            "already stored (or of the run a repeated request names). Three of them carry a code, as "
             '`{"code": ..., "message": ...}` in `detail`: `calibration_running`, another calibration attempt still '
-            "runs on this GPU; `model_changed`, a model the graph names changed or was removed since the graph was "
-            "compiled"
+            "runs on this GPU, or another owner's attempt is between its steps and was active in the last two "
+            "minutes (an owner's new attempt replaces its own attempt that stopped between steps); "
+            "`calibration_interleaved`, a later step of an attempt after another calibration ran on this GPU since "
+            "the attempt began; `model_changed`, a model the graph names changed or was removed since the graph was "
+            "compiled, or since an earlier step of the attempt"
         },
         422: {
             "description": "The graph cannot be measured as a calibration run, or attempt_id and attempt_steps were "
@@ -154,6 +160,7 @@ async def calibrate_model_working_memory(
         CalibrationQueueFullError,
         CalibrationAttemptConflictError,
         CalibrationAttemptBusyError,
+        CalibrationAttemptInterleavedError,
         CalibrationModelChangedError,
         EnqueueIdempotencyConflictError,
         EnqueueReceiptLimitError,
