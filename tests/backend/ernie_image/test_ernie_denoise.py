@@ -100,9 +100,7 @@ def test_heun_honours_a_partial_denoise_range() -> None:
 
 
 @pytest.mark.parametrize(("denoising_end", "expected_terminal"), [(1.0, 0.0), (0.75, 0.5)])
-def test_heun_keeps_the_schedulers_own_shift_on_a_partial_range(
-    denoising_end: float, expected_terminal: float
-) -> None:
+def test_heun_keeps_the_schedulers_own_shift_on_a_partial_range(denoising_end: float, expected_terminal: float) -> None:
     """The rebuilt window must carry the scheduler's `shift`, mapped the way `set_timesteps` maps it.
 
     With `shift=3`, the flow shift `3 * s / (1 + 2 * s)` turns the raw start 0.5 into 0.75 and a raw
