@@ -2,7 +2,10 @@ import type { GenerationModelCatalogItem as ModelConfig } from '@features/genera
 import type { GenerateModelConfig, GenerateSettings, LoraModelConfig } from '@features/generation/core/types';
 
 import { Badge, Separator, Stack } from '@chakra-ui/react';
-import { isReferenceImageSupported } from '@features/generation/core/baseGenerationPolicies';
+import {
+  getMissingReferenceImageFormat,
+  isReferenceImageSupported,
+} from '@features/generation/core/baseGenerationPolicies';
 import {
   type GenerateDraft,
   type GenerateSettingsUpdate,
@@ -85,7 +88,9 @@ export const GenerateGuidanceSection = ({
           onCommit={onReferenceCommit}
           onCommitImmediate={onCommitImmediate}
         />
-        {referenceImagesSupported || referenceImageCount > 0 ? <Separator borderColor="bg.subtle" /> : null}
+        {referenceImagesSupported || referenceImageCount > 0 || getMissingReferenceImageFormat(selectedModel) ? (
+          <Separator borderColor="bg.subtle" />
+        ) : null}
         <GenerateConceptsContent
           loraModels={loraModels}
           loras={settings.loras}

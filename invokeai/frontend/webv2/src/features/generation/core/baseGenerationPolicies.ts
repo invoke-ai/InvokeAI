@@ -1089,7 +1089,8 @@ const getBaseComponentSectionPolicy = (
         {
           ...qwen3VlEncoderSlot(
             'Qwen-Image-2.1 conditions on the Qwen3-VL 8B encoder, not the 4B one Krea-2 uses. Required for ' +
-              'non-Diffusers Qwen-Image-2.1 models.',
+              "non-Diffusers Qwen-Image-2.1 models. On a Diffusers model it replaces the model's own encoder, the " +
+              'only one that reads reference images.',
             isQwen3Vl8bEncoder
           ),
           required: (ctx) => ctx.model.format !== 'diffusers',
@@ -1374,10 +1375,34 @@ export const isReferenceImageSupported = (model: GenerateModelConfig | undefined
     return false;
   }
 
-  // The backend declares which reference-image features require a specific variant.
+  // The backend declares which reference-image features require a specific variant or format.
   return (
-    features.reference_images_require_variant === null || model.variant === features.reference_images_require_variant
+    (features.reference_images_require_variant === null ||
+      model.variant === features.reference_images_require_variant) &&
+    (features.reference_images_require_format === null || model.format === features.reference_images_require_format)
   );
+};
+
+/**
+ * The model format the selected base needs for reference images, when the model's format is all that keeps them
+ * unavailable, so the UI can say what to switch to instead of hiding the section without a reason.
+ */
+export const getMissingReferenceImageFormat = (model: GenerateModelConfig | undefined): string | null => {
+  if (!model || model.type === 'external_image_generator' || isReferenceImageSupported(model)) {
+    return null;
+  }
+
+  const features = getArchitectureFeatures(model.base);
+
+  if (
+    !features ||
+    features.max_reference_images <= 0 ||
+    (features.reference_images_require_variant !== null && model.variant !== features.reference_images_require_variant)
+  ) {
+    return null;
+  }
+
+  return features.reference_images_require_format;
 };
 
 export const getMaxReferenceImages = (model: GenerateModelConfig | undefined): number => {
@@ -1426,6 +1451,10 @@ export const getDefaultReferenceImageConfig = (
     return { image, styleStrength: DEFAULT_KREA2_STYLE_STRENGTH, type: 'krea2_reference_image' };
   }
 
+  if (modelBase === 'qwen-image-2-1') {
+    return { image, type: 'qwen_image_2_1_reference_image' };
+  }
+
   if (isFluxKontextModel(model)) {
     return { image, model, type: 'flux_kontext_reference_image' };
   }
@@ -1457,6 +1486,10 @@ const getReferenceImageConfigSupported = (
       return model.type !== 'external_image_generator' && model.base === 'qwen-image' && model.variant === 'edit';
     case 'krea2_reference_image':
       return model.type !== 'external_image_generator' && model.base === 'krea-2';
+    case 'qwen_image_2_1_reference_image':
+      return (
+        model.type !== 'external_image_generator' && model.base === 'qwen-image-2-1' && isReferenceImageSupported(model)
+      );
     case 'flux_kontext_reference_image':
       return isFluxKontextModel(model);
     case 'flux_redux':
@@ -1847,6 +1880,11 @@ const getPidValidationReasons = (model: GenerateModelConfig, settings: GenerateS
   return reasons;
 };
 
+/** Only the encoder of a Qwen-Image-2.1 Diffusers model keeps the vision tower that reads references. */
+export const QWEN_IMAGE_21_STANDALONE_ENCODER_REASON =
+  "Reference images need the Qwen-Image-2.1 model's own encoder, the only one with a vision tower. " +
+  'Clear the Qwen3-VL Encoder component.';
+
 const getReferenceImageValidationReasons = (model: GenerateModelConfig, settings: GenerateSettings): string[] => {
   const reasons: string[] = [];
   const enabled = settings.referenceImages.filter((referenceImage) => referenceImage.isEnabled);
@@ -1896,6 +1934,17 @@ const getReferenceImageValidationReasons = (model: GenerateModelConfig, settings
       }
     }
   });
+
+  // The encoder slot stays filled across models (Ideogram 4 and the GGUF builds share it), so a Diffusers model can
+  // inherit one that cannot read the references.
+  if (
+    model.base === 'qwen-image-2-1' &&
+    settings.qwen3VLEncoderModel &&
+    isQwen3Vl8bEncoder(settings.qwen3VLEncoderModel) &&
+    enabled.some((referenceImage) => referenceImage.config.type === 'qwen_image_2_1_reference_image')
+  ) {
+    reasons.push(QWEN_IMAGE_21_STANDALONE_ENCODER_REASON);
+  }
 
   return reasons;
 };
