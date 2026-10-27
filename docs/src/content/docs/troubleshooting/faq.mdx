@@ -25,7 +25,7 @@ If you find some models are missing after updating from v3, it's likely they wer
 
 You can use the `Scan Folder` tab in the Model Manager UI to fix this. The models will either be in the old, now-unused `autoimport` folder, or your `models` folder.
 
-- Find and copy your install's old `autoimport` folder path, install the main install folder.
+- Find and copy your install's old `autoimport` folder path, inside the main install folder.
 - Go to the Model Manager and click `Scan Folder`.
 - Paste the path and scan.
 - IMPORTANT: Uncheck `Inplace install`.
@@ -43,7 +43,7 @@ Once v7 has run on an install, it has updated the database, and older versions c
 
 - Check the [system requirements] to ensure that your system is capable of generating images.
 - Follow the [Low VRAM mode guide] to optimize performance.
-- Check that your generations are happening on your GPU (if you have one). Invoke will log what is being used for generation upon startup. If your GPU isn't used, re-install to and ensure you select the appropriate GPU option.
+- Check that your generations are happening on your GPU (if you have one). Invoke will log what is being used for generation upon startup. If your GPU isn't used, reinstall and make sure you select the appropriate GPU option.
 - If you are on Windows with an Nvidia GPU, you may have exceeded your GPU's VRAM capacity and are triggering Nvidia's "sysmem fallback". There's a guide to opt out of this behaviour in the [Low VRAM mode guide].
 
 ## Triton error on startup
@@ -77,7 +77,7 @@ Invoke now draws its seeded noise in `float32`, because PyTorch 2.13 changed its
 
 ## Invalid configuration file
 
-Everything seems to install ok, you get a `ValidationError` when starting up the app.
+Everything seems to install OK, but you get a `ValidationError` when starting up the app.
 
 This is caused by an invalid setting in the `invokeai.yaml` configuration file. The error message should tell you what is wrong.
 
@@ -89,7 +89,7 @@ The models are large, VRAM is expensive, and you may find yourself faced with Ou
 
 ## Memory Leak (Linux)
 
-If you notice a memory leak, it could be caused to memory fragmentation as models are loaded and/or moved from CPU to GPU.
+If you notice a memory leak, it could be caused by memory fragmentation as models are loaded and/or moved from CPU to GPU.
 
 A workaround is to tune memory allocation with an environment variable:
 
@@ -110,13 +110,13 @@ MALLOC_MMAP_THRESHOLD_=1048576
 
 <h3>Detailed Discussion</h3>
 
-Python (and PyTorch) relies on the memory allocator from the C Standard Library (`libc`). On linux, with the GNU C Standard Library implementation (`glibc`), our memory access patterns have been observed to cause severe memory fragmentation.
+Python (and PyTorch) relies on the memory allocator from the C Standard Library (`libc`). On Linux, with the GNU C Standard Library implementation (`glibc`), our memory access patterns have been observed to cause severe memory fragmentation.
 
 This fragmentation results in large amounts of memory that has been freed but can't be released back to the OS. Loading models from disk and moving them between CPU/CUDA seem to be the operations that contribute most to the fragmentation.
 
-This memory fragmentation issue can result in OOM crashes during frequent model switching, even if `ram` (the max RAM cache size) is set to a reasonable value (e.g. a OOM crash with `ram=16` on a system with 32GB of RAM).
+This memory fragmentation issue can result in OOM crashes during frequent model switching, even if `max_cache_ram_gb` (the max RAM cache size) is set to a reasonable value (e.g. an OOM crash with `max_cache_ram_gb: 16` on a system with 32GB of RAM).
 
-This problem may also exist on other OSes, and other `libc` implementations. But, at the time of writing, it has only been investigated on linux with `glibc`.
+This problem may also exist on other OSes, and other `libc` implementations. But, at the time of writing, it has only been investigated on Linux with `glibc`.
 
 To better understand how the `glibc` memory allocator works, see these references:
 
