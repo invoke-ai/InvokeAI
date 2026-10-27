@@ -28,6 +28,7 @@ More steps refine an image up to a point; beyond it, an image changes little and
 
 * SD 1.5 and SDXL: about 5 to 8.
 * Newer standard models, such as SD 3.5, Qwen Image, ERNIE-Image and Krea-2 Raw: about 3.5 to 6.
+* MOSS-Image: 3 by default, up to about 6 for short prompts.
 * Distilled models: 1. At a CFG of 1 the negative prompt has no effect, so several model families hide or ignore it.
 * FLUX.1 and some other families show **Guidance** instead, a value built into the model; about 3.5 for FLUX.1 dev.
 
@@ -40,7 +41,7 @@ The scheduler decides how much noise is removed at each step. Which ones are off
 * **SD 1.5, SD 2.x and SDXL** offer the full list. **DPM++ 2M Karras** and **Euler** are good general-purpose choices; **Euler Ancestral** and the other *Ancestral* and *SDE* schedulers add variety and keep changing the image as steps increase; **UniPC** and **DPM++ 3M** reach good results in fewer steps. **LCM** and **TCD** are only for LCM- and TCD-distilled models.
 * **Flow models**, such as FLUX.1, FLUX.2, Z-Image and ERNIE-Image, offer **Euler**, **Heun (2nd order)**, which is slower per step but can need fewer steps, and **LCM** for distilled models.
 * **Anima** has its own short list, starting with **Euler**.
-* Some families, including SD 3.5, Qwen Image, Qwen-Image-2.1, CogView4, Krea-2 and Ideogram 4, use a fixed schedule and do not show the field.
+* Some families, including SD 3.5, Qwen Image, Qwen-Image-2.1, CogView4, Krea-2, Ideogram 4 and MOSS-Image, use a fixed schedule and do not show the field.
 
 **Use model default scheduler** switches back to the model's own choice.
 

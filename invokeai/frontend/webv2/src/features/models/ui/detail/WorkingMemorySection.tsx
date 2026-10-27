@@ -663,9 +663,14 @@ const OutcomePanel = ({ outcome }: { outcome: CalibrationOutcome }) => {
   const kept = outcome.kind === 'failed' && outcome.kept ? t('models.workingMemory.failedKept') : null;
 
   const isFailed = outcome.kind === 'failed';
-  // A model whose record changed after its graphs compiled is calibrated again over the new record.
+  // A model whose record changed after its graphs compiled is calibrated again over the new record; an attempt another
+  // calibration ran in between of is calibrated again from its first step.
   const detail =
-    (outcome.refusal === 'modelChanged' ? t('models.workingMemory.modelChanged') : null) ||
+    (outcome.refusal === 'modelChanged'
+      ? t('models.workingMemory.modelChanged')
+      : outcome.refusal === 'interleaved'
+        ? t('models.workingMemory.interleaved')
+        : null) ||
     outcome.error ||
     (outcome.kind === 'partial'
       ? !outcome.canceled && outcome.queued < outcome.total

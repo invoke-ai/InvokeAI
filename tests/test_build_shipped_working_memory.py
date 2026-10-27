@@ -650,6 +650,26 @@ def test_a_raise_that_pushes_fresh_process_points_over_their_bound_is_refused_ev
         assert _files(data_dir) == before
 
 
+def test_two_owners_attempts_with_one_id_are_measured_apart(tmp_path: Path, machine, entries, specs) -> None:
+    """The two fp32 1280px decodes of `_fp32_1280`, each another owner's attempt "1": reserved grew from one to the
+    other around flat allocations, which within one attempt is fragmentation. Across two it is not."""
+    windows = [
+        {**window, "run_id": run_id} for window, run_id in zip(_fp32_1280(8020, 9300), ("run-a", "run-b"), strict=True)
+    ]
+    export = _amd_export(tmp_path, machine, windows)
+    store = json.loads(export.read_text(encoding="utf-8"))
+    [run] = store["runs"]
+    store["runs"] = [
+        {**run, "run_id": run_id, "user_id": owner, "attempt_id": "1", "attempt_steps": 1}
+        for run_id, owner in (("run-a", "admin-a"), ("run-b", "admin-b"))
+    ]
+    export.write_text(json.dumps(store), encoding="utf-8")
+
+    build = build_points([export], specs, entries)
+
+    assert [spread.fragmented for spread in build.spreads.values()] == [False]
+
+
 def test_a_raise_on_a_fragmentation_flagged_point_needs_consent(
     tmp_path: Path, machine, shipped_checks, capsys
 ) -> None:
