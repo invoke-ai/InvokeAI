@@ -18,6 +18,7 @@ import {
   type SchedulerPolicyState,
 } from '@features/models';
 import { createLogger } from '@platform/logging/logger';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { createListenerChannel } from '@platform/state/externalStoreCore';
 import {
   createHashHistory,
@@ -35,7 +36,9 @@ import {
 import { WorkbenchSplashScreen } from '@workbench/components/WorkbenchSplashScreen';
 import { isLaunchpadIntentId } from '@workbench/launchpad/intents';
 import { Launchpad } from '@workbench/launchpad/Launchpad';
+import { listProjects } from '@workbench/projects/api';
 import { ProjectFileOptionsProvider } from '@workbench/projects/components/ProjectFileOptionsProvider';
+import { getProjectLibrary, seedProjectLibrary } from '@workbench/projects/library';
 import { peekOpenProjectIds, type WorkbenchSearch } from '@workbench/projects/session';
 import {
   loadWorkbenchSettings,
@@ -48,6 +51,7 @@ import { Fragment, useMemo, type ReactNode } from 'react';
 import type * as SchedulerRules from './modelSchedulerPolicyReader';
 
 import { SocketHubRuntime } from './SocketHubRuntime';
+import { createStartupRedirects } from './startupRedirect';
 
 /**
  * The authenticated layout owns setup/login guards; lazy /app keeps editor code out of Launchpad. Hash history
@@ -169,8 +173,34 @@ const AuthenticatedLayout = () => {
   );
 };
 
+/**
+ * Captures the initial load before the router's history starts. Only accounts that chose the most recent project pay
+ * for the decision: a session peek and, for an empty session, a project listing without waiting for covers.
+ */
+const startupRedirects = createStartupRedirects(
+  {
+    hash: window.location.hash,
+    navigationType: (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)?.type,
+  },
+  {
+    loadProjectLibrary: async () => {
+      const owner = captureAccountScope();
+
+      try {
+        seedProjectLibrary(await listProjects(owner.signal), owner);
+      } catch {
+        // The library stays unloaded, so the launch stays on the Launchpad, whose Home lists projects again.
+      }
+
+      return getProjectLibrary();
+    },
+    peekOpenProjectIds,
+    preloadEditor: () => void import('./WorkbenchApp'),
+  }
+);
+
 const authenticatedRoute = createRoute({
-  beforeLoad: async () => {
+  beforeLoad: async ({ location, preload }) => {
     const session = await ensureReadyAuthSession();
 
     if (session.multiuserEnabled) {
@@ -185,7 +215,16 @@ const authenticatedRoute = createRoute({
 
     // What's New compares this with the account's last-seen version; it never holds up the route.
     void loadAppVersion();
-    await loadWorkbenchSettings();
+    const preferences = await loadWorkbenchSettings();
+
+    const startup = await startupRedirects.take(
+      { pathname: location.pathname, preload },
+      preferences.startupDestination
+    );
+
+    if (startup) {
+      throw redirect(startup);
+    }
   },
   component: AuthenticatedLayout,
   getParentRoute: () => rootRoute,
@@ -264,8 +303,8 @@ const workbenchRoute = createRoute({
 
     // Redirect a definitively empty session to Home unless ?project/?new is supplied. Unknown sessions fall
     // through. Check only entries: search changes can precede autosave, and hover preloads must not fetch the
-    // session.
-    if (cause !== 'enter' || search.project || search.new) {
+    // session. A launch redirect that just found open projects hands over its proof instead of a second peek.
+    if (cause !== 'enter' || search.project || search.new || startupRedirects.takeOpenSessionProof()) {
       return;
     }
 

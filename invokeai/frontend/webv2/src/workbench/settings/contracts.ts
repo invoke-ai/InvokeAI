@@ -15,6 +15,9 @@ export type WorkflowLibrarySortId = 'updated' | 'opened' | 'created' | 'name';
 /** How workflow thumbnails fill their 3:2 box: cropped to fill it, or letterboxed to fit whole. */
 export type WorkflowLibraryThumbnailFit = 'cover' | 'contain';
 
+/** What a launch of the app's bare URL opens: the Launchpad, or the most recent project. */
+export type StartupDestination = 'launchpad' | 'recentProject';
+
 /**
  * Export document generation settings with the project; personal editor choices belong in {@link
  * WorkbenchPreferences} so imports cannot overwrite them.
@@ -74,6 +77,8 @@ export interface WorkbenchPreferences {
   /** Auto-switch the Invoke source/destination to match the surface being edited; locks always win. */
   autoSwitchInvocationRoute: boolean;
   queueJobsScope: 'active-project' | 'all';
+  /** What opening the app's bare URL shows; deep links, reloads and later visits to Home are never redirected. */
+  startupDestination: StartupDestination;
   language: WorkbenchLanguage;
   enableInformationalPopovers: boolean;
   enableModelDescriptions: boolean;

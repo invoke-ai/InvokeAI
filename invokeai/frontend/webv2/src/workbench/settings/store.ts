@@ -77,6 +77,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   selectObjectAutoProcess: false,
   showPromptSyntaxHighlighting: true,
   showFocusRegionHighlight: true,
+  startupDestination: 'launchpad',
   themeId: DEFAULT_THEME_ID,
   whatsNewSeenVersion: null,
   workflowEdgeStyle: 'curved',
@@ -321,6 +322,7 @@ type WorkbenchPreferencesInput = Omit<
   | 'launchpadProjectsSort'
   | 'launchpadProjectsView'
   | 'queueJobsScope'
+  | 'startupDestination'
   | 'workflowEdgeStyle'
   | 'workflowLibrarySort'
   | 'workflowLibraryThumbnailFit'
@@ -328,6 +330,7 @@ type WorkbenchPreferencesInput = Omit<
   launchpadProjectsSort?: unknown;
   launchpadProjectsView?: unknown;
   queueJobsScope?: unknown;
+  startupDestination?: unknown;
   workflowEdgeStyle?: unknown;
   workflowLibrarySort?: unknown;
   workflowLibraryThumbnailFit?: unknown;
@@ -422,6 +425,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.showPromptSyntaxHighlighting === 'boolean'
       ? preferences.showPromptSyntaxHighlighting
       : DEFAULT_PREFERENCES.showPromptSyntaxHighlighting,
+  startupDestination:
+    preferences?.startupDestination === 'launchpad' || preferences?.startupDestination === 'recentProject'
+      ? preferences.startupDestination
+      : DEFAULT_PREFERENCES.startupDestination,
   themeId: resolveWorkbenchThemeId(preferences?.themeId) ?? DEFAULT_PREFERENCES.themeId,
   whatsNewSeenVersion:
     typeof preferences?.whatsNewSeenVersion === 'string'

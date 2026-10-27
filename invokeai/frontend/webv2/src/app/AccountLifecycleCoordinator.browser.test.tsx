@@ -1,4 +1,5 @@
 import type * as identityModule from '@features/identity';
+import type * as settingsStoreModule from '@workbench/settings/store';
 
 import { RouterProvider } from '@tanstack/react-router';
 import { act } from 'react';
@@ -118,10 +119,11 @@ vi.mock('@workbench/projects/session', async (importOriginal) => ({
   peekOpenProjectIds: () => Promise.resolve(null),
 }));
 
-vi.mock('@workbench/settings/store', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  loadWorkbenchSettings: () => Promise.resolve(undefined),
-}));
+vi.mock('@workbench/settings/store', async (importOriginal) => {
+  const settingsStore = await importOriginal<typeof settingsStoreModule>();
+
+  return { ...settingsStore, loadWorkbenchSettings: () => Promise.resolve(settingsStore.DEFAULT_PREFERENCES) };
+});
 
 vi.mock('./SocketHubRuntime', async () => {
   const React = await import('react');

@@ -63,6 +63,18 @@ export const appearanceSettings = section('appearance', 'Appearance', [
   },
 ]);
 export const behaviorSettings = section('behavior', 'Behavior', [
+  {
+    id: 'startupDestination',
+    label: text('startupDestination.label', 'On startup, open'),
+    description: text('startupDestination.description'),
+    keywords: 'launch start open resume recent project launchpad home',
+    kind: 'select',
+    scope: 'preference',
+    options: [
+      { value: 'launchpad', label: text('options.launchpad', 'Launchpad') },
+      { value: 'recentProject', label: text('options.recentProject', 'Most recent project') },
+    ],
+  },
   preference('autoSwitchInvocationRoute', 'Auto-switch Invoke route'),
   preference('enableInformationalPopovers', 'Enable informational popovers', 'help tooltips'),
   preference('enableModelDescriptions', 'Show model descriptions', 'models'),

@@ -533,6 +533,20 @@ describe('normalizeWorkbenchPreferences queue scope', () => {
   });
 });
 
+describe('normalizeWorkbenchPreferences startup destination', () => {
+  it('opens the Launchpad unless the most recent project was chosen', () => {
+    expect(store.normalizeWorkbenchPreferences({}).startupDestination).toBe('launchpad');
+    expect(store.normalizeWorkbenchPreferences({ startupDestination: 'recentProject' }).startupDestination).toBe(
+      'recentProject'
+    );
+    expect(store.normalizeWorkbenchPreferences({ startupDestination: 'launchpad' }).startupDestination).toBe(
+      'launchpad'
+    );
+    expect(store.normalizeWorkbenchPreferences({ startupDestination: 'project' }).startupDestination).toBe('launchpad');
+    expect(store.normalizeWorkbenchPreferences({ startupDestination: true }).startupDestination).toBe('launchpad');
+  });
+});
+
 describe('normalizeWorkbenchPreferences generate sections', () => {
   it('defaults to no section overrides', () => {
     expect(store.normalizeWorkbenchPreferences({}).generateSectionsOpen).toEqual({});
