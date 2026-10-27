@@ -136,6 +136,7 @@ const setModel = (project: Project, base: GenerateWidgetValues['model']['base'])
     krea2SeedVarianceEnabled: false,
     krea2SeedVarianceStrength: 0.1,
     krea2SeedVarianceRandomizePercent: 50,
+    krea2ReferenceKvCache: false,
     fluxDypePreset: 'off',
     fluxDypeScale: 2,
     fluxDypeExponent: 2,
