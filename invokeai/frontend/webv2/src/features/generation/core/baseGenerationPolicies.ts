@@ -915,22 +915,27 @@ const isBundledOrDiffusersSourceSatisfied = (ctx: ComponentPolicyContext): boole
   ctx.model.type !== 'external_image_generator' &&
   (isBundledMainForBase(ctx.model.base)(ctx.model) || hasCompatibleComponentSource(ctx));
 
-// Slot validation is shared by invocation readiness and graph preflight so picker requirements cannot drift.
+/**
+ * What blocks Invoke on one slot, or null. Shared by the picker, invocation readiness and graph preflight so picker
+ * requirements cannot drift.
+ */
+export const getComponentSlotIssue = (slotPolicy: ComponentSlotPolicy, ctx: ComponentPolicyContext): string | null => {
+  const value = ctx.selectedComponents[slotPolicy.key];
+  const isValid = value && (!slotPolicy.filter || slotPolicy.filter(value as ModelConfig, ctx));
+
+  if (value && !isValid && slotPolicy.incompatibleMessage) {
+    return slotPolicy.incompatibleMessage;
+  }
+
+  if (!slotPolicy.required?.(ctx)) {
+    return null;
+  }
+
+  return isValid ? null : (slotPolicy.missingMessage ?? `Generate needs a ${slotPolicy.label} for this model.`);
+};
+
 const validateSlots = (policy: Pick<ComponentSectionPolicy, 'slots'>, ctx: ComponentPolicyContext): string[] =>
-  policy.slots.flatMap((slotPolicy) => {
-    const value = ctx.selectedComponents[slotPolicy.key];
-    const isValid = value && (!slotPolicy.filter || slotPolicy.filter(value as ModelConfig, ctx));
-
-    if (value && !isValid && slotPolicy.incompatibleMessage) {
-      return [slotPolicy.incompatibleMessage];
-    }
-
-    if (!slotPolicy.required?.(ctx)) {
-      return [];
-    }
-
-    return isValid ? [] : [slotPolicy.missingMessage ?? `Generate needs a ${slotPolicy.label} for this model.`];
-  });
+  policy.slots.flatMap((slotPolicy) => getComponentSlotIssue(slotPolicy, ctx) ?? []);
 
 const createPolicy = (defaultOpen: boolean, slots: readonly ComponentSlotPolicy[]): ComponentSectionPolicy => ({
   defaultOpen,

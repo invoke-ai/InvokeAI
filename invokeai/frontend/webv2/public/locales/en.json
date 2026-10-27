@@ -2993,6 +2993,7 @@
       "unlockAspectRatio": "Unlock aspect ratio",
       "upload": "Upload",
       "useModelDefaultScheduler": "Use model default scheduler",
+      "selectComponent": "Select a component model…",
       "useModelDefaultVae": "Use model default VAE",
       "useModelDefaultVaePrecision": "Use model default VAE precision",
       "usePrompt": "Use prompt",

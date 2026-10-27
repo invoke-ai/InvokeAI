@@ -107,7 +107,7 @@ const ANIMA_SKETCH_ADAPTER = {
  * The picker, reduced to buttons that hand a model to its real selection handler: the model card's main picks, and
  * for a component slot the catalog models of its types that pass its filter.
  */
-const MainModelPicker = ({ filter, modelTypes, onChange, value }: GenerationModelSelectProps) =>
+const MainModelPicker = ({ filter, invalid, modelTypes, onChange, placeholder, value }: GenerationModelSelectProps) =>
   modelTypes.includes('external_image_generator') ? (
     [OTHER_SDXL, FLUX].map((model) => (
       <button key={model.key} data-model-pick={model.key} type="button" onClick={() => onChange(model)}>
@@ -115,7 +115,12 @@ const MainModelPicker = ({ filter, modelTypes, onChange, value }: GenerationMode
       </button>
     ))
   ) : (
-    <div data-component-types={modelTypes.join(',')} data-component-value={value ?? ''}>
+    <div
+      aria-invalid={invalid}
+      data-component-placeholder={placeholder}
+      data-component-types={modelTypes.join(',')}
+      data-component-value={value ?? ''}
+    >
       {stableGroups.models.catalog
         .filter((model) => modelTypes.includes(model.type) && (filter?.(model) ?? true))
         .map((model) => (
@@ -428,6 +433,48 @@ describe('GenerateSettingsForm Z-Image Qwen3 encoder', () => {
     expect(storedValues().getSnapshot()).toMatchObject({ qwen3EncoderModel: { key: QWEN3_4B.key } });
     expect(encoderSlot()?.getAttribute('data-component-value')).toBe(QWEN3_4B.key);
     expect(encoderError()).toBeNull();
+  });
+});
+
+describe('GenerateSettingsForm required components', () => {
+  const krea2 = (format: string) =>
+    ({ ...MODEL, base: 'krea-2', format, key: `krea-2-${format}`, name: 'Krea-2' }) as GenerationModelCatalogItem;
+  const slotStates = () =>
+    [
+      ...host!.querySelectorAll<HTMLElement>('[data-component-types="vae"], [data-component-types="qwen3_vl_encoder"]'),
+    ].map((slot) => ({
+      error: slot.closest('[data-scope="field"]')?.querySelector('[role="alert"]')?.textContent ?? null,
+      invalid: slot.getAttribute('aria-invalid') === 'true',
+      placeholder: slot.getAttribute('data-component-placeholder'),
+    }));
+  const selectModel = (model: GenerationModelCatalogItem) =>
+    settle(() => storedValues().patchSnapshot({ ...getDefaultGenerateSettings(model as never), modelKey: model.key }));
+
+  it('asks for the components a checkpoint needs and defers to the model when it bundles them', async () => {
+    const checkpoint = krea2('checkpoint');
+    const diffusers = krea2('diffusers');
+    stableGroups.models.catalog = [MODEL, checkpoint, diffusers];
+    await renderAdapter(buildAdapter());
+
+    await selectModel(checkpoint);
+    expect(slotStates()).toEqual([
+      {
+        error: 'Generate needs a VAE for non-Diffusers Krea-2 models.',
+        invalid: true,
+        placeholder: 'widgets.generate.selectComponent',
+      },
+      {
+        error: 'Generate needs a Qwen3-VL Encoder for non-Diffusers Krea-2 models.',
+        invalid: true,
+        placeholder: 'widgets.generate.selectComponent',
+      },
+    ]);
+
+    await selectModel(diffusers);
+    expect(slotStates()).toEqual([
+      { error: null, invalid: false, placeholder: 'widgets.generate.modelDefault' },
+      { error: null, invalid: false, placeholder: 'widgets.generate.modelDefault' },
+    ]);
   });
 });
 

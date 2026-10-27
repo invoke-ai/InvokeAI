@@ -4,6 +4,7 @@ import type { ComponentModelConfig, GenerateModelConfig, GenerateSettings } from
 import { Stack, Text } from '@chakra-ui/react';
 import {
   getComponentSectionPolicy,
+  getComponentSlotIssue,
   type ComponentPolicyContext,
   type ComponentSlotPolicy,
 } from '@features/generation/core/baseGenerationPolicies';
@@ -96,21 +97,26 @@ const ComponentPicker = ({
   onChange: (model: ModelConfig | null) => void;
   slot: ComponentSlotPolicy;
 }) => {
+  const { t } = useTranslation();
   const value = ctx.selectedComponents[slot.key];
   const filter = useCallback((model: ModelConfig) => slot.filter?.(model, ctx) ?? false, [ctx, slot]);
   const modelTypes = useMemo(() => [...slot.modelTypes], [slot.modelTypes]);
   const isIncompatible = Boolean(value && slot.filter && !filter(value as ModelConfig));
+  const isRequired = Boolean(slot.required?.(ctx));
+  const error = getComponentSlotIssue(slot, ctx) ?? undefined;
   // A slot that names an incompatible selection keeps it visible, so the error has a value to point at and clear.
-  const error = isIncompatible ? slot.incompatibleMessage : undefined;
-  const selectedValue = value && (!isIncompatible || error) ? value.key : null;
+  const selectedValue = value && (!isIncompatible || slot.incompatibleMessage) ? value.key : null;
 
   return (
     <Field label={slot.label} helpText={slot.helpText} error={error}>
       <ModelSelect
         filter={slot.filter ? filter : undefined}
+        invalid={Boolean(error)}
         isClearable
         modelTypes={modelTypes}
-        placeholder={slot.placeholder ?? 'Model default'}
+        placeholder={
+          slot.placeholder ?? (isRequired ? t('widgets.generate.selectComponent') : t('widgets.generate.modelDefault'))
+        }
         value={selectedValue}
         onChange={onChange}
       />
