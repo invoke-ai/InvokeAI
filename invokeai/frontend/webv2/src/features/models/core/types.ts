@@ -21,6 +21,7 @@ export type ModelBase =
   | 'ideogram-4'
   | 'krea-2'
   | 'anima'
+  | 'moss-image'
   /** Wan 2.2. A video architecture, used here for image generation at `num_frames=1`. */
   | 'wan'
   /** MiniMax H3. A video architecture that generates video with synchronized audio. */
