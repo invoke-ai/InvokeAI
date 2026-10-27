@@ -71,6 +71,7 @@ const CANDIDATE_VARIANTS = [
   'qwen3_vl_4b',
   'qwen3_vl_8b',
   'qwen3_5_4b',
+  'qwen3_5_9b',
 ] as const;
 /** Ideogram 4's two transformer branches; every other main leaves the field unset. */
 const CANDIDATE_BRANCHES = [undefined, 'conditional', 'unconditional'] as const;

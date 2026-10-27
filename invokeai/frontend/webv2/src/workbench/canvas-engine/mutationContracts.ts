@@ -14,6 +14,7 @@ import type {
   CanvasMaskNoiseContract,
   CanvasRasterLayerContractV2,
   CanvasRegionalGuidanceLayerContract,
+  CanvasRegionalLayoutContract,
   CanvasStagingAreaContractV2,
 } from './contracts';
 import type { CanvasNodeInsertion, CanvasNodeInsertionAnchor, CanvasNodeMove } from './document/insertionAnchors';
@@ -69,6 +70,8 @@ export type CanvasLayerConfigPatch =
       negativePrompt?: string | null;
       autoNegative?: boolean;
       referenceImages?: CanvasRegionalGuidanceLayerContract['referenceImages'];
+      /** Replaces the layout role whole; `null` (or the `undefined` an inverse records) removes it. */
+      layout?: CanvasRegionalLayoutContract | null;
     }
   | {
       layerType: 'inpaint_mask';

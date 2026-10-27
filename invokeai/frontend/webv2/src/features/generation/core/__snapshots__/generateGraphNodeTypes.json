@@ -244,7 +244,8 @@
         "standalone-components": [
           "qwen3VLEncoderModel",
           "vae"
-        ]
+        ],
+        "diffusers-with-edit-references": []
       },
       "nodeTypes": [
         "collect",
@@ -253,9 +254,12 @@
         "img_watermark",
         "integer",
         "krea2_denoise",
+        "krea2_lora_collection_loader",
         "krea2_model_loader",
         "krea2_style_reference",
         "krea2_text_encoder",
+        "lora_selector",
+        "qwen_image_i2l",
         "qwen_image_l2i",
         "string"
       ]
@@ -326,6 +330,26 @@
         "img_nsfw",
         "img_watermark",
         "integer",
+        "string"
+      ]
+    },
+    "moss-image": {
+      "componentsFilled": {
+        "diffusers": [],
+        "standalone-components": [
+          "qwen35EncoderModel",
+          "vae"
+        ]
+      },
+      "nodeTypes": [
+        "core_metadata",
+        "flux2_vae_decode",
+        "img_nsfw",
+        "img_watermark",
+        "integer",
+        "moss_image_denoise",
+        "moss_image_model_loader",
+        "moss_image_text_encoder",
         "string"
       ]
     }
@@ -562,6 +586,7 @@
     },
     "collect": {
       "inputs": [
+        "collection",
         "item"
       ],
       "literalInputs": {
@@ -605,6 +630,7 @@
         ],
         "cfg_scale": [
           1,
+          3,
           3.5,
           4,
           4.5,
@@ -633,6 +659,7 @@
           "flux2_txt2img",
           "ideogram4_txt2img",
           "krea2_txt2img",
+          "moss_image_txt2img",
           "qwen_image_2_1_txt2img",
           "qwen_image_txt2img",
           "sd3_txt2img",
@@ -681,6 +708,9 @@
         "krea2_rebalance_weights": [
           "1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0"
         ],
+        "krea2_reference_kv_cache": [
+          true
+        ],
         "krea2_seed_variance_enabled": [
           false
         ],
@@ -693,8 +723,10 @@
         "krea2_style_strength": [
           1
         ],
+        "loras": [],
         "mistral_encoder": [],
         "model": [],
+        "moss_image_uncond_skip_layers": [],
         "qwen_image_quantization": [
           "nf4",
           "none"
@@ -1428,19 +1460,25 @@
     },
     "krea2_denoise": {
       "inputs": [
+        "negative_conditioning",
         "positive_conditioning",
+        "reference_latents",
         "seed",
         "style_reference",
         "transformer"
       ],
       "literalInputs": {
         "cfg_scale": [
-          1
+          1,
+          4.5
         ],
         "height": [
           1024
         ],
         "is_intermediate": [
+          true
+        ],
+        "reference_kv_cache": [
           true
         ],
         "steps": [
@@ -1455,6 +1493,25 @@
       },
       "outputs": [
         "latents"
+      ]
+    },
+    "krea2_lora_collection_loader": {
+      "inputs": [
+        "loras",
+        "qwen3_vl_encoder",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "qwen3_vl_encoder",
+        "transformer"
       ]
     },
     "krea2_model_loader": {
@@ -1511,6 +1568,7 @@
         "is_intermediate": [
           true
         ],
+        "reference_images": [],
         "use_cache": [
           true
         ]
@@ -1544,6 +1602,24 @@
         "image"
       ]
     },
+    "lora_selector": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "lora": [],
+        "use_cache": [
+          true
+        ],
+        "weight": [
+          1
+        ]
+      },
+      "outputs": [
+        "lora"
+      ]
+    },
     "main_model_loader": {
       "inputs": [],
       "literalInputs": {
@@ -1559,6 +1635,81 @@
         "clip",
         "unet",
         "vae"
+      ]
+    },
+    "moss_image_denoise": {
+      "inputs": [
+        "negative_conditioning",
+        "positive_conditioning",
+        "seed",
+        "transformer",
+        "vae"
+      ],
+      "literalInputs": {
+        "cfg_scale": [
+          3
+        ],
+        "denoising_end": [
+          1
+        ],
+        "denoising_start": [
+          0
+        ],
+        "height": [
+          1024
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "steps": [
+          50
+        ],
+        "uncond_skip_layers": [],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          1024
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "moss_image_model_loader": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "model": [],
+        "qwen3_5_encoder_model": [],
+        "use_cache": [
+          true
+        ],
+        "vae_model": []
+      },
+      "outputs": [
+        "qwen3_5_encoder",
+        "transformer",
+        "vae"
+      ]
+    },
+    "moss_image_text_encoder": {
+      "inputs": [
+        "prompt",
+        "qwen3_5_encoder"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "conditioning"
       ]
     },
     "noise": {
@@ -1730,6 +1881,26 @@
         ],
         "width": [
           1024
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "qwen_image_i2l": {
+      "inputs": [
+        "vae"
+      ],
+      "literalInputs": {
+        "image": [],
+        "is_intermediate": [
+          true
+        ],
+        "reference": [
+          true
+        ],
+        "use_cache": [
+          true
         ]
       },
       "outputs": [
