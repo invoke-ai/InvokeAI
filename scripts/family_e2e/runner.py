@@ -449,7 +449,7 @@ def save_calibration(run_dir: Path, stores: calibration.Stores, status: bytes | 
         return []
     with run_lock(run_dir):
         info = load_run_info(run_dir)
-        return calibration.save(run_dir, info, stores, status, "store_file" if status is None else "api")
+        return calibration.save(run_dir, info, stores, status)
 
 
 def register_runner(run_dir: Path) -> None:

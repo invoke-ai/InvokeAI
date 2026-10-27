@@ -227,7 +227,9 @@ def test_a_stop_whose_store_cannot_be_saved_ends_stopped_and_keeps_the_root(
     assert (root / "databases" / "working_memory" / f"{DEVICE_CLASS_ID}.json").is_file()
 
 
+@pytest.mark.parametrize("save", ["works", "fails"])
 def test_a_runner_that_finds_the_run_stopped_saves_its_store_and_keeps_the_stop(
+    save: str,
     setup: tuple[Path, Path],  # noqa: F811 - fixture
     isolated_runner: None,  # noqa: F811 - fixture
     monkeypatch: pytest.MonkeyPatch,
@@ -235,6 +237,9 @@ def test_a_runner_that_finds_the_run_stopped_saves_its_store_and_keeps_the_stop(
     manifest_path, data_dir = setup
     gpu = FakeGpu()
     run_dir = runner.new_run(manifest_path, [], [], calibrate=True)
+    if save == "fails":
+        # A file where the run's calibration/ directory goes: the copy raises, as on a full disk.
+        (run_dir / "calibration").write_text("")
     store = runner._Session.store
 
     def store_then_stop(session: runner._Session, record: Record) -> None:
@@ -249,12 +254,19 @@ def test_a_runner_that_finds_the_run_stopped_saves_its_store_and_keeps_the_stop(
     records = load_records(run_dir)
     assert [(r.kind, r.rep) for r in records] == [("warmup", 0)]
     info = load_run_info(run_dir)
-    # The store is recorded without undoing the stop.
+    # The store is recorded, or kept with its root, without undoing the stop.
     assert info.status == "stopped"
-    [export] = info.calibration_exports
-    assert (export.lifetime, export.source) == (1, "store_file")
-    assert [p["queue_item_id"] for p in _store(run_dir, export.export)["points"]] == [records[0].queue_item_id]
-    assert not (data_dir / "scratch-roots" / f"{run_dir.name}-default").exists()
+    assert not (run_dir / "report.html").exists()
+    root = data_dir / "scratch-roots" / f"{run_dir.name}-default"
+    if save == "works":
+        [export] = info.calibration_exports
+        assert (export.lifetime, export.source) == (1, "store_file")
+        assert [p["queue_item_id"] for p in _store(run_dir, export.export)["points"]] == [records[0].queue_item_id]
+        assert not root.exists()
+    else:
+        assert info.calibration_exports == []
+        kept = json.loads((root / "databases" / "working_memory" / f"{DEVICE_CLASS_ID}.json").read_text())
+        assert [p["queue_item_id"] for p in kept["points"]] == [records[0].queue_item_id]
 
 
 def test_a_server_that_cannot_calibrate_fails_the_run_before_any_step(

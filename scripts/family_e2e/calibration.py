@@ -79,15 +79,11 @@ Stores = list[tuple[str, bytes]]
 """(device class id, store bytes) per saved store."""
 
 
-def save(
-    run_dir: Path,
-    info: RunInfo,
-    stores: Stores,
-    status: bytes | None,
-    source: Literal["api", "store_file"],
-) -> list[CalibrationExport]:
-    """Writes one lifetime's stores (and the status) into the run's `calibration/` and lists them in `info`, which it
-    writes to run.json. Hold the run lock with `info` read under it: `runner.save_calibration` does."""
+def save(run_dir: Path, info: RunInfo, stores: Stores, status: bytes | None) -> list[CalibrationExport]:
+    """Writes one lifetime's stores into the run's `calibration/` and lists them in `info`, which it writes to run.json.
+    Stores from the export routes come with the status; store files copied from a scratch root come without one. Hold
+    the run lock with `info` read under it: `runner.save_calibration` does."""
+    source: Literal["api", "store_file"] = "store_file" if status is None else "api"
     lifetime = max((e.lifetime for e in info.calibration_exports), default=0) + 1
     (run_dir / CALIBRATION_DIR).mkdir(exist_ok=True)
     status_path = None
