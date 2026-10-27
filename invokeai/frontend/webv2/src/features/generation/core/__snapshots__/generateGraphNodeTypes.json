@@ -328,6 +328,26 @@
         "integer",
         "string"
       ]
+    },
+    "moss-image": {
+      "componentsFilled": {
+        "diffusers": [],
+        "standalone-components": [
+          "qwen35EncoderModel",
+          "vae"
+        ]
+      },
+      "nodeTypes": [
+        "core_metadata",
+        "flux2_vae_decode",
+        "img_nsfw",
+        "img_watermark",
+        "integer",
+        "moss_image_denoise",
+        "moss_image_model_loader",
+        "moss_image_text_encoder",
+        "string"
+      ]
     }
   },
   "fieldsByNodeType": {
@@ -605,6 +625,7 @@
         ],
         "cfg_scale": [
           1,
+          3,
           3.5,
           4,
           4.5,
@@ -633,6 +654,7 @@
           "flux2_txt2img",
           "ideogram4_txt2img",
           "krea2_txt2img",
+          "moss_image_txt2img",
           "qwen_image_2_1_txt2img",
           "qwen_image_txt2img",
           "sd3_txt2img",
@@ -695,6 +717,7 @@
         ],
         "mistral_encoder": [],
         "model": [],
+        "moss_image_uncond_skip_layers": [],
         "qwen_image_quantization": [
           "nf4",
           "none"
@@ -1559,6 +1582,81 @@
         "clip",
         "unet",
         "vae"
+      ]
+    },
+    "moss_image_denoise": {
+      "inputs": [
+        "negative_conditioning",
+        "positive_conditioning",
+        "seed",
+        "transformer",
+        "vae"
+      ],
+      "literalInputs": {
+        "cfg_scale": [
+          3
+        ],
+        "denoising_end": [
+          1
+        ],
+        "denoising_start": [
+          0
+        ],
+        "height": [
+          1024
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "steps": [
+          50
+        ],
+        "uncond_skip_layers": [],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          1024
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "moss_image_model_loader": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "model": [],
+        "qwen3_5_encoder_model": [],
+        "use_cache": [
+          true
+        ],
+        "vae_model": []
+      },
+      "outputs": [
+        "qwen3_5_encoder",
+        "transformer",
+        "vae"
+      ]
+    },
+    "moss_image_text_encoder": {
+      "inputs": [
+        "prompt",
+        "qwen3_5_encoder"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "conditioning"
       ]
     },
     "noise": {

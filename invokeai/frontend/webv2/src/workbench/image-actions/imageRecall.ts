@@ -41,6 +41,7 @@ import {
   isFluxDypePreset,
   isQwenImageEncoderQuantization,
   isValidKrea2RebalanceWeights,
+  isValidMossImageSkipLayers,
   MAX_FLUX_DYPE_EXPONENT,
   MAX_FLUX_DYPE_SCALE,
   MAX_HIDIFFUSION_RATIO,
@@ -56,6 +57,7 @@ import {
   MIN_REFINER_STEPS,
   MIN_TIMESTEP_SHIFT,
   MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
+  normalizeMossImageSkipLayers,
   normalizeReferenceImages,
 } from '@features/generation/settings';
 import { SEED_MAX } from '@platform/core/seed';
@@ -102,6 +104,7 @@ type RecalledField =
   | 'externalProvider'
   | 'refiner'
   | 'krea2SeedVariance'
+  | 'mossImageSkipLayers'
   | 'modelTuning'
   | 'animaInpaintAdapterWeight';
 
@@ -470,6 +473,26 @@ const getMetadataKrea2SeedVariance = (
 
 const hasKrea2SeedVariance = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
   Object.keys(getMetadataKrea2SeedVariance(metadata, model)).length > 0;
+
+/**
+ * MOSS-Image's negative-branch skip layers; an empty list is a recorded choice, skipping none. A list naming a block
+ * MOSS-Image lacks keeps the current setting: applying it would block every generation until edited.
+ */
+const getMetadataMossImageSkipLayers = (
+  metadata: unknown,
+  model: GenerateModelConfig | undefined
+): Partial<GenerateWidgetValues> => {
+  if (model?.base !== 'moss-image' || !isRecord(metadata)) {
+    return {};
+  }
+
+  const layers = normalizeMossImageSkipLayers(metadata.moss_image_uncond_skip_layers);
+
+  return layers !== null && isValidMossImageSkipLayers(layers) ? { mossImageUncondSkipLayers: layers } : {};
+};
+
+const hasMossImageSkipLayers = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
+  Object.keys(getMetadataMossImageSkipLayers(metadata, model)).length > 0;
 
 /**
  * Generation graphs stamp `generation_mode` and record what ran, so on such a record a missing list or switch means
@@ -1196,6 +1219,7 @@ export const getImageRecallCapabilities = ({
   const hasModel = supportedMetadataModel !== null;
   const hasProviderOptions = hasExternalProvider(metadata, clipSkipModel);
   const hasRebalance = hasKrea2Rebalance(metadata, clipSkipModel) || hasKrea2SeedVariance(metadata, clipSkipModel);
+  const hasSkipLayers = hasMossImageSkipLayers(metadata, clipSkipModel);
   const hasTuning = hasModelTuning(metadata, clipSkipModel);
   const hasRefiner =
     Object.keys(getRefinerRecall(metadata, clipSkipModel, models, supportedMetadataModel).patch).length > 0;
@@ -1217,6 +1241,7 @@ export const getImageRecallCapabilities = ({
     hasRebalance ||
     hasProviderOptions ||
     hasRefiner ||
+    hasSkipLayers ||
     hasTuning ||
     hasAdapterSettings;
   const hasNonSeedMetadata =
@@ -1233,6 +1258,7 @@ export const getImageRecallCapabilities = ({
     hasRebalance ||
     hasProviderOptions ||
     hasRefiner ||
+    hasSkipLayers ||
     hasTuning ||
     hasAdapterSettings;
 
@@ -1322,6 +1348,13 @@ export const buildImageRecallSettings = ({
     if (Object.keys(seedVariancePatch).length > 0) {
       values = { ...values, ...seedVariancePatch };
       fields.push('krea2SeedVariance');
+    }
+
+    const skipLayersPatch = getMetadataMossImageSkipLayers(metadata, values.model);
+
+    if (Object.keys(skipLayersPatch).length > 0) {
+      values = { ...values, ...skipLayersPatch };
+      fields.push('mossImageSkipLayers');
     }
 
     const tuningPatch = getMetadataModelTuning(metadata, values.model);

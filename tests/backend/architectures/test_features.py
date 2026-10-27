@@ -24,6 +24,7 @@ DENOISE_NODE = {
     BaseModelType.QwenImage21: "qwen_image_2_1_denoise",
     BaseModelType.Wan: "wan_denoise",
     BaseModelType.MiniMaxH3: "minimax_h3_denoise",
+    BaseModelType.MossImage: "moss_image_denoise",
 }
 
 
@@ -148,6 +149,7 @@ def test_the_negative_prompt_policy_follows_the_guidance_model() -> None:
         "z-image",
         "ernie-image",
         "ltx-2",
+        "moss-image",
     }
     # Nothing declares a visible box it never uses, or an invisible one it does.
     for base in generative_bases():

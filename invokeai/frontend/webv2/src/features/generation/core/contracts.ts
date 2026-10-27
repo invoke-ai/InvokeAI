@@ -76,6 +76,7 @@ export type KnownGenerationModelBase =
   | 'ideogram-4'
   | 'krea-2'
   | 'anima'
+  | 'moss-image'
   | 'wan'
   | 'external'
   | 'any'
