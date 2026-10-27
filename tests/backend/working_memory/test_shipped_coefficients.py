@@ -1,10 +1,11 @@
 """The shipped working-memory data, checked against the estimators that read it.
 
-Every coefficient entry resolves for the spec it names on a measured platform. Every value an entry carries is either a
-declared stand-in or decided by at least one in-fit point and the shipped fit (`fit.py`) of the points it is resolved
-for. A point is a peak over the operation, one fresh process per point (see its `method` and `provenance`), and bounds
-its estimate from both sides. The model cache consumes an estimate as `free >= estimate`, so the estimate must be at
-least the point. Where a fitted term decides an in-fit point, it must also be at most 1.3 times the point, or the
+Every coefficient entry resolves for the spec it names on a measured platform, or on every platform for a spec keyed by
+no platform trait. Every value an entry carries is either a declared stand-in or decided by at least one in-fit point,
+and on a pixel line also the shipped fit (`fit.py`) of the points it is resolved for; only an estimator keyed by no
+platform trait carries values off one. A point is a peak over the operation (see its `method` and `provenance`), and
+bounds its estimate from both sides. The model cache consumes an estimate as `free >= estimate`, so the estimate must be
+at least the point. Where a fitted term decides an in-fit point, it must also be at most 1.3 times the point, or the
 point's tighter `max_ratio`: a reservation the operation never uses is model weights evicted for nothing. The points no
 line can hold that close are listed in `UPPER_BOUND_EXCEPTIONS`. Where an analytic term (a materialized score matrix)
 decides it, that term bounds rather than describes, so it gets no upper bound, and the cache's `device_working_mem_gb`
@@ -38,7 +39,7 @@ from invokeai.backend.working_memory.coefficients import (
     shipped_data,
 )
 from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate
-from invokeai.backend.working_memory.fit import carrier_of, entry_key, fit_points, fitted_values
+from invokeai.backend.working_memory.fit import carrier_of, entry_key, fit_points, fitted_values, hand_set_values
 from invokeai.backend.working_memory.platform import MEASURED, Platform, is_measured, platform_for, priced_as
 from invokeai.backend.working_memory.spec import ESTIMATOR_MODULES, EstimatorSpec, import_estimator_modules
 
@@ -51,11 +52,11 @@ WORKING_MEMORY_FLOOR = int(InvokeAIAppConfig.model_fields["device_working_mem_gb
 environment variable could move."""
 
 UPPER_BOUND_EXCEPTIONS = {
-    "vae.sd-miopen,native,windows-decode-fp16-1280x1280-RX9060XT-demand_peak": 1.33,
-    "vae.sd-miopen,native,windows-encode-fp16-1024x1024-RX9060XT-demand_peak": 1.57,
-    "vae.sd-miopen,native,windows-encode-fp16-1280x1280-RX9060XT-demand_peak": 1.78,
-    "vae.flux-miopen,native,windows-decode-bf16-512x512-RX9060XT-demand_peak": 1.33,
-    "vae.flux2-miopen,native,windows-decode-bf16-512x512-RX9060XT-demand_peak": 1.33,
+    "vae.sd-miopen,native,windows-decode-fp16-1280x1280-scores-RX9060XT-demand_peak": 1.33,
+    "vae.sd-miopen,native,windows-encode-fp16-1024x1024-scores-RX9060XT-demand_peak": 1.57,
+    "vae.sd-miopen,native,windows-encode-fp16-1280x1280-scores-RX9060XT-demand_peak": 1.78,
+    "vae.flux-miopen,native,windows-decode-bf16-512x512-scores-RX9060XT-demand_peak": 1.33,
+    "vae.flux2-miopen,native,windows-decode-bf16-512x512-scores-RX9060XT-demand_peak": 1.33,
 }
 """In-fit points whose envelope sits more than 1.3x above them, with the ratio they are held to instead. All are MIOpen
 with the native allocator on Windows, where the demand is concave in the size: first-run driver spikes at small sizes
@@ -83,7 +84,11 @@ def _keys(platform: Platform, spec: EstimatorSpec) -> dict[str, str]:
 
 
 def _platform_of(point: MeasuredPoint) -> Platform:
-    """The platform a point is evaluated on. One that names no OS measured what holds on every OS."""
+    """The platform a point is evaluated on. One that names no OS measured what holds on every OS. One of a spec keyed
+    by no platform trait names nothing, and its one entry resolves alike on every platform, so any measured one will
+    do."""
+    if not SPECS[point.estimator].platform_keys:
+        return MEASURED_PLATFORMS[0]
     return Platform(**({"os": "other"} | point.platform))
 
 
@@ -92,13 +97,13 @@ def _point_id(point: MeasuredPoint) -> str:
     shape = f"{features.get('height')}x{features.get('width')}"
     tile = f"-tile{features['tile']}" if features.get("tile") is not None else ""
     batch = f"-b{features['batch_size']}" if features.get("batch_size", 1) != 1 else ""
+    text = f"-text{features['text_tokens']}" if "text_tokens" in features else ""
+    scores = "-scores" if features.get("score_matrix_bytes") else ""
     out_of_fit = "-outfit" if not point.in_fit else ""
-    platform = ",".join(point.platform.values())
     card = point.device.split(" (")[0].replace(" ", "")
-    return (
-        f"{point.estimator}-{platform}-{features.get('operation')}-{features.get('dtype')}-{shape}{tile}{batch}"
-        f"{out_of_fit}-{card}-{point.method}"
-    )
+    head = [point.estimator, ",".join(point.platform.values())] if point.platform else [point.estimator]
+    head += [str(features[key]) for key in ("operation", "dtype") if key in features]
+    return f"{'-'.join(head)}-{shape}{tile}{batch}{text}{scores}{out_of_fit}-{card}-{point.method}"
 
 
 def _evaluate(point: MeasuredPoint) -> WorkingMemoryEstimate:
@@ -169,6 +174,10 @@ def test_an_unmeasured_platform_is_priced_as_the_measured_one_at_least_and_says_
         assert is_measured(measured) and measured.os == platform.os
         resolved = shipped_coefficients(spec, platform)
         borrowed = shipped_coefficients(spec, measured)
+        if not spec.platform_keys:
+            # Keyed by no platform trait: nothing is priced as anything else, and the source says so.
+            assert resolved == ResolvedCoefficients(values=borrowed.values, source="shipped:any platform")
+            continue
         assert all(resolved.values[name] >= value for name, value in borrowed.values.items())
         where = ",".join(f"{key}={value}" for key, value in _keys(measured, spec).items())
         assert resolved.source.startswith(f"shipped:conv_backend={platform.conv_backend},")
@@ -196,17 +205,19 @@ def test_every_fitted_value_is_decided_by_an_in_fit_point() -> None:
 
 def test_every_fitted_value_is_the_shipped_fit_of_its_points() -> None:
     """The values are reproducible from the points rather than hand-tuned. A new point that moves a fit fails here,
-    naming the values to ship."""
+    naming the values to ship. Only `hand_set_values` are exempt: values off a pixel line of an estimator keyed by no
+    platform trait, which its points decide and bound but nothing fits."""
     fitted = fitted_values(shipped_data().values())
     stale = {}
     for entry in ENTRIES:
         if entry.values is None:
             continue
         expected = fitted.get(entry_key(entry), {})
+        hand_set = hand_set_values(entry, SPECS[entry.estimator])
         differs = {
             name: expected.get(name)
             for name, value in entry.values.items()
-            if name not in entry.stand_ins and expected.get(name) != value
+            if name not in {*entry.stand_ins, *hand_set} and expected.get(name) != value
         }
         if differs:
             stale[f"{entry.estimator} {entry.platform}"] = differs

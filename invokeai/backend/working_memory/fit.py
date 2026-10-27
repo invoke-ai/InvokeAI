@@ -9,16 +9,22 @@ regime) with no weight growth. Tiled points bound their estimates but fit nothin
 pair. Nor does a point whose VAE an in-place cast grew (`upcast_weight_bytes`): its demand includes the growth, which
 the estimate prices as a term of its own.
 
-`tests/backend/working_memory/test_shipped_coefficients.py` holds every carried value that is not a declared stand-in
-to `fitted_values` of the shipped points, so a new point that moves a fit fails there with the value to ship.
+`tests/backend/working_memory/test_shipped_coefficients.py` holds every carried value on such a line that is not a
+declared stand-in to `fitted_values` of the shipped points, so a new point that moves a fit fails there with the value
+to ship. A value on no pixel line is hand-set, which `hand_set_values` allows only for an estimator keyed by no platform
+trait: the MOSS-Image denoise's `k_token`, bytes per attended token with no base. Its points still decide and bound it
+there; this module fits pixel lines only.
 """
 
 import math
 from collections.abc import Iterable, Mapping, Sequence
 from fractions import Fraction
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from invokeai.backend.working_memory.coefficients import CoefficientEntry, MeasuredPoint, WorkingMemoryData, find_entry
+
+if TYPE_CHECKING:
+    from invokeai.backend.working_memory.spec import EstimatorSpec
 
 SHIPPED_MARGIN: Final = Fraction(1, 20)
 """What the shipped slope and intercept add over the envelope of their points: 5%, for the runs and cards the points
@@ -92,6 +98,16 @@ def _pairs(entry: CoefficientEntry) -> set[str]:
     """The `<operation>_<dtype>` suffixes an entry carries both halves of a convolution line for."""
     names = set(entry.values or {})
     return {name[2:] for name in names if name.startswith("k_") and f"b_{name[2:]}" in names}
+
+
+def hand_set_values(entry: CoefficientEntry, spec: "EstimatorSpec") -> set[str]:
+    """The values `entry` may carry that no fit reproduces: those on no pixel line, for a `spec` keyed by no platform
+    trait. Any other spec prices convolutions, whose every value is half of a line, so a value off one there is a typo
+    or a term the fit never checks, and none is exempt."""
+    if spec.platform_keys:
+        return set()
+    lines = {f"{part}_{suffix}" for suffix in _pairs(entry) for part in ("k", "b")}
+    return set(entry.values or {}) - lines
 
 
 def fit_points(data: Iterable[WorkingMemoryData]) -> Mapping[tuple[EntryKey, str], list[tuple[int, int]]]:

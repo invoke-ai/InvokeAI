@@ -39,6 +39,8 @@ export const FEATURE_HINTS = {
   hidiffusionT2Ratio: { href: 'https://github.com/megvii-research/HiDiffusion' },
   hidiffusionWindowAttn: { href: 'https://github.com/megvii-research/HiDiffusion' },
   imageInfluence: {},
+  krea2ReferenceKvCache: {},
+  krea2ReferenceMode: {},
   layerStackControl: {},
   layerStackInpaintMask: {},
   layerStackRaster: {},

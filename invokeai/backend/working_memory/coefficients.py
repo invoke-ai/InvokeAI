@@ -79,17 +79,19 @@ class MeasuredPoint(_DataModel):
     platform: dict[str, str]
     features: dict[str, FeatureValue]
     measured_bytes: int
-    method: Literal["reserved_peak", "driver_peak", "demand_peak"]
-    """How `measured_bytes` was read, each as a peak over its value just before the operation, one fresh process per
-    point:
+    method: Literal["reserved_peak", "driver_peak", "demand_peak", "device_peak"]
+    """How `measured_bytes` was read, each as a peak over its value just before the operation:
 
-    - ``reserved_peak``: the caching allocator's reserved bytes. Reserved rather than allocated, because reserved is
-      what the model cache's reservation has to cover.
+    - ``reserved_peak``: the caching allocator's reserved bytes, one fresh process per point. Reserved rather than
+      allocated, because reserved is what the model cache's reservation has to cover.
     - ``driver_peak``: the process's device usage as the driver reports it (Windows ``D3DKMT`` ``CurrentUsage``), the
-      larger of two runs.
-    - ``demand_peak``: the largest of the driver-level, the reserved and the allocated peak, the larger of two runs.
-      The driver-level figure is what reserved misses: on HIP the first operation of a process maps ~300 MiB beyond
-      ``max_memory_reserved``."""
+      larger of two runs, one fresh process per point.
+    - ``demand_peak``: the largest of the driver-level, the reserved and the allocated peak, the larger of two runs,
+      one fresh process per point. The driver-level figure is what reserved misses: on HIP the first operation of a
+      process maps ~300 MiB beyond ``max_memory_reserved``.
+    - ``device_peak``: the drop in the driver's free memory (`torch.cuda.mem_get_info`, polled during the operation),
+      the larger over the forwards measured. It counts the allocator's reserve and whatever is allocated around it, so
+      it is at least the reserved peak."""
     device: str
     provenance: str
     max_ratio: float | None = None
@@ -147,7 +149,8 @@ def shipped_data() -> Mapping[str, WorkingMemoryData]:
 
 
 def _where(keys: Mapping[str, str]) -> str:
-    return ",".join(f"{key}={value}" for key, value in keys.items())
+    # An estimator keyed by no platform trait (`platform_keys=()`) has one entry for every platform.
+    return ",".join(f"{key}={value}" for key, value in keys.items()) or "any platform"
 
 
 def find_entry(
@@ -187,6 +190,9 @@ def resolve_coefficients(
     entry of another estimator that applies on the same platform. No other fallback: an estimate priced with
     coefficients fitted for something else is the shortfall this data exists to prevent, so a missing, ambiguous,
     chained or mismatched entry raises, naming what is wrong. `origin` prefixes the `source`.
+
+    A spec keyed by no platform trait (`platform_keys=()`) reads its one entry, whose `platform` is empty, alike on
+    every platform, measured or not: nothing is priced as anything else, so nothing is floored either.
     """
     measured = priced_as(platform)
     full = {key: str(value) for key, value in asdict(measured).items()}
@@ -220,7 +226,7 @@ def resolve_coefficients(
     shown = list(dict.fromkeys(shown))
     read = {name: values[name] for name in sorted(spec.coefficients)}
     notes = [f"values of {lender}"] if lender else []
-    if measured != platform:
+    if spec.platform_keys and measured != platform:
         floors = {name: floor for name, floor in carrier.unmeasured_floor.items() if name in read}
         read |= {name: max(read[name], floor) for name, floor in floors.items()}
         notes.insert(0, f"priced as {_where({key: full[key] for key in shown})}{', floored' if floors else ''}")

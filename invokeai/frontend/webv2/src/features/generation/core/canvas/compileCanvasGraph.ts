@@ -8,7 +8,10 @@ import type { SupportedGenerateBase } from '@features/generation/core/baseGenera
 import type { BackendGraphContract, BackendInvocationContract } from '@features/generation/core/contracts';
 import type { ComponentModelConfig, GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
-import { getGenerationValidationReasons } from '@features/generation/core/baseGenerationPolicies';
+import {
+  getGenerationValidationReasons,
+  hasEnabledKrea2EditReferences,
+} from '@features/generation/core/baseGenerationPolicies';
 import {
   describeExternalCanvasRefusal,
   isExternalGenerationMode,
@@ -57,16 +60,22 @@ const CANVAS_I2L_NODE_TYPES: Partial<Record<SupportedGenerateBase, string>> = {
   'krea-2': 'qwen_image_i2l',
   'qwen-image-2-1': 'qwen_image_2_1_i2l',
   anima: 'anima_i2l',
+  // MOSS-Image denoises in the FLUX.2 VAE's raw latent layout, so it encodes with that family's node.
+  'moss-image': 'flux2_vae_encode',
   wan: 'wan_i2l',
   // Ideogram lacks an encode node; reject these modes with an actionable error.
 };
 
-/** SD-3, FLUX, and FLUX.2 use start = 1 - strength^0.2. FLUX Fill always starts at 0; other bases use 1 - strength. */
+/**
+ * SD-3, FLUX, FLUX.2 and MOSS-Image use start = 1 - strength^0.2; MOSS-Image clips its shifted schedule in sigma space
+ * like FLUX.2. FLUX Fill always starts at 0; other bases use 1 - strength.
+ */
 const canvasDenoisingStart = (model: GenerateModelConfig, strength: number): number => {
   if (model.base === 'flux' && model.variant === 'dev_fill') {
     return 0;
   }
-  const usesOptimizedCurve = model.base === 'sd-3' || model.base === 'flux' || model.base === 'flux2';
+  const usesOptimizedCurve =
+    model.base === 'sd-3' || model.base === 'flux' || model.base === 'flux2' || model.base === 'moss-image';
   return 1 - strength ** (usesOptimizedCurve ? 0.2 : 1);
 };
 
@@ -154,6 +163,17 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSi
         `Anima inpaint adapter weight must be between ${MIN_ANIMA_INPAINT_ADAPTER_WEIGHT} and ${MAX_ANIMA_INPAINT_ADAPTER_WEIGHT}.`
       );
     }
+  }
+
+  // A regional mask covers the prompt and target tokens only; edit references add image tokens it cannot place.
+  if (
+    model.base === 'krea-2' &&
+    (input.regionalGuidance?.length ?? 0) > 0 &&
+    hasEnabledKrea2EditReferences(settings.referenceImages)
+  ) {
+    reasons.push(
+      'Krea-2 edit references cannot be combined with regional guidance. Turn off the edit references or disable the regional guidance layers.'
+    );
   }
 
   if (!Number.isFinite(bbox.width) || !Number.isFinite(bbox.height) || bbox.width <= 0 || bbox.height <= 0) {
