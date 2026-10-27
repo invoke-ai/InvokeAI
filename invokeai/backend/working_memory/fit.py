@@ -121,7 +121,8 @@ def _pairs(entry: CoefficientEntry) -> set[str]:
 
 def line_values(entry: CoefficientEntry) -> set[str]:
     """The values of `entry` that `fitted_values` reproduces: both halves of each pixel line it carries, stand-ins
-    included. Any other value is hand-set (see the module docstring).
+    included. Any other value is hand-set (see the module docstring), which the data test allows only for an estimator
+    keyed by no platform trait.
 
     Where per-estimator lines take over (`EstimatorSpec.line`, PR #9919), a line in attended tokens such as the
     MOSS-Image denoise's is fitted too, and this distinction goes."""
