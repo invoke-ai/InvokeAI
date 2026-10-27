@@ -25,6 +25,7 @@ from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_w
     CachedModelWithPartialLoad,
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
 from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 from tests.backend.model_manager.load.model_cache.cached_model.utils import TiedWeightsModule
 
@@ -39,11 +40,29 @@ keep_ram_copy = pytest.mark.parametrize("keep_ram_copy", [True, False])
 partial_loading = pytest.mark.parametrize("partial_loading", [True, False], ids=["partial", "full"])
 
 
+def _upcast(model: torch.nn.Module) -> None:
+    model.to(dtype=torch.float32)
+
+
+def _upcast_and_back(model: torch.nn.Module) -> None:
+    """Two holders of one lock running the VAE in different dtypes: the weights are in their counted dtype again, but
+    each one cast its own copy."""
+    model.to(dtype=torch.float32)
+    model.to(dtype=torch.float16)
+
+
+casts = pytest.mark.parametrize("cast", [_upcast, _upcast_and_back], ids=["upcast", "upcast-and-back"])
+
+
 @pytest.fixture
 def make_cache():
     caches: list[ModelCache] = []
 
-    def make(keep_ram_copy: bool, enable_partial_loading: bool = True) -> ModelCache:
+    def make(
+        keep_ram_copy: bool,
+        enable_partial_loading: bool = True,
+        shared_cpu_weights: SharedCpuWeightsStore | None = None,
+    ) -> ModelCache:
         logger = MagicMock()
         logger.getEffectiveLevel.return_value = logging.INFO
         cache = ModelCache(
@@ -53,6 +72,7 @@ def make_cache():
             execution_device="cpu",
             storage_device="cpu",
             logger=logger,
+            shared_cpu_weights=shared_cpu_weights,
         )
         caches.append(cache)
         return cache
@@ -119,12 +139,14 @@ def _assert_at_the_counted_state(
 
 @devices
 @keep_ram_copy
+@casts
 def test_the_last_unlock_returns_a_partially_resident_model_to_its_counted_state(
-    make_cache, device: str, keep_ram_copy: bool
+    make_cache, device: str, keep_ram_copy: bool, cast
 ):
     """The cast reaches the weights on both devices and unties the tied matrix, which `Module.to(dtype)` casts name by
-    name: restored name by name, the matrix took twice its count in RAM and then in VRAM. Each weight is restored where
-    it is, so the VRAM count the lock took stays true."""
+    name: restored name by name, the matrix took twice its count in RAM and then in VRAM. A cast back to the counted
+    dtype unties it the same way and moves the CPU weights off the RAM copy. Each weight is restored where it is, so the
+    VRAM count the lock took stays true."""
     cache = make_cache(keep_ram_copy)
     model = TiedWeightsModule().to(torch.float16)
     with patch.object(model_cache_module, "device_has_dedicated_vram", return_value=True):
@@ -138,7 +160,7 @@ def test_the_last_unlock_returns_a_partially_resident_model_to_its_counted_state
     placement = {key: t.device.type for key, t in model.state_dict().items()}
     snapshot = _snapshot(model)
     cache.lock_in_ram(record)
-    model.to(dtype=torch.float32)
+    cast(model)
 
     cache.unlock(record)
 
@@ -157,8 +179,9 @@ def test_the_last_unlock_returns_a_partially_resident_model_to_its_counted_state
 
 @devices
 @keep_ram_copy
+@casts
 def test_the_last_unlock_returns_a_fully_loaded_model_to_its_counted_state(
-    make_cache, device: str, keep_ram_copy: bool
+    make_cache, device: str, keep_ram_copy: bool, cast
 ):
     cache = make_cache(keep_ram_copy, enable_partial_loading=False)
     model = TiedWeightsModule().to(torch.float16)
@@ -169,7 +192,7 @@ def test_the_last_unlock_returns_a_fully_loaded_model_to_its_counted_state(
     snapshot = _snapshot(model)
     cached_model.full_load_to_vram()
     cache.lock_in_ram(record)
-    model.to(dtype=torch.float32)
+    cast(model)
 
     cache.unlock(record)
 
@@ -182,18 +205,61 @@ def test_the_last_unlock_returns_a_fully_loaded_model_to_its_counted_state(
 
 
 @keep_ram_copy
-def test_the_last_unlock_returns_a_cpu_only_model_to_its_counted_state(make_cache, keep_ram_copy: bool):
+@casts
+def test_the_last_unlock_returns_a_cpu_only_model_to_its_counted_state(make_cache, keep_ram_copy: bool, cast):
     """A model that runs on the CPU is never moved, so nothing but the unlock would ever put it back."""
     cache = make_cache(keep_ram_copy)
     model = TiedWeightsModule().to(torch.float16)
     record = _put(cache, model, partial_loading=False)
     snapshot = _snapshot(model)
     cache.lock(record, None)
-    model.to(dtype=torch.float32)
+    cast(model)
 
     cache.unlock(record)
 
     _assert_at_the_counted_state(model, record.cached_model, "cpu", snapshot)
+
+
+def _resident_bytes(*state_dicts: dict[str, torch.Tensor]) -> int:
+    """The bytes the tensors of `state_dicts` hold, each storage once however many names and dicts share it."""
+    return sum(
+        {t.untyped_storage().data_ptr(): calc_tensor_size(t) for sd in state_dicts for t in sd.values()}.values()
+    )
+
+
+@partial_loading
+def test_a_cast_round_trip_leaves_a_tied_weight_adopted_from_another_device_one_tensor(
+    make_cache, partial_loading: bool
+):
+    """In multi-GPU mode the second device's cache adopts the first one's RAM copy with `load_state_dict(assign=True)`,
+    which gives each name of the tied matrix its own `Parameter` over the one tensor. A cast and a cast back give each of
+    them its own copy in the counted dtype: two copies of the matrix in RAM where the store counts one."""
+    store = SharedCpuWeightsStore()
+    _put(
+        make_cache(True, enable_partial_loading=partial_loading, shared_cpu_weights=store),
+        TiedWeightsModule().to(torch.float16),
+        partial_loading,
+    )
+    cache = make_cache(True, enable_partial_loading=partial_loading, shared_cpu_weights=store)
+    model = TiedWeightsModule().to(torch.float16)
+    record = _put(cache, model, partial_loading)
+    cpu_state_dict = record.cached_model.get_cpu_state_dict()
+    assert cpu_state_dict is not None
+    assert model.embed.weight is not model.head.weight and _is_tied(model)
+    cache.lock_in_ram(record)
+    _upcast_and_back(model)
+
+    cache.unlock(record)
+
+    assert cache.get("vae") is record
+    assert {model.embed.weight.dtype, model.head.weight.dtype} == {torch.float16}
+    assert (
+        model.embed.weight.untyped_storage().data_ptr()
+        == model.head.weight.untyped_storage().data_ptr()
+        == cpu_state_dict["embed.weight"].untyped_storage().data_ptr()
+    )
+    assert _resident_bytes(model.state_dict(), cpu_state_dict) == store.total_bytes_in_use()
+    assert store.total_bytes_in_use() == record.cached_model.total_bytes()
 
 
 class _MixedDtypeModule(TiedWeightsModule):
