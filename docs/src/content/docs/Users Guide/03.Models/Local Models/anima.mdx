@@ -1,7 +1,7 @@
 ---
 title: Anima
-description: Generate anime-style images with Anima, a 2B Cosmos Predict2 diffusion transformer with an LLM adapter, including its schedulers, regional prompting and ControlNet-LLLite adapters.
-lastUpdated: 2026-10-02
+description: Generate anime-style images with Anima, a 2B Cosmos Predict2 diffusion transformer with an LLM adapter, including its schedulers, regional prompting, character-reference IP-Adapter and ControlNet-LLLite adapters.
+lastUpdated: 2026-10-18
 sidebar:
   order: 1
 ---
@@ -64,7 +64,8 @@ Both finetunes keep Anima's VAE, schedulers and Canvas support, and install from
 | **Anima-3.8B** (v1.1) | 52 blocks, plus a **semantic connector** bundled in the checkpoint that adds a second text encoder, **Qwen3.5 4B**, for better prompt adherence, multi-character binding and mixed natural-language/tag prompts. | Qwen3 0.6B **and** Qwen3.5 4B encoder, VAE |
 
 With an Anima-3.8B model selected, the **Components** section shows a third picker, **Qwen3.5 Encoder**,
-and generation needs it. Its starter model (~4.8 GB) installs together with Anima-3.8B. The connector
+and generation needs it. Its starter model (~4.8 GB) installs together with Anima-3.8B. The picker lists
+only Qwen3.5 4B encoders: MOSS-Image's Qwen3.5 9B installs under the same type but does not work with Anima-3.8B. The connector
 runs once per denoising step, so Anima-3.8B is slower per step than Anima-2.9B (about 1.3 against 1.7
 iterations per second at 832×1216 on an RTX 4090), and its Qwen3.5 encoder adds memory while the prompt
 is encoded. **Reset all to model defaults** sets 40 steps at CFG 6, the settings of the author's reference
@@ -116,6 +117,52 @@ Anima LoRAs (Kohya / LyCORIS format) are supported. They apply to the transforme
 includes text-encoder layers, to the Qwen3 encoder. In the workflow editor use **Apply LoRA - Anima** or
 **Apply LoRA Collection - Anima**.
 
+## Character reference (IP-Adapter)
+
+The **Anima IP-Adapter (Character Reference)** starter model, by LuciferTC (~500 MB), carries a character
+from reference images into the generation. It was trained on anime images. Installing it also installs
+the **SigLIP2** image encoder it reads the reference with (google/siglip2-base-patch16-512, ~1.5 GB). If the
+adapter came from somewhere else, Invoke installs the encoder the first time a reference is used; in
+multi-user mode only an administrator's generation does, and anyone else is asked to have it installed
+from the Model Manager.
+
+To use it, select an Anima model and add a reference image in the **Guidance** section; the first installed
+Anima IP-Adapter is selected for it. The card has one main control, **Strength**, from 0 to 2 (default 1),
+and **Active steps** under **Advanced**. There is no **Mode** or CLIP Vision choice as there is for SD
+IP-Adapters.
+
+- **Strength** scales how much of the reference the image carries. **0** turns the reference off, and the
+  image is exactly what you would get without it. Higher values carry more of the character, and also more
+  of the reference's composition.
+- **Active steps** limit when the reference image is attended. The adapter's built-in LoRA stays on for the
+  whole generation, so even a range that leaves out every step does not give the same image as no reference.
+- **Up to four reference images** (experimental: the adapter was trained on single images). References that
+  use the same adapter are attended together, each with its own **Strength** and **Active steps**, and the
+  built-in LoRA is applied once.
+  - Several images of the **same** character work well together.
+  - Images of **different** characters blend. The adapter cannot assign an image to one figure, even with a
+    prompt such as "2girls", so expect hair, outfits and accessories to mix.
+  - Each image's **Strength** sets how much of it goes into the mix. A low but non-zero Strength still takes
+    attention away from the other images, so remove a reference rather than turning it down near 0.
+- **Anima and Anima-2.9B only.** The adapter was trained on Anima's 28-block releases. Invoke applies it to
+  the blocks Anima-2.9B kept from Anima, the same way it maps LoRAs, but that combination is untested.
+  With an **Anima-3.8B** model selected, reference images are not offered.
+
+What it carries, from our tests on Anima Base 1.0:
+
+- A character's **appearance** transfers: hair colour and style, outfit and accessories. At strength 1.5,
+  even details such as the skirt carried over.
+- Fine details can be lost. A character's **heterochromia** (two different eye colours) did not carry.
+- A **stylized reference** brings its composition and content along, not only its style. The adapter is
+  not a style transfer: expect the pose, framing and objects of the reference to show up as well.
+
+In the workflow editor, add an **IP-Adapter - Anima** node, give it the reference image and the adapter
+model, and connect its output to the **IP-Adapter** input of **Denoise - Anima**. For several references, add
+one node per image and collect them into that input.
+
+The adapter is a derivative of Anima and falls under the same **CircleStone Labs Non-Commercial License**:
+it may not be used commercially. Images you generate may be.
+
 ## ControlNet-LLLite adapters
 
 Anima supports kohya-ss's **ControlNet-LLLite** adapters, small models (8–66 MB) that condition the
@@ -164,7 +211,8 @@ Base 1.0; the pose adapter is notably weak. Only the Inpainting and Sketch adapt
 | ---------------------------- | --------------------------------------------------------- |
 | **Main Model - Anima**       | Loads the transformer, Qwen3 encoder and VAE, and for Anima-3.8B the Qwen3.5 encoder |
 | **Prompt - Anima**           | Encodes a prompt, with an optional regional mask; connect the Qwen3.5 encoder for Anima-3.8B |
-| **Denoise - Anima**          | Runs sampling; accepts img2img latents, masks and LLLite adapters |
+| **Denoise - Anima**          | Runs sampling; accepts img2img latents, masks, LLLite adapters and an IP-Adapter |
 | **Image to Latents - Anima** | VAE encode                                                |
 | **Latents to Image - Anima** | VAE decode                                                |
 | **Anima ControlNet-LLLite**  | Configures one ControlNet-LLLite adapter                  |
+| **IP-Adapter - Anima**       | Encodes a reference image for the Anima IP-Adapter        |

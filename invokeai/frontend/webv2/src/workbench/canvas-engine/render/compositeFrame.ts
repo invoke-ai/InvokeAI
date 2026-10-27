@@ -46,7 +46,15 @@ export interface CreateCompositeFrameDeps {
   readonly getControlView: () => CompositeOptions['controlView'];
   /** Starts (or joins) the rasterization of a layer whose cache is stale. */
   readonly rasterizeLayer: (layer: CanvasLayerContract, doc: CanvasDocumentContractV3) => void;
+  /** Whether the staging area holds a candidate, shown or not. */
+  readonly hasStagedCandidates: () => boolean;
 }
+
+/**
+ * While a generation is staged (a candidate waits, or a staged or progress preview is published) masks and regions
+ * stop tinting the screen, so the result reads as it would be accepted; control layers stay.
+ */
+const STAGING_OVERLAY_STACKS = { control: true, inpaint_mask: false, regional_guidance: false } as const;
 
 export interface CompositeFrame {
   /** Composites the document onto the screen surface and enforces the surface budget. */
@@ -132,12 +140,14 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
   const describeFrame = (
     doc: CanvasDocumentContractV3,
     isolationLayerId: string | null,
-    overrides: CompositeOptions['transformOverrides']
+    overrides: CompositeOptions['transformOverrides'],
+    showOverlayStacks: CompositeOptions['showOverlayStacks']
   ): CompositePreparation => {
     const plan = reusePreparation(preparation, doc, {
       backend: deps.backend,
       groupSurface: deps.getGroupSurface,
       isolationLayerId,
+      showOverlayStacks,
       transformOverrides: overrides,
     });
     preparation = plan;
@@ -187,7 +197,9 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
       const stagedPlacement = stagedPreview?.placement;
       const isolatedGuard = samPreview?.isolated ? samPreview.guard : null;
       const overrides = !isolatedGuard && transformOverrides.size > 0 ? transformOverrides : null;
-      const frame = describeFrame(doc, isolatedGuard?.layerId ?? null, overrides);
+      const staging = stagedPreview !== null || deps.hasStagedCandidates();
+      const showOverlayStacks = staging ? STAGING_OVERLAY_STACKS : undefined;
+      const frame = describeFrame(doc, isolatedGuard?.layerId ?? null, overrides, showOverlayStacks);
       // Snapshot filter previews only when active, avoiding an empty map allocation every frame.
       const layerPreviews = !isolatedGuard && previews.filterCount() > 0 ? previews.filterSnapshot() : null;
       const activeFrameLayerIds = calculateActiveFrameLayerIds({
@@ -223,8 +235,9 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         layerPreviews,
         maskPatternTile: deps.getMaskPatternTile,
         preparation: frame,
-        // Screen frames are display-time: the region tint may draw.
-        regionOverlays: true,
+        // Screen frames are display-time: the region tint may draw, except over a staged result.
+        regionOverlays: !staging,
+        showOverlayStacks,
         // Candidate-specific placement wins for final images. Progress frames
         // and legacy image inputs continue to follow the CURRENT bbox origin.
         stagedPreview:

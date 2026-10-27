@@ -111,6 +111,7 @@ const CANVAS_MUTATION_TYPES = new Set<CanvasProjectMutation['type']>([
   'reorderCanvasSiblings',
   'replaceCanvasDocument',
   'replaceCanvasLayer',
+  'replaceCanvasLayers',
   'rollbackStagedImageCommit',
   'resizeCanvasDocument',
   'restoreCanvasSnapshot',
@@ -276,6 +277,7 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   krea2SeedVarianceEnabled: false,
   krea2SeedVarianceStrength: 0.1,
   krea2SeedVarianceRandomizePercent: 50,
+  krea2ReferenceKvCache: false,
   fluxDypePreset: 'off',
   fluxDypeScale: 2,
   fluxDypeExponent: 2,
@@ -285,6 +287,7 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   zImageSeedVarianceRandomizePercent: 50,
   qwenImageShift: null,
   qwenImageEncoderQuantization: 'none',
+  mossImageUncondSkipLayers: [22],
   referenceImages: [],
   scheduler: 'euler_a',
   seamlessXAxis: false,
@@ -8137,6 +8140,48 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
     });
     expect(missing).toBe(replaced);
     expect(getCanvas(missing).document).toBe(getCanvas(replaced).document);
+  });
+
+  it('replaces several leaves in place in one edit, and refuses them all when any entry is invalid', () => {
+    const state = withCanvasLayers(createInitialWorkbenchState(), [
+      createRasterLayer('a'),
+      createRasterLayer('b'),
+      createInpaintMaskLayer('m'),
+    ]);
+    const before = getCanvas(state).document;
+    const paintA = { ...createRasterLayer('a'), source: { bitmap: null, type: 'paint' as const } };
+    const emptiedMask = { ...getDocumentLeaves(before).find((layer) => layer.id === 'm')!, name: 'Emptied' };
+
+    const replaced = workbenchReducer(state, {
+      replacements: [
+        { layer: paintA, layerId: 'a' },
+        { layer: emptiedMask, layerId: 'm' },
+      ],
+      type: 'replaceCanvasLayers',
+    });
+    const leaves = getDocumentLeaves(getCanvas(replaced).document);
+    expect(leaves.map((layer) => layer.id)).toEqual(getDocumentLeaves(before).map((layer) => layer.id));
+    expect(leaves.find((layer) => layer.id === 'a')).toBe(paintA);
+    expect(leaves.find((layer) => layer.id === 'm')).toBe(emptiedMask);
+    expect(leaves.find((layer) => layer.id === 'b')).toBe(getDocumentLeaves(before).find((layer) => layer.id === 'b'));
+
+    const refusals = [
+      [
+        { layer: paintA, layerId: 'a' },
+        { layer: { ...paintA, id: 'missing' }, layerId: 'missing' },
+      ],
+      [
+        { layer: paintA, layerId: 'a' },
+        { layer: paintA, layerId: 'a' },
+      ],
+      [{ layer: paintA, layerId: 'b' }],
+      [{ layer: { ...createControlLayer('a') }, layerId: 'a' }],
+      [],
+    ];
+    for (const replacements of refusals) {
+      const refused = workbenchReducer(state, { replacements, type: 'replaceCanvasLayers' });
+      expect(refused).toBe(state);
+    }
   });
 
   it('swaps a raster/control layer source but ignores mask-only layer types', () => {

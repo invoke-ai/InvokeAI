@@ -305,6 +305,8 @@ Tiling costs some speed on smaller images, and a tiled result is not pixel-ident
   decode pushes the Anima model out of VRAM on 8GB cards. Wan videos tile from 832x480 on 8GB cards and from 720p on
   16GB cards.
 - **Krea-2** decodes with the Qwen-Image **Latents to Image** node, so it follows that node's settings and field.
+- **MOSS-Image** encodes and decodes with the FLUX.2 **Latents to Image** and **Image to Latents** nodes, so it
+  follows the FLUX.2 row for decodes and encodes.
 - **LTX-2** always decodes its video in tiles, sized by the node's own **Tile Size** fields.
 - The [Upscale panel](/users-guide/image-generation/upscale/) turns tiling on by itself. Nodes with a **Tiled** field
   also have a **Tile Size** field.

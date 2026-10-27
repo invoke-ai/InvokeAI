@@ -113,6 +113,8 @@ export interface WorkbenchPreferences {
   workflowLibraryThumbnailFit: WorkflowLibraryThumbnailFit;
   /** Raise text and border contrast on every theme (a11y). */
   highContrast: boolean;
+  /** Select Object processes each prompt edit automatically; kept across sessions, Reset, and reloads. */
+  selectObjectAutoProcess: boolean;
   /** Account-bound overrides keyed by hotkey id (`app.invoke`, `gallery.galleryNavLeft`, etc.). */
   customHotkeys: Record<string, string[]>;
   /** Generate panel section open/closed overrides keyed by section id; absent = section default. */
