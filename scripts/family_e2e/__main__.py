@@ -31,7 +31,7 @@ from scripts.family_e2e.runner import (
     finish_run,
     gpu_lock,
     is_alive,
-    kill_identified,
+    kill_recorded,
     load_run_manifest,
     new_run,
     open_gpu,
@@ -197,9 +197,15 @@ def cmd_stop(args: argparse.Namespace) -> int:
         time.sleep(STOP_HEARTBEAT_POLL_S)
         heartbeat = read_heartbeat(run_dir)
     # The runner first: it would otherwise notice its server dying and record a crash.
-    for role in ("runner", *SERVER_ROLES):
-        if kill_identified(heartbeat.get(role)):
-            print(f"killed {role} (pid {int(heartbeat[role][0])}) and its descendants")
+    killed, survivors = kill_recorded(heartbeat, ("runner", *SERVER_ROLES))
+    if survivors:
+        # What still runs may still write to its scratch root and the calibration store in it.
+        raise RunnerError(
+            f"the run's processes survived the kill: {survivors}. {run_dir.name} is marked stopped; its scratch roots "
+            "stay as they are. End them, then `stop` again"
+        )
+    for role in killed:
+        print(f"killed {role} (pid {int(heartbeat[role][0])}) and its descendants")
     info = load_run_info(run_dir)
     unsaved = []
     for arm in sorted({DEFAULT_ARM, *info.environments}):
