@@ -82,7 +82,7 @@ class _Window:
     device: str
     export: Path
     attempt: str
-    """The calibration attempt the window ran in (`attempt_id`), or its run without one."""
+    """The calibration attempt the window ran in (its owner's `attempt_id`), or its run without one."""
 
 
 @dataclass(frozen=True)
@@ -178,7 +178,11 @@ def build_points(
     for path in exports:
         store = _load_export(path)
         envs = {env.id: env for env in store.envs}
-        attempts = {run.run_id: run.attempt_id or run.run_id for run in store.runs}
+        # Two owners' attempts never share windows, whatever their ids.
+        attempts = {
+            run.run_id: f"{run.user_id}\x00{run.attempt_id}" if run.attempt_id is not None else run.run_id
+            for run in store.runs
+        }
         # A point's card is its device class. One name can stand for several (another memory size, say); the id
         # tells them apart, in the groups and in the points written.
         device = f"{store.device_class.name} ({store.device_class.id})"

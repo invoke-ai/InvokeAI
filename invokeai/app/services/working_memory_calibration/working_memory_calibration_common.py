@@ -110,7 +110,12 @@ after the calibration was planned, so the item failed at admission; calibrate ag
 
 MODEL_CHANGED: Final[CalibrationErrorCode] = "model_changed"
 CALIBRATION_RUNNING: Final = "calibration_running"
-"""The code of the 409 that refuses a new attempt while another one runs on the GPU's device class."""
+"""The code of the 409 that refuses a new attempt while another one runs, or is still open, on the GPU's device
+class."""
+
+CALIBRATION_INTERLEAVED: Final = "calibration_interleaved"
+"""The code of the 409 that refuses a later step of an attempt once another calibration ran on the GPU since the
+attempt began."""
 
 
 class ObservedItem(_StoreModel):
@@ -176,6 +181,12 @@ class CalibrationRun(_StoreModel):
         description="The model as it was when the run was created; an item fails at admission once it changed. Absent "
         "in runs stored before it was recorded, which compare the hash alone",
     )
+    graph_models: dict[str, CalibrationModelIdentity] = Field(
+        default_factory=dict,
+        description="Per model key, each model the run's graph names as it was when the run was created: the graph's "
+        "own identifiers carry hash, base and type, not format or variant. An item fails at admission once one "
+        "changed. Absent in runs stored before it was recorded",
+    )
 
     @model_validator(mode="after")
     def _steps_belong_to_an_attempt(self) -> "CalibrationRun":
@@ -190,6 +201,8 @@ class CalibrationRun(_StoreModel):
         for name in ("attempt_id", "attempt_steps", "soft", "model_identity"):
             if data.get(name) is None:
                 data.pop(name, None)
+        if not data.get("graph_models"):
+            data.pop("graph_models", None)
         return data
 
 
@@ -273,8 +286,9 @@ ATTEMPT_ID_DESCRIPTION: Final = (
     "window of an attempt feeds an estimate until it queued attempt_steps runs and every one has finished; a run a "
     "reset removed still counts as queued, without its measurements. An aborted attempt never feeds one: an item of "
     "it ended canceled (Stop, a queue clear) or failed because a model changed after the calibration was planned "
-    "(error_code model_changed), it ended before it queued all its runs (Stop, a failed submission), or a reset "
-    "removed a run of it while it ran. An item that failed ends that step, not the attempt. "
+    "(error_code model_changed), it ended before it queued all its runs (Stop, a failed submission), another "
+    "calibration ran on the GPU between its runs, or a reset removed a run of it while it ran. An item that failed "
+    "ends that step, not the attempt. "
     "The run id derives from the idempotency_key, the request and the attempt, so an idempotency_key names one run: "
     "repeating the request under the same attempt returns that run, and reusing the key under another attempt is "
     "refused with 409 while the queue keeps the key's receipt. Make each key unique per run of an attempt."
@@ -347,7 +361,8 @@ CalibrationHoldBack = Literal["running", "aborted_attempt"]
 aborted_attempt, none is running and its attempt was aborted: an item of it ended canceled (Stop, a queue clear) or
 failed because a model changed after the calibration was planned (`model_changed`), it queued fewer runs than its
 attempt_steps (Stop, or a failed submission, ended it before it queued them all; a run a reset removed counts as
-queued), or a reset removed a run of it while it ran or after it was aborted. An aborted attempt never feeds a fit."""
+queued), another calibration ran on the GPU between its runs, or a reset removed a run of it while it ran or after it
+was aborted. An aborted attempt never feeds a fit."""
 
 _RUN_ERROR_CODE_DESCRIPTION: Final = (
     "Why the failed item failed, where a client acts on it (`CalibrationErrorCode`): model_changed, a model its graph "
@@ -585,7 +600,8 @@ class WorkingMemoryCalibrationModelRun(BaseModel):
         description="Why no window of the run feeds a fit: running, it or a run of its attempt is still in the queue, "
         "and its windows join once all have finished; aborted_attempt, its attempt was aborted, and its windows never "
         "feed one: an item of it ended canceled (Stop, a queue clear) or failed because a model changed after "
-        "the calibration was planned (model_changed), the attempt ended before it queued all "
+        "the calibration was planned (model_changed), another calibration ran on the GPU between its runs, the "
+        "attempt ended before it queued all "
         "attempt_steps runs (Stop, a failed submission), or a reset removed a run of it while it ran. Null when its "
         "windows are judged like any finished run's"
     )
@@ -649,6 +665,14 @@ class CalibrationAttemptBusyError(Exception):
     `calibration_running`."""
 
     code: Final = CALIBRATION_RUNNING
+
+
+class CalibrationAttemptInterleavedError(Exception):
+    """Another calibration ran on the GPU's device class after the attempt's first run: its later steps would measure
+    the GPU after that calibration, not after its own earlier steps. The route answers 409 with `code`
+    `calibration_interleaved`."""
+
+    code: Final = CALIBRATION_INTERLEAVED
 
 
 class CalibrationAttemptConflictError(Exception):

@@ -53,8 +53,12 @@ def _suffix(point: CalibrationPoint) -> str:
 
 
 def _attempts(file: CalibrationStoreFile) -> dict[str, str]:
-    """Per run id, the attempt its windows are judged with: its `attempt_id`, or the run itself without one."""
-    return {run.run_id: run.attempt_id or run.run_id for run in file.runs}
+    """Per run id, the attempt its windows are judged with: its owner's `attempt_id` (two owners' attempts never share
+    windows, whatever their ids), or the run itself without one."""
+    return {
+        run.run_id: f"{run.user_id}\x00{run.attempt_id}" if run.attempt_id is not None else run.run_id
+        for run in file.runs
+    }
 
 
 HeldBack = Mapping[str, CalibrationHoldBack]
@@ -72,8 +76,8 @@ def exclusions(
 
     - aborted_attempt: a window of a run `held_back` names so: its attempt was stopped, cleared or cut short.
     - partial_residency: valid but not fit-eligible, its model not fully on the device.
-    - fragmented: the fit-eligible windows of one measurement -- one attempt (`attempt_id`, else the run) at one
-      environment, estimator, version and features, in the order they ran -- are what `fragmentation.fragmented`
+    - fragmented: the fit-eligible windows of one measurement -- one attempt (an owner's `attempt_id`, else the run)
+      at one environment, estimator, version and features, in the order they ran -- are what `fragmentation.fragmented`
       flags: they grew around a flat allocation, or their largest window is a ratio outlier against the smaller
       sizes of the same line in the environment that count, from any attempt. The measurement drops out whole: its
       windows ran back to back on one allocator state. Another attempt's windows of the same size ran on another and

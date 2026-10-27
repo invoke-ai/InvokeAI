@@ -507,6 +507,28 @@ def test_an_attempt_is_refused_with_a_code_while_another_one_runs(
     assert _calibrate(client, admin_token, first).status_code == 201
 
 
+def test_a_later_step_after_another_calibration_ran_is_refused_with_a_code(
+    client: TestClient, admin_token: str, calibration
+) -> None:
+    queue, _ = calibration
+    step = {"graph": _graph(), "attempt_id": "model-tab", "attempt_steps": 2}
+    [item_id] = _calibrate(client, admin_token, step).json()["item_ids"]
+    queue.dequeue()
+    queue.complete_queue_item(item_id)
+    [other] = _calibrate(client, admin_token).json()["item_ids"]
+    queue.dequeue()
+    queue.complete_queue_item(other)
+
+    refused = _calibrate(client, admin_token, step | {"idempotency_key": "step-2"})
+
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["detail"] == {
+        "code": "calibration_interleaved",
+        "message": "Another calibration ran on this GPU after this calibration started, so its measurements can no "
+        "longer be combined. Calibrate again.",
+    }
+
+
 def test_an_attempt_on_another_model_is_refused_while_one_runs_on_the_gpu(
     client: TestClient, admin_token: str, calibration
 ) -> None:

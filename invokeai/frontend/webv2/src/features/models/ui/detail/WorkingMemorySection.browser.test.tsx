@@ -1624,6 +1624,38 @@ describe('WorkingMemorySection plan freshness', () => {
     expect(sectionText()).not.toContain(serverText);
   });
 
+  it('stops posting when another calibration ran on the GPU between its steps, saying so in its own words', async () => {
+    await renderSection();
+    await expect.poll(sectionText).toContain('models.workingMemory.neverCalibrated');
+    const post = api.calibrateWorkingMemory.getMockImplementation()!;
+    const serverText =
+      'Another calibration ran on this GPU after this calibration started, so its measurements can no longer be combined. Calibrate again.';
+    api.calibrateWorkingMemory.mockImplementation((...args: unknown[]) =>
+      api.calibrateWorkingMemory.mock.calls.length === 2
+        ? Promise.reject(
+            new ApiError(JSON.stringify({ detail: { code: 'calibration_interleaved', message: serverText } }), 409)
+          )
+        : post(...args)
+    );
+
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate')!));
+    await expect.poll(openDialog).not.toBeNull();
+    await act(() => userEvent.click(buttonNamed('models.workingMemory.calibrate', openDialog()!)!));
+    await expect.poll(() => api.calibrateWorkingMemory.mock.calls.length).toBe(2);
+
+    // The server lists the one run queued before the refusal, held back with its short attempt.
+    const attemptId = (api.calibrateWorkingMemory.mock.calls[0]![1] as { attemptId: string }).attemptId;
+    serveSummary(summary({ runs: [run('run-1', 1, 'completed', null, attemptId, { ...ABORTED, attempt_steps: 6 })] }));
+    await refreshSummary();
+    await expect.poll(sectionText).toContain('models.workingMemory.interleaved');
+    expect(sectionText()).toContain('models.workingMemory.discarded');
+    expect(sectionText()).not.toContain(serverText);
+    expect(buttonNamed('common.retry')).toBeDefined();
+    // The refused step ends the attempt: no later step is posted.
+    expect(api.calibrateWorkingMemory).toHaveBeenCalledTimes(2);
+    expect(notify.info).not.toHaveBeenCalled();
+  });
+
   it('follows an attempt of this model another tab started, found right before the start', async () => {
     await renderSection();
     await expect.poll(sectionText).toContain('models.workingMemory.neverCalibrated');

@@ -2,14 +2,17 @@
 
 import asyncio
 import builtins
+import datetime
 import gc
 import json
 import os
+import time
 import weakref
 from collections.abc import Iterator, Mapping
 from contextlib import asynccontextmanager
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Optional
 from unittest.mock import MagicMock
 
 import pytest
@@ -25,15 +28,20 @@ from invokeai.app.services.session_queue.session_queue_common import Batch, Batc
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph
+from invokeai.app.services.working_memory_calibration import (
+    working_memory_calibration_default as calibration_default,
+)
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
     CalibrationAttemptBusyError,
     CalibrationAttemptConflictError,
+    CalibrationAttemptInterleavedError,
     CalibrationModelChangedError,
     CalibrationStoreError,
     WorkingMemoryCalibrationRequest,
 )
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import (
     _ATTEMPTS_LOCK,
+    ATTEMPT_IDLE_GRACE,
     DeviceMemory,
     SettingValue,
     WorkingMemoryCalibrationService,
@@ -551,11 +559,26 @@ def test_an_attempt_feeds_once_it_queued_every_planned_run_and_all_finished(tmp_
     assert {run.held_back for run in service.get_model_summary("model-a").runs} == {None}
 
 
-def _announce_retries(service: WorkingMemoryCalibrationService) -> None:
-    """Deliver the retries the queue announced to the service, as the event bus does once the retry committed."""
-    for event in service._services.events.events:  # type: ignore[attr-defined]
-        if isinstance(event, QueueItemsRetriedEvent):
-            asyncio.run(service._on_queue_items_retried((event.__event_name__, event)))
+def _announce_retries(service: WorkingMemoryCalibrationService, order: str = "as made") -> None:
+    """Deliver the retries the queue announced to the service, as the event bus does once the retry committed (or in
+    the reverse order, which the bus does not rule out), and wait until the retry worker recorded them."""
+    announced = service._services.events.events  # type: ignore[attr-defined]
+    events = [event for event in announced if isinstance(event, QueueItemsRetriedEvent)]
+    for event in events if order == "as made" else events[::-1]:
+        asyncio.run(service._on_queue_items_retried((event.__event_name__, event)))
+    _recorded(service)
+
+
+def _recorded(service: WorkingMemoryCalibrationService) -> None:
+    """Wait for what the retry worker was handed."""
+    assert service._retry_worker is not None
+    service._retry_worker.submit(lambda: None).result(timeout=30)
+
+
+def _idle(monkeypatch: pytest.MonkeyPatch, by: datetime.timedelta = ATTEMPT_IDLE_GRACE) -> None:
+    """Let the service's clock run on by `by` and a second, as if the client went away between two steps."""
+    clock = calibration_default._now
+    monkeypatch.setattr(calibration_default, "_now", lambda: clock() + by + datetime.timedelta(seconds=1))
 
 
 def _queue_attempt(service: WorkingMemoryCalibrationService, attempt_id: str, steps: int) -> list:
@@ -886,9 +909,89 @@ def test_a_retry_canceled_and_pruned_before_any_refresh_still_aborts_its_attempt
     assert {run.held_back for run in service.get_model_summary("model-a").runs} == {"aborted_attempt"}
 
 
+def test_a_retry_canceled_and_pruned_before_its_announcement_was_handled_still_aborts_its_attempt(
+    tmp_path: Path, started
+) -> None:
+    """The listener runs late: by then Stop canceled the retry and a prune removed its row. The announcement alone
+    names it, as a retry of the run's item."""
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="announced-late", attempt_steps=2)
+    first, largest = (asyncio.run(service.create_run("model-a", request, "system")) for _ in range(2))
+    _settle_as_the_runner(service, first.run_id, first.item_ids, "completed")
+    service.record_windows(first.run_id, _on_the_line(first.run_id))
+    _settle_as_the_runner(service, largest.run_id, largest.item_ids, "failed")
+    [retried] = queue.retry_items_by_id("default", largest.item_ids).retried_items
+    queue.cancel_queue_item(retried.item_id)
+    queue.prune("default")
+
+    _announce_retries(service)
+    service.refresh_user_fits()
+
+    assert _estimate() == _shipped()
+    assert {run.held_back for run in service.get_model_summary("model-a").runs} == {"aborted_attempt"}
+
+
+def test_a_retry_of_an_unrelated_item_that_reuses_a_recorded_id_is_not_the_runs(
+    tmp_path: Path, started, mock_invoker: Invoker
+) -> None:
+    """A recreated database gave the id the run recorded to a canvas item, which fails and is retried: its row's
+    origin says it is not the run's, and its retry is not recorded."""
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    created = asyncio.run(service.create_run("model-a", WorkingMemoryCalibrationRequest(graph=_add_graph()), "system"))
+    [canvas] = asyncio.run(
+        queue.enqueue_batch("default", Batch(graph=_add_graph(), origin="canvas"), prepend=False)
+    ).item_ids
+    service.stop(mock_invoker)
+    path = next((tmp_path / "working_memory").glob("*.json"))
+    stored = json.loads(path.read_bytes())
+    stored["runs"][0]["queue_item_ids"] = [canvas]
+    path.write_text(json.dumps(stored))
+    service = started(tmp_path)
+    queue.fail_queue_item(canvas, "OutOfMemoryError", "out of memory", "")
+
+    service.record_retries(queue.retry_items_by_id("default", [canvas]).retried_items)
+
+    assert _stored(tmp_path)["runs"][0]["observed"] == {}
+    assert created.item_ids
+
+
+@pytest.mark.parametrize("order", ["as made", "reversed"])
+def test_a_retry_of_a_retry_announced_late_is_recorded_on_its_run_in_either_order(
+    tmp_path: Path, started, order: str
+) -> None:
+    """Out of memory at the largest size; its retry R1 is canceled, and retried as R2, which is canceled too; a prune
+    removes every row before any announcement was handled. R2's source is R1, which only R1's own announcement
+    records: handled first, R2 waits for it."""
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="retried-twice-late", attempt_steps=2)
+    first, largest = (asyncio.run(service.create_run("model-a", request, "system")) for _ in range(2))
+    _settle_as_the_runner(service, first.run_id, first.item_ids, "completed")
+    service.record_windows(first.run_id, _on_the_line(first.run_id))
+    _settle_as_the_runner(service, largest.run_id, largest.item_ids, "failed")
+    [first_retry] = queue.retry_items_by_id("default", largest.item_ids).retried_items
+    queue.cancel_queue_item(first_retry.item_id)
+    [second_retry] = queue.retry_items_by_id("default", [first_retry.item_id]).retried_items
+    queue.cancel_queue_item(second_retry.item_id)
+    queue.prune("default")
+
+    _announce_retries(service, order)
+    service.refresh_user_fits()
+
+    [run] = [run for run in _stored(tmp_path)["runs"] if run["run_id"] == largest.run_id]
+    assert {int(key): value["retried_from_item_id"] for key, value in run["observed"].items()} == {
+        largest.item_ids[0]: None,
+        first_retry.item_id: largest.item_ids[0],
+        second_retry.item_id: largest.item_ids[0],
+    }
+    assert _estimate() == _shipped()
+
+
 def test_the_queues_retry_announcement_records_each_calibration_retry_on_its_run(tmp_path: Path, started) -> None:
     """A retry of a run's item becomes an item of the run, pending, standing for the item it retried. A retry of
-    another item, whose origin is not the run's, leaves the store as it is, whatever source the announcement names."""
+    another item leaves the store as it is."""
     service = started(tmp_path)
     queue = service._services.session_queue
     created = asyncio.run(service.create_run("model-a", WorkingMemoryCalibrationRequest(graph=_add_graph()), "system"))
@@ -903,9 +1006,6 @@ def test_the_queues_retry_announcement_records_each_calibration_retry_on_its_run
         retry.source_item_id: retry.item_id
         for retry in queue.retry_items_by_id("default", [item_id, generation]).retried_items
     }
-    service.record_retries([RetriedQueueItem(source_item_id=item_id, item_id=retried[generation])])
-    assert _stored(tmp_path)["runs"][0]["observed"] == {}
-
     _announce_retries(service)
 
     [run] = _stored(tmp_path)["runs"]
@@ -933,6 +1033,7 @@ def test_the_service_listens_for_the_queues_retry_announcements(tmp_path: Path, 
     for handler in local_handler._registry.get(QueueItemsRetriedEvent.__event_name__, []):
         if handler.__module__ == WorkingMemoryCalibrationService.__module__:
             asyncio.run(handler((event.__event_name__, event)))
+    _recorded(service)
 
     assert str(retried.item_id) in _stored(tmp_path)["runs"][0]["observed"]
 
@@ -1066,7 +1167,9 @@ def test_a_retry_queued_as_a_reset_takes_the_files_lock_still_stops_the_attempt(
     ]
 
 
-def test_two_owners_attempts_with_one_id_are_two_incomplete_attempts(tmp_path: Path, started) -> None:
+def test_two_owners_attempts_with_one_id_are_two_incomplete_attempts(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Each owner posts one of two planned steps under the same attempt id: neither attempt queued both, so neither
     feeds a fit; and each owner's count is its own."""
     service = started(tmp_path)
@@ -1075,6 +1178,8 @@ def test_two_owners_attempts_with_one_id_are_two_incomplete_attempts(tmp_path: P
         created = asyncio.run(service.create_run("model-a", request, owner))
         service.record_windows(created.run_id, _on_the_line(created.run_id))
         _finish(service, created.item_ids)
+        # The other owner's attempt may start once this one went idle between its steps.
+        _idle(monkeypatch)
 
     service.refresh_user_fits()
 
@@ -1089,6 +1194,8 @@ def test_two_owners_attempts_with_one_id_are_two_incomplete_attempts(tmp_path: P
         ("hash", "MODEL-A changed after this calibration was planned (hash). Calibrate again."),
         ("base", "MODEL-A changed after this calibration was planned (base). Calibrate again."),
         ("removed", "Model model-a was removed after this calibration was planned. Calibrate again."),
+        ("format", "MODEL-A changed after this calibration was planned (format). Calibrate again."),
+        ("variant", "MODEL-A changed after this calibration was planned (variant). Calibrate again."),
     ],
 )
 def test_an_item_whose_model_changed_after_planning_fails_at_admission_with_its_code(
@@ -1103,8 +1210,13 @@ def test_an_item_whose_model_changed_after_planning_fails_at_admission_with_its_
         monkeypatch.delitem(MODELS, "model-a")
     elif change == "hash":
         monkeypatch.setattr(MODELS["model-a"], "hash", "blake3:reinstalled")
-    else:
+    elif change == "base":
         monkeypatch.setattr(MODELS["model-a"], "base", BaseModelType.StableDiffusion1)
+    else:
+        # A model without a format or variant passes as it is (every other test); one set since does not.
+        monkeypatch.setattr(
+            MODELS["model-a"], change, "gguf_quantized" if change == "format" else "klein_9b", raising=False
+        )
     item = queue.get_queue_item(created.item_ids[0])
 
     assert service.admit(item, created.run_id) == refusal
@@ -1175,6 +1287,41 @@ def _naming_model_b(field: str, model_hash: str) -> Graph:
     return graph
 
 
+@pytest.mark.parametrize("change", ["variant", "format"])
+def test_an_item_whose_component_model_changed_variant_or_format_fails_at_admission(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch, change: str
+) -> None:
+    """The graph's identifiers carry no variant or format: the run recorded them for model-b as it was created."""
+    service = started(tmp_path)
+    monkeypatch.setattr(MODELS["model-b"], "hash", "blake3:planned")
+    monkeypatch.setattr(MODELS["model-b"], "variant", "dev", raising=False)
+    request = WorkingMemoryCalibrationRequest(graph=_naming_model_b("loader", "blake3:planned"))
+    created = asyncio.run(service.create_run("model-a", request, "system"))
+    monkeypatch.setattr(
+        MODELS["model-b"], change, "klein_9b" if change == "variant" else "gguf_quantized", raising=False
+    )
+    item = service._services.session_queue.get_queue_item(created.item_ids[0])
+
+    assert service.admit(item, created.run_id) == (
+        f"MODEL-B changed after this calibration was planned ({change}). Calibrate again."
+    )
+
+
+def test_a_later_step_whose_model_changed_variant_is_refused(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Step 1 measured model-a as FLUX.2 [dev]; the record now says Klein 9B: step 2 would measure another model."""
+    service = started(tmp_path)
+    monkeypatch.setattr(MODELS["model-a"], "variant", "dev", raising=False)
+    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="variant-changed", attempt_steps=2)
+    first = asyncio.run(service.create_run("model-a", request, "system"))
+    _settle_as_the_runner(service, first.run_id, first.item_ids, "completed")
+    monkeypatch.setattr(MODELS["model-a"], "variant", "klein_9b")
+
+    with pytest.raises(CalibrationModelChangedError, match=r"\(variant\)"):
+        asyncio.run(service.create_run("model-a", request, "system"))
+
+
 @pytest.mark.parametrize("field", ["loader", "lora-collection"])
 def test_an_item_whose_component_model_changed_after_planning_fails_at_admission(
     tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch, field: str
@@ -1194,6 +1341,445 @@ def test_an_item_whose_component_model_changed_after_planning_fails_at_admission
     queue.fail_queue_item(item.item_id, "WorkingMemoryCalibrationError", refusal, refusal)
     [run] = service.get_status().device_classes[0].runs
     assert (run.status, run.error_code) == ("failed", "model_changed")
+
+
+def _step(service: WorkingMemoryCalibrationService, attempt_id: Optional[str], owner: str = "system"):
+    """One step of a two-step attempt (or a run without one), queued and run to completion by the runner."""
+    request = WorkingMemoryCalibrationRequest(
+        graph=_add_graph(), attempt_id=attempt_id, attempt_steps=2 if attempt_id is not None else None
+    )
+    created = asyncio.run(service.create_run("model-a", request, owner))
+    _settle_as_the_runner(service, created.run_id, created.item_ids, "completed")
+    return created
+
+
+def test_a_calibration_between_two_steps_of_an_attempt_refuses_its_next_step(tmp_path: Path, started) -> None:
+    """The reviewer's sequence: A's first step finishes, another calibration (an API client's run without an attempt,
+    which no attempt blocks) runs to completion, and A's next step is refused: it would measure the GPU after that
+    calibration. A stays short and never feeds."""
+    service = started(tmp_path)
+    first = _step(service, "tab-a")
+    service.record_windows(first.run_id, _on_the_line(first.run_id))
+    _step(service, None)
+
+    with pytest.raises(CalibrationAttemptInterleavedError) as refused:
+        asyncio.run(
+            service.create_run(
+                "model-a",
+                WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="tab-a", attempt_steps=2),
+                "system",
+            )
+        )
+
+    assert (refused.value.code, str(refused.value)) == (
+        "calibration_interleaved",
+        "Another calibration ran on this GPU after this calibration started, so its measurements can no longer be "
+        "combined. Calibrate again.",
+    )
+    service.refresh_user_fits()
+    assert _estimate() == _shipped()
+    runs = {run.run_id: run.held_back for run in service.get_model_summary("model-a").runs}
+    assert runs[first.run_id] == "aborted_attempt"
+
+
+def test_another_attempt_waits_while_one_is_between_its_steps(tmp_path: Path, started, monkeypatch) -> None:
+    """A's first step finished a moment ago, and its client is about to post the next: B, another administrator's,
+    is refused, A's next step is not, and once A finished B may start."""
+    service = started(tmp_path)
+    _step(service, "tab-a")
+
+    with pytest.raises(CalibrationAttemptBusyError):
+        _step(service, "tab-b", "other-admin")
+    _step(service, "tab-a")
+    _step(service, "tab-b", "other-admin")
+
+
+def test_an_attempt_idle_past_the_grace_blocks_nothing_and_cannot_go_on_after_another_ran(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A's client went away after its first step. Past `ATTEMPT_IDLE_GRACE` B may run; A's next step, posted after
+    all, is refused, and A never feeds."""
+    service = started(tmp_path)
+    first = _step(service, "tab-a")
+    service.record_windows(first.run_id, _on_the_line(first.run_id))
+    _idle(monkeypatch, ATTEMPT_IDLE_GRACE - datetime.timedelta(seconds=2))
+    with pytest.raises(CalibrationAttemptBusyError):
+        _step(service, "tab-b", "other-admin")
+    _idle(monkeypatch, datetime.timedelta(seconds=2))
+
+    _step(service, "tab-b", "other-admin")
+    with pytest.raises(CalibrationAttemptInterleavedError):
+        _step(service, "tab-a")
+    service.refresh_user_fits()
+    runs = {run.run_id: run.held_back for run in service.get_model_summary("model-a").runs}
+    assert runs[first.run_id] == "aborted_attempt"
+
+
+def test_the_idle_wait_counts_from_the_last_observation_not_the_run_s_creation(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A long step: created long ago, it finished a moment ago. A is open."""
+    service = started(tmp_path)
+    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="tab-a", attempt_steps=2)
+    created = asyncio.run(service.create_run("model-a", request, "system"))
+    _idle(monkeypatch)
+    _settle_as_the_runner(service, created.run_id, created.item_ids, "completed")
+
+    with pytest.raises(CalibrationAttemptBusyError):
+        _step(service, "tab-b", "other-admin")
+
+
+def test_an_attempt_whose_steps_another_calibration_ran_between_never_feeds(
+    tmp_path: Path, started, mock_invoker: Invoker
+) -> None:
+    """A store that holds such an attempt all the same (its later step posted past the refusal, say by a build without
+    it): complete, every step finished, and still aborted."""
+    service = started(tmp_path)
+    first, _ = _step(service, "tab-a"), _step(service, "tab-a")
+    service.record_windows(first.run_id, _on_the_line(first.run_id))
+    other = _step(service, None)
+    service.stop(mock_invoker)
+    path = next((tmp_path / "working_memory").glob("*.json"))
+    stored = json.loads(path.read_bytes())
+    start = datetime.datetime(2026, 10, 27, 12, tzinfo=datetime.timezone.utc)
+    # The plain run between the attempt's two steps.
+    for run, offset in zip(
+        sorted(stored["runs"], key=lambda run: (run["run_id"] == other.run_id, run["created_at"])),
+        (0, 10, 5),
+        strict=True,
+    ):
+        run["created_at"] = (start + datetime.timedelta(seconds=offset)).isoformat()
+    path.write_text(json.dumps(stored))
+
+    reread = started(tmp_path)
+    reread.refresh_user_fits()
+
+    assert _estimate() == _shipped()
+    held = {run.run_id: run.held_back for run in reread.get_model_summary("model-a").runs}
+    assert held[first.run_id] == "aborted_attempt"
+
+
+def test_another_attempt_started_as_the_next_step_of_one_is_posted_is_refused(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A's first step finished; A's client posts the next step as another tab starts B. A's step is held inside its
+    enqueue, recorded and not yet queued, while B reaches the attempts' lock: B is refused, A's step is queued."""
+    service = started(tmp_path)
+    _step(service, "tab-a")
+    held = HeldEnqueue(monkeypatch)
+    lock = service._file_lock
+    arrived = asyncio.Event()
+
+    @asynccontextmanager
+    async def watched(name: str, os_lock):
+        if name == _ATTEMPTS_LOCK and held.entered.is_set():
+            arrived.set()
+        async with lock(name, os_lock):
+            yield
+
+    monkeypatch.setattr(service, "_file_lock", watched)
+
+    def request(attempt_id: str) -> WorkingMemoryCalibrationRequest:
+        return WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id=attempt_id, attempt_steps=2)
+
+    async def both() -> list:
+        step = asyncio.create_task(service.create_run("model-a", request("tab-a"), "system"))
+        assert await asyncio.to_thread(held.entered.wait, 10)
+        other = asyncio.create_task(service.create_run("model-a", request("tab-b"), "system"))
+        await asyncio.wait_for(arrived.wait(), 10)
+        held.release.set()
+        return await asyncio.gather(step, other, return_exceptions=True)
+
+    created, refused = asyncio.run(both())
+
+    assert isinstance(refused, CalibrationAttemptBusyError), refused
+    assert [run.attempt_id for run in service.get_status().device_classes[0].runs] == ["tab-a", "tab-a"]
+    assert created.item_ids
+
+
+def _steps(attempt_id: str, steps: int) -> WorkingMemoryCalibrationRequest:
+    return WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id=attempt_id, attempt_steps=steps)
+
+
+def test_an_owners_new_attempt_replaces_its_own_attempt_that_stopped_between_steps(tmp_path: Path, started) -> None:
+    """The submission stopped after step 2 of 3 (a full queue, a lost connection): the summary shows it aborted, and
+    its owner's Retry starts a new attempt at once. The old one stays short, and a late step of it is refused."""
+    service = started(tmp_path)
+    stopped = [asyncio.run(service.create_run("model-a", _steps("first-try", 3), "system")) for _ in range(2)]
+    for created in stopped:
+        _settle_as_the_runner(service, created.run_id, created.item_ids, "completed")
+        service.record_windows(created.run_id, _on_the_line(created.run_id))
+
+    retry = asyncio.run(service.create_run("model-a", _steps("second-try", 1), "system"))
+    _settle_as_the_runner(service, retry.run_id, retry.item_ids, "completed")
+
+    with pytest.raises(CalibrationAttemptInterleavedError):
+        asyncio.run(service.create_run("model-a", _steps("first-try", 3), "system"))
+    service.refresh_user_fits()
+    held = {run.run_id: run.held_back for run in service.get_model_summary("model-a").runs}
+    assert [held[created.run_id] for created in stopped] == ["aborted_attempt", "aborted_attempt"]
+    assert held[retry.run_id] is None
+
+
+def test_another_owners_attempt_between_its_steps_is_said_to_be_between_its_steps(tmp_path: Path, started) -> None:
+    service = started(tmp_path)
+    _step(service, "tab-a")
+
+    with pytest.raises(CalibrationAttemptBusyError) as refused:
+        _step(service, "tab-b", "other-admin")
+
+    assert str(refused.value) == (
+        "Another calibration on this GPU is between its steps. Try again in a moment, or once it has finished."
+    )
+
+
+def test_an_attempt_stopped_between_its_steps_blocks_no_other_owner(tmp_path: Path, started) -> None:
+    """Stop canceled the item of step 2 of 3: the attempt is aborted, and another administrator may start at once."""
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    first = asyncio.run(service.create_run("model-a", _steps("stopped", 3), "system"))
+    _settle_as_the_runner(service, first.run_id, first.item_ids, "completed")
+    second = asyncio.run(service.create_run("model-a", _steps("stopped", 3), "system"))
+    queue.cancel_queue_item(second.item_ids[0])
+
+    _step(service, "tab-b", "other-admin")
+
+
+def test_an_attempt_a_reset_stopped_blocks_no_other_owner(tmp_path: Path, started) -> None:
+    """A reset removed step 2 of 3 between the steps: the attempt can no longer measure every size, so it is aborted."""
+    service = started(tmp_path)
+    for _ in range(2):
+        created = asyncio.run(service.create_run("model-a", _steps("reset", 3), "system"))
+        _settle_as_the_runner(service, created.run_id, created.item_ids, "completed")
+    service.reset_run(created.run_id)
+
+    _step(service, "tab-b", "other-admin")
+
+
+def test_an_attempt_another_run_cut_off_blocks_no_other_owner(tmp_path: Path, started) -> None:
+    """A script's run without an attempt ran after A's first step: A cannot go on, so it holds nothing open."""
+    service = started(tmp_path)
+    _step(service, "tab-a")
+    _step(service, None)
+
+    _step(service, "tab-b", "other-admin")
+
+
+def test_a_later_step_whose_component_model_changed_variant_is_refused(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The graph loads model-b too, which changed its variant between the steps; the graph's identifiers cannot tell."""
+    service = started(tmp_path)
+    monkeypatch.setattr(MODELS["model-b"], "hash", "blake3:planned")
+    monkeypatch.setattr(MODELS["model-b"], "variant", "dev", raising=False)
+    request = WorkingMemoryCalibrationRequest(
+        graph=_naming_model_b("loader", "blake3:planned"), attempt_id="component", attempt_steps=2
+    )
+    first = asyncio.run(service.create_run("model-a", request, "system"))
+    _settle_as_the_runner(service, first.run_id, first.item_ids, "completed")
+    monkeypatch.setattr(MODELS["model-b"], "variant", "klein_9b")
+
+    with pytest.raises(CalibrationModelChangedError) as refused:
+        asyncio.run(service.create_run("model-a", request, "system"))
+
+    assert str(refused.value) == "MODEL-A changed after this calibration was planned (variant). Calibrate again."
+
+
+def test_retries_that_waited_for_their_source_are_recorded_along_the_chain(tmp_path: Path, started) -> None:
+    """R2 and R3 (a retry of R2) are announced before R1, all rows gone: once R1 is recorded, so are they."""
+    service = started(tmp_path)
+    created = asyncio.run(service.create_run("model-a", WorkingMemoryCalibrationRequest(graph=_add_graph()), "system"))
+    [item_id] = created.item_ids
+    r1, r2, r3 = 10_001, 10_002, 10_003
+
+    service.record_retries([RetriedQueueItem(source_item_id=r2, item_id=r3)])
+    service.record_retries([RetriedQueueItem(source_item_id=r1, item_id=r2)])
+    service.record_retries([RetriedQueueItem(source_item_id=item_id, item_id=r1)])
+
+    [run] = _stored(tmp_path)["runs"]
+    assert {int(key): value["retried_from_item_id"] for key, value in run["observed"].items()} == {
+        r1: item_id,
+        r2: item_id,
+        r3: item_id,
+    }
+
+
+def test_the_oldest_waiting_retry_is_the_one_let_go(tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch) -> None:
+    service = started(tmp_path)
+    monkeypatch.setattr(calibration_default, "_UNRESOLVED_RETRIES_LIMIT", 2)
+    created = asyncio.run(service.create_run("model-a", WorkingMemoryCalibrationRequest(graph=_add_graph()), "system"))
+    [item_id] = created.item_ids
+    sources, waiting = (10_001, 10_002, 10_003), (20_001, 20_002, 20_003)
+    for source, retry in zip(sources, waiting, strict=True):
+        service.record_retries([RetriedQueueItem(source_item_id=source, item_id=retry)])
+
+    service.record_retries([RetriedQueueItem(source_item_id=item_id, item_id=source) for source in sources])
+
+    [run] = _stored(tmp_path)["runs"]
+    assert sorted(int(key) for key in run["observed"]) == [*sources, *waiting[1:]]
+
+
+def test_a_bulk_retry_of_generations_reads_no_store_file(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A thousand failed generations retried at once: every source row says it is no calibration's."""
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    asyncio.run(service.create_run("model-a", WorkingMemoryCalibrationRequest(graph=_add_graph()), "system"))
+    data = [[BatchDatum(node_path="add", field_name="a", items=list(range(1000)))]]
+    generations = asyncio.run(
+        queue.enqueue_batch("default", Batch(graph=_add_graph(), data=data, origin="canvas"), prepend=False)
+    ).item_ids
+    for generation in generations:
+        queue.fail_queue_item(generation, "OutOfMemoryError", "out of memory", "")
+    retried = queue.retry_items_by_id("default", generations).retried_items
+    reads: list[str] = []
+    read = service._store.read
+    monkeypatch.setattr(
+        service._store, "read", lambda device_class_id: (reads.append(device_class_id), read(device_class_id))[1]
+    )
+
+    service.record_retries(retried)
+
+    assert len(retried) == 1000 and reads == []
+
+
+def test_stopping_the_service_records_what_was_announced_first(
+    tmp_path: Path, started, mock_invoker: Invoker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    created = asyncio.run(service.create_run("model-a", WorkingMemoryCalibrationRequest(graph=_add_graph()), "system"))
+    queue.fail_queue_item(created.item_ids[0], "OutOfMemoryError", "out of memory", "")
+    [retried] = queue.retry_items_by_id("default", created.item_ids).retried_items
+    [event] = [event for event in service._services.events.events if isinstance(event, QueueItemsRetriedEvent)]
+    record = service.record_retries
+
+    def slowly(retries) -> None:
+        time.sleep(0.5)
+        record(retries)
+
+    monkeypatch.setattr(service, "record_retries", slowly)
+    asyncio.run(service._on_queue_items_retried((event.__event_name__, event)))
+
+    service.stop(mock_invoker)
+
+    assert str(retried.item_id) in _stored(tmp_path)["runs"][0]["observed"]
+
+
+def test_an_announcement_that_meets_the_worker_shut_down_is_let_go(tmp_path: Path, started) -> None:
+    """The announcement passed the check just before `stop` shut the worker down."""
+    service = started(tmp_path)
+
+    class Stopped:
+        def submit(self, *args, **kwargs):
+            service._listening = False
+            raise RuntimeError("cannot schedule new futures after shutdown")
+
+        def shutdown(self, wait: bool = True) -> None:
+            pass
+
+    service._retry_worker = Stopped()  # type: ignore[assignment]
+    event = QueueItemsRetriedEvent(
+        queue_id="default",
+        retried_item_ids=[2],
+        user_ids=["system"],
+        retried_item_ids_by_user={"system": [2]},
+        retried_items=[RetriedQueueItem(source_item_id=1, item_id=2)],
+    )
+
+    asyncio.run(service._on_queue_items_retried((event.__event_name__, event)))
+
+
+def test_a_failure_on_the_retry_worker_is_logged(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    service = started(tmp_path)
+
+    def broken(retries) -> None:
+        raise OSError("disk unavailable")
+
+    monkeypatch.setattr(service, "record_retries", broken)
+    event = QueueItemsRetriedEvent(
+        queue_id="default",
+        retried_item_ids=[2],
+        user_ids=["system"],
+        retried_item_ids_by_user={"system": [2]},
+        retried_items=[RetriedQueueItem(source_item_id=1, item_id=2)],
+    )
+    asyncio.run(service._on_queue_items_retried((event.__event_name__, event)))
+    _recorded(service)
+
+    assert "Could not record the retries of calibration items" in caplog.text
+
+
+def test_a_queue_that_cannot_be_read_for_a_retry_whose_source_is_unknown_is_logged(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    read = queue.get_queue_item_summaries_by_ids
+    calls: list[int] = []
+
+    def second_read_fails(*args, **kwargs):
+        calls.append(1)
+        if len(calls) > 1:
+            raise OSError("database is locked")
+        return read(*args, **kwargs)
+
+    monkeypatch.setattr(queue, "get_queue_item_summaries_by_ids", second_read_fails)
+
+    service.record_retries([RetriedQueueItem(source_item_id=10_001, item_id=10_002)])
+
+    assert "Could not read retried queue items" in caplog.text
+
+
+def test_an_announcement_reads_each_store_file_once(tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Three failed items of one run retried at once."""
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    data = [[BatchDatum(node_path="add", field_name="a", items=[1, 2, 3])]]
+    created = asyncio.run(
+        service.create_run("model-a", WorkingMemoryCalibrationRequest(graph=_add_graph(), data=data), "system")
+    )
+    for item_id in created.item_ids:
+        queue.fail_queue_item(item_id, "OutOfMemoryError", "out of memory", "")
+    retried = queue.retry_items_by_id("default", created.item_ids).retried_items
+    reads: list[str] = []
+    read = service._store.read
+    monkeypatch.setattr(
+        service._store, "read", lambda device_class_id: (reads.append(device_class_id), read(device_class_id))[1]
+    )
+
+    service.record_retries(retried)
+
+    assert len(reads) == 1
+    assert len(_stored(tmp_path)["runs"][0]["observed"]) == 3
+
+
+def test_one_step_attempts_started_at_once_queue_only_the_first(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A one-step attempt held inside its enqueue is complete, and its item not queued yet: neither running nor open,
+    it would let another administrator's attempt through. Only the attempts' lock keeps that one out until the item is
+    queued, and then it is running."""
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    held = HeldEnqueue(monkeypatch)
+
+    async def both() -> list:
+        first = asyncio.create_task(service.create_run("model-a", _steps("tab-a", 1), "system"))
+        assert await asyncio.to_thread(held.entered.wait, 10)
+        second = asyncio.create_task(service.create_run("model-a", _steps("tab-b", 1), "other-admin"))
+        # Time for the second creation to pass the first, were nothing to hold it.
+        await asyncio.wait({second}, timeout=0.5)
+        held.release.set()
+        return await asyncio.gather(first, second, return_exceptions=True)
+
+    created, refused = asyncio.run(both())
+
+    assert isinstance(refused, CalibrationAttemptBusyError), refused
+    assert queue.get_queue_item_ids("default").item_ids == created.item_ids
 
 
 def test_two_attempts_started_at_once_queue_only_the_first(
@@ -1238,7 +1824,7 @@ def test_two_attempts_started_at_once_queue_only_the_first(
 
 
 def test_a_development_builds_removal_records_read_as_each_owners(
-    tmp_path: Path, started, mock_invoker: Invoker
+    tmp_path: Path, started, mock_invoker: Invoker, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Development builds kept what resets removed by attempt id alone. Such a record reads as the record of each owner
     whose runs carry the id: each owner's attempt queued one step, lost the other to a reset, and is complete. A record
@@ -1249,6 +1835,7 @@ def test_a_development_builds_removal_records_read_as_each_owners(
         created = asyncio.run(service.create_run("model-a", request, owner))
         service.record_windows(created.run_id, _on_the_line(created.run_id))
         _finish(service, created.item_ids)
+        _idle(monkeypatch)
     service.stop(mock_invoker)
     path = next((tmp_path / "working_memory").glob("*.json"))
     stored = json.loads(path.read_bytes())

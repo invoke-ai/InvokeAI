@@ -249,6 +249,21 @@ def test_each_attempt_at_a_size_is_judged_on_its_own(order: str) -> None:
     assert (size.counted, size.windows, size.measured_bytes) == (True, 3, 7465861120)
 
 
+def test_two_owners_attempts_with_one_id_are_judged_apart() -> None:
+    """Two administrators each ran an attempt named "1": one clean, one fragmented. Pooled as one measurement, the clean
+    windows would share the fragmented ones' fate."""
+    file = _file([("fragmented", FRAGMENTED_ATTEMPT), ("clean", CLEAN_ATTEMPT)])
+    file.runs = [
+        run.model_copy(update={"attempt_id": "1", "user_id": owner})
+        for run, owner in zip(file.runs, ("admin-a", "admin-b"), strict=True)
+    ]
+
+    assert _reasons_by_attempt(file, exclusions(file)) == {
+        "fragmented": ["partial_residency", "fragmented", "partial_residency"],
+        "clean": [None, None, None],
+    }
+
+
 def test_a_running_attempts_windows_set_no_standard_for_finished_sizes() -> None:
     """The fragmented attempt's 1152px window, with no smaller size of its own finished: while the clean attempt still
     runs, its 576px and 768px windows are no reference, so nothing finished flags it yet."""
