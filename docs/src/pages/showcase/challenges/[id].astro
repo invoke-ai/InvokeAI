@@ -15,7 +15,6 @@ import {
   adjacentChallenges,
   challengePath,
   formatChallengeDates,
-  orderWinners,
   placeLabel,
   sortChallenges,
   winnerAlt,
@@ -38,21 +37,28 @@ type Props = {
 const { challenge, older, newer } = Astro.props;
 const { week, theme, brief, startDate, endDate, discordUrl, winners } = challenge.data;
 const base = import.meta.env.BASE_URL;
-const pageTitle = (entry: CollectionEntry<'challenges'>) => `Week ${entry.data.week}: ${entry.data.theme}`;
+/** The challenge's name in the links to the weeks either side: "Week 44: Bioluminescence", or the theme. */
+const linkTitle = ({ data: { week, theme } }: CollectionEntry<'challenges'>) =>
+  week === undefined ? theme : `Week ${week}: ${theme}`;
 
-// The schema requires a winner.
-const [first] = orderWinners(winners);
+// The top-placed winner: the schema keeps winners in display order, numbered places first.
+const [first] = winners;
 // A JPEG at the size link previews use (Discord, Open Graph), in place of the site-wide cover image.
 const preview = await getImage({ src: first.image, width: Math.min(first.image.width, 1200), format: 'jpeg' });
 const previewUrl = new URL(preview.src, Astro.site).href;
-const previewAlt = winnerAlt(first, week);
+const previewAlt = winnerAlt(first, theme);
+// "1st place by Revenant.", or with a title, "1st place: “Tidewater Lantern” by Ana Example."
+const firstCredit = `${placeLabel(first.place)}${first.title ? `: “${first.title}”` : ''} by ${first.artist}.`;
+const description =
+  `Winners of the ${week === undefined ? 'weekly' : `week ${week}`} art challenge on the Invoke Discord, ` +
+  `“${theme}”. ${firstCredit}`;
 const meta = (property: string, content: string) => ({ tag: 'meta' as const, attrs: { property, content } });
 ---
 
 <StarlightPage
   frontmatter={{
-    title: pageTitle(challenge),
-    description: `Winners of the week ${week} art challenge on the Invoke Discord, “${theme}”. ${placeLabel(first.place)}: ${previewAlt}.`,
+    title: week === undefined ? `${theme}: weekly challenge` : `Week ${week}: ${theme}`,
+    description,
     template: 'splash',
     head: [
       meta('og:image', previewUrl),
@@ -67,11 +73,11 @@ const meta = (property: string, content: string) => ({ tag: 'meta' as const, att
     <div class="intro">
       {brief && <p class="brief">{brief}</p>}
       <p class="meta">
-        <span>Weekly challenge · {formatChallengeDates(startDate, endDate)}</span>
+        <span>{week !== undefined && 'Weekly challenge · '}{formatChallengeDates(startDate, endDate)}</span>
         {
           discordUrl && (
             <a href={discordUrl}>
-              The challenge on Discord
+              Winners on Discord
               <ArrowUpRight size={14} aria-hidden="true" />
             </a>
           )
@@ -89,7 +95,7 @@ const meta = (property: string, content: string) => ({ tag: 'meta' as const, att
               <ArrowLeft class="docs-link-card__icon" size={14} aria-hidden="true" />
               Previous week
             </span>
-            <span class="docs-link-card__title">{pageTitle(older)}</span>
+            <span class="docs-link-card__title">{linkTitle(older)}</span>
           </a>
         )
       }
@@ -104,7 +110,7 @@ const meta = (property: string, content: string) => ({ tag: 'meta' as const, att
               Next week
               <ArrowRight class="docs-link-card__icon" size={14} aria-hidden="true" />
             </span>
-            <span class="docs-link-card__title">{pageTitle(newer)}</span>
+            <span class="docs-link-card__title">{linkTitle(newer)}</span>
           </a>
         )
       }

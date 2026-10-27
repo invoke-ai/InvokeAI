@@ -1,0 +1,25 @@
+theme: Lost
+brief: >-
+  Sometimes being lost means not knowing where you are. Sometimes it means not knowing where you’re going. And sometimes, you don’t even realize what you’ve lost until it’s gone.
+startDate: 2026-09-21
+endDate: 2026-09-28
+discordUrl: https://discord.com/channels/1020123559063990373/1020355799945580585/1554053507265462322
+winners:
+  - place: 1
+    image: ./1-kahn.webp
+    artist: kahn
+  - place: 2
+    image: ./2-alz-heimer.webp
+    artist: Alz-Heimer
+  - place: 2
+    image: ./2-xorpio.webp
+    artist: Xorpio
+  - place: runner-up
+    image: ./runner-up-mickr777.webp
+    artist: mickr777
+  - place: runner-up
+    image: ./runner-up-romeo.webp
+    artist: Romeo
+  - place: runner-up
+    image: ./runner-up-skunkworxdark.webp
+    artist: SkunkWorxDark

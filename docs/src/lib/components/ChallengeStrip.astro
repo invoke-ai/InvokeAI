@@ -1,13 +1,15 @@
 ---
-// The home page's teaser for the latest weekly challenge: its top three winners as thumbnails, and a link to the
-// challenge's page.
-// The labels are UI strings; the theme and the artists' names stay as the challenge's file gives them.
+// The home page's teaser for the latest weekly challenge: its first three winners as thumbnails (the numbered places,
+// then runners-up, in the file's order), and a link to the challenge's page.
+// The labels are UI strings and the dates follow the page's language; the theme and the artists' names stay as the
+// challenge's file gives them.
 import ArrowRight from '@lucide/astro/icons/arrow-right';
 import type { CollectionEntry } from 'astro:content';
 import { Image } from 'astro:assets';
 
 import { withBase } from '../base-path';
-import { challengePath, orderWinners } from '../challenges.mjs';
+import { challengePath, formatChallengeDates } from '../challenges.mjs';
+import { pageLang } from './memory/page-lang.mjs';
 
 type Props = {
   challenge: CollectionEntry<'challenges'>;
@@ -15,21 +17,27 @@ type Props = {
 
 const { challenge } = Astro.props;
 const { t } = Astro.locals;
-const { week, theme } = challenge.data;
+const { week, theme, startDate, endDate } = challenge.data;
 const placeLabels: Record<string | number, string> = {
   1: t('home.challenge.first'),
   2: t('home.challenge.second'),
   3: t('home.challenge.third'),
+  'runner-up': t('home.challenge.runnerUp'),
   honourable: t('home.challenge.honourable'),
 };
-const top = orderWinners(challenge.data.winners).slice(0, 3);
+// The schema keeps winners in display order.
+const top = challenge.data.winners.slice(0, 3);
+const when =
+  week === undefined
+    ? formatChallengeDates(startDate, endDate, pageLang(Astro.locals))
+    : t('home.challenge.week', { week });
 ---
 
 <div class="strip not-content">
   <div class="strip__text">
     <h3>{t('home.challenge.title')}</h3>
     <p>
-      {t('home.challenge.week', { week })} · <span lang="en">{theme}</span>
+      {when} · <span lang="en">{theme}</span>
     </p>
     <a class="more" href={withBase(challengePath(challenge.id), import.meta.env.BASE_URL)}>
       {t('home.challenge.link')}

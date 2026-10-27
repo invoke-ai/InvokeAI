@@ -40,22 +40,27 @@ const [challenge] = sortChallenges(await getCollection('challenges'));
       <section class="wide challenge not-content" aria-labelledby="weekly-challenge">
         <div class="challenge__top">
           <div class="challenge__heading">
-            <p class="eyebrow">Weekly challenge · Week {challenge.data.week}</p>
+            <p class="eyebrow">
+              Weekly challenge{challenge.data.week !== undefined && ` · Week ${challenge.data.week}`}
+            </p>
             <h2 id="weekly-challenge">{challenge.data.theme}</h2>
             {challenge.data.brief && <p class="challenge__brief">{challenge.data.brief}</p>}
             <p class="challenge__meta">
               <span>{formatChallengeDates(challenge.data.startDate, challenge.data.endDate)}</span>
               {challenge.data.discordUrl && (
                 <a href={challenge.data.discordUrl}>
-                  The challenge on Discord
+                  Winners on Discord
                   <ArrowUpRight size={14} aria-hidden="true" />
                 </a>
               )}
             </p>
           </div>
           <div class="challenge__links">
-            <a class="docs-button docs-button--secondary docs-button--lg" href={withBase(challengePath(challenge.id), base)}>
-              Week {challenge.data.week} winners
+            <a
+              class="docs-button docs-button--secondary docs-button--lg"
+              href={withBase(challengePath(challenge.id), base)}
+            >
+              {challenge.data.week === undefined ? 'Winners page' : `Week ${challenge.data.week} winners`}
             </a>
             <a class="docs-button docs-button--ghost docs-button--lg" href={withBase(CHALLENGES_PATH, base)}>
               All challenges

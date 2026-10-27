@@ -9,15 +9,14 @@ import {
   DISCORD_INVITE_URL,
   challengePath,
   formatChallengeDates,
-  orderWinners,
   sortChallenges,
 } from '../../../lib/challenges.mjs';
 
 const base = import.meta.env.BASE_URL;
-// A card shows 1st place large and the next two winners beside it.
+// A card shows the top place large and the next two winners beside it; the schema keeps winners in display order.
 const challenges = sortChallenges(await getCollection('challenges')).map((challenge) => ({
   ...challenge,
-  thumbnails: orderWinners(challenge.data.winners).slice(0, 3),
+  thumbnails: challenge.data.winners.slice(0, 3),
 }));
 ---
 
@@ -61,7 +60,7 @@ const challenges = sortChallenges(await getCollection('challenges')).map((challe
               <span class="card__text">
                 <h2 class="docs-link-card__title">{theme}</h2>
                 <span class="docs-link-card__description">
-                  Week {week} · {formatChallengeDates(startDate, endDate)}
+                  {week !== undefined && `Week ${week} · `}{formatChallengeDates(startDate, endDate)}
                 </span>
               </span>
             </a>

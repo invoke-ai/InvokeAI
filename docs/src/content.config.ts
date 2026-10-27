@@ -7,7 +7,7 @@ import { docsSchema, i18nSchema } from '@astrojs/starlight/schema';
 import { changelogsLoader } from 'starlight-changelogs/loader';
 
 import en from './content/i18n/en.json';
-import { repeatedPlaces } from './lib/challenges.mjs';
+import { PLACES, placeProblems } from './lib/challenges.mjs';
 import { NODE_PACK_CATEGORIES } from './lib/community-nodes.mjs';
 import { generateDocsId } from './lib/sort-prefix.mjs';
 
@@ -52,9 +52,10 @@ export const collections = {
         date: z.coerce.date(),
       }),
   }),
-  // Winners of the weekly Discord art challenges, one folder per week with its `challenge.yaml` and the winners' images,
-  // shown on `/showcase/`, `/showcase/challenges/` and the home page. `src/content/challenges/README.md` explains how
-  // to publish one; `src/lib/challenges.test.mjs` checks the folders (stray files, image sizes, unique weeks).
+  // Winners of the weekly Discord art challenges, one folder per week with its `challenge.yaml` and the winners'
+  // images, shown on `/showcase/`, `/showcase/challenges/` and the home page. `src/content/challenges/README.md`
+  // explains how to publish one; `src/lib/challenges.test.mjs` checks the folders (stray files, image sizes, unique
+  // weeks and start dates).
   challenges: defineCollection({
     loader: glob({
       pattern: '*/challenge.yaml',
@@ -66,23 +67,24 @@ export const collections = {
     schema: ({ image }) =>
       z
         .strictObject({
-          /** The challenge's number, as announced on Discord. */
-          week: z.number().int().positive(),
+          /** The challenge's number, only if Discord announced one. */
+          week: z.number().int().positive().optional(),
           theme: z.string().min(1),
           /** The prompt as announced, in a sentence or two. */
           brief: z.string().max(280).optional(),
-          /** YAML dates (`2026-10-21`, unquoted), which the YAML parser reads as dates; a quoted date is a string. */
+          /**
+           * The days the challenge and its winners were announced. YAML dates (`2026-10-21`, unquoted), which the YAML
+           * parser reads as dates; a quoted date is a string.
+           */
           startDate: z.date({ error: 'Write the date as YYYY-MM-DD, without quotes, such as 2026-10-21.' }),
           endDate: z.date({ error: 'Write the date as YYYY-MM-DD, without quotes, such as 2026-10-27.' }),
-          /** The challenge's announcement or thread on Discord. */
+          /** The winners' announcement on Discord. */
           discordUrl: z.httpUrl().optional(),
           winners: z
             .array(
               z.strictObject({
-                /** 1, 2 or 3, or `honourable` for an honourable mention. */
-                place: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal('honourable')], {
-                  error: 'place must be 1, 2, 3 or honourable.',
-                }),
+                /** A numbered place (ties repeat it), an unranked runner-up, or an honourable mention. */
+                place: z.literal([...PLACES], { error: 'place must be 1, 2, 3, runner-up or honourable.' }),
                 image: image(),
                 /** The entrant's name exactly as they asked to be credited. */
                 artist: z.string().min(1),
@@ -99,12 +101,8 @@ export const collections = {
           if (challenge.endDate < challenge.startDate) {
             context.addIssue({ code: 'custom', message: '`endDate` is before `startDate`.', path: ['endDate'] });
           }
-          for (const place of repeatedPlaces(challenge.winners)) {
-            context.addIssue({
-              code: 'custom',
-              message: `More than one winner has \`place: ${place}\`. Use \`honourable\` for further mentions.`,
-              path: ['winners'],
-            });
+          for (const message of placeProblems(challenge.winners)) {
+            context.addIssue({ code: 'custom', message, path: ['winners'] });
           }
         }),
   }),

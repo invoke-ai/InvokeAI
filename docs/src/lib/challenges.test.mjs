@@ -9,18 +9,23 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   adjacentChallenges,
   formatChallengeDates,
-  orderWinners,
-  repeatedPlaces,
+  pairSpans,
+  placeProblems,
+  podiumLayout,
   sortChallenges,
   winnerAlt,
 } from './challenges.mjs';
 
-/** @param {string} id @param {number} week @param {string} endDate */
+/** @param {string} id @param {number | undefined} week @param {string} endDate */
 const challenge = (id, week, endDate) => ({ id, data: { week, endDate: new Date(endDate) } });
 
 describe('sortChallenges', () => {
   it('puts the latest end date first, whatever the week numbers say', () => {
-    const challenges = [challenge('a', 12, '2026-10-06'), challenge('b', 3, '2026-10-20'), challenge('c', 13, '2026-10-13')];
+    const challenges = [
+      challenge('a', 12, '2026-10-06'),
+      challenge('b', 3, '2026-10-20'),
+      challenge('c', 13, '2026-10-13'),
+    ];
     assert.deepEqual(
       sortChallenges(challenges).map(({ id }) => id),
       ['b', 'c', 'a'],
@@ -28,10 +33,26 @@ describe('sortChallenges', () => {
   });
 
   it('orders challenges ending the same day by week, highest first, then by id', () => {
-    const challenges = [challenge('x', 4, '2026-10-20'), challenge('z', 5, '2026-10-20'), challenge('y', 5, '2026-10-20')];
+    const challenges = [
+      challenge('x', 4, '2026-10-20'),
+      challenge('z', 5, '2026-10-20'),
+      challenge('y', 5, '2026-10-20'),
+    ];
     assert.deepEqual(
       sortChallenges(challenges).map(({ id }) => id),
       ['y', 'z', 'x'],
+    );
+  });
+
+  it('sorts unnumbered challenges deterministically, with numbered challenges at the same end date', () => {
+    const challenges = [
+      challenge('b', undefined, '2026-10-20'),
+      challenge('a', undefined, '2026-10-20'),
+      challenge('c', 3, '2026-10-20'),
+    ];
+    assert.deepEqual(
+      sortChallenges(challenges).map(({ id }) => id),
+      ['c', 'a', 'b'],
     );
   });
 
@@ -45,31 +66,107 @@ describe('sortChallenges', () => {
   });
 });
 
-describe('orderWinners', () => {
-  it('puts 1st, 2nd and 3rd first, and keeps honourable mentions in file order after them', () => {
-    const winners = [
-      { place: 'honourable', artist: 'h1' },
-      { place: 3, artist: 'third' },
-      { place: 'honourable', artist: 'h2' },
-      { place: 1, artist: 'first' },
-      { place: 2, artist: 'second' },
-    ];
-    assert.deepEqual(
-      orderWinners(winners).map(({ artist }) => artist),
-      ['first', 'second', 'third', 'h1', 'h2'],
-    );
+describe('placeProblems', () => {
+  /** @param {...(number | string)} places */
+  const winners = (...places) => places.map((place, index) => ({ place, artist: `artist${index + 1}` }));
+
+  it('accepts winners listed in display order, with ties side by side', () => {
+    assert.deepEqual(placeProblems(winners(1, 2, 2, 'runner-up', 'runner-up', 'honourable')), []);
+    assert.deepEqual(placeProblems(winners(1, 1, 3)), []);
+  });
+
+  it('accepts a week that leads with a lower place, as after a removal', () => {
+    assert.deepEqual(placeProblems(winners(2, 'runner-up')), []);
+  });
+
+  it('rejects a numbered place listed after a lower one', () => {
+    assert.deepEqual(placeProblems(winners(2, 1)), [
+      'Winner 2 (artist2, `place: 1`) comes after `place: 2`. List winners in the order the page shows them: ' +
+        '1, 2, 3, runner-up, honourable, with ties side by side.',
+    ]);
+  });
+
+  it('rejects numbered places after a runner-up, and runners-up after an honourable mention', () => {
+    const problems = placeProblems(winners(1, 'runner-up', 2, 'honourable', 'runner-up'));
+    assert.equal(problems.length, 2);
+    assert.match(problems[0], /^Winner 3 \(artist3, `place: 2`\) comes after `place: runner-up`/);
+    assert.match(problems[1], /^Winner 5 \(artist5, `place: runner-up`\) comes after `place: honourable`/);
+  });
+
+  it('rejects more than three numbered places, ties included', () => {
+    assert.deepEqual(placeProblems(winners(1, 2, 2, 3)), [
+      '4 winners have a numbered place; at most 3 can. Use `runner-up` or `honourable` for the rest.',
+    ]);
+  });
+
+  it('rejects a week without a numbered place, since one leads the page', () => {
+    assert.deepEqual(placeProblems(winners('runner-up', 'honourable')), [
+      'No winner has a numbered place. Give the top winner `place: 1` (or 2 or 3), as announced.',
+    ]);
   });
 });
 
-describe('repeatedPlaces', () => {
-  it('names each place from 1 to 3 that more than one winner holds', () => {
-    const places = [1, 2, 2, 3, 3, 3].map((place) => ({ place }));
-    assert.deepEqual(repeatedPlaces(places), [2, 3]);
+describe('podiumLayout', () => {
+  /** @param {number | string} place @param {number} width @param {number} height */
+  const winner = (place, width, height) => ({ place, image: { width, height } });
+
+  it('gives a lone winner its own shape at full height', () => {
+    assert.deepEqual(podiumLayout([winner(1, 1344, 768)]), {
+      frames: [{ aspect: 1.75, scale: 1 }],
+      span: 1.75,
+      mentionScale: 0.55,
+    });
   });
 
-  it('allows any number of honourable mentions', () => {
-    const places = [1, 'honourable', 'honourable', 'honourable'].map((place) => ({ place }));
-    assert.deepEqual(repeatedPlaces(places), []);
+  it('gives tied places one height, each at its own shape', () => {
+    // Week 2026-10-12-gothic: a landscape 1st, then a portrait and a landscape tied for 2nd.
+    const { frames } = podiumLayout([winner(1, 1248, 832), winner(2, 888, 1184), winner(2, 1920, 1280)]);
+    assert.deepEqual(
+      frames.map(({ aspect }) => aspect),
+      [1.5, 0.75, 1.5],
+    );
+    assert.equal(frames[1].scale, frames[2].scale);
+    // Sized for the wider of the two, which stays smaller than the lead in area.
+    assert.ok(frames[2].scale ** 2 * frames[2].aspect < frames[0].aspect);
+  });
+
+  it('keeps a lower place shorter than the lead and smaller in area, even when it is wider', () => {
+    // A portrait 1st beside a landscape 2nd, as in week 2026-08-18-pin-up.
+    const { frames, span, mentionScale } = podiumLayout([winner(1, 1728, 2304), winner(2, 1920, 1088)]);
+    const [lead, side] = frames;
+    assert.ok(side.scale <= 0.7);
+    assert.ok(side.scale ** 2 * side.aspect < lead.scale ** 2 * lead.aspect);
+    assert.equal(span, Math.round((lead.aspect + side.aspect * side.scale) * 1e4) / 1e4);
+    // Mentions are shorter than the shortest side frame.
+    assert.ok(mentionScale < side.scale);
+  });
+
+  it('gives tied leads full height', () => {
+    const { frames } = podiumLayout([winner(1, 1000, 1000), winner(1, 2000, 1000), winner(3, 1000, 1000)]);
+    assert.deepEqual(
+      frames.map(({ scale }) => scale),
+      [1, 1, 0.7],
+    );
+  });
+
+  it('keeps extreme shapes within limits', () => {
+    const { frames } = podiumLayout([winner(1, 4000, 1000), winner(2, 300, 1500)]);
+    assert.equal(frames[0].aspect, 2.2);
+    assert.equal(frames[1].aspect, 0.5);
+  });
+});
+
+describe('pairSpans', () => {
+  it("sums each pair's aspect ratios, so a row's frames share its height and fill its width", () => {
+    assert.deepEqual(pairSpans([1.5, 0.5, 1, 1]), [2, 2, 2, 2]);
+  });
+
+  it('keeps the row above\'s height for a last frame alone', () => {
+    assert.deepEqual(pairSpans([1.5, 0.5, 0.75]), [2, 2, 2]);
+  });
+
+  it('sizes a lone frame as if a square stood beside it', () => {
+    assert.deepEqual(pairSpans([0.5]), [1.5]);
   });
 });
 
@@ -94,18 +191,23 @@ describe('adjacentChallenges', () => {
 
 describe('winnerAlt', () => {
   it('names the title and the artist', () => {
-    assert.equal(winnerAlt({ title: 'Tidewater Lantern', artist: 'Ana' }, 44), 'Tidewater Lantern by Ana');
+    assert.equal(
+      winnerAlt({ title: 'Tidewater Lantern', artist: 'Ana', place: 1 }, 'Bioluminescence'),
+      'Tidewater Lantern by Ana',
+    );
   });
 
-  it('names the week for an untitled entry', () => {
-    assert.equal(winnerAlt({ artist: 'mira_k' }, 44), 'Week 44 winner by mira_k');
+  it('names the theme and the place for an untitled entry', () => {
+    assert.equal(winnerAlt({ artist: 'Revenant', place: 1 }, 'Pin-Up'), 'Pin-Up, 1st place by Revenant');
+    assert.equal(winnerAlt({ artist: 'Romeo', place: 'runner-up' }, 'Lost'), 'Lost, runner-up by Romeo');
+    assert.equal(winnerAlt({ artist: 'lumen', place: 'honourable' }, 'Gothic'), 'Gothic, honourable mention by lumen');
   });
 });
 
 describe('formatChallengeDates', () => {
   // ICU versions differ in the spaces around the dash.
-  /** @param {string} start @param {string} end */
-  const format = (start, end) => formatChallengeDates(new Date(start), new Date(end)).replace(/\s+/g, ' ');
+  /** @param {string} start @param {string} end @param {string} [lang] */
+  const format = (start, end, lang) => formatChallengeDates(new Date(start), new Date(end), lang).replace(/\s+/g, ' ');
 
   it('shows the calendar days YAML dates name', () => {
     // YAML dates are midnight UTC: a local-time format would show October 20 west of Greenwich.
@@ -115,6 +217,11 @@ describe('formatChallengeDates', () => {
   it('shows both months, and both years when they differ', () => {
     assert.equal(format('2026-10-28', '2026-11-03'), 'October 28 – November 3, 2026');
     assert.equal(format('2026-12-30', '2027-01-05'), 'December 30, 2026 – January 5, 2027');
+  });
+
+  it("formats in the page's language", () => {
+    assert.equal(format('2026-10-19', '2026-10-26', 'de'), '19.–26. Oktober 2026');
+    assert.equal(format('2026-08-24', '2026-08-31', 'es'), '24–31 de agosto de 2026');
   });
 });
 
@@ -129,7 +236,8 @@ const { parseYaml } = await import(
 const MAX_IMAGE_BYTES = 500_000;
 const IMAGE_EXTENSION = /\.(webp|jpe?g)$/i;
 /** `<year>-w<week>-<theme>`, such as `2026-w44-bioluminescence`: the folder name is the page's URL. */
-const FOLDER_NAME = /^(\d{4})-w(\d+)-[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const NUMBERED_FOLDER_NAME = /^(\d{4})-w(\d+)-[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const DATED_FOLDER_NAME = /^(\d{4}-\d{2}-\d{2})-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /**
  * The file a winner's `image` names in its folder, as Astro resolves it (relative to `challenge.yaml`, with or without
@@ -157,6 +265,8 @@ const challengeFolderProblems = (directory) => {
   const problems = [];
   /** @type {Map<string, string[]>} folders by `<start year> week <week>` */
   const foldersByWeek = new Map();
+  /** @type {Map<string, string[]>} folders by start date */
+  const foldersByDate = new Map();
   const visible = (name) => !name.startsWith('.');
   for (const entry of readdirSync(directory, { withFileTypes: true }).filter(({ name }) => visible(name))) {
     if (entry.isFile() && entry.name === 'README.md') continue;
@@ -165,9 +275,13 @@ const challengeFolderProblems = (directory) => {
       continue;
     }
     const folder = entry.name;
-    const [, folderYear, folderWeek] = FOLDER_NAME.exec(folder) ?? [];
-    if (!folderWeek) {
-      problems.push(`${folder}: name the folder <year>-w<week>-<theme>, in lowercase letters, digits and hyphens.`);
+    const [, folderYear, folderWeek] = NUMBERED_FOLDER_NAME.exec(folder) ?? [];
+    const [, folderDate] = DATED_FOLDER_NAME.exec(folder) ?? [];
+    if (!folderWeek && !folderDate) {
+      problems.push(
+        `${folder}: name the folder YYYY-MM-DD-<theme> or <year>-w<week>-<theme>, in lowercase letters, digits ` +
+          'and hyphens.',
+      );
     }
     const files = readdirSync(join(directory, folder)).filter(visible);
     if (!files.includes('challenge.yaml')) {
@@ -183,11 +297,26 @@ const challengeFolderProblems = (directory) => {
     }
     const { week, startDate, winners } = challenge;
     const startYear = startDate instanceof Date ? startDate.getUTCFullYear() : undefined;
+    if (folderDate && week !== undefined) {
+      problems.push(`${folder}: a numbered challenge must use <year>-w<week>-<theme>.`);
+    }
+    if (folderWeek && week === undefined) {
+      problems.push(`${folder}: an unnumbered challenge must use YYYY-MM-DD-<theme>.`);
+    }
     if (folderWeek && Number.isInteger(week) && Number(folderWeek) !== week) {
-      problems.push(`${folder}: the folder says week ${Number(folderWeek)}, but challenge.yaml says \`week: ${week}\`.`);
+      problems.push(
+        `${folder}: the folder says week ${Number(folderWeek)}, but challenge.yaml says \`week: ${week}\`.`,
+      );
     }
     if (folderYear && startYear && Number(folderYear) !== startYear) {
       problems.push(`${folder}: the folder says ${folderYear}, but the challenge started in ${startYear}.`);
+    }
+    if (startYear) {
+      const start = startDate.toISOString().slice(0, 10);
+      if (folderDate && folderDate !== start) {
+        problems.push(`${folder}: the folder date differs from \`startDate: ${start}\`.`);
+      }
+      foldersByDate.set(start, [...(foldersByDate.get(start) ?? []), folder]);
     }
     if (Number.isInteger(week) && startYear) {
       const key = `${startYear} week ${week}`;
@@ -219,6 +348,9 @@ const challengeFolderProblems = (directory) => {
   }
   for (const [key, folders] of foldersByWeek) {
     if (folders.length > 1) problems.push(`${key} appears in more than one folder: ${folders.join(', ')}.`);
+  }
+  for (const [date, folders] of foldersByDate) {
+    if (folders.length > 1) problems.push(`${date} starts more than one challenge: ${folders.join(', ')}.`);
   }
   return problems;
 };
@@ -262,6 +394,32 @@ describe('challengeFolderProblems', () => {
     assert.deepEqual(challengeFolderProblems(path), []);
   });
 
+  it('uses the start date for unnumbered challenges and rejects duplicate dates or mismatched folder metadata', () => {
+    const yaml = 'startDate: 2026-08-18\nwinners: []\n';
+    assert.deepEqual(challengeFolderProblems(directory({ '2026-08-18-pin-up': { 'challenge.yaml': yaml } })), []);
+    assert.deepEqual(
+      challengeFolderProblems(
+        directory({
+          '2026-08-19-pin-up': { 'challenge.yaml': yaml },
+          '2026-w34-pin-up': { 'challenge.yaml': yaml },
+        }),
+      ),
+      [
+        '2026-08-19-pin-up: the folder date differs from `startDate: 2026-08-18`.',
+        '2026-w34-pin-up: an unnumbered challenge must use YYYY-MM-DD-<theme>.',
+        '2026-08-18 starts more than one challenge: 2026-08-19-pin-up, 2026-w34-pin-up.',
+      ],
+    );
+    assert.deepEqual(
+      challengeFolderProblems(
+        directory({
+          '2026-08-18-pin-up': { 'challenge.yaml': 'week: 34\n' + yaml },
+        }),
+      ),
+      ['2026-08-18-pin-up: a numbered challenge must use <year>-w<week>-<theme>.'],
+    );
+  });
+
   it('reports stray files, PNGs, oversized images and folders without challenge.yaml', () => {
     const path = directory({
       '2026-w1-a': {
@@ -283,7 +441,9 @@ describe('challengeFolderProblems', () => {
 
   it('reports images that are missing or outside the folder', () => {
     const path = directory({
-      '2026-w1-a': { 'challenge.yaml': yaml(1, '2026-01-01', './gone.webp', '../2026-w2-b/x.webp', 'https://x.test/a.webp') },
+      '2026-w1-a': {
+        'challenge.yaml': yaml(1, '2026-01-01', './gone.webp', '../2026-w2-b/x.webp', 'https://x.test/a.webp'),
+      },
     });
     assert.deepEqual(challengeFolderProblems(path), [
       '2026-w1-a: no file named gone.webp in this folder.',
@@ -308,13 +468,13 @@ describe('challengeFolderProblems', () => {
     ]);
   });
 
-  it('reports folder names outside <year>-w<week>-<theme>, since they become URLs', () => {
+  it('reports folder names outside YYYY-MM-DD-<theme> and <year>-w<week>-<theme>, since they become URLs', () => {
     const path = directory({
       'Week 3': { 'challenge.yaml': yaml(3, '2026-01-14') },
       '2026-w3': { 'challenge.yaml': yaml(3, '2026-01-14') },
     });
     const problems = challengeFolderProblems(path).join('\n');
-    assert.match(problems, /^Week 3: name the folder <year>-w<week>-<theme>/m);
+    assert.match(problems, /^Week 3: name the folder YYYY-MM-DD-<theme> or <year>-w<week>-<theme>/m);
     assert.match(problems, /^2026-w3: name the folder/m);
   });
 
