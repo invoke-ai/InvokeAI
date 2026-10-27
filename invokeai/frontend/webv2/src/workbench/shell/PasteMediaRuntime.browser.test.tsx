@@ -60,9 +60,9 @@ vi.mock('@features/gallery/queries', () => ({
 }));
 vi.mock('@features/generation/react', () => ({ createGenerateFormValuesSelector: () => () => ({}) }));
 vi.mock('@workbench/image-actions', () => ({
-  getGalleryCanvasImportMenuItems: () => [
-    { destination: 'raster', label: 'widgets.canvas.import.raster', value: 'raster' },
-    { destination: 'control', label: 'widgets.canvas.import.control', value: 'control' },
+  GALLERY_CANVAS_IMPORT_DESTINATIONS: [
+    { destination: 'raster', icon: () => null, label: 'widgets.canvas.import.raster' },
+    { destination: 'control', icon: () => null, label: 'widgets.canvas.import.control' },
   ],
   useDeletionConfirmation: () => ({ dialog: null, requestDeletionConfirmation: vi.fn() }),
   useImageActions: () => ({

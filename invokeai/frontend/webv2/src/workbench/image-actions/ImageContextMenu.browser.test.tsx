@@ -471,11 +471,29 @@ describe('ImageContextMenu canvas destinations', () => {
       'the add-to-current-canvas submenu to open',
       5000
     );
-    // Raster leads the destinations, as the drop zones and Preview's Edit menu order them.
-    expect(menuItemLabels().indexOf('widgets.canvas.import.raster')).toBeLessThan(
-      menuItemLabels().indexOf('widgets.canvas.import.control')
-    );
-    await interact(() => getMenuItem('widgets.canvas.import.inpaintMask').click());
+    // Raster leads, as the drop zones order them; each destination shows its layer kind's glyph, and resized control
+    // a resize glyph so it reads apart from control.
+    const destinations = Array.from(
+      getMenuItem('widgets.canvas.import.raster')
+        .closest('[role="menu"]')!
+        .querySelectorAll<HTMLElement>('[role="menuitem"]')
+    ).map((item) => [
+      item.textContent?.trim(),
+      Array.from(item.querySelector('svg')?.classList ?? []).find((name) => name.startsWith('lucide-')),
+    ]);
+    expect(destinations).toEqual([
+      ['widgets.canvas.import.raster', 'lucide-brush'],
+      ['widgets.canvas.import.control', 'lucide-sliders-horizontal'],
+      ['widgets.canvas.import.inpaintMask', 'lucide-square-dashed-bottom'],
+      ['widgets.canvas.import.regionalGuidance', 'lucide-map-pin'],
+      ['widgets.canvas.import.regionalReference', 'lucide-image-plus'],
+      ['widgets.canvas.import.resizedControl', 'lucide-scaling'],
+    ]);
+    // Destinations select through zag, which needs the item highlighted by a hover before the click.
+    const inpaintMask = getMenuItem('widgets.canvas.import.inpaintMask');
+    await hoverItem(inpaintMask);
+    await settleUntil(() => inpaintMask.hasAttribute('data-highlighted'), 'the inpaint mask destination highlight');
+    await interact(() => inpaintMask.click());
 
     const calls = vi.mocked(actions.sendToCanvas).mock.calls;
     expect(calls).toHaveLength(1);

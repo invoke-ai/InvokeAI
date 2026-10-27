@@ -3541,7 +3541,6 @@
         "fitBboxToLayers": "Fit frame to layers",
         "fitBboxToMasks": "Fit frame to masks",
         "fitToView": "Fit to view",
-        "moreSaveOptions": "More save options",
         "newCanvasConfirm": "Clear all layers and start a fresh canvas? This cannot be undone.",
         "zoomLevel": "Zoom level: {{zoom}}"
       },
@@ -3565,6 +3564,7 @@
         "newProjectSuccess_one": "Created a new project from the image",
         "newProjectSuccess_other": "Created a new project from {{count}} images",
         "partial_one": "Added {{successCount}} image; {{failedCount}} could not be prepared.",
+        "savingToGallery": "Saving…",
         "partial_other": "Added {{successCount}} images; {{failedCount}} could not be prepared.",
         "raster": "Raster Layer",
         "regionalGuidance": "Regional Guidance",

@@ -5,8 +5,8 @@ import type { ImageActions } from '@workbench/image-actions';
 import { HStack, Icon, Menu, Portal } from '@chakra-ui/react';
 import { galleryImageItemToGalleryImage, isGalleryImageItem, toGalleryItemRef } from '@features/gallery/contracts';
 import { canCopyImage } from '@platform/browser/clipboard';
-import { Button, IconButton, MenuActionItem, MenuContent, Tooltip, useTooltipTriggerIds } from '@platform/ui';
-import { getGalleryCanvasImportMenuItems } from '@workbench/image-actions';
+import { Button, IconButton, MenuContent, Tooltip, useTooltipTriggerIds } from '@platform/ui';
+import { GalleryCanvasImportMenuItems } from '@workbench/image-actions';
 import {
   ChevronDownIcon,
   CopyIcon,
@@ -21,7 +21,6 @@ import { useTranslation } from 'react-i18next';
 
 import type { PreviewDensity } from './previewDensity';
 
-const CANVAS_ITEMS = getGalleryCanvasImportMenuItems(false);
 const CANVAS_MENU_POSITIONING = { placement: 'bottom-start' } as const;
 const STAR_LABEL_KEYS = {
   image: { off: 'widgets.preview.starImage', on: 'widgets.preview.unstarImage' },
@@ -129,36 +128,12 @@ const EditOnCanvasMenu = ({ onSend }: { onSend: (destination: GalleryCanvasImpor
       <Portal>
         <Menu.Positioner>
           <MenuContent minW="14rem">
-            {CANVAS_ITEMS.map((item) => (
-              <CanvasDestinationItem
-                key={item.destination}
-                destination={item.destination}
-                label={t(item.label)}
-                value={item.value}
-                onSend={onSend}
-              />
-            ))}
+            <GalleryCanvasImportMenuItems onSelect={onSend} />
           </MenuContent>
         </Menu.Positioner>
       </Portal>
     </Menu.Root>
   );
-};
-
-const CanvasDestinationItem = ({
-  destination,
-  label,
-  onSend,
-  value,
-}: {
-  destination: GalleryCanvasImportDestination;
-  label: string;
-  onSend: (destination: GalleryCanvasImportDestination) => void;
-  value: string;
-}) => {
-  const handleSelect = useCallback(() => onSend(destination), [destination, onSend]);
-
-  return <MenuActionItem label={label} value={value} onSelect={handleSelect} />;
 };
 
 const StripIconButton = ({

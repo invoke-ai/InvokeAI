@@ -19,10 +19,11 @@ import { canCopyImage } from '@platform/browser/clipboard';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { MenuContent, MenuIconItem } from '@platform/ui';
-import { MenuItem } from '@platform/ui/Menu';
+import { MenuActionItem, MenuItem } from '@platform/ui/Menu';
 import { useQuery } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { LAYER_KIND_ICONS } from '@workbench/widgets/layers/layerTypeIcon';
 import { useActiveProjectId, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
   ClapperboardIcon,
@@ -45,6 +46,7 @@ import {
   LayersIcon,
   QuoteIcon,
   RulerIcon,
+  ScalingIcon,
   ScanIcon,
   ScissorsIcon,
   ShuffleIcon,
@@ -111,26 +113,69 @@ const isUsableGalleryImage = (value: unknown): value is GalleryImage =>
   typeof (value as GalleryImage).imageUrl === 'string' &&
   typeof (value as GalleryImage).thumbnailUrl === 'string';
 
-interface GalleryCanvasImportMenuItem {
+interface GalleryCanvasImportDestinationOption {
   destination: GalleryCanvasImportDestination;
+  icon: LucideIcon;
+  /** i18n key. */
   label: string;
-  value: string;
 }
 
-const GALLERY_CANVAS_IMPORT_MENU_ITEMS = [
-  { destination: 'raster', label: 'widgets.canvas.import.raster' },
-  { destination: 'control', label: 'widgets.canvas.import.control' },
-  { destination: 'inpaint-mask', label: 'widgets.canvas.import.inpaintMask' },
-  { destination: 'regional-guidance', label: 'widgets.canvas.import.regionalGuidance' },
-  { destination: 'regional-reference', label: 'widgets.canvas.import.regionalReference' },
-  { destination: 'control-resized', label: 'widgets.canvas.import.resizedControl' },
-] as const satisfies readonly Omit<GalleryCanvasImportMenuItem, 'value'>[];
+/**
+ * The canvas layers an image can be added to, in the order every host lists them. Icons are the add-layer menu's per
+ * layer kind; a resized control layer is still a control layer, so it takes a resize glyph to tell the two apart.
+ */
+export const GALLERY_CANVAS_IMPORT_DESTINATIONS: readonly GalleryCanvasImportDestinationOption[] = [
+  { destination: 'raster', icon: LAYER_KIND_ICONS.raster, label: 'widgets.canvas.import.raster' },
+  { destination: 'control', icon: LAYER_KIND_ICONS.control, label: 'widgets.canvas.import.control' },
+  { destination: 'inpaint-mask', icon: LAYER_KIND_ICONS.inpaint_mask, label: 'widgets.canvas.import.inpaintMask' },
+  {
+    destination: 'regional-guidance',
+    icon: LAYER_KIND_ICONS.regional_guidance,
+    label: 'widgets.canvas.import.regionalGuidance',
+  },
+  {
+    destination: 'regional-reference',
+    icon: LAYER_KIND_ICONS.regional_reference_image,
+    label: 'widgets.canvas.import.regionalReference',
+  },
+  { destination: 'control-resized', icon: ScalingIcon, label: 'widgets.canvas.import.resizedControl' },
+];
 
-export const getGalleryCanvasImportMenuItems = (isBulk: boolean): GalleryCanvasImportMenuItem[] =>
-  GALLERY_CANVAS_IMPORT_MENU_ITEMS.map((item) => ({
-    ...item,
-    value: `send-${isBulk ? 'images' : 'image'}-to-canvas-${item.destination}`,
-  }));
+/**
+ * The canvas destinations as menu items. The host owns the container: the image menu's "Add to current canvas"
+ * submenu, or Preview's Edit dropdown.
+ */
+export const GalleryCanvasImportMenuItems = ({
+  onSelect,
+}: {
+  onSelect: (destination: GalleryCanvasImportDestination) => void;
+}) => (
+  <>
+    {GALLERY_CANVAS_IMPORT_DESTINATIONS.map((option) => (
+      <GalleryCanvasImportMenuItem key={option.destination} option={option} onSelect={onSelect} />
+    ))}
+  </>
+);
+
+const GalleryCanvasImportMenuItem = ({
+  option,
+  onSelect,
+}: {
+  option: GalleryCanvasImportDestinationOption;
+  onSelect: (destination: GalleryCanvasImportDestination) => void;
+}) => {
+  const { t } = useTranslation();
+  const handleSelect = useCallback(() => onSelect(option.destination), [onSelect, option.destination]);
+
+  return (
+    <MenuActionItem
+      icon={option.icon}
+      label={t(option.label)}
+      value={`send-to-canvas-${option.destination}`}
+      onSelect={handleSelect}
+    />
+  );
+};
 
 export const getImageContextMenuImages = (target: ImageContextMenuTarget | null): GalleryImage[] => {
   if (target && 'itemRefs' in target) {
@@ -857,7 +902,7 @@ const SingleImageMenuItems = ({
         />
       </ContextSubMenu>
       <Menu.Separator borderColor="border.subtle" />
-      <CanvasDestinationMenuItems actions={actions} images={images} isBulk={false} />
+      <CanvasDestinationMenuItems actions={actions} images={images} />
       <UpscaleSubMenu image={image} onSendToUpscale={handleSendToUpscale} />
       <ContextMenuItem
         icon={ClapperboardIcon}
@@ -1002,7 +1047,7 @@ const BulkMenuItems = ({
         {images.length} images selected
       </Text>
       <Menu.Separator borderColor="border.subtle" />
-      <CanvasDestinationMenuItems actions={actions} images={images} isBulk />
+      <CanvasDestinationMenuItems actions={actions} images={images} />
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
         icon={StarIcon}
@@ -1031,30 +1076,18 @@ const BulkMenuItems = ({
 };
 
 /** The open project's canvas leads; starting a separate project from the images is the explicit alternative. */
-const CanvasDestinationMenuItems = ({
-  actions,
-  images,
-  isBulk,
-}: {
-  actions: ImageActions;
-  images: GalleryImage[];
-  isBulk: boolean;
-}) => {
+const CanvasDestinationMenuItems = ({ actions, images }: { actions: ImageActions; images: GalleryImage[] }) => {
   const { t } = useTranslation();
-  const items = getGalleryCanvasImportMenuItems(isBulk);
+  const handleSend = useCallback(
+    (destination: GalleryCanvasImportDestination) => void actions.sendToCanvas(images, destination),
+    [actions, images]
+  );
   const handleNewProject = useCallback(() => void actions.createCanvasFromImages(images), [actions, images]);
 
   return (
     <>
       <ContextSubMenu icon={LayersIcon} label={t('widgets.canvas.import.addToCurrentCanvas')}>
-        {items.map((item) => (
-          <GalleryCanvasImportDestinationMenuItem
-            key={item.destination}
-            actions={actions}
-            images={images}
-            item={item}
-          />
-        ))}
+        <GalleryCanvasImportMenuItems onSelect={handleSend} />
       </ContextSubMenu>
       <ContextMenuItem
         icon={FileImageIcon}
@@ -1064,24 +1097,6 @@ const CanvasDestinationMenuItems = ({
       />
     </>
   );
-};
-
-const GalleryCanvasImportDestinationMenuItem = ({
-  actions,
-  images,
-  item,
-}: {
-  actions: ImageActions;
-  images: GalleryImage[];
-  item: GalleryCanvasImportMenuItem;
-}) => {
-  const { t } = useTranslation();
-  const handleClick = useCallback(
-    () => void actions.sendToCanvas(images, item.destination),
-    [actions, images, item.destination]
-  );
-
-  return <ContextMenuItem icon={LayersIcon} label={t(item.label)} value={item.value} onClick={handleClick} />;
 };
 
 const FindInGalleryMenuItem = ({ itemRef }: { itemRef: GalleryItemRef }) => {

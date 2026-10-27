@@ -4,13 +4,12 @@ import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { Project } from '@workbench/projectContracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
-import { Box, HStack, Icon, Menu, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Box, HStack, Menu, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { useModifierHeld } from '@platform/react/useModifierHeld';
 import { Button, IconButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
-import { Group } from '@platform/ui/Group';
-import { MenuContent } from '@platform/ui/Menu';
-import { Tooltip } from '@platform/ui/Tooltip';
+import { MenuActionItem, MenuContent } from '@platform/ui/Menu';
+import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { getCanvasEngine } from '@workbench/canvas-operations/api';
 import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { useNotify } from '@workbench/useNotify';
@@ -28,6 +27,7 @@ import {
   SaveIcon,
   Trash2Icon,
   Undo2Icon,
+  ZoomInIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -99,6 +99,10 @@ const CanvasHeaderActionsInner = ({
   const canRedo = useCanvasCanRedo(engine);
   const editingLocked = useCanvasDocumentEditingLocked(engine);
   const { isSaving, save: saveToGallery } = useCanvasGallerySave(engine);
+  const saveMenuIds = useTooltipTriggerIds();
+  const saveLabel = isSaving
+    ? t('widgets.canvas.controls.savingToGallery')
+    : t('widgets.canvas.contextMenu.saveToGallery');
   const document = useActiveProjectSelector((project) => project.canvas.document);
   const modelBase = useActiveProjectSelector(selectModelBase);
   const modelVariant = useActiveProjectSelector(selectModelVariant);
@@ -166,18 +170,20 @@ const CanvasHeaderActionsInner = ({
     <HStack gap="0.5">
       <Menu.Root positioning={MENU_POSITIONING}>
         <Menu.Trigger asChild>
-          <IconButton
+          <Button
             aria-label={t('widgets.canvas.controls.zoomLevel', { zoom: zoomLabel })}
-            minW="4rem"
-            px="2"
+            color="fg.muted"
+            fontVariantNumeric="tabular-nums"
             size="sm"
             variant="ghost"
           >
-            <HStack gap="1">
-              <Text fontVariantNumeric="tabular-nums">{zoomLabel}</Text>
-              <ChevronDownIcon size={12} />
-            </HStack>
-          </IconButton>
+            <ZoomInIcon aria-hidden />
+            {/* Wide enough for "2000%" in tabular digits, so the trigger keeps its width as the zoom changes. */}
+            <Text minW="6ch" textAlign="center">
+              {zoomLabel}
+            </Text>
+            <ChevronDownIcon size={12} />
+          </Button>
         </Menu.Trigger>
         <Portal>
           <Menu.Positioner>
@@ -261,41 +267,37 @@ const CanvasHeaderActionsInner = ({
 
       <HeaderDivider />
 
-      <Menu.Root positioning={MENU_POSITIONING}>
-        <Group attached css={SPLIT_GROUP_CSS}>
-          <Tooltip content={t('widgets.canvas.contextMenu.saveCanvasToGallery')}>
-            <IconButton
-              aria-label={t('widgets.canvas.contextMenu.saveCanvasToGallery')}
-              color="fg.muted"
-              disabled={editingLocked || isSaving}
-              size="sm"
-              variant="ghost"
-              onClick={() => void saveToGallery('canvas')}
-            >
-              {isSaving ? <Spinner /> : <SaveIcon />}
-            </IconButton>
-          </Tooltip>
+      <Menu.Root ids={saveMenuIds} positioning={MENU_POSITIONING}>
+        <Tooltip content={saveLabel} ids={saveMenuIds}>
           <Menu.Trigger asChild>
-            <IconButton
-              aria-label={t('widgets.canvas.controls.moreSaveOptions')}
+            <Button
+              aria-busy={isSaving || undefined}
+              aria-label={saveLabel}
               color="fg.muted"
               disabled={editingLocked || isSaving}
-              minW="0"
               size="sm"
               variant="ghost"
-              w="6"
             >
+              {isSaving ? <Spinner boxSize="3.5" /> : <SaveIcon aria-hidden />}
               <ChevronDownIcon size={12} />
-            </IconButton>
+            </Button>
           </Menu.Trigger>
-        </Group>
+        </Tooltip>
         <Portal>
           <Menu.Positioner>
-            <MenuContent minW="11rem" py="1">
-              <Menu.Item value="save-bbox" onClick={() => void saveToGallery('bbox')}>
-                <Icon as={SaveIcon} boxSize="3.5" color="fg.subtle" />
-                <Menu.ItemText>{t('widgets.canvas.contextMenu.saveBboxToGallery')}</Menu.ItemText>
-              </Menu.Item>
+            <MenuContent minW="13rem" py="1">
+              <MenuActionItem
+                icon={SaveIcon}
+                label={t('widgets.canvas.contextMenu.saveCanvasToGallery')}
+                value="save-canvas"
+                onSelect={() => void saveToGallery('canvas')}
+              />
+              <MenuActionItem
+                icon={SaveIcon}
+                label={t('widgets.canvas.contextMenu.saveBboxToGallery')}
+                value="save-bbox"
+                onSelect={() => void saveToGallery('bbox')}
+              />
             </MenuContent>
           </Menu.Positioner>
         </Portal>
@@ -327,10 +329,6 @@ const CanvasHeaderActionsInner = ({
 };
 
 /** A thin vertical rule separating header-action groups (matching legacy's dividers). */
-// Ghost buttons have no border to collapse, and the attached overlap would
-// leave the save button under 24px of unobscured target.
-const SPLIT_GROUP_CSS = { '& > *:not(:last-child)': { marginEnd: 0 } } as const;
-
 const HeaderDivider = () => <Box bg="border.subtle" flexShrink={0} h="4" mx="1" w="1px" />;
 
 /** Diagnostics use an existing engine; opening settings must never acquire a canvas engine lease. */

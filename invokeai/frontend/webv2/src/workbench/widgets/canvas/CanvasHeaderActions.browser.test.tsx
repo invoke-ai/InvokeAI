@@ -25,6 +25,8 @@ import type * as EngineStoreHooks from './engineStoreHooks';
 const harness = vi.hoisted(() => ({
   editingLocked: false,
   engine: null as CanvasEngine | null,
+  isSaving: false,
+  save: vi.fn<(region: 'bbox' | 'canvas') => Promise<void>>(),
   store: null as ReturnType<typeof createWorkbenchStore> | null,
 }));
 const activeProject = () => harness.store!.getState().projects[0]!;
@@ -42,7 +44,7 @@ vi.mock('./engineStoreHooks', async (importOriginal) => ({
 }));
 vi.mock('@workbench/canvas-operations/react', () => ({ useCanvasEngine: () => harness.engine }));
 vi.mock('./useCanvasGallerySave', () => ({
-  useCanvasGallerySave: () => ({ isSaving: false, save: () => Promise.resolve() }),
+  useCanvasGallerySave: () => ({ isSaving: harness.isSaving, save: harness.save }),
 }));
 
 import { CanvasHeaderActions } from './CanvasHeaderActions';
@@ -61,7 +63,8 @@ afterEach(async () => {
   await act(() => root?.unmount());
   host?.remove();
   harness.engine?.lifecycle.dispose();
-  Object.assign(harness, { editingLocked: false, engine: null, store: null });
+  Object.assign(harness, { editingLocked: false, engine: null, isSaving: false, store: null });
+  harness.save.mockReset();
   root = null;
   host = null;
 });
@@ -230,5 +233,42 @@ describe('CanvasHeaderActions fit frame to masks', () => {
     await expect
       .poll(() => store.getState().projects[0]!.canvas.document.bbox)
       .toEqual({ height: 144, width: 144, x: 48, y: 48 });
+  });
+});
+
+describe('CanvasHeaderActions save to gallery', () => {
+  const saveTrigger = () => page.getByRole('button', { exact: true, name: 'Save to Gallery' });
+  const item = (name: string) => page.getByRole('menuitem', { exact: true, name });
+
+  it('opens one menu that saves the canvas or the frame, each to its own region', async () => {
+    harness.save.mockResolvedValue(undefined);
+    await renderActions();
+
+    await saveTrigger().click();
+    await expect.element(item('Save Frame to Gallery')).toBeVisible();
+    await item('Save Canvas to Gallery').click();
+    expect(harness.save).toHaveBeenCalledExactlyOnceWith('canvas');
+
+    await saveTrigger().click();
+    await item('Save Frame to Gallery').click();
+    expect(harness.save).toHaveBeenLastCalledWith('bbox');
+    expect(harness.save).toHaveBeenCalledTimes(2);
+  });
+
+  it('is disabled while editing is locked', async () => {
+    harness.editingLocked = true;
+    await renderActions();
+
+    await expect.element(saveTrigger()).toBeDisabled();
+  });
+
+  it('says it is saving, and takes no second save, while one is in flight', async () => {
+    harness.isSaving = true;
+    await renderActions();
+
+    const trigger = page.getByRole('button', { exact: true, name: 'Saving…' });
+    await expect.element(trigger).toBeDisabled();
+    await expect.element(trigger).toHaveAttribute('aria-busy', 'true');
+    expect(saveTrigger().query()).toBeNull();
   });
 });

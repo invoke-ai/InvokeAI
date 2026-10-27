@@ -1,6 +1,7 @@
 export {
+  GALLERY_CANVAS_IMPORT_DESTINATIONS,
+  GalleryCanvasImportMenuItems,
   ImageContextMenu,
-  getGalleryCanvasImportMenuItems,
   getImageContextMenuImages,
   getImageContextMenuRecallRequestKey,
   type ImageContextMenuTarget,
