@@ -27,6 +27,7 @@ from invokeai.app.invocations.fields import (
     Krea2StyleReferenceField,
     LatentsField,
     MiniMaxH3ConditioningField,
+    MossImageConditioningField,
     OutputField,
     QwenImage21ConditioningField,
     QwenImageConditioningField,
@@ -582,6 +583,17 @@ class MiniMaxH3ConditioningOutput(BaseInvocationOutput):
     @classmethod
     def build(cls, conditioning_name: str) -> "MiniMaxH3ConditioningOutput":
         return cls(conditioning=MiniMaxH3ConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("moss_image_conditioning_output")
+class MossImageConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a MOSS-Image conditioning tensor."""
+
+    conditioning: MossImageConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "MossImageConditioningOutput":
+        return cls(conditioning=MossImageConditioningField(conditioning_name=conditioning_name))
 
 
 @invocation_output("wan_ref_image_output")

@@ -37,6 +37,11 @@ describe('isBaseCompatible', () => {
     expect(isBaseCompatible(model('anima', 'main'), model('flux', 'vae'))).toBe(true);
     // z_image_pid_decode reuses the FLUX PiD decoder.
     expect(isBaseCompatible(model('z-image', 'main'), model('flux', 'pid_decoder'))).toBe(true);
+    // moss_image_model_loader takes the FLUX.2 VAE, and MOSS-Image decodes with flux2_pid_decode.
+    expect(isBaseCompatible(model('moss-image', 'main'), model('flux2', 'vae'))).toBe(true);
+    expect(isBaseCompatible(model('moss-image', 'main'), model('flux2', 'pid_decoder'))).toBe(true);
+    // The pairing is the VAE's and decoder's, not the base pair's: FLUX.2 LoRAs do not fit MOSS-Image.
+    expect(isBaseCompatible(model('moss-image', 'main'), model('flux2', 'lora'))).toBe(false);
   });
 
   it('limits cross-base allowances to the helper type and cited pairs', () => {
@@ -86,6 +91,9 @@ describe('isBaseCompatible', () => {
     expect(isBaseCompatible(model('any', 'mistral_encoder'), model('flux2', 'main'))).toBe(true);
     // Z-Image PiD decode consumes a standalone Gemma2 encoder.
     expect(isBaseCompatible(model('any', 'gemma2_encoder'), model('z-image', 'main'))).toBe(true);
+    // moss_image_model_loader reads a standalone Qwen3.5 encoder, and its PiD decode a Gemma2 one.
+    expect(isBaseCompatible(model('any', 'qwen3_5_encoder'), model('moss-image', 'main'))).toBe(true);
+    expect(isBaseCompatible(model('any', 'gemma2_encoder'), model('moss-image', 'main'))).toBe(true);
     // No pipeline feeds a CLIP Vision model to an SD2 main.
     expect(isBaseCompatible(model('any', 'clip_vision'), model('sd-2', 'main'))).toBe(false);
   });

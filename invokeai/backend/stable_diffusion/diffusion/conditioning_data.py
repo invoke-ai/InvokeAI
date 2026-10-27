@@ -305,6 +305,18 @@ class WanConditioningInfo:
 
 
 @dataclass
+class MossImageConditioningInfo:
+    """MOSS-Image text conditioning: Qwen3.5-9B's last hidden state, after its final norm, for one unpadded prompt."""
+
+    prompt_embeds: torch.Tensor
+    """Shape: (seq_len, 4096)."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        return self
+
+
+@dataclass
 class ConditioningFieldData:
     # If you change this class, adding more types, you _must_ update the instantiation of ObjectSerializerDisk in
     # invokeai/app/api/dependencies.py, adding the types to the list of safe globals. If you do not, torch will be
@@ -325,6 +337,7 @@ class ConditioningFieldData:
         | List[WanConditioningInfo]
         | List[MiniMaxH3ConditioningInfo]
         | List[LTX2ConditioningInfo]
+        | List[MossImageConditioningInfo]
     )
 
 

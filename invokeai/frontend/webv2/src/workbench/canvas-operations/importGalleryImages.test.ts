@@ -145,6 +145,7 @@ const setModel = (project: Project, base: GenerateWidgetValues['model']['base'])
     zImageSeedVarianceRandomizePercent: 50,
     qwenImageShift: null,
     qwenImageEncoderQuantization: 'none',
+    mossImageUncondSkipLayers: [22],
     pidMode: 'off',
     pidDecoderModel: null,
     gemma2EncoderModel: null,
