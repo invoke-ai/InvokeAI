@@ -1362,6 +1362,14 @@ export const getMaxReferenceImages = (model: GenerateModelConfig | undefined): n
   return getArchitectureFeatures(model.base)?.max_reference_images ?? DEFAULT_REFERENCE_IMAGE_LIMIT;
 };
 
+const IP_ADAPTER_BASES: ReadonlySet<string> = new Set(['sd-1', 'sdxl', 'flux', 'anima']);
+
+/**
+ * Anima's IP-Adapter node takes a strength alone: it has no method choice and brings its own SigLIP2 encoder, so the
+ * UI hides those controls and the graph never sends them.
+ */
+export const isStrengthOnlyIPAdapterBase = (base: string | undefined): boolean => base === 'anima';
+
 export const createReferenceImageId = (): string =>
   `reference_image_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
@@ -1424,7 +1432,8 @@ const getReferenceImageConfigSupported = (
     case 'flux_redux':
       return model.type !== 'external_image_generator' && model.base === 'flux';
     case 'ip_adapter':
-      return model.type !== 'external_image_generator' && ['sd-1', 'sdxl', 'flux'].includes(model.base);
+      // `isReferenceImageSupported` applies the backend's variant gate: Anima only on its Qwen3 releases.
+      return IP_ADAPTER_BASES.has(model.base) && isReferenceImageSupported(model);
   }
 };
 
@@ -1450,6 +1459,33 @@ export const isReferenceImageCompatibleWithModel = (
 };
 
 /**
+ * An SD reference that never had an adapter (model null) passes the base check, so a switch to a strength-only base
+ * would keep its unset adapter and its SD weight, which may be negative. Re-target it when that leaves it unusable and
+ * re-targeting can help: a weight the node rejects, or no adapter while one is installed. Without an installed adapter
+ * the re-targeted config is stable, so a repeated switch changes nothing.
+ */
+const needsStrengthOnlyRetarget = (
+  model: GenerateModelConfig,
+  referenceImage: GenerateReferenceImage,
+  models: readonly ReferenceModelCandidate[]
+): boolean => {
+  const { config } = referenceImage;
+
+  if (config.type !== 'ip_adapter' || !isStrengthOnlyIPAdapterBase(model.base)) {
+    return false;
+  }
+
+  if (!(config.weight >= 0 && config.weight <= 2)) {
+    return true;
+  }
+
+  return (
+    config.model === null &&
+    models.some((candidate) => candidate.type === 'ip_adapter' && candidate.base === model.base)
+  );
+};
+
+/**
  * Drop unsupported references; retarget incompatible ones while preserving image/enabled state. No changes return
  * the same array.
  */
@@ -1468,12 +1504,34 @@ export const getCompatibleReferenceImages = (
 
   let didChange = false;
   const next = referenceImages.map((referenceImage) => {
-    if (isReferenceImageCompatibleWithModel(model, referenceImage)) {
+    if (
+      isReferenceImageCompatibleWithModel(model, referenceImage) &&
+      !needsStrengthOnlyRetarget(model, referenceImage, models)
+    ) {
       return referenceImage;
     }
 
     didChange = true;
-    return { ...referenceImage, config: getDefaultReferenceImageConfig(model, models, referenceImage.config.image) };
+    const { config } = referenceImage;
+    const defaults = getDefaultReferenceImageConfig(model, models, config.image);
+
+    // A strength-only base keeps the user's step window and strength; only the adapter and the hidden SD fields reset.
+    if (config.type === 'ip_adapter' && defaults.type === 'ip_adapter' && isStrengthOnlyIPAdapterBase(model.base)) {
+      // Clamping a negative SD weight to 0 would switch the reference off, so it takes the default strength instead.
+      const weight =
+        Number.isFinite(config.weight) && config.weight >= 0 ? Math.min(config.weight, 2) : defaults.weight;
+      return {
+        ...referenceImage,
+        config: {
+          ...defaults,
+          beginEndStepPct: config.beginEndStepPct,
+          model: config.model?.base === model.base ? config.model : defaults.model,
+          weight,
+        },
+      };
+    }
+
+    return { ...referenceImage, config: defaults };
   });
 
   return didChange ? next : referenceImages;
@@ -1787,6 +1845,12 @@ const getReferenceImageValidationReasons = (model: GenerateModelConfig, settings
     if (referenceImage.config.type === 'ip_adapter') {
       if (!referenceImage.config.model || referenceImage.config.model.base !== model.base) {
         reasons.push(`${prefix} needs a compatible IP Adapter model.`);
+      }
+
+      // A weight recalled from an SD reference can be negative; `anima_ip_adapter.strength` rejects it at enqueue.
+      const { weight } = referenceImage.config;
+      if (isStrengthOnlyIPAdapterBase(model.base) && !(weight >= 0 && weight <= 2)) {
+        reasons.push(`${prefix} strength must be between 0 and 2.`);
       }
     }
 

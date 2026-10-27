@@ -20,7 +20,7 @@ export interface RasterizationJob {
   version: number;
   documentGeneration: number;
   source: CanvasLayerSourceContract;
-  promise: Promise<'published' | 'stale' | 'error' | 'aborted'>;
+  promise: Promise<'published' | 'stale' | 'error' | 'unavailable' | 'aborted'>;
 }
 
 import {

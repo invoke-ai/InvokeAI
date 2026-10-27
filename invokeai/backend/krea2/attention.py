@@ -31,6 +31,7 @@ import torch.nn.functional as F
 from diffusers.models.embeddings import apply_rotary_emb
 from torch.nn.attention import SDPBackend
 
+from invokeai.backend.krea2.reference_edit import Krea2ReferenceKVCache, Krea2ReferenceKVMode
 from invokeai.backend.krea2.style_reference import (
     Krea2StyleReferenceMode,
     Krea2StyleReferenceState,
@@ -140,6 +141,7 @@ class Krea2MemoryEfficientAttnProcessor:
         sdpa_backends: Krea2SdpaBackends | None = None,
         style_reference_state: Krea2StyleReferenceState | None = None,
         block_index: int | None = None,
+        reference_kv_cache: Krea2ReferenceKVCache | None = None,
     ) -> None:
         self.regional_prompting_state = regional_prompting_state
         # Resolved once per generation and handed down, not read per attention call.
@@ -148,6 +150,8 @@ class Krea2MemoryEfficientAttnProcessor:
         # nothing beyond the identity check below.
         self.style_reference_state = style_reference_state
         self.block_index = block_index
+        # Only set on the main blocks while an edit reference runs in K/V-cache mode; see reference_edit.py.
+        self.reference_kv_cache = reference_kv_cache
 
     def __call__(
         self,
@@ -183,6 +187,15 @@ class Krea2MemoryEfficientAttnProcessor:
         query = query.transpose(1, 2)
         key = key.transpose(1, 2)
         value = value.transpose(1, 2)
+
+        # The edit-reference K/V cache hooks in at the same point as style reference below: post-RoPE, so the
+        # cached keys carry the references' own rotation, and pre GQA expansion. The two never run together.
+        reference_kv = self.reference_kv_cache
+        if reference_kv is not None and self.block_index is not None:
+            if reference_kv.mode is Krea2ReferenceKVMode.CAPTURE:
+                reference_kv.store(self.block_index, key, value)
+            elif reference_kv.mode is Krea2ReferenceKVMode.APPEND:
+                key, value = reference_kv.extend(self.block_index, key, value, attention_mask)
 
         # Style reference hooks in here: after RoPE (so the captured keys carry their rotation) but before
         # the GQA head expansion, which keeps the retained cache 4x smaller. See style_reference.py.
@@ -295,6 +308,7 @@ def build_krea2_attention_processors(
     regional_prompting_state: Krea2RegionalPromptingState,
     style_reference_state: Krea2StyleReferenceState | None = None,
     style_reference_blocks: Iterable[int] | None = None,
+    reference_kv_cache: Krea2ReferenceKVCache | None = None,
 ) -> dict[str, Krea2MemoryEfficientAttnProcessor]:
     """Build processors that apply regional masks to alternating main transformer blocks only.
 
@@ -302,8 +316,10 @@ def build_krea2_attention_processors(
     parities), so it gets a second state object rather than sharing the regional one. Leaving both style
     arguments unset reproduces the pre-style behaviour exactly.
 
-    The text-fusion blocks do not match the main-block pattern, so they never receive either state. That is
-    correct: they only ever see text tokens.
+    The edit-reference K/V cache, when given, goes to every main block: each one captures and appends its own.
+
+    The text-fusion blocks do not match the main-block pattern, so they never receive any of these states. That
+    is correct: they only ever see text tokens.
     """
 
     style_blocks = frozenset(style_reference_blocks or ())
@@ -331,5 +347,6 @@ def build_krea2_attention_processors(
             sdpa_backends=sdpa_backends,
             style_reference_state=style,
             block_index=block_index,
+            reference_kv_cache=reference_kv_cache if block_index is not None else None,
         )
     return processors

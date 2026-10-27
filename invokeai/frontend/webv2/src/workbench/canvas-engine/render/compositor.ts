@@ -12,6 +12,7 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
+import type { OverlayStackKind } from '@workbench/canvas-engine/document/layerStacks';
 import type { FrameDamage, Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 import { compileDocumentLeaves, lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
@@ -55,6 +56,9 @@ export const DEFAULT_CHECKER_COLORS: CheckerColors = { a: '#2a2a2a', b: '#363636
 
 /** Opacity of the display-only regenerate tint drawn over a raster layer's coverage. */
 export const REGION_OVERLAY_ALPHA = 0.5;
+
+/** Strength of a control layer's map over its original in the Overlay view, relative to the layer's opacity. */
+export const CONTROL_OVERLAY_MAP_ALPHA = 0.5;
 
 /** Dashed outline drawn around a staged-generation preview so it reads as pending, not committed. */
 const STAGED_PREVIEW_OUTLINE_COLOR = '#3b82f6';
@@ -108,6 +112,8 @@ export interface CompositeOptions {
   layerPreviews?: ReadonlyMap<string, { surface: RasterSurface; rect: Rect }> | null;
   /** Isolate one leaf and suppress staged/filter previews; disabled or hidden leaves remain undrawn. */
   isolationLayerId?: string | null;
+  /** Overlay stacks the screen draws; absence draws all. An isolated target draws whatever its stack. */
+  showOverlayStacks?: Readonly<Record<OverlayStackKind, boolean>>;
   /**
    * Memoized adjusted raster surface, or null for raw pixels. Optional provider; without it adjustments are
    * ignored. Cache versions prevent per-frame recomputation.
@@ -120,11 +126,22 @@ export interface CompositeOptions {
    * matrix are layer-local and compose with the layer transform.
    */
   floatingSelection?: { layerId: string; surface: RasterSurface; rect: Rect; matrix: Mat2d } | null;
+  /**
+   * Display-only control layer view: the kept original (layer-local through `matrix`, at the layer's opacity and
+   * blend) in place of the map, or under the map at {@link CONTROL_OVERLAY_MAP_ALPHA}. Suppressed under isolation.
+   */
+  controlView?: {
+    layerId: string;
+    view: 'original' | 'overlay';
+    surface: RasterSurface;
+    rect: Rect;
+    matrix: Mat2d;
+  } | null;
   /** Optional deterministic render counters; omitted in the normal zero-overhead path. */
   diagnostics?: CanvasDiagnostics | null;
   /**
    * Reused frame description from {@link prepareComposite}; ignored unless it was prepared for this document,
-   * isolation, grouping and transform overrides.
+   * isolation, overlay stacks, grouping and transform overrides.
    */
   preparation?: CompositePreparation | null;
   /**
@@ -164,14 +181,21 @@ export const transformOverridesKey = (overrides: TransformOverrides | null | und
   return key;
 };
 
+/** A stable key for the overlay stack switches; absence shows every stack. */
+const overlayStacksKey = (shown: CompositeOptions['showOverlayStacks']): string => {
+  const stacks = shown ?? ALL_OVERLAY_STACKS_SHOWN;
+  return `${+stacks.control}${+stacks.inpaint_mask}${+stacks.regional_guidance}`;
+};
+
 /**
  * One frame description: the leaves drawn (bottom first), their effective matrices with overrides applied, the
  * isolated group scopes, and optionally each leaf's document-space bounds this frame. Stable while the document,
- * isolation, grouping and override contents are, so frame demand, compositing and sampling share it.
+ * isolation, overlay stacks, grouping and override contents are, so frame demand, compositing and sampling share it.
  */
 export interface CompositePreparation {
   readonly document: CanvasDocumentContractV3;
   readonly isolationLayerId: string | null;
+  readonly overlayStacksKey: string;
   readonly grouped: boolean;
   readonly overridesKey: string;
   readonly leaves: readonly SemanticLeaf[];
@@ -198,13 +222,13 @@ const effectiveMatrix = (leaf: SemanticLeaf, overrides: TransformOverrides | nul
 /** Plans the draw order, placement and isolated group scopes for `doc`, for callers compositing it repeatedly. */
 export const prepareComposite = (
   doc: CanvasDocumentContractV3,
-  opts: Pick<CompositeOptions, 'groupSurface' | 'isolationLayerId' | 'transformOverrides'> = {}
+  opts: Pick<CompositeOptions, 'groupSurface' | 'isolationLayerId' | 'showOverlayStacks' | 'transformOverrides'> = {}
 ): CompositePreparation => {
   const isolationLayerId = opts.isolationLayerId ?? null;
   // The plan lists the leaves to draw bottom first; the `stagedPreview` lands on top of every stack.
   const { leaves } = planScreenComposition(compileDocumentLeaves(doc), {
     isolationLayerId,
-    showOverlayStacks: ALL_OVERLAY_STACKS_SHOWN,
+    showOverlayStacks: opts.showOverlayStacks ?? ALL_OVERLAY_STACKS_SHOWN,
   });
   // Isolation mode inspects raw members, so scopes are bypassed while active.
   const grouped = !!opts.groupSurface && isolationLayerId === null;
@@ -216,6 +240,7 @@ export const prepareComposite = (
     isolationLayerId,
     leaves,
     matrices: leaves.map((leaf) => effectiveMatrix(leaf, overrides)),
+    overlayStacksKey: overlayStacksKey(opts.showOverlayStacks),
     overridesKey: transformOverridesKey(overrides),
     scopes,
   };
@@ -229,6 +254,7 @@ const isPreparedFor = (
   !!preparation &&
   preparation.document === doc &&
   preparation.isolationLayerId === (opts.isolationLayerId ?? null) &&
+  preparation.overlayStacksKey === overlayStacksKey(opts.showOverlayStacks) &&
   preparation.grouped === (!!opts.groupSurface && !isIsolated(opts)) &&
   preparation.overridesKey === transformOverridesKey(opts.transformOverrides);
 
@@ -367,11 +393,12 @@ const drawCachedLayer = (
   matrix: Mat2d,
   entry: LayerCacheEntry,
   view: Mat2d,
-  opts: CompositeOptions
+  opts: CompositeOptions,
+  alpha = 1
 ): void => {
   const { layer } = leaf;
   ctx.save();
-  ctx.globalAlpha = layer.opacity;
+  ctx.globalAlpha = layer.opacity * alpha;
   ctx.globalCompositeOperation = blendToComposite(layer.blendMode);
   setTransformFromMat(ctx, multiply(view, matrix));
 
@@ -469,27 +496,46 @@ const drawRegionCoverage = (
 };
 
 /**
- * Draws the floating selection over the layer it was cut from. Its pixels are
- * layer-local, so they go through the layer's (possibly overridden) matrix and
- * then the float's own — never resampled into document space and back.
+ * Draws layer-local pixels that are not the layer's cache (a floating selection, a control layer's original) with
+ * the layer's opacity and blend. They go through the layer's (possibly overridden) matrix and then their own,
+ * never resampled into document space and back.
  */
-const drawFloatingSelection = (
+const drawLayerLocalSurface = (
   ctx: Ctx,
   leaf: SemanticLeaf,
   matrix: Mat2d,
   view: Mat2d,
-  float: NonNullable<CompositeOptions['floatingSelection']>
+  pixels: { surface: RasterSurface; rect: Rect; matrix: Mat2d }
 ): void => {
   const { layer } = leaf;
   ctx.save();
   ctx.globalAlpha = layer.opacity;
   ctx.globalCompositeOperation = blendToComposite(layer.blendMode);
-  setTransformFromMat(ctx, multiply(multiply(view, matrix), float.matrix));
-  ctx.drawImage(float.surface.canvas, float.rect.x, float.rect.y);
+  setTransformFromMat(ctx, multiply(multiply(view, matrix), pixels.matrix));
+  ctx.drawImage(pixels.surface.canvas, pixels.rect.x, pixels.rect.y);
   ctx.restore();
 };
 
-/** Document-space bounds a leaf can cover this frame: committed pixels joined with its preview and float. */
+/** `bounds` joined with where layer-local `pixels` land through the leaf's matrix. */
+const unionLanding = (
+  bounds: Rect | null,
+  matrix: Mat2d,
+  pixels: { rect: Rect; matrix: Mat2d } | null | undefined
+): Rect | null => {
+  if (!pixels || isEmpty(pixels.rect)) {
+    return bounds;
+  }
+  const landing = transformBounds(multiply(matrix, pixels.matrix), pixels.rect);
+  return bounds ? union(bounds, landing) : landing;
+};
+
+const controlViewOf = (leaf: SemanticLeaf, opts: CompositeOptions): CompositeOptions['controlView'] =>
+  !isIsolated(opts) && leaf.layer.type === 'control' && opts.controlView?.layerId === leaf.id ? opts.controlView : null;
+
+/**
+ * Document-space bounds a leaf can cover this frame: committed pixels joined with its preview, float and shown
+ * control original.
+ */
 const leafBounds = (leaf: SemanticLeaf, matrix: Mat2d, committed: Rect | null, opts: CompositeOptions): Rect | null => {
   const preview = isIsolated(opts) ? null : (opts.layerPreviews?.get(leaf.id) ?? null);
   let bounds = committed;
@@ -498,11 +544,7 @@ const leafBounds = (leaf: SemanticLeaf, matrix: Mat2d, committed: Rect | null, o
     bounds = bounds ? union(bounds, previewBounds) : previewBounds;
   }
   const float = !isIsolated(opts) && opts.floatingSelection?.layerId === leaf.id ? opts.floatingSelection : null;
-  if (float && !isEmpty(float.rect)) {
-    const landing = transformBounds(multiply(matrix, float.matrix), float.rect);
-    bounds = bounds ? union(bounds, landing) : landing;
-  }
-  return bounds;
+  return unionLanding(unionLanding(bounds, matrix, float), matrix, controlViewOf(leaf, opts));
 };
 
 /** Whether document-space `bounds` reach the screen region; non-finite geometry counts as visible. */
@@ -580,13 +622,18 @@ export const compositeDocument = (
     }
     const matrix = matrices[index]!;
     const entry = caches.get(leaf.id);
+    // The original replaces the map, or lies under it in the Overlay view; it shows even when there is no map.
+    const controlView = controlViewOf(leaf, opts);
+    if (controlView) {
+      drawLayerLocalSurface(ctx, leaf, matrix, view, controlView);
+    }
     // A float still draws over an emptied source: its pixels are detached.
-    if (entry && entry.rect.width > 0 && entry.rect.height > 0) {
-      drawCachedLayer(ctx, leaf, matrix, entry, view, opts);
+    if (entry && entry.rect.width > 0 && entry.rect.height > 0 && controlView?.view !== 'original') {
+      drawCachedLayer(ctx, leaf, matrix, entry, view, opts, controlView ? CONTROL_OVERLAY_MAP_ALPHA : 1);
       opts.diagnostics?.increment('layersDrawn');
     }
     if (float?.layerId === leaf.id) {
-      drawFloatingSelection(ctx, leaf, matrix, view, float);
+      drawLayerLocalSurface(ctx, leaf, matrix, view, float);
     }
   };
 
