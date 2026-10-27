@@ -2,8 +2,8 @@
 // `start-here/system-requirements.mdx`, with each family's tagline in `src/content/i18n/en.json`
 // (`modelFamilies.<slug>.tagline`). Keep them in step when a guide changes.
 //
-// A card shows a cover image when `src/assets/model-families/<slug>.webp` exists, and a generated backdrop in the
-// family's `hue` otherwise. Covers are cropped to fill a wide card, so keep the subject near the centre.
+// A card shows a cover image above its text when `src/assets/model-families/<slug>.webp` exists, and is text only
+// otherwise. Covers are cropped to a 16:9 frame, so keep the subject near the centre.
 
 type LicenseKind = 'open' | 'community' | 'noncommercial' | 'research' | 'restricted' | 'mixed';
 
@@ -22,8 +22,6 @@ type ModelFamily = {
   vram?: number;
   /** Quantized and single-file builds the guide documents, at most four. */
   formats: Label[];
-  /** Hue in degrees for the generated backdrop, spread so neighbouring cards differ. */
-  hue: number;
 };
 
 const variesByModel = { labelKey: 'modelFamilies.license.variesByModel' };
@@ -42,7 +40,6 @@ const modelFamilies: ModelFamily[] = [
     license: { kind: 'mixed', label: variesByModel },
     vram: 8,
     formats: ['GGUF', 'FP8', 'int8', 'SDNQ'],
-    hue: 265,
   },
   {
     slug: 'flux-1',
@@ -52,7 +49,6 @@ const modelFamilies: ModelFamily[] = [
     license: { kind: 'mixed', label: variesByModel },
     vram: 10,
     formats: ['NF4', 'GGUF', 'int8', 'SDNQ'],
-    hue: 42,
   },
   {
     slug: 'z-image',
@@ -62,7 +58,6 @@ const modelFamilies: ModelFamily[] = [
     license: { kind: 'open', label: 'Apache 2.0' },
     vram: 8,
     formats: ['GGUF', 'NVFP4', 'SDNQ'],
-    hue: 180,
   },
   {
     slug: 'qwen-image-2-1',
@@ -72,7 +67,6 @@ const modelFamilies: ModelFamily[] = [
     license: { kind: 'research', label: 'Qwen Research' },
     vram: 16,
     formats: ['GGUF', 'FP8', 'int8'],
-    hue: 317,
   },
   {
     slug: 'qwen-image',
@@ -81,7 +75,6 @@ const modelFamilies: ModelFamily[] = [
     kind: 'image',
     license: { kind: 'open', label: 'Apache 2.0' },
     formats: ['GGUF', 'FP8', 'NVFP4'],
-    hue: 95,
   },
   {
     slug: 'krea-2',
@@ -91,7 +84,6 @@ const modelFamilies: ModelFamily[] = [
     license: { kind: 'community', label: 'Krea 2 Community' },
     vram: 16,
     formats: ['NVFP4', 'GGUF', 'int8', 'FP8'],
-    hue: 232,
   },
   {
     slug: 'ideogram4',
@@ -101,7 +93,6 @@ const modelFamilies: ModelFamily[] = [
     license: { kind: 'noncommercial', label: nonCommercial },
     vram: 24,
     formats: ['NF4', 'FP8', 'int8', 'GGUF'],
-    hue: 10,
   },
   {
     slug: 'ernie-image',
@@ -111,7 +102,6 @@ const modelFamilies: ModelFamily[] = [
     license: { kind: 'open', label: 'Apache 2.0' },
     vram: 24,
     formats: ['GGUF', singleFile],
-    hue: 147,
   },
   {
     slug: 'cogview4',
@@ -120,7 +110,6 @@ const modelFamilies: ModelFamily[] = [
     kind: 'image',
     license: { kind: 'open', label: 'Apache 2.0' },
     formats: [],
-    hue: 285,
   },
   {
     slug: 'anima',
@@ -129,7 +118,6 @@ const modelFamilies: ModelFamily[] = [
     kind: 'image',
     license: { kind: 'noncommercial', label: nonCommercial },
     formats: [singleFile, 'int8'],
-    hue: 62,
   },
   {
     slug: 'sd-3',
@@ -138,7 +126,6 @@ const modelFamilies: ModelFamily[] = [
     kind: 'image',
     license: { kind: 'community', label: 'Stability Community' },
     formats: [],
-    hue: 200,
   },
   {
     slug: 'sdxl',
@@ -148,7 +135,6 @@ const modelFamilies: ModelFamily[] = [
     license: { kind: 'open', label: 'OpenRAIL++-M' },
     vram: 8,
     formats: [singleFile],
-    hue: 337,
   },
   {
     slug: 'stable-diffusion-1-2',
@@ -158,7 +144,6 @@ const modelFamilies: ModelFamily[] = [
     license: { kind: 'open', label: 'OpenRAIL-M' },
     vram: 4,
     formats: [singleFile],
-    hue: 115,
   },
   {
     slug: 'wan-22',
@@ -168,7 +153,6 @@ const modelFamilies: ModelFamily[] = [
     license: { kind: 'open', label: 'Apache 2.0' },
     vram: 6,
     formats: ['GGUF'],
-    hue: 252,
   },
   {
     slug: 'ltx-2',
@@ -177,7 +161,6 @@ const modelFamilies: ModelFamily[] = [
     kind: 'video',
     license: { kind: 'community', label: 'LTX-2 Community' },
     formats: ['int8', 'NVFP4'],
-    hue: 30,
   },
   {
     slug: 'minimax-h3',
@@ -186,7 +169,6 @@ const modelFamilies: ModelFamily[] = [
     kind: 'video',
     license: { kind: 'restricted', label: 'MiniMax Community' },
     formats: ['int8'],
-    hue: 167,
   },
 ];
 

@@ -1,9 +1,10 @@
 ---
 /*
  * The home page's model families as a grid of link cards, with the external providers below. The section heading goes
- * in the slot, so it shares the grid's width and left edge. A family's cover is `src/assets/model-families/<slug>.webp`
- * when that file exists; without one the card paints a backdrop in the family's hue, under the same fade to the card
- * surface, so cards with and without covers match.
+ * in the slot, so it shares the grid's width and left edge. Cards follow the site's link-card recipe. A card shows its
+ * family's cover, `src/assets/model-families/<slug>.webp`, above the text when that file exists, and is text only
+ * otherwise. Cards in a row stretch to the tallest and keep their text at the bottom, so text lines up across a row
+ * that mixes cards with and without covers.
  */
 import ArrowRight from '@lucide/astro/icons/arrow-right';
 import type { ImageMetadata } from 'astro';
@@ -25,18 +26,17 @@ const coverFor = (slug: string) => covers[`../../assets/model-families/${slug}.w
   <slot />
   <ul class="grid" role="list">
     {
-      modelFamilies.map(({ slug, name, link, kind, license, vram, formats, hue }) => {
+      modelFamilies.map(({ slug, name, link, kind, license, vram, formats }) => {
         const cover = coverFor(slug);
         return (
           <li>
             <a
               class="card"
               href={withBase(link, base)}
-              style={`--hue: ${hue}`}
               aria-labelledby={`model-${slug}`}
               aria-describedby={`model-${slug}-tagline`}
             >
-              {cover ? (
+              {cover && (
                 <Image
                   class="cover"
                   src={cover}
@@ -44,8 +44,6 @@ const coverFor = (slug: string) => covers[`../../assets/model-families/${slug}.w
                   widths={[400, 640, 960]}
                   sizes="(min-width: 84rem) 20rem, (min-width: 48rem) 34vw, (min-width: 32rem) 50vw, 100vw"
                 />
-              ) : (
-                <span class="cover backdrop" aria-hidden="true" />
               )}
               <span class="body">
                 <span class="title">
@@ -143,40 +141,25 @@ const coverFor = (slug: string) => covers[`../../assets/model-families/${slug}.w
     }
   }
 
+  /* Stretched to the row's tallest card, with the text at the bottom. */
   .card {
-    position: relative;
-    isolation: isolate;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
-    --fade-solid: 6.6rem;
-    --fade-reach: 7.2rem;
-    height: 15rem;
+    height: 100%;
     overflow: hidden;
     border: 1px solid var(--docs-border);
     border-radius: var(--docs-radius-container);
     background-color: var(--docs-surface);
     color: var(--docs-text-strong);
     text-decoration: none;
-    transition: border-color 150ms ease;
-
-    /* The fade to the card surface, which the text sits on. */
-    &::after {
-      position: absolute;
-      z-index: -1;
-      inset: 0;
-      background-image: linear-gradient(
-        to top,
-        var(--docs-surface) var(--fade-solid),
-        color-mix(in oklab, var(--docs-surface) 85%, transparent) calc(var(--fade-solid) + 0.23 * var(--fade-reach)),
-        color-mix(in oklab, var(--docs-surface) 45%, transparent) calc(var(--fade-solid) + 0.54 * var(--fade-reach)),
-        transparent calc(var(--fade-solid) + var(--fade-reach))
-      );
-      content: '';
-    }
+    transition:
+      border-color 150ms ease,
+      background-color 150ms ease;
 
     &:is(:hover, :focus-visible) {
       border-color: var(--docs-border-strong);
+      background-color: var(--docs-control);
       color: var(--docs-text-strong);
     }
 
@@ -186,40 +169,17 @@ const coverFor = (slug: string) => covers[`../../assets/model-families/${slug}.w
     }
   }
 
-  /* One column keeps the sixteen cards short; the fade's solid part still holds the text. */
-  @container models (width < 28rem) {
-    .card {
-      --fade-solid: 6rem;
-      --fade-reach: 4rem;
-      height: 10rem;
-    }
-  }
-
+  /* Covers are cropped to a wide frame above the text. */
   .cover {
-    position: absolute;
-    z-index: -2;
-    inset: 0;
+    display: block;
+    flex: none;
     width: 100%;
-    height: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    margin-bottom: auto;
+    border-bottom: 1px solid var(--docs-border);
     object-fit: cover;
     object-position: center;
-  }
-
-  /* Without a cover: two soft lights in the family's hue over the page background and its dot grid. */
-  .backdrop {
-    background-color: var(--docs-bg);
-    background-image:
-      radial-gradient(70% 90% at 82% 4%, oklch(0.62 0.15 var(--hue) / 0.5), transparent 70%),
-      radial-gradient(60% 70% at 14% 30%, oklch(0.5 0.12 calc(var(--hue) + 50) / 0.4), transparent 70%),
-      radial-gradient(circle, var(--docs-grid-dot) 1px, transparent 1px);
-    background-size:
-      auto,
-      auto,
-      20px 20px;
-  }
-
-  .card:is(:hover, :focus-visible) .cover {
-    filter: brightness(1.08);
   }
 
   .body {
@@ -249,12 +209,12 @@ const coverFor = (slug: string) => covers[`../../assets/model-families/${slug}.w
   .arrow {
     flex-shrink: 0;
     margin-inline-start: auto;
-    color: var(--sl-color-gray-4);
-    transition: color 150ms ease-out;
+    color: var(--docs-text-subtle);
+    transition: color 150ms ease;
   }
 
   .card:is(:hover, :focus-visible) .arrow {
-    color: var(--docs-accent);
+    color: var(--docs-text-strong);
   }
 
   .tagline {
@@ -315,22 +275,6 @@ const coverFor = (slug: string) => covers[`../../assets/model-families/${slug}.w
   .tag--mixed {
     background-color: var(--docs-control);
     color: var(--docs-text-muted);
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .cover {
-      transition: filter 150ms ease;
-    }
-
-    .arrow {
-      transition:
-        color 150ms ease-out,
-        translate 150ms ease-out;
-    }
-
-    .card:is(:hover, :focus-visible) .arrow {
-      translate: 2px 0;
-    }
   }
 
   /* External providers */
