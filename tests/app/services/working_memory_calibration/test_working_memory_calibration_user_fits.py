@@ -736,6 +736,33 @@ def test_removing_a_run_of_a_complete_attempt_discards_only_its_own_measurements
     ]
 
 
+def test_each_reset_forgets_what_the_service_kept_of_the_runs_it_removed(tmp_path: Path, started) -> None:
+    """The service keeps, for the runs it judged, which file holds each and the outcomes of their items it read from
+    the queue. Those last as long as the runs: calibrating and resetting again and again leaves nothing behind."""
+    service = started(tmp_path)
+    run_ids = [
+        _create(service, model_key, attempt_id=f"attempt-{index}", attempt_steps=1)
+        for index, model_key in enumerate(("model-a", "model-a", "model-b", "model-c"))
+    ]
+    items = {run_id: set(_stored_run(tmp_path, run_id)["queue_item_ids"]) for run_id in run_ids}
+    service.refresh_user_fits()
+
+    def kept() -> tuple[set[int], set[str]]:
+        return set(service._item_outcomes), set(service._run_files)
+
+    def of(*ids: str) -> tuple[set[int], set[str]]:
+        return set().union(*(items[run_id] for run_id in ids)), set(ids)
+
+    first, second, third, fourth = run_ids
+    assert kept() == of(*run_ids)
+    service.reset_run(first)
+    assert kept() == of(second, third, fourth)
+    service.reset_model("model-b")
+    assert kept() == of(second, fourth)
+    service.reset_all()
+    assert kept() == (set(), set())
+
+
 def test_removing_a_canceled_run_keeps_its_attempt_aborted(tmp_path: Path, started) -> None:
     service = started(tmp_path)
     _, stopped = _queue_attempt(service, "stopped-then-removed", 2)

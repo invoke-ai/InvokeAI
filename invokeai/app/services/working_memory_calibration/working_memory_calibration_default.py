@@ -572,7 +572,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         self._fits: Mapping[str, _DeviceFit] = {}
         self._fits_lock = threading.Lock()
         # The status of each calibration item `_canceled_runs` found finished in the queue: item ids are never reused,
-        # and a finished item never changes, so an entry holds for the process's lifetime.
+        # and a finished item never changes, so an entry holds until a reset removes its run (`_forget`).
         self._item_outcomes: dict[int, QUEUE_ITEM_STATUS] = {}
         # One object, so that `stop` unregisters exactly what `start` registered.
         self._provider: user_fit.UserFitProvider = self._user_fit_for
@@ -1649,10 +1649,10 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
 
         The items are those the store records: the run's batch, and every retry (recorded as the queue commits it,
         `retries_committed`, and by the runner's observations). The runner's observation decides an item it saw
-        finish. Any other is read from the queue by id once it finished, kept for the process's life since a finished
-        item never changes, and only as the queue holds it with the run's origin: a recreated or restored database
-        gives the id to an unrelated item, and the run's own is gone. Reads the queue only for items without such an
-        outcome."""
+        finish. Any other is read from the queue by id once it finished, kept until a reset removes its run since a
+        finished item never changes, and only as the queue holds it with the run's origin: a recreated or restored
+        database gives the id to an unrelated item, and the run's own is gone. Reads the queue only for items without
+        such an outcome."""
         if not runs:
             return set(), set()
         unknown: dict[int, CalibrationRun] = {
@@ -1923,6 +1923,16 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         _prune_envs(file)
         return result.runs_removed > 0 or result.points_removed > 0, result
 
+    def _forget(self, runs: Iterable[CalibrationRun]) -> None:
+        """Drop what this process keeps of runs a store change removed: the file that held each, and the outcomes of
+        their items, which nothing reads once the runs are gone. Under the fits' lock, so that a refresh judging the
+        file as it was before the removal cannot put an outcome back afterwards."""
+        with self._fits_lock:
+            for run in runs:
+                self._run_files.pop(run.run_id, None)
+                for item_id in set(run.queue_item_ids) | set(run.observed):
+                    self._item_outcomes.pop(item_id, None)
+
     def _hold_reasons(self, file: CalibrationStoreFile) -> dict[str, Optional[CalibrationHoldBack]]:
         """Per stored run of `file`, why its windows are held back now (`_held_back`; None where they are not). Read by
         a reset inside its change of the file, under the file's lock, which the queue's retries take too, before
@@ -1939,39 +1949,48 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         if found is None:
             raise CalibrationRunNotFoundError(run_id)
 
+        removed: list[CalibrationRun] = []
+
         def remove(file: CalibrationStoreFile) -> tuple[bool, WorkingMemoryCalibrationResetResult]:
+            removed.extend(run for run in file.runs if run.run_id == run_id)
             return self._remove(file, {run_id}, reasons=self._hold_reasons(file) if reset else None)
 
         result = self._store.change(found[0], remove)
+        self._forget(removed)
         self._run_files.pop(run_id, None)
         self._try_refresh_user_fits("after a reset")
         return result or WorkingMemoryCalibrationResetResult(runs_removed=0, points_removed=0)
 
     def reset_model(self, model_key: str, device_class_id: Optional[str] = None) -> WorkingMemoryCalibrationResetResult:
         class_id = self._current_device_class_id(device_class_id)
+        removed: list[CalibrationRun] = []
 
         def remove(file: CalibrationStoreFile) -> tuple[bool, WorkingMemoryCalibrationResetResult]:
             reasons = self._hold_reasons(file)
             # Written with the removal or not at all: a node that read the older epoch drops its points of the model.
             file.model_reset_epochs[model_key] = file.model_reset_epochs.get(model_key, 0) + 1
-            run_ids = {run.run_id for run in file.runs if run.model_key == model_key}
-            return True, self._remove(file, run_ids, model_key, reasons=reasons)[1]
+            removed.extend(run for run in file.runs if run.model_key == model_key)
+            return True, self._remove(file, {run.run_id for run in removed}, model_key, reasons=reasons)[1]
 
         result = self._store.change(class_id, remove)
+        self._forget(removed)
         self._try_refresh_user_fits("after a reset")
         return result or WorkingMemoryCalibrationResetResult(runs_removed=0, points_removed=0)
 
     def reset_all(self, device_class_id: Optional[str] = None) -> WorkingMemoryCalibrationResetResult:
         class_id = self._current_device_class_id(device_class_id)
+        removed: list[CalibrationRun] = []
 
         def remove(file: CalibrationStoreFile) -> tuple[bool, WorkingMemoryCalibrationResetResult]:
             result = WorkingMemoryCalibrationResetResult(runs_removed=len(file.runs), points_removed=len(file.points))
             changed = bool(file.runs or file.points or file.envs)
+            removed.extend(file.runs)
             self._remove(file, {run.run_id for run in file.runs}, reasons=self._hold_reasons(file))
             file.points, file.envs = [], []
             return changed, result
 
         result = self._store.change(class_id, remove)
+        self._forget(removed)
         self._try_refresh_user_fits("after a reset")
         return result or WorkingMemoryCalibrationResetResult(runs_removed=0, points_removed=0)
 
