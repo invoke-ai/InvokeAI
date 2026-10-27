@@ -379,3 +379,32 @@ def test_a_capped_window_pools_each_frame_in_space_and_keeps_them_all(
 def test_a_taesd_decoder_refuses_a_latent_window(taesd: TaesdDecoder) -> None:
     with pytest.raises(ValueError, match="not a \\(B, C, T, h, w\\) window"):
         decode_preview(taesd, _latent(1, 4, 2, 3, 3))
+
+
+@pytest.mark.parametrize(
+    ("layout", "latent", "frames_per_latent", "stage_pixels"),
+    [
+        # 8x, no patches: the full-resolution stage is the image, 32 x 48 pixels; four frames per latent frame.
+        (TAEW2_1, (1, 16, 4, 6), 4, 32 * 48),
+        # 16x with 2x2 patches: the stage runs at half the 64 x 96 image.
+        (TAEW2_2, (1, 48, 4, 6), 4, 32 * 48),
+        # 32x with 4x4 patches and eight frames per latent frame: a quarter of the 128 x 192 image.
+        (TAELTX2_3, (1, 128, 4, 6), 8, 32 * 48),
+    ],
+    ids=["taew2_1", "taew2_2", "taeltx2_3"],
+)
+def test_a_video_decode_reserves_its_live_activations_and_workspace_per_output_frame(
+    layout, latent: tuple[int, ...], frames_per_latent: int, stage_pixels: int
+) -> None:
+    decoder = build_taehv_decoder(layout)
+
+    # 2.25 live 64-channel float32 activations and 2 of workspace per output frame of the full-resolution stage.
+    per_output_frame = (2.25 + 2) * 64 * stage_pixels * 4
+    assert decode_working_memory_bytes(decoder, _latent(*latent)) == per_output_frame * frames_per_latent
+    window = _latent(latent[0], latent[1], 2, *latent[2:])
+    assert decode_working_memory_bytes(decoder, window) == per_output_frame * frames_per_latent * 2
+
+
+def test_a_video_decode_is_priced_at_its_own_cap(taew2_1: TinyAutoencoderDecoder) -> None:
+    """taew2_1's 512-pixel cap decodes a 128 x 128 latent (1024 pixels) at 64 x 64."""
+    assert decode_working_memory_bytes(taew2_1, _latent(1, 16, 128, 128)) == (2.25 + 2) * 64 * 512 * 512 * 4 * 4

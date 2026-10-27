@@ -327,3 +327,54 @@ def test_an_explicit_shift_reaches_the_scheduler(monkeypatch, tmp_path) -> None:
     mu = _run_to_scheduler(monkeypatch, tmp_path / "qwen-image.gguf", 4096, 4096, shift=3.0)
 
     assert mu == pytest.approx(1.0986122886681098, abs=1e-12)  # ln 3
+
+
+def test_no_preview_is_sent_before_the_transformer_is_locked(monkeypatch, tmp_path) -> None:
+    """A Tiny AutoEncoder preview places its TAE next to the locked model; before the lock there is none to fit."""
+    monkeypatch.setattr(qwen_image_denoise, "QwenImageTransformer2DModel", _TinyQwenImageTransformer)
+    monkeypatch.setattr(qwen_image_denoise.TorchDevice, "choose_torch_device", lambda: torch.device("cpu"))
+    events: list[str] = []
+
+    class _Locked(Exception):
+        """Ends the run once the transformer is locked: what follows needs a real transformer."""
+
+    class _Transformer(_TinyQwenImageTransformer):
+        def modules(self):
+            return iter(())
+
+    def lock(**_kwargs):
+        events.append("lock")
+        raise _Locked
+
+    conditioning = ConditioningFieldData(conditionings=[QwenImageConditioningInfo(prompt_embeds=torch.zeros(1, 4, 8))])
+    context = SimpleNamespace(
+        models=SimpleNamespace(
+            load=lambda _identifier: SimpleNamespace(model=_Transformer(), model_on_device=lock),
+            get_config=lambda _identifier: SimpleNamespace(),
+            get_absolute_path=lambda _config: tmp_path / "qwen-image.gguf",
+        ),
+        conditioning=SimpleNamespace(load=lambda _name: conditioning),
+        util=SimpleNamespace(sd_step_callback=lambda *_args: events.append("preview")),
+    )
+    node = QwenImageDenoiseInvocation.model_construct(
+        latents=None,
+        reference_latents=None,
+        denoise_mask=None,
+        control=None,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        transformer=SimpleNamespace(transformer=SimpleNamespace(), loras=[]),
+        positive_conditioning=SimpleNamespace(conditioning_name="positive"),
+        negative_conditioning=None,
+        cfg_scale=1.0,
+        width=64,
+        height=64,
+        steps=2,
+        seed=0,
+        shift=None,
+    )
+
+    with pytest.raises(_Locked):
+        node._run_diffusion(context)
+
+    assert events == ["lock"]

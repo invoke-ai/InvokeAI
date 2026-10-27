@@ -37,6 +37,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+from typing import Final
+
 import torch
 import torch.nn as nn
 
@@ -74,6 +76,26 @@ class Block(nn.Module):
         return self.fuse(self.conv(x) + self.skip(x))
 
 
+_LAST_STAGE_CHANNELS: Final = 64
+"""Width of a TAESD decoder's full-resolution stage, the last `Block` and the convolution before it."""
+
+_LIVE_ACTIVATIONS: Final = 3
+"""Full-resolution activations a TAESD decode holds at once, read off the decoder above.
+
+The peak is in the last `Block`, the only one at full resolution. Its input stays referenced while its conv branch
+runs, and `nn.ReLU` is not in place, so each layer of the branch has its own input and output live next to the block's
+input: three tensors. Adding the branch's output to the input (the skip is an identity) and fusing the sum holds three
+again. Every earlier stage runs at half resolution or less. TAEQI2.1's last stage runs at half resolution and holds a
+quarter of this; the bound reserves it the same.
+"""
+
+_CONV_WORKSPACE_ACTIVATIONS: Final = 2
+"""The convolutions' workspace on top, in activation-sized buffers. Measured, and it depends on the algorithm the
+backend picks: on an RTX 4090 in fp16, `max_memory_allocated` grew by 640 MiB over a 1024x1024 decode, five
+activations, two more than the structure holds.
+"""
+
+
 class TaesdDecoder(TinyAutoencoderDecoder, nn.Sequential):
     """An upstream decoder `nn.Sequential`, and what its input and output look like."""
 
@@ -86,6 +108,12 @@ class TaesdDecoder(TinyAutoencoderDecoder, nn.Sequential):
         # size and scaling down would look better (SDXL 36.3 vs 30.7 dB against the VAE) but carries that
         # uncapped cost, so `decode_preview` area-downsamples the latent instead.
         self.max_preview_edge = 1024
+
+    def preview_working_memory_bytes(self, height: int, width: int, frames: int) -> int:
+        """640 MiB at 1024x1024 in fp16. `frames` is always 1: a TAESD decoder decodes no windows."""
+        pixels = height * width * self.spatial_compression**2
+        activation_bytes = _LAST_STAGE_CHANNELS * pixels * next(self.parameters()).element_size()
+        return (_LIVE_ACTIVATIONS + _CONV_WORKSPACE_ACTIVATIONS) * activation_bytes
 
 
 def Decoder(latent_channels: int = 4, use_midblock_gn: bool = False, image_channels: int = 3) -> TaesdDecoder:

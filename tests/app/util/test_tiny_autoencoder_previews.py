@@ -563,7 +563,8 @@ def test_a_latent_window_is_decoded_by_the_video_tae_of_its_space() -> None:
     config = SimpleNamespace(
         key="taew2_1", name="TAEW2.1", type=ModelType.TinyAutoencoder, base=BaseModelType.Wan, latent_channels=16
     )
-    previews = _previews(_services(_Store([config]), _load(taew2_1)))
+    load = _load(taew2_1)
+    previews = _previews(_services(_Store([config]), load))
     window = _wan_window()
 
     image, size = previews.render(BaseModelType.Wan, window)
@@ -573,6 +574,9 @@ def test_a_latent_window_is_decoded_by_the_video_tae_of_its_space() -> None:
     expected = last.clamp(0, 1).mul(255).round().to(torch.uint8).permute(1, 2, 0).numpy()
     assert np.array_equal(np.asarray(image), expected)
     assert size == (64, 48)
+    # The lock keeps the whole window's decode free: two latent frames, four output frames each, of the 48 x 64
+    # image, at 2.25 live float32 activations and 2 of workspace per output frame.
+    assert load.loaded.working_mem_requests == [(2.25 + 2) * 64 * (48 * 64) * 4 * 8]
 
 
 def test_a_missing_tae_names_the_starter_of_its_space_even_under_another_base(caplog: pytest.LogCaptureFixture) -> None:

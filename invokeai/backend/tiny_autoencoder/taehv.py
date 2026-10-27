@@ -34,6 +34,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import math
+from typing import Final
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -78,6 +81,26 @@ class TGrow(nn.Module):
         return self.conv(x).reshape(-1, c, h, w)
 
 
+_LAST_STAGE_CHANNELS: Final = 64
+"""Width of a TAEHV decoder's last two stages, which run at a half and at the full resolution."""
+
+_LIVE_ACTIVATIONS_PER_FRAME: Final = 2.25
+"""Full-resolution activations a TAEHV decode holds at once per output frame, read off the decoder below.
+
+The peak is the convolution after the last `TGrow`: its input, every output frame at full resolution, and its output
+are live together, two per output frame. The last memory block's `past` is still referenced: half the output frames
+plus one frame of padding, at half resolution, at most a quarter more per output frame. Earlier stages hold less.
+"""
+
+_CONV_WORKSPACE_ACTIVATIONS_PER_FRAME: Final = 2
+"""The convolutions' workspace on top, in activation-sized buffers per output frame. Measured, and it depends on the
+algorithm the backend picks: on an RTX 4090 in fp16, one latent decoded at 1024x1024 grew `max_memory_allocated` by
+2145 MiB for taew2_1, 536 MiB for taew2_2 and 266 MiB for taeltx2_3, 16.75, 16.76 and 33.3 activations of their
+full-resolution stage. Their structure holds 8.75, 8.75 and 17.25 (four, four and eight output frames): two more per
+output frame.
+"""
+
+
 class TaehvDecoder(TinyAutoencoderDecoder):
     """The base TAEHV decoder for one latent space.
 
@@ -116,6 +139,14 @@ class TaehvDecoder(TinyAutoencoderDecoder):
         # under TAESD's ~640 MB. A window of latent frames costs about that per frame: Wan video's
         # two-frame window doubles the memory (see `PREVIEW_LATENT_WINDOW` in `wan_video_denoise.py`).
         self.max_preview_edge = 512 if patch_size == 1 else 1024
+
+    def preview_working_memory_bytes(self, height: int, width: int, frames: int) -> int:
+        """2176 MiB for taew2_1 at 1024x1024 in fp16, 544 MiB at its 512 cap; that again per latent frame of a window."""
+        output_frames = frames * self.t_upscale
+        stage_pixels = height * width * (self.spatial_compression // self.patch_size) ** 2
+        activation_bytes = _LAST_STAGE_CHANNELS * stage_pixels * next(self.parameters()).element_size()
+        per_frame = _LIVE_ACTIVATIONS_PER_FRAME + _CONV_WORKSPACE_ACTIVATIONS_PER_FRAME
+        return math.ceil(per_frame * output_frames * activation_bytes)
 
     def _decode_frames(self, x: torch.Tensor) -> torch.Tensor:
         """`(N, T, C, h, w)` latents to `(N, T * t_upscale, 3, H, W)` frames in [0, 1], untrimmed.

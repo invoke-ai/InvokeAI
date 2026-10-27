@@ -578,6 +578,27 @@ def test_run_diffusion_applies_mixed_cfg_only_at_enabled_steps(monkeypatch, tmp_
     assert transformer.conditioning_values == [1.0, 0.0, 1.0]
 
 
+def test_every_preview_is_sent_while_the_transformer_is_locked(monkeypatch, tmp_path) -> None:
+    """A Tiny AutoEncoder preview places its TAE next to the locked model; before the lock there is none to fit."""
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    context = _runtime_context(tmp_path, transformer)
+    events: list[str] = []
+
+    @contextmanager
+    def locked(**_kwargs):
+        events.append("lock")
+        yield ({}, transformer)
+        events.append("unlock")
+
+    context.models.load = lambda _identifier: SimpleNamespace(model=transformer, model_on_device=locked)
+    context.util.sd_step_callback = lambda *_args: events.append("preview")
+
+    _runtime_invocation(cfg_scale=1.0)._run_diffusion(context)
+
+    assert events == ["lock", "preview", "preview", "preview", "unlock"]
+
+
 def test_run_diffusion_treats_an_empty_negative_collection_as_absent(monkeypatch, tmp_path) -> None:
     _patch_runtime(monkeypatch)
     transformer = _Transformer()

@@ -471,16 +471,6 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         step_callback = self._build_step_callback(context)
 
-        step_callback(
-            PipelineIntermediateState(
-                step=0,
-                order=1,
-                total_steps=total_steps,
-                timestep=int(timesteps_sched[0].item()) if len(timesteps_sched) > 0 else 0,
-                latents=self._unpack_latents(latents, latent_height, latent_width),
-            ),
-        )
-
         noisy_seq_len = latents.shape[1]
         model_input_seq_len = noisy_seq_len + (ref_latents_packed.shape[1] if ref_latents_packed is not None else 0)
 
@@ -547,6 +537,16 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                         transformer, control_branch, control_context, scale=self.control.control_context_scale
                     )
                 )
+            # Inside the lock: a Tiny AutoEncoder preview loads its TAE only if it fits next to the locked model.
+            step_callback(
+                PipelineIntermediateState(
+                    step=0,
+                    order=1,
+                    total_steps=total_steps,
+                    timestep=int(timesteps_sched[0].item()) if len(timesteps_sched) > 0 else 0,
+                    latents=self._unpack_latents(latents, latent_height, latent_width),
+                ),
+            )
             # Quantized weights (packed nvfp4 Linears, GGUF, SDNQ) cannot take a direct patch, so their LoRAs ride as
             # sidecars. Asked of the loaded module tree: a `checkpoint` build may hold packed Linears.
             model_is_quantized = requires_sidecar_patching(transformer, transformer_config.format)

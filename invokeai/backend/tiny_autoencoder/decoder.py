@@ -17,6 +17,12 @@ class TinyAutoencoderDecoder(nn.Module):
     max_preview_edge: int
     """Longest preview edge, in pixels, this decoder renders; a larger latent is downsampled first."""
 
+    def preview_working_memory_bytes(self, height: int, width: int, frames: int) -> int:
+        """What decoding a `(height, width)` latent, or a window of `frames` latent frames, takes on the compute device
+        besides the weights: an upper bound on its live activations and its convolutions' workspace, at the
+        decoder's element size."""
+        raise NotImplementedError
+
     def decode_window(self, window: torch.Tensor) -> torch.Tensor:
         """The image of the last frame of a `(B, C, T, h, w)` latent window, the earlier ones as its context."""
         raise ValueError(f"{type(self).__name__} decodes single latents, not a (B, C, T, h, w) window of latent frames")
