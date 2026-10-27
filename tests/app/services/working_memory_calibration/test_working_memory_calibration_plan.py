@@ -558,6 +558,67 @@ def test_a_main_model_picks_a_gpu_vae_where_generate_could_fill_in_one_on_the_cp
     assert {tuple(case.components.items()) for case in _plan(flux, [gpu]).cases} == {()}
 
 
+def _with_default_vae(model: SimpleNamespace, vae_key: str) -> SimpleNamespace:
+    return SimpleNamespace(**{**vars(model), "default_settings": SimpleNamespace(vae=vae_key)})
+
+
+SDXL_CPU_VAE = _model("sdxl-cpu-vae", BaseModelType.StableDiffusionXL, ModelType.VAE, cpu_only=True)
+
+
+def test_an_sd_model_whose_default_vae_runs_on_the_cpu_cannot_be_calibrated() -> None:
+    """Selecting the model applies its default VAE (`getModelDefaultVae`), and the SD graph decodes with it; an SD case
+    has no `vae` slot to pick another. A default the model does not accept is not applied, so its own VAE decodes."""
+    sdxl = _with_default_vae(_model("sdxl", BaseModelType.StableDiffusionXL), "sdxl-cpu-vae")
+    gpu_vae = _model("sdxl-gpu-vae", BaseModelType.StableDiffusionXL, ModelType.VAE)
+    sd1_cpu_vae = _model("sd1-cpu-vae", BaseModelType.StableDiffusion1, ModelType.VAE, cpu_only=True)
+
+    plan = _plan(sdxl, [SDXL_CPU_VAE, gpu_vae])
+
+    assert not plan.supported and plan.cases == []
+    assert "default VAE, SDXL-CPU-VAE, which runs on the CPU" in (plan.reason or "")
+    assert _plan(_with_default_vae(sdxl, "sdxl-gpu-vae"), [SDXL_CPU_VAE, gpu_vae]).supported
+    assert _plan(_with_default_vae(sdxl, "sd1-cpu-vae"), [sd1_cpu_vae]).supported
+
+
+def test_an_sd_vae_is_calibrated_through_a_main_model_whose_default_vae_runs_on_the_gpu() -> None:
+    sdxl_vae = _model("sdxl-vae", BaseModelType.StableDiffusionXL, ModelType.VAE)
+    on_the_cpu = _with_default_vae(_model("a-sdxl", BaseModelType.StableDiffusionXL), "sdxl-cpu-vae")
+    own_vae = _model("b-sdxl", BaseModelType.StableDiffusionXL)
+
+    plan = _plan(sdxl_vae, [on_the_cpu, own_vae, SDXL_CPU_VAE])
+    alone = _plan(sdxl_vae, [on_the_cpu, SDXL_CPU_VAE])
+
+    assert (plan.supported, plan.calibrated_through) == (True, "b-sdxl")
+    assert not alone.supported and "A-SDXL decodes with its default VAE" in (alone.reason or "")
+
+
+def test_a_model_with_a_vae_slot_picks_a_gpu_vae_over_its_default_one_on_the_cpu() -> None:
+    sd3 = _with_default_vae(_model("sd3", BaseModelType.StableDiffusion3), "a-cpu-vae")
+    cpu = _model("a-cpu-vae", BaseModelType.StableDiffusion3, ModelType.VAE, cpu_only=True)
+    gpu = _model("b-gpu-vae", BaseModelType.StableDiffusion3, ModelType.VAE)
+
+    assert {tuple(case.components.items()) for case in _plan(sd3, [cpu, gpu]).cases} == {(("vae", "b-gpu-vae"),)}
+    alone = _plan(sd3, [cpu])
+    assert not alone.supported and "no compatible VAE that runs on the GPU" in (alone.reason or "")
+
+
+def test_a_pipeline_with_a_default_vae_decodes_with_it_in_the_standalone_vaes_dtype() -> None:
+    """The FLUX.2 and Z-Image model loader nodes take the `vae` setting over the pipeline's own VAE. Under `precision:
+    float32` a standalone FLUX VAE stays fp32 where the FLUX.2 pipeline's own loads in bf16; one on the CPU gives way to
+    a pick on the GPU."""
+    klein = _model("klein", BaseModelType.Flux2, format="diffusers")
+    cpu = _model("a-cpu-vae", BaseModelType.Flux2, ModelType.VAE, cpu_only=True)
+    gpu = _model("b-gpu-vae", BaseModelType.Flux2, ModelType.VAE)
+
+    assert _lines_of(_plan(klein, [cpu, gpu], vae_dtypes=FP32_VAES)) == {("decode_bf16", ())}
+    assert _lines_of(_plan(_with_default_vae(klein, "b-gpu-vae"), [cpu, gpu], vae_dtypes=FP32_VAES)) == {
+        ("decode_fp32", ())
+    }
+    assert _lines_of(_plan(_with_default_vae(klein, "a-cpu-vae"), [cpu, gpu], vae_dtypes=FP32_VAES)) == {
+        ("decode_fp32", (("vae", "b-gpu-vae"),))
+    }
+
+
 @pytest.mark.parametrize(
     "target, models, reason",
     [
