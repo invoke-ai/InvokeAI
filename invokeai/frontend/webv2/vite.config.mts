@@ -52,6 +52,9 @@ const ROUTE_SHARED_MODULES = [
   '/platform/browser/downloadBlob.ts',
   // Editor search fields and the lazy pickers share the IME guard; alone it costs a startup request.
   '/platform/browser/imeComposition.ts',
+  // The settings dialog (boot) and the lazy Launchpad managers share the `/` search shortcut; alone it costs a startup
+  // request.
+  '/platform/browser/searchShortcut.ts',
   // The route's recovery peek and the lazy editor share the editor-session lock probe; alone they cost a startup request.
   '/platform/browser/webLocks.ts',
   '/workbench/projects/editorSession.ts',
@@ -133,6 +136,9 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/features/gallery/ui/GalleryItemSearch.tsx',
   // The image menu (editor boot) and the lazy layer menu share the board destination list; alone it costs a request.
   '/workbench/image-actions/GalleryBoardDestinationGroups.tsx',
+  // The image menu's canvas destinations and the lazy Layers widget share the layer-kind glyphs; alone they cost a
+  // request.
+  '/workbench/widgets/layers/layerTypeIcon.ts',
   '/app/GalleryUiAdapter.tsx',
   '/features/generation/core/prompt/ast.ts',
   '/features/generation/core/prompt/attention.ts',

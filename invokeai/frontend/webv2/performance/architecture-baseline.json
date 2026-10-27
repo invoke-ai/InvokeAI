@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 808399,
+        "brotliBytes": 811093,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 807399,
+        "gzipBytes": 810254,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2083953,
-        "largestAssetRawBytes": 751904,
+        "initialRawBytes": 2092633,
+        "largestAssetRawBytes": 751877,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 103029,
+        "ownedRawBytes": 104738,
         "requestCount": 35,
         "scriptRequestCount": 19,
         "sourceOwners": [
@@ -130,6 +130,7 @@
           "source:src/app/loggingRuntime.ts",
           "source:src/app/main.tsx",
           "source:src/app/router.tsx",
+          "source:src/app/startupRedirect.ts",
           "source:src/assets/SplashImage.webp",
           "source:src/features/fonts/data/keys.ts",
           "source:src/features/fonts/launchpad.tsx",
@@ -186,6 +187,7 @@
           "source:src/platform/browser/imeComposition.ts",
           "source:src/platform/browser/knownBrowserIssues.ts",
           "source:src/platform/browser/randomUuid.ts",
+          "source:src/platform/browser/searchShortcut.ts",
           "source:src/platform/browser/sha256.ts",
           "source:src/platform/browser/webLocks.ts",
           "source:src/platform/core/concurrency.ts",
@@ -352,15 +354,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1216912,
+        "brotliBytes": 1227918,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1209036,
+        "gzipBytes": 1220426,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3350470,
-        "largestAssetRawBytes": 751904,
+        "initialRawBytes": 3385928,
+        "largestAssetRawBytes": 751877,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 156430,
+        "ownedRawBytes": 157416,
         "requestCount": 71,
         "scriptRequestCount": 55,
         "sourceOwners": [
@@ -500,6 +502,7 @@
           "source:src/app/loggingRuntime.ts",
           "source:src/app/main.tsx",
           "source:src/app/router.tsx",
+          "source:src/app/startupRedirect.ts",
           "source:src/app/workbenchPorts.tsx",
           "source:src/assets/SplashImage.webp",
           "source:src/features/fonts/data/keys.ts",
@@ -726,6 +729,7 @@
           "source:src/platform/browser/imeComposition.ts",
           "source:src/platform/browser/knownBrowserIssues.ts",
           "source:src/platform/browser/randomUuid.ts",
+          "source:src/platform/browser/searchShortcut.ts",
           "source:src/platform/browser/sha256.ts",
           "source:src/platform/browser/webLocks.ts",
           "source:src/platform/core/concurrency.ts",
@@ -1033,6 +1037,7 @@
           "source:src/workbench/shell/topbar/RoutingControl.tsx",
           "source:src/workbench/shell/topbar/RoutingDestinationSegments.tsx",
           "source:src/workbench/shell/topbar/TopBar.tsx",
+          "source:src/workbench/shell/topbar/TopbarMenuChevron.tsx",
           "source:src/workbench/shell/topbar/TopbarProgressRail.tsx",
           "source:src/workbench/shell/topbar/TopbarShortcutKeys.tsx",
           "source:src/workbench/shell/topbar/index.ts",
@@ -1092,6 +1097,7 @@
           "source:src/workbench/widgets/image-map/manifest.ts",
           "source:src/workbench/widgets/image-map/settingsContribution.ts",
           "source:src/workbench/widgets/layers/layerPropertiesRequestStore.ts",
+          "source:src/workbench/widgets/layers/layerTypeIcon.ts",
           "source:src/workbench/widgets/layers/manifest.ts",
           "source:src/workbench/widgets/layers/panes/editorPaneLayout.ts",
           "source:src/workbench/widgets/layers/revealLayerProperties.ts",
@@ -1120,7 +1126,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-10-24",
+  "capturedAt": "2026-10-27",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",
