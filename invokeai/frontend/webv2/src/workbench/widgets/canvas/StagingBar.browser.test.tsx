@@ -1,4 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
+import type { QueueItemProgress } from '@features/queue/contracts';
 import type { CanvasStagingSlot } from '@workbench/canvasStagingView';
 
 import { Box, ChakraProvider } from '@chakra-ui/react';
@@ -15,6 +16,11 @@ import { StagingBar } from './StagingBar';
 
 const contextMenu = vi.hoisted(() => ({
   targets: [] as { slotId: string; x: number; y: number }[],
+}));
+const queueProgress = vi.hoisted(() => ({ current: null as QueueItemProgress | null }));
+vi.mock('@features/queue/react', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useQueueItemProgress: () => queueProgress.current,
 }));
 vi.mock('./StagingItemContextMenu', () => ({
   StagingItemContextMenu: ({ target }: { target: { slot: { id: string }; x: number; y: number } }) => {
@@ -244,6 +250,35 @@ describe('StagingBar thumbnail strip', () => {
     expect(document.querySelector('[data-testid="staging-context-menu"]')).not.toBeNull();
   });
 
+  it('shows the spinner on the executing placeholder until its progress is known', async () => {
+    const indicators = () => [...host!.querySelectorAll('[role="progressbar"]')];
+    const remount = async () => {
+      await interact(() => root?.unmount());
+      host?.remove();
+      host = null;
+      await renderStagingBar(3, 0, noop, noop, noop, makePlaceholder);
+    };
+
+    try {
+      // Zero reads as not started yet, as on every other progress surface.
+      for (const percentage of [null, 0]) {
+        queueProgress.current = { activeItemIndex: 1, message: 'Loading model', percentage };
+        await remount();
+        expect(indicators()).toHaveLength(1);
+        expect(indicators()[0]!.classList.contains('chakra-spinner')).toBe(true);
+        expect(indicators()[0]!.getAttribute('aria-label')).toBe('Generation progress');
+      }
+
+      queueProgress.current = { activeItemIndex: 1, message: 'Denoising', percentage: 0.42 };
+      await remount();
+      expect(indicators()).toHaveLength(1);
+      expect(indicators()[0]!.classList.contains('chakra-spinner')).toBe(false);
+      expect(indicators()[0]!.getAttribute('aria-valuenow')).toBe('42');
+    } finally {
+      queueProgress.current = null;
+    }
+  });
+
   it('leaves the native menu alone on an in-progress placeholder', async () => {
     const { thumbnails } = await renderStagingBar(3, 0, noop, noop, noop, makePlaceholder);
     const before = contextMenu.targets.length;
@@ -342,6 +377,13 @@ describe('StagingBar thumbnail strip', () => {
       }
       // The accept action keeps its full name, and Tooltip, however narrow the bar.
       expect(accept.getAttribute('aria-label')).toBe('Accept to Layer');
+      // Labelled or collapsed to its icon, the auto-switch trigger keeps the height of the bar's other controls.
+      expect(
+        page
+          .getByRole('button', { name: /^Auto-switch:/ })
+          .element()
+          .getBoundingClientRect().height
+      ).toBe(page.getByRole('button', { exact: true, name: 'Discard' }).element().getBoundingClientRect().height);
       // Collapsed or not, Discard All and the generating status keep their names.
       await expect.element(page.getByRole('button', { name: 'Discard All' })).toBeVisible();
       expect(page.getByRole('status').element().textContent).toBe('Generating…');

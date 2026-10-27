@@ -13,7 +13,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PreviewDetailsPopover } from './PreviewDetailsPopover';
+import { PreviewDetailsPanel } from './PreviewDetailsPanel';
 
 const galleryMocks = vi.hoisted(() => ({
   imageMetadata: vi.fn(),
@@ -150,6 +150,8 @@ void i18n.use(initReactI18next).init({
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
+/** The Preview stage Details pins itself into. */
+let stage: HTMLDivElement | null = null;
 let queryClient: QueryClient;
 let actions: ImageActions;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -176,13 +178,13 @@ const renderDetails = async ({
       <QueryClientProvider client={queryClient}>
         <I18nextProvider i18n={i18n}>
           <ChakraProvider value={system}>
-            <PreviewDetailsPopover
+            <PreviewDetailsPanel
               actions={actions}
               image={item.kind === 'image' ? actionImage : null}
               isOpen={isOpen}
               item={item}
               position={POSITION}
-              stageElement={null}
+              stageElement={stage}
               onOpenChange={() => undefined}
             />
           </ChakraProvider>
@@ -207,7 +209,9 @@ beforeEach(() => {
     defaultOptions: { queries: { gcTime: Infinity, retry: false } },
   });
   host = document.createElement('div');
-  document.body.append(host);
+  stage = document.createElement('div');
+  Object.assign(stage.style, { height: '480px', position: 'relative', width: '640px' });
+  document.body.append(host, stage);
   root = createRoot(host);
 });
 
@@ -215,8 +219,10 @@ afterEach(async () => {
   await interact(() => root?.unmount(), 0);
   queryClient.clear();
   host?.remove();
+  stage?.remove();
   host = null;
   root = null;
+  stage = null;
 });
 
 describe('Preview query-driven Details', () => {
@@ -251,8 +257,6 @@ describe('Preview query-driven Details', () => {
 
     await renderDetails({ isOpen: false, item: imageItem });
 
-    // The popover's exit runs through zag outside act; settle it before asserting.
-    await interact(() => undefined, 600);
     expect(metadataSignal.aborted).toBe(true);
     await interact(() => {
       metadata.resolve(null);
@@ -292,8 +296,6 @@ describe('Preview query-driven Details', () => {
 
     await renderDetails({ isOpen: false, item: videoItem });
 
-    // The popover's exit runs through zag outside act; settle it before asserting.
-    await interact(() => undefined, 600);
     expect(metadataSignal.aborted).toBe(true);
     expect(workflowSignal.aborted).toBe(true);
     expect(galleryMocks.videoMetadata).toHaveBeenCalledOnce();
@@ -350,8 +352,6 @@ describe('Preview query-driven Details', () => {
     identityMocks.accountEpoch = 8;
     await renderDetails({ isOpen: true, item: videoItem });
 
-    // The popover's exit runs through zag outside act; settle it before asserting.
-    await interact(() => undefined, 600);
     expect(oldSignal.aborted).toBe(true);
     expect(galleryMocks.videoMetadata).toHaveBeenCalledTimes(2);
     expect(queryClient.getQueryCache().find({ queryKey: ['preview', 'details', 8, 'video:clip.mp4'] })).toBeDefined();

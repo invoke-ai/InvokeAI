@@ -29,6 +29,7 @@ import { commands, userEvent } from 'vitest/browser';
 
 import { LivePreviewFollowProvider, useLivePreviewFollow } from './livePreviewFollow';
 import { usePreviewHeaderContext, type PreviewItemPosition } from './previewHeaderStore';
+import { PreviewWidgetLabel } from './PreviewWidgetChrome';
 
 const queueItem: QueueItem = {
   backendItemIds: [1],
@@ -103,7 +104,13 @@ const mocks = vi.hoisted(() => {
   return {
     commands: {
       account: { updateProjectPreferences: vi.fn() },
-      gallery: { selectImage: vi.fn(), selectItem: vi.fn(), setCompareImage: vi.fn(), setCompareItem: vi.fn() },
+      gallery: {
+        clearSelection: vi.fn(),
+        selectImage: vi.fn(),
+        selectItem: vi.fn(),
+        setCompareImage: vi.fn(),
+        setCompareItem: vi.fn(),
+      },
       notifications: { reportError: vi.fn() },
       widgets: { patchValues: vi.fn() },
     },
@@ -399,13 +406,13 @@ vi.mock('@features/gallery/contracts', async (importOriginal) => ({
 
 vi.mock('@workbench/image-actions', async () => ({
   EMPTY_IMAGE_RECALL_CAPABILITIES: {},
+  GalleryCanvasImportMenuItems: () => null,
   ImageContextMenu: () => null,
   RecallActionButtons: () => null,
   buildImageRecallSettings: () => ({}),
   executeImageRecall: () => {},
   getCurrentGenerateValues: () => ({}),
   getImageRecallVerb: () => ({ icon: () => null, label: '' }),
-  getGalleryCanvasImportMenuItems: () => [],
   getImageContextMenuImages: () => [],
   getImageContextMenuRecallRequestKey: () => null,
   getImageRecallCapabilities: () => ({}),
@@ -444,8 +451,10 @@ await i18n.use(initReactI18next).init({
       translation: {
         common: { countOfTotal: '{{count}} of {{total}}', generating: 'Generating' },
         widgets: {
+          gallery: { commands: { clearSelection: 'Clear gallery selection' } },
           preview: {
             commands: { nextItem: 'Show next item', previousItem: 'Show previous item' },
+            noGallerySelection: 'No gallery selection',
             framesPerSecond: '{{count}} fps',
             itemCount_one: '{{count}} item',
             itemCount_other: '{{count}} items',
@@ -539,7 +548,13 @@ const ShellDndContext = ({ children }: Pick<DndContextProps, 'children'>) => {
   return <DndContext sensors={sensors}>{children}</DndContext>;
 };
 
-/** The center region as the shell frames it: the focusable region container around the widget's own frame. */
+// Off unless a test renders the center chrome's label beside the view.
+let showsHeaderLabel = false;
+
+/**
+ * The center region as the shell frames it: the focusable region container around the widget's own frame, with the
+ * chrome's label after the frame, outside it.
+ */
 const CenterRegion = ({ children }: Pick<DndContextProps, 'children'>) => (
   <section data-testid="center-region" {...useFocusRegionProps('center')} tabIndex={-1}>
     <div
@@ -549,6 +564,11 @@ const CenterRegion = ({ children }: Pick<DndContextProps, 'children'>) => (
     >
       {children}
     </div>
+    {showsHeaderLabel ? (
+      <div data-testid="center-label">
+        <PreviewWidgetLabel region="center" />
+      </div>
+    ) : null}
   </section>
 );
 
@@ -755,6 +775,8 @@ beforeEach(() => {
   mocks.commands.account.updateProjectPreferences.mockClear();
   mocks.commands.gallery.selectImage.mockClear();
   mocks.commands.gallery.selectItem.mockClear();
+  mocks.commands.gallery.clearSelection.mockReset();
+  showsHeaderLabel = false;
   vi.mocked(requestGalleryItemReveal).mockClear();
   mocks.project.queue.items = [];
   mocks.project.settings.viewerAutoSwitch = 'off';
@@ -3550,7 +3572,7 @@ describe('preview keyboard navigation boundary', () => {
     expect([...registeredHotkeys.keys()]).not.toContain('viewer.zoomToFit');
   });
 
-  it('binds I to toggling the details popover through the preview widget value', async () => {
+  it('binds I to toggling the details panel through the preview widget value', async () => {
     await render();
 
     expect(registeredHotkeys.get('viewer.toggleMetadata')).toEqual(['i']);
@@ -3818,4 +3840,61 @@ describe('preview image recovery', () => {
       await imageRouteCommands.stopThumbnailRoute();
     }
   }, 20_000);
+});
+
+describe('preview label clear selection', () => {
+  const clearButton = () =>
+    host!.querySelector<HTMLButtonElement>('[data-testid="center-label"] button[aria-label="Clear gallery selection"]');
+  const centerRegion = () => host!.querySelector<HTMLElement>('[data-testid="center-region"]');
+
+  beforeEach(() => {
+    showsHeaderLabel = true;
+    // What the reducer's clearGallerySelection does to these values; recent results stay.
+    mocks.commands.gallery.clearSelection.mockImplementation(() =>
+      setGalleryValues({ selectedImage: null, selectedImageName: null, selectedImageNames: [] })
+    );
+  });
+
+  const expectCleared = async () => {
+    expect(mocks.commands.gallery.clearSelection).toHaveBeenCalledOnce();
+    await rerender();
+
+    expect(clearButton()).toBeNull();
+    expect(host!.querySelector('[data-testid="center-label"]')?.textContent).toBe('');
+    expect(host!.textContent).toContain('No gallery selection');
+    // The button left with the selection; focus moves to the Preview's region rather than the document body.
+    await expect.poll(() => document.activeElement).toBe(centerRegion());
+  };
+
+  it('clears the selection from the image name, leaving the empty state though recent results exist', async () => {
+    await render();
+
+    await expect.poll(() => host!.querySelector('[data-testid="center-label"]')?.textContent).toContain('newest');
+    expect(host!.textContent).not.toContain('No gallery selection');
+
+    await userEvent.click(clearButton()!);
+
+    await expectCleared();
+  });
+
+  it('clears the selection from the keyboard', async () => {
+    await render();
+    await expect.poll(clearButton).not.toBeNull();
+
+    await act(async () => {
+      clearButton()!.focus();
+      await userEvent.keyboard('{Enter}');
+    });
+
+    await expectCleared();
+  });
+
+  it('offers no clear control without a selection', async () => {
+    setGalleryValues({ selectedImage: null, selectedImageName: null, selectedImageNames: [] });
+
+    await render();
+
+    expect(host!.textContent).toContain('No gallery selection');
+    expect(clearButton()).toBeNull();
+  });
 });

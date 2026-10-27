@@ -9,7 +9,7 @@ import type { ImageMapImageLabels } from '@workbench/image-map/api';
 import type { WidgetContributionSource } from '@workbench/widgetContracts';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 
-import { ChakraProvider } from '@chakra-ui/react';
+import { Box, ChakraProvider } from '@chakra-ui/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { createExtensionRegistry, type ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
@@ -17,13 +17,13 @@ import { FocusRegionProvider, useFocusRegionProps } from '@workbench/focusRegion
 import { createTestFocusController } from '@workbench/focusRegions.testing';
 import { WorkbenchHotkeyRuntime } from '@workbench/hotkeys/WorkbenchHotkeyRuntime';
 import { createInstance } from 'i18next';
-import { act, useState } from 'react';
+import { act, createRef, useImperativeHandle, useState, type CSSProperties } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
-import { PreviewDetailsPopover } from './PreviewDetailsPopover';
+import { PreviewDetailsPanel } from './PreviewDetailsPanel';
 
 // Forty rows / a long payload: far taller than the stage below, so the cap is what keeps it inside.
 const TALL_RECORD = Object.fromEntries(Array.from({ length: 40 }, (_, index) => [`field_${index}`, `value ${index}`]));
@@ -157,6 +157,8 @@ const actions = {
   }),
   recallImageData: vi.fn(),
 } as unknown as ImageActions;
+const detailsToggle = createRef<() => void>();
+const toggleDetails = () => detailsToggle.current?.();
 const POSITION = { boardItemCount: 3, isLoadingBoard: false, selectedIndex: 0 };
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -174,36 +176,92 @@ const settle = (ms = 300) =>
       })
   );
 
-/** A widget: a header row holding the trigger, a short stage, and a filmstrip row under it. */
-const Widget = ({ item }: { item: GalleryImageItem | GalleryVideoItem }) => {
+/** CenterArea's chrome inset; its islands sit `top="2"`, `insetX="2"`, `h="8"` over the region. */
+const CENTER_CHROME_INSET_STYLE = { '--wb-center-chrome-inset': '3rem' } as CSSProperties;
+
+/**
+ * A widget: the trigger in a side region's header row above a short stage, or in a centre chrome island floating over
+ * it; a filmstrip row under the stage.
+ */
+const Widget = ({
+  chrome,
+  hasPanel,
+  hasStage,
+  item,
+  stageKey,
+}: {
+  chrome: 'center' | 'side';
+  hasPanel: boolean;
+  hasStage: boolean;
+  item: GalleryImageItem | GalleryVideoItem;
+  stageKey: number;
+}) => {
   const [stage, setStage] = useState<HTMLDivElement | null>(null);
+  const [isOpen, setIsOpen] = useState(true);
+  // What the Preview's I binding does through the widget value.
+  useImperativeHandle(detailsToggle, () => () => setIsOpen((open) => !open), []);
 
   return (
-    <div
-      {...useFocusRegionProps('center')}
-      data-hotkey-widget-instance-id="preview-instance"
-      data-hotkey-widget-region="center"
-      data-hotkey-widget-type-id="preview"
-      style={{ display: 'flex', flexDirection: 'column', height: 360, width: 640 }}
-    >
-      <div style={{ display: 'flex', height: 32, justifyContent: 'flex-end' }}>
-        <PreviewDetailsPopover
-          actions={actions}
-          image={item.kind === 'image' ? image : null}
-          isOpen
-          item={item}
-          position={POSITION}
-          stageElement={stage}
-          onOpenChange={onOpenChange}
+    // The region container around the widget frame, as the shell nests them.
+    <div {...useFocusRegionProps('center')}>
+      <div
+        data-hotkey-widget-instance-id="preview-instance"
+        data-hotkey-widget-region="center"
+        data-hotkey-widget-type-id="preview"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: 360,
+          position: 'relative',
+          width: 640,
+          ...(chrome === 'center' ? CENTER_CHROME_INSET_STYLE : {}),
+        }}
+      >
+        <Box
+          data-testid="chrome"
+          display="flex"
+          h="8"
+          justifyContent="flex-end"
+          {...(chrome === 'center' ? { insetEnd: '2', position: 'absolute', top: '2', zIndex: '1' } : {})}
+        >
+          {hasPanel ? (
+            <PreviewDetailsPanel
+              actions={actions}
+              image={item.kind === 'image' ? image : null}
+              isOpen={isOpen}
+              item={item}
+              position={POSITION}
+              stageElement={hasStage ? stage : null}
+              onOpenChange={(open) => {
+                onOpenChange(open);
+                setIsOpen(open);
+              }}
+            />
+          ) : null}
+        </Box>
+        {/* As Preview's stage is: positioned, so the panel pins to its corner. */}
+        <div
+          key={stageKey}
+          ref={setStage}
+          data-testid="stage"
+          style={{ flex: 1, minHeight: 0, position: 'relative' }}
+          tabIndex={-1}
         />
+        <div data-testid="filmstrip" style={{ height: 60 }} tabIndex={-1} />
       </div>
-      <div ref={setStage} data-testid="stage" style={{ flex: 1, minHeight: 0 }} tabIndex={-1} />
-      <div data-testid="filmstrip" style={{ height: 60 }} />
     </div>
   );
 };
 
-const render = async (item: GalleryImageItem | GalleryVideoItem) => {
+const render = async (
+  item: GalleryImageItem | GalleryVideoItem,
+  {
+    chrome = 'side',
+    hasPanel = true,
+    hasStage = true,
+    stageKey = 0,
+  }: { chrome?: 'center' | 'side'; hasPanel?: boolean; hasStage?: boolean; stageKey?: number } = {}
+) => {
   await act(() =>
     root.render(
       <QueryClientProvider client={queryClient}>
@@ -213,7 +271,7 @@ const render = async (item: GalleryImageItem | GalleryVideoItem) => {
               <WorkbenchHotkeyRuntime />
               {/* As a docked Preview sits in the workbench: the nearest region is the whole project. */}
               <div aria-label="Project" role="region">
-                <Widget item={item} />
+                <Widget chrome={chrome} hasPanel={hasPanel} hasStage={hasStage} item={item} stageKey={stageKey} />
                 <div
                   data-hotkey-widget-instance-id="gallery-instance"
                   data-hotkey-widget-region="left"
@@ -231,6 +289,9 @@ const render = async (item: GalleryImageItem | GalleryVideoItem) => {
                   style={{ height: 40 }}
                 />
               </div>
+              <button data-testid="outside" type="button">
+                Outside
+              </button>
             </FocusRegionProvider>
           </ChakraProvider>
         </I18nextProvider>
@@ -240,13 +301,13 @@ const render = async (item: GalleryImageItem | GalleryVideoItem) => {
   await settle();
 };
 
-const popover = () => document.querySelector<HTMLElement>('[data-preview-details]')!;
+const panel = () => document.querySelector<HTMLElement>('[data-preview-details]');
 const stage = () => host.querySelector<HTMLElement>('[data-testid="stage"]')!;
 const filmstrip = () => host.querySelector<HTMLElement>('[data-testid="filmstrip"]')!;
 
-/** The popover sits under its trigger and ends on or above the stage's bottom edge, never over the strip. */
+/** The panel starts at the stage's top and ends on or above its bottom edge, never over the strip. */
 const expectBoundedByStage = () => {
-  const rect = popover().getBoundingClientRect();
+  const rect = panel()!.getBoundingClientRect();
   const stageRect = stage().getBoundingClientRect();
 
   expect(rect.top).toBeGreaterThanOrEqual(stageRect.top - 1);
@@ -271,7 +332,7 @@ afterEach(async () => {
   host.remove();
 });
 
-describe('PreviewDetailsPopover', () => {
+describe('PreviewDetailsPanel', () => {
   it('keeps long image details inside the stage, scrolling them above the filmstrip', async () => {
     await render(imageItem);
 
@@ -314,7 +375,7 @@ describe('PreviewDetailsPopover', () => {
     expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
     expect(tags!.scrollWidth).toBeGreaterThan(tags!.clientWidth);
     expect(getComputedStyle(tags!).textOverflow).toBe('ellipsis');
-    expect(tags!.getBoundingClientRect().right).toBeLessThanOrEqual(popover().getBoundingClientRect().right);
+    expect(tags!.getBoundingClientRect().right).toBeLessThanOrEqual(panel()!.getBoundingClientRect().right);
   });
 
   it('withdraws the tags when the image index stops being ready', async () => {
@@ -402,7 +463,8 @@ describe('PreviewDetailsPopover', () => {
     const detailsTab = document.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')!;
     expect(detailsTab.textContent).toBe('Details');
     await press(detailsTab);
-    await expect.element(page.getByRole('tab', { name: 'Metadata' })).toHaveAttribute('aria-selected', 'true');
+    // Focus moves to the next tab; selection waits for Enter, Space or a click.
+    expect(document.activeElement).toBe(page.getByRole('tab', { name: 'Metadata' }).element());
     expect(step).toHaveBeenCalledTimes(1);
   });
 
@@ -416,46 +478,174 @@ describe('PreviewDetailsPopover', () => {
     await expect.element(page.getByRole('tab', { name: 'Graph' })).toHaveAttribute('aria-disabled', 'true');
   });
 
-  it('stays open for interactions inside the preview widget and does not steal focus', async () => {
+  it('pins a named region inside the stage, controlled by its trigger, without taking focus', async () => {
     const before = document.activeElement;
     await render(imageItem);
 
     await expect.element(page.getByText('a tall prompt')).toBeVisible();
-    expect(popover().contains(document.activeElement)).toBe(false);
+    const region = page.getByRole('region', { name: 'Details' }).element();
+    expect(region).toBe(panel());
+    expect(region.parentElement).toBe(stage());
+    expect(page.getByRole('button', { name: 'Details' }).element().getAttribute('aria-controls')).toBe(region.id);
     expect(document.activeElement).toBe(before);
+    // Under a side region's header row: pinned to the stage's top-end corner.
+    const rect = region.getBoundingClientRect();
+    const stageRect = stage().getBoundingClientRect();
+    expect(rect.top - stageRect.top).toBeCloseTo(8, 0);
+    expect(stageRect.right - rect.right).toBeCloseTo(8, 0);
+  });
 
-    await act(() => {
-      filmstrip().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'mouse' }));
-      filmstrip().dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'mouse' }));
-      filmstrip().dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    await settle(100);
-    expect(onOpenChange).not.toHaveBeenCalled();
+  it('sits as far below the centre chrome island as the island sits below the stage top, sharing its end edge', async () => {
+    await render(imageItem, { chrome: 'center' });
+    await expect.element(page.getByText('a tall prompt')).toBeVisible();
 
+    const rect = panel()!.getBoundingClientRect();
+    const island = host.querySelector<HTMLElement>('[data-testid="chrome"]')!.getBoundingClientRect();
+    const stageRect = stage().getBoundingClientRect();
+    expect(island.top - stageRect.top).toBeGreaterThan(0);
+    expect(Math.abs(rect.top - island.bottom - (island.top - stageRect.top))).toBeLessThanOrEqual(1);
+    expect(Math.abs(rect.right - island.right)).toBeLessThanOrEqual(1);
+    expect(stageRect.bottom - rect.bottom).toBeGreaterThanOrEqual(island.top - stageRect.top - 1);
+  });
+
+  it('stays open for interactions anywhere outside it', async () => {
+    await render(imageItem);
+    await expect.element(page.getByText('a tall prompt')).toBeVisible();
+
+    // Real clicks: nothing outside is pointer-blocked, and focus is free to leave for each target.
+    for (const testId of ['gallery-tile', 'canvas', 'outside', 'filmstrip']) {
+      await page.getByTestId(testId).click();
+    }
+    expect(document.activeElement).toBe(filmstrip());
     await act(() => {
       document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'mouse' }));
       document.body.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'mouse' }));
     });
-    await settle(100);
-    expect(onOpenChange).toHaveBeenCalledWith(false);
+
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(panel()).not.toBeNull();
   });
 
-  it('stays open while a Gallery elsewhere changes the selection, and closes for another widget', async () => {
+  it('leaves Escape, unhandled, to whatever has focus outside it', async () => {
     await render(imageItem);
     await expect.element(page.getByText('a tall prompt')).toBeVisible();
-    const pointAt = (element: HTMLElement) =>
-      act(() => {
-        element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'mouse' }));
-        element.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'mouse' }));
+    const tile = host.querySelector<HTMLElement>('[data-testid="gallery-tile"]')!;
+    const prevented: boolean[] = [];
+    tile.addEventListener('keydown', (event) => prevented.push(event.defaultPrevented));
+
+    for (const target of [tile, host.querySelector<HTMLElement>('[data-testid="outside"]')!]) {
+      await act(async () => {
+        target.focus();
+        await userEvent.keyboard('{Escape}');
       });
+    }
 
-    await pointAt(host.querySelector<HTMLElement>('[data-testid="gallery-tile"]')!);
-    await settle(100);
+    // The Canvas Escape ladder, among others, ignores a press already marked handled.
+    expect(prevented).toEqual([false]);
     expect(onOpenChange).not.toHaveBeenCalled();
+    expect(panel()).not.toBeNull();
+  });
 
-    // Another widget in the same project region.
-    await pointAt(host.querySelector<HTMLElement>('[data-testid="canvas"]')!);
-    await settle(100);
-    expect(onOpenChange).toHaveBeenCalledWith(false);
+  it('closes on Escape from within, returning focus to its trigger', async () => {
+    await render(imageItem);
+    await expect.element(page.getByText('a tall prompt')).toBeVisible();
+
+    await act(async () => {
+      document.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')!.focus();
+      await userEvent.keyboard('{Escape}');
+    });
+
+    expect(onOpenChange).toHaveBeenCalledExactlyOnceWith(false);
+    expect(panel()).toBeNull();
+    expect(document.activeElement).toBe(page.getByRole('button', { name: 'Details' }).element());
+  });
+
+  it('toggles from its trigger', async () => {
+    await render(imageItem);
+    await expect.element(page.getByText('a tall prompt')).toBeVisible();
+    const trigger = page.getByRole('button', { name: 'Details' });
+
+    await trigger.click();
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
+    expect(panel()).toBeNull();
+    await expect.element(trigger).toHaveAttribute('aria-pressed', 'false');
+    expect(trigger.element().hasAttribute('aria-controls')).toBe(false);
+
+    await trigger.click();
+    await expect.element(page.getByText('a tall prompt')).toBeVisible();
+    expect(onOpenChange).toHaveBeenLastCalledWith(true);
+    await expect.element(trigger).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('re-anchors in a remounted stage and renders nothing without one', async () => {
+    await render(imageItem);
+    await expect.element(page.getByText('a tall prompt')).toBeVisible();
+    const firstStage = stage();
+
+    await render(imageItem, { stageKey: 1 });
+    expect(stage()).not.toBe(firstStage);
+    expect(panel()?.parentElement).toBe(stage());
+
+    await render(imageItem, { hasStage: false, stageKey: 1 });
+    expect(panel()).toBeNull();
+    await expect.element(page.getByRole('button', { name: 'Details' })).toHaveAttribute('aria-pressed', 'true');
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it('hands focus inside it to the trigger when the I binding closes it', async () => {
+    const source: WidgetContributionSource = {
+      instanceId: 'preview-instance',
+      projectId: 'project-1',
+      region: 'center',
+      typeId: 'preview',
+    };
+    mocks.extensions.commands.register({
+      handler: () => toggleDetails(),
+      id: 'viewer.toggleMetadata',
+      source,
+      title: 'Toggle details',
+    });
+    mocks.extensions.hotkeys.register({
+      commandId: 'viewer.toggleMetadata',
+      defaultKeys: ['i'],
+      id: 'viewer.toggleMetadata',
+      scope: 'widget',
+      source,
+      title: 'Toggle details',
+    });
+    await render(imageItem);
+    await expect.element(page.getByText('a tall prompt')).toBeVisible();
+
+    await act(async () => {
+      page.getByRole('tab', { name: 'Metadata' }).element().focus();
+      await userEvent.keyboard('i');
+    });
+
+    await vi.waitFor(() => expect(panel()).toBeNull());
+    expect(document.activeElement).toBe(page.getByRole('button', { name: 'Details' }).element());
+  });
+
+  it('hands focus inside it to the Preview region when its trigger leaves with it', async () => {
+    await render(imageItem);
+    await expect.element(page.getByText('a tall prompt')).toBeVisible();
+    act(() => page.getByRole('tab', { name: 'Metadata' }).element().focus());
+
+    await render(imageItem, { hasPanel: false });
+
+    const region = host.querySelector<HTMLElement>('[data-focus-region="center"]')!;
+    await vi.waitFor(() => expect(document.activeElement).toBe(region));
+  });
+
+  it('leaves focus that is already elsewhere when it closes', async () => {
+    await render(imageItem);
+    await expect.element(page.getByText('a tall prompt')).toBeVisible();
+    const tile = host.querySelector<HTMLElement>('[data-testid="gallery-tile"]')!;
+    act(() => tile.focus());
+
+    await act(() => toggleDetails());
+    await settle(50);
+
+    expect(panel()).toBeNull();
+    expect(document.activeElement).toBe(tile);
   });
 });

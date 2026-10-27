@@ -1,12 +1,13 @@
 import type { GalleryImage, GalleryImageMetadata, GalleryItem, GalleryItemKey } from '@features/gallery';
 
-import { DataList, HStack, Icon, Stack, Tabs, Text } from '@chakra-ui/react';
+import { Box, DataList, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { galleryImages, galleryVideos } from '@features/gallery';
 import { toGalleryItemKey } from '@features/gallery/contracts';
 import { canCopyText, copyText } from '@platform/browser/clipboard';
 import { IconButton, Scrollable, Tooltip } from '@platform/ui';
 import { JsonPreview } from '@platform/ui/JsonPreview';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { toaster } from '@platform/ui/toaster';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -17,7 +18,7 @@ import {
   type ImageRecallKind,
 } from '@workbench/image-actions';
 import { CopyIcon } from 'lucide-react';
-import { useCallback, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useId, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { parsePreviewMetadata, type PreviewMetadataEntry } from './previewMetadata';
@@ -58,7 +59,7 @@ export const PreviewDetails = ({
   image,
   item,
 }: {
-  /** Read by the caller, outside the popover's presence boundary, so an account change re-keys the query. */
+  /** Read by the caller, outside the panel's mount boundary, so an account change re-keys the query. */
   accountEpoch: number;
   actions: ImageActions;
   image: GalleryImage | null;
@@ -237,6 +238,8 @@ const ImageDetails = ({
   );
 };
 
+type DetailsTabId = 'details' | 'graph' | 'metadata' | 'workflow';
+
 const DetailsTabs = ({
   children: details,
   graph,
@@ -250,52 +253,52 @@ const DetailsTabs = ({
   workflow: string | null;
 }) => {
   const { t } = useTranslation();
+  const idBase = useId();
   // A tab with nothing behind it is disabled rather than opening onto an empty
-  // pane, so the first tab with content is where the popover opens.
-  const defaultValue = details ? 'details' : metadata !== null ? 'metadata' : workflow !== null ? 'workflow' : 'graph';
+  // pane, so the first tab with content is where the panel opens.
+  const [activeId, setActiveId] = useState<DetailsTabId>(() =>
+    details ? 'details' : metadata !== null ? 'metadata' : workflow !== null ? 'workflow' : 'graph'
+  );
+  const tabs = useMemo(
+    () => [
+      ...(details ? [{ id: 'details' as const, label: t('widgets.preview.details') }] : []),
+      { disabled: metadata === null, id: 'metadata' as const, label: t('widgets.preview.metadata') },
+      { disabled: workflow === null, id: 'workflow' as const, label: t('widgets.preview.workflow') },
+      { disabled: graph === null, id: 'graph' as const, label: t('widgets.preview.graph') },
+    ],
+    [details, graph, metadata, t, workflow]
+  );
 
   return (
-    <Tabs.Root
-      defaultValue={defaultValue}
-      display="flex"
-      flexDirection="column"
-      lazyMount
-      minH="0"
-      size="xl"
-      unmountOnExit
-      variant="outline"
-    >
-      <Tabs.List flexShrink={0} onKeyDown={keepTabKeys}>
-        {details ? (
-          <Tabs.Trigger fontSize="xs" value="details">
-            {t('widgets.preview.details')}
-          </Tabs.Trigger>
-        ) : null}
-        <Tabs.Trigger disabled={metadata === null} fontSize="xs" value="metadata">
-          {t('widgets.preview.metadata')}
-        </Tabs.Trigger>
-        <Tabs.Trigger disabled={workflow === null} fontSize="xs" value="workflow">
-          {t('widgets.preview.workflow')}
-        </Tabs.Trigger>
-        <Tabs.Trigger disabled={graph === null} fontSize="xs" value="graph">
-          {t('widgets.preview.graph')}
-        </Tabs.Trigger>
-      </Tabs.List>
-      {details ? (
-        <Tabs.Content display="flex" flexDirection="column" minH="0" value="details">
-          {details}
-        </Tabs.Content>
-      ) : null}
-      <Tabs.Content display="flex" flexDirection="column" minH="0" value="metadata">
-        <JsonPreview label={t('widgets.preview.metadataJsonLabel')} maxH="100%" value={metadata} />
-      </Tabs.Content>
-      <Tabs.Content display="flex" flexDirection="column" minH="0" value="workflow">
-        <RawJsonPreview label={t('widgets.preview.workflowJsonLabel')} text={workflow} />
-      </Tabs.Content>
-      <Tabs.Content display="flex" flexDirection="column" minH="0" value="graph">
-        <RawJsonPreview label={t('widgets.preview.graphJsonLabel')} text={graph} />
-      </Tabs.Content>
-    </Tabs.Root>
+    <Stack gap="1.5" minH="0">
+      <Box flexShrink={0} onKeyDown={keepTabKeys}>
+        <SegmentTabs
+          activeId={activeId}
+          ariaLabel={t('widgets.preview.details')}
+          idBase={idBase}
+          isCompact
+          tabs={tabs}
+          onSelect={setActiveId}
+        />
+      </Box>
+      <Stack
+        aria-labelledby={segmentTabsTabId(idBase, activeId)}
+        gap="0"
+        id={segmentTabsPanelId(idBase)}
+        minH="0"
+        role="tabpanel"
+      >
+        {activeId === 'details' ? (
+          details
+        ) : activeId === 'metadata' ? (
+          <JsonPreview label={t('widgets.preview.metadataJsonLabel')} maxH="100%" value={metadata} />
+        ) : activeId === 'workflow' ? (
+          <RawJsonPreview label={t('widgets.preview.workflowJsonLabel')} text={workflow} />
+        ) : (
+          <RawJsonPreview label={t('widgets.preview.graphJsonLabel')} text={graph} />
+        )}
+      </Stack>
+    </Stack>
   );
 };
 

@@ -189,6 +189,8 @@ describe('preview header Auto-switch', () => {
   it('shows the mode on the trigger, Off as soon as a selection turns it off', async () => {
     await render();
     expect(button('Auto-switch: In progress').textContent).toContain('In progress');
+    // Labelled, it ends in the chevron the header's other menu triggers show.
+    expect(button('Auto-switch: In progress').querySelector('.lucide-chevron-down')).not.toBeNull();
 
     // A Gallery selection writes Off; the trigger reads it from the project on the next render.
     state.viewerAutoSwitch = 'off';
@@ -205,21 +207,50 @@ describe('preview header Auto-switch', () => {
     expect(button('Auto-switch: Off').textContent).toContain('Off');
   });
 
-  it('is the icon alone in a compact region, naming the mode in its tooltip and dimming for Off', async () => {
+  it('is the icon alone in a compact region, naming the mode in its tooltip, with each mode its own icon', async () => {
+    // Lucide names each glyph in a class; Chakra's styling classes differ between trigger and menu.
+    const glyph = (svg: Element | undefined) => [...(svg?.classList ?? [])].find((name) => name.startsWith('lucide-'));
+    const icons = new Map<string, string | undefined>();
+
     await render('right');
     const trigger = button('Auto-switch: In progress');
-    const icon = () =>
-      button(`Auto-switch: ${state.viewerAutoSwitch === 'off' ? 'Off' : 'In progress'}`).querySelector('svg')!;
-
     expect(trigger.textContent).toBe('');
-    const onOpacity = getComputedStyle(icon()).opacity;
+    expect(trigger.querySelectorAll('svg')).toHaveLength(1);
     await settle(() => trigger.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerType: 'mouse' })));
     await expect.element(page.getByRole('tooltip')).toHaveTextContent('Auto-switch: In progress');
 
-    // A selection turns it Off: the trigger says so and its icon dims.
-    state.viewerAutoSwitch = 'off';
+    for (const [mode, label] of [
+      ['off', 'Off'],
+      ['progress', 'In progress'],
+      ['latest', 'Newest'],
+    ] as const) {
+      state.viewerAutoSwitch = mode;
+      await render('right');
+      icons.set(mode, glyph(host!.querySelector('[aria-label^="Auto-switch:"] svg')!));
+
+      // The menu shows each mode with the icon the trigger takes for it, so the mapping can be learned.
+      await settle(() => button(`Auto-switch: ${label}`).click());
+      const itemIcon = [...page.getByRole('menuitemradio', { name: label }).element().querySelectorAll('svg')].find(
+        (svg) => !svg.closest('[data-part="item-indicator"]')
+      );
+      expect(glyph(itemIcon)).toBe(icons.get(mode));
+      await settle(() => root?.unmount());
+      host?.remove();
+    }
+
+    // Off reads by its shape, not by dimming the icon the other modes share.
+    expect(new Set(icons.values()).size).toBe(3);
+  });
+
+  it('sizes the trigger like the header controls beside it, square when it is the icon alone', async () => {
+    const box = (label: string) => button(label).getBoundingClientRect();
+
     await render('right');
-    expect(Number(getComputedStyle(icon()).opacity)).toBeLessThan(Number(onOpacity));
+    expect(box('Auto-switch: In progress').height).toBe(box('Hide filmstrip').height);
+    expect(box('Auto-switch: In progress').width).toBe(box('Hide filmstrip').width);
+
+    await render('center');
+    expect(box('Auto-switch: In progress').height).toBe(box('Hide filmstrip').height);
   });
 });
 
@@ -292,7 +323,10 @@ describe('preview zoom menu', () => {
 
     state.zoom = { fitPercent: 88, isZoomed: true, percent: 200, reset: vi.fn(), zoomTo: vi.fn() };
     await render('right');
-    expect(host!.querySelector('button[aria-label="Zoom 200%"]')).not.toBeNull();
+    const trigger = button('Zoom 200%');
+    // A side rail is at least 350px wide; the full-width magnifier trigger left the widget title no room there.
+    expect(trigger.getBoundingClientRect().width).toBeLessThan(70);
+    expect(trigger.querySelectorAll('svg')).toHaveLength(1);
   });
 });
 

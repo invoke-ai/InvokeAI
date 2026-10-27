@@ -1,8 +1,8 @@
-import { HStack, Menu, Portal, Text } from '@chakra-ui/react';
+import { Menu, Portal, Text } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
 import { MenuActionItem, MenuContent } from '@platform/ui/Menu';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
-import { ChevronDownIcon } from 'lucide-react';
+import { ChevronDownIcon, ZoomInIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -13,9 +13,16 @@ const MENU_POSITIONING = { placement: 'bottom-start' } as const;
 
 /**
  * Expose fitted/actual zoom and keyboard presets in the header; the stage owns wheel, pinch, and double-click
- * gestures.
+ * gestures. A `compact` header (a side rail or floating window, down to 280px) keeps only the readout and chevron:
+ * the magnifier and the fixed readout width would leave the widget title no room.
  */
-export const PreviewZoomMenu = ({ zoom }: { zoom: PreviewZoomControls }) => {
+export const PreviewZoomMenu = ({
+  density = 'full',
+  zoom,
+}: {
+  density?: 'compact' | 'full';
+  zoom: PreviewZoomControls;
+}) => {
   const { t } = useTranslation();
   const percent = zoom.percent;
   const label = percent === null ? '—' : t('widgets.preview.zoomPercent', { percent });
@@ -29,17 +36,15 @@ export const PreviewZoomMenu = ({ zoom }: { zoom: PreviewZoomControls }) => {
             aria-label={percent === null ? t('widgets.preview.zoom') : t('widgets.preview.zoomLevel', { percent })}
             color="fg.muted"
             fontVariantNumeric="tabular-nums"
-            minW="0"
-            px="1.5"
             size="sm"
             variant="ghost"
           >
-            <HStack gap="1">
-              <Text fontSize="md" fontWeight="600">
-                {label}
-              </Text>
-              <ChevronDownIcon size={12} />
-            </HStack>
+            {density === 'full' ? <ZoomInIcon aria-hidden /> : null}
+            {/* Wide enough for "1600%" in tabular digits, so the trigger keeps its width as the zoom changes. */}
+            <Text fontSize="md" minW={density === 'full' ? '6ch' : undefined} textAlign="center">
+              {label}
+            </Text>
+            <ChevronDownIcon size={12} />
           </Button>
         </Menu.Trigger>
       </Tooltip>

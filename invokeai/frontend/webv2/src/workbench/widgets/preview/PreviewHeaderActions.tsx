@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useLivePreviewFollow } from './livePreviewFollow';
 import { PreviewActionStrip } from './PreviewActionStrip';
-import { PreviewDetailsPopover } from './PreviewDetailsPopover';
+import { PreviewDetailsPanel } from './PreviewDetailsPanel';
 import { usePreviewHeaderContext, usePreviewStageContext, type PreviewZoomControls } from './previewHeaderStore';
 import { getPreviewFilmstripVisible, getPreviewMetadataOpen } from './previewSettings';
 import { PreviewZoomMenu } from './PreviewZoomMenu';
@@ -64,7 +64,7 @@ export const PreviewHeaderActions = ({ region }: WidgetViewProps) => {
           still say so and offer the way back. */}
       {zoomControls && (isFull || zoomControls.isZoomed) ? (
         <>
-          <PreviewZoomMenu zoom={zoomControls} />
+          <PreviewZoomMenu density={isFull ? 'full' : 'compact'} zoom={zoomControls} />
           <Divider />
         </>
       ) : null}
@@ -83,6 +83,7 @@ export const PreviewHeaderActions = ({ region }: WidgetViewProps) => {
       ) : null}
 
       <AutoSwitchMenu
+        chrome="header"
         density={isFull ? 'full' : 'compact'}
         positioning={AUTO_SWITCH_POSITIONING}
         value={autoSwitch}
@@ -95,7 +96,7 @@ export const PreviewHeaderActions = ({ region }: WidgetViewProps) => {
         onCheckedChange={toggleFilmstrip}
       />
       {actionItem && actions ? (
-        <PreviewDetailsPopover
+        <PreviewDetailsPanel
           actions={actions}
           image={isGalleryImageItem(actionItem) ? galleryImageItemToGalleryImage(actionItem) : null}
           isOpen={isDetailsOpen}

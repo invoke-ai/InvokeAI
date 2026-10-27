@@ -142,15 +142,16 @@ const getLocalGalleryItems = (values: Record<string, unknown>, queueItems: Queue
   );
 };
 
+/** Preview shows the gallery selection only: a cleared selection shows the empty state, not the newest result. */
 const getSelectedItem = (values: Record<string, unknown>, localItems: GalleryImageItem[]): GalleryItem | null => {
   const selectedItem = getSelectedGalleryItemFromValues(values);
 
-  if (selectedItem) {
-    const selectedItemKey = toGalleryItemKey(selectedItem);
-    return localItems.find((candidate) => toGalleryItemKey(candidate) === selectedItemKey) ?? selectedItem;
+  if (!selectedItem) {
+    return null;
   }
 
-  return localItems[0] ?? null;
+  const selectedItemKey = toGalleryItemKey(selectedItem);
+  return localItems.find((candidate) => toGalleryItemKey(candidate) === selectedItemKey) ?? selectedItem;
 };
 
 const getBoardName = (
@@ -851,8 +852,8 @@ const SelectedMediaPreview = ({
   source: Parameters<typeof PreviewFrame>[0]['source'];
 }) => (
   <PreviewMediaScaffold>
-    {/* The stage wrapper is the Details popover's boundary for images and
-        videos alike; the frame inside fills it, so their rects coincide. */}
+    {/* The stage wrapper hosts the Details panel for images and videos
+        alike; the frame inside fills it, so their rects coincide. */}
     <Flex ref={setStageElement} css={PREVIEW_NAV_STAGE_CSS} direction="column" flex="1" minH="0" position="relative">
       <PreviewFrame
         dragItem={dragItem}

@@ -36,7 +36,7 @@ export const getActualZoomLimits = (fitRatio: number): { max: number; min: numbe
   min: Math.min(fitRatio, 1),
 });
 
-/** Where the selection sits in its board, for the Details popover's header line. */
+/** Where the selection sits in its board, for the Details panel's header line. */
 export interface PreviewItemPosition {
   boardItemCount: number;
   isLoadingBoard: boolean;
@@ -95,7 +95,7 @@ export const usePreviewHeaderContext = (): PreviewHeaderContext => store.useSele
 
 /** Publish hot-path zoom readouts directly so wheel ticks update only the zoom menu. */
 export interface PreviewStageContext {
-  /** The media stage; the Details popover keeps within it, off the filmstrip. */
+  /** The media stage; the Details panel is pinned inside it, off the filmstrip. */
   stageElement: HTMLElement | null;
   zoom: PreviewZoomReadout | null;
 }
