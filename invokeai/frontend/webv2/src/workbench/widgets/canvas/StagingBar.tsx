@@ -16,6 +16,7 @@ import {
   Text,
 } from '@chakra-ui/react';
 import { galleryImageUrls } from '@features/gallery/utility';
+import { getDeterminateProgressPercent } from '@features/queue/contracts';
 import { useQueueItemProgress, useQueueItemProgressImage } from '@features/queue/react';
 import { Button, Group, IconButton, MenuContent, Tooltip, useTooltipTriggerIds } from '@platform/ui';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
@@ -523,7 +524,7 @@ const StagingPlaceholderThumbnail = ({
   const progressImage = useQueueItemProgressImage(slot.queueItemId, slot.itemIndex);
   const progress = useQueueItemProgress(slot.queueItemId);
   const isActive = progress?.activeItemIndex === slot.itemIndex;
-  const percentage = typeof progress?.percentage === 'number' ? Math.round(progress.percentage * 100) : null;
+  const percentage = getDeterminateProgressPercent(progress?.percentage);
 
   return (
     <>
@@ -546,23 +547,26 @@ const StagingPlaceholderProgress = ({ percentage }: { percentage: number | null 
 
   return (
     <Flex align="center" inset="0" justify="center" pointerEvents="none" position="absolute" zIndex="1">
-      <ProgressCircle.Root
-        aria-label={
-          percentage === null
-            ? t('widgets.gallery.generationProgress')
-            : t('widgets.gallery.generationProgressPercent', { percentage })
-        }
-        bg="bg/85"
-        borderWidth={1}
-        p={0.5}
-        rounded="full"
-        value={percentage}
-      >
-        <ProgressCircle.Circle>
-          <ProgressCircle.Track />
-          <ProgressCircle.Range />
-        </ProgressCircle.Circle>
-      </ProgressCircle.Root>
+      {percentage === null ? (
+        // The app-wide spinner, not the ring's indeterminate sweep, for unknown progress; as large as the ring.
+        <Flex bg="bg/85" borderWidth={1} p={0.5} rounded="full">
+          <Spinner aria-label={t('widgets.gallery.generationProgress')} boxSize="6" role="progressbar" />
+        </Flex>
+      ) : (
+        <ProgressCircle.Root
+          aria-label={t('widgets.gallery.generationProgressPercent', { percentage })}
+          bg="bg/85"
+          borderWidth={1}
+          p={0.5}
+          rounded="full"
+          value={percentage}
+        >
+          <ProgressCircle.Circle>
+            <ProgressCircle.Track />
+            <ProgressCircle.Range />
+          </ProgressCircle.Circle>
+        </ProgressCircle.Root>
+      )}
     </Flex>
   );
 };

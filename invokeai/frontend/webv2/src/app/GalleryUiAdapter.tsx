@@ -7,9 +7,11 @@ import { GalleryUiProvider } from '@features/gallery/react';
 import { useAuthSession } from '@features/identity';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { useProjectLibrarySelector } from '@workbench/projects/library';
 import { useExportLibraryProject } from '@workbench/projects/useProjectFileActions';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { revealPlacedWidget } from '@workbench/widgetPlacementCommands';
 import { useLivePreviewFollow } from '@workbench/widgets/preview/livePreviewFollow';
 import { getProjectWidgetInstance } from '@workbench/widgetState';
 import {
@@ -62,6 +64,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
   const accountScope = captureAccountScope();
   const exportProject = useExportLibraryProject();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
+  const { focusFloating, focusRegion } = useWorkbenchFocus();
   // Only what the gallery needs to label other projects' boards, compared structurally: every autosave ack and
   // library refresh rebuilds the summaries, and the gallery must not re-render for cover or timestamp churn.
   const projects = useProjectLibrarySelector(selectGalleryProjects, areGalleryProjectsEqual);
@@ -108,8 +111,21 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
           return;
         }
         livePreview.follow(sessionId);
-        if (revealPreview) {
+        if (!revealPreview) {
+          return;
+        }
+        // Reveal Preview where it already is; the default open would pull it into the center over the Gallery.
+        const revealed = revealPlacedWidget({
+          project: queries.getSnapshot().activeProject,
+          typeId: 'preview',
+          widgets,
+        });
+        if (!revealed) {
           openWorkbenchWidget('preview');
+        } else if (revealed.kind === 'floating') {
+          focusFloating(revealed.instanceId);
+        } else {
+          focusRegion(revealed.region, 'preview');
         }
       },
       notifications,
@@ -135,6 +151,8 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       antialiasProgressImages,
       boardSharing,
       exportProject,
+      focusFloating,
+      focusRegion,
       gallery,
       galleryValues,
       generateValues,

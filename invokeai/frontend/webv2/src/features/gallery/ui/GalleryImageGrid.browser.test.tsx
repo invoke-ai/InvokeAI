@@ -3934,6 +3934,42 @@ describe('shared gallery progress section', () => {
     expect(followProgressSession).not.toHaveBeenCalled();
     expect(finishing.getAttribute('aria-disabled')).toBe('true');
   });
+  it('shows the spinner, not an indeterminate ring, until progress is known', async () => {
+    currentProgressSessions = [session];
+    await renderGallery();
+    const indicator = host!.querySelector('[aria-label="In progress"] [role="progressbar"]');
+    expect(indicator?.classList.contains('chakra-spinner')).toBe(true);
+    expect(indicator?.getAttribute('aria-label')).toBe('Preparing');
+    // As large as the queued and finishing icons that take its place.
+    expect(indicator?.getBoundingClientRect().width).toBe(16);
+  });
+  it('letterboxes placeholders to the output aspect only in aspect thumbnail mode', async () => {
+    currentProgressSessions = [
+      { ...session, width: 1024, height: 512, state: 'queued' },
+      { ...session, id: 'run:2', width: 512, height: 1024 },
+      { ...session, id: 'run:3', width: 0, height: 1024, state: 'queued' },
+    ];
+    const placeholderRatios = () =>
+      [...host!.querySelectorAll<HTMLElement>('[aria-label="In progress"] button[aria-pressed]')].map((tile) => {
+        const cell = tile.firstElementChild!.getBoundingClientRect();
+        const placeholder = tile.firstElementChild!.firstElementChild!.getBoundingClientRect();
+        return [placeholder.width / cell.width, placeholder.height / cell.height].map((ratio) => ratio.toFixed(2));
+      });
+
+    await renderGallery(createGallery({ settings: { ...DENSE_SETTINGS, thumbnailFit: 'aspect' } }));
+    expect(placeholderRatios()).toEqual([
+      ['1.00', '0.50'],
+      ['0.50', '1.00'],
+      ['1.00', '1.00'],
+    ]);
+
+    await renderGallery(createGallery({ settings: { ...DENSE_SETTINGS, thumbnailFit: 'square' } }));
+    expect(placeholderRatios()).toEqual([
+      ['1.00', '1.00'],
+      ['1.00', '1.00'],
+      ['1.00', '1.00'],
+    ]);
+  });
   it('updates tile spacing when density changes without changing the batch', async () => {
     currentProgressSessions = [session, { ...session, id: 'run:2', itemIndex: 2 }];
     for (const imageDensityPercent of [100, 0, 100]) {

@@ -1,7 +1,7 @@
 import type { GalleryThumbnailFit } from '@features/gallery/core/settings';
 import type { QueueProgressSession } from '@features/queue/contracts';
 
-import { Box, chakra, Icon, ProgressCircle, Skeleton, Text } from '@chakra-ui/react';
+import { Box, chakra, Icon, ProgressCircle, Skeleton, Spinner, Text } from '@chakra-ui/react';
 import { getDeterminateProgressPercent } from '@features/queue/contracts';
 import { useItemProgress, useQueueItemProgressImage } from '@features/queue/react';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
@@ -180,6 +180,14 @@ const GalleryProgressGrid = ({
   );
 };
 
+const FILL_CELL = { h: 'full', w: 'full' } as const;
+const FILL_WIDTH = { w: 'full' } as const;
+const FILL_HEIGHT = { h: 'full' } as const;
+
+/** The output's width-to-height ratio, for letterboxing a placeholder like an aspect-fit thumbnail. */
+const getPlaceholderAspectRatio = ({ width, height }: QueueProgressSession): number | null =>
+  width > 0 && height > 0 && Number.isFinite(width / height) ? width / height : null;
+
 const GalleryProgressTile = ({
   session,
   size,
@@ -236,6 +244,11 @@ const GalleryProgressTile = ({
   );
 
   const isShownSelected = selected && session.state !== 'queued';
+  // Aspect fit letterboxes the placeholder inside the square cell, as completed thumbnails are: the longer side fills
+  // the cell and the other follows the output's ratio.
+  const placeholderAspectRatio = fit === 'aspect' ? getPlaceholderAspectRatio(session) : null;
+  const placeholderSize =
+    placeholderAspectRatio === null ? FILL_CELL : placeholderAspectRatio >= 1 ? FILL_WIDTH : FILL_HEIGHT;
 
   return (
     <chakra.button
@@ -261,13 +274,20 @@ const GalleryProgressTile = ({
       onClick={follow}
     >
       <StreamingImageFrame
+        alignItems="center"
         aspectRatio={1}
+        display="flex"
         fit={fit === 'aspect' ? 'contain' : 'cover'}
+        justifyContent="center"
         liveImage={progressImageToStreamingSource(image)}
         shouldAntialiasLiveImage={antialiasProgressImages}
         w="full"
       >
-        {session.state === 'queued' ? <Box bg="bg.subtle" h="full" w="full" /> : <Skeleton h="full" w="full" />}
+        {session.state === 'queued' ? (
+          <Box bg="bg.subtle" aspectRatio={placeholderAspectRatio ?? undefined} {...placeholderSize} />
+        ) : (
+          <Skeleton aspectRatio={placeholderAspectRatio ?? undefined} {...placeholderSize} />
+        )}
       </StreamingImageFrame>
       <Box
         position="absolute"
@@ -279,7 +299,10 @@ const GalleryProgressTile = ({
         p="0.5"
         display="flex"
       >
-        {session.state === 'running' ? (
+        {session.state === 'running' && percentage === null ? (
+          // The app-wide spinner, not the ring's indeterminate sweep, for unknown progress.
+          <Spinner aria-label={status} boxSize="4" role="progressbar" />
+        ) : session.state === 'running' ? (
           <ProgressCircle.Root aria-label={status} value={percentage}>
             <ProgressCircle.Circle>
               <ProgressCircle.Track />
