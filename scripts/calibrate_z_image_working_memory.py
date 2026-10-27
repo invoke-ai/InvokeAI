@@ -44,7 +44,10 @@ Modes
   hint-sized tensors it keeps, against the n + 4 the estimate charges.
 
 Only the fit grid's points are fit points (`"fit": true`). The checks' points, the extra-blocks forward included, test
-analytic terms or assumptions rather than the line: they are marked `"fit": false`, and their `in_fit` is false.
+analytic terms or assumptions rather than the line: they are marked `"fit": false`, and their `in_fit` is false. A fit
+point is `in_fit` only where the estimator's line admits its features (`Line.fits`): on a build whose SDPA kernel
+materializes the score matrix, the fit grid's forwards carry a score term on top of the line, so they measure that term
+rather than the line, as a check does.
 
 Output
 ------
@@ -218,12 +221,16 @@ def point_line(
     raw = {**raw, **dict(zip(("cold", "warm"), map(dataclasses.asdict, windows), strict=False))}
     if reasons:
         return line | {"reasons": reasons, "raw": raw}
+    # Imports torch: a point line is taken in the measuring process, after `_apply_server_runtime`.
+    from invokeai.backend.z_image.denoise_working_memory import Z_IMAGE_DENOISE_SPEC
+
     measured, method = measured_bytes_and_method(windows)
+    on_line = Z_IMAGE_DENOISE_SPEC.line(common["features"])
     return line | {
         "measured_bytes": measured,
         "method": method,
         "provenance": provenance,
-        "in_fit": point.fit,
+        "in_fit": point.fit and on_line is not None and on_line.fits,
         "raw": raw,
     }
 
