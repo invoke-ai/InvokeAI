@@ -12,7 +12,9 @@ import { getCollection } from 'astro:content';
 import { getSectionIcon, getTopicIcon } from '../../config/icons';
 import { docsTopics, topicDescription, topicLabel } from '../../config/topics';
 import { withBase } from '../base-path';
+import { sortChallenges } from '../challenges.mjs';
 import { sortShowcase } from '../showcase.mjs';
+import ChallengeStrip from './ChallengeStrip.astro';
 import ModelFamilies from './ModelFamilies.astro';
 import ShowcaseMarquee from './ShowcaseMarquee.astro';
 import CompareImage from './compare/CompareImage.astro';
@@ -249,6 +251,7 @@ const glowBands = (
 ).map(bandLayer);
 
 const showcase = sortShowcase(await getCollection('showcase')).slice(0, 12);
+const [challenge] = sortChallenges(await getCollection('challenges'));
 
 const community = [
   { label: t('home.community.showcaseLink'), link: href('/showcase/') },
@@ -372,7 +375,7 @@ const installLinks: Record<string, string> = {
   </section>
 
   {
-    showcase.length > 0 && (
+    (showcase.length > 0 || challenge) && (
       <section class="section" aria-labelledby="home-showcase">
         <div class="section__top">
           <div class="heading">
@@ -384,7 +387,8 @@ const installLinks: Record<string, string> = {
             <ArrowRight class="nudge" size={14} aria-hidden="true" />
           </a>
         </div>
-        <ShowcaseMarquee entries={showcase} />
+        {showcase.length > 0 && <ShowcaseMarquee entries={showcase} />}
+        {challenge && <ChallengeStrip challenge={challenge} />}
       </section>
     )
   }

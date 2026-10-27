@@ -4,6 +4,8 @@ The docs site at [v7.invoke.ai](https://v7.invoke.ai), built with Astro Starligh
 
 Contributor guide: [Documentation](src/content/docs/development/Documentation/index.mdx) (dev server, adding pages, builds, tests).
 
+Community content: [showcase artwork](src/content/showcase/README.md), [weekly challenge winners](src/content/challenges/README.md) and [community node packs](src/content/community-nodes/README.md).
+
 Toolchain: Node 22.23.4 or newer (`engines` in `package.json`; Astro needs it) and pnpm 10, run from this directory.
 
 ## Translations
@@ -91,6 +93,7 @@ After the first sync, paste these into each string's context in Crowdin.
 | `home.cta.platformsAndLicense` | Keep the OS names and "Apache 2.0". |
 | `home.install.body` | Keep the three tags; their order may change. |
 | `home.community.body` | Keep the `<link>` tag and the maintainers' names. |
+| `home.challenge.*` | The home page's teaser for the latest weekly art challenge on Discord. `{{week}}` is the challenge's number; the places label the winners' thumbnails. |
 | `whatsNew.*.body` | Keep node and model names. |
 | `modelFamilies.licenseTag`, `modelFamilies.vramTag` | `<srOnly>` text is read only by screen readers. Keep "GB+". |
 | `modelFamilies.format.singleFile` | A model file format, listed beside GGUF and int8: one checkpoint file. |

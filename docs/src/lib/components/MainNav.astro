@@ -35,7 +35,9 @@ const items = [
     label: t('nav.showcase'),
     href: showcaseHref,
     icon: Images,
-    current: pathname === trimSlash(showcaseHref) ? 'page' : undefined,
+    // The weekly challenges' pages belong to the showcase.
+    current:
+      pathname === trimSlash(showcaseHref) ? 'page' : pathname.startsWith(showcaseHref) ? 'true' : undefined,
   },
 ];
 

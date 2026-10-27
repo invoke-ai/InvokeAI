@@ -3,6 +3,9 @@
 Artwork in this directory appears on the docs site's `/showcase/` page, newest first, and the latest eight appear in the
 "Made with Invoke" section of the home page. The collection is defined in `docs/src/content.config.ts`.
 
+Winners of the weekly Discord art challenges are published separately, from `src/content/challenges/`: see its
+[README](../challenges/README.md).
+
 ## Before you add an entry
 
 Add only artwork submitted through the [showcase issue form](https://github.com/invoke-ai/InvokeAI/issues/new?template=SHOWCASE.yml)

@@ -1,0 +1,336 @@
+---
+// A weekly challenge's winners: the top place (1st, unless a winner was removed) large, the next two beside it (below
+// it on phones), honourable mentions in a row below. Every image shows whole, letterboxed in its frame where the frame's
+// shape differs, and links to its largest size. The place is a text badge.
+import type { CollectionEntry } from 'astro:content';
+import { getImage, Image } from 'astro:assets';
+
+import { orderWinners, placeLabel, winnerAlt } from '../challenges.mjs';
+
+type Props = {
+  challenge: CollectionEntry<'challenges'>;
+  /**
+   * Images in view when the page opens, which load eagerly: `lead`, the top-placed image (with high priority), or
+   * `podium`, all three. The rest load lazily.
+   */
+  eager?: 'lead' | 'podium';
+};
+
+const { challenge, eager } = Astro.props;
+const { week } = challenge.data;
+const winners = orderWinners(challenge.data.winners);
+const podium = winners.filter(({ place }) => place !== 'honourable');
+const mentions = winners.filter(({ place }) => place === 'honourable');
+const [lead] = podium;
+
+const maxWidth = 2400;
+/** Candidate widths up to the image's own. */
+const widthsUpTo = (candidates: number[], width: number) =>
+  [...new Set(candidates.filter((candidate) => candidate < width).concat(Math.min(width, maxWidth)))];
+// The frame links to the largest size, as the showcase grid's tiles do.
+const fullImages = await Promise.all(
+  winners.map(({ image }) => getImage({ src: image, width: Math.min(image.width, maxWidth) }))
+);
+const fullSrc = (winner: (typeof winners)[number]) => fullImages[winners.indexOf(winner)].src;
+
+const groups = [
+  { name: 'podium', winners: podium },
+  { name: 'mentions', winners: mentions },
+].filter((group) => group.winners.length > 0);
+
+// Display widths in the wide column (up to 90rem): 1st place takes two thirds of it (all of it alone), 2nd and 3rd a
+// third.
+const candidateWidths = { lead: [640, 960, 1280, 1600, 1920], side: [400, 640, 960], mention: [320, 480, 640] };
+const sizes = {
+  lead: podium.length > 1 ? '(min-width: 50rem) min(60rem, 62vw), 100vw' : '(min-width: 50rem) min(90rem, 96vw), 100vw',
+  side: '(min-width: 50rem) min(30rem, 32vw), 50vw',
+  mention: '(min-width: 50rem) 20rem, 50vw',
+};
+---
+
+<div class="winners not-content" data-podium={podium.length}>
+  {
+    groups.map(({ name, winners: group }) => (
+      <ul class={name} role="list">
+        {group.map((winner) => {
+          const isLead = winner === lead;
+          const size = isLead ? 'lead' : name === 'podium' ? 'side' : 'mention';
+          return (
+            <li class:list={['winner', { 'winner--lead': isLead }]}>
+              <figure>
+                <a class="frame" href={fullSrc(winner)}>
+                  <Image
+                    src={winner.image}
+                    alt={winnerAlt(winner, week)}
+                    widths={widthsUpTo(candidateWidths[size], winner.image.width)}
+                    sizes={sizes[size]}
+                    loading={(eager === 'podium' && name === 'podium') || (eager && isLead) ? 'eager' : 'lazy'}
+                    fetchpriority={eager && isLead ? 'high' : undefined}
+                  />
+                </a>
+                <figcaption>
+                  <span class:list={['place', { 'place--first': winner.place === 1, 'place--mention': name === 'mentions' }]}>
+                    {placeLabel(winner.place)}
+                  </span>
+                  <span class="credit">
+                    {winner.title && <span class="credit__title">{winner.title}</span>}
+                    <span class="credit__artist">
+                      by{' '}
+                      {winner.artistUrl ? (
+                        <a href={winner.artistUrl} target="_blank" rel="nofollow ugc noopener noreferrer">
+                          {winner.artist}
+                        </a>
+                      ) : (
+                        winner.artist
+                      )}
+                    </span>
+                    {winner.model && <span class="credit__model">{winner.model}</span>}
+                  </span>
+                </figcaption>
+              </figure>
+            </li>
+          );
+        })}
+      </ul>
+    ))
+  }
+</div>
+
+<style>
+  .winners {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .podium {
+    display: grid;
+    gap: 1.5rem 1rem;
+  }
+
+  .mentions {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
+    gap: 1.25rem 1rem;
+  }
+
+  .winner,
+  figure {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    margin: 0;
+  }
+
+  figure {
+    flex: 1;
+    gap: 0.625rem;
+  }
+
+  /* The frame is the image's link: the strong border and the control fill on hover. */
+  .frame {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+    transition: var(--docs-control-transition);
+
+    &:hover {
+      border-color: var(--docs-border-strong);
+      background-color: var(--docs-control);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--docs-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  .frame img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  /*
+   * Phones: the top place across the column, at most three quarters of the screen tall; the next two side by side below it in
+   * square frames like the honourable mentions', so a tall 2nd place never outweighs a wide 1st.
+   */
+  @media (max-width: 49.99rem) {
+    .podium {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .winner--lead {
+      grid-column: 1 / -1;
+    }
+
+    .winner--lead .frame img {
+      max-height: 75svh;
+      object-fit: contain;
+    }
+
+    .podium .winner:not(.winner--lead) {
+      .frame {
+        aspect-ratio: 1;
+      }
+
+      .frame img {
+        position: absolute;
+        inset: 0;
+        height: 100%;
+        object-fit: contain;
+      }
+
+      figcaption {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  }
+
+  /* Honourable mentions sit in equal frames at every width, each image whole inside its own. */
+  .mentions .frame {
+    aspect-ratio: 1;
+
+    img {
+      position: absolute;
+      inset: 0;
+      height: 100%;
+      object-fit: contain;
+    }
+  }
+
+  /*
+   * Wide screens: 1st place takes two thirds, with 2nd and 3rd stacked beside it. Frames stretch to the row, and the
+   * images sit whole inside them.
+   */
+  @media (min-width: 50rem) {
+    .podium {
+      --lead-height: clamp(22rem, 8rem + 26vw, 36rem);
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    }
+
+    [data-podium='1'] .podium {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    [data-podium='3'] .winner--lead {
+      grid-row: span 2;
+    }
+
+    .podium .frame {
+      flex: 1;
+      min-height: calc(var(--lead-height) / 2 - 3rem);
+
+      img {
+        position: absolute;
+        inset: 0;
+        height: 100%;
+        object-fit: contain;
+      }
+    }
+
+    .podium .winner--lead .frame {
+      min-height: var(--lead-height);
+    }
+
+    .mentions {
+      grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    }
+  }
+
+  figcaption {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.375rem 0.75rem;
+    font-size: var(--sl-text-sm);
+    line-height: 1.4;
+  }
+
+  /* The place in words; 1st place takes the solid accent. */
+  .place {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    height: 1.375rem;
+    padding: 0 0.5rem;
+    border: 1px solid var(--docs-border-strong);
+    border-radius: var(--docs-radius);
+    background-color: var(--docs-control);
+    color: var(--docs-text-strong);
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .place--first {
+    border-color: var(--docs-accent);
+    background-color: var(--docs-accent);
+    color: var(--docs-accent-contrast);
+  }
+
+  .place--mention {
+    border-color: var(--docs-border);
+    background-color: transparent;
+    color: var(--docs-text-muted);
+    font-weight: 500;
+  }
+
+  .credit {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.125rem 0.5rem;
+    min-width: 0;
+  }
+
+  .credit__title {
+    color: var(--docs-text-strong);
+    font-weight: 600;
+  }
+
+  .winner--lead .credit__title {
+    font-size: 1.125rem;
+  }
+
+  .credit__artist {
+    color: var(--docs-text-muted);
+
+    a {
+      color: var(--docs-accent);
+      text-decoration: none;
+
+      &:hover {
+        color: var(--docs-accent-text);
+        text-decoration: underline;
+      }
+    }
+  }
+
+  .credit__model {
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-xs);
+  }
+
+  /* Mentions are narrow: the credit goes below the badge. */
+  .mentions figcaption {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .frame {
+      transition: none;
+    }
+  }
+</style>

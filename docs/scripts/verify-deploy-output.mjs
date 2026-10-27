@@ -108,6 +108,12 @@ if (existsSync(new URL('../dist/de/releases', import.meta.url))) {
   errors.push('dist/de/releases exists, but release pages are root-only');
 }
 
+/** @param {string} directory a directory inside dist */
+const htmlFilesIn = (directory) =>
+  readdirSync(new URL(`../dist/${directory}/`, import.meta.url), { recursive: true })
+    .filter((file) => file.endsWith('.html'))
+    .map((file) => `${directory}/${file}`);
+
 // Language alternates list translations only, so pages that are never translated (the contributor docs stay English)
 // and pages without locale routes list none.
 const untranslatedFiles = [
@@ -116,18 +122,14 @@ const untranslatedFiles = [
   '404.html',
   'releases/index.html',
   'download/index.html',
+  // The showcase, the weekly challenges' archive and each challenge's page.
+  ...htmlFilesIn('showcase'),
 ];
 for (const file of untranslatedFiles) {
   if (readDist(file).includes('<link rel="alternate" hreflang=')) {
     errors.push(`${file} lists language alternates, but has no translation`);
   }
 }
-
-/** @param {string} directory a directory inside dist */
-const htmlFilesIn = (directory) =>
-  readdirSync(new URL(`../dist/${directory}/`, import.meta.url), { recursive: true })
-    .filter((file) => file.endsWith('.html'))
-    .map((file) => `${directory}/${file}`);
 
 // Every internal link on the hand-written pages, and on every page of a locale, leads to a built file. The links
 // validator only checks Markdown links, and a locale's pages move links into the locale after rendering, where links
@@ -141,7 +143,8 @@ const isBuilt = (target) => {
 const linkCheckedFiles = [
   'index.html',
   'download/index.html',
-  'showcase/index.html',
+  // The showcase, the weekly challenges' archive and each challenge's page.
+  ...htmlFilesIn('showcase'),
   ...translatedLocales.flatMap(htmlFilesIn),
 ];
 for (const file of linkCheckedFiles) {

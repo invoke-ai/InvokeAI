@@ -7,6 +7,7 @@ import { docsSchema, i18nSchema } from '@astrojs/starlight/schema';
 import { changelogsLoader } from 'starlight-changelogs/loader';
 
 import en from './content/i18n/en.json';
+import { repeatedPlaces } from './lib/challenges.mjs';
 import { NODE_PACK_CATEGORIES } from './lib/community-nodes.mjs';
 import { generateDocsId } from './lib/sort-prefix.mjs';
 
@@ -50,6 +51,62 @@ export const collections = {
         createdWith: z.string().optional(),
         date: z.coerce.date(),
       }),
+  }),
+  // Winners of the weekly Discord art challenges, one folder per week with its `challenge.yaml` and the winners' images,
+  // shown on `/showcase/`, `/showcase/challenges/` and the home page. `src/content/challenges/README.md` explains how
+  // to publish one; `src/lib/challenges.test.mjs` checks the folders (stray files, image sizes, unique weeks).
+  challenges: defineCollection({
+    loader: glob({
+      pattern: '*/challenge.yaml',
+      base: './src/content/challenges',
+      // The folder name is the id, and the page's URL: `/showcase/challenges/<folder>/`.
+      generateId: ({ entry }) => entry.split('/')[0],
+    }),
+    // Strict objects, so a misspelt field (`artistURL`, `winner`) fails the build instead of being dropped.
+    schema: ({ image }) =>
+      z
+        .strictObject({
+          /** The challenge's number, as announced on Discord. */
+          week: z.number().int().positive(),
+          theme: z.string().min(1),
+          /** The prompt as announced, in a sentence or two. */
+          brief: z.string().max(280).optional(),
+          /** YAML dates (`2026-10-21`, unquoted), which the YAML parser reads as dates; a quoted date is a string. */
+          startDate: z.date({ error: 'Write the date as YYYY-MM-DD, without quotes, such as 2026-10-21.' }),
+          endDate: z.date({ error: 'Write the date as YYYY-MM-DD, without quotes, such as 2026-10-27.' }),
+          /** The challenge's announcement or thread on Discord. */
+          discordUrl: z.httpUrl().optional(),
+          winners: z
+            .array(
+              z.strictObject({
+                /** 1, 2 or 3, or `honourable` for an honourable mention. */
+                place: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal('honourable')], {
+                  error: 'place must be 1, 2, 3 or honourable.',
+                }),
+                image: image(),
+                /** The entrant's name exactly as they asked to be credited. */
+                artist: z.string().min(1),
+                /** Only http(s): it becomes a link. */
+                artistUrl: z.httpUrl().optional(),
+                title: z.string().min(1).optional(),
+                /** Free text, such as "FLUX.2 Klein". */
+                model: z.string().min(1).optional(),
+              })
+            )
+            .min(1),
+        })
+        .superRefine((challenge, context) => {
+          if (challenge.endDate < challenge.startDate) {
+            context.addIssue({ code: 'custom', message: '`endDate` is before `startDate`.', path: ['endDate'] });
+          }
+          for (const place of repeatedPlaces(challenge.winners)) {
+            context.addIssue({
+              code: 'custom',
+              message: `More than one winner has \`place: ${place}\`. Use \`honourable\` for further mentions.`,
+              path: ['winners'],
+            });
+          }
+        }),
   }),
   // Node packs on the Community Nodes page. `src/content/community-nodes/README.md` explains how to add one.
   communityNodes: defineCollection({
