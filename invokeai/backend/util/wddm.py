@@ -21,6 +21,11 @@ next allocation (1-2 GiB measured, still held after ``empty_cache()``), so it wo
 Whether Windows has actually paged this process out is not visible through D3DKMT (``CurrentUsage`` counts paged bytes
 as local); it is visible in the ``GPU Process Memory`` performance counters Task Manager shows, read here through PDH.
 
+The working-memory probe measures what an operation needs on CUDA and on ROCm alike, so `process_local_usage` (this
+process's ``CurrentUsage``) and `process_paged_bytes` answer on either build under Windows; on an RTX 4090 with torch
+2.13 the usage follows torch's reserved bytes to three decimals. The ROCm-only readers the model cache decides with keep
+their gate.
+
 Everything here is best-effort: any failure yields ``None`` ("unknown") rather than raising, and callers must keep their
 existing behaviour when the answer is unknown.
 """
@@ -36,6 +41,7 @@ from typing import Optional
 import torch
 
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.pci import pci_location
 
 _KMTQAITYPE_ADAPTERADDRESS = 6
 _MEMORY_SEGMENT_GROUP_LOCAL = 0
@@ -149,8 +155,12 @@ _pdh_lock = threading.Lock()
 _pdh_queries: dict[str, Optional[tuple[ctypes.c_void_p, ctypes.c_void_p]]] = {}
 
 
+def _windows_gpu(device: torch.device) -> bool:
+    return sys.platform == "win32" and device.type == "cuda"
+
+
 def _supported(device: torch.device) -> bool:
-    return sys.platform == "win32" and torch.version.hip is not None and device.type == "cuda"
+    return _windows_gpu(device) and torch.version.hip is not None
 
 
 @functools.lru_cache(maxsize=1)
@@ -211,11 +221,11 @@ def _close(lib: ctypes.CDLL, handle: int) -> None:
 def _resolve_adapter(lib: ctypes.CDLL, index: int) -> Optional[_Adapter]:
     """Open the WDDM adapter at the torch device's PCI location, closing every other handle the enumeration opened.
 
-    ROCm's device properties carry no LUID, so the PCI bus and device numbers are the link. Anything but exactly one
-    match is treated as unknown rather than guessed.
+    torch's device properties carry no LUID, on ROCm or CUDA, so the PCI bus and device numbers are the link. Anything
+    but exactly one match is treated as unknown rather than guessed.
     """
     props = torch.cuda.get_device_properties(index)
-    location = (int(props.pci_bus_id), int(props.pci_device_id))
+    _domain, bus, device_number = pci_location(index)
 
     enum = _EnumAdapters2(0, None)
     if lib.D3DKMTEnumAdapters2(ctypes.byref(enum)) != 0:
@@ -241,9 +251,9 @@ def _resolve_adapter(lib: ctypes.CDLL, index: int) -> Optional[_Adapter]:
                 ctypes.cast(ctypes.byref(address), ctypes.c_void_p),
                 ctypes.sizeof(address),
             )
-            if (
-                lib.D3DKMTQueryAdapterInfo(ctypes.byref(query)) == 0
-                and (address.BusNumber, address.DeviceNumber) == location
+            if lib.D3DKMTQueryAdapterInfo(ctypes.byref(query)) == 0 and (address.BusNumber, address.DeviceNumber) == (
+                bus,
+                device_number,
             ):
                 matches.append(info)
             else:
@@ -293,22 +303,58 @@ def local_video_memory(device: torch.device) -> Optional[tuple[int, Optional[int
     if not _supported(device):
         return None
     try:
-        resolved = _adapter_for(device)
-        if resolved is None:
+        queried = _query_local_memory(device)
+        if queried is None:
             return None
-        lib, adapter = resolved
-        info = _QueryVideoMemoryInfo(None, adapter.handle, _MEMORY_SEGMENT_GROUP_LOCAL)
-        if lib.D3DKMTQueryVideoMemoryInfo(ctypes.byref(info)) != 0:
-            return None
+        info, adapter = queried
         if not 0 < info.Budget <= adapter.total_bytes:
             return None
-        # `CurrentUsage` counts bytes Windows has already paged out, so it exceeds the adapter's own size exactly when
-        # the process over-commits. It says nothing about residency then, so it is reported as unknown; the budget
-        # stands, since the model cache's free-VRAM cap is the caller that needs it most in that state.
-        usage = int(info.CurrentUsage)
-        return int(info.Budget), usage if 0 <= usage <= adapter.total_bytes else None
+        # The budget stands when the usage is unknown (see `_plausible_usage`): the model cache's free-VRAM cap is the
+        # caller that needs it most in exactly that state.
+        return int(info.Budget), _plausible_usage(info, adapter)
     except Exception:
         InvokeAILogger.get_logger(__name__).debug(f"WDDM memory lookup for {device} failed", exc_info=True)
+        return None
+
+
+def _query_local_memory(device: torch.device) -> Optional[tuple[_QueryVideoMemoryInfo, _Adapter]]:
+    """This process's local-segment memory info on the device's adapter, with the adapter; None if the driver cannot
+    answer."""
+    resolved = _adapter_for(device)
+    if resolved is None:
+        return None
+    lib, adapter = resolved
+    info = _QueryVideoMemoryInfo(None, adapter.handle, _MEMORY_SEGMENT_GROUP_LOCAL)
+    if lib.D3DKMTQueryVideoMemoryInfo(ctypes.byref(info)) != 0:
+        return None
+    return info, adapter
+
+
+def _plausible_usage(info: _QueryVideoMemoryInfo, adapter: _Adapter) -> Optional[int]:
+    """`CurrentUsage`, or None when it exceeds the adapter's own size.
+
+    It counts bytes Windows has already paged out, so it exceeds the adapter exactly when the process over-commits,
+    and says nothing about residency then.
+    """
+    usage = int(info.CurrentUsage)
+    return usage if 0 <= usage <= adapter.total_bytes else None
+
+
+def process_local_usage(device: torch.device) -> Optional[int]:
+    """This process's ``CurrentUsage`` in the local segment of the device's adapter, in bytes, on a CUDA or a ROCm
+    build under Windows: everything the process has committed there, the allocator's cached blocks, the libraries' own
+    allocations and any bytes Windows paged out included.
+
+    ``None`` off Windows, for a device that is not a GPU, when the driver cannot answer, and when the usage exceeds the
+    adapter.
+    """
+    if not _windows_gpu(device):
+        return None
+    try:
+        queried = _query_local_memory(device)
+        return None if queried is None else _plausible_usage(*queried)
+    except Exception:
+        InvokeAILogger.get_logger(__name__).debug(f"WDDM usage lookup for {device} failed", exc_info=True)
         return None
 
 
@@ -376,6 +422,13 @@ def paged_bytes(device: torch.device) -> Optional[int]:
     The first call opens this counter's PDH query (~0.3 s); each later call collects it once (~0.3 ms).
     """
     if not _supported(device):
+        return None
+    return process_paged_bytes(device)
+
+
+def process_paged_bytes(device: torch.device) -> Optional[int]:
+    """`paged_bytes` on a CUDA or a ROCm build under Windows; ``None`` elsewhere."""
+    if not _windows_gpu(device):
         return None
     resolved = _adapter_for(device)
     if resolved is None:

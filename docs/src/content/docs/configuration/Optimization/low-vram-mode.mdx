@@ -214,6 +214,8 @@ auto_tiled_decode: false
 - **Per node:** the SD, FLUX.1, FLUX.2, Z-Image, Qwen-Image and Qwen-Image-2.1 **Latents to Image** and **Image to Latents** nodes, and **Image to Latents - Anima**, have **Tiled** and **Tile Size** fields for workflows. So do the **Z-Image ControlNet**, **Qwen Image ControlNet** and **FLUX.2 [dev] ControlNet** nodes, for the images the denoise encodes. The [Upscale panel](/users-guide/image-generation/upscale/) turns tiling on by itself.
 - **Automatic retry:** if a FLUX.1, FLUX.2, Z-Image or Anima decode, or a FLUX.1 or FLUX.2 encode, runs out of memory, InvokeAI retries it once with tiling and logs that it did.
 
+MOSS-Image encodes and decodes with the FLUX.2 nodes, so everything this section says about FLUX.2 applies to it as well.
+
 A tiled decode is not pixel-identical to a single-pass one. The VAE looks at the whole image at once, so the difference is spread over the image rather than limited to the tile seams; it is small (for a 1024x1024 FLUX.2 Klein image, 5.6 of 255 per pixel value on average, with no visible seams), but the same seed will not reproduce an untiled result exactly.
 
 ### PiD decode optimization
