@@ -6,7 +6,11 @@ import type {
 } from '@features/generation/core/types';
 
 import { Badge, createListCollection, HStack, Stack } from '@chakra-ui/react';
-import { getDefaultGenerateSettings, getGenerationUiPolicy } from '@features/generation/core/baseGenerationPolicies';
+import {
+  getDefaultGenerateSettings,
+  getGenerationUiPolicy,
+  getKrea2EditLoraState,
+} from '@features/generation/core/baseGenerationPolicies';
 import { isPidMode, MAX_PID_STEPS, MIN_PID_STEPS } from '@features/generation/core/pid';
 import {
   DEFAULT_HIDIFFUSION_T1_RATIO,
@@ -59,6 +63,7 @@ const selectAdvancedSettings = pickGenerateSettings([
   'hiDiffusionT1Ratio',
   'hiDiffusionT2Ratio',
   'hiDiffusionWindowAttentionEnabled',
+  'krea2ReferenceKvCache',
   'pidMode',
   'pidSteps',
   'qwenImageEncoderQuantization',
@@ -68,6 +73,12 @@ const selectAdvancedSettings = pickGenerateSettings([
   'vaePrecision',
 ]);
 
+const KREA2_REFERENCE_KV_CACHE_HELP_KEYS = {
+  noEditReferences: 'widgets.generate.krea2ReferenceKvCacheNeedsEditReferences',
+  noLora: 'widgets.generate.krea2ReferenceKvCacheNeedsLora',
+  ready: 'widgets.generate.krea2ReferenceKvCacheHelp',
+} as const;
+
 export const GenerateAdvancedFields = ({
   draft,
   onCommit,
@@ -76,6 +87,12 @@ export const GenerateAdvancedFields = ({
 }: GenerateAdvancedFieldsProps) => {
   const { t } = useTranslation();
   const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectAdvancedSettings);
+  // A string, so editing a reference or a concept re-renders this section only when the K/V cache starts or stops
+  // applying.
+  const krea2EditLoraState = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, (current: GenerateSettings) =>
+    getKrea2EditLoraState(selectedModel, current)
+  );
+  const krea2ReferenceKvCacheApplies = krea2EditLoraState === 'ready';
   const modelBase = selectedModel?.base;
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
   const policy = getGenerationUiPolicy(selectedModel);
@@ -133,7 +150,8 @@ export const GenerateAdvancedFields = ({
     !policy.clipSkipMax &&
     !policy.cfgRescaleVisible &&
     !policy.pidVisible &&
-    !policy.encoderQuantizationVisible
+    !policy.encoderQuantizationVisible &&
+    !policy.krea2ReferenceKvCacheVisible
   ) {
     return null;
   }
@@ -149,6 +167,8 @@ export const GenerateAdvancedFields = ({
     policy.hiDiffusionVisible && settings.hiDiffusionEnabled,
     policy.pidVisible && settings.pidMode !== 'off',
     policy.encoderQuantizationVisible && settings.qwenImageEncoderQuantization !== 'none',
+    // The graph sends the switch only with edit references and a LoRA, so it is no override without them.
+    policy.krea2ReferenceKvCacheVisible && krea2ReferenceKvCacheApplies && settings.krea2ReferenceKvCache,
   ].filter(Boolean).length;
 
   const badges =
@@ -382,6 +402,24 @@ export const GenerateAdvancedFields = ({
                 onCommit({ qwenImageEncoderQuantization: quantization });
               }
             }}
+          />
+        </Field>
+      ) : null}
+
+      {policy.krea2ReferenceKvCacheVisible ? (
+        <Field
+          disabled={!krea2ReferenceKvCacheApplies}
+          helpText={t(KREA2_REFERENCE_KV_CACHE_HELP_KEYS[krea2EditLoraState])}
+          hint="krea2ReferenceKvCache"
+          label={t('widgets.generate.krea2ReferenceKvCache')}
+          p="2"
+        >
+          {/* Shown off while it is not sent; the stored value stays and is back once it applies again. */}
+          <GenerateToggleSwitch
+            checked={krea2ReferenceKvCacheApplies && settings.krea2ReferenceKvCache}
+            disabled={!krea2ReferenceKvCacheApplies}
+            label={t('widgets.generate.krea2ReferenceKvCache')}
+            onCheckedChange={(checked) => onCommit({ krea2ReferenceKvCache: checked })}
           />
         </Field>
       ) : null}
