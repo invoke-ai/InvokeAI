@@ -90,6 +90,8 @@ _SQUARE_1024 = {"width": 1024, "height": 1024}
 # qwen-image-2-1: the pipeline's num_inference_steps=40 and true_cfg_scale=1.0 (the model card samples
 #             without guidance); Turbo's card: 8 steps on its shipped sigma table, CFG 1.
 # anima:      Turbo's card says CFG 1 and 8-12 steps; like ERNIE's, it is reached by name hint.
+# moss-image: model card / pipeline defaults: `MOSSImagePipeline.__call__` runs 50 steps at
+#             guidance_scale 3 (true CFG, so a negative prompt applies) at 1024x1024.
 DEFAULT_SETTINGS_MATRIX: list[tuple[str, BaseModelType, AnyVariant | None, str | None, dict[str, Any]]] = [
     (
         "sd-1",
@@ -276,6 +278,13 @@ DEFAULT_SETTINGS_MATRIX: list[tuple[str, BaseModelType, AnyVariant | None, str |
         None,
         "anima-turbo-v1.1-Q8_0",
         {"scheduler": "euler", "steps": 10, "cfg_scale": 1.0, **_SQUARE_1024},
+    ),
+    (
+        "moss-image",
+        BaseModelType.MossImage,
+        None,
+        None,
+        {"scheduler": "euler", "steps": 50, "cfg_scale": 3.0, **_SQUARE_1024},
     ),
 ]
 
