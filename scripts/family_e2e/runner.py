@@ -420,7 +420,18 @@ def read_heartbeat(run_dir: Path) -> dict[str, Any]:
 
 
 def ensure_running(run_dir: Path) -> None:
-    """Raises RunStopped unless run.json still says `running`."""
+    """Raises RunStopped unless run.json still says `running`.
+
+    Under the run lock: Windows refuses to open run.json for a moment while `stop` replaces it, which would end the
+    runner as failed instead of stopped.
+    """
+    with run_lock(run_dir):
+        _raise_unless_running(run_dir)
+
+
+def _raise_unless_running(run_dir: Path) -> None:
+    """ensure_running for a caller that holds the run lock: the lock belongs to a file handle, so taking it again would
+    wait for itself."""
     status = load_run_info(run_dir).status
     if status != "running":
         raise RunStopped(f"run {run_dir.name} is {status}; the runner leaves it as it is")
@@ -445,7 +456,7 @@ def register_runner(run_dir: Path) -> None:
     stay for stop_surviving_server. While another runner of the run is alive this refuses.
     """
     with run_lock(run_dir):
-        ensure_running(run_dir)
+        _raise_unless_running(run_dir)
         heartbeat = read_heartbeat(run_dir)
         other = heartbeat.get("runner")
         if other and int(other[0]) != os.getpid() and is_alive(other):
@@ -885,7 +896,7 @@ class _Session:
     def save_info(self) -> None:
         """Writes the session's run.json while the run is still running; `stop` owns it otherwise."""
         with run_lock(self.run_dir):
-            ensure_running(self.run_dir)
+            _raise_unless_running(self.run_dir)
             write_run_info(self.run_dir, self.info)
 
     def upload_inputs(
