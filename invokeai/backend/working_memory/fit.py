@@ -23,7 +23,10 @@ below.
 
 `tests/backend/working_memory/test_shipped_coefficients.py` holds every carried value that is not a declared stand-in
 to `fitted_values` of the shipped points, so a new point that moves a fit fails there with the value to ship. A
-`legacy` entry's hand-set values are neither fitted nor held to a fit.
+`legacy` entry's hand-set values are neither fitted nor held to a fit. A value on no line its entry carries
+(`line_values`) is hand-set too: the MOSS-Image denoise's `k_token`, bytes per attended token, whose entry ships no
+base for its line. Its points still decide and bound it (`bounds.py`), and the data test allows such a value only for
+an estimator keyed by no platform trait.
 
 A user's own calibration fits the same lines from its windows (`user_pair`, read by `user_fit.py`), with
 `USER_MARGIN`, the same margin, for the estimators that opt in (`EstimatorSpec.user_calibrated`).
@@ -191,6 +194,16 @@ def carried_lines(entry: CoefficientEntry) -> set[str]:
     """The suffixes an entry carries both halves of a line for."""
     names = set(entry.values or {})
     return {name[2:] for name in names if name.startswith("k_") and f"b_{name[2:]}" in names}
+
+
+def line_values(entry: CoefficientEntry) -> set[str]:
+    """The values of `entry` that `fitted_values` reproduces: both halves of each line it carries (`carried_lines`),
+    stand-ins included. Any other value is hand-set (see the module docstring), which the data test allows only for an
+    estimator keyed by no platform trait.
+
+    The MOSS-Image denoise declares its line in attended tokens, but its entry carries the slope alone; shipping a
+    fitted base (`b_token`) with it makes that a carried line, and this exemption goes."""
+    return {f"{part}_{suffix}" for suffix in carried_lines(entry) for part in ("k", "b")}
 
 
 def fit_points(

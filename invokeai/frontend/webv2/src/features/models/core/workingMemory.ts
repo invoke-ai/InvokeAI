@@ -150,10 +150,12 @@ export const selectAttemptRuns = (runs: readonly WorkingMemoryRun[], attemptId?:
 };
 
 /**
- * Why the server refused a calibration's step, where the section says it in its own words: another attempt of the
- * model is running, or the model's record changed after the graphs were compiled over it.
+ * Why the server refused a calibration's step, where the section says it in its own words: another attempt is
+ * running on this GPU, the model's record changed after the graphs were compiled over it, or another calibration ran
+ * on this GPU between this attempt's steps (`interleaved`), whose later steps then no longer combine with its earlier
+ * ones.
  */
-export type CalibrationRefusal = 'alreadyRunning' | 'modelChanged';
+export type CalibrationRefusal = 'alreadyRunning' | 'interleaved' | 'modelChanged';
 
 /** What this tab knows of an attempt it started. */
 export interface LocalAttempt {
@@ -449,7 +451,9 @@ export const getCalibrationBlocker = ({
 
 /**
  * The model whose calibration attempt holds this GPU, as the status lists it, or null. The server takes one attempt
- * per device class at a time; a run without an attempt holds nothing.
+ * per device class at a time; a run without an attempt holds nothing. An attempt between its steps runs nothing and
+ * reads as free here: the status cannot tell it from an abandoned one, which the server judges by its last activity.
+ * The server's refusal covers that gap of seconds.
  */
 export const modelCalibratingOnGpu = (status: Pick<WorkingMemoryStatus, 'device_classes'>): string | null =>
   status.device_classes

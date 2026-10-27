@@ -286,6 +286,7 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   zImageSeedVarianceRandomizePercent: 50,
   qwenImageShift: null,
   qwenImageEncoderQuantization: 'none',
+  mossImageUncondSkipLayers: [22],
   referenceImages: [],
   scheduler: 'euler_a',
   seamlessXAxis: false,

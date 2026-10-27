@@ -366,12 +366,14 @@ class DefaultSessionRunner(SessionRunnerBase):
                 refusal = f"Could not admit the calibration item: {error}"
             if refusal is not None:
                 self._services.logger.warning(f"Failing calibration item {queue_item.item_id}: {refusal}")
+                failing = copy.copy(queue_item)
                 with suppress(SessionQueueItemNotFoundError):
                     self._settle(
                         queue_item.item_id,
                         lambda: self._services.session_queue.fail_queue_item(
-                            queue_item.item_id, "WorkingMemoryCalibrationError", refusal, refusal
+                            queue_item.item_id, "WorkingMemoryCalibrationError", refusal, refusal, queue_item=failing
                         ),
+                        queue_item=failing,
                     )
                 return
             self._calibration_run_id = run_id
@@ -432,12 +434,15 @@ class DefaultSessionRunner(SessionRunnerBase):
         message = f"Could not save the working-memory measurements of node {invocation.id}: {error}"
         self._services.logger.error(message, exc_info=True)
         details = traceback.format_exc()
+        # A copy for the queue to update, as in `_cancel_if_owner_revoked`.
+        failing = copy.copy(queue_item)
         with suppress(SessionQueueItemNotFoundError):
             self._settle(
                 queue_item.item_id,
                 lambda: self._services.session_queue.fail_queue_item(
-                    queue_item.item_id, "WorkingMemoryCalibrationError", message, details
+                    queue_item.item_id, "WorkingMemoryCalibrationError", message, details, queue_item=failing
                 ),
+                queue_item=failing,
             )
         return False
 

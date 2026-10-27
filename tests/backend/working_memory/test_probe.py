@@ -726,6 +726,85 @@ def test_a_dropped_model_voids_the_window_its_weights_die_in(
         assert (window.valid, window.reasons) == (True, [])
 
 
+def test_a_model_dropped_before_the_scope_voids_the_window_its_weights_die_in(
+    device: FakeDevice, model_cache: CacheOnFakeDevice
+):
+    """Dropped between nodes, with no scope armed, while a node still held it: its weights leave during the next
+    node's window."""
+    text_encoder = model_cache.admit("text-encoder")
+    held = [model_cache.cache._cached_models["text-encoder"]]
+    model_cache.drop("text-encoder")
+
+    with _scope() as scope:
+        with model_cache.model("vae").model_on_device(working_memory=_estimate()):
+            held.clear()
+            device.alloc(3 * text_encoder // 2)
+            device.free(3 * text_encoder // 2)
+
+    (window,) = scope.windows
+    assert window.demand_bytes == text_encoder // 2
+    assert (window.valid, window.fit_eligible, window.reasons) == (False, False, ["weights_left"])
+
+
+def test_dropped_weights_that_die_with_no_window_open_leave_no_trace(
+    device: FakeDevice, model_cache: CacheOnFakeDevice
+):
+    """Without a calibration, a server drops models for as long as it runs: what they leave behind must not pile up,
+    nor what a window that has closed read."""
+    model_cache.admit("lora")
+    held = [model_cache.cache._cached_models["lora"]]
+    model_cache.drop("lora")
+    with _scope() as scope:
+        with model_cache.model("vae").model_on_device(working_memory=_estimate()):
+            held.clear()
+    for key in ("text-encoder", "transformer"):
+        model_cache.admit(key)
+        model_cache.drop(key)
+
+    assert [window.reasons for window in scope.windows] == [["weights_left"]]
+    assert probe._freed_weights == []
+
+
+def test_weights_dying_in_a_parent_window_void_it_although_a_child_opened_and_closed_since(
+    device: FakeDevice, model_cache: CacheOnFakeDevice
+):
+    """Neither the child's registration nor its departure may forget a death the parent has yet to read."""
+    model_cache.admit("text-encoder")
+    held = [model_cache.cache._cached_models["text-encoder"]]
+    model_cache.drop("text-encoder")
+
+    with _scope() as scope:
+        with model_cache.model("transformer").model_on_device(working_memory=_estimate()):
+            held.clear()
+            with model_cache.model("vae").model_on_device(working_memory=_estimate()):
+                device.alloc(1 * GIB)
+                device.free(1 * GIB)
+
+    child, parent = scope.windows
+    assert (child.valid, child.reasons) == (True, [])
+    assert (parent.valid, parent.reasons) == (False, ["weights_left"])
+
+
+def test_a_dropped_record_locked_onto_the_device_between_scopes_voids_the_window_its_weights_die_in(
+    device: FakeDevice, model_cache: CacheOnFakeDevice
+):
+    """The lock that put the dropped record's weights on the device ran with no scope armed."""
+    text_encoder = model_cache.admit("text-encoder", on_device=False)
+    held = [model_cache.cache._cached_models["text-encoder"]]
+    model_cache.drop("text-encoder")
+    model_cache.lock_dropped(held[0])
+
+    with _scope() as scope:
+        with model_cache.model("vae").model_on_device(working_memory=_estimate()):
+            held.clear()
+            device.alloc(3 * text_encoder // 2)
+            device.free(3 * text_encoder // 2)
+
+    (window,) = scope.windows
+    assert window.demand_bytes == text_encoder // 2
+    assert (window.valid, window.reasons) == (False, ["weights_left"])
+
+
 def test_a_dropped_record_a_lock_put_on_the_device_voids_the_window_its_weights_die_in(
     device: FakeDevice, model_cache: CacheOnFakeDevice
 ):
