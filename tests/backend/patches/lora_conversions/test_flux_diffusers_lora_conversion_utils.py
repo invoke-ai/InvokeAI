@@ -5,7 +5,11 @@ from invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_ut
     is_state_dict_likely_in_flux_diffusers_format,
     lora_model_from_flux_diffusers_state_dict,
 )
-from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.patches.lora_conversions.flux_lora_constants import (
+    FLUX_LORA_CLIP_PREFIX,
+    FLUX_LORA_T5_PREFIX,
+    FLUX_LORA_TRANSFORMER_PREFIX,
+)
 from tests.backend.patches.lora_conversions.lora_state_dicts.flux_dora_onetrainer_format import (
     state_dict_keys as flux_onetrainer_state_dict_keys,
 )
@@ -117,3 +121,20 @@ def test_lora_model_from_flux_diffusers_state_dict_guidance_embedder():
     out_layer = model.layers[f"{FLUX_LORA_TRANSFORMER_PREFIX}guidance_in.out_layer"]
     assert in_layer.get_parameters({"weight": torch.empty(3072, 256)}, 1.0)["weight"].shape == (3072, 256)
     assert out_layer.get_parameters({"weight": torch.empty(3072, 3072)}, 1.0)["weight"].shape == (3072, 3072)
+
+
+def test_lora_model_from_flux_diffusers_state_dict_with_text_encoder_layers():
+    """Test that a diffusers-format FLUX LoRA that also trains the text encoders loads, routing the
+    text_encoder.* keys to the CLIP prefix and text_encoder_2.* keys to the T5 prefix.
+    """
+    state_dict = keys_to_mock_state_dict(flux_diffusers_state_dict_keys)
+    state_dict["text_encoder.text_model.encoder.layers.0.self_attn.q_proj.lora_A.weight"] = torch.empty([4, 768])
+    state_dict["text_encoder.text_model.encoder.layers.0.self_attn.q_proj.lora_B.weight"] = torch.empty([768, 4])
+    state_dict["text_encoder_2.encoder.block.0.layer.0.SelfAttention.q.lora_A.weight"] = torch.empty([4, 4096])
+    state_dict["text_encoder_2.encoder.block.0.layer.0.SelfAttention.q.lora_B.weight"] = torch.empty([4096, 4])
+
+    model = lora_model_from_flux_diffusers_state_dict(state_dict, alpha=8.0)
+
+    assert any(k.startswith(FLUX_LORA_TRANSFORMER_PREFIX) for k in model.layers)
+    assert f"{FLUX_LORA_CLIP_PREFIX}text_model.encoder.layers.0.self_attn.q_proj" in model.layers
+    assert f"{FLUX_LORA_T5_PREFIX}encoder.block.0.layer.0.SelfAttention.q" in model.layers
