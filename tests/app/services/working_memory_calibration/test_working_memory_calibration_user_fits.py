@@ -667,6 +667,31 @@ def test_a_retry_of_a_failed_step_canceled_before_it_ran_aborts_its_attempt(tmp_
     assert {run.held_back for run in summary.runs} == {"aborted_attempt"}
 
 
+def test_a_retry_of_a_judged_failed_step_cleared_before_the_next_refresh_aborts_its_attempt(
+    tmp_path: Path, started
+) -> None:
+    """The failed step was judged (its outcome read from the queue, the attempt feeding the fit), then retried, and a
+    queue clear deleted the retry's row before anything refreshed: no read of the queue finds the retry any more. The
+    store recorded it as the queue committed it, so the attempt is aborted and its measurements leave the fit."""
+    service = started(tmp_path)
+    _, largest = _queue_attempt(service, "retried-then-cleared", 2)
+    queue = service._services.session_queue
+    queue.fail_queue_item(largest.item_ids[0], "OutOfMemoryError", "out of memory", "")
+    service.refresh_user_fits()
+    assert _estimate() == _user_bytes(1024)
+
+    [retried] = queue.retry_items_by_id("default", largest.item_ids).retried_items
+    queue.clear("default")
+    service.refresh_user_fits()
+
+    assert queue.get_queue_item_ids("default").item_ids == []
+    assert _estimate() == _shipped()
+    summary = service.get_model_summary("model-a")
+    assert {run.held_back for run in summary.runs} == {"aborted_attempt"}
+    sizes = {(size.counted, size.excluded_reason) for line in summary.lines for size in line.sizes}
+    assert sizes == {(False, "aborted_attempt")}
+
+
 def test_a_queue_item_id_that_now_names_another_item_is_not_taken_for_the_runs(
     tmp_path: Path, started, mock_invoker: Invoker
 ) -> None:
