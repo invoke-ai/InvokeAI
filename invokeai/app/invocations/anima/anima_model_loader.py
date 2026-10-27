@@ -17,7 +17,13 @@ from invokeai.app.invocations.model import (
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.architectures import accepted_vae_bases
-from invokeai.backend.model_manager.taxonomy import AnimaVariantType, BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager.taxonomy import (
+    AnimaVariantType,
+    BaseModelType,
+    ModelType,
+    Qwen35VariantType,
+    SubModelType,
+)
 
 
 @invocation_output("anima_model_loader_output")
@@ -117,6 +123,15 @@ class AnimaModelLoaderInvocation(BaseInvocation):
             raise ValueError(
                 f"{self.model.name} bundles a Qwen3.5 semantic connector and needs a Qwen3.5 4B encoder. "
                 "Install one (qwen35_4b.safetensors) and select it as the Qwen3.5 Encoder."
+            )
+        # MOSS-Image's 9B installs under the same model type, and the connector was trained on the 4B.
+        # Without this check the 9B loads (~16 GB) and denoising then fails on a 4096-against-2560 shape
+        # mismatch, which says nothing about the encoder the user picked.
+        encoder_config = context.models.get_config(self.qwen3_5_encoder_model)
+        if getattr(encoder_config, "variant", None) != Qwen35VariantType.Qwen35_4B:
+            raise ValueError(
+                f"'{encoder_config.name}' is not a Qwen3.5 4B encoder, which {self.model.name}'s semantic "
+                "connector was trained on (hidden size 2560). Select qwen35_4b.safetensors as the Qwen3.5 Encoder."
             )
         return Qwen35EncoderField(
             tokenizer=self.qwen3_5_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer}),
