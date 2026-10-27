@@ -72,6 +72,11 @@ class WanDiffusersModel(GenericDiffusersLoader):
             patch_wan_causal_conv3d_for_rocm()
 
         model_path = Path(config.path)
+        if submodel_type is SubModelType.Tokenizer:
+            from invokeai.backend.wan.tokenizer import load_wan_tokenizer
+
+            return load_wan_tokenizer(model_path / submodel_type.value)
+
         load_class = self.get_hf_load_class(model_path, submodel_type)
         repo_variant = config.repo_variant if isinstance(config, Diffusers_Config_Base) else None
         variant = repo_variant.value if repo_variant else None
@@ -581,7 +586,7 @@ class WanT5EncoderLoader(ModelLoader):
        what ``Wan-AI/Wan2.2-T2V-A14B::text_encoder+tokenizer`` produces.
     2. A flat ``text_encoder/`` folder with ``config.json`` declaring
        ``model_type: umt5`` directly at the root. In this case the tokenizer
-       is loaded from the same folder via ``AutoTokenizer.from_pretrained``.
+       is loaded from the same folder.
     """
 
     def _load_model(
@@ -606,7 +611,7 @@ class WanT5EncoderLoader(ModelLoader):
                 local_files_only=True,
             )
         if submodel_type == SubModelType.Tokenizer:
-            from transformers import AutoTokenizer
+            from invokeai.backend.wan.tokenizer import load_wan_tokenizer
 
             # Prefer a sibling tokenizer/ directory; fall back to the encoder dir
             # itself, which is normal for "flat" downloads.
@@ -615,7 +620,7 @@ class WanT5EncoderLoader(ModelLoader):
                 if nested_tokenizer.exists()
                 else (nested_text_encoder if nested_text_encoder.exists() else root)
             )
-            return AutoTokenizer.from_pretrained(str(target), local_files_only=True)
+            return load_wan_tokenizer(target)
 
         raise ValueError(
             f"Unsupported submodel type for WanT5Encoder: {submodel_type.value if submodel_type else 'None'}"
