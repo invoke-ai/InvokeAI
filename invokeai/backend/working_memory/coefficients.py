@@ -64,9 +64,13 @@ class MeasuredPoint(_DataModel):
     platform: dict[str, str]
     features: dict[str, FeatureValue]
     measured_bytes: int
-    method: Literal["reserved_peak"]
+    method: Literal["reserved_peak", "device_peak"]
     """``reserved_peak``: the caching allocator's peak reserved bytes over the operation, one fresh process per
-    point. Reserved rather than allocated, because reserved is what the model cache's reservation has to cover."""
+    point. Reserved rather than allocated, because reserved is what the model cache's reservation has to cover.
+
+    ``device_peak``: the drop in the driver's free memory (`torch.cuda.mem_get_info`, polled during the operation)
+    below its value just before it. It counts the allocator's reserve and whatever is allocated around it, so it is at
+    least the reserved peak, and bounds the reservation from the same side."""
     device: str
     provenance: str
     max_ratio: float | None = None
@@ -120,7 +124,8 @@ def shipped_data() -> Mapping[str, WorkingMemoryData]:
 
 
 def _where(keys: Mapping[str, str]) -> str:
-    return ",".join(f"{key}={value}" for key, value in keys.items())
+    # An estimator keyed by no platform trait (`platform_keys=()`) has one entry for every platform.
+    return ",".join(f"{key}={value}" for key, value in keys.items()) or "any platform"
 
 
 def _entry(
