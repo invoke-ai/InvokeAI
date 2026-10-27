@@ -1,0 +1,99 @@
+---
+/*
+ * A static "how it works" diagram: steps in order, left to right with arrows between them, stacked top to bottom
+ * where the figure is narrower than 36rem. It is an ordered list, so screen readers read the steps in order, and it
+ * needs no script. Labels are string attributes and children, so a translation can change them.
+ *
+ *   <Pipeline label="How an upscale runs">
+ *     <PipelineStep title="Source image" />
+ *     <PipelineBranch>
+ *       <PipelineLane label="Model only" />
+ *       <PipelineLane label="Refine">
+ *         <PipelineStep title="Detail pass" description="Main model and prompt" />
+ *       </PipelineLane>
+ *     </PipelineBranch>
+ *     <PipelineStep title="Result" />
+ *   </Pipeline>
+ *
+ * `PipelineBranch` is one step whose lanes are alternatives; a lane without steps goes straight on.
+ */
+type Props = {
+  /** The diagram's caption, which names the figure. */
+  label: string;
+  class?: string;
+};
+
+const { label, class: className } = Astro.props;
+---
+
+<figure class:list={['pipeline not-content', className]}>
+  <figcaption class="pipeline__caption">{label}</figcaption>
+  <ol class="pipeline__steps" role="list">
+    <slot />
+  </ol>
+</figure>
+
+<style>
+  .pipeline {
+    margin: 0;
+    padding: 0.75rem;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+    container-type: inline-size;
+  }
+
+  .pipeline__caption {
+    margin-bottom: 0.625rem;
+    color: var(--docs-text-muted);
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+  }
+
+  /*
+   * Step lists: the diagram's own and each lane's (`PipelineLane`). `role="list"` on them: Safari drops list semantics
+   * from a list without list markers.
+   */
+  .pipeline :global(:is(.pipeline__steps, .pipeline__lane-steps)) {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* Each item after the first draws the arrow from the one before it. */
+  .pipeline :global(.pipeline__item) {
+    display: flex;
+    flex: 1 1 0;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .pipeline :global(.pipeline__item + .pipeline__item)::before {
+    content: '';
+    flex: none;
+    width: 1.75rem;
+    height: 0.875rem;
+    background-color: var(--docs-text-subtle);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 14'%3E%3Cpath d='M3 7h20m-5-5 5 5-5 5' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+  }
+
+  /* Narrow: top to bottom, arrows pointing down. */
+  @container (width < 36rem) {
+    .pipeline :global(:is(.pipeline__steps, .pipeline__lane-steps)),
+    .pipeline :global(.pipeline__item) {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .pipeline :global(.pipeline__item + .pipeline__item)::before {
+      align-self: center;
+      height: 1.5rem;
+      rotate: 90deg;
+    }
+  }
+</style>

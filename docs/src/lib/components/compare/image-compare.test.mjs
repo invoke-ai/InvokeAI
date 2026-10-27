@@ -8,7 +8,7 @@ import {
   percentFromPointer,
   touchGesture,
   valueText,
-} from './canvas-compare.mjs';
+} from './image-compare.mjs';
 
 describe('clampPercent', () => {
   it('keeps positions inside the image and rounds to a tenth', () => {
@@ -80,12 +80,20 @@ describe('nudgeAt', () => {
 });
 
 describe('valueText', () => {
-  it('names the share of each image in view', () => {
-    const template = '{{before}}% before, {{after}}% after';
-    assert.equal(valueText(50, template), '50% before, 50% after');
-    assert.equal(valueText(62.4, template), '62% before, 38% after');
-    assert.equal(valueText(0, template), '0% before, 100% after');
-    assert.equal(valueText(30, 'vorher {{before}} %, nachher {{after}} %'), 'vorher 30 %, nachher 70 %');
+  const labels = { before: 'Model only', after: 'Refine' };
+
+  it('names the share of each image in view by its label', () => {
+    const template = '{{beforeLabel}} {{before}}%, {{afterLabel}} {{after}}%';
+    assert.equal(valueText(50, template, labels), 'Model only 50%, Refine 50%');
+    assert.equal(valueText(62.4, template, labels), 'Model only 62%, Refine 38%');
+    assert.equal(valueText(0, template, labels), 'Model only 0%, Refine 100%');
+  });
+
+  it('follows a translation that orders the parts its own way', () => {
+    assert.equal(
+      valueText(30, '{{before}} % {{beforeLabel}}, {{after}} % {{afterLabel}}', { before: 'Vorher', after: 'Nachher' }),
+      '30 % Vorher, 70 % Nachher'
+    );
   });
 });
 

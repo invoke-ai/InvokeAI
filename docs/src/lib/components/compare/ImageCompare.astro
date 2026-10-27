@@ -1,43 +1,39 @@
 ---
 /*
- * The Canvas tour's before/after slider: one inpainting edit on the canvas, a plate of sushi whose third roll was
- * masked and regenerated as a salmon roe roll. The before image shows left of the divider and the after image right
- * of it; drag the divider, click or tap anywhere on the image, or focus the handle and use the arrow keys, Page Up/Down,
- * Home and End. Without JavaScript the two images sit side by side.
+ * A before/after slider over two images of the same size. The before image shows left of the divider and the after
+ * image right of it; drag the divider, click or tap anywhere on the image, or focus the handle and use the arrow keys,
+ * Page Up/Down, Home and End. Without JavaScript the two images sit side by side. The default slot, if given, is the
+ * figure's caption.
  *
- * Both images are crops of `Users Guide/assets/canvas-inpaint-result.webp` at the same size and offset, so they line up
- * pixel for pixel. That screenshot's "before" half shows the inpaint mask's hatching over the roll; the hatch lines were
- * removed from the before crop by interpolating each from its unmasked neighbours, leaving the original roll.
+ * The images are `CompareImage` children in the `before` and `after` slots, so their alt text and labels are string
+ * attributes that Crowdin can translate in a docs page:
+ *
+ *   <ImageCompare label="Model only and Refine compared">
+ *     <CompareImage slot="before" src={modelOnly} alt="…" label="Model only" />
+ *     <CompareImage slot="after" src={refine} alt="…" label="Refine" />
+ *   </ImageCompare>
+ *
+ * Both images must have the same size and framing, so they line up pixel for pixel.
  */
 import ChevronsLeftRight from '@lucide/astro/icons/chevrons-left-right';
-import { Image } from 'astro:assets';
-
-import after from '../../../assets/tour/canvas/sushi-after.webp';
-import before from '../../../assets/tour/canvas/sushi-before.webp';
-import { valueText } from './canvas-compare.mjs';
 
 type Props = {
+  /** Names the slider for screen readers. */
+  label: string;
   /** Where the divider starts, in percent of the width from the left. */
   start?: number;
   class?: string;
 };
 
-const { start = 50, class: className } = Astro.props;
+const { label, start = 50, class: className } = Astro.props;
 const { t } = Astro.locals;
-const valueTemplate = t('canvasCompare.valueText');
-const imageProps = {
-  widths: [640, before.width],
-  sizes: '(min-width: 72rem) 66rem, calc(100vw - 2rem)',
-  loading: 'lazy',
-  decoding: 'async',
-} as const;
 ---
 
 {/* `not-content` opts out of Starlight's Markdown spacing, which would push the stacked layers apart. */}
 <figure
   class:list={['compare not-content', className]}
-  data-canvas-compare
-  data-value-text={valueTemplate}
+  data-image-compare
+  data-value-text={t('imageCompare.valueText')}
   style={`--pos: ${start}%`}
 >
   {/* Marks the figure before first paint, so readers with JavaScript never see the side-by-side layout. */}
@@ -45,39 +41,36 @@ const imageProps = {
     document.currentScript.parentElement.dataset.js = '';
   </script>
   <div class="compare__view" data-compare-view>
-    <div class="compare__pane compare__pane--before">
-      <Image
-        src={before}
-        alt={t('canvasCompare.beforeAlt')}
-        {...imageProps}
-      />
-      <span class="compare__label compare__label--before" aria-hidden="true">{t('canvasCompare.before')}</span>
+    <div class="compare__pane compare__pane--before" data-compare-pane="before">
+      <slot name="before" />
     </div>
-    <div class="compare__pane compare__pane--after">
-      <Image
-        src={after}
-        alt={t('canvasCompare.afterAlt')}
-        {...imageProps}
-      />
-      <span class="compare__label compare__label--after" aria-hidden="true">{t('canvasCompare.after')}</span>
+    <div class="compare__pane compare__pane--after" data-compare-pane="after">
+      <slot name="after" />
     </div>
     <div class="compare__track">
+      {/* The script names the value with the images' labels; without script the slider is hidden. */}
       <div
         class="compare__handle"
         role="slider"
         tabindex="0"
-        aria-label={t('canvasCompare.label')}
+        aria-label={label}
         aria-orientation="horizontal"
         aria-valuemin="0"
         aria-valuemax="100"
         aria-valuenow={start}
-        aria-valuetext={valueText(start, valueTemplate)}
         data-compare-handle
       >
         <ChevronsLeftRight aria-hidden="true" size={16} />
       </div>
     </div>
   </div>
+  {
+    Astro.slots.has('default') && (
+      <figcaption class="compare__caption">
+        <slot />
+      </figcaption>
+    )
+  }
 </figure>
 
 <script>
@@ -88,7 +81,7 @@ const imageProps = {
     percentFromPointer,
     touchGesture,
     valueText,
-  } from './canvas-compare.mjs';
+  } from './image-compare.mjs';
 
   const NUDGE_TO = 64;
   const NUDGE_MS = 1400;
@@ -99,6 +92,9 @@ const imageProps = {
     const handle = root.querySelector<HTMLElement>('[data-compare-handle]');
     if (!view || !handle) return;
 
+    const labelOf = (pane: 'before' | 'after') =>
+      root.querySelector(`[data-compare-pane="${pane}"] [data-compare-label]`)?.textContent?.trim() ?? '';
+    const labels = { before: labelOf('before'), after: labelOf('after') };
     let position = clampPercent(Number(handle.getAttribute('aria-valuenow')));
     let nudgeFrame = 0;
     let touched = false;
@@ -108,8 +104,9 @@ const imageProps = {
       // One custom property drives the clip and the divider's translate: no layout reads or writes per move.
       root.style.setProperty('--pos', `${position}%`);
       handle.setAttribute('aria-valuenow', String(Math.round(position)));
-      handle.setAttribute('aria-valuetext', valueText(position, root.dataset.valueText!));
+      handle.setAttribute('aria-valuetext', valueText(position, root.dataset.valueText!, labels));
     };
+    set(position);
 
     const stopNudge = () => {
       touched = true;
@@ -179,7 +176,7 @@ const imageProps = {
       set(next);
     });
 
-    // A one-time hint when the slider first comes into view: the divider sweeps across the roll and back.
+    // A one-time hint when the slider first comes into view: the divider sweeps right and back.
     if (reducedMotion.matches || !('IntersectionObserver' in window)) return;
     const observer = new IntersectionObserver(
       (entries) => {
@@ -201,12 +198,12 @@ const imageProps = {
     observer.observe(view);
   };
 
-  for (const root of document.querySelectorAll<HTMLElement>('[data-canvas-compare]')) mount(root);
+  for (const root of document.querySelectorAll<HTMLElement>('[data-image-compare]')) mount(root);
 </script>
 
 <style>
   .compare {
-    /* The tour frames' shell: see `.frame` in HomePage.astro. */
+    /* The home page tour frames' shell: see `.frame` in HomePage.astro. */
     --frame-inset: 0.375rem;
     --inner-radius: calc(var(--docs-radius-container) - var(--frame-inset) - 1px);
     --line: oklch(1 0 0 / 0.92);
@@ -228,46 +225,26 @@ const imageProps = {
     -webkit-tap-highlight-color: transparent;
   }
 
-  .compare__pane {
-    img {
-      display: block;
-      width: 100%;
-      height: auto;
-      -webkit-user-drag: none;
-      pointer-events: none;
-    }
-  }
-
   .compare__pane--after {
     position: absolute;
     inset: 0;
     clip-path: inset(0 0 0 var(--pos));
   }
 
-  /* Each label sits in its own image, so the divider clips it with the image as it passes. */
-  .compare__label {
-    position: absolute;
-    top: 0.75rem;
-    display: inline-flex;
-    align-items: center;
-    height: var(--docs-tab-height);
-    padding-inline: var(--docs-tab-pad-x);
-    border-radius: var(--docs-radius);
-    background-color: color-mix(in oklab, var(--docs-surface) 82%, transparent);
-    box-shadow: inset 0 0 0 1px var(--docs-border-translucent);
-    backdrop-filter: blur(8px);
-    color: var(--docs-text-strong);
-    font-size: var(--docs-control-font-size);
-    font-weight: 500;
-    line-height: 1;
-  }
+  .compare__caption {
+    padding: 0.5rem 0.375rem 0.125rem;
+    color: var(--docs-text-muted);
+    font-size: var(--sl-text-sm);
+    line-height: 1.55;
 
-  .compare__label--before {
-    left: 0.75rem;
-  }
+    > :global(* + *) {
+      margin-top: 0.5rem;
+    }
 
-  .compare__label--after {
-    right: 0.75rem;
+    :global(strong) {
+      color: var(--docs-text);
+      font-weight: 600;
+    }
   }
 
   /*

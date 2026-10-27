@@ -1,8 +1,8 @@
 // @ts-check
 import { interpolate } from '../../i18n.mjs';
 
-// Position maths for the Canvas tour's before/after slider (`CanvasCompare.astro`). Positions are percentages of the
-// image width, from the left edge: the before image shows left of the divider, the after image right of it.
+// Position maths for the before/after slider (`ImageCompare.astro`). Positions are percentages of the image width, from
+// the left edge: the before image shows left of the divider, the after image right of it.
 
 /** One arrow-key press, in percent. */
 export const KEY_STEP = 5;
@@ -73,13 +73,15 @@ export const touchGesture = (dx, dy) => {
 };
 
 /**
- * The slider's spoken value: how much of each image shows.
+ * The slider's spoken value: how much of each image shows, named by the images' labels.
  * @param {number} value
- * @param {string} template the `canvasCompare.valueText` UI string, with `{{before}}` and `{{after}}` percentages
+ * @param {string} template the `imageCompare.valueText` UI string, with `{{before}}` and `{{after}}` percentages and
+ *   `{{beforeLabel}}` and `{{afterLabel}}` names
+ * @param {{ before: string, after: string }} labels
  */
-export const valueText = (value, template) => {
+export const valueText = (value, template, labels) => {
   const before = Math.round(clampPercent(value));
-  return interpolate(template, { before, after: 100 - before });
+  return interpolate(template, { before, after: 100 - before, beforeLabel: labels.before, afterLabel: labels.after });
 };
 
 /**

@@ -94,6 +94,6 @@ After the first sync, paste these into each string's context in Crowdin.
 | `whatsNew.*.body` | Keep node and model names. |
 | `modelFamilies.licenseTag`, `modelFamilies.vramTag` | `<srOnly>` text is read only by screen readers. Keep "GB+". |
 | `modelFamilies.format.singleFile` | A model file format, listed beside GGUF and int8: one checkpoint file. |
-| `canvasCompare.valueText` | `{{before}}` and `{{after}}` are percentages. |
+| `imageCompare.valueText` | A slider's spoken value: `{{before}}` and `{{after}}` are percentages, `{{beforeLabel}}` and `{{afterLabel}}` the two images' labels, such as "Before" and "After". |
 | `workflowDemo.field` | `{{field}}` and `{{node}}` stay English mock names. |
 | `workflowDemo.connected`, `workflowDemo.disconnected` | `{{source}}` and `{{target}}` are filled with the `workflowDemo.field` message. |

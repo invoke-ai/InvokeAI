@@ -226,12 +226,12 @@
   "modelFamilies.ltx-2.tagline": "Text-to-video with sound",
   "modelFamilies.minimax-h3.tagline": "Video with sound from reference media",
 
-  "canvasCompare.label": "Before and after comparison",
-  "canvasCompare.before": "Before",
-  "canvasCompare.after": "After",
-  "canvasCompare.beforeAlt": "Before: a plate with salmon nigiri, a yellow roll and, on the right, a plain maroon roll.",
-  "canvasCompare.afterAlt": "After inpainting: the maroon roll, and only it, regenerated as a nori-wrapped roll topped with salmon roe.",
-  "canvasCompare.valueText": "{{before}}% before, {{after}}% after",
+  "home.tour.canvas.compare.label": "Before and after comparison",
+  "home.tour.canvas.compare.before": "Before",
+  "home.tour.canvas.compare.after": "After",
+  "home.tour.canvas.compare.beforeAlt": "Before: a plate with salmon nigiri, a yellow roll and, on the right, a plain maroon roll.",
+  "home.tour.canvas.compare.afterAlt": "After inpainting: the maroon roll, and only it, regenerated as a nori-wrapped roll topped with salmon roe.",
+  "imageCompare.valueText": "{{beforeLabel}} {{before}}%, {{afterLabel}} {{after}}%",
 
   "workflowDemo.label": "Interactive workflow demo",
   "workflowDemo.hint": "Drag a node by its title, or focus it and use the arrow keys to move it. Drag from an output dot to a matching input to connect them.",

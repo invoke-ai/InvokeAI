@@ -15,12 +15,15 @@ import { withBase } from '../base-path';
 import { sortShowcase } from '../showcase.mjs';
 import ModelFamilies from './ModelFamilies.astro';
 import ShowcaseMarquee from './ShowcaseMarquee.astro';
-import CanvasCompare from './tour/CanvasCompare.astro';
+import CompareImage from './compare/CompareImage.astro';
+import ImageCompare from './compare/ImageCompare.astro';
 import GalleryDemo from './tour/GalleryDemo.astro';
 import WorkflowDemo from './tour/WorkflowDemo.astro';
 import Trans from './Trans.astro';
 import WhatsNewBento from './WhatsNewBento.astro';
 // A copy of the app's `invokeai/frontend/webv2/src/assets/V7Logo.webp`; `src/lib/app-assets.test.mjs` keeps them equal.
+import sushiAfter from '../../assets/tour/canvas/sushi-after.webp';
+import sushiBefore from '../../assets/tour/canvas/sushi-before.webp';
 import v7Logo from '../../assets/v7-logo.webp';
 import blacksmithLogo from '../../content/docs/assets/blacksmith-logo.png';
 import workbenchImage from '../../content/docs/Users Guide/assets/canvas-edit-layout.webp';
@@ -28,6 +31,8 @@ import workbenchImage from '../../content/docs/Users Guide/assets/canvas-edit-la
 const base = import.meta.env.BASE_URL;
 const href = (path: string) => withBase(path, base);
 const { t } = Astro.locals;
+// The tour's slider spans the wide home page column.
+const compareSizes = '(min-width: 72rem) 66rem, calc(100vw - 2rem)';
 
 const topic = (id: string) => {
   const found = docsTopics.find((candidate) => candidate.id === id);
@@ -311,7 +316,27 @@ const installLinks: Record<string, string> = {
           </a>
         </div>
       </div>
-      <CanvasCompare />
+      {/*
+        One inpainting edit: the third roll was masked and regenerated as a salmon roe roll. Both images are crops of
+        `Users Guide/assets/canvas-inpaint-result.webp` at the same size and offset; the inpaint mask's hatch lines were
+        removed from the before crop by interpolating each from its unmasked neighbours, leaving the original roll.
+      */}
+      <ImageCompare label={t('home.tour.canvas.compare.label')}>
+        <CompareImage
+          slot="before"
+          src={sushiBefore}
+          alt={t('home.tour.canvas.compare.beforeAlt')}
+          label={t('home.tour.canvas.compare.before')}
+          sizes={compareSizes}
+        />
+        <CompareImage
+          slot="after"
+          src={sushiAfter}
+          alt={t('home.tour.canvas.compare.afterAlt')}
+          label={t('home.tour.canvas.compare.after')}
+          sizes={compareSizes}
+        />
+      </ImageCompare>
     </div>
 
     <!-- The workflow demo's nodes can be dragged anywhere in this row, over its copy too. -->

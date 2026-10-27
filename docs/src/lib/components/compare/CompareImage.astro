@@ -1,0 +1,58 @@
+---
+/*
+ * One side of an `ImageCompare` slider, passed in its `before` or `after` slot: the image and its label, which sits in
+ * the image's top corner on that side so the divider clips it with the image as it passes. See `ImageCompare.astro`.
+ */
+import type { ImageMetadata } from 'astro';
+import { Image } from 'astro:assets';
+
+type Props = {
+  src: ImageMetadata;
+  alt: string;
+  /** A short name for this side, such as "Before"; it also names the side in the slider's spoken value. */
+  label: string;
+  /** The image's `sizes`; the default fits the docs content column. */
+  sizes?: string;
+};
+
+const { src, alt, label, sizes = '(min-width: 72rem) 52rem, calc(100vw - 2rem)' } = Astro.props;
+if (!alt) throw new Error('CompareImage needs `alt` text.');
+---
+
+<Image src={src} alt={alt} widths={[640, src.width]} sizes={sizes} loading="lazy" decoding="async" />
+<span class="compare__label" aria-hidden="true" data-compare-label>{label}</span>
+
+<style>
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    -webkit-user-drag: none;
+    pointer-events: none;
+  }
+
+  .compare__label {
+    position: absolute;
+    top: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    height: var(--docs-tab-height);
+    padding-inline: var(--docs-tab-pad-x);
+    border-radius: var(--docs-radius);
+    background-color: color-mix(in oklab, var(--docs-surface) 82%, transparent);
+    box-shadow: inset 0 0 0 1px var(--docs-border-translucent);
+    backdrop-filter: blur(8px);
+    color: var(--docs-text-strong);
+    font-size: var(--docs-control-font-size);
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  :global([data-compare-pane='before']) > .compare__label {
+    left: 0.75rem;
+  }
+
+  :global([data-compare-pane='after']) > .compare__label {
+    right: 0.75rem;
+  }
+</style>
