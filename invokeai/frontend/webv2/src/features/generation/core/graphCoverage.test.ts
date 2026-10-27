@@ -10,11 +10,11 @@ import type { MainModelConfig, ModelIdentifierConfig, VaeModelConfig } from './t
 
 import {
   getComponentSectionPolicy,
-  getDefaultReferenceImageConfig,
   getGenerationValidationReasons,
   isLoraSupported,
   isReferenceImageSupported,
   SUPPORTED_GENERATE_BASES,
+  withAddedReferenceImages,
 } from './baseGenerationPolicies';
 import { compileGenerateGraph, GRAPH_BUILDERS } from './graph';
 import {
@@ -49,17 +49,17 @@ const compileForShape = (
   const settings = isReferenceImageSupported(model)
     ? {
         ...satisfied,
-        referenceImages: [
-          {
-            config: getDefaultReferenceImageConfig(
-              model,
-              [{ base, key: `${base}-ip-adapter`, name: `${base} IP Adapter`, type: 'ip_adapter' }],
-              { original: { image: { height: 512, image_name: 'reference.png', width: 512 } } }
-            ),
-            id: 'coverage-reference',
-            isEnabled: true,
-          },
-        ],
+        referenceImages: withAddedReferenceImages(
+          model,
+          [{ base, key: `${base}-ip-adapter`, name: `${base} IP Adapter`, type: 'ip_adapter' }],
+          [],
+          [
+            {
+              id: 'coverage-reference',
+              image: { original: { image: { height: 512, image_name: 'reference.png', width: 512 } } },
+            },
+          ]
+        ),
       }
     : satisfied;
 
@@ -70,6 +70,7 @@ const compileForShape = (
 };
 
 const SDXL_REFINER_SHAPE: ModelShape = { label: 'diffusers-with-refiner', overrides: { format: 'diffusers' } };
+const KREA2_EDIT_SHAPE: ModelShape = { label: 'diffusers-with-edit-references', overrides: { format: 'diffusers' } };
 const SDXL_REFINER_MODEL: MainModelConfig = {
   base: 'sdxl-refiner',
   key: 'sdxl-refiner',
@@ -117,6 +118,43 @@ const compileWithLoraForShape = (
       'gallery',
       { useCpuNoise: true, useNsfwChecker: false, useWatermark: false }
     ).backendGraph,
+  };
+};
+
+// Edit references replace the style reference the tuned Krea-2 recipe carries, so they need their own case.
+const krea2EditCase = () => {
+  const { filled, model, settings } = satisfiedSettingsFor('krea-2', KREA2_EDIT_SHAPE);
+  const image = { original: { image: { height: 1024, image_name: 'edit-reference.png', width: 1024 } } };
+  const withEditReferences = {
+    ...settings,
+    // CFG builds the negative prompt, which reads the references too.
+    cfgScale: 4.5,
+    krea2ReferenceKvCache: true,
+    // The K/V cache switch is sent only while a LoRA reads the references.
+    loras: [
+      {
+        isEnabled: true,
+        model: { base: 'krea-2', key: 'edit-lora', name: 'edit-lora', type: 'lora' as const },
+        weight: 1,
+      },
+    ],
+    referenceImages: [
+      { config: { image, type: 'krea2_edit_reference_image' as const }, id: 'edit-1', isEnabled: true },
+      { config: { image, type: 'krea2_edit_reference_image' as const }, id: 'edit-2', isEnabled: true },
+    ],
+  };
+
+  expect(getGenerationValidationReasons(model, withEditReferences)).toEqual([]);
+
+  return {
+    base: 'krea-2' as const,
+    filled,
+    graph: compileGenerateGraph(withEditReferences, model, 'gallery', {
+      useCpuNoise: true,
+      useNsfwChecker: false,
+      useWatermark: false,
+    }).backendGraph,
+    shape: KREA2_EDIT_SHAPE,
   };
 };
 
@@ -291,6 +329,7 @@ describe('generate graph coverage', () => {
         ];
       }),
       refinerCase(),
+      krea2EditCase(),
     ];
 
     for (const { base, filled, graph, shape } of compilations) {

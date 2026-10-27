@@ -81,6 +81,10 @@ export const isAnimaQwen3Encoder: GenerateComponentFilter = (model) =>
 export const isAnimaQwen35Encoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_5_encoder' && model.variant === 'qwen3_5_4b';
 
+/** MOSS-Image conditions on the Qwen3.5 9B; the 4B's hidden size does not fit its text embedder. */
+export const isMossImageQwen35Encoder: GenerateComponentFilter = (model) =>
+  model.type === 'qwen3_5_encoder' && model.variant === 'qwen3_5_9b';
+
 /** Z-Image's caption embedder is 2560 wide, the Qwen3 4B hidden size; the 8B encoder's 4096 cannot feed it. */
 export const isZImageQwen3Encoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_encoder' && model.variant === 'qwen3_4b';

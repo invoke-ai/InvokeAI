@@ -43,6 +43,7 @@ import {
   isQwen3Vl8bEncoder,
   isIdeogram4UnconditionalBranch,
   isKrea2Qwen3VlEncoder,
+  isMossImageQwen35Encoder,
   isSelfContainedSDNQFlux1Pipeline,
   isSelfContainedSDNQPipeline,
   isVaeAcceptedByBase,
@@ -90,6 +91,7 @@ import {
   DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT,
   DEFAULT_KREA2_SEED_VARIANCE_STRENGTH,
   DEFAULT_KREA2_STYLE_STRENGTH,
+  DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS,
   DEFAULT_REFERENCE_IMAGE_LIMIT,
   DEFAULT_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
   DEFAULT_ZIMAGE_SEED_VARIANCE_STRENGTH,
@@ -103,8 +105,10 @@ import {
   isGenerateSettings,
   isLoraCompatibleWithModel,
   isValidKrea2RebalanceWeights,
+  isValidMossImageSkipLayers,
   isWanLoraTargetingMain,
   KREA2_REBALANCE_WEIGHT_COUNT,
+  MAX_MOSS_IMAGE_SKIP_LAYER,
   normalizeGenerateSettings,
 } from './settings';
 
@@ -386,6 +390,7 @@ export const getGenerationUiPolicy = (model: GenerateModelConfig | undefined) =>
     refinerVisible: isRefinerSupported(model),
     // Both Qwen-Image text encoders take the quantization choice; no other family's encoder does.
     encoderQuantizationVisible: model?.type === 'main' && model.base === 'qwen-image',
+    krea2ReferenceKvCacheVisible: model?.type === 'main' && model.base === 'krea-2',
   };
 };
 
@@ -506,6 +511,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     krea2SeedVarianceEnabled: false,
     krea2SeedVarianceStrength: DEFAULT_KREA2_SEED_VARIANCE_STRENGTH,
     krea2SeedVarianceRandomizePercent: DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT,
+    krea2ReferenceKvCache: false,
     fluxDypePreset: 'off',
     fluxDypeScale: DEFAULT_FLUX_DYPE_SCALE,
     fluxDypeExponent: DEFAULT_FLUX_DYPE_EXPONENT,
@@ -515,6 +521,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     zImageSeedVarianceRandomizePercent: DEFAULT_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
     qwenImageShift: null,
     qwenImageEncoderQuantization: 'none',
+    mossImageUncondSkipLayers: [...DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS],
     pidMode: 'off',
     pidDecoderModel: null,
     gemma2EncoderModel: null,
@@ -706,14 +713,14 @@ const qwen3VlEncoderSlot = (helpText: string, filter: GenerateComponentFilter): 
     filter,
   });
 
-const qwen35EncoderSlot = (helpText: string): ComponentSlotPolicy =>
+const qwen35EncoderSlot = (helpText: string, filter: GenerateComponentFilter): ComponentSlotPolicy =>
   slot({
     key: 'qwen35EncoderModel',
     label: 'Qwen3.5 Encoder',
     modelTypes: TYPE_QWEN35,
     valueKind: 'component',
     helpText,
-    filter: wrapFilter(isAnimaQwen35Encoder),
+    filter: wrapFilter(filter),
   });
 
 /** Optional; only the canvas inpaint/outpaint graphs read it, so it is never required. */
@@ -1084,7 +1091,8 @@ const getBaseComponentSectionPolicy = (
         {
           ...qwen3VlEncoderSlot(
             'Qwen-Image-2.1 conditions on the Qwen3-VL 8B encoder, not the 4B one Krea-2 uses. Required for ' +
-              'non-Diffusers Qwen-Image-2.1 models.',
+              "non-Diffusers Qwen-Image-2.1 models. On a Diffusers model it replaces the model's own encoder, the " +
+              'only one that reads reference images.',
             isQwen3Vl8bEncoder
           ),
           required: (ctx) => ctx.model.format !== 'diffusers',
@@ -1109,6 +1117,28 @@ const getBaseComponentSectionPolicy = (
           ),
           required: (ctx) => ctx.model.format !== 'diffusers',
           missingMessage: 'Generate needs a VAE for non-Diffusers ERNIE-Image models.',
+        },
+      ]);
+    case 'moss-image':
+      // A Diffusers pipeline brings its encoder and VAE; a single-file transformer needs both.
+      return createPolicy(model.format !== 'diffusers', [
+        {
+          ...qwen35EncoderSlot(
+            'MOSS-Image conditions on the Qwen3.5 9B encoder, not the 4B one Anima-3.8B uses. Required for ' +
+              'non-Diffusers MOSS-Image models.',
+            isMossImageQwen35Encoder
+          ),
+          required: (ctx) => ctx.model.format !== 'diffusers',
+          missingMessage: 'Generate needs a Qwen3.5 9B Encoder for non-Diffusers MOSS-Image models.',
+        },
+        {
+          ...vaeSlot(
+            'MOSS-Image decodes with the 32-channel FLUX.2 VAE, which is the base it installs under. Required for ' +
+              'non-Diffusers MOSS-Image models.',
+            isAcceptedVae
+          ),
+          required: (ctx) => ctx.model.format !== 'diffusers',
+          missingMessage: 'Generate needs a VAE for non-Diffusers MOSS-Image models.',
         },
       ]);
     case 'ideogram-4':
@@ -1171,7 +1201,10 @@ const getBaseComponentSectionPolicy = (
         ...(model.variant === 'anima_qwen35'
           ? [
               {
-                ...qwen35EncoderSlot('Anima-3.8B reads Qwen3.5 4B beside Qwen3 0.6B. Required for this model.'),
+                ...qwen35EncoderSlot(
+                  'Anima-3.8B reads Qwen3.5 4B beside Qwen3 0.6B. Required for this model.',
+                  isAnimaQwen35Encoder
+                ),
                 required: () => true,
                 missingMessage: 'Generate needs a Qwen3.5 Encoder for Anima-3.8B.',
               },
@@ -1345,10 +1378,34 @@ export const isReferenceImageSupported = (model: GenerateModelConfig | undefined
     return false;
   }
 
-  // The backend declares which reference-image features require a specific variant.
+  // The backend declares which reference-image features require a specific variant or format.
   return (
-    features.reference_images_require_variant === null || model.variant === features.reference_images_require_variant
+    (features.reference_images_require_variant === null ||
+      model.variant === features.reference_images_require_variant) &&
+    (features.reference_images_require_format === null || model.format === features.reference_images_require_format)
   );
+};
+
+/**
+ * The model format the selected base needs for reference images, when the model's format is all that keeps them
+ * unavailable, so the UI can say what to switch to instead of hiding the section without a reason.
+ */
+export const getMissingReferenceImageFormat = (model: GenerateModelConfig | undefined): string | null => {
+  if (!model || model.type === 'external_image_generator' || isReferenceImageSupported(model)) {
+    return null;
+  }
+
+  const features = getArchitectureFeatures(model.base);
+
+  if (
+    !features ||
+    features.max_reference_images <= 0 ||
+    (features.reference_images_require_variant !== null && model.variant !== features.reference_images_require_variant)
+  ) {
+    return null;
+  }
+
+  return features.reference_images_require_format;
 };
 
 export const getMaxReferenceImages = (model: GenerateModelConfig | undefined): number => {
@@ -1374,10 +1431,40 @@ export const isStrengthOnlyIPAdapterBase = (base: string | undefined): boolean =
 export const createReferenceImageId = (): string =>
   `reference_image_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
-export const getDefaultReferenceImageConfig = (
+/** Edit references switch Krea-2 into edit mode, which excludes style references and regional prompts. */
+export const hasEnabledKrea2EditReferences = (referenceImages: readonly GenerateReferenceImage[]): boolean =>
+  referenceImages.some(
+    (referenceImage) => referenceImage.isEnabled && referenceImage.config.type === 'krea2_edit_reference_image'
+  );
+
+/**
+ * Whether running Krea-2 edit references have an active LoRA to read them. The base model is no instruction editor:
+ * without an edit LoRA it copies the references, and the graph leaves the reference K/V cache, which only such a LoRA
+ * reads, at the denoise default. A LoRA counts as the graph counts it: enabled and compatible with the model.
+ */
+export const getKrea2EditLoraState = (
+  model: GenerateModelConfig | undefined,
+  settings: Pick<GenerateSettings, 'loras' | 'referenceImages'>
+): 'noEditReferences' | 'noLora' | 'ready' => {
+  if (model?.base !== 'krea-2' || !hasEnabledKrea2EditReferences(settings.referenceImages)) {
+    return 'noEditReferences';
+  }
+
+  return settings.loras.some((lora) => lora.isEnabled && isLoraCompatibleWithModel(lora.model, model))
+    ? 'ready'
+    : 'noLora';
+};
+
+/** A Krea-2 style reference at zero strength is bypassed, so it neither runs nor counts against the others. */
+const isReferenceImageActive = (referenceImage: GenerateReferenceImage): boolean =>
+  referenceImage.isEnabled &&
+  !(referenceImage.config.type === 'krea2_reference_image' && referenceImage.config.styleStrength <= 0);
+
+/** The family's one reference kind; Krea-2's choice between style and edit is `getDefaultReferenceImageConfigs`'s. */
+const getFamilyDefaultReferenceImageConfig = (
   model: GenerateModelConfig | undefined,
   models: readonly ReferenceModelCandidate[],
-  image: GenerateReferenceImageAsset | null = null
+  image: GenerateReferenceImageAsset | null
 ): GenerateReferenceImageConfig => {
   const modelBase: string | undefined = model?.base;
 
@@ -1393,8 +1480,8 @@ export const getDefaultReferenceImageConfig = (
     return { image, type: 'qwen_image_reference_image' };
   }
 
-  if (modelBase === 'krea-2') {
-    return { image, styleStrength: DEFAULT_KREA2_STYLE_STRENGTH, type: 'krea2_reference_image' };
+  if (modelBase === 'qwen-image-2-1') {
+    return { image, type: 'qwen_image_2_1_reference_image' };
   }
 
   if (isFluxKontextModel(model)) {
@@ -1426,8 +1513,13 @@ const getReferenceImageConfigSupported = (
       return model.type !== 'external_image_generator' && model.base === 'flux2';
     case 'qwen_image_reference_image':
       return model.type !== 'external_image_generator' && model.base === 'qwen-image' && model.variant === 'edit';
+    case 'krea2_edit_reference_image':
     case 'krea2_reference_image':
       return model.type !== 'external_image_generator' && model.base === 'krea-2';
+    case 'qwen_image_2_1_reference_image':
+      return (
+        model.type !== 'external_image_generator' && model.base === 'qwen-image-2-1' && isReferenceImageSupported(model)
+      );
     case 'flux_kontext_reference_image':
       return isFluxKontextModel(model);
     case 'flux_redux':
@@ -1459,6 +1551,107 @@ export const isReferenceImageCompatibleWithModel = (
   return true;
 };
 
+/** A new or re-targeted reference, typed for the model; existing references keep theirs. */
+interface ReferenceImageAddition {
+  image: GenerateReferenceImageAsset | null;
+  isEnabled: boolean;
+}
+
+/**
+ * Configs for `additions` joining `referenceImages`. A Krea-2 addition is the style reference only when it would be
+ * the sole running Krea-2 reference, counting the other additions and itself as switched on; arriving with or beside
+ * others, it is an edit reference.
+ */
+const getDefaultReferenceImageConfigs = (
+  model: GenerateModelConfig | undefined,
+  models: readonly ReferenceModelCandidate[],
+  additions: readonly ReferenceImageAddition[],
+  referenceImages: readonly GenerateReferenceImage[]
+): GenerateReferenceImageConfig[] => {
+  if (model?.type !== 'main' || model.base !== 'krea-2') {
+    return additions.map(({ image }) => getFamilyDefaultReferenceImageConfig(model, models, image));
+  }
+
+  const runningElsewhere = referenceImages.filter(isReferenceImageActive).length;
+  const enabledAdditions = additions.filter((addition) => addition.isEnabled).length;
+
+  return additions.map(({ image, isEnabled }) =>
+    runningElsewhere + enabledAdditions + (isEnabled ? 0 : 1) === 1
+      ? { image, styleStrength: DEFAULT_KREA2_STYLE_STRENGTH, type: 'krea2_reference_image' }
+      : { image, type: 'krea2_edit_reference_image' }
+  );
+};
+
+/** Within the model's limit; Krea-2 runs either one style reference or a set of edit references, never both. */
+const canRunWithEnabledReferenceImages = (
+  model: GenerateModelConfig,
+  enabled: readonly GenerateReferenceImage[],
+  referenceImage: GenerateReferenceImage
+): boolean => {
+  if (enabled.length >= getMaxReferenceImages(model)) {
+    return false;
+  }
+
+  if (model.base !== 'krea-2') {
+    return true;
+  }
+
+  return referenceImage.config.type === 'krea2_reference_image'
+    ? enabled.length === 0
+    : enabled.every((kept) => kept.config.type !== 'krea2_reference_image');
+};
+
+/**
+ * The list's one running reference when it is a Krea-2 style reference still at its default strength, which an
+ * addition turns into an edit reference.
+ */
+const getLoneDefaultStyleReference = (
+  referenceImages: readonly GenerateReferenceImage[]
+): GenerateReferenceImage | null => {
+  const active = referenceImages.filter(isReferenceImageActive);
+  const [lone] = active;
+
+  return active.length === 1 &&
+    lone?.config.type === 'krea2_reference_image' &&
+    lone.config.styleStrength === DEFAULT_KREA2_STYLE_STRENGTH
+    ? lone
+    : null;
+};
+
+/**
+ * `referenceImages` with `additions` appended as enabled references typed for the model; every way of adding a
+ * reference goes through here. A lone first Krea-2 reference starts as the style reference, so an edit set built one
+ * image at a time begins with one: the next addition turns it into an edit reference too, unless its strength was
+ * changed, which marks it as meant for style. Validation then reports the mix.
+ */
+export const withAddedReferenceImages = (
+  model: GenerateModelConfig | undefined,
+  models: readonly ReferenceModelCandidate[],
+  referenceImages: GenerateReferenceImage[],
+  additions: readonly { id: string; image: GenerateReferenceImageAsset | null }[]
+): GenerateReferenceImage[] => {
+  if (additions.length === 0) {
+    return referenceImages;
+  }
+
+  const lone = model?.type === 'main' && model.base === 'krea-2' ? getLoneDefaultStyleReference(referenceImages) : null;
+  const kept = lone
+    ? referenceImages.map((referenceImage): GenerateReferenceImage =>
+        referenceImage === lone
+          ? { ...referenceImage, config: { image: referenceImage.config.image, type: 'krea2_edit_reference_image' } }
+          : referenceImage
+      )
+    : referenceImages;
+  const configs = getDefaultReferenceImageConfigs(
+    model,
+    models,
+    additions.map(({ image }) => ({ image, isEnabled: true })),
+    kept
+  );
+
+  return [...kept, ...additions.map(({ id }, index) => ({ config: configs[index]!, id, isEnabled: true }))];
+};
+
 /**
  * An SD reference that never had an adapter (model null) passes the base check, so a switch to a strength-only base
  * would keep its unset adapter and its SD weight, which may be negative. Re-target it when that leaves it unusable and
@@ -1487,8 +1680,9 @@ const needsStrengthOnlyRetarget = (
 };
 
 /**
- * Drop unsupported references; retarget incompatible ones while preserving image/enabled state. No changes return
- * the same array.
+ * Drop unsupported references; retarget incompatible ones, and strength-only IP-Adapter references left unusable,
+ * while preserving image/enabled state. The re-targeted ones are typed together, beside the others; a strength-only
+ * base then keeps their step window, same-base adapter and strength. No changes return the same array.
  */
 export const getCompatibleReferenceImages = (
   referenceImages: GenerateReferenceImage[],
@@ -1503,18 +1697,32 @@ export const getCompatibleReferenceImages = (
     return [];
   }
 
-  let didChange = false;
-  const next = referenceImages.map((referenceImage) => {
-    if (
+  const isKept = referenceImages.map(
+    (referenceImage) =>
       isReferenceImageCompatibleWithModel(model, referenceImage) &&
       !needsStrengthOnlyRetarget(model, referenceImage, models)
-    ) {
+  );
+  const retargeted = referenceImages.filter((_, index) => !isKept[index]);
+
+  if (retargeted.length === 0) {
+    return referenceImages;
+  }
+
+  const configs = getDefaultReferenceImageConfigs(
+    model,
+    models,
+    retargeted.map(({ config, isEnabled }) => ({ image: config.image, isEnabled })),
+    referenceImages.filter((_, index) => isKept[index])
+  );
+  let retargetIndex = 0;
+
+  return referenceImages.map((referenceImage, index) => {
+    if (isKept[index]) {
       return referenceImage;
     }
 
-    didChange = true;
     const { config } = referenceImage;
-    const defaults = getDefaultReferenceImageConfig(model, models, config.image);
+    const defaults = configs[retargetIndex++]!;
 
     // A strength-only base keeps the user's step window and strength; only the adapter and the hidden SD fields reset.
     if (config.type === 'ip_adapter' && defaults.type === 'ip_adapter' && isStrengthOnlyIPAdapterBase(model.base)) {
@@ -1534,8 +1742,6 @@ export const getCompatibleReferenceImages = (
 
     return { ...referenceImage, config: defaults };
   });
-
-  return didChange ? next : referenceImages;
 };
 
 const getSettingsWithCompatibleModelSelections = (
@@ -1597,22 +1803,25 @@ const getSettingsWithCompatibleModelSelections = (
     addClearedLabel(clearedLabels, 'LoRAs');
   }
 
-  // Enabled references beyond the new family's limit are switched off rather than deleted: Invoke is not left
+  // Enabled references the new family cannot run together are switched off rather than deleted: Invoke is not left
   // blocked, the first enabled ones keep running, and switching back can turn the rest on again.
   const retargetedReferenceImages = getCompatibleReferenceImages(settings.referenceImages, model, models);
-  const maxReferenceImages = getMaxReferenceImages(model);
-  let enabledKept = 0;
-  const compatibleReferenceImages =
-    retargetedReferenceImages.filter((referenceImage) => referenceImage.isEnabled).length > maxReferenceImages
-      ? retargetedReferenceImages.map((referenceImage) => {
-          if (!referenceImage.isEnabled) {
-            return referenceImage;
-          }
+  const enabledKept: GenerateReferenceImage[] = [];
+  let didSwitchOff = false;
+  const keptOrSwitchedOff = retargetedReferenceImages.map((referenceImage) => {
+    if (!isReferenceImageActive(referenceImage)) {
+      return referenceImage;
+    }
 
-          enabledKept += 1;
-          return enabledKept > maxReferenceImages ? { ...referenceImage, isEnabled: false } : referenceImage;
-        })
-      : retargetedReferenceImages;
+    if (canRunWithEnabledReferenceImages(model, enabledKept, referenceImage)) {
+      enabledKept.push(referenceImage);
+      return referenceImage;
+    }
+
+    didSwitchOff = true;
+    return { ...referenceImage, isEnabled: false };
+  });
+  const compatibleReferenceImages = didSwitchOff ? keptOrSwitchedOff : retargetedReferenceImages;
 
   if (compatibleReferenceImages !== settings.referenceImages) {
     nextSettings.referenceImages = compatibleReferenceImages;
@@ -1818,6 +2027,11 @@ const getPidValidationReasons = (model: GenerateModelConfig, settings: GenerateS
   return reasons;
 };
 
+/** Only the encoder of a Qwen-Image-2.1 Diffusers model keeps the vision tower that reads references. */
+export const QWEN_IMAGE_21_STANDALONE_ENCODER_REASON =
+  "Reference images need the Qwen-Image-2.1 model's own encoder, the only one with a vision tower. " +
+  'Clear the Qwen3-VL Encoder component.';
+
 const getReferenceImageValidationReasons = (model: GenerateModelConfig, settings: GenerateSettings): string[] => {
   const reasons: string[] = [];
   const enabled = settings.referenceImages.filter((referenceImage) => referenceImage.isEnabled);
@@ -1825,7 +2039,10 @@ const getReferenceImageValidationReasons = (model: GenerateModelConfig, settings
   // zero.
   const maxReferenceImages = getMaxReferenceImages(model);
 
-  if (isReferenceImageSupported(model) && enabled.length > maxReferenceImages) {
+  if (
+    isReferenceImageSupported(model) &&
+    settings.referenceImages.filter(isReferenceImageActive).length > maxReferenceImages
+  ) {
     reasons.push(
       `Generate supports at most ${maxReferenceImages} reference image${maxReferenceImages === 1 ? '' : 's'} for ${model.name}.`
     );
@@ -1868,6 +2085,17 @@ const getReferenceImageValidationReasons = (model: GenerateModelConfig, settings
     }
   });
 
+  // The encoder slot stays filled across models (Ideogram 4 and the GGUF builds share it), so a Diffusers model can
+  // inherit one that cannot read the references.
+  if (
+    model.base === 'qwen-image-2-1' &&
+    settings.qwen3VLEncoderModel &&
+    isQwen3Vl8bEncoder(settings.qwen3VLEncoderModel) &&
+    enabled.some((referenceImage) => referenceImage.config.type === 'qwen_image_2_1_reference_image')
+  ) {
+    reasons.push(QWEN_IMAGE_21_STANDALONE_ENCODER_REASON);
+  }
+
   return reasons;
 };
 
@@ -1889,9 +2117,47 @@ export const getGuidanceBoundReason = (
   return null;
 };
 
+/**
+ * Combinations the backend refuses only after queueing. The encoder reads edit references with its vision tower, which
+ * a GGUF Qwen3-VL encoder does not carry; a Diffusers main without an encoder override uses its bundled one. A
+ * standalone encoder folder may lack the vision weights too, but its config does not say so, so the message names
+ * what the encoder needs rather than a format that always has it.
+ */
+const getKrea2ReferenceValidationReasons = (settings: GenerateSettings): string[] => {
+  const styleCount = settings.referenceImages.filter(
+    (referenceImage) => isReferenceImageActive(referenceImage) && referenceImage.config.type === 'krea2_reference_image'
+  ).length;
+  const hasEditReferences = hasEnabledKrea2EditReferences(settings.referenceImages);
+  const reasons: string[] = [];
+
+  if (styleCount > 1) {
+    reasons.push('Krea-2 uses one style reference at a time. Turn off all but one, or switch all of them to Edit.');
+  }
+
+  if (styleCount > 0 && hasEditReferences) {
+    reasons.push(
+      'Krea-2 cannot combine a style reference with edit references. Switch the style reference to Edit, or turn off one kind.'
+    );
+  }
+
+  const encoder = settings.qwen3VLEncoderModel;
+
+  if (hasEditReferences && encoder && isKrea2Qwen3VlEncoder(encoder) && encoder.format === 'gguf_quantized') {
+    reasons.push(
+      `Krea-2 edit references need a Qwen3-VL encoder with vision weights, which the GGUF encoder "${encoder.name}" does not have. Select a safetensors file or Diffusers folder that includes the vision weights.`
+    );
+  }
+
+  return reasons;
+};
+
 /** Scalar/LoRA family rules are separate from component-slot validation. */
 const getModelFamilyValidationReasons = (model: MainModelConfig, settings: GenerateSettings): string[] => {
   const reasons: string[] = [];
+
+  if (model.base === 'krea-2') {
+    reasons.push(...getKrea2ReferenceValidationReasons(settings));
+  }
 
   // Parse raw rebalance strings before forwarding them to the backend.
   if (
@@ -1900,6 +2166,17 @@ const getModelFamilyValidationReasons = (model: MainModelConfig, settings: Gener
     !isValidKrea2RebalanceWeights(settings.krea2RebalanceWeights)
   ) {
     reasons.push(`Krea-2 rebalance weights must be ${KREA2_REBALANCE_WEIGHT_COUNT} comma-separated numbers.`);
+  }
+
+  // The field commits only lists in range, but a persisted one can still name a block MOSS-Image lacks, which would fail
+  // the queue item. Without CFG the negative branch never runs, so the list has no effect and its disabled field cannot
+  // be fixed.
+  if (
+    model.base === 'moss-image' &&
+    settings.cfgScale > 1 &&
+    !isValidMossImageSkipLayers(settings.mossImageUncondSkipLayers)
+  ) {
+    reasons.push(`MOSS-Image skip layers must be whole numbers from 0 to ${MAX_MOSS_IMAGE_SKIP_LAYER}.`);
   }
 
   // Finite persisted Ideogram overrides still need range validation.
