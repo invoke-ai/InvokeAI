@@ -718,9 +718,10 @@ const installLinks: Record<string, string> = {
   /* The screenshot sits inset by the padding and the border, with corners that nest inside the frame's. */
   .frame {
     --frame-inset: 0.375rem;
+    --frame-border: 1px;
     margin: 0;
     padding: var(--frame-inset);
-    border: 1px solid var(--docs-border);
+    border: var(--frame-border) solid var(--docs-border);
     border-radius: var(--docs-radius-container);
     background-color: var(--docs-surface);
 
@@ -728,7 +729,7 @@ const installLinks: Record<string, string> = {
       display: block;
       width: 100%;
       height: auto;
-      border-radius: calc(var(--docs-radius-container) - var(--frame-inset) - 1px);
+      border-radius: calc(var(--docs-radius-container) - var(--frame-inset) - var(--frame-border));
     }
   }
 
@@ -822,13 +823,37 @@ const installLinks: Record<string, string> = {
   }
 
   /*
-   * The frame's border is translucent over a background that stops inside it, so the glow behind lights the rim where
-   * it is strongest.
+   * A brand ring right around the screenshot that fades out down the frame. The gradient fills the whole border box, so
+   * the image's antialiased corners blend into the ring, not a dark seam. It is twice the frame's height and drifts up
+   * and down, so the bright part slides along the sides.
    */
   .frame--hero {
-    --frame-inset: 0.5rem;
-    border-color: oklch(1 0 0 / 0.1);
-    background-clip: padding-box;
+    --frame-inset: 0px;
+    --frame-border: 2px;
+    border-color: transparent;
+    background: linear-gradient(var(--docs-brand), transparent 80%) border-box;
+    background-size: 100% 200%;
+
+    /* Until the screenshot paints, the image box shows the surface instead of the gradient behind it. */
+    img {
+      background-color: var(--docs-surface);
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .frame--hero {
+      animation: hero-ring-drift 6s ease-in-out infinite;
+    }
+  }
+
+  @keyframes hero-ring-drift {
+    50% {
+      background-position: 0 100%;
+    }
+  }
+
+  .hero-shot[data-paused] .frame--hero {
+    animation-play-state: paused;
   }
 
   /* The gallery demo is framed like the app's panel and keeps that panel's width, centred in its column. */
