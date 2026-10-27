@@ -856,7 +856,8 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
   body runs. A gated `For` brings in a `For` nested in its body together with that body. Two `For`s stay ungated. A
   `For` nested in the body of an ungated `For` runs with that loop. A `For` whose final output feeds the `If` directly
   attaches after it finalizes; with a per-item condition, rejected frames do not run the `For` or its body, and selected
-  frames wait for its final output before the `If` input is attached.
+  frames wait for its final output before the `If` input is attached. A literal `If` waits only for its selected branch;
+  an unselected `For` final input does not delay it.
 - An `If` has no execution in a frame where the innermost iterator in its ancestry has no items. When an `Iterate` in
   its iterator ancestry, whether it feeds `If.condition` or a branch, has no items at all, no `If` execution is created,
   the branch sources are retired empty, the downstream `Collect` produces an empty collection, and the state completes

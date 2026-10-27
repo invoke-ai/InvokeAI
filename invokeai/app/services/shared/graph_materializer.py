@@ -341,7 +341,12 @@ class _ExecutionNodeBuilder:
 
     def _has_unmaterializable_for_final_input(self, node_id: str) -> bool:
         final_for_source_ids = set()
-        for edge in self._state.graph._get_input_edges(node_id):
+        node = self._state.graph.get_node(node_id)
+        input_edges = self._state.graph._get_input_edges(node_id)
+        if isinstance(node, IfInvocation) and not self._state.graph._get_input_edges(node_id, "condition"):
+            selected_field = "true_input" if node.condition else "false_input"
+            input_edges = self._state.graph._get_input_edges(node_id, selected_field)
+        for edge in input_edges:
             source_node = self._state.graph.get_node(edge.source.node_id)
             if not isinstance(source_node, ForInvocation):
                 continue
@@ -1764,7 +1769,35 @@ class _ExecutionNodeBuilder:
             if condition_iterator_ids:
                 iterator_nodes = condition_axes
             else:
-                iterator_nodes = list(self._get_iterator_ancestry(iterator_graph).get_frame_iterators(node_id))
+                # A root condition's frames come from its resolved selected branch. Mapping every open axis here
+                # duplicates root results when only the unselected branch carries an axis.
+                condition_mappings = self._get_parent_iteration_mappings(
+                    node_id, graph, input_edges=condition_edges, iterator_node_ids=[]
+                )
+                branch_edges = {
+                    branch: self._state.graph._get_input_edges(node_id, branch)
+                    for branch in ("true_input", "false_input")
+                }
+
+                def get_root_condition_mappings() -> Iterable[list[tuple[str, str]]]:
+                    for mapping in condition_mappings:
+                        condition_exec_id = dict(mapping)[condition_edges[0].source.node_id]
+                        if condition_exec_id not in self._state.results:
+                            continue
+                        condition_value = getattr(
+                            self._state.results[condition_exec_id], condition_edges[0].source.field
+                        )
+                        selected_field = "true_input" if condition_value else "false_input"
+                        axes = self._get_ordered_iterator_axes_for_edges(branch_edges[selected_field], iterator_graph)
+                        if not axes:
+                            yield mapping
+                            continue
+                        axis_id = axes[-1]
+                        prepared_axis_ids = self._get_prepared_nodes_for_source(axis_id)
+                        for prepared_axis_id in sorted(prepared_axis_ids, key=self._state._get_iteration_path):
+                            yield [*mapping, (axis_id, prepared_axis_id)]
+
+                return get_root_condition_mappings()
         else:
             iterator_nodes = self.get_node_iterators(node_id, iterator_graph)
         if condition_edges and not iterator_nodes:
@@ -2583,7 +2616,11 @@ class _ExecutionNodeBuilder:
                                 input_fields={"condition"},
                             )
                             new_node_ids.extend(create_results)
-                elif not self.get_node_iterators(next_node_id):
+                elif not self.get_node_iterators(
+                    next_node_id
+                ) and not graph_if_runtime._has_empty_selected_for_final_frame(
+                    self._state, iterator_ancestry, next_node_id
+                ):
                     # Root-frame If nodes may be prepared from their condition while branch sources
                     # are still being materialized; branch inputs attach after the gate resolves.
                     for iteration_mapping in iteration_mappings:

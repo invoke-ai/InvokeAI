@@ -31,6 +31,22 @@ def test_runtime_import_without_graph() -> None:
     assert_module_imports_without_graph("invokeai.app.services.shared.graph_if_runtime")
 
 
+def test_empty_if_frame_analysis_reuses_graph_topology(monkeypatch: pytest.MonkeyPatch) -> None:
+    state = GraphExecutionState(graph=Graph(nodes={"if": IfInvocation(id="if")}))
+    original = graph_if_runtime._get_if_branch_frame_axes
+    analysis_count = 0
+
+    def count_analysis(*args: object, **kwargs: object) -> dict[str, tuple[str, ...]]:
+        nonlocal analysis_count
+        analysis_count += 1
+        return original(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(graph_if_runtime, "_get_if_branch_frame_axes", count_analysis)
+
+    assert [graph_if_runtime._has_empty_if_frame(state, "if") for _ in range(20)] == [False] * 20
+    assert analysis_count == 1
+
+
 @pytest.mark.parametrize(
     ("source_kind", "source_field", "axes", "expected"),
     [

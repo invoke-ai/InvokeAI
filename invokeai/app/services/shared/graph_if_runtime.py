@@ -341,6 +341,44 @@ def _get_if_branch_frame_axes(
     return result
 
 
+def _get_if_static_frame_analysis(
+    state: "GraphExecutionState", iterator_ancestry: _IteratorAncestry, node_id: str
+) -> tuple[dict[str, tuple[str, ...]], dict[str, set[str]]]:
+    """Cache branch axes and the axes reached through For final outputs for this graph traversal."""
+    cache = getattr(iterator_ancestry, "_if_static_frame_analysis", None)
+    if cache is None:
+        cache = {}
+        iterator_ancestry._if_static_frame_analysis = cache
+    if node_id in cache:
+        return cache[node_id]
+
+    branch_axes = _get_if_branch_frame_axes(state, iterator_ancestry, node_id, {})
+    final_axes: dict[str, set[str]] = {}
+    for branch_field in ("true_input", "false_input"):
+        branch_final_axes: set[str] = set()
+        pending = list(state.graph._get_input_edges(node_id, branch_field))
+        visited: set[str] = set()
+        while pending:
+            edge = pending.pop()
+            source_id = edge.source.node_id
+            if source_id in visited:
+                continue
+            visited.add(source_id)
+            source_node = state.graph.get_node(source_id)
+            if (
+                isinstance(source_node, ForInvocation)
+                and get_output_field_scope(source_node, edge.source.field) == OutputScope.Final
+            ):
+                branch_final_axes.update(iterator_ancestry.get_frame_axes_for_edge(edge))
+            else:
+                pending.extend(state.graph._get_input_edges(source_id))
+        final_axes[branch_field] = branch_final_axes
+
+    analysis = (branch_axes, final_axes)
+    cache[node_id] = analysis
+    return analysis
+
+
 def _get_effective_iteration_paths_for_edge(
     state: "GraphExecutionState",
     edge: Edge,
@@ -348,7 +386,7 @@ def _get_effective_iteration_paths_for_edge(
     get_prepared_nodes_for_source: Callable[[str], set[str]],
     get_prepared_edge_iteration_path: Callable[[Edge, str], tuple[int, ...]],
     iterator_ancestry: _IteratorAncestry,
-    effective_paths_by_edge: Optional[dict[tuple[str, str], set[tuple[int, ...]]]] = None,
+    effective_paths_by_edge: Optional[dict[Edge, set[tuple[int, ...]]]] = None,
 ) -> set[tuple[int, ...]]:
     cache = effective_paths_by_edge if effective_paths_by_edge is not None else {}
     pending: list[tuple[Edge, bool]] = [(edge, False)]
@@ -356,7 +394,7 @@ def _get_effective_iteration_paths_for_edge(
     while pending:
         current_edge, exiting_source = pending.pop()
         current_source_id = current_edge.source.node_id
-        cache_key = (current_source_id, current_edge.source.field)
+        cache_key = current_edge
         if cache_key in cache:
             continue
 
@@ -365,9 +403,7 @@ def _get_effective_iteration_paths_for_edge(
             if not input_edges:
                 cache[cache_key] = {()}
             else:
-                cache[cache_key] = set().union(
-                    *(cache[(input_edge.source.node_id, input_edge.source.field)] for input_edge in input_edges)
-                )
+                cache[cache_key] = set().union(*(cache[input_edge] for input_edge in input_edges))
             continue
 
         if current_source_id in visited_source_ids:
@@ -488,7 +524,7 @@ def _get_effective_iteration_paths_for_edge(
         pending.append((current_edge, True))
         pending.extend((input_edge, False) for input_edge in reversed(input_edges))
 
-    return cache[(edge.source.node_id, edge.source.field)]
+    return cache[edge]
 
 
 def _get_if_iteration_paths_with_ancestry(
@@ -512,9 +548,8 @@ def _get_if_iteration_paths_with_ancestry(
         except nx.NetworkXError:
             # A filtered materialization view can omit unresolved condition sources.
             continue
-    branch_axes = {
-        branch: set(axes) for branch, axes in _get_if_branch_frame_axes(state, iterator_ancestry, node_id, {}).items()
-    }
+    static_branch_axes, branch_for_final_axes = _get_if_static_frame_analysis(state, iterator_ancestry, node_id)
+    branch_axes = {branch: set(axes) for branch, axes in static_branch_axes.items()}
     shared_deeper_branch_axes = (
         bool(branch_axes["true_input"])
         and branch_axes["true_input"] == branch_axes["false_input"]
@@ -538,9 +573,13 @@ def _get_if_iteration_paths_with_ancestry(
         condition_selections.append((None, selected_field))
 
     paths: set[tuple[int, ...]] = set()
+    unselected_final_axes: set[str] = set()
     has_selected_edges = False
     has_unresolved_selected_source = False
     for condition_path, selected_field in condition_selections:
+        if condition_path in (None, ()):
+            other_field = "false_input" if selected_field == "true_input" else "true_input"
+            unselected_final_axes.update(branch_for_final_axes[other_field] - branch_for_final_axes[selected_field])
         selected_edges = state.graph._get_input_edges(node_id, selected_field)
         has_selected_edges = has_selected_edges or bool(selected_edges)
         has_unresolved_selected_source = has_unresolved_selected_source or any(
@@ -624,7 +663,11 @@ def _get_if_iteration_paths_with_ancestry(
     # The If runs once per frame of the innermost iterator open at it; validation keeps those iterators nested. An
     # iterator that has not run leaves the frames unknown, and one with no items leaves the If no frames. An iterator
     # reaching the If only through a For's final output does not add frames here.
-    frame_iterators = iterator_ancestry.get_ordered_iterator_ancestors(node_id)
+    frame_iterators = [
+        axis_id
+        for axis_id in iterator_ancestry.get_ordered_iterator_ancestors(node_id)
+        if axis_id not in unselected_final_axes
+    ]
     if frame_iterators:
         innermost_id = frame_iterators[-1]
         if innermost_id not in state.executed and innermost_id not in state.source_prepared_mapping:
@@ -819,7 +862,7 @@ def _has_empty_if_frame(state: "GraphExecutionState", if_node_id: str) -> bool:
     ancestry = state._runtime()._iterator_ancestry
     condition_edges = state.graph._get_input_edges(if_node_id, "condition")
     axes = {axis_id for edge in condition_edges for axis_id in ancestry.get_frame_axes_for_edge(edge)}
-    branch_axes = _get_if_branch_frame_axes(state, ancestry, if_node_id, {})
+    branch_axes, branch_final_axes = _get_if_static_frame_analysis(state, ancestry, if_node_id)
 
     selected_fields: set[str] = set()
     if not condition_edges:
@@ -832,23 +875,7 @@ def _has_empty_if_frame(state: "GraphExecutionState", if_node_id: str) -> bool:
                 selected_fields.add("true_input" if value else "false_input")
 
     for branch_field, branch_axis_ids in branch_axes.items():
-        branch_for_final_axes: set[str] = set()
-        pending = list(state.graph._get_input_edges(if_node_id, branch_field))
-        visited: set[str] = set()
-        while pending:
-            edge = pending.pop()
-            source_id = edge.source.node_id
-            if source_id in visited:
-                continue
-            visited.add(source_id)
-            source_node = state.graph.get_node(source_id)
-            if (
-                isinstance(source_node, ForInvocation)
-                and get_output_field_scope(source_node, edge.source.field) == OutputScope.Final
-            ):
-                branch_for_final_axes.update(ancestry.get_frame_axes_for_edge(edge))
-                continue
-            pending.extend(state.graph._get_input_edges(source_id))
+        branch_for_final_axes = branch_final_axes[branch_field]
         if branch_field in selected_fields:
             axes.update(branch_axis_ids)
         else:
@@ -860,6 +887,36 @@ def _has_empty_if_frame(state: "GraphExecutionState", if_node_id: str) -> bool:
         and not state.source_prepared_mapping.get(iterator_id)
         for iterator_id in axes
     )
+
+
+def _has_empty_selected_for_final_frame(
+    state: "GraphExecutionState", iterator_ancestry: _IteratorAncestry, if_node_id: str
+) -> bool:
+    """Check for an empty root-selected branch whose open axes all come from For final outputs."""
+    condition_edges = state.graph._get_input_edges(if_node_id, "condition")
+    if not condition_edges or any(iterator_ancestry.get_frame_axes_for_edge(edge) for edge in condition_edges):
+        return False
+    branch_axes, branch_final_axes = _get_if_static_frame_analysis(state, iterator_ancestry, if_node_id)
+    condition_edge = condition_edges[0]
+    for exec_id in state.source_prepared_mapping.get(condition_edge.source.node_id, ()):
+        if exec_id not in state.results:
+            continue
+        value = getattr(state.results[exec_id], condition_edge.source.field)
+        selected_field = "true_input" if value else "false_input"
+        selected_axes = set(branch_axes[selected_field])
+        final_axes = branch_final_axes[selected_field]
+        if not selected_axes or not selected_axes <= final_axes:
+            continue
+        if not set(iterator_ancestry.get_ordered_iterator_ancestors(if_node_id)) <= final_axes:
+            continue
+        if any(
+            isinstance(state.graph.get_node(axis_id), IterateInvocation)
+            and axis_id in state.executed
+            and not state.source_prepared_mapping.get(axis_id)
+            for axis_id in final_axes
+        ):
+            return True
+    return False
 
 
 def _has_unresolved_if_frame_axes(

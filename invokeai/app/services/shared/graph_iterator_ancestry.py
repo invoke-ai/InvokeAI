@@ -36,7 +36,7 @@ class _IteratorAncestry:
         self._has_iterator_ancestor: dict[str, bool] | None = None
         self._ordered_iterator_ancestors: dict[str, tuple[str, ...]] = {}
         self._frame_iterators: dict[str, tuple[str, ...]] = {}
-        self.effective_iteration_paths_by_edge: dict[tuple[str, str], set[tuple[int, ...]]] = {}
+        self.effective_iteration_paths_by_edge: dict[Edge, set[tuple[int, ...]]] = {}
 
     def clear_effective_iteration_paths(self) -> None:
         """Invalidate prepared-path results when execution materialization advances."""
