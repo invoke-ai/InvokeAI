@@ -16,7 +16,11 @@ import { applyAdjustments } from '@workbench/canvas-engine/render/adjustments';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { RasterCompositeOverBudgetError } from '@workbench/canvas-engine/render/rasterComposite';
 import { MEASURED_NOISY_TEXT } from '@workbench/canvas-engine/render/rasterComposite.testing';
-import { planComposites, planControlComposites } from '@workbench/canvas-operations/generationCompositePlan';
+import {
+  planComposites,
+  planControlComposites,
+  planRegionalMaskComposites,
+} from '@workbench/canvas-operations/generationCompositePlan';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ExecuteCompositePlanDeps } from './compositeForGeneration';
@@ -26,6 +30,7 @@ import {
   executeCompositePlan,
   executeControlComposite,
   executeMaskComposite,
+  executeRegionalMaskComposite,
   toGrayscaleMaskPixels,
 } from './compositeForGeneration';
 
@@ -321,6 +326,63 @@ describe('executeControlComposite', () => {
     expect(target.callLog).toContainEqual({ args: [0, 0, 100, 100], op: 'fillRect' });
     expect(readImageData).not.toHaveBeenCalled();
     expect(harness.encodeSurface).toHaveBeenCalledWith(target);
+  });
+});
+
+describe('executeRegionalMaskComposite', () => {
+  const regionalLayer: CanvasLayerContract = {
+    autoNegative: false,
+    blendMode: 'normal',
+    id: 'region',
+    isEnabled: true,
+    isLocked: false,
+    mask: { bitmap: imageRef('region-bmp'), fill: { color: '#00ff00', style: 'solid' } },
+    name: 'Region',
+    negativePrompt: null,
+    opacity: 0.5,
+    positivePrompt: 'a sign',
+    referenceImages: [],
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type: 'regional_guidance',
+  };
+  const regionalEntry = () => planRegionalMaskComposites(makeDoc([regionalLayer]), BBOX)[0]!.entry;
+
+  /** A transparent scan with one faint pixel at each opposite corner of a box. */
+  const boxImageData = (width: number, height: number): ImageData => {
+    const image = uniformImageData(width, height, 0);
+    image.data[(12 * width + 10) * 4 + 3] = 1;
+    image.data[(40 * width + 29) * 4 + 3] = 255;
+    return image;
+  };
+
+  it('measures the alpha bounds on the coverage readback it already takes', async () => {
+    const readImageData = vi.fn(() => boxImageData(100, 100));
+    const harness = makeHarness(readImageData);
+
+    const result = await executeRegionalMaskComposite(regionalEntry(), harness.deps);
+
+    expect(result).toMatchObject({ bounds: { height: 29, width: 20, x: 10, y: 12 }, imageName: 'uploaded-1' });
+    expect(readImageData).toHaveBeenCalledTimes(1);
+  });
+
+  it('reuses the cached bounds with the cached upload', async () => {
+    const readImageData = vi.fn(() => boxImageData(100, 100));
+    const harness = makeHarness(readImageData);
+
+    await executeRegionalMaskComposite(regionalEntry(), harness.deps);
+    const second = await executeRegionalMaskComposite(regionalEntry(), harness.deps);
+
+    expect(second).toMatchObject({ bounds: { height: 29, width: 20, x: 10, y: 12 }, reusedUpload: true });
+    expect(readImageData).toHaveBeenCalledTimes(1);
+    expect(harness.encodeSurface).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports empty bounds for a mask with no pixels in the bbox', async () => {
+    const harness = makeHarness(() => uniformImageData(100, 100, 0));
+
+    const result = await executeRegionalMaskComposite(regionalEntry(), harness.deps);
+
+    expect(result.bounds).toEqual({ height: 0, width: 0, x: 0, y: 0 });
   });
 });
 

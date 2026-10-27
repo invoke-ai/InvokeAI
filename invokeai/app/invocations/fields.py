@@ -203,6 +203,11 @@ class FieldDescriptions:
     ltx2_audio_conditioning = "A soundtrack to generate a picture for (audio-to-video)"
     ltx2_full_video_conditioning = "A clip to generate a soundtrack for (video-to-audio)"
     ltx2_video_conditioning = "First-frame (VAE-latent) conditioning for LTX-2"
+    moss_image_model = "MOSS-Image model (Transformer) to load"
+    moss_image_uncond_skip_layers = (
+        "Zero-based transformer blocks the negative (unconditional) branch skips. Empty skips none. Used only when "
+        "cfg_scale > 1."
+    )
     sdxl_main_model = "SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load"
     sdxl_refiner_model = "SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load"
     onnx_main_model = "ONNX Main model (UNet, VAE, CLIP) to load"
@@ -520,6 +525,12 @@ class LTX2ConditioningField(BaseModel):
     LTX-2 conditioning is a pair of prompt streams, one per modality, already projected by the
     text connectors, plus the token mask the connectors emit alongside them.
     """
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
+class MossImageConditioningField(BaseModel):
+    """A MOSS-Image conditioning tensor primitive value."""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
 
