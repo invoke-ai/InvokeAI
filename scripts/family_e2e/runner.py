@@ -7,11 +7,17 @@ runner of the run left running (`stop_surviving_server`). Every new server lifet
 after the server crashed in a step) skips steps that already have a final record and repeats the last warm-up of
 every case key with measures left, because the new server starts with a cold model cache.
 
+`stop` and the runner agree through run.json under the run lock (`run_lock`): the runner names itself in the heartbeat
+before anything else (`register_runner`), and `stop` marks the run stopped before it reads the heartbeat. So `stop`
+either finds the runner and kills it, or the runner finds the run stopped and leaves it untouched. The runner checks
+again before every server and every step (`ensure_running`), and never overwrites a status other than `running`.
+
 A calibration run also checks that the server can calibrate, submits each step through the working-memory calibrate
-route, and saves the lifetime's calibration store before the scratch root goes (`calibration.py`). A store that cannot
-be saved fails the run (or leaves a stop a stop) and keeps the root that holds it; the next `resume` saves a store an
-earlier runner left in a root before anything rebuilds it, once that runner's server is stopped (it may still write
-the store), and refuses to go on when that save fails.
+route, and saves the lifetime's calibration store before the scratch root goes (`calibration.py`). It records the
+store under the run lock and keeps whatever status run.json has (`save_calibration`), so a runner the stop has not
+killed yet still saves its store. A store that cannot be saved fails the run (or leaves a stop a stop) and keeps the
+root that holds it; the next `resume` saves a store an earlier runner left in a root before anything rebuilds it, once
+that runner's server is stopped (it may still write the store), and refuses to go on when that save fails.
 """
 
 from __future__ import annotations
@@ -44,6 +50,7 @@ from scripts.family_e2e.client import (
     wait_for_idle_queue,
     wait_for_item,
 )
+from scripts.family_e2e.detach import RUNNER_LOG
 from scripts.family_e2e.graphs import (
     PreparedGraph,
     build_export_request,
@@ -62,6 +69,7 @@ from scripts.family_e2e.manifest import (
     resolve_cases,
 )
 from scripts.family_e2e.records import (
+    CalibrationExport,
     Environment,
     ForeignProcess,
     Memory,
@@ -97,6 +105,13 @@ from scripts.family_e2e.server import (
 logger = logging.getLogger("family_e2e")
 
 HEARTBEAT_FILE = "heartbeat.json"
+RUN_LOCK_FILE = "run.lock"
+# Holders keep the run lock for one read and one write of a small JSON file, and a calibration run's store files.
+RUN_LOCK_TIMEOUT_S = 30.0
+RUN_LOCK_POLL_S = 0.01
+# A started runner registers once its interpreter has imported the tool, which takes seconds on a busy machine.
+REGISTER_TIMEOUT_S = 120.0
+REGISTER_POLL_S = 0.05
 # The heartbeat entries that identify the server's processes. The launcher (the process the runner started, which
 # leads the server's process group on POSIX) comes first: its tree and group take the serving process along.
 SERVER_ROLES = ("server_launcher", "server")
@@ -129,6 +144,10 @@ SERVER_CRASHED = "server crashed"
 
 class RunnerError(RuntimeError):
     pass
+
+
+class RunStopped(Exception):
+    """The run is no longer `running`, normally because `stop` marked it: the runner leaves it as it is."""
 
 
 class ServerCrashed(Exception):
@@ -267,6 +286,27 @@ def gpu_lock(adapter: gpu_memory.Adapter) -> Iterator[None]:
             _lock_file(f, lock=False)
 
 
+@contextmanager
+def run_lock(run_dir: Path) -> Iterator[None]:
+    """Holds `<run_dir>/run.lock`, which orders status changes of run.json and the runner's registration between the
+    runner, `stop` and `resume`. Waits while another process holds it; the operating system releases the lock of a
+    killed holder."""
+    with open(run_dir / RUN_LOCK_FILE, "a+b") as f:
+        deadline = time.monotonic() + RUN_LOCK_TIMEOUT_S
+        while True:
+            try:
+                _lock_file(f, lock=True)
+                break
+            except OSError:
+                if time.monotonic() >= deadline:
+                    raise RunnerError(f"{run_dir / RUN_LOCK_FILE} stayed locked for {RUN_LOCK_TIMEOUT_S:g}s") from None
+                time.sleep(RUN_LOCK_POLL_S)
+        try:
+            yield
+        finally:
+            _lock_file(f, lock=False)
+
+
 def _lock_file(f: BinaryIO, lock: bool) -> None:
     if sys.platform == "win32":
         import msvcrt
@@ -381,6 +421,81 @@ def read_heartbeat(run_dir: Path) -> dict[str, Any]:
         return json.loads((run_dir / HEARTBEAT_FILE).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
+
+
+def ensure_running(run_dir: Path) -> None:
+    """Raises RunStopped unless run.json still says `running`."""
+    status = load_run_info(run_dir).status
+    if status != "running":
+        raise RunStopped(f"run {run_dir.name} is {status}; the runner leaves it as it is")
+
+
+def finish_run(run_dir: Path, status: str) -> bool:
+    """Ends a running run with `status` and returns True. Any other status stays: the runner does not overwrite a
+    stop, and `stop` does not overwrite a finished run."""
+    with run_lock(run_dir):
+        info = load_run_info(run_dir)
+        if info.status != "running":
+            return False
+        write_run_info(run_dir, info.model_copy(update={"status": status, "finished_at": now_iso()}))
+        return True
+
+
+def save_calibration(run_dir: Path, stores: calibration.Stores, status: bytes | None = None) -> list[CalibrationExport]:
+    """Saves a lifetime's calibration stores into the run: from the export routes with their status, or the store files
+    of a scratch root (no status). Under the run lock on run.json as it is then: the stores belong to the run whatever
+    its status, and a status `stop` set meanwhile stays."""
+    if not stores:
+        return []
+    with run_lock(run_dir):
+        info = load_run_info(run_dir)
+        return calibration.save(run_dir, info, stores, status, "store_file" if status is None else "api")
+
+
+def register_runner(run_dir: Path) -> None:
+    """Names this process as the run's runner in heartbeat.json, before the runner does anything else.
+
+    Under the run lock, as `stop` marks the run stopped: a runner registered first is in the heartbeat that `stop`
+    reads next, and one that comes later finds the run stopped (RunStopped). The server entries an earlier runner left
+    stay for stop_surviving_server. While another runner of the run is alive this refuses.
+    """
+    with run_lock(run_dir):
+        ensure_running(run_dir)
+        heartbeat = read_heartbeat(run_dir)
+        other = heartbeat.get("runner")
+        if other and int(other[0]) != os.getpid() and is_alive(other):
+            raise RunnerError(f"runner pid {int(other[0])} of run {run_dir.name} is still running")
+        heartbeat.update(runner=process_identity(os.getpid()), step="starting", updated_at=now_iso())
+        write_bytes_atomic(run_dir / HEARTBEAT_FILE, json.dumps(heartbeat, indent=2).encode("utf-8"))
+
+
+def wait_for_runner(run_dir: Path, spawned_pid: int, previous: list[float] | None) -> list[float]:
+    """Waits until a runner other than `previous` registered for the run, and returns its identity.
+
+    `spawned_pid` is the process `start` or `resume` launched: the runner, or a venv launcher whose child it is. Once
+    that has exited, a registration that has not appeared will not appear any more.
+    """
+    try:
+        spawned: psutil.Process | None = psutil.Process(spawned_pid)
+    except psutil.NoSuchProcess:
+        spawned = None
+    deadline = time.monotonic() + REGISTER_TIMEOUT_S
+    while True:
+        # Before the heartbeat is read: a runner that registered and exited at once still counts.
+        exited = spawned is None or not _running(spawned)
+        registered = read_heartbeat(run_dir).get("runner")
+        if registered and registered != previous:
+            return registered
+        if exited:
+            if load_run_info(run_dir).status == "stopped":
+                raise RunnerError(f"run {run_dir.name} was stopped before its runner registered")
+            raise RunnerError(f"the runner exited before it registered; see {run_dir / RUNNER_LOG}")
+        if time.monotonic() >= deadline:
+            raise RunnerError(
+                f"the runner (pid {spawned_pid}) did not register within {REGISTER_TIMEOUT_S:g}s; see "
+                f"{run_dir / RUNNER_LOG}. `python -m scripts.family_e2e stop {run_dir}` keeps it from starting"
+            )
+        time.sleep(REGISTER_POLL_S)
 
 
 def stop_surviving_server(run_dir: Path) -> None:
@@ -592,28 +707,30 @@ def load_run_manifest(info: RunInfo) -> Manifest:
     return load_manifest(path)
 
 
-def _set_status(run_dir: Path, status: str) -> None:
-    info = load_run_info(run_dir)
-    write_run_info(run_dir, info.model_copy(update={"status": status, "finished_at": now_iso()}))
-
-
 def run(run_dir: Path, gpu_factory: Callable[[str], Gpu] = open_gpu, export: Exporter = run_pnpm_exporter) -> int:
-    """Executes the remaining steps of a run, then writes the report. Returns 1 when the report has failures."""
+    """Executes the remaining steps of a run, then writes the report. Returns 1 when the report has failures.
+
+    Raises RunStopped, with run.json and the report left as they are, once the run is no longer `running`.
+    """
+    register_runner(run_dir)
     info = load_run_info(run_dir)
     manifest = load_run_manifest(info)
     try:
         gpu = gpu_factory(manifest.gpu)
         with gpu_lock(gpu.adapter):
+            ensure_running(run_dir)
             stop_surviving_server(run_dir)
             _Session(run_dir, manifest, gpu, export).run()
+    except RunStopped:
+        raise
     except BaseException as e:
-        _set_status(run_dir, "stopped" if isinstance(e, KeyboardInterrupt) else "failed")
+        finish_run(run_dir, "stopped" if isinstance(e, KeyboardInterrupt) else "failed")
         try:
             write_report(manifest.data_dir, run_dir)
         except Exception:
             logger.exception("writing the report of the aborted run failed")
         raise
-    _set_status(run_dir, "completed")
+    finish_run(run_dir, "completed")
     result = write_report(manifest.data_dir, run_dir)
     logger.info(
         "report %s: %d failures, %d outliers, %d invalid",
@@ -673,6 +790,7 @@ class _Session:
             logger.info("every planned step has a final record")
         # Each crash adds a crash record to a case, and MAX_SERVER_CRASHES of them make the case final: this ends.
         while todo:
+            ensure_running(self.run_dir)
             preflight(self.manifest, self.gpu)
             if not self.serve_once(todo):
                 return
@@ -686,7 +804,7 @@ class _Session:
             if not root.exists():
                 continue
             try:
-                exports = calibration.save_store_files(self.run_dir, self.info, root)
+                exports = self.save_calibration(calibration.read_store_files(root))
             except OSError as e:
                 raise RunnerError(
                     f"could not save the calibration store an earlier server left in {root} ({e}); not resuming, as "
@@ -703,7 +821,7 @@ class _Session:
         root = scratch_root(self.manifest.data_dir, self.info.run_id, self.arm)
         log_path = self.run_dir / f"server-{self.arm}.log"
         self.device_class_ids, self.store_saved = set(), False
-        interrupted = False
+        stopping = False
         try:
             pin = device_env(self.gpu.adapter, self.manifest.server.env)
             build_scratch_root(self.manifest.server.template_root, root, log_path, free_port(), bool(pin))
@@ -724,15 +842,15 @@ class _Session:
             finally:
                 self.server.stop()
                 self.server = None
-        except KeyboardInterrupt:
-            interrupted = True
+        except (KeyboardInterrupt, RunStopped):
+            stopping = True
             raise
         finally:
             # stop() returns once the server tree has exited, so its database files are closed by now.
             kept = False
             if self.info.calibrate and not self.store_saved:
                 try:
-                    calibration.save_store_files(self.run_dir, self.info, root)
+                    self.save_calibration(calibration.read_store_files(root))
                 except OSError as e:
                     # The root holds the only copy of the lifetime's windows; `recover_stores` saves it on `resume`.
                     kept = True
@@ -740,9 +858,10 @@ class _Session:
                         f"could not save the calibration store ({e}); kept the scratch root {root} with it. Fix the "
                         "cause and `resume`, which saves it first"
                     )
-                    if not interrupted:
+                    if not stopping:
                         raise RunnerError(message) from e
-                    # A stop stays a stop; the run ends as stopped and the save error is logged.
+                    # A stop stays a stop (an interrupt ends the run stopped, RunStopped keeps `stop`'s mark); the save
+                    # error is logged.
                     logger.error(message)
             if not kept:
                 leftovers = remove_tree(root)
@@ -787,7 +906,7 @@ class _Session:
                             self.check_server_on_adapter(server)
                             adapter_checked = True
             if self.device_class_ids:
-                calibration.save_exports(client, self.run_dir, self.info, self.device_class_ids)
+                self.save_calibration(*calibration.fetch_exports(client, self.device_class_ids))
                 self.store_saved = True
         finally:
             recorder.close()
@@ -830,8 +949,20 @@ class _Session:
                 "start a new run"
             )
         self.info.environments[self.arm] = environment
-        write_run_info(self.run_dir, self.info)
+        self.save_info()
         return runtime_config
+
+    def save_calibration(self, stores: calibration.Stores, status: bytes | None = None) -> list[CalibrationExport]:
+        exports = save_calibration(self.run_dir, stores, status)
+        # save_info writes self.info whole.
+        self.info.calibration_exports.extend(exports)
+        return exports
+
+    def save_info(self) -> None:
+        """Writes the session's run.json while the run is still running; `stop` owns it otherwise."""
+        with run_lock(self.run_dir):
+            ensure_running(self.run_dir)
+            write_run_info(self.run_dir, self.info)
 
     def upload_inputs(
         self, client: InvokeClient, cases: list[ResolvedCase]
@@ -919,7 +1050,7 @@ class _Session:
                 for key, graph in graphs.items()
             }
         )
-        write_run_info(self.run_dir, self.info)
+        self.save_info()
         return graphs, errors
 
     def last_warmup(self, case_key: str) -> PlannedStep:
@@ -961,6 +1092,7 @@ class _Session:
         """
         attempts = [r for r in self.records if _step_id(r) == _step_id(step)]
         while True:
+            ensure_running(self.run_dir)
             attempt = max((r.attempt for r in attempts), default=0) + 1
             self.heartbeat(f"{step.case_key} {step.kind} {step.rep} attempt {attempt}")
             try:
