@@ -131,7 +131,7 @@
   "settingsReference.allowedValues": "Values:",
 
   "home.hero.announcement": "Invoke V7 Available Now!",
-  "home.hero.screenshotAlt": "The Invoke workbench in the Edit layout: the Generate panel with an SDXL model, prompt, size and guidance settings on the left, the Canvas with a mountain meadow in the center, and the color picker and Layers panel on the right.",
+  "home.hero.screenshotAlt": "The Invoke workbench in the Edit layout: the Generate panel with a Krea-2 model and a long prompt on the left; in the center, the Canvas with a glowing violet-and-cyan jellyfish over a city at dusk, its inpaint masks and regional guidance areas visible; and on the right, the color picker and a Layers panel of inpaint masks, regional guidance and raster layers.",
   "home.cta.download": "Download Invoke",
   "home.cta.readDocs": "Read the docs",
   "home.cta.platformsAndLicense": "Windows · macOS · Linux · Apache 2.0",
