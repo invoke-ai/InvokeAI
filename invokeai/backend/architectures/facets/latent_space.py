@@ -568,7 +568,7 @@ FLUX2_32 = LatentSpace(
     rgb_factors=FLUX2_LATENT_RGB_FACTORS,
     rgb_bias=FLUX2_LATENT_RGB_BIAS,
 )
-"""AutoencoderKLFlux2: FLUX.2, ERNIE-Image and Ideogram 4."""
+"""AutoencoderKLFlux2: FLUX.2, ERNIE-Image, Ideogram 4 and MOSS-Image."""
 
 MINIMAX_H3_24 = LatentSpace(
     channels=24,

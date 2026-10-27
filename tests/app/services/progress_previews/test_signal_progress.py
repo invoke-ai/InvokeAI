@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from PIL import Image
 
 from invokeai.app.services.progress_previews.progress_previews_default import MemoryProgressPreviews
-from invokeai.app.services.shared.invocation_context import UtilInterface
+from invokeai.app.services.shared.invocation_context import InvocationContextData, UtilInterface
 
 
 class _Clock:
@@ -36,9 +36,17 @@ class _FakeEvents:
 def _util(clock: _Clock) -> tuple[UtilInterface, _FakeEvents, MemoryProgressPreviews]:
     events = _FakeEvents()
     previews = MemoryProgressPreviews(clock=clock)
-    services = SimpleNamespace(events=events, progress_previews=previews)
+    services = SimpleNamespace(
+        events=events,
+        progress_previews=previews,
+        configuration=SimpleNamespace(tiny_autoencoder_previews=False),
+    )
     queue_item = SimpleNamespace(item_id=7, session_id="session-7", user_id="owner", queue_id="default")
-    data = SimpleNamespace(queue_item=queue_item, invocation=SimpleNamespace(id="node"))
+    data = InvocationContextData(
+        queue_item=queue_item,  # type: ignore[arg-type]
+        invocation=SimpleNamespace(id="node"),  # type: ignore[arg-type]
+        source_invocation_id="node",
+    )
     return UtilInterface(services, data, is_canceled=lambda: False), events, previews  # type: ignore[arg-type]
 
 

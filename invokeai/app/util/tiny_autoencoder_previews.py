@@ -17,16 +17,22 @@ from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.tiny_autoencoder.decoder import TinyAutoencoderDecoder
-from invokeai.backend.tiny_autoencoder.preview import decode_preview, select_tiny_autoencoder
+from invokeai.backend.tiny_autoencoder.preview import (
+    decode_preview,
+    decode_working_memory_bytes,
+    select_tiny_autoencoder,
+)
 from invokeai.backend.util.devices import TorchDevice
 
 if TYPE_CHECKING:
     from invokeai.app.services.invocation_services import InvocationServices
 
-# Predictable conditions already reported once, so later generations log them at DEBUG: a space with
-# no installed TAE (keyed by the space's `id()` -- spaces are module-level constants that live as long
-# as the process, and `LatentSpace` holds lists, so it does not hash) and a TAE record whose file is
-# gone (keyed by the record's key). Shared by every generation thread.
+# Fallback causes already reported once, so later generations log them at DEBUG: they repeat on every
+# generation until the user acts, and every generation is a new session. Keyed by the cause and what it
+# concerns: a space with no installed TAE (by the space's `id()` -- spaces are module-level constants that
+# live as long as the process, and `LatentSpace` holds lists, so it does not hash), a TAE record whose file
+# is gone or that does not fit in VRAM (by the record's key), and a failure (by the space and the exception
+# type). All of them are finite, so the set is bounded. Shared by every generation thread.
 _reported: set[Hashable] = set()
 _reported_lock = Lock()
 
@@ -77,13 +83,15 @@ class TinyAutoencoderPreviews:
 
     Falls back to the linear projection when no TAE decodes the sample's latent space, when the TAE
     would not be fully resident in VRAM, and, for the rest of the invocation, after any load or decode
-    failure. Only the invocation's generation thread calls `render`, so its state needs no lock.
+    failure. Created with `enabled=False` (the `tiny_autoencoder_previews` setting off), it renders every
+    frame linearly and never looks a TAE up. Only the invocation's generation thread calls `render`, so
+    its state needs no lock.
     """
 
-    def __init__(self, services: "InvocationServices", user_id: str | None = None) -> None:
+    def __init__(self, services: "InvocationServices", user_id: str | None = None, enabled: bool = True) -> None:
         self._services = services
         self._user_id = user_id
-        self._disabled = False
+        self._disabled = not enabled
         self._configs: list[AnyModelConfig] | None = None
         # One entry per latent space seen, compared by identity; None when the space renders linearly.
         self._decoders: list[tuple[LatentSpace, _HeldDecoder | None]] = []
@@ -133,16 +141,20 @@ class TinyAutoencoderPreviews:
         space = resolve_latent_space(base_model, preview_frame(sample))
         if not self._disabled:
             try:
-                held = self._decoder_for(base_model, space)
+                held = self._decoder_for(base_model, space, sample)
                 if held is not None:
                     image = decode_preview(held.decoder, sample, device=held.device)
                     self._decoded_on = held.device
                     size = (sample.shape[-1] * space.spatial_compression, sample.shape[-2] * space.spatial_compression)
                     return image, size
-            except Exception:
+            except Exception as error:
                 # OOM included: the preview is optional, the denoise around it is not.
                 self._disable()
-                self._services.logger.warning(
+                # The TAE that failed is the one `_resolve` selected for the space (None if the lookup itself failed).
+                config = select_tiny_autoencoder(self._configs or [], space)
+                self._log_once(
+                    ("failed", None if config is None else config.key, id(space), type(error)),
+                    logging.WARNING,
                     "Tiny AutoEncoder preview failed; using linear previews for the rest of this invocation.",
                     exc_info=True,
                 )
@@ -154,19 +166,20 @@ class TinyAutoencoderPreviews:
 
     def _disable(self) -> None:
         self._disabled = True
+        self._last_tae_device = None
         self._decoders.clear()
         self._locks.close()
 
-    def _decoder_for(self, base_model: BaseModelType, space: LatentSpace) -> _HeldDecoder | None:
+    def _decoder_for(self, base_model: BaseModelType, space: LatentSpace, sample: torch.Tensor) -> _HeldDecoder | None:
         for known, held in self._decoders:
             if known is space:
                 return held
-        held = self._resolve(base_model, space)
+        held = self._resolve(base_model, space, sample)
         if not self._disabled:
             self._decoders.append((space, held))
         return held
 
-    def _resolve(self, base_model: BaseModelType, space: LatentSpace) -> _HeldDecoder | None:
+    def _resolve(self, base_model: BaseModelType, space: LatentSpace, sample: torch.Tensor) -> _HeldDecoder | None:
         model_manager = self._services.model_manager
         if self._configs is None:
             self._configs = model_manager.store.search_by_attr(model_type=ModelType.TinyAutoencoder)
@@ -184,15 +197,17 @@ class TinyAutoencoderPreviews:
             self._report_unloadable(config, error)
             return None
 
-        if not self._fits_in_vram(loaded):
+        decoder = loaded.model  # the very module the lock moves and yields
+        if not isinstance(decoder, TinyAutoencoderDecoder):
+            raise TypeError(f"expected a TinyAutoencoderDecoder, the loader returned {type(decoder).__name__}")
+        # Reserved once, with the lock: a denoise keeps its size, so every later frame decodes the same.
+        working_mem_bytes = decode_working_memory_bytes(decoder, sample)
+        if not self._fits_in_vram(loaded, working_mem_bytes):
             self._report_not_resident(config)
             return None
 
         lock = ExitStack()
-        _, decoder = lock.enter_context(loaded.model_on_device())
-        if not isinstance(decoder, TinyAutoencoderDecoder):
-            lock.close()
-            raise TypeError(f"expected a TinyAutoencoderDecoder, the loader returned {type(decoder).__name__}")
+        lock.enter_context(loaded.model_on_device(working_mem_bytes=working_mem_bytes))
         if loaded.compute_device.type != "cpu" and loaded.resident_weight_bytes < loaded.weight_bytes:
             # The cache's own budget (which `max_vram_cache_size_gb` caps) left the TAE partly in RAM. A CPU
             # model reports no resident bytes at all: its lock does not move it.
@@ -203,20 +218,22 @@ class TinyAutoencoderPreviews:
         self._locks.push(lock)
         return _HeldDecoder(decoder=decoder, device=loaded.compute_device)
 
-    def _fits_in_vram(self, loaded: LoadedModel) -> bool:
-        """Whether locking `loaded` would make it fully resident, asked before locking it.
+    def _fits_in_vram(self, loaded: LoadedModel, working_mem_bytes: int) -> bool:
+        """Whether locking `loaded` with `working_mem_bytes` reserved would make it fully resident, asked before
+        locking it.
 
-        `make_room_in_vram` offloads unlocked models by the policy a lock applies and keeps the same
-        working-memory reserve, so a TAE that would not fit is refused without the lock's "VRAM budget
-        short" warning -- under partial loading, on every generation. It measures the device, not the
-        cache's cap, so `_resolve` checks residency again after locking.
+        `make_room_in_vram` offloads unlocked models by the policy a lock applies and keeps the reserve the
+        lock will keep, so a TAE that would not fit is refused without the lock's "VRAM budget short"
+        warning -- under partial loading, on every generation. It measures the device, not the cache's cap,
+        so `_resolve` checks residency again after locking.
         """
         if loaded.compute_device.type == "cpu":
             return True
         missing = loaded.weight_bytes - loaded.resident_weight_bytes
         if missing <= 0:
             return True
-        return self._services.model_manager.load.ram_cache.make_room_in_vram(missing) >= missing
+        ram_cache = self._services.model_manager.load.ram_cache
+        return ram_cache.make_room_in_vram(missing, working_mem_bytes=working_mem_bytes) >= missing
 
     def _report_missing(self, base_model: BaseModelType, space: LatentSpace) -> None:
         starters = tiny_autoencoder_starters(space)
@@ -239,10 +256,19 @@ class TinyAutoencoderPreviews:
         )
 
     def _report_not_resident(self, config: AnyModelConfig) -> None:
-        self._services.logger.info(
+        self._log_once(
+            ("not resident", config.key),
+            logging.INFO,
             f"Tiny AutoEncoder '{config.name}' does not fit in VRAM next to the running model; "
-            "using linear previews for this invocation."
+            "using linear previews for this invocation.",
         )
 
-    def _log_once(self, key: Hashable, level: int, message: str) -> None:
-        self._services.logger.log(level if _first_report(key) else logging.DEBUG, message)
+    def _log_once(self, key: Hashable, level: int, message: str, exc_info: bool | None = None) -> None:
+        """Log `message` at `level` the first time `key` is reported in this process, at DEBUG after that.
+
+        The traceback, if any, goes with the first report only.
+        """
+        if _first_report(key):
+            self._services.logger.log(level, message, exc_info=exc_info)
+        else:
+            self._services.logger.debug(message)

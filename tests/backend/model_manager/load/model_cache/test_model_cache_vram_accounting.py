@@ -192,6 +192,33 @@ def test_physical_availability_shares_the_reclaimable_credit_policy(monkeypatch:
     assert cache._get_physical_vram_available() == 3 * GB
 
 
+def test_making_room_keeps_free_the_reserve_a_lock_with_that_working_memory_keeps(monkeypatch: pytest.MonkeyPatch):
+    """A caller about to lock a model with `working_mem_bytes` asks `make_room_in_vram` with the same figure: the
+    reserve is that request, but never less than `device_working_mem_gb`, exactly as the lock's."""
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=True,
+        keep_ram_copy_of_weights=True,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=MagicMock(),
+        shared_cpu_weights=None,
+    )
+    cache._execution_device = torch.device("cuda")  # policy only; every VRAM query below is patched out
+    monkeypatch.setattr(torch.cuda, "mem_get_info", lambda device: (4 * GB, 24 * GB))
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device: 2 * GB)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 5 * GB)
+    monkeypatch.setattr(torch.cuda, "memory_stats", lambda device: {"inactive_split_bytes.all.current": GB})
+    monkeypatch.delenv("PYTORCH_CUDA_ALLOC_CONF", raising=False)
+    monkeypatch.delenv("PYTORCH_ALLOC_CONF", raising=False)
+    monkeypatch.delenv("PYTORCH_HIP_ALLOC_CONF", raising=False)
+
+    # 4 GB free + 2 GB reclaimable, less the reserve.
+    assert cache.make_room_in_vram(GB) == 5 * GB
+    assert cache.make_room_in_vram(GB, working_mem_bytes=GB // 2) == 5 * GB
+    assert cache.make_room_in_vram(GB, working_mem_bytes=5 * GB // 2) == 7 * GB // 2
+
+
 def test_the_windows_video_memory_budget_caps_the_measured_free_vram(monkeypatch: pytest.MonkeyPatch):
     """On Windows ROCm, torch reports the device total minus this process's usage. Windows pages allocations into
     shared system memory once the process passes its video-memory budget, so the budget's headroom is what the cache

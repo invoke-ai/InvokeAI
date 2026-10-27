@@ -168,6 +168,7 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   krea2SeedVarianceEnabled: false,
   krea2SeedVarianceStrength: 0.1,
   krea2SeedVarianceRandomizePercent: 50,
+  krea2ReferenceKvCache: false,
   fluxDypePreset: 'off',
   fluxDypeScale: 2,
   fluxDypeExponent: 2,
@@ -177,6 +178,7 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   zImageSeedVarianceRandomizePercent: 50,
   qwenImageShift: null,
   qwenImageEncoderQuantization: 'none',
+  mossImageUncondSkipLayers: [22],
   referenceImages: [],
   scheduler: 'euler_a',
   seamlessXAxis: false,
@@ -347,6 +349,48 @@ describe('image recall', () => {
       type: 'ip_adapter',
     });
     expect(result?.fields).toContain('referenceImages');
+  });
+
+  // Only the Diffusers pipeline reads Qwen-Image-2.1 references, so the recalled flavor survives there and nowhere else.
+  it('recalls Qwen-Image-2.1 reference images onto a Diffusers model and drops them on a GGUF one', () => {
+    const recall = (model: MainModelConfig) =>
+      buildImageRecallSettings({
+        currentValues: createValues({ model, modelKey: model.key }),
+        image,
+        kind: 'all',
+        metadata: {
+          positive_prompt: 'swap the jacket',
+          ref_images: [
+            {
+              config: {
+                image: { height: 640, image_name: 'edit.png', width: 480 },
+                type: 'qwen_image_2_1_reference_image',
+              },
+              id: 'edit-1',
+              isEnabled: true,
+            },
+          ],
+        },
+        models: [],
+        supportedModels: [model],
+        vaeModels: [],
+      });
+    const diffusers = recall({ base: 'qwen-image-2-1', format: 'diffusers', key: 'q21', name: 'Q21', type: 'main' });
+    const gguf = recall({ base: 'qwen-image-2-1', format: 'gguf_quantized', key: 'q21-q4', name: 'Q4', type: 'main' });
+
+    expect(diffusers?.values.referenceImages).toEqual([
+      {
+        config: {
+          image: { original: { image: { height: 640, image_name: 'edit.png', width: 480 } } },
+          type: 'qwen_image_2_1_reference_image',
+        },
+        id: 'edit-1',
+        isEnabled: true,
+      },
+    ]);
+    expect(diffusers?.fields).toContain('referenceImages');
+    expect(gguf?.values.referenceImages).toEqual([]);
+    expect(gguf?.fields).not.toContain('referenceImages');
   });
 
   it('preserves canonical original and crop provenance from legacy metadata', () => {
@@ -1216,6 +1260,81 @@ describe('image recall', () => {
     });
   });
 
+  describe('MOSS-Image skip layers', () => {
+    const mossImageModel: MainModelConfig = {
+      base: 'moss-image',
+      format: 'diffusers',
+      key: 'moss-image-model',
+      name: 'MOSS-Image',
+      type: 'main',
+    };
+    const recall = (layers: unknown, kind: ImageRecallKind = 'all', model: MainModelConfig = mossImageModel) =>
+      buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind,
+        metadata: { model: { key: model.key }, moss_image_uncond_skip_layers: layers },
+        models: [],
+        supportedModels: [mossImageModel, sdxlModel],
+        vaeModels: [],
+      });
+
+    it.each([[[22, 26]], [[]]])('restores the skip layers %j a generated image records', (layers) => {
+      // Recorded by the graph, so the round trip covers the metadata key as well as the reader.
+      const generated = compileGenerateGraph(
+        createValues({ model: mossImageModel, modelKey: mossImageModel.key, mossImageUncondSkipLayers: layers }),
+        mossImageModel,
+        'gallery',
+        { useCpuNoise: true, useNsfwChecker: false, useWatermark: false }
+      ).backendGraph;
+      const result = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind: 'all',
+        metadata: Object.values(generated.nodes).find((node) => node.type === 'core_metadata'),
+        models: [],
+        supportedModels: [mossImageModel],
+        vaeModels: [],
+      });
+
+      expect(result?.values.mossImageUncondSkipLayers).toEqual(layers);
+      expect(result?.fields).toContain('mossImageSkipLayers');
+    });
+
+    it('recalls the skip layers on a remix too', () => {
+      expect(recall([24], 'remix')?.values.mossImageUncondSkipLayers).toEqual([24]);
+    });
+
+    it.each([[[22, 42]], [[2.5]], ['22']])('keeps the current skip layers for a recorded %j', (layers) => {
+      // A block MOSS-Image lacks would block every generation until edited, so the current list stays.
+      const result = recall(layers);
+
+      expect(result?.values.mossImageUncondSkipLayers).toEqual([22]);
+      expect(result?.fields).not.toContain('mossImageSkipLayers');
+    });
+
+    it('ignores the skip layers when the recalled model is not MOSS-Image', () => {
+      const result = recall([], 'all', sdxlModel);
+
+      expect(result?.values.mossImageUncondSkipLayers).toEqual([22]);
+      expect(result?.fields).not.toContain('mossImageSkipLayers');
+    });
+
+    it('offers recall for an image whose only recallable delta is the skip layers', () => {
+      const capabilities = getImageRecallCapabilities({
+        currentValues: createValues({ model: mossImageModel }),
+        image,
+        metadata: { moss_image_uncond_skip_layers: [] },
+        models: [],
+        supportedModels: [],
+        vaeModels: [],
+      });
+
+      expect(capabilities.all).toBe(true);
+      expect(capabilities.remix).toBe(true);
+    });
+  });
+
   describe('external provider options', () => {
     const openaiModel = {
       base: 'external',
@@ -1550,6 +1669,33 @@ describe('model-family tuning recall', () => {
     expect(unchanged?.fields).not.toContain('modelTuning');
   });
 
+  it('restores the Krea-2 reference K/V cache only from a record that has it', () => {
+    const krea2: MainModelConfig = { base: 'krea-2', key: 'krea2-tuning', name: 'Krea-2', type: 'main' };
+    const krea2Record = (extra: Record<string, unknown> = {}) => ({
+      generation_mode: 'krea2_txt2img',
+      model: { base: 'krea-2', key: krea2.key, name: krea2.name, type: 'main' },
+      ...extra,
+    });
+    const restored = recall(krea2Record({ krea2_reference_kv_cache: true }), krea2);
+
+    expect(restored?.values.krea2ReferenceKvCache).toBe(true);
+    expect(restored?.fields).toContain('modelTuning');
+    expect(
+      recall(krea2Record({ krea2_reference_kv_cache: false }), krea2, 'all', { krea2ReferenceKvCache: true })?.values
+        .krea2ReferenceKvCache
+    ).toBe(false);
+    // Graphs record the switch only when they send it (edit references and a LoRA), so a record without it leaves the
+    // user's setting alone and does not count as a recalled field.
+    const unrecorded = recall(krea2Record(), krea2, 'all', { krea2ReferenceKvCache: true });
+
+    expect(unrecorded?.values.krea2ReferenceKvCache).toBe(true);
+    expect(unrecorded?.fields).not.toContain('modelTuning');
+    expect(
+      recall({ krea2_reference_kv_cache: true }, qwenModel, 'all', { krea2ReferenceKvCache: false })?.values
+        .krea2ReferenceKvCache
+    ).toBe(false);
+  });
+
   it('restores the Qwen-Image shift and encoder quantization', () => {
     const result = recall({ qwen_image_quantization: 'nf4', qwen_image_shift: 3 }, qwenModel);
 
@@ -1719,6 +1865,48 @@ describe('model-family tuning recall', () => {
       },
     ]);
     expect(result?.fields).toContain('referenceImages');
+  });
+
+  it('restores Krea-2 edit references and the K/V cache from the metadata their graph recorded', () => {
+    const krea2PoseLora: LoraModelConfig = { base: 'krea-2', key: 'krea2-pose', name: 'Krea-2 Pose', type: 'lora' };
+    const krea2Diffusers: MainModelConfig = { ...krea2Model, format: 'diffusers' };
+    const editReference = (imageName: string) => ({
+      config: {
+        image: { original: { image: { height: 640, image_name: imageName, width: 480 } } },
+        type: 'krea2_edit_reference_image' as const,
+      },
+      id: imageName,
+      isEnabled: true,
+    });
+    const referenceImages = [editReference('pose.png'), editReference('room.png')];
+    const graph = compileGenerateGraph(
+      {
+        ...createValues({ model: krea2Diffusers, modelKey: krea2Diffusers.key }),
+        krea2ReferenceKvCache: true,
+        // The graph records the switch only while a LoRA reads the references.
+        loras: [{ isEnabled: true, model: krea2PoseLora, weight: 1 }],
+        referenceImages,
+      },
+      krea2Diffusers,
+      'gallery',
+      { useCpuNoise: true, useNsfwChecker: false, useWatermark: false }
+    ).backendGraph;
+    const metadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
+
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata,
+      models: [],
+      supportedModels: [krea2Diffusers],
+      vaeModels: [],
+    });
+
+    expect(result?.values.model).toEqual(krea2Diffusers);
+    expect(result?.values.referenceImages).toEqual(referenceImages);
+    expect(result?.values.krea2ReferenceKvCache).toBe(true);
+    expect(result?.fields).toEqual(expect.arrayContaining(['referenceImages', 'modelTuning']));
   });
 });
 

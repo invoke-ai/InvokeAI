@@ -1,4 +1,4 @@
-from contextlib import ExitStack, nullcontext
+from contextlib import ExitStack
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -31,12 +31,7 @@ from invokeai.app.services.shared.execution_effects import ExecutionEffectsRecor
 from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.videos.videos_common import VideoDTO
 from invokeai.app.services.wildcard_records.wildcard_records_common import build_wildcard_manager
-from invokeai.app.util.step_callback import (
-    PreviewRender,
-    PreviewRenderer,
-    diffusion_step_callback,
-    render_linear_preview,
-)
+from invokeai.app.util.step_callback import PreviewRender, diffusion_step_callback
 from invokeai.app.util.tiny_autoencoder_previews import TinyAutoencoderPreviews
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
@@ -862,8 +857,7 @@ class UtilInterface(InvocationContextInterface):
     ) -> None:
         super().__init__(services, data)
         self._is_canceled = is_canceled
-        self._preview_renderer: PreviewRenderer | None = None
-        self._tiny_autoencoder_previews: TinyAutoencoderPreviews | None = None
+        self._previews: TinyAutoencoderPreviews | None = None
 
     def is_canceled(self) -> bool:
         """Checks if the current session has been canceled.
@@ -890,7 +884,7 @@ class UtilInterface(InvocationContextInterface):
             intermediate_state=intermediate_state,
             base_model=base_model,
             is_canceled=self.is_canceled,
-            render=self._get_preview_renderer(),
+            render=self._get_previews().render,
         )
 
     def flux_step_callback(self, intermediate_state: PipelineIntermediateState) -> None:
@@ -909,7 +903,7 @@ class UtilInterface(InvocationContextInterface):
             intermediate_state=intermediate_state,
             base_model=BaseModelType.Flux,
             is_canceled=self.is_canceled,
-            render=self._get_preview_renderer(),
+            render=self._get_previews().render,
         )
 
     def flux2_step_callback(self, intermediate_state: PipelineIntermediateState) -> None:
@@ -925,7 +919,7 @@ class UtilInterface(InvocationContextInterface):
             intermediate_state=intermediate_state,
             base_model=BaseModelType.Flux2,
             is_canceled=self.is_canceled,
-            render=self._get_preview_renderer(),
+            render=self._get_previews().render,
         )
 
     def signal_progress(
@@ -1011,16 +1005,13 @@ class UtilInterface(InvocationContextInterface):
         # JPEG encode. A Tiny AutoEncoder's frames are expensive enough to widen the interval.
         queue_item = self._data.queue_item
         previews = self._services.progress_previews
-        tae = self._tiny_autoencoder_previews
+        renderer = self._get_previews()
         revision = previews.reserve_revision(
-            queue_item.item_id,
-            queue_item.session_id,
-            percentage,
-            min_interval_s=None if tae is None else tae.min_frame_interval_s,
+            queue_item.item_id, queue_item.session_id, percentage, min_interval_s=renderer.min_frame_interval_s
         )
         if revision is None:
             return
-        with nullcontext() if tae is None else tae.measure_frame():
+        with renderer.measure_frame():
             image, image_size = render()
             progress_image = ProgressImage.build(image, image_size)
         event = self._services.events.emit_invocation_progress(
@@ -1033,18 +1024,20 @@ class UtilInterface(InvocationContextInterface):
         )
         previews.record(event)
 
-    def _get_preview_renderer(self) -> PreviewRenderer:
-        """The renderer for this invocation's denoising previews, chosen on the first step."""
-        if self._preview_renderer is None:
-            if self._services.configuration.tiny_autoencoder_previews:
-                tae = TinyAutoencoderPreviews(self._services, user_id=self._data.queue_item.user_id)
-                # The TAE stays locked from the first preview until the invocation's runner closes this.
-                self._data.invocation_resources.callback(tae.close)
-                self._tiny_autoencoder_previews = tae
-                self._preview_renderer = tae.render
-            else:
-                self._preview_renderer = render_linear_preview
-        return self._preview_renderer
+    def _get_previews(self) -> TinyAutoencoderPreviews:
+        """What renders and paces this invocation's preview frames, created on the first one.
+
+        With `tiny_autoencoder_previews` off, it renders every frame linearly at the store's interval.
+        """
+        if self._previews is None:
+            self._previews = TinyAutoencoderPreviews(
+                self._services,
+                user_id=self._data.queue_item.user_id,
+                enabled=self._services.configuration.tiny_autoencoder_previews,
+            )
+            # A TAE stays locked from the first preview until the invocation's runner closes this.
+            self._data.invocation_resources.callback(self._previews.close)
+        return self._previews
 
 
 class WildcardsInterface(InvocationContextInterface):

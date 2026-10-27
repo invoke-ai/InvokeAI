@@ -711,6 +711,9 @@ select = ["B", "C", "E", "F", "W", "I", "TID"]
 "invokeai/backend/minimax_h3/autoencoder_kl_minimax_h3.py" = ["B905"]
 "invokeai/backend/minimax_h3/autoencoder_kl_minimax_h3_audio.py" = ["B905"]
 "invokeai/backend/minimax_h3/scheduling_minimax_h3.py" = ["B905"]
+# Vendored from OpenMOSS-Team/MOSS-Image-Base (see invokeai/backend/moss_image/__init__.py). Upstream's
+# import order is kept so that a diff against upstream shows nothing but the code removed locally.
+"invokeai/backend/moss_image/pipeline_moss_image.py" = ["I001"]
 
 [tool.ruff.format]
 # The vendored MiniMax-H3 files are kept byte-identical to upstream diffusers (modulo the
@@ -727,6 +730,8 @@ exclude = [
   "invokeai/backend/minimax_h3/autoencoder_kl_minimax_h3.py",
   "invokeai/backend/minimax_h3/autoencoder_kl_minimax_h3_audio.py",
   "invokeai/backend/minimax_h3/scheduling_minimax_h3.py",
+  # Vendored MOSS-Image model code, kept identical to upstream (see invokeai/backend/moss_image/__init__.py).
+  "invokeai/backend/moss_image/pipeline_moss_image.py",
 ]
 
 [tool.ruff.lint.flake8-tidy-imports]

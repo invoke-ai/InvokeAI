@@ -22,6 +22,7 @@ describe('SUPPORTED_GENERATE_BASES', () => {
       'qwen-image-2-1',
       'wan',
       'anima',
+      'moss-image',
     ]);
   });
 

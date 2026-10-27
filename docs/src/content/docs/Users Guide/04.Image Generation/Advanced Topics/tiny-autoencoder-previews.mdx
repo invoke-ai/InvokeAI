@@ -1,6 +1,6 @@
 ---
 title: Tiny AutoEncoder Previews
-lastUpdated: 2026-10-26
+lastUpdated: 2026-10-28
 sidebar:
   order: 13
 ---
@@ -95,8 +95,8 @@ InvokeAI falls back to the linear preview by itself, and the generation always c
   under which family the starter list shows it.
 - **The TAE does not fit in VRAM** next to the running model: linear previews for that generation, noted once in
   the server log. This is the case whenever the main model is only partially loaded into VRAM, as on low-VRAM cards.
-- **Loading or decoding the TAE fails:** a warning in the server log, then linear previews for the rest of that
-  generation.
+- **Loading or decoding the TAE fails:** a warning with the error in the server log, once per kind of failure,
+  then linear previews for the rest of that generation.
 
 <Aside type="note">
 If more than one installed TAE fits a family, InvokeAI uses the one that is alphabetically first by name.

@@ -2687,8 +2687,7 @@ class TestBulkDownloadAccessControl:
         asyncio.run(socketio._handle_bulk_image_download_event(("bulk_download_complete", event)))
 
         rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
-        assert "default" not in rooms_emitted_to
-        assert "user:owner-xyz" in rooms_emitted_to
+        assert set(rooms_emitted_to) == {"user:owner-xyz", "admin"}
 
 
 # ===========================================================================
@@ -2970,7 +2969,7 @@ class TestWebSocketAuth:
             assert payload["destination"] == "canvas"
 
         # A sanitized companion event must go to the queue_id room with sensitive fields cleared
-        queue_emits = [(p, s) for r, p, s in emits if r == "default"]
+        queue_emits = [(p, s) for r, p, s in emits if r == "queue:default"]
         assert len(queue_emits) == 1, "expected exactly one sanitized emit to queue room"
         sanitized_payload, skip_sid = queue_emits[0]
         assert sanitized_payload["user_id"] == "redacted"
@@ -3041,7 +3040,7 @@ class TestWebSocketAuth:
             assert payload["origin"] == "workflows"
 
         # Sanitized event to queue room: user/batch/origin redacted, owner+admin skipped
-        queue_emits = [(p, s) for r, p, s in emits if r == "default"]
+        queue_emits = [(p, s) for r, p, s in emits if r == "queue:default"]
         assert len(queue_emits) == 1
         sanitized_payload, skip_sid = queue_emits[0]
         assert sanitized_payload["user_id"] == "redacted"
@@ -3097,7 +3096,9 @@ class TestWebSocketAuth:
 
         # CRITICAL: nothing identifying may reach the queue room. The only emit there is the
         # sanitized companion, which must not name any owner or any retried item.
-        queue_room_payloads = [c.kwargs["data"] for c in mock_emit.call_args_list if c.kwargs.get("room") == "default"]
+        queue_room_payloads = [
+            c.kwargs["data"] for c in mock_emit.call_args_list if c.kwargs.get("room") == "queue:default"
+        ]
         assert len(queue_room_payloads) == 1
         assert queue_room_payloads[0]["retried_item_ids"] == []
         assert queue_room_payloads[0]["user_ids"] == []
@@ -3132,7 +3133,7 @@ class TestWebSocketAuth:
 
         asyncio.run(socketio._handle_queue_event(("queue_items_retried", event)))
 
-        queue_emits = [c for c in mock_emit.call_args_list if c.kwargs.get("room") == "default"]
+        queue_emits = [c for c in mock_emit.call_args_list if c.kwargs.get("room") == "queue:default"]
         assert len(queue_emits) == 1, "expected exactly one sanitized emit to the queue room"
         payload = queue_emits[0].kwargs["data"]
         skip_sid = queue_emits[0].kwargs["skip_sid"]
@@ -3196,7 +3197,7 @@ class TestWebSocketAuth:
         assert owner_123_calls[0].kwargs["data"]["retried_items"] == [{"source_item_id": 10, "item_id": 30}]
         assert owner_456_calls[0].kwargs["data"]["retried_items"] == [{"source_item_id": 20, "item_id": 31}]
         assert len(admin_calls[0].kwargs["data"]["retried_items"]) == 2
-        sanitized_calls = [call for call in mock_emit.call_args_list if call.kwargs.get("room") == "default"]
+        sanitized_calls = [call for call in mock_emit.call_args_list if call.kwargs.get("room") == "queue:default"]
         assert sanitized_calls[0].kwargs["data"]["retried_items"] == []
 
     def test_queue_items_canceled_routed_privately_per_owner(self, socketio: Any) -> None:
@@ -3239,7 +3240,9 @@ class TestWebSocketAuth:
 
         # Nothing identifying may reach the queue room: the only emit there is the sanitized
         # companion, which must not name any owner or any canceled item.
-        queue_room_payloads = [c.kwargs["data"] for c in mock_emit.call_args_list if c.kwargs.get("room") == "default"]
+        queue_room_payloads = [
+            c.kwargs["data"] for c in mock_emit.call_args_list if c.kwargs.get("room") == "queue:default"
+        ]
         assert len(queue_room_payloads) == 1
         assert queue_room_payloads[0]["canceled_item_ids"] == []
         assert queue_room_payloads[0]["user_ids"] == []
@@ -3271,7 +3274,7 @@ class TestWebSocketAuth:
 
         asyncio.run(socketio._handle_queue_event(("queue_items_canceled", event)))
 
-        queue_emits = [c for c in mock_emit.call_args_list if c.kwargs.get("room") == "default"]
+        queue_emits = [c for c in mock_emit.call_args_list if c.kwargs.get("room") == "queue:default"]
         assert len(queue_emits) == 1, "expected exactly one sanitized emit to the queue room"
         payload = queue_emits[0].kwargs["data"]
         skip_sid = queue_emits[0].kwargs["skip_sid"]
@@ -3341,7 +3344,7 @@ class TestWebSocketAuth:
         asyncio.run(socketio._handle_queue_event(("queue_cleared", event)))
 
         assert len(mock_emit.call_args_list) == 1
-        assert mock_emit.call_args_list[0].kwargs.get("room") == "default"
+        assert mock_emit.call_args_list[0].kwargs.get("room") == "queue:default"
         assert mock_emit.call_args_list[0].kwargs.get("data")["user_id"] is None
 
     def test_user_scoped_queue_cleared_routed_privately(self, socketio: Any) -> None:
@@ -3377,7 +3380,7 @@ class TestWebSocketAuth:
         assert private_emits[0][0]["user_id"] == "owner-xyz"
 
         # Sanitized companion goes to the queue room, skipping the owner's and admins' sids
-        queue_emits = [(p, s) for r, p, s in emits if r == "default"]
+        queue_emits = [(p, s) for r, p, s in emits if r == "queue:default"]
         assert len(queue_emits) == 1, "expected exactly one sanitized emit to queue room"
         sanitized_payload, skip_sid = queue_emits[0]
         assert sanitized_payload["user_id"] == "redacted"
@@ -3421,7 +3424,7 @@ class TestWebSocketAuth:
         assert isinstance(room, list)
         assert set(room) == {"user:owner-recall", "admin"}
         # And never to the shared queue room, which would leak to other users.
-        assert "default" not in room
+        assert "queue:default" not in room
 
     def test_video_recall_is_emitted_once_to_the_owner_only(self, socketio: Any) -> None:
         """A video recall names the owner's media and no admin UI consumes it, so it goes to the
