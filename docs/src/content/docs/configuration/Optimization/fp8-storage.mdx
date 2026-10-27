@@ -76,7 +76,7 @@ FP8 Storage is **only** applied to layers where the precision trade-off is accep
 | --- | --- |
 | Main models: SD1, SD2, SDXL, SDXL Refiner, SD3, CogView4 | Yes |
 | FLUX.1, FLUX.2 (all variants) | Yes |
-| Z-Image, Anima, Krea-2, Qwen-Image, Qwen-Image-2.1, ERNIE-Image | Yes |
+| Z-Image, Anima, Krea-2, Qwen-Image, Qwen-Image-2.1, ERNIE-Image, MOSS-Image | Yes |
 | Ideogram 4 (single-file safetensors) | Yes — both transformer branches |
 | LTX-2 | Yes |
 | Wan (checkpoint and diffusers) | Yes — except ComfyUI `fp8_scaled` files, which load at BF16 |
@@ -101,9 +101,14 @@ The cost is a slightly smaller saving on the models that declare a lot. Measured
 | Krea-2                    | 39 M (`time_embed`)                              | ~38 MiB         |
 | Anima                     | 19 M (`t_embedder`, `x_embedder`, `final_layer`) | ~18 MiB         |
 | Wan 14B                   | 232 M (`condition_embedder`, `patch_embedding`)  | ~221 MiB        |
+| MOSS-Image                | 486 M (every block's `proj.q`, the embedders, modulations and output head) | ~464 MiB |
 | FLUX.1, Qwen-Image        | 0                                                | 0               |
 
 Measured on Wan 2.2 TI2V-5B (fp16 single file, 512², 20 steps, RTX 4090), FP8 Storage takes the transformer from 9.5 GB to 4.9 GB resident, at 21.4 s instead of 18.4 s per video.
+
+MOSS-Image keeps each block's query projection at compute precision because its forward pass casts the
+block's input to that layer's dtype; the rest of the block is stored in FP8. Measured on an RTX 4090, its
+transformer takes 5.3 GB with FP8 Storage instead of 10.2 GB.
 
 ### Where the toggle is shown
 

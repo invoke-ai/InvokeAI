@@ -3,7 +3,7 @@ import hashlib
 import json
 import math
 from datetime import datetime, timedelta, timezone
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, cast
 
 from pydantic_core import to_jsonable_python
 
@@ -32,6 +32,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     NodeFieldValue,
     PruneResult,
     QueueItemDeliveryResult,
+    QueueItemLineage,
     QueueItemOwner,
     RetriedQueueItem,
     RetryItemsResult,
@@ -107,6 +108,37 @@ def _decode_enqueue_receipt(batch_id: str, requested: int, enqueued: int, item_i
     return EnqueueBatchReceipt(batch_id=batch_id, requested=requested, enqueued=enqueued, item_ids=item_ids)
 
 
+def _payload_hash(batch: Batch, prepend: bool) -> str:
+    """What a key's receipt matches a repeat of its enqueue by."""
+    return hashlib.sha256(
+        json.dumps(
+            {"batch": batch.model_dump(mode="json", exclude={"batch_id", "idempotency_key"}), "prepend": prepend},
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _settled_result(
+    queue_id: str, batch: Batch, payload_hash: Optional[str], receipt: SettledReceipt
+) -> EnqueueBatchResult:
+    """The result a repeat of `batch`'s enqueue answers with: its key's settled receipt."""
+    if receipt.payload_hash != payload_hash:
+        raise EnqueueIdempotencyConflictError(
+            f"Idempotency key {batch.idempotency_key} is already used by another submission"
+        )
+    result = _decode_enqueue_receipt(receipt.batch_id, receipt.requested, receipt.enqueued, receipt.item_ids)
+    return EnqueueBatchResult(
+        queue_id=queue_id,
+        requested=result.requested,
+        enqueued=result.enqueued,
+        batch=batch.model_copy(update={"batch_id": result.batch_id}),
+        priority=receipt.priority,
+        item_ids=result.item_ids,
+    )
+
+
 class SessionQueue(SessionQueueBase):
     __invoker: Invoker
 
@@ -144,11 +176,11 @@ class SessionQueue(SessionQueueBase):
         return self._queries.session_queue.prune(queue_id, user_id=None, keep=keep)
 
     async def enqueue_batch(
-        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system"
+        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system", *, all_or_none: bool = False
     ) -> EnqueueBatchResult:
         # The route awaits this method, but every operation below is synchronous database/CPU work. Keep the
         # complete enqueue in one worker operation, off the event loop.
-        return await asyncio.to_thread(self._enqueue_batch, queue_id, batch, prepend, user_id)
+        return await asyncio.to_thread(self._enqueue_batch, queue_id, batch, prepend, user_id, all_or_none)
 
     def acknowledge_enqueue(self, queue_id: str, idempotency_key: str, user_id: str = "system") -> None:
         self._queries.session_queue.acknowledge_receipt(queue_id, user_id, idempotency_key)
@@ -159,37 +191,24 @@ class SessionQueue(SessionQueueBase):
         receipt = self._queries.session_queue.enqueue_receipt(queue_id, user_id, idempotency_key)
         return _decode_enqueue_receipt(*receipt) if receipt is not None else None
 
-    def _enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool, user_id: str) -> EnqueueBatchResult:
+    def replay_enqueue(
+        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system"
+    ) -> Optional[EnqueueBatchResult]:
+        key = batch.idempotency_key
+        if key is None:
+            raise ValueError("Only a batch with an idempotency key can be replayed")
+        receipt = self._queries.session_queue.settled_receipt(queue_id, user_id, key)
+        return _settled_result(queue_id, batch, _payload_hash(batch, prepend), receipt) if receipt is not None else None
+
+    def _enqueue_batch(
+        self, queue_id: str, batch: Batch, prepend: bool, user_id: str, all_or_none: bool = False
+    ) -> EnqueueBatchResult:
         requested_count = calc_session_count(batch=batch)
-        payload_hash = (
-            hashlib.sha256(
-                json.dumps(
-                    {
-                        "batch": batch.model_dump(mode="json", exclude={"batch_id", "idempotency_key"}),
-                        "prepend": prepend,
-                    },
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                    sort_keys=True,
-                ).encode("utf-8")
-            ).hexdigest()
-            if batch.idempotency_key is not None
-            else None
-        )
+        payload_hash = _payload_hash(batch, prepend) if batch.idempotency_key is not None else None
         key = batch.idempotency_key
 
         def settle(receipt: SettledReceipt) -> EnqueueBatchResult:
-            if receipt.payload_hash != payload_hash:
-                raise EnqueueIdempotencyConflictError(f"Idempotency key {key} is already used by another submission")
-            result = _decode_enqueue_receipt(receipt.batch_id, receipt.requested, receipt.enqueued, receipt.item_ids)
-            return EnqueueBatchResult(
-                queue_id=queue_id,
-                requested=result.requested,
-                enqueued=result.enqueued,
-                batch=batch.model_copy(update={"batch_id": result.batch_id}),
-                priority=receipt.priority,
-                item_ids=result.item_ids,
-            )
+            return _settled_result(queue_id, batch, payload_hash, receipt)
 
         def require_project(q: Queries) -> None:
             if batch.project_id is not None and q.projects.summary(user_id, batch.project_id) is None:
@@ -208,11 +227,12 @@ class SessionQueue(SessionQueueBase):
 
         # Preparing the values is CPU work, done outside a transaction; admission below takes what still fits.
         max_queue_size = self.__invoker.services.configuration.max_queue_size
+        room = max(0, max_queue_size - surveyed)
         prepared_values = prepare_values_to_insert(
             queue_id=queue_id,
             batch=batch,
             priority=0,
-            max_new_queue_items=max(0, max_queue_size - surveyed),
+            max_new_queue_items=0 if all_or_none and requested_count > room else room,
             user_id=user_id,
         )
 
@@ -225,6 +245,9 @@ class SessionQueue(SessionQueueBase):
             require_project(q)
 
             max_new_queue_items = max(0, max_queue_size - q.session_queue.pending_count(queue_id))
+            # Checked under the admission lock: the room the survey saw may have been taken meanwhile.
+            if all_or_none and min(len(prepared_values), max_new_queue_items) < requested_count:
+                max_new_queue_items = 0
             priority = q.session_queue.top_pending_priority(queue_id) + 1 if prepend else 0
             values_to_insert = prepared_values[:max_new_queue_items]
             if priority != 0:
@@ -619,13 +642,16 @@ class SessionQueue(SessionQueueBase):
     def prune(self, queue_id: str, user_id: Optional[str] = None) -> PruneResult:
         return PruneResult(deleted=self._queries.session_queue.prune(queue_id, user_id=user_id))
 
-    def cancel_queue_item(self, item_id: int) -> SessionQueueItem:
+    def cancel_queue_item(self, item_id: int, queue_item: Optional[SessionQueueItem] = None) -> SessionQueueItem:
         chain_item_ids = self._get_workflow_call_chain_item_ids(item_id)
         canceled_item: SessionQueueItem | None = None
         for chain_item_id in chain_item_ids:
-            queue_item = self._set_queue_item_status(item_id=chain_item_id, status="canceled")
-            if chain_item_id == item_id:
-                canceled_item = queue_item
+            own = chain_item_id == item_id
+            transitioned = self._set_queue_item_status(
+                item_id=chain_item_id, status="canceled", queue_item=queue_item if own else None
+            )
+            if own:
+                canceled_item = transitioned
         assert canceled_item is not None
         return canceled_item
 
@@ -651,6 +677,7 @@ class SessionQueue(SessionQueueBase):
         error_type: str,
         error_message: str,
         error_traceback: str,
+        queue_item: Optional[SessionQueueItem] = None,
     ) -> SessionQueueItem:
         return self._set_queue_item_status(
             item_id=item_id,
@@ -658,6 +685,7 @@ class SessionQueue(SessionQueueBase):
             error_type=error_type,
             error_message=error_message,
             error_traceback=error_traceback,
+            queue_item=queue_item,
         )
 
     def cancel_by_batch_ids(
@@ -1036,6 +1064,14 @@ class SessionQueue(SessionQueueBase):
 
     def has_active_queue_work(self) -> bool:
         return self._queries.session_queue.has_active_work()
+
+    def get_queue_item_lineage(self, queue_id: str, origin_prefix: str) -> list[QueueItemLineage]:
+        return [
+            QueueItemLineage(item_id, cast(QUEUE_ITEM_STATUS, status), origin, retried_from_item_id)
+            for item_id, status, origin, retried_from_item_id in self._queries.session_queue.lineage(
+                queue_id, origin_prefix
+            )
+        ]
 
     def get_queue_item_summaries_by_ids(self, queue_id: str, item_ids: list[int]) -> list[SessionQueueItemSummary]:
         if not item_ids:

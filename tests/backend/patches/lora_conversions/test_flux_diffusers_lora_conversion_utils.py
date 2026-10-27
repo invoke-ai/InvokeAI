@@ -92,3 +92,28 @@ def test_lora_model_from_flux_diffusers_state_dict_extra_keys_error():
     # Check that an error is raised.
     with pytest.raises(AssertionError):
         lora_model_from_flux_diffusers_state_dict(state_dict, alpha=8.0)
+
+
+def test_lora_model_from_flux_diffusers_state_dict_guidance_embedder():
+    """Test that the two guidance-embedder layers map onto guidance_in.in_layer and guidance_in.out_layer, the same way
+    the timestep and text embedders map onto time_in and vector_in, rather than both onto guidance_in.
+    """
+    rank = 4
+    state_dict: dict[str, torch.Tensor] = {}
+    for name, in_dim in (("linear_1", 256), ("linear_2", 3072)):
+        prefix = f"transformer.time_text_embed.guidance_embedder.{name}"
+        state_dict[f"{prefix}.lora_A.weight"] = torch.randn(rank, in_dim)
+        state_dict[f"{prefix}.lora_B.weight"] = torch.randn(3072, rank)
+
+    model = lora_model_from_flux_diffusers_state_dict(state_dict, alpha=None)
+
+    assert set(model.layers.keys()) == {
+        f"{FLUX_LORA_TRANSFORMER_PREFIX}guidance_in.in_layer",
+        f"{FLUX_LORA_TRANSFORMER_PREFIX}guidance_in.out_layer",
+    }
+
+    # Each layer must produce a weight delta with the shape of the Linear it targets.
+    in_layer = model.layers[f"{FLUX_LORA_TRANSFORMER_PREFIX}guidance_in.in_layer"]
+    out_layer = model.layers[f"{FLUX_LORA_TRANSFORMER_PREFIX}guidance_in.out_layer"]
+    assert in_layer.get_parameters({"weight": torch.empty(3072, 256)}, 1.0)["weight"].shape == (3072, 256)
+    assert out_layer.get_parameters({"weight": torch.empty(3072, 3072)}, 1.0)["weight"].shape == (3072, 3072)
