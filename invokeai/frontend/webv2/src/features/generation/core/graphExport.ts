@@ -22,12 +22,14 @@ import {
   getComponentPolicyContext,
   getComponentSectionPolicy,
   getDefaultGenerateSettings,
-  getDefaultReferenceImageConfig,
   getGenerateModelSelectionResult,
+  getMissingReferenceImageFormat,
   getSchedulerOptions,
   isArchitectureDescribed,
   isGenerateModelSelectable,
   isLoraSupported,
+  isReferenceImageSupported,
+  withAddedReferenceImages,
 } from './baseGenerationPolicies';
 import { compileCanvasGraph } from './canvas/compileCanvasGraph';
 import {
@@ -302,21 +304,40 @@ const withLoras = (
   };
 };
 
+/** Adding the images to the Reference Images section, which types each one for the model as it joins the list. */
 const withReferenceImages = (
   values: GenerateWidgetValues,
   input: GraphExportCase,
   models: readonly ModelConfig[]
-): GenerateWidgetValues => ({
-  ...values,
-  referenceImages: input.referenceImages.map((imageName, index) => ({
-    // Cases name images only; the output size stands in for dimensions that reach metadata, not inference.
-    config: getDefaultReferenceImageConfig(values.model, models, {
-      original: { image: { height: input.height, image_name: imageName, width: input.width } },
-    }),
-    id: `reference_image_${index + 1}`,
-    isEnabled: true,
-  })),
-});
+): GenerateWidgetValues => {
+  if (input.referenceImages.length === 0) {
+    return values;
+  }
+
+  const { model } = values;
+
+  if (!isReferenceImageSupported(model)) {
+    const format = getMissingReferenceImageFormat(model);
+
+    throw new Error(
+      `reference_images: ${model.name} takes no reference images${format ? ` in this format; they need ${format}` : ''}.`
+    );
+  }
+
+  return {
+    ...values,
+    referenceImages: withAddedReferenceImages(
+      model,
+      models,
+      values.referenceImages,
+      input.referenceImages.map((imageName, index) => ({
+        id: `reference_image_${index + 1}`,
+        // Cases name images only; the output size stands in for dimensions that reach metadata, not inference.
+        image: { original: { image: { height: input.height, image_name: imageName, width: input.width } } },
+      }))
+    ),
+  };
+};
 
 /** The widget reconciles after every commit; reconciliation can pick a FLUX.2 component source. */
 const reconcile = (values: GenerateWidgetValues, models: readonly ModelConfig[]): GenerateWidgetValues => {

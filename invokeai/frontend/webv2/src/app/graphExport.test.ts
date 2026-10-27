@@ -1,7 +1,12 @@
 import type { BackendGraphContract, BackendInvocationContract } from '@features/generation/contracts';
+import type { SupportedGenerateBase } from '@features/generation/core/baseGenerationPolicies';
 
 import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
-import { generateGraphCases, satisfiedSettingsFor } from '@features/generation/core/graphCoverage.testing';
+import {
+  generateGraphCases,
+  satisfiedSettingsFor,
+  type ModelShape,
+} from '@features/generation/core/graphCoverage.testing';
 import { withArchitectureCapabilities } from '@features/generation/graphExport';
 import { describe, expect, it } from 'vitest';
 
@@ -63,14 +68,18 @@ const exportOne = (testCase: Record<string, unknown>, models?: unknown[]) => {
 const nodesOfType = (graph: BackendGraphContract, type: string): BackendInvocationContract[] =>
   Object.values(graph.nodes).filter((node) => node.type === type);
 
+/** A main model of `base` and the components it needs, as graph coverage builds them. */
+const satisfiedFor = (base: SupportedGenerateBase, overrides: ModelShape['overrides']) =>
+  withArchitectureCapabilities(architectureCapabilitiesFixture, () =>
+    satisfiedSettingsFor(base, { label: base, overrides })
+  );
+
 const errorOf = (result: GraphExportCaseResult | undefined): string =>
   result && 'error' in result ? result.error : '';
 
 describe('graph export', () => {
   it('sends the case through Generate: seed and prompts as batch data, size and steps in the graph', () => {
-    const { batch, id } = exportOne(
-      sdxlCase('sdxl-t2i', { loras: [{ key: 'sdxl-lora', weight: 0.65 }], reference_images: ['reference.png'] })
-    );
+    const { batch, id } = exportOne(sdxlCase('sdxl-t2i', { loras: [{ key: 'sdxl-lora', weight: 0.65 }] }));
     const { graph } = batch;
     const noise = nodesOfType(graph, 'noise')[0];
     const denoise = graph.nodes.denoise_latents;
@@ -90,9 +99,88 @@ describe('graph export', () => {
     expect(
       nodesOfType(graph, 'lora_selector').map((node) => [(node.lora as { key: string }).key, node.weight])
     ).toEqual([['sdxl-lora', 0.65]]);
-    expect(nodesOfType(graph, 'ip_adapter')).toMatchObject([
-      { image: { image_name: 'reference.png' }, ip_adapter_model: { key: 'sdxl-ip-adapter' } },
+  });
+
+  it('adds SDXL reference images as full-strength IP-Adapter references with the installed adapter', () => {
+    const { graph } = exportOne(sdxlCase('sdxl-refs', { reference_images: ['first.png', 'second.png'] })).batch;
+
+    expect(nodesOfType(graph, 'ip_adapter')).toMatchObject(
+      ['first.png', 'second.png'].map((imageName) => ({
+        begin_step_percent: 0,
+        clip_vision_model: 'ViT-H',
+        end_step_percent: 1,
+        image: { image_name: imageName },
+        ip_adapter_model: { base: 'sdxl', key: 'sdxl-ip-adapter' },
+        method: 'full',
+        weight: 1,
+      }))
+    );
+  });
+
+  it('adds FLUX.2 reference images as Kontext conditioning, in order', () => {
+    const { filled, model: main, settings } = satisfiedFor('flux2', { format: 'diffusers', variant: 'dev' });
+    const { graph } = exportOne(
+      sdxlCase('flux2-refs', {
+        height: settings.height,
+        model_key: main.key,
+        negative_prompt: null,
+        reference_images: ['first.png', 'second.png'],
+        width: settings.width,
+      }),
+      [main, ...filled.map((key) => settings[key])]
+    ).batch;
+    const kontext = nodesOfType(graph, 'flux_kontext');
+    const [firstCollect, lastCollect] = kontext.map(
+      (node) => graph.edges.find((edge) => edge.source.node_id === node.id)?.destination.node_id
+    );
+
+    expect(kontext.map((node) => node.image)).toEqual([{ image_name: 'first.png' }, { image_name: 'second.png' }]);
+    expect(graph.edges).toContainEqual({
+      destination: { field: 'collection', node_id: lastCollect },
+      source: { field: 'collection', node_id: firstCollect },
+    });
+    expect(graph.edges).toContainEqual(
+      expect.objectContaining({
+        destination: expect.objectContaining({ field: 'kontext_conditioning' }),
+        source: { field: 'collection', node_id: lastCollect },
+      })
+    );
+  });
+
+  it('makes a lone Krea-2 reference the style reference and several references edit references', () => {
+    const { filled, model: main, settings } = satisfiedFor('krea-2', { format: 'diffusers' });
+    const krea2Case = (id: string, referenceImages: string[]) =>
+      sdxlCase(id, {
+        height: settings.height,
+        model_key: main.key,
+        reference_images: referenceImages,
+        width: settings.width,
+      });
+    const models = [main, ...filled.map((key) => settings[key])];
+    const style = exportOne(krea2Case('krea2-style', ['style.png']), models).batch.graph;
+    const edit = exportOne(krea2Case('krea2-edit', ['first.png', 'second.png']), models).batch.graph;
+
+    expect(nodesOfType(style, 'krea2_style_reference')).toMatchObject([
+      { height: settings.height, image: { image_name: 'style.png' }, style_strength: 1, width: settings.width },
     ]);
+    expect(nodesOfType(style, 'qwen_image_i2l')).toEqual([]);
+    expect(nodesOfType(edit, 'krea2_style_reference')).toEqual([]);
+    expect(nodesOfType(edit, 'qwen_image_i2l').map((node) => [node.image, node.reference])).toEqual([
+      [{ image_name: 'first.png' }, true],
+      [{ image_name: 'second.png' }, true],
+    ]);
+  });
+
+  it('rejects reference images for a model without them and more than the model takes', () => {
+    const [unsupported, tooMany] = exportGraphs(
+      request([
+        sdxlCase('z-image-refs', { model_key: 'z-image-gguf', reference_images: ['reference.png'] }),
+        sdxlCase('sdxl-six-refs', { reference_images: ['1.png', '2.png', '3.png', '4.png', '5.png', '6.png'] }),
+      ])
+    ).cases;
+
+    expect(errorOf(unsupported)).toBe('reference_images: z-image-gguf name takes no reference images.');
+    expect(errorOf(tooMany)).toBe('Generate supports at most 5 reference images for sdxl name.');
   });
 
   it('sends img2img through Canvas with the uploaded image and strength', () => {

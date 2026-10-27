@@ -3463,6 +3463,9 @@ export type paths = {
         /**
          * Retry Items By Id
          * @description Retries the given queue items. Users can only retry their own items unless they are an admin.
+         *
+         *     A calibration item's retry is recorded in the calibration store as it commits. When that store cannot be written,
+         *     the request retries nothing, also its items that are no calibration's (503); retry again once it can.
          */
         put: operations["retry_items_by_id"];
         post?: never;
@@ -62547,6 +62550,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description The items include a working-memory calibration's, and its store cannot be written now (unwritable root, lock timeout): no item is retried, the request's other items included */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
