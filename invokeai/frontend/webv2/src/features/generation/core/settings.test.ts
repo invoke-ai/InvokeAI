@@ -29,8 +29,10 @@ import {
   hasModelDefaultVae,
   isLoraCompatibleWithModel,
   isGenerateSettings,
+  isValidMossImageSkipLayers,
   moveReferenceImage,
   normalizeGenerateSettings,
+  parseMossImageSkipLayers,
   syncGenerateWidgetValuesWithModels,
   syncGenerateLorasWithModels,
 } from './settings';
@@ -279,6 +281,64 @@ describe('normalizeGenerateSettings', () => {
     expect(normalized?.vaePrecision).toBe('fp32');
   });
 
+  it('keeps valid hosted-provider options and drops the rest back to provider defaults', () => {
+    const kept = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      externalImageSize: '2K',
+      geminiTemperature: 0.5,
+      geminiThinkingLevel: 'minimal',
+      openaiBackground: 'opaque',
+      openaiInputFidelity: 'high',
+      openaiQuality: 'medium',
+      seedreamOptimizePrompt: true,
+      seedreamWatermark: true,
+    });
+
+    expect(kept).toMatchObject({
+      externalImageSize: '2K',
+      geminiTemperature: 0.5,
+      geminiThinkingLevel: 'minimal',
+      openaiBackground: 'opaque',
+      openaiInputFidelity: 'high',
+      openaiQuality: 'medium',
+      seedreamOptimizePrompt: true,
+      seedreamWatermark: true,
+    });
+
+    const dropped = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      externalImageSize: '',
+      geminiTemperature: 2.5,
+      geminiThinkingLevel: 'max',
+      openaiBackground: 'clear',
+      openaiInputFidelity: 'medium',
+      openaiQuality: 'ultra',
+      seedreamOptimizePrompt: 'yes',
+      seedreamWatermark: 1,
+    });
+
+    expect(dropped).toMatchObject({
+      externalImageSize: null,
+      geminiTemperature: null,
+      geminiThinkingLevel: null,
+      openaiBackground: 'auto',
+      openaiInputFidelity: null,
+      openaiQuality: 'auto',
+      seedreamOptimizePrompt: false,
+      seedreamWatermark: false,
+    });
+  });
+
+  it.each([0, 2])('preserves the Gemini temperature boundary %s', (geminiTemperature) => {
+    expect(normalizeGenerateSettings({ ...legacyStoredValues, geminiTemperature })?.geminiTemperature).toBe(
+      geminiTemperature
+    );
+  });
+
+  it('drops a negative Gemini temperature back to the provider default', () => {
+    expect(normalizeGenerateSettings({ ...legacyStoredValues, geminiTemperature: -0.1 })?.geminiTemperature).toBeNull();
+  });
+
   it('bounds the model-family tuning fields and defaults the rest', () => {
     const normalized = normalizeGenerateSettings({
       ...legacyStoredValues,
@@ -391,6 +451,54 @@ describe('the Anima inpaint adapter settings', () => {
         animaInpaintAdapterWeight: 'heavy',
       })
     ).toMatchObject({ animaInpaintAdapterModel: null, animaInpaintAdapterWeight: 1 });
+  });
+
+  it('keeps the adapter switched on unless a stored value turns it off', () => {
+    // Projects saved before the toggle existed wired a selected adapter, so a missing value means on.
+    expect(normalizeGenerateSettings(legacyStoredValues)?.animaInpaintAdapterEnabled).toBe(true);
+    const enabledFrom = (stored: unknown) =>
+      normalizeGenerateSettings({ ...legacyStoredValues, animaInpaintAdapterEnabled: stored })
+        ?.animaInpaintAdapterEnabled;
+    expect(enabledFrom(false)).toBe(false);
+    expect(enabledFrom(true)).toBe(true);
+    expect(enabledFrom('off')).toBe(true);
+  });
+});
+
+describe('the MOSS-Image skip layers', () => {
+  it('parses comma-separated block indices into unique ascending ones, an empty field into none', () => {
+    expect(parseMossImageSkipLayers(' 26, 22,24 ,22')).toEqual([22, 24, 26]);
+    // A trailing comma is a list being typed, not a mistake.
+    expect(parseMossImageSkipLayers('22, ')).toEqual([22]);
+    expect(parseMossImageSkipLayers('')).toEqual([]);
+    expect(parseMossImageSkipLayers(' , ')).toEqual([]);
+  });
+
+  it('rejects an entry that is not a whole number, and leaves the range to the validator', () => {
+    for (const text of ['22, x', '2.5', '-1', '1e1', '22 24']) {
+      expect(parseMossImageSkipLayers(text)).toBeNull();
+    }
+    expect(parseMossImageSkipLayers('42')).toEqual([42]);
+    expect(isValidMossImageSkipLayers([42])).toBe(false);
+    expect(isValidMossImageSkipLayers([0, 41])).toBe(true);
+    expect(isValidMossImageSkipLayers([])).toBe(true);
+  });
+
+  it('defaults to block 22, keeps an empty list, and normalizes a stored list without dropping its blocks', () => {
+    expect(normalizeGenerateSettings(legacyStoredValues)?.mossImageUncondSkipLayers).toEqual([22]);
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, mossImageUncondSkipLayers: [] })?.mossImageUncondSkipLayers
+    ).toEqual([]);
+    // An out-of-range block stays, so validation names it instead of the list changing behind the user's back.
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, mossImageUncondSkipLayers: [26, 22, 26, 50] })
+        ?.mossImageUncondSkipLayers
+    ).toEqual([22, 26, 50]);
+    // A list that is not all integers is not one the user chose, so the default takes its place.
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, mossImageUncondSkipLayers: [24, 'x'] })
+        ?.mossImageUncondSkipLayers
+    ).toEqual([22]);
   });
 });
 
@@ -588,6 +696,8 @@ describe('dimension helpers', () => {
     expect(getGenerationDimensions({ base: 'flux2', type: 'main' }).grid).toBe(16);
     expect(getGenerationDimensions({ base: 'qwen-image', type: 'main' }).grid).toBe(16);
     expect(getGenerationDimensions({ base: 'cogview4', type: 'main' }).grid).toBe(32);
+    // Hosted providers bucket sizes themselves, so their presets (e.g. 1365 wide) are kept pixel-exact.
+    expect(getGenerationDimensions({ base: 'external', type: 'external_image_generator' }).grid).toBe(1);
     expect(clampDimension(888, getGenerationDimensions({ base: 'flux2', type: 'main' }).grid)).toBe(896);
   });
 });

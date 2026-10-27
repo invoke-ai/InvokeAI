@@ -6,7 +6,7 @@ import { ChevronDownIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { PreviewZoomControls } from './previewHeaderStore';
+import { getActualZoomLimits, type PreviewZoomControls } from './previewHeaderStore';
 
 const ZOOM_PRESETS = [100, 200, 400] as const;
 const MENU_POSITIONING = { placement: 'bottom-start' } as const;
@@ -55,8 +55,7 @@ export const PreviewZoomMenu = ({ zoom }: { zoom: PreviewZoomControls }) => {
             {ZOOM_PRESETS.map((preset) => (
               <ZoomPresetItem
                 key={preset}
-                // A preset the fit already exceeds would only snap back to fit.
-                disabled={zoom.fitPercent !== null && preset <= zoom.fitPercent}
+                disabled={isPresetUnreachable(preset, zoom.fitPercent)}
                 isCurrent={zoom.isZoomed && percent === preset}
                 percent={preset}
                 onZoomTo={zoom.zoomTo}
@@ -67,6 +66,22 @@ export const PreviewZoomMenu = ({ zoom }: { zoom: PreviewZoomControls }) => {
       </Portal>
     </Menu.Root>
   );
+};
+
+/**
+ * A preset outside the loupe's zoom limits cannot be reached, and the preset equal to fit is fit itself, its own menu
+ * item. Below an enlarging fit, presets down to 100% stay offered. Judged on the unrounded fit: a 100.2% fit reads as
+ * 100% yet is not the image's own size.
+ */
+const isPresetUnreachable = (preset: number, fitPercent: number | null): boolean => {
+  if (fitPercent === null) {
+    return false;
+  }
+
+  const { max, min } = getActualZoomLimits(fitPercent / 100);
+  const actualZoom = preset / 100;
+
+  return preset === fitPercent || actualZoom < min || actualZoom > max;
 };
 
 const ZoomPresetItem = ({

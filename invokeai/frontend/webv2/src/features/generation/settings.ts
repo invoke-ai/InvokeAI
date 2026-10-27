@@ -15,11 +15,13 @@ export {
   hasModelDefaultVae,
   isAspectRatioLocked,
   isFluxDypePreset,
+  isGenerateModelConfig,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
   isModelIdentifierConfig,
   isQwenImageEncoderQuantization,
+  isValidMossImageSkipLayers,
   isVaeModelConfig,
   isWanLoraTargetingMain,
   MAX_FLUX_DYPE_EXPONENT,
@@ -36,6 +38,7 @@ export {
   MIN_TIMESTEP_SHIFT,
   MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
   normalizeGenerateSettings,
+  normalizeMossImageSkipLayers,
   normalizeGenerateWidgetValues,
   normalizeReferenceImages,
   syncGenerateWidgetValuesWithModels,
@@ -66,6 +69,19 @@ export {
   type GenerateModelSelectionResult,
 } from './core/baseGenerationPolicies';
 export { hasArchitectureCapabilities } from './core/architectureCapabilities';
+export {
+  describeExternalCanvasRefusal,
+  GEMINI_TEMPERATURE_MAX,
+  GEMINI_TEMPERATURE_MIN,
+  getExternalProviderOptionKeys,
+  getExternalResolutionPresets,
+  isExternalTextOnlyCanvasModel,
+  isGeminiThinkingLevel,
+  isOpenAIImageBackground,
+  isOpenAIImageQuality,
+  isOpenAIInputFidelity,
+  resolveExternalCanvasRequestSize,
+} from './core/externalProvider';
 export {
   resolveGenerateWidgetValues,
   type ResolvedGenerateWidgetValues,

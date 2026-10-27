@@ -2,7 +2,7 @@
 title: Hardware Requirements
 sidebar:
   order: 1
-lastUpdated: 2026-07-14
+lastUpdated: 2026-10-18
 ---
 
 import { Tabs, TabItem, Steps } from '@astrojs/starlight/components'
@@ -16,7 +16,7 @@ Hardware requirements vary significantly depending on model and image output siz
 The requirements below are rough guidelines for best performance. GPUs with less VRAM typically still work, if a bit slower. Follow the [Low VRAM Guide] to optimize performance.
 
 - All Apple Silicon (M1, M2, etc) Macs work, but 16GB+ memory is recommended.
-- Nvidia GPUs need compute capability 7.5 or newer (GTX 16xx, RTX 20xx and everything after) and a driver from the R580 series or newer. Maxwell, Pascal and Volta cards (GTX 9xx/10xx, Titan V, Tesla P40/P100/V100) are not supported by Invoke's CUDA build: stay on the previous Invoke release, or do a [manual install](../manual) with `--torch-backend=cu126`, whose PyTorch build still includes these GPUs (not tested by the Invoke team). With a driver that is too old, Invoke starts on the CPU and logs an error saying so; on an unsupported GPU it logs an error at startup and generation fails.
+- Nvidia GPUs need compute capability 7.5 or newer (GTX 16xx, RTX 20xx and everything after) and a driver from the R580 series or newer. Maxwell, Pascal and Volta cards (GTX 9xx/10xx, Titan V, Tesla P40/P100/V100) are not supported by Invoke's CUDA build: stay on the previous Invoke release, or do a [manual install](../manual) with `--torch-backend=cu126` and without the `cuda` extra, whose PyTorch build still includes these GPUs (not tested by the Invoke team). With a driver that is too old, Invoke starts on the CPU and logs an error saying so; on an unsupported GPU it logs an error at startup and generation fails.
 - AMD GPUs are supported on Windows and Linux `x86_64` through ROCm 10 (see [AMD](#amd) below for the GPUs and drivers). On Linux, Vega-based cards (gfx900/gfx906) are no longer supported. The VRAM requirements are the same as Nvidia GPUs.
 - Intel Arc GPUs (Alchemist, Battlemage and newer) are supported on Windows and Linux `x86_64`. The VRAM requirements are the same as Nvidia GPUs.
 - Linux ARM64 (`aarch64`) devices — e.g. Raspberry Pi 5, other SBCs, ARM servers — are supported in CPU-only mode. Local generation is slow without a GPU, but API-backed models (e.g. GPT Image, Gemini) work well.
@@ -36,6 +36,7 @@ The requirements below are rough guidelines for best performance. GPUs with less
 | Ideogram 4 | 1024x1024 | Nvidia 30xx+ | 24GB | 32GB | Two transformers resident at once. nf4 build fits 24GB (CUDA only); single-file fp8 or int8 pair ~17.5GB, GGUF Q4_0 pair ~11GB, plus the Qwen3-VL 8B encoder. See [Ideogram 4](/users-guide/models/local-models/ideogram4/) |
 | Qwen-Image-2.1 | 1024x1024 | Nvidia 30xx+ | 16GB | 32GB | GGUF Q4_K_M transformer ~4GB, bf16 ~14GB, plus the Qwen3-VL 8B encoder (~10GB fp8). Diffusers ~31GB. See [Qwen-Image-2.1](/users-guide/models/local-models/qwen-image-2-1/) |
 | ERNIE-Image | 1024x1024 | Nvidia 40xx | 24GB | 32GB | Single-file transformer ~16GB (GGUF Q4_K_M ~5.0GB, Q8_0 ~8.7GB) plus the Ministral 3B encoder ~7.7GB |
+| MOSS-Image | 1024x1024 | Nvidia 40xx | 24GB | 32GB | Transformer 10.2GB (5.3GB with FP8 Storage) plus the Qwen3.5 9B encoder 16.8GB, which do not fit 24GB together, so Invoke swaps them. ~70s per 1024x1024 image on an RTX 4090. Diffusers ~27GB. See [MOSS-Image](/users-guide/models/local-models/moss-image/) |
 | Wan 2.2 A14B (T2V/I2V) | 1280x720 | Nvidia 30xx+ | 12GB | 32GB | Dual-expert MoE; Q4_K_M 12GB; Q8 18GB+; Diffusers requires 32GB+ |
 | Wan 2.2 TI2V-5B | 1280x720 | Nvidia 20xx+ | 8GB | 16GB | Single transformer; Q4_K_M 6GB+; Q8 8GB+; Diffusers 12GB+ |
 

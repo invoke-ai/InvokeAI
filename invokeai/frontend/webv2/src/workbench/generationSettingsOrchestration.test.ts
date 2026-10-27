@@ -43,6 +43,7 @@ describe('selectProjectGenerateModel', () => {
     });
 
     const result = selectProjectGenerateModel({
+      isCanvasFrame: false,
       currentValues,
       generation: { setSettings },
       model,
@@ -71,6 +72,7 @@ describe('selectProjectGenerateModel', () => {
     const setSettings = vi.fn();
 
     const result = selectProjectGenerateModel({
+      isCanvasFrame: false,
       currentValues: {},
       generation: { setSettings },
       model,

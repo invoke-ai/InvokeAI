@@ -43,6 +43,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     raise_if_not_dir,
     raise_if_not_file,
     state_dict_has_any_keys_exact,
+    state_dict_has_any_keys_starting_with,
 )
 from invokeai.backend.model_manager.configs.qwen3_encoder import _SDNQ_LOADABLE_QWEN_ARCHITECTURES
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
@@ -65,6 +66,7 @@ from invokeai.backend.model_manager.taxonomy import (
     WanVariantType,
     ZImageVariantType,
 )
+from invokeai.backend.quantization.fp8_scaled import FP8_WEIGHT_DTYPES, is_scale_metadata_key
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.int8_convrot import INT8_TENSORWISE_FORMAT, read_comfy_quant_markers
 from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
@@ -251,6 +253,54 @@ def _has_krea2_keys(state_dict: dict[str | int, Any]) -> bool:
     return has_text_fusion and has_corroborator
 
 
+_SD_GGUF_UNSUPPORTED = (
+    "Stable Diffusion 1.x, 2.x and SDXL models are not supported in GGUF format. Install the model's .safetensors "
+    "or .ckpt checkpoint, or its Diffusers folder, instead."
+)
+
+# A UNet's cross-attention takes its text encoder's width, which tells the bases apart: SD 1.x (768) and 2.x (1024)
+# at the first resolution level, where SDXL has no attention, and SDXL (2048) and its refiner (1280) at the second.
+# The keys are named as in the original checkpoint layout, and as in diffusers'.
+_SD_BASES_BY_CONTEXT_WIDTH = (
+    {768: BaseModelType.StableDiffusion1, 1024: BaseModelType.StableDiffusion2},
+    {2048: BaseModelType.StableDiffusionXL, 1280: BaseModelType.StableDiffusionXLRefiner},
+)
+_SD_CHECKPOINT_CONTEXT_KEYS = (
+    "input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight",
+    "input_blocks.4.1.transformer_blocks.0.attn2.to_k.weight",
+)
+_SD_DIFFUSERS_CONTEXT_KEYS = (
+    "down_blocks.0.attentions.1.transformer_blocks.0.attn2.to_k.weight",
+    "down_blocks.1.attentions.0.transformer_blocks.0.attn2.to_k.weight",
+)
+
+
+def _sd_unet_base(state_dict: dict[str | int, Any], context_keys: tuple[str, ...]) -> BaseModelType | None:
+    """The SD base whose context width the UNet's cross-attention at `context_keys` takes, or None."""
+    for key, bases in zip(context_keys, _SD_BASES_BY_CONTEXT_WIDTH, strict=True):
+        tensor = state_dict.get(key)
+        if tensor is not None and (base := bases.get(tensor.shape[-1])) is not None:
+            return base
+    return None
+
+
+def _bare_sd_unet_base(state_dict: dict[str | int, Any]) -> BaseModelType | None:
+    """The base of a whole SD UNet stored without the checkpoint's `model.diffusion_model.` prefix, or None.
+
+    ComfyUI-GGUF's converter writes SD GGUFs this way: the UNet alone, under the checkpoint's key names or diffusers'.
+    The decoder half (`output_blocks.` / `up_blocks.`) is required because a ControlNet copies the encoder half under
+    the same names.
+    """
+    for context_keys, decoder_prefix in (
+        (_SD_CHECKPOINT_CONTEXT_KEYS, "output_blocks."),
+        (_SD_DIFFUSERS_CONTEXT_KEYS, "up_blocks."),
+    ):
+        base = _sd_unet_base(state_dict, context_keys)
+        if base is not None:
+            return base if state_dict_has_any_keys_starting_with(state_dict, decoder_prefix) else None
+    return None
+
+
 class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
     """Model config for main checkpoint models."""
 
@@ -268,6 +318,11 @@ class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
         cls._validate_looks_like_main_model(mod)
 
         cls._validate_base(mod)
+
+        # No SD loader reads GGUF: a stable-diffusion.cpp conversion would install as a checkpoint and fail to load.
+        # Checked after the base, so only a file that is this base is refused.
+        if _has_ggml_tensors(mod.load_state_dict()):
+            raise InvalidMatchError(_SD_GGUF_UNSUPPORTED)
 
         prediction_type = override_fields.pop("prediction_type", None) or cls._get_scheduler_prediction_type_or_raise(
             mod
@@ -287,21 +342,11 @@ class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
-        state_dict = mod.load_state_dict()
-
-        key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
-        if key_name in state_dict and state_dict[key_name].shape[-1] == 768:
-            return BaseModelType.StableDiffusion1
-        if key_name in state_dict and state_dict[key_name].shape[-1] == 1024:
-            return BaseModelType.StableDiffusion2
-
-        key_name = "model.diffusion_model.input_blocks.4.1.transformer_blocks.0.attn2.to_k.weight"
-        if key_name in state_dict and state_dict[key_name].shape[-1] == 2048:
-            return BaseModelType.StableDiffusionXL
-        elif key_name in state_dict and state_dict[key_name].shape[-1] == 1280:
-            return BaseModelType.StableDiffusionXLRefiner
-
-        raise NotAMatchError("unable to determine base type from state dict")
+        context_keys = tuple(f"model.diffusion_model.{key}" for key in _SD_CHECKPOINT_CONTEXT_KEYS)
+        base = _sd_unet_base(mod.load_state_dict(), context_keys)
+        if base is None:
+            raise NotAMatchError("unable to determine base type from state dict")
+        return base
 
     @classmethod
     def _get_scheduler_prediction_type_or_raise(cls, mod: ModelOnDisk) -> SchedulerPredictionType:
@@ -346,9 +391,16 @@ class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
 
     @classmethod
     def _validate_looks_like_main_model(cls, mod: ModelOnDisk) -> None:
-        has_main_model_keys = _has_main_keys(mod.load_state_dict())
-        if not has_main_model_keys:
-            raise NotAMatchError("state dict does not look like a main model")
+        """Raise `NotAMatch` unless the state dict looks like a main model; refuse a bare GGUF UNet of this base.
+
+        That UNet has none of the checkpoint's prefixes, so without the refusal it would register as Unknown.
+        """
+        state_dict = mod.load_state_dict()
+        if _has_main_keys(state_dict):
+            return
+        if _bare_sd_unet_base(state_dict) is cls.model_fields["base"].default and _has_ggml_tensors(state_dict):
+            raise InvalidMatchError(_SD_GGUF_UNSUPPORTED)
+        raise NotAMatchError("state dict does not look like a main model")
 
 
 class Main_Checkpoint_SD1_Config(Main_SD_Checkpoint_Config_Base, Config_Base):
@@ -4033,5 +4085,133 @@ class Main_GGUF_ErnieImage_Config(Checkpoint_Config_Base, Main_Config_Base, Conf
 
         if not _has_ggml_tensors(state_dict):
             raise NotAMatchError("state dict does not look like GGUF quantized")
+
+        return cls(**override_fields)
+
+
+# ---------------------------------------------------------------------------------------------
+# MOSS-Image
+# ---------------------------------------------------------------------------------------------
+
+# What a MOSS-Image pipeline folder must hold besides its `model_index.json`. The scheduler is not listed: the
+# denoise node builds the schedule itself and never reads `scheduler/`.
+_MOSS_IMAGE_REQUIRED_COMPONENT_FILES = {
+    "transformer": ("config.json", "*.safetensors"),
+    "text_encoder": ("config.json", "*.safetensors"),
+    # The chat template is its own file here, not a `tokenizer_config.json` key, and the prompt encoding needs it.
+    "tokenizer": ("tokenizer_config.json", "tokenizer.json", "chat_template.jinja"),
+    "vae": ("config.json", "*.safetensors"),
+}
+
+
+class Main_Diffusers_MossImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for MOSS-Image diffusers pipelines (MOSS-Image Base and SFT).
+
+    The folder bundles the transformer, the Qwen3.5-9B text encoder with its tokenizer, and a FLUX.2 VAE. Base and SFT
+    differ only in their transformer weights, so there is no variant.
+    """
+
+    base: Literal[BaseModelType.MossImage] = Field(BaseModelType.MossImage)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # The pipeline class name implies the base.
+        raise_for_class_name(common_config_paths(mod.path), {"MOSSImagePipeline"})
+
+        # From here on the folder is a MOSS-Image pipeline, so what is missing is a broken download, not another
+        # model: refuse it with what to fetch rather than registering a model that fails at its first generation.
+        missing = [
+            f"{component}/{pattern}"
+            for component, patterns in _MOSS_IMAGE_REQUIRED_COMPONENT_FILES.items()
+            for pattern in patterns
+            if not any((mod.path / component).glob(pattern))
+        ]
+        if missing:
+            raise InvalidMatchError(
+                f"this MOSS-Image pipeline folder is incomplete; missing: {', '.join(missing)}. "
+                "Download the whole repository again."
+            )
+        transformer_class = get_config_dict_or_raise(mod.path / "transformer" / "config.json").get("_class_name")
+        if transformer_class != "MOSSImageTransformer":
+            raise InvalidMatchError(
+                f"this MOSS-Image pipeline's transformer is a {transformer_class!r}, not a MOSSImageTransformer"
+            )
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        return cls(**override_fields, repo_variant=repo_variant)
+
+
+def _has_moss_image_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Whether the state dict is a MOSS-Image transformer, and not a LoRA for one.
+
+    The modulation shared by every block, the video head and the text refiner's fused qkv: no other architecture
+    probed here spells any of them. The diffusers shards and the ComfyUI single-file export use the same names.
+    """
+    keys = {_strip_comfyui_key_prefix(k) for k in state_dict.keys() if isinstance(k, str)}
+    if any(k.endswith(_LORA_KEY_SUFFIXES) for k in keys):
+        return False
+    return all(
+        key in keys
+        for key in (
+            "shared_block_modulation.weight",
+            "final_linear_video.weight",
+            "text_embedder.blocks.0.qkv.weight",
+        )
+    )
+
+
+def _moss_image_quantized_key(state_dict: dict[str | int, Any]) -> str | None:
+    """The first key that shows the checkpoint is quantized, or None for a dense one.
+
+    A side channel (`weight_scale`, `input_scale`, `.comfy_quant` markers) or a weight stored as fp8 or as packed
+    integer codes. Identification reads the header on the meta device, so the dtype is all there is to go on.
+    """
+    quantized_dtypes = (*FP8_WEIGHT_DTYPES, torch.uint8, torch.int8)
+    for key, value in state_dict.items():
+        if not isinstance(key, str):
+            continue
+        if is_scale_metadata_key(key) or getattr(value, "dtype", None) in quantized_dtypes:
+            return key
+    return None
+
+
+class Main_Checkpoint_MossImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for MOSS-Image single-file transformers (safetensors), such as the ComfyUI export.
+
+    The file holds the transformer alone; the Qwen3.5-9B encoder and the FLUX.2 VAE are separate models, selected on
+    the loader node. Only dense (bf16/fp16/fp32) files load. A quantized one is refused at install with
+    `InvalidMatchError`: the loader has no quantization path, and `NotAMatchError` would let it register as an unknown
+    model instead.
+    """
+
+    base: Literal[BaseModelType.MossImage] = Field(default=BaseModelType.MossImage)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+        if not _has_moss_image_keys(state_dict):
+            raise NotAMatchError("state dict does not look like a MOSS-Image transformer")
+
+        if _has_ggml_tensors(state_dict):
+            raise InvalidMatchError(
+                "GGUF-quantized MOSS-Image checkpoints are not supported yet. Install the bf16 transformer instead."
+            )
+
+        quantized_key = _moss_image_quantized_key(state_dict)
+        if quantized_key is not None:
+            raise InvalidMatchError(
+                f"quantized MOSS-Image checkpoints are not supported yet (found '{quantized_key}'). "
+                "Install the bf16 transformer instead."
+            )
 
         return cls(**override_fields)

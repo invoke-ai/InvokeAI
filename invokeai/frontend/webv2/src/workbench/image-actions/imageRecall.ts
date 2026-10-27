@@ -16,6 +16,8 @@ import {
   deriveAspectRatioId,
   getCompatibleReferenceImages,
   getDimensionGrid,
+  getExternalProviderOptionKeys,
+  getExternalResolutionPresets,
   getGenerateModelSelectionResult,
   getGenerationUiPolicy,
   isComponentCompatibleWithModel,
@@ -29,10 +31,17 @@ import {
   isMainModelConfig,
   isModelIdentifierConfig,
   isVaeCompatibleWithGenerateModel,
+  isGeminiThinkingLevel,
+  isOpenAIImageBackground,
+  isOpenAIImageQuality,
+  isOpenAIInputFidelity,
+  GEMINI_TEMPERATURE_MAX,
+  GEMINI_TEMPERATURE_MIN,
   isRefinerModel,
   isFluxDypePreset,
   isQwenImageEncoderQuantization,
   isValidKrea2RebalanceWeights,
+  isValidMossImageSkipLayers,
   MAX_FLUX_DYPE_EXPONENT,
   MAX_FLUX_DYPE_SCALE,
   MAX_HIDIFFUSION_RATIO,
@@ -48,6 +57,7 @@ import {
   MIN_REFINER_STEPS,
   MIN_TIMESTEP_SHIFT,
   MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
+  normalizeMossImageSkipLayers,
   normalizeReferenceImages,
 } from '@features/generation/settings';
 import { SEED_MAX } from '@platform/core/seed';
@@ -91,8 +101,10 @@ type RecalledField =
   | 'loras'
   | 'referenceImages'
   | 'krea2Rebalance'
+  | 'externalProvider'
   | 'refiner'
   | 'krea2SeedVariance'
+  | 'mossImageSkipLayers'
   | 'modelTuning'
   | 'animaInpaintAdapterWeight';
 
@@ -463,6 +475,26 @@ const hasKrea2SeedVariance = (metadata: unknown, model: GenerateModelConfig | un
   Object.keys(getMetadataKrea2SeedVariance(metadata, model)).length > 0;
 
 /**
+ * MOSS-Image's negative-branch skip layers; an empty list is a recorded choice, skipping none. A list naming a block
+ * MOSS-Image lacks keeps the current setting: applying it would block every generation until edited.
+ */
+const getMetadataMossImageSkipLayers = (
+  metadata: unknown,
+  model: GenerateModelConfig | undefined
+): Partial<GenerateWidgetValues> => {
+  if (model?.base !== 'moss-image' || !isRecord(metadata)) {
+    return {};
+  }
+
+  const layers = normalizeMossImageSkipLayers(metadata.moss_image_uncond_skip_layers);
+
+  return layers !== null && isValidMossImageSkipLayers(layers) ? { mossImageUncondSkipLayers: layers } : {};
+};
+
+const hasMossImageSkipLayers = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
+  Object.keys(getMetadataMossImageSkipLayers(metadata, model)).length > 0;
+
+/**
  * Generation graphs stamp `generation_mode` and record what ran, so on such a record a missing list or switch means
  * none or the node default. Other records that name a model, such as canvas saves, never record concepts or tuning.
  */
@@ -569,25 +601,165 @@ const getMetadataModelTuning = (
 const hasModelTuning = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
   Object.keys(getMetadataModelTuning(metadata, model)).length > 0;
 
+/** The canvas inpaint and outpaint graphs record the adapter key whenever the adapter ran. */
+const ANIMA_INPAINT_ADAPTER_MODES: readonly string[] = ['anima_inpaint', 'anima_outpaint'];
+
 /**
- * The canvas records the adapter's weight beside the adapter; only an Anima image can carry it. An out-of-range
- * weight is clamped rather than applied, which would block every inpaint until the user edits it.
+ * Provider options and the named size, gated on what the effective model's provider accepts: the keys are recorded
+ * by the provider nodes (`openai_quality`, `gemini_temperature`, ...), so a value only applies to the same provider.
  */
-const getMetadataAnimaInpaintAdapterWeight = (
+const getMetadataExternalProvider = (
+  metadata: unknown,
+  model: GenerateModelConfig | undefined,
+  isCanvasFrame: boolean
+): Partial<GenerateWidgetValues> => {
+  // Local models advertise no provider options or presets, so every lookup below answers nothing for them.
+  const patch: Partial<GenerateWidgetValues> = {};
+  const imageSize = getString(metadata, 'image_size');
+
+  if (imageSize !== null) {
+    const width = getNumber(metadata, 'width');
+    const height = getNumber(metadata, 'height');
+    const ratio = getString(metadata, 'aspect_ratio');
+    const named = getExternalResolutionPresets(model).filter(
+      (preset) => preset.image_size === imageSize && (ratio === null || preset.aspect_ratio === ratio)
+    );
+    const exact = named.filter(
+      (preset) => (width === null || preset.width === width) && (height === null || preset.height === height)
+    );
+    // A Canvas output records its frame, not the provider size: the Canvas asked for the named size at the ratio
+    // nearest the frame, so Generate recall picks that one. A Canvas route keeps the recorded frame instead, and the
+    // Canvas derives the same named size from it.
+    const ratioDistance = (preset: { width: number; height: number }) =>
+      width !== null && height !== null && width > 0 && height > 0
+        ? Math.abs(Math.log(preset.width / preset.height / (width / height)))
+        : Number.NaN;
+    const nearest =
+      !isCanvasFrame && exact.length === 0 && named.length > 0 && !Number.isNaN(ratioDistance(named[0]!))
+        ? named.reduce((best, preset) => (ratioDistance(preset) < ratioDistance(best) ? preset : best))
+        : undefined;
+    const preset = exact.length === 1 ? exact[0] : nearest;
+
+    // A name alone can describe many aspect ratios. Restore only a size the record pins down, with its dimensions.
+    if (preset) {
+      patch.externalImageSize = preset.image_size;
+      patch.width = preset.width;
+      patch.height = preset.height;
+      patch.aspectRatioId = deriveAspectRatioId(preset.width, preset.height);
+      patch.aspectRatioValue = preset.width / preset.height;
+    }
+  }
+
+  // Provider outputs omit nullable fields when their default was used. The provider stamp distinguishes those
+  // omissions from partial or unrelated metadata, where the current choice should remain untouched.
+  const usesProviderDefaults = getString(metadata, 'external_provider') === model?.provider_id;
+  const isDefault = (key: string): boolean =>
+    isRecord(metadata) && (metadata[key] === null || (usesProviderDefaults && !(key in metadata)));
+
+  for (const key of getExternalProviderOptionKeys(model)) {
+    switch (key) {
+      case 'openaiQuality': {
+        const value = getString(metadata, 'openai_quality');
+
+        if (isOpenAIImageQuality(value)) {
+          patch.openaiQuality = value;
+        }
+        break;
+      }
+      case 'openaiBackground': {
+        const value = getString(metadata, 'openai_background');
+
+        if (isOpenAIImageBackground(value)) {
+          patch.openaiBackground = value;
+        }
+        break;
+      }
+      case 'openaiInputFidelity': {
+        const value = getString(metadata, 'openai_input_fidelity');
+
+        if (isOpenAIInputFidelity(value)) {
+          patch.openaiInputFidelity = value;
+        } else if (isDefault('openai_input_fidelity')) {
+          patch.openaiInputFidelity = null;
+        }
+        break;
+      }
+      case 'geminiTemperature': {
+        const value = getNumber(metadata, 'gemini_temperature');
+
+        if (value !== null && value >= GEMINI_TEMPERATURE_MIN && value <= GEMINI_TEMPERATURE_MAX) {
+          patch.geminiTemperature = value;
+        } else if (isDefault('gemini_temperature')) {
+          patch.geminiTemperature = null;
+        }
+        break;
+      }
+      case 'geminiThinkingLevel': {
+        const value = getString(metadata, 'gemini_thinking_level');
+
+        if (isGeminiThinkingLevel(value)) {
+          patch.geminiThinkingLevel = value;
+        } else if (isDefault('gemini_thinking_level')) {
+          patch.geminiThinkingLevel = null;
+        }
+        break;
+      }
+      case 'seedreamWatermark': {
+        const value = getBoolean(metadata, 'seedream_watermark');
+
+        if (value !== null) {
+          patch.seedreamWatermark = value;
+        }
+        break;
+      }
+      case 'seedreamOptimizePrompt': {
+        const value = getBoolean(metadata, 'seedream_optimize_prompt');
+
+        if (value !== null) {
+          patch.seedreamOptimizePrompt = value;
+        }
+        break;
+      }
+    }
+  }
+
+  return patch;
+};
+
+const hasExternalProvider = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
+  Object.keys(getMetadataExternalProvider(metadata, model, false)).length > 0;
+
+/**
+ * The adapter switch and weight; only an Anima image can carry them. A recorded adapter means it ran, so the switch
+ * turns on. `core_metadata` drops `null` on write, so an inpaint or outpaint record without the key ran without one:
+ * the switch turns off and the current pick stays for the next time it is wanted. Other records say nothing about
+ * it. An out-of-range weight is clamped rather than applied, which would block every inpaint until the user edits it.
+ */
+const getMetadataAnimaInpaintAdapter = (
   metadata: unknown,
   model: GenerateModelConfig | undefined
-): Partial<GenerateWidgetValues> => {
-  if (model?.base !== 'anima') {
+): Partial<Pick<GenerateWidgetValues, 'animaInpaintAdapterEnabled' | 'animaInpaintAdapterWeight'>> => {
+  if (model?.base !== 'anima' || !isRecord(metadata)) {
     return {};
   }
 
   const weight = getNumber(metadata, 'anima_inpaint_adapter_weight');
+  const mode = getString(metadata, 'generation_mode');
+  const enabled =
+    'anima_inpaint_adapter' in metadata
+      ? true
+      : mode !== null && ANIMA_INPAINT_ADAPTER_MODES.includes(mode)
+        ? false
+        : null;
 
-  return weight === null ? {} : { animaInpaintAdapterWeight: clampAnimaInpaintAdapterWeight(weight) };
+  return {
+    ...(enabled === null ? {} : { animaInpaintAdapterEnabled: enabled }),
+    ...(weight === null ? {} : { animaInpaintAdapterWeight: clampAnimaInpaintAdapterWeight(weight) }),
+  };
 };
 
-const hasAnimaInpaintAdapterWeight = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
-  Object.keys(getMetadataAnimaInpaintAdapterWeight(metadata, model)).length > 0;
+const hasAnimaInpaintAdapterSettings = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
+  Object.keys(getMetadataAnimaInpaintAdapter(metadata, model)).length > 0;
 
 type RecalledComponentSetting = keyof Pick<
   GenerateWidgetValues,
@@ -612,12 +784,6 @@ interface RecalledComponent {
   setting: RecalledComponentSetting;
   /** The setting holds a main model (a component source or second transformer), not an encoder. */
   isMainModel?: true;
-  /**
-   * The `generation_mode` values whose graphs record the key whenever the component ran. `core_metadata` drops
-   * `null` on write, so on these records an absent key means "none" and clears the slot; elsewhere it means
-   * "unknown" and keeps the current pick.
-   */
-  absentMeansNoneIn?: readonly string[];
 }
 
 /**
@@ -630,11 +796,7 @@ const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
   { isMainModel: true, metadataKey: 'wan_component_source', setting: 'componentSourceModel' },
   { isMainModel: true, metadataKey: 'ideogram4_unconditional_model', setting: 'ideogram4UnconditionalModel' },
   { isMainModel: true, metadataKey: 'wan_transformer_low_noise', setting: 'wanLowNoiseModel' },
-  {
-    absentMeansNoneIn: ['anima_inpaint', 'anima_outpaint'],
-    metadataKey: 'anima_inpaint_adapter',
-    setting: 'animaInpaintAdapterModel',
-  },
+  { metadataKey: 'anima_inpaint_adapter', setting: 'animaInpaintAdapterModel' },
   { metadataKey: 'clip_embed_model', setting: 'clipEmbedModel' },
   { metadataKey: 'gemma2_encoder', setting: 'gemma2EncoderModel' },
   { metadataKey: 'mistral_encoder', setting: 'mistralEncoderModel' },
@@ -651,17 +813,10 @@ const getRecalledComponent = (
   metadata: unknown,
   component: RecalledComponent,
   models: readonly ComponentModelConfig[]
-): ComponentModelConfig | null | undefined => {
-  if (isRecord(metadata) && !(component.metadataKey in metadata) && component.absentMeansNoneIn) {
-    const mode = getString(metadata, 'generation_mode');
-
-    return mode !== null && component.absentMeansNoneIn.includes(mode) ? null : undefined;
-  }
-
-  return component.isMainModel
+): ComponentModelConfig | null | undefined =>
+  component.isMainModel
     ? getMetadataMainModel(metadata, component.metadataKey, models)
     : getMetadataComponent(metadata, component.metadataKey, models);
-};
 
 /** Recorded components that resolve to installed models; `null` clears a slot the image left empty. */
 const getComponentPatch = (
@@ -1062,11 +1217,13 @@ export const getImageRecallCapabilities = ({
     recordedReferenceImages !== null &&
     (recordedReferenceImages.length > 0 || currentValues.referenceImages.length > 0);
   const hasModel = supportedMetadataModel !== null;
+  const hasProviderOptions = hasExternalProvider(metadata, clipSkipModel);
   const hasRebalance = hasKrea2Rebalance(metadata, clipSkipModel) || hasKrea2SeedVariance(metadata, clipSkipModel);
+  const hasSkipLayers = hasMossImageSkipLayers(metadata, clipSkipModel);
   const hasTuning = hasModelTuning(metadata, clipSkipModel);
   const hasRefiner =
     Object.keys(getRefinerRecall(metadata, clipSkipModel, models, supportedMetadataModel).patch).length > 0;
-  const hasAdapterWeight = hasAnimaInpaintAdapterWeight(metadata, clipSkipModel);
+  const hasAdapterSettings = hasAnimaInpaintAdapterSettings(metadata, clipSkipModel);
   const hasConcepts =
     (getMetadataConcepts(metadata, models, clipSkipModel, supportedMetadataModel).loras?.length ?? 0) > 0;
   const hasAnyMetadata =
@@ -1082,9 +1239,11 @@ export const getImageRecallCapabilities = ({
     hasReferenceImages ||
     hasConcepts ||
     hasRebalance ||
+    hasProviderOptions ||
     hasRefiner ||
+    hasSkipLayers ||
     hasTuning ||
-    hasAdapterWeight;
+    hasAdapterSettings;
   const hasNonSeedMetadata =
     hasModel ||
     hasVae ||
@@ -1097,9 +1256,11 @@ export const getImageRecallCapabilities = ({
     hasReferenceImages ||
     hasConcepts ||
     hasRebalance ||
+    hasProviderOptions ||
     hasRefiner ||
+    hasSkipLayers ||
     hasTuning ||
-    hasAdapterWeight;
+    hasAdapterSettings;
 
   return {
     all: hasAnyMetadata && isImageRecallKindAvailable('all'),
@@ -1115,6 +1276,7 @@ export const getImageRecallCapabilities = ({
 export const buildImageRecallSettings = ({
   currentValues,
   image,
+  isCanvasFrame = false,
   kind,
   metadata,
   supportedModels,
@@ -1123,6 +1285,8 @@ export const buildImageRecallSettings = ({
 }: {
   currentValues: GenerateWidgetValues;
   image: GalleryImage;
+  /** The Generate size is the Canvas frame (a Canvas route), which recall sets as recorded. */
+  isCanvasFrame?: boolean;
   kind: ImageRecallKind;
   metadata: unknown;
   supportedModels: GenerateModelConfig[];
@@ -1136,6 +1300,8 @@ export const buildImageRecallSettings = ({
   const fields: RecalledField[] = [];
   const skipped: ImageRecallSkip[] = [];
   let values: GenerateWidgetValues = cloneGenerateWidgetValues(currentValues);
+  // A restored provider size is what the provider was asked for; the recorded size may be a Canvas frame instead.
+  let restoredProviderSize = false;
 
   if (kind === 'all' || kind === 'remix') {
     const model = getSupportedMetadataModel(metadata, supportedModels);
@@ -1169,11 +1335,26 @@ export const buildImageRecallSettings = ({
       fields.push('krea2Rebalance');
     }
 
+    const providerPatch = getMetadataExternalProvider(metadata, values.model, isCanvasFrame);
+
+    if (Object.keys(providerPatch).length > 0) {
+      values = { ...values, ...providerPatch };
+      fields.push('externalProvider');
+      restoredProviderSize = providerPatch.width !== undefined;
+    }
+
     const seedVariancePatch = getMetadataKrea2SeedVariance(metadata, values.model);
 
     if (Object.keys(seedVariancePatch).length > 0) {
       values = { ...values, ...seedVariancePatch };
       fields.push('krea2SeedVariance');
+    }
+
+    const skipLayersPatch = getMetadataMossImageSkipLayers(metadata, values.model);
+
+    if (Object.keys(skipLayersPatch).length > 0) {
+      values = { ...values, ...skipLayersPatch };
+      fields.push('mossImageSkipLayers');
     }
 
     const tuningPatch = getMetadataModelTuning(metadata, values.model);
@@ -1184,10 +1365,10 @@ export const buildImageRecallSettings = ({
       fields.push('modelTuning');
     }
 
-    const adapterWeightPatch = getMetadataAnimaInpaintAdapterWeight(metadata, values.model);
+    const adapterPatch = getMetadataAnimaInpaintAdapter(metadata, values.model);
+    values = { ...values, ...adapterPatch };
 
-    if (Object.keys(adapterWeightPatch).length > 0) {
-      values = { ...values, ...adapterWeightPatch };
+    if (adapterPatch.animaInpaintAdapterWeight !== undefined) {
       fields.push('animaInpaintAdapterWeight');
     }
 
@@ -1205,8 +1386,12 @@ export const buildImageRecallSettings = ({
       values = { ...values, ...settings };
     }
 
-    // Judged after the transition, which can complete or undo a recorded pick.
-    if (recordedSettings.some((setting) => values[setting]?.key !== currentValues[setting]?.key)) {
+    // Judged after the transition, which can complete or undo a recorded pick. The adapter switch is a component
+    // change too: a record can turn it off without touching the pick.
+    if (
+      recordedSettings.some((setting) => values[setting]?.key !== currentValues[setting]?.key) ||
+      values.animaInpaintAdapterEnabled !== currentValues.animaInpaintAdapterEnabled
+    ) {
       fields.push('components');
     }
 
@@ -1262,6 +1447,8 @@ export const buildImageRecallSettings = ({
       values = withDimensions(values, size);
       fields.push('size');
     }
+  } else if (restoredProviderSize) {
+    fields.push('size');
   } else if (kind === 'all' || kind === 'remix') {
     const size = getMetadataSize(metadata, values.model);
 

@@ -246,6 +246,23 @@ describe('collectLiveAssetRefs', () => {
     expect(images).toEqual(new Set(['mask.png', 'reference.png', 'graph-image.png', 'upscale-input.png']));
   });
 
+  it("holds a control layer's pre-detection original beside its derived map", () => {
+    const control = {
+      controlType: 'depth',
+      detection: { settings: {}, type: 'depth_anything_depth_estimation' },
+      id: 'control-1',
+      original: { image: imageRef('photo.png'), type: 'image' },
+      source: { bitmap: imageRef('depth-map.png'), type: 'paint' },
+      type: 'control',
+    };
+    const document = projectDocument({ canvas: { document: { stacks: { control: [control] } } } });
+
+    expect(collectLiveAssetRefs(document).images).toEqual(
+      new Set(['photo.png', 'depth-map.png', 'graph-image.png', 'upscale-input.png'])
+    );
+    expect(collectHeldAssetRefs([document]).images.has('photo.png')).toBe(true);
+  });
+
   it('ignores empty names and non-string values', () => {
     const refs = collectLiveAssetRefs({ canvas: { imageName: '' }, settings: { image_name: 7, video_name: null } });
 
@@ -410,6 +427,29 @@ describe('stripInstallationState', () => {
     expect(recent).toMatchObject({ imageName: 'recent.png', imageUrl: '', thumbnailUrl: '' });
     expect(Object.keys(recent!)).toContain('thumbnailUrl');
     expect(JSON.stringify(stripped)).not.toContain('source-install');
+  });
+
+  it('blanks a gallery item full URL kept outside the selection keys', () => {
+    const stripped = stripInstallationState({
+      widgetInstances: {
+        'preview-1': {
+          state: {
+            values: {
+              heldItem: {
+                fullUrl: 'http://source-install/api/v1/images/i/held.png/full',
+                kind: 'image',
+                name: 'held.png',
+                thumbnailUrl: 'http://source-install/api/v1/images/i/held.png/thumbnail',
+              },
+            },
+          },
+          typeId: 'preview',
+        },
+      },
+    });
+
+    expect(JSON.stringify(stripped)).not.toContain('source-install');
+    expect(JSON.stringify(stripped)).toContain('"name":"held.png"');
   });
 
   /** Preserve unchanged identity and authored workflow board inputs. */
