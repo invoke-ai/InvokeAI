@@ -553,7 +553,9 @@ def _px(line: Mapping[str, Any]) -> int:
 
 def _summarize_fit(lines: Sequence[Mapping[str, Any]], text_tokens: int) -> None:
     measured = [line for line in lines if line["status"] == "point"]
-    fit = [line for line in measured if line["fit"]]
+    grid = [line for line in measured if line["fit"]]
+    # The line's slopes from the points that fit it; the extra-blocks forward compares with any grid point.
+    fit = [line for line in grid if line["in_fit"]]
     for dtype in dict.fromkeys(line["point"]["dtype"] for line in fit):
         of_dtype = [line for line in fit if line["point"]["dtype"] == dtype]
         main = sorted((line for line in of_dtype if line["point"]["text_tokens"] == text_tokens), key=_tokens)
@@ -574,7 +576,7 @@ def _summarize_fit(lines: Sequence[Mapping[str, Any]], text_tokens: int) -> None
                 )
     for line in (line for line in measured if line["point"]["kind"] == "blocks"):
         same = ("px", "text_tokens", "dtype")
-        base = next((ref for ref in fit if all(ref["point"][key] == line["point"][key] for key in same)), None)
+        base = next((ref for ref in grid if all(ref["point"][key] == line["point"][key] for key in same)), None)
         if base is not None:
             extra = line["measured_bytes"] - base["measured_bytes"]
             print(
