@@ -8,6 +8,8 @@ import type { AddRegionalGuidanceOptions, RegionalGuidanceInput, RegionalReferen
 
 import {
   addRegionalGuidance,
+  getLayoutPromptRejectionReason,
+  getLayoutRegionIssue,
   getRegionalGuidanceRejectionReason,
   getRegionalGuidanceSupport,
   isRegionalGuidanceSupportedForBase,
@@ -160,6 +162,7 @@ const ipModel = (base: string): RegionalReferenceModel => ({
 const region = (overrides: Partial<RegionalGuidanceInput> = {}): RegionalGuidanceInput => ({
   autoNegative: false,
   id: 'r1',
+  maskBounds: { height: 64, width: 64, x: 0, y: 0 },
   maskImageName: 'mask1.png',
   negativePrompt: null,
   positivePrompt: 'a cat',
@@ -182,7 +185,7 @@ seedArchitectureCapabilities();
 
 describe('isRegionalGuidanceSupportedForBase', () => {
   it('supports every base whose encoder takes a mask and whose denoiser takes a conditioning list', () => {
-    for (const base of ['sd-1', 'sd-2', 'sdxl', 'flux', 'flux2', 'krea-2', 'z-image', 'anima']) {
+    for (const base of ['sd-1', 'sd-2', 'sdxl', 'flux', 'flux2', 'krea-2', 'z-image', 'anima', 'moss-image']) {
       expect(isRegionalGuidanceSupportedForBase(base), base).toBe(true);
     }
     for (const base of ['sd-3', 'cogview4', 'qwen-image', 'ideogram-4', 'wan', 'external']) {
@@ -223,12 +226,23 @@ describe('getRegionalGuidanceSupport', () => {
     for (const base of ['flux2', 'krea-2', 'z-image', 'anima']) {
       expect(getRegionalGuidanceSupport(base), base).toMatchObject({
         autoNegative: false,
+        mode: 'masks',
         negativePrompt: false,
         referenceImages: null,
       });
     }
     expect(getRegionalGuidanceSupport('sd-3')).toBeNull();
     expect(getRegionalGuidanceSupport(null)).toBeNull();
+  });
+
+  it('places MOSS-Image regions as layout boxes, with no negative or reference-image side', () => {
+    expect(getRegionalGuidanceSupport('moss-image')).toEqual({
+      autoNegative: false,
+      label: 'MOSS-Image',
+      mode: 'layout',
+      negativePrompt: false,
+      referenceImages: null,
+    });
   });
 });
 
@@ -541,5 +555,87 @@ describe('getRegionalGuidanceRejectionReason', () => {
     expect(
       getRegionalGuidanceRejectionReason({ ...params, mainBase: 'flux', positivePrompt: null, referenceImageCount: 1 })
     ).toBeNull();
+  });
+});
+
+describe('getRegionalGuidanceRejectionReason — layout bases', () => {
+  const params = {
+    hasContent: true,
+    layerName: 'Sign',
+    mainBase: 'moss-image',
+    negativePrompt: null as string | null,
+    positivePrompt: 'a shop sign' as string | null,
+    referenceImageCount: 0,
+  };
+
+  it('keeps a captioned region of every kind once a text region has its text', () => {
+    expect(getRegionalGuidanceRejectionReason(params)).toBeNull();
+    expect(getRegionalGuidanceRejectionReason({ ...params, layout: { kind: 'character' } })).toBeNull();
+    expect(getRegionalGuidanceRejectionReason({ ...params, layout: { kind: 'text', text: 'OPEN' } })).toBeNull();
+  });
+
+  it('rejects a region without a caption even when it carries what mask bases would use', () => {
+    for (const positivePrompt of [null, '   ']) {
+      expect(
+        getRegionalGuidanceRejectionReason({
+          ...params,
+          negativePrompt: 'blurry',
+          positivePrompt,
+          referenceImageCount: 1,
+        })
+      ).toBe('Regional guidance "Sign" has no prompt to place in the MOSS-Image layout.');
+    }
+  });
+
+  it('rejects a text region without visible text', () => {
+    for (const text of [undefined, '', ' \n ']) {
+      expect(getRegionalGuidanceRejectionReason({ ...params, layout: { kind: 'text', text } })).toBe(
+        'Regional guidance "Sign" is a text region without visible text.'
+      );
+    }
+  });
+
+  it('ignores a stored layout role on a mask base', () => {
+    expect(getRegionalGuidanceRejectionReason({ ...params, layout: { kind: 'text' }, mainBase: 'z-image' })).toBeNull();
+  });
+
+  it('still rejects an empty mask first', () => {
+    expect(getRegionalGuidanceRejectionReason({ ...params, hasContent: false, positivePrompt: null })).toMatch(
+      /no masked region/
+    );
+  });
+});
+
+describe('getLayoutRegionIssue', () => {
+  it('ignores text the object and character kinds keep for a later switch back', () => {
+    expect(getLayoutRegionIssue({ layout: { kind: 'object', text: '' }, positivePrompt: 'a cat' })).toBeNull();
+    expect(getLayoutRegionIssue({ layout: { kind: 'character' }, positivePrompt: 'a cat' })).toBeNull();
+  });
+
+  it('names the caption before the text when both are missing', () => {
+    expect(getLayoutRegionIssue({ layout: { kind: 'text' }, positivePrompt: null })).toBe('missing_prompt');
+    expect(getLayoutRegionIssue({ layout: { kind: 'text' }, positivePrompt: 'a sign' })).toBe('missing_text');
+  });
+});
+
+describe('getLayoutPromptRejectionReason', () => {
+  const placeable = { layout: { kind: 'object' as const }, positivePrompt: 'a cup' };
+
+  it('refuses placeable regions around a blank prompt on a layout base', () => {
+    expect(getLayoutPromptRejectionReason({ base: 'moss-image', prompt: ' \n', regions: [placeable] })).toBe(
+      'MOSS-Image needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.'
+    );
+  });
+
+  it('lets a prompt, regions the layout cannot place, or a mask base through', () => {
+    expect(getLayoutPromptRejectionReason({ base: 'moss-image', prompt: 'a cafe', regions: [placeable] })).toBeNull();
+    expect(
+      getLayoutPromptRejectionReason({
+        base: 'moss-image',
+        prompt: '',
+        regions: [{ positivePrompt: null }, { layout: { kind: 'text' }, positivePrompt: 'a sign' }],
+      })
+    ).toBeNull();
+    expect(getLayoutPromptRejectionReason({ base: 'z-image', prompt: '', regions: [placeable] })).toBeNull();
   });
 });

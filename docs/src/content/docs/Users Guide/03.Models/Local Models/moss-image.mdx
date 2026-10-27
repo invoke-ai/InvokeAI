@@ -1,6 +1,6 @@
 ---
 title: MOSS-Image
-description: Generate and edit images with OpenMOSS's MOSS-Image Base and SFT, from the Diffusers pipelines or a single-file transformer, including JSON layout prompts.
+description: Generate and edit images with OpenMOSS's MOSS-Image Base and SFT, from the Diffusers pipelines or a single-file transformer, including JSON layout prompts and layouts from canvas regions.
 lastUpdated: 2026-10-18
 sidebar:
   order: 8
@@ -17,8 +17,8 @@ weights:
   clearly and lays out scenes more cleanly.
 
 Both run at **50 steps** with **CFG 3** and support negative prompts. MOSS-Image works in the Generate tab,
-on the Canvas (image-to-image, inpainting and outpainting) and in the workflow editor, and it can decode
-with [PiD](/users-guide/image-generation/advanced-topics/pid-decode/).
+on the Canvas (image-to-image, inpainting, outpainting and [regional guidance](#layout-with-canvas-regions))
+and in the workflow editor, and it can decode with [PiD](/users-guide/image-generation/advanced-topics/pid-decode/).
 
 ## License
 
@@ -160,7 +160,7 @@ field in the format OpenMOSS defines; OpenMOSS calls this experimental. For a 10
 ```
 
 - `summary.caption` describes the whole scene and its style.
-- Each entry in `items` has a `label` (the examples use `text` and `object`), a `caption` describing it, its
+- Each entry in `items` has a `label` (`object`, `character` or `text`), a `caption` describing it, its
   `bbox`, and for text the exact `text` to render.
 - `bbox` is `[y_min, x_min, y_max, x_max]` in pixels, measured from the **center** of the image, with x
   growing to the right and y downward. A 1024×1024 image runs from `-512` to `512` on both axes. To convert
@@ -170,11 +170,39 @@ The coordinates are absolute pixels, so a layout made for one size needs new coo
 width or height. See OpenMOSS's [user guide](https://github.com/OpenMOSS/MOSS-Image/blob/main/USERGUIDE.md)
 for the format.
 
+### Layout with canvas regions
+
+On the Canvas, InvokeAI builds the JSON layout for you from **Regional Guidance** layers. The main prompt
+becomes the layout's `summary.caption`, and each enabled regional guidance layer becomes one element: the
+region's **Positive prompt** describes it, and its box is the rectangle around everything painted on the
+layer inside the generation frame, scaled to the generation size. The shape does not matter, and separate
+painted areas on one layer share one box.
+
+With a MOSS-Image model selected, the layer's **Layer** section in **Properties** has a **Region type**:
+
+- **Character** is for people and creatures, **Object**, the default, for everything else.
+- **Text** renders text. Enter the exact characters in **Visible text**, and describe how they look in the
+  positive prompt. The field takes several lines; each line break reaches the model as `\n`, and the text
+  breaks there.
+
+A region without a positive prompt, or a Text region without visible text, is left out of the layout, and the
+layer's settings say why. When a region can be placed, the main prompt cannot be blank: Invoke is disabled
+with *MOSS-Image needs a prompt to place regional guidance in its layout. Enter a prompt or disable the
+regional guidance layers.* Regional negative prompts, auto-negative and regional reference images are not used
+with MOSS-Image; the layer hides its negative prompt and auto-negative controls.
+
+Without regions the prompt is sent unchanged. If the prompt already is a JSON layout in the format above, the
+regions are added to its `items`; a layout with another `bbox_coord_space` or `bbox_format` makes the
+generation fail with a message. Any other prompt, including JSON that is not a layout, becomes the caption.
+The layout is built when the generation runs, so dynamic prompts and batches vary the caption inside it. The
+encoded layout is saved in the image's metadata as `moss_image_layout_prompt`.
+
 ## Limitations
 
 - LoRA is not supported.
 - Quantized transformers are refused at install (see [Installing](#installing)).
-- ControlNet, reference images, regional prompting and seamless tiling are not available.
+- ControlNet, reference images and seamless tiling are not available.
+- Regional guidance places boxes in a layout; it has no regional negative prompts or regional reference images.
 - MOSS-Image is not offered in the [Upscale panel](/users-guide/image-generation/upscale/).
 
 ## Workflow nodes
@@ -182,6 +210,7 @@ for the format.
 | Node                              | Purpose                                                                    |
 | --------------------------------- | -------------------------------------------------------------------------- |
 | **Main Model - MOSS-Image**       | Loads the transformer, and the Qwen3.5 9B encoder and VAE from the pipeline or from the standalone models selected |
+| **Layout Prompt - MOSS-Image**    | Builds a JSON layout from a prompt and a list of regions, each with a type, a caption, visible text for text regions, and a pixel box `[x1, y1, x2, y2]` from the image's top-left. The Canvas feeds it for regional guidance; its regions input has no editor widget |
 | **Prompt - MOSS-Image**           | Encodes a prompt with the Qwen3.5 9B encoder                               |
 | **Denoise - MOSS-Image**          | Runs sampling; accepts image-to-image latents and an inpainting mask, and takes the skip layers as **Uncond Skip Layers** |
 | **Image to Latents - FLUX2**      | VAE encode, for image-to-image and inpainting                              |
