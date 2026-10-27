@@ -571,9 +571,11 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         # The user fit per generation device: replaced whole by `refresh_user_fits`, read by every estimate.
         self._fits: Mapping[str, _DeviceFit] = {}
         self._fits_lock = threading.Lock()
-        # The status of each calibration item `_canceled_runs` found finished in the queue: item ids are never reused,
-        # and a finished item never changes, so an entry holds until a reset removes its run (`_forget`).
-        self._item_outcomes: dict[int, QUEUE_ITEM_STATUS] = {}
+        # The status of each calibration item `_canceled_runs` found finished in the queue, per run and item id: a
+        # finished item never changes, so an entry holds until its run is removed (`_forget`). Keyed by the run too: a
+        # recreated or restored database numbers its items anew, and two runs can then record one id. Read and written
+        # under `_fits_lock`.
+        self._item_outcomes: dict[tuple[str, int], QUEUE_ITEM_STATUS] = {}
         # One object, so that `stop` unregisters exactly what `start` registered.
         self._provider: user_fit.UserFitProvider = self._user_fit_for
 
@@ -965,7 +967,10 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             _add_env(file, env)
             return True, True
 
-        created = bool(self._store.change(device_class.id, add, create=CalibrationDeviceClass.of(device_class)))
+        # The attempt check judges other runs' items (`_attempt_blocks`) under the lock that orders those judgements
+        # with removals, taken before the file's lock as every holder of both takes them.
+        with self._fits_lock:
+            created = bool(self._store.change(device_class.id, add, create=CalibrationDeviceClass.of(device_class)))
         self._run_files[run_id] = device_class.id
         return _Enqueue(batch, device_class.id, created=created, marks=created)
 
@@ -1649,54 +1654,57 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
 
         The items are those the store records: the run's batch, and every retry (recorded as the queue commits it,
         `retries_committed`, and by the runner's observations). The runner's observation decides an item it saw
-        finish. Any other is read from the queue by id once it finished, kept until a reset removes its run since a
+        finish. Any other is read from the queue by id once it finished, kept until its run is removed since a
         finished item never changes, and only as the queue holds it with the run's origin: a recreated or restored
-        database gives the id to an unrelated item, and the run's own is gone. Reads the queue only for items without
-        such an outcome."""
+        database gives the id to an unrelated item, or to another run's, and the run's own is gone. Reads the queue
+        only for items without such an outcome.
+
+        Called under `_fits_lock`, from a read of the store file made under it too: a removal's `_forget` then cannot
+        run between the read and the outcomes this writes, which would keep outcomes of a run that is gone."""
         if not runs:
             return set(), set()
-        unknown: dict[int, CalibrationRun] = {
-            item_id: run
+        unknown: dict[tuple[str, int], CalibrationRun] = {
+            (run.run_id, item_id): run
             for run in runs
             for item_id in set(run.queue_item_ids) | set(run.observed)
-            if item_id not in self._item_outcomes
+            if (run.run_id, item_id) not in self._item_outcomes
             and ((observed := run.observed.get(item_id)) is None or observed.status in _RUNNING)
         }
         started: set[str] = set()
         if unknown:
             queue = self._services.session_queue
+            ids = sorted({item_id for _, item_id in unknown})
             found = {
-                summary.item_id: summary
-                for summary in queue.get_queue_item_summaries_by_ids(DEFAULT_QUEUE_ID, list(unknown))
+                summary.item_id: summary for summary in queue.get_queue_item_summaries_by_ids(DEFAULT_QUEUE_ID, ids)
             }
-            for item_id, run in unknown.items():
-                summary = found.get(item_id)
+            for key, run in unknown.items():
+                summary = found.get(key[1])
                 if summary is None or summary.origin != calibration_origin(run.run_id):
-                    self._item_outcomes[item_id] = "canceled"
+                    self._item_outcomes[key] = "canceled"
                 elif summary.status in _RUNNING:
                     # Defensive: every item read here is the store's, of a run the read for unfinished items found
                     # settled, and a settled item does not start again (a retry is a new item, which that read would
-                    # have found). Should one run all the same, its status is not final: it must not enter the
-                    # process-lifetime outcomes, and the run waits for the next refresh.
+                    # have found). Should one run all the same, its status is not final: it must not enter the kept
+                    # outcomes, and the run waits for the next refresh.
                     started.add(run.run_id)
                 else:
-                    self._item_outcomes[item_id] = summary.status
+                    self._item_outcomes[key] = summary.status
         canceled: set[str] = set()
         for run in runs:
             if run.run_id in started:
                 continue
-            outcomes = {
-                item_id: QueueItemLineage(
+            outcomes: dict[int, QueueItemLineage] = {}
+            for item_id in set(run.queue_item_ids) | set(run.observed):
+                status = self._item_outcomes.get((run.run_id, item_id))
+                if status is None:
+                    continue
+                observed = run.observed.get(item_id)
+                outcomes[item_id] = QueueItemLineage(
                     item_id=item_id,
-                    status=self._item_outcomes[item_id],
+                    status=status,
                     origin=None,
-                    retried_from_item_id=observed.retried_from_item_id
-                    if (observed := run.observed.get(item_id)) is not None
-                    else None,
+                    retried_from_item_id=observed.retried_from_item_id if observed is not None else None,
                 )
-                for item_id in set(run.queue_item_ids) | set(run.observed)
-                if item_id in self._item_outcomes
-            }
             _, statuses = _lineage_outcomes(run, outcomes)
             if not statuses or any(_interrupts(run, item_id, status) for item_id, status in statuses.items()):
                 canceled.add(run.run_id)
@@ -1807,7 +1815,9 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         # Raises UnknownModelException for an unknown key.
         target = store.get_model(model_key)
         class_id = self._current_device_class_id(device_class_id)
-        read = self._store.read(class_id)
+        with self._fits_lock:
+            read = self._store.read(class_id)
+            held_back = self._held_back(read.file) if read is not None and read.file is not None else {}
         present = self._present(class_id)
         method, verified = _measurement(self._present_backends().get(class_id))
         summary = WorkingMemoryCalibrationModelSummary(
@@ -1842,7 +1852,6 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             except ValueError:
                 return None
 
-        held_back = self._held_back(file)
         lines, excluded = model_lines(
             file,
             model_key,
@@ -1925,19 +1934,18 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
 
     def _forget(self, runs: Iterable[CalibrationRun]) -> None:
         """Drop what this process keeps of runs a store change removed: the file that held each, and the outcomes of
-        their items, which nothing reads once the runs are gone. Under the fits' lock, so that a refresh judging the
-        file as it was before the removal cannot put an outcome back afterwards."""
-        with self._fits_lock:
-            for run in runs:
-                self._run_files.pop(run.run_id, None)
-                for item_id in set(run.queue_item_ids) | set(run.observed):
-                    self._item_outcomes.pop(item_id, None)
+        their items, which nothing reads once the runs are gone. Called under `_fits_lock`, which the change ran under
+        too: nothing that judged the file as it was before the removal (`_canceled_runs`) can put an outcome back."""
+        for run in runs:
+            self._run_files.pop(run.run_id, None)
+            for item_id in set(run.queue_item_ids) | set(run.observed):
+                self._item_outcomes.pop((run.run_id, item_id), None)
 
     def _hold_reasons(self, file: CalibrationStoreFile) -> dict[str, Optional[CalibrationHoldBack]]:
         """Per stored run of `file`, why its windows are held back now (`_held_back`; None where they are not). Read by
-        a reset inside its change of the file, under the file's lock, which the queue's retries take too, before
-        they commit (`retries_starting`): none slips in between. The queue is read under that lock; the queue takes it
-        only outside its transactions."""
+        a reset inside its change of the file, under `_fits_lock` (`_canceled_runs`) and the file's lock, which the
+        queue's retries take too, before they commit (`retries_starting`): none slips in between. The queue is read
+        under that lock; the queue takes it only outside its transactions."""
         held_back = self._held_back(file)
         return {run.run_id: held_back.get(run.run_id) for run in file.runs}
 
@@ -1955,9 +1963,10 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             removed.extend(run for run in file.runs if run.run_id == run_id)
             return self._remove(file, {run_id}, reasons=self._hold_reasons(file) if reset else None)
 
-        result = self._store.change(found[0], remove)
-        self._forget(removed)
-        self._run_files.pop(run_id, None)
+        with self._fits_lock:
+            result = self._store.change(found[0], remove)
+            self._forget(removed)
+            self._run_files.pop(run_id, None)
         self._try_refresh_user_fits("after a reset")
         return result or WorkingMemoryCalibrationResetResult(runs_removed=0, points_removed=0)
 
@@ -1972,8 +1981,9 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             removed.extend(run for run in file.runs if run.model_key == model_key)
             return True, self._remove(file, {run.run_id for run in removed}, model_key, reasons=reasons)[1]
 
-        result = self._store.change(class_id, remove)
-        self._forget(removed)
+        with self._fits_lock:
+            result = self._store.change(class_id, remove)
+            self._forget(removed)
         self._try_refresh_user_fits("after a reset")
         return result or WorkingMemoryCalibrationResetResult(runs_removed=0, points_removed=0)
 
@@ -1989,8 +1999,9 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             file.points, file.envs = [], []
             return changed, result
 
-        result = self._store.change(class_id, remove)
-        self._forget(removed)
+        with self._fits_lock:
+            result = self._store.change(class_id, remove)
+            self._forget(removed)
         self._try_refresh_user_fits("after a reset")
         return result or WorkingMemoryCalibrationResetResult(runs_removed=0, points_removed=0)
 
