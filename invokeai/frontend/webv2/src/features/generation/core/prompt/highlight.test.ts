@@ -242,3 +242,92 @@ describe('buildPromptHighlightSegments on a large prompt', () => {
     expect(performance.now() - started).toBeLessThan(150);
   });
 });
+
+describe('Anima painting follows parsed attention', () => {
+  it.each(['red\\+', 'cat)2', '((red)2', '(red (blue)2', 'a(b)2', 'foo.bar+'])(
+    'leaves literal suffixes plain in %s',
+    (prompt) => {
+      const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+      expect(segments.map(({ text }) => text).join('')).toBe(prompt);
+      expect(segments.every(({ kind }) => kind === 'text')).toBe(true);
+    }
+  );
+
+  it.each([
+    '.and(dog+)',
+    '.and(dog+',
+    '.and(.blend(dog+))',
+    '(red, blue).and(dog+)',
+    '(red).and((dog)+, cat+)',
+    '(cat)2.and(dog+)',
+  ])('shows supported attention inside unsupported operations: %s', (prompt) => {
+    const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+    expect(segments.map(({ text }) => text).join('')).toBe(prompt);
+    expect(segments.some(({ text, kind }) => text.includes('+') && kind === 'attention')).toBe(true);
+    const method = prompt.indexOf('.and');
+    expect(segments.find(({ range }) => range.start <= method && range.end > method)?.kind).toBe('text');
+  });
+
+  it.each(['red\\.blue+', '"red (blue)2"+', '(foo.bar+)2', 'red+(blue)2', 'red .attend (2)'])(
+    'paints attention accepted by the backend in %s',
+    (prompt) => {
+      const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+      expect(segments.map(({ text }) => text).join('')).toBe(prompt);
+      expect(segments.some(({ kind }) => kind === 'attention' || kind === 'attentionNumeric')).toBe(true);
+    }
+  );
+
+  it('paints 1500 nested groups without recursion and keeps malformed input plain', () => {
+    const valid = `${'('.repeat(1500)}red${')'.repeat(1500)}2`;
+    expect(buildPromptHighlightSegments(valid, { syntaxProfile: 'anima' }).at(-1)?.kind).toBe('attentionNumeric');
+    const invalid = `${'('.repeat(20_000)}red)2`;
+    expect(buildPromptHighlightSegments(invalid, { syntaxProfile: 'anima' })).toEqual([
+      { kind: 'text', range: { start: 0, end: invalid.length }, text: invalid },
+    ]);
+  });
+});
+
+it.each(['red .attend (2)', '(red) .attend(++)', '"red".attend(--)'])(
+  'keeps the method marker plain and colours its supported weight: %s',
+  (prompt) => {
+    const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+    const marker = prompt.indexOf('.attend');
+    expect(segments.find(({ range }) => range.start <= marker && range.end > marker)?.kind).toBe('text');
+    expect(segments.some(({ kind }) => kind === 'attention' || kind === 'attentionNumeric')).toBe(true);
+    expect(segments.map(({ text }) => text).join('')).toBe(prompt);
+  }
+);
+
+it.each(['("cat(")2', '("cat(")65505', String.raw`"cat\fdog"2`])(
+  'keeps rejected quoted attention plain: %s',
+  (prompt) => {
+    const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+    expect(segments.map(({ text }) => text).join('')).toBe(prompt);
+    expect(segments.every(({ kind }) => kind === 'text')).toBe(true);
+  }
+);
+
+it.each(['n', 't', 'r'])('paints source ranges after a quoted \\%s separator', (escape) => {
+  const prompt = `"cat\\${escape}dog+"2`;
+  const plus = prompt.indexOf('+');
+  const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+  expect(segments.map(({ text }) => text).join('')).toBe(prompt);
+  expect(segments.find(({ range }) => range.start <= plus && range.end > plus)?.kind).toBe('attention');
+  expect(segments.find(({ range }) => range.start <= 4 && range.end > 4)?.kind).toBe('text');
+});
+
+it.each([
+  String.raw`"cat\fdog+"2 bird+`,
+  '"cat("2 bird+',
+  '"cat)"2 bird+',
+  String.raw`"cat\fdog+"2,bird+`,
+  String.raw`.and("cat\fdog+"2, bird+)`,
+])('paints only the valid following weight after a closed rejected quote: %s', (prompt) => {
+  const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+  expect(segments.map(({ text }) => text).join('')).toBe(prompt);
+  const bird = prompt.indexOf('bird');
+  expect(
+    segments.filter(({ kind }) => kind === 'attention' || kind === 'attentionNumeric').map(({ text }) => text)
+  ).toEqual(['+']);
+  expect(segments.find(({ range }) => range.start <= bird + 4 && range.end > bird + 4)?.kind).toBe('attention');
+});

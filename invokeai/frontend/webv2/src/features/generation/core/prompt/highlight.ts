@@ -1,7 +1,7 @@
 import type { PromptAstNode, PromptRange, PromptToken } from './ast';
+import type { PromptSyntaxProfile } from './compel';
 
 import { parsePromptTokens, tokenizePrompt } from './ast';
-import { getUnsupportedPromptMethodRanges, type PromptSyntaxProfile } from './compel';
 import { scanDynamicPromptSyntax } from './dynamicPromptSyntax';
 
 export type PromptHighlightKind =
@@ -259,13 +259,6 @@ const collectDynamicPromptAnnotations = (prompt: string, knownWildcards?: Readon
     range,
   }));
 
-const collectUnsupportedMethodAnnotations = (prompt: string): HighlightAnnotation[] =>
-  getUnsupportedPromptMethodRanges(prompt).map((range) => ({
-    kind: 'text',
-    priority: 36,
-    range,
-  }));
-
 /** Anima's lexical words can cross dynamic-syntax boundaries; split only for painting, after parsing. */
 const splitTokensAtAnnotations = (
   prompt: string,
@@ -326,13 +319,8 @@ export const buildPromptHighlightSegments = (
     // Token boundaries keep dynamic annotations aligned even when the model reads plain text.
     const tokens = tokenizePrompt(prompt, syntaxProfile === 'anima' ? 'anima' : 'compel');
     const annotations = [
-      ...(syntaxProfile !== 'none'
-        ? [
-            ...collectAnnotations(prompt, parsePromptTokens(tokens, syntaxProfile)),
-            ...(syntaxProfile === 'compel'
-              ? collectParenthesisErrors(tokens)
-              : collectUnsupportedMethodAnnotations(prompt)),
-          ]
+      ...(syntaxProfile === 'compel'
+        ? [...collectAnnotations(prompt, parsePromptTokens(tokens)), ...collectParenthesisErrors(tokens)]
         : []),
       ...(options.dynamicPrompts ? collectDynamicPromptAnnotations(prompt, options.knownWildcards) : []),
     ];
