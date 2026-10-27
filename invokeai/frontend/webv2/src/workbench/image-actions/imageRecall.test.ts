@@ -350,6 +350,48 @@ describe('image recall', () => {
     expect(result?.fields).toContain('referenceImages');
   });
 
+  // Only the Diffusers pipeline reads Qwen-Image-2.1 references, so the recalled flavor survives there and nowhere else.
+  it('recalls Qwen-Image-2.1 reference images onto a Diffusers model and drops them on a GGUF one', () => {
+    const recall = (model: MainModelConfig) =>
+      buildImageRecallSettings({
+        currentValues: createValues({ model, modelKey: model.key }),
+        image,
+        kind: 'all',
+        metadata: {
+          positive_prompt: 'swap the jacket',
+          ref_images: [
+            {
+              config: {
+                image: { height: 640, image_name: 'edit.png', width: 480 },
+                type: 'qwen_image_2_1_reference_image',
+              },
+              id: 'edit-1',
+              isEnabled: true,
+            },
+          ],
+        },
+        models: [],
+        supportedModels: [model],
+        vaeModels: [],
+      });
+    const diffusers = recall({ base: 'qwen-image-2-1', format: 'diffusers', key: 'q21', name: 'Q21', type: 'main' });
+    const gguf = recall({ base: 'qwen-image-2-1', format: 'gguf_quantized', key: 'q21-q4', name: 'Q4', type: 'main' });
+
+    expect(diffusers?.values.referenceImages).toEqual([
+      {
+        config: {
+          image: { original: { image: { height: 640, image_name: 'edit.png', width: 480 } } },
+          type: 'qwen_image_2_1_reference_image',
+        },
+        id: 'edit-1',
+        isEnabled: true,
+      },
+    ]);
+    expect(diffusers?.fields).toContain('referenceImages');
+    expect(gguf?.values.referenceImages).toEqual([]);
+    expect(gguf?.fields).not.toContain('referenceImages');
+  });
+
   it('preserves canonical original and crop provenance from legacy metadata', () => {
     const crop = {
       box: { height: 256, width: 320, x: 12, y: 24 },

@@ -79,8 +79,8 @@ jobs:
             # here than on linux, which runs it. macOS runs a different torch without bitsandbytes and keeps them.
             pytest-markers: 'not slow and not platform_independent and not ffmpeg'
             prepare-server-core: true
-            # Roughly 3x the job's ~5 min (pytest ~3 min, checkout, install and runner preparation ~2 min).
-            timeout-minutes: 15
+            # Job takes 10-15 min (runner prep ~3.5, pytest startup ~2, tests ~5-8); 30 leaves linux's and macOS's room.
+            timeout-minutes: 30
           - platform: windows-ffmpeg
             os: windows-2022
             github-env: $env:GITHUB_ENV
