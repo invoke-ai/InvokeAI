@@ -1,10 +1,12 @@
-import { Badge, Box, chakra, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
+import type { DonationMenuItemProps } from '@workbench/shell/DonationMenuItem';
+
+import { Badge, Box, chakra, HStack, Icon, Menu, Portal } from '@chakra-ui/react';
 import { AccountMenuSection, useCapabilities, useHasAccountSection } from '@features/identity';
 import { getQueueSummary } from '@features/queue/contracts';
 import { APP_VERSION, DOCS_URL } from '@platform/runtime/appMetadata';
 import { IconButton } from '@platform/ui/Button';
 import { InvokeMark } from '@platform/ui/InvokeMark';
-import { MenuContent } from '@platform/ui/Menu';
+import { MenuContent, MenuHeadingGroup } from '@platform/ui/Menu';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { DiscordIcon, LightbulbFilamentIcon } from '@platform/ui/VendoredIcon';
 import { useQueryClient } from '@tanstack/react-query';
@@ -19,7 +21,6 @@ import {
   BookOpenTextIcon,
   BlocksIcon,
   BoxIcon,
-  ChevronDownIcon,
   FolderIcon,
   HouseIcon,
   ListOrderedIcon,
@@ -30,6 +31,7 @@ import {
 import { useCallback, useState, type ComponentType, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { TopbarMenuChevron } from './TopbarMenuChevron';
 import { useTopbarShortcut } from './useTopbarShortcut';
 
 const MENU_POSITIONING = { placement: 'bottom-start' } as const;
@@ -66,7 +68,7 @@ export const AppMenu = () => {
   const queryClient = useQueryClient();
   // Rendered only once loaded: a lazy() boundary would suspend on open and React delays its reveal, shifting rows.
   // A chunk that fails to load (e.g. after an upgrade) leaves the optional link absent.
-  const [DonationMenuItem, setDonationMenuItem] = useState<ComponentType | null>(null);
+  const [DonationMenuItem, setDonationMenuItem] = useState<ComponentType<DonationMenuItemProps> | null>(null);
   const preloadDonationMenuItem = useCallback(() => {
     void loadDonationMenuItem().then(
       (module) => {
@@ -104,22 +106,15 @@ export const AppMenu = () => {
       <Portal>
         <Menu.Positioner>
           <MenuContent minW="15rem">
-            <HStack justify="space-between" px="3" py="2">
-              <Text fontWeight="800">Invoke</Text>
-              <Text color="fg.subtle" fontSize="xs">
-                v{APP_VERSION}
-              </Text>
-            </HStack>
-            <Menu.Separator />
-            <Menu.Item value="launchpad" onClick={openLaunchpad}>
-              <Icon as={HouseIcon} boxSize="3.5" />
-              <Menu.ItemText>{t('topbar.appMenu.launchpad')}</Menu.ItemText>
-            </Menu.Item>
+            <MenuHeadingGroup label="Invoke" trailing={`v${APP_VERSION}`}>
+              <Menu.Item value="launchpad" onClick={openLaunchpad}>
+                <Icon as={HouseIcon} boxSize="3.5" />
+                <Menu.ItemText>{t('topbar.appMenu.launchpad')}</Menu.ItemText>
+              </Menu.Item>
+            </MenuHeadingGroup>
             <Menu.Separator />
             <Menu.ItemGroup>
-              <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
-                {t('topbar.appMenu.manage')}
-              </Menu.ItemGroupLabel>
+              <Menu.ItemGroupLabel>{t('topbar.appMenu.manage')}</Menu.ItemGroupLabel>
               <Menu.Item value="projects" onClick={openProjects}>
                 <Icon as={FolderIcon} boxSize="3.5" />
                 <Menu.ItemText>{t('launchpad.sections.projects')}</Menu.ItemText>
@@ -150,6 +145,7 @@ export const AppMenu = () => {
                 ) : null}
               </Menu.Item>
             </Menu.ItemGroup>
+            {DonationMenuItem ? <DonationMenuItem separated /> : null}
             {hasAccount ? (
               <>
                 <Menu.Separator />
@@ -174,7 +170,6 @@ export const AppMenu = () => {
               />
               <AppMenuLink href={DISCORD_URL} icon={DiscordIcon} label="Discord" value="discord" />
             </HStack>
-            {DonationMenuItem ? <DonationMenuItem /> : null}
           </MenuContent>
         </Menu.Positioner>
       </Portal>
@@ -182,21 +177,12 @@ export const AppMenu = () => {
   );
 };
 
-const CHEVRON_HOVER_PROPS = { color: 'fg' } as const;
-
 const AppMenuGlyph = () => (
   <HStack gap="0" role="presentation">
     <Box alignItems="center" display="flex" justifyContent="center" w="8">
       <InvokeMark size={14} />
     </Box>
-    <Icon
-      as={ChevronDownIcon}
-      boxSize="3"
-      color="fg.subtle"
-      transition="color var(--wb-motion-duration-fast) ease"
-      _groupHover={CHEVRON_HOVER_PROPS}
-      _groupExpanded={CHEVRON_HOVER_PROPS}
-    />
+    <TopbarMenuChevron />
   </HStack>
 );
 

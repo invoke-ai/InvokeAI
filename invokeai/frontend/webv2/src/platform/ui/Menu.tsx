@@ -1,12 +1,24 @@
 import type { LucideIcon } from 'lucide-react';
 import type { ComponentProps, ReactNode, Ref } from 'react';
 
-import { Box, HStack, Icon, Menu, Portal, Stack, Text, useMenuContext, useMenuItemContext } from '@chakra-ui/react';
+import {
+  Box,
+  chakra,
+  HStack,
+  Icon,
+  Menu,
+  Portal,
+  Stack,
+  Text,
+  useMenuContext,
+  useMenuItemContext,
+} from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { createExternalStore } from '@platform/state/externalStore';
 import { useCallback, useId, useMemo } from 'react';
 
 import { IconButton, useUnavailableControl } from './Button';
+import { MiddleTruncate } from './MiddleTruncate';
 import { Tooltip } from './Tooltip';
 import { useRegisterWidgetOverlay } from './widgetOverlays';
 
@@ -18,6 +30,39 @@ export const MenuContent = (props: MenuContentProps) => {
   const stale = useRegisterWidgetOverlay(menu.open, menu.setOpen);
   return stale ? null : <Menu.Content {...props} />;
 };
+
+export interface MenuHeadingGroupProps {
+  /** What the menu acts on, often a user's name: kept in its own case and middle-truncated. */
+  label: string;
+  /** Plain state text on the heading's row, such as "Unsaved changes". */
+  trailing?: ReactNode;
+  children: ReactNode;
+}
+
+/**
+ * A menu's title over the items it names. It keeps the group label's size, weight, padding and height so a titled
+ * menu reads like every other one, and labels the group, so assistive technology hears it without a focusable row.
+ */
+export const MenuHeadingGroup = ({ children, label, trailing }: MenuHeadingGroupProps) => (
+  <Menu.ItemGroup>
+    <Menu.ItemGroupLabel
+      alignItems="center"
+      color="fg.muted"
+      display="flex"
+      gap="2"
+      letterSpacing="normal"
+      textTransform="none"
+    >
+      <MiddleTruncate flex="1" text={label} />
+      {trailing ? (
+        <chakra.span color="fg.subtle" flexShrink={0} fontWeight="normal">
+          {trailing}
+        </chakra.span>
+      ) : null}
+    </Menu.ItemGroupLabel>
+    {children}
+  </Menu.ItemGroup>
+);
 
 const UNAVAILABLE_REASON_POSITIONING = { placement: 'right' } as const;
 

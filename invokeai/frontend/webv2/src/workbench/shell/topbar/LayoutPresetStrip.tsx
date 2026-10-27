@@ -23,8 +23,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { IconButton } from '@platform/ui/Button';
-import { MenuContent } from '@platform/ui/Menu';
-import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { MenuContent, MenuHeadingGroup } from '@platform/ui/Menu';
 import { Tabs } from '@platform/ui/Tabs';
 import { Tooltip, TooltipGroup } from '@platform/ui/Tooltip';
 import { getPlacedWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
@@ -573,54 +572,46 @@ const PresetMenu = ({
       <Portal>
         <Menu.Positioner>
           <MenuContent minW="16rem">
-            <HStack justify="space-between" px="3" py="2">
-              <MiddleTruncate fontSize="md" fontWeight="700" text={preset.label} />
-              {isUnsaved ? (
-                <Text color="fg.muted" fontSize="xs" flexShrink={0}>
-                  {t('topbar.presets.unsaved')}
-                </Text>
-              ) : null}
-            </HStack>
-            <Menu.Separator />
-
-            {isActive ? null : (
-              <Menu.Item value="apply-preset" onClick={apply}>
-                <Icon as={ArrowRightIcon} boxSize="3.5" />
-                <Menu.ItemText>{t('topbar.presets.switch')}</Menu.ItemText>
-              </Menu.Item>
-            )}
-
-            {/* An inactive preset with a working copy here saves or reverts without switching to it. */}
-            {isActive || isUnsaved ? (
-              <>
-                {isUnsaved ? (
-                  <Menu.Item value="revert-layout" onClick={revert}>
-                    <Icon as={RotateCcwIcon} boxSize="3.5" />
-                    <Menu.ItemText>{t('topbar.presets.revert')}</Menu.ItemText>
-                  </Menu.Item>
-                ) : null}
-                <Menu.Item value="save-layout" onClick={save}>
-                  <Icon as={SaveIcon} boxSize="3.5" />
-                  <Menu.ItemText>{t('topbar.presets.saveChanges')}</Menu.ItemText>
-                  {isActive && saveShortcut ? (
-                    <Text color="fg.subtle" fontSize="xs" ms="auto">
-                      {saveShortcut}
-                    </Text>
-                  ) : null}
+            <MenuHeadingGroup label={preset.label} trailing={isUnsaved ? t('topbar.presets.unsaved') : null}>
+              {isActive ? null : (
+                <Menu.Item value="apply-preset" onClick={apply}>
+                  <Icon as={ArrowRightIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('topbar.presets.switch')}</Menu.ItemText>
                 </Menu.Item>
-              </>
-            ) : null}
+              )}
 
-            <Menu.Item value="edit-preset" onClick={edit}>
-              <Icon as={PencilIcon} boxSize="3.5" />
-              <Menu.ItemText>{t('topbar.presets.editWithEllipsis')}</Menu.ItemText>
-            </Menu.Item>
-            {isCustom ? (
-              <Menu.Item data-danger="" value="delete-preset" onClick={remove}>
-                <Icon as={Trash2Icon} boxSize="3.5" />
-                <Menu.ItemText>{t('topbar.presets.deleteWithEllipsis')}</Menu.ItemText>
+              {/* An inactive preset with a working copy here saves or reverts without switching to it. */}
+              {isActive || isUnsaved ? (
+                <>
+                  {isUnsaved ? (
+                    <Menu.Item value="revert-layout" onClick={revert}>
+                      <Icon as={RotateCcwIcon} boxSize="3.5" />
+                      <Menu.ItemText>{t('topbar.presets.revert')}</Menu.ItemText>
+                    </Menu.Item>
+                  ) : null}
+                  <Menu.Item value="save-layout" onClick={save}>
+                    <Icon as={SaveIcon} boxSize="3.5" />
+                    <Menu.ItemText>{t('topbar.presets.saveChanges')}</Menu.ItemText>
+                    {isActive && saveShortcut ? (
+                      <Text color="fg.subtle" fontSize="xs" ms="auto">
+                        {saveShortcut}
+                      </Text>
+                    ) : null}
+                  </Menu.Item>
+                </>
+              ) : null}
+
+              <Menu.Item value="edit-preset" onClick={edit}>
+                <Icon as={PencilIcon} boxSize="3.5" />
+                <Menu.ItemText>{t('topbar.presets.editWithEllipsis')}</Menu.ItemText>
               </Menu.Item>
-            ) : null}
+              {isCustom ? (
+                <Menu.Item data-danger="" value="delete-preset" onClick={remove}>
+                  <Icon as={Trash2Icon} boxSize="3.5" />
+                  <Menu.ItemText>{t('topbar.presets.deleteWithEllipsis')}</Menu.ItemText>
+                </Menu.Item>
+              ) : null}
+            </MenuHeadingGroup>
 
             <Menu.Separator />
             <Menu.Item value="manage-presets" onClick={manage}>

@@ -181,6 +181,32 @@ describe('ProjectSwitcher', () => {
     await vi.waitFor(() => expect(document.querySelector('[role="dialog"][data-state="open"]')).not.toBeNull());
   });
 
+  it('brightens the trigger chevron while hovered and while the menu is open, like the app menu', async () => {
+    const resolveColor = (token: string) => {
+      const probe = document.createElement('span');
+      probe.style.color = system.token.var(`colors.${token}`);
+      host!.append(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    };
+    const subtle = resolveColor('fg.subtle');
+    const bright = resolveColor('fg');
+    const trigger = document.querySelector<HTMLElement>('button[aria-label="topbar.projectSwitcher.trigger"]')!;
+    const chevron = [...trigger.querySelectorAll('svg')].at(-1)!;
+    const chevronColor = () => getComputedStyle(chevron).color;
+
+    expect(subtle).not.toBe(bright);
+    await vi.waitFor(() => expect(chevronColor()).toBe(bright));
+
+    await act(() => setProjectSwitcherOpen(false));
+    await act(() => userEvent.unhover(trigger));
+    await vi.waitFor(() => expect(chevronColor()).toBe(subtle));
+
+    await act(() => userEvent.hover(trigger));
+    await vi.waitFor(() => expect(chevronColor()).toBe(bright));
+  });
+
   it('flushes an immediate debounced prompt edit before reading and exporting the project', async () => {
     let exportItem: HTMLElement | undefined;
 

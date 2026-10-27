@@ -770,11 +770,25 @@ const runTopbarMenuJourney = async (browser) => {
     });
     assert.equal(await page.getByRole('tooltip', { name: /^Command palette/ }).count(), 0);
 
+    // Donate is its own group right after Manage (ending with Queue), above the footer icon row; this mock journey
+    // is single-user, so no account section sits between them.
+    const menuItemValues = await appMenu.evaluate((menu) =>
+      [...menu.querySelectorAll('[role="menuitem"]')].map((item) => item.getAttribute('data-value'))
+    );
+    assert.deepEqual(menuItemValues.slice(menuItemValues.indexOf('queue')), [
+      'queue',
+      'donate',
+      'command-palette',
+      'settings',
+      'whats-new',
+      'documentation',
+      'discord',
+    ]);
+    const queueItem = appMenu.locator('[role="menuitem"][data-value="queue"]');
+
     await appMenu.press('End');
-    assert.equal(await appMenu.getAttribute('aria-activedescendant'), await donationItem.getAttribute('id'));
-    await appMenu.press('ArrowUp');
     assert.equal(await appMenu.getAttribute('aria-activedescendant'), await discordItem.getAttribute('id'));
-    for (const item of [documentationItem, whatsNewItem, settingsItem, commandPaletteItem]) {
+    for (const item of [documentationItem, whatsNewItem, settingsItem, commandPaletteItem, donationItem, queueItem]) {
       await appMenu.press('ArrowUp');
       assert.equal(await appMenu.getAttribute('aria-activedescendant'), await item.getAttribute('id'));
     }

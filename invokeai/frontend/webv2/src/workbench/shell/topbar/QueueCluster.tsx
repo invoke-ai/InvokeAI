@@ -21,9 +21,11 @@ import { getDestinationLabel, getSourceLabel } from '@workbench/invocation';
 import { useActiveQueueProgress } from '@workbench/queue-integration/useActiveQueueProgress';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
-import { ChevronDownIcon, ListOrderedIcon, ListXIcon, PauseIcon, XIcon } from 'lucide-react';
+import { ListOrderedIcon, ListXIcon, PauseIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useState, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { TopbarMenuChevron } from './TopbarMenuChevron';
 
 const TOOLTIP_CONTENT_PROPS = { maxW: '22rem', p: '0' };
 
@@ -150,13 +152,13 @@ export const QueueCluster = () => {
         <Menu.Trigger asChild>
           <IconButton
             aria-label={t('topbar.queue.actions')}
-            color="fg.subtle"
+            className="group"
             size="lg"
             minW="0"
             w="6"
             variant="outline"
           >
-            <Icon as={ChevronDownIcon} />
+            <TopbarMenuChevron fillTrigger />
           </IconButton>
         </Menu.Trigger>
       </Group>
