@@ -825,7 +825,11 @@ _PREFIXED_QWEN_IMAGE_BLOCK_KEY_RE = re.compile(
 
 
 def _has_prefixed_qwen_image_lora_keys(state_dict: dict[str | int, Any]) -> bool:
-    return any(isinstance(key, str) and _PREFIXED_QWEN_IMAGE_BLOCK_KEY_RE.match(key) for key in state_dict)
+    keys = [key for key in state_dict if isinstance(key, str)]
+    # PEFT DoRA magnitudes are not mapped yet (#9558): the converter would fail on every generation.
+    if any(key.endswith(".lora_magnitude_vector") for key in keys):
+        return False
+    return any(_PREFIXED_QWEN_IMAGE_BLOCK_KEY_RE.match(key) for key in keys)
 
 
 class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):

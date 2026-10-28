@@ -145,6 +145,17 @@ def test_a_prefixed_lora_without_a_qwen_image_only_module_is_not_claimed(
         LoRA_LyCORIS_QwenImage_Config.from_model_on_disk(_make_mod(path, _lora(layers)), _overrides(path))
 
 
+def test_a_prefixed_peft_dora_is_not_claimed(tmp_path: Path) -> None:
+    """PEFT DoRA magnitudes are not mapped yet, so claiming the file would install a LoRA that fails to apply."""
+    sd = _qwen_image_lora("base_model.model.")
+    for key in [key for key in sd if key.endswith(".lora_B.weight")]:
+        sd[key.removesuffix(".lora_B.weight") + ".lora_magnitude_vector"] = _z(sd[key].shape[0])
+    path = tmp_path / "adapter_model.safetensors"
+
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_QwenImage_Config.from_model_on_disk(_make_mod(path, sd), _overrides(path))
+
+
 def test_a_prefixed_lokr_is_not_claimed(tmp_path: Path) -> None:
     """The converter cannot group dotted LoKr keys, so claiming one would install a LoRA that fails to apply."""
     sd: dict[str, torch.Tensor] = {}

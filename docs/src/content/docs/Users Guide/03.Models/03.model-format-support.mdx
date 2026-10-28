@@ -115,7 +115,7 @@ not check, so a quantized file there fails with an unclear error or decodes inco
 | LTX-2, MiniMax H3 | ✓ (plain low-rank; LoKR, LoHA and DoRA are refused) | ✗ | |
 | SD 3, CogView4, Ideogram 4, ERNIE-Image, Qwen-Image-2.1, MOSS-Image | ✗ | ✗ | |
 
-Qwen-Image LoRAs also load in ComfyUI's `diffusion_model.` key layout and as raw PEFT adapters
+Plain Qwen-Image LoRAs also load in ComfyUI's `diffusion_model.` key layout and as raw PEFT adapters
 (`base_model.model.`) when they train the blocks' modulation or MLP layers; see the
 [family page](/users-guide/models/local-models/qwen-image/#lora).
 
