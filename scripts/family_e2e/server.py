@@ -17,6 +17,8 @@ import socket
 import subprocess
 import sys
 import time
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Any
@@ -538,27 +540,44 @@ def launch_server(
     log_path: Path,
     console_path: Path,
     device_env: dict[str, str] | None = None,
+    *,
+    registration: AbstractContextManager[Callable[[int], None]],
 ) -> ServerProcess:
-    """Starts the server on a prepared scratch root and waits until its API answers."""
+    """Starts the server on a prepared scratch root and waits until its API answers.
+
+    The spawn happens inside `registration`, which yields what records the launcher's pid; it is called right after
+    the spawn, still inside, and the wait for the server follows outside it. On POSIX the server outlives a runner
+    killed while it starts, and only what the runner records then names it for `stop` and `resume`: the runner's
+    registration holds the run lock and refuses to enter once the run is stopped (`_Session.server_registration`).
+    The one wait inside it: when recording the pid fails, the server is killed and waited for before the registration
+    ends, since a `stop` after it would find that server in no heartbeat.
+    """
     env = server_env(spec, device_env)
     invokeai_file = verify_interpreter(spec, env)
     cmd = [str(spec.python), str(spec.code_dir / "scripts" / "invokeai-web.py"), "--root", str(scratch_root)]
     log_offset = log_path.stat().st_size if log_path.exists() else 0
     console = console_path.open("ab")
+    process: subprocess.Popen[bytes] | None = None
+    job: KillOnCloseJob | None = None
     try:
-        process, job = spawn_in_job(
-            cmd, cwd=spec.code_dir, env=env, stdin=subprocess.DEVNULL, stdout=console, stderr=subprocess.STDOUT
-        )
-    except BaseException:
-        console.close()
-        raise
-    try:
+        with registration as on_spawn:
+            process, job = spawn_in_job(
+                cmd, cwd=spec.code_dir, env=env, stdin=subprocess.DEVNULL, stdout=console, stderr=subprocess.STDOUT
+            )
+            try:
+                on_spawn(process.pid)
+            except BaseException:
+                terminate(process, job)
+                process = None
+                raise
         port = _wait_for_port(process, log_path, log_offset, console_path)
         base_url = f"http://127.0.0.1:{port}"
         _wait_for_api(process, base_url, console_path)
         serving = _serving_process(process.pid, port)
     except BaseException:
-        terminate(process, job)
+        # A recorded server is killed outside the registration: `stop` finds it, and the run lock is not kept waiting.
+        if process is not None:
+            terminate(process, job)
         console.close()
         raise
     return ServerProcess(process, console, log_path, base_url, serving, cmd, invokeai_file, job)

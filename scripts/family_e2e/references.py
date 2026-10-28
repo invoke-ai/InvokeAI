@@ -50,6 +50,9 @@ def accept(data_dir: Path, run_dir: Path, case_keys: list[str] | None) -> list[R
     arms = sorted(set(info.environments) | {r.arm for r in records})
     if arms != [DEFAULT_ARM]:
         raise AcceptError(f"run {info.run_id} has arms {', '.join(arms)}; references come only from normal runs")
+    if info.calibrate:
+        # The probe changes time and VRAM; a reference from such a run would be rated against normal runs.
+        raise AcceptError(f"run {info.run_id} is a calibration run; references come only from normal runs")
     environment = info.environments.get(DEFAULT_ARM)
     if environment is None:
         raise AcceptError(f"run {info.run_id} has no recorded environment")

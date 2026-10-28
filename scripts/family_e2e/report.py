@@ -166,6 +166,9 @@ def render_report(
         for (arm, case_key), case_records in _group(info, records).items()
     ]
     notes = [scrubber.text(note) for note in context.history.notes]
+    if info.calibrate:
+        exports = ", ".join(export.export for export in info.calibration_exports) or "none saved"
+        notes.insert(0, f"Calibration run: time and VRAM are not rated. Store exports: {exports}.")
     run_status = status or info.status
     return RenderedReport(
         html=_render_html(context, cases, notes, href, run_status),
@@ -239,7 +242,7 @@ class _History:
         """The latest earlier normal run with completed measured records of `case_key`."""
         for run_dir in self._candidates:
             run = self._load(run_dir)
-            if run is None:
+            if run is None or run.info.calibrate:
                 continue
             case_records = [r for r in run.records if r.case_key == case_key and r.arm == DEFAULT_ARM]
             records = [r for r in _final_records(case_records) if r.kind == "measure" and r.status == "completed"]
