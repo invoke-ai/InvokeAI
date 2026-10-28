@@ -408,7 +408,11 @@ const BoardDownloadMenuItem = ({ board }: { board: GalleryBoard }) => {
   return (
     <BoardMenuItem
       icon={DownloadIcon}
-      label={t('widgets.gallery.downloadBoardWithOmission', { count: board.videoCount })}
+      label={
+        board.videoCount > 0
+          ? t('widgets.gallery.downloadBoardWithOmission', { count: board.videoCount })
+          : t('widgets.gallery.downloadBoard')
+      }
       value="download-board"
       onClick={handleClick}
     />

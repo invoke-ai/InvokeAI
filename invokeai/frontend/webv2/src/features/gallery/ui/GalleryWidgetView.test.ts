@@ -46,7 +46,7 @@ describe('mixed-media gallery translations', () => {
       })
     ).toBe('2 images · 3 videos · 4 uploads');
     expect(instance.t('widgets.gallery.downloadBoardWithOmission', { count: 2 })).toBe(
-      'Download Board (2 videos omitted)'
+      'Download board (2 videos omitted)'
     );
     expect(
       instance.t('widgets.gallery.uploadSummary', {

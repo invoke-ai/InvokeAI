@@ -22,12 +22,13 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.boardItemCounts': `${String(values?.images)} · ${String(values?.videos)} · ${String(
           values?.assets
         )}`,
-        'widgets.gallery.deleteBoard': 'Delete Board',
-        'widgets.gallery.deleteBoardAndMedia': 'Delete Board and Media',
+        'widgets.gallery.deleteBoard': 'Delete board',
+        'widgets.gallery.deleteBoardAndMedia': 'Delete board and media',
         'widgets.gallery.deleteBoardDescription': 'Choose whether the board media moves or is deleted.',
-        'widgets.gallery.deleteBoardOnly': 'Delete Board Only',
+        'widgets.gallery.deleteBoardOnly': 'Delete board only',
         'widgets.gallery.deleteBoardQuestion': `Delete board "${String(values?.name)}"?`,
-        'widgets.gallery.downloadBoardWithOmission': `Download Board (${String(values?.count)} video omitted)`,
+        'widgets.gallery.downloadBoard': 'Download board',
+        'widgets.gallery.downloadBoardWithOmission': `Download board (${String(values?.count)} video omitted)`,
         'widgets.gallery.imageCount': `${String(values?.count)} images`,
         'widgets.gallery.videoCount': `${String(values?.count)} videos`,
         'widgets.gallery.boardGroups.library': 'Library',
@@ -109,12 +110,19 @@ afterEach(async () => {
 });
 
 it('states the exact number of videos omitted from the image-only board archive', () => {
-  expect(document.body.textContent).toContain('Download Board (1 video omitted)');
+  expect(document.body.textContent).toContain('Download board (1 video omitted)');
+});
+
+it('offers a plain board download when the board holds no videos', async () => {
+  await renderMenuFor({ ...board, videoCount: 0 } as GalleryBoard);
+
+  expect(menuItemLabels()).toContain('Download board');
+  expect(document.body.textContent).not.toContain('omitted');
 });
 
 it('shows image, video, and asset counts before deleting a mixed-media board', async () => {
   const deleteItem = Array.from(document.querySelectorAll('[role="menuitem"]')).find(
-    (element) => element.textContent === 'Delete Board'
+    (element) => element.textContent === 'Delete board'
   );
 
   expect(deleteItem).toBeDefined();
@@ -123,7 +131,7 @@ it('shows image, video, and asset counts before deleting a mixed-media board', a
   await vi.waitFor(() => {
     expect(document.body.textContent).toContain('2 images · 1 videos · 0 assets');
   });
-  expect(document.body.textContent).toContain('Delete Board and Media');
+  expect(document.body.textContent).toContain('Delete board and media');
 });
 
 it('makes the board the auto-add destination', async () => {
@@ -223,7 +231,7 @@ it('leaves an inbox with only the actions its project does not own', async () =>
 
   expect(labels).toContain('widgets.gallery.exportProjectFromBoard');
   expect(labels).not.toContain('Move to…');
-  expect(labels).not.toContain('Delete Board');
+  expect(labels).not.toContain('Delete board');
   expect(labels).not.toContain('widgets.gallery.renameBoard');
 });
 
@@ -252,7 +260,7 @@ const ALL_ACTIONS: GalleryBoardAction[] = [
 it('offers a viewer only what they may do, and says whose board it is and whom to ask', async () => {
   await renderMenuFor(withAccess('viewer', ['read']), { boardSharing: true });
 
-  expect(menuItemLabels()).toEqual(['Download Board (1 video omitted)']);
+  expect(menuItemLabels()).toEqual(['Download board (1 video omitted)']);
   expect(document.body.textContent).toContain('widgets.gallery.boardAccess.header.viewer');
   expect(document.body.textContent).toContain('widgets.gallery.boardAccess.askToAdd');
 });
@@ -264,7 +272,7 @@ it('lets an editor rename and archive someone else’s board, but not move, shar
 
   expect(menuItemLabels()).toEqual([
     'widgets.gallery.autoAddToBoard',
-    'Download Board (1 video omitted)',
+    'Download board (1 video omitted)',
     'widgets.gallery.renameBoard',
     'widgets.gallery.archiveBoard',
   ]);
@@ -297,7 +305,7 @@ it('gives an admin someone else’s board to manage, but no move into their own 
 
   const labels = menuItemLabels();
   expect(document.body.textContent).toContain('widgets.gallery.boardAccess.header.admin');
-  expect(labels).toContain('Delete Board');
+  expect(labels).toContain('Delete board');
   expect(labels).not.toContain('Move to…');
 });
 
