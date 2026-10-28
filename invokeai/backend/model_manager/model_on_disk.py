@@ -81,6 +81,15 @@ def _safetensors_meta_state_dict(path: Path) -> StateDict:
     }
 
 
+def unwrap_state_dict(checkpoint: dict[Any, Any]) -> StateDict:
+    """A checkpoint's weights: training checkpoints nest them under `state_dict`.
+
+    Identification reads its state dicts through this (`ModelOnDisk.load_state_dict`). A loader that reads a pickle
+    itself unwraps through it too, so it loads the weights identification accepted.
+    """
+    return checkpoint.get("state_dict", checkpoint)
+
+
 def _is_sdnq_safetensors(path: Path) -> bool:
     """Check if a safetensors file contains SDNQ-quantized weights by checking for weight+scale pairs."""
     try:
@@ -216,7 +225,7 @@ class ModelOnDisk:
             else:
                 raise ValueError(f"Unrecognized model extension: {path.suffix}")
 
-        state_dict = checkpoint.get("state_dict", checkpoint)
+        state_dict = unwrap_state_dict(checkpoint)
 
         # Normalize PEFT named-adapter keys (e.g. `lora_A.default.weight` → `lora_A.weight`).
         # Pattern is LoRA-specific, so this is a no-op for non-LoRA state dicts.

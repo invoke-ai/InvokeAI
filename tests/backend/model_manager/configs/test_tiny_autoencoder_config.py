@@ -113,6 +113,34 @@ def test_the_install_url_names_a_file_its_own_name_does_not(tmp_path: Path, sour
     assert _single_tae(_identify(path, source=source, source_type="url")).base is base
 
 
+def _moved(tmp_path: Path) -> Path:
+    """Where an install moves `diffusion_pytorch_model.safetensors`: a folder named for the record's key."""
+    (tmp_path / "0123abcd").mkdir()
+    return _write(tmp_path / "0123abcd" / "diffusion_pytorch_model.safetensors", TAESD3, combined=True)
+
+
+@pytest.mark.parametrize(
+    ("source", "base"),
+    [
+        (r"C:\Users\me\Downloads\taef1\diffusion_pytorch_model.safetensors", BaseModelType.Flux),
+        ("/home/me/downloads/taesd3/diffusion_pytorch_model.safetensors", BaseModelType.StableDiffusion3),
+    ],
+)
+def test_a_moved_local_install_is_named_by_the_folder_of_its_source_path_from_either_os(
+    tmp_path: Path, source: str, base: BaseModelType
+) -> None:
+    """Re-identification reads the file and folder name of the recorded source, whichever OS recorded it."""
+    assert _single_tae(_identify(_moved(tmp_path), source=source, source_type="path")).base is base
+
+
+def test_an_ancestor_folder_of_a_local_source_path_does_not_name_the_tae(tmp_path: Path) -> None:
+    """Only the source's file and folder name are evidence, not the folders the user keeps those in."""
+    result = _identify(_moved(tmp_path), source=r"C:\taef1\Downloads\diffusion_pytorch_model.safetensors")
+
+    assert result.config is None
+    assert result.invalid_matches
+
+
 @pytest.mark.parametrize("base", [BaseModelType.StableDiffusion3, BaseModelType.Flux])
 def test_a_base_override_decides_within_the_shared_family(tmp_path: Path, base: BaseModelType) -> None:
     """The starter installer always sends the base; it outranks a name that says otherwise."""

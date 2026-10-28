@@ -15,6 +15,7 @@ from invokeai.app.util import tiny_autoencoder_previews
 from invokeai.app.util.step_callback import render_linear_preview
 from invokeai.app.util.tiny_autoencoder_previews import TinyAutoencoderPreviews, tiny_autoencoder_starters
 from invokeai.backend.architectures import resolve_latent_space
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.stable_diffusion.extensions.preview import PipelineIntermediateState
 from invokeai.backend.tiny_autoencoder.checkpoint import TAEW2_1, build_taehv_decoder
@@ -33,6 +34,13 @@ class _Store:
         return [config for config in self.configs if model_type is None or config.type == model_type]
 
 
+def _model_load_lock_state() -> str | None:
+    """How MODEL_LOAD_LOCK is held right now. These tests run on one thread, so any holder is the code under test."""
+    if MODEL_LOAD_LOCK._writer_active:
+        return "write"
+    return "read" if MODEL_LOAD_LOCK._readers else None
+
+
 class _LoadedModel:
     """A cache entry: counts locks, and reports how much of the decoder a lock leaves resident.
 
@@ -48,6 +56,7 @@ class _LoadedModel:
         self.locks_taken = 0
         self.locks_held = 0
         self.working_mem_requests: list[int | None] = []
+        self.model_load_lock_at_lock: list[str | None] = []
 
     @property
     def resident_weight_bytes(self) -> int:
@@ -58,6 +67,7 @@ class _LoadedModel:
     @contextmanager
     def model_on_device(self, working_mem_bytes: int | None = None):
         self.working_mem_requests.append(working_mem_bytes)
+        self.model_load_lock_at_lock.append(_model_load_lock_state())
         self.locks_taken += 1
         self.locks_held += 1
         try:
@@ -81,13 +91,17 @@ class _Load:
         self.loaded = loaded
         self.loads = 0
         self.error = error
+        # (call, how MODEL_LOAD_LOCK was held during it), in call order.
+        self.model_load_lock_during: list[tuple[str, str | None]] = []
 
         def make_room_in_vram(_needed: int, working_mem_bytes: int | None = None) -> int:
+            self.model_load_lock_during.append(("make_room_in_vram", _model_load_lock_state()))
             return vram_available - max(0, (working_mem_bytes or 0) - working_mem_floor)
 
         self.ram_cache = SimpleNamespace(make_room_in_vram=make_room_in_vram)
 
     def load_model(self, config, submodel_type=None, user_id=None) -> _LoadedModel:
+        self.model_load_lock_during.append(("load_model", _model_load_lock_state()))
         self.loads += 1
         if self.error is not None:
             raise self.error
@@ -352,6 +366,22 @@ def test_tae_left_partly_in_ram_by_its_lock_is_released_and_renders_linear(caplo
     assert decodes == []
     assert (load.loads, load.loaded.locks_taken, load.loaded.locks_held) == (1, 1, 0)
     assert len(_messages(caplog, logging.INFO)) == 1
+
+
+def test_the_fit_check_offloads_under_the_model_load_read_lock_and_loads_and_locks_outside_it() -> None:
+    """The offload is a VRAM move: a construction on another worker would strand the weights it registers on `meta`
+    unless it holds the read lock, as every VRAM move does. The load (a writer on a cache miss) and the lock take
+    MODEL_LOAD_LOCK themselves, and the lock is not reentrant: held around either, it would deadlock."""
+    # Locked half-resident, so the invocation stops before decoding on a device it does not have.
+    loaded = _LoadedModel(_decoder(), device="cuda", resident_fraction_when_locked=0.5)
+    load = _Load(loaded, vram_available=loaded.weight_bytes)
+    previews = _previews(_services(_Store([_tae_config()]), load))
+
+    previews.render(BaseModelType.StableDiffusion1, _sample())
+
+    assert load.model_load_lock_during == [("load_model", None), ("make_room_in_vram", "read")]
+    assert loaded.model_load_lock_at_lock == [None]
+    assert _model_load_lock_state() is None
 
 
 def test_tae_that_would_not_fit_in_vram_is_never_locked(caplog: pytest.LogCaptureFixture) -> None:

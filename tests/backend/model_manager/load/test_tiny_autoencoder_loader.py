@@ -7,6 +7,7 @@ import pytest
 import torch
 from safetensors.torch import save_file
 
+from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
 from invokeai.backend.model_manager.configs.tiny_autoencoder import (
     TinyAutoencoder_Checkpoint_Config_Base,
     TinyAutoencoder_Checkpoint_FLUX_Config,
@@ -78,6 +79,23 @@ def test_a_comfyui_pth_decoder_loads(tmp_path: Path) -> None:
     torch.save(native, tmp_path / "taesd_decoder.pth")
 
     _assert_holds(_load(tmp_path / "taesd_decoder.pth"), native)
+
+
+def test_a_pth_decoder_wrapped_as_a_training_checkpoint_identifies_and_loads_the_weights_it_wraps(
+    tmp_path: Path,
+) -> None:
+    """Training checkpoints nest their weights under `state_dict`. Identification unwraps them, so the loader must
+    too: otherwise the file installs, then fails to load and every preview falls back to linear."""
+    native = native_weights(TAESD)
+    path = tmp_path / "taesd_decoder.pth"
+    torch.save({"state_dict": native}, path)
+
+    identified = ModelConfigFactory.from_model_on_disk(
+        path, {"hash": "blake3:fake", "file_size": 1, "source": str(path), "source_type": "path"}
+    ).config
+
+    assert isinstance(identified, TinyAutoencoder_Checkpoint_SD1_Config)
+    _assert_holds(_load(path, type(identified)), native)
 
 
 def test_the_decoder_takes_the_loaders_dtype(tmp_path: Path) -> None:
