@@ -2,10 +2,10 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 811093,
+        "brotliBytes": 811112,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 810254,
+        "gzipBytes": 810292,
         "imageRawBytes": 44398,
         "initialRawBytes": 2092633,
         "largestAssetRawBytes": 751877,
@@ -354,15 +354,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1227918,
+        "brotliBytes": 1229781,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1220426,
+        "gzipBytes": 1222575,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3385928,
+        "initialRawBytes": 3390831,
         "largestAssetRawBytes": 751877,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 157416,
+        "ownedRawBytes": 161059,
         "requestCount": 71,
         "scriptRequestCount": 55,
         "sourceOwners": [
@@ -791,6 +791,7 @@
           "source:src/platform/ui/RetryBoundary.tsx",
           "source:src/platform/ui/Row.tsx",
           "source:src/platform/ui/Scrollable.tsx",
+          "source:src/platform/ui/ScrollableMenuContent.tsx",
           "source:src/platform/ui/SeedInput.tsx",
           "source:src/platform/ui/SegmentTabs.tsx",
           "source:src/platform/ui/SegmentedControl.tsx",
@@ -828,6 +829,7 @@
           "source:src/platform/ui/theme/themes.ts",
           "source:src/platform/ui/toaster.tsx",
           "source:src/platform/ui/useScrollAreaPhantomHeal.ts",
+          "source:src/platform/ui/wheelScrollsHorizontally.ts",
           "source:src/platform/ui/widgetOverlayRegistry.ts",
           "source:src/platform/ui/widgetOverlays.ts",
           "source:src/workbench/WorkbenchContext.tsx",
@@ -1011,6 +1013,7 @@
           "source:src/workbench/settings/store.ts",
           "source:src/workbench/shell/BottomPanel.tsx",
           "source:src/workbench/shell/CenterArea.tsx",
+          "source:src/workbench/shell/ChromeIsland.tsx",
           "source:src/workbench/shell/DocumentTitleProgress.tsx",
           "source:src/workbench/shell/Panels.tsx",
           "source:src/workbench/shell/PasteMediaRuntime.tsx",
