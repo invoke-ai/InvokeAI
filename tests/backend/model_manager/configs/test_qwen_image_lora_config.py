@@ -2,7 +2,7 @@
 
 Most Qwen-Image LoRAs on Hugging Face prefix their keys with ComfyUI's `diffusion_model.`, and raw PEFT adapters
 with `base_model.model.`. Other families' LoRAs carry the same prefixes, so a prefixed file is claimed only when
-it names a module that Qwen-Image's dual-stream blocks alone have.
+it has low-rank weights on a module that Qwen-Image's dual-stream blocks alone have.
 """
 
 from pathlib import Path
@@ -126,6 +126,14 @@ def test_only_the_qwen_image_probe_claims_a_qwen_image_lora(prefix: str, tmp_pat
             {"diffusion_model.transformer_blocks.0.attn.to_q": (3072, 3072)},
             id="attention-only",
         ),
+        pytest.param(
+            # Qwen-Image-2.1's blocks name their MLP `img_mlp.proj` / `img_mlp.out`, not `img_mlp.net`.
+            {
+                "diffusion_model.transformer_blocks.0.img_mlp.proj": (4096, 16384),
+                "diffusion_model.transformer_blocks.0.img_mlp.out": (16384, 4096),
+            },
+            id="qwen-image-2.1-mlp",
+        ),
     ],
 )
 def test_a_prefixed_lora_without_a_qwen_image_only_module_is_not_claimed(
@@ -135,3 +143,15 @@ def test_a_prefixed_lora_without_a_qwen_image_only_module_is_not_claimed(
 
     with pytest.raises(NotAMatchError):
         LoRA_LyCORIS_QwenImage_Config.from_model_on_disk(_make_mod(path, _lora(layers)), _overrides(path))
+
+
+def test_a_prefixed_lokr_is_not_claimed(tmp_path: Path) -> None:
+    """The converter cannot group dotted LoKr keys, so claiming one would install a LoRA that fails to apply."""
+    sd: dict[str, torch.Tensor] = {}
+    for module, (in_features, out_features) in _QWEN_IMAGE_BLOCK_LINEARS.items():
+        sd[f"diffusion_model.transformer_blocks.0.{module}.lokr_w1"] = _z(16, 16)
+        sd[f"diffusion_model.transformer_blocks.0.{module}.lokr_w2"] = _z(out_features // 16, in_features // 16)
+    path = tmp_path / "lokr.safetensors"
+
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_QwenImage_Config.from_model_on_disk(_make_mod(path, sd), _overrides(path))

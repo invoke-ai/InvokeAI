@@ -3,7 +3,7 @@
 Qwen Image uses QwenImageTransformer2DModel architecture.
 Supports multiple LoRA formats:
 - Diffusers/PEFT: transformer_blocks.0.attn.to_k.lora_down.weight
-- With prefix: transformer.transformer_blocks.0.attn.to_k.lora_down.weight (also diffusion_model., base_model.model.)
+- With prefix: transformer.transformer_blocks.0.attn.to_k.lora_down.weight (also diffusion_model./base_model.model.)
 - Kohya: lora_unet_transformer_blocks_0_attn_to_k.lora_down.weight (underscores instead of dots)
 """
 
@@ -84,7 +84,8 @@ def lora_model_from_qwen_image_state_dict(
 
     Handles three key formats:
     - Diffusers/PEFT: transformer_blocks.0.attn.to_k.lora_down.weight
-    - With prefix: transformer.transformer_blocks.0.attn.to_k.lora_down.weight (also diffusion_model., base_model.model.)
+    - With prefix: transformer.transformer_blocks.0.attn.to_k.lora_down.weight
+      (also diffusion_model., base_model.model.)
     - Kohya: lora_unet_transformer_blocks_0_attn_to_k.lora_down.weight
     """
     is_kohya = is_state_dict_likely_kohya_qwen_image(state_dict)
