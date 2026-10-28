@@ -3,7 +3,7 @@ import type { BackendGraphContract, BackendInvocationContract } from '@features/
 import { getArchitectureFeatures } from '@features/generation/core/architectureCapabilities';
 import { addEdge, addNode } from '@features/generation/core/graphBuilder';
 import { COMPEL_PROMPT_NODE_TYPES } from '@features/generation/core/prompt/compel';
-import { unwrapPromptFence } from '@features/generation/core/prompt/jsonPrompt';
+import { unwrapPromptFence } from '@features/generation/core/promptTemplates';
 
 import type { Rect } from './types';
 

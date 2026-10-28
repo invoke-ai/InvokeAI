@@ -1281,7 +1281,10 @@ export const getComponentSectionPolicy = (
   };
 };
 
-const getComponentPolicyContext = (model: GenerateModelConfig, settings: GenerateSettings): ComponentPolicyContext => ({
+export const getComponentPolicyContext = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings
+): ComponentPolicyContext => ({
   model,
   settings,
   selectedComponents: {
@@ -1324,6 +1327,9 @@ const COMPONENT_SETTING_LABELS: Record<GenerateComponentValueKey, string> = {
   vae: 'VAE',
   componentSourceModel: 'Component source',
 };
+
+/** Every settings key that holds a component model. */
+export const GENERATE_COMPONENT_VALUE_KEYS = Object.keys(COMPONENT_SETTING_LABELS) as GenerateComponentValueKey[];
 
 const addClearedLabel = (labels: string[], label: string) => {
   if (!labels.includes(label)) {
@@ -1867,7 +1873,7 @@ const getSettingsWithCompatibleModelSelections = (
   const slotsByKey = new Map(policy.slots.map((slotPolicy) => [slotPolicy.key, slotPolicy]));
   const uiPolicy = getGenerationUiPolicy(model);
 
-  for (const key of Object.keys(COMPONENT_SETTING_LABELS) as GenerateComponentValueKey[]) {
+  for (const key of GENERATE_COMPONENT_VALUE_KEYS) {
     if (!nextSettings[key]) {
       continue;
     }
@@ -1984,7 +1990,7 @@ export const getGenerationModelAvailabilityReasons = (
     reasons.push(`Selected model "${model.name}" is no longer installed.`);
   }
 
-  for (const key of Object.keys(COMPONENT_SETTING_LABELS) as GenerateComponentValueKey[]) {
+  for (const key of GENERATE_COMPONENT_VALUE_KEYS) {
     const value = settings[key];
 
     if (value && !hasModelKey(models, value.key, value.type)) {

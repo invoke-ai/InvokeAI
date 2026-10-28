@@ -16,6 +16,7 @@ deleted stays edited or deleted.
 
 from sqlalchemy import column, exists, insert, select, table, true
 
+from invokeai.app.services.shared.database.types import now_text
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import (
     PortableMigration,
     PortableMigrationContext,
@@ -60,6 +61,8 @@ _system_prompts = table(
     column("user_id"),
     column("is_public"),
     column("max_tokens"),
+    column("created_at"),
+    column("updated_at"),
 )
 
 
@@ -69,6 +72,8 @@ def _add_moss_image_enhancer_system_prompt(context: PortableMigrationContext) ->
     ).scalar()
     if already_there:
         return
+    # Only SQLite declares defaults for the timestamps; on a server the application supplies them, as here.
+    created_at = now_text()
     context.conn.execute(
         insert(_system_prompts).values(
             id=MOSS_IMAGE_ENHANCER_PROMPT_ID,
@@ -77,6 +82,8 @@ def _add_moss_image_enhancer_system_prompt(context: PortableMigrationContext) ->
             user_id="system",
             is_public=true(),
             max_tokens=MOSS_IMAGE_ENHANCER_MAX_TOKENS,
+            created_at=created_at,
+            updated_at=created_at,
         )
     )
 

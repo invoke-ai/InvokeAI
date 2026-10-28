@@ -1,4 +1,8 @@
-import { isJsonPrompt } from './prompt/jsonPrompt';
+import { planSeedSubmission, type SeedMode, type SeedStep, type SeedSubmissionPlan } from '@platform/core/seed';
+
+import type { EffectivePrompts, PromptTemplateSnapshot } from './promptTemplates';
+
+import { getEffectivePrompts, isJsonPrompt } from './promptTemplates';
 
 const SEED_MAX = 4_294_967_295;
 
@@ -308,3 +312,75 @@ export const sanitizeSampleSeed = (value: unknown): number =>
   typeof value === 'number' && Number.isFinite(value) ? Math.abs(Math.round(value)) % SEED_MAX : 0;
 
 export const createDynamicPromptsSampleSeed = (): number => Math.floor(Math.random() * SEED_MAX);
+
+/** The prompted, seeded values Generate, Canvas, Upscale and Video submit from. */
+export interface GenerateSubmissionSource {
+  batchCount: number;
+  negativePrompt: string;
+  negativePromptEnabled: boolean;
+  positivePrompt: string;
+  promptTemplate?: PromptTemplateSnapshot | null;
+  seed: number;
+  seedMode: SeedMode;
+  dynamicPromptsSeedBehaviour?: DynamicPromptsSeedBehaviour;
+}
+
+/** The prompt and seed fields of a queued generate submission; the host adds the graph and its node ids. */
+export interface GenerateSubmissionPrompts {
+  batchCount: number;
+  negativePrompt: string;
+  positivePrompt: string;
+  /** Present when the positive prompt expanded; the expansion is sent instead of the prompt. */
+  positivePrompts?: string[];
+  seed: number;
+  seedBehaviour?: DynamicPromptsSeedBehaviour;
+  seedStep: SeedStep;
+}
+
+export interface GenerateSubmissionPlan {
+  /** Template-merged prompts, before negative-prompt suppression. */
+  effectivePrompts: EffectivePrompts;
+  seedPlan: SeedSubmissionPlan;
+  submission: GenerateSubmissionPrompts;
+}
+
+/**
+ * The prompts and seeds a submission sends. `expandedPositivePrompts` are what the host expanded the merged positive
+ * prompt into; they count only when that prompt has dynamic syntax, so templates that introduce syntax count too.
+ */
+export const planGenerateSubmission = (
+  source: GenerateSubmissionSource,
+  expandedPositivePrompts?: string[]
+): GenerateSubmissionPlan => {
+  const effectivePrompts = getEffectivePrompts(source);
+  // Record expansions even when only one prompt results.
+  const positivePrompts =
+    expandedPositivePrompts &&
+    expandedPositivePrompts.length > 0 &&
+    hasDynamicPromptSyntax(effectivePrompts.positivePrompt)
+      ? expandedPositivePrompts
+      : undefined;
+  const seedBehaviour = positivePrompts ? source.dynamicPromptsSeedBehaviour : undefined;
+  const seedPlan = planSeedSubmission({
+    batchCount: source.batchCount,
+    promptCount: positivePrompts?.length ?? 1,
+    seedBehaviour: seedBehaviour ?? 'per-iteration',
+    seedMode: source.seedMode,
+    startSeed: source.seed,
+  });
+
+  return {
+    effectivePrompts,
+    seedPlan,
+    submission: {
+      batchCount: source.batchCount,
+      // Disabling the negative prompt also suppresses the template's negative side.
+      negativePrompt: source.negativePromptEnabled ? effectivePrompts.negativePrompt : '',
+      positivePrompt: effectivePrompts.positivePrompt,
+      ...(positivePrompts ? { positivePrompts } : {}),
+      seed: source.seed,
+      ...(seedBehaviour ? { seedBehaviour } : {}),
+      seedStep: seedPlan.step,
+    },
+  };
+};
