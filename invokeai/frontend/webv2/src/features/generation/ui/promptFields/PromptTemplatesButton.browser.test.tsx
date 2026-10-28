@@ -97,6 +97,28 @@ describe('the prompt templates button', () => {
     expect(document.querySelector('[data-scope="popover"][data-part="content"]')).not.toBeNull();
   });
 
+  it('keeps its tooltip shut while the panel is open, even when the pointer leaves and returns', async () => {
+    await render(null);
+    const trigger = host!.querySelector('button')!;
+    const openTooltip = () => document.querySelector('[data-scope="tooltip"][data-part="content"][data-state="open"]');
+
+    await userEvent.hover(trigger);
+    await expect.poll(openTooltip).not.toBeNull();
+
+    await act(async () => {
+      await userEvent.click(trigger);
+    });
+    await userEvent.unhover(trigger);
+    await userEvent.hover(trigger);
+    // Past the tooltip's 400ms open delay.
+    await new Promise((resolve) => {
+      setTimeout(resolve, 700);
+    });
+
+    expect(document.querySelector('[data-scope="popover"][data-part="content"]')).not.toBeNull();
+    expect(openTooltip()).toBeNull();
+  });
+
   it('dims the name and says so when the applied template is gone', async () => {
     await render(applied);
 

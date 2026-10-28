@@ -99,7 +99,10 @@ export const PromptTemplatesButton = ({
       unmountOnExit
       onOpenChange={handleOpenChange}
     >
-      <Tooltip content={tooltip} ids={popoverIds}>
+      {/* The freshly mounted panel paints one unpositioned frame over this wide trigger; the pointer leave it causes
+          lets the tooltip reopen over the open panel. Forcing `open={false}` (not `disabled`, which remounts the
+          trigger) keeps it shut while the panel is open. */}
+      <Tooltip content={tooltip} ids={popoverIds} open={isOpen ? false : undefined}>
         <Popover.Trigger asChild>
           <IconButton
             aria-label={t('widgets.generate.promptTemplates.title')}
