@@ -168,17 +168,35 @@ class FakeCachedModel:
 
 class FakeCache:
     """A model cache on a `FakeDevice`: a lock puts the model's weights there, through a staging buffer of
-    `staging_bytes`; `partial` caps a model's residency."""
+    `staging_bytes`, after offloading the models named in `offloads`; `partial` caps a model's residency."""
 
     def __init__(self, device: FakeDevice, staging_bytes: int = 0):
         self.device = device
         self.staging_bytes = staging_bytes
         self.reserved: list[Optional[int]] = []
+        self.offloads: dict[str, list[CacheRecord]] = {}
         self.partial: dict[str, int] = {}
+        self.records: dict[str, CacheRecord] = {}
+        self.in_use_at_lock: list[int] = []
+        """What the device had allocated when each lock began."""
         self._locks: dict[str, int] = {}
+
+    def offload_unlocked_models_from_vram(self, keep_cache_keys=()) -> int:
+        """`ModelCache.offload_unlocked_models_from_vram`: every unlocked record but the kept ones leaves whole."""
+        freed = 0
+        for key, record in self.records.items():
+            if key not in keep_cache_keys and not self._locks.get(key) and record.cached_model.resident:
+                self.device.free(record.cached_model.resident)
+                freed += record.cached_model.resident
+                record.cached_model.resident = 0
+        return freed
 
     def lock(self, record: CacheRecord, working_mem_bytes: Optional[int], max_move_bytes: Optional[int] = None) -> bool:
         self.reserved.append(working_mem_bytes)
+        self.in_use_at_lock.append(self.device.allocated)
+        for victim in self.offloads.get(record.key, []):
+            self.device.free(victim.cached_model.resident)
+            victim.cached_model.resident = 0
         model = record.cached_model
         if model.compute_device.type != "cpu":
             target = self.partial.get(record.key, model.total)
@@ -335,9 +353,9 @@ def _estimate(reservation: int = 2 * GIB) -> WorkingMemoryEstimate:
 
 
 def _model(cache: FakeCache, key: str, total_bytes: int = 1 * GIB, device: str = "meta") -> LoadedModelWithoutConfig:
-    return LoadedModelWithoutConfig(
-        CacheRecord(key=key, cached_model=FakeCachedModel(total_bytes, device)), cache=cache
-    )
+    record = CacheRecord(key=key, cached_model=FakeCachedModel(total_bytes, device))
+    cache.records[key] = record
+    return LoadedModelWithoutConfig(record, cache=cache)
 
 
 def _on_another_thread(model: LoadedModelWithoutConfig) -> None:
@@ -450,6 +468,88 @@ def test_a_co_lock_counts_its_weights_as_offset_and_its_lock_outside_the_peak(de
     assert window.reserved is not None and window.reserved.offset == 2 * GIB
     assert window.co_locked_models == ["controlnet"]
     assert window.valid
+
+
+def _resident(cache: FakeCache, key: str, total_bytes: int) -> LoadedModelWithoutConfig:
+    """A model a previous node left on the device, unlocked."""
+    model = _model(cache, key, total_bytes=total_bytes)
+    with model:
+        pass
+    return model
+
+
+def test_a_calibration_lock_moves_every_other_unlocked_model_out_first(device: FakeDevice):
+    """Left to the lock, a UNet would be split by the predicted shortfall, and a split that freed a little less than
+    predicted ran the VAE partly resident. Moved out whole first, nothing is split."""
+    cache = FakeCache(device)
+    unet = _resident(cache, "sdxl:unet", 5 * GIB)
+    text_encoder = _resident(cache, "sdxl:text_encoder_2", 1 * GIB)
+    vae = _model(cache, "sdxl:vae", total_bytes=160 * MIB)
+
+    with _scope() as scope:
+        with vae.model_on_device(working_memory=_estimate()):
+            pass
+
+    assert cache.in_use_at_lock[-1] == 0, "both moved out before the VAE's lock began"
+    assert unet._cache_record.cached_model.resident == text_encoder._cache_record.cached_model.resident == 0
+    (window,) = scope.windows
+    assert window.resident_fraction == 1.0 and window.fit_eligible
+
+
+def test_outside_a_calibration_scope_a_lock_moves_nothing_else_out(device: FakeDevice):
+    cache = FakeCache(device)
+    unet = _resident(cache, "sdxl:unet", 5 * GIB)
+    vae = _model(cache, "sdxl:vae", total_bytes=160 * MIB)
+
+    with vae.model_on_device(working_memory=_estimate()):
+        pass
+
+    assert cache.in_use_at_lock[-1] == 5 * GIB
+    assert unet._cache_record.cached_model.resident == 5 * GIB
+
+
+def test_a_model_the_window_holds_locked_stays_on_the_device_for_a_nested_calibration_lock(device: FakeDevice):
+    """A transformer whose own window is open locks a VAE for a reference image: the transformer, a co-lock of the
+    VAE's window, stays; the text encoder the node locked and released inside the window goes."""
+    cache = FakeCache(device)
+    text_encoder = _model(cache, "flux:text_encoder", total_bytes=2 * GIB)
+    transformer = _model(cache, "flux:transformer", total_bytes=4 * GIB)
+    vae = _model(cache, "flux:vae", total_bytes=160 * MIB)
+
+    with _scope() as scope:
+        with transformer.model_on_device(working_memory=_estimate(8 * GIB)):
+            with text_encoder:
+                pass
+            with vae.model_on_device(working_memory=_estimate(2 * GIB)):
+                assert cache.in_use_at_lock[-1] == 4 * GIB, "the transformer only"
+                assert text_encoder._cache_record.cached_model.resident == 0
+            assert transformer._cache_record.cached_model.resident == 4 * GIB
+
+    child, parent = scope.windows
+    assert child.co_locked_models == ["flux:transformer"] and child.valid and parent.valid
+
+
+def test_a_co_lock_that_offloads_more_than_it_loads_takes_its_offload_off_the_offset(device: FakeDevice):
+    """A text encoder locked inside the window stays resident after its unlock (+1 GiB); the adapter's co-lock then
+    moves it out to load its own 512 MiB, a co-lock offset of -512 MiB."""
+    cache = FakeCache(device)
+    text_encoder = _model(cache, "text-encoder", total_bytes=1 * GIB)
+    vae = _model(cache, "vae")
+    adapter = _model(cache, "adapter", total_bytes=512 * MIB)
+    cache.offloads["adapter"] = [text_encoder._cache_record]
+
+    with _scope() as scope:
+        with vae.model_on_device(working_memory=_estimate()):
+            with text_encoder:
+                pass
+            with adapter:
+                pass
+            device.alloc(2 * GIB)
+            device.free(2 * GIB)
+
+    (window,) = scope.windows
+    assert window.reserved is not None and window.reserved.offset == 1 * GIB - 512 * MIB
+    assert window.demand_bytes == 2 * GIB
 
 
 def test_a_co_lock_that_offloads_more_than_it_loads_has_a_negative_offset(
