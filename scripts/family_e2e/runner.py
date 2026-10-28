@@ -1215,7 +1215,7 @@ class _Session:
             if self.info.calibrate:
                 try:
                     item_id, fields["calibration"] = calibration.submit(
-                        client, self.cases[step.case_key].spec.model, graph.batch
+                        client, self.cases[step.case_key].spec.model, graph.batch, self.info.case_models[step.case_key]
                     )
                 except calibration.CaseRefused as e:
                     fields.update(error=str(e), invalid_reasons=[str(e)])

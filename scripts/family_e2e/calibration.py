@@ -20,6 +20,7 @@ from scripts.family_e2e.client import ApiError, InvokeClient
 from scripts.family_e2e.records import (
     CalibrationExport,
     CalibrationSubmission,
+    ModelIdentity,
     RunInfo,
     write_bytes_atomic,
     write_run_info,
@@ -55,13 +56,27 @@ def check_available(client: InvokeClient) -> None:
         raise CalibrationError(f"the server cannot calibrate: {status.get('unavailable_reason')}")
 
 
-def submit(client: InvokeClient, model_key: str, batch: dict[str, Any]) -> tuple[int, CalibrationSubmission]:
+def submit(
+    client: InvokeClient, model_key: str, batch: dict[str, Any], models: Iterable[ModelIdentity]
+) -> tuple[int, CalibrationSubmission]:
     """Starts a calibration run of the batch's graph and data; returns its one queue item and the run.
 
+    `models` are the graph's models as the configs it was compiled from have them (`RunInfo.case_models`): the server
+    refuses the run when a model's record differs from that now, so the graph measures what was compiled.
     A refusal raises `CaseRefused` for a `CASE_REFUSALS` status and CalibrationError for any other error response.
     Each server lifetime has a fresh queue and store and the tool submits each attempt once, so it sends no retry key.
     """
-    body: dict[str, Any] = {"graph": batch["graph"]}
+    graph_models = {
+        model.key: {
+            "hash": model.hash,
+            "base": model.base,
+            "type": model.type,
+            "format": model.format,
+            "variant": model.variant,
+        }
+        for model in models
+    }
+    body: dict[str, Any] = {"graph": batch["graph"], "graph_models": graph_models}
     if batch.get("data"):
         body["data"] = batch["data"]
     try:

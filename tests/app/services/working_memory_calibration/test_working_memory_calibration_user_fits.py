@@ -9,12 +9,14 @@ from collections.abc import Iterator, Mapping
 from contextlib import asynccontextmanager
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Optional
+from typing import Any, Optional
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic import ValidationError
 
 from invokeai.app.invocations.math import AddInvocation
+from invokeai.app.invocations.metadata import CoreMetadataInvocation
 from invokeai.app.invocations.model import LoRACollectionLoader, LoRAField, ModelIdentifierField
 from invokeai.app.invocations.sd.sdxl import SDXLModelLoaderInvocation
 from invokeai.app.services.invoker import Invoker
@@ -155,7 +157,9 @@ def _create(
     """A run of `model_key`; finished (its item completed) unless `running`, so the fits take its windows."""
     graph = Graph()
     graph.add_node(AddInvocation(id="add", a=1, b=2))
-    request = WorkingMemoryCalibrationRequest(graph=graph, attempt_id=attempt_id, attempt_steps=attempt_steps)
+    request = WorkingMemoryCalibrationRequest(
+        graph_models={}, graph=graph, attempt_id=attempt_id, attempt_steps=attempt_steps
+    )
     created = asyncio.run(service.create_run(model_key, request, "system"))
     if not running:
         _finish(service, created.item_ids)
@@ -439,7 +443,9 @@ def test_a_run_still_running_feeds_no_fit_until_the_queue_finishes_it(tmp_path: 
     service = started(tmp_path)
     graph = Graph()
     graph.add_node(AddInvocation(id="add", a=1, b=2))
-    created = asyncio.run(service.create_run("model-a", WorkingMemoryCalibrationRequest(graph=graph), "system"))
+    created = asyncio.run(
+        service.create_run("model-a", WorkingMemoryCalibrationRequest(graph_models={}, graph=graph), "system")
+    )
     service.record_windows(created.run_id, _on_the_line(created.run_id))
 
     service.refresh_user_fits()
@@ -462,7 +468,9 @@ def test_a_failed_run_feeds_no_fit_while_its_retry_waits_in_the_queue(tmp_path: 
     queued behind other work, it must hold the failed run's windows back from the moment it is queued, and release
     them once it is canceled."""
     service = started(tmp_path)
-    created = asyncio.run(service.create_run("model-a", WorkingMemoryCalibrationRequest(graph=_add_graph()), "system"))
+    created = asyncio.run(
+        service.create_run("model-a", WorkingMemoryCalibrationRequest(graph_models={}, graph=_add_graph()), "system")
+    )
     service.record_windows(created.run_id, _on_the_line(created.run_id))
     queue = service._services.session_queue
     [item_id] = created.item_ids
@@ -495,7 +503,7 @@ def test_an_attempt_feeds_no_fit_until_every_run_of_it_finished_and_another_fini
     second = asyncio.run(
         service.create_run(
             "model-a",
-            WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="current", attempt_steps=2),
+            WorkingMemoryCalibrationRequest(graph_models={}, graph=_add_graph(), attempt_id="current", attempt_steps=2),
             "system",
         )
     )
@@ -547,7 +555,7 @@ def test_an_attempt_feeds_once_it_queued_every_planned_run_and_all_finished(tmp_
     assert _estimate() == _shipped()
 
     graph = _add_graph()
-    request = WorkingMemoryCalibrationRequest(graph=graph, attempt_id="whole", attempt_steps=2)
+    request = WorkingMemoryCalibrationRequest(graph_models={}, graph=graph, attempt_id="whole", attempt_steps=2)
     second = asyncio.run(service.create_run("model-a", request, "system"))
     service.refresh_user_fits()
     assert _estimate() == _shipped()
@@ -567,7 +575,9 @@ def _idle(monkeypatch: pytest.MonkeyPatch, by: datetime.timedelta = ATTEMPT_IDLE
 
 def _queue_attempt(service: WorkingMemoryCalibrationService, attempt_id: str, steps: int) -> list:
     """Every run of the attempt queued, as the client posts them; the first measures the line."""
-    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id=attempt_id, attempt_steps=steps)
+    request = WorkingMemoryCalibrationRequest(
+        graph_models={}, graph=_add_graph(), attempt_id=attempt_id, attempt_steps=steps
+    )
     created = [asyncio.run(service.create_run("model-a", request, "system")) for _ in range(steps)]
     service.record_windows(created[0].run_id, _on_the_line(created[0].run_id))
     _finish(service, created[0].item_ids)
@@ -724,7 +734,9 @@ def test_a_step_with_a_failed_and_a_canceled_item_aborts_its_attempt(tmp_path: P
     first = _create(service, attempt_id="two-items", attempt_steps=2)
     service.record_windows(first, _on_the_line(first))
     data = [[BatchDatum(node_path="add", field_name="a", items=[1, 2])]]
-    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), data=data, attempt_id="two-items", attempt_steps=2)
+    request = WorkingMemoryCalibrationRequest(
+        graph_models={}, graph=_add_graph(), data=data, attempt_id="two-items", attempt_steps=2
+    )
     second = asyncio.run(service.create_run("model-a", request, "system"))
     queue = service._services.session_queue
     failed, stopped = second.item_ids
@@ -769,7 +781,9 @@ def test_each_reset_forgets_what_the_service_kept_of_the_runs_it_removed(tmp_pat
     queue = service._services.session_queue
     items: dict[str, set[int]] = {}
     for index, model_key in enumerate(("model-a", "model-a", "model-b", "model-c")):
-        request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id=f"attempt-{index}", attempt_steps=1)
+        request = WorkingMemoryCalibrationRequest(
+            graph_models={}, graph=_add_graph(), attempt_id=f"attempt-{index}", attempt_steps=1
+        )
         created = asyncio.run(service.create_run(model_key, request, "system"))
         items[created.run_id] = set(created.item_ids)
         if index != 1:
@@ -807,7 +821,9 @@ def test_every_judgement_of_item_outcomes_holds_the_lock_removals_hold(tmp_path:
     service = started(tmp_path)
     queue = service._services.session_queue
     settled = _create(service, attempt_id="settled", attempt_steps=1)
-    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="between-steps", attempt_steps=2)
+    request = WorkingMemoryCalibrationRequest(
+        graph_models={}, graph=_add_graph(), attempt_id="between-steps", attempt_steps=2
+    )
     _finish(service, asyncio.run(service.create_run("model-b", request, "other-admin")).item_ids)
     read_by_id = queue.get_queue_item_summaries_by_ids
     held: dict[str, list[bool]] = {}
@@ -854,7 +870,7 @@ def test_a_new_attempt_whose_item_id_an_old_run_recorded_counts_when_judged_afte
     service = started(tmp_path)
     old = _create(service, attempt_id="old", attempt_steps=1)
     service.record_windows(old, _off_the_line(old))
-    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="new", attempt_steps=1)
+    request = WorkingMemoryCalibrationRequest(graph_models={}, graph=_add_graph(), attempt_id="new", attempt_steps=1)
     new = asyncio.run(service.create_run("model-a", request, "system"))
     service.stop(mock_invoker)
     _renumber(tmp_path, old, new.item_ids)
@@ -881,7 +897,7 @@ def test_an_old_run_whose_item_id_a_new_attempt_took_is_not_judged_by_the_new_it
     old_created = asyncio.run(
         service.create_run(
             "model-a",
-            WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="old", attempt_steps=1),
+            WorkingMemoryCalibrationRequest(graph_models={}, graph=_add_graph(), attempt_id="old", attempt_steps=1),
             "system",
         )
     )
@@ -918,7 +934,9 @@ def test_a_reset_while_an_attempt_runs_discards_the_attempt(tmp_path: Path, star
     """The model's runs are removed while the attempt's second step waits: the first step's measurements go with
     the reset, and the attempt, which can no longer measure every size it planned, never feeds a fit."""
     service = started(tmp_path)
-    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="reset-while-running", attempt_steps=3)
+    request = WorkingMemoryCalibrationRequest(
+        graph_models={}, graph=_add_graph(), attempt_id="reset-while-running", attempt_steps=3
+    )
     first = asyncio.run(service.create_run("model-a", request, "system"))
     _finish(service, first.item_ids)
     second = asyncio.run(service.create_run("model-a", request, "system"))
@@ -952,7 +970,9 @@ def test_a_later_run_of_an_attempt_a_reset_removed_while_it_ran_must_plan_the_sa
 ) -> None:
     """The reset left no run of the attempt, yet its later steps may still come: they must plan its count."""
     service = started(tmp_path)
-    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="still-posting", attempt_steps=2)
+    request = WorkingMemoryCalibrationRequest(
+        graph_models={}, graph=_add_graph(), attempt_id="still-posting", attempt_steps=2
+    )
     waiting = asyncio.run(service.create_run("model-a", request, "system"))
 
     if reset == "run":
@@ -1037,7 +1057,9 @@ def _settle_as_the_runner(service: WorkingMemoryCalibrationService, run_id: str,
 def _failed_largest_step(service: WorkingMemoryCalibrationService, attempt_id: str):
     """A two-step attempt whose first step measured the line and whose largest step ran out of memory, as the runner
     saw them: complete, it feeds the fit."""
-    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id=attempt_id, attempt_steps=2)
+    request = WorkingMemoryCalibrationRequest(
+        graph_models={}, graph=_add_graph(), attempt_id=attempt_id, attempt_steps=2
+    )
     first, largest = (asyncio.run(service.create_run("model-a", request, "system")) for _ in range(2))
     _settle_as_the_runner(service, first.run_id, first.item_ids, "completed")
     service.record_windows(first.run_id, _on_the_line(first.run_id))
@@ -1231,7 +1253,9 @@ def test_a_retry_of_an_unrelated_item_that_reuses_a_recorded_id_is_not_the_runs(
     origin says it is not the run's, and its retry is not recorded."""
     service = started(tmp_path)
     queue = service._services.session_queue
-    created = asyncio.run(service.create_run("model-a", WorkingMemoryCalibrationRequest(graph=_add_graph()), "system"))
+    created = asyncio.run(
+        service.create_run("model-a", WorkingMemoryCalibrationRequest(graph_models={}, graph=_add_graph()), "system")
+    )
     [canvas] = asyncio.run(
         queue.enqueue_batch("default", Batch(graph=_add_graph(), origin="canvas"), prepend=False)
     ).item_ids
@@ -1284,7 +1308,9 @@ def test_each_retry_of_a_calibration_item_is_recorded_on_its_run_as_the_queue_co
     service = started(tmp_path)
     queue = service._services.session_queue
     created = [
-        asyncio.run(service.create_run(model, WorkingMemoryCalibrationRequest(graph=_add_graph()), "system"))
+        asyncio.run(
+            service.create_run(model, WorkingMemoryCalibrationRequest(graph_models={}, graph=_add_graph()), "system")
+        )
         for model in ("model-a", "model-b")
     ]
     [generation] = asyncio.run(
@@ -1385,7 +1411,9 @@ def test_two_owners_attempts_with_one_id_are_two_incomplete_attempts(
     """Each owner posts one of two planned steps under the same attempt id: neither attempt queued both, so neither
     feeds a fit; and each owner's count is its own."""
     service = started(tmp_path)
-    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="shared-id", attempt_steps=2)
+    request = WorkingMemoryCalibrationRequest(
+        graph_models={}, graph=_add_graph(), attempt_id="shared-id", attempt_steps=2
+    )
     for owner in ("system", "other-admin"):
         created = asyncio.run(service.create_run("model-a", request, owner))
         service.record_windows(created.run_id, _on_the_line(created.run_id))
@@ -1417,7 +1445,9 @@ def test_an_item_whose_model_changed_after_planning_fails_at_admission_with_its_
     run was planned with, so it fails before any node runs, and the run's status says why in a code."""
     service = started(tmp_path)
     queue = service._services.session_queue
-    created = asyncio.run(service.create_run("model-a", WorkingMemoryCalibrationRequest(graph=_add_graph()), "system"))
+    created = asyncio.run(
+        service.create_run("model-a", WorkingMemoryCalibrationRequest(graph_models={}, graph=_add_graph()), "system")
+    )
     if change == "removed":
         monkeypatch.delitem(MODELS, "model-a")
     elif change == "hash":
@@ -1447,7 +1477,9 @@ def test_a_model_changed_between_steps_aborts_its_attempt(
     admission. Unlike an out-of-memory failure, that interrupts the attempt: step 1's windows feed no fit."""
     service = started(tmp_path)
     queue = service._services.session_queue
-    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="reinstalled", attempt_steps=3)
+    request = WorkingMemoryCalibrationRequest(
+        graph_models={}, graph=_add_graph(), attempt_id="reinstalled", attempt_steps=3
+    )
     first, *later = [asyncio.run(service.create_run("model-a", request, "system")) for _ in range(3)]
     _settle_as_the_runner(service, first.run_id, first.item_ids, "completed")
     service.record_windows(first.run_id, _on_the_line(first.run_id))
@@ -1470,7 +1502,9 @@ def test_a_later_step_that_would_measure_another_version_of_the_model_is_refused
     """The client posts each step once the last one finished. The model was reinstalled in between: the next step
     would measure another model than the first did, so it is refused, and the attempt, short of a step, never feeds."""
     service = started(tmp_path)
-    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="posted-late", attempt_steps=2)
+    request = WorkingMemoryCalibrationRequest(
+        graph_models={}, graph=_add_graph(), attempt_id="posted-late", attempt_steps=2
+    )
     first = asyncio.run(service.create_run("model-a", request, "system"))
     _settle_as_the_runner(service, first.run_id, first.item_ids, "completed")
     service.record_windows(first.run_id, _on_the_line(first.run_id))
@@ -1486,32 +1520,109 @@ def test_a_later_step_that_would_measure_another_version_of_the_model_is_refused
     asyncio.run(service.create_run("model-a", other, "system"))
 
 
-def _naming_model_b(field: str, model_hash: str) -> Graph:
-    """A graph that names model-b as the client compiled it: as a loader's model, or as a LoRA in a collection."""
-    named = ModelIdentifierField(
-        key="model-b", hash=model_hash, name="MODEL-B", base=BaseModelType.StableDiffusionXL, type=ModelType.Main
-    )
+def _compiled_naming_model_b(field: str = "loader", **fields: Any) -> WorkingMemoryCalibrationRequest:
+    """A request whose graph names model-b as a client compiles it now, over its record: in the graph's identifier, as
+    a loader's model or as a LoRA in a collection, and in graph_models."""
+    record = MODELS["model-b"]
+    named = ModelIdentifierField(key="model-b", hash=record.hash, name="MODEL-B", base=record.base, type=record.type)
     graph = _add_graph()
     if field == "loader":
         graph.add_node(SDXLModelLoaderInvocation(id="loader", model=named))
     else:
         graph.add_node(LoRACollectionLoader(id="loras", loras=[LoRAField(lora=named, weight=1.0)]))
-    return graph
+    compiled = {
+        "hash": record.hash,
+        "base": record.base.value,
+        "type": record.type.value,
+        "format": getattr(record, "format", None),
+        "variant": getattr(record, "variant", None),
+    }
+    return WorkingMemoryCalibrationRequest(graph=graph, graph_models={"model-b": compiled}, **fields)
+
+
+def _planned_model_b(monkeypatch: pytest.MonkeyPatch) -> None:
+    """model-b as installed when the client compiles: a variant, a diffusers folder."""
+    monkeypatch.setattr(MODELS["model-b"], "hash", "blake3:planned")
+    monkeypatch.setattr(MODELS["model-b"], "variant", "dev", raising=False)
+    monkeypatch.setattr(MODELS["model-b"], "format", "diffusers", raising=False)
+
+
+_CHANGED_FACTS = {
+    "hash": "blake3:reinstalled",
+    "base": BaseModelType.StableDiffusion1,
+    "type": ModelType.LoRA,
+    "format": "gguf_quantized",
+    "variant": "klein_9b",
+}
+"""What an administrator's edit or reinstall changes model-b's record to, per fact."""
+
+
+@pytest.mark.parametrize("fact", list(_CHANGED_FACTS))
+def test_a_model_that_changed_between_compiling_the_graph_and_posting_it_is_refused(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch, fact: str
+) -> None:
+    """The client compiled the graph over model-b's record, which changed before the request arrived: the run would
+    measure another configuration than the one compiled, so it is refused and nothing is queued or recorded."""
+    service = started(tmp_path)
+    _planned_model_b(monkeypatch)
+    request = _compiled_naming_model_b()
+    monkeypatch.setattr(MODELS["model-b"], fact, _CHANGED_FACTS[fact])
+
+    with pytest.raises(CalibrationModelChangedError) as refused:
+        asyncio.run(service.create_run("model-a", request, "system"))
+
+    assert str(refused.value) == f"MODEL-B changed after this calibration was planned ({fact}). Calibrate again."
+    assert service._services.session_queue.get_queue_item_ids("default").item_ids == []
+    assert [run for device_class in service.get_status().device_classes for run in device_class.runs] == []
+
+
+def test_a_graph_compiled_over_the_records_as_they_are_is_accepted_and_records_what_was_compiled(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A model without a variant compiles to null, which a record that still has none matches."""
+    service = started(tmp_path)
+    monkeypatch.setattr(MODELS["model-b"], "hash", "blake3:planned")
+    monkeypatch.setattr(MODELS["model-b"], "format", "checkpoint", raising=False)
+
+    created = asyncio.run(service.create_run("model-a", _compiled_naming_model_b(), "system"))
+
+    [run] = _stored(tmp_path)["runs"]
+    assert run["run_id"] == created.run_id
+    assert run["graph_models"] == {
+        "model-b": {"hash": "blake3:planned", "base": "sdxl", "type": "main", "format": "checkpoint", "variant": None}
+    }
+
+
+def test_a_model_only_an_untyped_field_names_is_stated_and_compared(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A metadata node's extra field holds a model as a plain mapping, which a client cannot tell from a typed model
+    field in the graph's JSON: it counts as a model the graph names."""
+    service = started(tmp_path)
+    _planned_model_b(monkeypatch)
+    graph = _add_graph()
+    named = {"key": "model-b", "hash": "blake3:planned", "name": "MODEL-B", "base": "sdxl", "type": "main"}
+    graph.add_node(CoreMetadataInvocation(id="metadata", t5_encoder=named))
+    compiled = {"hash": "blake3:planned", "base": "sdxl", "type": "main", "format": "diffusers", "variant": "dev"}
+
+    with pytest.raises(ValidationError, match="the graph names model-b, which graph_models lacks"):
+        WorkingMemoryCalibrationRequest(graph=graph, graph_models={})
+    request = WorkingMemoryCalibrationRequest(graph=graph, graph_models={"model-b": compiled})
+    monkeypatch.setattr(MODELS["model-b"], "variant", "klein_9b")
+
+    with pytest.raises(CalibrationModelChangedError, match=r"\(variant\)"):
+        asyncio.run(service.create_run("model-a", request, "system"))
 
 
 @pytest.mark.parametrize("change", ["variant", "format"])
 def test_an_item_whose_component_model_changed_variant_or_format_fails_at_admission(
     tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch, change: str
 ) -> None:
-    """The graph's identifiers carry no variant or format: the run recorded them for model-b as it was created."""
+    """The graph's identifiers carry no variant or format: the run recorded them for model-b as it was compiled."""
     service = started(tmp_path)
-    monkeypatch.setattr(MODELS["model-b"], "hash", "blake3:planned")
-    monkeypatch.setattr(MODELS["model-b"], "variant", "dev", raising=False)
-    request = WorkingMemoryCalibrationRequest(graph=_naming_model_b("loader", "blake3:planned"))
-    created = asyncio.run(service.create_run("model-a", request, "system"))
-    monkeypatch.setattr(
-        MODELS["model-b"], change, "klein_9b" if change == "variant" else "gguf_quantized", raising=False
-    )
+    _planned_model_b(monkeypatch)
+    created = asyncio.run(service.create_run("model-a", _compiled_naming_model_b(), "system"))
+    monkeypatch.setattr(MODELS["model-b"], change, _CHANGED_FACTS[change])
     item = service._services.session_queue.get_queue_item(created.item_ids[0])
 
     assert service.admit(item, created.run_id) == (
@@ -1525,10 +1636,8 @@ def test_a_component_recorded_without_a_hash_is_admitted_on_the_rest_of_its_iden
     """Runs stored before graph_models recorded hashes: their items are admitted while the rest of the identity holds,
     and refused once it changed."""
     service = started(tmp_path)
-    monkeypatch.setattr(MODELS["model-b"], "hash", "blake3:planned")
-    monkeypatch.setattr(MODELS["model-b"], "variant", "dev", raising=False)
-    request = WorkingMemoryCalibrationRequest(graph=_naming_model_b("loader", "blake3:planned"))
-    created = asyncio.run(service.create_run("model-a", request, "system"))
+    _planned_model_b(monkeypatch)
+    created = asyncio.run(service.create_run("model-a", _compiled_naming_model_b(), "system"))
     service.stop(mock_invoker)
     path = next((tmp_path / "working_memory").glob("*.json"))
     stored = json.loads(path.read_bytes())
@@ -1550,7 +1659,9 @@ def test_a_later_step_whose_model_changed_variant_is_refused(
     """Step 1 measured model-a as FLUX.2 [dev]; the record now says Klein 9B: step 2 would measure another model."""
     service = started(tmp_path)
     monkeypatch.setattr(MODELS["model-a"], "variant", "dev", raising=False)
-    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="variant-changed", attempt_steps=2)
+    request = WorkingMemoryCalibrationRequest(
+        graph_models={}, graph=_add_graph(), attempt_id="variant-changed", attempt_steps=2
+    )
     first = asyncio.run(service.create_run("model-a", request, "system"))
     _settle_as_the_runner(service, first.run_id, first.item_ids, "completed")
     monkeypatch.setattr(MODELS["model-a"], "variant", "klein_9b")
@@ -1566,8 +1677,7 @@ def test_an_item_whose_component_model_changed_after_planning_fails_at_admission
     """The run calibrates model-a, and its graph loads model-b too, which was reinstalled while the item waited."""
     service = started(tmp_path)
     monkeypatch.setattr(MODELS["model-b"], "hash", "blake3:planned")
-    request = WorkingMemoryCalibrationRequest(graph=_naming_model_b(field, "blake3:planned"))
-    created = asyncio.run(service.create_run("model-a", request, "system"))
+    created = asyncio.run(service.create_run("model-a", _compiled_naming_model_b(field), "system"))
     monkeypatch.setattr(MODELS["model-b"], "hash", "blake3:reinstalled")
     queue = service._services.session_queue
     item = queue.get_queue_item(created.item_ids[0])
@@ -1583,7 +1693,7 @@ def test_an_item_whose_component_model_changed_after_planning_fails_at_admission
 def _step(service: WorkingMemoryCalibrationService, attempt_id: Optional[str], owner: str = "system"):
     """One step of a two-step attempt (or a run without one), queued and run to completion by the runner."""
     request = WorkingMemoryCalibrationRequest(
-        graph=_add_graph(), attempt_id=attempt_id, attempt_steps=2 if attempt_id is not None else None
+        graph=_add_graph(), graph_models={}, attempt_id=attempt_id, attempt_steps=2 if attempt_id is not None else None
     )
     created = asyncio.run(service.create_run("model-a", request, owner))
     _settle_as_the_runner(service, created.run_id, created.item_ids, "completed")
@@ -1603,7 +1713,9 @@ def test_a_calibration_between_two_steps_of_an_attempt_refuses_its_next_step(tmp
         asyncio.run(
             service.create_run(
                 "model-a",
-                WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="tab-a", attempt_steps=2),
+                WorkingMemoryCalibrationRequest(
+                    graph_models={}, graph=_add_graph(), attempt_id="tab-a", attempt_steps=2
+                ),
                 "system",
             )
         )
@@ -1657,7 +1769,7 @@ def test_the_idle_wait_counts_from_the_last_observation_not_the_run_s_creation(
 ) -> None:
     """A long step: created long ago, it finished a moment ago. A is open."""
     service = started(tmp_path)
-    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="tab-a", attempt_steps=2)
+    request = WorkingMemoryCalibrationRequest(graph_models={}, graph=_add_graph(), attempt_id="tab-a", attempt_steps=2)
     created = asyncio.run(service.create_run("model-a", request, "system"))
     _idle(monkeypatch)
     _settle_as_the_runner(service, created.run_id, created.item_ids, "completed")
@@ -1717,7 +1829,9 @@ def test_another_attempt_started_as_the_next_step_of_one_is_posted_is_refused(
     monkeypatch.setattr(service, "_file_lock", watched)
 
     def request(attempt_id: str) -> WorkingMemoryCalibrationRequest:
-        return WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id=attempt_id, attempt_steps=2)
+        return WorkingMemoryCalibrationRequest(
+            graph_models={}, graph=_add_graph(), attempt_id=attempt_id, attempt_steps=2
+        )
 
     async def both() -> list:
         step = asyncio.create_task(service.create_run("model-a", request("tab-a"), "system"))
@@ -1735,7 +1849,9 @@ def test_another_attempt_started_as_the_next_step_of_one_is_posted_is_refused(
 
 
 def _steps(attempt_id: str, steps: int) -> WorkingMemoryCalibrationRequest:
-    return WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id=attempt_id, attempt_steps=steps)
+    return WorkingMemoryCalibrationRequest(
+        graph_models={}, graph=_add_graph(), attempt_id=attempt_id, attempt_steps=steps
+    )
 
 
 def test_an_owners_new_attempt_replaces_its_own_attempt_that_stopped_between_steps(tmp_path: Path, started) -> None:
@@ -1806,22 +1922,16 @@ def test_an_attempt_another_run_cut_off_blocks_no_other_owner(tmp_path: Path, st
 def test_a_later_step_whose_component_model_changed_is_refused(
     tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch, change: str
 ) -> None:
-    """The graph loads model-b too, which changed between the steps: its variant or format, which the graph's
-    identifiers do not carry, or its hash, which a graph compiled after the reinstall names as it is now."""
+    """The graph loads model-b too, which changed between the steps. The later step compiles over the record as it is
+    now, so its creation finds the graph current, and the attempt refuses it: it would measure another version of
+    model-b than the first step did."""
     service = started(tmp_path)
-    monkeypatch.setattr(MODELS["model-b"], "hash", "blake3:planned")
-    monkeypatch.setattr(MODELS["model-b"], "variant", "dev", raising=False)
-    monkeypatch.setattr(MODELS["model-b"], "format", "diffusers", raising=False)
-    request = WorkingMemoryCalibrationRequest(
-        graph=_naming_model_b("loader", "blake3:planned"), attempt_id="component", attempt_steps=2
-    )
+    _planned_model_b(monkeypatch)
+    request = _compiled_naming_model_b(attempt_id="component", attempt_steps=2)
     first = asyncio.run(service.create_run("model-a", request, "system"))
     _settle_as_the_runner(service, first.run_id, first.item_ids, "completed")
-    changed = {"variant": "klein_9b", "format": "gguf_quantized", "hash": "blake3:reinstalled"}[change]
-    monkeypatch.setattr(MODELS["model-b"], change, changed)
-    later = request.model_copy(
-        update={"graph": _naming_model_b("loader", changed if change == "hash" else "blake3:planned")}
-    )
+    monkeypatch.setattr(MODELS["model-b"], change, _CHANGED_FACTS[change])
+    later = _compiled_naming_model_b(attempt_id="component", attempt_steps=2)
 
     with pytest.raises(CalibrationModelChangedError) as refused:
         asyncio.run(service.create_run("model-a", later, "system"))
@@ -1835,7 +1945,9 @@ def test_a_bulk_retry_of_generations_touches_no_store_file(
     """A thousand failed generations retried at once: a retry carries its source's origin, no calibration's."""
     service = started(tmp_path)
     queue = service._services.session_queue
-    asyncio.run(service.create_run("model-a", WorkingMemoryCalibrationRequest(graph=_add_graph()), "system"))
+    asyncio.run(
+        service.create_run("model-a", WorkingMemoryCalibrationRequest(graph_models={}, graph=_add_graph()), "system")
+    )
     data = [[BatchDatum(node_path="add", field_name="a", items=list(range(1000)))]]
     generations = asyncio.run(
         queue.enqueue_batch("default", Batch(graph=_add_graph(), data=data, origin="canvas"), prepend=False)
@@ -1904,7 +2016,9 @@ def test_two_attempts_started_at_once_queue_only_the_first(
     monkeypatch.setattr(service, "_file_lock", watched)
 
     def request(attempt_id: str) -> WorkingMemoryCalibrationRequest:
-        return WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id=attempt_id, attempt_steps=2)
+        return WorkingMemoryCalibrationRequest(
+            graph_models={}, graph=_add_graph(), attempt_id=attempt_id, attempt_steps=2
+        )
 
     async def both() -> list:
         arrived.append(asyncio.Event())
@@ -1930,7 +2044,7 @@ def test_a_development_builds_removal_records_read_as_each_owners(
     whose runs carry the id: each owner's attempt queued one step, lost the other to a reset, and is complete. A record
     no stored run carries any more is dropped."""
     service = started(tmp_path)
-    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="before", attempt_steps=2)
+    request = WorkingMemoryCalibrationRequest(graph_models={}, graph=_add_graph(), attempt_id="before", attempt_steps=2)
     for owner in ("system", "other-admin"):
         created = asyncio.run(service.create_run("model-a", request, owner))
         service.record_windows(created.run_id, _on_the_line(created.run_id))

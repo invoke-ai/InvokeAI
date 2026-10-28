@@ -5803,10 +5803,10 @@
             "description": "The model could not be found; the run was removed while it was being created, whose items are queued then and fail when they start; or a reset removed the run the idempotency key started"
           },
           "409": {
-            "description": "This machine cannot calibrate now (no GPU, or several generation devices), the device class's store file is unusable and kept as it is (possibly after the items were queued, which then fail when they start), the queue has no room for all of the run's items (it then takes none), the idempotency key was used for another request, or attempt_steps differs from that of the attempt's runs already stored (or of the run a repeated request names). Three of them carry a code, as `{\"code\": ..., \"message\": ...}` in `detail`: `calibration_running`, another calibration attempt still runs on this GPU, or another owner's attempt is between its steps and was active in the last two minutes (an owner's new attempt replaces its own attempt that stopped between steps); `calibration_interleaved`, a later step of an attempt after another calibration ran on this GPU since the attempt began; `model_changed`, a model the graph names changed or was removed since the graph was compiled, or since an earlier step of the attempt"
+            "description": "This machine cannot calibrate now (no GPU, or several generation devices), the device class's store file is unusable and kept as it is (possibly after the items were queued, which then fail when they start), the queue has no room for all of the run's items (it then takes none), the idempotency key was used for another request, or attempt_steps differs from that of the attempt's runs already stored (or of the run a repeated request names). Three of them carry a code, as `{\"code\": ..., \"message\": ...}` in `detail`: `calibration_running`, another calibration attempt still runs on this GPU, or another owner's attempt is between its steps and was active in the last two minutes (an owner's new attempt replaces its own attempt that stopped between steps); `calibration_interleaved`, a later step of an attempt after another calibration ran on this GPU since the attempt began; `model_changed`, a model the graph names changed or was removed since the graph was compiled (its record differs from the graph's identifier or its graph_models entry), or since an earlier step of the attempt"
           },
           "422": {
-            "description": "The graph cannot be measured as a calibration run, or attempt_id and attempt_steps were not sent together"
+            "description": "The graph cannot be measured as a calibration run, graph_models does not state exactly the graph's models, or attempt_id and attempt_steps were not sent together"
           },
           "429": {
             "description": "Too many unacknowledged idempotency keys; acknowledge or wait, then retry"
@@ -25471,6 +25471,52 @@
         "required": ["output_meta", "tiles", "type", "type"],
         "title": "CalculateImageTilesOutput",
         "type": "object"
+      },
+      "CalibrationCompiledModel": {
+        "properties": {
+          "base": {
+            "type": "string",
+            "title": "Base"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format",
+            "description": "The model's format; null for a record without one"
+          },
+          "variant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant",
+            "description": "The model's variant; null for a record without one"
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The model's hash, as the graph's identifier names it"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["base", "type", "format", "variant", "hash"],
+        "title": "CalibrationCompiledModel",
+        "description": "A model a calibration request's graph names, as the record the client compiled the graph against has it. Every\nfact is required: format and variant are null for a record without one, the rest is never null."
       },
       "CalibrationDeviceClass": {
         "properties": {
@@ -121082,6 +121128,14 @@
             "$ref": "#/components/schemas/Graph",
             "description": "The graph to measure"
           },
+          "graph_models": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CalibrationCompiledModel"
+            },
+            "type": "object",
+            "title": "Graph Models",
+            "description": "Per model key, every model the graph names (in a node's field, inside one, or in a mapping that reads as a model identifier), as the client compiled the graph against its record. Exactly the graph's models are named (422 otherwise). The run's creation compares each with the model's record now, and refuses the run with 409 `model_changed` when any differs, so send the records the graph was compiled from, never ones read again before posting. The run records them, and admission compares them again when its item starts."
+          },
           "data": {
             "anyOf": [
               {
@@ -121146,7 +121200,7 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["graph"],
+        "required": ["graph", "graph_models"],
         "title": "WorkingMemoryCalibrationRequest",
         "description": "The batch a calibration run enqueues, built by the client. The server sets origin, destination, runs and the\ngraph's id, turns the node cache off, and makes every node's images intermediates on no board: never in the\ngallery, and removed by clearing intermediates."
       },

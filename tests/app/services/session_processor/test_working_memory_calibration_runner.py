@@ -156,7 +156,9 @@ def _graph(*behaviours: str) -> Graph:
 
 def _create(service: WorkingMemoryCalibrationService, user_id: str, *behaviours: str) -> tuple[str, int]:
     created = asyncio.run(
-        service.create_run("model-key", WorkingMemoryCalibrationRequest(graph=_graph(*behaviours)), user_id)
+        service.create_run(
+            "model-key", WorkingMemoryCalibrationRequest(graph_models={}, graph=_graph(*behaviours)), user_id
+        )
     )
     return created.run_id, created.item_ids[0]
 
@@ -344,7 +346,9 @@ def test_a_calibration_items_images_are_intermediates_on_no_board(
     graph.add_node(
         CalibrationImageNodeInvocation(id="image", board=BoardField(board_id=board.board_id), is_intermediate=False)
     )
-    asyncio.run(service.create_run("model-key", WorkingMemoryCalibrationRequest(graph=graph), "system"))
+    asyncio.run(
+        service.create_run("model-key", WorkingMemoryCalibrationRequest(graph_models={}, graph=graph), "system")
+    )
 
     assert _run_next(queue, runner[0]).status == "completed"
     [name] = _SAVED
@@ -426,6 +430,7 @@ def test_windows_of_a_run_still_running_join_no_fit_until_it_finished(
     estimate = Graph()
     estimate.add_node(EstimateNodeInvocation(id="estimate"))
     two_items = WorkingMemoryCalibrationRequest(
+        graph_models={},
         graph=_graph("complete"),
         data=[[BatchDatum(node_path="node0", field_name="behaviour", items=["complete", "complete"])]],
     )
@@ -454,7 +459,9 @@ def test_the_finished_steps_of_an_attempt_join_no_fit_while_a_later_step_waits(
     estimate.add_node(EstimateNodeInvocation(id="estimate"))
 
     def step() -> str:
-        request = WorkingMemoryCalibrationRequest(graph=_graph("complete"), attempt_id="attempt", attempt_steps=2)
+        request = WorkingMemoryCalibrationRequest(
+            graph_models={}, graph=_graph("complete"), attempt_id="attempt", attempt_steps=2
+        )
         return asyncio.run(service.create_run("model-key", request, "system")).run_id
 
     first, _ = step(), step()

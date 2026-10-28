@@ -7,21 +7,19 @@ import threading
 import uuid
 import weakref
 from bisect import bisect_left, bisect_right
-from collections.abc import AsyncIterator, Callable, Iterable, Iterator, Mapping
+from collections.abc import AsyncIterator, Callable, Iterable, Mapping
 from contextlib import AbstractContextManager, ExitStack, asynccontextmanager
 from dataclasses import dataclass
 from functools import partial
 from itertools import chain
 from pathlib import Path
-from types import MappingProxyType, SimpleNamespace
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Final, NamedTuple, Optional
 
 import torch
-from pydantic import BaseModel
 
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 from invokeai.app.invocations.fields import WithBoard
-from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.model_records import UnknownModelException
 from invokeai.app.services.session_queue.session_queue_common import (
     DEFAULT_QUEUE_ID,
@@ -79,6 +77,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     WorkingMemoryCalibrationStatus,
     calibration_origin,
     calibration_run_id,
+    graph_model_identifiers,
 )
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_fits import (
     HeldBack,
@@ -502,25 +501,6 @@ def _identity_changes(run: CalibrationRun, model_hash: Optional[str], identity: 
     return (["hash"] if model_hash != run.model_hash else []) + facts
 
 
-def _model_identifiers(graph: Graph) -> Iterator[ModelIdentifierField]:
-    """The models a graph's nodes name: their model fields, also inside a field's model or list (a LoRA collection's
-    `LoRAField.lora`)."""
-
-    def within(value: object) -> Iterator[ModelIdentifierField]:
-        if isinstance(value, ModelIdentifierField):
-            yield value
-        elif isinstance(value, BaseModel):
-            for _, field in value:
-                yield from within(field)
-        elif isinstance(value, (list, tuple)):
-            for entry in value:
-                yield from within(entry)
-
-    for node in graph.nodes.values():
-        for _, value in node:
-            yield from within(value)
-
-
 class _Enqueue(NamedTuple):
     """What a creation enqueues: the batch, the run's device class, whether this request recorded the run, and
     whether it marks the run's enqueue, and so may clear the mark again when nothing was queued."""
@@ -898,14 +878,19 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         device = self._calibration_device()
         # Raises UnknownModelException for an unknown key.
         config = self._services.model_manager.store.get_model(model_key)
-        if (changed := self._changed_models(request.graph)) is not None:
+        changed, graph_configs = self._changed_models(request.graph, request.graph_models)
+        if changed is not None:
             raise CalibrationModelChangedError(changed)
-        store = self._services.model_manager.store
-        # As they are now: `_changed_models` just found every one of them as the graph names it.
-        graph_configs = {named.key: store.get_model(named.key) for named in _model_identifiers(request.graph)}
+        # The records the comparison found as the client compiled the graph against them: what the run records.
+        config = graph_configs.get(model_key, config)
         graph_models = {key: _graph_model(graph_config) for key, graph_config in graph_configs.items()}
         batch = self._batch(request, run_id)
         if found is not None:
+            # The run id does not derive from graph_models: a repeat may state other identities than the run recorded,
+            # and its item would fail at admission. A run stored without some of them compares the rest.
+            for key, recorded in found[1].graph_models.items():
+                if (stated := request.graph_models.get(key)) is not None and (facts := recorded.changes(stated)):
+                    raise CalibrationModelChangedError(_changed(getattr(graph_configs[key], "name", key), facts))
             # The run is recorded without items and unmarked, and nothing of it is queued: enqueue its batch.
             return _Enqueue(batch, found[0], created=False, marks=True)
         device_class = self._device_class(device)
@@ -1038,18 +1023,22 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         return not _identity_changes(newest, getattr(config, "hash", None), _model_identity(config))
 
     def _changed_models(
-        self, graph: Graph, recorded: Mapping[str, CalibrationGraphModel] = MappingProxyType({})
-    ) -> Optional[str]:
-        """Why a model the graph names is not the one the graph was compiled against any more, or None: its record is
-        gone, or names another hash, base or type than the graph does, or, for one `recorded` (`graph_models`, as the
-        run's creation found them), another hash, base, type, format or variant. The graph's identifiers carry no
-        format or variant, so a change of those between compiling the graph and posting it goes unseen."""
+        self, graph: Graph, expected: Mapping[str, CalibrationGraphModel]
+    ) -> tuple[Optional[str], dict[str, Any]]:
+        """Why a model the graph names is not the one the graph was compiled against any more, or None; and the record
+        of each of the graph's models this comparison read, once per key. Changed: its record is gone, or names another
+        hash, base or type than the graph does, or, for one in `expected`, another hash, base, type, format or variant
+        than that names. `expected` is the request's `graph_models` at the run's creation (the client's compiled
+        identities, one per model the graph names) and the run's `graph_models` at admission."""
         store = self._services.model_manager.store
-        for named in _model_identifiers(graph):
-            try:
-                config = store.get_model(named.key)
-            except UnknownModelException:
-                return f"{named.name} was removed after this calibration was planned. Calibrate again."
+        configs: dict[str, Any] = {}
+        for named in graph_model_identifiers(graph):
+            config = configs.get(named.key)
+            if config is None:
+                try:
+                    config = configs[named.key] = store.get_model(named.key)
+                except UnknownModelException:
+                    return f"{named.name} was removed after this calibration was planned. Calibrate again.", configs
             facts = [
                 fact
                 for fact, planned, current in (
@@ -1059,11 +1048,11 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                 )
                 if planned != current
             ]
-            if (identity := recorded.get(named.key)) is not None:
+            if (identity := expected.get(named.key)) is not None:
                 facts += [fact for fact in identity.changes(_graph_model(config)) if fact not in facts]
             if facts:
-                return _changed(named.name, facts)
-        return None
+                return _changed(named.name, facts), configs
+        return None, configs
 
     @staticmethod
     def _batch(request: WorkingMemoryCalibrationRequest, run_id: str) -> Batch:
@@ -1184,7 +1173,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         if facts:
             return _changed(getattr(config, "name", run.model_key), facts)
         session = getattr(queue_item, "session", None)
-        return self._changed_models(session.graph, run.graph_models) if session is not None else None
+        return self._changed_models(session.graph, run.graph_models)[0] if session is not None else None
 
     def _observe(self, run_id: str, item_id: int, observation: ObservedItem) -> None:
         found = self._find_run(run_id)

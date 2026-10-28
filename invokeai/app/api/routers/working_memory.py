@@ -115,11 +115,12 @@ def _http_error(error: Exception) -> HTTPException:
             "minutes (an owner's new attempt replaces its own attempt that stopped between steps); "
             "`calibration_interleaved`, a later step of an attempt after another calibration ran on this GPU since "
             "the attempt began; `model_changed`, a model the graph names changed or was removed since the graph was "
-            "compiled, or since an earlier step of the attempt"
+            "compiled (its record differs from the graph's identifier or its graph_models entry), or since an earlier "
+            "step of the attempt"
         },
         422: {
-            "description": "The graph cannot be measured as a calibration run, or attempt_id and attempt_steps were "
-            "not sent together"
+            "description": "The graph cannot be measured as a calibration run, graph_models does not state exactly "
+            "the graph's models, or attempt_id and attempt_steps were not sent together"
         },
         429: {"description": "Too many unacknowledged idempotency keys; acknowledge or wait, then retry"},
         503: {
