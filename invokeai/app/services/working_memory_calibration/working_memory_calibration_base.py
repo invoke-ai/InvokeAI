@@ -1,9 +1,12 @@
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Optional
 
-from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
+from invokeai.app.services.session_queue.session_queue_common import RetriedQueueItem, SessionQueueItem
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
+    RetriesInFlight,
+    WorkingMemoryCalibrationModelSummary,
+    WorkingMemoryCalibrationPlan,
     WorkingMemoryCalibrationRequest,
     WorkingMemoryCalibrationResetResult,
     WorkingMemoryCalibrationRunCreated,
@@ -28,6 +31,22 @@ class WorkingMemoryCalibrationServiceBase(ABC):
     @abstractmethod
     def admit(self, queue_item: SessionQueueItem, run_id: str) -> Optional[str]:
         """Called by the session runner before a calibration item runs: None to run it, or why it must fail."""
+
+    @abstractmethod
+    def retries_starting(self, sources: Mapping[int, tuple[Optional[str], int]]) -> Optional[RetriesInFlight]:
+        """Called by the session queue before it commits retries: per item a retry is made of, that item's origin and
+        the item its lineage started from. Counts the retries in flight on the runs of the calibration items among
+        them, in the store, so that a retry the store then fails to record keeps its attempt from feeding a fit. None
+        when no item is a calibration's, which touches no store file. Raises `CalibrationStoreError` when the store
+        cannot be written: the queue then retries nothing."""
+
+    @abstractmethod
+    def retries_committed(self, in_flight: RetriesInFlight, retried: Optional[Iterable[RetriedQueueItem]]) -> None:
+        """Called by the session queue once it committed the retries `retries_starting` counted, or rolled them back
+        (`retried` empty): record each retry of `retried` on its run, pending and standing for the item its lineage
+        started from, and count the retries in flight down again. `retried` None when the queue failed at or after its
+        commit, which may have committed: the count then stays. Never raises; a failure is logged and leaves the count
+        up."""
 
     @abstractmethod
     def model_reset_epochs(self, run_id: str) -> dict[str, int]:
@@ -76,3 +95,25 @@ class WorkingMemoryCalibrationServiceBase(ABC):
     @abstractmethod
     def export(self, device_class_id: Optional[str] = None) -> Optional[bytes]:
         """The device class's store file as it is on disk, the current one by default; None when it has none."""
+
+    @abstractmethod
+    def refresh_user_fits(self) -> None:
+        """Bring the user fits estimates read (`backend/working_memory/user_fit.py`) up to date with the store: per
+        GPU generation device, the fit of its device class's windows in the current environment, leaving out the
+        windows of calibration runs still running. Re-reads a file only when its signature or the environment changed,
+        so an unchanged store whose runs all finished costs one stat per device; while a run is unfinished, also one
+        queue read of its unfinished items by id. The session runner calls this when it starts any queue item;
+        building a plan and a reset call it too. Estimates read the fits from memory."""
+
+    @abstractmethod
+    def get_plan(self, model_key: str) -> WorkingMemoryCalibrationPlan:
+        """The cases that calibrate the model on this machine's GPU, or why it cannot be calibrated here. Raises
+        UnknownModelException for an unknown key."""
+
+    @abstractmethod
+    def get_model_summary(
+        self, model_key: str, device_class_id: Optional[str] = None
+    ) -> WorkingMemoryCalibrationModelSummary:
+        """What the windows that feed the model's lines measured on one device class, the current one by default: per
+        line and environment, the shipped and the user estimate at each size, whether the user line applies, and which
+        models measured it; and the model's runs. Raises UnknownModelException for an unknown key."""

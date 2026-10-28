@@ -5,7 +5,11 @@ import torch
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
-from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.patches.lora_conversions.flux_lora_constants import (
+    FLUX_LORA_CLIP_PREFIX,
+    FLUX_LORA_T5_PREFIX,
+    FLUX_LORA_TRANSFORMER_PREFIX,
+)
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
 
@@ -100,6 +104,22 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
     This function is based on:
     https://github.com/huggingface/diffusers/blob/55ac421f7bb12fd00ccbef727be4dc2f3f920abb/scripts/convert_flux_to_diffusers.py
     """
+
+    # Diffusers keeps CLIP layers under "text_encoder." and T5 layers under "text_encoder_2.",
+    # alongside the "transformer." layers. Route them to the CLIP and T5 prefixes; only the
+    # transformer layers continue through the conversion below.
+    clip_grouped_sd: dict[str, dict[str, torch.Tensor]] = {}
+    t5_grouped_sd: dict[str, dict[str, torch.Tensor]] = {}
+    transformer_grouped_sd: dict[str, dict[str, torch.Tensor]] = {}
+    for k, v in grouped_state_dict.items():
+        bare = k.removeprefix("base_model.model.")
+        if bare.startswith("text_encoder_2."):
+            t5_grouped_sd[bare.removeprefix("text_encoder_2.")] = v
+        elif bare.startswith("text_encoder."):
+            clip_grouped_sd[bare.removeprefix("text_encoder.")] = v
+        else:
+            transformer_grouped_sd[k] = v
+    grouped_state_dict = transformer_grouped_sd
 
     # Determine which prefix is used and remove it from all keys.
     # Check if any key starts with "base_model.model." prefix
@@ -288,6 +308,14 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
     assert len(grouped_state_dict) == 0
 
     layers_with_prefix = {f"{FLUX_LORA_TRANSFORMER_PREFIX}{k}": v for k, v in layers.items()}
+
+    for model_prefix, te_grouped_sd in [
+        (FLUX_LORA_CLIP_PREFIX, clip_grouped_sd),
+        (FLUX_LORA_T5_PREFIX, t5_grouped_sd),
+    ]:
+        for layer_key, src_layer_dict in te_grouped_sd.items():
+            values = get_lora_layer_values(src_layer_dict)
+            layers_with_prefix[f"{model_prefix}{layer_key}"] = any_lora_layer_from_state_dict(values)
 
     return layers_with_prefix
 

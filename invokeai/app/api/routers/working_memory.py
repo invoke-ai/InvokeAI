@@ -23,12 +23,18 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     WorkingMemoryCalibrationServiceBase,
 )
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
+    CalibrationAttemptBusyError,
+    CalibrationAttemptConflictError,
+    CalibrationAttemptInterleavedError,
     CalibrationGraphError,
+    CalibrationModelChangedError,
     CalibrationQueueFullError,
     CalibrationRunNotFoundError,
     CalibrationStoreError,
     CalibrationStoreUnusableError,
     CalibrationUnavailableError,
+    WorkingMemoryCalibrationModelSummary,
+    WorkingMemoryCalibrationPlan,
     WorkingMemoryCalibrationRequest,
     WorkingMemoryCalibrationResetResult,
     WorkingMemoryCalibrationRunCreated,
@@ -62,6 +68,11 @@ def _service() -> WorkingMemoryCalibrationServiceBase:
 
 
 def _http_error(error: Exception) -> HTTPException:
+    if isinstance(
+        error, (CalibrationAttemptBusyError, CalibrationAttemptInterleavedError, CalibrationModelChangedError)
+    ):
+        # Coded, as other routes' refusals a client acts on are: it tells these 409s from the others.
+        return HTTPException(status_code=409, detail={"code": error.code, "message": str(error)})
     if isinstance(error, (CalibrationRunNotFoundError, UnknownModelException)):
         return HTTPException(status_code=404, detail=str(error))
     if isinstance(error, CalibrationGraphError):
@@ -72,6 +83,7 @@ def _http_error(error: Exception) -> HTTPException:
             CalibrationUnavailableError,
             CalibrationStoreUnusableError,
             CalibrationQueueFullError,
+            CalibrationAttemptConflictError,
             EnqueueIdempotencyConflictError,
         ),
     ):
@@ -95,10 +107,21 @@ def _http_error(error: Exception) -> HTTPException:
         409: {
             "description": "This machine cannot calibrate now (no GPU, or several generation devices), the device "
             "class's store file is unusable and kept as it is (possibly after the items were queued, which then fail "
-            "when they start), the queue has no room for all of the run's items (it then takes none), or the "
-            "idempotency key was used for another request"
+            "when they start), the queue has no room for all of the run's items (it then takes none), the "
+            "idempotency key was used for another request, or attempt_steps differs from that of the attempt's runs "
+            "already stored (or of the run a repeated request names). Three of them carry a code, as "
+            '`{"code": ..., "message": ...}` in `detail`: `calibration_running`, another calibration attempt still '
+            "runs on this GPU, or another owner's attempt is between its steps and was active in the last two "
+            "minutes (an owner's new attempt replaces its own attempt that stopped between steps); "
+            "`calibration_interleaved`, a later step of an attempt after another calibration ran on this GPU since "
+            "the attempt began; `model_changed`, a model the graph names changed or was removed since the graph was "
+            "compiled (its record differs from the graph's identifier or its graph_models entry), or since an earlier "
+            "step of the attempt"
         },
-        422: {"description": "The graph cannot be measured as a calibration run"},
+        422: {
+            "description": "The graph cannot be measured as a calibration run, graph_models does not state exactly "
+            "the graph's models, or attempt_id and attempt_steps were not sent together"
+        },
         429: {"description": "Too many unacknowledged idempotency keys; acknowledge or wait, then retry"},
         503: {
             "description": "The calibration store cannot be read or written (unwritable root, lock timeout); with an "
@@ -111,8 +134,9 @@ async def calibrate_model_working_memory(
     key: str = Path(description="Key of the model the run calibrates"),
     request: WorkingMemoryCalibrationRequest = Body(description="The batch to measure"),
 ) -> WorkingMemoryCalibrationRunCreated:
-    """Start a working-memory calibration run: enqueue the batch with every node uncached and measure each node's
-    model operations on the generation device. Needs exactly one generation device, and it must be a GPU. The queue
+    """Start a working-memory calibration run: enqueue the batch with every node uncached, its images intermediates
+    on no board (never in the gallery; clearing intermediates removes them), and measure each node's model operations
+    on the generation device. Needs exactly one generation device, and it must be a GPU. The queue
     takes all of the batch's items or none.
 
     Once the items are queued, a request without an `idempotency_key` succeeds even when the store fails for a passing
@@ -135,6 +159,10 @@ async def calibrate_model_working_memory(
         CalibrationUnavailableError,
         CalibrationStoreError,
         CalibrationQueueFullError,
+        CalibrationAttemptConflictError,
+        CalibrationAttemptBusyError,
+        CalibrationAttemptInterleavedError,
+        CalibrationModelChangedError,
         EnqueueIdempotencyConflictError,
         EnqueueReceiptLimitError,
     ) as error:
@@ -155,6 +183,49 @@ def get_working_memory_calibration_status(current_admin: AdminUserOrDefault) -> 
         raise _http_error(error) from error
 
 
+@working_memory_router.get(
+    "/i/{key}/working_memory/plan",
+    operation_id="get_model_working_memory_calibration_plan",
+    response_model=WorkingMemoryCalibrationPlan,
+    responses={404: {"description": "The model could not be found"}},
+)
+def get_model_working_memory_calibration_plan(
+    current_admin: AdminUserOrDefault,
+    key: str = Path(description="Key of the model to calibrate"),
+) -> WorkingMemoryCalibrationPlan:
+    """The text-to-image cases that calibrate the model's decode on this machine's GPU, how often each runs, which
+    other installed models the calibration also moves, or why the model cannot be calibrated here (`supported`)."""
+    try:
+        return _service().get_plan(key)
+    except UnknownModelException as error:
+        raise _http_error(error) from error
+
+
+@working_memory_router.get(
+    "/i/{key}/working_memory/summary",
+    operation_id="get_model_working_memory_calibration_summary",
+    response_model=WorkingMemoryCalibrationModelSummary,
+    responses={
+        404: {"description": "The model could not be found"},
+        409: {"description": "No device_class_id was given and there is no current one"},
+        503: _STORE_UNREADABLE,
+    },
+)
+def get_model_working_memory_calibration_summary(
+    current_admin: AdminUserOrDefault,
+    key: str = Path(description="Key of the model whose measurements to summarise"),
+    device_class_id: Optional[str] = _DEVICE_CLASS_ID,
+) -> WorkingMemoryCalibrationModelSummary:
+    """What the calibration windows of the model's lines measured on one device class, per estimator line and
+    environment: the sizes, the largest demand, the shipped and the user estimate, whether the user line is in use,
+    stale or unusable, and which models measured it, also for a line the model's decode shares with other models'
+    measurements; and the model's runs."""
+    try:
+        return _service().get_model_summary(key, device_class_id)
+    except (UnknownModelException, CalibrationUnavailableError, CalibrationStoreError) as error:
+        raise _http_error(error) from error
+
+
 @working_memory_router.delete(
     "/working_memory/runs/{run_id}",
     operation_id="delete_working_memory_calibration_run",
@@ -169,7 +240,11 @@ def delete_working_memory_calibration_run(
     current_admin: AdminUserOrDefault,
     run_id: str = Path(description="The calibration run to remove"),
 ) -> WorkingMemoryCalibrationResetResult:
-    """Remove a calibration run and its measurements. Its queue items that have not run yet fail when they start."""
+    """Remove a calibration run and its measurements. Its queue items that have not run yet fail when they start.
+
+    A removed run of an attempt still counts toward the attempt's runs (`attempt_steps`), so the rest of a finished
+    attempt is judged as before. Removing a run while its attempt runs, or after it was stopped (a canceled item),
+    stops the attempt for good: none of its measurements count."""
     try:
         return _service().reset_run(run_id)
     except (CalibrationRunNotFoundError, CalibrationStoreError) as error:
@@ -188,7 +263,8 @@ def reset_model_working_memory_calibration(
     device_class_id: Optional[str] = _DEVICE_CLASS_ID,
 ) -> WorkingMemoryCalibrationResetResult:
     """Remove a model's calibration runs with all their measurements, and every measurement of the model taken in
-    other runs (a VAE measured inside a transformer's run, say), from one device class."""
+    other runs (a VAE measured inside a transformer's run, say), from one device class. Removed runs of an attempt
+    still count toward its runs; an attempt that was running is stopped for good, its later steps included."""
     try:
         return _service().reset_model(key, device_class_id)
     except (CalibrationUnavailableError, CalibrationStoreError) as error:
@@ -205,7 +281,8 @@ def reset_working_memory_calibration(
     current_admin: AdminUserOrDefault,
     device_class_id: Optional[str] = _DEVICE_CLASS_ID,
 ) -> WorkingMemoryCalibrationResetResult:
-    """Remove every calibration run and measurement of one device class."""
+    """Remove every calibration run and measurement of one device class. An attempt that was running is stopped
+    for good: its later steps never count either."""
     try:
         return _service().reset_all(device_class_id)
     except (CalibrationUnavailableError, CalibrationStoreError) as error:
