@@ -14,6 +14,7 @@ import type { LayerStackKind, ReorderSiblingsCommand } from '@workbench/canvas-e
 import type {
   CanvasLayerBasePatch,
   CanvasLayerConfigPatch,
+  CanvasLayerPreviewMutation,
   CanvasProjectMutation,
 } from '@workbench/canvas-engine/mutationContracts';
 
@@ -354,6 +355,31 @@ const patchInverse = (node: CanvasNodeContract, patch: CanvasLayerBasePatch): Ca
   }
   return inverse as CanvasLayerBasePatch;
 };
+
+const configInverse = (layer: CanvasNodeContract, config: CanvasLayerConfigPatch): CanvasLayerConfigPatch => {
+  const current = layer as unknown as Record<string, unknown>;
+  const inverse: Record<string, unknown> = { layerType: config.layerType };
+  for (const [key, value] of Object.entries(config)) {
+    if (key === 'layerType') {
+      continue;
+    }
+    const before = current[key];
+    inverse[key] =
+      (key === 'adapter' || key === 'mask') && typeof value === 'object' && value !== null && typeof before === 'object'
+        ? Object.fromEntries(Object.keys(value).map((field) => [field, (before as Record<string, unknown>)[field]]))
+        : before;
+  }
+  return inverse as CanvasLayerConfigPatch;
+};
+
+/** The mutation that returns `node` to its current values for the fields `action` previews. */
+export const previewInverse = (
+  node: CanvasNodeContract,
+  action: CanvasLayerPreviewMutation
+): CanvasLayerPreviewMutation =>
+  action.type === 'updateCanvasLayer'
+    ? { id: action.id, patch: patchInverse(node, action.patch), type: 'updateCanvasLayer' }
+    : { config: configInverse(node, action.config), id: action.id, type: 'updateCanvasLayerConfig' };
 
 const stackOf = (node: CanvasNodeContract, index: CanvasDocumentIndex): LayerStackKind | null =>
   isGroupNode(node) ? (index.byId.get(node.id)?.stack ?? null) : layerStackOf(node);
@@ -1152,25 +1178,6 @@ export const createDocumentModel = (
         touchedStacks: [entry.stack],
       }
     );
-  };
-
-  const configInverse = (layer: CanvasNodeContract, config: CanvasLayerConfigPatch): CanvasLayerConfigPatch => {
-    const current = layer as unknown as Record<string, unknown>;
-    const inverse: Record<string, unknown> = { layerType: config.layerType };
-    for (const [key, value] of Object.entries(config)) {
-      if (key === 'layerType') {
-        continue;
-      }
-      const before = current[key];
-      inverse[key] =
-        (key === 'adapter' || key === 'mask') &&
-        typeof value === 'object' &&
-        value !== null &&
-        typeof before === 'object'
-          ? Object.fromEntries(Object.keys(value).map((field) => [field, (before as Record<string, unknown>)[field]]))
-          : before;
-    }
-    return inverse as CanvasLayerConfigPatch;
   };
 
   /** The unlocked leaf `id` names; content edits are refused inside a locked subtree. */

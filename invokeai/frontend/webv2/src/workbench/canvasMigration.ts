@@ -12,20 +12,25 @@ import type {
   LayerStackKind,
 } from '@workbench/canvas-engine/api';
 
-import { CANVAS_MAX_NODE_COUNT, CANVAS_MAX_NODE_DEPTH, LAYER_STACK_ORDER } from '@workbench/canvas-engine/api';
+import { createItemId } from '@platform/browser/randomUuid';
+import {
+  CANVAS_MAX_NODE_COUNT,
+  CANVAS_MAX_NODE_DEPTH,
+  CANVAS_REGIONAL_LAYOUT_KINDS,
+  CONTROL_TYPES,
+  LAYER_STACK_ORDER,
+} from '@workbench/canvas-engine/api';
+import { repairControlDerivationRecord } from '@workbench/canvas-engine/document/controlDerivation';
 import { repairSelectedLayerId } from '@workbench/canvas-engine/document/selectionRepair';
 import { z } from 'zod';
 
 import type { CanvasLoadDiagnostic, CanvasLoadResult, CanvasVersionScope } from './canvasLoadContracts';
 
 import { MAX_SUPPORTED_CANVAS_SCHEMA_VERSION, MIN_SUPPORTED_CANVAS_SCHEMA_VERSION } from './canvasSchemaVersion';
-import { normalizeControlAdapter } from './controlAdapters';
+import { isStorableControlStepRange, isStorableControlWeight, normalizeControlAdapter } from './controlAdapters';
 
 export const DEFAULT_CANVAS_DOCUMENT_WIDTH = 1024;
 export const DEFAULT_CANVAS_DOCUMENT_HEIGHT = 1024;
-
-const createMigrationId = (prefix: string): string =>
-  `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -43,6 +48,8 @@ const zPaintSource = z.object({
   offset: zCoordinate.optional(),
   type: z.literal('paint'),
 });
+const zImageSource = z.object({ image: zImageRef, type: z.literal('image') });
+const zPixelSource = z.discriminatedUnion('type', [zPaintSource, zImageSource]);
 const zTextFontRef = z.object({
   contentHash: z.string().regex(/^[a-f0-9]{64}$/u),
   family: z.string(),
@@ -51,7 +58,7 @@ const zTextFontRef = z.object({
 });
 const zLayerSource = z.discriminatedUnion('type', [
   zPaintSource,
-  z.object({ image: zImageRef, type: z.literal('image') }),
+  zImageSource,
   z.object({
     align: z.enum(['left', 'center', 'right']),
     color: z.string(),
@@ -124,21 +131,43 @@ const zAdjustmentEntry = z.discriminatedUnion('type', [
     .refine((entry) => entry.inBlack < entry.inWhite && entry.gamma > 0),
   z.object({ ...zAdjustmentBase, rotation: zFiniteNumber, type: z.literal('hue') }),
   z.object({ ...zAdjustmentBase, type: z.literal('invert') }),
+  z.object({
+    ...zAdjustmentBase,
+    amount: zFiniteNumber.min(0).max(1),
+    distribution: z.enum(['gaussian', 'uniform']),
+    grain: z.enum(['monochrome', 'color', 'chroma']),
+    response: z.enum(['flat', 'midtones']),
+    seed: z.number().int().min(0).max(0xffffffff),
+    size: zFiniteNumber.min(1).max(8),
+    type: z.literal('noise'),
+  }),
+  // Spatial entries accept any finite value: evaluation clamps, and a refine failure would drop the whole stack.
+  z.object({ ...zAdjustmentBase, amount: zFiniteNumber, size: zFiniteNumber, type: z.literal('clarity') }),
+  z.object({ ...zAdjustmentBase, amount: zFiniteNumber, size: zFiniteNumber, type: z.literal('texture') }),
+  z.object({ ...zAdjustmentBase, amount: zFiniteNumber, type: z.literal('dehaze') }),
 ]);
 const zAdjustments = z.array(zAdjustmentEntry);
 const zControlAdapter = z
   .object({
     beginEndStepPct: z.tuple([zFiniteNumber, zFiniteNumber]),
     controlMode: z.enum(['balanced', 'more_prompt', 'more_control', 'unbalanced']).nullable(),
-    kind: z.enum(['controlnet', 't2i_adapter', 'control_lora', 'z_image_control']),
+    // An unknown kind refuses the document: this build cannot apply it, and rewriting it would lose it on save.
+    kind: z.enum([
+      'controlnet',
+      't2i_adapter',
+      'control_lora',
+      'z_image_control',
+      'anima_lllite',
+      'qwen_image_control',
+      'flux2_control',
+    ]),
     model: z.string().nullable(),
     weight: zFiniteNumber,
   })
-  .refine(({ beginEndStepPct }) => {
-    const [begin, end] = beginEndStepPct;
-    return begin >= 0 && end <= 1 && begin < end;
-  })
-  .refine(({ kind, weight }) => weight >= (kind === 'z_image_control' ? 0 : -1) && weight <= 2);
+  // The same bounds for every kind: the stored kind is advisory (the resolved kind governs in the panel, readiness
+  // validation and the graph), and a refusal here would reject the whole document.
+  .refine(({ beginEndStepPct }) => isStorableControlStepRange(beginEndStepPct))
+  .refine(({ weight }) => isStorableControlWeight(weight));
 const zMaskFill = z.object({
   color: z.string(),
   style: z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']),
@@ -233,7 +262,12 @@ const zCanvasLayer = z.discriminatedUnion('type', [
   }),
   zLayerBase.extend({
     adapter: zControlAdapter,
+    // An unknown type refuses the document like an unknown adapter kind; detector strings stay open.
+    controlType: z.enum(CONTROL_TYPES).optional(),
+    detection: zFilter.nullable().optional(),
     filter: zFilter.optional(),
+    original: zPixelSource.optional(),
+    originalTransform: zTransform.optional(),
     // Missing display-only visibility means visible for older documents; only overlay types carry it.
     isHidden: z.boolean().optional(),
     source: zLayerSource,
@@ -243,6 +277,13 @@ const zCanvasLayer = z.discriminatedUnion('type', [
   zLayerBase.extend({
     autoNegative: z.boolean(),
     isHidden: z.boolean().optional(),
+    // A structurally broken layout role drops (the region reads as an object). A role this build does not know
+    // refuses the canvas instead: rewriting it as an object would replace the user's choice on the next autosave.
+    layout: z
+      .object({ kind: z.string(), text: z.string().optional() })
+      .optional()
+      .catch(undefined)
+      .pipe(z.object({ kind: z.enum(CANVAS_REGIONAL_LAYOUT_KINDS), text: z.string().optional() }).optional()),
     mask: zMask,
     negativePrompt: z.string().nullable(),
     positivePrompt: z.string().nullable(),
@@ -319,7 +360,7 @@ export const createEmptyCanvasDocument = (
 /** Mirror the default inpaint mask without importing the Layers panel into this pure module. */
 const createInitialInpaintMaskLayer = (): CanvasInpaintMaskLayerContract => ({
   blendMode: 'normal',
-  id: createMigrationId('layer'),
+  id: createItemId('layer'),
   isEnabled: true,
   isLocked: false,
   mask: { bitmap: null, fill: { color: '#e07575', style: 'diagonal' } },
@@ -351,22 +392,92 @@ const createDefaultStagingArea = (): CanvasStagingAreaContractV2 => ({
   selectedImageIndex: 0,
 });
 
-/** v4 is adopted only when a document actually carries custom-font typography. */
+type CanvasSchemaVersion = CanvasDocumentContractV3['version'];
+
+const isSupportedCanvasSchemaVersion = (version: unknown): version is CanvasSchemaVersion =>
+  typeof version === 'number' &&
+  Number.isInteger(version) &&
+  version >= MIN_SUPPORTED_CANVAS_SCHEMA_VERSION &&
+  version <= MAX_SUPPORTED_CANVAS_SCHEMA_VERSION;
+
+/** The newest of the declared versions; a value outside the supported range counts as the oldest supported. */
+export const newestCanvasSchemaVersion = (versions: Iterable<unknown>): CanvasSchemaVersion => {
+  let newest = MIN_SUPPORTED_CANVAS_SCHEMA_VERSION as CanvasSchemaVersion;
+  for (const version of versions) {
+    if (isSupportedCanvasSchemaVersion(version) && version > newest) {
+      newest = version;
+    }
+  }
+  return newest;
+};
+
 const textSourceRequiresV4 = (source: unknown): boolean =>
   isRecord(source) &&
   source.type === 'text' &&
   ('fontRef' in source || 'fontStyle' in source || 'fontVariations' in source);
 
-const nodeRequiresV4 = (node: unknown): boolean =>
-  isRecord(node) &&
-  (textSourceRequiresV4(node.source) || (Array.isArray(node.children) && node.children.some(nodeRequiresV4)));
+/** Adjustment types a v4 reader cannot parse; it would drop the whole stack holding one. */
+const V5_ADJUSTMENT_TYPES: ReadonlySet<unknown> = new Set(['noise', 'clarity', 'texture', 'dehaze']);
 
-/** Returns whether a document uses any v4-only custom-font source fields. */
-export const canvasDocumentRequiresFontSchemaV4 = (document: Pick<CanvasDocumentContractV3, 'stacks'>): boolean =>
-  Object.values(document.stacks).some((roots) => roots.some(nodeRequiresV4));
+const hasV5Adjustment = (node: Record<string, unknown>): boolean =>
+  Array.isArray(node.adjustments) &&
+  node.adjustments.some((entry) => isRecord(entry) && V5_ADJUSTMENT_TYPES.has(entry.type));
 
-const writableDocumentVersion = (declaredVersion: unknown, stacks: CanvasStackForests): 3 | 4 =>
-  declaredVersion === 4 || canvasDocumentRequiresFontSchemaV4({ stacks }) ? 4 : 3;
+/** The control derivation fields a v5 reader would strip on load, losing the kept original on its next save. */
+const CONTROL_DERIVATION_KEYS = ['controlType', 'detection', 'original', 'originalTransform'] as const;
+
+const controlLayerRequiresV6 = (node: Record<string, unknown>): boolean =>
+  node.type === 'control' && CONTROL_DERIVATION_KEYS.some((key) => node[key] !== undefined);
+
+const ownSchemaRequirement = (node: Record<string, unknown>): CanvasSchemaVersion => {
+  if (controlLayerRequiresV6(node)) {
+    return 6;
+  }
+  if (hasV5Adjustment(node)) {
+    return 5;
+  }
+  return textSourceRequiresV4(node.source) ? 4 : 3;
+};
+
+/**
+ * The newest schema a node or any descendant needs. v4: custom-font typography. v5: a noise or spatial adjustment,
+ * enabled or not, which a v4 reader would drop. v6: a control layer carrying any derivation field.
+ */
+const nodeSchemaRequirement = (node: unknown): CanvasSchemaVersion => {
+  if (!isRecord(node)) {
+    return 3;
+  }
+  let required = ownSchemaRequirement(node);
+  if (Array.isArray(node.children)) {
+    for (const child of node.children) {
+      if (required === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION) {
+        break;
+      }
+      required = Math.max(required, nodeSchemaRequirement(child)) as CanvasSchemaVersion;
+    }
+  }
+  return required;
+};
+
+/**
+ * The schema a document is written as: the newest it already declares (adoption is sticky) or the newest its content
+ * needs, so a build that cannot read that content refuses the document rather than dropping it on load.
+ */
+export const writableCanvasSchemaVersion = (
+  declaredVersions: Iterable<unknown>,
+  document: Pick<CanvasDocumentContractV3, 'stacks'>
+): CanvasSchemaVersion => {
+  let version = newestCanvasSchemaVersion(declaredVersions);
+  for (const roots of Object.values(document.stacks)) {
+    for (const root of roots) {
+      if (version === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION) {
+        return version;
+      }
+      version = Math.max(version, nodeSchemaRequirement(root)) as CanvasSchemaVersion;
+    }
+  }
+  return version;
+};
 
 export const placementToTransform = (
   placement: { x: number; y: number; width: number; height: number },
@@ -422,15 +533,7 @@ type LoadStep<T> = Extract<CanvasLoadResult<T>, { status: 'loaded' }> | Refusal;
 type DeclaredVersion = { kind: 'current' } | { kind: 'other'; version: number } | { kind: 'malformed' };
 
 const classifyVersion = (value: unknown): DeclaredVersion => {
-  if (value === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION) {
-    return { kind: 'current' };
-  }
-  if (
-    typeof value === 'number' &&
-    Number.isInteger(value) &&
-    value >= MIN_SUPPORTED_CANVAS_SCHEMA_VERSION &&
-    value < MAX_SUPPORTED_CANVAS_SCHEMA_VERSION
-  ) {
+  if (isSupportedCanvasSchemaVersion(value)) {
     return { kind: 'current' };
   }
   if (typeof value === 'number' && Number.isInteger(value) && value >= 1) {
@@ -500,11 +603,11 @@ interface ParseContext {
 const parseLeaf = (value: Record<string, unknown>, path: string, context: ParseContext): CanvasLayerContract | null => {
   let candidate: Record<string, unknown> = value;
   if (value.type === 'control') {
-    candidate = {
+    candidate = repairControlDerivationRecord({
       ...value,
       adapter: normalizeControlAdapter(value.adapter),
       withTransparencyEffect: value.withTransparencyEffect === undefined ? true : value.withTransparencyEffect,
-    };
+    });
   } else if (value.type === 'regional_guidance') {
     candidate = {
       ...value,
@@ -620,7 +723,7 @@ export const normalizeCanvasDocumentContract = (
         ...document,
         ...normalizeCanvasDocumentGeometry(document.width, document.height, document.bbox),
         stacks: parsed.stacks,
-        version: writableDocumentVersion(document.version, parsed.stacks),
+        version: writableCanvasSchemaVersion([document.version], parsed),
       }
     : null;
 };
@@ -662,7 +765,7 @@ const loadCanvasDocument = (
       ...normalizeCanvasDocumentGeometry(value.width, value.height, value.bbox),
       selectedLayerId,
       stacks: stacks.stacks,
-      version: writableDocumentVersion(value.version, stacks.stacks),
+      version: writableCanvasSchemaVersion([value.version], stacks),
     },
   };
 };
@@ -725,12 +828,11 @@ const loadCanvasStateStep = (canvas: unknown): LoadStep<CanvasStateContractV3> =
       documentRevision: asNumber(canvas.documentRevision, 0),
       snapshots,
       stagingArea: normalizeStagingArea(canvas),
-      version:
-        canvas.version === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION ||
-        document.value.version === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION ||
-        snapshots.some((snapshot) => snapshot.document.version === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION)
-          ? MAX_SUPPORTED_CANVAS_SCHEMA_VERSION
-          : 3,
+      version: newestCanvasSchemaVersion([
+        canvas.version,
+        document.value.version,
+        ...snapshots.map((snapshot) => snapshot.document.version),
+      ]),
     },
   };
 };

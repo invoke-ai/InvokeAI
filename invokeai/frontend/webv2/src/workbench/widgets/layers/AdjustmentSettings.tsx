@@ -2,6 +2,7 @@ import type { SelectValueChangeDetails, SliderValueChangeDetails } from '@chakra
 import type {
   CanvasAdjustmentCurves,
   CanvasAdjustmentEntry,
+  CanvasDocumentModel,
   CanvasRasterLayerContractV2,
 } from '@workbench/canvas-engine/api';
 import type { CanvasPreparedEngine } from '@workbench/widgets/canvas/useStructuralCommit';
@@ -10,11 +11,19 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 
 import { chakra, createListCollection, HStack, Stack, Text } from '@chakra-ui/react';
 import { Field, Select, Slider } from '@platform/ui';
+import { IconButton } from '@platform/ui/Button';
+import { ScrubberField } from '@platform/ui/ScrubberField';
+import { SegmentedControl } from '@platform/ui/SegmentedControl';
+import { Tooltip } from '@platform/ui/Tooltip';
 import { buildCurveLut } from '@workbench/canvas-engine/api';
-import { useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
+import { baselineConfig, useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
+import { DicesIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { AdjustmentStatusEngine } from './AdjustmentStatusIcon';
+
+import { AdjustmentStatusNotice } from './AdjustmentStatusIcon';
 import {
   CURVE_PADDING,
   CURVE_SIZE,
@@ -23,13 +32,20 @@ import {
   finishCurveDragResult,
   getCurveGridCoordinates,
 } from './curveEditorMath';
+import {
+  createNoiseSeed,
+  DEFAULT_CLARITY_SIZE,
+  DEFAULT_NOISE_AMOUNT,
+  DEFAULT_NOISE_SIZE,
+  DEFAULT_TEXTURE_SIZE,
+} from './layerOps';
 
 /**
  * Edit adjustment subrows through whole-stack patch-config. Preview gestures live and commit once; tree rows own
  * enable/remove/reorder.
  */
 
-export type AdjustmentsEngine = CanvasStructuralEngine & CanvasPreparedEngine;
+export type AdjustmentsEngine = CanvasStructuralEngine & CanvasPreparedEngine & AdjustmentStatusEngine;
 
 const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: true } as const;
 
@@ -62,7 +78,11 @@ const IDENTITY_CURVE: [number, number][] = [
   [255, 255],
 ];
 
-const formatSigned = (value: number): string => `${value > 0 ? '+' : ''}${Math.round(value * 100)}`;
+/** The fields a gesture changes on one entry. */
+type EntryPatch = Record<string, unknown>;
+
+const withPatch = (entries: readonly CanvasAdjustmentEntry[], id: string, patch: EntryPatch): CanvasAdjustmentEntry[] =>
+  entries.map((candidate) => (candidate.id === id ? ({ ...candidate, ...patch } as CanvasAdjustmentEntry) : candidate));
 
 /** An adjustment stack's owner: a raster layer or a raster-stack group. */
 export type AdjustmentOwner = Pick<CanvasRasterLayerContractV2, 'id' | 'adjustments'> & {
@@ -96,7 +116,9 @@ const AdjustmentEntryEditor = ({
 }) => {
   const { cancel: cancelPreview, commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const { t } = useTranslation();
-  const gestureBaselineRef = useRef<readonly CanvasAdjustmentEntry[] | null>(null);
+  // Previews patch the gesture's fields onto the live stack. The engine's preview session holds the stack as the
+  // gesture found it and ends the gesture when an undo or an edit from elsewhere lands, so the next preview starts
+  // from the changed stack and the commit records from where that session began.
   const configOf = useCallback(
     (adjustments: CanvasAdjustmentEntry[]) =>
       layer.type === 'group'
@@ -104,89 +126,80 @@ const AdjustmentEntryEditor = ({
         : { adjustments, layerType: 'raster' as const },
     [layer.type]
   );
+  const liveEntries = useCallback(
+    (model: CanvasDocumentModel | null | undefined): readonly CanvasAdjustmentEntry[] | null => {
+      const owner = model?.getNode(layer.id);
+      return owner && 'adjustments' in owner ? (owner.adjustments ?? []) : null;
+    },
+    [layer.id]
+  );
+  const currentEntries = useCallback(
+    () => liveEntries(engine?.document.model()) ?? layer.adjustments ?? [],
+    [engine, layer.adjustments, liveEntries]
+  );
 
   const patchLive = useCallback(
-    (next: CanvasAdjustmentEntry) => {
-      const entries = layer.adjustments ?? [];
-      gestureBaselineRef.current ??= entries;
+    (patch: EntryPatch) => {
       previewStructural({
-        config: configOf(entries.map((candidate) => (candidate.id === next.id ? next : candidate))),
+        config: configOf(withPatch(currentEntries(), entry.id, patch)),
         id: layer.id,
         type: 'updateCanvasLayerConfig',
       });
     },
-    [configOf, previewStructural, layer.adjustments, layer.id]
+    [configOf, currentEntries, entry.id, layer.id, previewStructural]
   );
 
+  // A gesture that ends where it began prepares nothing, which drops its previews.
   const commitEntry = useCallback(
-    (label: string, next: CanvasAdjustmentEntry) => {
-      const entries = layer.adjustments ?? [];
-      const baseline = gestureBaselineRef.current ?? entries;
-      gestureBaselineRef.current = null;
-      // The tree dot owns enablement; a toggle landing mid-gesture stays put.
-      const committed = { ...next, isEnabled: entry.isEnabled };
-      commitPrepared(label, (model) =>
-        model.prepare({
-          before: configOf([...baseline]),
-          config: configOf(entries.map((candidate) => (candidate.id === committed.id ? committed : candidate))),
-          id: layer.id,
-          type: 'patch-config',
-        })
-      );
+    (label: string, patch: EntryPatch) => {
+      commitPrepared(label, (model, baseline) => {
+        const entries = liveEntries(model);
+        // The entry was removed mid-gesture: committing would resurrect it.
+        if (!entries?.some((candidate) => candidate.id === entry.id)) {
+          return { ids: [entry.id], status: 'missing' };
+        }
+        const config = configOf(withPatch(entries, entry.id, patch));
+        return model.prepare({ before: baselineConfig(baseline, config), config, id: layer.id, type: 'patch-config' });
+      });
     },
-    [commitPrepared, configOf, entry.isEnabled, layer.adjustments, layer.id]
+    [commitPrepared, configOf, entry.id, layer.id, liveEntries]
   );
 
-  const cancelGesture = useCallback(() => {
-    const baseline = gestureBaselineRef.current;
-    gestureBaselineRef.current = null;
-    if (baseline) {
-      cancelPreview({ config: configOf([...baseline]), id: layer.id, type: 'updateCanvasLayerConfig' });
-    }
-  }, [cancelPreview, configOf, layer.id]);
-
-  const handleScalarLive = useCallback(
-    (field: ScalarField, next: number) => patchLive({ ...entry, [field]: next } as CanvasAdjustmentEntry),
-    [entry, patchLive]
-  );
+  const handleScalarLive = useCallback((field: ScalarField, next: number) => patchLive({ [field]: next }), [patchLive]);
   const handleScalarCommit = useCallback(
-    (field: ScalarField, next: number) =>
-      commitEntry(t(SCALAR_LABEL_KEYS[field]), { ...entry, [field]: next } as CanvasAdjustmentEntry),
-    [commitEntry, entry, t]
-  );
-  const handleLevelsLive = useCallback(
-    (patch: Partial<LevelsEntry>) => patchLive({ ...entry, ...patch } as CanvasAdjustmentEntry),
-    [entry, patchLive]
+    (field: ScalarField, next: number) => commitEntry(t(SCALAR_SPECS[field].labelKey), { [field]: next }),
+    [commitEntry, t]
   );
   const handleLevelsCommit = useCallback(
-    (patch: Partial<LevelsEntry>) =>
-      commitEntry(t('widgets.layers.adjustments.levels'), { ...entry, ...patch } as CanvasAdjustmentEntry),
-    [commitEntry, entry, t]
+    (patch: Partial<LevelsEntry>) => commitEntry(t('widgets.layers.adjustments.levels'), patch),
+    [commitEntry, t]
   );
-  const handleCurvesLive = useCallback(
-    (curves: CanvasAdjustmentCurves) => patchLive({ ...entry, curves } as CanvasAdjustmentEntry),
-    [entry, patchLive]
+  const handleNoiseCommit = useCallback(
+    (patch: Partial<NoiseEntry>) => commitEntry(t('widgets.layers.adjustments.noise'), patch),
+    [commitEntry, t]
   );
+  const handleSpatialCommit = useCallback(
+    (patch: Partial<SpatialEntry>) => commitEntry(t(`widgets.layers.adjustments.${entry.type}`), patch),
+    [commitEntry, entry.type, t]
+  );
+  const handleCurvesLive = useCallback((curves: CanvasAdjustmentCurves) => patchLive({ curves }), [patchLive]);
   const handleCurvesCommit = useCallback(
-    (curves: CanvasAdjustmentCurves) =>
-      commitEntry(t('widgets.layers.adjustments.curves'), { ...entry, curves } as CanvasAdjustmentEntry),
-    [commitEntry, entry, t]
+    (curves: CanvasAdjustmentCurves) => commitEntry(t('widgets.layers.adjustments.curves'), { curves }),
+    [commitEntry, t]
   );
 
   switch (entry.type) {
     case 'brightness-contrast':
       return (
-        <Stack gap="3">
-          <ScalarSlider
+        <Stack gap="2">
+          <ScalarScrubber
             field="brightness"
-            label={t('widgets.layers.adjustments.brightness')}
             value={entry.brightness}
             onCommit={handleScalarCommit}
             onLive={handleScalarLive}
           />
-          <ScalarSlider
+          <ScalarScrubber
             field="contrast"
-            label={t('widgets.layers.adjustments.contrast')}
             value={entry.contrast}
             onCommit={handleScalarCommit}
             onLive={handleScalarLive}
@@ -195,23 +208,12 @@ const AdjustmentEntryEditor = ({
       );
     case 'exposure':
       return (
-        <ScalarSlider
-          field="stops"
-          formatValue={formatStops}
-          label={t('widgets.layers.adjustments.exposure')}
-          max={5}
-          min={-5}
-          step={0.05}
-          value={entry.stops}
-          onCommit={handleScalarCommit}
-          onLive={handleScalarLive}
-        />
+        <ScalarScrubber field="stops" value={entry.stops} onCommit={handleScalarCommit} onLive={handleScalarLive} />
       );
     case 'hsl':
       return (
-        <ScalarSlider
+        <ScalarScrubber
           field="saturation"
-          label={t('widgets.layers.adjustments.saturation')}
           value={entry.saturation}
           onCommit={handleScalarCommit}
           onLive={handleScalarLive}
@@ -219,31 +221,41 @@ const AdjustmentEntryEditor = ({
       );
     case 'hue':
       return (
-        <ScalarSlider
+        <ScalarScrubber
           field="rotation"
-          formatValue={formatDegrees}
-          label={t('widgets.layers.adjustments.hue')}
-          max={180}
-          min={-180}
-          step={1}
           value={entry.rotation}
           onCommit={handleScalarCommit}
           onLive={handleScalarLive}
         />
       );
     case 'levels':
-      return <LevelsEditor entry={entry} onCommit={handleLevelsCommit} onLive={handleLevelsLive} />;
+      return <LevelsEditor entry={entry} onCommit={handleLevelsCommit} onLive={patchLive} />;
     case 'invert':
       return (
         <Text color="fg.muted" fontSize="md">
           {t('widgets.layers.adjustments.invertHint')}
         </Text>
       );
+    case 'noise':
+      return <NoiseEditor disabled={engine === null} entry={entry} onCommit={handleNoiseCommit} onLive={patchLive} />;
+    case 'clarity':
+    case 'texture':
+    case 'dehaze':
+      return (
+        <SpatialEditor
+          engine={engine}
+          entry={entry}
+          ownerId={layer.id}
+          ownerType={layer.type}
+          onCommit={handleSpatialCommit}
+          onLive={patchLive}
+        />
+      );
     case 'curves':
       return (
         <CurvesEditor
           curves={entry.curves}
-          onCancel={cancelGesture}
+          onCancel={cancelPreview}
           onCommit={handleCurvesCommit}
           onLive={handleCurvesLive}
         />
@@ -253,78 +265,82 @@ const AdjustmentEntryEditor = ({
 
 type ScalarField = 'brightness' | 'contrast' | 'saturation' | 'rotation' | 'stops';
 type LevelsEntry = Extract<CanvasAdjustmentEntry, { type: 'levels' }>;
+type NoiseEntry = Extract<CanvasAdjustmentEntry, { type: 'noise' }>;
+type SpatialEntry = Extract<CanvasAdjustmentEntry, { type: 'clarity' | 'texture' | 'dehaze' }>;
 
-const SCALAR_LABEL_KEYS: Record<ScalarField, string> = {
-  brightness: 'widgets.layers.adjustments.brightness',
-  contrast: 'widgets.layers.adjustments.contrast',
-  rotation: 'widgets.layers.adjustments.hue',
-  saturation: 'widgets.layers.adjustments.saturation',
-  stops: 'widgets.layers.adjustments.exposure',
-};
-
+const formatSigned = (value: number): string => `${value > 0 ? '+' : ''}${value}`;
 const formatDegrees = (value: number): string => `${Math.round(value)}°`;
 const formatStops = (value: number): string => `${value > 0 ? '+' : ''}${value.toFixed(2)} EV`;
 
+/** A scalar's scrubber range in display units (`scale` × stored); every scalar's identity value is 0. */
+interface ScalarSpec {
+  labelKey: string;
+  min: number;
+  max: number;
+  step: number;
+  scale: number;
+  format: (value: number) => string;
+}
+
+const SIGNED_UNIT: Omit<ScalarSpec, 'labelKey'> = { format: formatSigned, max: 100, min: -100, scale: 100, step: 1 };
+
+const SCALAR_SPECS: Record<ScalarField, ScalarSpec> = {
+  brightness: { ...SIGNED_UNIT, labelKey: 'widgets.layers.adjustments.brightness' },
+  contrast: { ...SIGNED_UNIT, labelKey: 'widgets.layers.adjustments.contrast' },
+  rotation: {
+    format: formatDegrees,
+    labelKey: 'widgets.layers.adjustments.hue',
+    max: 180,
+    min: -180,
+    scale: 1,
+    step: 1,
+  },
+  saturation: { ...SIGNED_UNIT, labelKey: 'widgets.layers.adjustments.saturation' },
+  stops: {
+    format: formatStops,
+    labelKey: 'widgets.layers.adjustments.exposure',
+    max: 5,
+    min: -5,
+    scale: 1,
+    step: 0.05,
+  },
+};
+
 const LEVELS_CHANNELS = ['rgb', 'r', 'g', 'b'] as const;
 
-const ScalarSlider = ({
+const ScalarScrubber = ({
   field,
-  formatValue = formatSigned,
-  label,
-  max = 1,
-  min = -1,
   onCommit,
   onLive,
-  step = 0.01,
   value,
 }: {
   field: ScalarField;
-  formatValue?: (value: number) => string;
-  label: string;
-  max?: number;
-  min?: number;
-  step?: number;
   value: number;
   onLive: (field: ScalarField, next: number) => void;
   onCommit: (field: ScalarField, next: number) => void;
 }) => {
-  const sliderValue = useMemo(() => [value], [value]);
-  const aria = useMemo(() => [label], [label]);
-
-  const handleChange = useCallback(
-    ({ value: v }: SliderValueChangeDetails) => {
-      const next = v[0];
-      if (next !== undefined && Number.isFinite(next)) {
-        onLive(field, next);
-      }
-    },
-    [field, onLive]
-  );
-
+  const { t } = useTranslation();
+  const spec = SCALAR_SPECS[field];
+  // Scaled values round to the step so stored fractions never show float noise.
+  const shown = spec.scale === 1 ? value : Math.round(value * spec.scale);
+  const handleChange = useCallback((next: number) => onLive(field, next / spec.scale), [field, onLive, spec.scale]);
   const handleChangeEnd = useCallback(
-    ({ value: v }: SliderValueChangeDetails) => {
-      const next = v[0];
-      if (next !== undefined && Number.isFinite(next)) {
-        onCommit(field, next);
-      }
-    },
-    [field, onCommit]
+    (next: number) => onCommit(field, next / spec.scale),
+    [field, onCommit, spec.scale]
   );
 
   return (
-    <Field label={label}>
-      <Slider
-        aria-label={aria}
-        formatValue={formatValue}
-        max={max}
-        min={min}
-        step={step}
-        value={sliderValue}
-        withThumbTooltip
-        onValueChange={handleChange}
-        onValueChangeEnd={handleChangeEnd}
-      />
-    </Field>
+    <ScrubberField
+      defaultValue={0}
+      formatValue={spec.format}
+      label={t(spec.labelKey)}
+      max={spec.max}
+      min={spec.min}
+      step={spec.step}
+      value={shown}
+      onChange={handleChange}
+      onChangeEnd={handleChangeEnd}
+    />
   );
 };
 
@@ -342,13 +358,11 @@ const LevelsEditor = ({
 }) => {
   const { t } = useTranslation();
   const inputValue = useMemo(() => [entry.inBlack, entry.inWhite], [entry.inBlack, entry.inWhite]);
-  const gammaValue = useMemo(() => [entry.gamma], [entry.gamma]);
   const outputValue = useMemo(() => [entry.outBlack, entry.outWhite], [entry.outBlack, entry.outWhite]);
   const inputAria = useMemo(
     () => [t('widgets.layers.adjustments.inputBlack'), t('widgets.layers.adjustments.inputWhite')],
     [t]
   );
-  const gammaAria = useMemo(() => [t('widgets.layers.adjustments.gamma')], [t]);
   const outputAria = useMemo(
     () => [t('widgets.layers.adjustments.outputBlack'), t('widgets.layers.adjustments.outputWhite')],
     [t]
@@ -416,22 +430,8 @@ const LevelsEditor = ({
     },
     [onCommit, rangePatch]
   );
-  const handleGammaChange = useCallback(
-    ({ value: v }: SliderValueChangeDetails) => {
-      if (v[0] !== undefined && Number.isFinite(v[0])) {
-        onLive({ gamma: v[0] });
-      }
-    },
-    [onLive]
-  );
-  const handleGammaCommit = useCallback(
-    ({ value: v }: SliderValueChangeDetails) => {
-      if (v[0] !== undefined && Number.isFinite(v[0])) {
-        onCommit({ gamma: v[0] });
-      }
-    },
-    [onCommit]
-  );
+  const handleGammaChange = useCallback((gamma: number) => onLive({ gamma }), [onLive]);
+  const handleGammaCommit = useCallback((gamma: number) => onCommit({ gamma }), [onCommit]);
 
   return (
     <Stack gap="3">
@@ -458,19 +458,17 @@ const LevelsEditor = ({
           onValueChangeEnd={handleInputCommit}
         />
       </Field>
-      <Field label={t('widgets.layers.adjustments.gamma')}>
-        <Slider
-          aria-label={gammaAria}
-          formatValue={formatGamma}
-          max={4}
-          min={0.1}
-          step={0.01}
-          value={gammaValue}
-          withThumbTooltip
-          onValueChange={handleGammaChange}
-          onValueChangeEnd={handleGammaCommit}
-        />
-      </Field>
+      <ScrubberField
+        defaultValue={1}
+        formatValue={formatGamma}
+        label={t('widgets.layers.adjustments.gamma')}
+        max={4}
+        min={0.1}
+        step={0.01}
+        value={entry.gamma}
+        onChange={handleGammaChange}
+        onChangeEnd={handleGammaCommit}
+      />
       <Field label={t('widgets.layers.adjustments.outputLevels')}>
         <Slider
           aria-label={outputAria}
@@ -484,6 +482,225 @@ const LevelsEditor = ({
         />
       </Field>
     </Stack>
+  );
+};
+
+const NOISE_DISTRIBUTIONS = ['gaussian', 'uniform'] as const;
+const NOISE_GRAINS = ['monochrome', 'color', 'chroma'] as const;
+const NOISE_RESPONSES = ['flat', 'midtones'] as const;
+const NOISE_MIN_SIZE = 1;
+const NOISE_MAX_SIZE = 8;
+
+const formatPercent = (value: number): string => `${value}%`;
+const formatPixels = (value: number): string => `${value.toFixed(1)} px`;
+/** Typed sizes keep their decimals (the field only clamps them); tenths of a pixel match the slider's grid. */
+const toNoiseSize = (value: number): number => Math.round(value * 10) / 10;
+
+/** One labelled segmented choice of the noise editor; picking the current option commits nothing. */
+const NoiseChoice = <Value extends string>({
+  disabled,
+  label,
+  labelKey,
+  onCommit,
+  options,
+  value,
+}: {
+  disabled: boolean;
+  label: string;
+  /** The i18n key prefix of each option's label. */
+  labelKey: string;
+  onCommit: (value: Value) => void;
+  options: readonly Value[];
+  value: Value;
+}) => {
+  const { t } = useTranslation();
+  const items = useMemo(
+    () => options.map((option) => ({ label: t(`${labelKey}.${option}`), value: option })),
+    [labelKey, options, t]
+  );
+  const handleChange = useCallback(
+    (next: string) => {
+      if (next !== value) {
+        onCommit(next as Value);
+      }
+    },
+    [onCommit, value]
+  );
+  return (
+    <Field disabled={disabled} label={label}>
+      <SegmentedControl ariaLabel={label} disabled={disabled} options={items} value={value} onChange={handleChange} />
+    </Field>
+  );
+};
+
+/** Distribution, grain, tonal response and size choices, an amount scrubber in percent, and a seed re-roll. */
+const NoiseEditor = ({
+  disabled,
+  entry,
+  onCommit,
+  onLive,
+}: {
+  disabled: boolean;
+  entry: NoiseEntry;
+  onLive: (patch: Partial<NoiseEntry>) => void;
+  onCommit: (patch: Partial<NoiseEntry>) => void;
+}) => {
+  const { t } = useTranslation();
+  const handleDistributionCommit = useCallback(
+    (distribution: NoiseEntry['distribution']) => onCommit({ distribution }),
+    [onCommit]
+  );
+  const handleGrainCommit = useCallback((grain: NoiseEntry['grain']) => onCommit({ grain }), [onCommit]);
+  const handleResponseCommit = useCallback((response: NoiseEntry['response']) => onCommit({ response }), [onCommit]);
+  const handleSizeChange = useCallback((size: number) => onLive({ size: toNoiseSize(size) }), [onLive]);
+  const handleSizeCommit = useCallback((size: number) => onCommit({ size: toNoiseSize(size) }), [onCommit]);
+  const handleAmountChange = useCallback((percent: number) => onLive({ amount: percent / 100 }), [onLive]);
+  const handleAmountCommit = useCallback((percent: number) => onCommit({ amount: percent / 100 }), [onCommit]);
+  const handleNewPattern = useCallback(() => onCommit({ seed: createNoiseSeed() }), [onCommit]);
+  const newPatternLabel = t('widgets.layers.adjustments.newNoisePattern');
+
+  return (
+    <Stack gap="3">
+      <NoiseChoice
+        disabled={disabled}
+        label={t('widgets.layers.adjustments.noiseDistribution')}
+        labelKey="widgets.layers.adjustments.noiseDistributions"
+        options={NOISE_DISTRIBUTIONS}
+        value={entry.distribution}
+        onCommit={handleDistributionCommit}
+      />
+      <NoiseChoice
+        disabled={disabled}
+        label={t('widgets.layers.adjustments.noiseGrain')}
+        labelKey="widgets.layers.adjustments.noiseGrains"
+        options={NOISE_GRAINS}
+        value={entry.grain}
+        onCommit={handleGrainCommit}
+      />
+      <NoiseChoice
+        disabled={disabled}
+        label={t('widgets.layers.adjustments.noiseResponse')}
+        labelKey="widgets.layers.adjustments.noiseResponses"
+        options={NOISE_RESPONSES}
+        value={entry.response}
+        onCommit={handleResponseCommit}
+      />
+      <ScrubberField
+        defaultValue={DEFAULT_NOISE_SIZE}
+        disabled={disabled}
+        formatValue={formatPixels}
+        label={t('widgets.layers.adjustments.noiseSize')}
+        max={NOISE_MAX_SIZE}
+        min={NOISE_MIN_SIZE}
+        step={0.1}
+        value={entry.size}
+        onChange={handleSizeChange}
+        onChangeEnd={handleSizeCommit}
+      />
+      <HStack gap="1">
+        <ScrubberField
+          defaultValue={Math.round(DEFAULT_NOISE_AMOUNT * 100)}
+          disabled={disabled}
+          flex="1"
+          formatValue={formatPercent}
+          label={t('widgets.layers.adjustments.noiseAmount')}
+          max={100}
+          min={0}
+          minW="0"
+          step={1}
+          value={Math.round(entry.amount * 100)}
+          onChange={handleAmountChange}
+          onChangeEnd={handleAmountCommit}
+        />
+        <Tooltip content={newPatternLabel}>
+          <IconButton
+            aria-label={newPatternLabel}
+            color="fg.muted"
+            disabled={disabled}
+            flexShrink={0}
+            variant="outline"
+            onClick={handleNewPattern}
+          >
+            <DicesIcon />
+          </IconButton>
+        </Tooltip>
+      </HStack>
+    </Stack>
+  );
+};
+
+/** The spatial amount's range, as on the backend nodes; 0 is identity. */
+const SPATIAL_AMOUNT_LIMIT = 200;
+/** Feature-size ranges in owner pixels, as on the backend nodes; Dehaze has none (it follows the content's size). */
+const SPATIAL_SIZES = {
+  clarity: { defaultValue: DEFAULT_CLARITY_SIZE, max: 1000, min: 4 },
+  texture: { defaultValue: DEFAULT_TEXTURE_SIZE, max: 100, min: 1 },
+} as const;
+
+const formatWholePixels = (value: number): string => `${Math.round(value)} px`;
+
+/** Clarity, Texture and Dehaze: a signed amount, a feature size for the first two, and why the canvas skips them. */
+const SpatialEditor = ({
+  engine,
+  entry,
+  onCommit,
+  onLive,
+  ownerId,
+  ownerType,
+}: {
+  engine: AdjustmentStatusEngine | null;
+  entry: SpatialEntry;
+  ownerId: string;
+  ownerType: AdjustmentOwner['type'];
+  onLive: (patch: Partial<SpatialEntry>) => void;
+  onCommit: (patch: Partial<SpatialEntry>) => void;
+}) => {
+  const { t } = useTranslation();
+  const handleAmountChange = useCallback((amount: number) => onLive({ amount }), [onLive]);
+  const handleAmountCommit = useCallback((amount: number) => onCommit({ amount }), [onCommit]);
+  // Whole pixels: a typed fraction would show one size and store another.
+  const handleSizeChange = useCallback((size: number) => onLive({ size: Math.round(size) }), [onLive]);
+  const handleSizeCommit = useCallback((size: number) => onCommit({ size: Math.round(size) }), [onCommit]);
+  const size = entry.type === 'dehaze' ? null : { ...SPATIAL_SIZES[entry.type], value: entry.size };
+
+  return (
+    <chakra.div>
+      <AdjustmentStatusNotice engine={engine} ownerId={ownerId} />
+      <Stack gap="3">
+        <ScrubberField
+          defaultValue={0}
+          formatValue={formatSigned}
+          helpText={entry.type === 'dehaze' ? t('widgets.layers.adjustments.dehazeHint') : undefined}
+          label={t('widgets.layers.adjustments.amount')}
+          max={SPATIAL_AMOUNT_LIMIT}
+          min={-SPATIAL_AMOUNT_LIMIT}
+          step={1}
+          value={Math.round(entry.amount)}
+          onChange={handleAmountChange}
+          onChangeEnd={handleAmountCommit}
+        />
+        {size ? (
+          <ScrubberField
+            defaultValue={size.defaultValue}
+            formatValue={formatWholePixels}
+            helpText={t(
+              ownerType === 'group'
+                ? 'widgets.layers.adjustments.sizeHintGroup'
+                : 'widgets.layers.adjustments.sizeHintLayer'
+            )}
+            label={t('widgets.layers.adjustments.size')}
+            max={size.max}
+            min={size.min}
+            // Equal travel per ratio: the small sizes that matter most would otherwise share a sliver of the track.
+            scale="log"
+            step={1}
+            value={size.value}
+            onChange={handleSizeChange}
+            onChangeEnd={handleSizeCommit}
+          />
+        ) : null}
+      </Stack>
+    </chakra.div>
   );
 };
 

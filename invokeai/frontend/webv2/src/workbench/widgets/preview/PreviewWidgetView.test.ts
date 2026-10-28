@@ -4,7 +4,98 @@ import { GALLERY_MAX_ROWS } from '@features/gallery/queries';
 import { describe, expect, it } from 'vitest';
 
 import { getVideoFrameCopyNotice } from './PreviewWidgetView';
-import { mergePreviewBoardItems } from './usePreviewNavigation';
+import { getPreviewSelectedPage, mergePreviewBoardItems } from './usePreviewNavigation';
+
+describe('getPreviewSelectedPage', () => {
+  const selectedImageQuery = {
+    boardId: 'none',
+    galleryView: 'images' as const,
+    imageOrderDir: 'DESC' as const,
+    itemBoard: false,
+    mediaKind: null,
+    page: 3,
+    paginationMode: 'infinite' as const,
+    searchTerm: '',
+    semanticKey: 'text:sunset',
+    starredOnly: false,
+  };
+
+  it('centers matching semantic navigation on the selected result page', () => {
+    expect(
+      getPreviewSelectedPage({
+        galleryPage: 0,
+        navigationBoardId: 'none',
+        navigationMediaKind: null,
+        navigationSemanticKey: 'text:sunset',
+        selectedImageQuery,
+      })
+    ).toBe(3);
+  });
+
+  it('does not reuse a result position after the semantic query changes', () => {
+    expect(
+      getPreviewSelectedPage({
+        galleryPage: 0,
+        navigationBoardId: 'none',
+        navigationMediaKind: null,
+        navigationSemanticKey: 'text:dawn',
+        selectedImageQuery,
+      })
+    ).toBe(0);
+
+    expect(
+      getPreviewSelectedPage({
+        galleryPage: 0,
+        navigationBoardId: 'different-board',
+        navigationMediaKind: null,
+        navigationSemanticKey: 'text:sunset',
+        selectedImageQuery,
+      })
+    ).toBe(0);
+  });
+
+  it('reuses a ranked page only while the ranking navigates the media kind it was stamped in', () => {
+    const pageFor = (stamped: 'image' | 'video' | null, navigated: 'image' | 'video' | null) =>
+      getPreviewSelectedPage({
+        galleryPage: 0,
+        navigationBoardId: 'none',
+        navigationMediaKind: navigated,
+        navigationSemanticKey: 'text:sunset',
+        selectedImageQuery: { ...selectedImageQuery, mediaKind: stamped },
+      });
+
+    expect(pageFor(null, null)).toBe(3);
+    expect(pageFor('video', 'video')).toBe(3);
+    // Another kind ranks another result set: the stamped page describes none of it.
+    expect(pageFor(null, 'video')).toBe(0);
+    expect(pageFor('video', null)).toBe(0);
+    expect(pageFor('image', 'video')).toBe(0);
+  });
+
+  it('keeps an ordinary listing on its stamped page, whose media kind it navigates', () => {
+    expect(
+      getPreviewSelectedPage({
+        galleryPage: 0,
+        navigationBoardId: 'none',
+        navigationMediaKind: 'video',
+        navigationSemanticKey: '',
+        selectedImageQuery: { ...selectedImageQuery, mediaKind: 'video', semanticKey: null },
+      })
+    ).toBe(3);
+  });
+
+  it('does not reinterpret a semantic result page as an ordinary board page', () => {
+    expect(
+      getPreviewSelectedPage({
+        galleryPage: 0,
+        navigationBoardId: 'none',
+        navigationMediaKind: null,
+        navigationSemanticKey: '',
+        selectedImageQuery,
+      })
+    ).toBe(0);
+  });
+});
 
 describe('mergePreviewBoardItems', () => {
   const item = (kind: GalleryItem['kind'], name: string, createdAt: string, starred = false): GalleryItem => {

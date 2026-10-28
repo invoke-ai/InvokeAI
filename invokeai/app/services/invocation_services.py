@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from invokeai.app.services.board_access.board_access_default import BoardAccessService
 from invokeai.app.services.object_serializer.object_serializer_base import ObjectSerializerBase
 from invokeai.app.services.style_preset_images.style_preset_images_base import StylePresetImageFileStorageBase
 from invokeai.app.services.style_preset_records.style_preset_records_base import StylePresetRecordsStorageBase
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.external_generation.external_generation_base import ExternalGenerationServiceBase
     from invokeai.app.services.fonts.fonts_default import FontService
     from invokeai.app.services.gallery.gallery_base import GalleryServiceABC
+    from invokeai.app.services.gallery_maintenance.gallery_maintenance_default import GalleryMaintenanceService
     from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
     from invokeai.app.services.image_index.image_index_base import ImageIndexServiceBase
     from invokeai.app.services.image_index.image_index_records_base import ImageIndexRecordsBase
@@ -46,6 +48,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.project_records.project_records_base import ProjectRecordsStorageBase
     from invokeai.app.services.session_processor.session_processor_base import SessionProcessorBase
     from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
+    from invokeai.app.services.shared.database.database import Database
     from invokeai.app.services.urls.urls_base import UrlServiceBase
     from invokeai.app.services.users.users_base import UserServiceBase
     from invokeai.app.services.video_files.video_files_base import VideoFileStorageBase
@@ -53,6 +56,9 @@ if TYPE_CHECKING:
     from invokeai.app.services.videos.videos_base import VideoServiceABC
     from invokeai.app.services.workflow_records.workflow_records_base import WorkflowRecordsStorageBase
     from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_base import WorkflowThumbnailServiceBase
+    from invokeai.app.services.working_memory_calibration.working_memory_calibration_base import (
+        WorkingMemoryCalibrationServiceBase,
+    )
     from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
 
 
@@ -73,6 +79,7 @@ class InvocationServices:
         board_records: "BoardRecordStorageBase",
         bulk_download: "BulkDownloadBase",
         configuration: "InvokeAIAppConfig",
+        database: "Database",
         events: "EventServiceBase",
         images: "ImageServiceABC",
         image_files: "ImageFileStorageBase",
@@ -112,6 +119,9 @@ class InvocationServices:
         image_moves: "ImageMoveService | None" = None,
         progress_previews: "ProgressPreviewsBase | None" = None,
         fonts: "FontService | None" = None,
+        gallery_maintenance: "GalleryMaintenanceService | None" = None,
+        working_memory_calibration: "WorkingMemoryCalibrationServiceBase | None" = None,
+        board_access: "BoardAccessService | None" = None,
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
@@ -119,6 +129,7 @@ class InvocationServices:
         self.board_records = board_records
         self.bulk_download = bulk_download
         self.configuration = configuration
+        self.database = database
         self.events = events
         self.images = images
         self.image_files = image_files
@@ -162,3 +173,8 @@ class InvocationServices:
         self.image_index = image_index
         self.fonts = fonts
         self.intermediates = intermediates
+        self.gallery_maintenance = gallery_maintenance
+        self.working_memory_calibration = working_memory_calibration
+        # Stateless over the database, so a real one is the default: no caller should get looser rules by leaving it
+        # out.
+        self.board_access = board_access or BoardAccessService(database)

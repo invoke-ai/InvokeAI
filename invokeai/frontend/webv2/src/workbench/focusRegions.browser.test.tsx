@@ -202,6 +202,52 @@ describe('focusRegion', () => {
   });
 });
 
+/** A center view whose control opens another view in its place; the replaced view stays mounted but hidden. */
+const ReplacingViewHarness = () => {
+  const [isReplaced, setIsReplaced] = useState(false);
+  const { focusRegion } = useWorkbenchFocus();
+  const open = () => {
+    setIsReplaced(true);
+    focusRegion('center', 'preview');
+  };
+
+  return (
+    <Box data-testid="center" {...useFocusRegionProps('center')}>
+      <Box display={isReplaced ? 'none' : undefined}>
+        <button type="button" onClick={open}>
+          Open in Preview
+        </button>
+      </Box>
+      {isReplaced ? <div data-hotkey-widget-type-id="preview">Preview</div> : null}
+    </Box>
+  );
+};
+
+describe('focusRegion from inside the view it replaces', () => {
+  it('catches the focus the hidden opener drops instead of leaving it on the document', async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <FocusRegionProvider controller={createTestFocusController()}>
+            <ReplacingViewHarness />
+          </FocusRegionProvider>
+        </ChakraProvider>
+      );
+    });
+    const center = host.querySelector<HTMLElement>('[data-testid="center"]')!;
+    const opener = center.querySelector('button')!;
+    opener.focus();
+
+    await act(() => opener.click());
+    await frames(6);
+
+    expect(document.activeElement).toBe(center);
+  });
+});
+
 /** A side region as the shell renders it: the panel shown before stays mounted but hidden beside the current one. */
 const KeptPanelsHarness = () => {
   const { focusRegion } = useWorkbenchFocus();

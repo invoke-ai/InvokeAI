@@ -20,7 +20,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.stable_diffusion.vae_tiling import patch_vae_tiling_params
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_sd15_sdxl
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_sd15_sdxl, sd_vae_run_dtype
 
 
 @invocation(
@@ -65,7 +65,7 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
         with (
             SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes),
-            vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae),
+            vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae),
         ):
             context.util.signal_progress("Running VAE decoder")
             assert isinstance(vae, (AutoencoderKL, AutoencoderTiny))
@@ -74,16 +74,12 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             # wrongly place the latents (and thus the whole decode) on the CPU (see #9373).
             device = vae_info.compute_device
             latents = latents.to(device)
-            # Force fp32 when running on CPU (e.g. when the VAE is configured cpu_only). fp16 conv does run on CPU with
+            # fp32 when asked, and on the CPU (e.g. when the VAE is configured cpu_only): fp16 conv does run on CPU with
             # the pinned torch, but it's much slower than fp32 there, and SD/SDXL VAE has known fp16 overflow issues
-            # that produce black images — fp32 avoids both.
-            if self.fp32 or device.type == "cpu":
-                # FP32 mode: convert everything to float32 for maximum precision
-                vae.to(dtype=torch.float32)
-                latents = latents.float()
-            else:
-                vae.to(dtype=torch.float16)
-                latents = latents.half()
+            # that produce black images — fp32 avoids both. fp16 otherwise. The estimate above priced the same rule.
+            run_dtype = sd_vae_run_dtype("decode", self.fp32, device)
+            vae.to(dtype=run_dtype)
+            latents = latents.to(dtype=run_dtype)
 
             if use_tiling:
                 vae.enable_tiling()

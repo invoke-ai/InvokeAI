@@ -1,14 +1,15 @@
 import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 
-import { Box, HStack, Icon, Text } from '@chakra-ui/react';
+import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { semanticReferenceFromDataTransfer } from '@features/gallery/core/semanticImageQuery';
 import { imageIndexAvailabilityOptions } from '@features/gallery/data/queries';
+import { isImeComposing } from '@platform/browser/imeComposition';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { describeDateRange, findInvalidDateToken, formatIsoDate, parseDateTokens } from '@platform/search/dateTokens';
 import { CloseButton, ToggleIconButton } from '@platform/ui/Button';
 import { InputShell } from '@platform/ui/InputShell';
 import { useQuery } from '@tanstack/react-query';
-import { ImageIcon, MapIcon, SparklesIcon } from 'lucide-react';
+import { ImageIcon, LibraryBigIcon, MapIcon, SparklesIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -110,7 +111,7 @@ export const GalleryItemSearch = () => {
   // Enter is the explicit form of the same commit: no reason to keep waiting.
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
-      if (!isSemanticMode || event.key !== 'Enter' || event.nativeEvent.isComposing) {
+      if (!isSemanticMode || event.key !== 'Enter' || isImeComposing(event.nativeEvent)) {
         return;
       }
 
@@ -153,6 +154,31 @@ export const GalleryItemSearch = () => {
     actions.clearSearch();
   }, [actions, cancelPendingCommit]);
   const handleClearSemantic = useCallback(() => actions.setSemanticImageQuery(null), [actions]);
+  const handleSearchScopeChange = useCallback(
+    (searchAllBoards: boolean) => actions.setSearchScope(searchAllBoards ? 'all' : 'board'),
+    [actions]
+  );
+  const isSearchingAllBoards = gallery.searchScope === 'all';
+  // Only a search has a scope, and it sits inside the search row so choosing one never moves the grid. The selected
+  // board and where results go stay as they are.
+  const scopeToggle = useMemo(
+    () =>
+      gallery.isSearchActive ? (
+        <ToggleIconButton
+          checked={isSearchingAllBoards}
+          color={isSearchingAllBoards ? 'accent.fg' : 'fg.muted'}
+          data-gallery-search-scope=""
+          icon={LibraryBigIcon}
+          label={t('widgets.gallery.searchScopeAll')}
+          tooltip={t('widgets.gallery.searchScopeCurrent', {
+            scope: isSearchingAllBoards ? t('widgets.gallery.searchScopeAll') : t('widgets.gallery.searchScopeBoard'),
+          })}
+          variant="ghost"
+          onCheckedChange={handleSearchScopeChange}
+        />
+      ) : null,
+    [gallery.isSearchActive, handleSearchScopeChange, isSearchingAllBoards, t]
+  );
 
   // In-app drags (dnd-kit) resolve through GalleryBoardDragMonitor; this hook
   // only registers the drop target and reports hover for the highlight.
@@ -219,7 +245,10 @@ export const GalleryItemSearch = () => {
   // explicit member lists, not rankings, so they are exempt.
   const isRankedSearch =
     isSemanticMode || (gallery.semanticImageQuery !== null && gallery.semanticImageQuery.kind !== 'cluster');
-  const isArchivedBoard = gallery.boards.some((board) => board.id === gallery.selectedBoardId && board.archived);
+  // A search of every board leaves archived boards out by design, so the selected board's state says nothing then.
+  const isArchivedBoard =
+    gallery.searchScope === 'board' &&
+    gallery.boards.some((board) => board.id === gallery.selectedBoardId && board.archived);
   const semanticHint =
     isSemanticMode && indexAvailability?.state === 'model_missing'
       ? t('widgets.gallery.semanticSearchModelMissing', { model: indexAvailability.modelName ?? '' })
@@ -274,9 +303,20 @@ export const GalleryItemSearch = () => {
     [handleToggleSemanticMode, isSemanticMode, showSemanticToggle, t]
   );
 
+  const chipToggles = useMemo(
+    () => (
+      <>
+        {scopeToggle}
+        {semanticToggle}
+      </>
+    ),
+    [scopeToggle, semanticToggle]
+  );
+
   const endElement = useMemo(
     () => (
       <HStack flexShrink={0} gap="0">
+        {scopeToggle}
         {semanticToggle}
         {isSemanticMode || gallery.searchTerm ? (
           <CloseButton
@@ -289,7 +329,7 @@ export const GalleryItemSearch = () => {
         {isSemanticMode ? null : <GallerySearchHelp />}
       </HStack>
     ),
-    [gallery.searchTerm, handleClearSearch, isSemanticMode, semanticToggle, t]
+    [gallery.searchTerm, handleClearSearch, isSemanticMode, scopeToggle, semanticToggle, t]
   );
 
   return (
@@ -305,36 +345,38 @@ export const GalleryItemSearch = () => {
       onDragOver={handleNativeDragOver}
       onDrop={handleNativeDrop}
     >
-      {/*
-       * Image/file/cluster chips replace semantic text mode. Legacy text chips remain readable; toggling switches
-       * a chip to typed search.
-       */}
-      {!isSemanticMode && gallery.semanticImageQuery ? (
-        <GallerySemanticChip
-          reference={gallery.semanticImageQuery}
-          toggle={semanticToggle}
-          onClear={handleClearSemantic}
-        />
-      ) : (
-        <GallerySearchField
-          ref={inputRef}
-          ariaLabel={
-            isSemanticMode ? t('widgets.gallery.semanticSearchAriaLabel') : t('widgets.gallery.searchImagesAriaLabel')
-          }
-          describedById={hint ? SEARCH_HINT_ID : undefined}
-          endElement={endElement}
-          isInvalid={invalidHint !== null}
-          mode={isSemanticMode ? 'semantic' : 'metadata'}
-          placeholder={
-            isSemanticMode
-              ? t('widgets.gallery.semanticSearchPlaceholder')
-              : t('widgets.gallery.searchImagesPlaceholder')
-          }
-          value={isSemanticMode ? semanticText : gallery.searchTerm}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-        />
-      )}
+      <Stack gap="1" minW="0">
+        {/*
+         * Image/file/cluster chips replace semantic text mode. Legacy text chips remain readable; toggling switches
+         * a chip to typed search.
+         */}
+        {!isSemanticMode && gallery.semanticImageQuery ? (
+          <GallerySemanticChip
+            reference={gallery.semanticImageQuery}
+            toggle={chipToggles}
+            onClear={handleClearSemantic}
+          />
+        ) : (
+          <GallerySearchField
+            ref={inputRef}
+            ariaLabel={
+              isSemanticMode ? t('widgets.gallery.semanticSearchAriaLabel') : t('widgets.gallery.searchImagesAriaLabel')
+            }
+            describedById={hint ? SEARCH_HINT_ID : undefined}
+            endElement={endElement}
+            isInvalid={invalidHint !== null}
+            mode={isSemanticMode ? 'semantic' : 'metadata'}
+            placeholder={
+              isSemanticMode
+                ? t('widgets.gallery.semanticSearchPlaceholder')
+                : t('widgets.gallery.searchImagesPlaceholder')
+            }
+            value={isSemanticMode ? semanticText : gallery.searchTerm}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+          />
+        )}
+      </Stack>
       {hint ? (
         <Text
           color={invalidHint ? 'fg.error' : 'fg.warning'}

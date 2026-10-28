@@ -9,9 +9,14 @@ import type { ModelConfig } from '@features/models';
 import type { ProjectGraphState } from '@features/workflow/contracts';
 import type { WorkflowGeneratorResolutions, WorkflowPendingGenerator } from '@features/workflow/utility';
 import type { AccountScope } from '@platform/state/accountLifecycle';
-import type { ResolvedInvocationRoute } from '@workbench/invocationContracts';
+import type {
+  ExpandedPositivePrompts,
+  ResolvedInvocationRoute,
+  UpscaleSourceMetadata,
+} from '@workbench/invocationContracts';
 import type { Project } from '@workbench/projectContracts';
 
+import { ensureGalleryBoardDestinations } from '@features/gallery/queries';
 import { resolveDynamicPrompts } from '@features/generation/prompts';
 import {
   getEffectivePrompts,
@@ -19,11 +24,13 @@ import {
   normalizeGenerateSettings,
   sanitizeBatchCount,
 } from '@features/generation/settings';
+import { normalizeUpscaleWidgetValues } from '@features/upscale';
 import { getWorkflowBatchCapReason } from '@features/workflow/graph';
 import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { planWorkflowBatch } from '@features/workflow/utility';
 import { queryClient } from '@platform/query/client';
 import { isAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { getApiErrorMessage } from '@platform/transport/http';
 
 import type { PrepareCanvasInvocationArgs } from './widgets/canvas/invoke/prepareCanvasInvocation';
 import type { WorkbenchCommands } from './workbenchStore';
@@ -37,6 +44,33 @@ import { getProjectWidgetValues } from './widgetState';
 const EXPANSION_FAILED_TITLE = 'The prompt could not be expanded';
 const GENERATOR_FAILED_TITLE = 'The batch generator could not be resolved';
 const BATCH_NOT_READY_TITLE = 'The batch is not ready';
+
+/** Settled, never rejected: it may fail while the board listing is still awaited, before anything awaits it. */
+type UpscaleSourceMetadataRead = UpscaleSourceMetadata | { error: unknown; imageName: string };
+
+/** Upscale in Model only mode copies its input's metadata into the result, so it is read before dispatch. */
+const readModelOnlyUpscaleSourceMetadata = (
+  project: Project,
+  route: ResolvedInvocationRoute,
+  owner: AccountScope
+): Promise<UpscaleSourceMetadataRead> | null => {
+  if (route.sourceId !== 'upscale') {
+    return null;
+  }
+
+  const values = normalizeUpscaleWidgetValues(getProjectWidgetValues(project, 'upscale'));
+  const imageName = values?.mode === 'model-only' ? values.inputImage?.image_name : undefined;
+
+  // Loaded on demand: the reader's gallery transport stays out of the editor's startup graph.
+  return imageName
+    ? import('@features/upscale/sourceMetadata')
+        .then(({ readUpscaleSourceMetadata }) => readUpscaleSourceMetadata(imageName, owner.signal))
+        .then(
+          (metadata) => ({ imageName, metadata }),
+          (error: unknown) => ({ error, imageName })
+        )
+    : null;
+};
 
 export interface SubmitResolvedInvocationDeps {
   /** The resolved route to submit — the caller has already checked it is valid. */
@@ -52,14 +86,18 @@ export interface SubmitResolvedInvocationDeps {
   workflowId?: string;
   /** Identity lifetime that initiated this submission. */
   owner: AccountScope;
+  /** Invoke Front: the backend runs the batch ahead of the user's other pending work. */
+  prepend?: boolean;
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
   /**
    * Resolves after Canvas preparation queues or reports failure; Canvas never dispatches
    * submitResolvedInvocationSnapshot.
    */
   prepareCanvasInvocation: (args: PrepareCanvasInvocationArgs) => Promise<void> | void;
-  /** Localizes a control-layer rejection notice; defaults to the English validation sentence. */
-  formatControlLayerError?: PrepareCanvasInvocationArgs['formatControlLayerError'];
+  /** Words a control-layer rejection from the locale; its error message is for logs only. */
+  formatControlLayerError: PrepareCanvasInvocationArgs['formatControlLayerError'];
+  /** Words, from the locale, a Model only upscale whose input image's metadata could not be read. */
+  formatUpscaleMetadataFailure: (imageName: string) => string;
 }
 
 /**
@@ -86,13 +124,16 @@ const getExpandableSettings = (project: Project, route: ResolvedInvocationRoute)
  * Expand here to avoid a gallery → queue → generation cycle. Treat null or response.error as failure even if
  * prompts are present.
  */
-const resolveExpandedPrompts = async (settings: GenerateSettings): Promise<ParseDynamicPromptsResponse | null> => {
+const resolveExpandedPrompts = async (
+  settings: GenerateSettings,
+  sampleSeed: number | null
+): Promise<ParseDynamicPromptsResponse | null> => {
   try {
     return await resolveDynamicPrompts(queryClient, {
       combinatorial: settings.dynamicPromptsCombinatorial,
       max_prompts: settings.dynamicPromptsMaxPrompts,
       prompt: settings.positivePrompt,
-      seed: settings.dynamicPromptsCombinatorial ? null : settings.dynamicPromptsSampleSeed,
+      seed: sampleSeed,
     });
   } catch {
     return null;
@@ -172,9 +213,11 @@ const resolveWorkflowGeneratorsForRoute = async (
 export const submitResolvedInvocation = async ({
   commands,
   formatControlLayerError,
+  formatUpscaleMetadataFailure,
   models,
   owner,
   prepareCanvasInvocation,
+  prepend,
   project,
   route,
   workflowId,
@@ -188,6 +231,19 @@ export const submitResolvedInvocation = async ({
   if (route.sourceId === 'workflow' && !workflowDocument) {
     return;
   }
+
+  // The reducer resolves where results land (the auto-add board, a workflow node's board) from the cached board
+  // listing, so a board is judged from a listing and never trusted unseen. Any cached listing decides at once, a
+  // stale one refreshing in the background for the next run; only with none cached does a read start now, alongside
+  // generator resolution and prompt expansion, to be awaited as the run is dispatched. So this path is synchronous
+  // but for the first run after the listings were cleared, which the Invoke control shows as preparing. A run bound
+  // for the canvas names no board, unless it is a workflow, whose nodes carry their boards whatever the destination.
+  const pendingBoards =
+    route.destination === 'gallery' || route.sourceId === 'workflow'
+      ? ensureGalleryBoardDestinations(queryClient)
+      : null;
+  // Upscale routes have no other asynchronous step, so this is awaited at dispatch, alongside the board listing.
+  const pendingUpscaleMetadata = readModelOnlyUpscaleSourceMetadata(project, route, owner);
 
   // Only a workflow with unresolved generators needs this round trip; every other route dispatches synchronously.
   const pendingGenerators = getPendingWorkflowGenerators(workflowDocument, route);
@@ -213,7 +269,10 @@ export const submitResolvedInvocation = async ({
 
   // Only dynamic prompts require a round trip.
   if (expandableSettings) {
-    const expansion = await resolveExpandedPrompts(expandableSettings);
+    const sampleSeed = expandableSettings.dynamicPromptsCombinatorial
+      ? null
+      : expandableSettings.dynamicPromptsSampleSeed;
+    const expansion = await resolveExpandedPrompts(expandableSettings, sampleSeed);
     if (!isAccountScopeCurrent(owner)) {
       return;
     }
@@ -230,19 +289,47 @@ export const submitResolvedInvocation = async ({
     }
 
     await dispatchResolvedInvocation(
-      { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, project, route, workflowId },
-      expansion.prompts.length > 0 ? expansion.prompts : undefined,
+      {
+        commands,
+        formatControlLayerError,
+        formatUpscaleMetadataFailure,
+        models,
+        owner,
+        prepareCanvasInvocation,
+        prepend,
+        project,
+        route,
+        workflowId,
+      },
+      expansion.prompts.length > 0
+        ? { positivePrompts: expansion.prompts, positivePromptsSampleSeed: sampleSeed }
+        : undefined,
       workflowGenerators,
-      workflowDocument?.id
+      workflowDocument?.id,
+      pendingBoards,
+      pendingUpscaleMetadata
     );
     return;
   }
 
   await dispatchResolvedInvocation(
-    { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, project, route, workflowId },
+    {
+      commands,
+      formatControlLayerError,
+      formatUpscaleMetadataFailure,
+      models,
+      owner,
+      prepareCanvasInvocation,
+      prepend,
+      project,
+      route,
+      workflowId,
+    },
     undefined,
     workflowGenerators,
-    workflowDocument?.id
+    workflowDocument?.id,
+    pendingBoards,
+    pendingUpscaleMetadata
   );
 };
 
@@ -250,16 +337,48 @@ const dispatchResolvedInvocation = async (
   {
     commands,
     formatControlLayerError,
+    formatUpscaleMetadataFailure,
     models,
     owner,
     prepareCanvasInvocation,
+    prepend,
     project,
     route,
   }: SubmitResolvedInvocationDeps,
-  positivePrompts: string[] | undefined,
+  expansion: ExpandedPositivePrompts | undefined,
   workflowGenerators: WorkflowGeneratorResolutions | undefined,
-  workflowId: string | undefined
+  workflowId: string | undefined,
+  pendingBoards: Promise<void> | null,
+  pendingUpscaleMetadata: Promise<UpscaleSourceMetadataRead> | null = null
 ): Promise<void> => {
+  // The board listing the destination is judged from, read while the rest was resolved when none was cached;
+  // nothing to wait for keeps the dispatch synchronous.
+  if (pendingBoards) {
+    await pendingBoards;
+    if (!isAccountScopeCurrent(owner)) {
+      return;
+    }
+  }
+
+  let upscaleSourceMetadata: UpscaleSourceMetadata | undefined;
+
+  if (pendingUpscaleMetadata) {
+    const read = await pendingUpscaleMetadata;
+
+    if (!isAccountScopeCurrent(owner)) {
+      return;
+    }
+    if ('error' in read) {
+      commands.notifications.add({
+        kind: 'error',
+        message: getApiErrorMessage(read.error, String(read.error)),
+        title: formatUpscaleMetadataFailure(read.imageName),
+      });
+      return;
+    }
+    upscaleSourceMetadata = read;
+  }
+
   if (route.sourceId === 'canvas') {
     // Await Canvas preparation to retain the submission guard until completion; pass the resolved destination so
     // Canvas can output to Gallery.
@@ -271,7 +390,8 @@ const dispatchResolvedInvocation = async (
       generateValues: getProjectWidgetValues(project, 'generate'),
       models,
       owner,
-      positivePrompts,
+      expansion,
+      ...(prepend ? { prepend } : {}),
       projectId: project.id,
       canvasValues: getProjectWidgetValues(project, 'canvas'),
       projectSettings: project.settings,
@@ -283,9 +403,11 @@ const dispatchResolvedInvocation = async (
   commands.generation.submitResolved({
     backendSupportsCancellation: true,
     models,
-    positivePrompts,
+    ...expansion,
+    ...(prepend ? { prepend } : {}),
     projectId: project.id,
     route,
+    ...(upscaleSourceMetadata ? { upscaleSourceMetadata } : {}),
     ...(workflowGenerators ? { workflowGenerators } : {}),
     ...(workflowId ? { workflowId } : {}),
   });

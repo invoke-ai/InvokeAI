@@ -11,7 +11,14 @@ import pytest
 import torch
 
 from invokeai.app.services.config import get_config
-from invokeai.backend.util.devices import TorchDevice, choose_precision, choose_torch_device, torch_dtype
+from invokeai.backend.util.devices import (
+    TorchDevice,
+    choose_precision,
+    choose_torch_device,
+    device_has_dedicated_vram,
+    device_is_integrated,
+    torch_dtype,
+)
 
 devices = ["cpu", "cuda:0", "cuda:1", "cuda:2", "mps"]
 device_types_cpu = [("cpu", torch.float32), ("cuda:0", torch.float32), ("mps", torch.float32)]
@@ -25,6 +32,30 @@ def test_device_choice(device_name):
     config.device = device_name
     torch_device = TorchDevice.choose_torch_device()
     assert torch_device == torch.device(device_name)
+
+
+@pytest.mark.parametrize(
+    ("device_name", "integrated", "expected"),
+    [
+        pytest.param("cpu", None, False, id="cpu-shared"),
+        pytest.param("mps", None, False, id="mps-shared"),
+        pytest.param("cuda:1", True, True, id="rocm-apu-keeps-dedicated-budget"),
+        pytest.param("xpu:2", True, False, id="integrated-xpu-shared"),
+        pytest.param("xpu:2", False, True, id="discrete-xpu-dedicated"),
+        pytest.param("xpu:2", None, True, id="unknown-xpu-dedicated"),
+    ],
+)
+def test_device_memory_budget_classification(device_name, integrated, expected, monkeypatch):
+    device = torch.device(device_name)
+
+    def probe(probed_device):
+        assert probed_device == device
+        return integrated
+
+    monkeypatch.setattr("invokeai.backend.util.devices.xpu_device_is_integrated", probe)
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _: SimpleNamespace(is_integrated=1))
+    monkeypatch.setattr(torch.version, "hip", "7.15.26333")
+    assert device_has_dedicated_vram(device) is expected
 
 
 # ===== per-thread session device (multi-GPU worker pinning) ================
@@ -81,6 +112,11 @@ def test_get_generation_devices_auto_expands_to_all_cuda():
     with (
         patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=True),
         patch("invokeai.backend.util.devices.torch.cuda.device_count", return_value=3),
+        # Discrete GPUs, whatever the machine running the test has (its iGPU would be left out).
+        patch(
+            "invokeai.backend.util.devices.torch.cuda.get_device_properties",
+            _cuda_properties({0: False, 1: False, 2: False}),
+        ),
     ):
         assert TorchDevice.get_generation_devices("auto") == [
             torch.device("cuda:0"),
@@ -341,6 +377,26 @@ def test_a_backend_that_rejects_bfloat16_falls_back_by_device(monkeypatch, devic
     monkeypatch.setattr(torch, "empty", unsupported)
 
     assert TorchDevice.choose_bfloat16_safe_dtype(torch.device(device_name)) is expected
+
+
+@pytest.mark.parametrize("dtype", [torch.float32, torch.bfloat16])
+def test_the_flux_vae_dtype_keeps_a_configured_float32_or_bfloat16(dtype):
+    assert TorchDevice.dtype_avoiding_float16(dtype, torch.device("cpu")) is dtype
+
+
+@pytest.mark.parametrize("bfloat16_supported, expected", [(True, torch.bfloat16), (False, torch.float32)])
+def test_the_flux_vae_dtype_replaces_float16_with_bfloat16_or_else_float32(monkeypatch, bfloat16_supported, expected):
+    """Full width also on CUDA, unlike `choose_bfloat16_safe_dtype`: the FLUX autoencoders are broken in float16."""
+    empty = torch.empty
+
+    def answer(*args, dtype, device):
+        if not bfloat16_supported:
+            raise TypeError("BFloat16 is not supported on this device")
+        return empty(0, dtype=dtype)
+
+    monkeypatch.setattr(torch, "empty", answer)
+
+    assert TorchDevice.dtype_avoiding_float16(torch.float16, torch.device("cuda")) is expected
 
 
 # ===== choose_anima_inference_dtype (config.precision honoring) ============
@@ -914,6 +970,127 @@ def test_disable_conv_benchmark_empty_cache_flips_torch_flag():
         setter(original)
 
 
+class TestCudaStreamCaptureShim:
+    """NVIDIA's Windows ARM64 torch crashes in is_current_stream_capturing() without a device; the shim answers False
+    there and stays out of the way everywhere else."""
+
+    @staticmethod
+    def _cuda_build_without_device(monkeypatch) -> None:
+        monkeypatch.setattr("invokeai.backend.util.devices.is_windows_arm64", lambda: True)
+        monkeypatch.setattr(torch.version, "cuda", "13.4")
+        monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+
+        # A fresh, unshimmed stand-in for torch's function (the shim may already be live in this process), raising
+        # as torch does without a device; monkeypatch restores whatever was there before.
+        def is_current_stream_capturing() -> bool:
+            raise RuntimeError("no CUDA device")
+
+        monkeypatch.setattr(torch.cuda, "is_current_stream_capturing", is_current_stream_capturing)
+
+    def test_answers_false_without_a_device_and_installs_once(self, monkeypatch):
+        from invokeai.backend.util.devices import install_cuda_stream_capture_shim
+
+        self._cuda_build_without_device(monkeypatch)
+        unshimmed = torch.cuda.is_current_stream_capturing
+        install_cuda_stream_capture_shim()
+        shim = torch.cuda.is_current_stream_capturing
+        assert shim is not unshimmed, "the shim must replace the function"
+        assert shim() is False
+        install_cuda_stream_capture_shim()
+        assert torch.cuda.is_current_stream_capturing is shim, "a second install must not wrap the shim"
+
+    def test_leaves_torch_alone_where_cuda_works_or_is_absent(self, monkeypatch):
+        from invokeai.backend.util.devices import install_cuda_stream_capture_shim
+
+        original = torch.cuda.is_current_stream_capturing
+        monkeypatch.setattr(torch.cuda, "is_current_stream_capturing", original)
+        monkeypatch.setattr(torch.version, "cuda", None)
+        monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+        install_cuda_stream_capture_shim()
+        assert torch.cuda.is_current_stream_capturing is original
+
+        monkeypatch.setattr(torch.version, "cuda", "13.4")
+        monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+        install_cuda_stream_capture_shim()
+        assert torch.cuda.is_current_stream_capturing is original
+
+    def test_leaves_torch_alone_off_windows_arm64(self, monkeypatch):
+        """Other CUDA builds raise without a device rather than crash; they keep torch's own function."""
+        from invokeai.backend.util.devices import install_cuda_stream_capture_shim
+
+        self._cuda_build_without_device(monkeypatch)
+        monkeypatch.setattr("invokeai.backend.util.devices.is_windows_arm64", lambda: False)
+        unshimmed = torch.cuda.is_current_stream_capturing
+        install_cuda_stream_capture_shim()
+        assert torch.cuda.is_current_stream_capturing is unshimmed
+
+
+# ===== integrated GPUs on CUDA/ROCm =========================================
+
+
+def _cuda_properties(integrated_map: dict[int, bool | None]):
+    """A `torch.cuda.get_device_properties` stand-in; None leaves `is_integrated` off the properties."""
+
+    def get_device_properties(index):
+        index = index.index if isinstance(index, torch.device) else index
+        flag = integrated_map[index]
+        return SimpleNamespace() if flag is None else SimpleNamespace(is_integrated=int(flag))
+
+    return get_device_properties
+
+
+def _auto_cuda_devices(integrated_map: dict[int, bool | None]):
+    config = get_config()
+    config.device = "auto"
+    with (
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=True),
+        patch("invokeai.backend.util.devices.torch.cuda.device_count", return_value=len(integrated_map)),
+        patch("invokeai.backend.util.devices.torch.cuda.get_device_properties", _cuda_properties(integrated_map)),
+    ):
+        return TorchDevice.get_generation_devices("auto")
+
+
+def test_auto_excludes_the_ryzen_igpu_that_rocm_enumerates_next_to_a_radeon():
+    """Measured on Windows ROCm: an RX 9060 XT at index 0 and the Ryzen iGPU (gfx1036, `is_integrated=1`) at index 1.
+    `auto` must not give the iGPU half of the queue."""
+    assert _auto_cuda_devices({0: False, 1: True}) == [torch.device("cuda:0")]
+
+
+def test_auto_keeps_a_cuda_igpu_that_is_the_only_gpu():
+    assert _auto_cuda_devices({0: True}) == [torch.device("cuda:0")]
+
+
+def test_auto_keeps_cuda_devices_whose_properties_do_not_say():
+    assert _auto_cuda_devices({0: None, 1: None}) == [torch.device("cuda:0"), torch.device("cuda:1")]
+
+
+def test_device_is_integrated_is_unknown_when_the_properties_cannot_be_read():
+    with patch("invokeai.backend.util.devices.torch.cuda.get_device_properties", side_effect=RuntimeError("no GPU")):
+        assert device_is_integrated(torch.device("cuda", 0)) is None
+
+
+@pytest.mark.parametrize(
+    ("integrated_map", "current", "expected"),
+    [
+        ({0: True, 1: False}, 0, torch.device("cuda", 1)),
+        ({0: False, 1: True}, 0, torch.device("cuda", 0)),
+        ({0: True}, 0, torch.device("cuda", 0)),
+        ({0: None, 1: False}, 0, torch.device("cuda", 0)),
+    ],
+    ids=["igpu-first", "discrete-first", "igpu-only", "unknown-stays"],
+)
+def test_auto_device_skips_an_igpu_enumerated_before_the_discrete_card(integrated_map, current, expected):
+    config = get_config()
+    config.device = "auto"
+    with (
+        patch("torch.cuda.is_available", return_value=True),
+        patch("torch.cuda.current_device", return_value=current),
+        patch("torch.cuda.device_count", return_value=len(integrated_map)),
+        patch("torch.cuda.get_device_properties", _cuda_properties(integrated_map)),
+    ):
+        assert TorchDevice.choose_torch_device() == expected
+
+
 def test_a_forced_empty_cache_runs_past_a_busy_peer_and_its_wrapper(monkeypatch):
     """The peer-aware wrapper on torch.cuda.empty_cache would defer a forced call again; it must reach torch."""
     calls: list[str] = []
@@ -934,6 +1111,37 @@ def test_a_forced_empty_cache_runs_past_a_busy_peer_and_its_wrapper(monkeypatch)
     assert calls == []
     assert TorchDevice.empty_cache(force=True) is True
     assert calls == ["torch"]
+
+
+def _explicit_cuda_devices(integrated_map: dict[int, bool | None], requested: list[str], platform: str, hip):
+    with (
+        patch("invokeai.backend.util.devices.sys.platform", platform),
+        patch("invokeai.backend.util.devices.torch.version.hip", hip),
+        patch("invokeai.backend.util.devices.torch.cuda.is_available", return_value=True),
+        patch("invokeai.backend.util.devices.torch.cuda.device_count", return_value=len(integrated_map)),
+        patch("invokeai.backend.util.devices.torch.cuda.get_device_properties", _cuda_properties(integrated_map)),
+    ):
+        return TorchDevice.get_generation_devices(requested)
+
+
+def test_naming_the_igpu_beside_a_radeon_on_windows_rocm_is_refused():
+    """Every kernel on it crashed the process (Ryzen gfx1036 beside an RX 9060 XT); refuse it with a reason instead."""
+    with pytest.raises(ValueError, match="integrated GPU"):
+        _explicit_cuda_devices({0: True, 1: False}, ["cuda:0"], "win32", "7.15.26333")
+
+
+@pytest.mark.parametrize(
+    ("integrated_map", "requested", "platform", "hip"),
+    [
+        ({0: True, 1: False}, ["cuda:1"], "win32", "7.15.26333"),  # the discrete card
+        ({0: True}, ["cuda:0"], "win32", "7.15.26333"),  # an APU on its own
+        ({0: True, 1: False}, ["cuda:0"], "linux", "7.15.26333"),  # ROCm on Linux
+        ({0: True, 1: False}, ["cuda:0"], "win32", None),  # CUDA
+    ],
+    ids=["discrete", "apu-alone", "linux-rocm", "cuda"],
+)
+def test_an_explicit_device_is_kept_unless_it_is_that_igpu(integrated_map, requested, platform, hip):
+    assert _explicit_cuda_devices(integrated_map, requested, platform, hip) == [torch.device(requested[0])]
 
 
 # ===== choose_krea2_transformer_dtype ============

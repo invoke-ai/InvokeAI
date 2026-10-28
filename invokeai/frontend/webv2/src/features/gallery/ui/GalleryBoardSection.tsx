@@ -15,6 +15,7 @@ const TRIGGER_HOVER_STYLES = { color: 'fg' } as const;
 export const GalleryBoardSection = ({
   action,
   children,
+  count,
   isOpen,
   label,
   sectionId,
@@ -22,6 +23,8 @@ export const GalleryBoardSection = ({
 }: {
   action?: ReactNode;
   children: ReactNode;
+  /** Boards in the section; shown beside the label so a collapsed section still says what it holds. */
+  count?: number;
   isOpen: boolean;
   label: string;
   sectionId: GalleryBoardSectionId;
@@ -33,7 +36,8 @@ export const GalleryBoardSection = ({
   );
 
   return (
-    <Collapsible.Root open={isOpen} onOpenChange={handleOpenChange}>
+    // A group that starts closed (an admin's view of other users' boards) mounts its rows only once opened.
+    <Collapsible.Root lazyMount open={isOpen} onOpenChange={handleOpenChange}>
       <HStack gap="1" minH="6" pe="1" ps="1">
         <Collapsible.Trigger
           alignItems="center"
@@ -59,6 +63,11 @@ export const GalleryBoardSection = ({
           >
             {label}
           </Text>
+          {count !== undefined ? (
+            <Text as="span" color="fg.muted" fontSize="xs" fontVariantNumeric="tabular-nums" lineHeight="1">
+              {count}
+            </Text>
+          ) : null}
         </Collapsible.Trigger>
         {action}
       </HStack>

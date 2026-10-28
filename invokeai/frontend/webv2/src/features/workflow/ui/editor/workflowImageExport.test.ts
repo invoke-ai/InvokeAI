@@ -1,16 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  EXPORT_PADDING,
-  EXPORT_SCALE,
   EXPORT_STYLE_PROPERTIES,
   getWorkflowExportCloneStyle,
-  getWorkflowExportOptions,
   getWorkflowExportStagingStyle,
-  getWorkflowImageDimensions,
   getWorkflowSvgExportStyles,
   hideWorkflowExportInfoIcons,
   hideWorkflowExportStatusIndicators,
+  planWorkflowImageExport,
   sanitizeWorkflowImageFilename,
   setWorkflowExportInputFieldTitleStyles,
   setWorkflowExportNodeOpacity,
@@ -18,31 +15,75 @@ import {
 } from './workflowImageExport';
 
 describe('workflow image export', () => {
-  it('uses padded logical bounds and export scale for output dimensions', () => {
-    expect(getWorkflowImageDimensions({ x: -100, y: 50, width: 1600, height: 900 })).toEqual({
-      width: 1600 + EXPORT_PADDING * 2,
-      height: 900 + EXPORT_PADDING * 2,
-      canvasWidth: (1600 + EXPORT_PADDING * 2) * EXPORT_SCALE,
-      canvasHeight: (900 + EXPORT_PADDING * 2) * EXPORT_SCALE,
+  it('exports ordinary workflows at full resolution from padded layout bounds', () => {
+    expect(planWorkflowImageExport({ x: -100, y: 50, width: 1600, height: 900 })).toEqual({
+      width: 1800,
+      height: 1100,
+      scale: 2,
+      outputWidth: 3600,
+      outputHeight: 2200,
     });
   });
 
   it.each([
-    [9000, 9000, 18400, 18400],
-    [20000, 300, 40400, 1000],
-    [300, 20000, 1000, 40400],
-  ])('preserves full export resolution for %i by %i bounds', (width, height, canvasWidth, canvasHeight) => {
-    const dimensions = getWorkflowImageDimensions({ x: 0, y: 0, width, height });
+    // The long side is capped at 16,384 px and the short side keeps the aspect ratio: floor(500 * 16384 / 20200).
+    { kind: 'wide', bounds: [20000, 300], output: [16384, 405] },
+    { kind: 'tall', bounds: [300, 20000], output: [405, 16384] },
+    // 9,200 px square would be 18,400 px square (338,560,000 px) at 2x; floor(sqrt(2^25)) = 5,792 px square fits.
+    { kind: 'large', bounds: [9000, 9000], output: [5792, 5792] },
+  ])('reduces resolution for a very $kind workflow to stay within the default budget', ({ bounds, output }) => {
+    const plan = planWorkflowImageExport({ x: 0, y: 0, width: bounds[0]!, height: bounds[1]! });
 
-    expect(dimensions.canvasWidth).toBe(canvasWidth);
-    expect(dimensions.canvasHeight).toBe(canvasHeight);
-    expect(getWorkflowExportOptions(dimensions, 'white').skipAutoScale).toBe(true);
+    expect(plan).not.toBeNull();
+    expect(plan!.scale).toBeLessThan(2);
+    expect([plan!.outputWidth, plan!.outputHeight]).toEqual(output);
+    expect(plan!.outputWidth * plan!.outputHeight).toBeLessThanOrEqual(2 ** 25);
+  });
+
+  it.each([
+    { kind: 'area', bounds: [12000, 12000] },
+    { kind: 'side', bounds: [40000, 100] },
+  ])('refuses a workflow whose $kind exceeds the budget even at half scale', ({ bounds }) => {
+    expect(planWorkflowImageExport({ x: 0, y: 0, width: bounds[0]!, height: bounds[1]! })).toBeNull();
+  });
+
+  const SIDE_BOUND = { maxPixels: 1_000_000, maxSide: 1000, minScale: 0.5 };
+  // Sides up to 2,000 px never bind for these rows; only the 500,000 px area does.
+  const AREA_BOUND = { maxPixels: 500_000, maxSide: 2000, minScale: 0.5 };
+
+  it.each([
+    { edge: 'side at the limit', limits: SIDE_BOUND, bounds: [300, 100], output: [1000, 600], reduced: false },
+    { edge: 'side one pixel over', limits: SIDE_BOUND, bounds: [301, 100], output: [1000, 598], reduced: true },
+    // 500 x 250 layout px is exactly 1,000 x 500 = 500,000 px at 2x.
+    { edge: 'area at the limit', limits: AREA_BOUND, bounds: [300, 50], output: [1000, 500], reduced: false },
+    // 500 x 251 needs sqrt(500,000 / 125,500) = 1.996x: floor(998.0) x floor(500.99).
+    { edge: 'area one row over', limits: AREA_BOUND, bounds: [300, 51], output: [998, 500], reduced: true },
+    { edge: 'exactly the minimum scale', limits: SIDE_BOUND, bounds: [1800, 0], output: [1000, 100], reduced: true },
+  ])('plans the $edge boundary within injected limits', ({ bounds, limits, output, reduced }) => {
+    const plan = planWorkflowImageExport({ x: 0, y: 0, width: bounds[0]!, height: bounds[1]! }, limits);
+
+    expect([plan?.outputWidth, plan?.outputHeight]).toEqual(output);
+    expect(plan!.scale < 2).toBe(reduced);
+  });
+
+  it('refuses just below the minimum scale', () => {
+    expect(
+      planWorkflowImageExport(
+        { x: 0, y: 0, width: 1801, height: 0 },
+        { maxPixels: 1_000_000, maxSide: 1000, minScale: 0.5 }
+      )
+    ).toBeNull();
+  });
+
+  it('rejects non-finite bounds instead of planning a capture', () => {
+    expect(() => planWorkflowImageExport({ x: 0, y: 0, width: Number.NaN, height: 100 })).toThrow('not finite');
+    expect(() => planWorkflowImageExport({ x: 0, y: 0, width: 100, height: Infinity })).toThrow('not finite');
   });
 
   it('keeps capture clone local to an offscreen staging wrapper', () => {
-    const dimensions = getWorkflowImageDimensions({ x: 0, y: 0, width: 400, height: 300 });
+    const plan = planWorkflowImageExport({ x: 0, y: 0, width: 400, height: 300 })!;
 
-    expect(getWorkflowExportStagingStyle(dimensions)).toEqual({
+    expect(getWorkflowExportStagingStyle(plan)).toEqual({
       position: 'fixed',
       left: '-100000px',
       top: '0',
@@ -50,31 +91,13 @@ describe('workflow image export', () => {
       height: '500px',
       pointerEvents: 'none',
     });
-    expect(getWorkflowExportCloneStyle(dimensions)).toEqual({
+    expect(getWorkflowExportCloneStyle(plan)).toEqual({
       width: '600px',
       height: '500px',
       position: 'relative',
       left: '0',
       top: '0',
       pointerEvents: 'none',
-    });
-  });
-
-  it('uses Blob-friendly image export dimensions', () => {
-    const dimensions = getWorkflowImageDimensions({ x: 0, y: 0, width: 400, height: 300 });
-
-    expect(getWorkflowExportOptions(dimensions, 'rgb(1, 2, 3)')).toEqual({
-      width: 600,
-      height: 500,
-      canvasWidth: 1200,
-      canvasHeight: 1000,
-      backgroundColor: 'rgb(1, 2, 3)',
-      pixelRatio: 1,
-      skipAutoScale: true,
-      includeStyleProperties: [...EXPORT_STYLE_PROPERTIES],
-      imagePlaceholder: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=',
-      onImageErrorHandler: expect.any(Function),
-      skipFonts: false,
     });
   });
 

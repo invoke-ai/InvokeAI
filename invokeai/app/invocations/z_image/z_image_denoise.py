@@ -1,4 +1,3 @@
-import inspect
 import math
 from contextlib import ExitStack
 from typing import Callable, Iterator, Optional
@@ -27,18 +26,25 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.vae.z_image_image_to_latents import ZImageImageToLatentsInvocation
 from invokeai.app.invocations.z_image.z_image_control import ZImageControlField
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.flux.schedulers import ZIMAGE_SCHEDULER_LABELS, ZIMAGE_SCHEDULER_MAP, ZIMAGE_SCHEDULER_NAME_VALUES
+from invokeai.backend.flux.schedulers import (
+    ZIMAGE_SCHEDULER_LABELS,
+    ZIMAGE_SCHEDULER_MAP,
+    ZIMAGE_SCHEDULER_NAME_VALUES,
+    set_heun_timesteps_from_sigmas,
+)
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.z_image_lora_constants import Z_IMAGE_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
+from invokeai.backend.rectified_flow.schedule_shift import ShiftFit, time_shift
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ZImageConditioningInfo
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.fp8 import get_model_compute_dtype
+from invokeai.backend.util.sage_attention import sage_attention_scope
 from invokeai.backend.z_image.extensions.regional_prompting_extension import ZImageRegionalPromptingExtension
 from invokeai.backend.z_image.text_conditioning import ZImageTextConditioning
 from invokeai.backend.z_image.z_image_control_adapter import ZImageControlAdapter
@@ -61,11 +67,13 @@ def _padded(tokens: int) -> int:
     return tokens + (-tokens) % SEQ_MULTI_OF
 
 
-# The two points the shift fit is built on. 4096 image tokens is a 1024x1024 frame -- one
-# megapixel, and where the reference pipeline's fit ends. Naming them keeps the fit and the clamp
-# in `_calculate_shift` from drifting apart.
-Z_IMAGE_MU_FIT_MIN_SEQ_LEN = 256
-Z_IMAGE_MU_FIT_MAX_SEQ_LEN = 4096
+# The shift fit of diffusers' ZImagePipeline. 4096 image tokens is a 1024x1024 frame -- one megapixel, and where the
+# reference fit ends. Extrapolated past it the shift runs away fast -- 25 at 2048px, 810 at 3072px and 103_777 at
+# 4096px -- and `_get_sigmas` flattens with it. Because `denoising_start` is clipped by *index* here, the step count
+# survives but the entry point does not: a canvas img2img pass at strength 0.5 would start from sigma 0.88 at 1536px,
+# 0.96 at 2048px and 1.0000 at 4096px, i.e. throw the input image away and generate a new one. Below one megapixel
+# the hold changes nothing, and an explicit `shift` on the invocation still overrides it.
+Z_IMAGE_SHIFT_FIT = ShiftFit(base_seq_len=256, max_seq_len=4096, base_shift=0.5, max_shift=1.15)
 
 
 @invocation(
@@ -251,55 +259,13 @@ class ZImageDenoiseInvocation(BaseInvocation):
             generator=torch.Generator(device=rand_device).manual_seed(seed),
         ).to(device=device, dtype=dtype)
 
-    def _calculate_shift(
-        self,
-        image_seq_len: int,
-        base_image_seq_len: int = Z_IMAGE_MU_FIT_MIN_SEQ_LEN,
-        max_image_seq_len: int = Z_IMAGE_MU_FIT_MAX_SEQ_LEN,
-        base_shift: float = 0.5,
-        max_shift: float = 1.15,
-    ) -> float:
-        """Calculate timestep shift based on image sequence length.
-
-        Based on diffusers ZImagePipeline.calculate_shift method.
-        Returns a linear shift value (exp(mu) from the original formula).
-
-        The fit is a straight line through two points and is not evaluated past the second one.
-        Extrapolated it runs away fast -- shift reaches 25 at 2048px, 810 at 3072px and 103_777 at
-        4096px -- and `_get_sigmas` flattens with it. Because `denoising_start` is clipped by *index*
-        here, the step count survives but the entry point does not: a canvas img2img pass at
-        strength 0.5 would start from sigma 0.88 at 1536px, 0.96 at 2048px and 1.0000 at 4096px,
-        i.e. throw the input image away and generate a new one. Below one megapixel the clamp
-        changes nothing, and an explicit `shift` on the invocation still overrides it.
-        """
-        m = (max_shift - base_shift) / (max_image_seq_len - base_image_seq_len)
-        b = base_shift - m * base_image_seq_len
-        mu = min(image_seq_len, max_image_seq_len) * m + b
-        # Convert from exponential mu to linear shift value
-        return math.exp(mu)
-
     def _get_sigmas(self, shift: float, num_steps: int) -> list[float]:
-        """Generate sigma schedule with linear time shift.
-
-        Uses linear time shift: shift / (shift + (1/t - 1)).
-        The shift value is used directly as a multiplier.
-        Generates num_steps + 1 sigma values (including terminal 0.0).
-        """
-
-        def time_shift(shift: float, t: float) -> float:
-            """Apply linear time shift to a single timestep value."""
-            if t <= 0:
-                return 0.0
-            if t >= 1:
-                return 1.0
-            return shift / (shift + (1 / t - 1))
-
+        """`num_steps + 1` sigmas from 1 to 0, linearly time-shifted by `shift` (`time_shift`)."""
         sigmas = []
         for i in range(num_steps + 1):
             t = 1.0 - i / num_steps  # Goes from 1.0 to 0.0
-            sigma = time_shift(shift, t)
-            sigmas.append(sigma)
-
+            # The ends are fixed. Evaluated, t = 0 would divide by zero, and so would t = 1 at a shift of 0.
+            sigmas.append(1.0 if t >= 1 else 0.0 if t <= 0 else time_shift(shift, t))
         return sigmas
 
     @staticmethod
@@ -322,7 +288,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
         and 3.85 GiB at 2048px (16896) -- 0.22 to 0.23 MB per token, unchanged between 2 and 4 blocks, because a
         no-grad forward frees each block's intermediates. 0.25 MB per token bounds every point on its own, with
         room for the ~5% more ROCm needed on FLUX.2. The fixed base covers what does not scale with the sequence
-        -- GGUF and fp8 weights cast per forward, and allocator slack across steps. Conditional and unconditional
+        -- fp8 weights cast per forward, and allocator slack across steps; the caller adds the dequantization copy
+        of an int8, nvfp4 or GGUF build. Conditional and unconditional
         passes run one after the other, so only the longer caption counts.
 
         Where SDPA has no fused kernel for these shapes it materializes the score matrices, and those dominate:
@@ -431,7 +398,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
         if self.shift is not None:
             shift = self.shift
         else:
-            shift = self._calculate_shift(img_seq_len)
+            shift = Z_IMAGE_SHIFT_FIT.shift(img_seq_len)
 
         # Generate sigma schedule with time shift
         sigmas = self._get_sigmas(shift, self.steps)
@@ -443,6 +410,16 @@ class ZImageDenoiseInvocation(BaseInvocation):
             start_idx = int(self.denoising_start * (total_sigmas - 1))
             end_idx = int(self.denoising_end * (total_sigmas - 1)) + 1
             sigmas = sigmas[start_idx:end_idx]
+
+        is_heun = self.scheduler == "heun"
+        if is_heun:
+            # Heun divides by every sigma it evaluates the model at, so an interval of zero length at sigma 0 is
+            # 0/0 and turns the latents into NaN; an explicit shift of 0 schedules [1, 0, ..., 0]. Such an interval
+            # has nothing to integrate (Euler steps through it unchanged), so Heun runs only the others and counts
+            # its progress over them. With none left, the pass returns the blended latents, as Euler would.
+            sigmas = [
+                sigma for sigma, sigma_next in zip(sigmas[:-1], sigmas[1:], strict=True) if sigma != sigma_next
+            ] + sigmas[-1:]
 
         total_steps = len(sigmas) - 1
 
@@ -465,13 +442,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
             if self.add_noise:
                 assert noise is not None
                 # Noise the init latents using the first sigma from the clipped
-                # InvokeAI schedule.
-                #
-                # Known limitation: if the selected scheduler later starts from a
-                # different first effective sigma/timestep than sigmas[0], the
-                # img2img preblend below may not match that scheduler exactly.
-                # This is an existing pipeline limitation and affects both
-                # internally generated noise and externally supplied noise.
+                # InvokeAI schedule. Euler and Heun start from this sigma; LCM
+                # creates its own schedule, whose first sigma can differ.
                 s_0 = sigmas[0]
                 latents = s_0 * noise + (1.0 - s_0) * init_latents
             else:
@@ -511,16 +483,13 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 num_train_timesteps=1000,
                 shift=1.0,
             )
-            # Set timesteps - LCM uses its own sigma schedule (num_inference_steps),
-            # while other schedulers can use custom sigmas if supported
-            is_lcm = self.scheduler == "lcm"
-            set_timesteps_sig = inspect.signature(scheduler.set_timesteps)
-            if not is_lcm and "sigmas" in set_timesteps_sig.parameters:
-                scheduler.set_timesteps(sigmas=sigmas, device=device)
+            if is_heun:
+                # Heun runs the shifted, clipped schedule above, so it starts at the sigma the img2img
+                # preblend used and stops at the requested end.
+                set_heun_timesteps_from_sigmas(scheduler, sigmas[:-1], sigmas[-1], device)
             else:
-                # LCM or a scheduler without custom-sigma support computes its own
-                # schedule from num_inference_steps. That can diverge from sigmas[0]
-                # used in the img2img preblend above.
+                # LCM owns its schedule: clipping only sets its step count. Its first sigma can
+                # differ from sigmas[0] used in the img2img preblend above.
                 scheduler.set_timesteps(num_inference_steps=total_steps, device=device)
 
             # For Heun scheduler, the number of actual steps may differ
@@ -565,7 +534,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 device=device,
                 dtype=inference_dtype,
             )
-            # An int8_tensorwise or nvfp4 build materializes each quantized linear's weight per forward, alive
+            # An int8_tensorwise, nvfp4 or GGUF build materializes each quantized linear's weight per forward, alive
             # alongside the activations above and invisible to them. Read from the unlocked model; zero for
             # every other build.
             working_mem_bytes += peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
@@ -626,6 +595,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 control_latents = ZImageImageToLatentsInvocation.vae_encode(
                     vae_info=vae_info,
                     image_tensor=control_image_tensor,
+                    tiled=self.control.tiled or context.config.get().force_tiled_decode,
+                    tile_size=self.control.tile_size,
                 )
 
                 # Move to inference device/dtype
@@ -699,11 +670,17 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 )
             )
 
+            exit_stack.enter_context(sage_attention_scope())
+
             # Denoising loop - supports both built-in Euler and diffusers schedulers
             # Track user-facing step for progress (accounts for Heun's double steps)
             user_step = 0
 
             if use_scheduler and scheduler is not None:
+                # LCM re-noises the sample on every step. Without an explicit generator that noise
+                # comes from the global RNG and the same seed gives a different image each run.
+                # XOR keeps the step noise decorrelated from the initial noise (as in ERNIE-Image).
+                step_generator = torch.Generator(device="cpu").manual_seed(self.seed ^ 0xFFFFFFFF)
                 # Use diffusers scheduler for stepping
                 # Use tqdm with total_steps (user-facing steps) not num_scheduler_steps (internal steps)
                 # This ensures progress bar shows 1/8, 2/8, etc. even when scheduler uses more internal steps
@@ -714,7 +691,6 @@ class ZImageDenoiseInvocation(BaseInvocation):
                     sigma_curr = sched_timestep.item() / scheduler.config.num_train_timesteps
 
                     # For Heun scheduler, track if we're in first or second order step
-                    is_heun = hasattr(scheduler, "state_in_first_order")
                     in_first_order = scheduler.state_in_first_order if is_heun else True
 
                     # Timestep tensor for Z-Image model
@@ -781,7 +757,9 @@ class ZImageDenoiseInvocation(BaseInvocation):
                         noise_pred = noise_pred_cond
 
                     # Use scheduler.step() for the update
-                    step_output = scheduler.step(model_output=noise_pred, timestep=sched_timestep, sample=latents)
+                    step_output = scheduler.step(
+                        model_output=noise_pred, timestep=sched_timestep, sample=latents, generator=step_generator
+                    )
                     latents = step_output.prev_sample
 
                     # Get sigma_prev for inpainting (next sigma value)
@@ -793,9 +771,10 @@ class ZImageDenoiseInvocation(BaseInvocation):
                     if inpaint_extension is not None:
                         latents = inpaint_extension.merge_intermediate_latents_with_init_latents(latents, sigma_prev)
 
-                    # For Heun, only increment user step after second-order step completes
+                    # For Heun, a user step completes with its second-order evaluation. The final
+                    # interval has none: Diffusers ends it with a first-order step to the terminal sigma.
                     if is_heun:
-                        if not in_first_order:
+                        if not in_first_order or step_index == num_scheduler_steps - 1:
                             user_step += 1
                             # Only call step_callback if we haven't exceeded total_steps
                             if user_step <= total_steps:
@@ -803,7 +782,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
                                 step_callback(
                                     PipelineIntermediateState(
                                         step=user_step,
-                                        order=2,
+                                        # Progress over completed user steps, not the solver's order.
+                                        order=1,
                                         total_steps=total_steps,
                                         timestep=int(sigma_curr * 1000),
                                         latents=latents,

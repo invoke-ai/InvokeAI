@@ -8,22 +8,27 @@ routes ran in the threadpool they could not overlap; now they can, so the scratc
 be invisible to the scan by construction.
 """
 
-from logging import Logger
+import json
 from pathlib import Path
 
 import pytest
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.model_install.install_staging_ledger import (
+    INSTALL_ACTIVE_SENTINEL,
+    INSTALL_RECOVERY_SENTINEL,
+)
+from invokeai.app.services.model_records import ModelRecordServiceSQL
 from invokeai.app.services.orphaned_models import CONVERSION_SCRATCH_DIRNAME, OrphanedModelsService
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
+from invokeai.backend.model_manager.configs.textual_inversion import TI_File_SD1_Config
+from invokeai.backend.model_manager.taxonomy import ModelSourceType
+from invokeai.backend.util.logging import InvokeAILogger
 
 
 @pytest.fixture
-def db() -> SqliteDatabase:
-    database = SqliteDatabase(db_path=None, logger=Logger("test_orphaned_models"), verbose=False)
-    database._conn.execute("CREATE TABLE models (id TEXT PRIMARY KEY, config TEXT NOT NULL);")
-    database._conn.commit()
-    return database
+def store(database: Database) -> ModelRecordServiceSQL:
+    return ModelRecordServiceSQL(database, InvokeAILogger.get_logger())
 
 
 @pytest.fixture
@@ -33,11 +38,11 @@ def models_path(tmp_path: Path) -> Path:
     return path
 
 
-def _service(models_path: Path, db: SqliteDatabase) -> OrphanedModelsService:
+def _service(models_path: Path, store: ModelRecordServiceSQL) -> OrphanedModelsService:
     config = InvokeAIAppConfig()
     config._root = models_path.parent
     assert config.models_path == models_path
-    return OrphanedModelsService(config=config, db=db)
+    return OrphanedModelsService(config=config, store=store)
 
 
 def _write_model_file(directory: Path, name: str = "model.safetensors") -> None:
@@ -45,12 +50,14 @@ def _write_model_file(directory: Path, name: str = "model.safetensors") -> None:
     (directory / name).write_bytes(b"not really a model")
 
 
-def test_conversion_scratch_directory_is_not_reported_as_orphaned(models_path: Path, db: SqliteDatabase) -> None:
+def test_conversion_scratch_directory_is_not_reported_as_orphaned(
+    models_path: Path, store: ModelRecordServiceSQL
+) -> None:
     # What a conversion looks like on disk while it runs: a TemporaryDirectory under the scratch
     # area, holding the diffusers copy it has written so far.
     _write_model_file(models_path / CONVERSION_SCRATCH_DIRNAME / "tmp8f2b1c" / "sd-v1-5")
 
-    orphans = _service(models_path, db).find_orphaned_models()
+    orphans = _service(models_path, store).find_orphaned_models()
 
     assert orphans == [], (
         "The scan reported a conversion's working directory. `DELETE /sync/orphaned` would delete "
@@ -58,19 +65,221 @@ def test_conversion_scratch_directory_is_not_reported_as_orphaned(models_path: P
     )
 
 
-def test_a_real_orphan_is_still_reported(models_path: Path, db: SqliteDatabase) -> None:
+def test_a_real_orphan_is_still_reported(models_path: Path, store: ModelRecordServiceSQL) -> None:
     """The control: the skip must be targeted, not a scan that has stopped finding anything."""
     _write_model_file(models_path / "some-unregistered-model")
 
-    orphans = _service(models_path, db).find_orphaned_models()
+    orphans = _service(models_path, store).find_orphaned_models()
 
     assert [orphan.path for orphan in orphans] == ["some-unregistered-model"]
 
 
-def test_conversion_scratch_directory_cannot_be_deleted(models_path: Path, db: SqliteDatabase) -> None:
+def test_conversion_scratch_directory_cannot_be_deleted(models_path: Path, store: ModelRecordServiceSQL) -> None:
     _write_model_file(models_path / CONVERSION_SCRATCH_DIRNAME / "active-conversion" / "sd-v1-5")
 
-    result = _service(models_path, db).delete_orphaned_models([CONVERSION_SCRATCH_DIRNAME])
+    result = _service(models_path, store).delete_orphaned_models([CONVERSION_SCRATCH_DIRNAME])
 
     assert result[CONVERSION_SCRATCH_DIRNAME].startswith("error:")
     assert (models_path / CONVERSION_SCRATCH_DIRNAME).exists()
+
+
+def test_a_registered_model_is_no_orphan_even_when_its_config_no_longer_validates(
+    models_path: Path, store: ModelRecordServiceSQL, database: Database
+) -> None:
+    _write_model_file(models_path / "future-model")
+    # A record of a model type this version does not know, as after going back to an older version: deleting its
+    # files would break the model for the version that wrote it.
+    record = {
+        "key": "future",
+        "hash": "blake3:0",
+        "base": "any",
+        "type": "from_the_future",
+        "format": "checkpoint",
+        "name": "future model",
+        "source": "somewhere",
+        "source_type": "path",
+        "file_size": 18,
+        "path": "future-model/model.safetensors",
+    }
+    database.queries.models.insert("future", json.dumps(record))
+
+    assert _service(models_path, store).find_orphaned_models() == []
+
+
+def test_a_model_registered_by_its_absolute_path_is_no_orphan(models_path: Path, store: ModelRecordServiceSQL) -> None:
+    # An in-place install records the file where it is, which may be under the models root.
+    _write_model_file(models_path / "in-place")
+    store.add_model(
+        TI_File_SD1_Config(
+            path=str(models_path / "in-place" / "model.safetensors"),
+            name="in place",
+            hash="ABC123",
+            file_size=18,
+            source="test/source/",
+            source_type=ModelSourceType.Path,
+        )
+    )
+
+    assert _service(models_path, store).find_orphaned_models() == []
+
+
+def test_a_directory_holding_a_registered_model_is_no_orphan_whatever_else_it_holds(
+    models_path: Path, store: ModelRecordServiceSQL
+) -> None:
+    # Orphans are reported, and deleted, by their directory under the models root: reporting this one for its loose
+    # weights would delete the registered model with them.
+    _write_model_file(models_path / "family" / "model-a")
+    _write_model_file(models_path / "family" / "loose-weights")
+    store.add_model(
+        TI_File_SD1_Config(
+            path="family/model-a/model.safetensors",
+            name="model a",
+            hash="ABC123",
+            file_size=18,
+            source="test/source/",
+            source_type=ModelSourceType.Path,
+        )
+    )
+
+    assert _service(models_path, store).find_orphaned_models() == []
+
+
+@pytest.mark.parametrize("root_name", ["tmpinstall_recovery", "recovered-model"])
+def test_install_recovery_root_is_not_reported_or_deleted(
+    root_name: str, models_path: Path, store: ModelRecordServiceSQL
+) -> None:
+    recovery_root = models_path / root_name
+    _write_model_file(recovery_root)
+    sentinel = models_path / f".{root_name}{INSTALL_RECOVERY_SENTINEL}"
+    sentinel.write_text("preserve", encoding="utf-8")
+    service = _service(models_path, store)
+
+    assert service.find_orphaned_models() == []
+    result = service.delete_orphaned_models([root_name])
+
+    assert result[root_name].startswith("error:")
+    assert (recovery_root / "model.safetensors").exists()
+    assert sentinel.exists()
+
+
+def test_empty_active_install_claim_protects_a_model_during_claim_publication(
+    models_path: Path, store: ModelRecordServiceSQL
+) -> None:
+    root_name = "claim-being-published"
+    root = models_path / root_name
+    _write_model_file(root)
+    claim = models_path / f".{root_name}{INSTALL_ACTIVE_SENTINEL}"
+    claim.touch()
+    service = _service(models_path, store)
+
+    assert service.find_orphaned_models() == []
+    result = service.delete_orphaned_models([root_name])
+
+    assert result[root_name].startswith("error:")
+    assert (root / "model.safetensors").exists()
+    assert claim.exists()
+
+
+def test_a_directory_with_a_claimed_root_beneath_it_is_neither_listed_nor_deleted(
+    models_path: Path, store: ModelRecordServiceSQL
+) -> None:
+    group = models_path / "model-group"
+    _write_model_file(group / "loose-weights")
+    _write_model_file(group / "being-installed")
+    claim = group / f".being-installed{INSTALL_ACTIVE_SENTINEL}"
+    claim.write_text("2147483647 1.0\n", encoding="ascii")
+    service = _service(models_path, store)
+
+    assert service.find_orphaned_models() == []
+    result = service.delete_orphaned_models(["model-group"])
+
+    assert result["model-group"] == "error: path is reserved by an active install or install recovery"
+    assert (group / "loose-weights" / "model.safetensors").exists()
+    assert (group / "being-installed" / "model.safetensors").exists()
+
+
+@pytest.mark.parametrize("payload", ["model.safetensors", "model.safetensors.downloading"])
+def test_staging_kept_for_an_unusable_install_marker_can_be_removed_as_an_orphan(
+    models_path: Path, store: ModelRecordServiceSQL, payload: str
+) -> None:
+    """Startup keeps a staging directory whose marker it cannot read; orphan cleanup is how a person removes it, even
+    when it holds only partial downloads."""
+    staging = models_path / "tmpinstall_torn"
+    _write_model_file(staging, payload)
+    (staging / ".invokeai_install.json").write_text('{"version": 1, "sta', encoding="utf-8")
+    service = _service(models_path, store)
+
+    [orphan] = service.find_orphaned_models()
+    assert orphan.path == "tmpinstall_torn"
+    assert payload in orphan.files
+    assert orphan.size_bytes >= len(b"not really a model")
+    result = service.delete_orphaned_models(["tmpinstall_torn"])
+
+    assert result == {"tmpinstall_torn": "deleted"}
+    assert not staging.exists()
+    assert list(models_path.iterdir()) == []
+
+
+def test_staging_with_an_unusable_marker_that_holds_a_registered_model_is_not_offered(
+    models_path: Path, store: ModelRecordServiceSQL
+) -> None:
+    # A recovered tree registered in place, whose marker an earlier release left torn.
+    staging = models_path / "tmpinstall_recovered"
+    _write_model_file(staging / "my-model")
+    (staging / ".invokeai_install.json").write_text('{"version": 1, "sta', encoding="utf-8")
+    store.add_model(
+        TI_File_SD1_Config(
+            path="tmpinstall_recovered/my-model/model.safetensors",
+            name="recovered",
+            hash="ABC123",
+            file_size=18,
+            source="test/source/",
+            source_type=ModelSourceType.Path,
+        )
+    )
+
+    assert _service(models_path, store).find_orphaned_models() == []
+
+
+def test_staging_with_a_resumable_or_claimed_marker_is_not_offered_as_an_orphan(
+    models_path: Path, store: ModelRecordServiceSQL
+) -> None:
+    resumable = models_path / "tmpinstall_resumable"
+    _write_model_file(resumable, "model.safetensors.downloading")
+    (resumable / ".invokeai_install.json").write_text(
+        json.dumps({"version": 1, "source": "https://example.com/m.safetensors", "status": "paused"}), encoding="utf-8"
+    )
+    claimed = models_path / "tmpinstall_claimed"
+    _write_model_file(claimed, "model.safetensors.downloading")
+    (claimed / ".invokeai_install.json").write_text("torn", encoding="utf-8")
+    (models_path / f".tmpinstall_claimed{INSTALL_ACTIVE_SENTINEL}").write_text("2147483647 1.0\n", encoding="ascii")
+
+    assert _service(models_path, store).find_orphaned_models() == []
+
+
+def test_parent_of_recovery_root_cannot_be_deleted(models_path: Path, store: ModelRecordServiceSQL) -> None:
+    parent = models_path / "model-group"
+    _write_model_file(parent / "ordinary-orphan")
+    recovery_root = parent / "recovered-model"
+    _write_model_file(recovery_root)
+    sentinel = parent / f".{recovery_root.name}{INSTALL_RECOVERY_SENTINEL}"
+    sentinel.write_text("preserve", encoding="utf-8")
+
+    service = _service(models_path, store)
+
+    assert "model-group" not in {orphan.path for orphan in service.find_orphaned_models()}
+    result = service.delete_orphaned_models(["model-group"])
+
+    assert result["model-group"] == "error: path is reserved by an active install or install recovery"
+    assert (parent / "ordinary-orphan" / "model.safetensors").exists()
+    assert (recovery_root / "model.safetensors").exists()
+    assert sentinel.exists()
+
+
+def test_models_root_cannot_be_deleted_as_an_orphan(models_path: Path, store: ModelRecordServiceSQL) -> None:
+    _write_model_file(models_path / "real-model")
+
+    result = _service(models_path, store).delete_orphaned_models(["."])
+
+    assert result["."].startswith("error:")
+    assert (models_path / "real-model" / "model.safetensors").exists()

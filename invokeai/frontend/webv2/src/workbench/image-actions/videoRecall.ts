@@ -21,6 +21,7 @@ import {
   getVideoModelPolicy,
   getVideoModelSelectionResult,
   getVideoTargetResolutionOptions,
+  isConditioningClipExcludingFrames,
   isSupportedVideoModel,
   isValidVideoNumFrames,
   LTX2_NUM_FRAMES_STEP,
@@ -413,7 +414,10 @@ export interface VideoRecallConditioningClip {
 }
 
 export interface VideoRecallMediaNames {
-  /** The LTX-2 whole-modality conditioning clip, which excludes every other slot below. */
+  /**
+   * The LTX-2 whole-modality conditioning clip. It excludes every other slot below, except that a soundtrack
+   * recalls alongside the first and last frames that anchored the picture generated for it.
+   */
   conditioningClip: VideoRecallConditioningClip | null;
   firstFrameName: string | null;
   lastFrameName: string | null;
@@ -788,9 +792,13 @@ export const buildVideoRecallSettings = ({
   }
 
   if (conditioningClip) {
-    // First, and alone: the clip holds a whole modality clean, so no other slot could have been
-    // filled on the run being recalled.
+    // First, and alone but for frames: the clip holds a whole modality clean, so no other slot could
+    // have been filled on the run being recalled -- except a held soundtrack's first and last frames.
     mediaNames.conditioningClip = conditioningClip;
+    if (!isConditioningClipExcludingFrames(conditioningClip)) {
+      mediaNames.firstFrameName = media.firstFrameName;
+      mediaNames.lastFrameName = media.lastFrameName;
+    }
     fields.push('media');
   } else if (references.length > 0) {
     // References replace the frame slots, but a recorded source video rides

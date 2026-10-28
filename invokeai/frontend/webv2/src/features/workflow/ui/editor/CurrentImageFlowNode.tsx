@@ -16,6 +16,7 @@ import {
   progressImageToStreamingSource,
 } from '@platform/ui/streaming-image/streamingImageSource';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { CurrentImageFlowNode as CurrentImageFlowNodeType } from './flowAdapters';
 
@@ -26,6 +27,7 @@ const getLatestImage = (values: Record<string, unknown>): GeneratedImageContract
 };
 
 const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNodeType>) => {
+  const { t } = useTranslation();
   const galleryValues = useWorkflowProjectSelector((project) => project.galleryValues);
   const progressImage = useProgressImage();
   const node = data.documentNode;
@@ -41,17 +43,17 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
     >
       <Flex {...getWorkflowNodeHeaderProps()}>
         <Text fontSize="lg" fontWeight="700">
-          {node.data.label || 'Current Image'}
+          {node.data.label || t('widgets.workflow.addNodeDialog.currentImageTitle')}
         </Text>
         {progressImage ? (
           <Text color="brand.solid" data-node-status-indicator="true" fontSize="xs" ms="auto">
-            generating…
+            {t('widgets.workflow.generating')}
           </Text>
         ) : null}
       </Flex>
       <StreamingImageFrame
         fallbackImage={imageUrlToStreamingSource({
-          alt: latestImage?.imageName ?? 'Current image',
+          alt: latestImage?.imageName ?? t('widgets.workflow.addNodeDialog.currentImageTitle'),
           height: latestImage?.height,
           kind: 'fallback',
           src: latestImage?.imageUrl,
@@ -63,7 +65,7 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
         w="full"
       >
         <Flex align="center" color="fg.subtle" fontSize="xs" h="full" justify="center" px="4" textAlign="center">
-          No image yet — the latest generation will appear here.
+          {t('widgets.workflow.currentImageEmpty')}
         </Flex>
       </StreamingImageFrame>
     </Box>
@@ -71,6 +73,7 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
 };
 
 const CurrentImageSnapshotNode = ({ data, selected }: NodeProps<CurrentImageFlowNodeType>) => {
+  const { t } = useTranslation();
   const node = data.documentNode;
 
   return (
@@ -88,7 +91,7 @@ const CurrentImageSnapshotNode = ({ data, selected }: NodeProps<CurrentImageFlow
           fontSize="lg"
           fontWeight="700"
           minW="0"
-          text={node.data.label || 'Current Image'}
+          text={node.data.label || t('widgets.workflow.addNodeDialog.currentImageTitle')}
         />
       </Flex>
     </Box>

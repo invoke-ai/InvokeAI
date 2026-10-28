@@ -8,66 +8,110 @@ import {
   isGenerateModelSelectable,
 } from '@features/generation/core/baseGenerationPolicies';
 import { isGenerateModelConfig } from '@features/generation/core/settings';
+import { areArraysEqual, useExternalStoreSelector } from '@platform/state/selectors';
 import { Button } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { Field } from '@platform/ui/Field';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { GenerateDraft } from './generateDebounce';
+
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from './GenerationUiContext';
+import { notifyGenerateDimensionsAdjusted } from './modelSelectionNotice';
 
 const MAIN_MODEL_TYPES = ['main', 'external_image_generator'];
 
+/** What a pending switch would change in the live draft: settings it removes, and the size it moves to, if any. */
+interface PendingSwitchPreview {
+  clearedLabels: readonly string[];
+  adjustedSize: { height: number; width: number } | null;
+}
+
+const NO_PENDING_SWITCH: PendingSwitchPreview = { adjustedSize: null, clearedLabels: [] };
+
+const arePreviewsEqual = (left: PendingSwitchPreview, right: PendingSwitchPreview) =>
+  areArraysEqual(left.clearedLabels, right.clearedLabels) &&
+  left.adjustedSize?.width === right.adjustedSize?.width &&
+  left.adjustedSize?.height === right.adjustedSize?.height;
+
 interface GenerateModelCardProps {
+  draft: GenerateDraft;
   isLoadingModels: boolean;
   loadError: string | null;
   models: readonly ModelConfig[];
   selectedModel: GenerateModelConfig | undefined;
-  settings: GenerateSettings;
   supportedModels: GenerateModelConfig[];
   onCommitSettings: (nextSettings: GenerateSettings) => void;
 }
 
 /** This owner checks model availability; invocation readiness is validated elsewhere. */
 export const GenerateModelCard = ({
+  draft,
   isLoadingModels,
   loadError,
   models,
   onCommitSettings,
   selectedModel,
-  settings,
   supportedModels,
 }: GenerateModelCardProps) => {
   const { i18n, t } = useTranslation();
   const ui = useGenerationUi();
   const { openManager } = ui.models;
+  // On a Canvas source the width and height are the frame, which a switch keeps for a hosted provider.
+  const isCanvasFrame = ui.project.invocationSourceId === 'canvas';
   const openManagerForMainModels = useCallback(() => openManager({ modelType: 'main' }), [openManager]);
-  // Retain only the selected model and recompute against live settings on confirmation.
+  // Retain only the selected model and recompute against the current draft on confirmation.
   const [pendingSwitchModel, setPendingSwitchModel] = useState<GenerateModelConfig | null>(null);
 
-  const pendingSwitchClearedLabels = useMemo(() => {
-    if (!pendingSwitchModel) {
-      return [];
-    }
+  // Constant until a switch awaits confirmation; then the open dialog lists what the latest draft would lose.
+  const pendingSwitch = useExternalStoreSelector(
+    draft.subscribe,
+    draft.getSnapshot,
+    (settings: GenerateSettings): PendingSwitchPreview => {
+      if (!pendingSwitchModel) {
+        return NO_PENDING_SWITCH;
+      }
 
-    return getGenerateModelSelectionResult({ currentValues: settings, model: pendingSwitchModel, models })
-      .clearedLabels;
-  }, [models, pendingSwitchModel, settings]);
+      const result = getGenerateModelSelectionResult({
+        currentValues: settings,
+        isCanvasFrame,
+        model: pendingSwitchModel,
+        models,
+      });
+
+      return {
+        adjustedSize: result.dimensionsAdjusted
+          ? { height: result.settings.height, width: result.settings.width }
+          : null,
+        clearedLabels: result.clearedLabels,
+      };
+    },
+    arePreviewsEqual
+  );
 
   const commitModelSelection = (model: GenerateModelConfig) => {
-    onCommitSettings(getGenerateModelSelectionResult({ currentValues: settings, model, models }).settings);
+    onCommitSettings(
+      getGenerateModelSelectionResult({ currentValues: draft.getSnapshot(), isCanvasFrame, model, models }).settings
+    );
   };
 
   const selectModel = (model: GenerateModelConfig) => {
-    const result = getGenerateModelSelectionResult({ currentValues: settings, model, models });
+    const result = getGenerateModelSelectionResult({
+      currentValues: draft.getSnapshot(),
+      isCanvasFrame,
+      model,
+      models,
+    });
 
-    // Lossy switches confirm before committing; lossless ones stay instant.
+    // Lossy switches confirm before committing; lossless ones stay instant and report a moved size.
     if (result.clearedLabels.length > 0) {
       setPendingSwitchModel(model);
       return;
     }
 
     onCommitSettings(result.settings);
+    notifyGenerateDimensionsAdjusted({ modelName: model.name, notifications: ui.notifications, result, t });
   };
 
   const hasNoSupportedModels = !isLoadingModels && !loadError && supportedModels.length === 0;
@@ -110,14 +154,21 @@ export const GenerateModelCard = ({
 
       <ConfirmDialog
         body={
-          <Text fontSize="lg">
-            {t('widgets.generate.switchModelBody', {
-              labels: new Intl.ListFormat(i18n.resolvedLanguage, { style: 'long', type: 'conjunction' }).format(
-                pendingSwitchClearedLabels
-              ),
-              name: pendingSwitchModel?.name ?? '',
-            })}
-          </Text>
+          <>
+            <Text fontSize="lg">
+              {t('widgets.generate.switchModelBody', {
+                labels: new Intl.ListFormat(i18n.resolvedLanguage, { style: 'long', type: 'conjunction' }).format(
+                  pendingSwitch.clearedLabels
+                ),
+                name: pendingSwitchModel?.name ?? '',
+              })}
+            </Text>
+            {pendingSwitch.adjustedSize ? (
+              <Text color="fg.muted" fontSize="md">
+                {t('widgets.generate.switchModelAdjustsDimensions', pendingSwitch.adjustedSize)}
+              </Text>
+            ) : null}
+          </>
         }
         confirmLabel={t('widgets.generate.switchModelConfirm')}
         isOpen={pendingSwitchModel !== null}
@@ -125,6 +176,8 @@ export const GenerateModelCard = ({
         onClose={() => setPendingSwitchModel(null)}
         onConfirm={() => {
           if (pendingSwitchModel) {
+            // Close before committing, so the dialog animates out listing what was confirmed, not the switched draft.
+            setPendingSwitchModel(null);
             commitModelSelection(pendingSwitchModel);
           }
         }}

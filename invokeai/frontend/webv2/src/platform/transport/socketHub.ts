@@ -4,9 +4,11 @@ import { io } from 'socket.io-client';
 import type { BackendConnectionStatus } from './types';
 
 import { setConnectionStatus } from './connectionStore';
-import { getBackendSocketPath, getBackendSocketUrl, getHttpAuthToken } from './http';
+import { getBackendSocketPath, getBackendSocketUrl, getHttpAuthToken, subscribeHttpCredential } from './http';
 
 export interface BackendSocket {
+  /** False once the server ended the session or refused the handshake; Socket.IO then never retries by itself. */
+  readonly active: boolean;
   on(event: string, handler: (payload: never) => void): unknown;
   off(event: string, handler: (payload: never) => void): unknown;
   emit(event: string, payload: unknown): unknown;
@@ -29,25 +31,47 @@ export interface SocketHub {
   onConnectionChange(handler: ConnectionListener): () => void;
 }
 
-const createDefaultSocket = (): BackendSocket => {
-  const token = getHttpAuthToken();
+/** Supplies the handshake payload; Socket.IO calls it on every connect and reconnect attempt. */
+export type SocketAuthenticator = (callback: (payload: { token?: string }) => void) => void;
 
+/** The bearer credential the hub authenticates with. */
+export interface SocketCredentialSource {
+  getToken(): string | null;
+  /** Notifies when the current identity's token is replaced in place. */
+  subscribe(listener: () => void): () => void;
+}
+
+// The backend reads the handshake `auth.token` first. A static Authorization header would outlive token
+// replacements, so none is sent.
+const createDefaultSocket = (authenticate: SocketAuthenticator): BackendSocket =>
   // Narrow Socket.IO's generic off overload to the facade's supported calls.
-  return io(getBackendSocketUrl(), {
-    auth: token ? { token } : undefined,
+  io(getBackendSocketUrl(), {
+    auth: authenticate,
     autoConnect: false,
-    extraHeaders: token ? { Authorization: `Bearer ${token}` } : undefined,
     path: getBackendSocketPath(),
     timeout: 60000,
   }) as unknown as BackendSocket;
+
+const httpCredentialSource: SocketCredentialSource = {
+  getToken: getHttpAuthToken,
+  subscribe: subscribeHttpCredential,
 };
 
 const socketLogger = createLogger({ area: 'socket', namespace: 'transport' });
 
-export const createSocketHub = (options: { createSocket?: () => BackendSocket } = {}): SocketHub => {
+export const createSocketHub = (
+  options: {
+    createSocket?: (authenticate: SocketAuthenticator) => BackendSocket;
+    credential?: SocketCredentialSource;
+  } = {}
+): SocketHub => {
   const createSocket = options.createSocket ?? createDefaultSocket;
+  const credential = options.credential ?? httpCredentialSource;
 
   let socket: BackendSocket | null = null;
+  /** The token the live socket last authenticated with. */
+  let handshakeToken: string | null = null;
+  let unsubscribeCredential: (() => void) | null = null;
   let socketLifecycleHandlers: {
     connect: (payload: never) => void;
     connectError: (payload: never) => void;
@@ -87,14 +111,33 @@ export const createSocketHub = (options: { createSocket?: () => BackendSocket } 
     }
   };
 
+  /**
+   * After an own password change the server closes sockets authenticated under the revoked token, and Socket.IO does
+   * not retry a session the server ended. A replaced credential is the one reason to try again; an unchanged one would
+   * only be refused again.
+   */
+  const resumeWithReplacedCredential = (): void => {
+    if (socket && !socket.active && credential.getToken() !== handshakeToken) {
+      socket.connect();
+    }
+  };
+
   const connect = (): void => {
     if (socket) {
       return;
     }
 
-    const nextSocket = createSocket();
+    const nextSocket: BackendSocket = createSocket((callback) => {
+      const token = credential.getToken();
+
+      if (socket === nextSocket) {
+        handshakeToken = token;
+      }
+      callback(token === null ? {} : { token });
+    });
 
     socket = nextSocket;
+    handshakeToken = null;
     publishStatus('connecting');
 
     const onConnect = () => {
@@ -103,9 +146,11 @@ export const createSocketHub = (options: { createSocket?: () => BackendSocket } 
     };
     const onConnectError = (error: { message: string }) => {
       publishStatus('disconnected', error.message);
+      resumeWithReplacedCredential();
     };
     const onDisconnect = (reason: string) => {
       publishStatus('disconnected', reason);
+      resumeWithReplacedCredential();
     };
 
     socketLifecycleHandlers = {
@@ -124,6 +169,7 @@ export const createSocketHub = (options: { createSocket?: () => BackendSocket } 
       }
     }
 
+    unsubscribeCredential = credential.subscribe(resumeWithReplacedCredential);
     nextSocket.connect();
   };
 
@@ -133,6 +179,8 @@ export const createSocketHub = (options: { createSocket?: () => BackendSocket } 
 
     socket = null;
     socketLifecycleHandlers = null;
+    unsubscribeCredential?.();
+    unsubscribeCredential = null;
 
     if (oldSocket) {
       if (oldLifecycleHandlers) {

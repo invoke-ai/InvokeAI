@@ -1,16 +1,23 @@
 import type { GalleryImageItem, GalleryItem, GalleryVideoItem } from '@features/gallery/core/items';
-import type { GalleryBoard, GeneratedImageContract } from '@features/gallery/core/types';
+import type { GalleryBoard, GalleryBoardAction, GeneratedImageContract } from '@features/gallery/core/types';
 
+import { getGallerySettings } from '@features/gallery/core/settings';
 import { describe, expect, it } from 'vitest';
 
 import {
   getBoardCounts,
   getGalleryAutoAddBoardId,
+  getGalleryRedirectedDestination,
   getGalleryDestinationBoardId,
+  getGalleryListingBoardId,
   getGallerySelectedBoardId,
+  getGallerySelectionBoardId,
   getGallerySelectedImageQuery,
   getGallerySemanticImageQuery,
+  getGalleryListing,
+  getGalleryReadStatus,
   getGalleryStateView,
+  type GalleryQueryFacts,
 } from './galleryStateView';
 
 const boards: GalleryBoard[] = [
@@ -22,6 +29,7 @@ const boards: GalleryBoard[] = [
     imageCount: 1,
     kind: 'uncategorized',
     name: '',
+    isInbox: false,
     projectId: null,
     videoCount: 0,
   },
@@ -33,6 +41,7 @@ const boards: GalleryBoard[] = [
     imageCount: 2,
     kind: 'board',
     name: 'Board 1',
+    isInbox: false,
     projectId: null,
     videoCount: 0,
   },
@@ -76,14 +85,14 @@ describe('gallery state view', () => {
     const values = { selectedBoardId: 'board-1' };
 
     expect(getGallerySelectedBoardId(values, [])).toBe('board-1');
-    expect(getGalleryStateView(values, [], null, false).selectedBoardId).toBe('board-1');
+    expect(getGalleryStateView(values, [], null).selectedBoardId).toBe('board-1');
   });
 
   it('falls back to uncategorized after loaded boards do not contain the selected board', () => {
     const values = { selectedBoardId: 'missing-board' };
 
     expect(getGallerySelectedBoardId(values, boards)).toBe('none');
-    expect(getGalleryStateView(values, boards, [], false).selectedBoardId).toBe('none');
+    expect(getGalleryStateView(values, boards, []).selectedBoardId).toBe('none');
   });
 
   /**
@@ -91,15 +100,21 @@ describe('gallery state view', () => {
    * Uncategorized.
    */
   it('falls back to the project board before uncategorized', () => {
-    const projectBoards = [...boards, { ...boards[1]!, id: 'project-board', name: 'My Project', projectId: 'p1' }];
+    const projectBoards = [
+      ...boards,
+      { ...boards[1]!, id: 'project-board', isInbox: true, name: 'My Project', projectId: 'p1' },
+    ];
     const values = { projectBoardId: 'project-board', selectedBoardId: 'missing-board' };
 
     expect(getGallerySelectedBoardId(values, projectBoards)).toBe('project-board');
-    expect(getGalleryStateView(values, projectBoards, [], false).selectedBoardId).toBe('project-board');
+    expect(getGalleryStateView(values, projectBoards, []).selectedBoardId).toBe('project-board');
   });
 
   it('keeps a still-resolvable selection rather than reverting to the project board', () => {
-    const projectBoards = [...boards, { ...boards[1]!, id: 'project-board', name: 'My Project', projectId: 'p1' }];
+    const projectBoards = [
+      ...boards,
+      { ...boards[1]!, id: 'project-board', isInbox: true, name: 'My Project', projectId: 'p1' },
+    ];
     const values = { projectBoardId: 'project-board', selectedBoardId: 'board-1' };
 
     expect(getGallerySelectedBoardId(values, projectBoards)).toBe('board-1');
@@ -113,18 +128,27 @@ describe('gallery state view', () => {
 
   /** An absent saved destination is not an explicit choice of Uncategorized; use the project's board. */
   it('uses the project board when nothing was ever selected', () => {
-    const projectBoards = [...boards, { ...boards[1]!, id: 'project-board', name: 'My Project', projectId: 'p1' }];
+    const projectBoards = [
+      ...boards,
+      { ...boards[1]!, id: 'project-board', isInbox: true, name: 'My Project', projectId: 'p1' },
+    ];
 
     expect(getGallerySelectedBoardId({ projectBoardId: 'project-board' }, projectBoards)).toBe('project-board');
     expect(getGallerySelectedBoardId({}, projectBoards)).toBe('none');
   });
 
-  it('does not render local fallback images while backend images are loading', () => {
-    const values = { recentImages: [createImage('local-fallback.png')], selectedBoardId: 'none' };
-    const gallery = getGalleryStateView(values, boards, null, true);
+  it('never substitutes unfiltered recents for a listing the current scope does not have', () => {
+    // Recents from another board, an anchored window or a failed page are not this scope's items.
+    const values = {
+      galleryPage: 3,
+      recentImages: [createImage('elsewhere.png')],
+      selectedBoardId: 'board-1',
+      selectedImageName: 'image:elsewhere.png',
+    };
+    const gallery = getGalleryStateView(values, boards, null);
 
-    expect((gallery as typeof gallery & { items?: GalleryItem[] }).items).toEqual([]);
-    expect(gallery.isLoading).toBe(true);
+    expect(gallery.items).toEqual([]);
+    expect(gallery.selectedItemKey).toBeNull();
   });
 
   it('exposes image, video, and asset counts for board labels', () => {
@@ -138,10 +162,9 @@ describe('gallery state view', () => {
 
   it('parses persisted gallery settings with safe defaults', () => {
     const gallery = getGalleryStateView(
-      { boardOrderBy: 'board_name', starredSectionCollapsed: 'yes' },
+      { boardOrderBy: 'board_name', mediaFilter: 'audio', starredSectionCollapsed: 'yes' },
       boards,
-      [],
-      false
+      []
     );
 
     expect(gallery.settings).toEqual({
@@ -152,8 +175,12 @@ describe('gallery state view', () => {
       boardPanelHeightPx: 280,
       boardPanelWidthPx: 240,
       collapsedBoardSections: [],
+      collapsedProjectGroupIds: [],
+      expandedBoardSections: [],
       imageDensityPercent: 50,
       imageOrderDir: 'DESC',
+      mediaFilter: 'all',
+      middleClickOpensInNewTab: false,
       paginationMode: 'infinite',
       showArchivedBoards: false,
       showDateBoards: false,
@@ -161,12 +188,14 @@ describe('gallery state view', () => {
       showOtherProjectBoards: false,
       showPendingItems: true,
       progressSectionCollapsed: false,
+      searchScope: 'board',
       starredSectionCollapsed: false,
       thumbnailFit: 'square',
     });
-    expect(
-      getGalleryStateView({ starredSectionCollapsed: true }, boards, [], false).settings.starredSectionCollapsed
-    ).toBe(true);
+    expect(getGalleryStateView({ starredSectionCollapsed: true }, boards, []).settings.starredSectionCollapsed).toBe(
+      true
+    );
+    expect(getGalleryStateView({ mediaFilter: 'video' }, boards, []).settings.mediaFilter).toBe('video');
   });
 
   it('exposes comparison state only while an image selection differs from the compare image', () => {
@@ -177,16 +206,16 @@ describe('gallery state view', () => {
       selectedImageName: 'image:selected.png',
     };
 
-    expect(getGalleryStateView(values, boards, [selected], false).isComparisonActive).toBe(true);
-    expect(
-      getGalleryStateView({ ...values, compareImage: selected }, boards, [selected], false).isComparisonActive
-    ).toBe(false);
-    expect(getGalleryStateView(values, boards, [], false).isComparisonActive).toBe(false);
+    expect(getGalleryStateView(values, boards, [selected]).isComparisonActive).toBe(true);
+    expect(getGalleryStateView({ ...values, compareImage: selected }, boards, [selected]).isComparisonActive).toBe(
+      false
+    );
+    expect(getGalleryStateView(values, boards, []).isComparisonActive).toBe(false);
 
     const video = createVideoItem('clip');
 
     expect(
-      getGalleryStateView({ ...values, selectedImageName: 'video:clip' }, boards, [video], false).isComparisonActive
+      getGalleryStateView({ ...values, selectedImageName: 'video:clip' }, boards, [video]).isComparisonActive
     ).toBe(false);
   });
 
@@ -209,12 +238,11 @@ describe('gallery state view', () => {
       getGalleryStateView(
         { ...stamped, ...values, selectedImageQuery: { ...stamped.selectedImageQuery, ...stamp } },
         boards,
-        [],
-        false
+        []
       ).revealTargetPage;
 
     expect(pageOf({})).toBe(2);
-    expect(getGalleryStateView(stamped, boards, [], false).page).toBe(0);
+    expect(getGalleryStateView(stamped, boards, []).page).toBe(0);
     expect(pageOf({ selectedBoardId: 'board-1' })).toBeNull();
     expect(pageOf({ paginationMode: 'infinite' })).toBeNull();
     expect(pageOf({}, { galleryView: 'assets' })).toBeNull();
@@ -223,6 +251,10 @@ describe('gallery state view', () => {
     expect(pageOf({ searchTerm: 'cats' })).toBeNull();
     expect(pageOf({ starredOnly: true })).toBeNull();
     expect(pageOf({ starredOnly: true }, { starredOnly: true })).toBe(2);
+    // A stamp without a media kind was made in a listing of both kinds, whatever the filter is now.
+    expect(pageOf({ mediaFilter: 'video' })).toBeNull();
+    expect(pageOf({ mediaFilter: 'video' }, { mediaKind: 'video' })).toBe(2);
+    expect(pageOf({}, { mediaKind: 'image' })).toBeNull();
     // A starred selection sits in the strip, so no page of the unstarred grid holds it.
     expect(pageOf({ selectedImage: { ...createImageItem('starred.png'), starred: true } })).toBeNull();
     expect(
@@ -232,47 +264,101 @@ describe('gallery state view', () => {
       )
     ).toBe(2);
     expect(pageOf({ semanticImageQuery: { imageName: 'ref.png', kind: 'image' } })).toBeNull();
+    // A search of every board is its own listing: a stamp made there names it rather than the selected board.
+    expect(pageOf({ searchScope: 'all', searchTerm: 'cats' }, { searchTerm: 'cats' })).toBeNull();
+    expect(pageOf({ searchScope: 'all', searchTerm: 'cats' }, { boardId: 'all', searchTerm: 'cats' })).toBe(2);
+    expect(pageOf({ searchTerm: 'cats' }, { boardId: 'all', searchTerm: 'cats' })).toBeNull();
+  });
+
+  it('searches every board only while a search is active, leaving the selected board as it is', () => {
+    const view = (values: Record<string, unknown>) =>
+      getGalleryStateView({ searchScope: 'all', selectedBoardId: 'board-1', ...values }, boards, []);
+    const searching = [
+      { searchTerm: 'cat' },
+      { semanticSearchText: 'sunset' },
+      { semanticImageQuery: { imageName: 'ref.png', kind: 'image' } },
+    ];
+
+    for (const search of searching) {
+      expect(view(search)).toMatchObject({
+        isSearchActive: true,
+        listingBoardId: 'all',
+        searchScope: 'all',
+        selectedBoardId: 'board-1',
+      });
+      expect(getGallerySelectionBoardId({ searchScope: 'all', selectedBoardId: 'board-1', ...search })).toBe('all');
+      expect(getGalleryListingBoardId({ searchScope: 'all', selectedBoardId: 'board-1', ...search }, boards)).toBe(
+        'all'
+      );
+    }
+
+    // No search, or only blank text: the scope does not apply.
+    for (const idle of [{}, { searchTerm: '  ' }, { semanticSearchText: '' }]) {
+      expect(view(idle)).toMatchObject({ isSearchActive: false, listingBoardId: 'board-1', searchScope: 'board' });
+      expect(getGallerySelectionBoardId({ searchScope: 'all', selectedBoardId: 'board-1', ...idle })).toBe('board-1');
+    }
+
+    expect(view({ searchScope: 'board', searchTerm: 'cat' })).toMatchObject({
+      listingBoardId: 'board-1',
+      searchScope: 'board',
+    });
+    // Where pasted or generated media lands is not the listing's scope.
+    expect(getGalleryDestinationBoardId({ searchScope: 'all', searchTerm: 'cat', selectedBoardId: 'board-1' })).toBe(
+      'board-1'
+    );
   });
 
   it('reads the starred-only filter as a strict boolean and stamps it on the selection query', () => {
-    expect(getGalleryStateView({ starredOnly: true }, boards, [], false).starredOnly).toBe(true);
-    expect(getGalleryStateView({ starredOnly: 'true' }, boards, [], false).starredOnly).toBe(false);
-    expect(getGalleryStateView({}, boards, [], false).starredOnly).toBe(false);
+    expect(getGalleryStateView({ starredOnly: true }, boards, []).starredOnly).toBe(true);
+    expect(getGalleryStateView({ starredOnly: 'true' }, boards, []).starredOnly).toBe(false);
+    expect(getGalleryStateView({}, boards, []).starredOnly).toBe(false);
 
     // The stamp wins over the live value: navigation walks the listing the
     // selection was made in, not the one the grid has since switched to.
     expect(
       getGallerySelectedImageQuery({ selectedImageQuery: { starredOnly: true }, starredOnly: false })
     ).toMatchObject({ starredOnly: true });
+    // Unlike the other fields, a legacy stamp's missing media kind never falls back to the live filter.
+    expect(getGallerySelectedImageQuery({ mediaFilter: 'video', selectedImageQuery: {} }).mediaKind).toBeNull();
+    expect(getGallerySelectedImageQuery({ mediaFilter: 'video' }).mediaKind).toBeNull();
+    expect(
+      getGallerySelectedImageQuery({ mediaFilter: 'all', selectedImageQuery: { mediaKind: 'video' } }).mediaKind
+    ).toBe('video');
     expect(getGallerySelectedImageQuery({ starredOnly: true })).toMatchObject({ starredOnly: true });
+  });
+
+  it('says whether the selection was made in a starred-only listing, by its stamp', () => {
+    const carriedIn = { selectedImageQuery: { starredOnly: false }, starredOnly: true };
+
+    expect(getGalleryStateView(carriedIn, boards, []).selectionStarredOnly).toBe(false);
+    expect(
+      getGalleryStateView({ selectedImageQuery: { starredOnly: true }, starredOnly: true }, boards, [])
+        .selectionStarredOnly
+    ).toBe(true);
   });
 
   it('qualifies legacy names and preserves ordered mixed-media selection keys', () => {
     const gallery = getGalleryStateView(
       { selectedImageNames: ['a.png', 'video:shared', 'image:shared', 7] },
       boards,
-      [],
-      false
+      []
     ) as ReturnType<typeof getGalleryStateView> & { selectedItemKeys?: string[] };
 
     expect(gallery.selectedItemKeys).toEqual(['image:a.png', 'video:shared', 'image:shared']);
     expect(
       (
-        getGalleryStateView({ selectedImageName: 'a.png' }, boards, [], false) as ReturnType<
-          typeof getGalleryStateView
-        > & { selectedItemKeys?: string[] }
+        getGalleryStateView({ selectedImageName: 'a.png' }, boards, []) as ReturnType<typeof getGalleryStateView> & {
+          selectedItemKeys?: string[];
+        }
       ).selectedItemKeys
     ).toEqual(['image:a.png']);
   });
 
   it('restores the selection set from a visible primary item after tab switches clear it', () => {
     const image = createImageItem('selected.png');
-    const gallery = getGalleryStateView(
-      { selectedImageName: 'image:selected.png', selectedImageNames: [] },
-      boards,
-      [image],
-      false
-    ) as ReturnType<typeof getGalleryStateView> & {
+    const gallery = getGalleryStateView({ selectedImageName: 'image:selected.png', selectedImageNames: [] }, boards, [
+      image,
+    ]) as ReturnType<typeof getGalleryStateView> & {
       selectedItemKey?: string | null;
       selectedItemKeys?: string[];
     };
@@ -285,10 +371,13 @@ describe('gallery state view', () => {
     const starred = { ...createImageItem('starred.png'), starred: true };
     const values = { selectedImageName: 'image:starred.png' };
 
-    expect(getGalleryStateView(values, boards, [createImageItem('regular.png')], false).selectedItemKey).toBeNull();
-    expect(
-      getGalleryStateView(values, boards, [createImageItem('regular.png')], false, [starred]).selectedItemKey
-    ).toBe('image:starred.png');
+    expect(getGalleryStateView(values, boards, [createImageItem('regular.png')]).selectedItemKey).toBeNull();
+    expect(getGalleryStateView(values, boards, [createImageItem('regular.png')]).primarySelectedItemKey).toBe(
+      'image:starred.png'
+    );
+    expect(getGalleryStateView(values, boards, [createImageItem('regular.png')], [starred]).selectedItemKey).toBe(
+      'image:starred.png'
+    );
   });
 
   it('projects same-name images and videos independently by qualified key', () => {
@@ -302,8 +391,7 @@ describe('gallery state view', () => {
         selectedImageNames: ['image:shared', 'video:shared'],
       },
       boards,
-      [image, video],
-      false
+      [image, video]
     ) as ReturnType<typeof getGalleryStateView> & {
       compareImageKey?: string | null;
       items?: GalleryItem[];
@@ -330,14 +418,80 @@ describe('gallery state view', () => {
     });
   });
   it('threads persisted semantic references into the board view', () => {
-    const ranked = getGalleryStateView(
-      { selectedBoardId: 'board-1', semanticImageQuery: 'ref.png' },
-      boards,
-      [],
-      false
-    );
+    const ranked = getGalleryStateView({ selectedBoardId: 'board-1', semanticImageQuery: 'ref.png' }, boards, []);
     expect(ranked.semanticImageQuery).toEqual({ imageName: 'ref.png', kind: 'image' });
-    expect(getGalleryStateView({ selectedBoardId: 'board-1' }, boards, [], false).semanticImageQuery).toBeNull();
+    expect(getGalleryStateView({ selectedBoardId: 'board-1' }, boards, []).semanticImageQuery).toBeNull();
+  });
+});
+
+describe('gallery read status', () => {
+  const pending: GalleryQueryFacts = { errorUpdateCount: 0, hasData: false, isError: false };
+  const failed: GalleryQueryFacts = { errorUpdateCount: 1, hasData: false, isError: true };
+  const loaded: GalleryQueryFacts = { errorUpdateCount: 0, hasData: true, isError: false };
+
+  it('tells a first load, an empty success and a failure apart', () => {
+    expect(getGalleryReadStatus(pending, 0)).toBe('loading');
+    expect(getGalleryReadStatus(loaded, 0)).toBe('empty');
+    expect(getGalleryReadStatus(loaded, 3)).toBe('ready');
+    expect(getGalleryReadStatus(failed, 0)).toBe('error');
+  });
+
+  it('keeps a failed scope failed while its retry is in flight', () => {
+    // A refetch resets a dataless query to pending with no error; the failure count survives that reset.
+    expect(getGalleryReadStatus({ errorUpdateCount: 1, hasData: false, isError: false }, 0)).toBe('error');
+  });
+
+  it("distinguishes a failed refresh from a failed next page of this scope's data", () => {
+    const refreshFailed = { ...loaded, errorUpdateCount: 1, isError: true };
+
+    expect(getGalleryReadStatus(refreshFailed, 3)).toBe('stale-error');
+    expect(getGalleryReadStatus({ ...refreshFailed, isFetchNextPageError: true }, 3)).toBe('more-error');
+    // A once-failed scope that has since loaded is healthy again.
+    expect(getGalleryReadStatus({ ...loaded, errorUpdateCount: 2 }, 3)).toBe('ready');
+  });
+});
+
+describe('getGalleryListing', () => {
+  const recent = createImageItem('just-generated.png');
+  const backend = createImageItem('backend.png');
+
+  it('lets scope-filtered recents ride along while the scope loads or has data', () => {
+    expect(getGalleryListing({ errorUpdateCount: 0, hasData: false, isError: false }, [recent])).toEqual({
+      items: [recent],
+      status: 'loading',
+    });
+    expect(getGalleryListing({ errorUpdateCount: 0, hasData: true, isError: false }, [recent, backend])).toEqual({
+      items: [recent, backend],
+      status: 'ready',
+    });
+  });
+
+  it('reports nothing to show before the first result when no recents apply', () => {
+    expect(getGalleryListing({ errorUpdateCount: 0, hasData: false, isError: false }, [])).toEqual({
+      items: null,
+      status: 'loading',
+    });
+  });
+
+  it('never lets recents stand in for a scope that failed without data, even mid-retry', () => {
+    expect(getGalleryListing({ errorUpdateCount: 1, hasData: false, isError: true }, [recent])).toEqual({
+      items: null,
+      status: 'error',
+    });
+    expect(getGalleryListing({ errorUpdateCount: 1, hasData: false, isError: false }, [recent])).toEqual({
+      items: null,
+      status: 'error',
+    });
+  });
+
+  it("keeps this scope's earlier items through a failed refresh or next page", () => {
+    const facts = { errorUpdateCount: 1, hasData: true, isError: true };
+
+    expect(getGalleryListing(facts, [backend])).toEqual({ items: [backend], status: 'stale-error' });
+    expect(getGalleryListing({ ...facts, isFetchNextPageError: true }, [backend])).toEqual({
+      items: [backend],
+      status: 'more-error',
+    });
   });
 });
 
@@ -357,13 +511,64 @@ describe('getGalleryDestinationBoardId', () => {
 });
 
 describe('getGalleryAutoAddBoardId', () => {
+  const anyBoard = () => true;
+
   it('follows the gallery destination until a board is fixed', () => {
-    expect(getGalleryAutoAddBoardId({ projectBoardId: 'project', selectedBoardId: 'picked' })).toBe('picked');
-    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'follow', projectBoardId: 'project' })).toBe('project');
+    expect(getGalleryAutoAddBoardId({ projectBoardId: 'project', selectedBoardId: 'picked' }, anyBoard)).toBe('picked');
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'follow', projectBoardId: 'project' }, anyBoard)).toBe('project');
   });
 
   it('uses a fixed board, including Uncategorized, whatever the selection', () => {
-    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'fixed', selectedBoardId: 'picked' })).toBe('fixed');
-    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'none', selectedBoardId: 'picked' })).toBe('none');
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'fixed', selectedBoardId: 'picked' }, anyBoard)).toBe('fixed');
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'none', selectedBoardId: 'picked' }, anyBoard)).toBe('none');
+  });
+
+  it('sends results a view-only board refuses to the project inbox, followed or fixed', () => {
+    const viewOnly = (boardId: string) => boardId !== 'shared';
+
+    expect(getGalleryAutoAddBoardId({ projectBoardId: 'inbox', selectedBoardId: 'shared' }, viewOnly)).toBe('inbox');
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'shared', projectBoardId: 'inbox' }, viewOnly)).toBe('inbox');
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'shared' }, viewOnly)).toBe('none');
+    // Uncategorized is always the caller's own.
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'none', projectBoardId: 'inbox' }, () => false)).toBe('none');
+  });
+});
+
+describe('getGalleryRedirectedDestination', () => {
+  const createBoard = (id: string): GalleryBoard => ({
+    archived: false,
+    assetCount: 0,
+    assetVideoCount: 0,
+    id,
+    imageCount: 0,
+    isInbox: false,
+    kind: 'board',
+    name: id,
+    projectId: null,
+    videoCount: 0,
+  });
+  const access = (actions: GalleryBoardAction[]) => ({
+    access: { actions, adminOverride: false, generalAccess: 'viewer' as const, role: 'viewer' as const },
+  });
+  const boards = [
+    { ...createBoard('shared'), ...access(['read']) },
+    { ...createBoard('moodboard'), ...access(['read', 'add_media']) },
+    createBoard('inbox'),
+  ];
+  const view = (settings: { autoAddBoardId: string }, selectedBoardId: string) => ({
+    boards,
+    projectBoardId: 'inbox',
+    selectedBoardId,
+    settings: { ...getGallerySettings({}), ...settings },
+  });
+
+  it('names the board that refused results and where they go instead', () => {
+    expect(getGalleryRedirectedDestination(view({ autoAddBoardId: 'follow' }, 'shared'))).toEqual({
+      boardId: 'inbox',
+      refusedBoard: boards[0],
+    });
+    expect(getGalleryRedirectedDestination(view({ autoAddBoardId: 'shared' }, 'inbox'))?.boardId).toBe('inbox');
+    expect(getGalleryRedirectedDestination(view({ autoAddBoardId: 'follow' }, 'moodboard'))).toBeNull();
+    expect(getGalleryRedirectedDestination(view({ autoAddBoardId: 'moodboard' }, 'shared'))).toBeNull();
   });
 });

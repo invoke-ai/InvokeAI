@@ -3,19 +3,29 @@ export type BrowserLockResult =
   | { kind: 'contended' }
   | { kind: 'unavailable' };
 
+/** The injected manager, else the browser's; none outside a secure context (plain HTTP), where the API is absent. */
+const getLockManager = (lockManager?: LockManager): LockManager | undefined => {
+  if (lockManager) {
+    return lockManager;
+  }
+  try {
+    return typeof navigator === 'undefined' ? undefined : navigator.locks;
+  } catch {
+    return undefined;
+  }
+};
+
+/** Whether tabs of this origin can coordinate through Web Locks; false on a plain-HTTP origin. */
+export const hasWebLocks = (lockManager?: LockManager): boolean => getLockManager(lockManager) !== undefined;
+
 const acquireLock = (
   name: string,
   mode: 'exclusive' | 'shared',
-  lockManager?: LockManager
+  lockManager?: LockManager,
+  /** Wait for the lock until it is granted or this aborts, instead of taking it only when free. */
+  waitSignal?: AbortSignal
 ): Promise<BrowserLockResult> => {
-  let manager = lockManager;
-  if (!manager) {
-    try {
-      manager = typeof navigator === 'undefined' ? undefined : navigator.locks;
-    } catch {
-      manager = undefined;
-    }
-  }
+  const manager = getLockManager(lockManager);
   if (!manager) {
     return Promise.resolve({ kind: 'unavailable' });
   }
@@ -30,7 +40,7 @@ const acquireLock = (
     try {
       let request: Promise<void>;
       request = manager
-        .request(name, { ifAvailable: true, mode }, async (lock) => {
+        .request(name, waitSignal ? { mode, signal: waitSignal } : { ifAvailable: true, mode }, async (lock) => {
           if (!lock) {
             didResolve = true;
             resolve({ kind: 'contended' });
@@ -70,3 +80,27 @@ export const acquireExclusiveLock = (name: string, lockManager?: LockManager): P
 
 export const acquireSharedLock = (name: string, lockManager?: LockManager): Promise<BrowserLockResult> =>
   acquireLock(name, 'shared', lockManager);
+
+/** Wait until the shared lock is granted; `unavailable` without the Web Locks API or once the signal aborts. */
+export const waitForSharedLock = (
+  name: string,
+  signal: AbortSignal,
+  lockManager?: LockManager
+): Promise<BrowserLockResult> => acquireLock(name, 'shared', lockManager, signal);
+
+/**
+ * Whether any context of this origin currently holds the lock, read without requesting it, so a holder about to claim
+ * the name is never turned away. `null` when the Web Locks API or its query is unavailable.
+ */
+export const isLockHeld = async (name: string, lockManager?: LockManager): Promise<boolean | null> => {
+  const manager = getLockManager(lockManager);
+  if (!manager || typeof manager.query !== 'function') {
+    return null;
+  }
+  try {
+    const { held = [] } = await manager.query();
+    return held.some((lock) => lock.name === name);
+  } catch {
+    return null;
+  }
+};

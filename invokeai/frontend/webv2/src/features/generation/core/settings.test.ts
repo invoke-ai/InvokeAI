@@ -29,8 +29,10 @@ import {
   hasModelDefaultVae,
   isLoraCompatibleWithModel,
   isGenerateSettings,
+  isValidMossImageSkipLayers,
   moveReferenceImage,
   normalizeGenerateSettings,
+  parseMossImageSkipLayers,
   syncGenerateWidgetValuesWithModels,
   syncGenerateLorasWithModels,
 } from './settings';
@@ -191,6 +193,46 @@ describe('normalizeGenerateSettings', () => {
     ).toBe(false);
   });
 
+  // Qwen-Image-2.1 references are their own flavor, so a stored one must not fold into Qwen-Image Edit's.
+  it('keeps persisted Qwen-Image-2.1 reference images as their own flavor', () => {
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      referenceImages: [
+        {
+          id: 'edit-1',
+          isEnabled: false,
+          config: {
+            type: 'qwen_image_2_1_reference_image',
+            image: {
+              height: 640,
+              imageName: 'edit.png',
+              imageUrl: '/api/v1/images/i/edit.png/full',
+              queuedAt: '2026-01-01T00:00:00.000Z',
+              sourceQueueItemId: 'backend-gallery',
+              thumbnailUrl: '/api/v1/images/i/edit.png/thumbnail',
+              width: 480,
+            },
+          },
+        },
+        { id: 'empty', isEnabled: true, config: { type: 'qwen_image_2_1_reference_image', image: null } },
+        { id: 'broken', isEnabled: true, config: { type: 'qwen_image_2_1_reference_image', image: { width: 1 } } },
+      ],
+    });
+
+    expect(normalized?.referenceImages).toEqual([
+      {
+        config: {
+          image: { original: { image: { height: 640, image_name: 'edit.png', width: 480 } } },
+          type: 'qwen_image_2_1_reference_image',
+        },
+        id: 'edit-1',
+        isEnabled: false,
+      },
+      { config: { image: null, type: 'qwen_image_2_1_reference_image' }, id: 'empty', isEnabled: true },
+    ]);
+    expect(normalized && isGenerateSettings(normalized)).toBe(true);
+  });
+
   it('keeps more than five valid persisted reference images for provider-specific caps', () => {
     const referenceImages = Array.from({ length: 6 }, (_, index) => ({
       id: `ref-${index}`,
@@ -279,6 +321,144 @@ describe('normalizeGenerateSettings', () => {
     expect(normalized?.vaePrecision).toBe('fp32');
   });
 
+  it('keeps valid hosted-provider options and drops the rest back to provider defaults', () => {
+    const kept = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      externalImageSize: '2K',
+      geminiTemperature: 0.5,
+      geminiThinkingLevel: 'minimal',
+      openaiBackground: 'opaque',
+      openaiInputFidelity: 'high',
+      openaiQuality: 'medium',
+      seedreamOptimizePrompt: true,
+      seedreamWatermark: true,
+    });
+
+    expect(kept).toMatchObject({
+      externalImageSize: '2K',
+      geminiTemperature: 0.5,
+      geminiThinkingLevel: 'minimal',
+      openaiBackground: 'opaque',
+      openaiInputFidelity: 'high',
+      openaiQuality: 'medium',
+      seedreamOptimizePrompt: true,
+      seedreamWatermark: true,
+    });
+
+    const dropped = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      externalImageSize: '',
+      geminiTemperature: 2.5,
+      geminiThinkingLevel: 'max',
+      openaiBackground: 'clear',
+      openaiInputFidelity: 'medium',
+      openaiQuality: 'ultra',
+      seedreamOptimizePrompt: 'yes',
+      seedreamWatermark: 1,
+    });
+
+    expect(dropped).toMatchObject({
+      externalImageSize: null,
+      geminiTemperature: null,
+      geminiThinkingLevel: null,
+      openaiBackground: 'auto',
+      openaiInputFidelity: null,
+      openaiQuality: 'auto',
+      seedreamOptimizePrompt: false,
+      seedreamWatermark: false,
+    });
+  });
+
+  it.each([0, 2])('preserves the Gemini temperature boundary %s', (geminiTemperature) => {
+    expect(normalizeGenerateSettings({ ...legacyStoredValues, geminiTemperature })?.geminiTemperature).toBe(
+      geminiTemperature
+    );
+  });
+
+  it('drops a negative Gemini temperature back to the provider default', () => {
+    expect(normalizeGenerateSettings({ ...legacyStoredValues, geminiTemperature: -0.1 })?.geminiTemperature).toBeNull();
+  });
+
+  it('bounds the model-family tuning fields and defaults the rest', () => {
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      fluxDypeExponent: 5000,
+      fluxDypePreset: 'turbo',
+      fluxDypeScale: -1,
+      qwenImageEncoderQuantization: 'fp8',
+      qwenImageShift: 3,
+      zImageSeedVarianceEnabled: 'yes',
+      zImageSeedVarianceRandomizePercent: 0,
+      zImageSeedVarianceStrength: 9,
+      zImageShift: 42,
+    });
+
+    expect(normalized).toMatchObject({
+      fluxDypeExponent: 1000,
+      fluxDypePreset: 'off',
+      fluxDypeScale: 0,
+      qwenImageEncoderQuantization: 'none',
+      qwenImageShift: 3,
+      zImageSeedVarianceEnabled: false,
+      zImageSeedVarianceRandomizePercent: 1,
+      zImageSeedVarianceStrength: 2,
+      // Out of the node's range means auto rather than a clamped override.
+      zImageShift: null,
+    });
+    expect(normalizeGenerateSettings(legacyStoredValues)).toMatchObject({
+      fluxDypeExponent: 2,
+      fluxDypePreset: 'off',
+      fluxDypeScale: 2,
+      qwenImageEncoderQuantization: 'none',
+      qwenImageShift: null,
+      zImageSeedVarianceEnabled: false,
+      zImageSeedVarianceRandomizePercent: 50,
+      zImageSeedVarianceStrength: 0.1,
+      zImageShift: null,
+    });
+  });
+
+  it('normalizes a Krea-2 style reference, defaulting and bounding its strength', () => {
+    const image = { original: { image: { height: 512, image_name: 'style.png', width: 512 } } };
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      referenceImages: [
+        { config: { image, type: 'krea2_reference_image' }, id: 'defaulted', isEnabled: true },
+        { config: { image, styleStrength: 7, type: 'krea2_reference_image' }, id: 'bounded', isEnabled: true },
+      ],
+    });
+
+    expect(normalized?.referenceImages.map((referenceImage) => referenceImage.config)).toEqual([
+      { image, styleStrength: 1, type: 'krea2_reference_image' },
+      { image, styleStrength: 2, type: 'krea2_reference_image' },
+    ]);
+    expect(normalized && isGenerateSettings(normalized)).toBe(true);
+  });
+
+  it('keeps a Krea-2 edit reference as its image alone and reads the K/V cache switch only when true', () => {
+    const image = { original: { image: { height: 512, image_name: 'pose.png', width: 512 } } };
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      krea2ReferenceKvCache: true,
+      referenceImages: [
+        // A style strength carried over from the other mode does not belong to an edit reference.
+        { config: { image, styleStrength: 1.5, type: 'krea2_edit_reference_image' }, id: 'pose', isEnabled: true },
+        { config: { image: null, type: 'krea2_edit_reference_image' }, id: 'empty', isEnabled: false },
+      ],
+    });
+
+    expect(normalized?.referenceImages).toEqual([
+      { config: { image, type: 'krea2_edit_reference_image' }, id: 'pose', isEnabled: true },
+      { config: { image: null, type: 'krea2_edit_reference_image' }, id: 'empty', isEnabled: false },
+    ]);
+    expect(normalized?.krea2ReferenceKvCache).toBe(true);
+    expect(normalized && isGenerateSettings(normalized)).toBe(true);
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, krea2ReferenceKvCache: 'yes' })?.krea2ReferenceKvCache
+    ).toBe(false);
+    expect(normalizeGenerateSettings(legacyStoredValues)?.krea2ReferenceKvCache).toBe(false);
+  });
+
   it('drops malformed persisted model identifiers missing a base', () => {
     const normalized = normalizeGenerateSettings({
       ...legacyStoredValues,
@@ -314,6 +494,78 @@ describe('normalizeGenerateSettings', () => {
   });
 });
 
+describe('the Anima inpaint adapter settings', () => {
+  it('defaults the weight, clamps it to the node bounds, and drops a malformed adapter', () => {
+    expect(normalizeGenerateSettings(legacyStoredValues)).toMatchObject({
+      animaInpaintAdapterModel: null,
+      animaInpaintAdapterWeight: 1,
+    });
+    const adapter = { base: 'anima', cond_in_channels: 4, key: 'inpaint', name: 'Inpainting', type: 'controlnet' };
+    expect(
+      normalizeGenerateSettings({
+        ...legacyStoredValues,
+        animaInpaintAdapterModel: adapter,
+        animaInpaintAdapterWeight: 12,
+      })
+    ).toMatchObject({ animaInpaintAdapterModel: adapter, animaInpaintAdapterWeight: 10 });
+    expect(
+      normalizeGenerateSettings({
+        ...legacyStoredValues,
+        animaInpaintAdapterModel: { key: 'no-name' },
+        animaInpaintAdapterWeight: 'heavy',
+      })
+    ).toMatchObject({ animaInpaintAdapterModel: null, animaInpaintAdapterWeight: 1 });
+  });
+
+  it('keeps the adapter switched on unless a stored value turns it off', () => {
+    // Projects saved before the toggle existed wired a selected adapter, so a missing value means on.
+    expect(normalizeGenerateSettings(legacyStoredValues)?.animaInpaintAdapterEnabled).toBe(true);
+    const enabledFrom = (stored: unknown) =>
+      normalizeGenerateSettings({ ...legacyStoredValues, animaInpaintAdapterEnabled: stored })
+        ?.animaInpaintAdapterEnabled;
+    expect(enabledFrom(false)).toBe(false);
+    expect(enabledFrom(true)).toBe(true);
+    expect(enabledFrom('off')).toBe(true);
+  });
+});
+
+describe('the MOSS-Image skip layers', () => {
+  it('parses comma-separated block indices into unique ascending ones, an empty field into none', () => {
+    expect(parseMossImageSkipLayers(' 26, 22,24 ,22')).toEqual([22, 24, 26]);
+    // A trailing comma is a list being typed, not a mistake.
+    expect(parseMossImageSkipLayers('22, ')).toEqual([22]);
+    expect(parseMossImageSkipLayers('')).toEqual([]);
+    expect(parseMossImageSkipLayers(' , ')).toEqual([]);
+  });
+
+  it('rejects an entry that is not a whole number, and leaves the range to the validator', () => {
+    for (const text of ['22, x', '2.5', '-1', '1e1', '22 24']) {
+      expect(parseMossImageSkipLayers(text)).toBeNull();
+    }
+    expect(parseMossImageSkipLayers('42')).toEqual([42]);
+    expect(isValidMossImageSkipLayers([42])).toBe(false);
+    expect(isValidMossImageSkipLayers([0, 41])).toBe(true);
+    expect(isValidMossImageSkipLayers([])).toBe(true);
+  });
+
+  it('defaults to block 22, keeps an empty list, and normalizes a stored list without dropping its blocks', () => {
+    expect(normalizeGenerateSettings(legacyStoredValues)?.mossImageUncondSkipLayers).toEqual([22]);
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, mossImageUncondSkipLayers: [] })?.mossImageUncondSkipLayers
+    ).toEqual([]);
+    // An out-of-range block stays, so validation names it instead of the list changing behind the user's back.
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, mossImageUncondSkipLayers: [26, 22, 26, 50] })
+        ?.mossImageUncondSkipLayers
+    ).toEqual([22, 26, 50]);
+    // A list that is not all integers is not one the user chose, so the default takes its place.
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, mossImageUncondSkipLayers: [24, 'x'] })
+        ?.mossImageUncondSkipLayers
+    ).toEqual([22]);
+  });
+});
+
 describe('Generate widget value snapshots', () => {
   const model: MainModelConfig = { base: 'flux2', key: 'model', name: 'Old Model', type: 'main' };
   const component: ComponentModelConfig = { base: 'any', key: 'qwen3', name: 'Old Qwen3', type: 'qwen3_encoder' };
@@ -327,7 +579,7 @@ describe('Generate widget value snapshots', () => {
   const lora: LoraModelConfig = { base: 'flux2', key: 'lora', name: 'Old LoRA', type: 'lora' };
   const values: GenerateWidgetValues = {
     ...(normalizeGenerateSettings(legacyStoredValues) as NonNullable<ReturnType<typeof normalizeGenerateSettings>>),
-    clipEmbedModel: { base: 'any', key: 'clip', name: 'CLIP', type: 'clip_embed' },
+    clipEmbedModel: { base: 'any', key: 'clip', name: 'CLIP', type: 'clip_embed', variant: 'large' },
     componentSourceModel: model,
     loras: [{ isEnabled: true, model: lora, weight: 0.5 }],
     mistralEncoderModel: mistral,
@@ -508,6 +760,8 @@ describe('dimension helpers', () => {
     expect(getGenerationDimensions({ base: 'flux2', type: 'main' }).grid).toBe(16);
     expect(getGenerationDimensions({ base: 'qwen-image', type: 'main' }).grid).toBe(16);
     expect(getGenerationDimensions({ base: 'cogview4', type: 'main' }).grid).toBe(32);
+    // Hosted providers bucket sizes themselves, so their presets (e.g. 1365 wide) are kept pixel-exact.
+    expect(getGenerationDimensions({ base: 'external', type: 'external_image_generator' }).grid).toBe(1);
     expect(clampDimension(888, getGenerationDimensions({ base: 'flux2', type: 'main' }).grid)).toBe(896);
   });
 });
@@ -609,5 +863,68 @@ describe('planSeedSubmission', () => {
         startSeed: 42,
       })
     ).toMatchObject({ lastSeed: 45, nextSeed: 46, sequenceLength: 4 });
+  });
+});
+
+describe('normalizeGenerateSettings refiner fields', () => {
+  const refiner: MainModelConfig = { base: 'sdxl-refiner', key: 'refiner', name: 'SDXL Refiner', type: 'main' };
+
+  it('defaults values saved before the refiner existed', () => {
+    expect(normalizeGenerateSettings(legacyStoredValues)).toMatchObject({
+      refinerCfgScale: 7.5,
+      refinerModel: null,
+      refinerNegativeAestheticScore: 2.5,
+      refinerPositiveAestheticScore: 6,
+      refinerScheduler: 'euler',
+      refinerStart: 0.8,
+      refinerSteps: 20,
+    });
+  });
+
+  it('keeps a refiner-family model and drops any other model stored in the slot', () => {
+    const stored = { ...legacyStoredValues, refinerModel: refiner };
+
+    expect(normalizeGenerateSettings(stored)?.refinerModel).toEqual(refiner);
+    expect(
+      normalizeGenerateSettings({
+        ...legacyStoredValues,
+        refinerModel: { base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' },
+      })?.refinerModel
+    ).toBeNull();
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, refinerModel: { key: 'refiner' } })?.refinerModel
+    ).toBeNull();
+  });
+
+  it('clamps the refiner tuning to its ranges and rounds steps', () => {
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      refinerCfgScale: 0,
+      refinerNegativeAestheticScore: -3,
+      refinerPositiveAestheticScore: 42,
+      refinerScheduler: 7,
+      refinerStart: 1.5,
+      refinerSteps: 2.6,
+    });
+
+    expect(normalized).toMatchObject({
+      refinerCfgScale: 1,
+      refinerNegativeAestheticScore: 1,
+      refinerPositiveAestheticScore: 10,
+      refinerScheduler: 'euler',
+      refinerStart: 1,
+      refinerSteps: 3,
+    });
+    expect(normalized && isGenerateSettings(normalized)).toBe(true);
+    expect(isGenerateSettings({ ...normalized, refinerStart: 2 })).toBe(false);
+  });
+
+  it('refreshes a stale refiner snapshot from the installed catalog', () => {
+    const sdxl: MainModelConfig = { base: 'sdxl', key: 'legacy-model', name: 'SDXL', type: 'main' };
+    const values = { ...normalizeGenerateSettings(legacyStoredValues)!, model: sdxl, refinerModel: refiner };
+    const renamed = { ...refiner, name: 'SDXL Refiner 1.0' };
+
+    expect(syncGenerateWidgetValuesWithModels(values, [sdxl, renamed]).refinerModel).toEqual(renamed);
+    expect(syncGenerateWidgetValuesWithModels(values, [sdxl, refiner])).toBe(values);
   });
 });

@@ -6,6 +6,7 @@ This module provides the scheduler types and mapping for Flow Matching models
 
 from typing import Any, Literal, Type
 
+import torch
 from diffusers import (
     DPMSolverMultistepScheduler,
     FlowMatchEulerDiscreteScheduler,
@@ -41,6 +42,48 @@ FLUX_SCHEDULER_MAP: dict[str, Type[SchedulerMixin]] = {
 
 if _HAS_LCM:
     FLUX_SCHEDULER_MAP["lcm"] = FlowMatchLCMScheduler
+
+
+def set_heun_timesteps_from_sigmas(
+    scheduler: FlowMatchHeunDiscreteScheduler,
+    sigmas: list[float],
+    terminal_sigma: float,
+    device: str | torch.device | None,
+) -> None:
+    """Set Diffusers 0.41.0's Heun layout from InvokeAI's shifted model sigmas."""
+    if not sigmas:
+        raise ValueError("At least one model-evaluation sigma is required")
+
+    # In Diffusers 0.41.0, set_timesteps() creates a schedule with the first
+    # sigma evaluated once and every later sigma twice. The final interval ends
+    # at the terminal sigma and has no second-order evaluation.
+    scheduler.set_timesteps(num_inference_steps=len(sigmas), device=device)
+    model_sigmas = torch.tensor(sigmas, dtype=torch.float32, device=device)
+    expanded_sigmas = torch.cat((model_sigmas[:1], model_sigmas[1:].repeat_interleave(2)))
+    scheduler.timesteps = expanded_sigmas * scheduler.config.num_train_timesteps
+    scheduler.sigmas = torch.cat((expanded_sigmas, model_sigmas.new_tensor([terminal_sigma])))
+
+    # set_timesteps() resets derivative, timestep-index and begin-index state.
+    # It does not clear the stored sample when reusing an interrupted scheduler.
+    scheduler.sample = None
+
+
+def set_timesteps_from_sigmas(
+    scheduler: SchedulerMixin,
+    sigmas: list[float],
+    terminal_sigma: float,
+    device: str | torch.device | None,
+) -> None:
+    """Set InvokeAI's shifted model sigmas on a scheduler whose set_timesteps() takes them (Euler, LCM)."""
+    # set_timesteps() appends a terminal sigma of 0, and step() reads sigmas[step_index + 1], so the
+    # requested terminal sigma has to replace it for a pass that ends before the schedule does.
+    scheduler.set_timesteps(sigmas=sigmas, device=device)
+    scheduler.sigmas[-1] = torch.as_tensor(terminal_sigma, dtype=scheduler.sigmas.dtype, device=scheduler.sigmas.device)
+
+
+def is_flow_match_lcm_scheduler(scheduler: SchedulerMixin) -> bool:
+    """Check the optional LCM scheduler without requiring it in older Diffusers builds."""
+    return _HAS_LCM and isinstance(scheduler, FlowMatchLCMScheduler)
 
 
 # Z-Image scheduler types (Flow Matching schedulers)

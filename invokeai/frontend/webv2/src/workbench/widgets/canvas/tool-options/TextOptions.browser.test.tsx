@@ -97,7 +97,6 @@ await i18n.use(initReactI18next).init({
         'widgets.canvas.toolOptions.textFontStyleNormal': 'Normal',
         'widgets.canvas.toolOptions.textFontWeight': 'Weight',
         'widgets.properties.groups.font': 'Font',
-        'widgets.properties.rows.size': 'Size',
         'widgets.properties.rows.weight': 'Weight',
         'widgets.properties.target.defaults': 'Defaults',
         'common.loading': 'Loading…',
@@ -185,17 +184,17 @@ describe('custom font controls', () => {
       );
     });
 
-    await expect.element(page.getByRole('slider', { name: 'Weight (wght)' })).toBeVisible();
+    await expect.element(page.getByRole('slider', { exact: true, name: 'Weight' })).toBeVisible();
     // The face's own axes own style and weight: no second control for either.
     expect(page.getByRole('combobox', { name: 'Style' }).query()).toBeNull();
     expect(page.getByRole('combobox', { name: 'Weight' }).query()).toBeNull();
-    expect(page.getByRole('slider', { name: 'Width (wdth)' }).query()).toBeNull();
+    expect(page.getByRole('slider', { exact: true, name: 'Width' }).query()).toBeNull();
     // A degenerate axis has nothing to edit and never appears.
-    expect(page.getByRole('slider', { name: 'Flat (FLAT)' }).query()).toBeNull();
+    expect(page.getByRole('slider', { exact: true, name: 'Flat' }).query()).toBeNull();
     await expect.element(page.getByRole('button', { name: 'Show hidden axes' })).toBeVisible();
 
     await act(() => page.getByRole('button', { name: 'Show hidden axes' }).click());
-    await expect.element(page.getByRole('slider', { name: 'Width (wdth)' })).toBeVisible();
+    await expect.element(page.getByRole('slider', { exact: true, name: 'Width' })).toBeVisible();
     await expect.element(page.getByRole('combobox', { name: 'Preset' })).toBeVisible();
   });
 
@@ -225,9 +224,9 @@ describe('custom font controls', () => {
         </ChakraProvider>
       );
     });
-    await expect.element(page.getByRole('slider', { name: 'Weight (wght)' })).toBeVisible();
+    await expect.element(page.getByRole('slider', { exact: true, name: 'Weight' })).toBeVisible();
     expect(page.getByRole('combobox', { name: 'Weight' }).query()).toBeNull();
-    expect(page.getByRole('slider', { name: 'Width (wdth)' }).query()).toBeNull();
+    expect(page.getByRole('slider', { exact: true, name: 'Width' }).query()).toBeNull();
   });
 
   it('reveals catalog fonts beyond the first page with an explicit load-more action', async () => {

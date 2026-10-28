@@ -1,7 +1,7 @@
 import type { DragEndEvent, KeyboardSensorOptions } from '@dnd-kit/core';
 import type { LayoutPreset, LayoutPresetId } from '@workbench/layoutContracts';
 
-import { Box, Dialog, HStack, Icon, Portal, Stack } from '@chakra-ui/react';
+import { Box, HStack, Icon, Portal, Stack } from '@chakra-ui/react';
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import {
@@ -12,9 +12,11 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Button, CloseButton, IconButton } from '@platform/ui/Button';
+import { Dialog } from '@platform/ui/Dialog';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getOrderedLayoutPresets } from '@workbench/layoutPresetCollection';
+import { getLayoutPresetLabel } from '@workbench/layoutPresets';
 import { useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { GripVerticalIcon, PencilIcon, RotateCcwIcon, Trash2Icon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
@@ -43,7 +45,11 @@ export const LayoutPresetManagerDialogBody = ({
   const { t } = useTranslation();
   const { layout } = useWorkbenchCommands();
   const account = useWorkbenchSelector((snapshot) => snapshot.account);
-  const presets = useMemo(() => getOrderedLayoutPresets(account), [account]);
+  // Labels as shown: a built-in preset not renamed by the account reads in the current language.
+  const presets = useMemo(
+    () => getOrderedLayoutPresets(account).map((preset) => ({ ...preset, label: getLayoutPresetLabel(preset, t) })),
+    [account, t]
+  );
   const presetIds = useMemo(() => presets.map(({ id }) => id), [presets]);
   const overriddenPresetIds = useMemo(
     () =>

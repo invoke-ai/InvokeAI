@@ -10,6 +10,7 @@ import type {
   CanvasTextFontVariations,
   ParametricShapeKind,
 } from '@workbench/canvas-engine/contracts';
+import type { AdjustedSurfaceStatus } from '@workbench/canvas-engine/render/spatialDisplay';
 import type { SamInteractionState } from '@workbench/canvas-engine/samInteraction';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect, SelectionOp, ToolId, Vec2 } from '@workbench/canvas-engine/types';
@@ -48,6 +49,19 @@ export interface EraserOptions {
   opacity: number;
   /** Edge hardness in [0, 1]: 1 is a crisp edge, lower feathers the silhouette. */
   hardness: number;
+  /** Whether pen pressure modulates the eraser width; pressure never modulates erase strength. */
+  pressureAffectsWidth: boolean;
+}
+
+/**
+ * Quick-switch memory (Q): the layer a user bookmarked from its menu, and the layer selected before the current
+ * one. Transient like tool options: it lives with the engine, never in the project.
+ */
+export interface LayerQuickSwitchState {
+  /** Set from the layer menu; a stale id (the layer was removed) is ignored by readers. */
+  bookmarkedLayerId: string | null;
+  /** Engine-maintained: the layer left by the last explicit switch; internal edits and deselection preserve it. */
+  previousLayerId: string | null;
 }
 
 /** Lasso (selection) tool options: how the path is drawn, and the op it applies. */
@@ -102,7 +116,7 @@ export interface ShapeToolOptions {
 }
 
 /** Sensible starting shape options: a filled rect, no stroke, drawn onto the selected paint layer. */
-export const DEFAULT_SHAPE_OPTIONS: ShapeToolOptions = {
+export const DEFAULT_SHAPE_OPTIONS: Readonly<ShapeToolOptions> = {
   fillEnabled: true,
   kind: 'rect',
   strokeEnabled: false,
@@ -145,7 +159,9 @@ export interface GradientPreview {
 }
 
 /** Sensible starting gradient options: the FG→BG preset, horizontal linear. */
-export const DEFAULT_GRADIENT_OPTIONS: GradientToolOptions = {
+export const DEFAULT_GRADIENT_OPTIONS: Readonly<Omit<GradientToolOptions, 'stops'>> & {
+  readonly stops: readonly Readonly<GradientStop>[];
+} = {
   angle: 0,
   kind: 'linear',
   preset: 'pair',
@@ -193,7 +209,7 @@ export const MAX_TEXT_FONT_SIZE = 2000;
 export type TextStylePatch = Partial<TextToolOptions> & { color?: string };
 
 /** Sensible starting text options: left-aligned Inter at 48px. */
-export const DEFAULT_TEXT_OPTIONS: TextToolOptions = {
+export const DEFAULT_TEXT_OPTIONS: Readonly<TextToolOptions> = {
   align: 'left',
   fontFamily: TEXT_FONT_FAMILIES[0]!.value,
   fontSize: 48,
@@ -234,7 +250,7 @@ export interface ActiveColorPairState {
 export const DEFAULT_COLOR_PAIR_STATE: ActiveColorPairState = { background: '#ffffff', foreground: '#000000' };
 
 /** Sensible starting brush options. */
-export const DEFAULT_BRUSH_OPTIONS: BrushOptions = {
+export const DEFAULT_BRUSH_OPTIONS: Readonly<BrushOptions> = {
   color: '#000000',
   hardness: 1,
   opacity: 1,
@@ -244,11 +260,18 @@ export const DEFAULT_BRUSH_OPTIONS: BrushOptions = {
 };
 
 /** Sensible starting eraser options. */
-export const DEFAULT_ERASER_OPTIONS: EraserOptions = {
+export const DEFAULT_ERASER_OPTIONS: Readonly<EraserOptions> = {
   hardness: 1,
   opacity: 1,
+  pressureAffectsWidth: true,
   size: 50,
 };
+
+/** The control layer displayed as its kept original, alone or under its map. */
+export interface ControlLayerView {
+  layerId: string;
+  view: 'original' | 'overlay';
+}
 
 /**
  * Transform sessions span gestures until Apply/Cancel. `startTransform` is the committed undo/cancel baseline;
@@ -320,10 +343,13 @@ export interface KeyedVersionStore {
 
 export type LayerThumbnailStatus = 'loading' | 'ready' | 'error';
 
-/** A per-layer thumbnail request state; absence represents `idle`. */
-export interface KeyedThumbnailStatusStore {
-  get(key: string): LayerThumbnailStatus | undefined;
-  set(key: string, value: LayerThumbnailStatus): void;
+/** Why a layer's displayed spatial adjustments are not exact yet; absence means they are (or it has none). */
+export type LayerAdjustmentStatus = AdjustedSurfaceStatus;
+
+/** A per-layer status; absence represents `idle`. */
+export interface KeyedStatusStore<T extends string> {
+  get(key: string): T | undefined;
+  set(key: string, value: T): void;
   delete(key: string): void;
   clear(): void;
   subscribeKey(key: string, listener: () => void): () => void;
@@ -377,8 +403,8 @@ const createKeyedVersionStore = (): KeyedVersionStore => {
   };
 };
 
-const createKeyedThumbnailStatusStore = (): KeyedThumbnailStatusStore => {
-  const values = new Map<string, LayerThumbnailStatus>();
+const createKeyedStatusStore = <T extends string>(): KeyedStatusStore<T> => {
+  const values = new Map<string, T>();
   const keyedListeners = new Map<string, Set<() => void>>();
   const notify = (key: string): void => {
     for (const listener of keyedListeners.get(key) ?? []) {
@@ -428,7 +454,8 @@ export interface EngineStores {
   viewportReady: ScalarStore<boolean>;
   cursor: ScalarStore<string>;
   thumbnailVersion: KeyedVersionStore;
-  thumbnailStatus: KeyedThumbnailStatusStore;
+  thumbnailStatus: KeyedStatusStore<LayerThumbnailStatus>;
+  adjustmentStatus: KeyedStatusStore<LayerAdjustmentStatus>;
   /** Monotonic aggregate version for consumers whose eligibility depends on live layer content. */
   layerPixelEpoch: ScalarStore<number>;
   /** Monotonic version of the mirrored document, for consumers that read the engine's model during render. */
@@ -437,8 +464,10 @@ export interface EngineStores {
   brushOptions: ScalarStore<BrushOptions>;
   /** One-way foreground/background mirror for gesture-start reads; the engine never writes it. */
   colorPair: ScalarStore<ActiveColorPairState>;
-  /** Eraser tool options (size / opacity). */
+  /** Eraser tool options (size / opacity / pressure width). */
   eraserOptions: ScalarStore<EraserOptions>;
+  /** The Q quick-switch memory: the bookmarked layer and the previously selected one. */
+  layerQuickSwitch: ScalarStore<LayerQuickSwitchState>;
   /** Whether the engine-owned canvas history has an entry to undo. */
   canUndo: ScalarStore<boolean>;
   /** Whether the engine-owned canvas history has an entry to redo. */
@@ -489,6 +518,8 @@ export interface EngineStores {
   bboxPreview: ScalarStore<Rect | null>;
   /** Transform session supplies numeric controls, Apply/Cancel and live preview; null when closed. */
   transformSession: ScalarStore<TransformSession | null>;
+  /** The layer a requested transform session waits on until its fresh pixels are persisted; null when none waits. */
+  pendingTransformLayerId: ScalarStore<string | null>;
   /** Checkerboard defaults on; disabling reveals the widget surface through transparent document pixels. */
   checkerboard: ScalarStore<boolean>;
   /**
@@ -510,6 +541,8 @@ export interface EngineStores {
   documentEditingLocked: ScalarStore<boolean>;
   /** The layer targeted by that operation, or null when no operation is active. */
   documentEditingLayerId: ScalarStore<string | null>;
+  /** The control layer displayed as its original (or original under map); null displays every map. */
+  controlLayerView: ScalarStore<ControlLayerView | null>;
 }
 
 const brushOptionsEqual = (a: BrushOptions, b: BrushOptions): boolean =>
@@ -521,7 +554,13 @@ const brushOptionsEqual = (a: BrushOptions, b: BrushOptions): boolean =>
   a.pressureAffectsOpacity === b.pressureAffectsOpacity;
 
 const eraserOptionsEqual = (a: EraserOptions, b: EraserOptions): boolean =>
-  a.size === b.size && a.opacity === b.opacity && a.hardness === b.hardness;
+  a.size === b.size &&
+  a.opacity === b.opacity &&
+  a.hardness === b.hardness &&
+  a.pressureAffectsWidth === b.pressureAffectsWidth;
+
+const layerQuickSwitchEqual = (a: LayerQuickSwitchState, b: LayerQuickSwitchState): boolean =>
+  a.bookmarkedLayerId === b.bookmarkedLayerId && a.previousLayerId === b.previousLayerId;
 
 const checkerColorsEqual = (a: CheckerColors, b: CheckerColors): boolean => a.a === b.a && a.b === b.b;
 
@@ -669,6 +708,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   checkerboard: createScalarStore<boolean>(true),
   clipToBbox: createScalarStore<boolean>(false),
   checkerColors: createScalarStore<CheckerColors>({ ...DEFAULT_CHECKER_COLORS }, checkerColorsEqual),
+  controlLayerView: createScalarStore<ControlLayerView | null>(null),
   cursor: createScalarStore<string>('default'),
   eraserOptions: createScalarStore<EraserOptions>({ ...DEFAULT_ERASER_OPTIONS }, eraserOptionsEqual),
   documentEditingLayerId: createScalarStore<string | null>(null),
@@ -676,6 +716,10 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   hasFloatingSelection: createScalarStore<boolean>(false),
   hasSelection: createScalarStore<boolean>(false),
   invertBrushSizeScroll: createScalarStore<boolean>(false),
+  layerQuickSwitch: createScalarStore<LayerQuickSwitchState>(
+    { bookmarkedLayerId: null, previousLayerId: null },
+    layerQuickSwitchEqual
+  ),
   gradientOptions: createScalarStore<GradientToolOptions>(
     { ...DEFAULT_GRADIENT_OPTIONS, stops: DEFAULT_GRADIENT_OPTIONS.stops.map((s) => ({ ...s })) },
     gradientOptionsEqual
@@ -697,8 +741,10 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   textEditSession: createScalarStore<TextEditSession | null>(null, textEditSessionEqual),
   textOptions: createScalarStore<TextToolOptions>({ ...DEFAULT_TEXT_OPTIONS }, textOptionsEqual),
   thumbnailVersion: createKeyedVersionStore(),
-  thumbnailStatus: createKeyedThumbnailStatusStore(),
+  thumbnailStatus: createKeyedStatusStore<LayerThumbnailStatus>(),
+  adjustmentStatus: createKeyedStatusStore<LayerAdjustmentStatus>(),
   transformSession: createScalarStore<TransformSession | null>(null, transformSessionEqual),
+  pendingTransformLayerId: createScalarStore<string | null>(null),
   viewportReady: createScalarStore<boolean>(false),
   zoom: createScalarStore<number>(1),
 });

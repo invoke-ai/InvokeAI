@@ -3,7 +3,7 @@
 These freeze the checkpoint key-surgery that the loaders perform before instantiating a model,
 so a regression like the transformers-5.x one (where `_checkpoint_conversion_mapping` became
 `{}` and the `visual.* -> model.visual.*` remap was silently skipped) fails here instead of at
-the user's first load.
+the user's first load. The mapping now lives in the loader, since transformers 5.10 removed it.
 """
 
 import torch
@@ -66,26 +66,6 @@ class TestRemapQwenVlCheckpointKeys:
         twice = _remap_qwen_vl_checkpoint_keys(once)
 
         assert set(once.keys()) == set(twice.keys())
-
-    def test_fallback_when_transformers_mapping_is_empty(self, monkeypatch):
-        """Even if transformers stops providing `_checkpoint_conversion_mapping`, the remap fires.
-
-        transformers 5.x returns `{}` here; forcing that value pins the fallback that fixes the
-        original bug.
-        """
-        from transformers import Qwen2_5_VLForConditionalGeneration
-
-        monkeypatch.setattr(Qwen2_5_VLForConditionalGeneration, "_checkpoint_conversion_mapping", {})
-
-        remapped = _remap_qwen_vl_checkpoint_keys(
-            {
-                "visual.blocks.0.norm1.weight": torch.empty(1),
-                "model.layers.0.input_layernorm.weight": torch.empty(1),
-            }
-        )
-
-        assert "model.visual.blocks.0.norm1.weight" in remapped
-        assert "model.language_model.layers.0.input_layernorm.weight" in remapped
 
 
 class TestStripQuantizationMetadata:

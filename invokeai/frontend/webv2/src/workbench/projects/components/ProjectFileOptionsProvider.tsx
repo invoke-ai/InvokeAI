@@ -1,6 +1,7 @@
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { type AccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { Dialog } from '@platform/ui/Dialog';
 import {
   lazy,
   Suspense,
@@ -15,6 +16,7 @@ import {
 
 interface ExportOptions {
   includeFonts: boolean;
+  includeWorkspace: boolean;
 }
 
 interface ProjectFileOptionsControl {
@@ -33,6 +35,8 @@ export interface ProjectFileOptionsRequest {
 const ProjectFileOptionsDialog = lazy(() =>
   import('./ProjectFileOptionsDialog').then((module) => ({ default: module.ProjectFileOptionsDialog }))
 );
+// The dialog is open, and modal, from the request that opened it, not from when its module arrives.
+const PENDING_DIALOG = <Dialog.Pending />;
 
 const ProjectFileOptionsContext = createContext<ProjectFileOptionsControl | null>(null);
 
@@ -90,7 +94,7 @@ export const ProjectFileOptionsProvider = ({ children }: { children: ReactNode }
     <ProjectFileOptionsContext.Provider value={control}>
       {children}
       {dialog.value ? (
-        <Suspense fallback={null}>
+        <Suspense fallback={dialog.isOpen ? PENDING_DIALOG : null}>
           <ProjectFileOptionsDialog
             key={dialog.value.ticket}
             isOpen={dialog.isOpen}

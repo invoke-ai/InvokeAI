@@ -1,9 +1,13 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
+import type * as GalleryModule from '@features/gallery';
+import type { GalleryBoard } from '@features/gallery';
 import type { CanvasNodeContract } from '@workbench/canvas-engine/api';
 import type { Project } from '@workbench/projectContracts';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { getGallerySettings } from '@features/gallery/contracts';
+import { galleryBoardsOptions, getGalleryListingBoardsQuery } from '@features/gallery/queries';
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
@@ -15,6 +19,7 @@ import {
 } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
 import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
+import { getProjectWidgetValues } from '@workbench/widgetState';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { createInstance } from 'i18next';
 import { act, createRef, useImperativeHandle, useState, type Ref } from 'react';
@@ -26,19 +31,28 @@ import { page, userEvent } from 'vitest/browser';
 import type { LayerRowCommands } from './layerRowCommands';
 import type * as RunLayerWorkflowDialogModule from './RunLayerWorkflowDialog';
 
+import { projectLayerChildRows } from './layerChildRows';
 import { LayerSurfaceHost, type LayerSurfaceEngine, type LayerSurfaceRequest } from './LayerSurfaceHost';
+import { buildLayerStackRows } from './layerTreeRows';
 
 const PROJECT_ID = 'surface-project';
 const mocks = vi.hoisted(() => ({
-  commands: { notifications: { add: () => undefined }, widgets: { open: () => undefined } },
+  commands: { notifications: { add: vi.fn() }, widgets: { open: () => undefined } },
   // Only a layer menu reads workflow availability, once per render, so its calls show a layer menu is mounted.
   layerMenuRender: vi.fn(),
   project: null as unknown as Project,
+  upload: vi.fn(() => Promise.resolve()),
 }));
+
+vi.mock('@features/gallery', async (importOriginal) => {
+  const gallery = await importOriginal<typeof GalleryModule>();
+  return { ...gallery, galleryTransfers: { ...gallery.galleryTransfers, upload: mocks.upload } };
+});
 
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
   useActiveProjectId: () => PROJECT_ID,
+  useActiveProjectName: () => 'Surface project',
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(mocks.project),
   useOptionalWorkbenchCommands: () => mocks.commands,
   useWorkbenchCommands: () => mocks.commands,
@@ -72,13 +86,25 @@ const nodes: CanvasNodeContract[] = [
   layerContract('layer', 'raster', { name: 'Layer' }),
   groupContract('group', [layerContract('child', 'raster', { name: 'Child' })], { name: 'Group' }),
 ];
+const quickSwitch = { bookmarkedLayerId: null as string | null, previousLayerId: 'child' as string | null };
 const engine = {
   document: {
     model: () => createDocumentModel(mocks.project.canvas.document, { editRevision: 0, projectId: PROJECT_ID }),
   },
-  exports: { hasExportableLayerContent: () => true },
-  interaction: { get: () => false, subscribe: () => () => undefined },
-  layers: { commitPrepared: () => ({ status: 'committed' as const }) },
+  exports: {
+    exportBakedLayerBlob: () => Promise.resolve({ blob: new Blob(['pixels'], { type: 'image/png' }), status: 'ok' }),
+    hasExportableLayerContent: () => true,
+  },
+  interaction: {
+    get: (key: string) => (key === 'layerQuickSwitch' ? quickSwitch : false),
+    set: (key: string, value: typeof quickSwitch) => {
+      if (key === 'layerQuickSwitch') {
+        Object.assign(quickSwitch, value);
+      }
+    },
+    subscribe: () => () => undefined,
+  },
+  layers: { commitPrepared: () => ({ status: 'committed' as const }), endStructuralPreview: () => undefined },
   projectId: PROJECT_ID,
 } as unknown as LayerSurfaceEngine;
 const anchor = { height: 10, width: 10, x: 40, y: 40 };
@@ -93,7 +119,6 @@ const Harness = ({ ref }: { ref: Ref<OpenSurface> }) => {
   return (
     <LayerSurfaceHost
       commands={rowCommands}
-      dispatch={() => true}
       document={mocks.project.canvas.document}
       editingLocked={false}
       engine={engine}
@@ -106,9 +131,12 @@ const Harness = ({ ref }: { ref: Ref<OpenSurface> }) => {
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
+let queryClient = new QueryClient();
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 beforeEach(async () => {
+  quickSwitch.bookmarkedLayerId = null;
+  quickSwitch.previousLayerId = 'child';
   const initial = { ...createInitialWorkbenchState().projects[0]!, id: PROJECT_ID };
   mocks.project = applyCanvasProjectMutation(initial, {
     document: { ...createEmptyCanvasDocument(), selectedLayerId: null, stacks: stacksFrom(nodes) },
@@ -117,9 +145,10 @@ beforeEach(async () => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
+  queryClient = new QueryClient();
   await act(() =>
     root!.render(
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={queryClient}>
         <I18nextProvider i18n={i18n}>
           <ChakraProvider value={system}>
             <Harness ref={openSurfaceRef} />
@@ -165,22 +194,31 @@ it.each([
 // A closed menu stays in the DOM until its own exit animation ends.
 const openMenu = () => document.querySelector('[role="menu"][data-state="open"]');
 
-/** Choose a menu's rename item, then dismiss the dialog, which is left animating out. */
+/** Choose a menu's rename item, then hold its real exit animation while a successor opens. */
 const renameThenDismiss = async (id: string) => {
   await act(() => openSurface({ anchor, id, kind: 'menu' }));
   await act(() => page.getByRole('menuitem', { name: 'Rename layer', exact: true }).click());
   await expect.element(page.getByRole('dialog', { name: 'Rename layer' })).toBeVisible();
-  const dialog = document.querySelector('[role="dialog"]')!;
+  const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
+  await Promise.all(dialog.getAnimations().map((animation) => animation.finished));
+  // Driver round trips can outlast the exit animation on CI; hold it before sending Escape.
+  dialog.style.animationPlayState = 'paused';
   await act(() => userEvent.keyboard('{Escape}'));
   expect(dialog.isConnected).toBe(true);
   expect(dialog).toHaveAttribute('data-state', 'closed');
+  const animations = dialog.getAnimations();
+  expect(animations).not.toHaveLength(0);
+  for (const animation of animations) {
+    expect(animation.playState).toBe('paused');
+  }
   return dialog;
 };
 
 it('drops a layer rename still animating out when another layer opens its menu', async () => {
-  await renameThenDismiss('layer');
+  const dialog = await renameThenDismiss('layer');
   await act(() => openSurface({ anchor: { ...anchor }, id: 'child', kind: 'menu' }));
   await expect.poll(openMenu).not.toBeNull();
+  expect(dialog.isConnected).toBe(false);
 
   mocks.layerMenuRender.mockClear();
   await act(() => userEvent.keyboard('{Escape}'));
@@ -195,6 +233,8 @@ it('opens a group menu requested while its rename animates out, and keeps it onc
 
   await act(() => openSurface({ anchor: { ...anchor }, id: 'group', kind: 'menu' }));
   await expect.poll(openMenu).not.toBeNull();
+  expect(dialog.isConnected).toBe(true);
+  dialog.style.removeProperty('animation-play-state');
   await expect.poll(() => dialog.isConnected).toBe(false);
 
   expect(openMenu()).not.toBeNull();
@@ -219,4 +259,118 @@ it('starts each Run workflow open from a fresh form', async () => {
 
   await openRunWorkflow();
   await expect.element(destination).toHaveTextContent('Gallery');
+});
+
+it('offers an adjustment every other raster layer and group the model accepts under Move to layer', async () => {
+  const initial = { ...createInitialWorkbenchState().projects[0]!, id: PROJECT_ID };
+  mocks.project = applyCanvasProjectMutation(initial, {
+    document: {
+      ...createEmptyCanvasDocument(),
+      selectedLayerId: null,
+      stacks: stacksFrom([
+        layerContract('source', 'raster', {
+          adjustments: [{ id: 'a1', isEnabled: true, type: 'invert' }],
+          name: 'Source',
+        }),
+        layerContract('target', 'raster', { name: 'Target' }),
+        layerContract('locked', 'raster', { isLocked: true, name: 'Locked' }),
+        groupContract('group', [layerContract('member', 'raster', { name: 'Member' })], { name: 'Group' }),
+        layerContract('control', 'control', { name: 'Control' }),
+      ]),
+    },
+    type: 'replaceCanvasDocument',
+  });
+  const moveChildToLayer = vi.fn();
+  rowCommands.moveChildToLayer = moveChildToLayer;
+  const source = buildLayerStackRows(mocks.project.canvas.document.stacks, new Set()).raster.rows.find(
+    (row) => row.id === 'source'
+  )!;
+  const child = projectLayerChildRows(source.vm)[0]!;
+
+  await act(() => openSurface({ anchor, child, kind: 'child-menu' }));
+  await act(() => page.getByRole('menuitem', { name: 'Move to layer', exact: true }).click());
+  await expect.element(page.getByRole('menuitem', { name: 'Target', exact: true })).toBeVisible();
+  const offered = Array.from(document.querySelectorAll('[role="menuitem"][data-value^="move-to:"]')).map(
+    (item) => item.textContent
+  );
+  // The locked layer and the control layer cannot take the entry; the source is where it already is.
+  expect(offered).toEqual(['Target', 'Group', 'Member']);
+
+  await act(() => page.getByRole('menuitem', { name: 'Group', exact: true }).click());
+  expect(moveChildToLayer).toHaveBeenCalledWith(child, 'group');
+});
+
+it('toggles the real bookmark menu handler without changing previous-layer memory', async () => {
+  await act(() => openSurface({ anchor, id: 'layer', kind: 'menu' }));
+  await act(() => page.getByRole('menuitem', { name: /^Bookmark for quick switch/ }).click());
+  expect(quickSwitch).toEqual({ bookmarkedLayerId: 'layer', previousLayerId: 'child' });
+  await expect.poll(openMenu).toBeNull();
+  await act(() => openSurface({ anchor, id: 'layer', kind: 'menu' }));
+  await act(() => page.getByRole('menuitem', { name: /^Remove quick switch bookmark/ }).click());
+  expect(quickSwitch).toEqual({ bookmarkedLayerId: null, previousLayerId: 'child' });
+});
+
+const sketchesBoard: GalleryBoard = {
+  access: { actions: ['read', 'add_media'], adminOverride: false, generalAccess: 'restricted', role: 'owner' },
+  archived: false,
+  assetCount: 0,
+  assetVideoCount: 0,
+  id: 'sketches',
+  imageCount: 0,
+  isInbox: false,
+  kind: 'board',
+  name: 'Sketches',
+  ownerName: 'Me',
+  projectId: null,
+  videoCount: 0,
+};
+
+/** Lists boards as the Gallery panel did, then as the listing of every readable board did afterwards. */
+const listBoards = (panelBoards: GalleryBoard[], destinationBoards: GalleryBoard[]) => {
+  const listing = galleryBoardsOptions(
+    getGalleryListingBoardsQuery(getGallerySettings(getProjectWidgetValues(mocks.project, 'gallery')))
+  );
+  queryClient.setQueryData(listing.queryKey, panelBoards, { updatedAt: Date.now() - 1_000 });
+  queryClient.setQueryData(galleryBoardsOptions({ includeArchived: true }).queryKey, destinationBoards);
+};
+
+it('saves the layer to the board picked in its submenu and names that board', async () => {
+  listBoards([sketchesBoard], [sketchesBoard]);
+  mocks.upload.mockClear();
+  mocks.commands.notifications.add.mockClear();
+
+  await act(() => openSurface({ anchor, id: 'layer', kind: 'menu' }));
+  await act(() => page.getByRole('menuitem', { name: 'Save layer to board', exact: true }).hover());
+  await act(() => page.getByRole('menuitem', { name: 'Sketches', exact: true }).click());
+
+  await expect
+    .poll(() => mocks.commands.notifications.add)
+    .toHaveBeenCalledWith({
+      kind: 'success',
+      message: undefined,
+      title: 'Layer saved to Sketches.',
+    });
+  expect(mocks.upload).toHaveBeenCalledExactlyOnceWith(expect.any(File), 'sketches', {
+    signal: expect.any(AbortSignal),
+  });
+});
+
+it('refuses a board the panel still offers once a newer listing holds it view-only, and says so', async () => {
+  listBoards(
+    [sketchesBoard],
+    [{ ...sketchesBoard, access: { ...sketchesBoard.access!, actions: ['read'], role: 'viewer' } }]
+  );
+  mocks.upload.mockClear();
+  mocks.commands.notifications.add.mockClear();
+
+  await act(() => openSurface({ anchor, id: 'layer', kind: 'menu' }));
+  await act(() => page.getByRole('menuitem', { name: 'Save layer to board', exact: true }).hover());
+  await act(() => page.getByRole('menuitem', { name: 'Sketches', exact: true }).click());
+
+  await expect
+    .poll(() => mocks.commands.notifications.add)
+    .toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'error', message: 'You can view Sketches but not add to it' })
+    );
+  expect(mocks.upload).not.toHaveBeenCalled();
 });

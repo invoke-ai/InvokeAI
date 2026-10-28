@@ -3,9 +3,11 @@ import type { GalleryImage, GalleryImageMetadata, GalleryItem, GalleryItemKey } 
 import { DataList, HStack, Icon, Stack, Tabs, Text } from '@chakra-ui/react';
 import { galleryImages, galleryVideos } from '@features/gallery';
 import { toGalleryItemKey } from '@features/gallery/contracts';
+import { canCopyText, copyText } from '@platform/browser/clipboard';
 import { IconButton, Scrollable, Tooltip } from '@platform/ui';
 import { JsonPreview } from '@platform/ui/JsonPreview';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { toaster } from '@platform/ui/toaster';
 import { useQuery } from '@tanstack/react-query';
 import {
   EMPTY_IMAGE_RECALL_CAPABILITIES,
@@ -15,7 +17,7 @@ import {
   type ImageRecallKind,
 } from '@workbench/image-actions';
 import { CopyIcon } from 'lucide-react';
-import { useCallback, type ReactNode } from 'react';
+import { useCallback, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { parsePreviewMetadata, type PreviewMetadataEntry } from './previewMetadata';
@@ -26,6 +28,15 @@ import { parsePreviewMetadata, type PreviewMetadataEntry } from './previewMetada
  */
 
 const GROUP_HOVER_VISIBLE = { opacity: 1 };
+
+const TAB_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'End', 'Home']);
+
+/** The tab list moves between its tabs with these keys; Preview's arrow bindings must not step the item too. */
+const keepTabKeys = (event: KeyboardEvent<HTMLElement>) => {
+  if (TAB_KEYS.has(event.key)) {
+    event.stopPropagation();
+  }
+};
 
 /**
  * Offer field recall only where a dedicated verb exists; model/steps/scheduler retain copy and use All/Remix for
@@ -254,7 +265,7 @@ const DetailsTabs = ({
       unmountOnExit
       variant="outline"
     >
-      <Tabs.List flexShrink={0}>
+      <Tabs.List flexShrink={0} onKeyDown={keepTabKeys}>
         {details ? (
           <Tabs.Trigger fontSize="xs" value="details">
             {t('widgets.preview.details')}
@@ -306,7 +317,14 @@ const MetadataRow = ({
   recallKind?: ImageRecallKind;
 }) => {
   const { t } = useTranslation();
-  const copyValue = useCallback(() => void navigator.clipboard.writeText(entry.value), [entry.value]);
+  const canCopy = canCopyText();
+  const copyValue = useCallback(
+    () =>
+      void copyText(entry.value).catch(() =>
+        toaster.create({ description: t('common.clipboardBlocked'), title: t('common.couldNotCopy'), type: 'error' })
+      ),
+    [entry.value, t]
+  );
   const recallValue = useCallback(() => {
     if (recallKind) {
       onRecall(recallKind);
@@ -347,11 +365,17 @@ const MetadataRow = ({
               </IconButton>
             </Tooltip>
           ) : null}
-          <Tooltip content={t('common.copy')}>
-            <IconButton aria-label={t('common.copy')} color="fg.muted" size="sm" variant="ghost" onClick={copyValue}>
-              <Icon as={CopyIcon} boxSize="3" />
-            </IconButton>
-          </Tooltip>
+          <IconButton
+            tooltip={t('common.copy')}
+            unavailableReason={canCopy ? undefined : t('common.copyUnavailable')}
+            aria-label={t('common.copy')}
+            color="fg.muted"
+            size="sm"
+            variant="ghost"
+            onClick={copyValue}
+          >
+            <Icon as={CopyIcon} boxSize="3" />
+          </IconButton>
         </HStack>
       </DataList.ItemValue>
     </DataList.Item>

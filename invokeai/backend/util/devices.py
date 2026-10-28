@@ -1,12 +1,15 @@
+import sys
 import threading
 from collections import Counter, defaultdict
 from functools import wraps
-from typing import Dict, Literal, Optional, Union
+from typing import Dict, Literal, Optional, Protocol, Union
 
+import psutil
 import torch
 from deprecated import deprecated
 
 from invokeai.app.services.config.config_default import get_config
+from invokeai.backend.util.host_platform import is_windows_arm64
 from invokeai.backend.util.level_zero import xpu_device_is_integrated, xpu_memory_info
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.wddm import video_memory_budget
@@ -23,9 +26,82 @@ MPS_DEVICE = torch.device("mps")
 _XPU_MEM_FALLBACK_WARNED: set[str] = set()
 
 
+class EmptyCacheObserver(Protocol):
+    def before_empty_cache(self) -> None: ...
+
+    def after_empty_cache(self) -> None: ...
+
+
+EMPTY_CACHE_OBSERVERS: list[EmptyCacheObserver] = []
+"""Told about every `TorchDevice.empty_cache` that releases memory, just before and just after the release, in
+registration order. The working-memory probe registers here while a calibration scope is open, so that a release inside
+a measured window ends a segment there (`invokeai.backend.working_memory.probe`); otherwise the list is empty and a
+release pays one truth test for it. Observers must not raise."""
+
+
 def _xpu_is_available() -> bool:
     """Return True if a torch XPU (Intel GPU) device is available."""
     return hasattr(torch, "xpu") and torch.xpu.is_available()
+
+
+def _unusable_rocm_windows_igpu(device: torch.device) -> bool:
+    """Whether `device` is an integrated GPU next to a discrete one under ROCm on Windows.
+
+    Any kernel launched there crashed the process with an access violation (measured: Ryzen gfx1036 beside an RX 9060
+    XT), so naming it is refused with a clear error. An APU on its own is left alone: it is all the machine has.
+    """
+    if sys.platform != "win32" or torch.version.hip is None or device_is_integrated(device) is not True:
+        return False
+    return any(device_is_integrated(torch.device("cuda", i)) is False for i in range(torch.cuda.device_count()))
+
+
+def device_is_integrated(device: torch.device) -> Optional[bool]:
+    """Return True/False if ``device`` is an integrated GPU, or None if it cannot be determined.
+
+    XPU asks Level Zero. A CUDA device answers through its properties, which on ROCm also report AMD's integrated
+    graphics: HIP enumerates the Radeon iGPU of a Ryzen desktop CPU next to a discrete card (measured: gfx1036 beside
+    an RX 9060 XT on Windows, ``is_integrated=1``). CPU and MPS are not GPUs that could be paired with a discrete
+    card, so they answer False.
+    """
+    if device.type == "xpu":
+        return xpu_device_is_integrated(device)
+    if device.type != "cuda":
+        return False
+    try:
+        index = device.index if device.index is not None else torch.cuda.current_device()
+        flag = getattr(torch.cuda.get_device_properties(index), "is_integrated", None)
+    except Exception:
+        return None
+    return None if flag is None else bool(flag)
+
+
+def device_has_dedicated_vram(device: torch.device) -> bool:
+    """Whether to budget device memory as dedicated VRAM rather than shared system RAM.
+
+    CUDA/ROCm retains its dedicated-memory budget. Integrated XPU shares system RAM; an unknown
+    XPU type keeps the discrete-device policy rather than guessing.
+    """
+    if device.type == "cuda":
+        return True
+    if device.type == "xpu":
+        return xpu_device_is_integrated(device) is not True
+    return False
+
+
+def _default_cuda_device() -> torch.device:
+    """The CUDA device ``device: auto`` means: the current one, unless it is an integrated GPU and a discrete one exists.
+
+    HIP may enumerate an APU's integrated graphics before the discrete card, and the current device is the first one
+    until something pins another, so without this an iGPU could become the default device.
+    """
+    current = torch.device("cuda", torch.cuda.current_device())
+    if device_is_integrated(current) is not True:
+        return CUDA_DEVICE
+    for index in range(torch.cuda.device_count()):
+        candidate = torch.device("cuda", index)
+        if device_is_integrated(candidate) is False:
+            return candidate
+    return CUDA_DEVICE
 
 
 @deprecated("Use TorchDevice.choose_torch_dtype() instead.")  # type: ignore
@@ -119,7 +195,7 @@ class TorchDevice:
         if app_config.device != "auto":
             device = torch.device(app_config.device)
         elif torch.cuda.is_available():
-            device = CUDA_DEVICE
+            device = _default_cuda_device()
         elif _xpu_is_available():
             device = XPU_DEVICE
         elif torch.backends.mps.is_available():
@@ -260,19 +336,21 @@ class TorchDevice:
     def _auto_generation_devices(cls) -> list[torch.device]:
         """The device list `generation_devices: auto` expands to.
 
-        Unlike CUDA, Level Zero enumerates the CPU's integrated GPU alongside any discrete card,
-        so on the mainstream Arc configuration (iGPU + discrete Arc) `auto` would dispatch half
-        the queue to the iGPU and make it a text-encoder borrow target. Drop integrated GPUs here.
+        Level Zero and ROCm enumerate the CPU's integrated GPU alongside any discrete card, so on
+        the mainstream configurations (iGPU + discrete Arc, Ryzen iGPU + discrete Radeon) `auto`
+        would dispatch half the queue to the iGPU and make it a text-encoder borrow target. Drop
+        integrated GPUs here.
 
-        Two deliberate limits: a device whose type cannot be determined is kept (the Level Zero
-        probe returns None, and narrowing on a guess is worse than the status quo), and a machine
-        whose only GPU is integrated keeps it -- otherwise there would be nothing to generate on.
-        An explicit `generation_devices` list is unaffected, so an iGPU can still be opted into.
+        Two deliberate limits: a device whose type cannot be determined is kept (the probe returns
+        None, and narrowing on a guess is worse than the status quo), and a machine whose only GPU
+        is integrated keeps it -- otherwise there would be nothing to generate on. An explicit
+        `generation_devices` list is unaffected, so an iGPU can still be opted into -- except under
+        ROCm on Windows, where no kernel runs on one (see `_unusable_rocm_windows_igpu`).
         """
         integrated: list[torch.device] = []
         remaining: list[torch.device] = []
         for device in cls._all_available_devices():
-            (integrated if xpu_device_is_integrated(device) is True else remaining).append(device)
+            (integrated if device_is_integrated(device) is True else remaining).append(device)
         if not integrated or not remaining:
             return integrated + remaining
         InvokeAILogger.get_logger(__name__).info(
@@ -288,7 +366,8 @@ class TorchDevice:
         - ``"auto"`` (the default) defers to an explicitly pinned legacy ``device:`` setting (an
           upgraded install that pinned e.g. ``device: cuda:1`` to avoid its display GPU must not
           silently start generating on every GPU); otherwise it expands to every visible CUDA
-          device, or the single best available device (mps/cpu) when CUDA is unavailable.
+          device except integrated GPUs next to a discrete one (see `_auto_generation_devices`),
+          or the single best available device (mps/cpu) when CUDA is unavailable.
         - An explicit list is normalized and deduplicated, with order preserved, and overrides the
           legacy ``device:`` setting.
         - ``None`` or an empty list yields an empty list; the caller decides the single-device fallback.
@@ -318,6 +397,13 @@ class TorchDevice:
                     raise ValueError(
                         f"generation_devices requested '{device_str}', but only {torch.cuda.device_count()} "
                         f"CUDA device(s) are available (valid indices 0-{torch.cuda.device_count() - 1})."
+                    )
+                if _unusable_rocm_windows_igpu(device):
+                    raise ValueError(
+                        f"generation_devices requested '{device_str}', which is an integrated GPU; under ROCm on "
+                        "Windows nothing can run on it. Name a discrete GPU or use 'auto'. Invoke hides the integrated "
+                        "GPU at startup, so device numbers count the discrete GPUs only, unless that failed (see the "
+                        "startup log) or HIP_VISIBLE_DEVICES was set to include it."
                     )
             elif device.type == "xpu":
                 if not _xpu_is_available():
@@ -388,14 +474,21 @@ class TorchDevice:
         # Clear before running: a skip that races in after this point re-sets the flag, so a
         # request is never lost, only (harmlessly) repeated.
         cls._empty_cache_deferred.clear()
-        if torch.backends.mps.is_available():
-            torch.mps.empty_cache()
-        if torch.cuda.is_available():
-            # A forced call must get past `install_peer_aware_empty_cache`'s wrapper, which would defer it again.
-            cuda_empty_cache = torch.cuda.empty_cache
-            (getattr(cuda_empty_cache, "__wrapped__", cuda_empty_cache) if force else cuda_empty_cache)()
-        if _xpu_is_available():
-            torch.xpu.empty_cache()
+        observers = tuple(EMPTY_CACHE_OBSERVERS) if EMPTY_CACHE_OBSERVERS else ()
+        for observer in observers:
+            observer.before_empty_cache()
+        try:
+            if torch.backends.mps.is_available():
+                torch.mps.empty_cache()
+            if torch.cuda.is_available():
+                # A forced call must get past `install_peer_aware_empty_cache`'s wrapper, which would defer it again.
+                cuda_empty_cache = torch.cuda.empty_cache
+                (getattr(cuda_empty_cache, "__wrapped__", cuda_empty_cache) if force else cuda_empty_cache)()
+            if _xpu_is_available():
+                torch.xpu.empty_cache()
+        finally:
+            for observer in observers:
+                observer.after_empty_cache()
         return True
 
     @classmethod
@@ -495,6 +588,29 @@ class TorchDevice:
         return free, total
 
     @classmethod
+    def memory_available_to_process(cls, device: torch.device) -> int:
+        """What this process can hold on a GPU `device`, what it holds there included.
+
+        On a device with its own memory (`device_has_dedicated_vram`): what the driver has free plus what torch has
+        allocated. On one whose "VRAM" is system RAM (MPS, an integrated XPU): the system's available RAM plus what the
+        backend holds for this process (`torch.mps.driver_allocated_memory`, `torch.xpu.memory_reserved`), since the
+        device totals say nothing about what the host still has free. The model cache budgets from it
+        (`ModelCache._get_vram_available`, which adds the caching allocator's reclaimable blocks on a dedicated
+        device), and a working-memory calibration plan sizes its cases from it. Raises ValueError for a device that is
+        not a GPU.
+        """
+        if device.type == "cuda":
+            free, _ = cls.cuda_mem_get_info(device)
+            return free + torch.cuda.memory_allocated(device)
+        if device.type == "xpu" and device_has_dedicated_vram(device):
+            free, _ = cls.xpu_mem_get_info(device)
+            return free + torch.xpu.memory_allocated(device)
+        if device.type in ("mps", "xpu"):
+            held = torch.mps.driver_allocated_memory() if device.type == "mps" else torch.xpu.memory_reserved(device)
+            return int(psutil.virtual_memory().available) + int(held)
+        raise ValueError(f"Unsupported execution device: {device.type}")
+
+    @classmethod
     def _to_dtype(cls, precision_name: TorchPrecisionNames) -> torch.dtype:
         return NAME_TO_PRECISION[precision_name]
 
@@ -534,6 +650,22 @@ class TorchDevice:
         return torch.bfloat16
 
     @classmethod
+    def dtype_avoiding_float16(cls, dtype: torch.dtype, device: torch.device) -> torch.dtype:
+        """`dtype`, except float16: bfloat16 where `device` has it, float32 otherwise.
+
+        The dtype of the autoencoders that are broken or unstable in float16 -- the dtype
+        `precision: auto` picks on CUDA and MPS: the standalone FLUX.1 and FLUX.2 VAEs and the
+        Qwen-Image-2.1 pipeline's. A float32 or bfloat16 request is kept as it is. The loaders take it
+        from the configured dtype, and a calibration plan sizes its FLUX decodes by it.
+        """
+        if dtype != torch.float16:
+            return dtype
+        try:
+            return torch.empty(0, dtype=torch.bfloat16, device=device).dtype
+        except TypeError:
+            return torch.float32
+
+    @classmethod
     def choose_anima_inference_dtype(cls, device: Optional[torch.device] = None) -> torch.dtype:
         """Choose the inference dtype for Anima models, honoring config.precision.
 
@@ -564,6 +696,31 @@ class TorchDevice:
 
 
 _PEER_AWARE_SENTINEL = "_invokeai_peer_aware"
+
+
+_STREAM_CAPTURE_SHIM_SENTINEL = "_invokeai_no_device_shim"
+
+
+def install_cuda_stream_capture_shim() -> None:
+    """On Windows ARM64 with no usable CUDA device, make ``torch.cuda.is_current_stream_capturing()`` answer False.
+
+    NVIDIA's out-of-tree CUDA 13.4 build, the only torch for Windows ARM64, dies there with an access violation
+    instead of raising as other CUDA builds do without a device. transformers calls it on every forward pass
+    (``masking_utils`` via ``is_tracing``) inside a try/except that expects the raise, so on a Windows ARM64
+    machine without an NVIDIA GPU any text encoder or LLM forward would take the process down. Without a device
+    there is no stream to capture, so False is the true answer. Limited to that platform so every other build
+    keeps torch's own behaviour. Idempotent; a no-op where CUDA works or the build has no CUDA.
+    """
+    if not is_windows_arm64() or torch.version.cuda is None or torch.cuda.is_available():
+        return
+    if getattr(torch.cuda.is_current_stream_capturing, _STREAM_CAPTURE_SHIM_SENTINEL, False):
+        return
+
+    def is_current_stream_capturing() -> bool:
+        return False
+
+    setattr(is_current_stream_capturing, _STREAM_CAPTURE_SHIM_SENTINEL, True)
+    torch.cuda.is_current_stream_capturing = is_current_stream_capturing
 
 
 def install_peer_aware_empty_cache() -> None:

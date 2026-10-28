@@ -18,7 +18,9 @@ vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) =>
   ...(await importOriginal<object>()),
   useGenerationUi: () => ({ notifications: { error: vi.fn(), info: vi.fn(), reportError: vi.fn() } }),
 }));
-vi.mock('@features/generation/data/wildcards', () => ({
+vi.mock('@features/generation/data/wildcards', async (importOriginal) => ({
+  // Partial: the real module's other exports (constants, mappers) stay available to what imports them.
+  ...(await importOriginal<Record<string, unknown>>()),
   createWildcard: vi.fn(),
   deleteWildcard: vi.fn(),
   invalidateWildcardDependents: vi.fn(),
@@ -34,6 +36,7 @@ const pageErrors: string[] = [];
 const BASE_CONFIG: DynamicPromptsConfig = {
   combinatorial: true,
   maxPrompts: 100,
+  resample: true,
   sampleSeed: 0,
   seedBehaviour: 'per-iteration',
 };
@@ -61,6 +64,7 @@ const render = async (onChange: (patch: Partial<DynamicPromptsConfig>) => void =
                 void act(() => draw());
               },
             }}
+            highlightExpandedPrompts
             positivePrompt="a {red|green} cat"
             showSyntaxHighlighting
             onInsertText={vi.fn()}
@@ -198,6 +202,37 @@ describe('dynamic prompts popover controls', () => {
     expect(row().getBoundingClientRect().height).toBe(combinatorialHeight);
   });
 
+  it('offers resampling only for random samples', async () => {
+    const onChange = vi.fn();
+    const resampleLabel = () =>
+      [...document.querySelectorAll<HTMLElement>('[data-scope="switch"][data-part="label"]')].find(
+        (label) => label.textContent === 'widgets.generate.dynamicPrompts.newSampleEveryInvoke'
+      );
+
+    await render(onChange);
+    await openPopover();
+
+    expect(resampleLabel(), 'all combinations have nothing to resample').toBeUndefined();
+
+    await act(async () => {
+      await userEvent.click(document.querySelector<HTMLElement>('[data-scope="menu"][data-part="trigger"]')!);
+    });
+    await act(async () => {
+      ([...document.querySelectorAll('[data-scope="menu"][data-part="item"]')].at(-1) as HTMLElement).click();
+      await Promise.resolve();
+    });
+
+    expect(onChange).toHaveBeenCalledWith({ combinatorial: false });
+    expect(resampleLabel(), 'random sample offers resampling').toBeTruthy();
+
+    await act(async () => {
+      await userEvent.click(resampleLabel()!);
+    });
+
+    expect(onChange).toHaveBeenCalledWith({ resample: false });
+    expect(pageErrors).toEqual([]);
+  });
+
   it('labels both settings controls with a real, associated label', async () => {
     await render();
     await openPopover();
@@ -259,7 +294,7 @@ describe('dynamic prompts popover controls', () => {
       await userEvent.click(tabButton('wildcards')!);
     });
 
-    // Header geometry must remain equal across tabs.
-    expect(headerControl()).toBe(summaryHeight);
+    // Header geometry must remain equal across tabs, once the lazily loaded wildcard manager is in.
+    await vi.waitFor(() => expect(headerControl()).toBe(summaryHeight));
   });
 });

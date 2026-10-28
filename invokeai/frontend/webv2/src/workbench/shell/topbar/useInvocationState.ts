@@ -12,18 +12,21 @@ import {
   sanitizeDynamicPromptsConfig,
 } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { isUpscaleBatchCountFixed } from '@features/upscale';
 import { getInvocationTemplatesSnapshot, subscribeInvocationTemplates } from '@features/workflow/react';
-import { localizeForLoopValidationReason } from '@features/workflow/utility';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
-import { useIsCanvasInvocationPreparing } from '@workbench/canvasInvocationPreparation';
+import { describeControlLayerIssue } from '@workbench/controlLayerChecks';
 import { getPlacedWidgetTypeIds, getVisibleWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
 import {
   createInvocationRouteInputSelector,
   isInvocationRouteValid,
+  localizeInvocationValidationReason,
   resolveInvocationRouteInput,
 } from '@workbench/invocation';
+import { useIsInvocationPreparing } from '@workbench/invocationPreparation';
+import { getWorkbenchPreferences, subscribeWorkbenchPreferences } from '@workbench/settings/store';
 import {
   useActiveProjectSelector,
   useWorkbenchCommands,
@@ -36,31 +39,39 @@ import { useTranslation } from 'react-i18next';
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
 
 /**
- * Include capability and template snapshots in route selection so either load independently clears its readiness
- * gate.
+ * Include capability, template and remembered control-model snapshots in route selection so each change
+ * independently re-evaluates its readiness gate.
  */
 const subscribeRouteSources = (listener: () => void): (() => void) => {
   const unsubscribeCapabilities = subscribeArchitectureCapabilities(listener);
   const unsubscribeTemplates = subscribeInvocationTemplates(listener);
+  const unsubscribePreferences = subscribeWorkbenchPreferences(listener);
 
   return () => {
     unsubscribeCapabilities();
     unsubscribeTemplates();
+    unsubscribePreferences();
   };
 };
 
 let routeSources: {
   capabilities: ReturnType<typeof getArchitectureCapabilitiesSnapshot>;
+  controlModelMemory: ReturnType<typeof getWorkbenchPreferences>['controlModelMemory'];
   templates: ReturnType<typeof getInvocationTemplatesSnapshot>;
 } | null = null;
 
-/** Referentially stable until one of the two stores publishes a new snapshot. */
+/** Referentially stable until one of the stores publishes a new snapshot. */
 const getRouteSourcesSnapshot = () => {
   const capabilities = getArchitectureCapabilitiesSnapshot();
+  const controlModelMemory = getWorkbenchPreferences().controlModelMemory;
   const templates = getInvocationTemplatesSnapshot();
 
-  if (routeSources?.capabilities !== capabilities || routeSources.templates !== templates) {
-    routeSources = { capabilities, templates };
+  if (
+    routeSources?.capabilities !== capabilities ||
+    routeSources.controlModelMemory !== controlModelMemory ||
+    routeSources.templates !== templates
+  ) {
+    routeSources = { capabilities, controlModelMemory, templates };
   }
 
   return routeSources;
@@ -72,6 +83,7 @@ const areTypeIdSetsEqual = (left: ReadonlySet<WidgetTypeId>, right: ReadonlySet<
 const readDynamicPromptsConfig = (values: Record<string, unknown>) => ({
   combinatorial: values.dynamicPromptsCombinatorial,
   maxPrompts: values.dynamicPromptsMaxPrompts,
+  resample: values.dynamicPromptsResample,
   sampleSeed: values.dynamicPromptsSampleSeed,
   seedBehaviour: values.dynamicPromptsSeedBehaviour,
 });
@@ -82,11 +94,22 @@ const readEffectivePositivePrompt = (values: Record<string, unknown>): string =>
   return settings ? getEffectivePrompts(settings).positivePrompt : '';
 };
 
-export const getBatchCount = (values: Record<string, unknown>): number => sanitizeBatchCount(values.batchCount);
+export const isBatchCountFixed = (sourceId: InvocationRoute['sourceId'], values: Record<string, unknown>): boolean =>
+  sourceId === 'upscale' && isUpscaleBatchCountFixed(values);
+
+export const getBatchCount = (sourceId: InvocationRoute['sourceId'], values: Record<string, unknown>): number =>
+  isBatchCountFixed(sourceId, values) ? 1 : sanitizeBatchCount(values.batchCount);
+
+/** Why Invoke cannot run, worded for the user; `layerId` names the canvas layer to show for it. */
+export interface InvocationIssue {
+  message: string;
+  layerId: string | null;
+}
 
 export interface InvocationState {
   batchCount: number;
-  blockingReasons: string[];
+  /** Every reason Invoke cannot run right now, in the order the tooltip lists them. */
+  issues: InvocationIssue[];
   invocation: InvocationRoute;
   /** Sessions one workflow run produces through batch nodes; absent without batch nodes, null while unresolved. */
   workflowBatchSize?: number | null;
@@ -97,7 +120,13 @@ export interface InvocationState {
   placedTypeIds: ReadonlySet<WidgetTypeId>;
   promptExpansion: DynamicPromptsExpansion;
   sourceValues: Record<string, unknown>;
-  invoke: (destinationOverride?: ResultDestination) => Promise<void>;
+  invoke: (options?: InvokeOptions) => Promise<void>;
+}
+
+export interface InvokeOptions {
+  destinationOverride?: ResultDestination;
+  /** Queue ahead of the user's other pending work, as Invoke Front does. */
+  prepend?: boolean;
 }
 
 export const useInvocationState = (): InvocationState => {
@@ -112,8 +141,7 @@ export const useInvocationState = (): InvocationState => {
   const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
   const availabilityModels = modelsStatus === 'loaded' ? models : undefined;
   const { invocation } = routeInput;
-  const isCanvasPreparing = useIsCanvasInvocationPreparing(routeInput.projectId);
-  const isPreparing = invocation.sourceId === 'canvas' && isCanvasPreparing;
+  const isPreparing = useIsInvocationPreparing(routeInput.projectId);
 
   useMountEffect(() => {
     void ensureModelsLoaded();
@@ -151,26 +179,27 @@ export const useInvocationState = (): InvocationState => {
     ? 'The prompt could not be expanded.'
     : (promptExpansion.error ?? null);
 
-  const blockingReasons = useMemo(
-    () => [
-      ...(isConnected ? [] : ['The backend is disconnected.']),
-      ...(expansionReason === null ? [] : [expansionReason]),
-      ...resolvedRoute.validationReasons.map((reason) => localizeForLoopValidationReason(reason, t)),
+  const issues = useMemo(
+    (): InvocationIssue[] => [
+      ...(isConnected ? [] : [{ layerId: null, message: 'The backend is disconnected.' }]),
+      ...(expansionReason === null ? [] : [{ layerId: null, message: expansionReason }]),
+      ...resolvedRoute.validationReasons.map((reason) => ({
+        layerId: typeof reason === 'object' && 'controlLayerIssue' in reason ? reason.controlLayerIssue.layerId : null,
+        message: localizeInvocationValidationReason(reason, t),
+      })),
     ],
     [expansionReason, isConnected, resolvedRoute.validationReasons, t]
   );
   const isValid = isInvocationRouteValid(resolvedRoute) && isConnected && expansionReason === null;
 
   const invoke = useCallback(
-    (destinationOverride?: ResultDestination) =>
+    ({ destinationOverride, prepend }: InvokeOptions = {}) =>
       submitActiveInvocation({
         commands,
         destinationOverride,
-        formatControlLayerError: (code, layerName) =>
-          t('widgets.layers.control.invalidLayer', {
-            name: layerName,
-            reason: t(`widgets.layers.control.validation.${code}`),
-          }),
+        prepend,
+        formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
+        formatUpscaleMetadataFailure: (name) => t('widgets.gallery.itemActions.upscale.metadataFailed', { name }),
         getModels: () => availabilityModels,
         queries,
       }),
@@ -178,10 +207,10 @@ export const useInvocationState = (): InvocationState => {
   );
 
   return {
-    batchCount: getBatchCount(sourceValues),
-    blockingReasons,
+    batchCount: getBatchCount(invocation.sourceId, sourceValues),
     invocation,
     invoke,
+    issues,
     isPreparing,
     isValid,
     placedTypeIds,

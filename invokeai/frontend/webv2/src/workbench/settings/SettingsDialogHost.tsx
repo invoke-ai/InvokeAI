@@ -1,8 +1,7 @@
-import { Dialog, Portal, Text } from '@chakra-ui/react';
-import { useMountEffect } from '@platform/react/useMountEffect';
+import { Portal, Text } from '@chakra-ui/react';
 import { CloseButton } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { RetryBoundary } from '@platform/ui/RetryBoundary';
-import { registerHotkeyModalLayer } from '@workbench/hotkeys/modalLayer';
 import { Suspense, use, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,11 +11,6 @@ import { focusSettingsSearchOnSlash } from './settingsSearchShortcut';
 const LoadedDialog = () => {
   const { default: SettingsDialog } = use(dialogResource.load());
   return <SettingsDialog />;
-};
-
-const SettingsModalLayer = () => {
-  useMountEffect(() => registerHotkeyModalLayer('settings'));
-  return null;
 };
 
 const getReturnFocus = () => {
@@ -67,7 +61,6 @@ export const SettingsDialogHost = () => {
             overflow="hidden"
             p="0"
           >
-            <SettingsModalLayer />
             <RetryBoundary
               retry={dialogResource.retry}
               message={t('settingsDialog.loadFailed')}

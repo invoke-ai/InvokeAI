@@ -1,24 +1,38 @@
 import type { LayerExportGuard } from '@workbench/canvas-engine/capabilities';
 import type {
+  CanvasAdjustmentsContract,
   CanvasDocumentContractV3,
   CanvasLayerContract,
-  CanvasNodeContract,
+  CanvasRasterLayerContractV2,
 } from '@workbench/canvas-engine/contracts';
-import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
+import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
 import type { CanvasCommandRefusal } from '@workbench/canvas-engine/document/commandRefusal';
 import type { SubsetOf } from '@workbench/canvas-engine/editConcurrency';
-import type { CompositeOptions } from '@workbench/canvas-engine/render/compositor';
-import type { DerivedSurfaceCache } from '@workbench/canvas-engine/render/derivedSurfaceCache';
-import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
+import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
 import { compileDocumentLeaves } from '@workbench/canvas-engine/document-model/documentModel';
 import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
-import { createEmptyStacks, isGroupNode } from '@workbench/canvas-engine/document/documentTree';
 import { getSourceContentRect } from '@workbench/canvas-engine/document/sources';
+import { isLayerUnreadable, type LayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 import { isEmpty } from '@workbench/canvas-engine/math/rect';
-import { compositeDocument } from '@workbench/canvas-engine/render/compositor';
+import {
+  type AdjustmentRefusal,
+  AdjustmentRefusedError,
+  adjustmentRefusal,
+  type SpatialRunner,
+} from '@workbench/canvas-engine/render/exactAdjustments';
+import {
+  collectCompositedGroups,
+  planGroupCompositeScopes,
+} from '@workbench/canvas-engine/render/groupCompositeScopes';
+import {
+  compositeScratchPixels,
+  planRasterComposite,
+  RasterCompositeOverBudgetError,
+  renderRasterComposite,
+} from '@workbench/canvas-engine/render/rasterComposite';
 
 import type { CanvasMutationContext } from './mutationContext';
 
@@ -28,56 +42,77 @@ import {
   layerOperationStatus,
   paintLayerAt,
   publishAddedRasterLayer,
+  readinessOfAll,
   rgbaBytes,
+  type LayerCacheReadiness,
   type LayerStepContext,
   type LayerEditRefusal,
 } from './editSteps';
 
 export type ExtractMaskedAreaResult =
   | { status: 'extracted'; layerId: string }
-  | { status: LayerEditRefusal | SubsetOf<CanvasCommandRefusal, 'missing' | 'unsupported'> | 'empty' | 'failed' };
+  | {
+      status: LayerEditRefusal | SubsetOf<CanvasCommandRefusal, 'missing' | 'unsupported'> | 'empty' | 'failed';
+    }
+  | LayerUnreadable
+  | AdjustmentRefusal;
+
+type OwnedExport = Extract<ExportResult, { status: 'ok' }>;
 
 type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
-  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' };
+  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | LayerUnreadable
+  | AdjustmentRefusal;
 
 export interface ExtractMaskedAreaControllerOptions {
   readonly ctx: LayerStepContext &
     Pick<
       CanvasMutationContext,
-      'begin' | 'capturePermit' | 'captureInsertionAnchor' | 'createLayerId' | 'getDocument' | 'isPermitCurrent'
+      | 'begin'
+      | 'capturePermit'
+      | 'captureInsertionAnchor'
+      | 'createLayerId'
+      | 'getDocument'
+      | 'getReducerDocument'
+      | 'isPermitCurrent'
     >;
   readonly backend: RasterBackend;
   readonly layers: LayerCacheStore;
-  readonly derived: DerivedSurfaceCache;
-  readonly diagnostics: CanvasDiagnostics;
-  readonly isCacheReady: (layer: CanvasLayerContract, document: CanvasDocumentContractV3) => boolean;
+  readonly cacheReadiness: (layer: CanvasLayerContract, document: CanvasDocumentContractV3) => LayerCacheReadiness;
   readonly hasExportableContent: (layerId: string) => boolean;
   readonly exportBaked: (layerId: string, includeDisabled?: boolean) => Promise<ExportResult>;
   readonly rasterize: (layerId: string) => Promise<ExportResult>;
   readonly isGuardCurrent: (guard: LayerExportGuard) => boolean;
-  readonly getAdjustedSurface: (layer: CanvasLayerContract, entry: LayerCacheEntry) => RasterSurface | null;
-  readonly getGroupSurface?: CompositeOptions['groupSurface'];
-  readonly getMaskPattern: (style: string, color: string) => RasterSurface | null;
+  /** The display's exact adjusted copy of a layer's live cache `surface`, or null; never builds one. */
+  readonly peekAdjustedCacheSurface?: (
+    layerId: string,
+    surface: RasterSurface,
+    adjustments: CanvasAdjustmentsContract
+  ) => RasterSurface | null;
+  /** Evaluates spatial adjustment runs; without it a spatial stack refuses `error`. */
+  readonly runSpatial?: SpatialRunner;
 }
 
-/** The raster forest reduced to `keep` leaves, groups intact so their stacks still apply. */
-const filterRasterForest = (nodes: readonly CanvasNodeContract[], keep: ReadonlySet<string>): CanvasNodeContract[] =>
-  nodes.flatMap((node): CanvasNodeContract[] => {
-    if (isGroupNode(node)) {
-      const children = filterRasterForest(node.children, keep);
-      return children.length > 0 ? [{ ...node, children }] : [];
-    }
-    return keep.has(node.id) ? [node] : [];
-  });
+/** The group compositing `layers` pass through (ancestor opacity, blend and adjustments), for comparison. */
+const groupScopesKey = (document: CanvasDocumentContractV3, layers: readonly CanvasLayerContract[]): string => {
+  const ids = new Set(layers.map((layer) => layer.id));
+  const leaves = compileDocumentLeaves(document).filter((leaf) => ids.has(leaf.id));
+  return JSON.stringify(planGroupCompositeScopes(leaves, collectCompositedGroups(document)));
+};
+
+type RasterLeaf = SemanticLeaf & { layer: CanvasRasterLayerContractV2 };
+
+const contributingLeaves = (document: CanvasDocumentContractV3, hasContent: (layerId: string) => boolean) =>
+  compileDocumentLeaves(document).filter(
+    (leaf): leaf is RasterLeaf =>
+      leaf.stack === 'raster' && leaf.layer.type === 'raster' && leaf.contributionEnabled && hasContent(leaf.id)
+  );
 
 const contributingRasters = (
   document: CanvasDocumentContractV3,
   hasContent: (layerId: string) => boolean
-): CanvasLayerContract[] =>
-  compileDocumentLeaves(document)
-    .filter((leaf) => leaf.stack === 'raster' && leaf.contributionEnabled && hasContent(leaf.id))
-    .map((leaf) => leaf.layer);
+): CanvasLayerContract[] => contributingLeaves(document, hasContent).map((leaf) => leaf.layer);
 
 /** Owns guarded extraction of raster content through an inpaint mask. */
 export class ExtractMaskedAreaController {
@@ -110,11 +145,9 @@ export class ExtractMaskedAreaController {
     if (contributors.length === 0) {
       return { status: 'empty' };
     }
-    if (
-      !this.deps.isCacheReady(mask, document) ||
-      contributors.some((layer) => !this.deps.isCacheReady(layer, document))
-    ) {
-      return { status: 'not-ready' };
+    const readiness = readinessOfAll([mask, ...contributors].map((layer) => this.deps.cacheReadiness(layer, document)));
+    if (readiness !== 'ready') {
+      return readiness === 'not-ready' ? { status: readiness } : readiness;
     }
     const owned: Extract<ExportResult, { status: 'ok' }>[] = [];
     const acquire = async (resultPromise: Promise<ExportResult>): Promise<ExportResult> => {
@@ -140,8 +173,15 @@ export class ExtractMaskedAreaController {
         return { status: 'busy' };
       }
       const statuses = [maskPixels, ...contributorPixels].map((pixels) => pixels.status);
-      if (statuses.includes('over-budget') || statuses.includes('not-ready')) {
-        return { status: statuses.includes('over-budget') ? 'over-budget' : 'not-ready' };
+      if (statuses.includes('over-budget')) {
+        return { status: 'over-budget' };
+      }
+      const unreadable = [maskPixels, ...contributorPixels].find(isLayerUnreadable);
+      if (unreadable) {
+        return unreadable;
+      }
+      if (statuses.includes('not-ready')) {
+        return { status: 'not-ready' };
       }
       if (maskPixels.status !== 'ok' || statuses.some((status) => status !== 'ok')) {
         return { status: 'empty' };
@@ -149,7 +189,8 @@ export class ExtractMaskedAreaController {
       if (maskPixels.guard.layer !== mask || !this.deps.isGuardCurrent(maskPixels.guard)) {
         return { status: 'not-ready' };
       }
-      const liveDocument = ctx.getDocument();
+      // A preview-tolerant recheck; see `CanvasMutationContext.getReducerDocument`.
+      const liveDocument = ctx.getReducerDocument();
       const liveMaskIndex =
         getDocumentLeaves(liveDocument ?? null).findIndex((layer) => layer.id === maskLayerId) ?? -1;
       const currentMask = getDocumentLeaves(liveDocument ?? null)[liveMaskIndex];
@@ -163,7 +204,9 @@ export class ExtractMaskedAreaController {
       if (
         liveMaskIndex !== maskIndex ||
         liveContributors.some((layer, index) => layer !== contributors[index]) ||
-        liveContributors.length !== contributors.length
+        liveContributors.length !== contributors.length ||
+        // The composite below reads the pre-await groups around the contributors.
+        groupScopesKey(liveDocument, liveContributors) !== groupScopesKey(document, contributors)
       ) {
         return { status: 'not-ready' };
       }
@@ -189,30 +232,58 @@ export class ExtractMaskedAreaController {
         return { status: layerEditRefusal(txn.status) };
       }
       try {
-        if (!txn.reserveRaster(rgbaBytes(rect))) {
+        // The contributors composite as generation and export do: exact adjustments (spatial ones on whole sources,
+        // never a display interim), from the leased pixels.
+        const leased = new Map(
+          contributorPixels.map((leasedPixels, index) => [contributors[index]!.id, leasedPixels as OwnedExport])
+        );
+        const entry = planRasterComposite(
+          document,
+          contributingLeaves(document, this.deps.hasExportableContent),
+          rect,
+          new Map([...leased].map(([id, owned]) => [id, owned.rect]))
+        );
+        // The output plus each scratch buffer and its ImageData, until the transaction ends.
+        if (!txn.reserveRaster(rgbaBytes(rect) + compositeScratchPixels(entry) * 2 * 4)) {
           return { status: 'over-budget' };
         }
-        const pixels = this.deps.backend.createSurface(rect.width, rect.height);
-        compositeDocument(
-          pixels,
-          {
-            ...document,
-            stacks: {
-              ...createEmptyStacks(),
-              raster: filterRasterForest(document.stacks.raster, new Set(contributors.map((layer) => layer.id))),
-            },
-          },
-          this.deps.layers,
-          { a: 1, b: 0, c: 0, d: 1, e: -rect.x, f: -rect.y },
-          {
-            adjustedSurface: this.deps.getAdjustedSurface,
-            groupSurface: this.deps.getGroupSurface,
+        let pixels: RasterSurface;
+        try {
+          pixels = await renderRasterComposite(entry, {
+            adjustedSurface: this.deps.peekAdjustedCacheSurface,
             backend: this.deps.backend,
-            derivedSurfaces: this.deps.derived,
-            diagnostics: this.deps.diagnostics,
-            maskPatternTile: this.deps.getMaskPattern,
+            getLayerSurface: (layerId) => {
+              const owned = leased.get(layerId);
+              return owned
+                ? Promise.resolve({ rect: owned.rect, release: () => undefined, surface: owned.surface })
+                : Promise.reject(new Error(`Extraction did not lease layer ${layerId}.`));
+            },
+            reserve: (bytes) =>
+              txn.reserveRaster(bytes)
+                ? { lease: { release: () => undefined }, status: 'ok' }
+                : { availableBytes: 0, requestedBytes: bytes, status: 'over-budget' },
+            runSpatial: this.deps.runSpatial,
+          });
+        } catch (error) {
+          if (error instanceof AdjustmentRefusedError) {
+            return adjustmentRefusal(document, error.ownerId, error.reason);
           }
-        );
+          if (error instanceof RasterCompositeOverBudgetError) {
+            return { status: 'over-budget' };
+          }
+          if (error instanceof DOMException && error.name === 'AbortError') {
+            return { status: 'not-ready' };
+          }
+          throw error;
+        }
+        // Spatial jobs yield: the extraction stands only for pixels that still describe their layers.
+        if (
+          this.disposed ||
+          !this.deps.isGuardCurrent(maskPixels.guard) ||
+          [...leased.values()].some((owned) => !this.deps.isGuardCurrent(owned.guard))
+        ) {
+          return { status: 'not-ready' };
+        }
         pixels.ctx.setTransform(1, 0, 0, 1, 0, 0);
         pixels.ctx.globalAlpha = 1;
         pixels.ctx.globalCompositeOperation = 'destination-in';

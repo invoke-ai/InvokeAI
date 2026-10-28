@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Iterable, Optional
 
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load import LoadedModel, LoadedModelWithoutConfig
@@ -28,6 +28,30 @@ class ModelLoadServiceBase(ABC):
         :param user_id: The user whose action triggered the load, threaded into the model load
             events so they can be routed to that user's UI (defaults to the system user).
         """
+
+    @abstractmethod
+    def apply_record_change(self, key: str, write: Callable[[], AnyModelConfig]) -> AnyModelConfig:
+        """Run `write`, which commits a change to `key`'s record and returns the record as stored, and evict
+        what the change made stale; return what `write` returned.
+
+        Every write of a model record that may change how the model loads must go through here. The stored
+        record is read before `write` runs; when the two differ in anything that loads (`load_settings_changed`,
+        paths compared after resolving them against the models directory), every cached entry of the model is
+        dropped from each device cache. Cold loads of `key` that start meanwhile wait for the change to end
+        before reading the record, and a load that read it earlier is rejected, and retried from the stored
+        record, if the change affected loading. If `write` raises an `Exception`, it may have committed first, so the
+        change is judged the same way by the record read back from the store before the exception propagates; if
+        that read fails too, the change counts as load-affecting. An interrupt (a `BaseException` that is not an
+        `Exception`) propagates without the read-back or any drop, but loads that overlapped are still re-checked.
+        The caller must not hold MODEL_LOAD_LOCK."""
+
+    @abstractmethod
+    def drop_cached_models(self, keys: Iterable[str]) -> int:
+        """Drop every cached entry of the models `keys` from each device cache, so their next loads rebuild;
+        return how many entries were dropped at once (in-use entries are marked stale and evicted on release).
+
+        Takes MODEL_LOAD_LOCK's write lock, so no load in construction can re-register state it built from the
+        models' previous records around the drop. The caller must not hold that lock."""
 
     @property
     @abstractmethod

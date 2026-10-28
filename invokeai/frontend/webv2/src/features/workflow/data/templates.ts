@@ -484,10 +484,8 @@ export const refreshInvocationTemplates = async (): Promise<void> => {
       message: 'Failed to load node definitions',
       name: 'workflows.templates-load-failed',
     });
-    store.patchSnapshot({
-      error: getApiErrorMessage(error, 'Failed to load node definitions from the backend.'),
-      status: 'error',
-    });
+    // Only a real server or network message; readers word the failure itself in the user's language.
+    store.patchSnapshot({ error: getApiErrorMessage(error, '') || null, status: 'error' });
   }
 };
 

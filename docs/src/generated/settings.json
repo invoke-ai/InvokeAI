@@ -127,6 +127,17 @@
     },
     {
       "category": "MISC FEATURES",
+      "default": true,
+      "description": "Show the Donate to InvokeAI link in the frontend menus.",
+      "env_var": "INVOKEAI_SHOW_DONATION_LINK",
+      "literal_values": [],
+      "name": "show_donation_link",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "MISC FEATURES",
       "default": false,
       "description": "Enable logging of parsed prompt tokens.",
       "env_var": "INVOKEAI_LOG_TOKENIZATION",
@@ -200,6 +211,17 @@
       "name": "db_dir",
       "required": false,
       "type": "<class 'pathlib.Path'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
+      "default": null,
+      "description": "URL of a MySQL 8.4+ or MariaDB 10.11+ database to use instead of the SQLite database in `db_dir`, e.g. `mariadb+pymysql://invokeai:password@db.example/invokeai`. Needs the `mysql` extra. One InvokeAI process uses a database at a time. Read at startup only.",
+      "env_var": "INVOKEAI_DB_URL",
+      "literal_values": [],
+      "name": "db_url",
+      "required": false,
+      "type": "typing.Optional[str]",
       "validation": {}
     },
     {
@@ -473,6 +495,17 @@
     },
     {
       "category": "CACHE",
+      "default": 0.0,
+      "description": "The amount of VRAM (in GB) to subtract from the model cache's available memory budget. Defaults to 0.",
+      "env_var": "INVOKEAI_RESERVE_VRAM_GB",
+      "literal_values": [],
+      "name": "reserve_vram_gb",
+      "required": false,
+      "type": "<class 'float'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
       "default": false,
       "description": "If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.",
       "env_var": "INVOKEAI_LOG_MEMORY_USAGE",
@@ -572,6 +605,17 @@
     },
     {
       "category": "CACHE",
+      "default": false,
+      "description": "Run the matmuls of ComfyUI int8 builds quantized with convrot ('int8_tensorwise' with 'convrot') on the int8 tensor cores instead of dequantizing their weights on every forward (requires an NVIDIA GPU with compute capability 8.0 or newer and Triton; falls back automatically otherwise, including on AMD, Apple and Intel GPUs and the CPU). Speeds up denoising with these builds, but quantizes activations per token as well, so images will differ from the dequantized path at the same seed. The kernels are tuned once per layer shape and token-count bucket: about 35 seconds for the first image after enabling it, about 1-5 seconds for a later size in a new token-count bucket, cached on disk across restarts.",
+      "env_var": "INVOKEAI_INT8_COMPUTE",
+      "literal_values": [],
+      "name": "int8_compute",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
       "default": null,
       "description": "DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.",
       "env_var": "INVOKEAI_RAM",
@@ -628,7 +672,7 @@
     {
       "category": "DEVICE",
       "default": "auto",
-      "description": "Devices to use for parallel generation. `auto` (the default) uses every available GPU, running one generation session per GPU concurrently and distributing jobs fairly across users \u2014 unless the legacy `device` setting is pinned to a specific device, in which case `auto` uses only that device (preserving configs that pinned `device` before multi-GPU support existed). Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices regardless of `device`, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, or `xpu:N` (where N is a device number)",
+      "description": "Devices to use for parallel generation. `auto` (the default) uses every available GPU, except an integrated GPU next to a discrete one, running one generation session per GPU concurrently and distributing jobs fairly across users \u2014 unless the legacy `device` setting is pinned to a specific device, in which case `auto` uses only that device (preserving configs that pinned `device` before multi-GPU support existed). Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices regardless of `device`, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, or `xpu:N` (where N is a device number)",
       "env_var": "INVOKEAI_GENERATION_DEVICES",
       "literal_values": [],
       "name": "generation_devices",
@@ -661,6 +705,21 @@
       "name": "precision",
       "required": false,
       "type": "typing.Literal['auto', 'float16', 'bfloat16', 'float32']",
+      "validation": {}
+    },
+    {
+      "category": "DEVICE",
+      "default": "auto",
+      "description": "Use AOTriton's fused (flash and memory-efficient) attention kernels on AMD GPUs that PyTorch marks experimental for them, such as the RX 7600/7700/7800 series, Ryzen AI 300/Max and the RX 9060 series, by setting TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL. Without them, attention on those GPUs runs on the slower math kernel, which also needs far more memory. `auto` turns them on only with a ROCm 10 build of PyTorch, and only when every GPU used for generation is one they were measured correct on (so far gfx1200, the RX 9060 series); `on` and `off` decide for any build and GPU. A TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL value already set in the environment takes precedence. Has no effect on other GPUs.",
+      "env_var": "INVOKEAI_ROCM_AOTRITON_EXPERIMENTAL",
+      "literal_values": [
+        "auto",
+        "on",
+        "off"
+      ],
+      "name": "rocm_aotriton_experimental",
+      "required": false,
+      "type": "typing.Literal['auto', 'on', 'off']",
       "validation": {}
     },
     {
@@ -752,8 +811,22 @@
     },
     {
       "category": "GENERATION",
+      "default": "auto",
+      "description": "Attention kernel for the attention inside diffusion models. `auto` lets PyTorch choose among its exact SDPA kernels and never selects a quantized one. `sage` uses SageAttention 2 for the models listed in the SageAttention docs: faster, most at high resolutions and for video, but quantized, so images differ slightly from `auto` at the same seed. SageAttention is installed separately and needs an NVIDIA GPU with compute capability 8.0 or newer; masked attention, text encoders and VAEs keep PyTorch SDPA.",
+      "env_var": "INVOKEAI_ATTENTION_BACKEND",
+      "literal_values": [
+        "auto",
+        "sage"
+      ],
+      "name": "attention_backend",
+      "required": false,
+      "type": "typing.Literal['auto', 'sage']",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
       "default": false,
-      "description": "Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, Z-Image and Qwen-Image VAE nodes, the Anima encode and the Krea-2 style reference; other model families ignore it.",
+      "description": "Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, FLUX.2, Z-Image, Qwen-Image and Qwen-Image-2.1 VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.",
       "env_var": "INVOKEAI_FORCE_TILED_DECODE",
       "literal_values": [],
       "name": "force_tiled_decode",
@@ -764,7 +837,7 @@
     {
       "category": "GENERATION",
       "default": true,
-      "description": "Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, Z-Image, Qwen-Image, Krea-2 and Wan decodes). Turn off to decode untiled unless tiling is requested; the FLUX.1 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.",
+      "description": "Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, FLUX.2, Z-Image, Qwen-Image, Qwen-Image-2.1, Krea-2 and Wan decodes, and Qwen-Image-2.1 encodes). Turn off to decode untiled unless tiling is requested; the FLUX.1, FLUX.2 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.",
       "env_var": "INVOKEAI_AUTO_TILED_DECODE",
       "literal_values": [],
       "name": "auto_tiled_decode",
@@ -1042,6 +1115,28 @@
       "env_var": "INVOKEAI_EXTERNAL_ALIBABACLOUD_BASE_URL",
       "literal_values": [],
       "name": "external_alibabacloud_base_url",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "API key for Atlas Cloud image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_ATLASCLOUD_API_KEY",
+      "literal_values": [],
+      "name": "external_atlascloud_api_key",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "Base URL override for Atlas Cloud image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_ATLASCLOUD_BASE_URL",
+      "literal_values": [],
+      "name": "external_atlascloud_base_url",
       "required": false,
       "type": "typing.Optional[str]",
       "validation": {}

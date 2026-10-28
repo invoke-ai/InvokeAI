@@ -28,7 +28,7 @@ pid_decoder_qwenimage_2kto4k = StarterModel(
 pid_1_5_decoder_qwenimage_2kto4k = StarterModel(
     name="PiD 1.5 Decoder Qwen-Image (2K to 4K)",
     base=BaseModelType.QwenImage,
-    source="https://huggingface.co/Comfy-Org/PixelDiT/resolve/main/diffusion_models/pid_1.5_qwenimage_1024_to_4096_4step_bf16.safetensors",
+    source="https://huggingface.co/Comfy-Org/PixelDiT/resolve/f1aa9118da0a0b53a4433e5de9a4de2e9aae2193/diffusion_models/pid_1.5_qwenimage_1024_to_4096_4step_bf16.safetensors",
     description="NVIDIA PiD 1.5 4x super-resolution decoder for Qwen-Image latents, 2K-to-4K preset, in Comfy-Org's single-file build. ~2.8GB",
     type=ModelType.PiDDecoder,
     format=ModelFormat.Checkpoint,
@@ -39,7 +39,7 @@ pid_1_5_decoder_qwenimage_2kto4k = StarterModel(
 pid_1_5_decoder_qwenimage_2kto4k_int8 = StarterModel(
     name="PiD 1.5 Decoder Qwen-Image (2K to 4K, int8)",
     base=BaseModelType.QwenImage,
-    source="https://huggingface.co/Comfy-Org/PixelDiT/resolve/main/diffusion_models/pid_1.5_qwenimage_1024_to_4096_4step_int8_convrot.safetensors",
+    source="https://huggingface.co/Comfy-Org/PixelDiT/resolve/f1aa9118da0a0b53a4433e5de9a4de2e9aae2193/diffusion_models/pid_1.5_qwenimage_1024_to_4096_4step_int8_convrot.safetensors",
     description="PiD 1.5 Qwen-Image decoder in Comfy-Org's int8_convrot build: its transformer layers stay int8, about 2GB once loaded instead of 5.6GB, with output practically identical to the full-precision build. ~1.6GB",
     type=ModelType.PiDDecoder,
     format=ModelFormat.Checkpoint,
@@ -195,4 +195,14 @@ qwen_image_lightning_8step = StarterModel(
     description="Lightning distillation LoRA for Qwen Image — enables generation in 8 steps with better quality. "
     "Settings: Steps=8, CFG=1, Shift Override=3.",
     type=ModelType.LoRA,
+)
+
+# region Qwen Image ControlNet
+qwen_image_fun_controlnet_union = StarterModel(
+    name="Qwen Image ControlNet Union",
+    base=BaseModelType.QwenImage,
+    source="https://huggingface.co/alibaba-pai/Qwen-Image-2512-Fun-Controlnet-Union/resolve/main/Qwen-Image-2512-Fun-Controlnet-Union-2602.safetensors",
+    description="Unified ControlNet for Qwen Image 2512 supporting Canny, HED, Depth, Pose, MLSD, Scribble and Gray "
+    "control images, plus inpainting. Works best at weights 0.70-0.95. Apache-2.0. ~3.5GB",
+    type=ModelType.ControlNet,
 )

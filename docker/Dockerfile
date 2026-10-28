@@ -84,7 +84,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     # this is just to get the package manager to recognize that the project exists, without making changes to the docker layer
     --mount=type=bind,source=invokeai/version,target=invokeai/version \
     ulimit -n 30000 && \
-    uv sync --extra $GPU_DRIVER --frozen
+    uv sync --extra $GPU_DRIVER --extra mysql --frozen
 
 # Link amdgpu.ids for ROCm builds
 # contributed by https://github.com/Rubonnek
@@ -114,5 +114,5 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     ulimit -n 30000 && \
-    uv pip install -e .[$GPU_DRIVER]
+    uv pip install -e .[$GPU_DRIVER,mysql]
 

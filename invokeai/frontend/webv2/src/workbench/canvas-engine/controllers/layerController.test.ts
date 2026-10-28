@@ -1,5 +1,6 @@
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
+import { documentFrom, layerContract } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { describe, expect, it, vi } from 'vitest';
 
 import { LayerController } from './layerController';
@@ -26,6 +27,7 @@ describe('LayerController', () => {
     getMaskPattern: () => null,
     isDisposed: () => false,
     isSupportedSource: () => true,
+    peekDisplayedSurface: () => null,
     projectId: 'p1',
     rasterize: vi.fn(),
     reportError: vi.fn(),
@@ -39,7 +41,7 @@ describe('LayerController', () => {
       dispatch: vi.fn(() => true),
       getDocument: () => null,
       getEditRevision: () => 0,
-      getReducerDocument: () => null,
+      getReducerDocument: () => documentFrom([layerContract('layer')]),
       historyTop: () => null,
       isGestureActive: () => false,
       projectId: 'p',
@@ -52,16 +54,17 @@ describe('LayerController', () => {
     ctx: {} as never,
     exportBaked: vi.fn(),
     hasExportableContent: () => false,
-    isCacheReady: () => true,
+    cacheReadiness: () => 'ready' as const,
     layers: {} as never,
     needsPixelPersistence: () => false,
+    peekAdjustedSurface: () => null,
     publishSelectedLayerIds: vi.fn(),
   };
   const booleanMerge = {
     backend: {} as never,
     ctx: {} as never,
     exportBaked: vi.fn(),
-    isCacheReady: () => true,
+    cacheReadiness: () => 'ready' as const,
     isGuardCurrent: () => true,
   };
   const extractMaskedArea = {
@@ -73,7 +76,7 @@ describe('LayerController', () => {
     getAdjustedSurface: vi.fn(),
     getMaskPattern: () => null,
     hasExportableContent: () => false,
-    isCacheReady: () => true,
+    cacheReadiness: () => 'ready' as const,
     isGuardCurrent: () => true,
     layers: {} as never,
     rasterize: vi.fn(),
@@ -84,10 +87,18 @@ describe('LayerController', () => {
     ctx: {} as never,
     discardPersisted: vi.fn(),
     exportBaked: vi.fn(),
+    flushPendingPixels: () => Promise.resolve(),
     isGuardCurrent: () => true,
     isSupportedSource: () => true,
   };
-  const copy = { backend: {} as never, ctx: {} as never, exportBaked: vi.fn(), isGuardCurrent: () => true };
+  const copy = {
+    backend: {} as never,
+    commitLayerCopy: () => false,
+    ctx: {} as never,
+    exportBaked: vi.fn(),
+    getMainModelBase: () => null,
+    isGuardCurrent: () => true,
+  };
   const newRasterLayer = { backend: {} as never, ctx: {} as never, layers: {} as never, selection: {} as never };
   it('exposes only declared layer and preview ports', async () => {
     const forward: CanvasProjectMutation = { id: 'layer', type: 'setCanvasSelectedLayer' };

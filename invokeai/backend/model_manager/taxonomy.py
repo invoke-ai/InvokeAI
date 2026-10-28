@@ -62,6 +62,9 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with Qwen Image Edit 2511 model architecture."""
     Anima = "anima"
     """Indicates the model is associated with Anima model architecture (Cosmos Predict2 DiT + LLM Adapter)."""
+    QwenImage21 = "qwen-image-2-1"
+    """Indicates the model is associated with the Qwen-Image-2.1 architecture: a single-stream DiT on a 64-channel,
+    16x RGBA VAE, conditioned by Qwen3-VL-8B. Unrelated to `QwenImage` beyond the name."""
     Krea2 = "krea-2"
     """Indicates the model is associated with the Krea 2 model architecture, including Krea-2-Turbo."""
     Wan = "wan"
@@ -72,6 +75,9 @@ class BaseModelType(str, Enum):
     LTX2 = "ltx-2"
     """Indicates the model is associated with the Lightricks LTX-2 family (LTX-2.5 in this version), a
     dual-stream video+audio DiT conditioned by a Gemma text encoder through learned connectors."""
+    MossImage = "moss-image"
+    """Indicates the model is associated with the OpenMOSS MOSS-Image architecture: a single-stream DiT on the
+    FLUX.2 VAE latent, conditioned by Qwen3.5-9B."""
     Unknown = "unknown"
     """Indicates the model's base architecture is unknown."""
 
@@ -124,6 +130,9 @@ class SubModelType(str, Enum):
     Tokenizer2 = "tokenizer_2"
     Tokenizer3 = "tokenizer_3"
     Processor = "processor"
+    # A vision-language encoder's vision tower alone, which the text encoder is loaded without; edits attach it
+    # while they encode, so the language model is cached once. Krea-2 and Qwen-Image-2.1.
+    VisionEncoder = "vision_encoder"
     PromptEnhancer = "pe"
     PromptEnhancerTokenizer = "pe_tokenizer"
     VAE = "vae"
@@ -204,6 +213,16 @@ class Krea2VariantType(str, Enum):
     using resolution-aware timestep shifting (``is_distilled=false`` in model_index.json).
 
     NOTE: the value is ``krea2_base`` (not ``base``) for the same disambiguation reason as ``Turbo``."""
+
+
+class QwenImage21VariantType(str, Enum):
+    """Qwen-Image-2.1 variants. The weights share one architecture; what differs is the sampling schedule."""
+
+    Base = "qwen_image_21_base"
+    """The released model: 40 steps on a resolution-shifted schedule with a terminal shift."""
+
+    Turbo = "qwen_image_21_turbo"
+    """Qwen-Image-2.1-Turbo: distilled for 8 steps on a fixed sigma table, CFG off."""
 
 
 class QwenImageVariantType(str, Enum):
@@ -293,6 +312,9 @@ class Qwen35VariantType(str, Enum):
 
     Qwen35_4B = "qwen3_5_4b"
     """Qwen3.5 4B (hidden_size=2560, 32 layers). Anima-3.8B's semantic encoder, read at layers 7/15/23/31."""
+
+    Qwen35_9B = "qwen3_5_9b"
+    """Qwen3.5 9B (hidden_size=4096, 32 layers). MOSS-Image's text encoder, read after its final norm."""
 
 
 class AnimaVariantType(str, Enum):
@@ -478,6 +500,7 @@ AnyVariant: TypeAlias = Union[
     Qwen35VariantType,
     AnimaVariantType,
     Krea2VariantType,
+    QwenImage21VariantType,
     MiniMaxH3VariantType,
     LTX2VariantType,
     MistralVariantType,
@@ -497,6 +520,7 @@ variant_type_adapter = TypeAdapter[
     | Qwen35VariantType
     | AnimaVariantType
     | Krea2VariantType
+    | QwenImage21VariantType
     | MiniMaxH3VariantType
     | LTX2VariantType
     | MistralVariantType
@@ -515,6 +539,7 @@ variant_type_adapter = TypeAdapter[
     | Qwen35VariantType
     | AnimaVariantType
     | Krea2VariantType
+    | QwenImage21VariantType
     | MiniMaxH3VariantType
     | LTX2VariantType
     | MistralVariantType

@@ -4,7 +4,7 @@ import { collectLiveAssetRefs, selectCoverImageName, stripInstallationState } fr
 
 import type { InvkArchiveEntry } from './archive';
 import type { FetchedThumbnail } from './assetTransport';
-import type { InvkBoardItem, InvkBoardSnapshot } from './board';
+import type { InvkBoard, InvkBoardSnapshot } from './board';
 import type { InvkTransferItem, ProjectTransferIssues } from './transfer';
 
 import { binaryEntry, INVK_MAX_ENTRIES, textEntry, writeArchive } from './archive';
@@ -14,7 +14,7 @@ import {
   INVK_TRANSFER_CONCURRENCY,
   isRequestCancellation,
 } from './assetTransport';
-import { buildInvkBoardSnapshot } from './board';
+import { buildInvkBoardSnapshot, flattenInvkBoardItems } from './board';
 import {
   collectFontDependencies,
   INVK_MAX_FONT_BYTES,
@@ -27,6 +27,7 @@ import {
   INVK_IMAGES_PREFIX,
   INVK_MANIFEST_ENTRY,
   INVK_VIDEOS_PREFIX,
+  INVK_WORKSPACE_ENTRY,
   InvkFormatError,
 } from './format';
 import { buildInvkManifest, toInvkFileName } from './manifest';
@@ -35,12 +36,14 @@ import { createTransferIssueLog, planMediaTransfer, toMediaRefs } from './transf
 /** Skip unavailable assets, but abort on cancellation before packing. */
 
 export interface InvkExportPlan {
-  /** The board's contents exactly as they will be written to `board.json`. */
+  /** The project's boards exactly as they will be written to `board.json`. */
   boardSnapshot: InvkBoardSnapshot;
   /** Cover image name, or `null` for a project that has produced nothing. */
   coverImageName: string | null;
-  /** The project document, already serialized. */
+  /** `project.json`, already serialized: the project content, or a whole document an exporter could not split. */
   documentJson: string;
+  /** `workspace.json`, already serialized, or `null` when the exporter's workspace stays out of the file. */
+  workspaceJson: string | null;
   /** Download file name, including the extension. */
   fileName: string;
   fonts: InvkFontDependency[];
@@ -48,6 +51,7 @@ export interface InvkExportPlan {
   manifestInput: {
     appVersion: string;
     createdAt: string;
+    documentSchemaVersion: number;
     minimumCanvasSchemaVersion: number;
     name: string;
     sourceProjectId?: string;
@@ -57,24 +61,37 @@ export interface InvkExportPlan {
 }
 
 /** Budget fixed entries separately from the optional cover. */
-const FIXED_ENTRY_COUNT = 3;
+const FIXED_ENTRY_COUNT = 4;
 
 export const planInvkExport = (input: {
   appVersion: string;
-  boardItems: readonly InvkBoardItem[];
+  /** The project's boards as the server enumerated them, the inbox among them. */
+  boards: readonly InvkBoard[];
   createdAt: string;
   minimumCanvasSchemaVersion: number;
   name: string;
-  projectDocument: Record<string, unknown>;
+  /** What `project.json` carries, and the document schema it is written in. */
+  content: Record<string, unknown>;
+  documentSchemaVersion: number;
+  /** The exporter's own workspace, or `null` to leave it out of the file. */
+  workspace: Record<string, unknown> | null;
   includeFonts?: boolean;
 }): InvkExportPlan => {
-  const sourceProjectId = typeof input.projectDocument.id === 'string' ? input.projectDocument.id : undefined;
+  const sourceProjectId = typeof input.content.id === 'string' ? input.content.id : undefined;
 
   // Strip installation state during planning; excluding its bytes alone leaves dangling references.
-  const projectDocument = stripInstallationState(input.projectDocument);
-  const boardSnapshot = buildInvkBoardSnapshot(input.boardItems);
-  const transferItems = planMediaTransfer(boardSnapshot.items, toMediaRefs(collectLiveAssetRefs(projectDocument)));
-  const fonts = collectFontDependencies(projectDocument);
+  const content = stripInstallationState(input.content);
+  const workspace = input.workspace === null ? null : stripInstallationState(input.workspace);
+  const written = workspace === null ? [content] : [content, workspace];
+  // Only what the file carries: media a left-out workspace names (staged results, gallery recents) stays behind.
+  const documentRefs = written.map(collectLiveAssetRefs).reduce((all, refs) => ({
+    images: new Set([...all.images, ...refs.images]),
+    videos: new Set([...all.videos, ...refs.videos]),
+  }));
+  const boardSnapshot = buildInvkBoardSnapshot(input.boards);
+  const transferItems = planMediaTransfer(flattenInvkBoardItems(boardSnapshot), toMediaRefs(documentRefs));
+  // A reader checks fonts against the canvas of each half it reads, the workspace's staging area included.
+  const fonts = collectFontDependencies({ canvas: written.map((half) => half.canvas) });
 
   // Check the archive budget before downloading assets.
   const worstCaseEntries = FIXED_ENTRY_COUNT + transferItems.length + (input.includeFonts ? fonts.length : 0) + 1;
@@ -85,20 +102,23 @@ export const planInvkExport = (input: {
 
   return {
     boardSnapshot,
-    coverImageName: selectCoverImageName(projectDocument),
+    // The gallery's newest result is the workspace's, so without it the cover comes from the canvas.
+    coverImageName: selectCoverImageName({ ...workspace, ...content }),
     // Serialize compactly to limit the uncompressed document size.
-    documentJson: JSON.stringify(projectDocument),
+    documentJson: JSON.stringify(content),
     fileName: toInvkFileName(input.name),
     fonts,
     includeFonts: input.includeFonts ?? false,
     manifestInput: {
       appVersion: input.appVersion,
       createdAt: input.createdAt,
+      documentSchemaVersion: input.documentSchemaVersion,
       minimumCanvasSchemaVersion: input.minimumCanvasSchemaVersion,
       name: input.name,
       ...(sourceProjectId === undefined ? {} : { sourceProjectId }),
     },
     transferItems,
+    workspaceJson: workspace === null ? null : JSON.stringify(workspace),
   };
 };
 
@@ -226,6 +246,9 @@ export const executeInvkExport = async (plan: InvkExportPlan, deps: InvkExportDe
   // The manifest is the one entry a person may open by hand, so it is indented.
   entries.set(INVK_MANIFEST_ENTRY, textEntry(JSON.stringify(manifest, null, 2)));
   entries.set(INVK_DOCUMENT_ENTRY, textEntry(plan.documentJson));
+  if (plan.workspaceJson !== null) {
+    entries.set(INVK_WORKSPACE_ENTRY, textEntry(plan.workspaceJson));
+  }
   // Write an explicit empty board entry and retain missing-byte descriptors for import reporting.
   entries.set(INVK_BOARD_ENTRY, textEntry(JSON.stringify(plan.boardSnapshot)));
 

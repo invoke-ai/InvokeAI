@@ -1,32 +1,32 @@
 import { Flex, Icon, Spinner, Text } from '@chakra-ui/react';
 import { queueBackend } from '@features/queue/data/httpRealtimeQueueBackend';
-import { queueReadModelOptions } from '@features/queue/data/queries';
+import { queueStatusOptions } from '@features/queue/data/queries';
 import { useQuery } from '@tanstack/react-query';
 import { HourglassIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * Home shows server-wide activity outside project scope. Read queries directly to avoid loading Queue runtime for
- * summary counts.
+ * Home shows server-wide activity outside project scope. Read the status query directly to avoid loading Queue
+ * runtime, items, or the recent window for summary counts.
  */
 
 const ALL_JOBS_SCOPE = {} as const;
 
 /**
  * Refresh Home counts here because editor realtime invalidation is unmounted and query focus refetching is
- * disabled.
+ * disabled. Polling continues at zero so work started elsewhere appears; it pauses while the document is hidden.
  */
 const QUEUE_POLL_INTERVAL_MS = 5_000;
 
 export const QueueStatusBand = () => {
   const { t } = useTranslation();
   const { data } = useQuery({
-    ...queueReadModelOptions(queueBackend, ALL_JOBS_SCOPE),
+    ...queueStatusOptions(queueBackend, ALL_JOBS_SCOPE),
     refetchInterval: QUEUE_POLL_INTERVAL_MS,
     refetchIntervalInBackground: false,
   });
 
-  const counts = data?.status.queue;
+  const counts = data?.queue;
   const inProgress = counts?.inProgress ?? 0;
   const pending = counts?.pending ?? 0;
 

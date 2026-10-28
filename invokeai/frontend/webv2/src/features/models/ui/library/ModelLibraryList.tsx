@@ -3,11 +3,12 @@ import type { ModelConfig } from '@features/models/core/types';
 import type { ListRowProps } from '@platform/ui/list/List';
 import type { ListContextMenuAnchor } from '@platform/ui/list/ListItem';
 
-import { Flex, HStack, Icon, Image } from '@chakra-ui/react';
+import { Box, Flex, HStack, Icon, Image } from '@chakra-ui/react';
 import { filterModels, groupModelsByType, type ModelLibraryFilters } from '@features/models/core/library';
 import { getModelImageUrl } from '@features/models/data/api';
 import { useModelsSelector } from '@features/models/data/modelsStore';
 import { MissingFileBadge, ModelBaseBadge, ModelFormatBadge } from '@features/models/ui/detail/ModelBadges';
+import { useModelHasUnsavedChanges } from '@features/models/ui/modelDraftsStore';
 import { getLibraryScrollOffset, openModelManagerTab, saveLibraryScrollOffset } from '@features/models/ui/uiStore';
 import { formatBytes } from '@platform/i18n/languages';
 import { Button } from '@platform/ui';
@@ -173,6 +174,8 @@ const ModelRow = memo(function ModelRow({
   onToggleSelected,
   ...rowProps
 }: ModelRowProps) {
+  // Per-row subscription: a keystroke in one model's draft re-renders only a row whose marker flips.
+  const hasUnsavedChanges = useModelHasUnsavedChanges(modelKey);
   const handlePress = useCallback(() => onActivate(modelKey), [modelKey, onActivate]);
   const handleCheckedChange = useCallback(() => onToggleSelected(modelKey), [modelKey, onToggleSelected]);
   const handleContextMenu = useCallback(
@@ -183,6 +186,7 @@ const ModelRow = memo(function ModelRow({
   return (
     <ListItem
       {...rowProps}
+      badges={hasUnsavedChanges ? <UnsavedChangesDot /> : null}
       description={
         <HStack gap="1" minW="0" wrap="wrap">
           <ModelBaseBadge base={base} />
@@ -208,6 +212,23 @@ const ModelRow = memo(function ModelRow({
     />
   );
 });
+
+/** Takes the title's color so it stays legible on the accent-filled active row. */
+const UnsavedChangesDot = () => {
+  const { t } = useTranslation();
+
+  return (
+    <Box
+      aria-label={t('models.unsavedChanges')}
+      as="span"
+      bg="currentColor"
+      boxSize="1.5"
+      display="inline-block"
+      rounded="full"
+      role="img"
+    />
+  );
+};
 
 const ModelRowThumbnail = ({
   coverImage,

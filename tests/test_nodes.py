@@ -1,5 +1,7 @@
-from typing import Any, Callable, Union
+from typing import Any, Callable, Literal, Optional, Union
 from unittest.mock import MagicMock
+
+from pydantic import BaseModel
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -97,6 +99,20 @@ class AnyTypeTestInvocation(BaseInvocation):
         return AnyTypeTestInvocationOutput(value=self.value)
 
 
+@invocation_output("test_fixed_collection_output")
+class FixedCollectionTestInvocationOutput(BaseInvocationOutput):
+    condition: bool = OutputField()
+    collection: list[Any] = OutputField()
+
+
+@invocation("test_fixed_collection", version="1.0.0")
+class FixedCollectionTestInvocation(BaseInvocation):
+    value: Any = InputField()
+
+    def invoke(self, context: InvocationContext) -> FixedCollectionTestInvocationOutput:
+        return FixedCollectionTestInvocationOutput(condition=bool(self.value), collection=[0, 1])
+
+
 @invocation("test_marked_any", version="1.0.0")
 class MarkedAnyTypeTestInvocation(AnyTypeTestInvocation):
     marker: str = InputField(default="")
@@ -126,6 +142,63 @@ class UnionCollectionTestInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> UnionCollectionTestInvocationOutput:
         return UnionCollectionTestInvocationOutput(value=self.value)
+
+
+@invocation_output("test_literal_output")
+class LiteralTestInvocationOutput(BaseInvocationOutput):
+    value: Literal[256, 512] = OutputField(default=256)
+    optional_value: Optional[Literal["a", "b"]] = OutputField(default=None)
+
+
+@invocation("test_literal", version="1.0.0")
+class LiteralTestInvocation(BaseInvocation):
+    """Outputs Literal-typed values, as the FLUX model loaders' max_seq_len does."""
+
+    def invoke(self, context: InvocationContext) -> LiteralTestInvocationOutput:
+        return LiteralTestInvocationOutput()
+
+
+@invocation("test_optional_collection", version="1.0.0")
+class OptionalCollectionTestInvocation(BaseInvocation):
+    value: Union[list[str], None] = InputField(default=None)
+
+    def invoke(self, context: InvocationContext) -> PromptCollectionTestInvocationOutput:
+        return PromptCollectionTestInvocationOutput(collection=self.value or [])
+
+
+class BaseTestField(BaseModel):
+    name: str = ""
+
+
+class DerivedTestField(BaseTestField):
+    pass
+
+
+@invocation_output("test_derived_field_output")
+class DerivedFieldTestInvocationOutput(BaseInvocationOutput):
+    value: DerivedTestField = OutputField()
+
+
+@invocation("test_derived_field", version="1.0.0")
+class DerivedFieldTestInvocation(BaseInvocation):
+    def invoke(self, context: InvocationContext) -> DerivedFieldTestInvocationOutput:
+        return DerivedFieldTestInvocationOutput(value=DerivedTestField())
+
+
+@invocation("test_union_item_collection", version="1.0.0")
+class UnionItemCollectionTestInvocation(BaseInvocation):
+    value: list[Union[BaseTestField, str]] = InputField(default=[])
+
+    def invoke(self, context: InvocationContext) -> PromptCollectionTestInvocationOutput:
+        return PromptCollectionTestInvocationOutput(collection=[])
+
+
+@invocation("test_pep604_union_item_collection", version="1.0.0")
+class Pep604UnionItemCollectionTestInvocation(BaseInvocation):
+    value: list[BaseTestField | str] = InputField(default=[])
+
+    def invoke(self, context: InvocationContext) -> PromptCollectionTestInvocationOutput:
+        return PromptCollectionTestInvocationOutput(collection=[])
 
 
 # Importing these must happen after test invocations are defined or they won't register

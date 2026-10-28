@@ -4,9 +4,10 @@ import type { ProjectWorkflowCollection } from '@workbench/projectWorkflows';
 import { stripInfiniteWindowAnchor, stripSessionScopedGallerySearch } from '@features/gallery/contracts';
 import { migrateProjectGraphToCollection, normalizeProjectWorkflowCollection } from '@workbench/projectWorkflows';
 
+import { PROJECT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
+
 /** Keep document codecs reducer-free; load rehydration lazily. */
 
-export const PROJECT_DOCUMENT_SCHEMA_VERSION = 3;
 export const PROJECT_DOCUMENT_MAX_BYTES = 32 * 1024 * 1024;
 
 export type ProjectDocumentV3 = Omit<
@@ -19,17 +20,20 @@ export type ProjectDocumentV3 = Omit<
     | 'lastFloatingGeometry'
     | 'layout'
     | 'name'
+    | 'presetWorkingLayouts'
     | 'promptHistory'
     | 'settings'
     | 'widgetGraphs'
     | 'widgetInstances'
     | 'widgetRegions'
   >,
-  'floatingWidgets' | 'lastFloatingGeometry'
+  'floatingWidgets' | 'lastFloatingGeometry' | 'presetWorkingLayouts'
 > & {
   documentSchemaVersion: typeof PROJECT_DOCUMENT_SCHEMA_VERSION;
   floatingWidgets?: Project['floatingWidgets'];
   lastFloatingGeometry?: Project['lastFloatingGeometry'];
+  /** Optional and additive, so schema 3 holds: a build that predates it ignores it and leaves it out of its next save. */
+  presetWorkingLayouts?: Project['presetWorkingLayouts'];
   workflows: ProjectWorkflowCollection;
 };
 
@@ -72,6 +76,7 @@ export const serializeProjectDocumentV3 = (project: Project): ProjectDocumentV3 
     ...(persistent.lastFloatingGeometry ? { lastFloatingGeometry: persistent.lastFloatingGeometry } : {}),
     layout: persistent.layout,
     name: persistent.name,
+    ...(persistent.presetWorkingLayouts ? { presetWorkingLayouts: persistent.presetWorkingLayouts } : {}),
     promptHistory: persistent.promptHistory,
     settings: persistent.settings,
     widgetGraphs: persistent.widgetGraphs,

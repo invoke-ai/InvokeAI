@@ -26,9 +26,12 @@ export const getLayoutPresetCommandTitleOverrides = (
 ): Readonly<Record<string, string>> =>
   Object.fromEntries(
     builtInLayoutPresetDescriptors.flatMap(({ hotkeyId, preset }) => {
-      const savedLabel = resolveSavedLayoutPreset(account, preset.id).label;
+      const saved = resolveSavedLayoutPreset(account, preset.id);
 
-      return savedLabel === preset.label ? [] : [[`app.${hotkeyId}`, formatTitle(savedLabel)]];
+      // Only a rename: a preset still on its shipped name keeps the catalog title.
+      return saved.labelKey !== undefined || saved.label === preset.label
+        ? []
+        : [[`app.${hotkeyId}`, formatTitle(saved.label)]];
     })
   );
 
@@ -48,10 +51,56 @@ export const resolveSavedLayoutPreset = (account: AccountState, presetId: Layout
   const override = account.layoutPresetOverrides?.[builtInPreset.id];
   const defaultRoute = account.layoutPresetRouteOverrides?.[builtInPreset.id] ?? builtInPreset.defaultRoute;
 
-  return metadata || override || defaultRoute !== builtInPreset.defaultRoute
-    ? { ...builtInPreset, ...metadata, defaultRoute, snapshot: override ?? builtInPreset.snapshot }
-    : builtInPreset;
+  if (!metadata && !override && defaultRoute === builtInPreset.defaultRoute) {
+    return builtInPreset;
+  }
+
+  const resolved: LayoutPreset = {
+    ...builtInPreset,
+    ...metadata,
+    defaultRoute,
+    snapshot: override ?? builtInPreset.snapshot,
+  };
+
+  // A renamed preset is shown by the name the account gave it, in every language.
+  if (metadata?.label !== undefined) {
+    delete resolved.labelKey;
+  }
+
+  return resolved;
 };
+
+/** Built-in presets always exist; a custom one exists while the account still has it. */
+export const doesLayoutPresetExist = (account: AccountState, presetId: LayoutPresetId): boolean =>
+  isBuiltInLayoutPresetId(presetId) || (account.customLayoutPresets ?? []).some((preset) => preset.id === presetId);
+
+export const findLayoutPresetWorkingCopy = (
+  presetWorkingLayouts: Project['presetWorkingLayouts'],
+  presetId: LayoutPresetId
+): LayoutPresetSnapshot | undefined => presetWorkingLayouts?.find((copy) => copy.presetId === presetId)?.snapshot;
+
+/** What switching to a preset lays out in this project: its working copy here, else its saved arrangement. */
+export const getLayoutPresetArrangement = (project: Project, preset: LayoutPreset): LayoutPresetSnapshot =>
+  (project.layout.presetId === preset.id
+    ? undefined
+    : findLayoutPresetWorkingCopy(project.presetWorkingLayouts, preset.id)) ?? preset.snapshot;
+
+/**
+ * Presets this project holds an unsaved arrangement of besides the active one, whose drift is the live layout's.
+ * A copy that matches its saved preset (saved since, here or in another project) is not unsaved.
+ */
+export const getUnsavedInactiveLayoutPresetIds = (
+  presetWorkingLayouts: Project['presetWorkingLayouts'],
+  activePresetId: LayoutPresetId,
+  account: AccountState
+): LayoutPresetId[] =>
+  (presetWorkingLayouts ?? []).flatMap(({ presetId, snapshot }) =>
+    presetId !== activePresetId &&
+    doesLayoutPresetExist(account, presetId) &&
+    !areLayoutPresetSnapshotsEqual(snapshot, resolveSavedLayoutPreset(account, presetId).snapshot)
+      ? [presetId]
+      : []
+  );
 
 const cloneFloatingWidgets = (
   floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState>

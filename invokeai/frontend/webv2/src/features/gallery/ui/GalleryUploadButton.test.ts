@@ -16,6 +16,7 @@ const board: GalleryBoard = {
   imageCount: 0,
   kind: 'board',
   name: 'Dogs',
+  isInbox: false,
   projectId: null,
   videoCount: 0,
 };
@@ -35,10 +36,29 @@ describe('getGalleryUploadTargetLabel', () => {
     });
   });
 
+  it('is unavailable while a search looks in every board, which has no board of its own to upload to', () => {
+    expect(getGalleryUploadTargetLabel([board], 'all', t)).toEqual({
+      isAvailable: false,
+      label: 'widgets.gallery.uploadsUnavailableForAllBoards',
+    });
+  });
+
   it('marks date boards unavailable', () => {
     expect(getGalleryUploadTargetLabel([board], 'by_date:2026-09-04', t)).toEqual({
       isAvailable: false,
       label: 'widgets.gallery.uploadsUnavailableForDateBoards',
+    });
+  });
+
+  it('marks a board the caller may only view unavailable, and says why', () => {
+    const viewOnly: GalleryBoard = {
+      ...board,
+      access: { actions: ['read'], adminOverride: false, generalAccess: 'viewer', role: 'viewer' },
+    };
+
+    expect(getGalleryUploadTargetLabel([viewOnly], 'dogs', t)).toEqual({
+      isAvailable: false,
+      label: 'widgets.gallery.uploadsUnavailableForViewOnlyBoard:Dogs',
     });
   });
 });

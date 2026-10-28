@@ -50,7 +50,7 @@ const DEFAULT_WEIGHT_VECTOR: readonly number[] = parseRebalanceWeights(DEFAULT_K
 type PresetDialog = { mode: 'save' } | { mode: 'rename'; preset: RebalancePreset };
 
 interface GenerateConditioningRebalanceFieldProps {
-  settings: GenerateSettings;
+  settings: Pick<GenerateSettings, 'krea2RebalanceEnabled' | 'krea2RebalanceMultiplier' | 'krea2RebalanceWeights'>;
   /** Debounced; used for the continuous controls. */
   onCommit: (patch: Partial<GenerateSettings>) => void;
   /** Immediate; used for discrete edits that should not sit in the draft. */
@@ -304,6 +304,7 @@ export const GenerateConditioningRebalanceField = ({
             >
               <ScrubberField
                 defaultValue={DEFAULT_KREA2_REBALANCE_MULTIPLIER}
+                hint="conditioningRebalanceGain"
                 inputMax={GAIN_INPUT_MAX}
                 label={t('widgets.generate.krea2RebalanceGain')}
                 max={GAIN_SLIDER_MAX}

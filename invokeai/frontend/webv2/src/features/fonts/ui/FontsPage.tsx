@@ -44,8 +44,9 @@ import { List } from '@platform/ui/list/List';
 import { ListItem } from '@platform/ui/list/ListItem';
 import { ListPager } from '@platform/ui/list/ListPager';
 import { listRowsFromItems } from '@platform/ui/list/listRows';
-import { ManagerColumn, ManagerDetailHeader } from '@platform/ui/ManagerLayout';
+import { ManagerColumn, ManagerDetailHeader, ManagerLayout } from '@platform/ui/ManagerLayout';
 import { MenuContent } from '@platform/ui/Menu';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRightIcon,
@@ -306,7 +307,11 @@ const FontLibrary = () => {
   const { canManageSharedFonts } = useCapabilities();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<FontFilter>('all');
-  const [activeTab, setActiveTab] = useState('details');
+  // Null until the library first loads (see below).
+  const [chosenTab, setActiveTab] = useState<string | null>(null);
+  // Which pane a manager too narrow for both shows; opening a font or a tab reveals the detail. Null until the
+  // library first loads (see below).
+  const [detailOpen, setDetailOpen] = useState<boolean | null>(null);
   const [selectedFont, setSelectedFont] = useState<FontRecord | null>(null);
   const [search, setSearch] = useState('');
   const [uploadScope, setUploadScope] = useState<FontScope>('private');
@@ -418,7 +423,10 @@ const FontLibrary = () => {
     }
     try {
       await deleteFont(deleteTarget.id);
-      setSelectedFont((current) => (current?.id === deleteTarget.id ? null : current));
+      if (selectedFont?.id === deleteTarget.id) {
+        setSelectedFont(null);
+        setDetailOpen(false);
+      }
       setDeleteTarget(null);
       await invalidateFonts();
     } catch (error) {
@@ -434,7 +442,7 @@ const FontLibrary = () => {
         ].slice(0, 12)
       );
     }
-  }, [deleteTarget, invalidateFonts, t]);
+  }, [deleteTarget, invalidateFonts, selectedFont, t]);
   const handleRescan = useCallback(async () => {
     setIsRescanning(true);
     try {
@@ -494,228 +502,258 @@ const FontLibrary = () => {
   const effectiveUploadScope = canManageSharedFonts ? uploadScope : 'private';
 
   const activeFont = fonts.find((font) => font.id === selectedFont?.id) ?? selectedFont;
+  const openTab = useCallback((tab: string) => {
+    setActiveTab(tab);
+    setDetailOpen(true);
+  }, []);
+  const closeDetail = useCallback(() => setDetailOpen(false), []);
+  const addAction = useMemo(() => ({ label: t('fonts.addFonts'), onAdd: () => openTab('add') }), [openTab, t]);
+  // The starting pane and tab are decided once, when the library first loads: an empty library opens on Add Fonts,
+  // any other on the list. Later uploads and deletes never move the user; only opening a font or a tab, and Back, do.
+  if (detailOpen === null && !query.isPending) {
+    const isLibraryEmpty = query.data?.total === 0 && offset === 0 && filter === 'all' && search === '';
+
+    setDetailOpen(isLibraryEmpty);
+    if (chosenTab === null) {
+      setActiveTab(isLibraryEmpty ? 'add' : 'details');
+    }
+  }
 
   return (
-    <Flex aria-label={t('fonts.title')} role="region" h="full" minH="0" w="full">
+    <Box aria-label={t('fonts.title')} h="full" role="region">
       <input ref={inputRef} accept={FONT_ACCEPT} hidden multiple type="file" onChange={handleInputChange} />
-      <ManagerColumn
-        actions={
-          canManageSharedFonts ? (
-            <Button
-              aria-label={t('fonts.rescan')}
-              disabled={isRescanning}
-              size="sm"
-              variant="ghost"
-              onClick={handleRescan}
-            >
-              <RefreshCwIcon />
-              {t('fonts.rescan')}
-            </Button>
-          ) : null
+      <ManagerLayout
+        backLabel={t('fonts.backToList')}
+        detail={
+          <Tabs.Root
+            asChild
+            lazyMount
+            size="xl"
+            unmountOnExit
+            value={chosenTab ?? 'details'}
+            onValueChange={(event) => openTab(event.value)}
+          >
+            <Flex direction="column" flex="1" minH="0" minW="0">
+              <ManagerDetailHeader>
+                <Tabs.List mb="-1px">
+                  <Tabs.Trigger data-manager-item-tab="" value="details">
+                    <Icon as={FileTypeIcon} boxSize="3" />
+                    <MiddleTruncate maxW="14rem" minW="0" text={activeFont?.label || t('fonts.details')} />
+                  </Tabs.Trigger>
+                  <Tabs.Trigger value="add">
+                    <Icon as={PlusIcon} boxSize="3" />
+                    {t('fonts.addFonts')}
+                  </Tabs.Trigger>
+                </Tabs.List>
+              </ManagerDetailHeader>
+              <Box flex="1" minH="0">
+                <Tabs.Content h="full" p="0" value="details">
+                  {activeFont ? (
+                    <Scrollable h="full" label={t('fonts.details')} minH="0">
+                      <FontDetail canDelete={canDelete(activeFont)} font={activeFont} onDelete={setDeleteTarget} />
+                    </Scrollable>
+                  ) : (
+                    <Flex align="center" direction="column" gap="2" h="full" justify="center" p="6">
+                      <Icon as={FileTypeIcon} boxSize="8" color="fg.subtle" />
+                      <Text color="fg.muted" fontSize="lg" fontWeight="600">
+                        {t('fonts.selectFont')}
+                      </Text>
+                      <Text color="fg.muted" maxW="22rem" textAlign="center">
+                        {t('fonts.selectFontDescription')}
+                      </Text>
+                    </Flex>
+                  )}
+                </Tabs.Content>
+                <Tabs.Content h="full" p="0" value="add">
+                  <Scrollable h="full" label={t('fonts.addFonts')} minH="0" p="3">
+                    <Stack align="start" gap="4" maxW="xl">
+                      <Stack gap="1">
+                        <Text as="h3" fontSize="lg" fontWeight="600">
+                          {t('fonts.upload')}
+                        </Text>
+                        <Text color="fg.muted" fontSize="md">
+                          {t('fonts.description')}
+                        </Text>
+                        <Text color="fg.muted" fontSize="md">
+                          {t('fonts.uploadDescription')}
+                        </Text>
+                      </Stack>
+                      {canManageSharedFonts ? (
+                        <SegmentedControl
+                          ariaLabel={t('fonts.uploadScopeLabel')}
+                          isFullWidth={false}
+                          options={uploadScopeOptions}
+                          value={effectiveUploadScope}
+                          onChange={(value) => setUploadScope(value as FontScope)}
+                        />
+                      ) : null}
+                      <Button onClick={() => inputRef.current?.click()}>
+                        <UploadIcon />
+                        {effectiveUploadScope === 'shared' ? t('fonts.uploadShared') : t('fonts.upload')}
+                      </Button>
+                    </Stack>
+                  </Scrollable>
+                </Tabs.Content>
+              </Box>
+            </Flex>
+          </Tabs.Root>
         }
-        count={query.data?.total ?? '–'}
-        title={t('fonts.title')}
-      >
-        <HStack gap="1.5" p="3">
-          <InputGroup startElement={SEARCH_ICON}>
-            <Input
-              aria-label={t('fonts.searchLabel')}
-              placeholder={t('fonts.searchPlaceholder')}
-              value={search}
-              onChange={(event) => {
-                setSearch(event.currentTarget.value);
-                setOffset(0);
-              }}
-            />
-          </InputGroup>
-          <Menu.Root closeOnSelect={false} positioning={FILTER_POSITION}>
-            <Menu.Trigger asChild>
-              <IconButton
-                aria-label={t('fonts.filterMenu')}
-                color={filter !== 'all' ? 'accent.solid' : 'fg.muted'}
-                variant="outline"
-              >
-                <Icon as={SlidersHorizontalIcon} boxSize="4" />
-              </IconButton>
-            </Menu.Trigger>
-            <Portal>
-              <Menu.Positioner>
-                <MenuContent minW="13rem">
-                  <Menu.RadioItemGroup
-                    value={filter}
-                    onValueChange={(event) => {
-                      setFilter(event.value as FontFilter);
-                      setOffset(0);
-                    }}
-                  >
-                    <Menu.ItemGroupLabel color="fg" fontSize="xs" textTransform="uppercase">
-                      {t('fonts.filterLabel')}
-                    </Menu.ItemGroupLabel>
-                    {filterOptions.map((option) => (
-                      <Menu.RadioItem key={option.value} value={option.value}>
-                        <Menu.ItemIndicator />
-                        <Menu.ItemText>{option.label}</Menu.ItemText>
-                      </Menu.RadioItem>
-                    ))}
-                  </Menu.RadioItemGroup>
-                </MenuContent>
-              </Menu.Positioner>
-            </Portal>
-          </Menu.Root>
-        </HStack>
-        <List
-          key={listKey}
-          activeKey={selectedFont?.id ?? null}
-          density="comfortable"
-          emptyState={
-            <EmptyState
-              description={search.trim() ? t('fonts.noSearchMatchesDescription') : t('fonts.emptyDescription')}
-              icon={search.trim() ? EMPTY_SEARCH_ICON : EMPTY_ICON}
-              title={search.trim() ? t('fonts.noSearchMatches') : t('fonts.emptyTitle')}
-            >
-              {search.trim() ? (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSearch('');
-                    setOffset(0);
-                  }}
-                >
-                  {t('common.clearSearch')}
-                </Button>
-              ) : (
-                <Button size="lg" onClick={() => setActiveTab('add')}>
-                  {t('fonts.addFonts')}
-                  <Icon as={ArrowRightIcon} />
-                </Button>
-              )}
-            </EmptyState>
-          }
-          errorState={
-            <EmptyState
-              danger
-              description={query.isError ? getApiErrorMessage(query.error, t('fonts.couldNotLoad')) : null}
-              icon={ERROR_ICON}
-              title={t('fonts.couldNotLoad')}
-            >
-              <Button variant="outline" onClick={handleRetry}>
-                {t('common.retry')}
-              </Button>
-            </EmptyState>
-          }
-          label={t('fonts.library')}
-          renderItem={(font: FontRecord, rowProps: ListRowProps) => (
-            <ListItem
-              {...rowProps}
-              description={font.filename}
-              leading={
-                <FontPreview compact key={`${font.id}:${font.contentHash}:${font.style}:${font.weight}`} font={font} />
-              }
-              title={font.label || font.family}
-              trailing={
-                <Badge fontSize="xs" variant="surface">
-                  {t(getScopeLabelKey(font.scope))}
-                </Badge>
-              }
-              onPress={() => {
-                setSelectedFont(font);
-                setActiveTab('details');
-              }}
-            />
-          )}
-          rows={rows}
-          status={query.isPending ? 'loading' : query.isError ? 'error' : 'ready'}
-        />
-        {showPagination ? (
-          <ListPager
-            hasNext={hasNextPage}
-            hasPrevious={hasPreviousPage}
-            isBusy={query.isFetching}
-            page={Math.floor(offset / FONT_PAGE_SIZE) + 1}
-            onNext={handleNextPage}
-            onPrevious={handlePreviousPage}
-          />
-        ) : null}
-      </ManagerColumn>
-      <Tabs.Root
-        asChild
-        lazyMount
-        size="xl"
-        unmountOnExit
-        value={activeTab}
-        onValueChange={(event) => setActiveTab(event.value)}
-      >
-        <Flex direction="column" flex="1" minH="0" minW="0">
-          <ManagerDetailHeader>
-            <Tabs.List mb="-1px">
-              <Tabs.Trigger value="details">
-                <Icon as={FileTypeIcon} boxSize="3" />
-                <Text maxW="14rem" truncate>
-                  {activeFont?.label || t('fonts.details')}
-                </Text>
-              </Tabs.Trigger>
-              <Tabs.Trigger value="add">
-                <Icon as={PlusIcon} boxSize="3" />
-                {t('fonts.addFonts')}
-              </Tabs.Trigger>
-            </Tabs.List>
-          </ManagerDetailHeader>
-          <Box flex="1" minH="0">
-            <Tabs.Content h="full" p="0" value="details">
-              {activeFont ? (
-                <Scrollable h="full" label={t('fonts.details')} minH="0">
-                  <FontDetail canDelete={canDelete(activeFont)} font={activeFont} onDelete={setDeleteTarget} />
-                </Scrollable>
-              ) : (
-                <Flex align="center" direction="column" gap="2" h="full" justify="center" p="6">
-                  <Icon as={FileTypeIcon} boxSize="8" color="fg.subtle" />
-                  <Text color="fg.muted" fontSize="lg" fontWeight="600">
-                    {t('fonts.selectFont')}
-                  </Text>
-                  <Text color="fg.muted" maxW="22rem" textAlign="center">
-                    {t('fonts.selectFontDescription')}
-                  </Text>
-                </Flex>
-              )}
-            </Tabs.Content>
-            <Tabs.Content h="full" p="0" value="add">
-              <Scrollable h="full" label={t('fonts.addFonts')} minH="0" p="3">
-                <Stack align="start" gap="4" maxW="xl">
-                  <Stack gap="1">
-                    <Text as="h3" fontSize="lg" fontWeight="600">
-                      {t('fonts.upload')}
-                    </Text>
-                    <Text color="fg.muted" fontSize="md">
-                      {t('fonts.description')}
-                    </Text>
-                    <Text color="fg.muted" fontSize="md">
-                      {t('fonts.uploadDescription')}
-                    </Text>
-                  </Stack>
-                  {canManageSharedFonts ? (
-                    <SegmentedControl
-                      ariaLabel={t('fonts.uploadScopeLabel')}
-                      isFullWidth={false}
-                      options={uploadScopeOptions}
-                      value={effectiveUploadScope}
-                      onChange={(value) => setUploadScope(value as FontScope)}
-                    />
-                  ) : null}
-                  <Button onClick={() => inputRef.current?.click()}>
-                    <UploadIcon />
-                    {effectiveUploadScope === 'shared' ? t('fonts.uploadShared') : t('fonts.upload')}
-                  </Button>
-                </Stack>
-              </Scrollable>
-            </Tabs.Content>
-          </Box>
-          {uploads.length > 0 ? (
+        footer={
+          uploads.length > 0 ? (
             <Box borderTopWidth="1px" maxH="32" overflowY="auto" p="3">
               <UploadStatusList items={uploads} />
             </Box>
-          ) : null}
-        </Flex>
-      </Tabs.Root>
+          ) : null
+        }
+        isDetailOpen={detailOpen ?? false}
+        library={
+          <ManagerColumn
+            addAction={addAction}
+            actions={
+              canManageSharedFonts ? (
+                <Button
+                  aria-label={t('fonts.rescan')}
+                  disabled={isRescanning}
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleRescan}
+                >
+                  <RefreshCwIcon />
+                  {t('fonts.rescan')}
+                </Button>
+              ) : null
+            }
+            count={query.data?.total ?? '–'}
+            title={t('fonts.title')}
+          >
+            <HStack gap="1.5" p="3">
+              <InputGroup startElement={SEARCH_ICON}>
+                <Input
+                  aria-label={t('fonts.searchLabel')}
+                  placeholder={t('fonts.searchPlaceholder')}
+                  value={search}
+                  onChange={(event) => {
+                    setSearch(event.currentTarget.value);
+                    setOffset(0);
+                  }}
+                />
+              </InputGroup>
+              <Menu.Root closeOnSelect={false} positioning={FILTER_POSITION}>
+                <Menu.Trigger asChild>
+                  <IconButton
+                    aria-label={t('fonts.filterMenu')}
+                    color={filter !== 'all' ? 'accent.solid' : 'fg.muted'}
+                    variant="outline"
+                  >
+                    <Icon as={SlidersHorizontalIcon} boxSize="4" />
+                  </IconButton>
+                </Menu.Trigger>
+                <Portal>
+                  <Menu.Positioner>
+                    <MenuContent minW="13rem">
+                      <Menu.RadioItemGroup
+                        value={filter}
+                        onValueChange={(event) => {
+                          setFilter(event.value as FontFilter);
+                          setOffset(0);
+                        }}
+                      >
+                        <Menu.ItemGroupLabel color="fg" fontSize="xs" textTransform="uppercase">
+                          {t('fonts.filterLabel')}
+                        </Menu.ItemGroupLabel>
+                        {filterOptions.map((option) => (
+                          <Menu.RadioItem key={option.value} value={option.value}>
+                            <Menu.ItemIndicator />
+                            <Menu.ItemText>{option.label}</Menu.ItemText>
+                          </Menu.RadioItem>
+                        ))}
+                      </Menu.RadioItemGroup>
+                    </MenuContent>
+                  </Menu.Positioner>
+                </Portal>
+              </Menu.Root>
+            </HStack>
+            <List
+              key={listKey}
+              activeKey={selectedFont?.id ?? null}
+              density="comfortable"
+              emptyState={
+                <EmptyState
+                  description={search.trim() ? t('fonts.noSearchMatchesDescription') : t('fonts.emptyDescription')}
+                  icon={search.trim() ? EMPTY_SEARCH_ICON : EMPTY_ICON}
+                  title={search.trim() ? t('fonts.noSearchMatches') : t('fonts.emptyTitle')}
+                >
+                  {search.trim() ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setSearch('');
+                        setOffset(0);
+                      }}
+                    >
+                      {t('common.clearSearch')}
+                    </Button>
+                  ) : (
+                    <Button size="lg" onClick={() => openTab('add')}>
+                      {t('fonts.addFonts')}
+                      <Icon as={ArrowRightIcon} />
+                    </Button>
+                  )}
+                </EmptyState>
+              }
+              errorState={
+                <EmptyState
+                  danger
+                  description={query.isError ? getApiErrorMessage(query.error, t('fonts.couldNotLoad')) : null}
+                  icon={ERROR_ICON}
+                  title={t('fonts.couldNotLoad')}
+                >
+                  <Button variant="outline" onClick={handleRetry}>
+                    {t('common.retry')}
+                  </Button>
+                </EmptyState>
+              }
+              label={t('fonts.library')}
+              renderItem={(font: FontRecord, rowProps: ListRowProps) => (
+                <ListItem
+                  {...rowProps}
+                  description={font.filename}
+                  leading={
+                    <FontPreview
+                      compact
+                      key={`${font.id}:${font.contentHash}:${font.style}:${font.weight}`}
+                      font={font}
+                    />
+                  }
+                  title={font.label || font.family}
+                  trailing={
+                    <Badge fontSize="xs" variant="surface">
+                      {t(getScopeLabelKey(font.scope))}
+                    </Badge>
+                  }
+                  onPress={() => {
+                    setSelectedFont(font);
+                    openTab('details');
+                  }}
+                />
+              )}
+              rows={rows}
+              status={query.isPending ? 'loading' : query.isError ? 'error' : 'ready'}
+            />
+            {showPagination ? (
+              <ListPager
+                hasNext={hasNextPage}
+                hasPrevious={hasPreviousPage}
+                isBusy={query.isFetching}
+                page={Math.floor(offset / FONT_PAGE_SIZE) + 1}
+                onNext={handleNextPage}
+                onPrevious={handlePreviousPage}
+              />
+            ) : null}
+          </ManagerColumn>
+        }
+        onBack={closeDetail}
+      />
       <ConfirmDialog
         body={deleteBody}
         confirmLabel={t('fonts.deleteConfirm')}
@@ -724,7 +762,7 @@ const FontLibrary = () => {
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
       />
-    </Flex>
+    </Box>
   );
 };
 

@@ -34,6 +34,12 @@ import {
  * facts so nodes need no workbench subscriptions.
  */
 
+/**
+ * Whether node definitions are known yet. A node without a template is unknown only once they have loaded; until then
+ * it is waiting, and after a failed load nothing can be said about its type.
+ */
+export type InvocationTemplateStatus = 'error' | 'loaded' | 'loading';
+
 export type InvocationFlowNode = FlowNode<
   {
     canUseCache: boolean;
@@ -47,6 +53,7 @@ export type InvocationFlowNode = FlowNode<
     /** Large workflows render unselected nodes without field controls until selected. */
     isCompact: boolean;
     template: InvocationNodeTemplateView | null;
+    templateStatus: InvocationTemplateStatus;
   },
   'invocation'
 >;
@@ -200,7 +207,8 @@ export const toFlowNodes = (
   templates?: InvocationTemplates,
   index: WorkflowGraphIndex = createWorkflowGraphIndex(document.nodes, document.edges),
   isCompact = false,
-  canUseCache = false
+  canUseCache = false,
+  templateStatus: InvocationTemplateStatus = 'loaded'
 ): WorkflowFlowNode[] => {
   const previousById = new Map(previousNodes.map((node) => [node.id, node]));
   const connectedByNode = getConnectedHandlesByNode(document, index);
@@ -229,6 +237,7 @@ export const toFlowNodes = (
         previous.data.documentNode === documentNode &&
         previous.data.isCompact === isCompact &&
         previous.data.template === template &&
+        previous.data.templateStatus === templateStatus &&
         sameNames(previous.data.connectedSourceHandles, connectedSourceHandles) &&
         sameNames(previous.data.connectedTargetHandles, connectedTargetHandles) &&
         sameNames(previous.data.exposedFieldNames, exposedFieldNames)
@@ -245,6 +254,7 @@ export const toFlowNodes = (
           exposedFieldNames,
           isCompact,
           template,
+          templateStatus,
         },
         id: documentNode.id,
         measured,
@@ -340,24 +350,25 @@ export const withNodeSelection = (nodes: WorkflowFlowNode[], selectedIds: Set<st
 export type FlowEdgeType = 'default' | 'step';
 export type WorkflowFlowEdgeType = FlowEdgeType | 'loop_linkage';
 
+/** The edge component names the edge from these facts, so the copy follows the UI language. */
 export interface WorkflowEdgeData extends Record<string, unknown> {
-  fieldTypeLabel: string;
+  /** The carried field type's name; null for a loop linkage or a type no template declares. */
+  fieldTypeLabel: string | null;
   pathType: FlowEdgeType;
+  isBatch?: boolean;
   isLoopLinkage?: boolean;
   stroke: string;
   strokeDasharray?: string;
   strokeWidth: number;
-  tooltip: string;
 }
 
 export type WorkflowFlowEdge = FlowEdge<WorkflowEdgeData, WorkflowFlowEdgeType>;
 
 const UNKNOWN_EDGE_DATA = (pathType: FlowEdgeType): WorkflowEdgeData => ({
-  fieldTypeLabel: 'Unknown',
+  fieldTypeLabel: null,
   pathType,
   stroke: 'var(--xy-edge-stroke)',
   strokeWidth: 2,
-  tooltip: 'Unknown field type',
 });
 
 const getWorkflowEdgeFieldType = (
@@ -386,13 +397,12 @@ export const getWorkflowEdgeData = (
 ): WorkflowEdgeData => {
   if (edge.type === 'loop_linkage') {
     return {
-      fieldTypeLabel: 'Loop linkage',
+      fieldTypeLabel: null,
       isLoopLinkage: true,
       pathType,
       stroke: LOOP_LINKAGE_STROKE,
       strokeDasharray: '6 4',
       strokeWidth: 2,
-      tooltip: 'Loop linkage',
     };
   }
 
@@ -402,7 +412,6 @@ export const getWorkflowEdgeData = (
     return UNKNOWN_EDGE_DATA(pathType);
   }
 
-  const fieldTypeLabel = getFieldTypeLabel(fieldType);
   const strokeDasharray = fieldType.batch
     ? '2 5'
     : fieldType.cardinality === 'COLLECTION'
@@ -412,23 +421,23 @@ export const getWorkflowEdgeData = (
         : undefined;
 
   return {
-    fieldTypeLabel,
+    fieldTypeLabel: getFieldTypeLabel(fieldType),
+    isBatch: fieldType.batch,
     pathType,
     stroke: getFieldTypeColor(fieldType),
     strokeDasharray,
     strokeWidth: fieldType.cardinality === 'SINGLE' && !fieldType.batch ? 2 : 2.5,
-    tooltip: fieldType.batch ? `${fieldTypeLabel} batch` : fieldTypeLabel,
   };
 };
 
 const isSameEdgeData = (a: WorkflowEdgeData | undefined, b: WorkflowEdgeData): boolean =>
   a?.fieldTypeLabel === b.fieldTypeLabel &&
+  a.isBatch === b.isBatch &&
   a.isLoopLinkage === b.isLoopLinkage &&
   a.pathType === b.pathType &&
   a.stroke === b.stroke &&
   a.strokeDasharray === b.strokeDasharray &&
-  a.strokeWidth === b.strokeWidth &&
-  a.tooltip === b.tooltip;
+  a.strokeWidth === b.strokeWidth;
 
 export const toFlowEdges = (
   document: ProjectGraphState,

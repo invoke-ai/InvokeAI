@@ -33,6 +33,8 @@ import {
   refreshImageIndexStatus,
   refreshImageMapPoints,
   setClusterEps,
+  attachImageMapViewer,
+  setImageMapMediaKind,
 } from './imageMapStore';
 import {
   ALL_POINTS_TRACE,
@@ -121,6 +123,18 @@ describe('image map api', () => {
     expect(mocks.apiFetchJson).toHaveBeenCalledWith(
       '/api/v1/image_map/points?include_videos=true&eps=0.4&min_samples=5'
     );
+  });
+
+  it('sends media_kind only when the map is restricted to one kind', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ ...BACKEND_RESPONSE, points: [] });
+
+    await fetchImageMapPoints({ mediaKind: 'video' });
+    await fetchImageMapPoints();
+
+    expect(mocks.apiFetchJson.mock.calls.map((call) => call[0])).toEqual([
+      '/api/v1/image_map/points?include_videos=true&media_kind=video',
+      '/api/v1/image_map/points?include_videos=true',
+    ]);
   });
 
   it('posts refresh requests', async () => {
@@ -218,6 +232,107 @@ describe('image map store', () => {
     setClusterEps(null);
 
     expect(mocks.apiFetchJson.mock.calls.length).toBe(before);
+  });
+
+  it('drops points fetched for the previous media kind and labels the new set with the same kind', async () => {
+    const VIDEO_RESPONSE = {
+      ...BACKEND_RESPONSE,
+      point_count: 1,
+      points: [{ cluster: 0, image_name: 'clip.mp4', kind: 'video', x: 2, y: -1 }],
+      visible_hash: 'hash-videos',
+    };
+    let resolveStale: (value: unknown) => void = () => {};
+    const detachViewer = attachImageMapViewer();
+    mockPointsWithForeignLabels();
+    await refreshImageMapPoints();
+    mocks.apiFetchJson.mockReset();
+    mocks.apiFetchJson.mockImplementation((url: string) => {
+      if (url.startsWith('/api/v1/image_map/cluster_labels')) {
+        return Promise.resolve(FOREIGN_LABELS_RESPONSE);
+      }
+
+      return url.includes('media_kind=video')
+        ? Promise.resolve(VIDEO_RESPONSE)
+        : new Promise((resolve) => {
+            resolveStale = resolve;
+          });
+    });
+
+    // A socket-driven refresh for both kinds is in flight when the filter changes.
+    const staleRefresh = refreshImageMapPoints();
+    setImageMapMediaKind('video');
+    resolveStale(BACKEND_RESPONSE);
+    await staleRefresh;
+    await vi.waitFor(() => expect(imageMapStore.getSnapshot().data?.visibleHash).toBe('hash-videos'));
+
+    const urls = mocks.apiFetchJson.mock.calls.map((call) => String(call[0]));
+    expect(urls.filter((url) => url.startsWith('/api/v1/image_map/points'))).toEqual([
+      '/api/v1/image_map/points?include_videos=true',
+      '/api/v1/image_map/points?include_videos=true&media_kind=video',
+    ]);
+    expect(urls.filter((url) => url.startsWith('/api/v1/image_map/cluster_labels'))).toEqual([
+      '/api/v1/image_map/cluster_labels?include_videos=true&media_kind=video&eps=0.42',
+    ]);
+    expect(imageMapStore.getSnapshot().data?.points.map((point) => point.key)).toEqual(['video:clip.mp4']);
+
+    detachViewer();
+    imageMapStore.patchSnapshot({ data: null, loadState: 'idle' });
+    setImageMapMediaKind(undefined);
+  });
+
+  it("takes the previous kind's points off a watched map at once and refetches the new kind", async () => {
+    const detachViewer = attachImageMapViewer();
+    mockPointsWithForeignLabels();
+    await refreshImageMapPoints();
+    mocks.apiFetchJson.mockClear();
+
+    setImageMapMediaKind('image');
+
+    // Nothing of the previous set is left to draw or click while the new one loads.
+    expect(imageMapStore.getSnapshot().data).toBeNull();
+    expect(imageMapStore.getSnapshot().loadState).toBe('loading');
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/image_map/points?include_videos=true&media_kind=image');
+
+    await vi.waitFor(() => expect(imageMapStore.getSnapshot().loadState).toBe('loaded'));
+    detachViewer();
+    imageMapStore.patchSnapshot({ data: null, loadState: 'idle' });
+    setImageMapMediaKind(undefined);
+  });
+
+  it('leaves an unwatched map idle until it is next opened, then loads the new kind', async () => {
+    mockPointsWithForeignLabels();
+    await refreshImageMapPoints();
+    mocks.apiFetchJson.mockClear();
+
+    setImageMapMediaKind('video');
+
+    expect(imageMapStore.getSnapshot()).toMatchObject({ data: null, loadState: 'idle' });
+    expect(mocks.apiFetchJson).not.toHaveBeenCalled();
+
+    ensureImageMapLoaded();
+
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/image_map/points?include_videos=true&media_kind=video');
+    await vi.waitFor(() => expect(imageMapStore.getSnapshot().loadState).toBe('loaded'));
+    imageMapStore.patchSnapshot({ data: null, loadState: 'idle' });
+    setImageMapMediaKind(undefined);
+  });
+
+  it('keeps a status diagnosis already under way when the kind changes with no points in flight', async () => {
+    let resolveStatus: (value: unknown) => void = () => {};
+    mocks.apiFetchJson.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveStatus = resolve;
+        })
+    );
+
+    refreshImageIndexStatus();
+    setImageMapMediaKind('video');
+    resolveStatus({ enabled: false, index: null, model_name: 'encoder', projection: { state: 'model_missing' } });
+
+    await vi.waitFor(() => expect(imageMapStore.getSnapshot().data?.state).toBe('model_missing'));
+    imageMapStore.patchSnapshot({ data: null, loadState: 'idle' });
+    setImageMapMediaKind(undefined);
   });
 
   it('loads points into the snapshot', async () => {

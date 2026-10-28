@@ -3,15 +3,7 @@ import type { GenerateModelConfig, GenerateSettings, LoraModelConfig } from '@fe
 
 import { Separator, Stack } from '@chakra-ui/react';
 import { createExternalStoreCore } from '@platform/state/externalStoreCore';
-import {
-  type ComponentType,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { GenerateAdvancedFields } from './GenerateAdvancedFields';
 import { GenerateCanvasSections } from './GenerateCanvasSections';
@@ -19,11 +11,8 @@ import { GenerateComponentsSection } from './GenerateComponentsSection';
 import {
   applyGenerateSettingsPatch,
   applyGenerateSettingsUpdate,
-  createDraftTracker,
-  type GenerateDraftStore,
   getChangedGenerateSettingsPatch,
   type GenerateSettingsUpdate,
-  isDraftView,
   mergeGenerateSettingsUpdate,
   type PendingGenerateSettingsUpdate,
   reuseEqualGenerateSettingsValues,
@@ -33,30 +22,13 @@ import { useRegisterGenerateDraftFlusher } from './generateDraftRegistry';
 import { getSettingsWithLatestPromptFields } from './generateFormViewModel';
 import { GenerateGuidanceSection } from './GenerateGuidanceSection';
 import { GenerateModelCard } from './GenerateModelCard';
+import { GenerateProviderOptionsSection } from './GenerateProviderOptionsSection';
+import { GenerateRefinerSection } from './GenerateRefinerSection';
 import { GenerateRenderSection } from './GenerateRenderSection';
+import { useGenerationUi } from './GenerationUiContext';
 import { GeneratePromptFields } from './promptFields';
 
 const GENERATE_INPUT_DEBOUNCE_MS = 250;
-
-type DraftSectionProps<Props extends { settings: GenerateSettings }> = Omit<Props, 'settings'> & {
-  draft: GenerateDraftStore;
-  section: ComponentType<Props>;
-};
-
-/**
- * Scopes draft subscriptions per section so a scrub in one section does not re-render the others. The section's
- * `settings` is a live draft view; see `createDraftTracker` for what it may and may not be used for.
- */
-const DraftSection = <Props extends { settings: GenerateSettings }>({
-  draft,
-  section: Section,
-  ...props
-}: DraftSectionProps<Props>) => {
-  const [getView] = useState(() => createDraftTracker(draft));
-  const settings = useSyncExternalStore(draft.subscribe, getView, getView);
-
-  return <Section {...(props as unknown as Props)} settings={settings} />;
-};
 
 interface GenerateSettingsFormProps {
   isLoadingModels: boolean;
@@ -84,6 +56,7 @@ export const GenerateSettingsForm = ({
   settings,
   supportedModels,
 }: GenerateSettingsFormProps) => {
+  const { resetDimensions } = useGenerationUi().settings;
   const [draft] = useState(() => createExternalStoreCore(settings));
   const latestSettingsRef = useRef(settings);
   const pendingUpdateRef = useRef<PendingGenerateSettingsUpdate>(null);
@@ -223,11 +196,9 @@ export const GenerateSettingsForm = ({
 
   const commitSettingsImmediately = useCallback(
     (requestedSettings: GenerateSettings) => {
-      // A section may hand back its draft view unchanged; commit the plain draft it reads from.
-      const nextSettings = isDraftView(requestedSettings) ? draft.getSnapshot() : requestedSettings;
       const previousSettings = latestSettingsRef.current;
       const settingsToCommit = getSettingsWithLatestPromptFields(
-        nextSettings,
+        requestedSettings,
         applyGenerateSettingsUpdate(latestSettingsRef.current, pendingUpdateRef.current)
       );
 
@@ -247,8 +218,9 @@ export const GenerateSettingsForm = ({
     [draft, onCommitSettings]
   );
 
-  const commitPatchImmediately = useCallback(
-    (patch: Partial<GenerateSettings>) => {
+  /** Folds pending edits under `patch` and hands the change to `send` now, so no late debounce can follow it. */
+  const sendPatchNow = useCallback(
+    (patch: Partial<GenerateSettings>, send: (patch: Partial<GenerateSettings>, projectId: string) => void) => {
       const previousSettings = latestSettingsRef.current;
       const nextSettings = applyGenerateSettingsPatch(
         applyGenerateSettingsUpdate(latestSettingsRef.current, pendingUpdateRef.current),
@@ -263,16 +235,25 @@ export const GenerateSettingsForm = ({
       pendingUpdateRef.current = null;
       latestSettingsRef.current = nextSettings;
       draft.setSnapshot(nextSettings);
-      onPatchSettings(getChangedGenerateSettingsPatch(previousSettings, nextSettings), projectIdRef.current);
+      send(getChangedGenerateSettingsPatch(previousSettings, nextSettings), projectIdRef.current);
     },
-    [draft, onPatchSettings]
+    [draft]
+  );
+
+  const commitPatchImmediately = useCallback(
+    (patch: Partial<GenerateSettings>) => sendPatchNow(patch, onPatchSettings),
+    [onPatchSettings, sendPatchNow]
+  );
+
+  const commitSizeReset = useCallback(
+    (patch: Partial<GenerateSettings>) => sendPatchNow(patch, resetDimensions),
+    [resetDimensions, sendPatchNow]
   );
 
   return (
     <Stack gap={1} p={1}>
-      <DraftSection
+      <GenerateModelCard
         draft={draft}
-        section={GenerateModelCard}
         isLoadingModels={isLoadingModels}
         loadError={loadError}
         models={models}
@@ -284,26 +265,24 @@ export const GenerateSettingsForm = ({
       {/* The same hairline the collapsible sections draw between one another. */}
       <Separator />
 
-      <DraftSection
+      <GeneratePromptFields
         draft={draft}
-        section={GeneratePromptFields}
         projectId={projectId}
         selectedModel={selectedModel}
         onCommit={commitPromptDraftPatch}
         onCommitImmediate={commitPatchImmediately}
       />
 
-      <DraftSection
+      <GenerateDimensionFields
         draft={draft}
-        section={GenerateDimensionFields}
         projectId={projectId}
         selectedModel={selectedModel}
         onCommit={commit}
+        onResetSize={commitSizeReset}
       />
 
-      <DraftSection
+      <GenerateGuidanceSection
         draft={draft}
-        section={GenerateGuidanceSection}
         loraModels={loraModels}
         models={models}
         projectId={projectId}
@@ -313,24 +292,26 @@ export const GenerateSettingsForm = ({
         onReferenceCommit={commit}
       />
 
-      <DraftSection
+      <GenerateRenderSection
         draft={draft}
-        section={GenerateRenderSection}
         selectedModel={selectedModel}
         onCommit={commit}
         onCommitImmediate={commitPatchImmediately}
       />
 
-      <DraftSection
+      <GenerateProviderOptionsSection draft={draft} selectedModel={selectedModel} onCommit={commit} />
+
+      <GenerateComponentsSection draft={draft} selectedModel={selectedModel} onCommit={commitPatchImmediately} />
+
+      <GenerateRefinerSection
         draft={draft}
-        section={GenerateComponentsSection}
         selectedModel={selectedModel}
-        onCommit={commitPatchImmediately}
+        onCommit={commit}
+        onCommitImmediate={commitPatchImmediately}
       />
 
-      <DraftSection
+      <GenerateAdvancedFields
         draft={draft}
-        section={GenerateAdvancedFields}
         selectedModel={selectedModel}
         onCommit={commit}
         onCommitImmediate={commitPatchImmediately}

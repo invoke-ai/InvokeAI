@@ -268,7 +268,6 @@ vi.mock('@workbench/widget-frame', () => {
       subscribe,
     },
     project: { getSnapshot: () => projectSnapshot, subscribe },
-    registerModalHotkeyLayer: () => () => {},
     widgets: { open: () => {}, patchValues: () => {} },
   };
   const runtime = {

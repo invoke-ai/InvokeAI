@@ -1,19 +1,21 @@
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import i18next from 'i18next';
-import { act } from 'react';
+import { act, useCallback, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
+import { getHintCard, openHintCard, parkPointer } from './hints/featureHint.testing';
+import { type FeatureHintsAdapter, FeatureHintsProvider } from './hints/hintsContext';
 import { ScrubberField, type ScrubberFieldProps } from './ScrubberField';
 
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
   fallbackLng: 'en',
   lng: 'en',
-  resources: { en: { translation: { common: { scrubber: { editValue: 'Edit {{label}}' } } } } },
+  resources: { en: { translation: { common: { scrubber: { editValue: 'Edit {{label}}: {{value}}' } } } } },
 });
 
 let host: HTMLDivElement | null = null;
@@ -29,6 +31,9 @@ afterEach(async () => {
 
 const TRACK_INSET_PX = 10;
 const HOST_WIDTH_PX = 400;
+
+/** Hundredths below 1 (and leaving 1 downwards), whole units above. */
+const stepFor = (value: number, direction: 1 | -1) => (value < 1 || (direction < 0 && value === 1) ? 0.01 : 1);
 
 const mount = async (props: Partial<ScrubberFieldProps> = {}) => {
   const onChange = vi.fn();
@@ -71,6 +76,56 @@ const pointer = (
   init: PointerEventInit
 ) => act(() => target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, ...init })));
 
+/** A caller that owns the value, so repeated keys step from what the previous step produced. */
+const ControlledScrubber = (props: Omit<ScrubberFieldProps, 'value'> & { initial: number }) => {
+  const { initial, onChange, ...rest } = props;
+  const [value, setValue] = useState(initial);
+  const handleChange = useCallback(
+    (next: number) => {
+      setValue(next);
+      onChange(next);
+    },
+    [onChange]
+  );
+
+  return <ScrubberField {...rest} value={value} onChange={handleChange} />;
+};
+
+const mountControlled = async (initial: number) => {
+  const events: string[] = [];
+  const onChange = vi.fn((value: number) => events.push(`change:${value}`));
+  const onChangeEnd = vi.fn((value: number) => events.push(`end:${value}`));
+
+  host = document.createElement('div');
+  host.style.width = `${HOST_WIDTH_PX}px`;
+  document.body.append(host);
+  root = createRoot(host);
+
+  await act(() => {
+    root?.render(
+      <I18nextProvider i18n={i18n}>
+        <ChakraProvider value={system}>
+          <ControlledScrubber
+            defaultValue={50}
+            initial={initial}
+            label="Steps"
+            max={100}
+            min={0}
+            step={1}
+            onChange={onChange}
+            onChangeEnd={onChangeEnd}
+          />
+        </ChakraProvider>
+      </I18nextProvider>
+    );
+  });
+
+  const frame = host.querySelector<HTMLDivElement>('[data-scope="scrubber"]')!;
+  const slider = host.querySelector<HTMLDivElement>('[role="slider"]')!;
+
+  return { events, frame, onChangeEnd, slider };
+};
+
 const valueButton = () => host?.querySelector<HTMLButtonElement>('button[data-part="value"]') ?? null;
 const editor = () => host?.querySelector<HTMLInputElement>('input[data-part="value"]') ?? null;
 
@@ -83,7 +138,23 @@ describe('ScrubberField', () => {
     expect(slider.getAttribute('aria-valuenow')).toBe('30');
     expect(slider.getAttribute('aria-valuetext')).toBe('30%');
     expect(valueButton()?.textContent).toBe('30%');
-    expect(valueButton()?.getAttribute('aria-label')).toBe('Edit Steps');
+    // The name carries the visible value (WCAG 2.5.3).
+    await expect.element(valueButton()!).toHaveAccessibleName('Edit Steps: 30%');
+  });
+
+  it('fills the frame at the maximum and still frames the thumb at the minimum', async () => {
+    const part = (frame: HTMLElement, name: string) =>
+      frame.querySelector<HTMLElement>(`[data-part="${name}"]`)!.getBoundingClientRect();
+
+    const full = await mount({ value: 100 });
+    const fullFrame = full.frame.getBoundingClientRect();
+    // Only the border and the fill's clearance separate a full fill from the frame's edge.
+    expect(fullFrame.right - part(full.frame, 'fill').right).toBeLessThanOrEqual(3);
+    await act(() => root?.unmount());
+    host?.remove();
+
+    const empty = await mount({ value: 0 });
+    expect(part(empty.frame, 'fill').right).toBeGreaterThan(part(empty.frame, 'thumb').right);
   });
 
   it('scrubs relative to the current value from wherever the press lands, snapped to the step', async () => {
@@ -487,5 +558,349 @@ describe('ScrubberField', () => {
     expect(described?.textContent).toBe('Too high');
     expect(described?.getAttribute('role')).toBe('alert');
     expect(frame.hasAttribute('data-invalid')).toBe(true);
+  });
+
+  describe('gesture end', () => {
+    it('ends a drag once with its final value on release, and not for a press that never moved', async () => {
+      const { events, frame } = await mountControlled(30);
+
+      await pointer(frame, 'pointerdown', { clientX: trackX(frame, 0.5) });
+      await pointer(window, 'pointerup', { clientX: trackX(frame, 0.5) });
+
+      expect(events).toEqual([]);
+
+      await pointer(frame, 'pointerdown', { clientX: trackX(frame, 0.5) });
+      await pointer(window, 'pointermove', { clientX: trackX(frame, 0.6) });
+      await pointer(window, 'pointermove', { clientX: trackX(frame, 0.7) });
+
+      expect(events).toEqual(['change:40', 'change:50']);
+
+      await pointer(window, 'pointercancel', { clientX: trackX(frame, 0.7) });
+
+      expect(events).toEqual(['change:40', 'change:50', 'end:50']);
+    });
+
+    it('still ends a drag that came back to where it started, so a preview can be reverted', async () => {
+      const { events, frame } = await mountControlled(30);
+
+      await pointer(frame, 'pointerdown', { clientX: trackX(frame, 0.5) });
+      await pointer(window, 'pointermove', { clientX: trackX(frame, 0.6) });
+      await pointer(window, 'pointermove', { clientX: trackX(frame, 0.5) });
+      await pointer(window, 'pointerup', { clientX: trackX(frame, 0.5) });
+
+      expect(events).toEqual(['change:40', 'change:30', 'end:30']);
+    });
+
+    it('ends a held step key once on release, and a tapped key per tap', async () => {
+      const { events, slider } = await mountControlled(30);
+
+      await act(async () => {
+        slider.focus();
+        await userEvent.keyboard('{ArrowRight>3/}');
+      });
+
+      expect(events).toEqual(['change:31', 'change:32', 'change:33', 'end:33']);
+
+      events.length = 0;
+      await act(() => userEvent.keyboard('{ArrowLeft}{ArrowLeft}'));
+
+      expect(events).toEqual(['change:32', 'end:32', 'change:31', 'end:31']);
+    });
+
+    it('ends a held key when focus leaves before the key is released', async () => {
+      const { events, slider } = await mountControlled(30);
+
+      await act(async () => {
+        slider.focus();
+        await userEvent.keyboard('{ArrowUp>2}');
+      });
+
+      expect(events).toEqual(['change:31', 'change:32']);
+
+      await act(() => slider.blur());
+
+      expect(events).toEqual(['change:31', 'change:32', 'end:32']);
+      await act(() => userEvent.keyboard('{/ArrowUp}'));
+      expect(events).toHaveLength(3);
+    });
+
+    it('ends typed values and resets immediately, and nothing that changed no value', async () => {
+      const { events, frame, slider } = await mountControlled(30);
+
+      await act(async () => {
+        slider.focus();
+        await userEvent.keyboard('{Enter}');
+      });
+      await act(() => userEvent.keyboard('75{Enter}'));
+      await act(() => frame.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: trackX(frame, 0.5) })));
+      await act(() => userEvent.keyboard('{Backspace}{Enter}50{Enter}'));
+
+      expect(events).toEqual(['change:75', 'end:75', 'change:50', 'end:50']);
+    });
+
+    it('ends an unfinished drag when the field unmounts', async () => {
+      const { events, frame } = await mountControlled(30);
+
+      await pointer(frame, 'pointerdown', { clientX: trackX(frame, 0.5) });
+      await pointer(window, 'pointermove', { clientX: trackX(frame, 0.75) });
+      await act(() => root?.unmount());
+      root = null;
+
+      expect(events).toEqual(['change:55', 'end:55']);
+
+      await pointer(window, 'pointermove', { clientX: trackX(frame, 0.9) });
+      await pointer(window, 'pointerup', { clientX: trackX(frame, 0.9) });
+
+      expect(events).toEqual(['change:55', 'end:55']);
+    });
+  });
+});
+
+describe('ScrubberField log scale and value-dependent steps', () => {
+  /** Where an element's centre sits along the track, 0–1. */
+  const trackFraction = (frame: HTMLElement, element: Element): number => {
+    const rect = frame.getBoundingClientRect();
+    const box = element.getBoundingClientRect();
+
+    return (box.left + box.width / 2 - rect.left - TRACK_INSET_PX) / (rect.width - TRACK_INSET_PX * 2);
+  };
+
+  const LOG = { max: 100, min: 1, scale: 'log', step: 1, value: 10 } as const;
+
+  it('places the thumb and stops by ratio', async () => {
+    const { frame, slider } = await mount({ ...LOG, marks: [50] });
+
+    // 10 is the geometric middle of 1–100.
+    expect(trackFraction(frame, frame.querySelector('[data-part="thumb"]')!)).toBeCloseTo(0.5, 1);
+    expect(trackFraction(frame, frame.querySelector('[data-part="mark"]')!)).toBeCloseTo(Math.log10(50) / 2, 1);
+    expect(slider.getAttribute('aria-valuenow')).toBe('10');
+  });
+
+  it('pins a value beyond the log track to its end', async () => {
+    const { frame, slider } = await mount({ ...LOG, inputMax: 1000, value: 500 });
+
+    expect(trackFraction(frame, frame.querySelector('[data-part="thumb"]')!)).toBeCloseTo(1, 1);
+    expect(slider.getAttribute('aria-valuemax')).toBe('500');
+  });
+
+  it.each([
+    // Back toward the track by 0.1 of it (10 units) on linear 0–100, by a quarter (÷10^0.5) on log 1–100.
+    ['linear', { inputMax: 1000, value: 150 }, 0.4, 140],
+    ['log', { ...LOG, inputMax: 1000, value: 500 }, 0.25, 158],
+  ] as const)(
+    'drags a %s value beyond the track from where it is: away holds, toward moves smoothly',
+    async (_scale, props, backTo, toward) => {
+      const { frame, onChange } = await mount(props);
+
+      await pointer(frame, 'pointerdown', { clientX: trackX(frame, 0.5) });
+      await pointer(window, 'pointermove', { clientX: trackX(frame, 0.51) });
+      await pointer(window, 'pointermove', { clientX: trackX(frame, 0.9) });
+
+      // Not snapped back onto the track's end, which would shrink the value.
+      expect(onChange).not.toHaveBeenCalled();
+
+      await pointer(window, 'pointermove', { clientX: trackX(frame, backTo) });
+
+      expect(onChange).toHaveBeenLastCalledWith(toward);
+      await pointer(window, 'pointerup', { clientX: trackX(frame, backTo) });
+    }
+  );
+
+  it('falls back to a linear track when a log scale has no positive minimum', async () => {
+    const { frame, onChange, slider } = await mount({ max: 100, min: 0, scale: 'log', value: 50 });
+
+    expect(trackFraction(frame, frame.querySelector('[data-part="thumb"]')!)).toBeCloseTo(0.5, 1);
+    await pointer(frame, 'pointerdown', { clientX: trackX(frame, 0.5) });
+    await pointer(window, 'pointermove', { clientX: trackX(frame, 0.6) });
+
+    expect(onChange).toHaveBeenLastCalledWith(60);
+    expect(slider.getAttribute('aria-valuenow')).toBe('50');
+    await pointer(window, 'pointerup', { clientX: trackX(frame, 0.6) });
+  });
+
+  it('scrubs along the track by ratio, finely with Shift, snapped to the step in real units', async () => {
+    const { frame, onChange } = await mount(LOG);
+
+    await pointer(frame, 'pointerdown', { clientX: trackX(frame, 0.5) });
+    // A quarter-track further multiplies by 10^0.5.
+    await pointer(window, 'pointermove', { clientX: trackX(frame, 0.75) });
+
+    expect(onChange).toHaveBeenLastCalledWith(32);
+    await pointer(window, 'pointerup', { clientX: trackX(frame, 0.75) });
+
+    await pointer(frame, 'pointerdown', { clientX: trackX(frame, 0.5), shiftKey: true });
+    await pointer(window, 'pointermove', { clientX: trackX(frame, 1), shiftKey: true });
+
+    // Half a track at a tenth of the sensitivity: 10 × 10^0.1.
+    expect(onChange).toHaveBeenLastCalledWith(13);
+    await pointer(window, 'pointerup', { clientX: trackX(frame, 1) });
+  });
+
+  it('snaps Alt-drags to the stop nearest along the track, not in raw units', async () => {
+    const { frame, onChange } = await mount({ ...LOG, marks: [2, 40] });
+
+    await pointer(frame, 'pointerdown', { altKey: true, clientX: trackX(frame, 0.5) });
+    // Raw ≈ 17: nearer 2 in units, nearer 40 along a log track.
+    await pointer(window, 'pointermove', { altKey: true, clientX: trackX(frame, 0.62) });
+
+    expect(onChange).toHaveBeenLastCalledWith(40);
+    await pointer(window, 'pointerup', { clientX: trackX(frame, 0.62) });
+  });
+
+  it('clamps typed values to the real-unit input bounds', async () => {
+    const { onChange, slider } = await mount({ ...LOG, inputMax: 1000, inputMin: 0.5 });
+
+    for (const [typed, committed] of [
+      ['500', 500],
+      ['0.1', 0.5],
+    ] as const) {
+      await act(async () => {
+        slider.focus();
+        await userEvent.keyboard('{Enter}');
+      });
+      await act(async () => {
+        await userEvent.fill(editor()!, typed);
+        await userEvent.keyboard('{Enter}');
+      });
+
+      expect(onChange).toHaveBeenLastCalledWith(committed);
+    }
+  });
+
+  it('steps by the value-dependent step, ×10 with Shift or Page keys, keeping its decimals', async () => {
+    const onChange = vi.fn();
+
+    host = document.createElement('div');
+    host.style.width = `${HOST_WIDTH_PX}px`;
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() => {
+      root?.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <ControlledScrubber
+              initial={0.98}
+              label="Size"
+              max={100}
+              min={0.1}
+              scale="log"
+              step={1}
+              stepFor={stepFor}
+              onChange={onChange}
+            />
+          </ChakraProvider>
+        </I18nextProvider>
+      );
+    });
+    const slider = host.querySelector<HTMLDivElement>('[role="slider"]')!;
+    const steps = () => onChange.mock.calls.map(([value]) => value as number);
+
+    await act(async () => {
+      slider.focus();
+      await userEvent.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}');
+    });
+
+    expect(steps()).toEqual([0.99, 1, 2]);
+
+    await act(() => userEvent.keyboard('{ArrowLeft}{ArrowLeft}{PageDown}{Shift>}{ArrowUp}{/Shift}{End}'));
+
+    expect(steps().slice(3)).toEqual([1, 0.99, 0.89, 0.99, 100]);
+  });
+});
+
+describe('ScrubberField hints', () => {
+  const HINT_RESOURCES = {
+    hints: { steps: { heading: 'Steps', paragraphs: ['Number of steps that will be performed.'] } },
+  };
+
+  i18n.addResourceBundle('en', 'translation', HINT_RESOURCES, true, false);
+
+  const HINTS_ON: FeatureHintsAdapter = { enabled: true, onDisable: null };
+  const HINTS_OFF: FeatureHintsAdapter = { enabled: false, onDisable: null };
+  /** Inset from the parked pointer, and narrow enough to leave room for the card beside the field. */
+  const HOST_CSS = 'width:120px;margin:120px 0 0 8px';
+
+  const mountWithHints = async (enabled: boolean) => {
+    const onChange = vi.fn();
+
+    host = document.createElement('div');
+    host.style.cssText = HOST_CSS;
+    document.body.append(host);
+    root = createRoot(host);
+
+    await act(() => {
+      root?.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <FeatureHintsProvider adapter={enabled ? HINTS_ON : HINTS_OFF}>
+              <ScrubberField hint="steps" label="Steps" max={100} min={0} step={1} value={30} onChange={onChange} />
+            </FeatureHintsProvider>
+          </ChakraProvider>
+        </I18nextProvider>
+      );
+    });
+
+    const frame = host.querySelector<HTMLDivElement>('[data-scope="scrubber"]')!;
+    const slider = host.querySelector<HTMLDivElement>('[role="slider"]')!;
+    const label = host.querySelector<HTMLElement>('[data-part="label"]')!;
+
+    return { frame, label, onChange, slider };
+  };
+
+  it('opens the hint card from the label beside the field, keeping the slider named by the label', async () => {
+    const { frame, label, slider } = await mountWithHints(true);
+    const card = await openHintCard(label.querySelector('[data-part="trigger"]')!);
+
+    expect(getHintCard()?.textContent).toContain('Number of steps that will be performed.');
+    // Beside the frame, not over the track and value the hint explains.
+    expect(card.left).toBeGreaterThanOrEqual(frame.getBoundingClientRect().right);
+    expect(document.getElementById(slider.getAttribute('aria-labelledby') ?? '')?.textContent).toBe('Steps');
+  });
+
+  it('closes the card when a press on the field starts other work', async () => {
+    const { label } = await mountWithHints(true);
+
+    await openHintCard(label.querySelector('[data-part="trigger"]')!);
+    // The value sits between the label and the card, inside the corridor to the card.
+    await act(() => userEvent.click(valueButton()!));
+    // Past the close delay, short of the corridor's grace window.
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        globalThis.setTimeout(resolve, 500);
+      });
+    });
+
+    expect(getHintCard()).toBeNull();
+  });
+
+  it('opens no card while hints are off', async () => {
+    const { label } = await mountWithHints(false);
+
+    await parkPointer();
+    await act(() => userEvent.hover(label));
+    // Past the hint's open delay.
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        globalThis.setTimeout(resolve, 900);
+      });
+    });
+
+    expect(document.querySelector('[data-scope="hover-card"]')).toBeNull();
+  });
+
+  it('still scrubs from a press on the hinted label', async () => {
+    const { frame, label, onChange } = await mountWithHints(true);
+    const { left, top } = label.getBoundingClientRect();
+
+    await pointer(label, 'pointerdown', { clientX: left + 4, clientY: top + 4 });
+
+    expect(frame.hasAttribute('data-dragging')).toBe(true);
+
+    const trackWidth = frame.getBoundingClientRect().width - TRACK_INSET_PX * 2;
+
+    await pointer(window, 'pointermove', { clientX: left + 4 + trackWidth * 0.2 });
+
+    expect(onChange).toHaveBeenLastCalledWith(50);
+    await pointer(window, 'pointerup', {});
   });
 });

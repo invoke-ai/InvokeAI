@@ -2,6 +2,7 @@ import type {
   CanvasAdjustmentEntry,
   CanvasDocumentContractV3,
   CanvasInpaintMaskLayerContract,
+  CanvasNodeContract,
   DocumentCommand,
   LayerStackKind,
   SemanticNode,
@@ -28,7 +29,11 @@ export type LayerChildRowKind =
   | 'adjustment-curves'
   | 'adjustment-hsl'
   | 'adjustment-hue'
-  | 'adjustment-invert';
+  | 'adjustment-invert'
+  | 'adjustment-noise'
+  | 'adjustment-clarity'
+  | 'adjustment-texture'
+  | 'adjustment-dehaze';
 
 type AdjustmentChildKind = Extract<LayerChildRowKind, `adjustment-${string}`>;
 
@@ -38,22 +43,30 @@ export const adjustmentChildKind = (type: CanvasAdjustmentEntry['type']): Adjust
 
 const ADJUSTMENT_KIND_OF: Record<CanvasAdjustmentEntry['type'], AdjustmentChildKind> = {
   'brightness-contrast': 'adjustment-brightness-contrast',
+  clarity: 'adjustment-clarity',
   curves: 'adjustment-curves',
+  dehaze: 'adjustment-dehaze',
   exposure: 'adjustment-exposure',
   hsl: 'adjustment-hsl',
   hue: 'adjustment-hue',
   invert: 'adjustment-invert',
   levels: 'adjustment-levels',
+  noise: 'adjustment-noise',
+  texture: 'adjustment-texture',
 };
 
 const CHILD_ROW_NAME_KEYS: Record<Exclude<LayerChildRowKind, 'reference-image'>, string> = {
   'adjustment-brightness-contrast': 'widgets.layers.modifiers.brightnessContrast',
+  'adjustment-clarity': 'widgets.layers.adjustments.clarity',
   'adjustment-curves': 'widgets.layers.adjustments.curves',
+  'adjustment-dehaze': 'widgets.layers.adjustments.dehaze',
   'adjustment-exposure': 'widgets.layers.adjustments.exposure',
   'adjustment-hsl': 'widgets.layers.adjustments.saturation',
   'adjustment-hue': 'widgets.layers.adjustments.hue',
   'adjustment-invert': 'widgets.layers.adjustments.invert',
   'adjustment-levels': 'widgets.layers.adjustments.levels',
+  'adjustment-noise': 'widgets.layers.adjustments.noise',
+  'adjustment-texture': 'widgets.layers.adjustments.texture',
   'layer-region': 'widgets.layers.modifiers.regenerateRegion',
   'mask-denoise': 'widgets.layers.modifiers.denoise',
   'mask-noise': 'widgets.layers.modifiers.noise',
@@ -78,12 +91,25 @@ const adjustmentDetail = (entry: CanvasAdjustmentEntry): string | null => {
     }
     case 'levels':
       return entry.channel && entry.channel !== 'rgb' ? entry.channel.toUpperCase() : null;
+    case 'noise':
+      return `${Math.round(entry.amount * 100)}%`;
+    case 'clarity':
+    case 'texture':
+    case 'dehaze': {
+      // A signed strength, as on the backend nodes; it is not a percentage of any visible change.
+      const amount = Math.round(entry.amount);
+      return `${amount > 0 ? '+' : ''}${amount}`;
+    }
     case 'brightness-contrast':
     case 'curves':
     case 'invert':
       return null;
   }
 };
+
+/** The localized fact following an adjustment row's detail, as row fields to spread. */
+const adjustmentDetailLabel = (entry: CanvasAdjustmentEntry): { detailLabelKey?: string } =>
+  entry.type === 'noise' ? { detailLabelKey: `widgets.layers.adjustments.noiseGrains.${entry.grain}` } : {};
 
 /** Kinds whose list order is document truth; their rows offer Move up/down and Duplicate. */
 export const isOrderedChildKind = (kind: LayerChildRowKind): boolean => kind.startsWith('adjustment-');
@@ -114,6 +140,8 @@ export interface ProjectedChildRow {
   readonly image: { readonly imageName: string; readonly thumbnailUrl: string } | null;
   /** A compact preformatted fact shown beside the name (a percent, degrees), or `null`. */
   readonly detail: string | null;
+  /** The i18n key of a localized fact shown after `detail` (noise's grain); absent when the kind has none. */
+  readonly detailLabelKey?: string;
   /** The user-given name of a renameable item (adjustment entries), or `null`. */
   readonly customName: string | null;
 }
@@ -122,7 +150,8 @@ export type LayerChildRowAction =
   | { type: 'set-enabled'; isEnabled: boolean }
   | { type: 'remove' }
   | { type: 'move'; direction: -1 | 1 }
-  | { type: 'duplicate'; newId: string }
+  /** `newNoiseSeed` reseeds a duplicated noise entry: an identical copy would stack perfectly correlated grain. */
+  | { type: 'duplicate'; newId: string; newNoiseSeed: number }
   | { type: 'rename'; name: string | null };
 
 /** A child row's live item facts, resolved from the document; `null` when it is gone. */
@@ -142,20 +171,22 @@ const adjustmentsPatch = (
   id: string,
   before: readonly CanvasAdjustmentEntry[],
   next: CanvasAdjustmentEntry[]
-): PatchConfigCommand =>
+): ConfigPatch =>
   ownerType === 'group'
     ? {
         before: { adjustments: [...before], layerType: 'group' },
         config: { adjustments: next, layerType: 'group' },
         id,
-        type: 'patch-config',
       }
     : {
         before: { adjustments: [...before], layerType: 'raster' },
         config: { adjustments: next, layerType: 'raster' },
         id,
-        type: 'patch-config',
       };
+
+/** Whether `owner` projects a region row: nothing lands above it, and no entry may take its reserved item id. */
+const hasRegionRow = (owner: { type: string; inpaint?: unknown }): boolean =>
+  owner.type === 'raster' && owner.inpaint !== undefined;
 
 const EMPTY_CHILD_ROWS: readonly ProjectedChildRow[] = [];
 
@@ -254,6 +285,7 @@ export const projectLayerChildRows = (vm: SemanticNode): readonly ProjectedChild
         ...baseRow(vm),
         customName: adjustment.name ?? null,
         detail: adjustmentDetail(adjustment),
+        ...adjustmentDetailLabel(adjustment),
         image: null,
         isEnabled: adjustment.isEnabled,
         itemId: adjustment.id,
@@ -306,6 +338,14 @@ export const getLayerChildItem = (
 export const layerChildRenameLabelKey = (kind: LayerChildRowKind): string =>
   kind === 'layer-region' ? 'widgets.layers.modifiers.renameRegion' : 'widgets.layers.modifiers.renameAdjustment';
 
+/** The i18n key naming a child row's drop or move to `layerId`, for history entries. */
+export const layerChildMoveLabelKey = (child: Pick<ProjectedChildRow, 'kind' | 'layerId'>, layerId: string): string =>
+  child.kind === 'reference-image'
+    ? 'widgets.layers.modifiers.moveReferenceImage'
+    : layerId === child.layerId
+      ? 'widgets.layers.modifiers.reorderAdjustment'
+      : 'widgets.layers.modifiers.moveAdjustment';
+
 /** The i18n key naming a child row's removal, for menus and history entries alike. */
 export const layerChildRemoveLabelKey = (kind: LayerChildRowKind): string => {
   switch (kind) {
@@ -324,11 +364,16 @@ export const layerChildRemoveLabelKey = (kind: LayerChildRowKind): string => {
     case 'adjustment-hsl':
     case 'adjustment-hue':
     case 'adjustment-invert':
+    case 'adjustment-noise':
+    case 'adjustment-clarity':
+    case 'adjustment-texture':
+    case 'adjustment-dehaze':
       return 'widgets.layers.modifiers.removeAdjustment';
   }
 };
 
 type PatchConfigCommand = Extract<DocumentCommand, { type: 'patch-config' }>;
+type ConfigPatch = Extract<DocumentCommand, { type: 'patch-config-batch' }>['patches'][number];
 
 /** Where a dragged child row lands: before `beforeItemId` among `layerId`'s items, or at the end. */
 export interface LayerChildDropTarget {
@@ -342,10 +387,63 @@ const insertAt = <T extends { id: string }>(items: readonly T[], item: T, before
 };
 
 /**
+ * An adjustment entry's landing: a reorder within its owner, or ONE atomic batch removing it from its owner and
+ * inserting it into another raster layer or group. The document model still refuses locked and overlay-stack
+ * owners when the command is prepared.
+ */
+const adjustmentDropCommand = (
+  document: CanvasDocumentContractV3,
+  child: Pick<ProjectedChildRow, 'layerId' | 'itemId'>,
+  target: LayerChildDropTarget
+): DocumentCommand | null => {
+  const source = adjustmentOwnerNode(document, child.layerId);
+  const destination = target.layerId === child.layerId ? source : adjustmentOwnerNode(document, target.layerId);
+  const before = source?.adjustments ?? [];
+  const entry = before.find((candidate) => candidate.id === child.itemId);
+  if (!source || !destination || !entry) {
+    return null;
+  }
+  // The region row always renders above the adjustments; nothing lands before it.
+  if (target.beforeItemId === LAYER_REGION_ITEM_ID && hasRegionRow(destination)) {
+    return null;
+  }
+  const remaining = before.filter((candidate) => candidate.id !== child.itemId);
+  if (destination === source) {
+    const next = insertAt(remaining, entry, target.beforeItemId);
+    if (next.every((candidate, index) => candidate === before[index])) {
+      return null;
+    }
+    return { ...adjustmentsPatch(source.type, source.id, before, next), type: 'patch-config' };
+  }
+  const destinationBefore = destination.adjustments ?? [];
+  // A duplicated layer can carry the same entry id (cloneSubtree re-mints only node ids), and the region owns its
+  // reserved id; landing on either would alias two rows onto one key. Refuse.
+  if (
+    destinationBefore.some((candidate) => candidate.id === entry.id) ||
+    (entry.id === LAYER_REGION_ITEM_ID && hasRegionRow(destination))
+  ) {
+    return null;
+  }
+  return {
+    patches: [
+      adjustmentsPatch(source.type, source.id, before, remaining),
+      adjustmentsPatch(
+        destination.type,
+        destination.id,
+        destinationBefore,
+        insertAt(destinationBefore, entry, target.beforeItemId)
+      ),
+    ],
+    type: 'patch-config-batch',
+  };
+};
+
+/**
  * The document command a child-row drag resolves to, or `null` when it is a
- * no-op or the landing is invalid. Adjustment entries reorder within their
- * layer; a reference image also moves to another regional layer as ONE atomic
- * cross-layer edit.
+ * no-op or the landing is invalid. Adjustment entries and reference images
+ * reorder within their layer, or move to another layer that holds their kind
+ * (raster layers and raster groups; regional layers) as ONE atomic cross-layer
+ * edit.
  */
 export const layerChildDropCommand = (
   document: CanvasDocumentContractV3,
@@ -355,36 +453,10 @@ export const layerChildDropCommand = (
   if (target.beforeItemId === child.itemId) {
     return null;
   }
-  const source = getDocumentLayer(document, child.layerId);
   if (isOrderedChildKind(child.kind)) {
-    const sourceOwner =
-      source?.type === 'raster' ? source : source ? null : adjustmentOwnerNode(document, child.layerId);
-    if (target.layerId !== child.layerId || !sourceOwner) {
-      return null;
-    }
-    const before = sourceOwner.adjustments ?? [];
-    const entry = before.find((candidate) => candidate.id === child.itemId);
-    if (!entry) {
-      return null;
-    }
-    // The region row always renders above the adjustments; nothing lands before it.
-    if (
-      target.beforeItemId === LAYER_REGION_ITEM_ID &&
-      sourceOwner.type === 'raster' &&
-      sourceOwner.inpaint !== undefined
-    ) {
-      return null;
-    }
-    const next = insertAt(
-      before.filter((candidate) => candidate.id !== child.itemId),
-      entry,
-      target.beforeItemId
-    );
-    if (next.every((candidate, index) => candidate === before[index])) {
-      return null;
-    }
-    return adjustmentsPatch(sourceOwner.type, child.layerId, before, next);
+    return adjustmentDropCommand(document, child, target);
   }
+  const source = getDocumentLayer(document, child.layerId);
   if (child.kind !== 'reference-image' || source?.type !== 'regional_guidance') {
     return null;
   }
@@ -440,6 +512,29 @@ export const layerChildDropCommand = (
     type: 'patch-config-batch',
   };
 };
+
+const preorder = (nodes: readonly CanvasNodeContract[]): CanvasNodeContract[] =>
+  nodes.flatMap((node) => (node.type === 'group' ? [node, ...preorder(node.children)] : [node]));
+
+export interface LayerChildMoveTarget {
+  readonly id: string;
+  readonly name: string;
+  /** Appends the item to this layer; still subject to the document model's refusal. */
+  readonly command: DocumentCommand;
+}
+
+/** The other layers a child row's item can move to, in panel order: the keyboard counterpart of a cross-layer drag. */
+export const layerChildMoveTargets = (
+  document: CanvasDocumentContractV3,
+  child: Pick<ProjectedChildRow, 'kind' | 'layerId' | 'itemId' | 'stack'>
+): LayerChildMoveTarget[] =>
+  preorder(document.stacks[child.stack]).flatMap((node) => {
+    if (node.id === child.layerId) {
+      return [];
+    }
+    const command = layerChildDropCommand(document, child, { beforeItemId: null, layerId: node.id });
+    return command ? [{ command, id: node.id, name: node.name }] : [];
+  });
 
 /** Resolve child actions to whole-value patches, or null for missing/no-op targets. */
 export const layerChildRowCommand = (
@@ -552,7 +647,9 @@ export const layerChildRowCommand = (
         const copy =
           source.type === 'curves'
             ? { ...source, curves: structuredClone(source.curves), id: action.newId }
-            : { ...source, id: action.newId };
+            : source.type === 'noise'
+              ? { ...source, id: action.newId, seed: action.newNoiseSeed }
+              : { ...source, id: action.newId };
         next = [...before.slice(0, index + 1), copy, ...before.slice(index + 1)];
         break;
       }
@@ -571,7 +668,7 @@ export const layerChildRowCommand = (
         break;
       }
     }
-    return adjustmentsPatch(owner.type, target.layerId, before, next);
+    return { ...adjustmentsPatch(owner.type, target.layerId, before, next), type: 'patch-config' };
   }
   return null;
 };

@@ -182,7 +182,7 @@ class TestSlidingWindowTokenMiddleware:
 
     def test_remember_me_token_refreshes_to_remember_me_duration(self):
         """A remember_me=True token refreshes with the remember-me duration, not the normal duration."""
-        from jose import jwt
+        import jwt
 
         from invokeai.app.api.routers.auth import TOKEN_EXPIRATION_REMEMBER_ME
         from invokeai.app.services.auth.token_service import ALGORITHM, get_jwt_secret
@@ -214,7 +214,7 @@ class TestSlidingWindowTokenMiddleware:
 
     def test_normal_token_refreshes_to_normal_duration(self):
         """A remember_me=False token refreshes with the normal duration."""
-        from jose import jwt
+        import jwt
 
         from invokeai.app.api.routers.auth import TOKEN_EXPIRATION_NORMAL
         from invokeai.app.services.auth.token_service import ALGORITHM, get_jwt_secret

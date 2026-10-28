@@ -1,6 +1,7 @@
 import type * as accountLifecycleModule from '@platform/state/accountLifecycle';
 
 import { LOG_NAMESPACES } from '@platform/logging/contracts';
+import { CONTROL_TYPES } from '@workbench/canvas-engine/api';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ProjectSettings } from './contracts';
@@ -340,11 +341,35 @@ describe('clearWorkbenchSettings', () => {
 });
 
 describe('normalizeProjectSettings', () => {
-  it('defaults progress-image behavior for older project payloads', () => {
-    expect(store.normalizeProjectSettings({}).showProgressImagesInViewer).toBe(true);
-    expect(store.normalizeProjectSettings({ showProgressImagesInViewer: false }).showProgressImagesInViewer).toBe(
-      false
+  it('starts a project saved before Auto-switch Off, whatever its old progress toggle said', () => {
+    type Legacy = Parameters<typeof store.normalizeProjectSettings>[0] & { showProgressImagesInViewer?: boolean };
+    const legacy = (settings: Legacy) => store.normalizeProjectSettings(settings);
+
+    expect(legacy({}).viewerAutoSwitch).toBe('off');
+    expect(legacy({ showProgressImagesInViewer: true }).viewerAutoSwitch).toBe('off');
+    expect(legacy({ showProgressImagesInViewer: false }).viewerAutoSwitch).toBe('off');
+    expect(legacy({ showProgressImagesInViewer: true })).not.toHaveProperty('showProgressImagesInViewer');
+  });
+
+  it('keeps a saved Auto-switch mode and reads anything else as Off', () => {
+    for (const mode of ['off', 'latest', 'progress'] as const) {
+      expect(store.normalizeProjectSettings({ viewerAutoSwitch: mode }).viewerAutoSwitch).toBe(mode);
+    }
+    expect(store.normalizeProjectSettings({ viewerAutoSwitch: 'always' as unknown as 'off' }).viewerAutoSwitch).toBe(
+      'off'
     );
+  });
+
+  it('starts new projects on In progress', () => {
+    expect(store.normalizeProjectSettings(store.DEFAULT_PROJECT_SETTINGS).viewerAutoSwitch).toBe('progress');
+  });
+
+  it('defaults the output filters off for projects saved before them', () => {
+    expect(store.normalizeProjectSettings({})).toMatchObject({ useNsfwChecker: false, useWatermark: false });
+    expect(store.normalizeProjectSettings({ useNsfwChecker: true, useWatermark: true })).toMatchObject({
+      useNsfwChecker: true,
+      useWatermark: true,
+    });
   });
 
   /**
@@ -379,11 +404,54 @@ describe('normalizeWorkbenchPreferences prompt editing', () => {
   });
 });
 
+describe('normalizeWorkbenchPreferences workflow library', () => {
+  it('orders by last update and fills thumbnails unless a known choice is stored', () => {
+    expect(store.normalizeWorkbenchPreferences({})).toMatchObject({
+      workflowLibrarySort: 'updated',
+      workflowLibraryThumbnailFit: 'cover',
+    });
+    expect(
+      store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'size', workflowLibraryThumbnailFit: 'stretch' })
+    ).toMatchObject({ workflowLibrarySort: 'updated', workflowLibraryThumbnailFit: 'cover' });
+    expect(
+      store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'opened', workflowLibraryThumbnailFit: 'contain' })
+    ).toMatchObject({ workflowLibrarySort: 'opened', workflowLibraryThumbnailFit: 'contain' });
+  });
+});
+
 describe('normalizeWorkbenchPreferences appearance', () => {
   it('keeps high contrast off unless explicitly enabled', () => {
     expect(store.normalizeWorkbenchPreferences({}).highContrast).toBe(false);
     expect(store.normalizeWorkbenchPreferences({ highContrast: 1 as never }).highContrast).toBe(false);
     expect(store.normalizeWorkbenchPreferences({ highContrast: true }).highContrast).toBe(true);
+  });
+});
+
+describe('normalizeWorkbenchPreferences canvas operations', () => {
+  it('keeps Select Object auto-process off unless it was stored as on', () => {
+    expect(store.normalizeWorkbenchPreferences({}).selectObjectAutoProcess).toBe(false);
+    expect(
+      store.normalizeWorkbenchPreferences({ selectObjectAutoProcess: 'true' as never }).selectObjectAutoProcess
+    ).toBe(false);
+    expect(store.normalizeWorkbenchPreferences({ selectObjectAutoProcess: true }).selectObjectAutoProcess).toBe(true);
+  });
+});
+
+describe('installInPlace preference', () => {
+  it('installs in place unless the account stored the box unticked', () => {
+    expect(store.normalizeWorkbenchPreferences({}).installInPlace).toBe(true);
+    expect(store.normalizeWorkbenchPreferences({ installInPlace: 'false' as never }).installInPlace).toBe(true);
+    expect(store.normalizeWorkbenchPreferences({ installInPlace: false }).installInPlace).toBe(false);
+  });
+
+  it('keeps an unticked box across a reload of the account settings', async () => {
+    await store.loadWorkbenchSettings();
+    await store.patchWorkbenchPreferences({ installInPlace: false });
+
+    vi.resetModules();
+    store = await import('./store');
+
+    expect((await store.loadWorkbenchSettings()).installInPlace).toBe(false);
   });
 });
 
@@ -497,5 +565,72 @@ describe('normalizeWorkbenchPreferences language', () => {
 
   it('heals unsupported languages to the default', () => {
     expect(store.normalizeWorkbenchPreferences({ language: 'missing' as never }).language).toBe('en');
+  });
+});
+
+describe('controlModelMemory preference', () => {
+  it('starts empty and keeps only well-formed picks', () => {
+    expect(store.normalizeWorkbenchPreferences({}).controlModelMemory).toEqual({});
+    expect(
+      store.normalizeWorkbenchPreferences({ controlModelMemory: ['sdxl:depth'] as never }).controlModelMemory
+    ).toEqual({});
+    expect(
+      store.normalizeWorkbenchPreferences({
+        controlModelMemory: {
+          ':depth': 'no-base',
+          'sdxl:depth': 'depth-model',
+          'sdxl:flux': 'unknown-type',
+          'sdxl:pose': '',
+          'sdxl:tile': 'x'.repeat(256),
+          'sd-1:edges': 7 as never,
+          sdxl: 'no-type',
+        },
+      }).controlModelMemory
+    ).toEqual({ 'sdxl:depth': 'depth-model' });
+  });
+
+  it('accepts every control type, so the spelled-out key pattern stays in step with the canvas contract', () => {
+    const memory = Object.fromEntries(CONTROL_TYPES.map((type) => [`sdxl:${type}`, `${type}-model`]));
+
+    expect(store.normalizeWorkbenchPreferences({ controlModelMemory: memory }).controlModelMemory).toEqual(memory);
+  });
+
+  it('keeps the newest 256 picks', () => {
+    const memory = Object.fromEntries(Array.from({ length: 300 }, (_, index) => [`base-${index}:depth`, `m${index}`]));
+    const kept = store.normalizeWorkbenchPreferences({ controlModelMemory: memory }).controlModelMemory;
+
+    expect(Object.keys(kept)).toHaveLength(256);
+    expect(kept['base-299:depth']).toBe('m299');
+    expect(kept['base-43:depth']).toBeUndefined();
+  });
+
+  it('keeps the same record across unrelated preference patches, so readers that compare it do not re-run', async () => {
+    await store.loadWorkbenchSettings();
+    await store.patchControlModelMemory('sdxl:depth', 'depth-a');
+    const memory = store.getWorkbenchPreferences().controlModelMemory;
+
+    await store.patchWorkbenchPreferences({ reduceMotion: true });
+
+    expect(store.getWorkbenchPreferences().controlModelMemory).toBe(memory);
+    expect(store.normalizeWorkbenchPreferences({ controlModelMemory: memory }).controlModelMemory).toBe(memory);
+  });
+
+  it('remembers, replaces and forgets a pick through the persisted preferences, and resets with the rest', async () => {
+    await store.loadWorkbenchSettings();
+
+    await store.patchControlModelMemory('sdxl:depth', 'depth-a');
+    await store.patchControlModelMemory('flux:pose', 'flux-union');
+    await store.patchControlModelMemory('sdxl:depth', 'depth-b');
+
+    expect(readBackendPreferences().controlModelMemory).toEqual({ 'flux:pose': 'flux-union', 'sdxl:depth': 'depth-b' });
+
+    await store.patchControlModelMemory('flux:pose', null);
+
+    expect(store.getWorkbenchPreferences().controlModelMemory).toEqual({ 'sdxl:depth': 'depth-b' });
+    expect(readBackendPreferences().controlModelMemory).toEqual({ 'sdxl:depth': 'depth-b' });
+
+    await store.clearWorkbenchSettings();
+
+    expect(store.getWorkbenchPreferences().controlModelMemory).toEqual({});
   });
 });

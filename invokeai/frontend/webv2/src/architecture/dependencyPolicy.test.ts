@@ -225,6 +225,7 @@ describe('feature public-interface registry', () => {
     expect(checkDependency('workbench/palette/paletteProviders.ts', '@features/workflow/queries')).toEqual([]);
     expect(checkDependency('workbench/palette/paletteProviders.ts', '@features/workflow/paletteSearch')).toEqual([]);
     expect(checkDependency('workbench/palette/paletteProviders.ts', '@features/gallery/paletteSearch')).toEqual([]);
+    expect(checkDependency('workbench/settings/ImageStorageSettings.tsx', '@features/gallery/storage')).toEqual([]);
     expect(checkDependency('workbench/palette/paletteProviders.ts', '@features/queue/queries')).toEqual([]);
     expect(checkDependency('workbench/palette/WorkbenchCommandPaletteDialog.tsx', '@features/queue/queries')).toEqual(
       []
@@ -235,6 +236,7 @@ describe('feature public-interface registry', () => {
     ]);
     expect(checkDependency('workbench/invocationSubmit.ts', '@features/generation/prompts')).toEqual([]);
     expect(checkDependency('app/GenerateWidgetSyncRuntime.tsx', '@features/generation/runtime')).toEqual([]);
+    expect(checkDependency('app/graphExport.ts', '@features/generation/graphExport')).toEqual([]);
     expect(checkDependency('workbench/widgets/canvas/invoke.ts', '@features/generation/canvasGraph')).toEqual([]);
     expect(checkDependency('workbench/WorkbenchContext.tsx', '@features/intermediates/holdLease')).toEqual([]);
     expect(

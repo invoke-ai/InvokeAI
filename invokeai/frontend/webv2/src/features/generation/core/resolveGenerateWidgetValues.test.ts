@@ -49,25 +49,28 @@ describe('resolveGenerateWidgetValues', () => {
     ).toBeNull();
   });
 
-  it('never defaults to a model that cannot run on its own', () => {
-    // Default resolution excludes unconditional Ideogram branches that cannot generate independently.
-    const unconditional = createModel('ideogram4-uncond', {
-      base: 'ideogram-4',
-      branch: 'unconditional',
-      format: 'checkpoint',
-    });
-    const conditional = createModel('ideogram4-cond', {
-      base: 'ideogram-4',
-      branch: 'conditional',
-      format: 'checkpoint',
-    });
+  it.each(['checkpoint', 'gguf_quantized'] as const)(
+    'never defaults to a model that cannot run on its own (%s)',
+    (format) => {
+      // Default resolution excludes unconditional Ideogram branches that cannot generate independently.
+      const unconditional = createModel('ideogram4-uncond', {
+        base: 'ideogram-4',
+        branch: 'unconditional',
+        format,
+      });
+      const conditional = createModel('ideogram4-cond', {
+        base: 'ideogram-4',
+        branch: 'conditional',
+        format,
+      });
 
-    const result = resolveGenerateWidgetValues({ models: [unconditional, conditional], storedValues: {} });
+      const result = resolveGenerateWidgetValues({ models: [unconditional, conditional], storedValues: {} });
 
-    expect(result?.values.model.key).toBe('ideogram4-cond');
-    // And with nothing else installed there is no default to fall back to at all.
-    expect(resolveGenerateWidgetValues({ models: [unconditional], storedValues: {} })).toBeNull();
-  });
+      expect(result?.values.model.key).toBe('ideogram4-cond');
+      // And with nothing else installed there is no default to fall back to at all.
+      expect(resolveGenerateWidgetValues({ models: [unconditional], storedValues: {} })).toBeNull();
+    }
+  );
 
   it('creates canonical defaults for the first supported model', () => {
     const unsupported = { base: 'sdxl', key: 'control', name: 'ControlNet', type: 'controlnet' };

@@ -1,6 +1,5 @@
 import type * as settingsStoreModule from '@workbench/settings/store';
 
-import { isHotkeyModalLayerActive } from '@workbench/hotkeys/modalLayer';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -62,14 +61,12 @@ afterEach(async () => {
 });
 
 describe('WorkbenchCommandPalette host', () => {
-  it('keeps the lazy dialog mounted while it animates closed, but releases workbench hotkeys at close', async () => {
+  it('keeps the lazy dialog mounted while it animates closed', async () => {
     await act(() => openCommandPalette());
     await expect.poll(() => palette()?.dataset.open).toBe('true');
-    expect(isHotkeyModalLayerActive()).toBe(true);
 
     await act(() => closeCommandPalette());
     expect(palette()?.dataset.open).toBe('false');
-    expect(isHotkeyModalLayerActive()).toBe(false);
 
     await act(() => workbenchDialog.onExitComplete?.());
     expect(palette()).toBeNull();
@@ -88,6 +85,5 @@ describe('WorkbenchCommandPalette host', () => {
     await act(() => openCommandPalette());
     expect(palette()?.dataset.open).toBe('true');
     expect(workbenchDialog.mounts).toBe(2);
-    expect(isHotkeyModalLayerActive()).toBe(true);
   });
 });

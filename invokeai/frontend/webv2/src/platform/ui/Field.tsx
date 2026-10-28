@@ -1,10 +1,39 @@
 import type { FeatureHintId } from '@platform/ui/hints';
 import type { ReactNode } from 'react';
 
-import { chakra, Field as ChakraField, HStack, Stack, Text, useRecipe, type StackProps } from '@chakra-ui/react';
-import { FeatureHint } from '@platform/ui/hints';
+import {
+  chakra,
+  Field as ChakraField,
+  HStack,
+  Stack,
+  Text,
+  useFieldContext,
+  useRecipe,
+  type StackProps,
+} from '@chakra-ui/react';
+import { FEATURE_HINT_FIELD_PROPS, FeatureHint } from '@platform/ui/hints';
 import { fieldLabelRecipe } from '@theme/recipes';
-import { useMemo } from 'react';
+import { createContext, useContext, useMemo } from 'react';
+
+// Field context carries a label id whether or not a label renders; raw `Field.Root` hosts render none.
+const RenderedLabelIdContext = createContext<string | null>(null);
+
+const RenderedLabelIdProvider = ({ children }: { children: ReactNode }) => {
+  const field = useFieldContext();
+
+  return <RenderedLabelIdContext value={field?.ids.label ?? null}>{children}</RenderedLabelIdContext>;
+};
+
+/**
+ * The id of the label naming the nearest field's control, or null when that field renders none. For custom
+ * controls that reference the label themselves; Chakra controls read Field context directly.
+ */
+export const useFieldLabelId = (): string | null => {
+  const field = useFieldContext();
+  const labelId = useContext(RenderedLabelIdContext);
+
+  return field && field.ids.label === labelId ? labelId : null;
+};
 
 export const FieldLabel = ({ children }: { children: ReactNode }) => {
   const recipe = useRecipe({ recipe: fieldLabelRecipe });
@@ -52,6 +81,7 @@ export const Field = ({
   const recipe = useRecipe({ recipe: fieldLabelRecipe });
   const isHorizontal = orientation === 'horizontal';
   const isInvalid = invalid ?? Boolean(error);
+  const hintFieldProps = hint ? FEATURE_HINT_FIELD_PROPS : undefined;
   const ids = useMemo(
     () =>
       id
@@ -98,12 +128,12 @@ export const Field = ({
         required={required}
         unstyled
       >
-        <Stack flex="1" gap="1.5" minW="0" {...rest}>
+        <Stack flex="1" gap="1.5" minW="0" {...hintFieldProps} {...rest}>
           <HStack align="center" justify="space-between" minW="0">
             {labelContent}
             {labelEnd}
           </HStack>
-          {children}
+          <RenderedLabelIdProvider>{children}</RenderedLabelIdProvider>
           {message}
         </Stack>
       </ChakraField.Root>
@@ -121,13 +151,13 @@ export const Field = ({
       required={required}
       unstyled
     >
-      <Stack align="flex-start" direction="row" flex="1" gap="1.5" minW="0" {...rest}>
+      <Stack align="flex-start" direction="row" flex="1" gap="1.5" minW="0" {...hintFieldProps} {...rest}>
         <HStack align="center" flexShrink="0" justify="space-between" minH="8" minW="0">
           {labelContent}
           {labelEnd}
         </HStack>
         <Stack flex="1" gap="1.5" minW="0" w="full">
-          {children}
+          <RenderedLabelIdProvider>{children}</RenderedLabelIdProvider>
           {message}
         </Stack>
       </Stack>

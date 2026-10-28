@@ -1,12 +1,17 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
-import type { CanvasNodeContract, PreparedDocumentEdit } from '@workbench/canvas-engine/api';
+import type { CanvasEngine, CanvasNodeContract, PreparedDocumentEdit } from '@workbench/canvas-engine/api';
 import type { CanvasOperationState } from '@workbench/canvas-operations/api';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { Project } from '@workbench/projectContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
-import { createDocumentModel, getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/api';
+import {
+  createDocumentModel,
+  getDocumentIndex,
+  getDocumentLayer,
+  getDocumentLeaves,
+} from '@workbench/canvas-engine/api';
 import {
   groupContract,
   layerContract,
@@ -23,6 +28,7 @@ import {
   toggleLayerStackCollapsed,
   useLayerPanelState,
 } from '@workbench/layerPanelState';
+import { executeCanvasHotkeyCommand, type CanvasHotkeyContext } from '@workbench/widgets/canvas/canvasHotkeyCommands';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { createInstance } from 'i18next';
 import { act, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
@@ -31,6 +37,11 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
+import type { ProjectedChildRow } from './layerChildRows';
+import type { LayerRowCommands } from './layerRowCommands';
+
+import { ADJUSTMENT_SPINNER_DELAY_MS } from './AdjustmentStatusIcon';
+import { createFakeAdjustmentStatus } from './AdjustmentStatusIcon.testing';
 import { clearLayerChildSelection, getLayerChildSelection } from './layerChildSelection';
 import { getLayerRowCommits, resetLayerRowCommits } from './layerPanelDiagnostics';
 import { LAYER_PANEL_DEGRADE_THRESHOLD, LAYER_ROW_HEIGHT_PX } from './layerPanelRows';
@@ -38,7 +49,7 @@ import { clearLayerPropertiesRequest, requestLayerProperties } from './layerProp
 import { LayersTree, type LayersTreeEngine } from './LayersTree';
 import { buildLayerStackRows } from './layerTreeRows';
 
-vi.mock('./ControlLayerWarningIcon', () => ({ ControlLayerWarningIcon: () => null }));
+vi.mock('./ControlLayerStatusIcon', () => ({ ControlLayerStatusIcon: () => null }));
 vi.mock('./LayerThumbnail', () => ({ LayerThumbnail: () => <span data-testid="thumbnail" /> }));
 vi.mock('./LayerStackHeader', () => ({
   LayerStackHeader: ({
@@ -69,13 +80,24 @@ vi.mock('./LayerStackHeader', () => ({
     </div>
   ),
 }));
+/** The command handle the tree last gave its surface host, which menus drive. */
+const surfaceCommands = vi.hoisted(() => ({ current: null as LayerRowCommands | null }));
 vi.mock('./LayerSurfaceHost', () => ({
-  LayerSurfaceHost: ({ surface }: { surface: { kind: string; id?: string; child?: { key: string } } | null }) => (
-    // Hidden like the harness outputs so the tree's scroll geometry doesn't depend on this stand-in's line height.
-    <output data-testid="surface" style={{ display: 'none' }}>
-      {surface ? `${surface.kind}:${surface.child?.key ?? surface.id}` : 'none'}
-    </output>
-  ),
+  LayerSurfaceHost: ({
+    commands,
+    surface,
+  }: {
+    commands: LayerRowCommands;
+    surface: { kind: string; id?: string; child?: { key: string } } | null;
+  }) => {
+    surfaceCommands.current = commands;
+    return (
+      // Hidden like the harness outputs so the tree's scroll geometry doesn't depend on this stand-in's line height.
+      <output data-testid="surface" style={{ display: 'none' }}>
+        {surface ? `${surface.kind}:${surface.child?.key ?? surface.id}` : 'none'}
+      </output>
+    );
+  },
 }));
 
 const i18n = createInstance();
@@ -147,6 +169,7 @@ const exportBakedLayerBlob = vi.fn(() =>
   Promise.resolve({ blob: new Blob(['png'], { type: 'image/png' }), status: 'ok' as const })
 );
 const refusalChecks = vi.fn();
+const committedEdits: PreparedDocumentEdit[] = [];
 const revealRequests = vi.fn();
 
 /** The one operation-state seam the tree reads; tests publish through `setOperation`. */
@@ -169,6 +192,7 @@ const withOperations = (engine: LayersTreeEngine): LayersTreeEngine => {
   attachCanvasOperations(engine, operationHarness as never);
   return engine;
 };
+const adjustmentStatus = createFakeAdjustmentStatus();
 // The real engine handle is stable across document changes; this one reads the harness's latest document.
 let harnessDocument = createEmptyCanvasDocument();
 const engine = withOperations({
@@ -185,12 +209,14 @@ const engine = withOperations({
     },
   },
   exports: { exportBakedLayerBlob: exportBakedLayerBlob, hasExportableLayerContent: () => false },
-  interaction: { get: () => false },
+  interaction: { get: () => false, ...adjustmentStatus.interaction },
   layers: {
     commitPrepared: (_label: string, edit: PreparedDocumentEdit) => {
+      committedEdits.push(edit);
       dispatchExternal(edit.forward);
       return { status: 'committed' as const };
     },
+    endStructuralPreview: () => undefined,
   },
   previews: { drawLayerThumbnail: () => false, requestLayerThumbnail: thumbnailRequests },
   projectId: PROJECT_ID,
@@ -257,6 +283,15 @@ const Harness = ({ initialNodes }: { initialNodes: CanvasNodeContract[] }) => {
             ? (layer.adjustments?.map((entry) => `${entry.id}:${entry.isEnabled ? 'on' : 'off'}`).join(',') ?? 'none')
             : 'none';
         })()}
+      </output>
+      <output data-testid="adjustment-owners" style={HIDDEN}>
+        {getDocumentIndex(document)
+          .nodes.flatMap(({ node }) =>
+            'adjustments' in node && node.adjustments?.length
+              ? [`${node.id}[${node.adjustments.map((entry) => entry.id).join(',')}]`]
+              : []
+          )
+          .join(' ') || 'none'}
       </output>
       <output data-testid="mask-modifiers" style={HIDDEN}>
         {(() => {
@@ -348,6 +383,7 @@ beforeEach(() => {
   resetLayerRowCommits();
   thumbnailRequests.mockClear();
   refusalChecks.mockClear();
+  committedEdits.length = 0;
   revealRequests.mockClear();
   clearLayerPropertiesRequest();
   setOperation(null);
@@ -454,6 +490,54 @@ describe('LayersTree keyboard and accessibility', () => {
     expect(group).toHaveAttribute('aria-selected', 'false');
   });
 
+  it('shows a delayed spinner while adjustments compute and a described warning when they cannot run', async () => {
+    await renderTree(nested());
+    const top = treeitem('Top');
+    const statusIcon = (row: HTMLElement, key: string): HTMLElement | null =>
+      row.querySelector<HTMLElement>(`[role="img"][aria-label="widgets.layers.adjustments.status.${key}"]`);
+    const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms));
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      // A job that ends before the delay never shows the spinner.
+      await act(() => adjustmentStatus.set('top', 'computing'));
+      await advance(ADJUSTMENT_SPINNER_DELAY_MS - 1);
+      expect(statusIcon(top, 'computing')).toBeNull();
+      await act(() => adjustmentStatus.set('top', 'idle'));
+      await advance(ADJUSTMENT_SPINNER_DELAY_MS);
+      expect(statusIcon(top, 'computing')).toBeNull();
+
+      await act(() => adjustmentStatus.set('top', 'computing'));
+      await advance(ADJUSTMENT_SPINNER_DELAY_MS - 1);
+      expect(statusIcon(top, 'computing')).toBeNull();
+      await advance(1);
+      expect(statusIcon(top, 'computing')).not.toBeNull();
+      expect(top).not.toHaveAttribute('aria-describedby');
+    } finally {
+      vi.useRealTimers();
+    }
+
+    await act(() => adjustmentStatus.set('top', 'too-large'));
+    expect(statusIcon(top, 'computing')).toBeNull();
+    const warning = statusIcon(top, 'tooLarge')!;
+    expect(warning).not.toBeNull();
+    // The icon is pointer-only, so focusing the row is how the keyboard reaches the explanation.
+    expect(top.getAttribute('aria-describedby')).toBe(warning.id);
+    expect(tabStops()).toHaveLength(1);
+
+    // A group reports through the same store, by its own id; other rows stay clear.
+    await act(() => adjustmentStatus.set('g', 'over-budget'));
+    expect(statusIcon(treeitem('Group'), 'overBudget')).not.toBeNull();
+    expect(treeitem('Bottom').querySelector('[role="img"]')).toBeNull();
+
+    await act(() => {
+      adjustmentStatus.set('top', 'idle');
+      adjustmentStatus.set('g', 'idle');
+    });
+    expect(top.querySelector('[role="img"]')).toBeNull();
+    expect(top).not.toHaveAttribute('aria-describedby');
+  });
+
   it('walks rows with the arrow keys, opens and enters groups, climbs to the parent, and jumps with End', async () => {
     await renderTree(nested());
     treeitem('Top').focus();
@@ -478,6 +562,21 @@ describe('LayersTree keyboard and accessibility', () => {
     expect(document.activeElement).toBe(treeitem('Top'));
     await act(() => userEvent.keyboard('{Shift>}{F10}{/Shift}'));
     expect(output('surface')).toBe('menu:top');
+  });
+
+  it('frames the keyboard-focused row surface with its ring, not the gap below it', async () => {
+    await renderTree(nested());
+    treeitem('Top').focus();
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+    const row = treeitem('Group');
+    expect(document.activeElement).toBe(row);
+
+    const ring = getComputedStyle(row, '::after');
+    const rowRect = row.getBoundingClientRect();
+    const surface = [...row.children].find((child) => child.textContent?.includes('Group'))!.getBoundingClientRect();
+    // The ring and the surface share their box, so the row's content sits centred inside the ring.
+    expect(rowRect.top + Number.parseFloat(ring.top)).toBeCloseTo(surface.top, 0);
+    expect(rowRect.bottom - Number.parseFloat(ring.bottom)).toBeCloseTo(surface.bottom, 0);
   });
 
   it('keeps the focused row mounted and focused while scrolled far away', async () => {
@@ -567,6 +666,56 @@ describe('LayersTree selection, surfaces and structure', () => {
     );
     expect(output('surface')).toBe('menu:third');
     expect(output('selected-layer')).toBe('third');
+  });
+
+  it('reveals a cycled layer through collapsed ancestors and a filter without opening properties', async () => {
+    await renderTree([
+      ...manyLayers(60),
+      groupContract('outer', [groupContract('inner', [layerContract('target', 'raster', { name: 'Target' })])]),
+    ]);
+    await act(() => dispatchExternal({ id: 'l59', type: 'setCanvasSelectedLayer' }));
+    await act(() => {
+      setLayerPanelFilter(PROJECT_ID, 'l59', 'Layer 59');
+      toggleLayerStackCollapsed(PROJECT_ID, 'l59', 'raster');
+    });
+    const ctx: CanvasHotkeyContext = {
+      document: harnessDocument,
+      engine: engine as CanvasEngine,
+      dispatch: (mutation) => {
+        dispatchExternal(mutation);
+        return true;
+      },
+      selectedLayerIds: ['l59'],
+      hasStagingSlots: false,
+      hasSelectedStagedCandidate: false,
+      isInteractionLocked: false,
+      copySelection: vi.fn(),
+      cropAllLayers: vi.fn(),
+      swapActiveColors: vi.fn(),
+      resetActiveColors: vi.fn(),
+      pasteFromClipboard: vi.fn(),
+      notifyLayerDuplicateFailed: vi.fn(),
+      reportStructuralCommit: vi.fn(),
+      reportPreparedCommit: vi.fn(),
+      reportLayerOperation: vi.fn(),
+      reportTransformRefusal: vi.fn(),
+      t: (key) => key,
+    };
+    await act(() => executeCanvasHotkeyCommand('canvas.nextEntity', ctx));
+    await settle();
+    expect(output('selected-layer')).toBe('target');
+    expect(readLayerPanelState(PROJECT_ID, 'target')).toMatchObject({
+      expandedGroupIds: ['outer', 'inner'],
+      collapsedStacks: [],
+      filter: '',
+    });
+    const row = treeitem('Target');
+    const scroller = host!.querySelector<HTMLElement>('[role="tree"]')!.closest<HTMLElement>('[data-part="viewport"]')!;
+    expect(scroller.scrollTop).toBeGreaterThan(0);
+    expect(row.getBoundingClientRect().top).toBeGreaterThanOrEqual(scroller.getBoundingClientRect().top);
+    expect(row.getBoundingClientRect().bottom).toBeLessThanOrEqual(scroller.getBoundingClientRect().bottom);
+    expect(output('surface')).toBe('none');
+    expect(revealRequests).not.toHaveBeenCalled();
   });
 
   it('reveals a primary that changed outside the panel once, even inside a collapsed stack', async () => {
@@ -795,6 +944,23 @@ describe('LayersTree projected child rows', () => {
     expect(document.activeElement).toBe(treeitem('Mask'));
   });
 
+  it("builds a child row's edit from the engine's document, not the rendered one", async () => {
+    await renderTree([
+      layerContract('mask', 'inpaint_mask', { name: 'Mask', noise: { isEnabled: true, level: 0.25 } }),
+    ]);
+    // The engine restored a preview that the rendered tree still shows: the toggle must carry the committed level.
+    harnessDocument = {
+      ...harnessDocument,
+      stacks: stacksFrom([
+        layerContract('mask', 'inpaint_mask', { name: 'Mask', noise: { isEnabled: true, level: 0.5 } }),
+      ]),
+    };
+    const dot = treeitem('Noise').querySelector<HTMLButtonElement>('button[aria-label="Toggle active"]')!;
+    await act(() => userEvent.click(dot));
+
+    expect(committedEdits.at(-1)!.forward).toMatchObject({ config: { noise: { isEnabled: false, level: 0.5 } } });
+  });
+
   it('projects adjustment rows in stack order; the dot toggles one entry', async () => {
     await renderTree([
       layerContract('r1', 'raster', {
@@ -902,6 +1068,81 @@ describe('LayersTree projected child rows', () => {
     await act(() => pointer('pointermove', document, end.x, end.y));
     await act(() => pointer('pointerup', document, end.x, end.y));
     expect(output('regional-refs')).toBe('rg[] rg2[ref1:on]');
+    expect(output('selected-layer')).toBe('rg2');
+    expect(getLayerChildSelection()).toMatchObject({ itemId: 'ref1', layerId: 'rg2' });
+  });
+
+  describe('moving adjustments between layers', () => {
+    const adjustedLayers = (overrides: { target?: object } = {}): CanvasNodeContract[] => [
+      layerContract('r1', 'raster', {
+        adjustments: [
+          { brightness: 0.2, contrast: 0, id: 'a1', isEnabled: true, type: 'brightness-contrast' },
+          { id: 'a2', isEnabled: true, saturation: -0.4, type: 'hsl' },
+        ],
+        name: 'Source',
+      }),
+      layerContract('r2', 'raster', {
+        adjustments: [{ curves: {}, id: 'b1', isEnabled: true, type: 'curves' }],
+        name: 'Target',
+        ...overrides.target,
+      }),
+      groupContract('g1', [paint('r3', 'Member')], { name: 'Group' }),
+      layerContract('c1', 'control', { name: 'Control' }),
+    ];
+    const row = (key: string) => host!.querySelector<HTMLElement>(`[data-layer-row-id="${key}"]`)!;
+    /** Drags `from` to `to`, landing `dy` pixels off its centre. */
+    const drag = async (from: HTMLElement, to: HTMLElement, dy = 0) => {
+      const start = centre(from);
+      const end = centre(to);
+      await act(() => pointer('pointerdown', from, start.x, start.y));
+      await act(() => pointer('pointermove', document, start.x + 8, start.y));
+      await act(() => pointer('pointermove', document, end.x, end.y + dy));
+      await act(() => pointer('pointerup', document, end.x, end.y + dy));
+      await settle();
+    };
+
+    it('lands among another layer’s adjustments as one undoable edit, and the selection follows', async () => {
+      await renderTree(adjustedLayers());
+      await drag(row('child:r1:a2'), row('child:r2:b1'), -6);
+      expect(output('adjustment-owners')).toBe('r1[a1] r2[a2,b1]');
+      expect(output('selected-layer')).toBe('r2');
+      expect(getLayerChildSelection()).toMatchObject({ itemId: 'a2', layerId: 'r2' });
+      expect(document.activeElement).toBe(row('child:r2:a2'));
+
+      expect(committedEdits).toHaveLength(1);
+      await act(() => dispatchExternal(committedEdits[0]!.inverse));
+      expect(output('adjustment-owners')).toBe('r1[a1,a2] r2[b1]');
+    });
+
+    it('appends to a raster layer or group row it is dropped on', async () => {
+      await renderTree(adjustedLayers());
+      await drag(row('child:r1:a1'), row('g1'));
+      expect(output('adjustment-owners')).toBe('r1[a2] r2[b1] g1[a1]');
+      await drag(row('child:r1:a2'), row('r2'));
+      expect(output('adjustment-owners')).toBe('r2[b1,a2] g1[a1]');
+    });
+
+    it('reveals and focuses an entry moved from the menu into a collapsed group member', async () => {
+      await renderTree(adjustedLayers());
+      expect(host!.querySelector('[data-layer-row-id="r3"]')).toBeNull();
+      const child = { itemId: 'a2', key: 'child:r1:a2', kind: 'adjustment-hsl', layerId: 'r1', stack: 'raster' };
+      await act(() => surfaceCommands.current!.moveChildToLayer(child as ProjectedChildRow, 'r3'));
+      await settle();
+      expect(output('adjustment-owners')).toBe('r1[a1] r2[b1] r3[a2]');
+      expect(output('selected-layer')).toBe('r3');
+      expect(getLayerChildSelection()).toMatchObject({ itemId: 'a2', layerId: 'r3' });
+      expect(readLayerPanelState(PROJECT_ID, 'r3')).toMatchObject({ focusId: 'child:r3:a2', selectedIds: ['r3'] });
+      expect(document.activeElement).toBe(row('child:r3:a2'));
+    });
+
+    it('refuses control layers and locked raster layers, leaving every owner intact', async () => {
+      await renderTree(adjustedLayers({ target: { isLocked: true } }));
+      await drag(row('child:r1:a1'), row('c1'));
+      await drag(row('child:r1:a1'), row('r2'));
+      await drag(row('child:r1:a1'), row('child:r2:b1'), -6);
+      expect(output('adjustment-owners')).toBe('r1[a1,a2] r2[b1]');
+      expect(committedEdits).toHaveLength(0);
+    });
   });
 
   it('walks child rows from the keyboard and routes their context menu', async () => {

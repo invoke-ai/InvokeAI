@@ -3,11 +3,11 @@ import type { Project } from '@workbench/projectContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
+import { isModalPresent, registerModalPresence } from '@platform/ui/modalPresence';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { applyThemeToRoot } from '@theme/applyTheme';
 import { system } from '@theme/system';
 import { DEFAULT_THEME_ID } from '@theme/themes';
-import { isHotkeyModalLayerActive, registerHotkeyModalLayer } from '@workbench/hotkeys/modalLayer';
 import { getProjectWidgetInstance } from '@workbench/widgetState';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { createInstance } from 'i18next';
@@ -24,7 +24,7 @@ const mocks = vi.hoisted(() => ({
   project: null as unknown as Project,
   sendToCanvas: vi.fn(),
   uploadFiles: vi.fn(),
-  uploadOptions: null as null | { selectedBoardId: string },
+  uploadOptions: null as null | { selectedBoardId: string | (() => string) },
   useAsReferenceImage: vi.fn(),
 }));
 
@@ -33,13 +33,15 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(mocks.project),
   useWidgetValuesSelector: () => ({}),
 }));
-vi.mock('@features/gallery/react', () => ({
-  useGalleryUploadAction: (options: { selectedBoardId: string }) => {
+vi.mock('@features/gallery/picker', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useGalleryUploadAction: (options: { selectedBoardId: string | (() => string) }) => {
     mocks.uploadOptions = options;
     return mocks.uploadFiles;
   },
 }));
 vi.mock('@features/gallery/queries', () => ({
+  canAddToCachedGalleryBoard: () => true,
   galleryBoardsOptions: () => ({
     queryFn: () =>
       Promise.resolve([
@@ -168,7 +170,7 @@ describe('PasteMediaRuntime', () => {
     await expect
       .element(page.getByRole('img', { name: i18n.t('shell.pasteMedia.imagePreview', { index: 1 }) }))
       .toBeVisible();
-    expect(isHotkeyModalLayerActive()).toBe(true);
+    expect(isModalPresent()).toBe(true);
 
     await page.getByRole('button', { name: i18n.t('widgets.canvas.import.control') }).click();
 
@@ -179,7 +181,7 @@ describe('PasteMediaRuntime', () => {
     expect(mocks.sendToCanvas.mock.calls[0]?.[1]).toBe('control');
     expect(mocks.useAsReferenceImage).not.toHaveBeenCalled();
     await expect.element(origin).toHaveFocus();
-    expect(isHotkeyModalLayerActive()).toBe(false);
+    expect(isModalPresent()).toBe(false);
   });
 
   it('uploads to the gallery without a follow-on action, and uses images as reference images', async () => {
@@ -212,7 +214,10 @@ describe('PasteMediaRuntime', () => {
     paste(document.body, [imageFile()]);
 
     await expect.element(page.getByRole('button', { name: /Upload to Gallery/ })).toHaveAccessibleName(/Moodboard/);
-    expect(mocks.uploadOptions?.selectedBoardId).toBe('board-1');
+    // Read by the upload action as the paste is chosen, once it has the listing the board is judged from.
+    const { selectedBoardId } = mocks.uploadOptions!;
+    expect(selectedBoardId).toBeTypeOf('function');
+    expect((selectedBoardId as () => string)()).toBe('board-1');
   });
 
   it('hides the reference option while the current model cannot take another reference image', async () => {
@@ -262,10 +267,13 @@ describe('PasteMediaRuntime', () => {
     expect(paste(document.body, [new File(['{}'], 'data.json', { type: 'application/json' })]).defaultPrevented).toBe(
       false
     );
-    const release = registerHotkeyModalLayer('test-modal');
-    expect(paste(document.body, [imageFile()]).defaultPrevented).toBe(false);
-    release();
-    // Dialogs that register no modal layer still own pastes from inside them.
+    const release = registerModalPresence();
+    try {
+      expect(paste(document.body, [imageFile()]).defaultPrevented).toBe(false);
+    } finally {
+      release();
+    }
+    // A non-modal dialog announces no modal presence but still owns pastes from inside it.
     const nameInput = page.getByRole('textbox', { name: 'Name' }).element();
     nameInput.focus();
     expect(paste(nameInput, [imageFile()]).defaultPrevented).toBe(false);
@@ -288,7 +296,7 @@ describe('PasteMediaRuntime', () => {
 
     const frames = await recordDialogExit(dialog, async () => {
       await page.getByRole('button', { name: i18n.t('common.cancel') }).click();
-      expect(isHotkeyModalLayerActive()).toBe(false);
+      expect(isModalPresent()).toBe(false);
     });
 
     // An unmounted dialog never reaches its closed state, so it cannot animate out; a retained one does, then leaves.

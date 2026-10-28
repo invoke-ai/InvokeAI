@@ -1,8 +1,9 @@
 import type { ChangeEvent, UIEvent } from 'react';
 
-import { Box, Dialog, Flex, HStack, Icon, NativeSelect, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
+import { Box, Flex, HStack, Icon, NativeSelect, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button } from '@platform/ui/Button';
+import { Dialog } from '@platform/ui/Dialog';
 import { PanelHeader } from '@platform/ui/PanelHeader';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { resolveSettingsText } from '@platform/ui/settings/contracts';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { builtInLayoutPresetDescriptors, layoutPresets } from './layoutPresets';
+import { builtInLayoutPresetDescriptors, getLayoutPresetLabel, layoutPresets } from './layoutPresets';
 
 describe('built-in layout preset descriptors', () => {
   it('has a widget instance for every instance id a preset places', () => {
@@ -53,11 +53,23 @@ describe('built-in layout preset descriptors', () => {
         defaultRoute: { destination: 'gallery', sourceId: 'workflow' },
         hotkeyId: 'selectAutomatePreset',
         iconId: 'workflow',
-        label: 'Automate',
+        label: 'Workflow',
         presetId: 'automate',
       },
     ]);
     expect(layoutPresets).toEqual(builtInLayoutPresetDescriptors.map(({ preset }) => preset));
+  });
+
+  it('names each built-in preset through the locale, Automate as Workflow', () => {
+    const t = (key: string) => `t:${key}`;
+
+    expect(layoutPresets.map((preset) => getLayoutPresetLabel(preset, t))).toEqual([
+      't:topbar.presets.builtInLabels.compose',
+      't:topbar.presets.builtInLabels.edit',
+      't:topbar.presets.builtInLabels.video',
+      't:topbar.presets.builtInLabels.automate',
+    ]);
+    expect(getLayoutPresetLabel({ label: 'My layout' }, t)).toBe('My layout');
   });
 
   it('ships task-focused widget sets in interaction-priority order', () => {
@@ -88,7 +100,7 @@ describe('built-in layout preset descriptors', () => {
           left: 'workflow',
           right: 'queue',
         },
-        bottom: ['server-status', 'queue-status', 'gallery:bottom', 'notifications', 'autosave-status'],
+        bottom: ['server-status', 'queue-status', 'gallery:bottom', 'shortcuts', 'notifications', 'autosave-status'],
         center: ['workflow:center', 'preview'],
         left: ['workflow'],
         panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
@@ -101,7 +113,7 @@ describe('built-in layout preset descriptors', () => {
           left: 'generate',
           right: 'gallery',
         },
-        bottom: ['server-status', 'queue-status', 'gallery:bottom', 'notifications', 'autosave-status'],
+        bottom: ['server-status', 'queue-status', 'gallery:bottom', 'shortcuts', 'notifications', 'autosave-status'],
         center: ['preview', 'gallery:center'],
         left: ['generate', 'upscale'],
         panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
@@ -114,7 +126,7 @@ describe('built-in layout preset descriptors', () => {
           left: 'generate',
           right: 'layers',
         },
-        bottom: ['server-status', 'queue-status', 'gallery:bottom', 'notifications', 'autosave-status'],
+        bottom: ['server-status', 'queue-status', 'gallery:bottom', 'shortcuts', 'notifications', 'autosave-status'],
         center: ['canvas', 'preview'],
         left: ['generate', 'upscale'],
         panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
@@ -122,7 +134,7 @@ describe('built-in layout preset descriptors', () => {
       },
       video: {
         active: { bottom: 'gallery:bottom', center: 'preview', left: 'video', right: 'gallery' },
-        bottom: ['server-status', 'queue-status', 'gallery:bottom', 'notifications', 'autosave-status'],
+        bottom: ['server-status', 'queue-status', 'gallery:bottom', 'shortcuts', 'notifications', 'autosave-status'],
         center: ['preview'],
         left: ['video', 'upscale'],
         panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },

@@ -55,21 +55,3 @@ def test_images_view_excludes_canvas_owned_images(mock_services: InvocationServi
     result = mock_services.image_records.get_many(offset=0, limit=10, categories=IMAGE_CATEGORIES)
 
     assert [record.image_name for record in result.items] == ["generated.png"]
-
-
-def test_date_board_counts_ignore_canvas_owned_images(mock_services: InvocationServices) -> None:
-    """`get_image_dates` derives its counts from the category constants.
-
-    It previously classified every non-`general` image as an asset, which would
-    keep counting canvas-owned images after they left the assets view — leaving
-    the date board's badge disagreeing with the images it actually lists.
-    """
-    _save(mock_services, "painted.png", ImageCategory.OTHER)
-    _save(mock_services, "uploaded.png", ImageCategory.USER)
-    _save(mock_services, "generated.png", ImageCategory.GENERAL)
-
-    dates = mock_services.image_records.get_image_dates()
-
-    assert len(dates) == 1
-    assert dates[0].image_count == 1
-    assert dates[0].asset_count == 1

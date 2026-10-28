@@ -1,16 +1,25 @@
 """Password hashing and validation utilities."""
 
-from typing import Literal, cast
+from typing import Literal
 
-from passlib.context import CryptContext
+import bcrypt
 
-# Configure bcrypt context - set truncate_error=False to allow passwords >72 bytes
-# without raising an error. They will be automatically truncated by bcrypt to 72 bytes.
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto",
-    bcrypt__truncate_error=False,
-)
+# bcrypt's work factor. This is also bcrypt.gensalt()'s default and what every stored hash so far was
+# produced with (via passlib, which this module used to wrap); stated explicitly so a library default
+# change cannot silently weaken new hashes.
+BCRYPT_ROUNDS = 12
+
+
+def _password_bytes(password: str) -> bytes:
+    """Encode a password for bcrypt, truncating to its 72-byte limit.
+
+    Truncation drops any incomplete trailing UTF-8 sequence, so hashing and verification agree byte
+    for byte on long passwords rather than depending on how the library treats over-long input.
+    """
+    password_bytes = password.encode("utf-8")
+    if len(password_bytes) > 72:
+        password_bytes = password_bytes[:72].decode("utf-8", errors="ignore").encode("utf-8")
+    return password_bytes
 
 
 def hash_password(password: str) -> str:
@@ -25,12 +34,7 @@ def hash_password(password: str) -> str:
     Returns:
         The hashed password
     """
-    # bcrypt has a 72 byte limit - encode and truncate if necessary
-    password_bytes = password.encode("utf-8")
-    if len(password_bytes) > 72:
-        # Truncate to 72 bytes and decode back, dropping incomplete UTF-8 sequences
-        password = password_bytes[:72].decode("utf-8", errors="ignore")
-    return cast(str, pwd_context.hash(password))
+    return bcrypt.hashpw(_password_bytes(password), bcrypt.gensalt(rounds=BCRYPT_ROUNDS)).decode("ascii")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -47,12 +51,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         True if the password matches the hash, False otherwise
     """
     try:
-        # bcrypt has a 72 byte limit - encode and truncate if necessary to match hash_password
-        password_bytes = plain_password.encode("utf-8")
-        if len(password_bytes) > 72:
-            # Truncate to 72 bytes and decode back, dropping incomplete UTF-8 sequences
-            plain_password = password_bytes[:72].decode("utf-8", errors="ignore")
-        return cast(bool, pwd_context.verify(plain_password, hashed_password))
+        return bcrypt.checkpw(_password_bytes(plain_password), hashed_password.encode("ascii"))
     except Exception:
         # Invalid hash format or other error - return False
         return False

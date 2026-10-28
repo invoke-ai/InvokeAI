@@ -12,14 +12,15 @@ import { Scrollable } from '@platform/ui/Scrollable';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
 import { CheckIcon, HourglassIcon, PinIcon } from 'lucide-react';
-import { useCallback, useMemo, type MouseEvent } from 'react';
+import { memo, useCallback, useMemo, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { PreviewDensity } from './previewDensity';
 
 /**
- * Render board thumbnails below the stage with live GPU slots leading in gallery order and settling into result
- * thumbnails in place. Reserve height outside media; item drag payloads work with existing gallery targets.
+ * Render board thumbnails below the stage in the gallery's order: the starred strip, the live GPU slots, then the
+ * listing, where each slot's result lands beside it. Reserve height outside media; item drag payloads work with
+ * existing gallery targets.
  */
 
 export const PreviewFilmstrip = ({
@@ -27,6 +28,7 @@ export const PreviewFilmstrip = ({
   followedSessionId = null,
   isSessionPinned = false,
   items,
+  leadingItemCount = 0,
   selectedItemKey,
   sessions = EMPTY_SESSIONS,
   onCompare,
@@ -42,8 +44,10 @@ export const PreviewFilmstrip = ({
   /** Whether that session was pinned by hand; clicking it again unpins. */
   isSessionPinned?: boolean;
   items: GalleryItem[];
+  /** How many `items` come before the in-progress slots: the starred strip, which the gallery pins above them. */
+  leadingItemCount?: number;
   selectedItemKey: GalleryItemKey | null;
-  /** In-progress slots in the gallery's order, leading the row. */
+  /** In-progress slots in the gallery's order, after the strip and before the listing. */
   sessions?: readonly QueueProgressSession[];
   onFollowSession?: (sessionId: string) => void;
   onUnpinSession?: () => void;
@@ -56,6 +60,21 @@ export const PreviewFilmstrip = ({
   onSelect: (item: GalleryItem) => void;
 }) => {
   const thumbSize = density === 'full' ? '12' : '8';
+  const renderItem = (item: GalleryItem) => {
+    const itemKey = toGalleryItemKey(item);
+
+    return (
+      <FilmstripThumb
+        key={itemKey}
+        item={item}
+        isSelected={itemKey === selectedItemKey}
+        size={thumbSize}
+        onCompare={onCompare}
+        onContextMenu={onContextMenu}
+        onSelect={onSelect}
+      />
+    );
+  };
 
   // Show the strip for any live session, even on an otherwise empty board.
   if (items.length < 2 && sessions.length === 0) {
@@ -80,6 +99,7 @@ export const PreviewFilmstrip = ({
       w="full"
     >
       <HStack align="center" gap="1" h="full">
+        {items.slice(0, leadingItemCount).map(renderItem)}
         {sessions.map((session) => (
           <FilmstripLiveThumb
             key={session.id}
@@ -92,21 +112,7 @@ export const PreviewFilmstrip = ({
             onUnpin={onUnpinSession}
           />
         ))}
-        {items.map((item) => {
-          const itemKey = toGalleryItemKey(item);
-
-          return (
-            <FilmstripThumb
-              key={itemKey}
-              item={item}
-              isSelected={itemKey === selectedItemKey}
-              size={thumbSize}
-              onCompare={onCompare}
-              onContextMenu={onContextMenu}
-              onSelect={onSelect}
-            />
-          );
-        })}
+        {items.slice(leadingItemCount).map(renderItem)}
       </HStack>
     </Scrollable>
   );
@@ -253,7 +259,8 @@ const FilmstripLiveThumb = ({
   );
 };
 
-const FilmstripThumb = ({
+// Memoized: the strip lists the whole board, and a selection move should re-render only the two thumbs it changes.
+const FilmstripThumb = memo(function FilmstripThumb({
   item,
   isSelected,
   size,
@@ -267,7 +274,7 @@ const FilmstripThumb = ({
   onCompare?: (item: GalleryItem) => void;
   onContextMenu?: (item: GalleryItem, x: number, y: number) => void;
   onSelect: (item: GalleryItem) => void;
-}) => {
+}) {
   const itemRef = useMemo(() => toGalleryItemRef(item), [item]);
   const dragData = useMemo(() => getGalleryItemDragData([itemRef]), [itemRef]);
   const thumbnailSrc = item.thumbnailUrl || (item.kind === 'image' ? item.fullUrl : null);
@@ -334,7 +341,7 @@ const FilmstripThumb = ({
       )}
     </Box>
   );
-};
+});
 
 const EMPTY_SESSIONS: readonly QueueProgressSession[] = [];
 

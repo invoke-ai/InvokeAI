@@ -1,7 +1,7 @@
 import type { ModelConfig, ModelTaxonomyType } from '@features/models/react';
 import type { FieldInputTemplate } from '@features/workflow/contracts';
 import type { WorkflowLibraryPage, WorkflowRecordDTO } from '@features/workflow/data/api';
-import type { LoraFieldCollectionEntry } from '@features/workflow/utility';
+import type { LoraFieldCollectionEntry, NodeFieldFormSettings } from '@features/workflow/utility';
 import type { SeedInputPatch } from '@platform/ui/SeedInput';
 
 import {
@@ -23,16 +23,29 @@ import {
 import { useDndContext, useDndMonitor, useDroppable, type DragEndEvent } from '@dnd-kit/core';
 import {
   formatGalleryVideoDuration,
-  galleryDestinations,
   galleryItems,
   galleryTransfers,
-  type GalleryBoard,
+  isGalleryBoardAttachable,
   type GalleryItem,
 } from '@features/gallery';
-import { getSelectedGalleryImageFromValues, toGalleryItemKey } from '@features/gallery/contracts';
+import {
+  canOnBoard,
+  getGalleryAutoAddBoardId,
+  getGalleryBoardDestinationGroups,
+  getGalleryBoardLabel,
+  getSelectedGalleryImageFromValues,
+  toGalleryItemKey,
+} from '@features/gallery/contracts';
 import { FindInGalleryThumbnailButton } from '@features/gallery/mediaSlot';
 import { GalleryPickerPopover, type GalleryPickerSelection } from '@features/gallery/picker';
-import { invalidateGallery } from '@features/gallery/queries';
+import {
+  canAddToCachedGalleryBoard,
+  ensureGalleryBoardDestinations,
+  galleryBoardsOptions,
+  getCachedGalleryBoard,
+  invalidateGallery,
+} from '@features/gallery/queries';
+import { useHostGalleryBoards, useOptionalGalleryHostProjectContext } from '@features/gallery/react';
 import { galleryImageUrls, galleryVideoUrls } from '@features/gallery/utility';
 import { DEFAULT_LORA_WEIGHT_CONFIG, sanitizeBatchCount, SCHEDULER_OPTIONS } from '@features/generation/settings';
 import { isInvocationNode } from '@features/workflow/contracts';
@@ -66,10 +79,12 @@ import {
   finiteNumberOrUndefined,
   invalidProps,
   NumericInput,
+  NumericSliderInput,
   useFocusedDraft,
 } from '@features/workflow/ui/fields/NumericInput';
 import { useWorkflowProjectSelector, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
 import {
+  getNodeFieldSliderRange,
   getResolvedWorkflowEdges,
   isLoraFieldCollectionEntry,
   isLoraFieldWeightValid,
@@ -80,13 +95,7 @@ import {
 } from '@features/workflow/utility';
 import { planSeedSubmission, type SeedMode, wrapSeed } from '@platform/core/seed';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import {
-  assertAccountScopeCurrent,
-  captureAccountScope,
-  isAccountScopeCurrent,
-  registerAccountOwnedResource,
-  type AccountScope,
-} from '@platform/state/accountLifecycle';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import {
   Button,
   ColorPicker,
@@ -159,6 +168,11 @@ export interface WorkflowFieldInputProps {
   /** The instance's seed mode; read only for seed inputs (`isSeedInputField`), which render the mode menu. */
   seedMode?: SeedMode;
   onSeedModeChange?: (seedMode: SeedMode) => void;
+  /**
+   * The form element's authored control (dropdown, slider, text area) for a scalar string or number field; the
+   * template's bounds are expected to be narrowed by `applyNodeFieldFormSettings` already.
+   */
+  formSettings?: NodeFieldFormSettings | null;
 }
 
 // The media well's hover matches DropZone's accent preview; an invalid well keeps its error border and tints instead.
@@ -171,7 +185,8 @@ const MEDIA_WELL_INVALID_PROPS = {
 /** A row of a list names itself by position; a scalar field is named by its title. */
 type ScalarInputProps = WorkflowFieldInputProps & { ariaLabel?: string };
 
-const StringInput = ({ ariaLabel, id, invalid, onChange, template, value }: ScalarInputProps) => {
+const StringInput = ({ ariaLabel, formSettings, id, invalid, onChange, template, value }: ScalarInputProps) => {
+  const { t } = useTranslation();
   const [draft, setDraft, clearDraft] = useFocusedDraft();
   const text = draft ?? (typeof value === 'string' ? value : '');
   const onTextChange = useCallback(
@@ -181,8 +196,34 @@ const StringInput = ({ ariaLabel, id, invalid, onChange, template, value }: Scal
     },
     [onChange, setDraft]
   );
+  const stringSettings = formSettings?.kind === 'string' ? formSettings : null;
+  const component = stringSettings?.component ?? (template.uiComponent === 'textarea' ? 'textarea' : 'input');
+  const dropdownOptions = useMemo(
+    () =>
+      stringSettings?.component === 'dropdown'
+        ? stringSettings.options.map((option, index) => ({
+            label:
+              option.label || option.value || t('widgets.workflow.formBuilder.unnamedOption', { index: index + 1 }),
+            value: option.value,
+          }))
+        : [],
+    [stringSettings, t]
+  );
 
-  if (template.uiComponent === 'textarea') {
+  if (component === 'dropdown') {
+    return (
+      <SelectInput
+        id={id}
+        invalid={invalid}
+        options={dropdownOptions}
+        title={ariaLabel ?? template.title}
+        value={value}
+        onChange={onChange}
+      />
+    );
+  }
+
+  if (component === 'textarea') {
     return (
       <ResizableTextarea
         aria-label={ariaLabel ?? template.title}
@@ -211,6 +252,28 @@ const StringInput = ({ ariaLabel, id, invalid, onChange, template, value }: Scal
       {...invalidProps(invalid)}
       onBlur={clearDraft}
       onChange={onTextChange}
+    />
+  );
+};
+
+/** A number field renders the authored slider when its (narrowed) template bounds both ends; otherwise the input. */
+const NumberFieldInput = (props: ScalarInputProps) => {
+  const { formSettings, template } = props;
+  const component = formSettings?.kind === 'number' ? formSettings.component : 'number-input';
+  const range = component === 'number-input' ? null : getNodeFieldSliderRange(template);
+
+  if (!range) {
+    return <NumericInput {...props} />;
+  }
+
+  return (
+    <NumericSliderInput
+      ariaLabel={props.ariaLabel}
+      range={range}
+      template={template}
+      value={props.value}
+      withNumberInput={component === 'number-input-and-slider'}
+      onChange={props.onChange}
     />
   );
 };
@@ -441,90 +504,127 @@ const SchedulerInput = ({ id, invalid, onChange, template, value }: WorkflowFiel
   />
 );
 
-let boardOptionsRequest: { owner: AccountScope; promise: Promise<GalleryBoard[]> } | null = null;
+interface BoardOption {
+  /** The gallery destination group the board lists under; empty for the fixed Auto and Uncategorized choices. */
+  group: string;
+  label: string;
+  value: string;
+}
 
-registerAccountOwnedResource({
-  clear: () => {
-    boardOptionsRequest = null;
-  },
-  name: 'workflow-board-options',
-});
-
-const getBoardOptions = (): Promise<GalleryBoard[]> => {
-  const owner = captureAccountScope();
-
-  if (boardOptionsRequest?.owner !== owner) {
-    const promise = galleryDestinations
-      .list({ signal: owner.signal })
-      .then((loadedBoards) => {
-        assertAccountScopeCurrent(owner);
-
-        return loadedBoards.filter((board) => board.kind === 'board');
-      })
-      .catch((error: unknown) => {
-        if (boardOptionsRequest?.promise === promise) {
-          boardOptionsRequest = null;
-        }
-        throw error;
-      });
-
-    boardOptionsRequest = { owner, promise };
-  }
-
-  return boardOptionsRequest.promise;
-};
+const FIXED_BOARD_GROUP = '';
 
 const BoardInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
-  const [boards, setBoards] = useState<GalleryBoard[]>([]);
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    getBoardOptions()
-      .then((loadedBoards) => {
-        if (!isCancelled) {
-          setBoards(loadedBoards);
-        }
-      })
-      .catch(() => {
-        // Board listing is a convenience; the auto/none sentinels still work.
-      });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, []);
-
+  const { t } = useTranslation();
+  // The gallery's own listing, so grants, revocations and new boards reach the field as they reach the panel.
+  const { data } = useQuery(galleryBoardsOptions());
+  const listedBoards = useHostGalleryBoards(data);
+  const host = useOptionalGalleryHostProjectContext();
+  // Only boards a node's results may land on: someone else's board the caller can only view would refuse them after
+  // the run.
+  const boards = useMemo(
+    () => listedBoards.filter((board) => board.kind === 'board' && canOnBoard(board, 'add_media')),
+    [listedBoards]
+  );
+  const queryClient = useQueryClient();
+  // The auto-add board as chosen, before any refusal: one the live listing lacks may be archived, which compilation
+  // still accepts, so its label waits on the listing of archived boards too (shared, and read only then).
+  const chosenAutoBoardId = useWorkflowProjectSelector((project) =>
+    getGalleryAutoAddBoardId(project.galleryValues, () => true)
+  );
+  const needsArchivedListing =
+    data !== undefined &&
+    chosenAutoBoardId !== null &&
+    chosenAutoBoardId !== 'none' &&
+    !listedBoards.some((board) => board.id === chosenAutoBoardId);
+  useQuery({ ...galleryBoardsOptions({ includeArchived: true }), enabled: needsArchivedListing });
+  // Compilation sends Auto to the gallery's auto-add board, deciding from the cached listings; the label names the
+  // board the same decision resolves to now. Either listing arriving re-renders the field, which reads it again.
+  const autoBoardId = useWorkflowProjectSelector((project) =>
+    getGalleryAutoAddBoardId(project.galleryValues, (boardId) => canAddToCachedGalleryBoard(boardId, queryClient))
+  );
+  const translate = useCallback((key: string) => t(key), [t]);
+  const groups = useMemo(
+    () =>
+      host
+        ? getGalleryBoardDestinationGroups({
+            boards,
+            projectId: host.projectId ?? null,
+            projectName: host.projectName,
+            projectNames: new Map(host.projects?.map((project) => [project.id, project.name])),
+            t: translate,
+          })
+        : [{ boards, id: 'boards', label: '' }],
+    [boards, host, translate]
+  );
+  const autoBoard =
+    autoBoardId === null
+      ? undefined
+      : (listedBoards.find((board) => board.id === autoBoardId) ?? getCachedGalleryBoard(autoBoardId, queryClient));
+  const autoBoardLabel =
+    autoBoardId === null || autoBoardId === 'none'
+      ? t('widgets.gallery.uncategorized')
+      : // The listing has not arrived yet.
+        autoBoard
+        ? getGalleryBoardLabel(autoBoard, translate)
+        : '…';
+  const options = useMemo<BoardOption[]>(
+    () => [
+      { group: FIXED_BOARD_GROUP, label: t('nodes.boardAuto', { board: autoBoardLabel }), value: 'auto' },
+      { group: FIXED_BOARD_GROUP, label: t('widgets.gallery.uncategorized'), value: 'none' },
+      ...groups.flatMap((group) =>
+        // Without a gallery host there are no group headings; boards list after the fixed choices.
+        group.boards.map((board) => ({
+          group: host ? group.id : FIXED_BOARD_GROUP,
+          label: getGalleryBoardLabel(board, translate),
+          value: board.id,
+        }))
+      ),
+    ],
+    [autoBoardLabel, groups, host, t, translate]
+  );
+  const groupLabels = useMemo(() => new Map(groups.map((group) => [group.id, group.label])), [groups]);
+  const renderGroupLabel = useCallback((group: string) => groupLabels.get(group) ?? null, [groupLabels]);
+  const collection = useMemo(() => createListCollection({ items: options }), [options]);
   const selected =
     value === 'auto' || value === 'none'
       ? value
       : typeof (value as { board_id?: unknown } | null)?.board_id === 'string'
         ? (value as { board_id: string }).board_id
         : 'auto';
-  const options = useMemo(
-    () => [
-      { label: 'Auto', value: 'auto' },
-      { label: 'None', value: 'none' },
-      ...boards.map((board) => ({ label: board.name, value: board.id })),
-    ],
-    [boards]
+  const selectedValue = useMemo(
+    () => (options.some((option) => option.value === selected) ? [selected] : []),
+    [options, selected]
   );
+  const selectIds = useMemo(() => (id ? { trigger: `${id}-select` } : undefined), [id]);
   const onBoardChange = useCallback(
-    (next: string) => onChange(next === 'auto' || next === 'none' ? next : { board_id: next }),
+    ({ value: next }: { value: string[] }) => {
+      const nextValue = next[0];
+
+      if (nextValue !== undefined) {
+        onChange(nextValue === 'auto' || nextValue === 'none' ? nextValue : { board_id: nextValue });
+      }
+    },
     [onChange]
   );
 
   return (
-    <SelectInput
-      id={id}
+    <Select
+      aria-label={template.title}
+      className="nodrag"
+      collection={collection}
+      groupBy={getBoardOptionGroup}
+      ids={selectIds}
       invalid={invalid}
-      options={options}
-      title={template.title}
-      value={selected}
-      onChange={onBoardChange}
+      renderGroupLabel={renderGroupLabel}
+      value={selectedValue}
+      valueTextProps={SELECT_VALUE_TEXT_PROPS}
+      w="full"
+      onValueChange={onBoardChange}
     />
   );
 };
+
+const getBoardOptionGroup = (option: BoardOption): string => option.group;
 
 const MEDIA_FIELD_CONFIG = {
   image: {
@@ -563,8 +663,11 @@ const useMediaUpload = ({
   onUploaded: (names: string[]) => void;
 }) => {
   const config = MEDIA_FIELD_CONFIG[kind];
-  const uploadBoardId = useWorkflowProjectSelector((project) =>
+  const selectedBoardId = useWorkflowProjectSelector((project) =>
     typeof project.galleryValues.selectedBoardId === 'string' ? project.galleryValues.selectedBoardId : 'none'
+  );
+  const projectBoardId = useWorkflowProjectSelector((project) =>
+    typeof project.galleryValues.projectBoardId === 'string' ? project.galleryValues.projectBoardId : null
   );
   const { project } = useWorkflowUi();
   const queryClient = useQueryClient();
@@ -607,6 +710,21 @@ const useMediaUpload = ({
         const names: string[] = [];
         const failedFiles: string[] = [];
 
+        // Uploads follow the gallery's selected board, unless it takes none: a date board, or someone else's board
+        // the caller can only view or no longer read. Then they go to the project's inbox, where results go in the
+        // same case. The listing is ensured first, so the board is judged from one and never trusted unseen.
+        if (selectedBoardId !== 'none') {
+          await ensureGalleryBoardDestinations(queryClient);
+        }
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+        const uploadBoardId =
+          selectedBoardId === 'none' ||
+          (isGalleryBoardAttachable(selectedBoardId) && canAddToCachedGalleryBoard(selectedBoardId, queryClient))
+            ? selectedBoardId
+            : (projectBoardId ?? 'none');
+
         // Each file lands or fails on its own; what landed is adopted either way.
         for (const file of files) {
           try {
@@ -628,9 +746,11 @@ const useMediaUpload = ({
           return;
         }
 
-        if (names.length > 0) {
-          void invalidateGallery(queryClient, owner);
+        // What landed is listed; a board that refused a file leaves the listing's view of it stale. Either way the
+        // gallery reads again.
+        void invalidateGallery(queryClient, owner);
 
+        if (names.length > 0) {
           if (isMountedRef.current && project.getSnapshot().id === projectId) {
             onUploaded(names);
           } else {
@@ -655,7 +775,7 @@ const useMediaUpload = ({
         }
       })();
     },
-    [config.noun, kind, multiple, onUploaded, project, queryClient, uploadBoardId]
+    [config.noun, kind, multiple, onUploaded, project, projectBoardId, queryClient, selectedBoardId]
   );
 
   return { fileInputRef, isUploading, onFileChange, onUploadClick };
@@ -854,7 +974,6 @@ const ImageCollectionInput = ({
           // The empty state keeps the drop target tall enough to hit and doubles as the picker trigger.
           <GalleryPickerPopover accept={IMAGE_ONLY} label={pickerLabel} selection={pickerSelection} onPick={onPick}>
             <chakra.button
-              aria-label={pickerLabel}
               className="nodrag"
               display="block"
               h="20"
@@ -988,7 +1107,8 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
       <Box ref={setNodeRef} className="nodrag group" h="32" position="relative" rounded="sm" w="full">
         <GalleryPickerPopover accept={pickerAccept} label={pickerLabel} onPick={onPick}>
           <chakra.button
-            aria-label={pickerLabel}
+            // A chosen item shows only its thumbnail; the empty face names itself with its visible text.
+            aria-label={mediaName ? pickerLabel : undefined}
             className="nodrag"
             display="block"
             h="full"
@@ -1817,9 +1937,9 @@ export const WorkflowFieldInput = (props: WorkflowFieldInputProps) => {
         );
       }
 
-      return <NumericInput {...props} />;
+      return <NumberFieldInput {...props} />;
     case 'FloatField':
-      return <NumericInput {...props} />;
+      return <NumberFieldInput {...props} />;
     case 'BooleanField':
       return <BooleanInput {...props} />;
     case 'EnumField':

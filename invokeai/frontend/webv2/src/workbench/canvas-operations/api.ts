@@ -15,7 +15,7 @@ export {
   type GalleryCanvasImportDestination,
   type ImportGalleryImagesResult,
 } from './importGalleryImages';
-export { getCanvasImportNotice } from './canvasImportNotice';
+export { getCanvasImportNotice, getSendAsControlNotice, type CanvasImportNotice } from './canvasImportNotice';
 export { createCanvasFromImages, type CreateCanvasFromImagesResult } from './createCanvasFromImages';
 export {
   createFromBbox,
@@ -24,9 +24,33 @@ export {
   type CreateFromBboxResult,
 } from './createFromBbox';
 export { getCreateFromBboxNotice, type CreateFromBboxNotice } from './createFromBboxNotice';
+export {
+  fillControlFromBbox,
+  getControlIntentNotice,
+  getControlSourceSnapshot,
+  getControlUploadNotice,
+  resolveControlFileDrop,
+  sendGalleryImageAsControl,
+  subscribeControlSourceSnapshot,
+  uploadControlImageFile,
+  type ControlFileDropResolution,
+  type ControlSourceNotice,
+  type ControlSourceOrigin,
+  type ControlSourceSnapshot,
+  type FillControlFromBboxResult,
+  type SendGalleryImageAsControlResult,
+  type UploadControlImageResult,
+} from './controlSourceActions';
+export type { CanvasCompositeExportEngine } from './exportCanvasComposite';
 export type {
+  ControlDetectionError,
+  ControlDetectionErrorCode,
+  ControlDetectionStatus,
+  ControlLayerIntent,
+  ControlLayerIntentResult,
   FilterOperationSessionState,
   FilterSessionErrorCode,
+  RetryControlDetectionResult,
   SamInput,
   SamModel,
   SamSessionError,
@@ -34,8 +58,14 @@ export type {
   SamSessionSnapshot,
 } from './operationTypes';
 export { getCanvasOperations } from './operationAccess';
+export { IDLE_CONTROL_DETECTION_STATUS } from './controlDetectionStatusStore';
 export { getCanvasEngine } from './engineRegistry';
 export { saveCanvasToGallery, type CanvasGallerySaveRegion } from './saveCanvasToGallery';
+export {
+  retryStagedResultBoard,
+  saveStagedResultToGallery,
+  type SaveStagedResultOutcome,
+} from './saveStagedResultToGallery';
 export {
   composeForGeneration,
   type ComposeForGenerationOptions,
@@ -61,5 +91,4 @@ export {
   type FilterParamSpec,
 } from './filterGraphs';
 export { readLastUsedFilterType, recordLastUsedFilterType } from './filterPreferences';
-export { resolveDefaultFilterForModel } from './controlRecommendations';
 export { buildSamGraph, documentToExportLocalSamInput, isSamDocumentInputValid, isSamInputValid } from './samGraph';

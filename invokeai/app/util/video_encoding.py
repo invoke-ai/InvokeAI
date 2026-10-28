@@ -10,6 +10,14 @@ checks downstream (e.g. concatenating a trimmed clip with its source).
 
 yuv420p requires even dimensions; callers validate that before encoding.
 
+Quality and keyframes: frames are encoded at CRF 18 (imageio's default quality maps to
+CRF 25), because derived videos — trims, joins, extensions — are routinely re-encoded
+from earlier outputs and the losses compound. An IDR keyframe is forced every
+``KEYFRAME_INTERVAL_SECONDS`` so a later join can stream-copy the head of this file up to
+a keyframe near its end instead of re-encoding it (see ``h264_splice``). Both settings
+are part of the SPS/PPS, so changing either makes files written before and after the
+change unspliceable with each other: a join between them falls back to re-encoding.
+
 Audio muxing: pass ``audio_path`` to include an audio track. Two constraints:
 
 - imageio-ffmpeg does not pass ``-shortest``, so the container duration is the
@@ -21,11 +29,17 @@ Audio muxing: pass ``audio_path`` to include an audio track. Two constraints:
   browsers.
 """
 
+import tempfile
 import wave
 from pathlib import Path
 
 import imageio.v2 as iio2
 import numpy as np
+
+from invokeai.app.util.video_audio import AAC_ENCODER_OPTIONS
+
+CRF = 18
+KEYFRAME_INTERVAL_SECONDS = 2.0
 
 
 def make_mp4_writer(path: Path | str, fps: float, audio_path: Path | str | None = None, audio_codec: str = "aac"):
@@ -45,7 +59,55 @@ def make_mp4_writer(path: Path | str, fps: float, audio_path: Path | str | None 
             raise FileNotFoundError(f"Audio file for muxing does not exist: {audio_path}")
         kwargs["audio_path"] = str(audio_path)
         kwargs["audio_codec"] = audio_codec
-    return iio2.get_writer(str(path), format="FFMPEG", mode="I", fps=fps, codec="libx264", macro_block_size=1, **kwargs)
+    # Soundtracks share the WAV-mux path's encoder options so either can be spliced onto the other.
+    audio_options = AAC_ENCODER_OPTIONS if audio_path is not None and audio_codec == "aac" else []
+    keyframe_interval = max(1, round(fps * KEYFRAME_INTERVAL_SECONDS))
+    return iio2.get_writer(
+        str(path),
+        format="FFMPEG",
+        mode="I",
+        fps=fps,
+        codec="libx264",
+        macro_block_size=1,
+        quality=None,
+        output_params=["-crf", str(CRF), "-g", str(keyframe_interval), *audio_options],
+        **kwargs,
+    )
+
+
+_writer_sample_entrys: dict[tuple[int, int, float], bytes] = {}
+
+
+def writer_sample_entry(width: int, height: int, fps: float) -> bytes | None:
+    """The sample entry ``make_mp4_writer`` writes for this canvas and rate (see
+    ``H264Layout.sample_entry``).
+
+    They depend only on the encoder settings, canvas and rate, never on the content, so one
+    encoded frame tells a splice up front whether a file can share a track with new output
+    — before a long encode is spent finding out. None if the probe cannot be read; only a
+    successful probe is remembered.
+    """
+    key = (width, height, fps)
+    if key not in _writer_sample_entrys:
+        config = _probe_sample_entry(width, height, fps)
+        if config is None:
+            return None
+        _writer_sample_entrys[key] = config
+    return _writer_sample_entrys[key]
+
+
+def _probe_sample_entry(width: int, height: int, fps: float) -> bytes | None:
+    from invokeai.app.util.h264_splice import read_h264_layout
+
+    with tempfile.TemporaryDirectory(prefix="invokeai_encoder_probe_") as work:
+        path = Path(work) / "probe.mp4"
+        writer = make_mp4_writer(path, fps)
+        try:
+            writer.append_data(np.zeros((height, width, 3), dtype=np.uint8))
+        finally:
+            writer.close()
+        layout = read_h264_layout(path)
+    return layout.sample_entry if layout is not None else None
 
 
 def write_stereo_wav(path: Path | str, samples: np.ndarray, sample_rate: int) -> None:

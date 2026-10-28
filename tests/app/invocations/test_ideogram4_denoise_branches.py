@@ -11,8 +11,11 @@ import logging
 from contextlib import ExitStack, contextmanager
 from types import SimpleNamespace
 
+import gguf
+import numpy as np
 import pytest
 import torch
+from gguf.quants import quantize
 
 from invokeai.app.invocations.fields import Ideogram4ConditioningField
 from invokeai.app.invocations.ideogram4.ideogram4_denoise import Ideogram4DenoiseInvocation
@@ -20,6 +23,7 @@ from invokeai.app.invocations.model import ModelIdentifierField, TransformerFiel
 from invokeai.backend.ideogram4.modeling_ideogram4 import Ideogram4Config, Ideogram4Transformer
 from invokeai.backend.ideogram4.transformer_pair import Ideogram4TransformerPair
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
@@ -245,6 +249,41 @@ def test_an_int8_branch_adds_its_dequantization_headroom() -> None:
     assert Ideogram4DenoiseInvocation._dequant_transient(int8) == (
         2 * largest.in_features * largest.out_features * torch.bfloat16.itemsize
     )
+
+
+def _gguf_branch(*packed: str) -> Ideogram4Transformer:
+    """A tiny bfloat16 branch whose `packed` Linears are stored Q8_0, as a community GGUF's are."""
+    model = Ideogram4Transformer(TINY).to(torch.bfloat16)
+    for path in packed:
+        linear = model.get_submodule(path)
+        raw = quantize(np.zeros((linear.out_features, linear.in_features), np.float32), gguf.GGMLQuantizationType.Q8_0)
+        linear.weight = torch.nn.Parameter(
+            GGMLTensor(
+                torch.from_numpy(raw),
+                ggml_quantization_type=gguf.GGMLQuantizationType.Q8_0,
+                tensor_shape=linear.weight.shape,
+                compute_dtype=torch.bfloat16,
+            ),
+            requires_grad=False,
+        )
+    return model
+
+
+def test_a_gguf_branch_adds_its_dequantization_headroom() -> None:
+    """A packed GGUF Linear is dequantized inside every forward, as an int8 one is.
+
+    Measured on the released geometry, `llm_cond_proj` alone needs 0.9 to 2.3 GB for that where a
+    release quantizes it, so a GGUF branch must not report the zero a dense one does. The layers
+    run one after another, so it is the largest packed layer that counts, not their sum.
+    """
+    largest = "layers.0.feed_forward.w1"
+    transient = Ideogram4DenoiseInvocation._dequant_transient(_gguf_branch(largest, "layers.0.attention.o"))
+
+    weight = _gguf_branch(largest).get_parameter(f"{largest}.weight")
+    # At least the dequantized copy and the packed bytes partial loading moves for the call; the
+    # kernels' own intermediates come on top of both.
+    assert transient > weight.shape.numel() * torch.bfloat16.itemsize + weight.quantized_data.nbytes
+    assert transient == Ideogram4DenoiseInvocation._dequant_transient(_gguf_branch(largest))
 
 
 @pytest.mark.parametrize("int8_branch", ["cond", "uncond"])

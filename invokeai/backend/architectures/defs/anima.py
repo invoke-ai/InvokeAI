@@ -38,6 +38,16 @@ register(
         scheduler_applies_to_graph=True,
         # Same shape as Z-Image: masked positive conditioning only.
         supports_regional_guidance=True,
+        # `anima_lllite` into `anima_denoise.control_lllite`. Only 3-channel (control image) adapters drive a
+        # control layer; 4-channel inpainting adapters need the inpaint mask and are not control layers.
+        control_kinds=frozenset({"anima_lllite"}),
+        # One `anima_ip_adapter` per image into `anima_denoise.ip_adapter`. Images sharing an adapter are attended
+        # together (their tokens concatenated); experimental, since the only published adapter was trained on single
+        # images, on the 28-block Anima. The variant gate offers it on every Qwen3 model, so also on Anima-2.9B
+        # (40 blocks), where it runs through the untested depth mapping of `block_layout`; Anima-3.8B (Qwen3.5) is
+        # excluded.
+        max_reference_images=4,
+        reference_images_require_variant=AnimaVariantType.Qwen3.value,
     ),
     VaeFacet(
         frozenset(

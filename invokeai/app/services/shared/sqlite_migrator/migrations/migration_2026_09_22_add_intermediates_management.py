@@ -18,10 +18,8 @@ import json
 import sqlite3
 from logging import Logger
 
-from invokeai.app.services.shared.media_references import (
-    create_media_references_table,
-    extract_media_references,
-)
+from invokeai.app.services.shared.media_references import extract_media_references
+from invokeai.app.services.shared.sqlite_migrator.migrations._media_references_v1 import create_media_references_table
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
 
 

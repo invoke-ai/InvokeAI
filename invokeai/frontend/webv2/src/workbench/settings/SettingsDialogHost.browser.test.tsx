@@ -1,7 +1,8 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
-import { ChakraProvider, Dialog } from '@chakra-ui/react';
+import { ChakraProvider } from '@chakra-ui/react';
+import { Dialog } from '@platform/ui/Dialog';
+import { isModalPresent } from '@platform/ui/modalPresence';
 import { system } from '@theme/system';
-import { isHotkeyModalLayerActive } from '@workbench/hotkeys/modalLayer';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -86,27 +87,27 @@ it('keeps a named modal through loading, failure, retry, and closing before rest
       </ChakraProvider>
     )
   );
-  expect(isHotkeyModalLayerActive()).toBe(false);
+  expect(isModalPresent()).toBe(false);
   const trigger = page.getByRole('button', { name: 'Open settings', exact: true });
   await act(() => trigger.click());
   await expect.element(page.getByRole('dialog', { name: 'Settings', exact: true })).toBeVisible();
   await expect.element(page.getByRole('status')).toHaveTextContent(i18n.t('common.loading'));
-  expect(isHotkeyModalLayerActive()).toBe(true);
+  expect(isModalPresent()).toBe(true);
 
   await act(() => initialLoad.reject(new Error('Settings chunk unavailable')));
   await expect.element(page.getByRole('alert')).toMatchTextContent(i18n.t('settingsDialog.loadFailed'));
   await expect.element(page.getByRole('dialog', { name: 'Settings', exact: true })).toBeVisible();
   const retry = page.getByRole('button', { name: i18n.t('common.retry'), exact: true });
   await expect.element(retry).toBeEnabled();
-  expect(isHotkeyModalLayerActive()).toBe(true);
+  expect(isModalPresent()).toBe(true);
   await act(() => retry.click());
   await expect.element(page.getByRole('alert')).toHaveAttribute('aria-busy', 'true');
-  expect(isHotkeyModalLayerActive()).toBe(true);
+  expect(isModalPresent()).toBe(true);
   await act(() => initialLoad.resolveRetry());
 
   await expect.element(page.getByRole('dialog', { name: 'Settings: Behavior', exact: true })).toBeVisible();
   await expect.element(page.getByRole('alert')).not.toBeInTheDocument();
-  expect(isHotkeyModalLayerActive()).toBe(true);
+  expect(isModalPresent()).toBe(true);
   // `/` from a control inside the dialog jumps to search; inside the search it types.
   await page.getByRole('button', { name: 'Reset all', exact: true }).click();
   await userEvent.keyboard('/');
@@ -117,8 +118,9 @@ it('keeps a named modal through loading, failure, retry, and closing before rest
     document.querySelector<HTMLButtonElement>('[data-scope="dialog"][data-part="close-trigger"]')!.click()
   );
   expect(document.querySelector('[data-scope="dialog"][data-part="content"][data-state="closed"]')).not.toBeNull();
-  expect(isHotkeyModalLayerActive()).toBe(true);
+  // The closing dialog is inert, so the shortcuts behind it return before it finishes animating out.
+  expect(isModalPresent()).toBe(false);
   await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
   await expect.element(trigger).toHaveFocus();
-  expect(isHotkeyModalLayerActive()).toBe(false);
+  expect(isModalPresent()).toBe(false);
 });

@@ -10,7 +10,7 @@ import {
   setArchitectureCapabilities,
 } from './architectureCapabilities';
 import { getDefaultGenerateSettings } from './baseGenerationPolicies';
-import { compileGeneratePreviewGraph, stabilizeBackendGraphIds } from './previewGraph';
+import { compileGeneratePreviewGraph, stabilizeBackendGraphIds, stabilizeBackendGraphNodeIds } from './previewGraph';
 
 const sdxlModel: MainModelConfig = { base: 'sdxl', key: 'sdxl-model', name: 'SDXL', type: 'main' };
 
@@ -49,7 +49,12 @@ afterEach(resetArchitectureCapabilities);
 
 describe('compileGeneratePreviewGraph', () => {
   it('compiles a ready graph with deterministic node ids across repeated compiles', () => {
-    const input = { destination: 'gallery' as const, models, storedValues, useCpuNoise: false };
+    const input = {
+      destination: 'gallery' as const,
+      models,
+      storedValues,
+      projectSettings: { useCpuNoise: false, useNsfwChecker: false, useWatermark: false },
+    };
     const first = compileGeneratePreviewGraph(input);
     const second = compileGeneratePreviewGraph(input);
 
@@ -71,7 +76,12 @@ describe('compileGeneratePreviewGraph', () => {
   });
 
   it('keeps the literal seed value instead of resolving a random one', () => {
-    const result = compileGeneratePreviewGraph({ destination: 'gallery', models, storedValues, useCpuNoise: false });
+    const result = compileGeneratePreviewGraph({
+      destination: 'gallery',
+      models,
+      storedValues,
+      projectSettings: { useCpuNoise: false, useNsfwChecker: false, useWatermark: false },
+    });
 
     if (result.status !== 'ready') {
       throw new Error('expected ready');
@@ -83,7 +93,12 @@ describe('compileGeneratePreviewGraph', () => {
   });
 
   it('rewrites edges consistently with rewritten node ids', () => {
-    const result = compileGeneratePreviewGraph({ destination: 'gallery', models, storedValues, useCpuNoise: false });
+    const result = compileGeneratePreviewGraph({
+      destination: 'gallery',
+      models,
+      storedValues,
+      projectSettings: { useCpuNoise: false, useNsfwChecker: false, useWatermark: false },
+    });
 
     if (result.status !== 'ready') {
       throw new Error('expected ready');
@@ -104,7 +119,7 @@ describe('compileGeneratePreviewGraph', () => {
       destination: 'gallery',
       models,
       storedValues: badValues,
-      useCpuNoise: false,
+      projectSettings: { useCpuNoise: false, useNsfwChecker: false, useWatermark: false },
     });
 
     expect(result.status).toBe('invalid');
@@ -119,14 +134,19 @@ describe('compileGeneratePreviewGraph', () => {
       destination: 'gallery',
       models: [],
       storedValues,
-      useCpuNoise: false,
+      projectSettings: { useCpuNoise: false, useNsfwChecker: false, useWatermark: false },
     });
 
     expect(result.status).toBe('invalid');
   });
 
   it('pins a deterministic seed across repeated compiles when generate settings are uninitialized', () => {
-    const input = { destination: 'gallery' as const, models, storedValues: undefined, useCpuNoise: false };
+    const input = {
+      destination: 'gallery' as const,
+      models,
+      storedValues: undefined,
+      projectSettings: { useCpuNoise: false, useNsfwChecker: false, useWatermark: false },
+    };
     const first = compileGeneratePreviewGraph(input);
     const second = compileGeneratePreviewGraph(input);
 
@@ -170,5 +190,22 @@ describe('stabilizeBackendGraphIds', () => {
       destination: { field: 'value', node_id: 'lora_selector' },
       source: { field: 'value', node_id: 'seed' },
     });
+  });
+
+  it('follows fixed node ids that lose their name to an earlier created id', () => {
+    const graph = {
+      edges: [],
+      id: 'graph',
+      nodes: {
+        seed_lqx1abc_a1b2c3: { id: 'seed_lqx1abc_a1b2c3', type: 'noise' },
+        seed: { id: 'seed', type: 'integer' },
+        positive_prompt: { id: 'positive_prompt', type: 'string' },
+      },
+    };
+
+    const result = stabilizeBackendGraphNodeIds(graph, { positive: 'positive_prompt', seed: 'seed' });
+
+    expect(result.nodeIds).toEqual({ positive: 'positive_prompt', seed: 'seed_2' });
+    expect(result.graph.nodes[result.nodeIds.seed]?.type).toBe('integer');
   });
 });

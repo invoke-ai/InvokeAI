@@ -7,8 +7,9 @@ of them was fitted on CUDA:
 
 1. ``SDPA_MATH_BYTES_PER_SCORE_ELEMENT`` (``backend/util/attention.py``) -- bytes per element of the
    score matrix, charged only where SDPA has no fused kernel and materializes it.
-2. ``estimate_vae_working_memory_flux2``'s 2200 / 1100 bytes per pixel per element byte
-   (``backend/util/vae_working_memory.py``).
+2. ``estimate_vae_working_memory_flux2``'s convolution lines, ``k_<operation>_<dtype>`` bytes per pixel plus a
+   ``b_<operation>_<dtype>`` base, shipped per convolution backend and allocator in
+   ``backend/working_memory/data/vae.json``.
 3. ``Flux2DenoiseInvocation._estimate_working_memory``'s 0.4 MB per token, defined at the Klein 9B
    width (4096) and scaled linearly by the loaded variant's width.
 4. The dispatch question underneath all of it: does this build's SDPA fuse these shapes, or does it
@@ -67,13 +68,29 @@ from invokeai.app.invocations.flux2.flux2_denoise import (
 from invokeai.backend.model_manager.configs.flux2_variant import flux2_hidden_size
 from invokeai.backend.model_manager.taxonomy import Flux2VariantType
 from invokeai.backend.util.attention import SDPA_MATH_BYTES_PER_SCORE_ELEMENT, sdpa_score_matrix_bytes
-from invokeai.backend.util.vae_working_memory import (
-    _flux_vae_scaling_constant,
-    estimate_vae_working_memory_flux2,
-)
+from invokeai.backend.util.vae_working_memory import VAE_FLUX2_SPEC, estimate_vae_working_memory_flux2
+from invokeai.backend.working_memory.coefficients import shipped_coefficients
+from invokeai.backend.working_memory.platform import platform_for
 
 GIB = 1024**3
 MIB = 1024**2
+
+
+_VAE_LINE_DTYPES = {"float16": "fp16", "bfloat16": "bf16", "float32": "fp32"}
+
+
+def _vae_line_dtypes() -> list[str]:
+    """The `--dtype` values the FLUX.2 VAE ships a line for: the loaders run it in bf16 or fp32, never fp16."""
+    return [name for name, dtype in _VAE_LINE_DTYPES.items() if f"k_decode_{dtype}" in VAE_FLUX2_SPEC.coefficients]
+
+
+def _shipped_vae_line(operation: str, dtype_name: str) -> tuple[float, float]:
+    """The VAE line this build's estimate uses for `operation` in `dtype_name`: bytes per pixel and base bytes, as the
+    platform (convolution backend, allocator) selects them."""
+    dtype = _VAE_LINE_DTYPES[dtype_name]
+    values = shipped_coefficients(VAE_FLUX2_SPEC, platform_for(torch.device("cuda"))).values
+    return values[f"k_{operation}_{dtype}"], values[f"b_{operation}_{dtype}"]
+
 
 # The FLUX.2 VAE attends on the 8x-downsampled grid with a single 512-wide head. Mirrors
 # `_FLUX2_VAE_*` in vae_working_memory.py.
@@ -264,7 +281,9 @@ def measure_vae(operation: str, px: int, dtype: torch.dtype, force_math: bool, v
     if peak is None:
         return row
 
-    estimate = estimate_vae_working_memory_flux2(operation=operation, image_tensor=x, vae=vae, device=device)
+    estimate = estimate_vae_working_memory_flux2(
+        operation=operation, image_tensor=x, vae=vae, device=device
+    ).reservation_bytes
     seq_len = (px // VAE_SPATIAL_COMPRESSION) ** 2
     score_bytes = sdpa_score_matrix_bytes(
         device=device, dtype=param.dtype, num_heads=1, head_dim=VAE_MID_BLOCK_HEAD_DIM, seq_len=seq_len
@@ -278,13 +297,13 @@ def measure_vae(operation: str, px: int, dtype: torch.dtype, force_math: bool, v
         "reserved_delta": peak,
         "estimate": estimate,
         "score_term": score_bytes,
-        # The whole measured peak over the pixel area, which is what the 2200/1100-style literals
-        # name. The score matrix is deliberately NOT backed out: the two terms peak in different
+        # The whole measured peak over the pixel area: the line's bytes per pixel plus its base spread over
+        # that area. The score matrix is deliberately NOT backed out: the two terms peak in different
         # phases of the forward, so the estimate takes the larger of them rather than the sum, and
         # the convolution phase is what sets the high-water mark until the quadratic term overtakes
         # it past ~1280px. Where `score_term` exceeds the measured peak, this column is not the
         # quantity being fitted -- the score model is, and it is bounding rather than describing.
-        "implied_linear_constant": peak / (px * px * element_size),
+        "implied_linear_constant": peak / (px * px),
         "covered": peak <= estimate,
     }
 
@@ -457,10 +476,12 @@ def report_sdpa(shapes: list[tuple[int, int, int]], dtype_name: str) -> list[dic
 
 
 def report_vae(pxs: list[int], dtype_name: str, vae_path: str | None) -> list[dict]:
-    decode_k = _flux_vae_scaling_constant("decode", torch.device("cuda"))
-    encode_k = _flux_vae_scaling_constant("encode", torch.device("cuda"))
-    print(f"\n=== 3. VAE linear constants (this build selects {decode_k} decode / {encode_k} encode) ===")
-    print("`implied_k` is the measured peak over pixel area, directly comparable to those literals;")
+    (decode_k, decode_b), (encode_k, encode_b) = (_shipped_vae_line(op, dtype_name) for op in ("decode", "encode"))
+    print(
+        f"\n=== 3. VAE lines (this build selects {decode_k:.0f} B/px + {decode_b / MIB:.0f} MiB decode, "
+        f"{encode_k:.0f} B/px + {encode_b / MIB:.0f} MiB encode) ==="
+    )
+    print("`implied_k` is the measured peak over pixel area, comparable to those bytes per pixel plus the base;")
     print("fit on the rows whose `math` column matches what this build really does (section 1).")
     print("`covered` is the question that matters: is the shipped estimate an upper bound here?")
     print("Caveat: forcing math on a build that HAS a fused kernel is not equivalent to a build that")
@@ -495,10 +516,10 @@ def report_vae(pxs: list[int], dtype_name: str, vae_path: str | None) -> list[di
     _flag_non_monotonic(rows)
     for operation in ("decode", "encode"):
         # Compare against the column this build actually selects, not against a hard-coded number.
-        shipped = _flux_vae_scaling_constant(operation, torch.device("cuda"))
+        shipped_k, shipped_b = _shipped_vae_line(operation, dtype_name)
         for force_math in (False, True):
             ks = [
-                r["implied_linear_constant"]
+                r["implied_linear_constant"] - shipped_b / (r["px"] * r["px"])
                 for r in rows
                 if r["operation"] == operation
                 and r["force_math"] is force_math
@@ -510,8 +531,11 @@ def report_vae(pxs: list[int], dtype_name: str, vae_path: str | None) -> list[di
             if not ks:
                 continue
             mode = "math" if force_math else "fused"
-            verdict = "OK" if shipped >= max(ks) else "SHORT"
-            print(f"  {operation} ({mode}): implied_k max = {max(ks):.0f}, shipped = {shipped} -> {verdict}")
+            verdict = "OK" if shipped_k >= max(ks) else "SHORT"
+            print(
+                f"  {operation} ({mode}): implied_k max past the base = {max(ks):.0f}, shipped = {shipped_k:.0f} "
+                f"-> {verdict}"
+            )
     short = [r for r in rows if not r.get("oom") and not r["covered"]]
     if short:
         print("\n  Points the shipped estimate does NOT cover:")
@@ -607,6 +631,13 @@ def main() -> None:
     # Internal: measure one point in this process and print one JSON line.
     parser.add_argument("--single", nargs="*", default=None, help=argparse.SUPPRESS)
     args = parser.parse_args()
+    sections = args.only or ["dispatch", "sdpa", "vae", "denoise"]
+    if "vae" in sections and args.dtype not in _vae_line_dtypes():
+        # Refused up front: the VAE section compares against the shipped line, and runs after dispatch and sdpa.
+        parser.error(
+            f"--dtype {args.dtype} has no FLUX.2 VAE line to measure against; the VAE runs in "
+            f"{', '.join(_vae_line_dtypes())}. Pick one of those, or leave the VAE out with --only."
+        )
 
     if not torch.cuda.is_available():
         raise SystemExit("No CUDA/HIP device available.")
@@ -634,7 +665,6 @@ def main() -> None:
             raise SystemExit(f"unknown point kind {kind}")
         return
 
-    sections = args.only or ["dispatch", "sdpa", "vae", "denoise"]
     print(
         f"torch {torch.__version__} | device {torch.cuda.get_device_name(0)} | "
         f"hip={torch.version.hip} | dtype={args.dtype}"

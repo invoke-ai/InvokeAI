@@ -4,6 +4,7 @@ import type { ElementType } from 'react';
 
 import { Box, Flex, HStack, Icon, Input, InputGroup, Spinner, Stack, Text } from '@chakra-ui/react';
 import { collectBases, collectTypes } from '@features/models/core/library';
+import { isInModelsDir } from '@features/models/core/schemas';
 import {
   DEFAULT_STARTER_MODEL_FILTERS,
   filterStarterModels,
@@ -14,13 +15,15 @@ import {
   ensureExternalProvidersLoaded,
   useExternalProvidersSelector,
 } from '@features/models/data/externalProvidersStore';
+import { useModelsSelector } from '@features/models/data/modelsStore';
 import { ensureStartersLoaded, useStartersSelector } from '@features/models/data/startersStore';
+import { useModelsUi } from '@features/models/ui/ModelsUiContext';
 import {
-  clearAddModelsSeeds,
-  getAddModelsSeed,
+  clearAddModelsTypeSeed,
   getAddModelsTypeSeed,
   openExternalProviderKeys,
   openModelManagerTab,
+  setAddModelsQuery,
   updateModelsUi,
   useModelsUiSelector,
 } from '@features/models/ui/uiStore';
@@ -43,6 +46,7 @@ import { AccessTokenPopover } from './AccessTokenPopover';
 import { BundleChips } from './BundleChips';
 import { HuggingFaceFiles } from './HuggingFaceFiles';
 import { InstallOptions } from './InstallOptions';
+import { ModelsFolderScan } from './ModelsFolderScan';
 import { ScanResults } from './ScanResults';
 import { SelectedBundleBar } from './SelectedBundleBar';
 import { classifySource } from './sourceClassifier';
@@ -72,27 +76,33 @@ export const AddModelsView = () => {
   const loadError = useStartersSelector((snapshot) => snapshot.error);
   const response = useStartersSelector((snapshot) => snapshot.response);
   const status = useStartersSelector((snapshot) => snapshot.status);
-  const { hfLookup, scan, selectedBundleName } = useModelsUiSelector(
+  const { hfLookup, query, scan, selectedBundleName } = useModelsUiSelector(
     (snapshot) => ({
       hfLookup: snapshot.hfLookup,
+      query: snapshot.addModelsQuery,
       scan: snapshot.scan,
       selectedBundleName: snapshot.selectedBundleName,
     }),
     (left, right) =>
       left.hfLookup === right.hfLookup &&
+      left.query === right.query &&
       left.scan === right.scan &&
       left.selectedBundleName === right.selectedBundleName
   );
 
-  // Read the one-shot seed purely for StrictMode initialization; consume it after mount and keep subsequent input
-  // state local.
-  const [query, setQuery] = useState(getAddModelsSeed);
   const [accessToken, setAccessToken] = useState('');
-  const [inplace, setInplace] = useState(true);
+  // The account's last choice; a source inside the models folder is forced in place without changing it.
+  const { installInPlace: inplace, setInstallInPlace: setInplace } = useModelsUi();
+  const modelsDir = useModelsSelector((snapshot) => snapshot.modelsDir);
+  // Sources in the models folder always install in place; otherwise the install would move their files into a new
+  // managed folder within it.
+  const inplaceFor = (source: string) => inplace || isInModelsDir(source, modelsDir);
   const [fp8Storage, setFp8Storage] = useState(false);
   const { isBusy: isPulling, run: runPull } = useScopedAction();
   const { isBusy: isScanning, run: runScan } = useScopedAction();
   const scanAbortRef = useRef<AbortController | null>(null);
+  // Which control started the scan in flight; that control shows Stop whatever the field holds meanwhile.
+  const [scanOrigin, setScanOrigin] = useState<'field' | 'models-folder' | null>(null);
   const [installingBundle, setInstallingBundle] = useState<string | null>(null);
   const providerConfigs = useExternalProvidersSelector((snapshot) => snapshot.configs);
   const configuredExternalProviders = useMemo<ReadonlySet<string>>(
@@ -111,8 +121,8 @@ export const AddModelsView = () => {
   });
 
   useMountEffect(() => {
-    // One-shot: a seed only ever fills the view it was opened with.
-    clearAddModelsSeeds();
+    // One-shot: a type seed only ever fills the view it was opened with.
+    clearAddModelsTypeSeed();
     ensureStartersLoaded();
 
     const owner = captureAccountScope();
@@ -229,7 +239,7 @@ export const AddModelsView = () => {
               (await install({ accessToken: token, config: installConfig, source: trimmed })) &&
               isAccountScopeCurrent(owner)
             ) {
-              setQuery('');
+              setAddModelsQuery('');
             }
 
             return;
@@ -251,7 +261,7 @@ export const AddModelsView = () => {
               (await install({ accessToken: token, config: installConfig, source: onlyUrl })) &&
               isAccountScopeCurrent(owner)
             ) {
-              setQuery('');
+              setAddModelsQuery('');
             }
 
             return;
@@ -266,12 +276,12 @@ export const AddModelsView = () => {
           (await install({
             accessToken: token,
             config: installConfig,
-            inplace: kind.looksLocal ? inplace : undefined,
+            inplace: kind.looksLocal ? inplaceFor(trimmed) : undefined,
             source: trimmed,
           })) &&
           isAccountScopeCurrent(owner)
         ) {
-          setQuery('');
+          setAddModelsQuery('');
         }
       },
       (message) => notify.error(t('models.installFailed'), message)
@@ -280,7 +290,7 @@ export const AddModelsView = () => {
 
   // Stop aborts the request; the server watches for the disconnect and
   // abandons its directory walk, so a wrong folder does not keep crawling.
-  const handleScan = async () => {
+  const handleScan = async (path: string, origin: 'field' | 'models-folder') => {
     // Enter in the field reaches here while the button reads Stop; a second
     // scan must not replace the controller the running one is wired to.
     if (scanAbortRef.current) {
@@ -292,18 +302,23 @@ export const AddModelsView = () => {
         const abort = new AbortController();
 
         scanAbortRef.current = abort;
+        setScanOrigin(origin);
         try {
-          const results = await scanFolderForModels(trimmed, AbortSignal.any([owner.signal, abort.signal]));
+          const results = await scanFolderForModels(path, AbortSignal.any([owner.signal, abort.signal]));
 
           assertAccountScopeCurrent(owner);
-          updateModelsUi({ scan: { path: trimmed, results } });
+          updateModelsUi({ scan: { path, results } });
         } finally {
           scanAbortRef.current = null;
+          setScanOrigin(null);
         }
       },
-      (message, error) => {
+      (_message, error) => {
         if (!(error instanceof DOMException && error.name === 'AbortError')) {
-          notify.error(t('models.scanFailed'), message);
+          notify.error(
+            t('models.scanFailed'),
+            t('models.scanFailedDescription', { reason: getApiErrorMessage(error, t('common.unknownError')) })
+          );
         }
       }
     );
@@ -320,7 +335,7 @@ export const AddModelsView = () => {
               placeholder={t('models.searchOrAddPlaceholder')}
               size="lg"
               value={query}
-              onChange={(event) => setQuery(event.currentTarget.value)}
+              onChange={(event) => setAddModelsQuery(event.currentTarget.value)}
               onKeyDown={(event) => {
                 if (event.key !== 'Enter') {
                   return;
@@ -328,7 +343,7 @@ export const AddModelsView = () => {
 
                 if (canScan) {
                   event.preventDefault();
-                  void handleScan();
+                  void handleScan(trimmed, 'field');
                 } else if (canPull) {
                   event.preventDefault();
                   void handlePull();
@@ -345,14 +360,14 @@ export const AddModelsView = () => {
             />
           ) : null}
 
-          {canScan && isScanning ? (
+          {scanOrigin === 'field' ? (
             <Button size="lg" variant="outline" onClick={handleStopScan}>
               <Spinner />
               {t('models.stopScan')}
             </Button>
           ) : canScan ? (
             <Tooltip content={t('models.scanFolderTooltip')}>
-              <Button size="lg" variant="solid" onClick={() => void handleScan()}>
+              <Button disabled={isScanning} size="lg" variant="solid" onClick={() => void handleScan(trimmed, 'field')}>
                 <Icon as={FolderSearchIcon} boxSize="3.5" />
                 {t('models.scan')}
               </Button>
@@ -390,11 +405,22 @@ export const AddModelsView = () => {
               <InstallOptions
                 fp8Storage={fp8Storage}
                 inplace={kind.localKind === 'file' ? inplace : undefined}
+                inplaceLocked={kind.localKind === 'file' && isInModelsDir(trimmed, modelsDir)}
                 onSetFp8Storage={setFp8Storage}
                 onSetInplace={setInplace}
               />
             ) : null}
           </HStack>
+        ) : null}
+
+        {/* Stays while its own scan runs, so Stop cannot vanish under another result arriving. */}
+        {!hasResults || scanOrigin === 'models-folder' ? (
+          <ModelsFolderScan
+            isRunning={scanOrigin === 'models-folder'}
+            isScanning={isScanning}
+            onScan={(path) => void handleScan(path, 'models-folder')}
+            onStop={handleStopScan}
+          />
         ) : null}
 
         {!hasResults ? (
@@ -450,12 +476,18 @@ export const AddModelsView = () => {
               <ScanResults
                 fp8Storage={fp8Storage}
                 inplace={inplace}
+                // Results carry resolved paths, so a symlinked spelling of the folder still locks.
+                inplaceLocked={
+                  scan.results.length > 0 && scan.results.every((result) => isInModelsDir(result.path, modelsDir))
+                }
                 pendingSources={pendingSources}
                 scan={scan}
                 onClear={() => updateModelsUi({ scan: null })}
-                onInstall={(path) => void install({ config: installConfig, inplace, source: path })}
+                onInstall={(path) => void install({ config: installConfig, inplace: inplaceFor(path), source: path })}
                 onInstallAll={(paths) =>
-                  void installAllSources(paths.map((path) => ({ config: installConfig, inplace, source: path })))
+                  void installAllSources(
+                    paths.map((path) => ({ config: installConfig, inplace: inplaceFor(path), source: path }))
+                  )
                 }
                 onSetFp8Storage={setFp8Storage}
                 onSetInplace={setInplace}

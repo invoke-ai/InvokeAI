@@ -302,6 +302,300 @@ OPENAI_GPT_IMAGE_PANEL_SCHEMA = ExternalModelPanelSchema(
     prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]
 )
 
+# Atlas Cloud exposes these models through one endpoint, but each model only accepts a
+# subset of shapes. Models that take a named size preset or an aspect ratio are limited
+# to the ratios listed here; the rest accept explicit pixel sizes. Only ratios already
+# in lowest terms are listed, because a capability check reduces the requested
+# dimensions before comparing them against these entries.
+ATLASCLOUD_PRESET_ASPECT_RATIOS = ["1:1", "3:4", "4:3", "9:16", "16:9"]
+ATLASCLOUD_GROK_ASPECT_RATIOS = ["1:1", "1:2", "2:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9"]
+ATLASCLOUD_NANO_BANANA_ASPECT_RATIOS = [
+    "1:1",
+    "2:3",
+    "3:2",
+    "3:4",
+    "4:3",
+    "4:5",
+    "5:4",
+    "9:16",
+    "16:9",
+]
+
+
+def _atlascloud_aspect_ratio_sizes(aspect_ratios: list[str], base: int = 1024) -> dict[str, ExternalImageSize]:
+    """Pixel dimensions for each aspect ratio, with the long edge at or just below `base` px.
+
+    Both sides are exact multiples of the ratio, so a capability check reduces the
+    dimensions back to the same ratio string, and multiples of 16, so they stay valid
+    generation dimensions.
+    """
+    sizes: dict[str, ExternalImageSize] = {}
+    for ratio_str in aspect_ratios:
+        w_part, h_part = (int(part) for part in ratio_str.split(":"))
+        step = 16 * max(1, base // (max(w_part, h_part) * 16))
+        sizes[ratio_str] = ExternalImageSize(width=w_part * step, height=h_part * step)
+    return sizes
+
+
+def _atlascloud_resolution_presets(
+    image_sizes: list[str],
+    aspect_ratios: list[str],
+) -> list[ExternalResolutionPreset]:
+    """Build resolution presets pairing each aspect ratio with a resolution preset name."""
+    base_pixels = {"1K": 1024, "2K": 2048, "4K": 4096}
+    presets: list[ExternalResolutionPreset] = []
+    for image_size in image_sizes:
+        base = base_pixels[image_size]
+        for ratio_str, size in _atlascloud_aspect_ratio_sizes(aspect_ratios, base=base).items():
+            presets.append(
+                ExternalResolutionPreset(
+                    label=f"{ratio_str} ({image_size}) \u2014 {size.width}\u00d7{size.height}",
+                    aspect_ratio=ratio_str,
+                    image_size=image_size,
+                    width=size.width,
+                    height=size.height,
+                )
+            )
+    return presets
+
+
+# MAI-Image-2.5 rejects any side under 768 px or above 1360 px, and any image over 1,049,088
+# pixels, so no single max size describes it (16:9 cannot fit at all). Each bucket is the
+# largest exact ratio on the 16 px grid that satisfies all three limits.
+ATLASCLOUD_MAI_IMAGE_SIZES = {
+    "1:1": ExternalImageSize(width=1024, height=1024),
+    "5:4": ExternalImageSize(width=1120, height=896),
+    "4:5": ExternalImageSize(width=896, height=1120),
+    "4:3": ExternalImageSize(width=1152, height=864),
+    "3:4": ExternalImageSize(width=864, height=1152),
+    "3:2": ExternalImageSize(width=1248, height=832),
+    "2:3": ExternalImageSize(width=832, height=1248),
+}
+
+ATLASCLOUD_NANO_BANANA_RESOLUTION_PRESETS = _atlascloud_resolution_presets(
+    ["1K", "2K", "4K"], ATLASCLOUD_NANO_BANANA_ASPECT_RATIOS
+)
+
+atlascloud_flux_schnell = StarterModel(
+    name="Atlas Cloud FLUX.1 Schnell",
+    base=BaseModelType.External,
+    source="external://atlascloud/black-forest-labs/flux-schnell",
+    description="FLUX.1 Schnell text-to-image generation through the Atlas Cloud asynchronous media API. Requires a configured Atlas Cloud API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=4,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+
+atlascloud_flux_dev = StarterModel(
+    name="Atlas Cloud FLUX.1 Dev",
+    base=BaseModelType.External,
+    source="external://atlascloud/black-forest-labs/flux-dev",
+    description="FLUX.1 Dev text-to-image generation through the Atlas Cloud asynchronous media API. Requires a configured Atlas Cloud API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=4,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+
+atlascloud_flux_2_pro = StarterModel(
+    name="Atlas Cloud FLUX.2 Pro",
+    base=BaseModelType.External,
+    source="external://atlascloud/black-forest-labs/flux-2-pro/text-to-image",
+    description="FLUX.2 Pro text-to-image generation through the Atlas Cloud asynchronous media API. Requires a configured Atlas Cloud API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=1,
+        max_image_size=ExternalImageSize(width=2048, height=2048),
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+
+atlascloud_qwen_image_3 = StarterModel(
+    name="Atlas Cloud Qwen Image 3.0",
+    base=BaseModelType.External,
+    source="external://atlascloud/qwen-image-3.0/text-to-image",
+    description="Qwen Image 3.0 text-to-image generation through the Atlas Cloud asynchronous media API. Requires a configured Atlas Cloud API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=4,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+
+atlascloud_z_image_turbo = StarterModel(
+    name="Atlas Cloud Z-Image Turbo",
+    base=BaseModelType.External,
+    source="external://atlascloud/z-image/turbo",
+    description="Z-Image Turbo text-to-image generation through the Atlas Cloud asynchronous media API. Requires a configured Atlas Cloud API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=1,
+        max_image_size=ExternalImageSize(width=2048, height=2048),
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+
+atlascloud_mai_image_2_5 = StarterModel(
+    name="Atlas Cloud MAI-Image-2.5",
+    base=BaseModelType.External,
+    source="external://atlascloud/microsoft/mai-image-2.5/text-to-image",
+    description="Microsoft MAI-Image-2.5 text-to-image generation through the Atlas Cloud asynchronous media API. Dimensions are mapped to the closest supported aspect ratio, up to about one megapixel. Requires a configured Atlas Cloud API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=False,
+        max_images_per_request=1,
+        allowed_aspect_ratios=list(ATLASCLOUD_MAI_IMAGE_SIZES),
+        aspect_ratio_sizes=ATLASCLOUD_MAI_IMAGE_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+
+atlascloud_ideogram_v4_turbo = StarterModel(
+    name="Atlas Cloud Ideogram V4 Turbo",
+    base=BaseModelType.External,
+    source="external://atlascloud/ideogram/v4/turbo/text-to-image",
+    description="Ideogram V4 Turbo text-to-image generation through the Atlas Cloud asynchronous media API. Dimensions are mapped to the closest supported size preset. Requires a configured Atlas Cloud API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=1,
+        allowed_aspect_ratios=ATLASCLOUD_PRESET_ASPECT_RATIOS,
+        aspect_ratio_sizes=_atlascloud_aspect_ratio_sizes(ATLASCLOUD_PRESET_ASPECT_RATIOS),
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+
+atlascloud_ideogram_v4_quality = StarterModel(
+    name="Atlas Cloud Ideogram V4 Quality",
+    base=BaseModelType.External,
+    source="external://atlascloud/ideogram/v4/quality/text-to-image",
+    description="Ideogram V4 Quality text-to-image generation through the Atlas Cloud asynchronous media API. Dimensions are mapped to the closest supported size preset. Requires a configured Atlas Cloud API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=1,
+        allowed_aspect_ratios=ATLASCLOUD_PRESET_ASPECT_RATIOS,
+        aspect_ratio_sizes=_atlascloud_aspect_ratio_sizes(ATLASCLOUD_PRESET_ASPECT_RATIOS),
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+
+atlascloud_krea_2_turbo = StarterModel(
+    name="Atlas Cloud Krea 2 Turbo",
+    base=BaseModelType.External,
+    source="external://atlascloud/krea-2-turbo/text-to-image",
+    description="Krea 2 Turbo text-to-image generation through the Atlas Cloud asynchronous media API. Dimensions are mapped to the closest supported size preset. Requires a configured Atlas Cloud API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=4,
+        allowed_aspect_ratios=ATLASCLOUD_PRESET_ASPECT_RATIOS,
+        aspect_ratio_sizes=_atlascloud_aspect_ratio_sizes(ATLASCLOUD_PRESET_ASPECT_RATIOS),
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+
+atlascloud_hidream_o1_1_5 = StarterModel(
+    name="Atlas Cloud HiDream O1 1.5",
+    base=BaseModelType.External,
+    source="external://atlascloud/hidream-o1-1.5/text-to-image",
+    description="HiDream O1 1.5 text-to-image generation through the Atlas Cloud asynchronous media API. Dimensions are mapped to the closest supported size preset. Requires a configured Atlas Cloud API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=False,
+        max_images_per_request=1,
+        allowed_aspect_ratios=ATLASCLOUD_PRESET_ASPECT_RATIOS,
+        aspect_ratio_sizes=_atlascloud_aspect_ratio_sizes(ATLASCLOUD_PRESET_ASPECT_RATIOS),
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+
+atlascloud_grok_imagine_image_2 = StarterModel(
+    name="Atlas Cloud Grok Imagine Image 2.0",
+    base=BaseModelType.External,
+    source="external://atlascloud/xai/grok-imagine-image-2.0/text-to-image",
+    description="xAI Grok Imagine Image 2.0 text-to-image generation through the Atlas Cloud asynchronous media API. Dimensions are mapped to the closest supported aspect ratio. Requires a configured Atlas Cloud API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=False,
+        max_images_per_request=4,
+        allowed_aspect_ratios=ATLASCLOUD_GROK_ASPECT_RATIOS,
+        aspect_ratio_sizes=_atlascloud_aspect_ratio_sizes(ATLASCLOUD_GROK_ASPECT_RATIOS),
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+
+atlascloud_nano_banana_2 = StarterModel(
+    name="Atlas Cloud Nano Banana 2",
+    base=BaseModelType.External,
+    source="external://atlascloud/google/nano-banana-2/text-to-image",
+    description="Google Nano Banana 2 text-to-image generation through the Atlas Cloud asynchronous media API. Supports 1K/2K/4K resolution presets. Requires a configured Atlas Cloud API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=1,
+        allowed_aspect_ratios=ATLASCLOUD_NANO_BANANA_ASPECT_RATIOS,
+        resolution_presets=ATLASCLOUD_NANO_BANANA_RESOLUTION_PRESETS,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+
 openai_gpt_image_2 = StarterModel(
     name="GPT Image 2",
     base=BaseModelType.External,
