@@ -21,6 +21,11 @@ export type WorkingMemoryStatus = Schemas['WorkingMemoryCalibrationStatus'];
 export type WorkingMemoryRunCreated = Schemas['WorkingMemoryCalibrationRunCreated'];
 export type WorkingMemoryLineState = WorkingMemoryLine['state'];
 export type WorkingMemoryLineContributor = Schemas['WorkingMemoryCalibrationLineContributor'];
+/**
+ * A model the graph names, as the record the graph was compiled over has it: what the server compares with the model's
+ * record when the step arrives (`graph_models`). Format and variant are null for a record without one.
+ */
+export type CalibrationCompiledModel = Schemas['CalibrationCompiledModel'];
 
 /** The server reserves this origin prefix for calibration queue items; the run id follows it. */
 export const CALIBRATION_ORIGIN_PREFIX = 'invokeai:wm-calibration:';
@@ -40,6 +45,81 @@ export interface CalibrationGraph {
   graph: unknown;
   data: unknown;
 }
+
+/** A case's graph with the identity of every model it names, from the records it was compiled over. */
+export interface CompiledCalibration extends CalibrationGraph {
+  models: Readonly<Record<string, CalibrationCompiledModel>>;
+}
+
+type JsonObject = Record<string, unknown>;
+
+const isJsonObject = (value: unknown): value is JsonObject =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/**
+ * A model identifier as the server reads one in a graph: an object that validates as its `ModelIdentifierField`, with a
+ * string key, hash, name, base and type, and a submodel type that is absent, null or a string. The server also checks
+ * base, type and submodel type against its enums. This module has no list of those that stays current with the
+ * server's, and a compiled graph's identifiers come from server records, whose values are the server's own.
+ */
+const isModelIdentifier = (value: JsonObject): value is JsonObject & { key: string } =>
+  ['key', 'hash', 'name', 'base', 'type'].every((field) => typeof value[field] === 'string') &&
+  (value.submodel_type === undefined || value.submodel_type === null || typeof value.submodel_type === 'string');
+
+/**
+ * The keys of every model the graph's nodes name, in a field or nested in one (a LoRA collection's list, a metadata
+ * node's record), as the server finds them (`graph_model_identifiers`): it takes the identities of exactly those.
+ */
+const modelKeysOf = (graph: unknown): Set<string> => {
+  const keys = new Set<string>();
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+    } else if (isJsonObject(value)) {
+      if (isModelIdentifier(value)) {
+        keys.add(value.key);
+      } else {
+        Object.values(value).forEach(visit);
+      }
+    }
+  };
+  const nodes = isJsonObject(graph) && isJsonObject(graph.nodes) ? Object.values(graph.nodes) : [];
+
+  for (const node of nodes) {
+    if (isJsonObject(node)) {
+      Object.values(node).forEach(visit);
+    }
+  }
+  return keys;
+};
+
+/**
+ * The identity of every model `graph` names, from `records`, the records it was compiled over. Throws for a model
+ * they lack, which a compiler over them cannot have named.
+ */
+export const compiledModelIdentities = (
+  graph: unknown,
+  records: readonly ModelConfig[]
+): Record<string, CalibrationCompiledModel> => {
+  const byKey = new Map(records.map((record) => [record.key, record]));
+  const identities: Record<string, CalibrationCompiledModel> = {};
+
+  for (const key of modelKeysOf(graph)) {
+    const record = byKey.get(key);
+
+    if (!record) {
+      throw new Error(`The graph names model ${key}, which the records it was compiled over lack.`);
+    }
+    identities[key] = {
+      base: record.base,
+      format: record.format,
+      hash: record.hash,
+      type: record.type,
+      variant: record.variant ?? null,
+    };
+  }
+  return identities;
+};
 
 /**
  * Builds every case's graph over `models`, or rejects naming the case that cannot compile, with the records' read

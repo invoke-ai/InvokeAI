@@ -274,20 +274,25 @@ beforeEach(() => {
   accountLifecycle.activate('wm-section-test', ':user:wm-section-test');
   library.models = [mainModel('sdxl')];
   // Like Generate's compiler, it builds over the records it is given, rejecting with their read's error; each graph
-  // names the base it was built for.
+  // names the base it was built for, and its model in a loader as the record has it.
   compile = vi.fn<CalibrationGraphCompiler>(async (cases, models) => {
     const records = await models;
 
-    return cases.map((item) => ({
-      caseId: item.id,
-      data: [],
-      graph: {
-        base: records.find((model) => model.key === item.model_key)?.base ?? null,
-        edges: [],
-        id: item.id,
-        nodes: {},
-      },
-    }));
+    return cases.map((item) => {
+      const model = records.find((record) => record.key === item.model_key);
+      const loader = model
+        ? {
+            id: 'loader',
+            model: { base: model.base, hash: model.hash, key: model.key, name: model.name, type: model.type },
+          }
+        : null;
+
+      return {
+        caseId: item.id,
+        data: [],
+        graph: { base: model?.base ?? null, edges: [], id: item.id, nodes: loader ? { loader } : {} },
+      };
+    });
   });
   currentSummary = summary();
   api.getWorkingMemoryPlan.mockImplementation(() => Promise.resolve(supportedPlan()));
@@ -1277,6 +1282,15 @@ describe('WorkingMemorySection plan freshness', () => {
       ([, request]) => (request as { graph: { base: string } }).graph.base
     );
     expect(new Set(bases)).toEqual(new Set(['sdxl']));
+    // Each step states the model as that compile read it, which the server compares with the record it holds then.
+    const identities = api.calibrateWorkingMemory.mock.calls.map(
+      ([, request]) => (request as { graphModels: Record<string, { base: string }> }).graphModels
+    );
+    expect(identities).toEqual(
+      identities.map(() => ({
+        [MODEL_KEY]: { base: 'sdxl', format: 'checkpoint', hash: 'hash', type: 'main', variant: null },
+      }))
+    );
   });
 
   it('starts nothing when the plan read on confirmation is no longer supported, naming why', async () => {

@@ -14,12 +14,13 @@ vi.mock('./transport', () => ({
 
 const { calibrateWorkingMemory } = await import('./workingMemoryApi');
 
-it('sends the attempt id together with its step count, as the server requires of every run of an attempt', async () => {
+it('sends the attempt id with its step count and the compiled model identities, in the server field names', async () => {
   await calibrateWorkingMemory('sdxl main', {
     attemptId: 'attempt-1',
     attemptSteps: 18,
     data: [],
     graph: { id: 'case' },
+    graphModels: { sdxl: { base: 'sdxl', format: 'diffusers', hash: 'blake3:sdxl', type: 'main', variant: null } },
     idempotencyKey: 'key-0',
   });
 
@@ -31,6 +32,7 @@ it('sends the attempt id together with its step count, as the server requires of
     attempt_steps: 18,
     data: [],
     graph: { id: 'case' },
+    graph_models: { sdxl: { base: 'sdxl', format: 'diffusers', hash: 'blake3:sdxl', type: 'main', variant: null } },
     idempotency_key: 'key-0',
   });
 });

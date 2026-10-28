@@ -3,9 +3,9 @@ import type {
   CalibrationActivity,
   CalibrationBlocker,
   CalibrationCoverage,
-  CalibrationGraph,
   CalibrationGraphCompiler,
   CalibrationOutcome,
+  CompiledCalibration,
   WorkingMemoryPlan,
   WorkingMemoryStatus,
   WorkingMemorySummary,
@@ -297,7 +297,7 @@ const WorkingMemoryBody = ({
     | { kind: 'unavailable' }
     | { kind: 'running'; own: boolean }
     | { kind: 'uncompilable'; message: string }
-    | { graphs: CalibrationGraph[]; kind: 'ready'; plan: WorkingMemoryPlan }
+    | { graphs: CompiledCalibration[]; kind: 'ready'; plan: WorkingMemoryPlan }
   > => {
     const current = await fetchCurrentWorkingMemoryPlan(queryClient, modelKey).catch(() => null);
 
@@ -305,7 +305,7 @@ const WorkingMemoryBody = ({
       return { kind: 'unavailable' };
     }
 
-    let graphs: CalibrationGraph[];
+    let graphs: CompiledCalibration[];
 
     try {
       graphs = await compileWorkingMemoryPlan(compiler, current, signal);

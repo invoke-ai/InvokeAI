@@ -26,7 +26,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     CalibrationStoreLockTimeoutError,
     calibration_origin,
 )
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from tests.app.routers.conftest import MockApiDependencies, _auth
 from tests.fixtures.working_memory_calibration import (
     GPU,
@@ -50,7 +50,13 @@ def calibration(
     queue.start(mock_invoker)
 
     model = SimpleNamespace(
-        key="model-key", name="Model", hash="blake3:abc", base=BaseModelType.StableDiffusionXL, type=ModelType.Main
+        key="model-key",
+        name="Model",
+        hash="blake3:abc",
+        base=BaseModelType.StableDiffusionXL,
+        type=ModelType.Main,
+        format=ModelFormat.Checkpoint,
+        variant=None,
     )
     # Installed too, and no model the plan covers: only `get_model` knows it.
     other = SimpleNamespace(
@@ -83,9 +89,10 @@ def _graph() -> dict:
 
 
 def _calibrate(client: TestClient, token: str, body: dict | None = None, key: str = "model-key"):
+    """Posts `body`; one that names no graph_models states none, as for a graph naming no model."""
     return client.post(
         f"/api/v2/models/i/{key}/working_memory/calibrate",
-        json=body if body is not None else {"graph": _graph()},
+        json={"graph_models": {}, **(body if body is not None else {"graph": _graph()})},
         headers=_auth(token),
     )
 
@@ -466,48 +473,140 @@ def test_a_retry_key_reused_for_an_unknown_model_is_a_conflict(
     assert response.status_code == 409, response.text
 
 
-def _loader_graph(list_field: bool = False, **compiled: Any) -> dict:
-    """A graph that names the model as the client compiled it, `compiled` overriding the current record: in a loader's
-    model field, or as the LoRA of a collection loader's list."""
+_RECORD = {
+    "key": "model-key",
+    "hash": "blake3:abc",
+    "name": "Model",
+    "base": "sdxl",
+    "type": "main",
+    "format": "checkpoint",
+    "variant": None,
+}
+"""model-key's record in the fixture, as a client reads it."""
+
+
+def _loader_body(list_field: bool = False, identifier: dict | None = None, **compiled: Any) -> dict:
+    """A request whose graph names the model as the client compiled it, `compiled` overriding the current record: in a
+    loader's model field, or as the LoRA of a collection loader's list, and in graph_models. `identifier` overrides
+    the graph's identifier alone."""
+    record = {**_RECORD, **compiled}
     named = ModelIdentifierField(
-        **{
-            "key": "model-key",
-            "hash": "blake3:abc",
-            "name": "Model",
-            "base": BaseModelType.StableDiffusionXL,
-            "type": ModelType.Main,
-            **compiled,
-        }
+        **{**{fact: record[fact] for fact in ("key", "hash", "name", "base", "type")}, **(identifier or {})}
     )
     graph = Graph()
     if list_field:
         graph.add_node(LoRACollectionLoader(id="loras", loras=[LoRAField(lora=named, weight=1.0)]))
     else:
         graph.add_node(SDXLModelLoaderInvocation(id="loader", model=named))
-    return graph.model_dump(mode="json")
+    identity = {fact: record[fact] for fact in ("hash", "base", "type", "format", "variant")}
+    return {"graph": graph.model_dump(mode="json"), "graph_models": {record["key"]: identity}}
 
 
 @pytest.mark.parametrize(
     "list_field, compiled, message",
     [
         (False, {"hash": "blake3:compiled-before"}, "Model changed after this calibration was planned (hash)."),
-        (False, {"base": BaseModelType.StableDiffusion1}, "Model changed after this calibration was planned (base)."),
-        (False, {"type": ModelType.LoRA}, "Model changed after this calibration was planned (type)."),
+        (False, {"base": "sd-1"}, "Model changed after this calibration was planned (base)."),
+        (False, {"type": "lora"}, "Model changed after this calibration was planned (type)."),
+        (False, {"format": "diffusers"}, "Model changed after this calibration was planned (format)."),
+        (False, {"variant": "inpaint"}, "Model changed after this calibration was planned (variant)."),
         (False, {"key": "gone-key", "name": "Gone"}, "Gone was removed after this calibration was planned."),
         (True, {"hash": "blake3:compiled-before"}, "Model changed after this calibration was planned (hash)."),
+        (True, {"variant": "inpaint"}, "Model changed after this calibration was planned (variant)."),
     ],
-    ids=["hash", "base", "type", "removed", "list-field"],
+    ids=["hash", "base", "type", "format", "variant", "removed", "list-field-hash", "list-field-variant"],
 )
 def test_a_graph_compiled_against_an_older_record_of_the_model_is_refused_with_a_code(
     client: TestClient, admin_token: str, calibration, list_field: bool, compiled: dict, message: str
 ) -> None:
-    """The client compiled the graph, then the model's record changed or went before the request arrived."""
-    current = _calibrate(client, admin_token, {"graph": _loader_graph(list_field)})
-    stale = _calibrate(client, admin_token, {"graph": _loader_graph(list_field, **compiled)})
+    """The client compiled the graph, then the model's record changed or went before the request arrived. A record
+    without a variant compiled to null, which it still matches."""
+    queue, _ = calibration
+    current = _calibrate(client, admin_token, _loader_body(list_field))
+    stale = _calibrate(client, admin_token, _loader_body(list_field, **compiled))
 
     assert current.status_code == 201, current.text
     assert stale.status_code == 409, stale.text
     assert stale.json()["detail"] == {"code": "model_changed", "message": f"{message} Calibrate again."}
+    assert queue.get_queue_item_ids("default").item_ids == current.json()["item_ids"]
+
+
+@pytest.mark.parametrize(
+    "fact, stale",
+    [("hash", "blake3:compiled-before"), ("base", "sd-1")],
+    ids=["hash", "base"],
+)
+def test_a_graph_whose_identifier_names_an_older_record_is_refused_though_graph_models_is_current(
+    client: TestClient, admin_token: str, calibration, fact: str, stale: str
+) -> None:
+    """graph_models states the record as it is, and the graph itself was compiled against an older one: the run would
+    load what the identifier names."""
+    queue, _ = calibration
+
+    response = _calibrate(client, admin_token, _loader_body(identifier={fact: stale}))
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"] == {
+        "code": "model_changed",
+        "message": f"Model changed after this calibration was planned ({fact}). Calibrate again.",
+    }
+    assert queue.get_queue_item_ids("default").item_ids == []
+
+
+def _without(identity: dict, fact: str) -> dict:
+    return {name: value for name, value in identity.items() if name != fact}
+
+
+@pytest.mark.parametrize(
+    "graph_models, loc, message",
+    [
+        ({}, ["body"], "the graph names model-key, which graph_models lacks"),
+        (
+            {"model-key": "same", "other-key": "same"},
+            ["body"],
+            "graph_models names other-key, which the graph does not",
+        ),
+        ({"model-key": "without variant"}, ["body", "graph_models", "model-key", "variant"], "Field required"),
+        ({"model-key": "null hash"}, ["body", "graph_models", "model-key", "hash"], "Input should be a valid string"),
+        (
+            {"model-key": "unknown fact"},
+            ["body", "graph_models", "model-key", "path"],
+            "Extra inputs are not permitted",
+        ),
+    ],
+    ids=["missing", "extra", "unstated-variant", "null-hash", "unknown-fact"],
+)
+def test_graph_models_must_state_exactly_the_graphs_models_with_every_fact(
+    client: TestClient, admin_token: str, calibration, graph_models: dict, loc: list[str], message: str
+) -> None:
+    """A null variant is a stated fact; an absent one is not."""
+    queue, _ = calibration
+    body = _loader_body()
+    identity = body["graph_models"]["model-key"]
+    stated = {
+        "same": identity,
+        "without variant": _without(identity, "variant"),
+        "null hash": {**identity, "hash": None},
+        "unknown fact": {**identity, "path": "/models/model.safetensors"},
+    }
+
+    response = _calibrate(
+        client, admin_token, {**body, "graph_models": {k: stated[v] for k, v in graph_models.items()}}
+    )
+
+    assert response.status_code == 422, response.text
+    [error] = response.json()["detail"]
+    assert error["loc"] == loc and message in error["msg"], error
+    assert queue.get_queue_item_ids("default").item_ids == []
+
+
+def test_a_request_without_graph_models_is_refused(client: TestClient, admin_token: str, calibration) -> None:
+    response = client.post(
+        "/api/v2/models/i/model-key/working_memory/calibrate", json={"graph": _graph()}, headers=_auth(admin_token)
+    )
+
+    assert response.status_code == 422, response.text
+    assert "graph_models" in response.text
 
 
 def test_an_attempt_is_refused_with_a_code_while_another_one_runs(

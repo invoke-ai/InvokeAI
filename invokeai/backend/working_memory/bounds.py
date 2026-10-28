@@ -34,11 +34,11 @@ environment variable could move."""
 
 UPPER_BOUND_EXCEPTIONS: Final[Mapping[str, float]] = MappingProxyType(
     {
-        "vae.sd-miopen,native,windows-decode-fp16-1280x1280-RX9060XT-demand_peak": 1.33,
-        "vae.sd-miopen,native,windows-encode-fp16-1024x1024-RX9060XT-demand_peak": 1.57,
-        "vae.sd-miopen,native,windows-encode-fp16-1280x1280-RX9060XT-demand_peak": 1.78,
-        "vae.flux-miopen,native,windows-decode-bf16-512x512-RX9060XT-demand_peak": 1.33,
-        "vae.flux2-miopen,native,windows-decode-bf16-512x512-RX9060XT-demand_peak": 1.33,
+        "vae.sd-miopen,native,windows-decode-fp16-1280x1280-scores-RX9060XT-demand_peak": 1.33,
+        "vae.sd-miopen,native,windows-encode-fp16-1024x1024-scores-RX9060XT-demand_peak": 1.57,
+        "vae.sd-miopen,native,windows-encode-fp16-1280x1280-scores-RX9060XT-demand_peak": 1.78,
+        "vae.flux-miopen,native,windows-decode-bf16-512x512-scores-RX9060XT-demand_peak": 1.33,
+        "vae.flux2-miopen,native,windows-decode-bf16-512x512-scores-RX9060XT-demand_peak": 1.33,
         "denoise.flux2-cudnn,native-denoise-bf16-h3072-8100+77tok-RTX4090-demand_peak": 1.42,
         "denoise.flux2-miopen,native,windows-denoise-bf16-h3072-8100+77tok-RX9060XT-demand_peak": 1.40,
     }
@@ -57,8 +57,9 @@ instead. All are the native allocator, never expandable segments or `cudaMallocA
 
 def point_id(point: MeasuredPoint, spec: "EstimatorSpec") -> str:
     """A readable id of a point: estimator, platform, its features as its estimator's line labels them (`fit.Line`:
-    operation, dtype, size, tile and batch of a VAE operation; size and prompt tokens of a MOSS-Image denoise), card
-    and method. Features that name no line show as they are. An estimator keyed by no platform trait records none."""
+    operation, dtype, size, tile, batch and a materialized score matrix of a VAE operation; size and prompt tokens of a
+    MOSS-Image denoise), card and method. Features that name no line show as they are. An estimator keyed by no
+    platform trait records none."""
     found = spec.line(point.features)
     label = found.label if found is not None else json.dumps(point.features, sort_keys=True, separators=(",", ":"))
     platform = ",".join(point.platform.values())
@@ -68,12 +69,16 @@ def point_id(point: MeasuredPoint, spec: "EstimatorSpec") -> str:
     return f"{head}-{label}{out_of_fit}-{card}-{point.method}"
 
 
-def platform_of(point: MeasuredPoint) -> Optional[Platform]:
-    """The platform a point is evaluated on. One that names no OS measured what holds on every OS. One that names no
-    trait at all is of an estimator keyed by none (`platform_keys=()`), which every platform prices alike: None, which
-    `resolve_coefficients` accepts for such an estimator only."""
-    if not point.platform:
-        return None
+_ANY_PLATFORM: Final = Platform("cudnn", "native", "linux")
+"""Where a point of an estimator keyed by no platform trait is evaluated. Its one entry resolves alike on every
+platform, so any will do; this one is measured."""
+
+
+def _platform_of(point: MeasuredPoint, spec: "EstimatorSpec") -> Platform:
+    """The platform a point is evaluated on. One that names no OS measured what holds on every OS. One of an estimator
+    keyed by no platform trait names nothing (`_ANY_PLATFORM`)."""
+    if not spec.platform_keys:
+        return _ANY_PLATFORM
     return Platform(**({"os": "other"} | point.platform))  # type: ignore[arg-type]
 
 
@@ -81,7 +86,7 @@ def evaluate_point(
     point: MeasuredPoint, spec: "EstimatorSpec", data: Iterable[WorkingMemoryData]
 ) -> WorkingMemoryEstimate:
     """The estimate for the point's features, priced with the coefficients `data` gives its platform."""
-    return spec.evaluate(point.features, resolve_coefficients(data, spec, platform_of(point), origin="data"))
+    return spec.evaluate(point.features, resolve_coefficients(data, spec, _platform_of(point, spec), origin="data"))
 
 
 def fitted_decides(estimate: WorkingMemoryEstimate) -> bool:

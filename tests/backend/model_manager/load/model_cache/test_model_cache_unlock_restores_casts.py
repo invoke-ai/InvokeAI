@@ -143,10 +143,9 @@ def _assert_at_the_counted_state(
 def test_the_last_unlock_returns_a_partially_resident_model_to_its_counted_state(
     make_cache, device: str, keep_ram_copy: bool, cast
 ):
-    """The cast reaches the weights on both devices and unties the tied matrix, which `Module.to(dtype)` casts name by
-    name: restored name by name, the matrix took twice its count in RAM and then in VRAM. A cast back to the counted
-    dtype unties it the same way and moves the CPU weights off the RAM copy. Each weight is restored where it is, so the
-    VRAM count the lock took stays true."""
+    """`Module.to(dtype)` can split the tied matrix while the weights are on both devices. On the last pin release, the
+    cache restores each weight's counted dtype and reties the matrix; CPU weights share the RAM copy again when one
+    exists. The VRAM count then matches the resident weights."""
     cache = make_cache(keep_ram_copy)
     model = TiedWeightsModule().to(torch.float16)
     with patch.object(model_cache_module, "device_has_dedicated_vram", return_value=True):
@@ -231,9 +230,9 @@ def _resident_bytes(*state_dicts: dict[str, torch.Tensor]) -> int:
 def test_a_cast_round_trip_leaves_a_tied_weight_adopted_from_another_device_one_tensor(
     make_cache, partial_loading: bool
 ):
-    """In multi-GPU mode the second device's cache adopts the first one's RAM copy with `load_state_dict(assign=True)`,
-    which gives each name of the tied matrix its own `Parameter` over the one tensor. A cast and a cast back give each of
-    them its own copy in the counted dtype: two copies of the matrix in RAM where the store counts one."""
+    """The second device adopts the first device's RAM copy with `load_state_dict(assign=True)`, leaving each tied name
+    as a separate `Parameter` over one tensor. A dtype cast can split that storage; the last pin release restores the
+    counted dtype and points both names at one tensor, keeping resident bytes equal to the shared store's count."""
     store = SharedCpuWeightsStore()
     first = _put(
         make_cache(True, enable_partial_loading=partial_loading, shared_cpu_weights=store),

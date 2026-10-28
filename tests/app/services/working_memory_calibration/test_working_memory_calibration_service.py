@@ -16,6 +16,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from invokeai.app.invocations.math import AddInvocation
+from invokeai.app.invocations.model import ModelIdentifierField
+from invokeai.app.invocations.sd.sdxl import SDXLModelLoaderInvocation
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records import UnknownModelException
 from invokeai.app.services.session_queue.session_queue_common import (
@@ -31,6 +33,7 @@ from invokeai.app.services.working_memory_calibration import working_memory_cali
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
     CALIBRATION_ORIGIN_PREFIX,
     CalibrationDeviceClass,
+    CalibrationModelChangedError,
     CalibrationQueueFullError,
     CalibrationRunNotFoundError,
     CalibrationStoreError,
@@ -39,11 +42,13 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     WorkingMemoryCalibrationRunCreated,
     WorkingMemoryCalibrationStatus,
     calibration_run_id,
+    graph_model_identifiers,
 )
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import (
     WorkingMemoryCalibrationService,
 )
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_store import CalibrationStore
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from tests.fixtures.sqlite_database import sqlite_cursor
 from tests.fixtures.working_memory_calibration import (
     GPU_CLASS,
@@ -78,7 +83,7 @@ def _request(
     graph = Graph() if graph_id is None else Graph(id=graph_id)
     graph.add_node(AddInvocation(id="add", a=1, b=b))
     data = [[BatchDatum(node_path="add", field_name="a", items=list(values))]] if len(values) > 1 else None
-    return WorkingMemoryCalibrationRequest(graph=graph, data=data, idempotency_key=key)
+    return WorkingMemoryCalibrationRequest(graph_models={}, graph=graph, data=data, idempotency_key=key)
 
 
 def _create(
@@ -794,7 +799,7 @@ def test_an_attempt_id_outside_its_alphabet_or_length_is_rejected(attempt_id: st
     graph = Graph()
     graph.add_node(AddInvocation(id="add", a=1, b=2))
     with pytest.raises(ValueError):
-        WorkingMemoryCalibrationRequest(graph=graph, attempt_id=attempt_id, attempt_steps=1)
+        WorkingMemoryCalibrationRequest(graph_models={}, graph=graph, attempt_id=attempt_id, attempt_steps=1)
 
 
 @pytest.mark.parametrize(
@@ -1325,3 +1330,88 @@ def test_a_model_reset_covers_its_submodels_windows(tmp_path: Path, mock_invoker
     assert removed.points_removed == 1
     points = json.loads(_store_path(tmp_path).read_bytes())["points"]
     assert [point["model_key"] for point in points] == ["vae-key"]
+
+
+ANIMA_LLLITE_GRAPHS = (
+    Path(__file__).parents[4]
+    / "invokeai"
+    / "frontend"
+    / "webv2"
+    / "src"
+    / "features"
+    / "generation"
+    / "core"
+    / "__snapshots__"
+    / "animaLLLiteCanvasGraphs.json"
+)
+
+
+def test_the_models_a_compiled_graph_names_are_found_where_the_client_finds_them() -> None:
+    """A graph webv2's canvas compiler wrote: the main model, its encoder and VAE in the loader's fields and again in
+    the metadata node's, and three ControlNet-LLLite adapters, beside image fields that name no model. webv2's
+    `compiledModelIdentities` test reads the same graph and expects the same keys."""
+    graph = Graph.model_validate(json.loads(ANIMA_LLLITE_GRAPHS.read_text(encoding="utf-8"))["inpaint_three_adapters"])
+
+    assert sorted({identifier.key for identifier in graph_model_identifiers(graph)}) == [
+        "anima-model",
+        "depth",
+        "pose",
+        "qwen-vae",
+        "qwen3",
+        "sketch",
+    ]
+
+
+def test_a_repeat_stating_other_identities_than_its_run_recorded_is_refused(
+    tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue, mock_sqlite_database: Database
+) -> None:
+    """The run id does not derive from graph_models. A repeat of a keyed request whose run lost its items, recompiled
+    after model-b's variant changed, names the same run and passes the check against the record; its item would fail
+    at admission on what the run recorded. It is refused at once, and a repeat stating what the run recorded is not."""
+    record = SimpleNamespace(
+        key="model-b",
+        name="Model B",
+        hash="blake3:b",
+        base=BaseModelType.StableDiffusionXL,
+        type=ModelType.Main,
+        format="diffusers",
+        variant="dev",
+    )
+    mock_invoker.services.model_manager.store.get_model.side_effect = lambda key: (
+        record if key == "model-b" else SimpleNamespace(key=key, hash=f"blake3:{key}")
+    )
+    service = _service(tmp_path, mock_invoker)
+
+    def compiled() -> WorkingMemoryCalibrationRequest:
+        named = ModelIdentifierField(
+            key="model-b", hash=record.hash, name=record.name, base=record.base, type=record.type
+        )
+        graph = Graph()
+        graph.add_node(SDXLModelLoaderInvocation(id="loader", model=named))
+        identity = {
+            "hash": record.hash,
+            "base": "sdxl",
+            "type": "main",
+            "format": record.format,
+            "variant": record.variant,
+        }
+        return WorkingMemoryCalibrationRequest(graph=graph, graph_models={"model-b": identity}, idempotency_key="lost")
+
+    first = asyncio.run(service.create_run("model-a", compiled(), "system"))
+    # Its items left the queue unseen, and the run lost them and its mark, as a store written before the mark has it.
+    queue.delete_queue_items_by_id(first.item_ids)
+    _collect_receipt(queue, mock_sqlite_database, "lost")
+    path = _store_path(tmp_path)
+    stored = json.loads(path.read_bytes())
+    stored["runs"][0].update(queue_item_ids=[], enqueue_attempted=False)
+    path.write_bytes(json.dumps(stored).encode())
+
+    record.variant = "klein_9b"
+    with pytest.raises(CalibrationModelChangedError) as refused:
+        asyncio.run(service.create_run("model-a", compiled(), "system"))
+
+    assert str(refused.value) == "Model B changed after this calibration was planned (variant). Calibrate again."
+    assert _calibration_item_ids(queue) == []
+    record.variant = "dev"
+    repeat = asyncio.run(service.create_run("model-a", compiled(), "system"))
+    assert repeat.run_id == first.run_id and _calibration_item_ids(queue) == repeat.item_ids != []

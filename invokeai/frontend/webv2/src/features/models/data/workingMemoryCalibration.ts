@@ -2,13 +2,14 @@ import type { QueryClient } from '@tanstack/react-query';
 
 import {
   calibrationIdempotencyKey,
+  compiledModelIdentities,
   isCalibrationOrigin,
   modelCalibratingOnGpu,
   newestRunId,
   planCalibrationSteps,
-  type CalibrationGraph,
   type CalibrationGraphCompiler,
   type CalibrationRefusal,
+  type CompiledCalibration,
   type LocalAttempt,
   type WorkingMemoryPlan,
   type WorkingMemoryRunCreated,
@@ -187,16 +188,18 @@ export const fetchCurrentWorkingMemoryPlan = (queryClient: QueryClient, modelKey
   queryClient.fetchQuery({ ...workingMemoryPlanQueryOptions(modelKey), staleTime: 0 });
 
 /**
- * The graphs of the plan's cases, as Generate would compile them over the model records the server holds now; loads
- * the compiler on first use. Rejects with the compiler's error, naming the first case that cannot compile, such as one
- * whose model needs a text encoder that is not installed, or with the error of reading the records. A start needs
- * them, so compiling first is how a plan the server supports turns out to be one this machine cannot run.
+ * The graphs of the plan's cases, as Generate would compile them over the model records the server holds now, each
+ * with the identity of every model it names from those same records; loads the compiler on first use. Each step posts
+ * those identities, never a later read, so the server refuses a step whose models changed since they compiled. Rejects
+ * with the compiler's error, naming the first case that cannot compile, such as one whose model needs a text encoder
+ * that is not installed, or with the error of reading the records. A start needs them, so compiling first is how a
+ * plan the server supports turns out to be one this machine cannot run.
  */
 export const compileWorkingMemoryPlan = async (
   compile: CalibrationGraphCompiler,
   plan: WorkingMemoryPlan,
   signal?: AbortSignal
-): Promise<CalibrationGraph[]> => {
+): Promise<CompiledCalibration[]> => {
   const owner = captureAccountScope();
   const compileSignal = signal ? AbortSignal.any([owner.signal, signal]) : owner.signal;
 
@@ -209,9 +212,10 @@ export const compileWorkingMemoryPlan = async (
   void records.catch(() => undefined);
 
   const graphs = await compile(plan.cases, records, compileSignal);
+  const compiledOver = await records;
 
   assertAccountScopeCurrent(owner);
-  return graphs;
+  return graphs.map((compiled) => ({ ...compiled, models: compiledModelIdentities(compiled.graph, compiledOver) }));
 };
 
 /**
@@ -228,7 +232,7 @@ export const startCalibration = ({
   plan,
   queryClient,
 }: {
-  graphs: readonly CalibrationGraph[];
+  graphs: readonly CompiledCalibration[];
   modelKey: string;
   plan: WorkingMemoryPlan;
   queryClient: QueryClient;
@@ -272,7 +276,14 @@ export const startCalibration = ({
       const idempotencyKey = calibrationIdempotencyKey(attemptId, step);
       await postStep(
         modelKey,
-        { attemptId, attemptSteps: steps.length, data: compiled.data, graph: compiled.graph, idempotencyKey },
+        {
+          attemptId,
+          attemptSteps: steps.length,
+          data: compiled.data,
+          graph: compiled.graph,
+          graphModels: compiled.models,
+          idempotencyKey,
+        },
         owner.signal
       );
 

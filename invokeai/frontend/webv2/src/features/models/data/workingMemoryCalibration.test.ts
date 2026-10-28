@@ -1,9 +1,15 @@
-import type { WorkingMemoryPlan, WorkingMemoryRunCreated } from '@features/models/core/workingMemory';
+import type { ModelConfig } from '@features/models/core/types';
+import type {
+  CalibrationGraphCompiler,
+  WorkingMemoryPlan,
+  WorkingMemoryRunCreated,
+} from '@features/models/core/workingMemory';
 import type { ConnectionListener } from '@platform/transport/socketHub';
 
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as ModelsApi from './api';
 import type { CalibrateRequest } from './workingMemoryApi';
 
 const hub = vi.hoisted(() => ({ statusChanged: null as ((payload: unknown) => void) | null }));
@@ -38,7 +44,16 @@ const api = vi.hoisted(() => ({
 
 vi.mock('./workingMemoryApi', () => api);
 
-const { attachWorkingMemoryRealtime, startCalibration } = await import('./workingMemoryCalibration');
+/** The model records the server holds, which a compile reads. */
+const library = vi.hoisted(() => ({ models: [] as unknown[] }));
+
+vi.mock('./api', async (importOriginal) => ({
+  ...(await importOriginal<typeof ModelsApi>()),
+  listModels: () => Promise.resolve(library.models),
+}));
+
+const { attachWorkingMemoryRealtime, compileWorkingMemoryPlan, startCalibration } =
+  await import('./workingMemoryCalibration');
 const { workingMemoryKeys } = await import('./workingMemoryQueries');
 const { calibrationRunOrigin } = await import('@features/models/core/workingMemory');
 const { accountLifecycle, captureAccountScope } = await import('@platform/state/accountLifecycle');
@@ -117,7 +132,7 @@ describe('posting the steps of a calibration', () => {
     shared_with: [],
     supported: true,
   };
-  const graphs = PLAN.cases.map((item) => ({ caseId: item.id, data: [], graph: { id: item.id } }));
+  const graphs = PLAN.cases.map((item) => ({ caseId: item.id, data: [], graph: { id: item.id }, models: {} }));
 
   /**
    * Answers like the server: a new key queues its items once, a repeat of a key returns the run it queued. The first
@@ -154,6 +169,46 @@ describe('posting the steps of a calibration', () => {
     expect(requests).toHaveLength(3);
     expect(requests.map((request) => request.attemptSteps)).toEqual([3, 3, 3]);
     expect(new Set(requests.map((request) => request.attemptId)).size).toBe(1);
+  });
+
+  it('posts the identities of the records the graphs compiled over, not of a later read', async () => {
+    serve(new ApiError('{"detail":"unused"}', 503), 0);
+    const record = (variant: string) =>
+      ({
+        base: 'flux2',
+        format: 'diffusers',
+        hash: 'blake3:flux2',
+        key: MODEL_KEY,
+        name: 'FLUX.2',
+        type: 'main',
+        variant,
+      }) as ModelConfig;
+    // Like Generate's compiler, it names the model as the records it was given have it. Another tab edits the model's
+    // variant once they were read, before the steps are posted.
+    const compile: CalibrationGraphCompiler = async (cases, models) => {
+      const [model] = await models;
+      const named = { base: model!.base, hash: model!.hash, key: model!.key, name: model!.name, type: model!.type };
+      library.models = [record('klein_9b')];
+
+      return cases.map((item) => ({
+        caseId: item.id,
+        data: [],
+        graph: { id: item.id, nodes: { loader: { id: 'loader', model: named, type: 'flux2_model_loader' } } },
+      }));
+    };
+    library.models = [record('klein_4b')];
+    const compiled = await compileWorkingMemoryPlan(compile, PLAN);
+    await startCalibration({ graphs: compiled, modelKey: MODEL_KEY, plan: PLAN, queryClient });
+
+    const posted = api.calibrateWorkingMemory.mock.calls.map(([, request]) => request.graphModels);
+    const compiledIdentity = {
+      base: 'flux2',
+      format: 'diffusers',
+      hash: 'blake3:flux2',
+      type: 'main',
+      variant: 'klein_4b',
+    };
+    expect(posted).toEqual([1, 2, 3].map(() => ({ [MODEL_KEY]: compiledIdentity })));
   });
 
   it('repeats a step the server answered with 503 after queuing it, with the same key, then posts the later steps', async () => {

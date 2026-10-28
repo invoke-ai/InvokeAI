@@ -64,7 +64,6 @@ from invokeai.backend.working_memory.fit import (
     entry_key,
     fit_points,
     fitted_values,
-    line_values,
     shipped_pair,
 )
 from invokeai.backend.working_memory.fragmentation import Measurement, fragmented
@@ -259,7 +258,8 @@ def build_points(
                     f"{path}: measured on {platform}, which `platform.MEASURED` does not list; ship coefficient "
                     "entries for it first"
                 )
-            keys = point_platform(platform, entries)
+            # A spec keyed by no platform trait reads one entry alike everywhere, and its points name no platform.
+            keys = point_platform(platform, entries) if spec.platform_keys else {}
             group = (device, window.estimator, window.version, _canonical(keys), _canonical(window.features))
             platforms[group] = keys
             attempt = attempts.get(window.run_id, window.run_id)
@@ -598,8 +598,8 @@ def review_lines(
         old_entries = {entry_key(entry): entry for entry in before[name].coefficients}
         for entry in file.coefficients:
             old_values, values = old_entries[entry_key(entry)].values or {}, entry.values or {}
-            # The pixel lines only: a hand-set value on no line (`line_values`) is not refitted, so it never moves.
-            for suffix in sorted({name[2:] for name in line_values(entry)}):
+            # Only a line points are fitted on can move. A hand-set value (`fit.hand_set_values`) is on none.
+            for suffix in sorted(line for key, line in fitted_on if key == entry_key(entry)):
                 old = (old_values[f"k_{suffix}"], old_values[f"b_{suffix}"])
                 new = (values[f"k_{suffix}"], values[f"b_{suffix}"])
                 if old == new:
