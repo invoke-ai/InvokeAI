@@ -21,5 +21,6 @@ Keep the file otherwise byte-identical to upstream: it is excluded from ``ruff f
 upstream's import order (``pyproject.toml``), so syncing a new revision is a copy plus exactly the
 changes above. InvokeAI drives the transformer with its own loop (``denoise.py``); ``sampling.py``
 holds the schedule, the initial noise and the conversion between InvokeAI's FLUX.2 latent layout and
-the model's.
+the model's. ``layout.py`` turns canvas regions into the model's JSON layout prompt, ported from
+OpenMOSS' prompt-enhancer skill (provenance in its docstring).
 """
