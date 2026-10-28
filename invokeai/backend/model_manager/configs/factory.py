@@ -92,6 +92,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_Krea2_Config,
     Main_Checkpoint_LTX2_Config,
     Main_Checkpoint_MiniMaxH3_Config,
+    Main_Checkpoint_MossImage_Config,
     Main_Checkpoint_QwenImage21_Config,
     Main_Checkpoint_QwenImage_Config,
     Main_Checkpoint_SD1_Config,
@@ -108,6 +109,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_Krea2_Config,
     Main_Diffusers_LTX2_Config,
     Main_Diffusers_MiniMaxH3_Config,
+    Main_Diffusers_MossImage_Config,
     Main_Diffusers_QwenImage21_Config,
     Main_Diffusers_QwenImage_Config,
     Main_Diffusers_SD1_Config,
@@ -117,6 +119,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_SDXLRefiner_Config,
     Main_Diffusers_Wan_Config,
     Main_Diffusers_ZImage_Config,
+    Main_GGUF_Anima_Config,
     Main_GGUF_ErnieImage_Config,
     Main_GGUF_Flux2_Config,
     Main_GGUF_FLUX_Config,
@@ -348,6 +351,8 @@ _PINNED_MODEL_CLASS_MARKERS = {
     "MiniMaxH3Transformer3DModel",
     "AutoencoderKLMiniMaxH3",
     "AutoencoderKLMiniMaxH3Audio",
+    # MOSS-Image's pipeline is remote code upstream; its classes are vendored under invokeai/backend/moss_image.
+    "MOSSImagePipeline",
 }
 
 
@@ -419,6 +424,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Diffusers_Krea2_Config, Main_Diffusers_Krea2_Config.get_tag()],
         Annotated[Main_Diffusers_MiniMaxH3_Config, Main_Diffusers_MiniMaxH3_Config.get_tag()],
         Annotated[Main_Diffusers_LTX2_Config, Main_Diffusers_LTX2_Config.get_tag()],
+        Annotated[Main_Diffusers_MossImage_Config, Main_Diffusers_MossImage_Config.get_tag()],
         # Main (Pipeline) - checkpoint format
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
         # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
@@ -438,6 +444,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Checkpoint_Anima_Config, Main_Checkpoint_Anima_Config.get_tag()],
         Annotated[Main_Checkpoint_MiniMaxH3_Config, Main_Checkpoint_MiniMaxH3_Config.get_tag()],
         Annotated[Main_Checkpoint_LTX2_Config, Main_Checkpoint_LTX2_Config.get_tag()],
+        Annotated[Main_Checkpoint_MossImage_Config, Main_Checkpoint_MossImage_Config.get_tag()],
         # Main (Pipeline) - quantized formats
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
         # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
@@ -451,6 +458,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_GGUF_Krea2_Config, Main_GGUF_Krea2_Config.get_tag()],
         Annotated[Main_GGUF_Ideogram4_Config, Main_GGUF_Ideogram4_Config.get_tag()],
         Annotated[Main_GGUF_ErnieImage_Config, Main_GGUF_ErnieImage_Config.get_tag()],
+        Annotated[Main_GGUF_Anima_Config, Main_GGUF_Anima_Config.get_tag()],
         # IMPORTANT: FLUX.2 must be listed BEFORE FLUX.1 here. An ambiguous SDNQ transformer
         # checkpoint (prefixed FLUX.2 keys) can look like a FLUX.1 main model, so FLUX.2 must get
         # first refusal. Main_SDNQ_FLUX_Config additionally rejects FLUX.2 state dicts to keep the

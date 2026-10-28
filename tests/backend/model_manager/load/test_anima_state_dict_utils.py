@@ -2,9 +2,9 @@
 
 import torch
 
-from invokeai.backend.model_manager.load.model_loaders.anima import (
-    _filter_non_model_keys,
-    _strip_anima_bundle_prefix,
+from invokeai.backend.anima.checkpoint_layout import (
+    filter_non_model_keys,
+    strip_anima_bundle_prefix,
 )
 from tests.backend.model_manager.load.state_dicts.anima_comfyui_keys import state_dict_keys as anima_keys
 from tests.backend.model_manager.load.state_dicts.utils import keys_to_mock_state_dict
@@ -15,7 +15,7 @@ class TestStripAnimaBundlePrefix:
         sd = keys_to_mock_state_dict(anima_keys)
         assert all(k.startswith("net.") for k in sd)
 
-        out = _strip_anima_bundle_prefix(sd)
+        out = strip_anima_bundle_prefix(sd)
 
         assert len(out) == len(sd)
         assert not any(k.startswith("net.") for k in out)
@@ -32,13 +32,13 @@ class TestStripAnimaBundlePrefix:
             "cond_stage_model.transformer.embeddings.weight": torch.empty(1),
         }
 
-        out = _strip_anima_bundle_prefix(sd)
+        out = strip_anima_bundle_prefix(sd)
 
         assert set(out.keys()) == {"blocks.0.attn.qkv.weight", "final_layer.weight"}
 
     def test_no_known_prefix_is_a_noop(self):
         sd = {"blocks.0.attn.qkv.weight": torch.empty(1)}
-        assert _strip_anima_bundle_prefix(sd) is sd
+        assert strip_anima_bundle_prefix(sd) is sd
 
 
 class TestFilterNonModelKeys:
@@ -49,7 +49,7 @@ class TestFilterNonModelKeys:
             "pos_embedder.seq": torch.empty(1),
         }
 
-        out = _filter_non_model_keys(sd)
+        out = filter_non_model_keys(sd)
 
         assert set(out.keys()) == {"blocks.0.attn.qkv.weight"}
 
@@ -59,7 +59,7 @@ class TestFilterNonModelKeys:
             "model_sampling.sigmas": torch.empty(1),
         }
 
-        out = _filter_non_model_keys(sd)
+        out = filter_non_model_keys(sd)
 
         assert set(out.keys()) == {"blocks.0.attn.qkv.weight"}
 
@@ -69,6 +69,6 @@ class TestFilterNonModelKeys:
             "final_layer.weight": torch.empty(1),
         }
 
-        out = _filter_non_model_keys(sd)
+        out = filter_non_model_keys(sd)
 
         assert out == sd

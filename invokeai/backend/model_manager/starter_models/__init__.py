@@ -22,6 +22,7 @@ from invokeai.backend.model_manager.starter_models.anima import (
     anima_lllite_scribble_preview3,
     anima_lllite_sketch,
     anima_qwen3_5_encoder,
+    anima_turbo_gguf_q8_0,
     anima_vae,
 )
 from invokeai.backend.model_manager.starter_models.cogview4 import cogview4
@@ -198,6 +199,7 @@ from invokeai.backend.model_manager.starter_models.minimax_h3 import (
     minimax_h3_ref2va_int8_transformer,
     minimax_h3_turbo_lora,
 )
+from invokeai.backend.model_manager.starter_models.moss_image import moss_image_base, moss_image_sft
 from invokeai.backend.model_manager.starter_models.qwen_image import (
     pid_1_5_decoder_qwenimage_2kto4k,
     pid_1_5_decoder_qwenimage_2kto4k_int8,
@@ -500,6 +502,8 @@ STARTER_MODELS: list[StarterModel] = [
     qwen_image_2_1_gguf_q4_k_m,
     qwen_image_2_1_vae,
     qwen3_vl_encoder_8b,
+    moss_image_base,
+    moss_image_sft,
     wan_22_t5_encoder,
     wan_22_a14b_vae,
     wan_22_5b_vae,
@@ -567,6 +571,7 @@ STARTER_MODELS: list[StarterModel] = [
     alibabacloud_wan26_t2i,
     alibabacloud_qwen_image_edit_max,
     anima_base,
+    anima_turbo_gguf_q8_0,
     anima_2_9b,
     anima_2_9b_int8,
     anima_3_8b,
@@ -747,6 +752,11 @@ minimax_h3_bundle: list[StarterModel] = [
     minimax_h3_lightx2v_ref2v_turbo_lora,
 ]
 
+# Base only: each pipeline bundles its own copy of the ~17GB encoder, so the bundle does not download it twice.
+moss_image_bundle: list[StarterModel] = [
+    moss_image_base,
+]
+
 ltx2_bundle: list[StarterModel] = [
     ltx2_5_components,
     ltx2_5_text_encoder_int8,
@@ -768,6 +778,7 @@ STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.MiniMaxH3: StarterModelBundle(name="MiniMax H3", models=minimax_h3_bundle),
     BaseModelType.LTX2: StarterModelBundle(name="LTX 2.5", models=ltx2_bundle),
     BaseModelType.Ideogram4: StarterModelBundle(name="Ideogram 4", models=ideogram_bundle),
+    BaseModelType.MossImage: StarterModelBundle(name="MOSS-Image", models=moss_image_bundle),
 }
 
 assert len(STARTER_MODELS) == len({m.source for m in STARTER_MODELS}), "Duplicate starter models"

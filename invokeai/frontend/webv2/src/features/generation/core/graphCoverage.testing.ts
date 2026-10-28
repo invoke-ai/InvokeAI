@@ -6,11 +6,18 @@ import type {
   GenerateComponentValueKey,
   SupportedGenerateBase,
 } from './baseGenerationPolicies';
-import type { GenerateSettings, MainModelConfig, ModelIdentifierConfig } from './types';
+import type {
+  GenerateReferenceImage,
+  GenerateReferenceImageAsset,
+  GenerateSettings,
+  MainModelConfig,
+  ModelIdentifierConfig,
+} from './types';
 
 import {
   getComponentSectionPolicy,
   getDefaultGenerateSettings,
+  isReferenceImageSupported,
   SUPPORTED_GENERATE_BASES,
 } from './baseGenerationPolicies';
 import { getIsPidSupportedBase } from './pid';
@@ -28,9 +35,10 @@ const DEFAULT_SHAPES: readonly ModelShape[] = [
 
 /** Check per-base shape overrides against supported bases. */
 export const SHAPE_OVERRIDES: Partial<Record<SupportedGenerateBase, readonly ModelShape[]>> = {
-  // Anima ships single files only; Anima-3.8B's variant adds a second encoder.
+  // Anima ships single files only, checkpoint or GGUF; Anima-3.8B's variant adds a second encoder.
   anima: [
     { label: 'qwen3', overrides: { format: 'checkpoint', variant: 'anima_qwen3' } },
+    { label: 'qwen3-gguf', overrides: { format: 'gguf_quantized', variant: 'anima_qwen3' } },
     { label: 'qwen35', overrides: { format: 'checkpoint', variant: 'anima_qwen35' } },
   ],
   // Ideogram's standalone fixture is a conditional checkpoint, not GGUF.
@@ -64,6 +72,7 @@ const CANDIDATE_VARIANTS = [
   'qwen3_vl_4b',
   'qwen3_vl_8b',
   'qwen3_5_4b',
+  'qwen3_5_9b',
 ] as const;
 /** Ideogram 4's two transformer branches; every other main leaves the field unset. */
 const CANDIDATE_BRANCHES = [undefined, 'conditional', 'unconditional'] as const;
@@ -210,6 +219,23 @@ export const fullyFilledSettingsFor = (base: SupportedGenerateBase, shape: Model
   return { filled: [...allFilled].sort(), model, settings };
 };
 
+/** References for the families whose builders wire them through their own nodes rather than an adapter. */
+const tunedReferenceImagesFor = (
+  model: MainModelConfig,
+  image: GenerateReferenceImageAsset
+): GenerateReferenceImage[] | undefined => {
+  if (model.base === 'krea-2') {
+    return [{ config: { image, styleStrength: 1, type: 'krea2_reference_image' }, id: 'style', isEnabled: true }];
+  }
+
+  // Only the Diffusers pipeline's own encoder reads references; other shapes compile without them.
+  if (model.base === 'qwen-image-2-1' && isReferenceImageSupported(model)) {
+    return [{ config: { image, type: 'qwen_image_2_1_reference_image' }, id: 'edit', isEnabled: true }];
+  }
+
+  return undefined;
+};
+
 /**
  * The optional per-family tuning and output filters, all switched on, so the backend contract also covers the nodes
  * and literal values a default recipe never emits. Settings a family ignores are harmless to carry.
@@ -224,21 +250,14 @@ export const tunedSettingsFor = (base: SupportedGenerateBase, shape: ModelShape)
     projectSettings: { useCpuNoise: true, useNsfwChecker: true, useWatermark: true },
     settings: {
       ...settings,
+      // CFG above 1 adds the negative prompt, which Qwen-Image-2.1 also encodes with the references.
+      cfgScale: base === 'qwen-image-2-1' ? 4 : settings.cfgScale,
       fluxDypeExponent: 1,
       fluxDypePreset: 'manual' as const,
       fluxDypeScale: 3,
       qwenImageEncoderQuantization: 'nf4' as const,
       qwenImageShift: 3,
-      referenceImages:
-        base === 'krea-2'
-          ? [
-              {
-                config: { image, styleStrength: 1, type: 'krea2_reference_image' as const },
-                id: 'style',
-                isEnabled: true,
-              },
-            ]
-          : settings.referenceImages,
+      referenceImages: tunedReferenceImagesFor(model, image) ?? settings.referenceImages,
       zImageSeedVarianceEnabled: true,
       zImageSeedVarianceStrength: 0.2,
       zImageShift: 3,
