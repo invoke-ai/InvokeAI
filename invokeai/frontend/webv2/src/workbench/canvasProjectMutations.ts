@@ -594,7 +594,7 @@ const patchLayerConfig = (layer: CanvasNodeContract, config: CanvasLayerConfigPa
     };
   }
   if (layer.type === 'regional_guidance' && config.layerType === 'regional_guidance') {
-    return {
+    const next = {
       ...layer,
       ...(config.mask ? { mask: { ...layer.mask, ...config.mask } } : {}),
       ...(Object.hasOwn(config, 'positivePrompt') ? { positivePrompt: config.positivePrompt } : {}),
@@ -602,6 +602,15 @@ const patchLayerConfig = (layer: CanvasNodeContract, config: CanvasLayerConfigPa
       ...(Object.hasOwn(config, 'autoNegative') ? { autoNegative: config.autoNegative } : {}),
       ...(Object.hasOwn(config, 'referenceImages') ? { referenceImages: config.referenceImages } : {}),
     };
+    // A cleared role is absent, as on a layer that never had one; the inverse of adding one records `undefined`.
+    if (Object.hasOwn(config, 'layout')) {
+      if (config.layout) {
+        next.layout = config.layout;
+      } else {
+        delete next.layout;
+      }
+    }
+    return next;
   }
   if (layer.type === 'inpaint_mask' && config.layerType === 'inpaint_mask') {
     const next = {
