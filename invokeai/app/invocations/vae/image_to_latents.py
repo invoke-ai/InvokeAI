@@ -27,7 +27,7 @@ from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.stable_diffusion.vae_tiling import patch_vae_tiling_params
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_sd15_sdxl
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_sd15_sdxl, sd_vae_run_dtype
 
 """
 SDXL VAE color compensation values determined experimentally to reduce color drift.
@@ -86,9 +86,10 @@ class ImageToLatentsInvocation(BaseInvocation):
         with vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae):
             assert isinstance(vae, (AutoencoderKL, AutoencoderTiny)), "VAE must be of type SD-1.5 or SDXL"
             orig_dtype = vae.dtype
-            if upcast:
-                vae.to(dtype=torch.float32)
-
+            # The dtype the estimate above priced: fp32 when upcasting, fp16 otherwise, on every device.
+            run_dtype = sd_vae_run_dtype("encode", upcast, vae_info.compute_device)
+            vae.to(dtype=run_dtype)
+            if run_dtype == torch.float32:
                 use_torch_2_0_or_xformers = hasattr(vae.decoder, "mid_block") and isinstance(
                     vae.decoder.mid_block.attentions[0].processor,
                     (
@@ -106,10 +107,6 @@ class ImageToLatentsInvocation(BaseInvocation):
                     vae.decoder.mid_block.to(orig_dtype)
                 # else:
                 #    latents = latents.float()
-
-            else:
-                vae.to(dtype=torch.float16)
-                # latents = latents.half()
 
             if tiled:
                 vae.enable_tiling()
