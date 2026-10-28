@@ -13,13 +13,13 @@ import pytest
 import torch
 
 from invokeai.backend.anima.anima_transformer import AnimaTransformer, LLMAdapter, masked_sdpa
-from invokeai.backend.anima.semantic_connector import AnimaSemanticConnector, AnimaSemanticConnectorConfig
-from invokeai.backend.model_manager.load.model_loaders.anima import (
+from invokeai.backend.anima.checkpoint_layout import (
     ANIMA_TRANSFORMER_CONFIG,
-    _filter_non_model_keys,
-    _strip_anima_bundle_prefix,
     anima_transformer_config,
+    filter_non_model_keys,
+    strip_anima_bundle_prefix,
 )
+from invokeai.backend.anima.semantic_connector import AnimaSemanticConnector, AnimaSemanticConnectorConfig
 from tests.backend.model_manager.load.state_dicts.anima_2_9b_keys import state_dict_keys as anima_2_9b_keys
 from tests.backend.model_manager.load.state_dicts.anima_3_8b_connector_keys import (
     ANIMA_3_8B_NUM_BLOCKS,
@@ -71,7 +71,7 @@ def test_transformer_built_from_the_bundle_takes_every_key() -> None:
         for suffix, shape in block_suffixes.items():
             sd[f"net.blocks.{index}.{suffix}"] = torch.empty(shape, device="meta")
     sd.update({k: torch.empty(s, device="meta") for k, s in connector_keys.items()})
-    sd = _filter_non_model_keys(_strip_anima_bundle_prefix(sd))
+    sd = filter_non_model_keys(strip_anima_bundle_prefix(sd))
 
     with accelerate.init_empty_weights():
         model = AnimaTransformer(

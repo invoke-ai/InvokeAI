@@ -18,6 +18,7 @@ from invokeai.app.invocations.anima.anima_denoise import AnimaDenoiseInvocation
 from invokeai.app.invocations.fields import AnimaConditioningField
 from invokeai.app.invocations.text_encoder.anima_text_encoder import AnimaTextEncoderInvocation
 from invokeai.backend.anima.semantic_connector import QWEN35_LAYER_INDICES
+from invokeai.backend.model_manager.taxonomy import ModelFormat
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import AnimaConditioningInfo, ConditioningFieldData
 
 
@@ -25,6 +26,7 @@ class _Loaded:
     def __init__(self, model, compute_device=torch.device("cpu")):
         self.model = model
         self.compute_device = compute_device
+        self.config = SimpleNamespace(format=ModelFormat.Checkpoint)
 
     @contextmanager
     def model_on_device(self, working_mem_bytes=None):
