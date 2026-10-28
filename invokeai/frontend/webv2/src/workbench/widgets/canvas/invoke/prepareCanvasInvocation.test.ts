@@ -151,6 +151,9 @@ interface HarnessOptions {
   outputOnlyMaskedRegions?: boolean;
   scaling?: RunCanvasInvocationDeps['scaling'];
   generateValues?: Record<string, unknown>;
+  /** Replaces the uniform-alpha coverage readback. */
+  readImageData?: GenerationCompositeExecutorDeps['readImageData'];
+  controlModelMemory?: RunCanvasInvocationDeps['controlModelMemory'];
 }
 
 const makeHarness = (options: HarnessOptions = {}): Harness => {
@@ -225,7 +228,7 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
   const executorDeps: GenerationCompositeExecutorDeps = {
     backend,
     hashBlob: (blob: Blob) => blob.text(),
-    readImageData: (_surface, rect) => uniformImageData(rect.width, rect.height, alpha),
+    readImageData: options.readImageData ?? ((_surface, rect) => uniformImageData(rect.width, rect.height, alpha)),
     uploadImage: uploadImage as (blob: Blob) => Promise<CanvasImageUploadResult>,
   };
 
@@ -258,6 +261,7 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
 
   const deps: RunCanvasInvocationDeps = {
     composeForGeneration: (composeOptions) => composeForGeneration(host, composeOptions),
+    controlModelMemory: options.controlModelMemory ?? {},
     compositing: {
       ...DEFAULT_CANVAS_COMPOSITING,
       outputOnlyMaskedRegions: options.outputOnlyMaskedRegions ?? true,
@@ -275,8 +279,7 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
     },
     flushPendingUploads: flushPendingUploads as () => Promise<void>,
     // Production words rejections from the locale; the harness records the structured rejection it was handed.
-    formatControlLayerError: ({ code, layerName, suggestedKind }) =>
-      `${layerName}: ${code}${suggestedKind ? ` -> ${suggestedKind}` : ''}`,
+    formatControlLayerError: ({ code, layerName }) => `${layerName}: ${code}`,
     generateValues: { ...generateValuesFor(model), ...options.generateValues },
     inFlight: options.inFlight ?? new Set<string>(),
     models: options.models,
@@ -690,6 +693,35 @@ describe('runCanvasInvocation', () => {
     expect(harness.notices()).toHaveLength(0);
   });
 
+  it('names the layer or group whose Clarity, Texture or Dehaze refused generation, and dispatches nothing', async () => {
+    const harness = makeHarness();
+    harness.deps.composeForGeneration = () =>
+      Promise.resolve({ ownerId: 'g', ownerName: 'Sky', reason: 'too-large', status: 'adjustment-refused' });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual([
+      'Clarity, Texture and Dehaze can’t run on “Sky”: its content is larger than 16.8 megapixels (4096 × 4096 px). Disable or remove them, or crop the content, then invoke again.',
+    ]);
+  });
+
+  it.each([
+    [
+      { layerId: 'layer-7', layerName: 'Sky', status: 'unreadable' } as const,
+      '“Sky” could not be read (its image may have been deleted or damaged). Disable or delete that layer, then invoke again.',
+    ],
+    [{ status: 'not-ready' } as const, 'Some layers are still loading. Wait a moment, then invoke again.'],
+  ])('explains a %o capture and dispatches nothing', async (result, message) => {
+    const harness = makeHarness();
+    harness.deps.composeForGeneration = () => Promise.resolve(result);
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual([message]);
+  });
+
   it('uses the frozen canvas and detached pixels after edits at composite, upload, and queue-dispatch boundaries', async () => {
     let liveDocument = makeDoc([rasterLayer('frozen-layer')], 96);
     liveDocument.bbox = { height: 64, width: 64, x: 7, y: 11 };
@@ -977,11 +1009,134 @@ describe('runCanvasInvocation', () => {
     expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
   });
 
-  it('blocks invocation and hands a nonempty model-less control layer to the formatter', async () => {
+  it('blocks a content-bearing control layer while the model list is still loading', async () => {
     const harness = makeHarness({ document: docWithLayers([controlLayer('control')]) });
     await runCanvasInvocation(harness.deps);
     expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual(['control: models_unavailable']);
+  });
+
+  it('blocks an untyped control layer whose model is no longer installed', async () => {
+    const harness = makeHarness({
+      document: docWithLayers([controlLayer('control', { model: 'uninstalled' })]),
+      models: [],
+    });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.submittedGraphs()).toHaveLength(0);
     expect(harness.notices().map((notice) => notice.message)).toEqual(['control: missing_model']);
+  });
+
+  it('leaves out a nonempty control layer with neither a type nor a model, without blocking', async () => {
+    const harness = makeHarness({ document: docWithLayers([controlLayer('control')]), models: [] });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.notices()).toHaveLength(0);
+    expect(harness.submittedGraphs()).toHaveLength(1);
+    expect(harness.submittedGraphs()[0]?.graph.backendGraph?.nodes).not.toHaveProperty('control_net_control');
+  });
+
+  describe('typed control layers', () => {
+    const controlModel = (key: string, base: string, type = 'controlnet', name = key) => ({
+      base,
+      file_size: 1,
+      format: 'checkpoint',
+      hash: `${key}-hash`,
+      key,
+      name,
+      path: key,
+      source: key,
+      source_type: 'path' as const,
+      type,
+    });
+    const typed = (
+      id: string,
+      controlType: NonNullable<CanvasControlLayerContract['controlType']>,
+      detection: CanvasControlLayerContract['detection'] = null
+    ): CanvasControlLayerContract => ({ ...controlLayer(id), controlType, detection });
+    const fluxMain = { ...sd1Model, base: 'flux' as const, key: 'flux', name: 'FLUX' };
+
+    it('runs the only model made for the type, as the kind that model runs', async () => {
+      const harness = makeHarness({
+        document: docWithLayers([typed('depth-layer', 'depth')]),
+        models: [controlModel('sd1-depth', 'sd-1', 'controlnet', 'control_v11f1p_sd15_depth')],
+      });
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.notices()).toHaveLength(0);
+      expect(harness.submittedGraphs()[0]?.graph.backendGraph?.nodes['control_net_depth-layer']).toMatchObject({
+        control_model: { key: 'sd1-depth' },
+        type: 'controlnet',
+      });
+    });
+
+    it('runs the remembered pick when several models fit, and asks without one', async () => {
+      const models = [
+        controlModel('depth-a', 'sd-1', 'controlnet', 'depth a'),
+        controlModel('depth-b', 'sd-1', 'controlnet', 'depth b'),
+      ];
+      const asking = makeHarness({ document: docWithLayers([typed('depth-layer', 'depth')]), models });
+      await runCanvasInvocation(asking.deps);
+      expect(asking.submittedGraphs()).toHaveLength(0);
+      expect(asking.notices()[0]?.message).toBe('depth-layer: choose_model');
+
+      const remembered = makeHarness({
+        controlModelMemory: { 'sd-1:depth': 'depth-b' },
+        document: docWithLayers([typed('depth-layer', 'depth')]),
+        models,
+      });
+      await runCanvasInvocation(remembered.deps);
+      expect(remembered.notices()).toHaveLength(0);
+      expect(
+        remembered.submittedGraphs()[0]?.graph.backendGraph?.nodes['control_net_depth-layer']?.control_model
+      ).toMatchObject({ key: 'depth-b' });
+    });
+
+    it('gives a FLUX union model the InstantX mode of the layer type', async () => {
+      const components = {
+        clipEmbedModel: { base: 'any', key: 'clip', name: 'CLIP Embed', type: 'clip_embed', variant: 'large' },
+        t5EncoderModel: { base: 'any', key: 't5', name: 'T5 Encoder', type: 't5_encoder' },
+        vae: { base: 'flux', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' },
+      };
+      const harness = makeHarness({
+        document: docWithLayers([typed('pose-layer', 'pose')]),
+        generateValues: components,
+        model: fluxMain,
+        models: [
+          controlModel('flux-union', 'flux', 'controlnet', 'FLUX.1-dev-Controlnet-Union-Pro'),
+          ...(Object.values(components) as unknown as NonNullable<RunCanvasInvocationDeps['models']>),
+        ],
+      });
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.notices()).toEqual([]);
+      expect(harness.submittedGraphs()[0]?.graph.backendGraph?.nodes['control_net_pose-layer']).toMatchObject({
+        instantx_control_mode: 4,
+        type: 'flux_controlnet',
+      });
+    });
+
+    it('blocks a layer whose type has no installed model', async () => {
+      const harness = makeHarness({
+        document: docWithLayers([typed('pose-layer', 'pose')]),
+        models: [controlModel('sd1-depth', 'sd-1', 'controlnet', 'sd15 depth')],
+      });
+      await runCanvasInvocation(harness.deps);
+      expect(harness.submittedGraphs()).toHaveLength(0);
+      expect(harness.notices()[0]?.message).toBe('pose-layer: no_model_for_type');
+    });
+
+    it('blocks a layer whose map detection has not caught up', async () => {
+      const harness = makeHarness({
+        document: docWithLayers([
+          typed('depth-layer', 'depth', { settings: {}, type: 'depth_anything_depth_estimation' }),
+        ]),
+        models: [controlModel('sd1-depth', 'sd-1', 'controlnet', 'sd15 depth')],
+      });
+      await runCanvasInvocation(harness.deps);
+      expect(harness.submittedGraphs()).toHaveLength(0);
+      expect(harness.notices()[0]?.message).toBe('depth-layer: detection_pending');
+    });
   });
 
   it('blocks invocation when a nonempty control layer has malformed numeric settings', async () => {
@@ -1387,9 +1542,9 @@ describe('runCanvasInvocation', () => {
       ['the same model twice', () => [lllite('a', sketch.key), lllite('b', sketch.key)], 'b: duplicate_lllite_model'],
       ['an inpainting adapter', () => [lllite('a', inpainting.key)], 'a: lllite_inpaint_adapter'],
       [
-        'a layer saved as ControlNet before LLLite was supported, naming the kind to switch to',
+        'a layer saved as ControlNet before LLLite was supported',
         () => [controlLayer('old', { kind: 'controlnet', model: sketch.key })],
-        'old: switch_adapter_kind -> anima_lllite',
+        'old: switch_adapter_kind',
       ],
     ])('blocks %s before submitting', async (_label, layers, message) => {
       const harness = await run(layers());
@@ -1482,7 +1637,7 @@ const regionalLayer = (
   overrides: Partial<
     Pick<
       CanvasLayerContract & { type: 'regional_guidance' },
-      'positivePrompt' | 'negativePrompt' | 'autoNegative' | 'referenceImages'
+      'positivePrompt' | 'negativePrompt' | 'autoNegative' | 'referenceImages' | 'layout'
     >
   > = {}
 ): CanvasLayerContract => ({
@@ -1583,6 +1738,80 @@ describe('runCanvasInvocation — regional guidance on a Qwen3 base', () => {
     const graph = harness.submittedGraphs()[0]?.graph.backendGraph;
     expect(graph?.nodes.denoise_latents?.type).toBe('anima_denoise');
     expect(graph?.nodes.rg_mask_to_tensor_rg).toBeUndefined();
+  });
+});
+
+describe('runCanvasInvocation — layout regions on MOSS-Image', () => {
+  const mossModel: MainModelConfig = {
+    base: 'moss-image',
+    format: 'diffusers',
+    key: 'moss-model',
+    name: 'MOSS-Image',
+    type: 'main',
+  };
+  /** Every regional mask covers x 8–23, y 4–35 of the 64×64 bbox. */
+  const maskScan: GenerationCompositeExecutorDeps['readImageData'] = (_surface, rect) => {
+    const image = uniformImageData(rect.width, rect.height, 0);
+    for (let y = 4; y < 36; y += 1) {
+      for (let x = 8; x < 24; x += 1) {
+        image.data[(y * rect.width + x) * 4 + 3] = 255;
+      }
+    }
+    return image;
+  };
+  const makeMossHarness = (
+    layers: CanvasLayerContract[],
+    generateValues: Record<string, unknown> = {},
+    readImageData = maskScan
+  ) =>
+    makeHarness({
+      document: docWithLayers(layers),
+      generateValues,
+      model: mossModel,
+      readImageData,
+    });
+
+  it("places each region's mask bounds and role in the layout prompt, skipping a text region without text", async () => {
+    // Each composited mask is read back once; identical masks would share one upload, so count the readbacks.
+    const readImageData = vi.fn(maskScan);
+    const harness = makeMossHarness(
+      [
+        regionalLayer('sign', { layout: { kind: 'text', text: 'OPEN' }, positivePrompt: 'a neon sign' }),
+        regionalLayer('blank', { layout: { kind: 'text' }, positivePrompt: 'a poster' }),
+      ],
+      {},
+      readImageData
+    );
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.notices()).toHaveLength(0);
+    // The text region without text never composites.
+    expect(readImageData).toHaveBeenCalledTimes(1);
+    const graph = harness.submittedGraphs()[0]?.graph.backendGraph;
+    expect(graph?.nodes.layout_prompt).toMatchObject({
+      height: 64,
+      regions: [{ bbox: [8, 4, 24, 36], caption: 'a neon sign', kind: 'text', text: 'OPEN' }],
+      type: 'moss_image_layout_prompt',
+      width: 64,
+    });
+    expect(Object.values(graph?.nodes ?? {}).some((node) => node.type === 'alpha_mask_to_tensor')).toBe(false);
+  });
+
+  it('blocks the invocation with a notice when regions would be laid out around a blank prompt', async () => {
+    const harness = makeMossHarness([regionalLayer('hero', { layout: { kind: 'character' } })], {
+      positivePrompt: '',
+    });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices()).toEqual([
+      expect.objectContaining({
+        message:
+          'MOSS-Image needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.',
+      }),
+    ]);
   });
 });
 

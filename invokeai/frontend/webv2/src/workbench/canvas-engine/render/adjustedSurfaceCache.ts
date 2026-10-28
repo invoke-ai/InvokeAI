@@ -1,40 +1,75 @@
 import type { CanvasAdjustmentsContract } from '@workbench/canvas-engine/contracts';
 import type { Rect } from '@workbench/canvas-engine/types';
 
-import { intersect, roundOut } from '@workbench/canvas-engine/math/rect';
-
 import type { LayerCacheEntry } from './layerCache';
 import type { RasterBackend, RasterSurface } from './raster';
 
-import { adjustmentsKey, applyAdjustments, isIdentityAdjustments } from './adjustments';
+import { adjustmentsKey, hasSpatialAdjustments, isIdentityAdjustments } from './adjustments';
 import { createDerivedSurfaceCache, type DerivedSurfaceCache } from './derivedSurfaceCache';
+import {
+  clampDamage,
+  createSpatialDisplay,
+  type DisplayedPixelsState,
+  paintAdjustedRegion,
+  type SpatialDisplayOptions,
+  type SpatialDisplayTarget,
+} from './spatialDisplay';
+
+export interface AdjustedSurfaceCacheOptions {
+  /** Surface-local {@link LayerCacheStore.damageSince}; without it every content change rebuilds whole surfaces. */
+  readonly damageSince?: (layerId: string, version: number) => Rect | null;
+  /** Without it, spatial entries are left out of the display (the per-pixel part only). */
+  readonly spatial?: SpatialDisplayOptions;
+}
 
 /** The imperative adjusted-surface store returned by {@link createAdjustedSurfaceCache}. */
 export interface AdjustedSurfaceCache {
   /**
-   * Returns a surface holding `entry`'s pixels with `adjustments` applied, or
-   * `null` when the adjustments are identity (the caller should draw the original
-   * cache surface). The returned surface is memoized: an unchanged
-   * `(entry.version, adjustmentsKey)` reuses it with zero pixel work.
+   * Returns the surface the display shows for `entry`'s pixels with `adjustments`, or `null` when the adjustments are
+   * identity (the caller should draw the original cache surface). Memoized: an unchanged
+   * `(entry.version, adjustmentsKey)` reuses it with zero pixel work. A stack with spatial entries shows an interim
+   * until its asynchronous evaluation lands (see `SpatialDisplayOptions.onSettle`).
    */
   get(
     layerId: string,
     entry: LayerCacheEntry,
     adjustments: CanvasAdjustmentsContract | undefined
   ): RasterSurface | null;
-  /** The memoized adjusted surface when it is current for `entry` and `adjustments`; never builds one. */
+  /** The memoized adjusted surface when it is current and exact for `entry` and `adjustments`; never builds one. */
   peek(
     layerId: string,
     entry: LayerCacheEntry,
     adjustments: CanvasAdjustmentsContract | undefined
   ): RasterSurface | null;
-  /** Drops a layer's memoized adjusted surface (e.g. on layer delete). */
+  /** What the display currently shows for `entry` and `adjustments`, exact or interim; never builds one. */
+  peekDisplayed(
+    layerId: string,
+    entry: LayerCacheEntry,
+    adjustments: CanvasAdjustmentsContract | undefined
+  ): RasterSurface | null;
+  /** How final what `get` shows for `entry` and `adjustments` is; a stack without spatial entries is exact. */
+  state(
+    layerId: string,
+    entry: LayerCacheEntry,
+    adjustments: CanvasAdjustmentsContract | undefined
+  ): DisplayedPixelsState;
+  /** Drops a layer's memoized adjusted surface and abandons its spatial work (e.g. on layer delete). */
   delete(layerId: string): void;
+  /**
+   * Abandons running and scheduled spatial jobs, dropping the interims they would have replaced; exact and failed
+   * spatial surfaces keep their pixels and state.
+   */
+  cancelSpatial(): void;
+  /**
+   * Drops the spatial state and surface of every layer `keep` rejects, e.g. one whose stack lost its spatial entries
+   * or that was removed while not drawn, so no stale status outlives its stack.
+   */
+  retainSpatial(keep: (layerId: string) => boolean): void;
   /** Number of memoized adjusted surfaces (for tests / accounting). */
   size(): number;
   /** Bytes held by adjusted surfaces. */
   byteSize(): number;
-  /** Releases all memoized surfaces. */
+  /** Releases every memoized derived surface and abandons all spatial work; the cache stays usable. */
   dispose(): void;
 }
 
@@ -42,33 +77,16 @@ export interface AdjustedSurfaceCache {
 export const createAdjustedSurfaceCache = (
   backend: RasterBackend,
   cache: DerivedSurfaceCache = createDerivedSurfaceCache(),
-  /** Optional surface-local {@link LayerCacheStore.damageSince} lookup; callers without it rebuild whole surfaces. */
-  layerDamageSince?: (layerId: string, version: number) => Rect | null
+  options: AdjustedSurfaceCacheOptions = {}
 ): AdjustedSurfaceCache => {
-  /** The damaged region clamped to the surface, or `null` to rebuild in full. */
-  const damageSince = (layerId: string, version: number, width: number, height: number): Rect | null => {
-    const damaged = layerDamageSince?.(layerId, version) ?? null;
-    if (!damaged) {
-      return null;
-    }
-    const clamped = intersect(roundOut(damaged), { height, width, x: 0, y: 0 });
-    return clamped && clamped.width > 0 && clamped.height > 0 ? clamped : null;
-  };
+  const display = options.spatial ? createSpatialDisplay(options.spatial, 'adjusted:') : null;
 
-  const get = (
+  const getPerPixel = (
     layerId: string,
     entry: LayerCacheEntry,
     adjustments: CanvasAdjustmentsContract | undefined
-  ): RasterSurface | null => {
-    if (isIdentityAdjustments(adjustments)) {
-      cache.delete(layerId, 'adjustments');
-      return null;
-    }
+  ): RasterSurface => {
     const { height, width } = entry.surface;
-    if (width <= 0 || height <= 0) {
-      return null;
-    }
-    const key = adjustmentsKey(adjustments);
     return cache.get({
       create: (target, reusableFromVersion) => {
         const surface = target ?? backend.createSurface(width, height);
@@ -79,57 +97,151 @@ export const createAdjustedSurfaceCache = (
         // Source versions change every stroke tick. Refresh only reported damage to avoid full-surface readback
         // and adjustment work; resized surfaces always rebuild.
         const refresh =
-          resized || reusableFromVersion === null ? null : damageSince(layerId, reusableFromVersion, width, height);
-        const region = refresh ?? { height, width, x: 0, y: 0 };
-        const ctx = surface.ctx;
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(region.x, region.y, region.width, region.height);
-        ctx.globalAlpha = 1;
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.drawImage(
-          entry.surface.canvas,
-          region.x,
-          region.y,
-          region.width,
-          region.height,
-          region.x,
-          region.y,
-          region.width,
-          region.height
-        );
-        const imageData = ctx.getImageData(region.x, region.y, region.width, region.height);
-        // A layer's stack works in layer-local pixels; surface (0,0) sits at `entry.rect`'s origin.
-        applyAdjustments(imageData, adjustments, { x: entry.rect.x + region.x, y: entry.rect.y + region.y });
-        ctx.putImageData(imageData, region.x, region.y);
+          resized || reusableFromVersion === null
+            ? null
+            : clampDamage(options.damageSince?.(layerId, reusableFromVersion) ?? null, width, height);
+        if (refresh !== 'none') {
+          // A layer's stack works in layer-local pixels; surface (0,0) sits at `entry.rect`'s origin.
+          paintAdjustedRegion(
+            surface,
+            entry.surface,
+            refresh ?? { height, width, x: 0, y: 0 },
+            adjustments,
+            entry.rect
+          );
+        }
         return surface;
       },
       kind: 'adjustments',
       layerId,
-      paramsKey: key,
+      paramsKey: adjustmentsKey(adjustments),
       source: entry.surface,
       sourceVersion: entry.version,
     });
   };
 
+  /** Forgets a layer's spatial state with the surface it describes, so no later request reuses that surface blind. */
+  const dropSlot = (layerId: string): void => {
+    if (display?.drop(layerId)) {
+      cache.delete(layerId, 'adjustments');
+    }
+  };
+
+  const dropSlots = (layerIds: readonly string[]): void => {
+    for (const layerId of layerIds) {
+      dropSlot(layerId);
+    }
+  };
+
+  /** A spatial stack: an interim now, the exact pixels when the worker lands them. */
+  const getSpatial = (
+    spatial: NonNullable<typeof display>,
+    layerId: string,
+    entry: LayerCacheEntry,
+    adjustments: CanvasAdjustmentsContract,
+    key: string
+  ): RasterSurface => {
+    const source = entry.surface;
+    const version = entry.version;
+    const target: SpatialDisplayTarget = {
+      adjustments,
+      damageSince: (from) => options.damageSince?.(layerId, from) ?? null,
+      hold: entry.hasPublishedPixels ? null : 'placeholder',
+      key,
+      liveVersion: () => (entry.surface === source ? entry.version : null),
+      origin: { x: entry.rect.x, y: entry.rect.y },
+      shown: () => cache.peek({ kind: 'adjustments', layerId, paramsKey: key, source, sourceVersion: version }),
+      source,
+      version,
+    };
+    const { height, width } = source;
+    let rebuilt = false;
+    const surface = cache.get({
+      create: (reusable) => {
+        const surface = reusable ?? backend.createSurface(width, height);
+        const resized = surface.width !== width || surface.height !== height;
+        if (resized) {
+          surface.resize(width, height);
+        }
+        rebuilt = spatial.paintInterim(layerId, surface, reusable !== null && !resized, target);
+        return surface;
+      },
+      kind: 'adjustments',
+      layerId,
+      paramsKey: key,
+      source,
+      sourceVersion: version,
+    });
+    spatial.request(layerId, target, rebuilt);
+    return surface;
+  };
+
+  const get = (
+    layerId: string,
+    entry: LayerCacheEntry,
+    adjustments: CanvasAdjustmentsContract | undefined
+  ): RasterSurface | null => {
+    if (isIdentityAdjustments(adjustments)) {
+      dropSlot(layerId);
+      cache.delete(layerId, 'adjustments');
+      return null;
+    }
+    if (entry.surface.width <= 0 || entry.surface.height <= 0) {
+      return null;
+    }
+    if (display && hasSpatialAdjustments(adjustments)) {
+      return getSpatial(display, layerId, entry, adjustments!, adjustmentsKey(adjustments));
+    }
+    dropSlot(layerId);
+    return getPerPixel(layerId, entry, adjustments);
+  };
+
+  const peekDisplayed = (
+    layerId: string,
+    entry: LayerCacheEntry,
+    adjustments: CanvasAdjustmentsContract | undefined
+  ): RasterSurface | null =>
+    isIdentityAdjustments(adjustments)
+      ? null
+      : cache.peek({
+          kind: 'adjustments',
+          layerId,
+          paramsKey: adjustmentsKey(adjustments),
+          source: entry.surface,
+          sourceVersion: entry.version,
+        });
+
+  const isExact = (layerId: string, entry: LayerCacheEntry, adjustments: CanvasAdjustmentsContract | undefined) =>
+    !display ||
+    !hasSpatialAdjustments(adjustments) ||
+    display.isExact(layerId, { key: adjustmentsKey(adjustments), source: entry.surface, version: entry.version });
+
   return {
     byteSize: cache.byteSize,
     delete: (layerId) => {
+      dropSlot(layerId);
       cache.delete(layerId, 'adjustments');
     },
+    cancelSpatial: () => {
+      for (const layerId of display?.cancel() ?? []) {
+        cache.delete(layerId, 'adjustments');
+      }
+    },
     dispose: () => {
+      dropSlots(display?.ownerIds() ?? []);
       cache.dispose();
     },
+    retainSpatial: (keep) => dropSlots(display?.ownerIds().filter((layerId) => !keep(layerId)) ?? []),
     get,
-    peek: (layerId, entry, adjustments) =>
-      isIdentityAdjustments(adjustments)
-        ? null
-        : cache.peek({
-            kind: 'adjustments',
-            layerId,
-            paramsKey: adjustmentsKey(adjustments),
-            source: entry.surface,
-            sourceVersion: entry.version,
-          }),
+    peek: (layerId, entry, adjustments) => {
+      const displayed = peekDisplayed(layerId, entry, adjustments);
+      return displayed && isExact(layerId, entry, adjustments) ? displayed : null;
+    },
+    peekDisplayed,
     size: cache.size,
+    state: (layerId, entry, adjustments) =>
+      display && hasSpatialAdjustments(adjustments)
+        ? display.state(layerId, { key: adjustmentsKey(adjustments), source: entry.surface, version: entry.version })
+        : 'exact',
   };
 };

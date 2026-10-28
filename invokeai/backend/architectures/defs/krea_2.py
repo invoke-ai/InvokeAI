@@ -34,9 +34,9 @@ register(
         dimension_grid=16,
         guidance_label="CFG",
         scheduler_set="flow",
-        # Training-free style reference: shared-KV attention splices one reference's keys and
-        # values into the target, so there is no adapter model and exactly one image.
-        max_reference_images=1,
+        # Either one training-free style reference (shared-KV attention, no adapter model) or up to
+        # three edit references for ai-toolkit edit LoRAs; `krea2_denoise` refuses more than three.
+        max_reference_images=3,
         supports_regional_guidance=True,
     ),
     VaeFacet(

@@ -74,6 +74,7 @@ const CANVAS_PROJECT_MUTATION_TYPES: ReadonlySet<string> = new Set<CanvasProject
   'replaceCanvasFontReferences',
   'replaceCanvasDocument',
   'replaceCanvasLayer',
+  'replaceCanvasLayers',
   'resizeCanvasDocument',
   'restoreCanvasSnapshot',
   'saveCanvasSnapshot',
@@ -256,6 +257,26 @@ const replaceLeaf = (
     document,
     anchor ? insertNodesAtAnchor(stacks, anchor, [layer]) : { ...stacks, [target]: [layer, ...stacks[target]] }
   );
+};
+
+/** Same-id, same-type leaf replacements as one value edit; any invalid entry refuses them all, so replay is atomic. */
+const replaceLeavesInPlace = (
+  document: CanvasDocumentContractV3,
+  replacements: readonly { layerId: string; layer: CanvasLayerContract }[]
+): CanvasDocumentContractV3 => {
+  const ids = new Set(replacements.map(({ layerId }) => layerId));
+  const valid =
+    replacements.length > 0 &&
+    ids.size === replacements.length &&
+    replacements.every(
+      ({ layer, layerId }) => layer.id === layerId && getDocumentLayer(document, layerId)?.type === layer.type
+    );
+  return valid
+    ? mapNodes(
+        document,
+        replacements.map(({ layer, layerId }) => [layerId, () => layer])
+      )
+    : document;
 };
 
 /** The stack every leaf of `nodes` belongs to, or `null` when they disagree; an empty group fits any stack. */
@@ -573,7 +594,7 @@ const patchLayerConfig = (layer: CanvasNodeContract, config: CanvasLayerConfigPa
     };
   }
   if (layer.type === 'regional_guidance' && config.layerType === 'regional_guidance') {
-    return {
+    const next = {
       ...layer,
       ...(config.mask ? { mask: { ...layer.mask, ...config.mask } } : {}),
       ...(Object.hasOwn(config, 'positivePrompt') ? { positivePrompt: config.positivePrompt } : {}),
@@ -581,6 +602,15 @@ const patchLayerConfig = (layer: CanvasNodeContract, config: CanvasLayerConfigPa
       ...(Object.hasOwn(config, 'autoNegative') ? { autoNegative: config.autoNegative } : {}),
       ...(Object.hasOwn(config, 'referenceImages') ? { referenceImages: config.referenceImages } : {}),
     };
+    // A cleared role is absent, as on a layer that never had one; the inverse of adding one records `undefined`.
+    if (Object.hasOwn(config, 'layout')) {
+      if (config.layout) {
+        next.layout = config.layout;
+      } else {
+        delete next.layout;
+      }
+    }
+    return next;
   }
   if (layer.type === 'inpaint_mask' && config.layerType === 'inpaint_mask') {
     const next = {
@@ -857,6 +887,8 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
       return mutation.layer.id === mutation.layerId
         ? updateCanvasDocument(project, (document) => replaceLeaf(project.id, document, mutation.layer))
         : project;
+    case 'replaceCanvasLayers':
+      return updateCanvasDocument(project, (document) => replaceLeavesInPlace(document, mutation.replacements));
     case 'setCanvasLayersEnabled':
       return updateCanvasDocument(project, (document) => setCanvasLayersEnabled(document, mutation.updates));
     case 'setCanvasLayerPositions':

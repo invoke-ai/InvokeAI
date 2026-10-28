@@ -170,6 +170,9 @@ export type CanvasLayerSourceContract =
       span?: number;
     };
 
+/** The pixel-backed sources: an uploaded image or a paint bitmap. */
+export type CanvasPixelSourceContract = Extract<CanvasLayerSourceContract, { type: 'image' | 'paint' }>;
+
 /** Photoshop's layer-color palette; also the PSD `layerColor` vocabulary. */
 export const CANVAS_COLOR_LABELS = ['red', 'orange', 'yellow', 'green', 'blue', 'violet', 'gray'] as const;
 export type CanvasColorLabel = (typeof CANVAS_COLOR_LABELS)[number];
@@ -266,6 +269,29 @@ export type CanvasAdjustmentEntry =
        * reference space (layer-local pixels for a layer's own stack, document pixels for a group's) and the channel.
        */
       seed: number;
+    })
+  /**
+   * Spatial entries match the backend's Clarity, Texture and Contrast Dehaze nodes. Each reads a neighborhood of
+   * OKLab lightness across the owner's whole surface (layer-local pixels for a layer's stack, document pixels for a
+   * group's) within its alpha bounds, so unlike the entries above it is neither per-pixel nor region independent.
+   * `amount` is a percentage, −200 to 200 (0 is identity); out-of-range values are clamped when evaluated.
+   */
+  | (CanvasAdjustmentEntryBase & {
+      /** Local contrast of mid-size detail, midtones weighted. `size`: feature size in pixels, 4–1000. */
+      type: 'clarity';
+      amount: number;
+      size: number;
+    })
+  | (CanvasAdjustmentEntryBase & {
+      /** Local contrast of fine detail; positive amounts spare noise-level flat areas. `size`: pixels, 1–100. */
+      type: 'texture';
+      amount: number;
+      size: number;
+    })
+  | (CanvasAdjustmentEntryBase & {
+      /** Removes (positive) or adds (negative) haze; its radius follows the alpha bounds' shorter side. */
+      type: 'dehaze';
+      amount: number;
     });
 
 /** A raster layer's ordered adjustment stack, applied top to bottom. */
@@ -320,17 +346,63 @@ export interface CanvasRasterLayerContractV2 extends CanvasLayerBaseContract {
   filter?: { type: string; settings: Record<string, unknown> };
 }
 
+/** What a control layer's image should control; a closed set, so an unknown value refuses the document. */
+export const CONTROL_TYPES = ['pose', 'depth', 'edges', 'softedge', 'lineart', 'sketch', 'color', 'tile'] as const;
+export type ControlType = (typeof CONTROL_TYPES)[number];
+
+/** A detector (filter node type) and its settings; the type string stays open so newer detectors survive a load. */
+export interface CanvasControlDetectionContract {
+  type: string;
+  settings: Record<string, unknown>;
+}
+
+/**
+ * Control layers may derive their map from a kept original. Invariants (`document/controlDerivation.ts`):
+ * I1 no `controlType` ⇒ no `detection`, `original` or `originalTransform`;
+ * I2 `detection === null` ⇒ no `original`: `source` is used as-is;
+ * I3 `original` present ⇒ `detection` is an object and `source` is the map derived from it;
+ * I4 the map is current when `detection` is null or absent, or an `original` is kept and `filter` structurally equals
+ * `detection`;
+ * I5 detection runs on `original ?? (filter ? null : source)`, so map-only layers cannot re-detect.
+ */
 export interface CanvasControlLayerContract extends CanvasLayerBaseContract {
   type: 'control';
+  /** The pixels generation uses: the derived map once detection ran. */
   source: CanvasLayerSourceContract;
   adapter: CanvasControlAdapterContract;
   withTransparencyEffect: boolean;
-  filter?: { type: string; settings: Record<string, unknown> };
+  /** The filter that produced `source`'s pixels; absent when they are not a filter result. */
+  filter?: CanvasControlDetectionContract;
   /**
    * Display-only visibility for overlay layers; generation is unchanged. Absence means visible. Raster layers
    * instead use `isEnabled` for both visibility and participation.
    */
   isHidden?: boolean;
+  /** What the image controls. Absent means no type chosen (legacy or new); never written as null. */
+  controlType?: ControlType;
+  /** The detector for `controlType`. `null` means "None: use the image as-is"; absent means legacy (no choice). */
+  detection?: CanvasControlDetectionContract | null;
+  /** The pre-detection pixels, kept so detection can re-run; a persisted image reference like `source`. */
+  original?: CanvasPixelSourceContract;
+  /** Maps `original`'s local frame into the layer-local frame of `source`; absent means identity. */
+  originalTransform?: CanvasLayerBaseContract['transform'];
+}
+
+/**
+ * The roles a region can take in a layout prompt, in the order the settings offer them; the load schema and the
+ * settings read this list. A closed persisted set: a build that does not know a stored role refuses the canvas instead
+ * of rewriting it (`projects/README.md`, "Additive canvas values"). Canvas invocation hands each role to Generation's
+ * layout type, so a role the graph cannot send fails to compile there.
+ */
+export const CANVAS_REGIONAL_LAYOUT_KINDS = ['object', 'character', 'text'] as const;
+
+/**
+ * A region's role for models that compose the image from layout boxes (MOSS-Image). `text` is the exact visible text
+ * of a `text` region; other kinds keep it so switching back restores it.
+ */
+export interface CanvasRegionalLayoutContract {
+  kind: (typeof CANVAS_REGIONAL_LAYOUT_KINDS)[number];
+  text?: string;
 }
 
 export interface CanvasRegionalGuidanceLayerContract extends CanvasLayerBaseContract {
@@ -340,6 +412,8 @@ export interface CanvasRegionalGuidanceLayerContract extends CanvasLayerBaseCont
   negativePrompt: string | null;
   autoNegative: boolean;
   referenceImages: RegionalGuidanceReferenceImage[];
+  /** Layout role for layout-based models; absence means an object region. Mask-based models ignore it. */
+  layout?: CanvasRegionalLayoutContract;
   /**
    * Display-only visibility for overlay layers; generation is unchanged. Absence means visible. Raster layers
    * instead use `isEnabled` for both visibility and participation.
@@ -423,12 +497,13 @@ export const CANVAS_MAX_NODE_COUNT = 10_000;
 
 export interface CanvasDocumentContractV3 {
   /**
-   * Schema this document needs: 3 for plain content, 4 for custom-font typography, 5 for noise adjustments. Each
-   * document mutation raises it to the newer of its content's need and the canvas state's version. A restored
-   * snapshot's document keeps its own, possibly lower, version until the next mutation; the state's version and the
-   * project's compatibility floor stay put meanwhile.
+   * Schema this document needs: 3 for plain content, 4 for custom-font typography, 5 for noise or spatial
+   * (clarity, texture, dehaze) adjustments, 6 for control-layer derivation fields. Each document mutation raises it to
+   * the newer of its content's need and the canvas state's version. A restored snapshot's document keeps its own,
+   * possibly lower, version until the next mutation; the state's version and the project's compatibility floor stay
+   * put meanwhile.
    */
-  version: 3 | 4 | 5;
+  version: 3 | 4 | 5 | 6;
   width: number;
   height: number;
   background: 'transparent' | { color: string };
@@ -452,9 +527,10 @@ export interface CanvasStagingAreaContractV2 extends CanvasStagingAreaContract {
 export interface CanvasStateContractV3 {
   /**
    * Newest schema the state needs: the newest of its previous version, the live document's and every snapshot's
-   * (3 plain, 4 custom-font typography, 5 noise adjustments). Sticky: removing that content never lowers it.
+   * (3 plain, 4 custom-font typography, 5 noise or spatial adjustments, 6 control-layer derivation fields). Sticky:
+   * removing that content never lowers it.
    */
-  version: 3 | 4 | 5;
+  version: 3 | 4 | 5 | 6;
   document: CanvasDocumentContractV3;
   /**
    * Monotonic wholesale-replacement counter. The mirror clears pixel history whenever it changes, including

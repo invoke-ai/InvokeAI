@@ -188,38 +188,55 @@ describe('color picker tool', () => {
     expect(h.ctx.stores.brushOptions.get().color).toBe(defaultColor);
   });
 
-  it('stashes claimed samples without writing brushOptions and commits on release', () => {
+  it('previews every sample of a pick and commits the last one once on release', () => {
     const h = createHarness(makeDoc());
     const tool = createColorPickerTool();
     const defaultColor = h.ctx.stores.brushOptions.get().color;
-    const claimed: string[] = [];
-    h.ctx.resolveColorSample = (hex) => {
-      claimed.push(hex);
+    const routed: [string, string][] = [];
+    h.ctx.resolveColorSample = (hex, phase) => {
+      routed.push([hex, phase]);
       return true;
     };
-    const commit = vi.fn();
-    h.ctx.commitColorSample = commit;
 
     down(tool, h.ctx, pointer(10, 10));
-    expect(claimed).toEqual(['#0a141e']);
-    expect(commit).not.toHaveBeenCalled();
-    expect(h.ctx.stores.brushOptions.get().color).toBe(defaultColor);
+    h.pixel.current = [255, 0, 0, 255];
+    move(tool, h.ctx, pointer(20, 20));
+    up(tool, h.ctx, pointer(20, 20, { buttons: 0 }));
+    // The next hover move after release samples nothing and settles nothing.
+    move(tool, h.ctx, pointer(30, 30, { buttons: 0 }));
 
-    up(tool, h.ctx, pointer(10, 10, { buttons: 0 }));
-    expect(commit).toHaveBeenCalledTimes(1);
+    expect(routed).toEqual([
+      ['#0a141e', 'preview'],
+      ['#ff0000', 'preview'],
+      ['#ff0000', 'commit'],
+    ]);
+    expect(h.ctx.stores.brushOptions.get().color).toBe(defaultColor);
   });
 
-  it('discards the stashed sample on gesture cancel and at each fresh press', () => {
+  it('cancels a pick with its last preview when the gesture is cancelled or the tool deactivates', () => {
     const h = createHarness(makeDoc());
     const tool = createColorPickerTool();
-    const discard = vi.fn();
-    h.ctx.discardColorSample = discard;
+    const routed: [string, string][] = [];
+    h.ctx.resolveColorSample = (hex, phase) => {
+      routed.push([hex, phase]);
+      return true;
+    };
 
     down(tool, h.ctx, pointer(10, 10));
-    expect(discard).toHaveBeenCalledTimes(1);
-
     tool.onPointerCancel?.(h.ctx);
-    expect(discard).toHaveBeenCalledTimes(2);
+    up(tool, h.ctx, pointer(10, 10, { buttons: 0 }));
+    expect(routed).toEqual([
+      ['#0a141e', 'preview'],
+      ['#0a141e', 'cancel'],
+    ]);
+
+    routed.length = 0;
+    down(tool, h.ctx, pointer(10, 10));
+    tool.onDeactivate?.(h.ctx);
+    expect(routed).toEqual([
+      ['#0a141e', 'preview'],
+      ['#0a141e', 'cancel'],
+    ]);
   });
 
   it('never dispatches and never emits a committed stroke', () => {
@@ -263,7 +280,7 @@ describe('color picker tool', () => {
 
       down(tool, h.ctx, pointer(10, 10));
 
-      expect(resolveColorSample).toHaveBeenCalledWith('#0a141e');
+      expect(resolveColorSample).toHaveBeenCalledWith('#0a141e', 'preview');
       expect(h.ctx.stores.brushOptions.get().color).toBe(defaultColor);
     });
 
@@ -276,7 +293,7 @@ describe('color picker tool', () => {
 
       down(tool, h.ctx, pointer(10, 10));
 
-      expect(resolveColorSample).toHaveBeenCalledWith('#0a141e');
+      expect(resolveColorSample).toHaveBeenCalledWith('#0a141e', 'preview');
       expect(h.ctx.stores.brushOptions.get().color).toBe('#0a141e');
     });
 
@@ -287,6 +304,7 @@ describe('color picker tool', () => {
       h.ctx.resolveColorSample = resolveColorSample;
 
       down(tool, h.ctx, pointer(10, 10));
+      up(tool, h.ctx, pointer(10, 10, { buttons: 0 }));
 
       expect(resolveColorSample).not.toHaveBeenCalled();
     });

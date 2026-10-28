@@ -17,12 +17,16 @@ import {
   Text,
 } from '@chakra-ui/react';
 import {
+  addConcept,
   CapabilitiesGate,
   ConceptList,
   type ConceptModelPort,
   ConceptRow,
+  type ConceptUpdate,
   GenerationSettingsSection,
+  removeConcept,
   SeedField,
+  updateConcept,
 } from '@features/generation/components';
 import {
   type ArchitectureCapabilitiesSnapshot,
@@ -31,7 +35,6 @@ import {
   subscribeArchitectureCapabilities,
 } from '@features/generation/runtime';
 import {
-  getDefaultLoraWeight,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
@@ -539,34 +542,31 @@ export const UpscaleWidgetView = () => {
     [models, patch, t, values]
   );
 
+  /** An edit that leaves the list unchanged writes nothing. */
+  const patchLoras = useCallback(
+    (edit: (current: UpscaleWidgetValues) => GenerateLora[]) =>
+      patchValues((current) => {
+        const loras = edit(current);
+
+        return loras === current.loras ? {} : { loras };
+      }),
+    [patchValues]
+  );
   const addLora = useCallback(
     (model: ModelConfig | null) => {
-      if (!isLoraModelConfig(model)) {
-        return;
+      if (isLoraModelConfig(model)) {
+        patchLoras((current) => addConcept(current.loras, model, current.model));
       }
-
-      patchValues((current) =>
-        current.model && isLoraCompatibleWithModel(model, current.model)
-          ? { loras: [...current.loras, { isEnabled: true, model, weight: getDefaultLoraWeight(model) }] }
-          : {}
-      );
     },
-    [patchValues]
+    [patchLoras]
   );
   const updateLora = useCallback(
-    (key: string, update: Partial<GenerateLora>) =>
-      // A row removed mid-edit still flushes its draft; that must not write an unchanged list.
-      patchValues((current) =>
-        current.loras.some((lora) => lora.model.key === key)
-          ? { loras: current.loras.map((lora) => (lora.model.key === key ? { ...lora, ...update } : lora)) }
-          : {}
-      ),
-    [patchValues]
+    (key: string, update: ConceptUpdate) => patchLoras((current) => updateConcept(current.loras, key, update)),
+    [patchLoras]
   );
   const removeLora = useCallback(
-    (key: string) =>
-      patchValues((current) => ({ loras: current.loras.filter((candidate) => candidate.model.key !== key) })),
-    [patchValues]
+    (key: string) => patchLoras((current) => removeConcept(current.loras, key)),
+    [patchLoras]
   );
   const selectedLoraKeys = useMemo(() => new Set(values.loras.map((lora) => lora.model.key)), [values.loras]);
 
