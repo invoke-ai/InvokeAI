@@ -10,6 +10,7 @@ from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.tiny_autoencoder import TinyAutoencoder_Checkpoint_Config_Base
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.model_on_disk import unwrap_state_dict
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.tiny_autoencoder.checkpoint import (
     PICKLE_SUFFIXES,
@@ -24,7 +25,7 @@ def _read_checkpoint(path: Path) -> dict[str, Any]:
     if path.suffix.lower() == SAFETENSORS_SUFFIX:
         return safetensors_load_file(path)
     if path.suffix.lower() in PICKLE_SUFFIXES:
-        return torch.load(path, map_location="cpu", weights_only=True)
+        return unwrap_state_dict(torch.load(path, map_location="cpu", weights_only=True))
     raise ValueError(f"Unrecognised Tiny AutoEncoder checkpoint extension: {path.suffix!r}")
 
 

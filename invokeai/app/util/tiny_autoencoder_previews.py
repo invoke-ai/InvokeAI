@@ -14,6 +14,7 @@ from invokeai.backend.architectures import LatentSpace, resolve_latent_space
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.tiny_autoencoder import is_tiny_autoencoder_supported
 from invokeai.backend.model_manager.load.load_base import LoadedModel
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.tiny_autoencoder.preview import (
     decode_preview,
@@ -213,6 +214,10 @@ class TinyAutoencoderPreviews:
         lock will keep, so a TAE that would not fit is refused without the lock's "VRAM budget short"
         warning -- under partial loading, on every generation. It measures the device, not the cache's cap,
         so `_resolve` checks residency again after locking.
+
+        The offload is a VRAM move, so it holds MODEL_LOAD_LOCK's read lock like every other: a construction on
+        another worker would otherwise strand the offloaded weights on `meta`. Taken before the cache's own lock,
+        per the lock order, and only around the offload -- `load_model` and the lock take it themselves.
         """
         if loaded.compute_device.type == "cpu":
             return True
@@ -220,7 +225,9 @@ class TinyAutoencoderPreviews:
         if missing <= 0:
             return True
         ram_cache = self._services.model_manager.load.ram_cache
-        return ram_cache.make_room_in_vram(missing, working_mem_bytes=working_mem_bytes) >= missing
+        with MODEL_LOAD_LOCK.read_lock():
+            available = ram_cache.make_room_in_vram(missing, working_mem_bytes=working_mem_bytes)
+        return available >= missing
 
     def _report_missing(self, base_model: BaseModelType, space: LatentSpace) -> None:
         if is_tiny_autoencoder_supported(space):
