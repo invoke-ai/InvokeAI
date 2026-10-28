@@ -1,6 +1,5 @@
 import gc
 import logging
-import os
 import queue
 import sys
 import threading
@@ -15,6 +14,7 @@ from typing import Any, Callable, Collection, Dict, Generator, List, NamedTuple,
 import psutil
 import torch
 
+from invokeai.app.util.torch_cuda_allocator import expandable_segments_enabled
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
@@ -38,20 +38,7 @@ from invokeai.backend.util.devices import TorchDevice, device_has_dedicated_vram
 from invokeai.backend.util.level_zero import xpu_device_is_integrated
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.prefix_logger_adapter import PrefixedLoggerAdapter
-
-
-def _expandable_segments_enabled() -> bool:
-    """Whether the torch caching allocator runs in expandable-segments mode.
-
-    The mode is configured through the allocator env vars before torch import (InvokeAI's own
-    `pytorch_cuda_alloc_conf` setting is plumbed into PYTORCH_CUDA_ALLOC_CONF the same way), so
-    parsing them is authoritative for the life of the process.
-    """
-    for var in ("PYTORCH_ALLOC_CONF", "PYTORCH_CUDA_ALLOC_CONF", "PYTORCH_HIP_ALLOC_CONF"):
-        if "expandable_segments:true" in os.environ.get(var, "").replace(" ", "").lower():
-            return True
-    return False
-
+from invokeai.backend.working_memory import probe
 
 # Size of a GB in bytes.
 GB = 2**30
@@ -615,6 +602,8 @@ class ModelCache:
 
         self._cached_models: Dict[str, CacheRecord] = {}
         self._cache_stack: List[str] = []
+        # Locks on this cache's records, detached ones included (see `locks_held`); changed only with `_lock` held.
+        self._locks_held = 0
 
         self._ram_cache_size_bytes = self._calc_ram_available_to_model_cache()
 
@@ -1874,6 +1863,39 @@ class ModelCache:
             raise
 
     @synchronized
+    def locks_held(self) -> int:
+        """How many locks this cache's records hold right now: VRAM and RAM pins of every thread together.
+
+        The working-memory probe compares it with the locks its own thread took, so that a window opening while
+        another thread holds a model on this device knows it shares the device. Counted as locks are taken and
+        released, not over the cached records: a record dropped while locked (the VRAM-move error paths) still holds
+        its model on the device until its holder unlocks it.
+        """
+        return self._locks_held
+
+    def _pin(self, cache_entry: CacheRecord) -> None:
+        """Lock `cache_entry` and count the lock in `locks_held`. Caller holds the lock."""
+        cache_entry.lock()
+        self._locks_held += 1
+
+    def _unpin(self, cache_entry: CacheRecord) -> None:
+        """Release a lock `_pin` took. Caller holds the lock. The record refuses an unlock it has no lock for before
+        either count changes, so a double unlock leaves `locks_held` right.
+
+        The last release, an unlock or a failed `lock`/`continue_lock` alike, returns weights a holder cast in place to
+        their counted dtypes (see `_restore_counted_dtypes`). A record that is detached or stale is skipped: it leaves
+        the cache, and a restore would only allocate on the device outside any reservation.
+        """
+        cache_entry.unlock()
+        self._locks_held -= 1
+        if (
+            not cache_entry.is_locked
+            and not cache_entry.is_stale
+            and self._cached_models.get(cache_entry.key) is cache_entry
+        ):
+            self._restore_counted_dtypes(cache_entry)
+
+    @synchronized
     @record_activity
     def lock_in_ram(self, cache_entry: CacheRecord) -> None:
         """Pin a cache entry in RAM without moving it to its execution device."""
@@ -1887,7 +1909,7 @@ class ModelCache:
                 "the RAM cache. This is a sign that the model loading order is non-optimal in the invocation code "
                 "(See https://github.com/invoke-ai/InvokeAI/issues/7513)."
             )
-        cache_entry.lock()
+        self._pin(cache_entry)
         cache_entry.awaiting_first_use = False
 
     @synchronized
@@ -1915,7 +1937,7 @@ class ModelCache:
                 "(See https://github.com/invoke-ai/InvokeAI/issues/7513)."
             )
         # cache_entry = self._cached_models[key]
-        cache_entry.lock()
+        self._pin(cache_entry)
         # End of the post-admission grace: from here the entry is pinned by its lock count, and
         # after the final unlock it is ordinary evictable cache content.
         cache_entry.awaiting_first_use = False
@@ -1951,10 +1973,10 @@ class ModelCache:
             )
         except torch.OutOfMemoryError:
             self._logger.warning("Insufficient GPU memory to load model. Aborting")
-            cache_entry.unlock()
+            self._unpin(cache_entry)
             raise
         except Exception:
-            cache_entry.unlock()
+            self._unpin(cache_entry)
             raise
 
         self._log_cache_state()
@@ -1999,10 +2021,10 @@ class ModelCache:
             )
         except torch.OutOfMemoryError:
             self._logger.warning("Insufficient GPU memory to load model. Aborting")
-            cache_entry.unlock()
+            self._unpin(cache_entry)
             raise
         except Exception:
-            cache_entry.unlock()
+            self._unpin(cache_entry)
             raise
 
         if settled:
@@ -2012,7 +2034,10 @@ class ModelCache:
     @synchronized
     @record_activity
     def unlock(self, cache_entry: CacheRecord) -> None:
-        """Unlock a model."""
+        """Unlock a model.
+
+        The last unlock returns weights a holder cast in place to the dtypes the cache counts them in (see `_unpin`).
+        """
         if cache_entry.key not in self._cached_models:
             self._logger.info(
                 f"Unlocking model cache entry {cache_entry.key} "
@@ -2021,7 +2046,7 @@ class ModelCache:
                 "(See https://github.com/invoke-ai/InvokeAI/issues/7513)."
             )
         # cache_entry = self._cached_models[key]
-        cache_entry.unlock()
+        self._unpin(cache_entry)
         self._logger.debug(
             f"Unlocked model {cache_entry.key} (Type: {cache_entry.cached_model.model.__class__.__name__})"
         )
@@ -2066,6 +2091,29 @@ class ModelCache:
         # hook perform the eviction.
         if self._ram_budget is not None and self._ram_budget.available() < 0:
             self._budget_reconcile_pending.set()
+
+    def _restore_counted_dtypes(self, cache_entry: CacheRecord) -> None:
+        """Return the weights the entry's holders cast in place to the dtypes the cache counts them in.
+
+        The SD VAE nodes cast the cached VAE to the dtype they run, fp16 to fp32 for an upcast. The cache counts every
+        weight in the dtype it was cached with, and the next decode's estimate prices its upcast from the dtype the VAE
+        holds before its lock, so a VAE left in fp32 holds more than the cache charges and gets nothing reserved for the
+        next cast. Only the last release of a pin restores (see `_unpin`): until then another holder may be running the
+        model in its cast dtype.
+        The passes do not restore on purpose; only an offload with a RAM copy puts the RAM copy back for the weights it
+        moves, and with it their counted dtype, even while the model is held, as it always has.
+        """
+        try:
+            cache_entry.cached_model.restore_counted_dtypes()
+        except Exception as e:
+            # As after a failed move: partly restored, the model no longer matches its counts, and dropping it contains
+            # that. Not raised: an unlock runs in the `finally` of a finished run, whose result is not saved yet, and a
+            # failed lock raises its own error.
+            self._logger.warning(
+                f"Could not return the weights of '{cache_entry.key}' to the dtypes the cache counts them in ({e}); "
+                "dropped it from the cache."
+            )
+            self._delete_cache_entry(cache_entry)
 
     def _load_locked_model(
         self,
@@ -2142,6 +2190,9 @@ class ModelCache:
         # We add 1 MB to the available VRAM to account for small errors in memory tracking (e.g. off-by-one). A fully
         # loaded model is much faster than a 95% loaded model.
         model_bytes_loaded, truncated = self._move_model_to_vram(cache_entry, vram_available + MB, max_move_bytes)
+        if self._cached_models.get(cache_entry.key) is not cache_entry:
+            # A record dropped earlier (see `lock`): no later drop reports the weights this put on the device.
+            probe.dropped(self, cache_entry)
 
         if truncated:
             # A paced pass that stopped at max_move_bytes with more weights still to move. Keep the
@@ -2216,7 +2267,7 @@ class ModelCache:
         driver_free, _ = TorchDevice.cuda_mem_get_info(self._execution_device)
         if driver_free >= reserve:
             return
-        if _expandable_segments_enabled():
+        if expandable_segments_enabled():
             # Freed pages inside a segment are not counted as reclaimable there, but empty_cache() unmaps them.
             releasable = torch.cuda.memory_reserved(self._execution_device) - torch.cuda.memory_allocated(
                 self._execution_device
@@ -2285,6 +2336,8 @@ class ModelCache:
         vram_bytes_to_free: int,
         keep_required_weights_in_vram: bool | None = None,
     ) -> int:
+        if probe.armed:
+            probe.offloading(self, cache_entry)
         try:
             if isinstance(cache_entry.cached_model, CachedModelWithPartialLoad):
                 return cache_entry.cached_model.partial_unload_from_vram(
@@ -2388,7 +2441,7 @@ class ModelCache:
         `_offload_unlocked_models` runs one after each offload in that mode; what it cannot do is
         make the credit trustworthy before it runs.
         """
-        if _expandable_segments_enabled():
+        if expandable_segments_enabled():
             return 0
         try:
             if self._execution_device.type == "cuda":
@@ -2603,7 +2656,7 @@ class ModelCache:
         # them -- so it is deliberately loop-local: it stops this loop offloading everything, and
         # the load that follows re-measures for itself (`lock`, `make_room_in_vram`) and streams
         # from RAM if the room did not materialize.
-        empty_cache_per_offload = _expandable_segments_enabled()
+        empty_cache_per_offload = expandable_segments_enabled()
         vram_bytes_freed_uncounted = 0
         # TODO(ryand): Give more thought to the offloading policy used here.
         cache_entries_increasing_size = sorted(self._cached_models.values(), key=lambda x: x.cached_model.total_bytes())
@@ -2979,6 +3032,8 @@ class ModelCache:
         # itself idempotent, but the budget debit is not).
         if self._cached_models.get(cache_entry.key) is not cache_entry:
             return
+        # Armed or not: the weights may die during a later calibration window.
+        probe.dropped(self, cache_entry)
         self._cache_stack = [key for key in self._cache_stack if key != cache_entry.key]
         del self._cached_models[cache_entry.key]
         # Drop this device's reference to the shared canonical CPU weights so they can be freed once
