@@ -74,6 +74,11 @@ def test_a_calibration_run_measures_every_step_once_and_saves_every_lifetimes_st
     # Each lifetime's store holds the runs its server created; the crashed one's item never ran a node.
     first_store, second_store = _store(run_dir, first.export), _store(run_dir, second.export)
     assert [run["run_id"] for run in first_store["runs"]] == ["run-1", "run-2"]
+    # Every step states the graph's model as the config the case was compiled from has it.
+    compiled = {"hash": "blake3:fakehash", "base": "fake", "type": "main", "format": "checkpoint", "variant": "normal"}
+    assert [run["graph_models"] for run in first_store["runs"] + second_store["runs"]] == [{"fake-model": compiled}] * (
+        len(first_store["runs"]) + len(second_store["runs"])
+    )
     assert [p["queue_item_id"] for p in first_store["points"]] == [records[0].queue_item_id]
     later = [records[1], spoiled, records[2]]
     assert [run["run_id"] for run in second_store["runs"]] == [r.calibration.run_id for r in later]

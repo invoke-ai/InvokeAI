@@ -1,11 +1,12 @@
 """The shipped working-memory data, checked against the estimators that read it.
 
-Every coefficient entry resolves for the spec it names on a measured platform. Every value an entry carries is a declared
-stand-in, a hand-set constant of a `legacy` entry listed in `LEGACY_ENTRIES`, or decided by at least one in-fit point
-and the shipped fit (`fit.py`) of the points it is resolved for. Every point bounds its estimate as
-`working_memory/bounds.py` says: from below always, from above where a fitted term decides an in-fit point that holds an
-upper bound (a fresh-process peak, not a `probe_demand` window). The points no line can hold within 1.3x are listed in
-`bounds.UPPER_BOUND_EXCEPTIONS`; the out-of-fit ones in `OUT_OF_FIT`.
+Every coefficient entry resolves for the spec it names on a measured platform, or on every platform for a spec keyed by
+no platform trait. Every value an entry carries is a declared stand-in, a hand-set constant of a `legacy` entry listed
+in `LEGACY_ENTRIES`, or decided by at least one in-fit point and, on a line its entry carries, the shipped fit
+(`fit.py`) of the points it is resolved for; only an estimator keyed by no platform trait carries values off one. Every
+point bounds its estimate as `working_memory/bounds.py` says: from below always, from above where a fitted term decides
+an in-fit point that holds an upper bound (a fresh-process peak, not a `probe_demand` window). The points no line can
+hold within 1.3x are listed in `bounds.UPPER_BOUND_EXCEPTIONS`; the out-of-fit ones in `OUT_OF_FIT`.
 """
 
 import collections
@@ -49,12 +50,13 @@ from invokeai.backend.working_memory.fingerprint import environment_for
 from invokeai.backend.working_memory.fit import (
     SMALLEST_APP_SIDE,
     capping_spans,
+    carried_lines,
     carrier_of,
     convolution_line,
     entry_key,
     fit_points,
     fitted_values,
-    line_values,
+    hand_set_values,
 )
 from invokeai.backend.working_memory.platform import (
     MEASURED,
@@ -161,11 +163,11 @@ def test_an_unmeasured_platform_is_priced_as_the_measured_one_at_least_and_says_
         measured = priced_as(platform)
         assert is_measured(measured) and measured.os == platform.os
         resolved = shipped_coefficients(spec, platform)
+        borrowed = shipped_coefficients(spec, measured)
         if not spec.platform_keys:
             # Keyed by no platform trait: nothing is priced as anything else, and the source says so.
-            assert resolved.source == "shipped:any platform"
+            assert resolved == ResolvedCoefficients(values=borrowed.values, source="shipped:any platform")
             continue
-        borrowed = shipped_coefficients(spec, measured)
         assert all(resolved.values[name] >= value for name, value in borrowed.values.items())
         where = ",".join(f"{key}={value}" for key, value in _keys(measured, spec).items())
         assert resolved.source.startswith(f"shipped:conv_backend={platform.conv_backend},")
@@ -209,18 +211,19 @@ def test_every_fitted_value_is_decided_by_an_in_fit_point() -> None:
 
 def test_every_fitted_value_is_the_shipped_fit_of_its_points() -> None:
     """The values are reproducible from the points rather than hand-tuned. A new point that moves a fit fails here,
-    naming the values to ship. Values on no line their entry carries (`fit.line_values`) are hand-set, held by their
-    points' bounds only."""
+    naming the values to ship. Only `hand_set_values` are exempt: values off a line their entry carries, of an
+    estimator keyed by no platform trait, which its points decide and bound but nothing fits."""
     fitted = fitted_values(shipped_data().values(), SPECS)
     stale = {}
     for entry in ENTRIES:
         if entry.values is None or entry.legacy:
             continue
         expected = fitted.get(entry_key(entry), {})
+        hand_set = hand_set_values(entry, SPECS[entry.estimator])
         differs = {
             name: expected.get(name)
             for name, value in entry.values.items()
-            if name in line_values(entry) and name not in entry.stand_ins and expected.get(name) != value
+            if name not in {*entry.stand_ins, *hand_set} and expected.get(name) != value
         }
         if differs:
             stale[f"{entry.estimator} {entry.platform}"] = differs
@@ -235,10 +238,12 @@ def test_only_the_listed_entries_ship_hand_set_values() -> None:
 
 
 def test_only_an_estimator_keyed_by_no_platform_trait_carries_values_off_a_line() -> None:
-    """The fit check above holds the lines an entry carries. An estimator keyed by a platform trait prices lines whose
-    every value is half of one, so a value off one there is a typo or a term the fit would never check."""
+    """The fit check above skips `legacy` entries. An estimator keyed by a platform trait prices lines whose every
+    value is half of one, so a value off one there, legacy or not, is a typo or a term the fit would never check."""
     off_line = {
-        f"{entry.estimator} {entry.platform}": sorted(set(entry.values) - line_values(entry))
+        f"{entry.estimator} {entry.platform}": sorted(
+            set(entry.values) - {f"{part}_{line}" for line in carried_lines(entry) for part in ("k", "b")}
+        )
         for entry in ENTRIES
         if entry.values is not None and SPECS[entry.estimator].platform_keys
     }
@@ -511,15 +516,6 @@ def _data(*entries: CoefficientEntry) -> list[WorkingMemoryData]:
 
 
 CUDNN = Platform("cudnn", "native", "linux")
-
-
-def test_only_an_estimator_keyed_by_no_platform_trait_is_priced_without_a_platform() -> None:
-    """A point of an estimator keyed by no platform trait records none and is priced without one; any other estimator's
-    values differ by platform, so pricing it without one refuses rather than picking an entry."""
-    spec = _spec("test.estimator")
-
-    with pytest.raises(ValueError, match=r"'test\.estimator' is keyed by \['conv_backend'\]"):
-        resolve_coefficients(_data(_entry(spec.id, values={"k": 7.0})), spec, None, origin="test")
 
 
 def test_a_missing_or_stale_entry_names_the_estimator_and_platform() -> None:

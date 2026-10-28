@@ -54,10 +54,10 @@ part of what the tile costs moves to the line beneath, and each point stays cove
 
 `tests/backend/working_memory/test_shipped_coefficients.py` holds every carried value that is not a declared stand-in
 to `fitted_values` of the shipped points, so a new point that moves a fit fails there with the value to ship. A
-`legacy` entry's hand-set values are neither fitted nor held to a fit. A value on no line its entry carries
-(`line_values`) is hand-set too: the MOSS-Image denoise's `k_token`, bytes per attended token, whose entry ships no
-base for its line. Its points still decide and bound it (`bounds.py`), and the data test allows such a value only for
-an estimator keyed by no platform trait.
+`legacy` entry's hand-set values are neither fitted nor held to a fit. A value on no line its entry carries is hand-set
+too, which `hand_set_values` allows only for an estimator keyed by no platform trait: the MOSS-Image denoise's
+`k_token`, bytes per attended token, whose entry ships no base for its line. Its points still decide and bound it
+there.
 
 A user's own calibration fits the same lines from its windows (`user_pair`, read by `user_fit.py`), with
 `USER_MARGIN`, the same margin, for the estimators that opt in (`EstimatorSpec.user_calibrated`): the lines whose
@@ -106,7 +106,8 @@ class Line(NamedTuple):
     """Whether a measurement of these features can join the line's fit: its demand is the line's alone, or the line's
     above the line it sits on."""
     label: str
-    """How a point of these features reads in its id (`bounds.point_id`), e.g. ``decode-bf16-1024x1024-tile512``."""
+    """How a point of these features reads in its id (`bounds.point_id`), e.g. ``decode-bf16-1024x1024-tile512``, with
+    ``-scores`` where a VAE operation's build materializes the mid-block score matrix."""
     sits_on: Optional[tuple[str, int]] = None
     """The line the estimate prices this operation on beneath this one, as its suffix and the operation's size on it,
     or None. A tiled VAE operation sits on the untiled line at its tile area. The line named sits on none."""
@@ -195,17 +196,18 @@ def convolution_line(features: Mapping[str, FeatureValue]) -> Optional[Line]:
         and features.get("vae_class", "AutoencoderKL") == "AutoencoderKL"
     )
     batched = f"-b{batch}" if batch != 1 else ""
+    scored = "-scores" if features.get("score_matrix_bytes") else ""
     label = f"{operation}-{dtype}-{height}x{width}"
     if not isinstance(tile, int):
         caps = height * width >= SMALLEST_APP_SIDE * SMALLEST_APP_SIDE
-        return Line(f"{operation}_{dtype}", height * width, fits, f"{label}{batched}", caps=caps)
+        return Line(f"{operation}_{dtype}", height * width, fits, f"{label}{batched}{scored}", caps=caps)
     samples = batch if isinstance(batch, int) else 1
     tile_area = min(tile, height) * min(tile, width)
     return Line(
         f"tiled_{operation}_{dtype}",
         height * width * samples,
         fits,
-        f"{label}-tile{tile}{batched}",
+        f"{label}-tile{tile}{batched}{scored}",
         sits_on=(f"{operation}_{dtype}", tile_area),
         assembly=f"assembled_decode_{dtype}" if operation == "decode" else None,
         caps=tile >= SMALLEST_APP_SIDE,
@@ -423,14 +425,16 @@ def carried_lines(entry: CoefficientEntry) -> set[str]:
     return {name[2:] for name in names if name.startswith("k_") and f"b_{name[2:]}" in names}
 
 
-def line_values(entry: CoefficientEntry) -> set[str]:
-    """The values of `entry` that `fitted_values` reproduces: both halves of each line it carries (`carried_lines`),
-    stand-ins included. Any other value is hand-set (see the module docstring), which the data test allows only for an
-    estimator keyed by no platform trait.
-
-    The MOSS-Image denoise declares its line in attended tokens, but its entry carries the slope alone; shipping a
-    fitted base (`b_token`) with it makes that a carried line, and this exemption goes."""
-    return {f"{part}_{suffix}" for suffix in carried_lines(entry) for part in ("k", "b")}
+def hand_set_values(entry: CoefficientEntry, spec: "EstimatorSpec") -> set[str]:
+    """The values `entry` may carry that no fit reproduces: those on no line it carries (`carried_lines`), for a `spec`
+    keyed by no platform trait. The MOSS-Image denoise declares its line in attended tokens, but its entry carries the
+    slope alone; shipping a fitted base (`b_token`) with it makes that a carried line, and its exemption goes. Any
+    other spec prices lines whose every value is half of one, so a value off one there is a typo or a term the fit
+    never checks, and none is exempt."""
+    if spec.platform_keys:
+        return set()
+    lines = {f"{part}_{suffix}" for suffix in carried_lines(entry) for part in ("k", "b")}
+    return set(entry.values or {}) - lines
 
 
 def fit_points(

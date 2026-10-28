@@ -1,4 +1,5 @@
 import type {
+  CalibrationCompiledModel,
   WorkingMemoryPlan,
   WorkingMemoryRunCreated,
   WorkingMemoryStatus,
@@ -37,6 +38,11 @@ export interface CalibrateRequest {
    */
   attemptSteps: number;
   graph: unknown;
+  /**
+   * Every model the graph names, as the records it was compiled over have them (`CompiledCalibration.models`). The
+   * server refuses the step as `model_changed` when a record differs now.
+   */
+  graphModels: Readonly<Record<string, CalibrationCompiledModel>>;
   data: unknown;
   idempotencyKey: string;
 }
@@ -44,7 +50,7 @@ export interface CalibrateRequest {
 /** Enqueues one queue item as one server run. Resending with the same key returns that run and enqueues nothing. */
 export const calibrateWorkingMemory = (
   key: string,
-  { attemptId, attemptSteps, data, graph, idempotencyKey }: CalibrateRequest,
+  { attemptId, attemptSteps, data, graph, graphModels, idempotencyKey }: CalibrateRequest,
   signal?: AbortSignal
 ): Promise<WorkingMemoryRunCreated> =>
   requestJson<WorkingMemoryRunCreated>(`${modelPath(key)}/calibrate`, {
@@ -53,6 +59,7 @@ export const calibrateWorkingMemory = (
       attempt_steps: attemptSteps,
       data,
       graph,
+      graph_models: graphModels,
       idempotency_key: idempotencyKey,
     }),
     method: 'POST',

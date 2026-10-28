@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import type { ModelConfig } from './types';
+
 import {
   calibrationIdempotencyKey,
   changesCalibration,
+  compiledModelIdentities,
   deriveCalibrationProgress,
   describeCoverage,
   describeFact,
@@ -618,5 +621,84 @@ describe('describeFact', () => {
     expect(describeFact('setting.attention_type')).toEqual({ name: 'attention_type' });
     expect(describeFact('env.PYTORCH_CUDA_ALLOC_CONF')).toEqual({ name: 'PYTORCH_CUDA_ALLOC_CONF' });
     expect(describeFact('something_new')).toEqual({ name: 'something_new' });
+  });
+});
+
+// Read rather than imported: the snapshot belongs to Generation, whose internals this feature never imports.
+const ANIMA_LLLITE_GRAPHS = Object.values(
+  import.meta.glob('../../generation/core/__snapshots__/animaLLLiteCanvasGraphs.json', {
+    eager: true,
+    import: 'default',
+  })
+)[0];
+
+describe('compiledModelIdentities', () => {
+  const record = (key: string, extra: Partial<ModelConfig> = {}) =>
+    ({
+      base: 'sdxl',
+      format: 'diffusers',
+      hash: `blake3:${key}`,
+      key,
+      name: key,
+      type: 'main',
+      ...extra,
+    }) as ModelConfig;
+  const identifier = (key: string) => ({ base: 'sdxl', hash: `blake3:${key}`, key, name: key, type: 'main' });
+
+  it("names every model the graph's nodes name, nested ones included, from the records it compiled over", () => {
+    const graph = {
+      id: 'case',
+      nodes: {
+        loader: { id: 'loader', model: identifier('main'), type: 'sdxl_model_loader' },
+        loras: { id: 'loras', loras: [{ lora: identifier('lora'), weight: 1 }], type: 'lora_collection_loader' },
+        // A metadata node's record of a model, which the server counts too.
+        metadata: { id: 'metadata', t5_encoder: identifier('encoder'), type: 'core_metadata' },
+        // Not model identifiers the server counts: no hash, and a submodel type that is no string.
+        other: {
+          id: 'other',
+          numbered: { ...identifier('numbered'), submodel_type: 3 },
+          type: 'other',
+          value: { base: 'sdxl', key: 'no-hash', name: 'x', type: 'main' },
+        },
+      },
+    };
+    const records = [
+      record('main', { variant: 'normal' }),
+      record('no-hash'),
+      record('numbered'),
+      record('lora', { format: 'lycoris' }),
+      record('encoder', { format: 't5_encoder' }),
+      record('unused'),
+    ];
+
+    expect(compiledModelIdentities(graph, records)).toEqual({
+      encoder: { base: 'sdxl', format: 't5_encoder', hash: 'blake3:encoder', type: 'main', variant: null },
+      lora: { base: 'sdxl', format: 'lycoris', hash: 'blake3:lora', type: 'main', variant: null },
+      main: { base: 'sdxl', format: 'diffusers', hash: 'blake3:main', type: 'main', variant: 'normal' },
+    });
+  });
+
+  it('finds the models of a graph the canvas compiler wrote, as the server does', () => {
+    // The server's test (`test_the_models_a_compiled_graph_names_are_found_where_the_client_finds_them`) reads the
+    // same graph and expects the same keys.
+    const graph = (ANIMA_LLLITE_GRAPHS as Record<string, unknown>).inpaint_three_adapters;
+    const keys = ['anima-model', 'depth', 'pose', 'qwen-vae', 'qwen3', 'sketch'];
+
+    expect(
+      Object.keys(
+        compiledModelIdentities(
+          graph,
+          keys.map((key) => record(key))
+        )
+      ).sort()
+    ).toEqual(keys);
+  });
+
+  it('refuses a graph naming a model its records lack', () => {
+    const graph = { nodes: { loader: { id: 'loader', model: identifier('gone'), type: 'sdxl_model_loader' } } };
+
+    expect(() => compiledModelIdentities(graph, [record('main')])).toThrow(
+      'The graph names model gone, which the records it was compiled over lack.'
+    );
   });
 });

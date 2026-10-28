@@ -1228,11 +1228,12 @@ test('working-memory calibration: a run per request, replayed by its key, advanc
     async (backend) => {
       const base = '/api/v2/models/i/fixture-model-001/working_memory';
       const plan = await getJson(backend, `${base}/plan`);
-      const request = (key, attempt = { attempt_id: 'attempt-1', attempt_steps: 2 }, nodes = {}) => ({
+      const request = (key, attempt = { attempt_id: 'attempt-1', attempt_steps: 2 }, nodes = {}, graphModels = {}) => ({
         body: JSON.stringify({
           ...attempt,
           data: [],
           graph: { edges: [], id: plan.cases[0].id, nodes },
+          graph_models: graphModels,
           idempotency_key: key,
         }),
         method: 'POST',
@@ -1240,11 +1241,13 @@ test('working-memory calibration: a run per request, replayed by its key, advanc
       const post = (key) => getJson(backend, `${base}/calibrate`, request(key));
       const refusal = async (key, attempt) =>
         (await fetch(`${backend.origin}${base}/calibrate`, request(key, attempt))).status;
-      /** The answer to a request whose graph names `model` as it compiled over it. */
-      const refusedFor = async (key, model) => {
+      /** The answer to a request whose graph names `model` as it compiled over it, stating `compiled` for it. */
+      const refusedFor = async (key, model, compiled = {}) => {
+        const identity = { base: model.base, format: record.format, hash: model.hash, type: model.type, variant: null };
+        const graphModels = { [model.key]: { ...identity, ...compiled } };
         const response = await fetch(
           `${backend.origin}${base}/calibrate`,
-          request(key, undefined, { main_model_loader: { id: 'main_model_loader', model } })
+          request(key, undefined, { main_model_loader: { id: 'main_model_loader', model } }, graphModels)
         );
         return [response.status, (await response.json()).detail];
       };
@@ -1279,6 +1282,40 @@ test('working-memory calibration: a run per request, replayed by its key, advanc
         409,
         { code: 'model_changed', message: 'Old SDXL was removed after this calibration was planned. Calibrate again.' },
       ]);
+      // The graph's identifier carries no variant: the identity compiled with it does.
+      assert.deepEqual(await refusedFor('variant', identifier, { variant: 'inpaint' }), [
+        409,
+        {
+          code: 'model_changed',
+          message: 'Fixture Model 001 changed after this calibration was planned (variant). Calibrate again.',
+        },
+      ]);
+      // graph_models states exactly the graph's models, every fact of each.
+      const unstated = await fetch(
+        `${backend.origin}${base}/calibrate`,
+        request('unstated', undefined, { main_model_loader: { id: 'main_model_loader', model: identifier } })
+      );
+      assert.equal(unstated.status, 422);
+      assert.match((await unstated.json()).detail, /the graph names fixture-model-001, which graph_models lacks/);
+      const nullHash = await fetch(
+        `${backend.origin}${base}/calibrate`,
+        request(
+          'null-hash',
+          undefined,
+          { main_model_loader: { id: 'main_model_loader', model: identifier } },
+          {
+            [identifier.key]: {
+              base: identifier.base,
+              format: record.format,
+              hash: null,
+              type: identifier.type,
+              variant: null,
+            },
+          }
+        )
+      );
+      assert.equal(nullHash.status, 422);
+      assert.match((await nullHash.json()).detail, /graph_models\[fixture-model-001\] does not state every fact/);
 
       const first = await post('attempt:0');
       assert.deepEqual(await post('attempt:0'), first);
@@ -1309,7 +1346,7 @@ test('working-memory calibration: a run per request, replayed by its key, advanc
       );
       assert.equal(summary.measurement_verified, true);
       const badAttempt = await fetch(`${backend.origin}${base}/calibrate`, {
-        body: JSON.stringify({ attempt_id: 'has space', graph: { edges: [], id: 'x', nodes: {} } }),
+        body: JSON.stringify({ attempt_id: 'has space', graph: { edges: [], id: 'x', nodes: {} }, graph_models: {} }),
         method: 'POST',
       });
       assert.equal(badAttempt.status, 422);
@@ -1375,6 +1412,7 @@ test('working-memory calibration: an open attempt holds the GPU, and a step afte
             attempt_steps: 3,
             data: [],
             graph: { edges: [], id: plan.cases[0].id, nodes: {} },
+            graph_models: {},
             idempotency_key: `${attempt_id}:${String(index)}`,
           }),
           method: 'POST',
@@ -1432,7 +1470,7 @@ test('working-memory calibration: seeded model states and device scenarios', asy
     assert.ok((await summaryOf('fixture-model-021')).runs.some((run) => run.status === 'running'));
     const calibrateOther = (attempt) =>
       fetch(`${backend.origin}/api/v2/models/i/fixture-model-001/working_memory/calibrate`, {
-        body: JSON.stringify({ ...attempt, data: [], graph: { edges: [], id: 'x', nodes: {} } }),
+        body: JSON.stringify({ ...attempt, data: [], graph: { edges: [], id: 'x', nodes: {} }, graph_models: {} }),
         method: 'POST',
       });
     const busy = await calibrateOther({ attempt_id: 'mine', attempt_steps: 1 });

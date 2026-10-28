@@ -5,10 +5,12 @@ import socket
 import sqlite3
 import subprocess
 import sys
+import threading
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import BinaryIO
 
 import psutil
 import pytest
@@ -528,25 +530,6 @@ def test_stop_keeps_the_run_while_a_recorded_process_survives_the_kill(
     assert [e.source for e in load_run_info(killed_run).calibration_exports] == ["store_file"]
 
 
-def test_stop_reads_the_heartbeat_again_once_the_runner_is_dead_and_kills_the_server_it_names(
-    killed_run: Path,
-    surviving_server: list[float],
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    # The runner launched its server after `stop` had read the heartbeat, and recorded it before it was killed.
-    _write_heartbeat(killed_run, server_launcher=surviving_server)
-    reads = [{**runner.read_heartbeat(killed_run), "server_launcher": None}]
-    monkeypatch.setattr(cli, "read_heartbeat", lambda d: reads.pop() if reads else runner.read_heartbeat(d))
-
-    capsys.readouterr()
-    assert main(["stop", str(killed_run)]) == 0
-
-    assert not runner.is_alive(surviving_server)
-    assert f"killed server_launcher (pid {int(surviving_server[0])})" in capsys.readouterr().out
-    assert not _scratch_file(killed_run).exists()
-
-
 def test_the_heartbeat_names_the_serving_process_as_captured_at_its_start(killed_run: Path, tmp_path: Path) -> None:
     # Once the serving process has exited, its pid can name an unrelated process that `stop` would then kill.
     process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
@@ -569,23 +552,62 @@ class _ServerStarting(Exception):
     pass
 
 
-def test_a_runner_records_the_server_launcher_before_it_waits_for_the_server_to_start(
-    killed_run: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # On POSIX a runner killed while its server starts leaves the server running: what heartbeat.json names by then
-    # is all `stop` and `resume` find it by.
-    code, template = killed_run.parents[2] / "code", killed_run.parents[2] / "template"
+def _launchable_server(run_dir: Path) -> None:
+    """Gives the killed run a server that `launch_server` starts: one that sleeps and never answers."""
+    code, template = run_dir.parents[2] / "code", run_dir.parents[2] / "template"
     (code / "scripts" / "invokeai-web.py").write_text("import time\ntime.sleep(60)\n")
     (code / "invokeai").mkdir()
     (code / "invokeai" / "__init__.py").write_text("")
     (template / "databases").mkdir()
     sqlite3.connect(template / "databases" / "invokeai.db").close()
+
+
+def _run_lock_held(run_dir: Path, lock_file: Callable[[BinaryIO, bool], None]) -> bool:
+    """Whether a holder keeps `run.lock`: a fresh handle is refused it."""
+    with open(run_dir / runner.RUN_LOCK_FILE, "a+b") as f:
+        try:
+            lock_file(f, True)
+        except OSError:
+            return True
+        lock_file(f, False)
+        return False
+
+
+def test_a_runner_records_the_server_launcher_before_it_waits_for_the_server_to_start(
+    killed_run: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # On POSIX a runner killed while its server starts leaves the server running: what heartbeat.json names by then
+    # is all `stop` and `resume` find it by. The status check, the spawn and that record share one hold of the run
+    # lock, so a stop's mark comes before the check or after the record; a stop's lock polls are too coarse to show it.
+    _launchable_server(killed_run)
     seen: list[tuple[object, object]] = []
+    lock_file, raise_unless_running = runner._lock_file, runner._raise_unless_running
+    server_spawned = runner._Session.server_spawned
+    holds = 0
+    # Per status check and per record: the hold of the run lock it ran in, and whether the lock was held.
+    checks: list[tuple[int, bool]] = []
+    records: list[tuple[int, bool]] = []
+
+    def counted_lock_file(f: BinaryIO, lock: bool) -> None:
+        nonlocal holds
+        lock_file(f, lock)
+        holds += lock
+
+    def checked_status(run_dir: Path) -> None:
+        checks.append((holds, _run_lock_held(run_dir, lock_file)))
+        raise_unless_running(run_dir)
+
+    def recorded_launcher(session: runner._Session, pid: int) -> None:
+        records.append((holds, _run_lock_held(session.run_dir, lock_file)))
+        server_spawned(session, pid)
 
     def wait_for_port(process: subprocess.Popen[bytes], *args: object) -> int:
         seen.append((runner.read_heartbeat(killed_run).get("server_launcher"), runner.process_identity(process.pid)))
         raise _ServerStarting
 
+    monkeypatch.setattr(runner, "_lock_file", counted_lock_file)
+    monkeypatch.setattr(runner, "_raise_unless_running", checked_status)
+    monkeypatch.setattr(runner._Session, "server_spawned", recorded_launcher)
     monkeypatch.setattr(server, "_wait_for_port", wait_for_port)
     with pytest.raises(_ServerStarting):
         runner.run(killed_run, gpu_factory=_fake_gpu)
@@ -593,6 +615,129 @@ def test_a_runner_records_the_server_launcher_before_it_waits_for_the_server_to_
     [(recorded, launched)] = seen
     assert launched is not None
     assert recorded == launched
+    [(record_hold, held)] = records
+    assert held
+    # The last status check before the record ran in the record's hold.
+    assert [check for check in checks if check[0] <= record_hold][-1] == (record_hold, True)
+
+
+class _RecordingFailed(Exception):
+    pass
+
+
+def test_a_server_whose_launcher_cannot_be_recorded_is_dead_before_the_run_lock_is_let_go(
+    killed_run: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Unrecorded, the server is in no heartbeat: a stop that took the lock once it is let go would miss the server.
+    _launchable_server(killed_run)
+    spawned: list[psutil.Process] = []
+    alive_at_release: list[bool] = []
+    lock_file, spawn_in_job = runner._lock_file, server.spawn_in_job
+
+    def watched_lock_file(f: BinaryIO, lock: bool) -> None:
+        if not lock and spawned and not alive_at_release:
+            alive_at_release.append(not _gone(spawned[0]))
+        lock_file(f, lock)
+
+    def spawn(*args: object, **kwargs: object) -> tuple[subprocess.Popen[bytes], object]:
+        process, job = spawn_in_job(*args, **kwargs)
+        spawned.append(psutil.Process(process.pid))
+        return process, job
+
+    def recording_fails(session: runner._Session, pid: int) -> None:
+        raise _RecordingFailed
+
+    monkeypatch.setattr(runner, "_lock_file", watched_lock_file)
+    monkeypatch.setattr(server, "spawn_in_job", spawn)
+    monkeypatch.setattr(runner._Session, "server_spawned", recording_fails)
+    with pytest.raises(_RecordingFailed):
+        runner.run(killed_run, gpu_factory=_fake_gpu)
+
+    assert len(spawned) == 1
+    assert alive_at_release == [False]
+
+
+@pytest.mark.parametrize("arrives", ["before the spawn", "during the spawn"])
+def test_a_stop_that_meets_the_server_spawn_kills_the_server_before_it_removes_the_scratch_root_or_none_starts(
+    killed_run: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], arrives: str
+) -> None:
+    # `stop` captured the runner's tree before the runner spawned its server. On POSIX that server runs in a session of
+    # its own and outlives the runner's kill, unless the heartbeat `stop` reads names it. The stop runs on a thread of
+    # this process, which is also the runner, so its kill of the runner is left out.
+    _launchable_server(killed_run)
+    spawned: list[psutil.Process] = []
+    alive_at_cleanup: dict[int, bool] = {}
+    stop_codes: list[int] = []
+    stop_thread: threading.Thread | None = None
+    settled = threading.Event()  # the stop has finished, or waits for the run lock
+
+    def stop() -> None:
+        try:
+            stop_codes.append(main(["stop", str(killed_run)]))
+        finally:
+            settled.set()
+
+    def stop_arrives() -> None:
+        nonlocal stop_thread
+        stop_thread = threading.Thread(target=stop)
+        stop_thread.start()
+        assert settled.wait(CHILD_TIMEOUT_S)
+
+    lock_file, kill_recorded, remove_tree = runner._lock_file, cli.kill_recorded, cli.remove_tree
+    verify_interpreter, spawn_in_job = server.verify_interpreter, server.spawn_in_job
+
+    def watched_lock_file(f: BinaryIO, lock: bool) -> None:
+        try:
+            lock_file(f, lock)
+        except OSError:
+            if threading.current_thread() is stop_thread:
+                settled.set()
+            raise
+
+    def remove_after_kill(path: Path) -> list[str]:
+        alive_at_cleanup.update((p.pid, not _gone(p)) for p in spawned)
+        return remove_tree(path)
+
+    def verify_then_stop(*args: object) -> str:
+        result = verify_interpreter(*args)
+        if arrives == "before the spawn":
+            stop_arrives()
+        return result
+
+    def spawn_then_stop(*args: object, **kwargs: object) -> tuple[subprocess.Popen[bytes], object]:
+        process, job = spawn_in_job(*args, **kwargs)
+        spawned.append(psutil.Process(process.pid))
+        if arrives == "during the spawn":
+            stop_arrives()
+        return process, job
+
+    def wait_for_port(*args: object) -> int:
+        if stop_thread is not None:
+            stop_thread.join(CHILD_TIMEOUT_S)
+        raise _ServerStarting
+
+    monkeypatch.setattr(runner, "_lock_file", watched_lock_file)
+    monkeypatch.setattr(
+        cli, "kill_recorded", lambda processes: kill_recorded([p for p in processes if p[0] != "runner"])
+    )
+    monkeypatch.setattr(cli, "remove_tree", remove_after_kill)
+    monkeypatch.setattr(server, "verify_interpreter", verify_then_stop)
+    monkeypatch.setattr(server, "spawn_in_job", spawn_then_stop)
+    monkeypatch.setattr(server, "_wait_for_port", wait_for_port)
+    capsys.readouterr()
+    with pytest.raises((runner.RunStopped, _ServerStarting)):
+        runner.run(killed_run, gpu_factory=_fake_gpu)
+    assert stop_thread is not None
+    stop_thread.join(CHILD_TIMEOUT_S)
+
+    assert stop_codes == [0]
+    # A server spawned before the stop's mark is in the heartbeat the stop reads and is gone before its scratch root
+    # goes; none is spawned after the mark.
+    assert len(spawned) == (1 if arrives == "during the spawn" else 0)
+    assert {p.pid: alive_at_cleanup.get(p.pid) for p in spawned} == {p.pid: False for p in spawned}
+    assert ("killed server_launcher" in capsys.readouterr().out) == bool(spawned)
+    assert not _scratch_file(killed_run).exists()
+    assert load_run_info(killed_run).status == "stopped"
 
 
 class _SavingStore(Exception):

@@ -34,7 +34,7 @@ def _line(features: Mapping[str, FeatureValue]) -> Optional[Line]:
     is not zero, in bytes.
 
     The shipped entry carries the slope alone (`k_token`), no base, so the line is not one it carries and the shipped
-    fit leaves it out (`fit.line_values`): the slope is hand-set until a fitted base ships with it."""
+    fit leaves it out (`fit.hand_set_values`): the slope is hand-set until a fitted base ships with it."""
     if not all(isinstance(features.get(name), int) for name in ("height", "width", "text_tokens")):
         return None
     on_top = [f"{name}={features[name]}" for name in ("score_matrix_bytes", "dequant_bytes") if features.get(name)]
