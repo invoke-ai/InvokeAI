@@ -6,7 +6,8 @@ format, and executes a queued graph by walking its nodes: the model loader logs 
 `fake_denoise` node sends preview frames, and the non-intermediate node returns a PNG of its width and height.
 When `<code_dir>/crash-at-enqueue` holds N, the server deletes the file and dies while running its N-th queue item.
 The working-memory calibrate route enqueues like enqueue_batch and records one point per model node in a store file
-under the root's db_dir, as the real server does. `<code_dir>/calibration-refused` holds `{"at": N or null, "status":
+under the root's db_dir, as the real server does, and the request's `graph_models` with each run; a request without
+them is refused with 422, as the real server refuses it. `<code_dir>/calibration-refused` holds `{"at": N or null, "status":
 "<HTTP status line>", "detail": ...}`: the route answers the N-th request (every one for null) with that error.
 `<code_dir>/calibration-unavailable` makes the status report calibration unavailable, with the file's text as reason.
 Self-contained on purpose: it runs in a fresh interpreter with only the code directory on the path.
@@ -41,6 +42,7 @@ MODEL_CONFIG = {
     "base": "fake",
     "type": "main",
     "format": "checkpoint",
+    "variant": "normal",
     "hash": "blake3:fakehash",
     "path": "/models/fake.safetensors",
     "source": "https://example.com/fake.safetensors?token=fake-token",
@@ -160,11 +162,13 @@ class FakeInvoke:
             refusal = json.loads(CALIBRATION_REFUSED.read_text())
             if refusal["at"] in (None, self.calibrate_requests):
                 return {"detail": refusal["detail"]}, refusal["status"]
+        if not isinstance(body.get("graph_models"), dict):
+            return {"detail": "graph_models: Field required"}, "422 Unprocessable Entity"
         self.calibration_runs += 1
         run_id = f"run-{self.calibration_runs}"
         with self.lock:
             store = self.store()
-            store["runs"].append({"run_id": run_id, "model_key": model_key})
+            store["runs"].append({"run_id": run_id, "model_key": model_key, "graph_models": body["graph_models"]})
             self.store_file.parent.mkdir(parents=True, exist_ok=True)
             self.store_file.write_text(json.dumps(store), encoding="utf-8")
         batch = {"graph": body["graph"], "data": body.get("data"), "origin": f"invokeai:wm-calibration:{run_id}"}

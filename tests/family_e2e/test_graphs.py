@@ -21,6 +21,22 @@ def _batch(image_name: str = "upload-1.png", seed: int = 1234, reverse: bool = F
     return {"graph": {"id": "g", "nodes": nodes, "edges": []}, "data": data, "origin": "o", "destination": "gallery"}
 
 
+def test_the_model_keys_are_the_models_the_server_finds_in_the_nodes() -> None:
+    """What the calibrate route takes the identities of: identifiers in node fields, nested ones included."""
+    batch = _batch()
+    nodes = batch["graph"]["nodes"]
+    nodes["metadata"] = {"id": "metadata", "type": "core_metadata", "model": MAIN, "t5_encoder": {**LORA, "key": "enc"}}
+    # Neither counts on the server: a mapping without a hash, and a config inside an identifier.
+    nodes["other"] = {
+        "id": "other",
+        "type": "other",
+        "value": {"key": "no-hash", "name": "No hash", "base": "sdxl", "type": "main"},
+        "loaded": {**MAIN, "key": "outer", "source_config": {**LORA, "key": "inner"}},
+    }
+
+    assert prepare_batch(batch, {}, {}).model_keys == {"main-key", "lora-key", "enc", "outer"}
+
+
 def test_prepare_disables_the_cache_on_every_node_and_runs_once() -> None:
     original = _batch()
     prepared = prepare_batch(original, {"vae": "vae-key"}, {})

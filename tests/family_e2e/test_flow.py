@@ -253,7 +253,7 @@ def test_run_survives_a_server_crash_retries_foreign_load_and_resumes(
                 base="fake",
                 type="main",
                 format="checkpoint",
-                variant=None,
+                variant="normal",
                 hash="blake3:fakehash",
                 source=None,
             )

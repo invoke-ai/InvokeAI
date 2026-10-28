@@ -239,6 +239,21 @@ def test_a_points_platform_is_the_one_platform_for_gives_on_the_measuring_machin
     assert ("os" in point.platform) == (hip is not None and os_name == "windows")
 
 
+@pytest.mark.parametrize("hip, os_name", [(None, "linux"), ("7.14.0", "windows")])
+def test_a_point_of_an_estimator_keyed_by_no_platform_names_no_platform(
+    hip, os_name, machine, tmp_path: Path, entries, specs
+) -> None:
+    # MOSS-Image's denoise entry reads alike on every platform; ROCm on Windows names even its OS for a VAE point.
+    machine(hip, os_name)
+    features = {"height": 1024, "width": 1024, "text_tokens": 64, "score_matrix_bytes": 0, "dequant_bytes": 0}
+    window = _window(1, features, 4 * GIB, estimator="moss_image.denoise", version=1)
+    export = _export(tmp_path / "export.json", RX_9060_XT if hip else RTX_4090, [window])
+
+    [point] = build_points([export], specs, entries).points
+
+    assert point.platform == {}
+
+
 def test_a_window_whose_environment_lacks_a_platform_fact_is_left_out(machine, tmp_path: Path, entries, specs) -> None:
     machine(None, "linux")
     complete = _export(tmp_path / "complete.json", RTX_4090, [_window(1, _decode(1024), 4 * GIB)])
@@ -544,7 +559,8 @@ def test_a_raise_that_pushes_fresh_process_points_over_their_bound_is_refused_ev
         assert "reserved MiB 8020, 13000 while allocated MiB 8020, 8020" in captured.out
         assert "decode_fp32: k 5988 -> " in captured.out and "1 flagged as fragmentation" in captured.out
         assert "the bounds of these points reject the result" in captured.err
-        assert "vae.sd-miopen,expandable,windows-decode-fp32-1280x1280-RX9060XT-demand_peak: reserves" in captured.err
+        violation = "vae.sd-miopen,expandable,windows-decode-fp32-1280x1280-scores-RX9060XT-demand_peak: reserves"
+        assert violation in captured.err
         assert _files(data_dir) == before
 
 

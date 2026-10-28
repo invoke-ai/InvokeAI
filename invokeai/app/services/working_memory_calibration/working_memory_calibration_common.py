@@ -9,12 +9,21 @@ model's runs measured.
 """
 
 import datetime
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import Any, Final, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, SerializerFunctionWrapHandler, model_serializer, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    ValidationError,
+    model_serializer,
+    model_validator,
+)
 
+from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.session_queue.session_queue_common import QUEUE_ITEM_STATUS, BatchDataCollection
 from invokeai.app.services.shared.graph import Graph
 from invokeai.backend.working_memory.counters import Backend
@@ -39,6 +48,32 @@ def calibration_run_id(origin: Optional[str]) -> Optional[str]:
     if origin is None or not origin.startswith(CALIBRATION_ORIGIN_PREFIX):
         return None
     return origin[len(CALIBRATION_ORIGIN_PREFIX) :]
+
+
+def graph_model_identifiers(graph: Graph) -> Iterator[ModelIdentifierField]:
+    """The models a graph's nodes name: their model fields, also inside a field's model, list or mapping (a LoRA
+    collection's `LoRAField.lora`), and every mapping that reads as a model identifier, such as a model a metadata
+    node's untyped field records. A client sees the graph as JSON, where those look alike, so both count."""
+
+    def within(value: object) -> Iterator[ModelIdentifierField]:
+        if isinstance(value, ModelIdentifierField):
+            yield value
+        elif isinstance(value, BaseModel):
+            for _, field in value:
+                yield from within(field)
+        elif isinstance(value, Mapping):
+            try:
+                yield ModelIdentifierField.model_validate(value)
+            except ValidationError:
+                for entry in value.values():
+                    yield from within(entry)
+        elif isinstance(value, (list, tuple)):
+            for entry in value:
+                yield from within(entry)
+
+    for node in graph.nodes.values():
+        for _, value in node:
+            yield from within(value)
 
 
 def is_reserved_origin(origin: Optional[str]) -> bool:
@@ -171,6 +206,17 @@ class CalibrationGraphModel(CalibrationModelIdentity):
         return data
 
 
+class CalibrationCompiledModel(CalibrationGraphModel):
+    """A model a calibration request's graph names, as the record the client compiled the graph against has it. Every
+    fact is required: format and variant are null for a record without one, the rest is never null."""
+
+    hash: str = Field(description="The model's hash, as the graph's identifier names it")
+    base: str
+    type: str
+    format: Optional[str] = Field(description="The model's format; null for a record without one")
+    variant: Optional[str] = Field(description="The model's variant; null for a record without one")
+
+
 class CalibrationRun(_StoreModel):
     run_id: str
     model_key: str
@@ -207,8 +253,8 @@ class CalibrationRun(_StoreModel):
     )
     graph_models: dict[str, CalibrationGraphModel] = Field(
         default_factory=dict,
-        description="Per model key, each model the run's graph names as it was when the run was created: the graph's "
-        "own identifiers carry hash, base and type, not format or variant. An item fails at admission once one "
+        description="Per model key, each model the run's graph names as the client compiled the graph against it "
+        "(the request's graph_models), which the run's creation found unchanged. An item fails at admission once one "
         "changed, and a later run of the attempt is refused once one differs from what this run recorded. Absent in "
         "runs stored before it was recorded",
     )
@@ -357,6 +403,16 @@ MEASUREMENT_VERIFIED_DESCRIPTION: Final = (
 )
 
 
+GRAPH_MODELS_DESCRIPTION: Final = (
+    "Per model key, every model the graph names (in a node's field, inside one, or in a mapping that reads as a model "
+    "identifier), as the client compiled the graph against its record. Exactly the graph's models are named (422 "
+    "otherwise). "
+    "The run's creation compares each with the model's record now, and refuses the run with 409 `model_changed` when "
+    "any differs, so send the records the graph was compiled from, never ones read again before posting. The run "
+    "records them, and admission compares them again when its item starts."
+)
+
+
 class WorkingMemoryCalibrationRequest(BaseModel):
     """The batch a calibration run enqueues, built by the client. The server sets origin, destination, runs and the
     graph's id, turns the node cache off, and makes every node's images intermediates on no board: never in the
@@ -365,6 +421,7 @@ class WorkingMemoryCalibrationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     graph: Graph = Field(description="The graph to measure")
+    graph_models: dict[str, CalibrationCompiledModel] = Field(description=GRAPH_MODELS_DESCRIPTION)
     data: Optional[BatchDataCollection] = Field(default=None, description="The batch data collection")
     idempotency_key: Optional[str] = Field(
         default=None,
@@ -389,6 +446,21 @@ class WorkingMemoryCalibrationRequest(BaseModel):
     def _attempt_comes_with_its_steps(self) -> "WorkingMemoryCalibrationRequest":
         if (self.attempt_id is None) != (self.attempt_steps is None):
             raise ValueError("attempt_id and attempt_steps are sent together or not at all")
+        return self
+
+    @model_validator(mode="after")
+    def _graph_models_name_the_graphs_models(self) -> "WorkingMemoryCalibrationRequest":
+        named = {identifier.key for identifier in graph_model_identifiers(self.graph)}
+        problems = [
+            f"the graph names {key}, which graph_models lacks" for key in sorted(named - self.graph_models.keys())
+        ]
+        problems += [
+            f"graph_models names {key}, which the graph does not" for key in sorted(self.graph_models.keys() - named)
+        ]
+        if problems:
+            raise ValueError(
+                f"graph_models must name every model the graph names, and only those: {'; '.join(problems)}"
+            )
         return self
 
 

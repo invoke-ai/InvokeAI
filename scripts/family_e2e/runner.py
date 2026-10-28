@@ -9,8 +9,11 @@ every case key with measures left, because the new server starts with a cold mod
 
 `stop` and the runner agree through run.json under the run lock (`run_lock`): the runner names itself in the heartbeat
 before anything else (`register_runner`), and `stop` marks the run stopped before it reads the heartbeat. So `stop`
-either finds the runner and kills it, or the runner finds the run stopped and leaves it untouched. The runner checks
-again before every server and every step (`ensure_running`), and never overwrites a status other than `running`.
+either finds the runner and kills it, or the runner finds the run stopped and leaves it untouched. The same holds for
+every server: the runner checks the status, spawns the server and records its launcher in the heartbeat under one hold
+of the run lock (`_Session.server_registration`), so a server spawned before the mark is in the heartbeat `stop` reads,
+and none is spawned after it. The runner checks again before every server and every step (`ensure_running`), and
+never overwrites a status other than `running`.
 
 A calibration run also checks that the server can calibrate, submits each step through the working-memory calibrate
 route, and saves the lifetime's calibration store before the scratch root goes (`calibration.py`). It records the
@@ -106,7 +109,8 @@ logger = logging.getLogger("family_e2e")
 
 HEARTBEAT_FILE = "heartbeat.json"
 RUN_LOCK_FILE = "run.lock"
-# Holders keep the run lock for one read and one write of a small JSON file, and a calibration run's store files.
+# Holders keep the run lock for one read and one write of a small JSON file, a calibration run's store files, or the
+# spawn of a server process (not its startup; a spawn that could not be recorded also waits there for its kill).
 RUN_LOCK_TIMEOUT_S = 30.0
 RUN_LOCK_POLL_S = 0.01
 # A started runner registers once its interpreter has imported the tool, which takes seconds on a busy machine.
@@ -288,9 +292,10 @@ def gpu_lock(adapter: gpu_memory.Adapter) -> Iterator[None]:
 
 @contextmanager
 def run_lock(run_dir: Path) -> Iterator[None]:
-    """Holds `<run_dir>/run.lock`, which orders status changes of run.json and the runner's registration between the
-    runner, `stop` and `resume`. Waits while another process holds it; the operating system releases the lock of a
-    killed holder."""
+    """Holds `<run_dir>/run.lock`, which orders status changes of run.json, the runner's registration and the spawn
+    of its servers between the runner, `stop` and `resume`. Waits while another process holds it; the operating system
+    releases the lock of a killed holder. The lock's handle is not inheritable, so a server spawned under it does not
+    keep it."""
     with open(run_dir / RUN_LOCK_FILE, "a+b") as f:
         deadline = time.monotonic() + RUN_LOCK_TIMEOUT_S
         while True:
@@ -860,7 +865,7 @@ class _Session:
                     log_path,
                     self.run_dir / f"server-{self.arm}.console.log",
                     pin,
-                    on_spawn=self.server_spawned,
+                    registration=self.server_registration(),
                 )
                 self.heartbeat("server ready")
                 self.serve(self.server, todo)
@@ -898,6 +903,19 @@ class _Session:
                 if leftovers:
                     logger.warning("could not remove the scratch root %s: %s", root, ", ".join(leftovers))
         return False
+
+    @contextmanager
+    def server_registration(self) -> Iterator[Callable[[int], None]]:
+        """Where `launch_server` spawns the server: under the run lock, and only while the run is still running.
+
+        `stop` marks the run stopped under the same lock before it reads the heartbeat, so a server is either in that
+        heartbeat (the launcher's identity is recorded before the lock is released) or never spawned. Without it, a
+        server spawned between `stop`'s capture of the runner's tree and the kill would be in neither on POSIX, where
+        it runs in a session of its own, and `stop` would remove the scratch root it still uses.
+        """
+        with run_lock(self.run_dir):
+            _raise_unless_running(self.run_dir)
+            yield self.server_spawned
 
     def server_spawned(self, pid: int) -> None:
         self.launcher = process_identity(pid)
@@ -1215,7 +1233,7 @@ class _Session:
             if self.info.calibrate:
                 try:
                     item_id, fields["calibration"] = calibration.submit(
-                        client, self.cases[step.case_key].spec.model, graph.batch
+                        client, self.cases[step.case_key].spec.model, graph.batch, self.info.case_models[step.case_key]
                     )
                 except calibration.CaseRefused as e:
                     fields.update(error=str(e), invalid_reasons=[str(e)])

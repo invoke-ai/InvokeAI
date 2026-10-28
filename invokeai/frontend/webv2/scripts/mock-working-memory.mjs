@@ -15,7 +15,8 @@
  * A calibrate request with an attempt is refused (409, coded) while another attempt runs on the GPU or is open (between
  * its steps, short of them, not aborted, active within the last two minutes of `clock`), for a later step once another
  * run was created since the attempt's first (`calibration_interleaved`), and for a graph naming a model whose hash,
- * base or type changed since it compiled, or that was removed.
+ * base, type, format or variant changed since it compiled, or that was removed. Like the server, it takes a request only
+ * with `graph_models` stating every model the graph names and no other (422).
  * Calibration items live here rather than in the fixture queue, so profile counts stay fixed. Tests pass their own
  * `clock` to advance runs without waiting.
  */
@@ -129,16 +130,65 @@ const INTERLEAVED_REFUSAL = {
 /** How long an attempt between its steps holds the GPU after its last activity, as the server waits. */
 const ATTEMPT_IDLE_GRACE_MS = 120_000;
 
-/** The model identifiers a graph names: the nodes' fields that carry a model's key, hash, base and type. */
-const modelIdentifiersOf = (graph) =>
-  Object.values(graph.nodes ?? {}).flatMap((node) =>
-    Object.values(node ?? {}).filter(
-      (value) =>
-        value !== null &&
-        typeof value === 'object' &&
-        ['key', 'hash', 'base', 'type'].every((field) => typeof value[field] === 'string')
-    )
-  );
+/** As webv2's `compiledModelIdentities` reads one: string key, hash, name, base and type; no submodel type but a string. */
+const isModelIdentifier = (value) =>
+  ['key', 'hash', 'name', 'base', 'type'].every((field) => typeof value[field] === 'string') &&
+  (value.submodel_type === undefined || value.submodel_type === null || typeof value.submodel_type === 'string');
+
+/** Every fact of a `graph_models` entry is stated; these three are never null, as the server requires. */
+const isStatedIdentity = (identity) =>
+  identity !== null &&
+  typeof identity === 'object' &&
+  IDENTITY_FACTS.every((fact) => fact in identity) &&
+  ['hash', 'base', 'type'].every((fact) => typeof identity[fact] === 'string');
+
+/** The model identifiers a graph names, as the server finds them: in the nodes' fields and nested in them. */
+const modelIdentifiersOf = (graph) => {
+  const found = [];
+  const visit = (value) => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+    } else if (value !== null && typeof value === 'object') {
+      if (isModelIdentifier(value)) {
+        found.push(value);
+      } else {
+        Object.values(value).forEach(visit);
+      }
+    }
+  };
+
+  for (const node of Object.values(graph.nodes ?? {})) {
+    if (node !== null && typeof node === 'object') {
+      Object.values(node).forEach(visit);
+    }
+  }
+  return found;
+};
+
+const IDENTITY_FACTS = ['hash', 'base', 'type', 'format', 'variant'];
+
+/** Why `graphModels` does not state exactly the graph's models, every fact of each, or null when it does. */
+const graphModelsProblem = (graph, graphModels) => {
+  if (graphModels === null || typeof graphModels !== 'object' || Array.isArray(graphModels)) {
+    return 'graph_models is required: the identity of every model the graph names.';
+  }
+
+  const named = new Set(modelIdentifiersOf(graph).map((identifier) => identifier.key));
+  const stated = Object.keys(graphModels);
+  const problems = [
+    ...[...named]
+      .filter((key) => !(key in graphModels))
+      .map((key) => `the graph names ${key}, which graph_models lacks`),
+    ...stated.filter((key) => !named.has(key)).map((key) => `graph_models names ${key}, which the graph does not`),
+    ...stated
+      .filter((key) => !isStatedIdentity(graphModels[key]))
+      .map((key) => `graph_models[${key}] does not state every fact, or states a null hash, base or type`),
+  ];
+
+  return problems.length > 0
+    ? `graph_models must state every model the graph names, and only those: ${problems.join('; ')}`
+    : null;
+};
 
 /**
  * `currentModel` reads a model's record as it is now, so a graph compiled over an older record is refused as the
@@ -666,6 +716,12 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
       return { body: { detail: 'The graph cannot be measured as a calibration run.' }, status: 422 };
     }
 
+    const graphModelsRefusal = graphModelsProblem(body.graph, body.graph_models);
+
+    if (graphModelsRefusal !== null) {
+      return { body: { detail: graphModelsRefusal }, status: 422 };
+    }
+
     const attemptId = body.attempt_id ?? null;
     const attemptSteps = body.attempt_steps ?? null;
 
@@ -717,7 +773,8 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
         return { body: { detail: RUNNING_REFUSAL }, status: 409 };
       }
 
-      // Every model the graph names must still be the record it compiled over.
+      // Every model the graph names must still be the record it compiled over: as its identifier and its
+      // graph_models entry name it.
       for (const identifier of modelIdentifiersOf(body.graph)) {
         const record = currentModel ? currentModel(identifier.key) : byKey.get(identifier.key);
         const name = identifier.name ?? record?.name ?? identifier.key;
@@ -727,7 +784,11 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
           return { body: { detail: { code: 'model_changed', message } }, status: 409 };
         }
 
-        const facts = ['hash', 'base', 'type'].filter((field) => record[field] !== identifier[field]);
+        const compiled = body.graph_models[identifier.key];
+        const facts = IDENTITY_FACTS.filter(
+          (fact) =>
+            (fact in identifier && record[fact] !== identifier[fact]) || (record[fact] ?? null) !== compiled[fact]
+        );
 
         if (facts.length > 0) {
           const message = `${name} changed after this calibration was planned (${facts.join(', ')}). Calibrate again.`;

@@ -187,8 +187,9 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 def cmd_stop(args: argparse.Namespace) -> int:
     run_dir = _resolve_run(args.run, args.manifest)
-    # Marked before the heartbeat is read, under the run lock a runner registers under: a runner registered before is
-    # in the heartbeat and is killed, one that registers after finds the run stopped and leaves it untouched.
+    # Marked before the heartbeat is read, under the run lock a runner registers and spawns each server under: a runner
+    # or server that came before is in the heartbeat and is killed, and none comes after (the runner finds the run
+    # stopped and leaves it untouched).
     was_running = finish_run(run_dir, "stopped")
     heartbeat = read_heartbeat(run_dir)
     # A running run has a registered runner, so an empty read is most likely one that met the runner's replace.
@@ -198,13 +199,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
         heartbeat = read_heartbeat(run_dir)
     # The runner first: it would otherwise notice its server dying and record a crash.
     killed, survivors = kill_recorded([("runner", heartbeat.get("runner"))])
-    # A runner records its server at the spawn, and nothing writes heartbeat.json once the runner is gone: read again,
-    # it also names a server launched between the read above and the kill, which on POSIX outlives the runner.
-    servers = [(role, heartbeat.get(role)) for role in SERVER_ROLES]
-    if not survivors:
-        latest = read_heartbeat(run_dir)
-        servers += [(role, latest.get(role)) for role in SERVER_ROLES if latest.get(role) != heartbeat.get(role)]
-    killed_servers, left = kill_recorded(servers)
+    killed_servers, left = kill_recorded([(role, heartbeat.get(role)) for role in SERVER_ROLES])
     killed += killed_servers
     survivors = ", ".join(s for s in (survivors, left) if s)
     if survivors:
