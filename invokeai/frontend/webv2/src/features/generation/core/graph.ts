@@ -1667,7 +1667,18 @@ const buildMossImageGraph = (
   // The denoise node reads the VAE's BatchNorm statistics, which define the latent space it works in.
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, modelLoader, 'qwen3_5_encoder', posCond, 'qwen3_5_encoder');
-  addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
+  // The layout node compiles a layout draft (e.g. from Expand Prompt) and canvas regions into the model's layout
+  // prompt at run time, and passes plain text through. Canvas fills `regions`; batch prompt variation still flows
+  // through `positive_prompt`.
+  const layoutPrompt = addNode(graph, {
+    height: denoiseSize.height,
+    id: 'layout_prompt',
+    regions: [],
+    type: 'moss_image_layout_prompt',
+    width: denoiseSize.width,
+  });
+  addEdge(graph, positivePrompt, 'value', layoutPrompt, 'prompt');
+  addEdge(graph, layoutPrompt, 'value', posCond, 'prompt');
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
 
   if (negCond) {
@@ -1683,6 +1694,10 @@ const buildMossImageGraph = (
     vae: vaeModel ?? undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
+  const metadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
+  if (metadata) {
+    addEdge(graph, layoutPrompt, 'value', metadata, 'moss_image_layout_prompt');
+  }
 
   return graph;
 };

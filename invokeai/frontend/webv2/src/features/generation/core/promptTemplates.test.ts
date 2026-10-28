@@ -31,6 +31,14 @@ describe('prompt template expansion', () => {
     expect(applyPromptTemplate(templatePrompt, prompt)).toBe(expected);
   });
 
+  it('keeps a JSON positive prompt whole under a template and still applies the negative side', () => {
+    const layout = '```json\n{"bbox_coord_space":"abs_centralized","items":[]}\n```';
+    expect(getEffectivePrompts({ negativePrompt: 'noise', positivePrompt: layout, promptTemplate: template })).toEqual({
+      negativePrompt: 'noise, blurry',
+      positivePrompt: layout,
+    });
+  });
+
   it('merges both prompt sides and passes them through when no template is active', () => {
     expect(getEffectivePrompts({ negativePrompt: 'noise', positivePrompt: 'owl' })).toEqual({
       negativePrompt: 'noise',

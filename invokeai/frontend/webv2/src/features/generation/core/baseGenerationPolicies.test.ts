@@ -27,6 +27,7 @@ import {
   getGenerationModelAvailabilityReasons,
   getGenerationUiPolicy,
   getGenerationValidationReasons,
+  getImageExpandPromptSuggestion,
   getKrea2EditLoraState,
   getMaxReferenceImages,
   getMissingReferenceImageFormat,
@@ -192,6 +193,18 @@ describe('architecture policy, read from the backend capability table', () => {
       'lcm',
     ]);
     expect(coerceSchedulerForGraph(zbase, 'lcm')).toBe('euler');
+  });
+
+  it('suggests the MOSS-Image prompt enhancer to Expand Prompt and nothing for other image bases', () => {
+    expect(getImageExpandPromptSuggestion(createModel('moss-image'))).toEqual({
+      image: null,
+      imageSystemPromptId: null,
+      modelName: 'Gemma 4 E4B (Prompt Enhancer)',
+      modelSource: 'google/gemma-4-E4B-it',
+      systemPromptId: '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0011',
+    });
+    expect(getImageExpandPromptSuggestion(createModel('flux'))).toBeNull();
+    expect(getImageExpandPromptSuggestion(undefined)).toBeNull();
   });
 
   it('matches expected prompt policy per base', () => {

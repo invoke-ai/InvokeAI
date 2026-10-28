@@ -348,6 +348,7 @@
         "img_watermark",
         "integer",
         "moss_image_denoise",
+        "moss_image_layout_prompt",
         "moss_image_model_loader",
         "moss_image_text_encoder",
         "string"
@@ -620,6 +621,7 @@
     },
     "core_metadata": {
       "inputs": [
+        "moss_image_layout_prompt",
         "negative_prompt",
         "positive_prompt",
         "seed"
@@ -1674,6 +1676,29 @@
       },
       "outputs": [
         "latents"
+      ]
+    },
+    "moss_image_layout_prompt": {
+      "inputs": [
+        "prompt"
+      ],
+      "literalInputs": {
+        "height": [
+          1024
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "regions": [],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          1024
+        ]
+      },
+      "outputs": [
+        "value"
       ]
     },
     "moss_image_model_loader": {

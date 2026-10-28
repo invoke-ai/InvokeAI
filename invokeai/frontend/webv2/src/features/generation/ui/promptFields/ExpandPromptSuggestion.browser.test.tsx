@@ -22,7 +22,17 @@ await i18n.use(initReactI18next).init({
   fallbackLng: 'en',
   lng: 'en',
   resources: {
-    en: { translation: { widgets: { generate: { expandSuggestedModelMissing: '{{model}} is not installed' } } } },
+    en: {
+      translation: {
+        widgets: {
+          generate: {
+            expandSuggestedModelAvailable: 'Recommended: {{model}}',
+            expandSuggestedModelMissing: '{{model}} is not installed',
+            expandUseSuggestedModelLabel: 'Use {{model}}',
+          },
+        },
+      },
+    },
   },
 });
 
@@ -36,6 +46,16 @@ const ENHANCER = {
   type: 'text_llm',
 };
 
+const MOSS_ENHANCER = { ...ENHANCER, key: 'e4b', name: 'Gemma 4 E4B', source: 'google/gemma-4-E4B-it' };
+const MOSS_PROMPT_ID = '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0011';
+const MOSS_SUGGESTION: ExpandPromptSuggestion = {
+  image: null,
+  imageSystemPromptId: null,
+  modelName: 'Gemma 4 E4B (Prompt Enhancer)',
+  modelSource: 'google/gemma-4-E4B-it',
+  systemPromptId: MOSS_PROMPT_ID,
+};
+
 const prompt = (id: string, content: string) => ({
   content,
   id,
@@ -47,7 +67,12 @@ const prompt = (id: string, content: string) => ({
 const VISION_A = { base: 'any', key: 'llava-a', name: 'LLaVA A', type: 'llava_onevision' };
 const VISION_B = { base: 'any', key: 'llava-b', name: 'LLaVA B', type: 'llava_onevision' };
 
-const PROMPTS = [prompt('default', 'DEFAULT'), prompt('t2v', 'T2V'), prompt('i2v', 'I2V')];
+const PROMPTS = [
+  prompt('default', 'DEFAULT'),
+  prompt('t2v', 'T2V'),
+  prompt('i2v', 'I2V'),
+  prompt(MOSS_PROMPT_ID, 'MOSS'),
+];
 
 const FRAME = { height: 512, image_name: 'frame.png', width: 768 };
 const LTX_SUGGESTION: ExpandPromptSuggestion = {
@@ -310,18 +335,59 @@ it('starts from the first listed model without a suggestion', async () => {
   expect(await runExpand()).toMatchObject({ model_key: 'e2b' });
 });
 
-it("uses the surface's saved pick over the suggestion and saves a different one", async () => {
+const useSuggestedButton = (name: string) =>
+  document.querySelector<HTMLButtonElement>(`button[aria-label="Use ${name}"]`);
+
+it("keeps the surface's saved pick over an installed suggestion, also after a remount, and saves a different one", async () => {
   const saved = savedModels({ expandPromptModelKey: 'qwen' });
   await renderAndOpen(LTX_SUGGESTION, saved);
 
   expect(select('text llm')?.value).toBe('qwen');
+  expect(document.body.textContent).toContain('Recommended: Gemma-4 E2B');
+  await act(() => root?.unmount());
+  host?.remove();
+  await renderAndOpen(LTX_SUGGESTION, saved);
+  expect(select('text llm')?.value).toBe('qwen');
+
   await choose('text llm', 'e2b');
   expect(saved.onChange).toHaveBeenCalledExactlyOnceWith({ expandPromptModelKey: 'e2b' });
+});
 
-  // Once saved, picking the same model again saves nothing.
-  await act(() => renderField(LTX_SUGGESTION, { ...saved, expandPromptModelKey: 'e2b' }));
-  await choose('text llm', 'e2b');
-  expect(saved.onChange).toHaveBeenCalledOnce();
+it('switches to the recommended MOSS-Image enhancer from the hint and saves it', async () => {
+  catalog = [TEXT_ONLY, ENHANCER, MOSS_ENHANCER];
+  const saved = savedModels({ expandPromptModelKey: 'e2b' });
+  await renderAndOpen(MOSS_SUGGESTION, saved);
+
+  expect(select('text llm')?.value).toBe('e2b');
+  await act(() => useSuggestedButton('Gemma 4 E4B')?.click());
+  expect(select('text llm')?.value).toBe('e4b');
+  expect(useSuggestedButton('Gemma 4 E4B')).toBeNull();
+  expect(saved.onChange).toHaveBeenCalledExactlyOnceWith({ expandPromptModelKey: 'e4b' });
+  expect(await runExpand()).toMatchObject({ model_key: 'e4b', system_prompt: 'MOSS' });
+});
+
+it('preselects an installed suggestion when nothing is saved, without the hint', async () => {
+  catalog = [TEXT_ONLY, ENHANCER, MOSS_ENHANCER];
+  await renderAndOpen(MOSS_SUGGESTION, savedModels());
+
+  expect(select('text llm')?.value).toBe('e4b');
+  expect(useSuggestedButton('Gemma 4 E4B')).toBeNull();
+});
+
+it('recognises the MOSS-Image enhancer installed in place from a local folder', async () => {
+  catalog = [TEXT_ONLY, { ...MOSS_ENHANCER, source: 'E:/ModelStuffSSD/gemma-4-E4B-it' }];
+  await renderAndOpen(MOSS_SUGGESTION, savedModels());
+
+  expect(select('text llm')?.value).toBe('e4b');
+  expect(document.body.textContent).not.toContain('is not installed');
+});
+
+it('points to the MOSS-Image enhancer starter model when it is not installed', async () => {
+  await renderAndOpen(MOSS_SUGGESTION, savedModels({ expandPromptModelKey: 'e2b' }));
+
+  expect(select('text llm')?.value).toBe('e2b');
+  expect(document.body.textContent).toContain('Gemma 4 E4B (Prompt Enhancer) is not installed');
+  expect(document.body.textContent).not.toContain('Recommended:');
 });
 
 it('falls back when the saved pick is no longer installed', async () => {

@@ -1,3 +1,5 @@
+import { isJsonPrompt } from './prompt/jsonPrompt';
+
 export const PROMPT_TEMPLATE_PLACEHOLDER = '{prompt}';
 
 export interface PromptTemplateSnapshot {
@@ -33,7 +35,10 @@ export const getEffectivePrompts = (settings: AuthoredPrompts): EffectivePrompts
 
   return {
     negativePrompt: applyPromptTemplate(promptTemplate.negativePrompt, negativePrompt),
-    positivePrompt: applyPromptTemplate(promptTemplate.positivePrompt, positivePrompt),
+    // Text around a JSON prompt (a MOSS-Image layout, a structured prompt) would stop it parsing, so it stays whole.
+    positivePrompt: isJsonPrompt(positivePrompt)
+      ? positivePrompt
+      : applyPromptTemplate(promptTemplate.positivePrompt, positivePrompt),
   };
 };
 

@@ -18,6 +18,7 @@ import {
 import { SEED_MAX } from '@platform/core/seed';
 
 import type {
+  ExpandPromptSuggestion,
   ExternalGenerationMode,
   GenerateModelConfig,
   GenerateReferenceImage,
@@ -366,6 +367,41 @@ export const getPromptPolicy = (
       ? { negativeHelpText: 'Used only when CFG is greater than 1.' }
       : {}),
   };
+};
+
+/** A family's released prompt enhancer, which Expand Prompt preselects for a text-only rewrite. */
+interface ImagePromptEnhancer {
+  /** Starter source of the enhancer model; an installed text LLM with this source is preselected. */
+  modelSource: string;
+  /** The starter model's name, for the hint shown when it is not installed. */
+  modelName: string;
+  /** Seeded public system prompt. */
+  systemPromptId: string;
+}
+
+const IMAGE_PROMPT_ENHANCERS: Partial<Record<string, ImagePromptEnhancer>> = {
+  // The OpenMOSS prompt-enhancer skill writes a layout draft the `moss_image_layout_prompt` node compiles.
+  'moss-image': {
+    modelName: 'Gemma 4 E4B (Prompt Enhancer)',
+    modelSource: 'google/gemma-4-E4B-it',
+    systemPromptId: '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0011',
+  },
+};
+
+/** What Expand Prompt starts from for this image family, or null when the family ships no enhancer. */
+export const getImageExpandPromptSuggestion = (
+  model: GenerateModelConfig | undefined
+): ExpandPromptSuggestion | null => {
+  const enhancer = model?.type === 'main' ? IMAGE_PROMPT_ENHANCERS[model.base] : undefined;
+  return enhancer
+    ? {
+        image: null,
+        imageSystemPromptId: null,
+        modelName: enhancer.modelName,
+        modelSource: enhancer.modelSource,
+        systemPromptId: enhancer.systemPromptId,
+      }
+    : null;
 };
 
 export const getGenerationUiPolicy = (model: GenerateModelConfig | undefined) => {

@@ -92555,7 +92555,7 @@
         "category": "conditioning",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Places regions on a MOSS-Image prompt as a JSON layout, at generation time.\n\nThe layout is built here rather than by the graph builder so the prompt that dynamic prompts and batching vary is\nthe one laid out. Without regions the prompt passes through unchanged; a prompt that already is a layout gets the\nregions appended to its items.",
+        "description": "Places regions on a MOSS-Image prompt as a JSON layout, at generation time.\n\nThe layout is built here rather than by the graph builder so the prompt that dynamic prompts and batching vary is\nthe one laid out. A layout draft with absolute pixel boxes (what Expand Prompt's MOSS-Image Prompt Enhancer writes)\nis compiled at this width and height, regions following its items. Otherwise, without regions the prompt passes\nthrough unchanged, and a prompt that already is a compiled layout gets the regions appended to its items.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -92584,7 +92584,7 @@
           },
           "prompt": {
             "default": "",
-            "description": "The image prompt: plain text becomes the layout's summary caption, a compiled layout gets the regions appended.",
+            "description": "The image prompt: plain text becomes the layout's summary caption, a compiled layout gets the regions appended, and a layout draft with absolute pixel boxes is compiled at this width and height.",
             "field_kind": "input",
             "input": "any",
             "orig_default": "",

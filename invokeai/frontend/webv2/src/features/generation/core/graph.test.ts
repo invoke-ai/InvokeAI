@@ -1554,6 +1554,24 @@ describe('MOSS-Image graphs', () => {
     expect(getNodeByType(graph, 'core_metadata')?.generation_mode).toBe('moss_image_txt2img');
   });
 
+  it('routes the positive prompt through the layout node, which compiles a layout draft at the denoise size', () => {
+    const graph = compile(mossDiffusers, { height: 768, width: 1280 });
+    const metadata = getNodeByType(graph, 'core_metadata')!;
+
+    expect(graph.nodes.layout_prompt).toMatchObject({
+      height: 768,
+      regions: [],
+      type: 'moss_image_layout_prompt',
+      width: 1280,
+    });
+    expect(getEdge(graph, 'layout_prompt', 'prompt')?.source).toEqual({ field: 'value', node_id: 'positive_prompt' });
+    expect(getEdge(graph, 'pos_cond', 'prompt')?.source).toEqual({ field: 'value', node_id: 'layout_prompt' });
+    expect(getEdge(graph, metadata.id, 'moss_image_layout_prompt')?.source).toEqual({
+      field: 'value',
+      node_id: 'layout_prompt',
+    });
+  });
+
   it('encodes the negative prompt only while CFG runs the negative branch', () => {
     const withCfg = compile(mossDiffusers, { cfgScale: 4 });
 

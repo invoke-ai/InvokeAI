@@ -18,6 +18,17 @@ describe('hasDynamicPromptSyntax', () => {
     expect(hasDynamicPromptSyntax('multi\nline {a|b}')).toBe(true);
   });
 
+  it('never treats a JSON prompt as dynamic, fenced or not', () => {
+    const draft =
+      '{"width":1024,"height":1536,"bbox_coord_space":"abs","bbox_format":"xyxy","summary":{"caption":"a #1 poster"},"items":[{"caption":"__colors__"}]}';
+    expect(hasDynamicPromptSyntax(draft)).toBe(false);
+    expect(hasDynamicPromptSyntax(`\`\`\`json\n${draft}\n\`\`\``)).toBe(false);
+    expect(hasDynamicPromptSyntax('[{"caption": "a {red|green} ball"}]')).toBe(false);
+    // Braces that do not form JSON are still variants.
+    expect(hasDynamicPromptSyntax('{"caption": a {red|green} ball}')).toBe(true);
+    expect(hasDynamicPromptSyntax('a poster {"caption": "x"}')).toBe(true);
+  });
+
   it('detects a wildcard reference', () => {
     expect(hasDynamicPromptSyntax('a __colors__ ball')).toBe(true);
     expect(hasDynamicPromptSyntax('prefix__name__')).toBe(true);

@@ -1,3 +1,5 @@
+import { isJsonPrompt } from './prompt/jsonPrompt';
+
 const SEED_MAX = 4_294_967_295;
 
 export const DYNAMIC_PROMPTS_MIN_PROMPTS = 1;
@@ -269,9 +271,13 @@ export const getWildcardNameError = (
   return null;
 };
 
-/** # is expansion syntax because the backend strips comments without an escape, even without other dynamic syntax. */
+/**
+ * # is expansion syntax because the backend strips comments without an escape, even without other dynamic syntax. A
+ * JSON prompt is never expanded: its braces are data.
+ */
 export const hasDynamicPromptSyntax = (prompt: string): boolean =>
-  /\{[\s\S]*\}/.test(prompt) || prompt.includes('#') || scanWildcardReferences(prompt).length > 0;
+  (/\{[\s\S]*\}/.test(prompt) || prompt.includes('#') || scanWildcardReferences(prompt).length > 0) &&
+  !isJsonPrompt(prompt);
 
 export const isDynamicPromptsSeedBehaviour = (value: unknown): value is DynamicPromptsSeedBehaviour =>
   value === 'per-iteration' || value === 'per-image';

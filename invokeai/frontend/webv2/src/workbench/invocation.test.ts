@@ -628,6 +628,9 @@ describe('resolveInvocationRoute — canvas source', () => {
         canvasRoute
       ).validationReasons;
 
+    expect(reasonsFor({ positivePrompt: '```json\n{"bbox_coord_space": "abs",\n```' }, [])).toEqual([
+      'The prompt looks like a MOSS-Image layout draft but is not valid JSON. Run Expand Prompt again or fix it.',
+    ]);
     expect(reasonsFor({ positivePrompt: ' ' }, [region()])).toEqual([
       'MOSS-Image needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.',
     ]);
