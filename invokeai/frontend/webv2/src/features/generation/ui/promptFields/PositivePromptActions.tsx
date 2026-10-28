@@ -25,7 +25,7 @@ import {
   Text,
 } from '@chakra-ui/react';
 import { galleryImageUrls } from '@features/gallery/utility';
-import { isModelFromRepo } from '@features/generation/core/modelSource';
+import { isModelFromRepo } from '@features/generation/core/baseGenerationPolicies';
 import { filterPromptHistory } from '@features/generation/core/promptHistory';
 import { resolveSelectedSystemPromptId } from '@features/generation/core/systemPrompts';
 import { llmTaskProgressStore } from '@features/generation/data/llmTaskProgress';
