@@ -30,9 +30,10 @@ import {
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
-import { Activity, Suspense, use, useCallback, useMemo, useRef, type ReactNode } from 'react';
+import { Activity, Suspense, use, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ChromeIsland, getChromeIslandMinWidth } from './ChromeIsland';
 import {
   areInstanceIdListsEqual,
   getActiveInstanceIdsOutside,
@@ -48,6 +49,14 @@ const CENTER_PREFERRED_REGIONS = ['center'] as const;
 const CENTER_CHROME_INSET_STYLE = { '--wb-center-chrome-inset': '3rem' } as React.CSSProperties;
 // Reserve a usable center width; side panels shrink to honor this floor.
 const CENTER_MIN_WIDTH = '20rem';
+/** The view menu keeps its icon, a few letters of its name, and its chevron; the row scrolls past that. */
+const VIEW_MENU_MIN_WIDTH = '5rem';
+/**
+ * The start island gives way first, down to this width: room for the view menu at its own floor, clear of the end cue.
+ * The end island's zoom and actions keep their full width up to what that leaves, then scroll.
+ */
+const START_ISLAND_MIN_WIDTH = getChromeIslandMinWidth(VIEW_MENU_MIN_WIDTH);
+const END_ISLAND_MAX_WIDTH = `calc(100% - ${START_ISLAND_MIN_WIDTH} - {spacing.2})`;
 
 export const CenterArea = () => {
   const { t } = useTranslation();
@@ -217,7 +226,7 @@ export const CenterArea = () => {
           </ChromeIsland>
 
           {activeItem && activeItem.widget.manifest.chrome?.header !== 'hidden' ? (
-            <ChromeIsland flexShrink={0}>
+            <ChromeIsland flexShrink={0} maxW={END_ISLAND_MAX_WIDTH}>
               {centerToolbarItems.map((toolbarItem) => (
                 <WidgetRendererById
                   key={toolbarItem.id}
@@ -237,25 +246,6 @@ export const CenterArea = () => {
     </Flex>
   );
 };
-
-const ChromeIsland = ({ children, flexShrink = 1 }: { children: ReactNode; flexShrink?: 0 | 1 }) => (
-  <HStack
-    bg="bg.subtle"
-    borderColor="border.subtle"
-    borderWidth="1px"
-    flexShrink={flexShrink}
-    gap="0.5"
-    h="8"
-    minW="0"
-    pointerEvents="auto"
-    position="relative"
-    px="1"
-    rounded="md"
-    shadow="sm"
-  >
-    {children}
-  </HStack>
-);
 
 const CenterViewMenu = ({
   activeItem,
@@ -296,14 +286,13 @@ const CenterViewMenu = ({
           color="fg"
           // The button recipe refuses to shrink; a narrow center truncates the view name beside the widget's label.
           flexShrink={1}
-          minW="0"
+          minW={VIEW_MENU_MIN_WIDTH}
           overflow="hidden"
-          position="relative"
           px="2"
           size="sm"
           variant="ghost"
         >
-          <HStack gap="2" minW="0" position="relative" zIndex="1">
+          <HStack gap="2" minW="0">
             {activeItem ? <CenterViewIcon widget={activeItem.widget} /> : null}
             <Text fontWeight="700" truncate>
               {label}

@@ -172,6 +172,7 @@ void i18n.use(initReactI18next).init({
   resources: {
     en: {
       translation: {
+        common: { scrollToEnd: 'Scroll to end', scrollToStart: 'Scroll to start' },
         widgets: {
           centerRegion: 'Center view',
           centerViewEmpty: 'No view',
@@ -234,6 +235,42 @@ describe('CenterArea chrome layout', () => {
     expect(trailingActions.getBoundingClientRect().right).toBeLessThanOrEqual(
       centerRegion.getBoundingClientRect().right
     );
+  });
+
+  it('keeps the islands apart and inside the minimum center width, scrolling what does not fit', async () => {
+    // The center's own minimum width; both islands hold more than fits beside each other.
+    await render(<CenterArea />, 320);
+    // Resize observations, and the cues they set, land before the second frame.
+    await act(
+      () =>
+        new Promise((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(resolve));
+        })
+    );
+
+    const centerRegion = host!.querySelector<HTMLElement>('section')!.getBoundingClientRect();
+    const [startIsland, endIsland] = [...host!.querySelectorAll<HTMLElement>('[data-center-chrome-island]')];
+    const start = startIsland!.getBoundingClientRect();
+    const end = endIsland!.getBoundingClientRect();
+    const viewMenu = startIsland!.querySelector('button[aria-label^="Center view"]')!.getBoundingClientRect();
+
+    expect(start.left).toBeGreaterThanOrEqual(centerRegion.left);
+    expect(start.right).toBeLessThanOrEqual(end.left);
+    expect(end.right).toBeLessThanOrEqual(centerRegion.right);
+    // The actions give way at the width that leaves the start island its floor: border, row padding, the view menu's
+    // 5rem, and the 2.75rem end cue.
+    expect(start.width).toBeGreaterThanOrEqual(2 + 4 + 80 + 44);
+    expect(viewMenu.width).toBeGreaterThanOrEqual(80);
+    // At least the view menu's own 5rem floor stays clear of the cue covering the start island's end.
+    expect(viewMenu.left + 80).toBeLessThanOrEqual(
+      startIsland!.querySelector('[data-overflow-cue="end"]')!.getBoundingClientRect().left
+    );
+    // Each island scrolls the rest, cueing the end that hides it.
+    for (const island of [startIsland!, endIsland!]) {
+      const row = island.firstElementChild!;
+      expect(row.scrollWidth).toBeGreaterThan(row.clientWidth);
+      expect(island.querySelector('[data-overflow-cue="end"]')).not.toBeNull();
+    }
   });
 });
 
