@@ -31,7 +31,7 @@ from scripts.family_e2e.runner import (
     finish_run,
     gpu_lock,
     is_alive,
-    kill_identified,
+    kill_recorded,
     load_run_manifest,
     new_run,
     open_gpu,
@@ -197,9 +197,24 @@ def cmd_stop(args: argparse.Namespace) -> int:
         time.sleep(STOP_HEARTBEAT_POLL_S)
         heartbeat = read_heartbeat(run_dir)
     # The runner first: it would otherwise notice its server dying and record a crash.
-    for role in ("runner", *SERVER_ROLES):
-        if kill_identified(heartbeat.get(role)):
-            print(f"killed {role} (pid {int(heartbeat[role][0])}) and its descendants")
+    killed, survivors = kill_recorded([("runner", heartbeat.get("runner"))])
+    # A runner records its server at the spawn, and nothing writes heartbeat.json once the runner is gone: read again,
+    # it also names a server launched between the read above and the kill, which on POSIX outlives the runner.
+    servers = [(role, heartbeat.get(role)) for role in SERVER_ROLES]
+    if not survivors:
+        latest = read_heartbeat(run_dir)
+        servers += [(role, latest.get(role)) for role in SERVER_ROLES if latest.get(role) != heartbeat.get(role)]
+    killed_servers, left = kill_recorded(servers)
+    killed += killed_servers
+    survivors = ", ".join(s for s in (survivors, left) if s)
+    if survivors:
+        # What still runs may still write to its scratch root and the calibration store in it.
+        raise RunnerError(
+            f"the run's processes survived the kill: {survivors}. {run_dir.name} is marked stopped; its scratch roots "
+            "stay as they are. End them, then `stop` again"
+        )
+    for role, pid in killed:
+        print(f"killed {role} (pid {pid}) and its descendants")
     info = load_run_info(run_dir)
     unsaved = []
     for arm in sorted({DEFAULT_ARM, *info.environments}):
