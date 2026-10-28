@@ -232,6 +232,21 @@ def test_a_points_platform_is_the_one_platform_for_gives_on_the_measuring_machin
     assert ("os" in point.platform) == (hip is not None and os_name == "windows")
 
 
+@pytest.mark.parametrize("hip, os_name", [(None, "linux"), ("7.14.0", "windows")])
+def test_a_point_of_an_estimator_keyed_by_no_platform_names_no_platform(
+    hip, os_name, machine, tmp_path: Path, entries, specs
+) -> None:
+    # MOSS-Image's denoise entry reads alike on every platform; ROCm on Windows names even its OS for a VAE point.
+    machine(hip, os_name)
+    features = {"height": 1024, "width": 1024, "text_tokens": 64, "score_matrix_bytes": 0, "dequant_bytes": 0}
+    window = _window(1, features, 4 * GIB, estimator="moss_image.denoise", version=1)
+    export = _export(tmp_path / "export.json", RX_9060_XT if hip else RTX_4090, [window])
+
+    [point] = build_points([export], specs, entries).points
+
+    assert point.platform == {}
+
+
 def test_a_window_whose_environment_lacks_a_platform_fact_is_left_out(machine, tmp_path: Path, entries, specs) -> None:
     machine(None, "linux")
     complete = _export(tmp_path / "complete.json", RTX_4090, [_window(1, _decode(1024), 4 * GIB)])

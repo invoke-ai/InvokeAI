@@ -222,7 +222,8 @@ def build_points(
                     f"{path}: measured on {platform}, which `platform.MEASURED` does not list; ship coefficient "
                     "entries for it first"
                 )
-            keys = point_platform(platform, entries)
+            # A spec keyed by no platform trait reads one entry alike everywhere, and its points name no platform.
+            keys = point_platform(platform, entries) if spec.platform_keys else {}
             group = (device, window.estimator, window.version, _canonical(keys), _canonical(window.features))
             platforms[group] = keys
             groups.setdefault(group, []).append(_Window(window, env, device, path))
