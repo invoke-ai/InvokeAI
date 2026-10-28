@@ -186,7 +186,9 @@ happens.
 FLUX.2 LoRAs are labelled with the variant they were trained for, and the Generate tab only offers LoRAs
 that match the selected model's variant. LoRAs patch the transformer and, where they include text-encoder
 layers, the Qwen3 or Mistral encoder. In workflows use **Apply LoRA - Flux2 Klein** or **Apply LoRA -
-FLUX.2 [dev]** (and their *Collection* versions).
+FLUX.2 [dev]** (and their *Collection* versions). Supported layouts include LyCORIS, Diffusers/PEFT and
+ComfyUI/OneTrainer PEFT files whose module names start with `diffusion_model.`. Per-layer `.alpha` values in
+these `diffusion_model.` files set the LoRA scale.
 
 ## PiD super-resolution decode
 
