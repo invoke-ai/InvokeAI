@@ -12,14 +12,14 @@ describe('queueConfirmationStore', () => {
 
     requestQueueConfirmation({
       body: 'Clear queued work?',
-      confirmLabel: 'Clear Queue',
+      confirmLabel: 'Clear queue',
       onConfirm,
       title: 'Clear queue?',
     });
 
     expect(getQueueConfirmation()).toMatchObject({
       body: 'Clear queued work?',
-      confirmLabel: 'Clear Queue',
+      confirmLabel: 'Clear queue',
       onConfirm,
       title: 'Clear queue?',
     });

@@ -5,12 +5,12 @@ import { getQueueMenuActions } from './queueMenuActions';
 describe('getQueueMenuActions', () => {
   const buildInputs = (includeOpenQueue: boolean) => ({
     labels: {
-      cancelAll: 'Cancel All Items',
+      cancelAll: 'Cancel all items',
       cancelAllExceptCurrent: 'Cancel all except current item',
-      cancelCurrent: 'Cancel Current Item',
-      openQueue: 'Open Queue',
-      pauseProcessor: 'Pause Processor',
-      resumeProcessor: 'Resume Processor',
+      cancelCurrent: 'Cancel current item',
+      openQueue: 'Open queue',
+      pauseProcessor: 'Pause processor',
+      resumeProcessor: 'Resume processor',
     },
     cancellableCount: 2,
     canManageProcessor: true,
@@ -30,18 +30,18 @@ describe('getQueueMenuActions', () => {
     const actions = getQueueMenuActions(buildInputs(true));
 
     expect(actions.map((action) => action.label)).toEqual([
-      'Cancel Current Item',
-      'Cancel All Items',
+      'Cancel current item',
+      'Cancel all items',
       'Cancel all except current item',
-      'Resume Processor',
-      'Pause Processor',
-      'Open Queue',
+      'Resume processor',
+      'Pause processor',
+      'Open queue',
     ]);
   });
 
   it('omits the open-queue entry for menus rendered inside the queue widget', () => {
     const actions = getQueueMenuActions(buildInputs(false));
 
-    expect(actions.map((action) => action.label)).not.toContain('Open Queue');
+    expect(actions.map((action) => action.label)).not.toContain('Open queue');
   });
 });
