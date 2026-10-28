@@ -5,6 +5,7 @@ import { Box, Flex, Icon, Text } from '@chakra-ui/react';
 import { IconButton } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Row } from '@platform/ui/Row';
+import { Tooltip } from '@platform/ui/Tooltip';
 import { Link } from '@tanstack/react-router';
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
 import { isProjectSummaryCompatible } from '@workbench/projects/library';
@@ -34,6 +35,7 @@ export const ProjectRow = ({
   const isCompatible = isProjectSummaryCompatible(summary);
 
   const projectSearch = useMemo(() => ({ project: summary.id }), [summary.id]);
+  const pinLabel = isPinned ? t('projects.unpin') : t('projects.pin');
   const menuTarget = useMemo(() => ({ isPinned, onTogglePin, summary }), [isPinned, onTogglePin, summary]);
   const handleContextMenu = useCallback(
     (event: MouseEvent<HTMLDivElement>) => menu.openAtPointer(event, menuTarget),
@@ -72,20 +74,21 @@ export const ProjectRow = ({
         </Text>
       </Flex>
       <Flex flexShrink={0} gap="0.5" pointerEvents="auto" zIndex="1">
-        <IconButton
-          aria-label={isPinned ? t('projects.unpin') : t('projects.pin')}
-          aria-pressed={isPinned}
-          color={isPinned ? 'fg' : 'fg.muted'}
-          opacity={isPinned ? 1 : 0}
-          size="sm"
-          title={isPinned ? t('projects.unpin') : t('projects.pin')}
-          variant="ghost"
-          _focusVisible={REVEAL_ON_HOVER}
-          _groupHover={REVEAL_ON_HOVER}
-          onClick={handleTogglePin}
-        >
-          <Icon as={PinIcon} boxSize="3" fill={isPinned ? 'currentColor' : 'none'} />
-        </IconButton>
+        <Tooltip content={pinLabel}>
+          <IconButton
+            aria-label={pinLabel}
+            aria-pressed={isPinned}
+            color={isPinned ? 'fg' : 'fg.muted'}
+            opacity={isPinned ? 1 : 0}
+            size="sm"
+            variant="ghost"
+            _focusVisible={REVEAL_ON_HOVER}
+            _groupHover={REVEAL_ON_HOVER}
+            onClick={handleTogglePin}
+          >
+            <Icon as={PinIcon} boxSize="3" fill={isPinned ? 'currentColor' : 'none'} />
+          </IconButton>
+        </Tooltip>
         <IconButton
           aria-expanded={menuTrigger.isExpanded}
           aria-haspopup="menu"

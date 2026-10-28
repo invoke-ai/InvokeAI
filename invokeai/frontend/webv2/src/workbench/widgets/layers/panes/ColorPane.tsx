@@ -290,22 +290,24 @@ const TargetChip = ({
   onSelect: (target: ActiveColorTarget) => void;
   target: ActiveColorTarget;
 }) => {
+  const { t } = useTranslation();
   const style = useMemo(() => ({ backgroundColor: colorHex }), [colorHex]);
   const select = useCallback(() => onSelect(target), [onSelect, target]);
   return (
-    <chakra.button
-      aria-label={label}
-      aria-pressed={isActive}
-      borderColor={isActive ? 'accent.solid' : 'border'}
-      borderWidth="2px"
-      h="6"
-      rounded="sm"
-      style={style}
-      title={colorHex}
-      type="button"
-      w="6"
-      onClick={select}
-    />
+    <Tooltip content={t('widgets.layers.colorTargetTooltip', { hex: colorHex, label })}>
+      <chakra.button
+        aria-label={label}
+        aria-pressed={isActive}
+        borderColor={isActive ? 'accent.solid' : 'border'}
+        borderWidth="2px"
+        h="6"
+        rounded="sm"
+        style={style}
+        type="button"
+        w="6"
+        onClick={select}
+      />
+    </Tooltip>
   );
 };
 

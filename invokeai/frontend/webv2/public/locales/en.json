@@ -4778,6 +4778,7 @@
         "tabs": "Color panes",
         "maskTint": "Mask tint"
       },
+      "colorTargetTooltip": "{{label}} · {{hex}}",
       "historyPane": {
         "count_one": "{{count}} step",
         "count_other": "{{count}} steps",
