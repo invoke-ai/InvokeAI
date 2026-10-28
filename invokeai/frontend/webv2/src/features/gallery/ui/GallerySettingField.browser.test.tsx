@@ -26,6 +26,7 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 const STALE_TARGET = { projectId: 'old-project' };
 const PICKED_BOARD_VALUES = { selectedBoardId: 'picked' };
+const NO_VALUES = {};
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const Harness = ({
@@ -103,6 +104,18 @@ describe('Gallery settings contribution bindings', () => {
 
     expect(dialog?.checked).toBe(false);
     expect(host?.querySelector('output')?.textContent).toContain('"showPendingItems":false');
+  });
+
+  it('binds the opt-in middle-click setting, off by default, through the settings command', async () => {
+    await act(() => root?.render(<Harness id="middleClickOpensInNewTab" initialValues={NO_VALUES} />));
+    const quick = host?.querySelector<HTMLInputElement>('[data-surface="quick"] input');
+    const dialog = host?.querySelector<HTMLInputElement>('[data-surface="dialog"] input');
+
+    expect(quick?.checked).toBe(false);
+    await act(() => dialog?.click());
+
+    expect(quick?.checked).toBe(true);
+    expect(host?.querySelector('output')?.textContent).toContain('"middleClickOpensInNewTab":true');
   });
 
   it('pins the current destination when results stop following the selected board', async () => {

@@ -2,7 +2,8 @@ import type { HydratedWorkbenchSnapshot } from '@workbench/persistenceContracts'
 import type { Project, ProjectLoadResult, RefusedWorkbenchProject, WorkbenchState } from '@workbench/projectContracts';
 
 import { createUuid } from '@platform/browser/randomUuid';
-import { assertAccountScopeCurrent, type AccountScope } from '@platform/state/accountLifecycle';
+import { createLogger } from '@platform/logging/logger';
+import { assertAccountScopeCurrent, isAccountScopeCurrent, type AccountScope } from '@platform/state/accountLifecycle';
 import {
   getProjectCanvasSchemaRequirement,
   isCanvasSchemaVersionSupported,
@@ -17,14 +18,28 @@ import {
   withAuthoritativeProjectBoard,
 } from '@workbench/workbenchState';
 
-import type { ProjectCreateRequest, ProjectRecordDTO, ProjectSummaryDTO, ProjectUpdateRequest } from './api';
+import type {
+  DeleteProjectBoards,
+  ProjectCreateRequest,
+  ProjectRecordDTO,
+  ProjectSummaryDTO,
+  ProjectUpdateRequest,
+  ProjectWithWorkspaceDTO,
+  ProjectWorkspaceDTO,
+  ProjectWorkspaceSaveRequest,
+} from './api';
 import type {
   ProjectDraft,
+  ProjectDraftBases,
+  ProjectDraftConflict,
   ProjectDraftCopyReservation,
   ProjectDraftRetargetCursor,
   ProjectDraftRetargetHandoff,
   ProjectDraftStore,
   ProjectDraftSummary,
+  ProjectUnloadJournalEntry,
+  ProjectUnloadJournalKey,
+  ProjectUnloadJournalReconciliation,
 } from './draftStore';
 import type { EditorSession } from './editorSession';
 import type { ProjectPushOutcome, ProjectSchemaRefusal } from './projectFlush';
@@ -37,43 +52,53 @@ import {
   deleteProject,
   getProject,
   getProjectCanvasSchemaCompatibilityRefusal,
+  getProjectDocumentSchemaRefusal,
   getProjectWriteSizeRefusal,
   isProjectConflictError,
   isProjectNotFoundError,
   listProjects,
   ProjectCreateAbsentError,
+  saveProjectWorkspace,
   setClientStateValue,
   updateProject,
 } from './api';
 import { recordProjectCover } from './covers';
+import { PROJECT_DOCUMENT_SCHEMA_VERSION, PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
 import {
   getUtf8ByteSize,
   getCopySourceProjectName,
   PROJECT_DRAFT_PROJECT_LIMIT,
+  PROJECT_UNLOAD_JOURNAL_MAX_BYTES,
+  PROJECT_UNLOAD_JOURNAL_SCHEMA_VERSION,
   toConflictProjectDraft,
   toDirtyProjectDraft,
   toSchemaRefusedProjectDraft,
+  withBases,
 } from './draftStore';
-import { getEditorSession } from './editorSession';
+import { createEditorSessionLivenessCheck, getEditorSession, isEditorSessionLive } from './editorSession';
 import { createDeterministicProjectId } from './ids';
 import { createAccountOwnedProjectDraftStore } from './indexedDbDraftStore';
 import { seedProjectLibrary, upsertProjectSummary } from './library';
 import { selectCoverImageName } from './projectAssets';
 import {
+  applyAuthoritativeProjectBoard,
   migrateProjectDocument,
   PROJECT_DOCUMENT_MAX_BYTES,
-  PROJECT_DOCUMENT_SCHEMA_VERSION,
   serializeProjectDocumentV3Json,
+  type ProjectDocumentV3,
 } from './projectDocument';
 import { assertProjectFlushed, ProjectFlushError } from './projectFlush';
-import { deserializeProjectDocument, deserializeProjectRecord } from './projectHydration';
-import { acquireProjectMutationLock } from './projectLifecycleLocks';
+import { findRepeatedWorkflowItem, splitProjectDocument, toProjectCreation } from './projectHalves';
+import { deserializeProjectDocument, deserializeProjectRecord, isSplitProjectRecord } from './projectHydration';
+import { acquireProjectMutationLock, withSingleTabFallback } from './projectLifecycleLocks';
 import { fetchSessionBlobStrict, serializeSessionBlob, SESSION_STATE_KEY } from './session';
 import { getOpenProject, reportProjectSync, reportProjectSyncEntry, resolveProjectSyncConflict } from './syncStore';
 import { deleteWorkbenchDatabase } from './workbenchDatabase';
 
 export interface ProjectConflictInfo {
   detectedAt: string;
+  /** For a revision conflict: whether the caller's workspace diverged rather than the project content. */
+  half?: 'workspace';
   kind: 'deleted' | 'revision';
   projectId: string;
   serverRevision?: number;
@@ -108,22 +133,37 @@ export interface SaveDraftAsNewInput {
   sourceProjectId: string;
 }
 
-export type SaveDraftAsNew = (input: SaveDraftAsNewInput) => Promise<ProjectRecordDTO>;
+/** Creates the copy, content and workspace in one request; the record carries the workspace it stored. */
+export type SaveDraftAsNew = (input: SaveDraftAsNewInput) => Promise<ProjectWithWorkspaceDTO>;
+
+/** How many unacknowledged bodies of each half a page remembers sending: a few retries' worth, each up to 32 MiB. */
+const SENT_HALVES_KEPT = 4;
 
 /** How long a failed upload-provenance creation answers later uploads before another attempt is made. */
 const PROJECT_ENSURE_FAILURE_REUSE_MS = 5_000;
 
-const saveDraftAsNew: SaveDraftAsNew = (input) => {
-  return createProjectSettled(
-    {
-      data: input.document,
-      minimum_canvas_schema_version: input.minimumCanvasSchemaVersion,
-      name: input.name,
-      project_id: input.copyProjectId,
-    },
-    input.owner
-  );
-};
+/**
+ * Save-as-copy through the persistence API: the copy's content and the caller's workspace in one create, so the copy
+ * never exists without the workspace (a page gone between two requests would lose it, as sign-out deletes its drafts).
+ */
+const createSaveDraftAsNew =
+  (api: DurableProjectPersistenceApi): SaveDraftAsNew =>
+  async (input) => {
+    const creation = toProjectCreation(input.document as unknown as ProjectDocumentV3);
+    const record = await api.createProject(
+      {
+        data: creation.data as unknown as Record<string, unknown>,
+        minimum_canvas_schema_version: input.minimumCanvasSchemaVersion,
+        minimum_document_schema_version: creation.documentSchemaVersion,
+        name: input.name,
+        project_id: input.copyProjectId,
+        ...(creation.workspace ? { workspace: creation.workspace as unknown as Record<string, unknown> } : {}),
+      },
+      input.owner
+    );
+    assertAccountScopeCurrent(input.owner);
+    return record;
+  };
 
 const mapConcurrent = async <T, R>(
   items: readonly T[],
@@ -186,14 +226,31 @@ const awaitDatabaseDeletion = async (
 };
 
 export interface DurableWorkbenchSaveResult {
+  /** An open project holds a conflict or schema refusal that only the user can resolve; it does not retry. */
+  awaitsDecision: boolean;
   conflicts: ProjectConflictInfo[];
   error: string | null;
   hasPendingChanges: boolean;
+  /**
+   * Pending work that no decision blocks (an unsaved session, or a draft staged while its push was in flight): a retry
+   * pushes it, even while another project awaits a decision.
+   */
+  hasRetryablePendingChanges: boolean;
   localDraftStatus: LocalDraftStatus;
   projectBoardAssignments: ProjectBoardAssignment[];
   shouldRetry: boolean;
   snapshot: HydratedWorkbenchSnapshot;
 }
+
+export type UnloadJournalOutcome =
+  | {
+      kind: 'journaled';
+      projectIds: string[];
+      skippedOversizedProjectIds: string[];
+      /** Settles true once the write commits, false if it aborted. */
+      written: Promise<boolean>;
+    }
+  | { kind: 'nothing-to-journal' | 'unavailable' };
 
 export interface QueueRecoveryProject {
   projectId: string;
@@ -212,11 +269,17 @@ export interface DurableHydratedWorkbenchSnapshot extends HydratedWorkbenchSnaps
 }
 
 export interface DurableProjectPersistenceApi {
-  createProject(request: ProjectCreateRequest, owner: AccountScope): Promise<ProjectRecordDTO>;
-  deleteProject(projectId: string, signal?: AbortSignal): Promise<void>;
+  /** Answers with the workspace the create stored, null when the request carried none (a document created whole). */
+  createProject(request: ProjectCreateRequest, owner: AccountScope): Promise<ProjectWithWorkspaceDTO>;
+  deleteProject(projectId: string, signal?: AbortSignal, boards?: DeleteProjectBoards): Promise<void>;
   deleteSession(signal?: AbortSignal): Promise<void>;
-  getProject(projectId: string, signal?: AbortSignal): Promise<ProjectRecordDTO>;
+  getProject(projectId: string, signal?: AbortSignal): Promise<ProjectWithWorkspaceDTO>;
   listProjects(signal?: AbortSignal): Promise<ProjectSummaryDTO[]>;
+  saveProjectWorkspace(
+    projectId: string,
+    request: ProjectWorkspaceSaveRequest,
+    signal?: AbortSignal
+  ): Promise<ProjectWorkspaceDTO>;
   loadSession(signal?: AbortSignal): Promise<WorkbenchSessionBlob | null>;
   saveSession(
     state: WorkbenchState,
@@ -224,7 +287,11 @@ export interface DurableProjectPersistenceApi {
     draftEditorSessionIds: Record<string, string>,
     signal?: AbortSignal
   ): Promise<void>;
-  updateProject(projectId: string, request: ProjectUpdateRequest, signal?: AbortSignal): Promise<ProjectRecordDTO>;
+  updateProject(
+    projectId: string,
+    request: ProjectUpdateRequest,
+    signal?: AbortSignal
+  ): Promise<ProjectWithWorkspaceDTO>;
 }
 
 const productionApi: DurableProjectPersistenceApi = {
@@ -234,6 +301,7 @@ const productionApi: DurableProjectPersistenceApi = {
   getProject,
   listProjects,
   loadSession: fetchSessionBlobStrict,
+  saveProjectWorkspace,
   saveSession: (state, editorSessionId, draftEditorSessionIds, signal) =>
     setClientStateValue(SESSION_STATE_KEY, serializeSessionBlob(state, editorSessionId, draftEditorSessionIds), signal),
   updateProject,
@@ -249,6 +317,8 @@ interface DurableSyncedPersistenceDependencies {
   deleteDatabase?: typeof deleteWorkbenchDatabase;
   draftStore?: Promise<ProjectDraftStore>;
   editorSession?: Promise<EditorSession>;
+  /** Whether another page still holds the editor session, so its unload journal is left for it to settle. */
+  isEditorSessionLive?: (editorSessionId: string) => Promise<boolean>;
   now?: () => string;
   projectMutationLock?: (projectId: string) => ReturnType<typeof acquireProjectMutationLock>;
   queueRunJournal?: typeof createAccountOwnedQueueRunJournal;
@@ -256,10 +326,25 @@ interface DurableSyncedPersistenceDependencies {
   writerToken?: string;
 }
 
+/**
+ * What the server holds of a project, as this page last learned it. The content and the caller's workspace are
+ * acknowledged one after the other, so each has its own pushed copy and revision; `pushedDoc` is the whole document
+ * as last acknowledged with both.
+ */
 interface SyncEntry {
   minimumCanvasSchemaVersion: number;
+  /**
+   * The whole document the server holds, or '' while that is not known to be any one document (one half acknowledged
+   * without the other). It is the cheap test for "nothing to save", so it must never name a document the server lacks.
+   */
   pushedDoc: string;
+  /** The content's revision. */
   revision: number;
+  /** The content the server holds; null while it holds the project whole (saved before the split). */
+  pushedContent: string | null;
+  /** The caller's workspace the server holds; null while it holds none. */
+  pushedWorkspace: string | null;
+  workspaceRevision: number | null;
 }
 
 interface LoadedDraft {
@@ -285,35 +370,93 @@ const toSnapshot = (state: WorkbenchState, savedAt: string): HydratedWorkbenchSn
   version: 1,
 });
 
-const recordDocumentJson = (record: ProjectRecordDTO): string | null => {
-  const loaded = deserializeProjectRecord(record);
-
-  return loaded.status === 'loaded' ? serializeProjectDocumentV3Json(loaded.project).documentJson : null;
-};
-
-const toProjectSummary = (record: ProjectRecordDTO): ProjectSummaryDTO => ({
+const toProjectSummary = (record: ProjectWithWorkspaceDTO): ProjectSummaryDTO => ({
   board_id: record.board_id,
   created_at: record.created_at,
   minimum_canvas_schema_version: record.minimum_canvas_schema_version,
+  minimum_document_schema_version: record.minimum_document_schema_version,
   name: record.name,
   project_id: record.project_id,
   revision: record.revision,
   updated_at: record.updated_at,
+  workspace_updated_at: record.workspace?.updated_at ?? record.workspace_updated_at,
 });
 
-const recordRequiresDocumentUpgrade = (record: ProjectRecordDTO): boolean =>
-  record.data.documentSchemaVersion !== PROJECT_DOCUMENT_SCHEMA_VERSION;
+/** A project the server holds whole is split by its next save, whether or not anything changed. */
+/** A project the server holds whole is split by its next save, unless it must stay whole (`toProjectCreation`). */
+const recordRequiresDocumentUpgrade = (record: ProjectRecordDTO, project: Project): boolean =>
+  !isSplitProjectRecord(record) && findRepeatedWorkflowItem(project.workflows.entries) === null;
+
+/** What the server holds of a read, which loaded as `project`. */
+const toSyncEntry = (record: ProjectWithWorkspaceDTO, project: Project): SyncEntry => {
+  const { workspace } = record;
+  const { document, documentJson } = serializeProjectDocumentV3Json(project);
+  const halves = splitProjectDocument(document);
+  const isSplit = isSplitProjectRecord(record);
+  return {
+    minimumCanvasSchemaVersion: record.minimum_canvas_schema_version,
+    pushedContent: isSplit ? halves.contentJson : null,
+    pushedDoc: documentJson,
+    pushedWorkspace: isSplit && workspace ? halves.workspaceJson : null,
+    revision: record.revision,
+    workspaceRevision: workspace?.revision ?? null,
+  };
+};
 
 const toCanvasSchemaRefusal = (refusal: {
   maxCanvasSchemaVersion: number;
   minimumCanvasSchemaVersion: number;
 }): ProjectSchemaRefusal => ({ ...refusal, kind: 'canvas' });
 
-const toDocumentSchemaRefusal = (documentSchemaVersion: number): ProjectSchemaRefusal => ({
+const toDocumentSchemaRefusal = (
+  documentSchemaVersion: number
+): Extract<ProjectSchemaRefusal, { kind: 'document' }> => ({
   documentSchemaVersion,
   kind: 'document',
-  maxDocumentSchemaVersion: PROJECT_DOCUMENT_SCHEMA_VERSION,
+  maxDocumentSchemaVersion: PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION,
 });
+
+/** The refusal a 412 carries, of either floor: a newer Invoke wrote the project. */
+const toSchemaRefusal = (error: unknown): ProjectSchemaRefusal | null => {
+  const canvas = getProjectCanvasSchemaCompatibilityRefusal(error);
+  if (canvas) {
+    return toCanvasSchemaRefusal(canvas);
+  }
+  const documentRefusal = getProjectDocumentSchemaRefusal(error);
+  return documentRefusal ? toDocumentSchemaRefusal(documentRefusal.minimumDocumentSchemaVersion) : null;
+};
+
+/** A project a newer Invoke wrote, as the workbench reports it when there is no local copy to open instead. */
+const toRefusedProject = (
+  projectId: string,
+  projectName: string,
+  refusal: Extract<ProjectSchemaRefusal, { kind: 'canvas' | 'document' }>
+): RefusedWorkbenchProject =>
+  refusal.kind === 'document'
+    ? {
+        projectId,
+        projectName,
+        raw: null,
+        refusal: {
+          raw: null,
+          scope: 'project-document',
+          status: 'unsupported-version',
+          version: refusal.documentSchemaVersion,
+        },
+        source: 'project-document',
+      }
+    : {
+        projectId,
+        projectName,
+        raw: null,
+        refusal: {
+          raw: null,
+          scope: 'document',
+          status: 'unsupported-version',
+          version: refusal.minimumCanvasSchemaVersion,
+        },
+        source: 'canvas',
+      };
 
 const loadDraftProject = (draft: ProjectDraft): Project | null => {
   try {
@@ -365,7 +508,7 @@ export class ProjectDraftWriteRejectedError extends Error {
 export interface DurableSyncedWorkbenchPersistence {
   acknowledgeProjectResolution(projectId: string): void;
   abortProjectResolution(projectId: string): void;
-  adoptProjectRecord(record: ProjectRecordDTO): ProjectLoadResult;
+  adoptProjectRecord(record: ProjectWithWorkspaceDTO): ProjectLoadResult;
   clearWorkbench(): Promise<void>;
   close(): void;
   deleteRecoverableDraft(
@@ -374,17 +517,30 @@ export interface DurableSyncedWorkbenchPersistence {
     generation: number,
     updatedAt: number
   ): Promise<void>;
-  deleteProjectOnServer(projectId: string): Promise<void>;
+  deleteProjectOnServer(projectId: string, boards?: DeleteProjectBoards): Promise<void>;
   ensureProjectOnServer(project: Project): Promise<void>;
   flushProjectToServer(project: Project): Promise<ProjectPushOutcome>;
   getProjectDraftDocument(projectId: string): Promise<string | null>;
   getRecoverableDraftDocument(projectId: string, editorSessionId: string): Promise<string | null>;
+  /** True from `persistEmptySession` until `reopenSession`: the editor is leaving and its session must stay empty. */
+  hasClosedSession(): boolean;
+  /**
+   * Synchronously journals every open project whose document is not yet in local recovery, for a page that may unload
+   * before an asynchronous save can stage it. The next load reconciles the journal under the draft store's rules.
+   */
+  journalBeforeUnload(state: WorkbenchState): UnloadJournalOutcome;
   hasPendingChanges(): boolean;
   hydrateProjectFromServer(projectId: string, projectName?: string): Promise<ProjectLoadResult>;
   loadWorkbench(options?: { createNew?: boolean; openProjectId?: string }): Promise<DurableHydratedWorkbenchSnapshot>;
   listRecoverableDrafts(options?: { after?: [string, string]; limit?: number }): Promise<RecoverableProjectDraftPage>;
   markProjectDeleted(projectId: string): void;
   persistEmptySession(state: WorkbenchState): Promise<void>;
+  /** Releases cross-tab project locks held for unfinished resolutions once a newer editor in this tab takes over. */
+  releaseMutationLocks(): void;
+  /** Undoes `persistEmptySession` when the editor stays open after all, writing its session again. */
+  reopenSession(state: WorkbenchState): Promise<DurableWorkbenchSaveResult>;
+  /** Called after `reopenSession` has reopened the session, so saves held back while it was closed can resume. */
+  subscribeSessionReopened(listener: () => void): () => void;
   resolveConflictDiscard(projectId: string): Promise<void>;
   resolveConflictSaveAsNew(project: Project): Promise<{
     boardId: string;
@@ -396,7 +552,8 @@ export interface DurableSyncedWorkbenchPersistence {
   }>;
   resolveConflictUseServer(projectId: string): Promise<ProjectLoadResult>;
   releaseProjectSync(projectId: string): void;
-  retain(): () => void;
+  /** The release resolves once this service has either been retained again or released all of its resources. */
+  retain(): () => Promise<void>;
   saveWorkbench(state: WorkbenchState): Promise<DurableWorkbenchSaveResult>;
   unmarkProjectDeleted(projectId: string): void;
 }
@@ -406,6 +563,7 @@ export const createDurableSyncedWorkbenchPersistence = (
   dependencies: DurableSyncedPersistenceDependencies = {}
 ): DurableSyncedWorkbenchPersistence => {
   const api = dependencies.api ?? productionApi;
+  const logger = createLogger({ area: 'autosave', namespace: 'persistence' }, { owner });
   const autoOpenDraftByteLimit = dependencies.autoOpenDraftByteLimit ?? 64 * 1024 * 1024;
   const autoOpenDraftLimit = dependencies.autoOpenDraftLimit ?? 8;
   const requestedQueueRunProjectLimit = dependencies.autoOpenQueueRunProjectLimit ?? 8;
@@ -427,13 +585,18 @@ export const createDurableSyncedWorkbenchPersistence = (
     });
   let draftStorePromise: Promise<ProjectDraftStore> | null = null;
   let editorSessionPromise: Promise<EditorSession> | null = null;
+  /** The resolved store and editor session, for the synchronous unload journal; set once loading has them. */
+  let unloadJournalTarget: { editorSessionId: string; store: ProjectDraftStore } | null = null;
   const getDraftStore = () =>
     (draftStorePromise ??= dependencies.draftStore ?? createAccountOwnedProjectDraftStore(owner));
   const getEditorSessionForService = () => (editorSessionPromise ??= dependencies.editorSession ?? getEditorSession());
+  const isOtherEditorSessionLive = dependencies.isEditorSessionLive ?? isEditorSessionLive;
   const now = dependencies.now ?? (() => new Date().toISOString());
-  const getProjectMutationLock =
+  const acquireMutationLock =
     dependencies.projectMutationLock ??
     ((projectId: string) => acquireProjectMutationLock(owner.storageSuffix, projectId));
+  const getProjectMutationLock = async (projectId: string) =>
+    withSingleTabFallback(await acquireMutationLock(projectId));
   const openQueueRunJournal = dependencies.queueRunJournal ?? createAccountOwnedQueueRunJournal;
   const listQueueRunProjectIds = async (): Promise<
     { kind: 'available'; projectIds: string[] } | { kind: 'unavailable' }
@@ -467,7 +630,7 @@ export const createDurableSyncedWorkbenchPersistence = (
     }
   };
   const writerToken = dependencies.writerToken ?? createUuid();
-  const saveAsNew = dependencies.saveDraftAsNew ?? saveDraftAsNew;
+  const saveAsNew = dependencies.saveDraftAsNew ?? createSaveDraftAsNew(api);
   const deleteDatabase = dependencies.deleteDatabase ?? deleteWorkbenchDatabase;
   const databaseDeleteTimeoutMs = dependencies.databaseDeleteTimeoutMs ?? 5_000;
   const syncEntries = new Map<string, SyncEntry>();
@@ -476,10 +639,26 @@ export const createDurableSyncedWorkbenchPersistence = (
   const conflicts = new Map<string, ProjectConflictInfo>();
   const schemaRefusals = new Map<string, ProjectSchemaRefusal>();
   const generations = new Map<string, number>();
+  /**
+   * The highest generation this writer has used per project, never reset: the claim's unload journal mark is compared
+   * with this writer's generations, so they must not restart when a project is closed and reopened.
+   */
+  const issuedGenerations = new Map<string, number>();
+  const noteGeneration = (projectId: string, generation: number): void => {
+    generations.set(projectId, generation);
+    issuedGenerations.set(projectId, Math.max(issuedGenerations.get(projectId) ?? 0, generation));
+  };
+  const nextGeneration = (projectId: string): number =>
+    Math.max(generations.get(projectId) ?? 0, issuedGenerations.get(projectId) ?? 0) + 1;
   const deletedProjectIds = new Set<string>();
   const serverDeletedProjectIds = new Set<string>();
   const pendingProjectIds = new Set<string>();
   const projectsRequiringDocumentUpgrade = new Set<string>();
+  /**
+   * The bodies this page sent of each half of a project since both were last acknowledged, newest last and at most
+   * `SENT_HALVES_KEPT`: any of them on the server is this page's own write, its answer lost.
+   */
+  const sentHalves = new Map<string, { content: string[]; workspace: string[] }>();
   const pendingBoardAssignments = new Map<string, ProjectBoardAssignment>();
   const retargetedProjects = new Map<
     string,
@@ -506,8 +685,20 @@ export const createDurableSyncedWorkbenchPersistence = (
   let lastKnownState: WorkbenchState | null = null;
   let hasPending = false;
   let sessionSavePending = false;
+  let isSessionClosed = false;
+  const sessionReopenedListeners = new Set<() => void>();
   let localDraftStatus: LocalDraftStatus = 'ok';
   const localDraftFailures = new Set<string>();
+  /** Documents this writer journaled and has not yet seen acknowledged, by resolved project id. */
+  const journaledDocuments = new Map<string, ProjectUnloadJournalEntry>();
+  /**
+   * Projects whose journal record no longer stands for a stored entry, so its document is journaled again: retired at
+   * a hidden event (the record stays, so the next save writes the settled mark), or being settled right now.
+   */
+  const retiredJournalProjectIds = new Set<string>();
+  const settlingJournalProjectIds = new Set<string>();
+  /** Stages started but not finished, by project id: the page may unload before they commit. */
+  const stagingDocuments = new Map<string, { documentJson: string; generation: number }>();
   let mutationTail: Promise<void> = Promise.resolve();
   let loadPromise: Promise<DurableHydratedWorkbenchSnapshot> | null = null;
 
@@ -568,21 +759,26 @@ export const createDurableSyncedWorkbenchPersistence = (
     );
     return result;
   };
-  const close = (): void => {
-    if (isClosed) {
-      return;
+  const releaseAllMutationLocks = (): Promise<unknown>[] =>
+    [...projectMutationLocks].map(([projectId, lock]) => {
+      projectMutationLocks.delete(projectId);
+      return lock.release();
+    });
+  let closed: Promise<void> | null = null;
+  const close = (): Promise<void> => {
+    if (closed) {
+      return closed;
     }
     isClosed = true;
-    for (const [projectId, lock] of projectMutationLocks) {
-      projectMutationLocks.delete(projectId);
-      void lock.release().catch(() => undefined);
-    }
+    const releases = releaseAllMutationLocks();
     if (draftStorePromise) {
-      void draftStorePromise.then((store) => store.close());
+      releases.push(draftStorePromise.then((store) => store.close()));
     }
     if (editorSessionPromise) {
-      void editorSessionPromise.then((session) => session.release());
+      releases.push(editorSessionPromise.then((session) => session.release()));
     }
+    closed = Promise.allSettled(releases).then(() => undefined);
+    return closed;
   };
 
   const getOwnedDraft = async (store: ProjectDraftStore, projectId: string, editorSessionId: string) => {
@@ -714,22 +910,42 @@ export const createDurableSyncedWorkbenchPersistence = (
     return getOwnedDraft(store, projectId, activeEditorSessionId);
   };
 
-  const listDraftProjectCandidates = async (store: ProjectDraftStore): Promise<ProjectDraftSummary[]> => {
-    const candidates: ProjectDraftSummary[] = [];
+  /**
+   * The drafts this page may take. A lineage named after another running page's editor session is that page's to stage
+   * and save, so this page neither adopts it, opens its project for it, nor offers it for recovery, as with that page's
+   * unload journal: an edit adopted here could never be retired by an undo there. A draft records its lineage, not the
+   * page staging it, so a lineage named after no session (one isolated for an unopenable draft) is taken as before, as
+   * is every draft when liveness cannot be told (no Web Locks).
+   */
+  const withoutLivePagesDrafts = async (
+    items: readonly ProjectDraftSummary[],
+    editorSessionId: string
+  ): Promise<ProjectDraftSummary[]> => {
+    const isOtherPageLive = createEditorSessionLivenessCheck(editorSessionId, isOtherEditorSessionLive);
+    const verdicts = await Promise.all(items.map((item) => isOtherPageLive(item.editorSessionId)));
+    const candidates = items.filter((_, index) => !verdicts[index]);
+    for (const item of candidates) {
+      rememberFutureDraft(item);
+    }
+    return candidates;
+  };
+
+  const listDraftProjectCandidates = async (
+    store: ProjectDraftStore,
+    editorSessionId: string
+  ): Promise<ProjectDraftSummary[]> => {
+    const items: ProjectDraftSummary[] = [];
     let after: [string, string] | undefined;
     for (;;) {
       const page = await store.list({ ...(after ? { after } : {}), limit: 100 });
       if (page.kind !== 'available') {
         markLocalDraftFailure('list:drafts');
-        return candidates;
+        return withoutLivePagesDrafts(items, editorSessionId);
       }
-      for (const item of page.items) {
-        rememberFutureDraft(item);
-        candidates.push(item);
-      }
+      items.push(...page.items);
       if (!page.nextCursor) {
         clearLocalDraftFailure('list:drafts');
-        return candidates;
+        return withoutLivePagesDrafts(items, editorSessionId);
       }
       after = page.nextCursor;
     }
@@ -737,9 +953,10 @@ export const createDurableSyncedWorkbenchPersistence = (
 
   const listProjectDraftCandidates = async (
     store: ProjectDraftStore,
-    projectId: string
+    projectId: string,
+    editorSessionId: string
   ): Promise<ProjectDraftSummary[]> => {
-    const candidates: ProjectDraftSummary[] = [];
+    const items: ProjectDraftSummary[] = [];
     let after: string | undefined;
     for (;;) {
       const page = await store.listForProject(projectId, {
@@ -748,15 +965,12 @@ export const createDurableSyncedWorkbenchPersistence = (
       });
       if (page.kind !== 'available') {
         markLocalDraftFailure(`list:${projectId}`);
-        return candidates;
+        return withoutLivePagesDrafts(items, editorSessionId);
       }
-      for (const item of page.items) {
-        rememberFutureDraft(item);
-        candidates.push(item);
-      }
+      items.push(...page.items);
       if (!page.nextCursor) {
         clearLocalDraftFailure(`list:${projectId}`);
-        return candidates;
+        return withoutLivePagesDrafts(items, editorSessionId);
       }
       after = page.nextCursor;
     }
@@ -836,7 +1050,9 @@ export const createDurableSyncedWorkbenchPersistence = (
     const serialized = serializeProjectDocumentV3Json(project);
     const entry = syncEntries.get(project.id);
     const existingDraft = volatileDrafts.get(project.id);
-    const needsDocumentUpgrade = projectsRequiringDocumentUpgrade.has(project.id);
+    // A conflicted or refused project pushes nothing until resolved, so its upgrade waits too.
+    const needsDocumentUpgrade =
+      projectsRequiringDocumentUpgrade.has(project.id) && !conflicts.has(project.id) && !schemaRefusals.has(project.id);
     const needsStage =
       needsDocumentUpgrade ||
       (!entry && existingDraft?.documentJson !== serialized.documentJson) ||
@@ -860,8 +1076,8 @@ export const createDurableSyncedWorkbenchPersistence = (
       hasPending = true;
       throw new ProjectDocumentTooLargeError(serialized.byteSize);
     }
-    const generation = (generations.get(project.id) ?? 0) + 1;
-    generations.set(project.id, generation);
+    const generation = nextGeneration(project.id);
+    noteGeneration(project.id, generation);
     const entry = syncEntries.get(project.id);
     if (!entry || entry.pushedDoc !== serialized.documentJson) {
       pendingProjectIds.add(project.id);
@@ -870,6 +1086,7 @@ export const createDurableSyncedWorkbenchPersistence = (
       baseMinimumCanvasSchemaVersion:
         entry?.minimumCanvasSchemaVersion ?? getProjectCanvasSchemaRequirement(serialized.document),
       baseRevision: entry?.revision ?? null,
+      baseWorkspaceRevision: entry?.workspaceRevision ?? null,
       documentJson: serialized.documentJson,
       documentSchemaVersion: PROJECT_DOCUMENT_SCHEMA_VERSION,
       editorSessionId: getDraftEditorSessionId(project.id, session.id),
@@ -878,21 +1095,29 @@ export const createDurableSyncedWorkbenchPersistence = (
       updatedAt: Date.parse(now()),
       writerToken,
     };
-    let result = await store.stage(draftInput);
-    if (result.kind === 'corrupt') {
-      markLocalDraftFailure(projectDraftFailureKey(project.id));
-      const corruptKey = `corrupt:${project.id}:${draftInput.editorSessionId}`;
-      const cleanup = await store.deleteCorrupt(project.id, draftInput.editorSessionId);
-      if (cleanup.kind === 'deleted') {
-        clearLocalDraftFailure(corruptKey);
-      } else {
-        markLocalDraftFailure(corruptKey);
-      }
-      draftInput = {
-        ...draftInput,
-        editorSessionId: isolateUnopenableDraft(project.id, session.id),
-      };
+    stagingDocuments.set(project.id, { documentJson: serialized.documentJson, generation });
+    let result: Awaited<ReturnType<ProjectDraftStore['stage']>>;
+    try {
       result = await store.stage(draftInput);
+      if (result.kind === 'corrupt') {
+        markLocalDraftFailure(projectDraftFailureKey(project.id));
+        const corruptKey = `corrupt:${project.id}:${draftInput.editorSessionId}`;
+        const cleanup = await store.deleteCorrupt(project.id, draftInput.editorSessionId);
+        if (cleanup.kind === 'deleted') {
+          clearLocalDraftFailure(corruptKey);
+        } else {
+          markLocalDraftFailure(corruptKey);
+        }
+        draftInput = {
+          ...draftInput,
+          editorSessionId: isolateUnopenableDraft(project.id, session.id),
+        };
+        result = await store.stage(draftInput);
+      }
+    } finally {
+      if (stagingDocuments.get(project.id)?.generation === generation) {
+        stagingDocuments.delete(project.id);
+      }
     }
     if (['corrupt', 'fenced', 'generation-conflict', 'stale'].includes(result.kind)) {
       markLocalDraftFailure(projectDraftFailureKey(project.id));
@@ -911,7 +1136,11 @@ export const createDurableSyncedWorkbenchPersistence = (
         ? toConflictProjectDraft(
             dirty,
             conflict.kind === 'revision'
-              ? { kind: 'revision', serverRevision: conflict.serverRevision! }
+              ? {
+                  ...(conflict.half ? { half: conflict.half } : {}),
+                  kind: 'revision',
+                  serverRevision: conflict.serverRevision!,
+                }
               : { kind: 'deleted' }
           )
         : refusal
@@ -922,45 +1151,74 @@ export const createDurableSyncedWorkbenchPersistence = (
       markLocalDraftFailure(projectDraftFailureKey(project.id));
     } else {
       clearLocalDraftFailure(projectDraftFailureKey(project.id));
+      // The lineage now holds this generation, which supersedes the writer's journal through it.
+      const journaled = journaledDocuments.get(project.id);
+      if (journaled && journaled.generation <= generation && journaled.editorSessionId === draftInput.editorSessionId) {
+        journaledDocuments.delete(project.id);
+        retiredJournalProjectIds.delete(project.id);
+        await store.discardUnloadJournal(project.id, journaled.editorSessionId, writerToken, journaled.generation);
+      }
     }
     return { editorSessionId: draftInput.editorSessionId, generation, serialized, store };
   };
 
+  /** Both halves are on the server as `acknowledged` says: the generation sent is acknowledged. */
   const settleAck = async (
     project: Project,
     sentGeneration: number,
-    record: ProjectRecordDTO,
+    acknowledged: Omit<SyncEntry, 'pushedDoc'>,
+    document: Record<string, unknown>,
     documentJson: string,
     store: ProjectDraftStore,
     editorSessionId: string
   ): Promise<void> => {
-    syncEntries.set(project.id, {
-      minimumCanvasSchemaVersion: record.minimum_canvas_schema_version,
-      pushedDoc: documentJson,
-      revision: record.revision,
-    });
+    syncEntries.set(project.id, { ...acknowledged, pushedDoc: documentJson });
+    sentHalves.delete(project.id);
     upsertProjectSummary(
       {
         id: project.id,
-        minimumCanvasSchemaVersion: record.minimum_canvas_schema_version,
+        minimumCanvasSchemaVersion: acknowledged.minimumCanvasSchemaVersion,
         name: project.name,
-        revision: record.revision,
+        revision: acknowledged.revision,
       },
       owner
     );
-    recordProjectCover(project.id, selectCoverImageName(record.data), owner);
+    recordProjectCover(project.id, selectCoverImageName(document), owner);
     conflicts.delete(project.id);
     schemaRefusals.delete(project.id);
     projectsRequiringDocumentUpgrade.delete(project.id);
     pendingProjectIds.delete(project.id);
+    // Also settles the writer's unload journal through `sentGeneration`, in the same transaction.
     const settled = await store.settleAcknowledgement(
       project.id,
       editorSessionId,
       writerToken,
       sentGeneration,
-      record.revision,
-      record.minimum_canvas_schema_version
+      acknowledged.revision,
+      acknowledged.minimumCanvasSchemaVersion,
+      acknowledged.workspaceRevision
     );
+    const journaled = journaledDocuments.get(project.id);
+    if (journaled && journaled.generation <= sentGeneration) {
+      await settleJournaledDocument(project.id, store);
+    } else if (
+      journaled &&
+      journaled.editorSessionId === editorSessionId &&
+      (journaled.baseRevision !== acknowledged.revision ||
+        (journaled.baseWorkspaceRevision ?? null) !== acknowledged.workspaceRevision)
+    ) {
+      // A newer journaled document builds on the acknowledged one: rebase it, as a newer staged draft is rebased.
+      const rebased = {
+        ...journaled,
+        baseMinimumCanvasSchemaVersion: acknowledged.minimumCanvasSchemaVersion,
+        baseRevision: acknowledged.revision,
+        baseWorkspaceRevision: acknowledged.workspaceRevision,
+      };
+      const write = store.journalBeforeUnload({ entries: [rebased], retired: [] });
+      if (write.kind === 'started' && (await write.written) && journaledDocuments.get(project.id) === journaled) {
+        journaledDocuments.set(project.id, rebased);
+      }
+    }
     if (settled.kind === 'rebased') {
       pendingProjectIds.add(project.id);
       hasPending = true;
@@ -973,7 +1231,13 @@ export const createDurableSyncedWorkbenchPersistence = (
     const volatile = volatileDrafts.get(project.id);
     if (volatile) {
       if (volatile.generation > sentGeneration) {
-        volatileDrafts.set(project.id, toDirtyProjectDraft(volatile, { baseRevision: record.revision }));
+        volatileDrafts.set(
+          project.id,
+          toDirtyProjectDraft(volatile, {
+            baseRevision: acknowledged.revision,
+            baseWorkspaceRevision: acknowledged.workspaceRevision,
+          })
+        );
         pendingProjectIds.add(project.id);
         hasPending = true;
       } else {
@@ -982,10 +1246,41 @@ export const createDurableSyncedWorkbenchPersistence = (
     }
   };
 
+  /**
+   * A recovered draft against what the server holds: null when the draft builds on it, else the conflict. Each half is
+   * judged apart: a half equal to the server's needs no base (a page can save the content and be gone before the
+   * workspace), and a changed half conflicts only if the server moved it past the draft's base.
+   */
+  const findDraftDivergence = (
+    draft: ProjectDraft,
+    serverProject: Project,
+    record: ProjectWithWorkspaceDTO
+  ): ProjectDraftConflict | null => {
+    // Built on what the server holds of both halves: nothing to compare, which on a large document is costly.
+    if (
+      draft.baseRevision === record.revision &&
+      (draft.baseWorkspaceRevision ?? null) === (record.workspace?.revision ?? null)
+    ) {
+      return null;
+    }
+    const ours = splitProjectDocument(JSON.parse(draft.documentJson) as ProjectDocumentV3);
+    const theirs = splitProjectDocument(serializeProjectDocumentV3Json(serverProject).document);
+    if (ours.contentJson !== theirs.contentJson && draft.baseRevision !== record.revision) {
+      return { kind: 'revision', serverRevision: record.revision };
+    }
+    if (
+      ours.workspaceJson !== theirs.workspaceJson &&
+      (draft.baseWorkspaceRevision ?? null) !== (record.workspace?.revision ?? null)
+    ) {
+      return { half: 'workspace', kind: 'revision', serverRevision: record.revision };
+    }
+    return null;
+  };
+
   const markConflict = async (
     projectId: string,
     generation: number,
-    conflict: { kind: 'deleted' } | { kind: 'revision'; serverRevision: number },
+    conflict: ProjectDraftConflict,
     store: ProjectDraftStore,
     editorSessionId: string
   ): Promise<void> => {
@@ -994,6 +1289,7 @@ export const createDurableSyncedWorkbenchPersistence = (
       kind: conflict.kind,
       projectId,
       ...(conflict.kind === 'revision' ? { serverRevision: conflict.serverRevision } : {}),
+      ...(conflict.kind === 'revision' && conflict.half ? { half: conflict.half } : {}),
     };
     conflicts.set(projectId, info);
     pendingProjectIds.add(projectId);
@@ -1057,40 +1353,97 @@ export const createDurableSyncedWorkbenchPersistence = (
       return { documentJson, kind: 'conflicted' };
     }
     if (entry?.pushedDoc === documentJson && !projectsRequiringDocumentUpgrade.has(project.id)) {
-      await settleAck(
-        project,
-        generation,
-        {
-          board_id: '',
-          created_at: '',
-          data: document,
-          minimum_canvas_schema_version: entry.minimumCanvasSchemaVersion,
-          name: project.name,
-          project_id: project.id,
-          revision: entry.revision,
-          updated_at: '',
-        },
-        documentJson,
-        store,
-        editorSessionId
-      );
+      await settleAck(project, generation, entry, document, documentJson, store, editorSessionId);
       return { documentJson, kind: 'acknowledged' };
     }
 
-    try {
-      if (!entry) {
+    const halves = splitProjectDocument(document);
+    // Split content that repeats an item id would be refused by every later load, so such a project, which only a
+    // build before the split could have written, is created whole and keeps saving whole (see `toProjectCreation`).
+    const keepsWhole = findRepeatedWorkflowItem(halves.content.workflows.entries) !== null;
+    if (keepsWhole && entry && entry.pushedContent !== null) {
+      hasPending = true;
+      throw new Error(
+        'A workflow in this project now repeats an item id, so its changes cannot be saved. Undo the last workflow change to keep saving.'
+      );
+    }
+    /**
+     * The whole document the server holds once `entry` is, only when that is this one: with one half acknowledged
+     * and not the other, it holds neither this document nor the last one, and the shortcut that trusts `pushedDoc`
+     * must not take either for it.
+     */
+    const acknowledgedDocument = (entry: Omit<SyncEntry, 'pushedDoc'>): string =>
+      entry.pushedContent === halves.contentJson && entry.pushedWorkspace === halves.workspaceJson ? documentJson : '';
+    const settleRefusal = async (refusal: ProjectSchemaRefusal): Promise<ProjectPushOutcome> => {
+      schemaRefusals.set(project.id, refusal);
+      hasPending = true;
+      await store.settleSchemaRefusal(project.id, editorSessionId, writerToken, generation, refusal);
+      const volatile = volatileDrafts.get(project.id);
+      if (volatile) {
+        volatileDrafts.set(project.id, toSchemaRefusedProjectDraft(volatile, refusal));
+      }
+      return { documentJson, kind: 'schema-refused', refusal };
+    };
+    const conflicted = async (conflict: ProjectDraftConflict): Promise<ProjectPushOutcome> => {
+      await markConflict(project.id, generation, conflict, store, editorSessionId);
+      return { documentJson, kind: 'conflicted' };
+    };
+
+    /** Records what the server acknowledged of either half, as soon as it has, so a retry sends only what is owed. */
+    const record = (next: Omit<SyncEntry, 'pushedDoc'>): Omit<SyncEntry, 'pushedDoc'> => {
+      syncEntries.set(project.id, { ...next, pushedDoc: acknowledgedDocument(next) });
+      return next;
+    };
+    /** What this page sent of a half, kept until acknowledged: a save that landed with its answer lost is its own. */
+    const noteSent = (half: 'content' | 'workspace', json: string): void => {
+      const sent = sentHalves.get(project.id) ?? { content: [], workspace: [] };
+      sentHalves.set(project.id, {
+        ...sent,
+        [half]: [...sent[half].filter((body) => body !== json), json].slice(-SENT_HALVES_KEPT),
+      });
+    };
+    /**
+     * The lineage rebased onto the content just acknowledged, before the workspace is sent: should that save fail or
+     * the page go, recovery builds on the content the server now holds rather than conflicting with its own save.
+     */
+    const rebaseLineage = async (bases: ProjectDraftBases): Promise<void> => {
+      await store.rebaseDraft(project.id, editorSessionId, writerToken, generation, bases);
+      const volatile = volatileDrafts.get(project.id);
+      if (volatile) {
+        volatileDrafts.set(project.id, withBases(volatile, bases));
+      }
+      const journaled = journaledDocuments.get(project.id);
+      if (journaled && journaled.editorSessionId === editorSessionId) {
+        const rebased = { ...journaled, ...bases };
+        const write = store.journalBeforeUnload({ entries: [rebased], retired: [] });
+        if (write.kind === 'started' && (await write.written) && journaledDocuments.get(project.id) === journaled) {
+          journaledDocuments.set(project.id, rebased);
+        }
+      }
+    };
+
+    /**
+     * A project's first save, and the split of one the server holds whole, are one request each, which stores the
+     * content and the caller's workspace together: between two requests the server would hold the content alone, and
+     * a page gone at that moment (sign-out deletes its drafts) would leave the member's workspace lost for good. Once
+     * split, the halves go one after the other, content first: the server takes one write per account at a time, and
+     * the content's save is what raises the document floor, so a workspace never sits beside a project an older page
+     * could still save whole.
+     */
+    const pushHalves = async (base: SyncEntry | undefined): Promise<Omit<SyncEntry, 'pushedDoc'> | 'conflicted'> => {
+      if (keepsWhole && !base) {
         const created = await api.createProject(
           {
-            data: document,
+            data: document as unknown as Record<string, unknown>,
             minimum_canvas_schema_version: getProjectCanvasSchemaRequirement(document),
+            minimum_document_schema_version: PROJECT_DOCUMENT_SCHEMA_VERSION,
             name: project.name,
             project_id: project.id,
           },
           owner
         );
         assertOwner();
-        const serverJson = JSON.stringify(created.data);
-        if (serverJson !== documentJson) {
+        if (JSON.stringify(created.data) !== documentJson) {
           await markConflict(
             project.id,
             generation,
@@ -1098,145 +1451,274 @@ export const createDurableSyncedWorkbenchPersistence = (
             store,
             editorSessionId
           );
-          return { documentJson, kind: 'conflicted' };
+          return 'conflicted';
         }
-        await settleAck(project, generation, created, documentJson, store, editorSessionId);
         pendingBoardAssignments.set(project.id, { boardId: created.board_id, projectId: project.id });
-        return { documentJson, kind: 'acknowledged' };
+        return record({
+          minimumCanvasSchemaVersion: created.minimum_canvas_schema_version,
+          pushedContent: null,
+          pushedWorkspace: null,
+          revision: created.revision,
+          workspaceRevision: null,
+        });
       }
-
-      const raisedFloor = getRaisedCanvasSchemaFloor(document, entry.minimumCanvasSchemaVersion);
-      const updated = await api.updateProject(
-        project.id,
-        {
-          data: document,
-          expected_revision: entry.revision,
-          ...(raisedFloor === undefined ? {} : { minimum_canvas_schema_version: raisedFloor }),
-          name: project.name,
-        },
-        owner.signal
-      );
-      assertOwner();
-      await settleAck(project, generation, updated, documentJson, store, editorSessionId);
-      return { documentJson, kind: 'acknowledged' };
-    } catch (error) {
-      assertOwner();
-      const refusalError = error instanceof ProjectCreateAbsentError ? error.cause : error;
-      const sizeRefusal = getProjectWriteSizeRefusal(refusalError);
-      if (sizeRefusal) {
-        hasPending = true;
-        throw new ProjectDocumentTooLargeError(sizeRefusal.actualBytes, sizeRefusal.maxBytes);
+      if (keepsWhole && base) {
+        const raisedFloor = getRaisedCanvasSchemaFloor(document, base.minimumCanvasSchemaVersion);
+        const updated = await api.updateProject(
+          project.id,
+          {
+            data: document as unknown as Record<string, unknown>,
+            expected_revision: base.revision,
+            ...(raisedFloor === undefined ? {} : { minimum_canvas_schema_version: raisedFloor }),
+            name: project.name,
+          },
+          owner.signal
+        );
+        assertOwner();
+        // Never splitting, it needs no upgrade: the shortcut for an unchanged document applies again.
+        projectsRequiringDocumentUpgrade.delete(project.id);
+        return record({
+          ...base,
+          minimumCanvasSchemaVersion: updated.minimum_canvas_schema_version,
+          pushedContent: null,
+          pushedWorkspace: null,
+          revision: updated.revision,
+        });
       }
-      const schemaRefusal = getProjectCanvasSchemaCompatibilityRefusal(refusalError);
-      if (schemaRefusal) {
-        const refusal = toCanvasSchemaRefusal(schemaRefusal);
-        schemaRefusals.set(project.id, refusal);
-        hasPending = true;
-        await store.settleSchemaRefusal(project.id, editorSessionId, writerToken, generation, refusal);
-        const volatile = volatileDrafts.get(project.id);
-        if (volatile) {
-          volatileDrafts.set(project.id, toSchemaRefusedProjectDraft(volatile, refusal));
-        }
-        return { documentJson, kind: 'schema-refused', refusal };
-      }
-      if (error instanceof ProjectCreateAbsentError) {
-        throw error.cause;
-      }
-      if (isStatus(error, 404)) {
-        if (deletedProjectIds.has(project.id)) {
-          return { documentJson, kind: 'superseded' };
-        }
-        await markConflict(project.id, generation, { kind: 'deleted' }, store, editorSessionId);
-        return { documentJson, kind: 'conflicted' };
-      }
-      if (isStatus(error, 409)) {
-        try {
-          const current = await api.getProject(project.id, owner.signal);
-          assertOwner();
-          const currentJson = recordDocumentJson(current);
-          if (currentJson === documentJson) {
-            await settleAck(project, generation, current, documentJson, store, editorSessionId);
-            return { documentJson, kind: 'acknowledged' };
-          }
-          if (entry && currentJson === entry.pushedDoc) {
-            syncEntries.set(project.id, {
-              minimumCanvasSchemaVersion: current.minimum_canvas_schema_version,
-              pushedDoc: entry.pushedDoc,
-              revision: current.revision,
-            });
-            const retryRaisedFloor = getRaisedCanvasSchemaFloor(document, current.minimum_canvas_schema_version);
-            const retried = await api.updateProject(
-              project.id,
-              {
-                data: document,
-                expected_revision: current.revision,
-                ...(retryRaisedFloor === undefined ? {} : { minimum_canvas_schema_version: retryRaisedFloor }),
-                name: project.name,
-              },
-              owner.signal
-            );
-            assertOwner();
-            await settleAck(project, generation, retried, documentJson, store, editorSessionId);
-            return { documentJson, kind: 'acknowledged' };
-          }
+      let acknowledged: Omit<SyncEntry, 'pushedDoc'>;
+      const workspaceOwed = base?.pushedWorkspace !== halves.workspaceJson;
+      if (!base) {
+        noteSent('content', halves.contentJson);
+        noteSent('workspace', halves.workspaceJson);
+        const created = await api.createProject(
+          {
+            data: halves.content as unknown as Record<string, unknown>,
+            minimum_canvas_schema_version: getProjectCanvasSchemaRequirement(document),
+            minimum_document_schema_version: PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION,
+            name: project.name,
+            project_id: project.id,
+            workspace: halves.workspace as unknown as Record<string, unknown>,
+          },
+          owner
+        );
+        assertOwner();
+        if (JSON.stringify(created.data) !== halves.contentJson) {
           await markConflict(
             project.id,
             generation,
-            { kind: 'revision', serverRevision: current.revision },
+            { kind: 'revision', serverRevision: created.revision },
             store,
             editorSessionId
           );
+          return 'conflicted';
+        }
+        pendingBoardAssignments.set(project.id, { boardId: created.board_id, projectId: project.id });
+        // The answer names the workspace it stored, which is this save's only when it is what this save sent: a
+        // create settled by a read of an earlier attempt that committed unanswered carries that attempt's workspace,
+        // and the content it is judged by may not have changed since. Any other workspace stays owed, and is sent
+        // next against the revision the answer named; a server that stored none leaves it owed the same way.
+        const workspaceStored =
+          created.workspace !== null && JSON.stringify(created.workspace.data) === halves.workspaceJson;
+        acknowledged = record({
+          minimumCanvasSchemaVersion: created.minimum_canvas_schema_version,
+          pushedContent: halves.contentJson,
+          pushedWorkspace: workspaceStored ? halves.workspaceJson : null,
+          revision: created.revision,
+          workspaceRevision: created.workspace?.revision ?? null,
+        });
+        if (!workspaceStored) {
+          await rebaseLineage({
+            baseMinimumCanvasSchemaVersion: created.minimum_canvas_schema_version,
+            baseRevision: created.revision,
+          });
+        }
+      } else if (base.pushedContent === null) {
+        // The server holds the project whole: the split, in one request.
+        const raisedFloor = getRaisedCanvasSchemaFloor(document, base.minimumCanvasSchemaVersion);
+        noteSent('content', halves.contentJson);
+        noteSent('workspace', halves.workspaceJson);
+        const updated = await api.updateProject(
+          project.id,
+          {
+            data: halves.content as unknown as Record<string, unknown>,
+            expected_revision: base.revision,
+            ...(raisedFloor === undefined ? {} : { minimum_canvas_schema_version: raisedFloor }),
+            minimum_document_schema_version: PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION,
+            name: project.name,
+            workspace: {
+              data: halves.workspace as unknown as Record<string, unknown>,
+              expected_revision: base.workspaceRevision,
+            },
+          },
+          owner.signal
+        );
+        assertOwner();
+        projectsRequiringDocumentUpgrade.delete(project.id);
+        // The answer names the workspace it stored; a server that stored none leaves it owed, and it is sent next.
+        acknowledged = record({
+          minimumCanvasSchemaVersion: updated.minimum_canvas_schema_version,
+          pushedContent: halves.contentJson,
+          pushedWorkspace: updated.workspace ? halves.workspaceJson : null,
+          revision: updated.revision,
+          workspaceRevision: updated.workspace?.revision ?? null,
+        });
+        if (!updated.workspace) {
+          await rebaseLineage({
+            baseMinimumCanvasSchemaVersion: updated.minimum_canvas_schema_version,
+            baseRevision: updated.revision,
+          });
+        }
+      } else if (projectsRequiringDocumentUpgrade.has(project.id) || base.pushedContent !== halves.contentJson) {
+        const raisedFloor = getRaisedCanvasSchemaFloor(document, base.minimumCanvasSchemaVersion);
+        noteSent('content', halves.contentJson);
+        const updated = await api.updateProject(
+          project.id,
+          {
+            data: halves.content as unknown as Record<string, unknown>,
+            expected_revision: base.revision,
+            ...(raisedFloor === undefined ? {} : { minimum_canvas_schema_version: raisedFloor }),
+            // Idempotent on a split project.
+            minimum_document_schema_version: PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION,
+            name: project.name,
+          },
+          owner.signal
+        );
+        assertOwner();
+        projectsRequiringDocumentUpgrade.delete(project.id);
+        acknowledged = record({
+          ...base,
+          minimumCanvasSchemaVersion: updated.minimum_canvas_schema_version,
+          pushedContent: halves.contentJson,
+          revision: updated.revision,
+        });
+        if (workspaceOwed) {
+          await rebaseLineage({
+            baseMinimumCanvasSchemaVersion: updated.minimum_canvas_schema_version,
+            baseRevision: updated.revision,
+          });
+        }
+      } else {
+        acknowledged = base;
+      }
+      if (acknowledged.pushedWorkspace !== halves.workspaceJson) {
+        noteSent('workspace', halves.workspaceJson);
+        const saved = await api.saveProjectWorkspace(
+          project.id,
+          {
+            data: halves.workspace as unknown as Record<string, unknown>,
+            expected_revision: acknowledged.workspaceRevision,
+          },
+          owner.signal
+        );
+        assertOwner();
+        acknowledged = record({
+          ...acknowledged,
+          pushedWorkspace: halves.workspaceJson,
+          workspaceRevision: saved.revision,
+        });
+      }
+      return acknowledged;
+    };
+
+    /**
+     * After a revision conflict: what the server holds of each half. A half it holds as ours is acknowledged; a half
+     * it still holds as this page last saw it was moved by a save of the same bytes, and is retried at its revision;
+     * any other half diverged.
+     */
+    const reconcile = async (): Promise<
+      | { kind: 'acknowledged' | 'retry'; entry: Omit<SyncEntry, 'pushedDoc'> }
+      | { kind: 'diverged'; half?: 'workspace'; serverRevision: number }
+    > => {
+      const latest = await api.getProject(project.id, owner.signal);
+      assertOwner();
+      const loaded = deserializeProjectRecord(latest);
+      if (loaded.status !== 'loaded') {
+        return { kind: 'diverged', serverRevision: latest.revision };
+      }
+      const server = serializeProjectDocumentV3Json(loaded.project);
+      const serverHalves = splitProjectDocument(server.document);
+      const split = isSplitProjectRecord(latest);
+      const base = syncEntries.get(project.id);
+      const contentHeld = split && serverHalves.contentJson === halves.contentJson;
+      const sent = sentHalves.get(project.id);
+      // Unmoved: still what this page last had acknowledged, or what it sent and never heard back about.
+      const contentUnmoved = split
+        ? base?.pushedContent === serverHalves.contentJson || sent?.content.includes(serverHalves.contentJson) === true
+        : base !== undefined && base.pushedContent === null && base.pushedDoc === server.documentJson;
+      const workspaceHeld = Boolean(latest.workspace) && serverHalves.workspaceJson === halves.workspaceJson;
+      const workspaceUnmoved = latest.workspace
+        ? base?.pushedWorkspace === serverHalves.workspaceJson ||
+          sent?.workspace.includes(serverHalves.workspaceJson) === true
+        : (base?.workspaceRevision ?? null) === null;
+      if (!(contentHeld || contentUnmoved)) {
+        return { kind: 'diverged', serverRevision: latest.revision };
+      }
+      if (!(workspaceHeld || workspaceUnmoved)) {
+        return { half: 'workspace', kind: 'diverged', serverRevision: latest.revision };
+      }
+      const entry = {
+        minimumCanvasSchemaVersion: latest.minimum_canvas_schema_version,
+        pushedContent: split ? serverHalves.contentJson : null,
+        pushedWorkspace: latest.workspace ? serverHalves.workspaceJson : null,
+        revision: latest.revision,
+        workspaceRevision: latest.workspace?.revision ?? null,
+      };
+      return { entry, kind: contentHeld && workspaceHeld ? 'acknowledged' : 'retry' };
+    };
+
+    let base = entry;
+    // One retry: a second conflict means someone is saving this project now, which is a divergence to resolve.
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        const acknowledged = await pushHalves(base);
+        if (acknowledged === 'conflicted') {
           return { documentJson, kind: 'conflicted' };
+        }
+        await settleAck(project, generation, acknowledged, document, documentJson, store, editorSessionId);
+        return { documentJson, kind: 'acknowledged' };
+      } catch (error) {
+        assertOwner();
+        const refusalError = error instanceof ProjectCreateAbsentError ? error.cause : error;
+        const sizeRefusal = getProjectWriteSizeRefusal(refusalError);
+        if (sizeRefusal) {
+          hasPending = true;
+          throw new ProjectDocumentTooLargeError(sizeRefusal.actualBytes, sizeRefusal.maxBytes);
+        }
+        const schemaRefusal = toSchemaRefusal(refusalError);
+        if (schemaRefusal) {
+          return settleRefusal(schemaRefusal);
+        }
+        if (error instanceof ProjectCreateAbsentError) {
+          throw error.cause;
+        }
+        if (isStatus(error, 404)) {
+          if (deletedProjectIds.has(project.id)) {
+            return { documentJson, kind: 'superseded' };
+          }
+          return conflicted({ kind: 'deleted' });
+        }
+        if (!isStatus(error, 409)) {
+          if (isDeterministicClientError(error)) {
+            throw error;
+          }
+          hasPending = true;
+          return { documentJson, kind: 'unsynced' };
+        }
+        let settled: Awaited<ReturnType<typeof reconcile>>;
+        try {
+          settled = await reconcile();
         } catch (readError) {
           assertOwner();
           const retrySizeRefusal = getProjectWriteSizeRefusal(readError);
           if (retrySizeRefusal) {
             throw new ProjectDocumentTooLargeError(retrySizeRefusal.actualBytes, retrySizeRefusal.maxBytes);
           }
-          const retrySchemaRefusal = getProjectCanvasSchemaCompatibilityRefusal(readError);
-          if (retrySchemaRefusal) {
-            const refusal = toCanvasSchemaRefusal(retrySchemaRefusal);
-            schemaRefusals.set(project.id, refusal);
-            await store.settleSchemaRefusal(project.id, editorSessionId, writerToken, generation, refusal);
-            const volatile = volatileDrafts.get(project.id);
-            if (volatile) {
-              volatileDrafts.set(project.id, toSchemaRefusedProjectDraft(volatile, refusal));
-            }
-            return { documentJson, kind: 'schema-refused', refusal };
+          const readRefusal = toSchemaRefusal(readError);
+          if (readRefusal) {
+            return settleRefusal(readRefusal);
           }
           if (isStatus(readError, 404)) {
-            await markConflict(project.id, generation, { kind: 'deleted' }, store, editorSessionId);
-            return { documentJson, kind: 'conflicted' };
-          }
-          if (isStatus(readError, 409)) {
-            let latest: ProjectRecordDTO;
-            try {
-              latest = await api.getProject(project.id, owner.signal);
-            } catch (latestError) {
-              assertOwner();
-              if (isStatus(latestError, 404)) {
-                await markConflict(project.id, generation, { kind: 'deleted' }, store, editorSessionId);
-                return { documentJson, kind: 'conflicted' };
-              }
-              if (isDeterministicClientError(latestError)) {
-                throw latestError;
-              }
-              hasPending = true;
-              return { documentJson, kind: 'unsynced' };
-            }
-            assertOwner();
-            if (recordDocumentJson(latest) === documentJson) {
-              await settleAck(project, generation, latest, documentJson, store, editorSessionId);
-              return { documentJson, kind: 'acknowledged' };
-            }
-            await markConflict(
-              project.id,
-              generation,
-              { kind: 'revision', serverRevision: latest.revision },
-              store,
-              editorSessionId
-            );
-            return { documentJson, kind: 'conflicted' };
+            return conflicted({ kind: 'deleted' });
           }
           if (isDeterministicClientError(readError)) {
             throw readError;
@@ -1244,12 +1726,20 @@ export const createDurableSyncedWorkbenchPersistence = (
           hasPending = true;
           return { documentJson, kind: 'unsynced' };
         }
+        if (settled.kind === 'acknowledged') {
+          await settleAck(project, generation, settled.entry, document, documentJson, store, editorSessionId);
+          return { documentJson, kind: 'acknowledged' };
+        }
+        if (settled.kind === 'diverged' || attempt > 0) {
+          return conflicted({
+            ...(settled.kind === 'diverged' && settled.half ? { half: settled.half } : {}),
+            kind: 'revision',
+            serverRevision: settled.kind === 'diverged' ? settled.serverRevision : settled.entry.revision,
+          });
+        }
+        base = { ...settled.entry, pushedDoc: acknowledgedDocument(settled.entry) };
+        syncEntries.set(project.id, base);
       }
-      if (isDeterministicClientError(error)) {
-        throw error;
-      }
-      hasPending = true;
-      return { documentJson, kind: 'unsynced' };
     }
   };
 
@@ -1257,7 +1747,13 @@ export const createDurableSyncedWorkbenchPersistence = (
     plan: ProjectSavePlan,
     staged?: Awaited<ReturnType<typeof stageProject>>
   ): Promise<ProjectPushOutcome> => {
+    // The document went back to what recovery holds (an undo, say): the journal of a later state must not return.
+    if (journaledDocuments.has(plan.project.id) && isInRecovery(plan.project.id, plan.serialized.documentJson)) {
+      await settleJournaledDocument(plan.project.id, await getDraftStore());
+    }
     if (deletedProjectIds.has(plan.project.id)) {
+      // A pending push that the deletion overtook would otherwise keep every later save pending.
+      pendingProjectIds.delete(plan.project.id);
       return { documentJson: plan.serialized.documentJson, kind: 'superseded' };
     }
     if (!plan.needsPush) {
@@ -1316,6 +1812,7 @@ export const createDurableSyncedWorkbenchPersistence = (
             conflict: {
               detectedAt: conflict.detectedAt,
               kind: conflict.kind,
+              ...(conflict.half ? { half: conflict.half } : {}),
               ...(conflict.serverRevision === undefined ? {} : { serverRevision: conflict.serverRevision }),
             },
           }
@@ -1349,8 +1846,13 @@ export const createDurableSyncedWorkbenchPersistence = (
         await api.saveSession(state, editorSessionId, draftLineages, owner.signal);
         assertOwner();
         lastSessionJson = sessionJson;
-      } catch {
+      } catch (error) {
         assertOwner();
+        logger.warn({
+          error,
+          message: 'The workbench session could not be saved; autosave will retry.',
+          name: 'persistence.session-save-failed',
+        });
         sessionSavePending = true;
         hasPending = true;
         return false;
@@ -1442,13 +1944,147 @@ export const createDurableSyncedWorkbenchPersistence = (
     return { draft: availableDraft, editorSessionId, store };
   };
 
+  /**
+   * What the next load would restore for a project is exactly `documentJson`: its newest staged draft when it has one
+   * (and that stage was durable), otherwise the acknowledged server document.
+   */
+  const isInRecovery = (projectId: string, documentJson: string): boolean => {
+    const volatile = volatileDrafts.get(projectId);
+    return volatile
+      ? volatile.documentJson === documentJson && !localDraftFailures.has(projectDraftFailureKey(projectId))
+      : syncEntries.get(projectId)?.pushedDoc === documentJson;
+  };
+
+  /**
+   * Settles this writer's journal of a project in its lineage's claim (the mark makes a deletion that fails moot), then
+   * deletes it. The record is kept, for a later retry, until the mark commits. A fenced lineage needs no mark: its
+   * entries are discarded anyway. False while the journal could still come back.
+   */
+  const settleJournaledDocument = async (projectId: string, store: ProjectDraftStore): Promise<boolean> => {
+    const journaled = journaledDocuments.get(projectId);
+    if (!journaled) {
+      return true;
+    }
+    settlingJournalProjectIds.add(projectId);
+    let settled: Awaited<ReturnType<ProjectDraftStore['settleUnloadJournal']>>;
+    try {
+      settled = await store.settleUnloadJournal(
+        projectId,
+        journaled.editorSessionId,
+        writerToken,
+        journaled.generation
+      );
+    } finally {
+      settlingJournalProjectIds.delete(projectId);
+    }
+    if (settled.kind !== 'settled' && settled.kind !== 'fenced') {
+      return false;
+    }
+    // A hidden event meanwhile journaled a newer generation, which this settlement does not cover.
+    if (journaledDocuments.get(projectId) === journaled) {
+      journaledDocuments.delete(projectId);
+      retiredJournalProjectIds.delete(projectId);
+    }
+    return true;
+  };
+
   const deleteDraft = async (projectId: string): Promise<void> => {
     const { draft, editorSessionId, store } = await requireDraft(projectId);
-    const result = await store.delete(projectId, editorSessionId, draft.writerToken);
+    // Settling the journal in the deleting transaction keeps a discarded edit from coming back.
+    const result = await store.delete(projectId, editorSessionId, draft.writerToken, issuedGenerations.get(projectId));
     if (result.kind !== 'deleted') {
       throw new Error('The local project draft could not be deleted.');
     }
     volatileDrafts.delete(projectId);
+    await settleJournaledDocument(projectId, store);
+  };
+
+  /**
+   * Resolves a workspace conflict with the server's workspace, keeping this tab's project content: only the workspace
+   * diverged, and the content builds on what the server holds, so it is still this tab's to save. Content the server
+   * moved since is a conflict of its own, reported as one rather than overwritten. The draft is rewritten in place,
+   * never deleted first, so a crash at any point leaves either the conflict or the merge; a failure restores the
+   * conflict.
+   */
+  const useServerWorkspace = async (
+    projectId: string,
+    record: ProjectWithWorkspaceDTO,
+    serverProject: Project
+  ): Promise<ProjectLoadResult> => {
+    const { draft, editorSessionId, store } = await requireDraft(projectId);
+    // This tab's latest: what it last handed a save, which may not be staged yet, or else its draft.
+    const local = lastKnownState?.projects.find((candidate) => candidate.id === projectId) ?? loadDraftProject(draft);
+    if (!local) {
+      throw new Error('The local project could not be combined with the saved workspace.');
+    }
+    const ours = splitProjectDocument(serializeProjectDocumentV3Json(local).document);
+    const theirs = splitProjectDocument(serializeProjectDocumentV3Json(serverProject).document);
+    if (ours.contentJson !== theirs.contentJson && draft.baseRevision !== record.revision) {
+      await markConflict(
+        projectId,
+        draft.generation,
+        { kind: 'revision', serverRevision: record.revision },
+        store,
+        editorSessionId
+      );
+      reportSingleProjectSync(projectId);
+      throw new Error('The project changed elsewhere as well. Choose again which version to keep.');
+    }
+    const merged = deserializeProjectRecord({
+      ...record,
+      data: ours.content as unknown as Record<string, unknown>,
+    });
+    if (merged.status !== 'loaded') {
+      throw new Error('The local project could not be combined with the saved workspace.');
+    }
+    const previousConflict = conflicts.get(projectId);
+    const previousEntry = syncEntries.get(projectId);
+    const resumed = await store.resumeDraft(projectId, editorSessionId, writerToken, draft.generation);
+    if (resumed.kind !== 'marked') {
+      throw new Error('The local project draft could not be resumed.');
+    }
+    try {
+      syncEntries.set(projectId, toSyncEntry(record, serverProject));
+      conflicts.delete(projectId);
+      schemaRefusals.delete(projectId);
+      volatileDrafts.set(projectId, resumed.draft);
+      const staged = await stageProject(merged.project);
+      const rebased = await store.rebaseDraft(projectId, editorSessionId, writerToken, staged.generation, {
+        baseMinimumCanvasSchemaVersion: record.minimum_canvas_schema_version,
+        baseRevision: record.revision,
+        baseWorkspaceRevision: record.workspace?.revision ?? null,
+      });
+      if (rebased.kind !== 'rebased') {
+        throw new Error('The local project draft could not be rebased onto the saved workspace.');
+      }
+    } catch (error) {
+      if (previousEntry) {
+        syncEntries.set(projectId, previousEntry);
+      }
+      if (previousConflict?.kind === 'revision') {
+        await markConflict(
+          projectId,
+          draft.generation,
+          {
+            ...(previousConflict.half ? { half: previousConflict.half } : {}),
+            kind: 'revision',
+            serverRevision: previousConflict.serverRevision ?? record.revision,
+          },
+          store,
+          editorSessionId
+        );
+      }
+      reportSingleProjectSync(projectId);
+      throw error;
+    }
+    pendingProjectIds.add(projectId);
+    hasPending = true;
+    resolveProjectSyncConflict(projectId, { projectId, revision: record.revision }, hasPending);
+    projectResolutionFences.set(projectId, { kind: 'replace', project: merged.project });
+    if (lastKnownState) {
+      lastKnownState = applyProjectResolutionFences(lastKnownState);
+    }
+    return merged;
   };
 
   const alignLoadedDraftWithProject = async (
@@ -1462,7 +2098,7 @@ export const createDurableSyncedWorkbenchPersistence = (
       volatileDrafts.set(project.id, draft);
       return draft;
     }
-    const generation = draft.generation + 1;
+    const generation = Math.max(draft.generation, issuedGenerations.get(project.id) ?? 0) + 1;
     let input = {
       baseMinimumCanvasSchemaVersion: draft.baseMinimumCanvasSchemaVersion,
       baseRevision: draft.baseRevision,
@@ -1502,7 +2138,7 @@ export const createDurableSyncedWorkbenchPersistence = (
       ...input,
       documentByteSize: serialized.byteSize,
     } as ProjectDraft;
-    generations.set(project.id, generation);
+    noteGeneration(project.id, generation);
     volatileDrafts.set(project.id, aligned);
     return aligned;
   };
@@ -1510,7 +2146,7 @@ export const createDurableSyncedWorkbenchPersistence = (
   const hydrateProjectWithDraft = async (projectId: string, projectName: string): Promise<ProjectLoadResult> => {
     assertOwner();
     const [store, session] = await Promise.all([getDraftStore(), getEditorSessionForService()]);
-    const draftSummaries = await listProjectDraftCandidates(store, projectId);
+    const draftSummaries = await listProjectDraftCandidates(store, projectId, session.id);
     const draft = await adoptNewestDraft(store, projectId, session.id, draftSummaries);
     assertOwner();
     const reportOwnedProjectSync = (): void => {
@@ -1519,7 +2155,7 @@ export const createDurableSyncedWorkbenchPersistence = (
     };
     let loadedDraft: LoadedDraft | null = null;
     if (draft) {
-      generations.set(projectId, draft.generation);
+      noteGeneration(projectId, draft.generation);
       volatileDrafts.set(projectId, draft);
       const project = loadDraftProject(draft);
       if (project) {
@@ -1532,15 +2168,15 @@ export const createDurableSyncedWorkbenchPersistence = (
       }
     }
 
-    let record: ProjectRecordDTO;
+    let record: ProjectWithWorkspaceDTO;
     try {
       record = await api.getProject(projectId, owner.signal);
       assertOwner();
     } catch (error) {
       assertOwner();
-      const compatibility = getProjectCanvasSchemaCompatibilityRefusal(error);
-      if (compatibility && loadedDraft) {
-        const refusal = toCanvasSchemaRefusal(compatibility);
+      const readRefusal = toSchemaRefusal(error);
+      if (readRefusal && loadedDraft) {
+        const refusal = readRefusal;
         loadedDraft.draft = await alignLoadedDraftWithProject(loadedDraft.draft, loadedDraft.project, store);
         schemaRefusals.set(projectId, refusal);
         await store.settleSchemaRefusal(
@@ -1573,22 +2209,8 @@ export const createDurableSyncedWorkbenchPersistence = (
         reportOwnedProjectSync();
         return { project: loadedDraft.project, status: 'loaded' };
       }
-      if (compatibility) {
-        return {
-          refused: {
-            projectId,
-            projectName,
-            raw: null,
-            refusal: {
-              raw: null,
-              scope: 'document',
-              status: 'unsupported-version',
-              version: compatibility.minimumCanvasSchemaVersion,
-            },
-            source: 'canvas',
-          },
-          status: 'refused',
-        };
+      if (readRefusal?.kind === 'canvas' || readRefusal?.kind === 'document') {
+        return { refused: toRefusedProject(projectId, projectName, readRefusal), status: 'refused' };
       }
       return { status: 'unavailable' };
     }
@@ -1628,13 +2250,11 @@ export const createDurableSyncedWorkbenchPersistence = (
       return { project: localProject, status: 'loaded' };
     }
 
-    const serverJson = serializeProjectDocumentV3Json(result.project).documentJson;
-    syncEntries.set(projectId, {
-      minimumCanvasSchemaVersion: record.minimum_canvas_schema_version,
-      pushedDoc: serverJson,
-      revision: record.revision,
-    });
-    if (recordRequiresDocumentUpgrade(record)) {
+    const serverEntry = toSyncEntry(record, result.project);
+    syncEntries.set(projectId, serverEntry);
+    // Another page may have split it since this one learned it was whole.
+    projectsRequiringDocumentUpgrade.delete(projectId);
+    if (recordRequiresDocumentUpgrade(record, result.project)) {
       projectsRequiringDocumentUpgrade.add(projectId);
       pendingProjectIds.add(projectId);
       hasPending = true;
@@ -1646,39 +2266,36 @@ export const createDurableSyncedWorkbenchPersistence = (
 
     const localProject = withAuthoritativeProjectBoard(loadedDraft.project, record.board_id);
     loadedDraft.draft = await alignLoadedDraftWithProject(loadedDraft.draft, localProject, store);
-    if (loadedDraft.draft.documentJson === serverJson) {
+    if (loadedDraft.draft.documentJson === serverEntry.pushedDoc) {
       await store.settleAcknowledgement(
         projectId,
         loadedDraft.draft.editorSessionId,
         writerToken,
         loadedDraft.draft.generation,
         record.revision,
-        record.minimum_canvas_schema_version
+        record.minimum_canvas_schema_version,
+        serverEntry.workspaceRevision
       );
       volatileDrafts.delete(projectId);
       pendingProjectIds.delete(projectId);
       reportOwnedProjectSync();
       return result;
     }
+    const divergence =
+      loadedDraft.draft.state === 'conflict'
+        ? loadedDraft.draft.conflict
+        : findDraftDivergence(loadedDraft.draft, result.project, record);
     if (
       loadedDraft.draft.state === 'schema-refused' &&
       loadedDraft.draft.refusal.kind === 'canvas' &&
       !isCanvasSchemaVersionSupported(loadedDraft.draft.refusal.minimumCanvasSchemaVersion)
     ) {
       schemaRefusals.set(projectId, loadedDraft.draft.refusal);
-    } else if (loadedDraft.draft.state === 'conflict' || loadedDraft.draft.baseRevision !== record.revision) {
-      await markConflict(
-        projectId,
-        loadedDraft.draft.generation,
-        loadedDraft.draft.state === 'conflict'
-          ? loadedDraft.draft.conflict
-          : { kind: 'revision', serverRevision: record.revision },
-        store,
-        loadedDraft.draft.editorSessionId
-      );
+    } else if (divergence) {
+      await markConflict(projectId, loadedDraft.draft.generation, divergence, store, loadedDraft.draft.editorSessionId);
     } else {
       if (loadedDraft.draft.state === 'schema-refused') {
-        await store.resumeSchemaRefused(
+        await store.resumeDraft(
           projectId,
           loadedDraft.draft.editorSessionId,
           writerToken,
@@ -1693,7 +2310,7 @@ export const createDurableSyncedWorkbenchPersistence = (
     return { project: localProject, status: 'loaded' };
   };
 
-  return {
+  const service: DurableSyncedWorkbenchPersistence = {
     acknowledgeProjectResolution: (projectId) => {
       projectResolutionFences.delete(projectId);
       releaseProjectMutation(projectId);
@@ -1706,14 +2323,12 @@ export const createDurableSyncedWorkbenchPersistence = (
       }
       const result = deserializeProjectRecord(record);
       if (result.status === 'loaded') {
-        syncEntries.set(record.project_id, {
-          minimumCanvasSchemaVersion: record.minimum_canvas_schema_version,
-          pushedDoc: serializeProjectDocumentV3Json(result.project).documentJson,
-          revision: record.revision,
-        });
+        syncEntries.set(record.project_id, toSyncEntry(record, result.project));
         conflicts.delete(record.project_id);
         schemaRefusals.delete(record.project_id);
-        if (recordRequiresDocumentUpgrade(record)) {
+        // Another page may have split it since this one learned it was whole.
+        projectsRequiringDocumentUpgrade.delete(record.project_id);
+        if (recordRequiresDocumentUpgrade(record, result.project)) {
           projectsRequiringDocumentUpgrade.add(record.project_id);
           pendingProjectIds.add(record.project_id);
         }
@@ -1758,6 +2373,7 @@ export const createDurableSyncedWorkbenchPersistence = (
             seedProjectLibrary([], owner);
           }
           syncEntries.clear();
+          sentHalves.clear();
           conflicts.clear();
           schemaRefusals.clear();
           pendingProjectIds.clear();
@@ -1816,7 +2432,7 @@ export const createDurableSyncedWorkbenchPersistence = (
         unopenableDrafts.delete(`${projectId}\u0000${editorSessionId}`);
         reportSync(lastKnownState?.projects ?? []);
       }),
-    deleteProjectOnServer: (projectId) =>
+    deleteProjectOnServer: (projectId, boards = 'release') =>
       enqueue(async () => {
         const resolvedProjectId = resolveProjectId(projectId);
         const hadDeleteFence = deletedProjectIds.has(resolvedProjectId);
@@ -1835,7 +2451,7 @@ export const createDurableSyncedWorkbenchPersistence = (
             throw new Error('This tab no longer owns the local project draft.');
           }
           try {
-            await api.deleteProject(resolvedProjectId, owner.signal);
+            await api.deleteProject(resolvedProjectId, owner.signal, boards);
           } catch (error) {
             if (!isStatus(error, 404)) {
               throw error;
@@ -1844,17 +2460,30 @@ export const createDurableSyncedWorkbenchPersistence = (
           serverDeleteCommitted = true;
           serverDeletedProjectIds.add(resolvedProjectId);
           if (ownedDraft) {
-            const deleted = await store.delete(resolvedProjectId, editorSessionId, writerToken);
+            const deleted = await store.delete(
+              resolvedProjectId,
+              editorSessionId,
+              writerToken,
+              issuedGenerations.get(resolvedProjectId)
+            );
             if (deleted.kind !== 'deleted') {
               throw new Error(
                 'The server project was deleted, but its local draft could not be removed. Retry deletion.'
               );
             }
           }
+          // A journal from an earlier hidden page would otherwise bring the deleted project back on the next load.
+          if (!(await settleJournaledDocument(resolvedProjectId, store))) {
+            throw new Error(
+              'The server project was deleted, but its local recovery could not be removed. Retry deletion.'
+            );
+          }
           volatileDrafts.delete(resolvedProjectId);
           draftEditorSessionIds.delete(resolvedProjectId);
           syncEntries.delete(resolvedProjectId);
+          sentHalves.delete(resolvedProjectId);
           conflicts.delete(resolvedProjectId);
+          schemaRefusals.delete(resolvedProjectId);
           projectsRequiringDocumentUpgrade.delete(resolvedProjectId);
           pendingProjectIds.delete(resolvedProjectId);
           for (const [key, handoff] of pendingRetargetHandoffs) {
@@ -1942,7 +2571,137 @@ export const createDurableSyncedWorkbenchPersistence = (
       const result = await store.get(projectId, editorSessionId);
       return result.kind === 'found' ? result.draft.documentJson : null;
     },
+    hasClosedSession: () => isSessionClosed,
     hasPendingChanges: () => hasPending,
+    journalBeforeUnload: (state) => {
+      const target = unloadJournalTarget;
+      // Nothing of a closed session, a cleared workbench, or an ended account lifetime may be written.
+      if (
+        !target ||
+        isClosed ||
+        isTerminallyCleared ||
+        isSessionClosed ||
+        owner.accountId === null ||
+        !isAccountScopeCurrent(owner)
+      ) {
+        return { kind: 'nothing-to-journal' };
+      }
+      const entries: ProjectUnloadJournalEntry[] = [];
+      const retired: ProjectUnloadJournalKey[] = [];
+      const skippedOversizedProjectIds: string[] = [];
+      const journaledAt = Date.parse(now());
+      let remainingBytes = PROJECT_UNLOAD_JOURNAL_MAX_BYTES;
+      for (const inputProject of applyProjectResolutionFences(state).projects) {
+        const project = resolveInputProject(inputProject);
+        // Deletion owns this project's recovery: it must not come back from a journal.
+        if (deletedProjectIds.has(project.id)) {
+          continue;
+        }
+        const serialized = serializeProjectDocumentV3Json(project);
+        const journaled = journaledDocuments.get(project.id);
+        const isJournalStored = !retiredJournalProjectIds.has(project.id) && !settlingJournalProjectIds.has(project.id);
+        if (serialized.documentJson === journaled?.documentJson && isJournalStored) {
+          continue;
+        }
+        if (isInRecovery(project.id, serialized.documentJson)) {
+          // Back to what recovery holds: the journal of a later state must not come back as a newer draft. The record
+          // stays, so the next save also settles it, should this blind deletion be lost.
+          if (journaled && isJournalStored) {
+            retired.push([project.id, journaled.editorSessionId, writerToken, journaled.generation]);
+          }
+          continue;
+        }
+        if (serialized.byteSize > remainingBytes) {
+          skippedOversizedProjectIds.push(project.id);
+          continue;
+        }
+        remainingBytes -= serialized.byteSize;
+        // A stage of this very document that is still in flight shares its generation: whichever lands first, the
+        // lineage ends with one copy, and the acknowledgement of that stage also settles the journal.
+        const staging = stagingDocuments.get(project.id);
+        const entry = syncEntries.get(project.id);
+        entries.push({
+          accountId: owner.accountId,
+          baseMinimumCanvasSchemaVersion:
+            entry?.minimumCanvasSchemaVersion ?? getProjectCanvasSchemaRequirement(serialized.document),
+          baseRevision: entry?.revision ?? null,
+          baseWorkspaceRevision: entry?.workspaceRevision ?? null,
+          documentByteSize: serialized.byteSize,
+          documentJson: serialized.documentJson,
+          documentSchemaVersion: PROJECT_DOCUMENT_SCHEMA_VERSION,
+          editorSessionId: getDraftEditorSessionId(project.id, target.editorSessionId),
+          generation:
+            staging?.documentJson === serialized.documentJson ? staging.generation : nextGeneration(project.id),
+          journaledAt,
+          // The lineage above may be named after another tab's session; this page is the one that must still run.
+          ownerEditorSessionId: target.editorSessionId,
+          projectId: project.id,
+          recordType: 'unload-journal',
+          schemaVersion: PROJECT_UNLOAD_JOURNAL_SCHEMA_VERSION,
+          writerToken,
+        });
+      }
+      if (entries.length === 0 && retired.length === 0) {
+        return skippedOversizedProjectIds.length > 0
+          ? { kind: 'journaled', projectIds: [], skippedOversizedProjectIds, written: Promise.resolve(true) }
+          : { kind: 'nothing-to-journal' };
+      }
+      const write = target.store.journalBeforeUnload({ entries, retired });
+      if (write.kind !== 'started') {
+        return { kind: 'unavailable' };
+      }
+      // Remembered at once, so becoming hidden right after `pagehide` does not write it again; an aborted write puts
+      // back what was there, so the next hidden event writes again.
+      const replaced = new Map<
+        string,
+        {
+          after: ProjectUnloadJournalEntry | undefined;
+          before: ProjectUnloadJournalEntry | undefined;
+          wasRetired: boolean;
+        }
+      >();
+      for (const [projectId] of retired) {
+        const record = journaledDocuments.get(projectId);
+        replaced.set(projectId, { after: record, before: record, wasRetired: false });
+        retiredJournalProjectIds.add(projectId);
+      }
+      for (const entry of entries) {
+        replaced.set(entry.projectId, {
+          after: entry,
+          before: journaledDocuments.get(entry.projectId),
+          wasRetired: retiredJournalProjectIds.has(entry.projectId),
+        });
+        journaledDocuments.set(entry.projectId, entry);
+        retiredJournalProjectIds.delete(entry.projectId);
+        // Never reused: a journal settled at this generation must not swallow a later edit journaled next.
+        issuedGenerations.set(entry.projectId, Math.max(issuedGenerations.get(entry.projectId) ?? 0, entry.generation));
+      }
+      const written = write.written.then((isWritten) => {
+        if (!isWritten) {
+          for (const [projectId, { after, before, wasRetired }] of replaced) {
+            if (journaledDocuments.get(projectId) === after) {
+              if (before) {
+                journaledDocuments.set(projectId, before);
+              } else {
+                journaledDocuments.delete(projectId);
+              }
+              if (wasRetired) {
+                retiredJournalProjectIds.add(projectId);
+              } else {
+                retiredJournalProjectIds.delete(projectId);
+              }
+            }
+          }
+        }
+        return isWritten;
+      });
+      return {
+        kind: 'journaled',
+        projectIds: entries.map((entry) => entry.projectId),
+        skippedOversizedProjectIds,
+        written,
+      };
+    },
     hydrateProjectFromServer: (projectId, projectName = projectId) =>
       enqueue(() => {
         if (
@@ -1968,6 +2727,18 @@ export const createDurableSyncedWorkbenchPersistence = (
         clearLegacyStorage();
         const store = await getDraftStore();
         const session = await getEditorSessionForService();
+        assertOwner();
+        // Before this writer claims any lineage, so a journal is judged against the lineage its writer left behind;
+        // before the backend is asked, so a journaled document can be exported even when it is unreachable. A journal
+        // of a page that still runs (hidden, not unloaded) is left to that page, which settles it with its own saves.
+        const reconciledJournal =
+          owner.accountId === null
+            ? ({ kind: 'unavailable' } as const)
+            : await store.reconcileUnloadJournal(owner.accountId, Date.parse(now()), {
+                isEditorSessionLive: createEditorSessionLivenessCheck(session.id, isOtherEditorSessionLive),
+              });
+        assertOwner();
+        unloadJournalTarget = { editorSessionId: session.id, store };
         let summaries: ProjectSummaryDTO[];
         let sessionBlob: WorkbenchSessionBlob | null;
         let queueRunProjects: Awaited<ReturnType<typeof listQueueRunProjectIds>>;
@@ -1982,6 +2753,7 @@ export const createDurableSyncedWorkbenchPersistence = (
         }
         assertOwner();
         syncEntries.clear();
+        sentHalves.clear();
         conflicts.clear();
         schemaRefusals.clear();
         projectsRequiringDocumentUpgrade.clear();
@@ -1996,8 +2768,37 @@ export const createDurableSyncedWorkbenchPersistence = (
         closedRetargetTargetsAwaitingAck.clear();
         projectResolutionFences.clear();
         draftEditorSessionIds.clear();
+        journaledDocuments.clear();
+        retiredJournalProjectIds.clear();
+        settlingJournalProjectIds.clear();
         localDraftFailures.clear();
         localDraftStatus = 'ok';
+        // Without its journal, recovery works as it did before the journal existed: that is logged, not reported. An
+        // entry the draft store could not take is a draft-store failure for its project, which its next stage clears.
+        const journalReplacedDrafts = new Map<string, ProjectUnloadJournalReconciliation>();
+        if (reconciledJournal.kind === 'unavailable') {
+          logger.info({
+            message: 'The unload journal is unavailable; recovery relies on staged drafts alone.',
+            name: 'persistence.unload-journal-unavailable',
+          });
+        } else {
+          for (const reconciled of reconciledJournal.outcomes) {
+            if (reconciled.outcome === 'corrupt' || reconciled.outcome === 'quota') {
+              markLocalDraftFailure(projectDraftFailureKey(reconciled.projectId));
+            } else if (reconciled.replacedDraft) {
+              journalReplacedDrafts.set(reconciled.projectId, reconciled);
+            }
+          }
+          if (reconciledJournal.outcomes.length > 0) {
+            logger.info({
+              context: {
+                outcomes: reconciledJournal.outcomes.map(({ outcome, projectId }) => ({ outcome, projectId })),
+              },
+              message: 'Reconciled the unload journal.',
+              name: 'persistence.unload-journal-reconciled',
+            });
+          }
+        }
         for (const [projectId, editorSessionId] of Object.entries(sessionBlob?.draftEditorSessionIds ?? {})) {
           draftEditorSessionIds.set(projectId, editorSessionId);
         }
@@ -2005,12 +2806,12 @@ export const createDurableSyncedWorkbenchPersistence = (
         sessionSavePending = false;
         seedProjectLibrary(summaries, owner);
         const [draftCandidates, retargetHandoffs] = await Promise.all([
-          listDraftProjectCandidates(store),
+          listDraftProjectCandidates(store, session.id),
           listRetargetHandoffs(store),
         ]);
         const draftCandidatesByProject = groupDraftCandidatesByProject(draftCandidates);
         const summaryById = new Map(summaries.map((summary) => [summary.project_id, summary]));
-        const handoffRecordsById = new Map<string, ProjectRecordDTO>();
+        const handoffRecordsById = new Map<string, ProjectWithWorkspaceDTO>();
         const handoffTargetIds = new Set<string>();
         for (const handoff of retargetHandoffs) {
           if (!summaryById.has(handoff.targetProjectId)) {
@@ -2119,15 +2920,24 @@ export const createDurableSyncedWorkbenchPersistence = (
             draftCandidatesByProject.get(projectId) ?? []
           );
           if (draft) {
-            generations.set(projectId, draft.generation);
+            noteGeneration(projectId, draft.generation);
             volatileDrafts.set(projectId, draft);
           }
           const summary = summaryById.get(projectId);
-          const summaryIsIncompatible = Boolean(
-            summary && !isCanvasSchemaVersionSupported(summary.minimum_canvas_schema_version)
-          );
-          let record: ProjectRecordDTO | null = null;
-          if (summary && isCanvasSchemaVersionSupported(summary.minimum_canvas_schema_version)) {
+          // The listing already says what a read would refuse: neither floor is worth a request to learn again.
+          const summaryRefusal: Parameters<typeof toRefusedProject>[2] | null = !summary
+            ? null
+            : !isCanvasSchemaVersionSupported(summary.minimum_canvas_schema_version)
+              ? {
+                  kind: 'canvas',
+                  maxCanvasSchemaVersion: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION,
+                  minimumCanvasSchemaVersion: summary.minimum_canvas_schema_version,
+                }
+              : summary.minimum_document_schema_version > PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION
+                ? toDocumentSchemaRefusal(summary.minimum_document_schema_version)
+                : null;
+          let record: ProjectWithWorkspaceDTO | null = null;
+          if (summary && !summaryRefusal) {
             try {
               record = handoffRecordsById.get(projectId) ?? (await api.getProject(projectId, owner.signal));
             } catch (error) {
@@ -2135,19 +2945,8 @@ export const createDurableSyncedWorkbenchPersistence = (
                 throw new WorkbenchBackendUnavailableError(error);
               }
             }
-          } else if (summary) {
-            refusedProjects.push({
-              projectId,
-              projectName: summary.name,
-              raw: null,
-              refusal: {
-                raw: null,
-                scope: 'document',
-                status: 'unsupported-version',
-                version: summary.minimum_canvas_schema_version,
-              },
-              source: 'canvas',
-            });
+          } else if (summary && summaryRefusal) {
+            refusedProjects.push(toRefusedProject(projectId, summary.name, summaryRefusal));
           }
 
           let loadedDraft: LoadedDraft | null = null;
@@ -2178,13 +2977,8 @@ export const createDurableSyncedWorkbenchPersistence = (
               return;
             }
             loadedDraft.draft = await alignLoadedDraftWithProject(loadedDraft.draft, loadedDraft.project, store);
-            if (summaryIsIncompatible) {
-              const minimumCanvasSchemaVersion = summary!.minimum_canvas_schema_version;
-              const refusal: ProjectSchemaRefusal = {
-                kind: 'canvas',
-                maxCanvasSchemaVersion: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION,
-                minimumCanvasSchemaVersion,
-              };
+            if (summaryRefusal) {
+              const refusal = summaryRefusal;
               schemaRefusals.set(projectId, refusal);
               await store.settleSchemaRefusal(
                 projectId,
@@ -2246,13 +3040,12 @@ export const createDurableSyncedWorkbenchPersistence = (
           if (serverLoad.status !== 'loaded') {
             return;
           }
-          const serverJson = serializeProjectDocumentV3Json(serverLoad.project).documentJson;
-          syncEntries.set(projectId, {
-            minimumCanvasSchemaVersion: record.minimum_canvas_schema_version,
-            pushedDoc: serverJson,
-            revision: record.revision,
-          });
-          if (recordRequiresDocumentUpgrade(record)) {
+          const serverEntry = toSyncEntry(record, serverLoad.project);
+          const serverJson = serverEntry.pushedDoc;
+          syncEntries.set(projectId, serverEntry);
+          // Another page may have split it since this one learned it was whole.
+          projectsRequiringDocumentUpgrade.delete(projectId);
+          if (recordRequiresDocumentUpgrade(record, serverLoad.project)) {
             projectsRequiringDocumentUpgrade.add(projectId);
             pendingProjectIds.add(projectId);
             hasPending = true;
@@ -2270,12 +3063,64 @@ export const createDurableSyncedWorkbenchPersistence = (
               writerToken,
               loadedDraft.draft.generation,
               record.revision,
-              record.minimum_canvas_schema_version
+              record.minimum_canvas_schema_version,
+              serverEntry.workspaceRevision
             );
             pendingProjectIds.delete(projectId);
             loadedProjects.set(projectId, serverLoad.project);
             return;
           }
+          // The journal replaced a staged draft whose save reached the server without its answer reaching the page:
+          // the server holds exactly that document, so the journal is its successor, as if the answer had arrived.
+          // Judged half by half: of a split save, one half may have landed and not the other. Both sides are judged
+          // in the form a load gives the server's copy, with the project's board applied: a first save's draft could
+          // not carry the board, which only the create's lost answer named.
+          const replaced = journalReplacedDrafts.get(projectId)?.replacedDraft;
+          if (
+            replaced &&
+            journalReplacedDrafts.get(projectId)?.editorSessionId === loadedDraft.draft.editorSessionId &&
+            loadedDraft.draft.state === 'dirty'
+          ) {
+            const landedDocument = applyAuthoritativeProjectBoard(
+              JSON.parse(replaced.documentJson) as Record<string, unknown>,
+              record.board_id,
+              { selectBoard: false }
+            ) as unknown as ProjectDocumentV3;
+            const landed = splitProjectDocument(landedDocument);
+            const bases: ProjectDraftBases = {};
+            const contentLanded = serverEntry.pushedContent
+              ? landed.contentJson === serverEntry.pushedContent
+              : JSON.stringify(landedDocument) === serverJson;
+            if (contentLanded && loadedDraft.draft.baseRevision !== record.revision) {
+              bases.baseRevision = record.revision;
+              bases.baseMinimumCanvasSchemaVersion = record.minimum_canvas_schema_version;
+            }
+            if (
+              serverEntry.pushedWorkspace !== null &&
+              landed.workspaceJson === serverEntry.pushedWorkspace &&
+              (loadedDraft.draft.baseWorkspaceRevision ?? null) !== serverEntry.workspaceRevision
+            ) {
+              bases.baseWorkspaceRevision = serverEntry.workspaceRevision;
+            }
+            const rebased =
+              Object.keys(bases).length === 0
+                ? null
+                : await store.rebaseDraft(
+                    projectId,
+                    loadedDraft.draft.editorSessionId,
+                    writerToken,
+                    replaced.generation,
+                    bases
+                  );
+            if (rebased?.kind === 'rebased') {
+              loadedDraft.draft = withBases(loadedDraft.draft, bases);
+              volatileDrafts.set(projectId, loadedDraft.draft);
+            }
+          }
+          const divergence =
+            loadedDraft.draft.state === 'conflict'
+              ? loadedDraft.draft.conflict
+              : findDraftDivergence(loadedDraft.draft, serverLoad.project, record);
           if (
             loadedDraft.draft.state === 'schema-refused' &&
             loadedDraft.draft.refusal.kind === 'canvas' &&
@@ -2284,11 +3129,8 @@ export const createDurableSyncedWorkbenchPersistence = (
             schemaRefusals.set(projectId, loadedDraft.draft.refusal);
             pendingProjectIds.add(projectId);
             hasPending = true;
-          } else if (loadedDraft.draft.state === 'conflict' || loadedDraft.draft.baseRevision !== record.revision) {
-            const conflict =
-              loadedDraft.draft.state === 'conflict'
-                ? loadedDraft.draft.conflict
-                : ({ kind: 'revision', serverRevision: record.revision } as const);
+          } else if (divergence) {
+            const conflict = divergence;
             await markConflict(
               projectId,
               loadedDraft.draft.generation,
@@ -2298,7 +3140,7 @@ export const createDurableSyncedWorkbenchPersistence = (
             );
           } else {
             if (loadedDraft.draft.state === 'schema-refused') {
-              await store.resumeSchemaRefused(
+              await store.resumeDraft(
                 projectId,
                 loadedDraft.draft.editorSessionId,
                 writerToken,
@@ -2408,6 +3250,8 @@ export const createDurableSyncedWorkbenchPersistence = (
       if (isTerminallyCleared) {
         return Promise.reject(new Error('Workbench persistence was cleared and must be reloaded.'));
       }
+      // Set before the write is queued, so no save requested meanwhile can put the project back.
+      isSessionClosed = true;
       return enqueue(async () => {
         const emptyState = { ...state, activeProjectId: '', projects: [] };
         const session = await getEditorSessionForService();
@@ -2630,6 +3474,7 @@ export const createDurableSyncedWorkbenchPersistence = (
         }
         const settlement = await store.retargetAcknowledgedCopy({
           acknowledgedRevision: record.revision,
+          acknowledgedWorkspaceRevision: record.workspace?.revision ?? null,
           copyProjectId,
           editorSessionId,
           projectId,
@@ -2649,6 +3494,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           latestVolatile && latestVolatile.generation > reservation.copyProjectGeneration
             ? toDirtyProjectDraft(latestVolatile, {
                 baseRevision: record.revision,
+                baseWorkspaceRevision: record.workspace?.revision ?? null,
                 copyDocumentByteSize: undefined,
                 copyDocumentJson: undefined,
                 copyProjectGeneration: undefined,
@@ -2664,18 +3510,17 @@ export const createDurableSyncedWorkbenchPersistence = (
         if (volatileRetargeted) {
           volatileDrafts.set(copyProjectId, volatileRetargeted);
         }
-        const acknowledgedJson = JSON.stringify(record.data);
+        const loadedCopy = deserializeProjectRecord(record);
         syncEntries.delete(projectId);
+        sentHalves.delete(projectId);
         conflicts.delete(projectId);
         projectsRequiringDocumentUpgrade.delete(projectId);
         schemaRefusals.delete(projectId);
         pendingProjectIds.delete(projectId);
         retargetedProjects.delete(projectId);
-        syncEntries.set(copyProjectId, {
-          minimumCanvasSchemaVersion: record.minimum_canvas_schema_version,
-          pushedDoc: acknowledgedJson,
-          revision: record.revision,
-        });
+        if (loadedCopy.status === 'loaded') {
+          syncEntries.set(copyProjectId, toSyncEntry(record, loadedCopy.project));
+        }
         upsertProjectSummary(
           {
             id: copyProjectId,
@@ -2685,7 +3530,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           },
           owner
         );
-        recordProjectCover(copyProjectId, selectCoverImageName(record.data), owner);
+        recordProjectCover(copyProjectId, selectCoverImageName(document), owner);
         const durableRetargeted = settlement.kind === 'retargeted' ? settlement.draft : null;
         const survivingDraft =
           durableRetargeted && volatileRetargeted
@@ -2694,7 +3539,7 @@ export const createDurableSyncedWorkbenchPersistence = (
               : volatileRetargeted
             : (durableRetargeted ?? volatileRetargeted);
         if (survivingDraft) {
-          generations.set(copyProjectId, survivingDraft.generation);
+          noteGeneration(copyProjectId, survivingDraft.generation);
           pendingProjectIds.add(copyProjectId);
         } else {
           generations.delete(projectId);
@@ -2722,7 +3567,6 @@ export const createDurableSyncedWorkbenchPersistence = (
         });
         recomputeHasPending();
         resolveProjectSyncConflict(projectId, { projectId: copyProjectId, revision: record.revision }, hasPending);
-        const loadedCopy = deserializeProjectRecord(record);
         const visible = survivingDraft
           ? loadDraftProject(survivingDraft)
           : loadedCopy.status === 'loaded'
@@ -2765,13 +3609,18 @@ export const createDurableSyncedWorkbenchPersistence = (
           projectResolutionFences.delete(projectId);
           return result;
         }
+        const conflict = conflicts.get(projectId);
+        // Without a workspace row (one never saved, or since removed) the merge takes the one a new project starts with.
+        if (conflict?.kind === 'revision' && conflict.half === 'workspace' && isSplitProjectRecord(record)) {
+          return useServerWorkspace(projectId, record, result.project);
+        }
         await deleteDraft(projectId);
-        const documentJson = serializeProjectDocumentV3Json(result.project).documentJson;
-        syncEntries.set(projectId, {
-          minimumCanvasSchemaVersion: record.minimum_canvas_schema_version,
-          pushedDoc: documentJson,
-          revision: record.revision,
-        });
+        syncEntries.set(projectId, toSyncEntry(record, result.project));
+        if (recordRequiresDocumentUpgrade(record, result.project)) {
+          projectsRequiringDocumentUpgrade.add(projectId);
+        } else {
+          projectsRequiringDocumentUpgrade.delete(projectId);
+        }
         conflicts.delete(projectId);
         schemaRefusals.delete(projectId);
         pendingProjectIds.delete(projectId);
@@ -2789,6 +3638,11 @@ export const createDurableSyncedWorkbenchPersistence = (
         throw error;
       });
     },
+    releaseMutationLocks: () => {
+      for (const release of releaseAllMutationLocks()) {
+        void release.catch(() => undefined);
+      }
+    },
     releaseProjectSync: (projectId) => {
       projectEnsureFailures.delete(projectId);
       if ([...pendingRetargetHandoffs.values()].some((handoff) => handoff.targetProjectId === projectId)) {
@@ -2802,6 +3656,7 @@ export const createDurableSyncedWorkbenchPersistence = (
         return;
       }
       syncEntries.delete(projectId);
+      sentHalves.delete(projectId);
       conflicts.delete(projectId);
       schemaRefusals.delete(projectId);
       generations.delete(projectId);
@@ -2818,16 +3673,34 @@ export const createDurableSyncedWorkbenchPersistence = (
       let isReleased = false;
       return () => {
         if (isReleased) {
-          return;
+          return Promise.resolve();
         }
         isReleased = true;
         retainCount -= 1;
         const generation = ++releaseGeneration;
-        queueMicrotask(() => {
-          if (retainCount === 0 && releaseGeneration === generation) {
-            close();
-          }
+        return new Promise<void>((resolve) => {
+          queueMicrotask(() => {
+            if (retainCount === 0 && releaseGeneration === generation) {
+              void close().then(resolve);
+            } else {
+              resolve();
+            }
+          });
         });
+      };
+    },
+    reopenSession: (state) => {
+      isSessionClosed = false;
+      const saved = service.saveWorkbench(state);
+      for (const listener of sessionReopenedListeners) {
+        listener();
+      }
+      return saved;
+    },
+    subscribeSessionReopened: (listener) => {
+      sessionReopenedListeners.add(listener);
+      return () => {
+        sessionReopenedListeners.delete(listener);
       };
     },
     saveWorkbench: (state) => {
@@ -2905,6 +3778,7 @@ export const createDurableSyncedWorkbenchPersistence = (
         const projectBoardAssignments = [...pendingBoardAssignments.values()];
         pendingBoardAssignments.clear();
         return {
+          awaitsDecision: conflicts.size > 0 || schemaRefusals.size > 0,
           conflicts: [...conflicts.values()],
           error:
             firstPushError instanceof Error
@@ -2913,6 +3787,9 @@ export const createDurableSyncedWorkbenchPersistence = (
                 ? 'A project could not be saved.'
                 : null,
           hasPendingChanges: hasPending,
+          hasRetryablePendingChanges:
+            sessionSavePending ||
+            [...pendingProjectIds].some((projectId) => !conflicts.has(projectId) && !schemaRefusals.has(projectId)),
           localDraftStatus,
           projectBoardAssignments,
           shouldRetry,
@@ -2927,4 +3804,5 @@ export const createDurableSyncedWorkbenchPersistence = (
       }
     },
   };
+  return service;
 };

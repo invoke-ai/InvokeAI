@@ -63,9 +63,9 @@ const render = async (selectedModel: GenerateModelConfig = MAIN_MODEL, settings 
           <GenerationUiProvider adapter={ADAPTER}>
             <GenerateConceptsContent
               loraModels={LORA_MODELS}
+              loras={settings.loras}
               projectId={projectId}
               selectedModel={selectedModel}
-              settings={settings}
               onCommit={onCommit}
             />
           </GenerationUiProvider>
@@ -132,6 +132,16 @@ describe('GenerateConceptsContent', () => {
       { ...LORA, weight: 0.9 },
       { isEnabled: true, model: ADDED_LORA_MODEL, weight: expect.any(Number) },
     ]);
+  });
+
+  it('ignores a picked concept the selected model cannot load', async () => {
+    const fluxModel: GenerateModelConfig = { base: 'flux', key: 'flux', name: 'FLUX', type: 'main' };
+    const { onCommit, row } = await render(fluxModel);
+
+    await act(() => row.querySelector<HTMLElement>('[data-testid="concept-picker"]')?.click());
+
+    const update = onCommit.mock.calls[0]?.[0] as (settings: GenerateSettings) => GenerateSettings;
+    expect(update(SETTINGS)).toBe(SETTINGS);
   });
 
   it('holds weight steps as a draft and commits them once the debounce settles', async () => {

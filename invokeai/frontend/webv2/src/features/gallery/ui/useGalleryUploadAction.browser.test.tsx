@@ -13,6 +13,9 @@ import type { GalleryActions } from './GalleryWidgetContext';
 import { useGalleryUploadAction } from './useGalleryUploadAction';
 
 const mocks = vi.hoisted(() => ({
+  // The ensured listing's answer per board; the panel's `boards` fixture names only board-1.
+  canAddToCachedGalleryBoard: vi.fn((boardId: string) => boardId === 'board-1' || boardId === 'board-9'),
+  ensureGalleryBoardDestinations: vi.fn((): Promise<void> | null => null),
   invalidateGallery: vi.fn(),
   notificationsAdd: vi.fn(),
   notificationsReportError: vi.fn(),
@@ -22,12 +25,17 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@features/gallery/data/backend', () => ({
   isDateBoardId: (boardId: string) => boardId.startsWith('by_date:'),
+  isInvalidGalleryBoardDestination: (boardId: string) => boardId.startsWith('by_date:'),
   uploadGalleryImage: (...args: unknown[]) => mocks.uploadGalleryImage(...args),
   uploadGalleryVideo: (...args: unknown[]) => mocks.uploadGalleryVideo(...args),
 }));
 
 vi.mock('@features/gallery/data/queryCache', () => ({
+  canAddToCachedGalleryBoard: (boardId: string) => mocks.canAddToCachedGalleryBoard(boardId),
+  ensureGalleryBoardDestinations: () => mocks.ensureGalleryBoardDestinations(),
+  getCachedGalleryBoard: () => undefined,
   invalidateGallery: (...args: unknown[]) => mocks.invalidateGallery(...args),
+  invalidateGalleryBoardDestinations: vi.fn(),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -102,6 +110,7 @@ const adapter: GalleryUiAdapter = {
   },
   projectId: 'project-1',
   projectName: 'Project',
+  projects: [],
   widgets: { openGallery: () => true, patchGalleryValues: noop },
 };
 
@@ -129,6 +138,7 @@ const Probe = ({
         imageCount: 2,
         kind: 'board',
         name: 'Board 1',
+        isInbox: false,
         projectId: null,
         videoCount: 1,
       },
@@ -140,6 +150,7 @@ const Probe = ({
         imageCount: 0,
         kind: 'uncategorized',
         name: '',
+        isInbox: false,
         projectId: null,
         videoCount: 0,
       },
@@ -380,9 +391,11 @@ describe('focused gallery upload action', () => {
       namespace: 'gallery',
     });
     expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+    // The board may be what refused it: the listing, boards included, is read again before the next upload.
+    expect(mocks.invalidateGallery).toHaveBeenCalledTimes(1);
   });
 
-  it('trusts a board id the loaded list does not name', async () => {
+  it('sends an upload to a board the loaded list does not name once the ensured listing takes it', async () => {
     mocks.uploadGalleryImage.mockResolvedValue(imageUpload('photo.png', '2026-07-30T12:00:04.000Z', 'board-9'));
 
     selectedBoardId = 'board-9';
@@ -391,6 +404,8 @@ describe('focused gallery upload action', () => {
       await uploadFilesRef.current?.([new File(['image'], 'photo.png', { type: 'image/png' })]);
     });
 
+    expect(mocks.ensureGalleryBoardDestinations).toHaveBeenCalledOnce();
+    expect(mocks.canAddToCachedGalleryBoard).toHaveBeenCalledWith('board-9');
     expect(mocks.uploadGalleryImage).toHaveBeenCalledExactlyOnceWith(expect.any(File), 'board-9', expect.anything());
   });
 

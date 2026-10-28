@@ -45,9 +45,22 @@ const ROUTE_SHARED_MODULES = [
   '/features/nodes/data/nodeExecutionStore.ts',
   '/features/nodes/index.ts',
   '/features/nodes/ui/NodesPage.tsx',
+  // Gallery tiles, the lazy Preview and the Launchpad's gallery picker share the failed-image recovery; alone it costs a
+  // startup request.
+  '/features/gallery/data/imageRecovery.ts',
+  '/features/gallery/ui/useGalleryImageRecovery.ts',
   '/platform/browser/downloadBlob.ts',
+  // Editor search fields and the lazy pickers share the IME guard; alone it costs a startup request.
+  '/platform/browser/imeComposition.ts',
+  // The route's recovery peek and the lazy editor share the editor-session lock probe; alone they cost a startup request.
+  '/platform/browser/webLocks.ts',
+  '/workbench/projects/editorSession.ts',
   '/platform/ui/BrandIcon.tsx',
   '/platform/ui/Button.tsx',
+  // The Fonts page, the Generate render section and the lazy workflow number fields share the slider controls;
+  // alone they cost the editor a boot request, and the editor boot chunk would drag the editor into the Launchpad.
+  '/platform/ui/Slider.tsx',
+  '/platform/ui/SliderNumberField.tsx',
   '/platform/ui/Tooltip.tsx',
   '/platform/ui/RetryBoundary.tsx',
   '/platform/ui/PanelHeader.tsx',
@@ -62,6 +75,9 @@ const ROUTE_SHARED_MODULES = [
   '/platform/transport/connectionStore.ts',
   '/platform/transport/socketHub.ts',
   '/platform/ui/ConfirmDialog.tsx',
+  // Every dialog, eager or lazy, is built on these and the hotkey runtime reads the presence; alone they cost a startup request.
+  '/platform/ui/Dialog.tsx',
+  '/platform/ui/modalPresence.ts',
   // Confirm/Rename dialogs and the boot gates keep closing overlays mounted with it; alone it costs a startup request.
   '/platform/react/useExitRetainedValue.ts',
   '/platform/ui/MiddleTruncate.tsx',
@@ -71,6 +87,8 @@ const ROUTE_SHARED_MODULES = [
   '/platform/ui/list/ListSectionHeader.tsx',
   '/platform/ui/list/ListStack.tsx',
   '/platform/ui/list/listLayout.ts',
+  // The eager List and the lazy Picker share the pinned-header range helpers.
+  '/platform/ui/list/virtualSections.ts',
   // Lazy lists (graph preview) share these with startup; left ungrouped they split into an extra startup chunk.
   '/platform/react/usePreservedScrollOffset.ts',
   '/platform/ui/Scrollable.tsx',
@@ -92,6 +110,8 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/projects/invk/format.ts',
   '/workbench/projects/library.ts',
   '/workbench/projects/projectAssets.ts',
+  // The editor splits documents at boot, and project files reach it lazily; alone it costs a startup request.
+  '/workbench/projects/projectHalves.ts',
   '/workbench/projects/projectFile.ts',
   '/workbench/projects/projectFileErrors.ts',
   '/workbench/projects/projectFileToasts.ts',
@@ -105,7 +125,14 @@ const ROUTE_SHARED_MODULES = [
 const EDITOR_BOOT_SHARED_MODULES = [
   // Shell regions, their hotkeys and every control that opens a widget read it; alone it cost a boot request.
   '/workbench/focusRegions.tsx',
+  // The shell and lazy guide share hint resources and target resolution without extra boot requests.
+  '/workbench/hotkeys/hintSources.tsx',
+  '/workbench/hotkeys/shortcutHints.ts',
+  '/workbench/hotkeys/targetWidget.ts',
+  '/workbench/widget-frame/compactWidgetCapacity.tsx',
   '/features/gallery/ui/GalleryItemSearch.tsx',
+  // The image menu (editor boot) and the lazy layer menu share the board destination list; alone it costs a request.
+  '/workbench/image-actions/GalleryBoardDestinationGroups.tsx',
   '/app/GalleryUiAdapter.tsx',
   '/features/generation/core/prompt/ast.ts',
   '/features/generation/core/prompt/attention.ts',
@@ -124,6 +151,15 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/shell/topbar/LayoutPresetAdminDialogs.tsx',
   '/workbench/shell/topbar/LayoutPresetStrip.tsx',
   '/workbench/shell/topbar/ProjectSwitcher.tsx',
+  // The canvas dims sync reads the render-size keys at boot; the lazy canvas slots and compiler share them.
+  '/workbench/widgets/canvas/invoke/canvasScaling.ts',
+  // The Preview (open at boot) and the Canvas staging bar share the Auto-switch menu; alone it costs a boot request.
+  '/workbench/widgets/shared/AutoSwitchMenu.tsx',
+  // Invoke, the image menu (editor boot) and the lazy layer menu reveal a layer's Properties through these.
+  '/workbench/widgets/layers/layerPropertiesRequestStore.ts',
+  '/workbench/widgets/layers/revealLayerProperties.ts',
+  // The reveal opens widgets through this; its own imports (focus regions, context, widget registry) boot already.
+  '/workbench/useOpenWorkbenchWidget.ts',
 ] as const;
 
 // The workflow core, its UI barrel and the project workflow collection are one chunk: the editor boots with all of
@@ -183,6 +219,7 @@ const GALLERY_PICKER_MODULES = [
   '/features/gallery/picker.ts',
   '/features/gallery/ui/GalleryBoardCover.tsx',
   '/features/gallery/ui/GalleryBoardRowShell.tsx',
+  '/features/gallery/ui/GalleryLoadError.tsx',
   '/features/gallery/ui/GallerySearchField.tsx',
   '/features/gallery/ui/GalleryTileFrame.tsx',
   '/features/gallery/ui/GalleryUploadButton.tsx',
@@ -199,11 +236,16 @@ const GALLERY_PICKER_MODULES = [
 
 // Gallery's shared state projection and UI port travel together.
 const GALLERY_STATE_MODULES = [
+  // Board access predicates: the state view, the gallery's caches and the picker read them; alone they cost a request.
+  '/features/gallery/core/boardAccess.ts',
   '/features/gallery/core/items.ts',
   '/features/gallery/core/recentImages.ts',
   '/features/gallery/core/selection.ts',
   '/features/gallery/core/semanticImageQuery.ts',
   '/features/gallery/core/settings.ts',
+  // The React entry is reached from eager owners (App adapters) and lazy ones (workflow fields, Preview); alone it
+  // costs a request.
+  '/features/gallery/react.ts',
   '/features/gallery/ui/GalleryUiContext.tsx',
   '/features/gallery/ui/galleryStateView.ts',
   '/features/queue/contracts.ts',
@@ -239,8 +281,11 @@ const CANVAS_LAYER_SHARED_MODULES = [
   '/workbench/canvasProjectMutationPort.ts',
   '/workbench/useCanvasProjectMutationDispatch.ts',
   '/workbench/widgets/canvas/canvasInteractionLock.ts',
+  '/workbench/widgets/canvas/canvasToolCommands.ts',
   '/workbench/widgets/canvas/color-system/colorPair.ts',
+  '/workbench/widgets/canvas/color-system/maskTintTarget.ts',
   '/workbench/widgets/canvas/color-system/useActiveColors.ts',
+  '/workbench/widgets/canvas/color-system/useMaskTintEditor.ts',
   '/workbench/widgets/canvas/engineStoreHooks.ts',
   '/workbench/widgets/canvas/textFontStyle.tsx',
   '/workbench/widgets/canvas/tool-presentation/FormControls.tsx',
@@ -250,6 +295,7 @@ const CANVAS_LAYER_SHARED_MODULES = [
   '/workbench/widgets/canvas/useColorSampler.ts',
   '/workbench/widgets/canvas/useStructuralCommit.ts',
   '/workbench/widgets/layers/LayerContextMenu.tsx',
+  '/workbench/widgets/layers/LayerSaveToBoardSubmenu.tsx',
   '/workbench/widgets/layers/RunLayerWorkflowDialog.tsx',
   '/workbench/widgets/layers/colorLabels.ts',
   '/workbench/widgets/layers/layerActionSession.ts',
@@ -258,7 +304,6 @@ const CANVAS_LAYER_SHARED_MODULES = [
   '/workbench/widgets/layers/layerExportActions.ts',
   '/workbench/widgets/layers/layerGroupCommands.ts',
   '/workbench/widgets/layers/layerMenuState.ts',
-  '/workbench/widgets/layers/layerPropertiesRequestStore.ts',
   '/workbench/widgets/layers/runLayerWorkflow.ts',
   '/workbench/widgets/layers/useSelectedModelBase.ts',
 ];
@@ -269,6 +314,8 @@ const getLegacyChunkName = (id: string): string | null => {
   if (
     matchesAnySuffix(id, [
       '/platform/state/selectors.ts',
+      // Eager query stores and lazy runtimes share single-flight scheduling; avoid its standalone boot request.
+      '/platform/state/singleFlight.ts',
       '/workbench/palette/paletteStore.ts',
       '/platform/search/dateTokens.ts',
       '/platform/performance/semanticReady.ts',
@@ -285,6 +332,8 @@ const getLegacyChunkName = (id: string): string | null => {
       '/platform/i18n/languages.ts',
       '/platform/react/useMountEffect.ts',
       '/platform/ui/theme/system.ts',
+      // Editor hints and the lazy Launchpad palette/settings share keycaps without loading editor runtime.
+      '/workbench/hotkeys/keyGlyphs.tsx',
       '/workbench/hotkeys/resolve.ts',
       '/workbench/settings/settingsDialogStore.ts',
     ])
@@ -428,6 +477,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@api': fileURLToPath(new URL('../api', import.meta.url)),
       '@app': fileURLToPath(new URL('./src/app', import.meta.url)),
       '@assets': fileURLToPath(new URL('./src/assets', import.meta.url)),
       '@features': fileURLToPath(new URL('./src/features', import.meta.url)),

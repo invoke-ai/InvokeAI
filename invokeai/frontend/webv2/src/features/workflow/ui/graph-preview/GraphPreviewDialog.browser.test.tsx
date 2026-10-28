@@ -7,6 +7,10 @@ import type {
 import type { WorkflowGraphPreviewPort, WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import {
+  getUnresolvedWorkflowPublication,
+  getWorkflowPublicationController,
+} from '@features/workflow/ui/library/useWorkflowPublication';
 import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import { createProjectGraph } from '@features/workflow/utility';
 import { system } from '@theme/system';
@@ -102,14 +106,29 @@ vi.mock('@features/workflow/react', async (importOriginal) => ({
   useInvocationTemplatesSnapshot: () => templatesSnapshotRef.current,
 }));
 
-const { createLibraryWorkflowRecordMock } = vi.hoisted(() => ({
+const identity = vi.hoisted(() => ({
+  session: { multiuserEnabled: false, phase: 'ready', user: null } as {
+    multiuserEnabled: boolean;
+    phase: 'ready';
+    user: { user_id: string } | null;
+  },
+}));
+
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useAuthSession: () => identity.session,
+}));
+
+const { createLibraryWorkflowRecordMock, setLibraryWorkflowPublicMock } = vi.hoisted(() => ({
   createLibraryWorkflowRecordMock: vi.fn(),
+  setLibraryWorkflowPublicMock: vi.fn(),
 }));
 
 // The publication controller reaches the transport through the API module itself, not the queries barrel.
 vi.mock('@features/workflow/data/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   createLibraryWorkflowRecord: createLibraryWorkflowRecordMock,
+  setLibraryWorkflowPublic: setLibraryWorkflowPublicMock,
 }));
 
 // Supply rendered English strings without starting the HTTP-backed i18n client.
@@ -157,7 +176,13 @@ const TRANSLATIONS: Record<string, string> = {
   'graphPreview.showNode': 'show node',
   'graphPreview.thisGraph': 'This graph',
   'graphPreview.title': 'Graph preview',
+  'workflowLibrary.publicVisibilityHelp': 'Visible to users of this InvokeAI instance.',
+  'workflowLibrary.publicVisibilityPartial':
+    'The template was saved, but its public visibility could not be confirmed ({{message}}). Retry to make it public.',
+  'workflowLibrary.publicWorkflow': 'Public workflow',
+  'workflowLibrary.retry': 'Retry',
   'workflowLibrary.saveFailed': 'Failed to save workflow',
+  'workflowLibrary.saveToLibraryConfirm': 'Save',
   'workflowLibrary.saved': 'Workflow saved',
   'workflowLibrary.savedCreatedBody': 'Saved "{{name}}" to the library.',
 };
@@ -337,7 +362,6 @@ const createWorkflowUiAdapter = (): WorkflowUiAdapter => {
       getSnapshot: () => projectSnapshot,
       subscribe: () => () => {},
     },
-    registerModalHotkeyLayer: vi.fn(() => vi.fn()),
     widgets: { open: vi.fn(), patchValues: vi.fn() },
   } as unknown as WorkflowUiAdapter;
 };
@@ -406,6 +430,8 @@ describe('GraphPreviewDialog', () => {
     downloads.downloadBlob.mockReset();
     downloads.downloadText.mockReset();
     createLibraryWorkflowRecordMock.mockReset();
+    setLibraryWorkflowPublicMock.mockReset();
+    identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
     fitViewMock.mockClear();
     templatesSnapshotRef.current = TEMPLATES_SNAPSHOT;
   });
@@ -476,6 +502,17 @@ describe('GraphPreviewDialog', () => {
         setTimeout(resolve, 0);
       });
     });
+
+  const deferred = <T,>() => {
+    let reject!: (reason?: unknown) => void;
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+      resolve = resolvePromise;
+      reject = rejectPromise;
+    });
+
+    return { promise, reject, resolve };
+  };
 
   it('renders summary rows, node count, and the live subtitle', async () => {
     await renderDialog(FIXTURE_SOURCE);
@@ -752,6 +789,25 @@ describe('GraphPreviewDialog', () => {
     expect(buttonText.some((text) => text.includes('Invoke Generate → Gallery'))).toBe(true);
   });
 
+  it('keeps the footer Invoke button inert while the route cannot be invoked', async () => {
+    graphPreviewPort = {
+      ...createGraphPreviewPort(),
+      getRoute: () => ({ canInvoke: false, label: 'Generate → Gallery', validationMessage: 'Preparing generation…' }),
+    };
+    await renderDialog(FIXTURE_SOURCE);
+
+    const button = [...document.querySelectorAll('button')].find((candidate) =>
+      (candidate.textContent ?? '').includes('Invoke Generate → Gallery')
+    );
+    expect(button?.getAttribute('aria-disabled')).toBe('true');
+    expect(button?.getAttribute('title')).toBe('Preparing generation…');
+
+    await clickButtonWithText('Invoke Generate → Gallery');
+
+    expect(graphPreviewPort.invoke).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
   it('hideInvoke hides only the footer Invoke button — Copy JSON and Open as stay', async () => {
     await renderDialog(FIXTURE_SOURCE, true, 'generate', true);
 
@@ -777,11 +833,106 @@ describe('GraphPreviewDialog', () => {
     expect(serialized).toMatchObject({ name: 'Generate' });
     // A client-reserved id makes a resend after a lost answer idempotent.
     expect(options).toMatchObject({ reservedId: expect.any(String) });
+    expect(options).not.toHaveProperty('isPublic');
     expect(workflowUiAdapter.notifications.success).toHaveBeenCalledWith(
       'Workflow saved',
       'Saved "Generate" to the library.'
     );
     // A preview is not a project workflow, so nothing in the project is pointed at the new template.
+    expect(workflowUiAdapter.commands.setWorkflowSource).not.toHaveBeenCalled();
+    expect(setLibraryWorkflowPublicMock).not.toHaveBeenCalled();
+  });
+
+  it('Open as → Save to workflow library offers the public visibility choice in multiuser mode', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    createLibraryWorkflowRecordMock.mockImplementation(
+      (workflow: Record<string, unknown>, options: { reservedId?: string }) =>
+        Promise.resolve({
+          name: String(workflow.name),
+          revision: 1,
+          workflow,
+          workflow_id: options.reservedId,
+          is_public: false,
+        })
+    );
+    setLibraryWorkflowPublicMock.mockImplementation((workflowId: string) =>
+      Promise.resolve({ name: 'Generate', revision: 1, workflow: {}, workflow_id: workflowId, is_public: true })
+    );
+
+    await renderDialog(FIXTURE_SOURCE);
+
+    await openAsMenu();
+    await clickMenuItemWithText('Save to workflow library');
+
+    const checkbox = document.querySelector<HTMLInputElement>('input[type="checkbox"][name="isPublic"]');
+    expect(checkbox).not.toBeNull();
+    expect(checkbox?.checked).toBe(false);
+    await act(() => checkbox?.click());
+    await clickButtonWithText('Save');
+    await flushAsync();
+
+    expect(createLibraryWorkflowRecordMock).toHaveBeenCalledTimes(1);
+    const [, options] = createLibraryWorkflowRecordMock.mock.calls[0] ?? [];
+    expect(options).toMatchObject({ reservedId: expect.any(String) });
+    expect(options).not.toHaveProperty('isPublic');
+    expect(setLibraryWorkflowPublicMock).toHaveBeenCalledWith(
+      (options as { reservedId: string }).reservedId,
+      true,
+      expect.anything()
+    );
+    expect(workflowUiAdapter.commands.setWorkflowSource).not.toHaveBeenCalled();
+  });
+
+  it('retries a failed visibility change with the same preview template and public choice', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    createLibraryWorkflowRecordMock.mockImplementation(
+      (workflow: Record<string, unknown>, options: { reservedId?: string }) =>
+        Promise.resolve({
+          name: String(workflow.name),
+          revision: 1,
+          workflow,
+          workflow_id: options.reservedId,
+          is_public: false,
+        })
+    );
+    setLibraryWorkflowPublicMock
+      .mockRejectedValueOnce(new Error('visibility unavailable'))
+      .mockImplementationOnce((workflowId: string) =>
+        Promise.resolve({ name: 'Generate', revision: 1, workflow: {}, workflow_id: workflowId, is_public: true })
+      );
+
+    await renderDialog(FIXTURE_SOURCE);
+
+    await openAsMenu();
+    await clickMenuItemWithText('Save to workflow library');
+    const checkbox = document.querySelector<HTMLInputElement>('input[type="checkbox"][name="isPublic"]');
+    expect(checkbox).not.toBeNull();
+    await act(() => checkbox?.click());
+    await clickButtonWithText('Save');
+    await flushAsync();
+
+    const createCall = createLibraryWorkflowRecordMock.mock.calls[0];
+    expect(createCall).toBeDefined();
+    if (!createCall) {
+      throw new Error('Expected the preview workflow to be created');
+    }
+    const reservedId = (createCall[1] as { reservedId: string }).reservedId;
+    expect(setLibraryWorkflowPublicMock).toHaveBeenCalledTimes(1);
+    expect(setLibraryWorkflowPublicMock).toHaveBeenCalledWith(reservedId, true, expect.anything());
+    expect(createCall[1]).not.toHaveProperty('isPublic');
+    expect([...document.querySelectorAll('button')].some((button) => button.textContent?.includes('Retry'))).toBe(true);
+    expect(document.body.textContent).toContain(
+      'The template was saved, but its public visibility could not be confirmed (visibility unavailable). Retry to make it public.'
+    );
+
+    await clickButtonWithText('Retry');
+    await flushAsync();
+
+    expect(createLibraryWorkflowRecordMock).toHaveBeenCalledTimes(1);
+    expect(setLibraryWorkflowPublicMock.mock.calls.map((call) => call.slice(0, 2))).toEqual([
+      [reservedId, true],
+      [reservedId, true],
+    ]);
     expect(workflowUiAdapter.commands.setWorkflowSource).not.toHaveBeenCalled();
   });
 
@@ -823,6 +974,134 @@ describe('GraphPreviewDialog', () => {
     const item = findMenuItemWithText('Save to workflow library');
     expect(item).not.toBeUndefined();
     expect(item?.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('disables Fork into new project until invocation templates load, then restores it', async () => {
+    templatesSnapshotRef.current = { error: null, status: 'loading', templates: {} };
+
+    await renderDialog(FIXTURE_SOURCE);
+    await openAsMenu();
+
+    let item = findMenuItemWithText('Fork into new project');
+    expect(item?.getAttribute('aria-disabled')).toBe('true');
+
+    templatesSnapshotRef.current = TEMPLATES_SNAPSHOT;
+    await renderDialog(FIXTURE_SOURCE);
+
+    item = findMenuItemWithText('Fork into new project');
+    expect(item?.getAttribute('aria-disabled')).not.toBe('true');
+    await clickMenuItemWithText('Fork into new project');
+
+    expect(graphPreviewPort.openDocumentInNewProject).toHaveBeenCalledTimes(1);
+  });
+
+  it('discards a preview visibility failure that settles after the preview unmounts', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    const visibilityRequest = deferred<Record<string, unknown>>();
+    const publicationController = getWorkflowPublicationController();
+    const publishSpy = vi.spyOn(publicationController, 'publish');
+    createLibraryWorkflowRecordMock.mockImplementation(
+      (_workflow: Record<string, unknown>, options: { reservedId?: string }) =>
+        Promise.resolve({
+          name: 'Generate',
+          revision: 1,
+          workflow: {},
+          workflow_id: options.reservedId,
+          is_public: false,
+        })
+    );
+    setLibraryWorkflowPublicMock.mockReturnValue(visibilityRequest.promise);
+
+    await renderDialog(FIXTURE_SOURCE);
+    await openAsMenu();
+    await clickMenuItemWithText('Save to workflow library');
+    const checkbox = document.querySelector<HTMLInputElement>('input[type="checkbox"][name="isPublic"]');
+    expect(checkbox).not.toBeNull();
+    await act(() => checkbox?.click());
+    await clickButtonWithText('Save');
+    await flushAsync();
+
+    expect(setLibraryWorkflowPublicMock).toHaveBeenCalledTimes(1);
+    const request = publishSpy.mock.calls[0]?.[0];
+    expect(request).toBeDefined();
+    if (!request) {
+      throw new Error('Expected the preview publication request');
+    }
+
+    await act(() => root.render(null));
+    visibilityRequest.reject(new Error('visibility unavailable'));
+    await flushAsync();
+
+    expect(getUnresolvedWorkflowPublication('project-1', request.workflowId)).toBeNull();
+    publishSpy.mockRestore();
+  });
+
+  it('discards a single-user preview retry failure that settles after the preview unmounts', async () => {
+    const retry = deferred<Record<string, unknown>>();
+    const publicationController = getWorkflowPublicationController();
+    const publishSpy = vi.spyOn(publicationController, 'publish');
+    createLibraryWorkflowRecordMock
+      .mockRejectedValueOnce(new Error('first attempt lost'))
+      .mockReturnValueOnce(retry.promise);
+
+    await renderDialog(FIXTURE_SOURCE);
+    await openAsMenu();
+    await clickMenuItemWithText('Save to workflow library');
+    await flushAsync();
+
+    expect(createLibraryWorkflowRecordMock).toHaveBeenCalledTimes(2);
+    const request = publishSpy.mock.calls[0]?.[0];
+    publishSpy.mockRestore();
+    expect(request).toBeDefined();
+    if (!request) {
+      throw new Error('Expected the preview publication request');
+    }
+
+    await act(() => root.render(null));
+    retry.reject(new Error('retry unavailable'));
+    await flushAsync();
+
+    expect(getUnresolvedWorkflowPublication('project-1', request.workflowId)).toBeNull();
+  });
+
+  it('cleans earlier unresolved single-user saves after a later preview save succeeds', async () => {
+    const publicationController = getWorkflowPublicationController();
+    const publishSpy = vi.spyOn(publicationController, 'publish');
+    createLibraryWorkflowRecordMock
+      .mockRejectedValueOnce(new Error('first attempt lost'))
+      .mockRejectedValueOnce(new Error('retry unavailable'))
+      .mockImplementation((workflow: Record<string, unknown>, options: { reservedId?: string }) =>
+        Promise.resolve({
+          name: String(workflow.name),
+          revision: 1,
+          workflow,
+          workflow_id: options.reservedId,
+          is_public: true,
+        })
+      );
+
+    await renderDialog(FIXTURE_SOURCE);
+    await openAsMenu();
+    await clickMenuItemWithText('Save to workflow library');
+    await flushAsync();
+
+    const firstRequest = publishSpy.mock.calls[0]?.[0];
+    publishSpy.mockRestore();
+    expect(firstRequest).toBeDefined();
+    if (!firstRequest) {
+      throw new Error('Expected the first preview publication request');
+    }
+
+    await openAsMenu();
+    await clickMenuItemWithText('Save to workflow library');
+    await flushAsync();
+
+    expect(createLibraryWorkflowRecordMock).toHaveBeenCalledTimes(3);
+    expect(workflowUiAdapter.notifications.success).toHaveBeenCalledTimes(1);
+
+    await act(() => root.render(null));
+
+    expect(getUnresolvedWorkflowPublication('project-1', firstRequest.workflowId)).toBeNull();
   });
 
   it('truncates a long resolved-input string and exposes the full value via title', async () => {

@@ -24,10 +24,12 @@ fan-out. Five or more nested `If`s, other fan-out, mixed graphs outside the boun
 topology, loop-containing, saved-workflow, legacy, and five-or-more sibling shapes remain on the compatibility
 fallback. Legacy snapshots retain their generic compatibility projection and legacy skipped-state metadata. Legacy
 skipped-state projection remains only for old snapshots. Fresh `If` materialization prepares the condition boundary
-first, resolves the activation token, and attaches only the selected branch input. Unselected branch nodes are never
-prepared, skipped, or added to fresh execution history. Both scheduler adapters consume these dependency decisions
-without pruning execution edges or calling a type-specific branch scheduler. Legacy skipped-state metadata remains only
-for snapshots that already contain the old projection. Branch-membership analysis remains an internal author-graph
+first, resolves the activation token, and attaches only the selected branch input. Nodes exclusive to the unselected
+branch are not materialized or invoked. `executed_history` records source-level completion and retirement: a branch
+source retired as empty can appear there without an invocation or an execution result. It is bookkeeping, not an
+invocation trace. Both scheduler adapters consume the same dependency decisions without pruning execution edges or
+calling a type-specific branch scheduler. Legacy skipped-state metadata remains only for snapshots that already contain
+the old projection. Branch-membership analysis remains an internal author-graph
 admission decision. The focused fresh-shape ownership matrix also verifies that supported flat, nested, bounded
 fan-out, and four-sibling graphs do not instantiate the compatibility controller or project fresh skipped nodes in
 either scheduler route. This proves the current ownership boundary; it does not remove the controller, which remains
@@ -205,12 +207,19 @@ Runs a sequence of checks:
    - For `IfInvocation.value`, resolve both branch inputs to their source ports, following nested `If` outputs and
      deduplicating shared sources. Check every resolved source against the destination using the existing compatibility
      hooks; the current condition value does not narrow the possible types.
-   - Collector item/collection checks and iterator collection checks also use the resolved branch sources. This allows
-     matching string branches to feed a string collector without an intermediate string node.
+   - Collector item/collection checks and iterator collection checks also use the resolved branch sources. When a
+     branch source is a collector, use its inferred item root type instead of its declared `list[Any]` output. This
+     preserves type checks through If branches and chained collectors, while matching string branches can feed a
+     string collector without an intermediate string node.
+   - When an `If.value` feeds a typed collection input, each resolved collector branch is checked against the target
+     using its inferred item root. When an `If.value` feeds `Collect.collection`, the possible item roots from all
+     resolved branches must have one compatible root; mutually exclusive branches do not permit a heterogeneous
+     collector input. For example, `If(Collect[int], StringCollection) -> Collect.collection` is rejected.
    - Iterators over collectors validate their item consumers against the same inferred collector root type. Mixed
      `int` and `float` items therefore require consumers compatible with `float`.
    - If a branch is unresolved, retain the declared output compatibility behavior (`Any` for collector type
-     inference). The graph's separate DAG check rejects cycles before projection.
+     inference), and stop downstream incremental type revalidation at that unresolved `If`. The graph's separate DAG
+     check rejects cycles before projection.
    - This widens compatibility: a direct collector with both `int` and `float` items, previously rejected, now resolves
      to `float`. Its downstream consumers must accept floats; unrelated mixed item types remain invalid.
    - Ordinary source ports use the direct compatibility path with already resolved nodes, without If traversal or
@@ -244,10 +253,14 @@ Checks a single prospective edge before insertion:
 - Adding the edge to the flat DAG must keep it acyclic.
 - Iterator/collector constraints re-checked when the edge creates relevant patterns.
 
-After inserting an edge into `If.true_input` or `If.false_input`, `add_edge` also revalidates affected downstream
-connections. It follows resolved If outputs and collector chains, checking each affected If, collector, or iterator
-once. Ordinary nodes end this dependency walk; unrelated unfinished nodes are not revalidated. If a check fails, the
-new edge is removed and adjacency indexes are restored before the validation error is raised.
+After inserting an edge into `If.true_input` or `If.false_input`, or into a collector's `item` or `collection`,
+`add_edge` revalidates affected connections in both directions. Candidate collector checks validate local roots before
+insertion; after insertion, the walk checks upstream collectors against their updated downstream roots, then follows
+resolved If outputs and collector chains to check affected collectors and iterators once. One operation-local cache
+shares resolved collector item types across this walk and strict graph validation. Upstream collectors without a
+resolvable item type, ordinary nodes, unresolved If outputs, and unrelated unfinished nodes end or leave the dependency
+walk untouched. If a check fails, the new edge is removed and adjacency indexes are restored before the validation
+error is raised.
 
 ### 3.4 Topology utilities
 
@@ -257,8 +270,18 @@ new edge is removed and adjacency indexes are restored before the validation err
 
 ### 3.5 Mutation helpers
 
-- `add_node`, `update_node` (preserve edges, rewrite endpoints if id changes), `delete_node`.
+- `add_node`, `update_node` (preserve edges, rewrite endpoints if id changes; failed rewrites restore the original node
+  and edges, then invalidate lazy adjacency indexes so later lookups rebuild them), `delete_node`.
 - `add_edge`, `delete_edge` (with validation).
+
+### 3.6 Compatibility
+
+Graph validation runs when a workflow is queued and when a persisted runtime session is hydrated. New inferred collector
+root checks can therefore reject an older saved workflow at enqueue time, or make a pending queue snapshot unreadable
+when the queue worker restores it. Unreadable pending snapshots are marked failed and retained for recovery by the
+queue's quarantine path; they are not silently executed. Completed history entries with unreadable snapshots are shown
+as failed placeholders with the session and workflow data dropped. The workflow can be edited to make collector inputs
+and consumers agree with the inferred root before it is queued again.
 
 ## 4) GraphExecutionState (runtime)
 
@@ -326,6 +349,13 @@ mutation helpers. Those helpers reject changes once the affected nodes have alre
   - source node id
   - iteration path
   - runtime state such as pending, ready, executed, or skipped
+- _engine_frame() stores canonical immutable frames in the owning state's private runtime, keyed by state ID,
+  workflow-call depth, and iteration path. The cache is process-local, is not serialized, and retains only the distinct
+  frames requested while that state is alive. State copies get their own cache dictionary; a copy with a new ID starts
+  with no frames for the old ID.
+- If activation dependency lookup has a reverse index from If owner, selected branch, and frame to prepared exec IDs.
+  A restored state rebuilds the index once; newly prepared nodes extend it. The index is derived runtime state, not
+  snapshot data.
 - `execution_refs: dict[str, ExecutionReference]` - in-memory stable references for prepared execution nodes, including
   their source node and execution frame; version-2 snapshots rebuild these references instead of storing them.
 - `execution_tokens: dict[str, ExecutionToken]` - in-memory output tokens produced by applied execution results;
@@ -416,7 +446,10 @@ same adapter now projects ordinary readiness and calls the graph-state generic c
 prepared iteration when needed, and finalizes `output_collection` and `final_state`. For an empty literal collection,
 the generic path completes through the existing synthetic terminal `For` result without running the body or
 `ForReturn`. The generic scheduler receives only opaque node IDs and dependencies; it never receives a literal next
-node ID. The compatibility continuation bridge remains available only for unsupported loop shapes and explicitly
+node ID. Compatibility nested-For expansion also checks whether any prepared node is the synthetic empty
+terminal before finalizing empty contexts; non-empty sibling contexts still run their bodies. This handles mixed outer
+collections such as [[], [1]] as well as all-empty collections. The compatibility continuation bridge remains available
+only for unsupported loop shapes and explicitly
 legacy-loaded snapshots. The exact four-node/four-edge empty input-driven shape with one inputless static-list producer
 is also generic-routed. Other input-driven outer collections, five-level-or-deeper or sibling nested loops outside the
 exact two-sibling `CollectionConcat` fan-in contract, or unsupported mixed loop shapes remain compatibility-owned; the
@@ -557,6 +590,13 @@ Workflow-call note:
 - Private `graph_iterate_planner.py` expands the supported direct and body-mediated Iterate/Collect shapes. Graph-state
   method wrappers preserve the admission, copy creation, edge attachment, and atomic preparation entry points. The
   planner continues to use the graph state's journal, mappings, caches, and scheduler.
+- Private `graph_loop_topology.py` classifies every `For` once per graph: its body path to the linked `ForReturn`, and
+  its supported nested body shape (`NestedForBody`, `NestedIterateBody`, or `NestedIterateChain`). It also recognizes
+  the whole-graph serial `Iterate` chain (`NestedIterateSequence`). Graph validation rejects nested `For` and
+  `Iterate`-in-`For` bodies without a shape. Graph state, both schedulers, the nested planner, and the materializer
+  read `GraphExecutionState._loop_topology()` instead of re-recognizing shapes per completed node. Classification
+  reads only node types and edges, so it is dropped with the cached flat source graph (graph mutation, transaction
+  rollback, or a runtime-cache reset) and rebuilt from the next one.
 - `_IfActivationController` Owns fallback runtime `If` admission and compiles opaque, frame-local activation dependency
   records for unsupported fresh shapes and legacy prepared nodes. Fresh ordinary-node single-`If` graphs, the bounded
   nested pair, the exact bounded three-`If` inner/middle/outer chain, the exact four-`If` nested chain, and exactly
@@ -632,11 +672,32 @@ materialization.
   iterator ancestors because the source path crosses a collector, prepared parent iteration paths are still used to
   materialize one downstream exec node for each preserved collector path.
 
-- For a fresh **IfInvocation**: prepare only its condition inputs first. After the condition resolves, graph-state
-  activation dependencies admit selected branch contexts and attach only the selected branch input to the pending `If`
-  execution. Unsupported fresh shapes and legacy snapshots use the compatibility controller. Rejected branch sources
-  are not materialized. Pending `If` state is reconstructed from its durable execution edges, prepared mappings, and
-  activation token after rehydration.
+- For an IfInvocation with a wired condition, prepare condition inputs first. Readiness waits for condition source nodes
+  and their ancestors, and for the iterators in the `If`'s own iterator ancestry, which give it its frames and are never
+  gated by it; other iterator ancestry on a branch cannot hold the gate open. After the condition resolves, activation
+  dependencies admit selected branch contexts and attach only the selected branch input. A literal condition is gated by
+  the ancestry of its known selected branch; an iterator that only feeds the unselected branch, such as one closed by a
+  branch `Collect`, cannot hold it back. Its frames still wait for the iterators open at it. Unsupported fresh shapes
+  and legacy snapshots use the compatibility controller. Rejected branch sources are retired empty without invocation.
+  Pending If state is reconstructed from durable execution edges, prepared mappings, and the activation token after
+  rehydration.
+
+- A branch `Collect` whose `item` source combines exactly two sibling `Iterate` axes can close the axis beside the
+  `If` condition axis. The compatibility materializer expands that sibling `Iterate` beneath each resolved `If` frame
+  selecting the `Collect` branch, pairs only the matching condition frame, and closes the branch interval empty when no
+  frame selects it. Independent iterator axes follow destination input-port order; node insertion order and node IDs do
+  not reorder distinct ports. The condition and branch axes must be nested; divergent inner axes are rejected even when
+  they share an outer axis. An uncollected deeper branch axis that cannot be selected from the condition frame raises
+  `UnsupportedIfIterationAxesError` before invocation. One sibling `Iterate` can belong to only one `If` owner. A
+  `Collect` may feed both branch ports of that same `If`; if it would serve different `If` owners, materialization
+  raises `UnsupportedSharedIfCollectBranchesError` before invocation rather than dropping frames.
+
+- For a root-conditioned `If` whose selected branch input is a completed direct `Collect`, compatibility
+  materialization preserves each non-root `Collect` iteration path through ordinary descendants. It runs one `If`
+  execution per preserved group, with a matching activation frame; the already-resolved root activation gate and
+  token are aligned to the first group. Ordinary descendants of `If.value` use those same frames, and a downstream
+  `Collect` gathers every completed group through the standard grouping behavior. This bounded case does not imply
+  propagation through further nested controls or loops.
 
 - For each new exec node:
 
@@ -647,6 +708,58 @@ materialization.
     its opaque plan for ordinary static DAGs, legacy-shaped `If` graphs, and direct `Iterate`/`Collect`-only graphs.
   - Try to resolve any `If`-specific scheduling state.
   - If the node is ready and not deferred by an unresolved `If`, enqueue it into its class queue.
+
+`next()` applies `_GenericForPlanner.prepare()` and If-bearing `_ExecutionMaterializer.prepare()` calls as state
+transactions. If one of those expansions raises, journaled execution-graph, prepared-mapping, frame,
+activation-token, gate, and scheduler mutations are rolled back; derived caches are reset and ready queues are rebuilt
+from the restored state before the exception propagates. A later `next()` can retry from the pre-expansion state
+without retaining partially materialized nodes or activation state. If-free `_ExecutionMaterializer.prepare()` runs
+without this transaction wrapper to avoid overhead on ordinary graphs; root-If completed-Collect expansion retains
+its own transaction.
+
+This transaction boundary does not cover pending-If attachment (`_attach_pending_if_inputs`),
+`prepare_nested_iterate_sequence()`, or direct Iterate/Collect preparation. Those operations run outside the wrapper
+and must be considered separately when reasoning about rollback behavior.
+
+The execution-node builder retains a filtered iterator graph for the current source-graph identity. It builds this
+graph when compatibility preparation needs sibling-Collect relationships or iterator ancestry. The graph replaces
+Collect item inputs with its collection inputs for traversal; edge-scoped ancestry retains item axes needed for grouping.
+Final For outputs do not carry an open iteration axis. `If` branch gating and axis validation instead use the ancestry's
+frame iterators, which follow a final For output into the For's parent frame: the For's own axis is closed there, but
+the axes it runs under stay open.
+
+Iterator ancestry owns ordered ancestor and edge-axis analysis plus effective-path memoization for one graph traversal.
+The builder shares that object across candidate admission and materialization. Its separate per-source axis cache adds
+sibling-Collect relationship ordering and is cleared when that relationship graph is established; it does not repeat
+the ancestor-list cache. Independent parent paths merge in destination input-port order, with source node ID used only
+to break ties on the same input port. A standalone path lookup owns a separate context. These caches are process-local
+and rebuilt when graph identity changes; they are not serialized.
+
+Each pending-If attachment sweep also builds a local index from source edge and prepared iteration path to execution
+node ID. It enumerates each prepared source edge once per sweep, then resolves the deepest matching path prefix for each
+condition-ready If frame. This preserves deterministic attachment while avoiding a repeated full prepared-source scan
+for every If frame. The index is discarded at the end of the call; a later sweep rebuilds it from the current prepared
+mapping, so it is not retained across graph edits, rollback, or state restore. This optimization bounds candidate lookup
+for attachment; other preparation and branch-context work has separate costs.
+
+Inactive branch-source retirement uses an event queue owned by one materializer. A rejected branch queues only its
+activation-dependent source IDs when the corresponding `If` resolves; an empty condition `Iterate` queues both branch
+source sets. Each preparation pass checks the queued sources in topological order rather than rescanning every
+unprepared source. The index is tied to source-graph identity, rebuilt from durable activation state after graph changes
+or state restore, and is not serialized. Queue mutations participate in execution-state rollback. A process-local
+completed-source ID cache avoids rescanning the full `executed` set for every inactivity check; For/Iterate completion
+invalidates it because axis completion can change branch activity. Registering a new prepared execution evicts its
+source ID from the cached set; re-registering an existing execution does not. Graph edits or transaction rollback clear
+the derived cache. This bounds source-inactivity checks for serial If chains, but does not bound other preparation or
+branch-context costs.
+
+Literal-condition If fallback path inference uses the same ancestry context, including nested selected branches.
+
+Ordinary source nodes are traversed with an explicit stack, but path inference recurses when a selected input comes from
+another unprepared `If`. A direct lookup over a 400-node literal-`If` chain raises `RecursionError` with CPython 3.12's
+default recursion limit of 1,000; serial execution of the equivalent 1,100-node graph completes. This is a pathological
+depth limit in the unresolved compatibility fallback, not a general graph-size limit. Supporting arbitrary nested-`If`
+depth requires converting that path inference to an explicit stack.
 
 ### 4.5 Readiness and class ordering
 
@@ -695,12 +808,58 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
 - Nodes that are exclusive to the true or false branch remain unmaterialized until their branch is admitted, even when
   their indegree would otherwise be zero.
 - Once the condition resolves, graph-state activation logic records the selected activation token and attaches only the
-  selected branch input to the pending `If` execution. Branch-exclusive ancestors of the unselected branch are never
-  prepared, executed, or added to fresh execution history. Unsupported fresh shapes and legacy snapshots use the
+  selected branch input to the pending `If` execution. Branch-exclusive ancestors of the unselected branch are not
+  invoked or materialized into execution results. Their source IDs can appear in `executed_history` after empty
+  retirement; the history is not an invocation trace. Unsupported fresh shapes and legacy snapshots use the
   compatibility controller. Both scheduler adapters use append-only execution edges; no type-specific branch scheduler
   performs pruning or skip propagation.
 - Legacy snapshots that already contain skipped prepared nodes retain their compatibility metadata and scheduler
   projection. Fresh execution does not create that projection.
+- An `If` runs once per frame of the innermost iterator in its iterator ancestry, whichever branch is selected. When a
+  condition, literal or computed in the root frame, selects a root value while the other branch carries an open
+  `Iterate`, the `If` keeps that per-item cardinality and returns the root value in each item frame; the unselected
+  per-item computation stays inactive. A branch `For`'s final output carries no axis into that ancestry, so selecting
+  the root value over such a branch runs the `If` once in the root frame, while selecting it runs the `If` per item of
+  the iterator the `For` runs under.
+- The iterators whose frames are open at an `If`, including one reached through a `For` final output (which closes only
+  the `For`'s own axis), run regardless of the condition and are never gated by it.
+- Before invocation, graph validation raises `UnsupportedIfIterationAxesError` for these frame sets:
+  - Two unrelated iterators open at the `If` (neither stays open inside the other, judged by iterator ancestry, where a
+    `Collect.item` input closes an axis), unless the input that decides the `If`'s frames carries both: the condition,
+    or the known selected branch of a literal condition. A cross product computed by one selected node therefore keeps
+    its frames, while one `Iterate` per branch, or a root value selected over a cross product, is rejected. A literal
+    condition whose selected branch carries one of the two also runs when the other comes only from the unselected
+    branch and either the unselected one reaches the `If` only through a `For` final output, which adds no frames, or
+    the selected axis, or an iterator enclosing it, reopens the unselected one. An `Iterate` reopens every axis of its
+    `Collect`'s item (the one the `Collect` closes and the ones it keeps), and transitively what those reopen, when
+    its `collection` comes directly from a `Collect` with a single `item` input and nothing appended through its
+    `collection`: each item becomes one frame, so the selected frames pair with those axes by index. Any other reopen
+    (a node between the `Collect` and the `Iterate`, or extra collected items) can change the length, and selecting
+    the upstream axis over its reopening pairs it with per-group frames; both would drop or invent frames.
+  - A branch whose open axes, or the axes a branch `Collect` keeps, are deeper than a per-item condition's, unless
+    both branches carry the same deeper axes.
+  - A root-frame condition choosing between branches with different deeper axes. When both branches share nested
+    deeper axes, a root-frame condition runs the `If` once per frame of the innermost one.
+  Selected-branch frame cardinality is not supported.
+- A completed `Collect` on a branch closes its item axis; the `If` does not wait for an `Iterate` that only that
+  `Collect` consumes. When the `Collect` keeps an outer frame open and is selected, the `If` runs once per preserved
+  group; when it is rejected, it never runs and the `If` runs in the frames of its remaining iterators. A `Collect` of a
+  `For` final output groups in the `For`'s parent frame, so it keeps that frame open.
+- A `For` whose loop body belongs to an `If` branch (its body feeds the `ForReturn`, which reaches the `For` only
+  through the loop linkage) is gated with that branch: for a frame that rejects the branch, neither the `For` nor its
+  body runs. A gated `For` brings in a `For` nested in its body together with that body. Two `For`s stay ungated. A
+  `For` nested in the body of an ungated `For` runs with that loop. A `For` whose final output feeds the `If` directly
+  is attached only after it finalizes, and the `If` is not prepared before that, so gating it on the `If` would
+  deadlock. Known limitation: with a per-item condition, such a `For` and its body run even for items that reject the
+  branch, and an error they raise is recorded.
+- An `If` has no execution in a frame where the innermost iterator in its ancestry has no items. When an `Iterate` in
+  its iterator ancestry, whether it feeds `If.condition` or a branch, has no items at all, no `If` execution is created,
+  the branch sources are retired empty, the downstream `Collect` produces an empty collection, and the state completes
+  without an error. The same holds for a literal condition whose selected branch runs under an empty `Iterate` reached
+  only through a `For` final output. Retirement may add the branch source IDs to `executed_history`; neither branch
+  invocation runs and no branch result is created. Known limitation: with a wired condition, an `If` whose branch
+  reaches an empty `Iterate` only through a `For` final output stalls, whether the condition is root-frame or per item
+  of that `Iterate`.
 - The SQLite queue/processor path has evidence for cancellation before and after `If` resolution and retry from each
   boundary for both condition polarities. A canceled attempt keeps its activation ledger and cannot resume; retry
   starts a fresh state and must emit a fresh matching activation token before selected-only completion.

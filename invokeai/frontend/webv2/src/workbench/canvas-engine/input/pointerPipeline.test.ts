@@ -1,7 +1,9 @@
+import type { CanvasKeyOwner } from '@workbench/canvas-engine/capabilities';
 import type { PointerPipelineDeps } from '@workbench/canvas-engine/input/pointerPipeline';
 import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
 import type { PointerInput, ToolId } from '@workbench/canvas-engine/types';
 
+import { registerModalPresence } from '@platform/ui/modalPresence';
 import { createPointerPipeline } from '@workbench/canvas-engine/input/pointerPipeline';
 import { createViewport } from '@workbench/canvas-engine/viewport';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -76,6 +78,7 @@ const createHarness = (
     handleEscape?: (o: { gestureWasActive: boolean }) => void;
     maybeCommitModalSession?: () => boolean;
     replaying?: () => boolean;
+    resolveKeyOwner?: (event: KeyboardEvent) => CanvasKeyOwner;
   } = {}
 ) => {
   const registered = new Set<ToolId>(opts.tools ?? ['view', 'brush']);
@@ -123,6 +126,7 @@ const createHarness = (
     getActiveToolId: () => activeToolId,
     getInputElement: () => element,
     getKeyboardRoot: () => ({ contains: (node) => node === (SURFACE_TARGET as unknown) }),
+    getKeyOwnerResolver: () => opts.resolveKeyOwner ?? null,
     getToolContext: () => ctx,
     handleEscape: opts.handleEscape,
     hasTool: (id) => registered.has(id),
@@ -531,6 +535,205 @@ describe('pointer pipeline: temporary modifier tools', () => {
   });
 });
 
+describe('pointer pipeline: Alt eyedropper hold', () => {
+  const pickerHarness = (opts: { resolveKeyOwner?: (event: KeyboardEvent) => CanvasKeyOwner } = {}) =>
+    createHarness({ ...opts, tools: ['view', 'brush', 'colorPicker'] });
+  const altDown = (target: unknown = SURFACE_TARGET) => makeKeyEvent({ altKey: true, code: 'AltLeft', target });
+  const altUp = () => makeKeyEvent({ code: 'AltLeft', target: SURFACE_TARGET });
+
+  it('prevents both halves of an owned Alt tap so the browser menu bar stays closed', () => {
+    const h = pickerHarness();
+    h.pipeline.onPointerEnter();
+    const down = altDown();
+    const up = altUp();
+    h.pipeline.onKeyDown(down);
+    h.pipeline.onKeyUp(up);
+    expect(down.preventDefault).toHaveBeenCalledOnce();
+    expect(up.preventDefault).toHaveBeenCalledOnce();
+
+    // An unrelated release is still only observed.
+    const space = makeKeyEvent({ code: 'Space', target: SURFACE_TARGET });
+    h.pipeline.onKeyUp(space);
+    expect(space.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('leaves Alt alone in an editable field', () => {
+    const h = pickerHarness();
+    h.pipeline.onPointerEnter();
+    const editable = altDown({ tagName: 'INPUT' });
+    const editableUp = makeKeyEvent({ code: 'AltLeft', target: { tagName: 'INPUT' } });
+    h.pipeline.onKeyDown(editable);
+    h.pipeline.onKeyUp(editableUp);
+    expect(editable.preventDefault).not.toHaveBeenCalled();
+    expect(editableUp.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['hovered', true],
+    ['off the canvas', false],
+  ])(
+    'still prevents an owned Alt %s for a tool that uses it as a modifier, but starts and arms no picker',
+    (_, hovered) => {
+      const h = pickerHarness();
+      (h.tool as { usesAltKey?: boolean }).usesAltKey = true;
+      if (hovered) {
+        h.pipeline.onPointerEnter();
+      }
+      const down = altDown();
+      const up = altUp();
+      h.pipeline.onKeyDown(down);
+      h.pipeline.onPointerEnter({ altKey: true });
+      h.pipeline.onKeyUp(up);
+      expect(down.preventDefault).toHaveBeenCalledOnce();
+      expect(up.preventDefault).toHaveBeenCalledOnce();
+      expect(h.setTool).not.toHaveBeenCalled();
+    }
+  );
+
+  it('arms a pending hold off the canvas that a pointerenter with Alt still held begins', () => {
+    const h = pickerHarness();
+    const down = altDown();
+    h.pipeline.onKeyDown(down);
+    expect(down.preventDefault).toHaveBeenCalledOnce();
+    expect(h.setTool).not.toHaveBeenCalled();
+
+    h.pipeline.onPointerEnter({ altKey: true });
+    expect(h.setTool).toHaveBeenLastCalledWith('colorPicker', { temporary: true });
+    const up = altUp();
+    h.pipeline.onKeyUp(up);
+    expect(up.preventDefault).toHaveBeenCalledOnce();
+    expect(h.setTool).toHaveBeenLastCalledWith('brush', { temporary: true });
+  });
+
+  it('drops the pending hold when the pointer enters without Alt', () => {
+    const h = pickerHarness();
+    h.pipeline.onKeyDown(altDown());
+    h.pipeline.onPointerEnter({ altKey: false });
+    h.pipeline.onPointerLeave();
+    h.pipeline.onPointerEnter({ altKey: true });
+    expect(h.setTool).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['the Alt release', (h: ReturnType<typeof createHarness>) => h.pipeline.onKeyUp(altUp())],
+    ['a tool switch', (h: ReturnType<typeof createHarness>) => h.pipeline.endForToolSwitch()],
+    ['a reset', (h: ReturnType<typeof createHarness>) => h.pipeline.reset()],
+  ])('clears the pending hold on %s', (_, clear) => {
+    const h = pickerHarness();
+    h.pipeline.onKeyDown(altDown());
+    clear(h);
+    h.pipeline.onPointerEnter({ altKey: true });
+    expect(h.setTool).not.toHaveBeenCalled();
+  });
+
+  it('begins the pending hold before routing a press that lands without hover, so a pen samples on contact', () => {
+    const h = pickerHarness();
+    const order: string[] = [];
+    h.setTool.mockImplementation((id: ToolId) => order.push(`set:${id}`));
+    h.tool.onPointerDown = () => order.push('down');
+    h.pipeline.onKeyDown(altDown());
+
+    h.pipeline.onPointerDown(makePointerEvent({ altKey: true, pointerId: 5, pointerType: 'pen' }));
+    expect(order).toEqual(['set:colorPicker', 'down']);
+  });
+
+  it('arms nothing off the canvas unless the surface owns the key', () => {
+    const h = pickerHarness({ resolveKeyOwner: () => 'companion' });
+    const down = altDown({ tagName: 'BODY' });
+    h.pipeline.onKeyDown(down);
+    h.pipeline.onPointerEnter({ altKey: true });
+    expect(down.preventDefault).not.toHaveBeenCalled();
+    expect(h.setTool).not.toHaveBeenCalled();
+  });
+});
+
+describe('pointer pipeline: injected key owner', () => {
+  const ownerHarness = (owner: CanvasKeyOwner) => {
+    const handleEscape = vi.fn();
+    const resolveKeyOwner = vi.fn((_event: KeyboardEvent) => owner);
+    const h = createHarness({ handleEscape, resolveKeyOwner, tools: ['view', 'brush', 'bbox', 'colorPicker'] });
+    const commands: string[] = [];
+    h.tool.onKeyCommand = (_ctx, command) => commands.push(command);
+    return { ...h, commands, handleEscape, resolveKeyOwner };
+  };
+  const BODY = { tagName: 'BODY' };
+
+  it.each([
+    ['surface', ['apply'], 1],
+    ['companion', [], 1],
+    ['elsewhere', [], 0],
+  ] as const)('with owner %s, Enter applies %j and Escape reaches the ladder %i time(s)', (owner, applied, escapes) => {
+    const h = ownerHarness(owner);
+    // Focus left on the body by a click outside the canvas no longer settles ownership by itself.
+    h.pipeline.onKeyDown(makeKeyEvent({ key: 'Enter', target: BODY }));
+    h.pipeline.onKeyDown(makeKeyEvent({ key: 'Escape', target: BODY }));
+    expect(h.commands).toEqual(applied);
+    expect(h.handleEscape).toHaveBeenCalledTimes(escapes);
+  });
+
+  it('applies Enter from the surface only while focus is on its root or nowhere, not on a clicked control', () => {
+    const h = ownerHarness('surface');
+    const button = { ...BUTTON_TARGET, matches: () => false };
+    h.pipeline.onFocusIn({ target: button } as unknown as FocusEvent);
+    h.pipeline.onKeyDown(makeKeyEvent({ key: 'Enter', target: button }));
+    h.pipeline.onKeyDown(makeKeyEvent({ key: 'Enter', target: SURFACE_TARGET }));
+    expect(h.commands).toEqual(['apply']);
+  });
+
+  it.each([
+    ['surface', true],
+    ['companion', true],
+    ['elsewhere', false],
+  ] as const)('with owner %s, a quick C tap selects the frame tool: %s', (owner, selects) => {
+    const h = ownerHarness(owner);
+    h.pipeline.onKeyDown(makeKeyEvent({ code: 'KeyC', key: 'c', target: BODY }));
+    h.pipeline.onKeyUp(makeKeyEvent({ code: 'KeyC', key: 'c', target: BODY }));
+    expect(h.setTool.mock.calls.some(([id]) => id === 'bbox')).toBe(selects);
+  });
+
+  it.each(['surface', 'companion', 'elsewhere'] as const)(
+    'with owner %s, Space and Alt hold over the hovered canvas',
+    (owner) => {
+      const h = ownerHarness(owner);
+      h.pipeline.onPointerEnter();
+      const space = makeKeyEvent({ code: 'Space', target: BODY });
+      h.pipeline.onKeyDown(space);
+      expect(h.setTool).toHaveBeenLastCalledWith('view', { temporary: true });
+      expect(space.preventDefault).toHaveBeenCalledOnce();
+      h.pipeline.onKeyUp(makeKeyEvent({ code: 'Space', target: BODY }));
+
+      const alt = makeKeyEvent({ altKey: true, code: 'AltLeft', target: BODY });
+      h.pipeline.onKeyDown(alt);
+      expect(h.setTool).toHaveBeenLastCalledWith('colorPicker', { temporary: true });
+      expect(alt.preventDefault).toHaveBeenCalledOnce();
+    }
+  );
+
+  it.each([
+    ['companion', false],
+    ['elsewhere', false],
+    ['surface', true],
+  ] as const)('with owner %s and no hover, Alt is claimed: %s', (owner, claimed) => {
+    const h = ownerHarness(owner);
+    const alt = makeKeyEvent({ altKey: true, code: 'AltLeft', target: BODY });
+    h.pipeline.onKeyDown(alt);
+    expect(alt.preventDefault).toHaveBeenCalledTimes(claimed ? 1 : 0);
+    h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space', target: BODY }));
+    expect(h.setTool).not.toHaveBeenCalled();
+  });
+
+  it('asks the judge only after its own refusals', () => {
+    const h = ownerHarness('surface');
+    h.pipeline.onPointerEnter();
+    h.pipeline.onKeyDown(makeKeyEvent({ key: 'Escape', target: { tagName: 'INPUT' } }));
+    h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space', target: BUTTON_TARGET }));
+    h.pipeline.onKeyDown(makeKeyEvent({ defaultPrevented: true, key: 'Enter', target: BODY }));
+    h.pipeline.onPointerDown(makePointerEvent({ pointerId: 1 }));
+    expect(h.resolveKeyOwner).not.toHaveBeenCalled();
+    expect(h.handleEscape).not.toHaveBeenCalled();
+  });
+});
+
 describe('pointer pipeline: canvas keyboard ownership', () => {
   const applyHarness = () => {
     const h = createHarness();
@@ -552,6 +755,32 @@ describe('pointer pipeline: canvas keyboard ownership', () => {
       h.pipeline.onKeyDown(makeKeyEvent({ key: 'Enter', [modifier]: true, target: SURFACE_TARGET }));
     }
     expect(h.commands).toEqual(['apply', 'apply']);
+  });
+
+  it('takes no key beneath a modal dialog, even with focus left on the document body', () => {
+    const handleEscape = vi.fn();
+    const h = createHarness({ handleEscape });
+    const commands: string[] = [];
+    h.tool.onKeyCommand = (_ctx, command) => commands.push(command);
+    h.pipeline.onPointerEnter();
+    const body = { tagName: 'BODY' };
+    const release = registerModalPresence();
+
+    try {
+      h.pipeline.onKeyDown(makeKeyEvent({ key: 'Enter', target: body }));
+      h.pipeline.onKeyDown(makeKeyEvent({ key: 'Escape', target: body }));
+      h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space', key: ' ', target: body }));
+    } finally {
+      release();
+    }
+    expect(commands).toEqual([]);
+    expect(handleEscape).not.toHaveBeenCalled();
+    expect(h.setTool).not.toHaveBeenCalled();
+
+    h.pipeline.onKeyDown(makeKeyEvent({ key: 'Enter', target: body }));
+    h.pipeline.onKeyDown(makeKeyEvent({ key: 'Escape', target: body }));
+    expect(commands).toEqual(['apply']);
+    expect(handleEscape).toHaveBeenCalledOnce();
   });
 
   it('leaves Space to a focused control and to Ctrl/Meta/Alt chords', () => {

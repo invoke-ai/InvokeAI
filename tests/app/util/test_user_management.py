@@ -2,6 +2,7 @@
 
 import logging
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
@@ -10,7 +11,7 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.fonts.fonts_common import FontScope
 from invokeai.app.services.fonts.fonts_default import FontService
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
-from invokeai.app.services.shared.sqlite.sqlite_util import init_db
+from invokeai.app.services.shared.database.startup import init_database
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.users.users_default import UserService
 from invokeai.app.util import user_management
@@ -26,9 +27,9 @@ def deletion_fixture(tmp_path: Path):
     )
     config._root = tmp_path
     logger = logging.getLogger("user-management-font-tests")
-    db = init_db(config, logger, Mock(spec=ImageFileStorageBase))
+    db = init_database(config, logger, Mock(spec=ImageFileStorageBase))
     fonts = FontService(
-        db=db,
+        db,
         fonts_dir=config.fonts_path,
         storage_dir=config.fonts_storage_path,
         logger=logger,
@@ -66,7 +67,7 @@ def test_user_delete_commands_clean_private_fonts_and_keep_shared_fonts(
     assert shared_path.is_file()
     assert pending_path.is_file()
 
-    monkeypatch.setattr("invokeai.app.services.config.get_config", lambda: config)
+    monkeypatch.setattr(user_management, "_cli_config", lambda: config)
     if interactive:
         answers = iter([email, "yes"])
         monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
@@ -79,3 +80,11 @@ def test_user_delete_commands_clean_private_fonts_and_keep_shared_fonts(
     assert shared_path.is_file()
     assert pending_path.is_file()
     assert fonts.get_accessible(user_id="system", font_id=shared_id).id == shared_id
+
+
+def test_the_commands_use_the_database_the_install_configures(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # `get_config` outside the app reads no `invokeai.yaml`: a database configured there would be missed.
+    (tmp_path / "invokeai.yaml").write_text('schema_version: "4.0.3"\ndb_dir: elsewhere\n')
+    monkeypatch.setattr("invokeai.app.services.config.get_config", lambda: SimpleNamespace(root_path=tmp_path))
+
+    assert user_management._cli_config().db_path == (tmp_path / "elsewhere" / "invokeai.db").resolve()

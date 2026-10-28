@@ -1,7 +1,7 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop */
 import type { ModelConfig } from '@features/models/core/types';
 
-import { Dialog, Input, Portal, Stack, Text } from '@chakra-ui/react';
+import { Input, Portal, Stack, Text } from '@chakra-ui/react';
 import { modelPathSchema } from '@features/models/core/schemas';
 import { updateModel } from '@features/models/data/api';
 import { replaceModelInStore } from '@features/models/data/modelsStore';
@@ -9,6 +9,7 @@ import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, CloseButton, Field } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 

@@ -12,6 +12,7 @@ import type {
   LayoutPresetMetadataOverrides,
   LayoutPresetOverrides,
   LayoutPresetRouteOverrides,
+  LayoutPresetWorkingCopy,
   ProjectLayoutState,
   WidgetRegion,
   WidgetRegionState,
@@ -43,6 +44,12 @@ export interface Project {
    * layout drift, and undo leave it out. Absent means nothing is remembered.
    */
   lastFloatingGeometry?: Record<WidgetInstanceId, FloatingWidgetGeometry>;
+  /**
+   * This project's arrangement of each preset it switched away from while that arrangement differed from the saved
+   * one, oldest first, at most one per preset. Arrangement only (no widget state), and never the active preset: the
+   * live layout is its working copy. Absent means every inactive preset opens as saved.
+   */
+  presetWorkingLayouts?: LayoutPresetWorkingCopy[];
   widgetGraphs: Partial<Record<WidgetTypeId, GraphContract>>;
   canvas: CanvasStateContractV3;
   promptHistory: PromptHistoryItem[];
@@ -139,6 +146,8 @@ export interface ProjectUndoSnapshot {
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
   /** Captured with widgetRegions: regions and floating windows are one placement fact. */
   floatingWidgets?: Record<WidgetInstanceId, FloatingWidgetState>;
+  /** Captured with `layout.presetId`, so undoing a preset switch brings back the working copies it moved. */
+  presetWorkingLayouts?: Project['presetWorkingLayouts'];
   widgetGraphs: Partial<Record<WidgetTypeId, GraphContract>>;
 }
 
@@ -148,8 +157,12 @@ export interface UndoRedoHistory {
 }
 
 export interface AutosaveState {
-  /** `pending`: persisted content changed since the last acknowledged save and its save has not started yet. */
-  status: 'idle' | 'pending' | 'saving' | 'saved' | 'error';
+  /**
+   * `pending`: persisted content changed since the last acknowledged save and its save has not started yet, or a save
+   * that could not finish will retry. `attention`: the last save finished for every other project, but an open project
+   * awaits a user decision (a sync conflict or an unsupported schema); the project sync snapshot says which.
+   */
+  status: 'idle' | 'pending' | 'saving' | 'saved' | 'attention' | 'error';
   lastSavedAt?: string;
   error?: string;
 }

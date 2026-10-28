@@ -11,12 +11,14 @@ from transformers import (
     AutoConfig,
     AutoModelForTextEncoding,
     CLIPTextModel,
+    CLIPTextModelWithProjection,
     CLIPTokenizer,
     T5EncoderModel,
     T5Tokenizer,
 )
 
 from invokeai.app.services.config.config_default import get_config
+from invokeai.backend.clip.clip_text_encoder import clip_text_config, load_bundled_clip_tokenizer
 from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXControlNetFlux
 from invokeai.backend.flux.controlnet.state_dict_utils import (
     convert_diffusers_instantx_state_dict_to_bfl_format,
@@ -35,7 +37,10 @@ from invokeai.backend.flux.redux.flux_redux_model import FluxReduxModel
 from invokeai.backend.flux.util import get_flux_transformers_params, get_flux_vae_diffusers_config
 from invokeai.backend.model_manager.checkpoint_prefix import CheckpointPrefix
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
-from invokeai.backend.model_manager.configs.clip_embed import CLIPEmbed_Diffusers_Config_Base
+from invokeai.backend.model_manager.configs.clip_embed import (
+    CLIPEmbed_Checkpoint_Config_Base,
+    CLIPEmbed_Diffusers_Config_Base,
+)
 from invokeai.backend.model_manager.configs.controlnet import (
     ControlNet_Checkpoint_Config_Base,
     ControlNet_Diffusers_Config_Base,
@@ -76,6 +81,7 @@ from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import 
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
+    ClipVariantType,
     FluxVariantType,
     ModelFormat,
     ModelType,
@@ -84,6 +90,7 @@ from invokeai.backend.model_manager.taxonomy import (
 from invokeai.backend.model_manager.util.model_util import (
     convert_bundle_to_flux_transformer_checkpoint,
 )
+from invokeai.backend.quantization.bnb_import import bnb_unavailable_message, record_bnb_import_failure
 from invokeai.backend.quantization.fp8_scaled import (
     Fp8ScaledLayer,
     attach_fp8_scales,
@@ -128,7 +135,8 @@ try:
     from invokeai.backend.quantization.bnb_nf4 import quantize_model_nf4
 
     bnb_available = True
-except ImportError:
+except (ImportError, OSError, RuntimeError) as e:  # bnb may import and then fail loading its native library
+    record_bnb_import_failure(e)
     bnb_available = False
 
 app_config = get_config()
@@ -336,11 +344,85 @@ class CLIPDiffusersLoader(ModelLoader):
             case SubModelType.Tokenizer:
                 return CLIPTokenizer.from_pretrained(Path(config.path) / "tokenizer", local_files_only=True)
             case SubModelType.TextEncoder:
-                return CLIPTextModel.from_pretrained(Path(config.path) / "text_encoder", local_files_only=True)
+                encoder_path = Path(config.path) / "text_encoder"
+                if config.variant is not ClipVariantType.G:
+                    return CLIPTextModel.from_pretrained(encoder_path, local_files_only=True)
+                # SD 3 conditions on CLIP-G's projected pooled output, so the projection is loaded too, and a folder
+                # without one is refused: transformers would initialize it at random and only warn.
+                model, loading_info = CLIPTextModelWithProjection.from_pretrained(
+                    encoder_path, local_files_only=True, output_loading_info=True
+                )
+                if "text_projection.weight" in loading_info["missing_keys"]:
+                    raise ValueError(
+                        f"The CLIP-G text encoder '{config.name}' has no text_projection, which SD 3 needs."
+                    )
+                return model
 
         raise ValueError(
             f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
         )
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.CLIPEmbed, format=ModelFormat.Checkpoint)
+class CLIPSingleFileLoader(ModelLoader):
+    """Load a CLIP-L or CLIP-G text encoder from one safetensors file with transformers key names.
+
+    CLIP-L is built as a ``CLIPTextModel``, which FLUX.1 requires; SD 3 reads its unprojected pooled output, the same
+    value as SD 3's identity projection gives. CLIP-G is built with its projection, which SD 3 conditions on.
+    """
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        # The tokenizer is bundled, not read from the file.
+        if submodel_type is SubModelType.Tokenizer:
+            return 0
+        return super().get_size_fs(config, model_path, submodel_type)
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, CLIPEmbed_Checkpoint_Config_Base):
+            raise ValueError("Only CLIPEmbed_Checkpoint configs are supported here.")
+
+        match submodel_type:
+            case SubModelType.Tokenizer:
+                return load_bundled_clip_tokenizer()
+            case SubModelType.TextEncoder:
+                return self._load_text_encoder(config)
+
+        raise ValueError(
+            f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
+        )
+
+    def _load_text_encoder(self, config: CLIPEmbed_Checkpoint_Config_Base) -> AnyModel:
+        sd = load_file(Path(config.path))
+        text_config = clip_text_config(config.variant)
+        model: CLIPTextModel | CLIPTextModelWithProjection
+        with accelerate.init_empty_weights():
+            if config.variant is ClipVariantType.G:
+                model = CLIPTextModelWithProjection(text_config)
+            else:
+                model = CLIPTextModel(text_config)
+                # transformers >=5.6 flattened CLIPTextModel, dropping the `text_model.` prefix the file carries.
+                sd = {key.removeprefix("text_model."): value for key, value in sd.items()}
+
+        reserve_for_load(
+            self._ram_cache.make_room,
+            sd,
+            self._torch_dtype,
+            keep_fp8=False,
+            model=model,
+            fp8_layers={},
+            nvfp4_payloads={},
+        )
+        cast_state_dict(sd, self._torch_dtype, keep_fp8=False)
+        # Ignored: `logit_scale` and a CLIP-L projection, which belong to the full CLIP model, and the persistent
+        # `position_ids` older exports carry.
+        load_state_dict_ignoring_extras(model, sd, source=f"single-file CLIP-{config.variant.name}", assign=True)
+        return model
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.BnbQuantizedLlmInt8b)
@@ -355,9 +437,7 @@ class BnbQuantizedLlmInt8bCheckpointModel(ModelLoader):
         if not isinstance(config, T5Encoder_BnBLLMint8_Config):
             raise ValueError("Only T5EncoderBnbQuantizedLlmInt8bConfig models are currently supported here.")
         if not bnb_available:
-            raise ImportError(
-                "The bnb modules are not available. Please install bitsandbytes if available on your platform."
-            )
+            raise ImportError(bnb_unavailable_message())
         match submodel_type:
             case SubModelType.Tokenizer2 | SubModelType.Tokenizer3:
                 return T5Tokenizer.from_pretrained(
@@ -1005,9 +1085,7 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
     ) -> AnyModel:
         assert isinstance(config, Main_BnBNF4_FLUX_Config)
         if not bnb_available:
-            raise ImportError(
-                "The bnb modules are not available. Please install bitsandbytes if available on your platform."
-            )
+            raise ImportError(bnb_unavailable_message())
         model_path = Path(config.path)
 
         with SilenceWarnings():
@@ -2278,20 +2356,22 @@ class FluxSDNQDiffusersModel(ModelLoader):
         with accelerate.init_empty_weights():
             model = CLIPTextModel(model_config)
 
+        # transformers >=5.6 flattened CLIPTextModel, dropping the `text_model.` prefix the checkpoint carries.
+        # (`from_pretrained` strips it with a conversion rule; `load_state_dict` does not.)
+        sd = {k.removeprefix("text_model."): v for k, v in sd.items()}
+
         # position_ids is a non-persistent buffer that may be absent from the checkpoint.
         missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
         raise_on_incomplete_sdnq_load(
-            "SDNQ CLIP text encoder", missing, unexpected, allowed_missing={"text_model.embeddings.position_ids"}
+            "SDNQ CLIP text encoder", missing, unexpected, allowed_missing={"embeddings.position_ids"}
         )
 
         # Dequantize embedding layer
-        if hasattr(model, "text_model") and hasattr(model.text_model, "embeddings"):
-            embed_weight = model.text_model.embeddings.token_embedding.weight
-            if isinstance(embed_weight, SDNQTensor):
-                dequantized = embed_weight.get_dequantized_tensor()
-                model.text_model.embeddings.token_embedding.weight = torch.nn.Parameter(
-                    dequantized, requires_grad=False
-                )
+        embed_weight = model.embeddings.token_embedding.weight
+        if isinstance(embed_weight, SDNQTensor):
+            model.embeddings.token_embedding.weight = torch.nn.Parameter(
+                embed_weight.get_dequantized_tensor(), requires_grad=False
+            )
 
         return model
 

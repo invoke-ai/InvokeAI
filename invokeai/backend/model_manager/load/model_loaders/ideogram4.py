@@ -9,6 +9,9 @@ The on-disk model is a diffusers pipeline folder bundling:
 The transformer is our vendored ``Ideogram4Transformer`` (not a diffusers class), so we
 build it explicitly and load the prequantized state dict — mirroring how InvokeAI loads
 FLUX nf4. Both transformer branches are returned as a single ``Ideogram4TransformerPair``.
+
+Single files -- safetensors or GGUF -- hold one branch each; their loaders return a bare
+``Ideogram4Transformer`` and the loader node pairs two of them.
 """
 
 import itertools
@@ -24,6 +27,7 @@ from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_Ideogram4_Config,
     Main_Diffusers_Ideogram4_Config,
+    Main_GGUF_Ideogram4_Config,
 )
 from invokeai.backend.model_manager.load.fp8_capability import NotApplicable
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
@@ -54,6 +58,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     split_fp8_scaled_layers,
     warn_on_unattached_scales,
 )
+from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
 from invokeai.backend.quantization.int8_convrot import (
     drop_unconsumed_quantization_sidecars,
     extract_int8_convrot_markers,
@@ -509,3 +514,55 @@ class Ideogram4CheckpointModel(ModelLoader):
             return model
 
         return self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Ideogram4, type=ModelType.Main, format=ModelFormat.GGUFQuantized)
+class Ideogram4GGUFModel(ModelLoader):
+    """Loads ONE branch of Ideogram 4's dual-branch transformer from a GGUF file.
+
+    The community GGUFs are conversions of the per-branch single files: key-for-key this
+    repository's ``Ideogram4Transformer``, one branch per file, paired at the loader node exactly
+    like the safetensors builds. The Linear weights stay packed as ``GGMLTensor`` and dequantize per
+    forward through the model cache's autocast layers; what the model reads outside a matmul, and
+    what is not actually quantized, is dequantized here (see `unpack_ggml_at_load`).
+
+    No `fp8_storage` declaration: FP8 Storage is refused for every quantized format by rule, and a
+    packed weight cannot be re-encoded anyway.
+    """
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, Main_GGUF_Ideogram4_Config):
+            raise ValueError(f"Expected Main_GGUF_Ideogram4_Config, got {type(config).__name__}.")
+
+        if submodel_type is not SubModelType.Transformer:
+            raise ValueError(
+                "A single-file Ideogram 4 GGUF holds only a transformer; "
+                f"'{submodel_type.value if submodel_type else 'None'}' is not in it. Select a standalone "
+                "Qwen3-VL encoder and VAE on the model loader node, or install the diffusers pipeline."
+            )
+
+        from invokeai.backend.ideogram4.modeling_ideogram4 import Ideogram4Config, Ideogram4Transformer
+
+        target_device = TorchDevice.choose_torch_device()
+        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+
+        sd: dict[str, torch.Tensor] = gguf_sd_loader(Path(config.path), compute_dtype=compute_dtype)
+
+        with accelerate.init_empty_weights():
+            model: torch.nn.Module = Ideogram4Transformer(Ideogram4Config())
+
+        dequantized = unpack_ggml_at_load(sd, model, _model_declared_skip_patterns(model), self._ram_cache.make_room)
+
+        # Strict, as for the safetensors files: every published GGUF is key-for-key this model.
+        model.load_state_dict(sd, strict=True, assign=True)
+        sd.clear()
+
+        self._logger.info(
+            f"Ideogram 4: loaded the GGUF {config.branch} branch, {dequantized} unquantized or non-Linear "
+            "tensor(s) dequantized at load, the remaining Linear weights kept packed"
+        )
+        return model

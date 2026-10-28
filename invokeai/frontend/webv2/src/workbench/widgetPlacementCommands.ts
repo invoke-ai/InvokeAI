@@ -178,6 +178,44 @@ export const revealWidgetPlacement = ({
   return { ok: true, region };
 };
 
+/** Cycle docked panel views in their displayed order, leaving windows and toolbar/popover controls alone. */
+export const cycleRegionWidget = ({
+  direction,
+  getWidgetsForRegion,
+  project,
+  region,
+  widgets,
+}: {
+  direction: -1 | 1;
+  getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
+  project: WidgetPlacementProject;
+  region: WidgetRegion;
+  widgets: WorkbenchWidgetCommands;
+}): WidgetInstanceId | null => {
+  const available = new Set(
+    getWidgetsForRegion(region)
+      .filter(
+        (widget) =>
+          canRenderWidgetInRegion(widget, region) && !(region === 'bottom' && widget.manifest.bottomPanel === 'popover')
+      )
+      .map((widget) => widget.manifest.id)
+  );
+  const state = project.widgetRegions[region];
+  const ids = state.instanceIds.filter((id) => available.has(project.widgetInstances[id]?.typeId));
+  if (ids.length === 0) {
+    return null;
+  }
+  const current = ids.indexOf(state.activeInstanceId);
+  const next =
+    ids[current < 0 ? (direction > 0 ? 0 : ids.length - 1) : (current + direction + ids.length) % ids.length];
+  // Selecting the same side-panel tab toggles its collapse state.
+  if (next === state.activeInstanceId) {
+    return null;
+  }
+  revealWidgetPlacement({ instanceId: next, project, region, widgets });
+  return next;
+};
+
 /**
  * Activate a rail slot. A docked tab is revealed in its region. A floating window's marker brings the window
  * forward and expands it instead: docking is the window's own control and the marker's menu.
@@ -304,7 +342,6 @@ registerAccountOwnedResource({
 
 export interface CenterPreviewToggleState {
   isPreviewActive: boolean;
-  previewInstanceId: WidgetInstanceId | null;
   returnInstanceId: WidgetInstanceId | null;
 }
 
@@ -319,7 +356,7 @@ export const getCenterPreviewToggleState = (project: WidgetPlacementProject): Ce
       ? remembered
       : (center.instanceIds.find((id) => id !== previewInstanceId) ?? null);
 
-  return { isPreviewActive, previewInstanceId, returnInstanceId };
+  return { isPreviewActive, returnInstanceId };
 };
 
 const rememberReturnView = (project: WidgetPlacementProject): void => {
@@ -335,8 +372,8 @@ const rememberReturnView = (project: WidgetPlacementProject): void => {
 };
 
 /**
- * Swaps the preview into the center and back to the view it replaced. One preview instance can
- * sit in the center and a rail at once, so a rail actively showing it moves to its neighbour first.
+ * Swaps the preview into the center and back to the view it replaced. Opening it in the center hands any rail
+ * fronting the same instance to its neighbour (see `openRegionWidget`).
  */
 export const toggleCenterPreview = ({
   getWidgetsForRegion,
@@ -347,7 +384,7 @@ export const toggleCenterPreview = ({
   project: WidgetPlacementProject;
   widgets: WorkbenchWidgetCommands;
 }): boolean => {
-  const { isPreviewActive, previewInstanceId, returnInstanceId } = getCenterPreviewToggleState(project);
+  const { isPreviewActive, returnInstanceId } = getCenterPreviewToggleState(project);
 
   if (isPreviewActive) {
     return (
@@ -357,21 +394,6 @@ export const toggleCenterPreview = ({
   }
 
   rememberReturnView(project);
-
-  for (const [region, state] of Object.entries(project.widgetRegions) as [
-    WidgetRegion,
-    { activeInstanceId: string; instanceIds: string[] },
-  ][]) {
-    if (region === 'center' || state.activeInstanceId !== previewInstanceId) {
-      continue;
-    }
-
-    const neighbour = state.instanceIds.find((id) => id !== previewInstanceId);
-
-    if (neighbour) {
-      widgets.select({ projectId: project.projectId, region, widgetId: neighbour });
-    }
-  }
 
   return openWidgetPlacement({
     getWidgetsForRegion,

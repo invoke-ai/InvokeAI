@@ -2,13 +2,13 @@
 import { useCustomNodesSelector } from '@features/nodes/data/nodesStore';
 import { NodePackList } from '@features/nodes/ui/library/NodePackList';
 import { openNodePackDetail, updateNodesUi, useNodesUiSelector } from '@features/nodes/ui/nodesUiStore';
-import { ManagerColumn } from '@platform/ui/ManagerLayout';
+import { ManagerColumn, type ManagerAddAction } from '@platform/ui/ManagerLayout';
 import { useTranslation } from 'react-i18next';
 
 import { ReloadNodesButton } from './ReloadNodesButton';
 
 /** Persistent custom-node pack list, matching the model manager's library column. */
-export const LibraryColumn = () => {
+export const LibraryColumn = ({ addAction }: { addAction: ManagerAddAction }) => {
   const { t } = useTranslation();
   const activePackName = useNodesUiSelector((snapshot) => snapshot.activePackName);
   const filters = useNodesUiSelector((snapshot) => snapshot.filters);
@@ -17,7 +17,12 @@ export const LibraryColumn = () => {
   const status = useCustomNodesSelector((snapshot) => snapshot.status);
 
   return (
-    <ManagerColumn actions={<ReloadNodesButton />} count={nodePacks.length} title={t('nodes.nodePacks')}>
+    <ManagerColumn
+      actions={<ReloadNodesButton />}
+      addAction={addAction}
+      count={nodePacks.length}
+      title={t('nodes.nodePacks')}
+    >
       <NodePackList
         activePackName={activePackName}
         error={error}

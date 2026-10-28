@@ -181,9 +181,11 @@ describe('semantic page hydration', () => {
     mocks.apiFetchJson
       .mockResolvedValueOnce({
         results: [
+          { image_name: 'outside-before.png', score: 1 },
           { image_name: 'first.png', score: 0.9 },
-          { image_name: 'second.png', score: 0.8 },
-          { image_name: 'deleted.png', score: 0.7 },
+          { image_name: 'deleted.png', score: 0.8 },
+          { image_name: 'second.png', score: 0.7 },
+          { image_name: 'outside-after.png', score: 0.6 },
         ],
       })
       // by-names returns DTOs in arbitrary order; rank order must win, and a
@@ -191,10 +193,11 @@ describe('semantic page hydration', () => {
       .mockResolvedValueOnce([backendImage('second.png'), backendImage('first.png')]);
 
     const names = await listSemanticGalleryItemNames({ query: { kind: 'text', query: 'boats' } });
-    const page = await hydrateGalleryDateBoardItemPage({ ...names, limit: 3, offset: 0 });
+    const page = await hydrateGalleryDateBoardItemPage({ ...names, limit: 3, offset: 1 });
 
-    expect(page.total).toBe(3);
+    expect(page.total).toBe(5);
     expect(page.items.map((item) => item.name)).toEqual(['first.png', 'second.png']);
+    expect(page).toMatchObject({ itemIndices: [1, 3], offset: 1 });
     expect(page.items.every((item) => item.kind === 'image')).toBe(true);
   });
 });
@@ -237,6 +240,31 @@ describe('listSemanticGalleryItemNames', () => {
     });
     expect(mocks.apiFetchJson).not.toHaveBeenCalled();
   });
+
+  it('ranks only the restricted media kind, server-side for searches and client-side for clusters', async () => {
+    mocks.apiFetchJson.mockReset();
+    mocks.apiFetchJson.mockResolvedValue({ results: [] });
+    const clusterId = registerImageCluster(['image:near.png', 'video:clip.mp4', 'image:far.png'], 'beaches');
+
+    await listSemanticGalleryItemNames({
+      boardId: 'board-1',
+      mediaKind: 'video',
+      query: { kind: 'text', query: 'surf' },
+    });
+    await expect(
+      listSemanticGalleryItemNames({ mediaKind: 'image', query: { clusterId, kind: 'cluster' } })
+    ).resolves.toEqual({
+      items: [
+        { kind: 'image', name: 'near.png' },
+        { kind: 'image', name: 'far.png' },
+      ],
+      total: 2,
+    });
+
+    expect(mocks.apiFetchJson.mock.calls.map(([path]) => path)).toEqual([
+      '/api/v1/image_map/search?board_id=board-1&include_videos=true&limit=500&media_kind=video&q=surf',
+    ]);
+  });
 });
 
 describe('semantic filter canonicalization', () => {
@@ -274,5 +302,29 @@ describe('semantic filter canonicalization', () => {
 
     expect(withLabelA.semantic).toEqual({ fileId: 'external-7', kind: 'file' });
     expect(withLabelA).toEqual(withLabelB);
+  });
+
+  it('keys a media-kind restriction on both listings and rankings, and leaves unrestricted keys unchanged', () => {
+    const semanticQuery = { kind: 'text', query: 'boats' } as const;
+
+    // Unrestricted filters keep the exact shape they had before the field existed, so cached pages stay addressable.
+    expect(canonicalizeGalleryItemsFilter(baseFilter)).toEqual({
+      boardId: 'none',
+      galleryView: 'images',
+      orderDir: 'DESC',
+      searchTerm: '',
+    });
+    expect(canonicalizeGalleryItemsFilter({ ...baseFilter, semanticQuery })).toEqual({
+      boardId: 'none',
+      galleryView: 'images',
+      orderDir: 'DESC',
+      searchTerm: '',
+      semantic: semanticQuery,
+    });
+    expect(canonicalizeGalleryItemsFilter({ ...baseFilter, mediaKind: 'video' })).toMatchObject({ mediaKind: 'video' });
+    expect(canonicalizeGalleryItemsFilter({ ...baseFilter, mediaKind: 'image', semanticQuery })).toMatchObject({
+      mediaKind: 'image',
+      semantic: semanticQuery,
+    });
   });
 });

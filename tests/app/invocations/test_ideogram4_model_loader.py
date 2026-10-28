@@ -10,7 +10,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from invokeai.app.invocations.ideogram4.ideogram4_model_loader import Ideogram4ModelLoaderInvocation
+from invokeai.app.invocations.ideogram4.ideogram4_model_loader import (
+    _SINGLE_FILE_FORMATS,
+    Ideogram4ModelLoaderInvocation,
+)
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -96,6 +99,35 @@ def test_a_single_file_pair_emits_both_branches_and_the_selected_components() ->
     assert output.vae.vae.key == "vae"
 
 
+@pytest.mark.parametrize(
+    ("conditional_format", "unconditional_format"),
+    [
+        (ModelFormat.GGUFQuantized, ModelFormat.GGUFQuantized),
+        (ModelFormat.GGUFQuantized, ModelFormat.Checkpoint),
+        (ModelFormat.Checkpoint, ModelFormat.GGUFQuantized),
+    ],
+)
+def test_a_gguf_branch_pairs_like_a_safetensors_one(
+    conditional_format: ModelFormat, unconditional_format: ModelFormat
+) -> None:
+    """A GGUF holds one branch per file as well, so it takes the single-file path in either slot.
+
+    Mixed pairs are allowed on purpose: both load as the same `Ideogram4Transformer`, and the branch
+    check is what keeps a pair from guiding against itself, whatever each file's storage.
+    """
+    configs = _single_file_configs(
+        cond=_main(conditional_format, "conditional"),
+        uncond=_main(unconditional_format, "unconditional"),
+    )
+
+    output = _invoke(configs)
+
+    assert output.unconditional_transformer is not None
+    assert output.unconditional_transformer.transformer.key == "uncond"
+    assert output.qwen3_encoder.text_encoder.key == "encoder"
+    assert output.vae.vae.key == "vae"
+
+
 def test_a_diffusers_pipeline_serves_every_submodel_from_itself() -> None:
     configs = {"cond": _main(ModelFormat.Diffusers)}
     output = Ideogram4ModelLoaderInvocation(model=CONDITIONAL).invoke(_context(configs))
@@ -106,10 +138,11 @@ def test_a_diffusers_pipeline_serves_every_submodel_from_itself() -> None:
     assert output.vae.vae.key == "cond"
 
 
-def test_a_swapped_pair_is_refused() -> None:
+@pytest.mark.parametrize("model_format", [ModelFormat.Checkpoint, ModelFormat.GGUFQuantized])
+def test_a_swapped_pair_is_refused(model_format: ModelFormat) -> None:
     configs = _single_file_configs(
-        cond=_main(ModelFormat.Checkpoint, "unconditional"),
-        uncond=_main(ModelFormat.Checkpoint, "conditional"),
+        cond=_main(model_format, "unconditional"),
+        uncond=_main(model_format, "conditional"),
     )
 
     # The slot is the actionable half: "conditional branch" alone is a substring of "unconditional
@@ -145,14 +178,21 @@ def test_the_same_file_cannot_serve_both_branches() -> None:
         ("vae_model", "no VAE"),
     ],
 )
-def test_a_single_file_main_needs_every_component(missing: str, match: str) -> None:
+@pytest.mark.parametrize("model_format", [ModelFormat.Checkpoint, ModelFormat.GGUFQuantized])
+def test_a_single_file_main_needs_every_component(missing: str, match: str, model_format: ModelFormat) -> None:
+    """A main the node took for a pipeline would serve its encoder and VAE from itself, and the
+    generation would then fail on a submodel the file does not have, far from the cause."""
     fields = {"unconditional_model": UNCONDITIONAL, "qwen3_vl_encoder_model": ENCODER, "vae_model": VAE}
     fields[missing] = None
+    configs = _single_file_configs(
+        cond=_main(model_format, "conditional"),
+        uncond=_main(model_format, "unconditional"),
+    )
 
     node = Ideogram4ModelLoaderInvocation(model=CONDITIONAL, **fields)
 
     with pytest.raises(ValueError, match=match):
-        node.invoke(_context(_single_file_configs()))
+        node.invoke(_context(configs))
 
 
 def test_krea2s_qwen3_vl_encoder_is_refused() -> None:
@@ -200,6 +240,13 @@ def test_a_diffusers_model_cannot_be_the_unconditional_branch() -> None:
 
     with pytest.raises(ValueError, match="must be a single-file"):
         _invoke(configs)
+
+
+def test_the_unconditional_picker_offers_what_the_node_accepts() -> None:
+    field = Ideogram4ModelLoaderInvocation.model_fields["unconditional_model"]
+
+    assert field.json_schema_extra is not None
+    assert set(field.json_schema_extra["ui_model_format"]) == {f.value for f in _SINGLE_FILE_FORMATS}
 
 
 def test_the_vae_picker_offers_the_bases_the_architecture_accepts() -> None:

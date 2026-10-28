@@ -1,6 +1,7 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { FieldInputTemplate, FieldOutputTemplate, WorkflowInvocationNode } from '@features/workflow/contracts';
 import type { WorkflowNodeExecutionState as NodeExecutionState } from '@features/workflow/ui/contracts';
+import type { TFunction } from 'i18next';
 
 import { Box, Checkbox, Field, Flex, HStack, Icon, IconButton, Input, Stack, Text } from '@chakra-ui/react';
 import { getWorkflowFieldSeedMode, isSeedInputField } from '@features/workflow/graph';
@@ -50,7 +51,7 @@ const NODE_WIDTH = '18rem';
 /** Row padding-x in px; inline handles sit in the label rows, so they pull back out past it. */
 const ROW_PADDING_X = 12;
 /** Below this viewport zoom, field content renders as skeleton bars (ComfyUI-style) for performance/readability. */
-const CONTENT_VISIBILITY_ZOOM = 0.4;
+export const CONTENT_VISIBILITY_ZOOM = 0.4;
 
 /** True while the viewport is zoomed out far enough that field content is unreadable noise. */
 const useIsZoomedOut = (): boolean => {
@@ -267,6 +268,7 @@ const NodeTitle = ({
   node: WorkflowInvocationNode;
   title: string;
 }) => {
+  const { t } = useTranslation();
   const { editGraph } = useProjectGraphCommands();
   const [isEditing, setIsEditing] = useState(false);
 
@@ -286,7 +288,7 @@ const NodeTitle = ({
   if (isEditing) {
     return (
       <InlineLabelInput
-        ariaLabel="Node label"
+        ariaLabel={t('nodes.nodeLabel')}
         // Start from the displayed title, including the template fallback for unset labels.
         initialValue={title}
         onCommit={(label) => editGraph({ label, nodeId: node.id, type: 'setNodeLabel' })}
@@ -301,7 +303,8 @@ const NodeTitle = ({
       fontWeight="700"
       minW="0"
       text={title}
-      title="Double-click to rename"
+      // Keeps the full title MiddleTruncate would show, for a title cut short.
+      title={t('nodes.nodeTitleHint', { title })}
       onDoubleClick={() => setIsEditing(true)}
     />
   );
@@ -329,7 +332,7 @@ const InputFieldTooltip = ({
         {t('nodes.fieldInfo', { name: template.name, type: getFieldTypeLabel(template.type) })} ·{' '}
         {t(template.required ? 'nodes.required' : 'nodes.optional')} · {t(`nodes.inputModes.${template.input}`)}
         {isConnected ? ` · ${t('nodes.providedByConnection')}` : null}
-        {isExposed ? ` · ${t('nodes.pinnedToLinearUi')}` : null}
+        {isExposed ? ` · ${t('nodes.pinnedToForm')}` : null}
       </Text>
       {description ? <Text>{description}</Text> : null}
       <Text color="fg.subtle">{t('nodes.renameFieldHint')}</Text>
@@ -458,14 +461,19 @@ const NodeInfoIcon = ({
 }: {
   node: WorkflowInvocationNode;
   template: InvocationNodeTemplateView['template'];
-}) => (
-  <WorkflowNodeInfoIcon
-    content={<NodeInfoTooltipContent node={node} template={template} />}
-    label={`Show details for ${node.data.label || template.title}`}
-  />
-);
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <WorkflowNodeInfoIcon
+      content={<NodeInfoTooltipContent node={node} template={template} />}
+      label={t('nodes.showNodeDetails', { title: node.data.label || template.title })}
+    />
+  );
+};
 
 const NodeFooter = ({ canUseCache, node }: { canUseCache: boolean; node: WorkflowInvocationNode }) => {
+  const { t } = useTranslation();
   const { editGraph } = useProjectGraphCommands();
 
   return (
@@ -494,7 +502,7 @@ const NodeFooter = ({ canUseCache, node }: { canUseCache: boolean; node: Workflo
           >
             <Checkbox.HiddenInput />
             <Checkbox.Control />
-            <Checkbox.Label fontSize="xs">Use Cache</Checkbox.Label>
+            <Checkbox.Label fontSize="xs">{t('nodes.useCache')}</Checkbox.Label>
           </Checkbox.Root>
         ) : null}
         <Checkbox.Root
@@ -507,7 +515,7 @@ const NodeFooter = ({ canUseCache, node }: { canUseCache: boolean; node: Workflo
         >
           <Checkbox.HiddenInput />
           <Checkbox.Control />
-          <Checkbox.Label fontSize="xs">Save to Gallery</Checkbox.Label>
+          <Checkbox.Label fontSize="xs">{t('nodes.saveToGallery')}</Checkbox.Label>
         </Checkbox.Root>
       </HStack>
     </Flex>
@@ -621,7 +629,7 @@ const InputFieldRow = ({
             fieldTitle
           ) : isEditingLabel ? (
             <InlineLabelInput
-              ariaLabel="Field label"
+              ariaLabel={t('nodes.fieldLabel')}
               fontSize="xs"
               initialValue={label}
               // The template title is the unset label, so renaming back to it follows template changes again.
@@ -653,13 +661,12 @@ const InputFieldRow = ({
           )}
           <HStack flexShrink={0} gap="0" ml="auto">
             {canReset ? (
-              <Tooltip content="Reset to default value">
+              <Tooltip content={t('nodes.resetToDefault')}>
                 <IconButton
-                  aria-label={`Reset ${label} to default value`}
+                  aria-label={t('nodes.resetFieldToDefault', { label })}
                   className="nodrag"
                   color="fg.subtle"
                   size="sm"
-                  title="Reset to default value"
                   variant="ghost"
                   onClick={() =>
                     editGraph({
@@ -683,17 +690,20 @@ const InputFieldRow = ({
               />
             ) : null}
             {!isWorkflowImageExport && isExposableField(template) ? (
-              <IconButton
-                aria-label={isExposed ? `Remove ${label} from Linear UI` : `Expose ${label} in Linear UI`}
-                className="nodrag"
-                color={isExposed ? 'accent.solid' : 'fg.subtle'}
-                size="sm"
-                title={isExposed ? 'Remove from Linear UI form' : 'Expose in Linear UI form'}
-                variant="ghost"
-                onClick={() => editGraph({ fieldIdentifier, type: isExposed ? 'unexposeField' : 'exposeField' })}
-              >
-                <Icon as={isExposed ? PinOffIcon : PinIcon} boxSize="3" />
-              </IconButton>
+              <Tooltip content={isExposed ? t('nodes.removeFromForm') : t('nodes.addToForm')}>
+                <IconButton
+                  aria-label={
+                    isExposed ? t('nodes.removeFieldFromForm', { label }) : t('nodes.addFieldToForm', { label })
+                  }
+                  className="nodrag"
+                  color={isExposed ? 'accent.solid' : 'fg.subtle'}
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => editGraph({ fieldIdentifier, type: isExposed ? 'unexposeField' : 'exposeField' })}
+                >
+                  <Icon as={isExposed ? PinOffIcon : PinIcon} boxSize="3" />
+                </IconButton>
+              </Tooltip>
             ) : null}
           </HStack>
         </HStack>
@@ -887,27 +897,42 @@ const CompactHiddenHandles = ({
   );
 };
 
-const CompactNodeBody = ({ inputCount, outputCount }: { inputCount: number; outputCount: number }) => (
-  <Flex
-    align="center"
-    color="fg.muted"
-    fontSize="xs"
-    gap="2"
-    px={WORKFLOW_NODE_DENSITY.rowPaddingX}
-    {...getWorkflowNodeBodyProps()}
-  >
-    <Text>
-      {inputCount} input{inputCount === 1 ? '' : 's'}
-    </Text>
-    <Text>·</Text>
-    <Text>
-      {outputCount} output{outputCount === 1 ? '' : 's'}
-    </Text>
-    <Text ms="auto">Select for fields</Text>
-  </Flex>
-);
+const CompactNodeBody = ({ inputCount, outputCount }: { inputCount: number; outputCount: number }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Flex
+      align="center"
+      color="fg.muted"
+      fontSize="xs"
+      gap="2"
+      px={WORKFLOW_NODE_DENSITY.rowPaddingX}
+      {...getWorkflowNodeBodyProps()}
+    >
+      <Text>{t('nodes.inputCount', { count: inputCount })}</Text>
+      <Text>·</Text>
+      <Text>{t('nodes.outputCount', { count: outputCount })}</Text>
+      <Text ms="auto">{t('nodes.selectForFields')}</Text>
+    </Flex>
+  );
+};
+
+/** What a node without a template says: still loading, definitions unavailable, or a type this backend lacks. */
+const getTemplatelessNodeMessage = (
+  t: TFunction,
+  { documentNode, templateStatus }: InvocationFlowNodeType['data'],
+  isCompact: boolean
+): string =>
+  templateStatus === 'loading'
+    ? t('nodes.loadingNode')
+    : templateStatus === 'error'
+      ? t('nodes.nodeDefinitionsUnavailable')
+      : isCompact
+        ? t('nodes.unknownNodeType')
+        : t('nodes.unknownNodeTypeOnBackend', { type: documentNode.data.type });
 
 const CompactInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeType>) => {
+  const { t } = useTranslation();
   const node = data.documentNode;
   const templateView = data.template;
   const execution = useWorkflowNodeExecutionState(node.id);
@@ -918,7 +943,7 @@ const CompactInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeT
 
   return (
     <NodeShell
-      isMissing={!templateView}
+      isMissing={!templateView && data.templateStatus === 'loaded'}
       isOutdated={isOutdated}
       isRunning={execution?.status === 'running'}
       outcome={getExecutionOutcome(execution)}
@@ -935,7 +960,7 @@ const CompactInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeT
         <CompactNodeBody inputCount={inputTemplates.length} outputCount={outputTemplates.length} />
       ) : (
         <Text color="fg.subtle" fontSize="xs" px="3" {...getWorkflowNodeBodyProps()} py="2">
-          Unknown node type. Select for details.
+          {getTemplatelessNodeMessage(t, data, true)}
         </Text>
       )}
       <CompactHiddenHandles
@@ -958,10 +983,12 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
   const execution = useWorkflowNodeExecutionState(node.id);
 
   if (!templateView) {
+    const isMissing = !isWorkflowImageExport && data.templateStatus === 'loaded';
+
     return (
-      <NodeShell isMissing={!isWorkflowImageExport} selected={selected ?? false}>
+      <NodeShell isMissing={isMissing} selected={selected ?? false}>
         <HStack gap="1.5" minW={isWorkflowImageExport ? '0' : undefined} p="3">
-          {!isWorkflowImageExport ? <Icon as={TriangleAlertIcon} boxSize="3.5" color="red.solid" /> : null}
+          {isMissing ? <Icon as={TriangleAlertIcon} boxSize="3.5" color="red.solid" /> : null}
           <Stack flex={isWorkflowImageExport ? '1' : undefined} gap="0" minW={isWorkflowImageExport ? '0' : undefined}>
             {isWorkflowImageExport ? (
               <MiddleTruncate
@@ -979,7 +1006,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
             )}
             {!isWorkflowImageExport ? (
               <Text color="fg.subtle" fontSize="xs">
-                Unknown node type "{node.data.type}". It cannot run on this backend.
+                {getTemplatelessNodeMessage(t, data, false)}
               </Text>
             ) : null}
           </Stack>
@@ -1020,7 +1047,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
       >
         {!isWorkflowImageExport ? (
           <IconButton
-            aria-label={isOpen ? 'Collapse node' : 'Expand node'}
+            aria-label={isOpen ? t('nodes.collapseNode') : t('nodes.expandNode')}
             className="nodrag"
             size="sm"
             variant="ghost"

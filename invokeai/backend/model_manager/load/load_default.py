@@ -3,9 +3,10 @@
 import copy
 import itertools
 import re
+from contextlib import nullcontext
 from logging import Logger
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, ContextManager, Optional
 
 import torch
 
@@ -13,7 +14,7 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager.configs.base import Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.fp8_capability import fp8_storage_verdict
-from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase
+from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase, StaleModelConfigError
 from invokeai.backend.model_manager.load.memory_snapshot import GB, MemorySnapshot
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.model_cache import (
@@ -50,6 +51,9 @@ _FP8_PROBE_FAILURE_REPORTED: set[str] = set()
 # quality, which fp8 rounding degrades. Its tokenizer is listed for symmetry (it is not an nn.Module,
 # so casting is a no-op today only by accident).
 #
+# The vision tower follows the text encoder it attaches to. It also could not take the cast as it stands:
+# `Qwen3VLModel` casts the pixels to `visual.dtype`, which a cast tower reports as float8.
+#
 # Unlike the model-kind rules in `fp8_capability.py`, these are about which *component* of a model is
 # being loaded, which no client can see and nothing outside this file asks about.
 _FP8_EXCLUDED_SUBMODEL_TYPES: frozenset[SubModelType] = frozenset(
@@ -57,6 +61,7 @@ _FP8_EXCLUDED_SUBMODEL_TYPES: frozenset[SubModelType] = frozenset(
         SubModelType.TextEncoder,
         SubModelType.TextEncoder2,
         SubModelType.TextEncoder3,
+        SubModelType.VisionEncoder,
         SubModelType.Tokenizer,
         SubModelType.Tokenizer2,
         SubModelType.Tokenizer3,
@@ -100,9 +105,21 @@ def resolve_submodel_path(config: AnyModelConfig, submodel_type: SubModelType, f
 
     `fallback` is used when the config carries no such entry — configs persisted before submodel
     discovery existed, and the layouts where the component folder *is* the model path.
+
+    The recorded path is relative to the model folder (`config.path`, absolute by load time).
+    Records written before that convention hold the absolute path seen at identification — for an
+    installed model, the staging or source folder it was moved out of. Its last component is the
+    component key, so the model's own folder of that name wins; the recorded path is kept only when
+    the model has no such folder (a component that was a symlink was recorded by its target).
     """
     discovered = (getattr(config, "submodels", None) or {}).get(submodel_type)
-    return Path(discovered.path_or_prefix) if discovered else fallback
+    if not discovered:
+        return fallback
+    recorded = Path(discovered.path_or_prefix)
+    rebased = Path(config.path) / (recorded.name if recorded.is_absolute() else recorded)
+    if recorded.is_absolute() and recorded.exists() and not rebased.exists():
+        return recorded
+    return rebased
 
 
 def _device_supports_fp8_storage(device: torch.device, logger: Optional[Logger] = None) -> bool:
@@ -248,6 +265,13 @@ def _model_declared_skip_patterns(model: torch.nn.Module) -> tuple[str, ...]:
 class ModelLoader(ModelLoaderBase):
     """Default implementation of ModelLoaderBase."""
 
+    # Optionally set on an instance before `load_model()`: on a cache miss, entered with the caller's config
+    # before MODEL_LOAD_LOCK is taken (entering may block) and exited after it is released; the callable it
+    # yields is called once construction is serialized against cache invalidation, must not block, and False
+    # rejects the load with StaleModelConfigError. An attribute
+    # rather than a constructor argument so that registered loaders overriding `__init__` keep working.
+    config_check: Optional[Callable[[AnyModelConfig], ContextManager[Callable[[], bool]]]] = None
+
     def __init__(
         self,
         app_config: InvokeAIAppConfig,
@@ -295,17 +319,8 @@ class ModelLoader(ModelLoaderBase):
         return (model_base / config.path).resolve()
 
     def _torch_dtype_avoiding_float16(self) -> torch.dtype:
-        """The configured dtype, except float16: bfloat16 where the device has it, float32 otherwise.
-
-        For the FLUX autoencoders, which are broken in float16 -- the dtype `precision: auto` picks on
-        CUDA and MPS. A float32 or bfloat16 request is kept as it is.
-        """
-        if self._torch_dtype != torch.float16:
-            return self._torch_dtype
-        try:
-            return torch.empty(0, dtype=torch.bfloat16, device=self._torch_device).dtype
-        except TypeError:
-            return torch.float32
+        """The configured dtype on this loader's device, except float16 (`TorchDevice.dtype_avoiding_float16`)."""
+        return TorchDevice.dtype_avoiding_float16(self._torch_dtype, self._torch_device)
 
     def _get_execution_device(
         self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None
@@ -321,8 +336,14 @@ class ModelLoader(ModelLoaderBase):
         # Check if this is a text encoder submodel of a main model with cpu_only setting
         if hasattr(config, "default_settings") and config.default_settings is not None:
             if hasattr(config.default_settings, "cpu_only") and config.default_settings.cpu_only is True:
-                # Only apply CPU execution to text encoder submodels
-                if submodel_type in [SubModelType.TextEncoder, SubModelType.TextEncoder2, SubModelType.TextEncoder3]:
+                # Only apply CPU execution to text encoder submodels. The vision encoder is the text encoder's own
+                # tower, run inside its forward, so it has to execute on the same device.
+                if submodel_type in [
+                    SubModelType.TextEncoder,
+                    SubModelType.TextEncoder2,
+                    SubModelType.TextEncoder3,
+                    SubModelType.VisionEncoder,
+                ]:
                     return torch.device("cpu")
 
         # Check if this is a standalone text encoder config with cpu_only field (T5Encoder, Qwen3Encoder, etc.)
@@ -361,7 +382,12 @@ class ModelLoader(ModelLoaderBase):
         #
         # Lock-ordering: the write lock is acquired before any ModelCache._lock taken below
         # (get/make_room/put), matching the readers' order, so there is no AB-BA deadlock.
-        with MODEL_LOAD_LOCK.write_lock():
+        #
+        # The caller read `config` before this point. A record edit commits first and then invalidates the
+        # cache under this lock; building from a record superseded by an edit that has already invalidated
+        # would re-admit what that edit evicted, so the config check is finished under the lock.
+        config_check = self.config_check(config) if self.config_check is not None else nullcontext(None)
+        with config_check as still_current, MODEL_LOAD_LOCK.write_lock():
             # Double-checked locking: another worker sharing this cache may have loaded the same
             # entry while we waited for the mutex. (Workers on other devices use a different cache,
             # so they will still miss here and construct their own copy — which is intended.)
@@ -369,6 +395,11 @@ class ModelLoader(ModelLoaderBase):
                 return self._ram_cache.get_with_first_use_claim(key=cache_key, stats_name=stats_name)
             except IndexError:
                 pass
+
+            if still_current is not None and not still_current():
+                raise StaleModelConfigError(
+                    f"Model '{config.name}' was modified while it was being loaded; retry with the updated model."
+                )
 
             config.path = str(self._get_model_path(config))
             self._report_inert_fp8_request(config, submodel_type)

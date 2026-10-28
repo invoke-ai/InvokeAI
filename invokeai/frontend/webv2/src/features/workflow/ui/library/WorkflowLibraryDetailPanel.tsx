@@ -3,8 +3,9 @@ import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 import type { WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowseStore';
 import type { WorkflowLibraryListItem } from '@features/workflow/queries';
 
-import { Badge, Box, HStack, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, HStack, Menu, Portal, Stack, Switch, Text } from '@chakra-ui/react';
 import { getStarterModelInstallSources, useInstallActions } from '@features/models';
+import { getWorkflowRecordCategory } from '@features/workflow/data/api';
 import {
   createLibraryWorkflow,
   deleteLibraryWorkflow,
@@ -12,6 +13,7 @@ import {
   getLibraryWorkflowRecord,
   getLibraryWorkflowRecordCached,
   invalidateWorkflowLibraryCache,
+  setLibraryWorkflowPublic,
   updateLibraryWorkflow,
 } from '@features/workflow/queries';
 import { MenuActionItem } from '@features/workflow/ui/MenuActionItem';
@@ -39,7 +41,7 @@ import {
   useTooltipTriggerIds,
 } from '@platform/ui';
 import { CopyIcon, DownloadIcon, EllipsisIcon, GitForkIcon, PencilIcon, Trash2Icon, WorkflowIcon } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { planLibraryWorkflowOpen } from './useOpenLibraryWorkflow';
@@ -61,12 +63,26 @@ import {
 const DETAIL_RAIL_WIDTH = '18rem';
 const INSTALL_HOVER = { opacity: 0.85 } as const;
 
+type VisibilityState =
+  | { requestId: object; previousItem: WorkflowLibraryListItem; isPublic: boolean; status: 'pending' | 'success' }
+  | {
+      requestId: object;
+      previousItem: WorkflowLibraryListItem;
+      isPublic: boolean;
+      message: string;
+      status: 'error' | 'unknown' | 'reconciling';
+    };
+
 export interface WorkflowLibraryDetailPanelProps {
   /** Where a card's right-click asked for the actions menu; null while it is closed. */
   contextMenuPoint: WorkflowCardMenuAnchor | null;
   /** What opened the menu last, kept through its close so focus returns there. */
   contextMenuTriggerId: string | null;
+  /** Allows the authenticated owner to change visibility, only on Yours. */
+  canChangeVisibility?: boolean;
   entry: WorkflowLibraryEntry | null;
+  /** Hides writes to a public template owned by another account. */
+  isReadOnly?: boolean;
   /** The shell closes the library when a fork takes the user to a new project. */
   onClose: () => void;
   onContextMenuClose: () => void;
@@ -83,9 +99,11 @@ export interface WorkflowLibraryDetailPanelProps {
 const toFileSlug = (name: string): string => name.trim().replaceAll(/\s+/g, '-').toLowerCase() || 'workflow';
 
 export const WorkflowLibraryDetailPanel = ({
+  canChangeVisibility = false,
   contextMenuPoint,
   contextMenuTriggerId,
   entry,
+  isReadOnly = false,
   onClose,
   onContextMenuClose,
   onDeleted,
@@ -105,6 +123,9 @@ export const WorkflowLibraryDetailPanel = ({
   // Guard duplicate creation until the copy exists, including copies landing outside the visible category.
   const [isDuplicatePending, setIsDuplicatePending] = useState(false);
   const isDuplicatePendingRef = useRef(false);
+  const [visibilityStates, setVisibilityStates] = useState<Map<string, VisibilityState>>(() => new Map());
+  const visibilityInputRef = useRef<HTMLInputElement>(null);
+  const restoreVisibilityFocus = useRef<string | null>(null);
 
   const enrichment = entry?.enrichment ?? null;
   // Shares the grid's per-entry cache, so selecting a card the badges already
@@ -191,7 +212,10 @@ export const WorkflowLibraryDetailPanel = ({
     setIsDuplicatePending(true);
 
     try {
-      const raw = await getLibraryWorkflowCached(entry.item.workflow_id, owner.signal);
+      const raw = await getLibraryWorkflowCached(entry.item.workflow_id, {
+        expectedRevision: entry.item.revision,
+        signal: owner.signal,
+      });
 
       assertAccountScopeCurrent(owner);
 
@@ -232,7 +256,7 @@ export const WorkflowLibraryDetailPanel = ({
   // A rename is a content write at the record's current revision: the live record, never a cached one, is the base.
   const submitRename = useCallback(
     async (nextName: string) => {
-      if (!entry) {
+      if (!entry || isReadOnly) {
         return;
       }
 
@@ -260,7 +284,7 @@ export const WorkflowLibraryDetailPanel = ({
         throw error;
       }
     },
-    [entry, notify, t]
+    [entry, isReadOnly, notify, t]
   );
 
   const fork = useCallback(async () => {
@@ -271,7 +295,10 @@ export const WorkflowLibraryDetailPanel = ({
     const owner = captureAccountScope();
 
     try {
-      const record = await getLibraryWorkflowRecordCached(entry.item.workflow_id, owner.signal);
+      const record = await getLibraryWorkflowRecordCached(entry.item.workflow_id, {
+        expectedRevision: entry.item.revision,
+        signal: owner.signal,
+      });
 
       assertAccountScopeCurrent(owner);
 
@@ -281,6 +308,7 @@ export const WorkflowLibraryDetailPanel = ({
       // the library was opened from is left exactly as it was.
       openDocumentInNewProject(document, entry.item.name, {
         libraryWorkflowId: record.workflow_id,
+        ...(getWorkflowRecordCategory(record) === 'user' ? { ownerUserId: record.user_id } : {}),
         revision: record.revision,
       });
       onClose();
@@ -300,7 +328,10 @@ export const WorkflowLibraryDetailPanel = ({
     const owner = captureAccountScope();
 
     try {
-      const raw = await getLibraryWorkflowCached(entry.item.workflow_id, owner.signal);
+      const raw = await getLibraryWorkflowCached(entry.item.workflow_id, {
+        expectedRevision: entry.item.revision,
+        signal: owner.signal,
+      });
 
       assertAccountScopeCurrent(owner);
       downloadText(JSON.stringify(raw, null, 2), `${toFileSlug(entry.item.name)}.json`, 'application/json');
@@ -313,10 +344,10 @@ export const WorkflowLibraryDetailPanel = ({
   const handleDownload = useCallback(() => void download(), [download]);
 
   const openDeleteConfirm = useCallback(() => {
-    if (entry) {
+    if (entry && !isReadOnly) {
       setDeleteTargetName(entry.item.name || t('workflowLibrary.untitled'));
     }
-  }, [entry, t]);
+  }, [entry, isReadOnly, t]);
   const closeDeleteConfirm = useCallback(() => setDeleteTargetName(null), []);
 
   // A pointer point is a fixed rect; the tile button is the menu's trigger, so the menu follows it as it scrolls.
@@ -352,7 +383,7 @@ export const WorkflowLibraryDetailPanel = ({
   const moreActionsIds = useTooltipTriggerIds();
 
   const confirmDelete = useCallback(async () => {
-    if (!entry) {
+    if (!entry || isReadOnly) {
       return;
     }
 
@@ -369,11 +400,171 @@ export const WorkflowLibraryDetailPanel = ({
         notify.error(t('workflowLibrary.deleteFailed'), getApiErrorMessage(error, t('common.unknownError')));
       }
     }
-  }, [entry, notify, onDeleted, t]);
+  }, [entry, isReadOnly, notify, onDeleted, t]);
 
   const item = entry?.item ?? null;
   const tags = entry?.tags ?? [];
   const name = item ? item.name || t('workflowLibrary.untitled') : '';
+  const visibilityState = item ? visibilityStates.get(item.workflow_id) : undefined;
+  const selectedWorkflowId = item?.workflow_id ?? null;
+  const visibilityUnknown = visibilityState?.status === 'unknown' || visibilityState?.status === 'reconciling';
+  const itemIsPublic = visibilityUnknown
+    ? undefined
+    : item && visibilityState?.previousItem === item
+      ? visibilityState.isPublic
+      : item?.is_public === true;
+  const isVisibilityPending = visibilityState?.status === 'pending';
+  const visibilityError = visibilityState?.status === 'error' || visibilityUnknown ? visibilityState.message : null;
+  useLayoutEffect(() => {
+    if (restoreVisibilityFocus.current !== null && restoreVisibilityFocus.current !== selectedWorkflowId) {
+      restoreVisibilityFocus.current = null;
+    }
+    if (
+      selectedWorkflowId &&
+      restoreVisibilityFocus.current === selectedWorkflowId &&
+      !isVisibilityPending &&
+      !visibilityUnknown
+    ) {
+      restoreVisibilityFocus.current = null;
+      visibilityInputRef.current?.focus();
+    }
+  }, [isVisibilityPending, itemIsPublic, selectedWorkflowId, visibilityUnknown]);
+  const reconcileVisibility = useCallback(
+    async (
+      workflowId: string,
+      previousItem: WorkflowLibraryListItem,
+      requestId: object,
+      owner: ReturnType<typeof captureAccountScope>,
+      requestedVisibility?: boolean,
+      failureMessage?: string
+    ) => {
+      if (!isAccountScopeCurrent(owner)) {
+        return;
+      }
+      invalidateWorkflowLibraryCache(workflowId);
+      try {
+        const record = await getLibraryWorkflowRecord(workflowId, owner.signal);
+        assertAccountScopeCurrent(owner);
+        const isPublic = record.is_public === true;
+        setVisibilityStates((current) => {
+          if (current.get(workflowId)?.requestId !== requestId) {
+            return current;
+          }
+          const state = { isPublic, previousItem, requestId };
+          return new Map(current).set(
+            workflowId,
+            requestedVisibility !== undefined && isPublic !== requestedVisibility
+              ? { ...state, message: failureMessage ?? t('common.unknownError'), status: 'error' }
+              : { ...state, status: 'success' }
+          );
+        });
+      } catch (error) {
+        if (isAccountScopeCurrent(owner)) {
+          setVisibilityStates((current) => {
+            const state = current.get(workflowId);
+            if (state?.requestId !== requestId) {
+              return current;
+            }
+            return new Map(current).set(workflowId, {
+              ...state,
+              message: failureMessage ?? getApiErrorMessage(error, t('common.unknownError')),
+              status: 'unknown',
+            });
+          });
+        }
+      }
+    },
+    [t]
+  );
+  const updateVisibility = useCallback(
+    async (isPublic: boolean) => {
+      if (!item || !canChangeVisibility || isVisibilityPending || visibilityUnknown || isPublic === itemIsPublic) {
+        return;
+      }
+
+      const owner = captureAccountScope();
+      const workflowId = item.workflow_id;
+      const previousItem = item;
+      const requestId = {};
+      const previousVisibility = itemIsPublic === true;
+      restoreVisibilityFocus.current = document.activeElement === visibilityInputRef.current ? workflowId : null;
+      setVisibilityStates((current) =>
+        new Map(current).set(workflowId, {
+          isPublic: previousVisibility,
+          previousItem,
+          requestId,
+          status: 'pending',
+        })
+      );
+
+      try {
+        const record = await setLibraryWorkflowPublic(workflowId, isPublic, owner.signal);
+
+        assertAccountScopeCurrent(owner);
+        setVisibilityStates((current) => {
+          if (current.get(workflowId)?.requestId !== requestId) {
+            return current;
+          }
+          return new Map(current).set(workflowId, {
+            isPublic: record.is_public === true,
+            previousItem,
+            requestId,
+            status: 'success',
+          });
+        });
+        invalidateWorkflowLibraryCache(workflowId);
+      } catch (error) {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+        await reconcileVisibility(
+          workflowId,
+          previousItem,
+          requestId,
+          owner,
+          isPublic,
+          getApiErrorMessage(error, t('common.unknownError'))
+        );
+      } finally {
+        setVisibilityStates((current) => {
+          const request = current.get(workflowId);
+          if (request?.requestId !== requestId || request.status !== 'pending') {
+            return current;
+          }
+          const next = new Map(current);
+          next.delete(workflowId);
+          return next;
+        });
+      }
+    },
+    [canChangeVisibility, isVisibilityPending, item, itemIsPublic, reconcileVisibility, t, visibilityUnknown]
+  );
+  const retryVisibilityRead = useCallback(async () => {
+    if (!item || !visibilityUnknown || !visibilityState || visibilityState.status === 'reconciling') {
+      return;
+    }
+    const owner = captureAccountScope();
+    const workflowId = item.workflow_id;
+    const requestId = {};
+    const previousItem = item;
+    setVisibilityStates((current) =>
+      new Map(current).set(workflowId, {
+        ...visibilityState,
+        previousItem,
+        requestId,
+        status: 'reconciling',
+      })
+    );
+    await reconcileVisibility(workflowId, previousItem, requestId, owner);
+  }, [item, reconcileVisibility, visibilityState, visibilityUnknown]);
+  const handleRetryVisibilityRead = useCallback(() => void retryVisibilityRead(), [retryVisibilityRead]);
+  const handleVisibilityClick = useCallback(
+    (event: MouseEvent<HTMLInputElement>) => {
+      event.preventDefault();
+      void updateVisibility(!itemIsPublic);
+    },
+    [itemIsPublic, updateVisibility]
+  );
   const openLabel = hasCopies ? t('workflowLibrary.openWithEllipsis') : t('workflowLibrary.open');
 
   // One item set behind both the rail's overflow button and a card's right-click.
@@ -408,7 +599,7 @@ export const WorkflowLibraryDetailPanel = ({
         value="download-json"
         onSelect={handleDownload}
       />
-      {item?.category === 'user' ? (
+      {item?.category === 'user' && !isReadOnly ? (
         <MenuActionItem
           hint={t('workflowLibrary.renameTemplateHint')}
           icon={PencilIcon}
@@ -417,7 +608,7 @@ export const WorkflowLibraryDetailPanel = ({
           onSelect={openRename}
         />
       ) : null}
-      {item?.category === 'user' ? (
+      {item?.category === 'user' && !isReadOnly ? (
         // Bundled defaults are not the account's to delete.
         <MenuActionItem
           hint={t('workflowLibrary.deleteHint')}
@@ -448,6 +639,7 @@ export const WorkflowLibraryDetailPanel = ({
             <Stack gap="2" minW="0" p="2.5">
               <WorkflowLibraryThumbnail
                 key={item.workflow_id}
+                canEdit={item.category === 'user' && !isReadOnly}
                 item={item}
                 workflowDocument={enrichment?.status === 'ready' ? enrichment.document : null}
               />
@@ -459,6 +651,65 @@ export const WorkflowLibraryDetailPanel = ({
               <Text fontSize="lg" fontWeight="600" minW="0" overflowWrap="anywhere">
                 {name}
               </Text>
+
+              {item.category === 'user' ? (
+                <Stack gap="1">
+                  <HStack align="center" justify="space-between" minW="0">
+                    <Text color="fg.muted" fontSize="xs">
+                      {t('workflowLibrary.visibility')}
+                    </Text>
+                    <Badge
+                      data-workflow-visibility={visibilityUnknown ? 'unknown' : itemIsPublic ? 'public' : 'private'}
+                      variant="subtle"
+                    >
+                      {t(
+                        visibilityUnknown
+                          ? 'workflowLibrary.visibilityUnknown'
+                          : itemIsPublic
+                            ? 'workflowLibrary.public'
+                            : 'workflowLibrary.private'
+                      )}
+                    </Badge>
+                  </HStack>
+                  {canChangeVisibility && !visibilityUnknown ? (
+                    <Stack gap="1">
+                      <Switch.Root
+                        checked={itemIsPublic === true}
+                        colorPalette="accent"
+                        disabled={isVisibilityPending || visibilityUnknown}
+                        readOnly
+                      >
+                        <Switch.HiddenInput
+                          key={itemIsPublic ? 'public' : 'private'}
+                          onClick={handleVisibilityClick}
+                          ref={visibilityInputRef}
+                        />
+                        <Switch.Control>
+                          <Switch.Thumb />
+                        </Switch.Control>
+                        <Switch.Label srOnly>{t('workflowLibrary.publicWorkflow')}</Switch.Label>
+                      </Switch.Root>
+                      <Text color="fg.subtle" fontSize="xs">
+                        {t('workflowLibrary.publicVisibilityHelp')}
+                      </Text>
+                    </Stack>
+                  ) : null}
+                  {visibilityError ? (
+                    <Text color="fg.error" fontSize="xs" role="alert">
+                      {t('workflowLibrary.visibilityUpdateFailed')}: {visibilityError}
+                    </Text>
+                  ) : null}
+                  {visibilityUnknown ? (
+                    <Button
+                      size="xs"
+                      disabled={visibilityState?.status === 'reconciling'}
+                      onClick={handleRetryVisibilityRead}
+                    >
+                      {t('workflowLibrary.retry')}
+                    </Button>
+                  ) : null}
+                </Stack>
+              ) : null}
 
               {item.description ? (
                 <Text color="fg.muted" fontSize="xs" lineClamp={4}>
@@ -552,7 +803,7 @@ export const WorkflowLibraryDetailPanel = ({
 
           <RenameDialog
             initialName={name}
-            isOpen={isRenameOpen}
+            isOpen={isRenameOpen && !isReadOnly}
             label={t('workflowLibrary.templateName')}
             submitLabel={t('workflowLibrary.rename')}
             title={t('workflowLibrary.renameTemplateTitle')}
@@ -567,7 +818,7 @@ export const WorkflowLibraryDetailPanel = ({
       <ConfirmDialog
         body={t('workflowLibrary.deleteConfirmBody', { name: deleteTargetName ?? '' })}
         confirmLabel={t('workflowLibrary.delete')}
-        isOpen={deleteTargetName !== null}
+        isOpen={deleteTargetName !== null && !isReadOnly}
         title={t('workflowLibrary.deleteConfirmTitle')}
         onClose={closeDeleteConfirm}
         onConfirm={confirmDelete}

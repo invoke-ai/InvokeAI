@@ -40,11 +40,11 @@ Workflows expose the individual steps of image generation. The [Diffusion overvi
 
 ## A tour of the workflow editor
 
-Workflows are built and run in the **Automate** layout (**Alt+4**). The editor fills the center, the workflow's form is on the left, and the Gallery and Queue are on the right.
+Workflows are built and run in the **Workflow** layout (**Alt+4**). The editor fills the center, the workflow's form is on the left, and the Gallery and Queue are on the right.
 
 <EditorTour
   role="group"
-  aria-label="The Automate layout: the Workflow form panel on the left, the workflow editor with a graph of nodes in the center, and the Gallery on the right. Numbered callouts mark the parts described below."
+  aria-label="The Workflow layout: the Workflow form panel on the left, the workflow editor with a graph of nodes in the center, and the Gallery on the right. Numbered callouts mark the parts described below."
   style="width: 100%; height: auto;"
 />
 
@@ -54,13 +54,13 @@ Hover over a numbered circle, or tap it on a touchscreen, for a short descriptio
 |---|---|---|
 | 1 | **Workflow panel** | The workflow's **form**: its most important settings as simple controls, like a Generate panel for this workflow. |
 | 2 | **View** / **Edit** | **View** uses the form. **Edit** lets you design the form, edit the workflow's details (name, description, author, tags, notes), and inspect the selected node. |
-| 3 | **Editor toolbar** | Tools for panning, box and lasso selection, and erasing nodes or connections; **Zoom in**, **Zoom out** and **Fit view**; **Download workflow as PNG**; and **Node opacity**. |
+| 3 | **Editor toolbar** | Tools for panning, box and lasso selection, and erasing nodes or connections; **Zoom in**, **Zoom out** and **Fit view**; **Arrange nodes**, which lays out the whole graph, or just the selected nodes in place, as one undoable step; **Download workflow as PNG**; and **Node opacity**. |
 | 4 | **Workflow name** | The active workflow. Click it to open the **Workflows** library. |
 | 5 | **Workflow actions** | **Add node** (**+**), **Save to library…**, the save status, settings, and the **⋯** menu with **Workflow details…**, **Rename workflow…**, **Import workflow JSON…**, **Export workflow JSON**, **New workflow** and more. |
 | 6 | **The graph** | The workflow's nodes and connections. Drag nodes by their title bar; scroll to zoom; drag empty space to pan. |
 | 7 | **Minimap** | An overview of the whole graph for finding your way around large workflows. |
 | 8 | **Gallery and Queue** | Where results appear, with the Queue, Preview and Image Map on the right-hand rail. |
-| 9 | **Automate** | The layout preset for workflows. |
+| 9 | **Workflow** | The layout preset for workflows. |
 | 10 | **Invoke** | Runs the active workflow. The routing control beside it shows the source (**Workflow**) and the destination (**Gallery**). |
 
 ### The essentials
@@ -82,7 +82,7 @@ You need an SDXL model and an SDXL VAE, such as the *sdxl-vae-fp16-fix* starter 
 
 <Steps>
 
-1. Press **Alt+4** for the Automate layout.
+1. Press **Alt+4** for the Workflow layout.
 
 2. Click the workflow's name at the top of the editor to open the **Workflows** library, go to **Browse**, and open **Text to Image - SDXL**. A copy is added to your project and becomes the active workflow.
 
@@ -133,7 +133,7 @@ In summary, the **Image Compositor**'s settings are:
 
 A workflow with a dozen nodes is not the most convenient thing to use day to day. The **form** in the Workflow panel on the left gathers the settings you actually change into one simple panel, like the Generate panel.
 
-To add a setting to the form, click the **pin** icon at the right end of its row in the node (**Expose in Linear UI form**). Only settings with their own control can be pinned; connected inputs cannot.
+To add a setting to the form, click the **pin** icon at the right end of its row in the node (**Add to form**). Only settings with their own control can be pinned; connected inputs cannot.
 
 <Steps>
 

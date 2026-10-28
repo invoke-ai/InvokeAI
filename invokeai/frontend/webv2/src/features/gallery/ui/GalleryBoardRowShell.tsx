@@ -1,3 +1,5 @@
+import type { DraggableSyntheticListeners } from '@dnd-kit/core';
+
 import { HStack, Stack, type SystemStyleObject } from '@chakra-ui/react';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Row } from '@platform/ui/Row';
@@ -21,6 +23,9 @@ const SELECTED_CONTAINER_CSS: SystemStyleObject = {
   color: 'accent.contrast',
 } as const;
 
+/** A row that can be dragged: touch scrolls the list until a hold arms the drag, which the row shows by losing colour. */
+const DRAGGABLE_CSS: SystemStyleObject = { '&[data-drag-armed=true]': { filter: 'saturate(0)' }, touchAction: 'pan-y' };
+
 /** Suppress hover fill during compatible drags so it cannot obscure the row's drop tint. */
 const DROP_TARGET_CONTAINER_CSS: SystemStyleObject = {
   ...ROW_CONTAINER_CSS,
@@ -36,6 +41,7 @@ export const GalleryBoardRowShell = ({
   ariaLabel,
   children,
   cover,
+  dragListeners,
   isDropTarget = false,
   isSelected = false,
   label,
@@ -51,6 +57,8 @@ export const GalleryBoardRowShell = ({
   /** Trailing metadata rendered inside the row button (dates, counts, badges). */
   children?: ReactNode;
   cover: ReactNode;
+  /** Lets the whole row, not only its button, be picked up and dragged. */
+  dragListeners?: DraggableSyntheticListeners;
   /** A compatible drag is in flight and this row could receive it. */
   isDropTarget?: boolean;
   isSelected?: boolean;
@@ -61,13 +69,15 @@ export const GalleryBoardRowShell = ({
   onContextMenu?: (event: MouseEvent) => void;
   onSelect: () => void;
 }) => {
-  const containerCss = useMemo(
-    () => (isSelected ? SELECTED_CONTAINER_CSS : isDropTarget ? DROP_TARGET_CONTAINER_CSS : ROW_CONTAINER_CSS),
-    [isDropTarget, isSelected]
-  );
+  const isDraggable = dragListeners !== undefined;
+  const containerCss = useMemo(() => {
+    const css = isSelected ? SELECTED_CONTAINER_CSS : isDropTarget ? DROP_TARGET_CONTAINER_CSS : ROW_CONTAINER_CSS;
+
+    return isDraggable ? { ...css, ...DRAGGABLE_CSS } : css;
+  }, [isDraggable, isDropTarget, isSelected]);
 
   return (
-    <HStack ref={ref} css={containerCss} gap="0" pe="1" w="full">
+    <HStack ref={ref} css={containerCss} gap="0" pe="1" w="full" {...dragListeners}>
       <Row active="none" asChild css={ROW_BUTTON_CSS} flex="1" gap="2" minH="7" minW="0" px="1" py="1">
         <button
           aria-current={isSelected ? 'true' : undefined}

@@ -9,7 +9,7 @@ import {
 } from '@features/models/ui/shared/InstallSourceMenu';
 import { InstallPathRow } from '@features/models/ui/shared/InstallSourceRow';
 import { ResultsListHeader } from '@features/models/ui/shared/ResultsListHeader';
-import { useInstalledSourceKeys } from '@features/models/ui/shared/useInstalledSources';
+import { findInstalledLocalPathKey, useInstalledSourceKeys } from '@features/models/ui/shared/useInstalledSources';
 import { sourceLocation, useSourceNameFilter } from '@features/models/ui/shared/useSourceNameFilter';
 import { IconButton } from '@platform/ui';
 import { ListStack } from '@platform/ui/list/ListStack';
@@ -23,6 +23,7 @@ const pathOf = (result: FoundModel): string => result.path;
 export const ScanResults = ({
   fp8Storage,
   inplace,
+  inplaceLocked,
   onClear,
   onInstall,
   onInstallAll,
@@ -33,6 +34,8 @@ export const ScanResults = ({
 }: {
   fp8Storage: boolean;
   inplace: boolean;
+  /** Every result is in the models folder, so each installs in place. */
+  inplaceLocked?: boolean;
   onClear: () => void;
   onInstall: (path: string) => void;
   /** Bulk path: the parent queues silently and emits one summary toast. */
@@ -47,9 +50,10 @@ export const ScanResults = ({
   // Live library state: `is_installed` is a scan-time snapshot, so a model
   // installed from this list would otherwise keep offering Install forever.
   const installedSourceKeys = useInstalledSourceKeys();
-  const isRowInstalled = (result: FoundModel) => result.is_installed || installedSourceKeys.has(result.path);
+  const installedKeyOf = (result: FoundModel) => findInstalledLocalPathKey(result.path, installedSourceKeys);
+  const isRowInstalled = (result: FoundModel) => result.is_installed || installedKeyOf(result) !== null;
   const statusOf = (result: FoundModel): InstallSourceStatus => ({
-    installedModelKey: installedSourceKeys.get(result.path) ?? null,
+    installedModelKey: installedKeyOf(result),
     isInstalled: isRowInstalled(result),
     isPending: pendingSources.has(result.path),
   });
@@ -83,6 +87,7 @@ export const ScanResults = ({
           <InstallOptions
             fp8Storage={fp8Storage}
             inplace={inplace}
+            inplaceLocked={inplaceLocked}
             onSetFp8Storage={onSetFp8Storage}
             onSetInplace={onSetInplace}
           />

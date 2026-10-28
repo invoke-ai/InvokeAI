@@ -11,6 +11,8 @@ import { getIsPidActive, getPidGenerationSize } from './pid';
 export const PID_DECODE_NODE_TYPES = {
   flux: 'flux_pid_decode',
   flux2: 'flux2_pid_decode',
+  // MOSS-Image denoises into the FLUX.2 latent layout and decodes with the FLUX.2 PiD decoder.
+  'moss-image': 'flux2_pid_decode',
   'qwen-image': 'qwen_image_pid_decode',
   'sd-3': 'sd3_pid_decode',
   sdxl: 'sdxl_pid_decode',
@@ -18,6 +20,11 @@ export const PID_DECODE_NODE_TYPES = {
 } as const;
 
 export type PidDecodeNodeType = (typeof PID_DECODE_NODE_TYPES)[keyof typeof PID_DECODE_NODE_TYPES];
+
+const PID_DECODE_NODE_TYPE_SET: ReadonlySet<string> = new Set(Object.values(PID_DECODE_NODE_TYPES));
+
+export const isPidDecodeNodeType = (type: string | undefined): type is PidDecodeNodeType =>
+  type !== undefined && PID_DECODE_NODE_TYPE_SET.has(type);
 
 /** Retain VAE edges for runtime scaling constants even though PiD replaces decode. */
 const PID_DECODE_NODES_WITH_VAE_INPUT: ReadonlySet<string> = new Set([

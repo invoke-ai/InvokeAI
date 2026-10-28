@@ -6,9 +6,11 @@ import {
   hasDynamicPromptSyntax,
   matchesKnownWildcard,
   normalizeWildcardValues,
+  planGenerateSubmission,
   scanWildcardReferences,
   sanitizeDynamicPromptsConfig,
   sanitizeMaxPrompts,
+  type GenerateSubmissionSource,
 } from './dynamicPrompts';
 
 describe('hasDynamicPromptSyntax', () => {
@@ -99,14 +101,22 @@ describe('sanitizeDynamicPromptsConfig', () => {
     expect(sanitizeDynamicPromptsConfig({})).toEqual({
       combinatorial: true,
       maxPrompts: 100,
+      resample: true,
       sampleSeed: 0,
       seedBehaviour: 'per-iteration',
     });
     expect(
-      sanitizeDynamicPromptsConfig({ combinatorial: false, maxPrompts: 7, sampleSeed: 42, seedBehaviour: 'per-image' })
+      sanitizeDynamicPromptsConfig({
+        combinatorial: false,
+        maxPrompts: 7,
+        resample: false,
+        sampleSeed: 42,
+        seedBehaviour: 'per-image',
+      })
     ).toEqual({
       combinatorial: false,
       maxPrompts: 7,
+      resample: false,
       sampleSeed: 42,
       seedBehaviour: 'per-image',
     });
@@ -229,5 +239,72 @@ describe('getWildcardValuesError', () => {
   it('accepts the limits exactly', () => {
     expect(getWildcardValuesError(Array.from({ length: 10_000 }, () => 'v'))).toBeNull();
     expect(getWildcardValuesError(['x'.repeat(2_000)])).toBeNull();
+  });
+});
+
+const source = (overrides: Partial<GenerateSubmissionSource> = {}): GenerateSubmissionSource => ({
+  batchCount: 2,
+  negativePrompt: 'blurry',
+  negativePromptEnabled: true,
+  positivePrompt: 'a cat',
+  promptTemplate: null,
+  seed: 10,
+  seedMode: 'increment',
+  ...overrides,
+});
+
+describe('planGenerateSubmission', () => {
+  it('merges the template and suppresses its negative side with the negative prompt', () => {
+    const promptTemplate = {
+      id: 't',
+      name: 'Photo',
+      negativePrompt: '{prompt}, lowres',
+      positivePrompt: 'photo of {prompt}',
+    };
+
+    expect(planGenerateSubmission(source({ promptTemplate })).submission).toMatchObject({
+      negativePrompt: 'blurry, lowres',
+      positivePrompt: 'photo of a cat',
+    });
+
+    const suppressed = planGenerateSubmission(source({ negativePromptEnabled: false, promptTemplate }));
+
+    expect(suppressed.submission.negativePrompt).toBe('');
+    expect(suppressed.effectivePrompts.negativePrompt).toBe('blurry, lowres');
+  });
+
+  it('sends an expansion and its seed behaviour only for a prompt with dynamic syntax', () => {
+    const expansion = ['a red cat', 'a green cat'];
+    const expanded = planGenerateSubmission(
+      source({ dynamicPromptsSeedBehaviour: 'per-image', positivePrompt: 'a {red|green} cat' }),
+      expansion
+    );
+    const plain = planGenerateSubmission(source({ dynamicPromptsSeedBehaviour: 'per-image' }), expansion);
+
+    expect(expanded.submission).toEqual({
+      batchCount: 2,
+      negativePrompt: 'blurry',
+      positivePrompt: 'a {red|green} cat',
+      positivePrompts: expansion,
+      seed: 10,
+      seedBehaviour: 'per-image',
+      seedStep: 1,
+    });
+    // Two prompts per image across two runs consume four seeds.
+    expect(expanded.seedPlan.nextSeed).toBe(14);
+    expect(plain.submission).toEqual({
+      batchCount: 2,
+      negativePrompt: 'blurry',
+      positivePrompt: 'a cat',
+      seed: 10,
+      seedStep: 1,
+    });
+    expect(plain.seedPlan.nextSeed).toBe(12);
+  });
+
+  it('holds a fixed seed', () => {
+    const { seedPlan, submission } = planGenerateSubmission(source({ seedMode: 'fixed' }));
+
+    expect([submission.seed, submission.seedStep, seedPlan.nextSeed]).toEqual([10, 0, null]);
   });
 });

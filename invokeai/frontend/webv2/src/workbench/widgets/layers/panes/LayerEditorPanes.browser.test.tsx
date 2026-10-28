@@ -1,6 +1,10 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import type * as fonts from '@features/fonts';
-import type { CanvasLayerSourceContract } from '@workbench/canvas-engine/api';
+import type {
+  CanvasDocumentContractV3,
+  CanvasLayerSourceContract,
+  PreparedDocumentEdit,
+} from '@workbench/canvas-engine/api';
 import type { CanvasOperationState } from '@workbench/canvas-operations/api';
 import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { FilterOperationSessionState } from '@workbench/canvas-operations/filterOperationSession';
@@ -10,11 +14,13 @@ import type { Project } from '@workbench/projectContracts';
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
+import { createDocumentModel } from '@workbench/canvas-engine/api';
 import {
   groupContract,
   layerContract,
   stacksFrom,
 } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { IDLE_CONTROL_DETECTION_STATUS } from '@workbench/canvas-operations/api';
 import {
   createEngineRegistry,
   type EngineDeps,
@@ -118,7 +124,11 @@ const createEngineDeps = (): EngineDeps => {
     commitEdit: () => undefined,
     dispatch: () => false,
     getCanvasState: () => harness.project?.canvas ?? createEmptyCanvasState(64, 64),
-    subscribe: () => () => undefined,
+    // Harness project changes reach the engine's document mirror, as reducer dispatches do in the app.
+    subscribe: (listener) => {
+      harness.listeners.add(listener);
+      return () => harness.listeners.delete(listener);
+    },
   };
   return {
     getMainModelBase: () => null,
@@ -174,6 +184,8 @@ const createFakeOperations = () => {
     subscribeOperation: subscribe,
     subscribeSamSession: subscribe,
     updateFilterOperation: vi.fn(),
+    getControlDetectionStatus: () => IDLE_CONTROL_DETECTION_STATUS,
+    subscribeControlDetectionStatus: () => () => undefined,
   };
 };
 
@@ -194,7 +206,7 @@ const settle = () =>
 
 const IDENTITY = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
 
-type Selection = 'none' | 'layer' | 'group' | 'mask' | 'shape' | 'gradient' | 'text';
+type Selection = 'none' | 'layer' | 'group' | 'mask' | 'control' | 'shape' | 'stroked-shape' | 'gradient' | 'text';
 
 const SHAPE_SOURCE = {
   fill: '#ff0000',
@@ -227,32 +239,43 @@ const GRADIENT_SOURCE = {
   width: 10,
 } satisfies Extract<CanvasLayerSourceContract, { type: 'gradient' }>;
 
-const mount = async (View: typeof PropertiesPane, selection: Selection = 'none') => {
+const mount = async (
+  View: typeof PropertiesPane,
+  selection: Selection = 'none',
+  { extraNodes = [], width = 450 }: { extraNodes?: Parameters<typeof stacksFrom>[0]; width?: number } = {}
+) => {
   const base = { ...createInitialWorkbenchState().projects[0]!, id: 'p' };
   const nodes =
     selection === 'none'
       ? []
       : selection === 'layer'
         ? [layerContract('l0', 'raster', { name: 'Paint', transform: { ...IDENTITY, rotation: 0.5, x: 10.4 } })]
-        : selection === 'shape'
-          ? [layerContract('l0', 'raster', { name: 'My Shape', source: SHAPE_SOURCE })]
+        : selection === 'shape' || selection === 'stroked-shape'
+          ? [
+              layerContract('l0', 'raster', {
+                name: 'My Shape',
+                source: selection === 'shape' ? SHAPE_SOURCE : { ...SHAPE_SOURCE, stroke: '#00ff00', strokeWidth: 4 },
+              }),
+            ]
           : selection === 'gradient'
             ? [layerContract('l0', 'raster', { name: 'My Gradient', source: GRADIENT_SOURCE })]
             : selection === 'text'
               ? [layerContract('l0', 'raster', { name: 'My Text', source: TEXT_SOURCE })]
               : selection === 'mask'
                 ? [layerContract('m0', 'inpaint_mask', { name: 'Mask' })]
-                : [groupContract('g0', [layerContract('l0', 'raster', { name: 'Paint' })], { name: 'Folder' })];
+                : selection === 'control'
+                  ? [layerContract('l0', 'control', { name: 'Control Layer 1' })]
+                  : [groupContract('g0', [layerContract('l0', 'raster', { name: 'Paint' })], { name: 'Folder' })];
   harness.project = applyCanvasProjectMutation(base, {
     document: {
       ...createEmptyCanvasDocument(),
       selectedLayerId: selection === 'none' ? null : selection === 'mask' ? 'm0' : selection === 'group' ? 'g0' : 'l0',
-      stacks: stacksFrom(nodes),
+      stacks: stacksFrom([...nodes, ...extraNodes]),
     },
     type: 'replaceCanvasDocument',
   });
   host = document.createElement('div');
-  host.style.cssText = 'width:450px;height:600px;';
+  host.style.cssText = `width:${width}px;height:600px;`;
   document.body.append(host);
   root = createRoot(host);
   registry = createEngineRegistry({ gracePeriodMs: 0 });
@@ -316,27 +339,35 @@ describe('Properties pane', () => {
       .element(page.getByRole('checkbox', { exact: true, name: 'Pen pressure affects opacity' }))
       .toBeVisible();
 
+    // The eraser shares the group but exposes width only: pressure never modulates erase strength.
+    await act(() => engine!.tools.setTool('eraser'));
+    await settle();
+    const eraserWidth = page.getByRole('checkbox', { exact: true, name: 'Pen pressure affects width' });
+    await expect.element(eraserWidth).toBeChecked();
+    expect(page.getByRole('checkbox', { exact: true, name: 'Pen pressure affects opacity' }).query()).toBeNull();
+    await act(() => userEvent.click(page.getByText('Pen pressure affects width', { exact: true })));
+    expect(engine!.interaction.get('eraserOptions').pressureAffectsWidth).toBe(false);
+    expect(engine!.interaction.get('brushOptions').pressureAffectsWidth).toBe(true);
+
     await act(() => engine!.tools.setTool('view'));
     await settle();
     expect(page.getByRole('slider', { exact: true, name: 'Brush size' }).query()).toBeNull();
-    // Hint-only tools show a gesture card now, not a single sentence.
-    expect(host!.textContent).toContain('Pan the canvas.');
-    expect(host!.textContent).toContain('Hold Space');
+    // Gesture guidance lives in the status widget; an empty tool section takes no pane space.
+    expect(host!.textContent).not.toContain('Pan the canvas.');
+    expect(host!.textContent).not.toContain('Hold Space');
+    expect(host!.textContent).not.toContain('Tool');
+    expect(host!.textContent).toContain('Layer');
   });
 
-  it('keeps a slider and its number field on one grid row and shares row identity brush↔eraser', async () => {
+  it('follows size changes from outside the field and shares row identity brush↔eraser', async () => {
     await mount(PropertiesPane);
     await act(() => engine!.tools.setTool('brush'));
     await settle();
     const slider = page.getByRole('slider', { exact: true, name: 'Brush size' }).element() as HTMLElement;
-    const field = page.getByRole('spinbutton', { exact: true, name: 'Brush size' }).element() as HTMLElement;
-    // One grid row: the slider and its field never wrap apart (compare row
-    // centers; the two controls have different heights).
-    const centerOf = (el: HTMLElement) => {
-      const rect = el.getBoundingClientRect();
-      return rect.top + rect.height / 2;
-    };
-    expect(Math.abs(centerOf(slider) - centerOf(field))).toBeLessThan(8);
+    // `[` / `]` and canvas gestures write the store; the scrubber shows what they wrote.
+    await act(() => engine!.interaction.set('brushOptions', { ...engine!.interaction.get('brushOptions'), size: 80 }));
+    await settle();
+    expect(slider.getAttribute('aria-valuetext')).toBe('80px');
 
     await act(() => engine!.tools.setTool('eraser'));
     await settle();
@@ -364,7 +395,7 @@ describe('Properties pane', () => {
     // The fixture shape has no stroke, so the width slider is disabled in place.
     const width = page.getByRole('slider', { exact: true, name: 'Stroke width' });
     await expect.element(width).toBeVisible();
-    expect(width.element().getAttribute('data-disabled')).not.toBeNull();
+    await expect.element(width).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('previews the selected text layer above its form and offers style and weight on one row', async () => {
@@ -384,9 +415,9 @@ describe('Properties pane', () => {
     const style = page.getByRole('combobox', { exact: true, name: 'Style' }).element();
     const weight = page.getByRole('combobox', { exact: true, name: 'Weight' }).element();
     expect(Math.abs(style.getBoundingClientRect().top - weight.getBoundingClientRect().top)).toBeLessThan(2);
-    expect((page.getByRole('spinbutton', { exact: true, name: 'Font size' }).element() as HTMLInputElement).value).toBe(
-      '72'
-    );
+    await expect
+      .element(page.getByRole('slider', { exact: true, name: 'Font size' }))
+      .toHaveAttribute('aria-valuetext', '72px');
   });
 
   it('steps the log-scaled text size slider by whole pixels from the keyboard', async () => {
@@ -395,9 +426,14 @@ describe('Properties pane', () => {
     await settle();
     const slider = page.getByRole('slider', { exact: true, name: 'Font size' });
     await expect.element(slider).toBeVisible();
-    const field = () =>
-      (page.getByRole('spinbutton', { exact: true, name: 'Font size' }).element() as HTMLInputElement).value;
+    const field = () => slider.element().getAttribute('aria-valuenow');
     expect(field()).toBe('48');
+    // The log track spends its middle on the sizes text is set at.
+    const frame = slider.element().closest<HTMLElement>('[data-scope="scrubber"]')!.getBoundingClientRect();
+    const thumb = slider.element().parentElement!.querySelector('[data-part="thumb"]')!.getBoundingClientRect();
+    const thumbFraction = (thumb.left + thumb.width / 2 - frame.left - 10) / (frame.width - 20);
+    expect(thumbFraction).toBeGreaterThan(0.4);
+    expect(thumbFraction).toBeLessThan(0.6);
     await act(() => (slider.element() as HTMLElement).focus());
     await act(() => userEvent.keyboard('{ArrowRight}'));
     expect(field()).toBe('49');
@@ -429,6 +465,35 @@ describe('Properties pane', () => {
     await act(() => userEvent.keyboard('{ArrowRight}'));
     await settle();
     await expect.element(page.getByRole('button', { exact: true, name: 'Gradient stop at 1%' })).toBeVisible();
+  });
+
+  it('moves a gradient stop once when its offset scrub is released', async () => {
+    await mount(PropertiesPane);
+    await act(() => engine!.tools.setTool('gradient'));
+    await settle();
+    const offset = page.getByRole('slider', { exact: true, name: 'Offset' });
+    await expect.element(offset).toHaveAttribute('aria-valuetext', '0%');
+    const frame = offset.element().closest<HTMLElement>('[data-scope="scrubber"]')!;
+    const set = vi.spyOn(engine!.interaction, 'set');
+    const pointer = (target: EventTarget, type: 'pointerdown' | 'pointermove' | 'pointerup', clientX: number) =>
+      act(() => target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, clientX })));
+    const { left, width } = frame.getBoundingClientRect();
+
+    await pointer(frame, 'pointerdown', left + width * 0.1);
+    await pointer(window, 'pointermove', left + width * 0.3);
+    await pointer(window, 'pointermove', left + width * 0.5);
+    // Mid-scrub the field follows the pointer while the stop itself stays put.
+    expect(offset.element().getAttribute('aria-valuetext')).not.toBe('0%');
+    expect(set.mock.calls.filter(([key]) => key === 'gradientOptions')).toHaveLength(0);
+    await expect.element(page.getByRole('button', { exact: true, name: 'Gradient stop at 0%' })).toBeVisible();
+
+    await pointer(window, 'pointerup', left + width * 0.5);
+    await settle();
+    expect(set.mock.calls.filter(([key]) => key === 'gradientOptions')).toHaveLength(1);
+    const moved = Math.round(engine!.interaction.get('gradientOptions').stops[0]!.offset * 100);
+    expect(moved).toBeGreaterThan(0);
+    expect(offset.element().getAttribute('aria-valuetext')).toBe(`${moved}%`);
+    await expect.element(page.getByRole('button', { exact: true, name: `Gradient stop at ${moved}%` })).toBeVisible();
   });
 
   it('keeps the Position row identity across move, frame and transform, with the transform footer live', async () => {
@@ -489,19 +554,25 @@ describe('Properties pane', () => {
     });
   });
 
-  it('keeps the Tool section mounted with stable geometry across every tool switch', async () => {
+  it('keeps form sections stable across tools with properties and omits instruction-only sections', async () => {
     await mount(PropertiesPane);
     await act(() => engine!.tools.setTool('brush'));
     await settle();
     const section = host!.querySelector<HTMLElement>('[role="group"][aria-label="Tool"]')!;
     const { left, top } = section.getBoundingClientRect();
-    for (const tool of ['eraser', 'view', 'move', 'shape'] as const) {
+    for (const tool of ['eraser', 'move', 'shape'] as const) {
       await act(() => engine!.tools.setTool(tool));
       await settle();
       expect(host!.querySelector('[role="group"][aria-label="Tool"]')).toBe(section);
       const rect = section.getBoundingClientRect();
       expect(rect.left).toBe(left);
       expect(rect.top).toBe(top);
+    }
+    for (const tool of ['view', 'colorPicker', 'sam'] as const) {
+      await act(() => engine!.tools.setTool(tool));
+      await settle();
+      expect(host!.querySelector('[role="group"][aria-label="Tool"]')).toBeNull();
+      expect(host!.querySelector('[role="group"][aria-label="Layer"]')).not.toBeNull();
     }
   });
 
@@ -535,6 +606,198 @@ describe('Properties pane', () => {
     await act(() => operations!.start(false));
     await settle();
     expect(host!.querySelector('[inert]')).toBeNull();
+  });
+});
+
+describe('Control layer properties', () => {
+  it('fits a 320 px pane without horizontal overflow or clipped text', async () => {
+    await mount(PropertiesPane, 'control', { width: 320 });
+    await expect.element(page.getByRole('combobox', { exact: true, name: 'Type' })).toBeVisible();
+
+    const overflowing = [host!, ...host!.querySelectorAll<HTMLElement>('*')].filter(
+      (element) =>
+        element.scrollWidth > element.clientWidth + 1 &&
+        getComputedStyle(element).overflowX !== 'visible' &&
+        // Screen-reader-only labels are clipped on purpose.
+        getComputedStyle(element).position !== 'absolute'
+    );
+    expect(overflowing.map((element) => element.outerHTML.slice(0, 80))).toEqual([]);
+    expect(host!.scrollWidth).toBeLessThanOrEqual(320);
+  });
+});
+
+describe('Tool property scrubbers', () => {
+  beforeEach(() => resetPropertyGroupCollapse());
+  afterEach(() => resetPropertyGroupCollapse());
+
+  const scrubber = (name: string) => page.getByRole('slider', { exact: true, name }).element() as HTMLElement;
+
+  /** Presses the scrubber at `from` and moves through `to`; the gesture continues with `move` and ends on `release`. */
+  const drag = async (slider: HTMLElement, from: number, ...to: number[]) => {
+    const frame = slider.closest<HTMLElement>('[data-scope="scrubber"]')!;
+    const { left, width } = frame.getBoundingClientRect();
+    let last = from;
+    const fire = (target: EventTarget, type: string, fraction: number) => {
+      last = fraction;
+      return act(() =>
+        target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, clientX: left + width * fraction }))
+      );
+    };
+    const move = async (...fractions: number[]) => {
+      for (const fraction of fractions) {
+        await fire(window, 'pointermove', fraction);
+      }
+    };
+    await fire(frame, 'pointerdown', from);
+    await move(...to);
+    return { move, release: () => fire(window, 'pointerup', last) };
+  };
+
+  /** Holds `key` through `repeats` key-downs; resolves to the release. */
+  const holdKey = async (slider: HTMLElement, key: string, repeats: number) => {
+    for (let index = 0; index < repeats; index += 1) {
+      await act(() => slider.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key, repeat: index > 0 })));
+    }
+    return () => act(() => slider.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key })));
+  };
+
+  /**
+   * Routes commits through a model over `live`, a document the test can change mid-gesture the way an undo or a
+   * concurrent edit would, and records every write to `optionsKey`.
+   */
+  const observe = (optionsKey: 'gradientOptions' | 'shapeOptions' | 'textOptions') => {
+    let live: CanvasDocumentContractV3 = harness.project!.canvas.document;
+    vi.spyOn(engine!.document, 'model').mockImplementation(() =>
+      createDocumentModel(live, { editRevision: 0, projectId: 'p' })
+    );
+    const commits: PreparedDocumentEdit[] = [];
+    vi.spyOn(engine!.layers, 'commitPrepared').mockImplementation((_label, edit) => {
+      commits.push(edit);
+      return { status: 'committed' };
+    });
+    const set = vi.spyOn(engine!.interaction, 'set');
+    return {
+      commits,
+      /** Sources the commits wrote, in order. */
+      committedSources: () =>
+        commits.map(
+          (edit) => (edit.forward as { source: CanvasLayerSourceContract }).source as Record<string, unknown>
+        ),
+      previews: () => set.mock.calls.filter(([key]) => key === optionsKey).length,
+      setLiveSource: (source: CanvasLayerSourceContract) => {
+        live = applyCanvasProjectMutation(harness.project!, { id: 'l0', source, type: 'updateCanvasLayerSource' })
+          .canvas.document;
+      },
+    };
+  };
+
+  it.each([
+    ['text', 'Font size', 'textOptions'],
+    ['text', 'Line height', 'textOptions'],
+    ['stroked-shape', 'Stroke width', 'shapeOptions'],
+    ['gradient', 'Angle', 'gradientOptions'],
+  ] as const)(
+    'previews every step and commits once per drag or held key (%s, %s)',
+    async (selection, name, optionsKey) => {
+      await mount(PropertiesPane, selection);
+      await act(() => engine!.tools.setTool(selection === 'stroked-shape' ? 'shape' : selection));
+      await settle();
+      const { commits, previews } = observe(optionsKey);
+      const slider = scrubber(name);
+
+      const gesture = await drag(slider, 0.5, 0.55, 0.6);
+      expect(previews()).toBe(2);
+      expect(commits).toHaveLength(0);
+      await gesture.release();
+      expect(commits).toHaveLength(1);
+
+      // The settle writes the defaults too; count the key steps from there.
+      const settled = previews();
+      const releaseKey = await holdKey(slider, 'ArrowRight', 3);
+      expect(previews() - settled).toBe(3);
+      expect(commits).toHaveLength(1);
+      await releaseKey();
+      expect(commits).toHaveLength(2);
+    }
+  );
+
+  it('keeps a kind hotkey and a document edit that land mid stroke-width drag', async () => {
+    await mount(PropertiesPane, 'stroked-shape');
+    await act(() => engine!.tools.setTool('shape'));
+    await settle();
+    const { committedSources, setLiveSource } = observe('shapeOptions');
+
+    const gesture = await drag(scrubber('Stroke width'), 0.5, 0.6);
+    await act(() =>
+      engine!.interaction.set('shapeOptions', { ...engine!.interaction.get('shapeOptions'), kind: 'star' })
+    );
+    setLiveSource({ ...SHAPE_SOURCE, fill: '#0000ff', stroke: '#00ff00', strokeWidth: 4 });
+    await gesture.move(0.65);
+    expect(engine!.interaction.get('shapeOptions').kind).toBe('star');
+    await gesture.release();
+
+    expect(engine!.interaction.get('shapeOptions').kind).toBe('star');
+    const [committed] = committedSources();
+    expect(committed?.fill).toBe('#0000ff');
+    expect(committed?.strokeWidth).not.toBe(4);
+  });
+
+  it('keeps an undone colour in the font-size commit when the undo lands mid-drag', async () => {
+    await mount(PropertiesPane, 'text');
+    await act(() => engine!.tools.setTool('text'));
+    await settle();
+    const { committedSources, setLiveSource } = observe('textOptions');
+
+    const { release } = await drag(scrubber('Font size'), 0.5, 0.6);
+    setLiveSource({ ...TEXT_SOURCE, color: '#abcdef' });
+    await release();
+
+    const [committed] = committedSources();
+    expect(committed?.color).toBe('#abcdef');
+    expect(committed?.fontSize).toBeGreaterThan(TEXT_SOURCE.fontSize);
+    expect(committed?.content).toBe(TEXT_SOURCE.content);
+  });
+
+  it('keeps stops and defaults edited mid angle drag', async () => {
+    await mount(PropertiesPane, 'gradient');
+    await act(() => engine!.tools.setTool('gradient'));
+    await settle();
+    const { committedSources, setLiveSource } = observe('gradientOptions');
+    const stops = [
+      { color: '#ff0000ff', offset: 0 },
+      { color: '#00ff00ff', offset: 0.5 },
+      { color: '#ffffffff', offset: 1 },
+    ];
+
+    const { release } = await drag(scrubber('Angle'), 0.5, 0.6);
+    setLiveSource({ ...GRADIENT_SOURCE, stops });
+    await act(() =>
+      engine!.interaction.set('gradientOptions', { ...engine!.interaction.get('gradientOptions'), preset: 'custom' })
+    );
+    await release();
+
+    const [committed] = committedSources();
+    expect(committed?.stops).toEqual(stops);
+    expect(committed?.angle).not.toBe(0);
+    expect(engine!.interaction.get('gradientOptions').preset).toBe('custom');
+  });
+
+  it('moves the dragged stop within the stops as they are on release, keeping one added mid-drag', async () => {
+    await mount(PropertiesPane, 'gradient');
+    await act(() => engine!.tools.setTool('gradient'));
+    await settle();
+    const { commits, committedSources, setLiveSource } = observe('gradientOptions');
+    const added = { color: '#00ff00ff', offset: 0.5 };
+
+    const { release } = await drag(scrubber('Offset'), 0.1, 0.3, 0.35);
+    setLiveSource({ ...GRADIENT_SOURCE, stops: [GRADIENT_SOURCE.stops[0], added, GRADIENT_SOURCE.stops[1]] });
+    await release();
+
+    expect(commits).toHaveLength(1);
+    const stops = committedSources()[0]?.stops as { color: string; offset: number }[];
+    expect(stops.map((stop) => stop.color)).toEqual(['#000000ff', '#00ff00ff', '#ffffffff']);
+    expect(stops[0]!.offset).toBeGreaterThan(0);
+    expect(stops[0]!.offset).toBeLessThan(0.5);
   });
 });
 
@@ -821,5 +1084,105 @@ describe('Overview pane', () => {
     await settle();
     const after = viewport.getState().pan;
     expect(after.x === before.x && after.y === before.y).toBe(false);
+  });
+
+  it('shows content beyond the frame and centres the view on the clicked point there', async () => {
+    // Outpainted pixels left of the default 1024² frame at the origin.
+    const outpaint = layerContract('outpaint', 'raster', {
+      source: { bitmap: { height: 512, imageName: 'outpaint', width: 1024 }, type: 'paint' },
+      transform: { ...IDENTITY, x: -1024 },
+    });
+    await mount(OverviewHarness, 'none', { extraNodes: [outpaint] });
+    const pan = page.getByRole('button', { exact: true, name: 'Pan the canvas view' });
+    await expect.element(pan).toBeVisible();
+    const canvas = pan.element().querySelector('canvas')!;
+    // Frame (0,0) 1024×1024 ∪ content (-1024,0) 1024×512 = (-1024,0) 2048×1024.
+    expect(canvas.width).toBeGreaterThan(0);
+    expect(canvas.width / canvas.height).toBeCloseTo(2, 1);
+    const unitsPerPx = 2048 / canvas.width;
+    const viewport = engine!.viewport.getViewport();
+    engine!.surface.resize(400, 300, 1);
+
+    const offset = { x: 3, y: 3 };
+    await act(async () => {
+      await userEvent.click(canvas, { position: offset });
+    });
+    await settle();
+
+    const centre = viewport.screenToDocument({ x: 200, y: 150 });
+    const expected = { x: -1024 + offset.x * unitsPerPx, y: offset.y * unitsPerPx };
+    expect(expected.x).toBeLessThan(0);
+    expect(Math.abs(centre.x - expected.x)).toBeLessThan(unitsPerPx);
+    expect(Math.abs(centre.y - expected.y)).toBeLessThan(unitsPerPx);
+    // The outline is centred where the click landed on the bitmap.
+    const outline = pan.element().querySelector('div')!;
+    await expect
+      .poll(() => parseFloat(outline.style.left) + parseFloat(outline.style.width) / 2)
+      .toBeCloseTo(offset.x, 0);
+    await expect
+      .poll(() => parseFloat(outline.style.top) + parseFloat(outline.style.height) / 2)
+      .toBeCloseTo(offset.y, 0);
+  });
+
+  it('zooms the view around the document point under the wheel', async () => {
+    const outpaint = layerContract('outpaint', 'raster', {
+      source: { bitmap: { height: 512, imageName: 'outpaint', width: 1024 }, type: 'paint' },
+      transform: { ...IDENTITY, x: -1024 },
+    });
+    await mount(OverviewHarness, 'none', { extraNodes: [outpaint] });
+    const pan = page.getByRole('button', { exact: true, name: 'Pan the canvas view' });
+    await expect.element(pan).toBeVisible();
+    const canvas = pan.element().querySelector('canvas')!;
+    const unitsPerPx = 2048 / canvas.width;
+    const viewport = engine!.viewport.getViewport();
+    engine!.surface.resize(400, 300, 1);
+    const offset = { x: 10, y: 20 };
+    // Frame (0,0) 1024×1024 ∪ content (-1024,0) 1024×512 puts document (-1024,0) at the overview's top-left.
+    const documentPoint = { x: -1024 + offset.x * unitsPerPx, y: offset.y * unitsPerPx };
+    const anchor = viewport.documentToScreen(documentPoint);
+    const zoomBefore = viewport.getZoom();
+
+    const bounds = canvas.getBoundingClientRect();
+    act(() => {
+      pan.element().dispatchEvent(
+        new WheelEvent('wheel', {
+          bubbles: true,
+          cancelable: true,
+          clientX: bounds.left + offset.x,
+          clientY: bounds.top + offset.y,
+          deltaY: -100,
+        })
+      );
+    });
+
+    expect(viewport.getZoom()).toBeGreaterThan(zoomBefore);
+    const anchored = viewport.documentToScreen(documentPoint);
+    expect(Math.abs(anchored.x - anchor.x)).toBeLessThan(0.5);
+    expect(Math.abs(anchored.y - anchor.y)).toBeLessThan(0.5);
+  });
+
+  it('redraws to the new extent when a document edit moves content after mount', async () => {
+    await mount(OverviewHarness);
+    const pan = page.getByRole('button', { exact: true, name: 'Pan the canvas view' });
+    await expect.element(pan).toBeVisible();
+    const canvas = pan.element().querySelector('canvas')!;
+    // The empty document shows only its 1024² frame.
+    expect(canvas.width / canvas.height).toBeCloseTo(1, 1);
+
+    // Content 1024×512 placed above the frame: (0,-512)..(1024,1024) = 1024×1536.
+    const outpaint = layerContract('outpaint', 'raster', {
+      source: { bitmap: { height: 512, imageName: 'outpaint', width: 1024 }, type: 'paint' },
+      transform: { ...IDENTITY, y: -512 },
+    });
+    act(() => {
+      const project = harness.project!;
+      harness.project = applyCanvasProjectMutation(project, {
+        document: { ...project.canvas.document, stacks: stacksFrom([outpaint]) },
+        type: 'replaceCanvasDocument',
+      });
+      harness.listeners.forEach((listener) => listener());
+    });
+
+    await expect.poll(() => canvas.width / canvas.height, { timeout: 2000 }).toBeCloseTo(1024 / 1536, 1);
   });
 });

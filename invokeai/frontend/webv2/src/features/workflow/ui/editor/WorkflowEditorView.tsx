@@ -2,8 +2,9 @@ import type { ProjectGraphState, WorkflowEdge as WorkflowDocumentEdge, XYPositio
 import type { WorkflowPerfSource, WorkflowRuntimeApi } from '@features/workflow/ui/contracts';
 
 import { Box, Flex, HStack, Spinner, Stack, Text } from '@chakra-ui/react';
-import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@features/workflow/react';
+import { getArrangedLayout } from '@features/workflow/core/graphLayout';
 import '@xyflow/react/dist/style.css';
+import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@features/workflow/react';
 import { FlowMiniMap, flowThemeCss, getFlowColorMode } from '@features/workflow/ui/graph-preview';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
@@ -36,6 +37,8 @@ import {
   SelectionMode,
   applyEdgeChanges,
   applyNodeChanges,
+  getViewportForBounds,
+  useStoreApi,
   type Connection,
   type EdgeChange,
   type EdgeTypes,
@@ -52,36 +55,50 @@ import {
   useEffect,
   useEffectEvent,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   startTransition,
   type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { flushSync } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 
 import type { WorkflowImageExportView } from './WorkflowImageExportView';
 
-import { buildDuplicateElements, buildPasteElements, copyNodesToClipboard, useHasClipboardNodes } from './clipboard';
+import {
+  buildDuplicateElements,
+  buildPasteElements,
+  copyNodesToClipboard,
+  useHasClipboardNodes,
+  type WorkflowPastePlacement,
+} from './clipboard';
 import { ConnectorFlowNode } from './ConnectorFlowNode';
 import { CurrentImageFlowNode } from './CurrentImageFlowNode';
 import { EditorToolbar, type EditorTool } from './EditorToolbar';
+import { fitWorkflowBounds } from './fitWorkflowBounds';
 import {
   toFlowEdges,
   toFlowNodes,
   withNodeSelection,
   type FlowEdgeType,
+  type InvocationTemplateStatus,
   type WorkflowFlowEdge,
   type WorkflowFlowNode,
 } from './flowAdapters';
 import {
   registerWorkflowFlowInstance,
   releaseWorkflowFlowInstance,
+  WORKFLOW_FIT_PADDING,
+  WORKFLOW_TOOLBAR_CLEARANCE_PX,
+  type WorkflowFitViewTarget,
   type WorkflowFlowInstance,
 } from './flowInstanceStore';
-import { InvocationFlowNode } from './InvocationFlowNode';
+import { CONTENT_VISIBILITY_ZOOM, InvocationFlowNode } from './InvocationFlowNode';
 import LoopBodyBoundaryOverlay from './LoopBodyBoundaryOverlay';
-import { NodeContextMenu, type WorkflowContextMenuState } from './NodeContextMenu';
+import { NodeContextMenu, type WorkflowContextMenuPaste, type WorkflowContextMenuState } from './NodeContextMenu';
 import { NotesFlowNode } from './NotesFlowNode';
 import {
   isLargeWorkflowGraph,
@@ -92,6 +109,7 @@ import { reportNodeHover, reportNodeSelection, workflowSelectionStore } from './
 import { useEraser } from './useEraser';
 import { useLasso } from './useLasso';
 import { WorkflowEdge } from './WorkflowEdge';
+import { WORKFLOW_HOTKEYS } from './workflowHotkeys';
 import { WorkflowSelectionRequestRuntime } from './WorkflowSelectionRequestRuntime';
 import { getWorkflowViewport, getWorkflowViewportKey, setWorkflowViewport } from './workflowViewportStore';
 
@@ -136,7 +154,51 @@ const toDocumentEdge = (connection: Connection): WorkflowDocumentEdge | null =>
 
 const DEFAULT_EDGE_OPTIONS = { style: { strokeWidth: 2 } };
 // Offset fresh graphs so the floating left toolbar does not cover their first column.
-const DEFAULT_VIEWPORT = { x: 56, y: 0, zoom: 1 } as const;
+const DEFAULT_VIEWPORT = { x: WORKFLOW_TOOLBAR_CLEARANCE_PX, y: 0, zoom: 1 } as const;
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 2;
+
+/**
+ * Where a newly shown graph opens until its mount fit lands, or null for the default viewport. That fit waits for the
+ * nodes to be measured. When their positions alone span more than the container shows at the content-visibility zoom,
+ * it lands below that zoom whatever the nodes measure, so the editor opens at a fit of the positions instead: nodes
+ * mount as the skeletons the fitted view shows rather than mounting every field control only for the fit to replace
+ * them.
+ */
+export const getZoomedOutMountViewport = (
+  targets: readonly WorkflowFitViewTarget[],
+  container: { height: number; width: number }
+): Viewport | null => {
+  if (targets.length < 2) {
+    return null;
+  }
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const { position } of targets) {
+    minX = Math.min(minX, position.x);
+    minY = Math.min(minY, position.y);
+    maxX = Math.max(maxX, position.x);
+    maxY = Math.max(maxY, position.y);
+  }
+
+  const bounds = { height: maxY - minY, width: maxX - minX, x: minX, y: minY };
+  // The fit's zoom for these positions with its padding, as XYFlow resolves a fractional side; node sizes only lower
+  // it.
+  const fractionalSide = (size: number, padding: number) => Math.floor((size - size / (1 + padding)) * 0.5);
+  const { bottom, right, top } = WORKFLOW_FIT_PADDING;
+  const paddedWidth = container.width - WORKFLOW_TOOLBAR_CLEARANCE_PX - fractionalSide(container.width, right);
+  const paddedHeight =
+    container.height - fractionalSide(container.height, top) - fractionalSide(container.height, bottom);
+  const zoomUpperBound = Math.min(paddedWidth / bounds.width, paddedHeight / bounds.height);
+
+  return zoomUpperBound < CONTENT_VISIBILITY_ZOOM
+    ? getViewportForBounds(bounds, container.width, container.height, MIN_ZOOM, MAX_ZOOM, WORKFLOW_FIT_PADDING)
+    : null;
+};
 
 interface WorkflowFlowModel {
   edges: WorkflowFlowEdge[];
@@ -157,6 +219,7 @@ const buildWorkflowFlowModel = ({
   isCompact = false,
   canUseCache = false,
   perfSource,
+  templateStatus,
   time,
 }: {
   canUseCache?: boolean;
@@ -165,6 +228,7 @@ const buildWorkflowFlowModel = ({
   isCompact?: boolean;
   invocationTemplates?: Parameters<typeof toFlowNodes>[2];
   perfSource: WorkflowPerfSource;
+  templateStatus: InvocationTemplateStatus;
   previousEdges?: WorkflowFlowEdge[];
   previousNodes?: WorkflowFlowNode[];
   reduceMotion: boolean;
@@ -180,7 +244,7 @@ const buildWorkflowFlowModel = ({
       toFlowEdges(document, previousEdges, edgeType, selectedNodeIds, invocationTemplates, reduceMotion, index)
     ),
     nodes: time('workflow:to-flow-nodes', perfSource, () =>
-      toFlowNodes(document, previousNodes, invocationTemplates, index, isCompact, canUseCache)
+      toFlowNodes(document, previousNodes, invocationTemplates, index, isCompact, canUseCache, templateStatus)
     ),
   }));
 };
@@ -195,22 +259,25 @@ const getEventClientPosition = (event: MouseEvent | TouchEvent): { x: number; y:
   return touch ? { x: touch.clientX, y: touch.clientY } : null;
 };
 
-const WorkflowEditorPreparingState = ({ edgeCount, nodeCount }: { edgeCount: number; nodeCount: number }) => (
-  <Flex align="center" bg="bg.inset" h="full" justify="center" p="6" w="full">
-    <Stack align="center" gap="3" textAlign="center">
-      <HStack color="fg.muted" gap="2">
-        <Spinner size="lg" />
-        <Text fontSize="lg" fontWeight="700">
-          Preparing workflow graph
+export const WorkflowEditorPreparingState = ({ edgeCount, nodeCount }: { edgeCount: number; nodeCount: number }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Flex align="center" bg="bg.inset" h="full" justify="center" p="6" w="full">
+      <Stack align="center" gap="3" textAlign="center">
+        <HStack color="fg.muted" gap="2">
+          <Spinner size="lg" />
+          <Text fontSize="lg" fontWeight="700">
+            {t('widgets.workflow.preparingGraph')}
+          </Text>
+        </HStack>
+        <Text color="fg.subtle" fontSize="md">
+          {t('widgets.workflow.loadingGraph', { edgeCount, nodeCount })}
         </Text>
-      </HStack>
-      <Text color="fg.subtle" fontSize="md">
-        Loading {nodeCount.toLocaleString()} node{nodeCount === 1 ? '' : 's'} and {edgeCount.toLocaleString()} edge
-        {edgeCount === 1 ? '' : 's'}.
-      </Text>
-    </Stack>
-  </Flex>
-);
+      </Stack>
+    </Flex>
+  );
+};
 
 const getSelectedNodeIdSet = (nodes: WorkflowFlowNode[]): Set<string> =>
   new Set(nodes.filter((node) => node.selected).map((node) => node.id));
@@ -253,10 +320,14 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   const projectGraph = useWorkflowProjectSelector((project) => project.projectGraph);
   const projectId = useWorkflowProjectSelector((project) => project.id);
   const workflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
+  const canUndo = useWorkflowProjectSelector((project) => project.canUndo);
+  const canRedo = useWorkflowProjectSelector((project) => project.canRedo);
   const ui = useWorkflowUi();
   const { mark: markWorkbenchPerf, measure: measureWorkbenchPerf, time: timeWorkbenchPerf } = ui.performance;
   const { editGraph, redo, undo } = useProjectGraphCommands();
+  const flowStore = useStoreApi<WorkflowFlowNode, WorkflowFlowEdge>();
   const notify = useWorkflowNotifications();
+  const { t } = useTranslation();
   const {
     reduceMotion,
     themeId,
@@ -280,6 +351,8 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   const templatesStatus = useInvocationTemplatesSelector((snapshot) => snapshot.status);
   const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
   const invocationTemplates = templatesStatus === 'loaded' ? templates : undefined;
+  const templateStatus: InvocationTemplateStatus =
+    templatesStatus === 'loaded' || templatesStatus === 'error' ? templatesStatus : 'loading';
   const canUseCache = useWorkflowCapabilitiesSelector((capabilities) => capabilities.canUseCache);
   const edgeType: FlowEdgeType = workflowEdgeStyle === 'square' ? 'step' : 'default';
   const isLargeGraph = isLargeWorkflowGraph({
@@ -290,11 +363,21 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     () => getWorkflowViewportKey(projectId, workflowId, runtime.instanceId),
     [projectId, runtime.instanceId, workflowId]
   );
-  // XYFlow recreates its controller when React Activity reveals this view and reads this object on reconnect.
-  const defaultViewport = useMemo(() => getWorkflowViewport(viewportKey) ?? { ...DEFAULT_VIEWPORT }, [viewportKey]);
   // A workflow this editor has not shown yet (a load, a switch, a reload) opens fitted rather than at the origin.
   const [fitOnMount] = useState(() =>
     getWorkflowViewport(viewportKey) === null ? projectGraph.nodes.map(({ id, position }) => ({ id, position })) : null
+  );
+  // Undefined until the container is measured. Large graphs render compact nodes without a zoomed-out form, and choose
+  // their first nodes from the default viewport.
+  const [mountViewport, setMountViewport] = useState<Viewport | null | undefined>(() =>
+    fitOnMount && !isLargeGraph ? undefined : null
+  );
+  const mountContainerRef = useRef<HTMLDivElement>(null);
+  // XYFlow recreates its controller when React Activity reveals this view and reads this object on reconnect, so it is
+  // a mutable copy that tracks the view, never the state it starts from.
+  const defaultViewport = useMemo(
+    () => getWorkflowViewport(viewportKey) ?? { ...(mountViewport ?? DEFAULT_VIEWPORT) },
+    [mountViewport, viewportKey]
   );
   const perfSource = useMemo<WorkflowPerfSource>(
     () => ({
@@ -316,6 +399,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
           isCompact: isLargeGraph,
           perfSource,
           reduceMotion,
+          templateStatus,
           time: timeWorkbenchPerf,
         })
   );
@@ -356,7 +440,14 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     projectGraph: ProjectGraphState;
     reduceMotion: boolean;
     selectedNodeIds: string[];
+    templateStatus: InvocationTemplateStatus;
   } | null>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  /** The last pointer position over this editor, kept outside state so pointer moves never re-render it. */
+  const pointerRef = useRef<{ client: XYPosition | null; isOverEditor: boolean }>({
+    client: null,
+    isOverEditor: false,
+  });
 
   const selectNodes = useCallback(
     (nodeIds: string[]) => {
@@ -429,6 +520,19 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   const renderedFlowNodes = renderedFlowModel?.nodes ?? EMPTY_FLOW_NODES;
   const renderedFlowEdges = renderedFlowModel?.edges ?? EMPTY_FLOW_EDGES;
 
+  // Measured before paint, so the flow mounts once, at the viewport its nodes first render for.
+  // An unmeasurable container opens at the default viewport.
+  useLayoutEffect(() => {
+    if (mountViewport !== undefined || !fitOnMount) {
+      return;
+    }
+
+    const height = mountContainerRef.current?.clientHeight ?? 0;
+    const width = mountContainerRef.current?.clientWidth ?? 0;
+
+    setMountViewport(width > 0 && height > 0 ? getZoomedOutMountViewport(fitOnMount, { height, width }) : null);
+  }, [fitOnMount, mountViewport]);
+
   useEffect(() => {
     markWorkbenchPerf(perfMountMarkRef.current, perfSource);
   }, [markWorkbenchPerf, perfSource]);
@@ -491,7 +595,8 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
       lastBuiltModel.edgeType === edgeType &&
       lastBuiltModel.invocationTemplates === invocationTemplates &&
       lastBuiltModel.reduceMotion === reduceMotion &&
-      lastBuiltModel.selectedNodeIds === nextSelectedNodeIds
+      lastBuiltModel.selectedNodeIds === nextSelectedNodeIds &&
+      lastBuiltModel.templateStatus === templateStatus
     ) {
       return undefined;
     }
@@ -503,6 +608,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         projectGraph,
         reduceMotion,
         selectedNodeIds: nextSelectedNodeIds,
+        templateStatus,
       };
 
       startTransition(() => {
@@ -518,6 +624,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
             previousNodes: current?.nodes,
             reduceMotion,
             selectedNodeIds: nextSelectedNodeIdSet,
+            templateStatus,
             time: timeWorkbenchPerf,
           });
 
@@ -551,6 +658,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     reduceMotion,
     selectedNodeIds,
     shouldDeferInitialBuild,
+    templateStatus,
     timeWorkbenchPerf,
   ]);
 
@@ -586,22 +694,57 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
       const copiedCount = copyNodesToClipboard(projectGraph, getActionNodeIds(nodeId));
 
       if (copiedCount > 0) {
-        notify.success(`Copied ${copiedCount} node${copiedCount === 1 ? '' : 's'}`);
+        notify.success(t('widgets.workflow.copiedNodes', { count: copiedCount }));
       }
     },
-    [getActionNodeIds, notify, projectGraph]
+    [getActionNodeIds, notify, projectGraph, t]
   );
 
-  const pasteNodes = useCallback(() => {
-    const { edges, nodes } = buildPasteElements();
+  /**
+   * Where a paste without an explicit anchor lands: at the pointer while it is over this editor and focus is not
+   * elsewhere (the editor, or nothing, holds it), otherwise centered in the visible view. A palette, menu, or side
+   * panel holds focus while it runs the command, so those paste into the middle of what the user sees.
+   */
+  const getPastePlacement = useCallback((): WorkflowPastePlacement | undefined => {
+    const container = editorRef.current;
 
-    if (nodes.length === 0) {
-      return;
+    if (!flowInstance || !container) {
+      return undefined;
     }
 
-    pendingSelectionRef.current = nodes.map((node) => node.id);
-    editGraph({ edges, nodes, type: 'addGraphElements' });
-  }, [editGraph]);
+    const { client, isOverEditor } = pointerRef.current;
+    const focused = document.activeElement;
+    const isFocusFree = !focused || focused === document.body || container.contains(focused);
+
+    if (client && isOverEditor && isFocusFree) {
+      return { align: 'top-left', point: flowInstance.screenToFlowPosition(client) };
+    }
+
+    const rect = container.getBoundingClientRect();
+
+    return {
+      align: 'center',
+      point: flowInstance.screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }),
+    };
+  }, [flowInstance]);
+
+  /** Pastes the clipboard with its top-left at `at`, or where `getPastePlacement` decides. */
+  const pasteNodes = useCallback(
+    (withConnections: boolean, at?: XYPosition) => {
+      const { edges, nodes } = buildPasteElements({
+        placement: at ? { align: 'top-left', point: at } : getPastePlacement(),
+        withConnections,
+      });
+
+      if (nodes.length === 0) {
+        return;
+      }
+
+      pendingSelectionRef.current = nodes.map((node) => node.id);
+      editGraph({ edges, nodes, type: 'addGraphElements' });
+    },
+    [editGraph, getPastePlacement]
+  );
 
   const duplicateNodes = useCallback(
     (nodeId?: string) => {
@@ -662,9 +805,12 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         copyNodes();
         return;
       }
-      case 'workflows.pasteSelection':
+      case 'workflows.pasteSelection': {
+        pasteNodes(false);
+        return;
+      }
       case 'workflows.pasteSelectionWithEdges': {
-        pasteNodes();
+        pasteNodes(true);
         return;
       }
       case 'workflows.duplicateSelection': {
@@ -691,26 +837,19 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   });
 
   useEffect(() => {
-    const hotkeys = [
-      ['workflows.addNode', 'Add workflow node', ['shift+a', 'space']],
-      ['workflows.copySelection', 'Copy workflow selection', ['mod+c']],
-      ['workflows.pasteSelection', 'Paste workflow selection', ['mod+v']],
-      ['workflows.pasteSelectionWithEdges', 'Paste workflow selection with edges', ['mod+shift+v']],
-      ['workflows.duplicateSelection', 'Duplicate workflow selection', ['mod+d']],
-      ['workflows.selectAll', 'Select all workflow nodes', ['mod+a']],
-      ['workflows.deleteSelection', 'Delete workflow selection', ['delete', 'backspace']],
-      ['workflows.undo', 'Undo workflow edit', ['mod+z']],
-      ['workflows.redo', 'Redo workflow edit', ['mod+shift+z', 'mod+y']],
-    ] as const;
-    const disposers = hotkeys.flatMap(([id, title, defaultKeys]) => [
-      runtime.commands.register({ handler: () => executeWorkflowHotkey(id), id, title }),
-      runtime.hotkeys.register({ commandId: id, defaultKeys: [...defaultKeys], id, title }),
-    ]);
+    const disposers = WORKFLOW_HOTKEYS.flatMap(({ defaultKeys, id, titleKey }) => {
+      const title = t(titleKey);
+
+      return [
+        runtime.commands.register({ handler: () => executeWorkflowHotkey(id), id, title }),
+        runtime.hotkeys.register({ commandId: id, defaultKeys: [...defaultKeys], id, title }),
+      ];
+    });
 
     return () => {
       disposers.forEach((dispose) => dispose());
     };
-  }, [runtime.commands, runtime.hotkeys]);
+  }, [runtime.commands, runtime.hotkeys, t]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange<WorkflowFlowNode>[]) => {
@@ -1122,10 +1261,21 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     duplicateNodes(contextMenu?.kind === 'node' ? contextMenu.nodeId : undefined);
     setContextMenu(null);
   }, [contextMenu, duplicateNodes]);
-  const onContextMenuPaste = useCallback(() => {
-    pasteNodes();
-    setContextMenu(null);
-  }, [pasteNodes]);
+  // Only the empty-canvas menu names a point; a node or selection menu pastes like any other menu, centered in the
+  // view, so the copy never lands on the nodes it was opened on.
+  const onContextMenuPaste = useCallback<WorkflowContextMenuPaste>(
+    (withConnections, position) => {
+      pasteNodes(withConnections, position);
+      setContextMenu(null);
+    },
+    [pasteNodes]
+  );
+  const onEditorPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    pointerRef.current = { client: { x: event.clientX, y: event.clientY }, isOverEditor: true };
+  }, []);
+  const onEditorPointerLeave = useCallback(() => {
+    pointerRef.current = { ...pointerRef.current, isOverEditor: false };
+  }, []);
   const onContextMenuToggleOpen = useCallback(() => {
     if (contextMenu?.kind === 'node' && contextMenu.nodeId && contextMenu.isNodeOpen !== null) {
       editGraph({ isOpen: !contextMenu.isNodeOpen, nodeId: contextMenu.nodeId, type: 'setNodeIsOpen' });
@@ -1146,23 +1296,58 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   );
   // No id list: the reducer already skips every node that cannot move.
   const onUpdateNodes = useCallback(() => editGraph({ templates, type: 'updateNodes' }), [editGraph, templates]);
+  // A lone selected node has nothing to arrange against, so the whole graph is laid out instead.
+  const arrangeScope: 'all' | 'selection' | null =
+    selectedNodeIds.length > 1 ? 'selection' : projectGraph.nodes.length > 1 ? 'all' : null;
+  const onArrangeNodes = useCallback(() => {
+    if (!flowInstance || arrangeScope === null) {
+      return;
+    }
+
+    const { bounds, positions } = getArrangedLayout(
+      projectGraph.nodes,
+      projectGraph.edges,
+      arrangeScope === 'selection' ? new Set(selectedNodeIds) : null,
+      new Map(flowInstance.getNodes().map((node) => [node.id, node.measured]))
+    );
+
+    editGraph({ positions, type: 'setNodePositions' });
+    // The flow shows the new positions after the model rebuilds; the bounds are known now, so fit them directly.
+    void fitWorkflowBounds(flowInstance, bounds, flowStore.getState(), reduceMotion ? 0 : 300);
+  }, [
+    arrangeScope,
+    editGraph,
+    flowInstance,
+    flowStore,
+    projectGraph.edges,
+    projectGraph.nodes,
+    reduceMotion,
+    selectedNodeIds,
+  ]);
 
   if (isPreparing) {
     return <WorkflowEditorPreparingState edgeCount={projectGraph.edges.length} nodeCount={projectGraph.nodes.length} />;
   }
 
+  if (mountViewport === undefined) {
+    return <Box ref={mountContainerRef} bg="bg.inset" h="full" w="full" />;
+  }
+
   return (
     <Box
+      ref={editorRef}
       bg="bg.inset"
       css={editorCss}
       h="full"
       position="relative"
       w="full"
       onContextMenuCapture={onEditorContextMenuCapture}
+      onPointerEnter={onEditorPointerMove}
+      onPointerLeave={onEditorPointerLeave}
+      onPointerMove={onEditorPointerMove}
       {...pointerToolHandlers}
     >
       <ReactFlow<WorkflowFlowNode, WorkflowFlowEdge>
-        key={viewportKey}
         colorMode={getFlowColorMode(themeId)}
         connectionLineType={edgeType === 'step' ? ConnectionLineType.Step : ConnectionLineType.Bezier}
         defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
@@ -1172,8 +1357,8 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         edges={renderedFlowEdges}
         edgeTypes={edgeTypes}
         isValidConnection={isValidConnection}
-        maxZoom={2}
-        minZoom={0.1}
+        maxZoom={MAX_ZOOM}
+        minZoom={MIN_ZOOM}
         nodes={renderedFlowNodes}
         nodeTypes={nodeTypes}
         onlyRenderVisibleElements={isLargeGraph}
@@ -1211,13 +1396,19 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         />
         <LoopBodyBoundaryOverlay edges={projectGraph.edges} nodes={projectGraph.nodes} />
         <EditorToolbar
+          arrangeScope={arrangeScope}
+          canRedo={canRedo}
+          canUndo={canUndo}
           nodeOpacity={nodeOpacity}
           tool={tool}
           updatableNodeCount={updatableNodeCount}
+          onArrangeNodes={onArrangeNodes}
           onExportPrepare={onExportPrepare}
           onExportComplete={onExportComplete}
           onNodeOpacityChange={setNodeOpacity}
+          onRedo={redo}
           onToolChange={setTool}
+          onUndo={undo}
           onUpdateNodes={onUpdateNodes}
         />
         {workflowShowMinimap && (!isLargeGraph || isMinimapReady) ? <FlowMiniMap /> : null}
@@ -1266,10 +1457,12 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
 };
 
 export const WorkflowEditorView = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
-  // Each project workflow is its own editor mount: selection, viewport and deferred large-graph work stay with it.
+  // Each project workflow is its own editor mount (its viewport key's project, workflow and instance included):
+  // selection, viewport and deferred large-graph work stay with it. It owns its flow store too: a shared store would
+  // notify the outgoing flow's nodes of the incoming flow's updates while they unmount, each failing to find its node.
   const flowIdentity = useWorkflowProjectSelector(
     (project) =>
-      `${project.id}:${project.activeWorkflowId}:${isLargeWorkflowGraph({ edgeCount: project.projectGraph.edges.length, nodeCount: project.projectGraph.nodes.length }) ? 'large' : 'standard'}`
+      `${runtime.instanceId}:${project.id}:${project.activeWorkflowId}:${isLargeWorkflowGraph({ edgeCount: project.projectGraph.edges.length, nodeCount: project.projectGraph.nodes.length }) ? 'large' : 'standard'}`
   );
 
   useEffect(() => {
@@ -1277,12 +1470,12 @@ export const WorkflowEditorView = ({ runtime }: { runtime: WorkflowRuntimeApi })
   }, []);
 
   return (
-    <ReactFlowProvider>
-      <Flex direction="column" h="full" minH="0" w="full">
-        <Box flex="1" minH="0" position="relative">
-          <WorkflowFlow key={flowIdentity} runtime={runtime} />
-        </Box>
-      </Flex>
-    </ReactFlowProvider>
+    <Flex direction="column" h="full" minH="0" w="full">
+      <Box flex="1" minH="0" position="relative">
+        <ReactFlowProvider key={flowIdentity}>
+          <WorkflowFlow runtime={runtime} />
+        </ReactFlowProvider>
+      </Box>
+    </Flex>
   );
 };

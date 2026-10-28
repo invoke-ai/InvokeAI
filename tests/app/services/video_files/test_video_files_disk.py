@@ -206,7 +206,7 @@ def test_start_keeps_staged_delete_when_the_record_cannot_be_read(storage: DiskV
 
     The recovery decides between purging the staged files and restoring them by asking whether
     the record is still there, so it needs that read to distinguish "gone" from "could not
-    look". `SqliteVideoRecordStorage.get` used to translate every sqlite3.Error into
+    look". `VideoRecordStorage.get` used to translate every sqlite3.Error into
     VideoRecordNotFoundException, which made an unreadable database delete the user's video
     files outright. Now the staged copy survives for a later attempt.
     """
@@ -264,6 +264,7 @@ def _sidecars(storage: DiskVideoFileStorage) -> list[Path]:
     return [p for p in _all_files(storage.get_path(VIDEO_NAME).parent) if p.suffix == ".json"]
 
 
+@pytest.mark.ffmpeg
 def test_save_embeds_metadata_workflow_and_graph_in_the_mp4_and_writes_no_sidecar(
     storage: DiskVideoFileStorage, real_source: Path
 ):
@@ -290,6 +291,7 @@ def test_save_embeds_metadata_workflow_and_graph_in_the_mp4_and_writes_no_sideca
     assert storage.get_path(VIDEO_NAME, thumbnail=True).exists()
 
 
+@pytest.mark.ffmpeg
 def test_save_without_any_metadata_leaves_the_file_byte_identical(storage: DiskVideoFileStorage, real_source: Path):
     original = real_source.read_bytes()
 
@@ -299,6 +301,7 @@ def test_save_without_any_metadata_leaves_the_file_byte_identical(storage: DiskV
     assert _sidecars(storage) == []
 
 
+@pytest.mark.ffmpeg
 def test_save_falls_back_to_a_sidecar_when_embedding_fails(
     storage: DiskVideoFileStorage, real_source: Path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -321,6 +324,7 @@ def test_save_falls_back_to_a_sidecar_when_embedding_fails(
     assert [p.name for p in _all_files(storage.get_path(VIDEO_NAME).parent) if p.name.startswith(".embed_")] == []
 
 
+@pytest.mark.ffmpeg
 def test_legacy_sidecar_is_still_read_for_an_untagged_video(storage: DiskVideoFileStorage, real_source: Path):
     storage.save(source_path=real_source, video_name=VIDEO_NAME)
     sidecar_dir = storage.get_path(VIDEO_NAME).parent / "sidecars"
@@ -333,6 +337,7 @@ def test_legacy_sidecar_is_still_read_for_an_untagged_video(storage: DiskVideoFi
     assert storage.get_graph(VIDEO_NAME) is None
 
 
+@pytest.mark.ffmpeg
 def test_embedded_tags_win_over_a_stale_sidecar(storage: DiskVideoFileStorage, real_source: Path):
     storage.save(source_path=real_source, video_name=VIDEO_NAME, workflow='{"name": "embedded"}')
     sidecar_dir = storage.get_path(VIDEO_NAME).parent / "sidecars"
@@ -342,6 +347,7 @@ def test_embedded_tags_win_over_a_stale_sidecar(storage: DiskVideoFileStorage, r
     assert storage.get_workflow(VIDEO_NAME) == '{"name": "embedded"}'
 
 
+@pytest.mark.ffmpeg
 def test_save_of_an_already_tagged_file_skips_the_rewrite(
     storage: DiskVideoFileStorage, real_source: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -366,6 +372,7 @@ def test_save_of_an_already_tagged_file_skips_the_rewrite(
     assert _sidecars(storage) == []
 
 
+@pytest.mark.ffmpeg
 def test_crlf_metadata_is_embedded_not_rejected(storage: DiskVideoFileStorage, real_source: Path):
     """CRLF-formatted JSON from an API client must neither fail the save nor lose the record."""
     from invokeai.app.util.mp4_metadata import read_mp4_tags
@@ -378,6 +385,7 @@ def test_crlf_metadata_is_embedded_not_rejected(storage: DiskVideoFileStorage, r
     assert _sidecars(storage) == []
 
 
+@pytest.mark.ffmpeg
 def test_a_tag_the_writer_refuses_falls_back_to_a_sidecar_without_leaking(
     storage: DiskVideoFileStorage, real_source: Path
 ):
@@ -401,6 +409,7 @@ def test_start_sweeps_remux_temp_files_left_by_a_crash(tmp_path: Path):
     assert not stale.exists()
 
 
+@pytest.mark.ffmpeg
 def test_a_file_carrying_a_tag_the_caller_dropped_is_rewritten_without_it(
     storage: DiskVideoFileStorage, real_source: Path, tmp_path: Path
 ):
@@ -424,6 +433,7 @@ def test_a_file_carrying_a_tag_the_caller_dropped_is_rewritten_without_it(
     assert storage.get_graph(VIDEO_NAME) == "{}"
 
 
+@pytest.mark.ffmpeg
 def test_a_file_whose_only_tag_was_rejected_is_stored_without_it(
     storage: DiskVideoFileStorage, real_source: Path, tmp_path: Path
 ):

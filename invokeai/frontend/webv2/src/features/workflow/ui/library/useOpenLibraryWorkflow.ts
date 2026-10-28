@@ -1,6 +1,7 @@
-import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
+import type { ProjectWorkflowEntry, ProjectWorkflowSource } from '@features/workflow/core/types';
 import type { LibraryOpenItem } from '@features/workflow/ui/workflowUiStore';
 
+import { getWorkflowRecordCategory } from '@features/workflow/data/api';
 import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
 import { getLibraryWorkflowRecordCached, touchLibraryWorkflowOpenedAt } from '@features/workflow/queries';
 import { requestWorkflowFitView } from '@features/workflow/ui/editor/flowInstanceStore';
@@ -89,7 +90,10 @@ export const useOpenLibraryWorkflow = (onOpened: () => void): OpenLibraryWorkflo
       try {
         setLoadPhase('fetching');
 
-        const record = await getLibraryWorkflowRecordCached(item.workflow_id, owner.signal);
+        const record = await getLibraryWorkflowRecordCached(item.workflow_id, {
+          expectedRevision: item.revision,
+          signal: owner.signal,
+        });
 
         assertAccountScopeCurrent(owner);
         const { document: parsed, warnings: parseWarnings } = parseWorkflowJson({
@@ -113,7 +117,11 @@ export const useOpenLibraryWorkflow = (onOpened: () => void): OpenLibraryWorkflo
           return;
         }
 
-        const source = { libraryWorkflowId: record.workflow_id, revision: record.revision };
+        const source: ProjectWorkflowSource = {
+          libraryWorkflowId: record.workflow_id,
+          revision: record.revision,
+          ...(getWorkflowRecordCategory(record) === 'user' ? { ownerUserId: record.user_id } : {}),
+        };
 
         if (target.kind === 'replace') {
           replaceWorkflow({ projectId, workflowId: target.workflowId }, document, {

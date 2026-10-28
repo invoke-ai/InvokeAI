@@ -59,10 +59,14 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 #
 # - darwin is deliberately empty: macOS uses MPS, for which PyTorch publishes no
 #   separate index, so the launcher installs the default PyPI wheels.
-# - win32 has no rocm entry: PyTorch publishes no ROCm wheels for Windows, and
-#   the `rocm` extra in pyproject.toml is marked `sys_platform == 'linux'`.
+# - win32 has no rocm entry: legacy (pre-6.14.0) installs do not support ROCm on
+#   Windows. Current releases install the `rocm` extra from the lockfile, which
+#   covers Windows through AMD's index.
 # - xpu is on both win32 and linux: PyTorch's XPU index publishes win_amd64 and
 #   linux-x86_64 wheels, which is exactly what the `xpu` extra's markers allow.
+# - Windows on ARM64 is deliberately absent: the launcher's legacy path predates
+#   every Invoke version that runs there, and its bootstrap path installs from
+#   the release lockfile, which carries the ARM64 torch index itself.
 REQUIRED_BACKENDS: dict[str, set[str]] = {
     "win32": {"cpu", "cuda", "xpu"},
     "linux": {"cpu", "cuda", "rocm", "xpu"},

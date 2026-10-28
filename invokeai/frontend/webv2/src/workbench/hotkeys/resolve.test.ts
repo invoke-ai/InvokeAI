@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { RegisteredHotkey } from './types';
+import type { HotkeyDefinition, RegisteredHotkey } from './types';
 
-import { applyCustomHotkeys, resolveHotkey } from './resolve';
+import { applyCustomHotkeys, resolveHotkey, toPlatformHotkey } from './resolve';
 
 const event = { target: null } as KeyboardEvent;
 const context = {
   activeInstanceId: null,
   activeWidgetTypeId: null,
   focusedRegion: null,
-  isModalLayerActive: false,
+  isModalPresent: false,
   projectId: 'project-1',
 } as const;
 
@@ -22,6 +22,40 @@ const base = {
 } as const;
 
 describe('resolveHotkey', () => {
+  it('treats mod and the platform key it stands for as one press, leaving the choice to scope', () => {
+    expect(toPlatformHotkey('mod+arrowup', false)).toBe('ctrl+arrowup');
+    expect(toPlatformHotkey('shift+mod+a', true)).toBe('meta+shift+a');
+
+    // The runtime hands over whichever spelling's binding fired first.
+    const platformSpelling = toPlatformHotkey('mod+arrowup');
+    const globalHotkey: RegisteredHotkey = {
+      ...base,
+      commandId: 'global',
+      id: 'global',
+      keys: [platformSpelling],
+      scope: { kind: 'global' },
+      title: 'Global',
+    };
+    const widgetHotkey: RegisteredHotkey = {
+      ...base,
+      commandId: 'widget',
+      id: 'widget',
+      keys: ['mod+arrowup'],
+      scope: { kind: 'widget', typeIds: ['gallery'] },
+      title: 'Widget',
+    };
+    const resolve = (activeWidgetTypeId: string | null) =>
+      resolveHotkey({
+        context: { ...context, activeInstanceId: activeWidgetTypeId && 'gallery-1', activeWidgetTypeId },
+        event,
+        hotkeys: [globalHotkey, widgetHotkey],
+        matchedKey: platformSpelling,
+      })?.commandId;
+
+    expect(resolve('gallery')).toBe('widget');
+    expect(resolve(null)).toBe('global');
+  });
+
   it('prefers active widget over global', () => {
     const globalHotkey: RegisteredHotkey = {
       ...base,
@@ -34,7 +68,7 @@ describe('resolveHotkey', () => {
       ...base,
       commandId: 'widget',
       id: 'widget',
-      scope: { kind: 'widget', typeId: 'gallery' },
+      scope: { kind: 'widget', typeIds: ['gallery'] },
       title: 'Widget',
     };
 
@@ -53,7 +87,7 @@ describe('resolveHotkey', () => {
       ...base,
       commandId: 'widget',
       id: 'widget',
-      scope: { kind: 'widget', typeId: 'gallery' },
+      scope: { kind: 'widget', typeIds: ['gallery'] },
       title: 'Widget',
     };
     const instanceHotkey: RegisteredHotkey = {
@@ -142,7 +176,7 @@ describe('resolveHotkey', () => {
     const rightOnly = hotkey('right-only', { kind: 'focused-region', region: 'right' });
     const thisWindow = hotkey('this-window', { floatingInstanceId: 'map-1', kind: 'focused-region' });
     const otherWindow = hotkey('other-window', { floatingInstanceId: 'map-2', kind: 'focused-region' });
-    const widget = hotkey('widget', { kind: 'widget', typeId: 'image-map' });
+    const widget = hotkey('widget', { kind: 'widget', typeIds: ['image-map'] });
     const instance = hotkey('instance', { instanceId: 'map-1', kind: 'instance' });
     const resolve = (hotkeys: RegisteredHotkey[]) =>
       resolveHotkey({ context: floating, event, hotkeys, matchedKey: 'x' })?.commandId;
@@ -161,7 +195,7 @@ describe('resolveHotkey', () => {
     // Modal suppression is unchanged by where focus is.
     expect(
       resolveHotkey({
-        context: { ...floating, isModalLayerActive: true },
+        context: { ...floating, isModalPresent: true },
         event,
         hotkeys: [global, anyRegion, widget, instance],
         matchedKey: 'x',
@@ -174,7 +208,7 @@ describe('resolveHotkey', () => {
       ...base,
       commandId: 'stale',
       id: 'stale',
-      scope: { kind: 'widget', typeId: 'gallery' },
+      scope: { kind: 'widget', typeIds: ['gallery'] },
       source: { instanceId: 'gallery-1', projectId: 'project-2', region: 'left', typeId: 'gallery' },
       title: 'Stale project',
     };
@@ -233,7 +267,7 @@ describe('resolveHotkey', () => {
 
     expect(
       resolveHotkey({
-        context: { ...context, isModalLayerActive: true },
+        context: { ...context, isModalPresent: true },
         event,
         hotkeys: [hotkey],
         matchedKey: 'x',
@@ -241,12 +275,42 @@ describe('resolveHotkey', () => {
     ).toBeNull();
     expect(
       resolveHotkey({
-        context: { ...context, isModalLayerActive: true },
+        context: { ...context, isModalPresent: true },
         event,
         hotkeys: [hotkey, modalHotkey],
         matchedKey: 'x',
       })?.commandId
     ).toBe('modal');
+  });
+
+  it('gives a key to the user’s own binding over a default sharing its scope priority', () => {
+    const galleryContext = { ...context, activeInstanceId: 'gallery-1', activeWidgetTypeId: 'gallery' } as const;
+    const definition = (id: string, defaultKeys: string[], scope: HotkeyDefinition['scope']): HotkeyDefinition => ({
+      category: 'app',
+      commandId: id,
+      defaultKeys,
+      id,
+      implemented: true,
+      scope,
+      title: id,
+    });
+    // Catalog order: the default binding comes first, as a first-party hotkey precedes a later one on the same key.
+    const recallSeed = applyCustomHotkeys(
+      definition('recall', ['s'], { kind: 'widget', typeIds: ['preview', 'gallery'] }),
+      {}
+    );
+    const starredOnly = applyCustomHotkeys(definition('starred', [], { kind: 'widget', typeIds: ['gallery'] }), {
+      starred: ['s'],
+    });
+    const starredByDefault = applyCustomHotkeys({ ...starredOnly, defaultKeys: ['s'] }, {});
+    const resolve = (hotkeys: RegisteredHotkey[]) =>
+      resolveHotkey({ context: galleryContext, event, hotkeys, matchedKey: 's' })?.commandId;
+
+    expect(resolve([recallSeed, starredOnly])).toBe('starred');
+    expect(resolve([recallSeed, starredByDefault])).toBe('recall');
+    // Scope priority still comes first: a custom binding on a less specific scope does not jump ahead.
+    const customGlobal = applyCustomHotkeys(definition('global', [], { kind: 'global' }), { global: ['s'] });
+    expect(resolve([customGlobal, recallSeed])).toBe('recall');
   });
 
   it('keeps an empty custom key array as a disabled hotkey', () => {

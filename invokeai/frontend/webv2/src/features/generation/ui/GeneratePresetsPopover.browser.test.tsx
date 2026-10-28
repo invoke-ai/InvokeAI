@@ -1,6 +1,9 @@
+import type { MainModelConfig } from '@features/generation/core/types';
 import type { GenerationUiAdapter } from '@features/generation/ui/GenerationUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import { GenerationUiProvider } from '@features/generation/ui/GenerationUiContext';
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { system } from '@theme/system';
@@ -8,13 +11,29 @@ import i18next from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
 import { GeneratePresetsPopover } from './GeneratePresetsPopover';
 
 const i18n = i18next.createInstance();
-await i18n.use(initReactI18next).init({ fallbackLng: 'en', lng: 'en' });
+await i18n.use(initReactI18next).init({
+  fallbackLng: 'en',
+  lng: 'en',
+  resources: {
+    en: {
+      translation: {
+        widgets: {
+          generate: {
+            presetSettingsCleared: 'Settings cleared by preset',
+            presetSettingsClearedDescription: 'Cleared: {{labels}}.',
+          },
+        },
+      },
+    },
+  },
+});
+seedArchitectureCapabilities();
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -52,21 +71,25 @@ const openRename = async (index: number) => {
   await expect.poll(() => modalDialog()?.getAttribute('data-state')).toBe('open');
 };
 
-beforeEach(async () => {
-  host = document.createElement('div');
-  document.body.append(host);
-  root = createRoot(host);
+const renderAdapter = async (adapter: GenerationUiAdapter) => {
   await act(() =>
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
-          <GenerationUiProvider adapter={ADAPTER}>
+          <GenerationUiProvider adapter={adapter}>
             <GeneratePresetsPopover />
           </GenerationUiProvider>
         </ChakraProvider>
       </I18nextProvider>
     )
   );
+};
+
+beforeEach(async () => {
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  await renderAdapter(ADAPTER);
 });
 
 afterEach(async () => {
@@ -75,6 +98,68 @@ afterEach(async () => {
 });
 
 describe('GeneratePresetsPopover', () => {
+  it.each(['omitted', 'null'] as const)(
+    'clears an active refiner when applying a preset with %s refiner and names it in the clearing notice',
+    async (slot) => {
+      const model: MainModelConfig = { base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' };
+      const refiner: MainModelConfig = { base: 'sdxl-refiner', key: 'refiner', name: 'Refiner', type: 'main' };
+      const olderPreset: Record<string, unknown> = { ...getDefaultGenerateSettings(model) };
+      if (slot === 'omitted') {
+        delete olderPreset.refinerModel;
+      }
+      const patchGenerateSettings = vi.fn();
+      const info = vi.fn();
+      const adapter = {
+        ...ADAPTER,
+        generateValues: { getSnapshot: () => currentValues, subscribe: () => () => {} },
+        models: { ...ADAPTER.models, catalog: [model, refiner] },
+        presets: { ...ADAPTER.presets, presets: [{ id: 'older', label: 'Older preset', values: olderPreset }] },
+        notifications: { ...ADAPTER.notifications, info },
+        settings: { ...ADAPTER.settings, patchGenerateSettings },
+      } as unknown as GenerationUiAdapter;
+      const currentValues = { ...olderPreset, model, refinerModel: refiner };
+      await renderAdapter(adapter);
+      await act(() => userEvent.click(document.querySelector<HTMLElement>('[aria-label="widgets.generate.presets"]')!));
+      const presetButton = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+        (button) => button.textContent === 'Older preset'
+      );
+      await act(() => presetButton!.click());
+
+      expect(patchGenerateSettings).toHaveBeenCalledWith(expect.objectContaining({ refinerModel: null }), 'project-1');
+      expect(info).toHaveBeenCalledWith('Settings cleared by preset', 'Cleared: Refiner.');
+    }
+  );
+
+  it('names the size a preset moved to when its stored size does not fit the model', async () => {
+    const model: MainModelConfig = { base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' };
+    // 1028 is off SDXL's 8 px grid, as a preset saved from a hosted model's size can be.
+    const preset = { ...getDefaultGenerateSettings(model), height: 1024, width: 1028 };
+    // The current size differs from the preset's, so the preset is not shown as active.
+    const currentValues = { ...preset, model, width: 1024 };
+    const info = vi.fn();
+    const patchGenerateSettings = vi.fn();
+    const adapter = {
+      ...ADAPTER,
+      generateValues: { getSnapshot: () => currentValues, subscribe: () => () => {} },
+      models: { ...ADAPTER.models, catalog: [model] },
+      presets: { ...ADAPTER.presets, presets: [{ id: 'off-grid', label: 'Off grid', values: preset }] },
+      notifications: { ...ADAPTER.notifications, info },
+      settings: { ...ADAPTER.settings, patchGenerateSettings },
+    } as unknown as GenerationUiAdapter;
+    await renderAdapter(adapter);
+    await act(() => userEvent.click(document.querySelector<HTMLElement>('[aria-label="widgets.generate.presets"]')!));
+    const presetButton = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === 'Off grid'
+    );
+    await act(() => presetButton!.click());
+
+    expect(patchGenerateSettings).toHaveBeenCalledWith(expect.objectContaining({ width: 1032 }), 'project-1');
+    expect(info).toHaveBeenCalledWith(
+      'widgets.generate.dimensionsAdjusted',
+      'widgets.generate.dimensionsAdjustedDescription'
+    );
+  });
+
   it('animates the rename dialog out instead of unmounting it on close', async () => {
     await openRename(0);
     expect(renameInput()?.value).toBe('Portrait');
@@ -88,6 +173,14 @@ describe('GeneratePresetsPopover', () => {
   });
 
   it('starts a rename reopened during the exit animation from the newly chosen preset', async () => {
+    // The reopen has to land while the closed dialog is still animating out; on a loaded machine a real-length exit
+    // animation can end before the Escape press even returns, so it is held for the whole test.
+    const holdExit = document.createElement('style');
+    holdExit.textContent =
+      '[data-scope="dialog"][data-part="content"][data-state="closed"] { animation-duration: 3600s !important; }';
+    document.head.append(holdExit);
+    onTestFinished(() => holdExit.remove());
+
     await openRename(0);
     await act(() => userEvent.type(renameInput()!, ' draft'));
     await act(() => userEvent.keyboard('{Escape}'));

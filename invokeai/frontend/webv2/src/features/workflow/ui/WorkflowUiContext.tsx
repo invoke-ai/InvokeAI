@@ -1,8 +1,9 @@
 import type { GalleryItemRef } from '@features/gallery/contracts';
 import type { ForLoopValidationReason } from '@features/workflow/core/forLoops';
 import type { ProjectGraphState, ProjectWorkflowEntry, ProjectWorkflowSource } from '@features/workflow/core/types';
+import type { WorkflowLibrarySort } from '@features/workflow/data/libraryBrowseStore';
 import type { WorkbenchThemeId } from '@theme/themes';
-import type { ReactNode } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 
 import { useExternalStoreSelector, type EqualityFn } from '@platform/state/selectors';
 import { createContext, use, useCallback, useSyncExternalStore } from 'react';
@@ -15,12 +16,17 @@ import type {
   WorkflowWidgetCommands,
 } from './contracts';
 
+/** How workflow thumbnails sit in their 3:2 box: cropped to fill it, or letterboxed whole. */
+export type WorkflowThumbnailFit = 'cover' | 'contain';
+
 export interface WorkflowPreferences {
   reduceMotion: boolean;
   themeId: WorkbenchThemeId;
   workflowEdgeStyle: 'curved' | 'square';
   workflowEdgesBehindNodes: boolean;
   workflowGroupNodesByCategory: boolean;
+  workflowLibrarySort: WorkflowLibrarySort;
+  workflowLibraryThumbnailFit: WorkflowThumbnailFit;
   workflowShowMinimap: boolean;
   workflowSnapToGrid: boolean;
   workflowValidateConnections: boolean;
@@ -44,6 +50,9 @@ export interface WorkflowProjectSnapshot {
   /** The active workflow's entry: its document plus source and run metadata. */
   activeWorkflow: ProjectWorkflowEntry;
   activeWorkflowId: string;
+  /** Whether the active workflow's session history has an edit to undo or redo. */
+  canRedo: boolean;
+  canUndo: boolean;
   /** Every workflow the project owns, in collection order; entries keep identity until edited. */
   workflows: readonly ProjectWorkflowEntry[];
   workflowValues: Record<string, unknown>;
@@ -71,6 +80,8 @@ export interface WorkflowGraphPreviewPort {
 
 /** This UI port preserves dependency direction: Workflow cannot import Workbench. */
 export interface WorkflowUiAdapter {
+  /** Keycaps for a hotkey command's first effective binding, as the command palette shows them; nothing when unbound. */
+  CommandShortcut: ComponentType<{ commandId: string }>;
   capabilities: WorkflowReadPort<WorkflowCapabilities>;
   preferences: WorkflowReadPort<WorkflowPreferences>;
   project: WorkflowReadPort<WorkflowProjectSnapshot>;
@@ -78,6 +89,10 @@ export interface WorkflowUiAdapter {
   commands: WorkflowCommands;
   widgets: WorkflowWidgetCommands;
   getProjectGraph(): ProjectGraphState;
+  /** Saves the library's account-bound display choices. */
+  setLibraryPreferences(
+    patch: Partial<Pick<WorkflowPreferences, 'workflowLibrarySort' | 'workflowLibraryThumbnailFit'>>
+  ): void;
   notifications: {
     error(title: string, message?: string): void;
     info(title: string, message?: string): void;
@@ -92,7 +107,6 @@ export interface WorkflowUiAdapter {
   findInGallery(ref: GalleryItemRef): void;
   /** Leaves the editor for the model manager's Add Models section, searching for `query`. */
   openAddModels(query: string): void;
-  registerModalHotkeyLayer(id: string): () => void;
   nodeExecution: {
     get(nodeId: string): WorkflowNodeExecutionState | null;
     subscribe(nodeId: string, listener: () => void): () => void;

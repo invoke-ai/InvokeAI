@@ -11,7 +11,7 @@ import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import type { GalleryStateView } from './galleryStateView';
 import type { GalleryWidgetContextValue } from './GalleryWidgetContext';
@@ -43,6 +43,7 @@ const board: GalleryBoard = {
   imageCount: 50,
   kind: 'board',
   name: 'dogs',
+  isInbox: false,
   projectId: null,
   videoCount: 0,
 };
@@ -68,10 +69,11 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}) =>
     boards: [board],
     compareImageKey: null,
     galleryView: 'images',
-    isLoading: false,
     items: [createItem('a.png'), createItem('b.png')],
+    listingBoardId: overrides.selectedBoardId ?? 'dogs',
     pendingPlaceholders: [],
     projectBoardId: null,
+    searchScope: 'board',
     searchTerm: '',
     selectedBoardId: 'dogs',
     selectedItemKey: 'image:a.png',
@@ -98,6 +100,14 @@ const createContextValue = () =>
     region: 'center',
   }) as unknown as GalleryWidgetContextValue;
 
+const READY = {
+  error: null,
+  isFetchingMore: false,
+  isRetrying: false,
+  retry: () => Promise.resolve(),
+  status: 'ready',
+} as const;
+
 const contextBase = {
   actions: {
     createBoard: vi.fn(),
@@ -110,9 +120,11 @@ const contextBase = {
     updateSettings: vi.fn(),
     uploadFiles: vi.fn(),
   },
+  boardsState: READY,
   filter: { boardId: 'dogs', galleryView: 'images', searchTerm: '' },
   gallery,
   isWindowTruncated: false,
+  listing: READY,
   starredStrip: EMPTY_GALLERY_STARRED_STRIP,
   itemActions: {
     deleteItems: vi.fn(),
@@ -136,6 +148,7 @@ const adapter = {
   getItemLabel: () => Promise.resolve(null),
   followProgressSession: vi.fn(),
   antialiasProgressImages: false,
+  galleryValues: {},
   widgets: { openGallery: vi.fn(() => true), patchGalleryValues: vi.fn() },
 } as unknown as GalleryUiAdapter;
 
@@ -410,10 +423,84 @@ describe('gallery layout shells', () => {
     }
   });
 
+  it('places the media filter between the starred filter and the sort menu in both shells, operable by keyboard', async () => {
+    for (const Layout of [GalleryStackedLayout, GalleryWideLayout]) {
+      (contextBase.actions.updateSettings as ReturnType<typeof vi.fn>).mockClear();
+      setGallery(createGallery());
+      await renderLayout(Layout);
+
+      const toolbarButtons = [...(host?.querySelectorAll<HTMLButtonElement>('button') ?? [])];
+      const starIndex = toolbarButtons.findIndex(
+        (button) => button.getAttribute('aria-label') === 'widgets.gallery.starredOnly'
+      );
+      const filter = host?.querySelector<HTMLButtonElement>('[data-gallery-media-filter-menu]');
+      const sortIndex = toolbarButtons.findIndex(
+        (button) => button.getAttribute('aria-label') === 'widgets.gallery.imageSortValue'
+      );
+
+      expect(filter, 'media filter did not render in the toolbar').not.toBeNull();
+      expect(toolbarButtons.indexOf(filter!)).toBe(starIndex + 1);
+      expect(sortIndex).toBe(starIndex + 2);
+      expect(filter?.getAttribute('aria-label')).toBe('widgets.gallery.mediaFilterTrigger');
+
+      filter?.focus();
+      await userEvent.keyboard('{Enter}');
+      const videosOnly = page.getByRole('menuitemradio', { name: 'widgets.gallery.mediaFilterVideos' });
+
+      await expect.element(videosOnly).toBeVisible();
+      await expect
+        .element(page.getByRole('menuitemradio', { name: 'widgets.gallery.mediaFilterAll' }))
+        .toHaveAttribute('aria-checked', 'true');
+      await userEvent.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+
+      expect(contextBase.actions.updateSettings).toHaveBeenCalledExactlyOnceWith({ mediaFilter: 'video' });
+      await expect.element(videosOnly).not.toBeInTheDocument();
+    }
+  });
+
+  it('shows a restricted media filter as an active control', async () => {
+    const triggerBackground = () =>
+      getComputedStyle(host!.querySelector<HTMLElement>('[data-gallery-media-filter-menu]')!).backgroundColor;
+
+    await renderLayout(GalleryWideLayout);
+    const inactiveBackground = triggerBackground();
+
+    setGallery(createGallery({ settings: { ...DEFAULT_GALLERY_SETTINGS, mediaFilter: 'image' } }));
+    await renderLayout(GalleryWideLayout);
+
+    const trigger = host?.querySelector('[data-gallery-media-filter-menu]');
+
+    expect(trigger?.getAttribute('data-media-filter')).toBe('image');
+    expect(trigger?.hasAttribute('data-active')).toBe(true);
+    // The cue is visible, not just an attribute: a ghost trigger has no fill.
+    expect(triggerBackground()).not.toBe(inactiveBackground);
+  });
+
+  it('moves focus to the media filter when Show all media removes the empty state, in both shells', async () => {
+    for (const Layout of [GalleryStackedLayout, GalleryWideLayout]) {
+      (contextBase.actions.updateSettings as ReturnType<typeof vi.fn>).mockClear();
+      setGallery(createGallery({ items: [], settings: { ...DEFAULT_GALLERY_SETTINGS, mediaFilter: 'video' } }));
+      await renderLayout(Layout);
+
+      const showAll = [...(host?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find(
+        (button) => button.textContent === 'widgets.gallery.showAllMedia'
+      );
+
+      expect(showAll, 'Show all media did not render').toBeDefined();
+      showAll?.focus();
+      await act(() => {
+        showAll?.click();
+      });
+
+      expect(contextBase.actions.updateSettings).toHaveBeenCalledExactlyOnceWith({ mediaFilter: 'all' });
+      expect(document.activeElement?.hasAttribute('data-gallery-media-filter-menu')).toBe(true);
+    }
+  });
+
   it('moves focus to the toolbar toggle when Show all removes the strip header', async () => {
     const starredItem = { ...createItem('starred.png'), starred: true };
 
-    contextBase.starredStrip = { items: [starredItem], total: 9 };
+    contextBase.starredStrip = { items: [starredItem], state: READY, total: 9 };
     setGallery(createGallery({ items: [createItem('a.png')], starredOnly: false }));
     await renderLayout(GalleryWideLayout);
 

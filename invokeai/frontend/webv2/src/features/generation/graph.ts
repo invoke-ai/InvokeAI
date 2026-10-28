@@ -15,18 +15,28 @@ export {
   toModelIdentifier,
 } from './core/graphBuilder';
 export { detectCanvasMode } from './core/canvas/canvasMode';
+export { getCompelPromptNodeType, supportsPromptAttentionSyntax } from './core/prompt/compel';
 export {
+  areControlAdapterValuesValid,
+  CONTROL_ADAPTER_KINDS,
+  CONTROL_VALIDATION_REASONS,
   type ControlAdapterKind,
   type ControlValidationReason,
+  createControlValidationSequence,
+  getControlAdapterMinWeight,
+  getControlModelUnusableReason,
   getControlValidationReason,
   isControlKindSupportedForBase,
+  isControlModelUsableForKind,
 } from './core/canvas/controlValidation';
-export { getControlLayerRejectionReason, getControlValidationReasonMessage } from './core/canvas/addControlLayers';
 export {
+  getLayoutPromptRejectionReason,
+  getLayoutRegionIssue,
   getRegionalGuidanceRejectionReason,
   getRegionalGuidanceSupport,
   isRegionalGuidanceSupportedForBase,
   type RegionalGuidanceInput,
+  type RegionalLayoutKind,
   type RegionalReferenceImageInput,
 } from './core/canvas/addRegionalGuidance';
 export type { ControlLayerGraphInput } from './core/canvas/addControlLayers';

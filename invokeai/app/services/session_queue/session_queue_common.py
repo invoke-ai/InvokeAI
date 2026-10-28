@@ -2,7 +2,7 @@ import datetime
 import json
 from collections.abc import Mapping
 from itertools import chain, product
-from typing import Any, Generator, Literal, Optional, TypeAlias, Union
+from typing import Any, Generator, Literal, NamedTuple, Optional, TypeAlias, Union
 
 from pydantic import (
     AliasChoices,
@@ -101,7 +101,7 @@ BatchDataCollection: TypeAlias = list[list[BatchDatum]]
 
 
 class Batch(BaseModel):
-    batch_id: str = Field(default_factory=uuid_string, description="The ID of the batch")
+    batch_id: str = Field(default_factory=uuid_string, max_length=255, description="The ID of the batch")
     idempotency_key: str | None = Field(
         default=None,
         min_length=1,
@@ -216,11 +216,23 @@ SYSTEM_USER_ID = "system"  # Default user_id for system-generated queue items
 QUEUE_ITEM_STATUS = Literal["pending", "in_progress", "waiting", "completed", "failed", "canceled"]
 
 
+class QueueItemLineage(NamedTuple):
+    """An item's status and origin, and the item it retried: a retry of a retry names the first item as well."""
+
+    item_id: int
+    status: QUEUE_ITEM_STATUS
+    origin: Optional[str]
+    retried_from_item_id: Optional[int]
+
+
 class ItemIdsResult(BaseModel):
     """Response containing ordered item ids with metadata for optimistic updates."""
 
     item_ids: list[int] = Field(description="Ordered list of item ids")
-    total_count: int = Field(description="Total number of queue items matching the query")
+    total_count: int = Field(
+        description="Number of ids in item_ids. Equals the number of matching items only when no limit is given; "
+        "use the queue status for totals"
+    )
 
 
 NodeFieldValueValidator = TypeAdapter(list[NodeFieldValue])
@@ -533,9 +545,51 @@ class EnqueueBatchReceipt(BaseModel):
         return self
 
 
+class RetriedQueueItem(BaseModel):
+    source_item_id: int = Field(description="The ID of the retried root queue item")
+    item_id: int = Field(description="The ID of the queue item that re-runs it")
+
+
 class RetryItemsResult(BaseModel):
     queue_id: str = Field(description="The ID of the queue")
     retried_item_ids: list[int] = Field(description="The IDs of the queue items that were retried")
+    retried_items: list[RetriedQueueItem] = Field(
+        default_factory=list, description="Each retried root queue item with the queue item that re-runs it"
+    )
+
+
+QueueItemDeliveryAction: TypeAlias = Literal["claim", "confirm", "release"]
+QueueItemDeliveryStatus: TypeAlias = Literal["claimed", "delivered", "held", "released"]
+
+
+class QueueItemDeliveryRequest(BaseModel):
+    """A change to who stages a queue item's results, so that only one browser does."""
+
+    action: QueueItemDeliveryAction = Field(
+        description="claim: take delivering the results; confirm: mark them delivered; release: give up a claim"
+    )
+    claimant: str = Field(
+        min_length=1, max_length=128, description="An id the client chooses for the browser tab or run claiming"
+    )
+
+
+class QueueItemOwner(NamedTuple):
+    """The queue a queue item is in and the account that owns it."""
+
+    queue_id: str
+    user_id: str
+
+
+class QueueItemDeliveryResult(BaseModel):
+    """Who stages a queue item's results after a delivery request."""
+
+    status: QueueItemDeliveryStatus = Field(
+        description="claimed: the claimant may deliver; delivered: the results were delivered; "
+        "held: another claimant is delivering them; released: the claimant holds no claim"
+    )
+    retry_after_ms: Optional[int] = Field(
+        default=None, description="When held, how long until the other claim lapses, in milliseconds"
+    )
 
 
 class ClearResult(BaseModel):

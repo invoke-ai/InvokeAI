@@ -91,7 +91,7 @@ export const NodePackDetail = ({
         ) : (
           <Flex gap="8" wrap="wrap" px="2">
             {packTemplates.map((template) => (
-              <Box key={template.type} flexShrink={0} w="18rem">
+              <Box key={template.type} flexShrink={0} maxW="full" w="18rem">
                 <NodePreviewCard template={template} />
               </Box>
             ))}

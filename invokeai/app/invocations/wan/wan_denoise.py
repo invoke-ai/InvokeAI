@@ -48,10 +48,12 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, 
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.wan_lora_constants import WAN_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import WanConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.sage_attention import sage_attention_scope
 from invokeai.backend.wan.memory_optimization import wan_memory_optimization
 from invokeai.backend.wan.sampling_utils import get_spatial_scale_factor, make_noise
 
@@ -255,7 +257,11 @@ class _ExpertSwapper:
         info = self._context.models.load(model_id)
         supports_partial_loading = getattr(info, "supports_partial_loading", None)
         if self._working_mem_bytes is None or supports_partial_loading is False:
-            device_ctx = info.model_on_device()
+            # No estimate to add it to, so a GGUF expert's per-forward dequantization transient is passed
+            # alone; the cache floors it at `device_working_mem_gb`, so zero asks for the default.
+            device_ctx = info.model_on_device(
+                working_mem_bytes=peak_dequant_transient_bytes(info.model, self._inference_dtype)
+            )
         else:
             device_ctx = info.model_on_device(working_mem_bytes=self._working_mem_bytes)
         cached_weights, model = device_ctx.__enter__()
@@ -653,6 +659,7 @@ class WanDenoiseInvocation(BaseInvocation):
                 ),
             )
             exit_stack.callback(swapper.close)
+            exit_stack.enter_context(sage_attention_scope())
 
             for step_idx, t in enumerate(tqdm(timesteps, desc="Denoising (Wan 2.2)", total=total_steps)):
                 timestep = t.expand(latents.shape[0])

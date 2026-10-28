@@ -15,12 +15,19 @@ from invokeai.app.util.misc import uuid_string
 from invokeai.backend.architectures import resolve_default_settings
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
 from invokeai.backend.model_manager.configs.base import Config_Base
-from invokeai.backend.model_manager.configs.clip_embed import CLIPEmbed_Diffusers_G_Config, CLIPEmbed_Diffusers_L_Config
+from invokeai.backend.model_manager.configs.clip_embed import (
+    CLIPEmbed_Checkpoint_G_Config,
+    CLIPEmbed_Checkpoint_L_Config,
+    CLIPEmbed_Diffusers_G_Config,
+    CLIPEmbed_Diffusers_L_Config,
+)
 from invokeai.backend.model_manager.configs.clip_vision import CLIPVision_Diffusers_Config
 from invokeai.backend.model_manager.configs.controlnet import (
     ControlAdapterDefaultSettings,
     ControlNet_Checkpoint_Anima_Config,
+    ControlNet_Checkpoint_Flux2_Config,
     ControlNet_Checkpoint_FLUX_Config,
+    ControlNet_Checkpoint_QwenImage_Config,
     ControlNet_Checkpoint_SD1_Config,
     ControlNet_Checkpoint_SD2_Config,
     ControlNet_Checkpoint_SDXL_Config,
@@ -40,6 +47,7 @@ from invokeai.backend.model_manager.configs.gemma2_encoder import (
 from invokeai.backend.model_manager.configs.gemma4_encoder import Gemma4Encoder_Gemma4Encoder_LTX2_Config
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
 from invokeai.backend.model_manager.configs.ip_adapter import (
+    IPAdapter_Checkpoint_Anima_Config,
     IPAdapter_Checkpoint_FLUX_Config,
     IPAdapter_Checkpoint_SD1_Config,
     IPAdapter_Checkpoint_SD2_Config,
@@ -84,6 +92,8 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_Krea2_Config,
     Main_Checkpoint_LTX2_Config,
     Main_Checkpoint_MiniMaxH3_Config,
+    Main_Checkpoint_MossImage_Config,
+    Main_Checkpoint_QwenImage21_Config,
     Main_Checkpoint_QwenImage_Config,
     Main_Checkpoint_SD1_Config,
     Main_Checkpoint_SD2_Config,
@@ -99,6 +109,8 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_Krea2_Config,
     Main_Diffusers_LTX2_Config,
     Main_Diffusers_MiniMaxH3_Config,
+    Main_Diffusers_MossImage_Config,
+    Main_Diffusers_QwenImage21_Config,
     Main_Diffusers_QwenImage_Config,
     Main_Diffusers_SD1_Config,
     Main_Diffusers_SD2_Config,
@@ -107,9 +119,12 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_SDXLRefiner_Config,
     Main_Diffusers_Wan_Config,
     Main_Diffusers_ZImage_Config,
+    Main_GGUF_ErnieImage_Config,
     Main_GGUF_Flux2_Config,
     Main_GGUF_FLUX_Config,
+    Main_GGUF_Ideogram4_Config,
     Main_GGUF_Krea2_Config,
+    Main_GGUF_QwenImage21_Config,
     Main_GGUF_QwenImage_Config,
     Main_GGUF_Wan_Config,
     Main_GGUF_ZImage_Config,
@@ -176,6 +191,7 @@ from invokeai.backend.model_manager.configs.vae import (
     VAE_Checkpoint_Anima_Config,
     VAE_Checkpoint_Flux2_Config,
     VAE_Checkpoint_FLUX_Config,
+    VAE_Checkpoint_QwenImage21_Config,
     VAE_Checkpoint_QwenImage_Config,
     VAE_Checkpoint_SD1_Config,
     VAE_Checkpoint_SD2_Config,
@@ -184,6 +200,7 @@ from invokeai.backend.model_manager.configs.vae import (
     VAE_Checkpoint_Wan_Config,
     VAE_Diffusers_Flux2_Config,
     VAE_Diffusers_FLUX_Config,
+    VAE_Diffusers_QwenImage21_Config,
     VAE_Diffusers_SD1_Config,
     VAE_Diffusers_SD3_Config,
     VAE_Diffusers_SDXL_Config,
@@ -198,6 +215,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     variant_type_adapter,
 )
+from invokeai.backend.quantization.gguf.loaders import parse_q8_cr_markers
 
 logger = logging.getLogger(__name__)
 
@@ -332,6 +350,8 @@ _PINNED_MODEL_CLASS_MARKERS = {
     "MiniMaxH3Transformer3DModel",
     "AutoencoderKLMiniMaxH3",
     "AutoencoderKLMiniMaxH3Audio",
+    # MOSS-Image's pipeline is remote code upstream; its classes are vendored under invokeai/backend/moss_image.
+    "MOSSImagePipeline",
 }
 
 
@@ -395,6 +415,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Diffusers_Flux2_Config, Main_Diffusers_Flux2_Config.get_tag()],
         Annotated[Main_Diffusers_CogView4_Config, Main_Diffusers_CogView4_Config.get_tag()],
         Annotated[Main_Diffusers_QwenImage_Config, Main_Diffusers_QwenImage_Config.get_tag()],
+        Annotated[Main_Diffusers_QwenImage21_Config, Main_Diffusers_QwenImage21_Config.get_tag()],
         Annotated[Main_Diffusers_Wan_Config, Main_Diffusers_Wan_Config.get_tag()],
         Annotated[Main_Diffusers_ZImage_Config, Main_Diffusers_ZImage_Config.get_tag()],
         Annotated[Main_Diffusers_ErnieImage_Config, Main_Diffusers_ErnieImage_Config.get_tag()],
@@ -402,6 +423,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Diffusers_Krea2_Config, Main_Diffusers_Krea2_Config.get_tag()],
         Annotated[Main_Diffusers_MiniMaxH3_Config, Main_Diffusers_MiniMaxH3_Config.get_tag()],
         Annotated[Main_Diffusers_LTX2_Config, Main_Diffusers_LTX2_Config.get_tag()],
+        Annotated[Main_Diffusers_MossImage_Config, Main_Diffusers_MossImage_Config.get_tag()],
         # Main (Pipeline) - checkpoint format
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
         # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
@@ -412,6 +434,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Checkpoint_Flux2_Config, Main_Checkpoint_Flux2_Config.get_tag()],
         Annotated[Main_Checkpoint_FLUX_Config, Main_Checkpoint_FLUX_Config.get_tag()],
         Annotated[Main_Checkpoint_QwenImage_Config, Main_Checkpoint_QwenImage_Config.get_tag()],
+        Annotated[Main_Checkpoint_QwenImage21_Config, Main_Checkpoint_QwenImage21_Config.get_tag()],
         Annotated[Main_Checkpoint_Wan_Config, Main_Checkpoint_Wan_Config.get_tag()],
         Annotated[Main_Checkpoint_ZImage_Config, Main_Checkpoint_ZImage_Config.get_tag()],
         Annotated[Main_Checkpoint_ErnieImage_Config, Main_Checkpoint_ErnieImage_Config.get_tag()],
@@ -420,6 +443,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Checkpoint_Anima_Config, Main_Checkpoint_Anima_Config.get_tag()],
         Annotated[Main_Checkpoint_MiniMaxH3_Config, Main_Checkpoint_MiniMaxH3_Config.get_tag()],
         Annotated[Main_Checkpoint_LTX2_Config, Main_Checkpoint_LTX2_Config.get_tag()],
+        Annotated[Main_Checkpoint_MossImage_Config, Main_Checkpoint_MossImage_Config.get_tag()],
         # Main (Pipeline) - quantized formats
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
         # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
@@ -427,9 +451,12 @@ AnyModelConfig = Annotated[
         Annotated[Main_GGUF_Flux2_Config, Main_GGUF_Flux2_Config.get_tag()],
         Annotated[Main_GGUF_FLUX_Config, Main_GGUF_FLUX_Config.get_tag()],
         Annotated[Main_GGUF_QwenImage_Config, Main_GGUF_QwenImage_Config.get_tag()],
+        Annotated[Main_GGUF_QwenImage21_Config, Main_GGUF_QwenImage21_Config.get_tag()],
         Annotated[Main_GGUF_Wan_Config, Main_GGUF_Wan_Config.get_tag()],
         Annotated[Main_GGUF_ZImage_Config, Main_GGUF_ZImage_Config.get_tag()],
         Annotated[Main_GGUF_Krea2_Config, Main_GGUF_Krea2_Config.get_tag()],
+        Annotated[Main_GGUF_Ideogram4_Config, Main_GGUF_Ideogram4_Config.get_tag()],
+        Annotated[Main_GGUF_ErnieImage_Config, Main_GGUF_ErnieImage_Config.get_tag()],
         # IMPORTANT: FLUX.2 must be listed BEFORE FLUX.1 here. An ambiguous SDNQ transformer
         # checkpoint (prefixed FLUX.2 keys) can look like a FLUX.1 main model, so FLUX.2 must get
         # first refusal. Main_SDNQ_FLUX_Config additionally rejects FLUX.2 state dicts to keep the
@@ -453,6 +480,7 @@ AnyModelConfig = Annotated[
         Annotated[VAE_Checkpoint_Wan_Config, VAE_Checkpoint_Wan_Config.get_tag()],
         Annotated[VAE_Checkpoint_QwenImage_Config, VAE_Checkpoint_QwenImage_Config.get_tag()],
         Annotated[VAE_Checkpoint_Anima_Config, VAE_Checkpoint_Anima_Config.get_tag()],
+        Annotated[VAE_Checkpoint_QwenImage21_Config, VAE_Checkpoint_QwenImage21_Config.get_tag()],
         # VAE - diffusers format
         Annotated[VAE_Diffusers_SD1_Config, VAE_Diffusers_SD1_Config.get_tag()],
         Annotated[VAE_Diffusers_SDXL_Config, VAE_Diffusers_SDXL_Config.get_tag()],
@@ -460,6 +488,7 @@ AnyModelConfig = Annotated[
         Annotated[VAE_Diffusers_SD3_Config, VAE_Diffusers_SD3_Config.get_tag()],
         Annotated[VAE_Diffusers_Flux2_Config, VAE_Diffusers_Flux2_Config.get_tag()],
         Annotated[VAE_Diffusers_Wan_Config, VAE_Diffusers_Wan_Config.get_tag()],
+        Annotated[VAE_Diffusers_QwenImage21_Config, VAE_Diffusers_QwenImage21_Config.get_tag()],
         # PiD Decoder - checkpoint format
         Annotated[PiDDecoder_Checkpoint_FLUX_Config, PiDDecoder_Checkpoint_FLUX_Config.get_tag()],
         Annotated[PiDDecoder_Checkpoint_Flux2_Config, PiDDecoder_Checkpoint_Flux2_Config.get_tag()],
@@ -473,6 +502,8 @@ AnyModelConfig = Annotated[
         Annotated[ControlNet_Checkpoint_FLUX_Config, ControlNet_Checkpoint_FLUX_Config.get_tag()],
         Annotated[ControlNet_Checkpoint_ZImage_Config, ControlNet_Checkpoint_ZImage_Config.get_tag()],
         Annotated[ControlNet_Checkpoint_Anima_Config, ControlNet_Checkpoint_Anima_Config.get_tag()],
+        Annotated[ControlNet_Checkpoint_QwenImage_Config, ControlNet_Checkpoint_QwenImage_Config.get_tag()],
+        Annotated[ControlNet_Checkpoint_Flux2_Config, ControlNet_Checkpoint_Flux2_Config.get_tag()],
         # ControlNet - diffusers format
         Annotated[ControlNet_Diffusers_SD1_Config, ControlNet_Diffusers_SD1_Config.get_tag()],
         Annotated[ControlNet_Diffusers_SD2_Config, ControlNet_Diffusers_SD2_Config.get_tag()],
@@ -575,6 +606,7 @@ AnyModelConfig = Annotated[
         Annotated[IPAdapter_Checkpoint_SD2_Config, IPAdapter_Checkpoint_SD2_Config.get_tag()],
         Annotated[IPAdapter_Checkpoint_SDXL_Config, IPAdapter_Checkpoint_SDXL_Config.get_tag()],
         Annotated[IPAdapter_Checkpoint_FLUX_Config, IPAdapter_Checkpoint_FLUX_Config.get_tag()],
+        Annotated[IPAdapter_Checkpoint_Anima_Config, IPAdapter_Checkpoint_Anima_Config.get_tag()],
         # T2I Adapter - diffusers format
         Annotated[T2IAdapter_Diffusers_SD1_Config, T2IAdapter_Diffusers_SD1_Config.get_tag()],
         Annotated[T2IAdapter_Diffusers_SDXL_Config, T2IAdapter_Diffusers_SDXL_Config.get_tag()],
@@ -582,6 +614,8 @@ AnyModelConfig = Annotated[
         Annotated[Spandrel_Checkpoint_Config, Spandrel_Checkpoint_Config.get_tag()],
         Annotated[CLIPEmbed_Diffusers_G_Config, CLIPEmbed_Diffusers_G_Config.get_tag()],
         Annotated[CLIPEmbed_Diffusers_L_Config, CLIPEmbed_Diffusers_L_Config.get_tag()],
+        Annotated[CLIPEmbed_Checkpoint_G_Config, CLIPEmbed_Checkpoint_G_Config.get_tag()],
+        Annotated[CLIPEmbed_Checkpoint_L_Config, CLIPEmbed_Checkpoint_L_Config.get_tag()],
         Annotated[CLIPVision_Diffusers_Config, CLIPVision_Diffusers_Config.get_tag()],
         Annotated[SigLIP_Diffusers_Config, SigLIP_Diffusers_Config.get_tag()],
         Annotated[FLUXRedux_Checkpoint_Config, FLUXRedux_Checkpoint_Config.get_tag()],
@@ -656,6 +690,27 @@ class ModelConfigFactory:
         e.__context__ = None
         e.__cause__ = None
         return e
+
+    @staticmethod
+    def _raise_for_unsupported_gguf_quantization(mod: ModelOnDisk, config: Config_Base) -> None:
+        """Refuse a GGUF whose ComfyUI-GGUF quantization the matched config's loader cannot decode.
+
+        Here rather than in each GGUF config: the question is the same for all of them, and a GGUF config
+        added later is refused by default instead of installing a file it fails on at the first render.
+        `InvalidMatchError`, so the installer shows the reason rather than registering an unknown model.
+        Read from the cached metadata, so a large file is not re-read once per candidate.
+        """
+        if getattr(config, "format", None) is not ModelFormat.GGUFQuantized:
+            return
+        try:
+            markers = parse_q8_cr_markers(mod.metadata(), mod.path.name)
+        except ValueError as e:
+            raise InvalidMatchError(str(e)) from None
+        if markers and not type(config).DECODES_GGUF_Q8_CR:
+            raise InvalidMatchError(
+                f"{mod.path.name} is a ComfyUI-GGUF Q8_CR (int8 convrot) file, which this model type cannot load "
+                "yet. Use a GGML-quantized (Q8_0, Q4_K, ...) or safetensors build instead."
+            )
 
     @staticmethod
     def from_dict(fields: dict[str, Any]) -> AnyModelConfig:
@@ -862,9 +917,20 @@ class ModelConfigFactory:
         for candidate_class in filter(lambda x: x is not Unknown_Config, Config_Base.CONFIG_CLASSES):
             candidate_name = candidate_class.__name__
             try:
+                candidate_fields = fields
+                # Preserve the explicit encoder choice for InvokeAI IP-Adapter probes; this field is not part of
+                # the common model record changes, but re-identification can carry it from the stored config.
+                if (
+                    override_fields is not None
+                    and "image_encoder_model_id" in override_fields
+                    and "image_encoder_model_id" in candidate_class.model_fields
+                ):
+                    candidate_fields = {**fields, "image_encoder_model_id": override_fields["image_encoder_model_id"]}
                 # Technically, from_model_on_disk returns a Config_Base, but in practice it will always be a member of
                 # the AnyModelConfig union.
-                details[candidate_name] = candidate_class.from_model_on_disk(mod, fields)  # type: ignore
+                candidate = candidate_class.from_model_on_disk(mod, candidate_fields)
+                ModelConfigFactory._raise_for_unsupported_gguf_quantization(mod, candidate)
+                details[candidate_name] = candidate  # type: ignore
             except NotAMatchError as e:
                 # This means the model didn't match this config class. It's not an error, just no match.
                 details[candidate_name] = ModelConfigFactory._detach_traceback(e)

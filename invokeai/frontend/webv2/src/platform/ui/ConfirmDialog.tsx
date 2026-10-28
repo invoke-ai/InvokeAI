@@ -1,8 +1,9 @@
-import { Dialog, Portal, Stack, Text } from '@chakra-ui/react';
+import { Portal, Stack } from '@chakra-ui/react';
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { Button, CloseButton } from './Button';
+import { Dialog } from './Dialog';
 
 /** Closes after confirmation even on error; callers must report failures. */
 export const ConfirmDialog = ({
@@ -10,6 +11,7 @@ export const ConfirmDialog = ({
   confirmLabel,
   finalFocusEl,
   isDestructive = true,
+  isConfirmDisabled = false,
   isOpen,
   onClose,
   onConfirm,
@@ -21,6 +23,8 @@ export const ConfirmDialog = ({
   /** Where focus returns on close when the opener may no longer exist, e.g. a row the confirmed action deleted. */
   finalFocusEl?: () => HTMLElement | null;
   isDestructive?: boolean;
+  /** Keep confirmation unavailable until the caller has prepared a valid confirmation target. */
+  isConfirmDisabled?: boolean;
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => Promise<void> | void;
@@ -30,6 +34,7 @@ export const ConfirmDialog = ({
 }) => {
   const [isPending, setIsPending] = useState(false);
   const isPendingRef = useRef(false);
+  const cancelRef = useRef<HTMLButtonElement>(null);
   // Hosts often clear the subject the dialog describes as it closes; keep the text it showed while it animates out.
   const live = useMemo(
     () => ({ body, confirmLabel, isDestructive, title }),
@@ -44,7 +49,7 @@ export const ConfirmDialog = ({
   }, [onExitComplete, release]);
 
   const handleConfirm = useCallback(async () => {
-    if (isPendingRef.current) {
+    if (isPendingRef.current || isConfirmDisabled) {
       return;
     }
 
@@ -58,7 +63,7 @@ export const ConfirmDialog = ({
       setIsPending(false);
       onClose();
     }
-  }, [onClose, onConfirm]);
+  }, [isConfirmDisabled, onClose, onConfirm]);
 
   const handleClose = useCallback(() => {
     if (!isPendingRef.current) {
@@ -79,11 +84,16 @@ export const ConfirmDialog = ({
     void handleConfirm();
   }, [handleConfirm]);
 
+  // A destructive confirmation opens on Cancel rather than the dialog's default target (the close button for an
+  // alertdialog), so a reflexive Enter or Space cancels and never commits or flips an option in the body.
+  const getInitialFocus = useCallback(() => cancelRef.current, []);
+
   return (
     <Dialog.Root
       closeOnEscape={!isPending}
       closeOnInteractOutside={!isPending}
       finalFocusEl={finalFocusEl}
+      initialFocusEl={text.isDestructive ? getInitialFocus : undefined}
       open={isOpen}
       role="alertdialog"
       size="sm"
@@ -99,16 +109,25 @@ export const ConfirmDialog = ({
             </Dialog.Header>
             <Dialog.Body>
               <Stack gap="2">
-                {typeof text.body === 'string' ? <Text fontSize="md">{text.body}</Text> : text.body}
+                {/* A text body describes the dialog (`aria-describedby`), so the consequence is read when it opens. It
+                    keeps the body's look, not the description recipe's muted color and tighter `md` line height. A
+                    composed body names its own description. */}
+                {typeof text.body === 'string' ? (
+                  <Dialog.Description color="fg" fontSize="md" lineHeight="inherit">
+                    {text.body}
+                  </Dialog.Description>
+                ) : (
+                  text.body
+                )}
               </Stack>
             </Dialog.Body>
             <Dialog.Footer>
-              <Button disabled={isPending} variant="ghost" onClick={handleClose}>
+              <Button ref={cancelRef} disabled={isPending} variant="ghost" onClick={handleClose}>
                 Cancel
               </Button>
               <Button
                 colorPalette={text.isDestructive ? 'red' : 'accent'}
-                disabled={isPending}
+                disabled={isPending || isConfirmDisabled}
                 loading={isPending}
                 variant="solid"
                 onClick={handleConfirmClick}

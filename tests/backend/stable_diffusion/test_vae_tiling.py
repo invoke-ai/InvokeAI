@@ -49,6 +49,7 @@ def tiny_vae() -> AutoencoderTiny:
 
 
 class TestEveryFieldValueProducesTheRightShape:
+    @pytest.mark.platform_independent
     def test_tiled_decode_keeps_the_full_image_size(self, vae):
         """Before the derivation was shared, 36 of these 49 values assembled an image between 518
         and 542 pixels wide instead of 512 -- silently, and on the most-used decode path."""
@@ -64,6 +65,7 @@ class TestEveryFieldValueProducesTheRightShape:
 
         assert not wrong
 
+    @pytest.mark.platform_independent
     def test_tiled_encode_keeps_the_full_latent_size(self, vae):
         """The encode path is affected too, and not symmetrically: `_tiled_encode` steps a *pixel*
         loop and crops a *latent* tile, so the same inconsistency shows up as a latent one or two
@@ -97,6 +99,7 @@ class TestTheTinyVaeIsUnaffected:
     `tile_latent_min_size` in its tiled decode, so the two never meet and it had no bug to fix. It
     goes through the same derivation rather than a class branch; this pins that that is harmless."""
 
+    @pytest.mark.platform_independent
     def test_tiled_decode_and_encode_keep_their_shapes(self, tiny_vae):
         tiny_vae.enable_tiling()
         for tile_size in FIELD_VALUES:

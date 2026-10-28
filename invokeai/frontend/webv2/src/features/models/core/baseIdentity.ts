@@ -8,6 +8,7 @@ export const toTitleCase = (value: string): string =>
   value.replaceAll(/[_-]+/g, ' ').replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1));
 
 export type ModelBaseColorPalette =
+  | 'aqua'
   | 'blue'
   | 'coral'
   | 'cyan'
@@ -16,6 +17,7 @@ export type ModelBaseColorPalette =
   | 'green'
   | 'ice'
   | 'lavender'
+  | 'lime'
   | 'mint'
   | 'orange'
   | 'periwinkle'
@@ -97,6 +99,12 @@ export const MODEL_BASES = {
     label: 'Qwen Image',
     colorPalette: 'cyan',
   },
+  'qwen-image-2-1': {
+    base: 'qwen-image-2-1',
+    label: 'Qwen-Image-2.1',
+    // A deeper cyan: of the Qwen-Image family, yet told apart from it, as their models and LoRAs do not mix.
+    colorPalette: 'aqua',
+  },
   'z-image': {
     base: 'z-image',
     label: 'Z-Image',
@@ -116,6 +124,11 @@ export const MODEL_BASES = {
     base: 'anima',
     label: 'Anima',
     colorPalette: 'pink',
+  },
+  'moss-image': {
+    base: 'moss-image',
+    label: 'MOSS-Image',
+    colorPalette: 'lime',
   },
   wan: {
     base: 'wan',

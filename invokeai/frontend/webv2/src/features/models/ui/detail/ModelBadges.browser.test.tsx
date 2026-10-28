@@ -22,6 +22,8 @@ const UPDATED_BASES = new Set([
   'wan',
   'minimax-h3',
   'ltx-2',
+  'qwen-image-2-1',
+  'moss-image',
 ]);
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

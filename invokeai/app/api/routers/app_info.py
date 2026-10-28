@@ -27,6 +27,7 @@ from invokeai.app.services.external_generation.external_generation_common import
 from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
 from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
+from invokeai.app.services.shared.database.startup import redacted_database_url
 from invokeai.backend.image_util.infill_methods.patchmatch import PatchMatch
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.util.devices import TorchDevice
@@ -50,6 +51,17 @@ class AppVersion(BaseModel):
     """App Version Response"""
 
     version: str = Field(description="App version")
+
+
+class FrontendConfig(BaseModel):
+    """Presentation settings any signed-in user may read; never include private runtime configuration here."""
+
+    show_donation_link: bool = Field(description="Whether to show the Donate to InvokeAI menu link")
+
+
+@app_router.get("/frontend_config", operation_id="get_frontend_config", response_model=FrontendConfig)
+def get_frontend_config(current_user: CurrentUserOrDefault) -> FrontendConfig:
+    return FrontendConfig(show_donation_link=get_config().show_donation_link)
 
 
 @app_router.get("/version", operation_id="app_version", status_code=200, response_model=AppVersion)
@@ -226,6 +238,9 @@ def _redact_config_secrets(config: InvokeAIAppConfig) -> InvokeAIAppConfig:
 
     if config.download_proxy and "@" in config.download_proxy:
         updates["download_proxy"] = REDACTED_SECRET
+
+    if config.db_url:
+        updates["db_url"] = redacted_database_url(config.db_url)
 
     return config.model_copy(update=updates) if updates else config
 

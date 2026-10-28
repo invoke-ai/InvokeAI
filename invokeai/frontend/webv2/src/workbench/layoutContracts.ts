@@ -74,6 +74,12 @@ export interface LayoutPresetSnapshot {
   floatingWidgets?: Record<WidgetInstanceId, FloatingWidgetState>;
 }
 
+/** A project's unsaved arrangement of one preset; see `Project.presetWorkingLayouts`. */
+export interface LayoutPresetWorkingCopy {
+  presetId: LayoutPresetId;
+  snapshot: LayoutPresetSnapshot;
+}
+
 /**
  * The route a preset establishes when it is activated. Locks belong to the
  * live project controller and are intentionally never persisted on a preset.
@@ -86,6 +92,11 @@ export interface LayoutPresetRoute {
 export interface LayoutPreset {
   id: LayoutPresetId;
   label: string;
+  /**
+   * The i18n key a built-in preset is shown by while the account has not renamed it; `label` is then its English
+   * default. Never on a custom preset, and never persisted.
+   */
+  labelKey?: string;
   isBuiltIn?: boolean;
   /** Missing only on legacy or source-less custom presets. */
   defaultRoute?: LayoutPresetRoute;

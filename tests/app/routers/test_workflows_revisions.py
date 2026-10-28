@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowCategory, WorkflowRecordOrderBy
 from tests.app.routers.test_workflows_multiuser import WORKFLOW_BODY, create_workflow
 

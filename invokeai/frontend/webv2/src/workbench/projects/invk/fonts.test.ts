@@ -41,12 +41,14 @@ const documentWith = (
 const planFor = async (includeFonts: boolean) =>
   planInvkExport({
     appVersion: '7',
-    boardItems: [],
+    boards: [{ archived: false, isInbox: true, items: [], name: 'Fonts' }],
     createdAt: '2026-09-07',
     includeFonts,
     minimumCanvasSchemaVersion: 4,
     name: 'Fonts',
-    projectDocument: documentWith(await fontRef()),
+    content: documentWith(await fontRef()),
+    documentSchemaVersion: 4,
+    workspace: null,
   });
 const transportFor = (): FontArchiveTransport => ({
   download: vi.fn(() => Promise.resolve({ bytes, filename: 'Example.ttf' })),

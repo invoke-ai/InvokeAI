@@ -4,22 +4,26 @@ import type {
   ShapeToolKind,
   ToolId,
 } from '@workbench/canvas-engine/api';
+import type { HotkeyDefinition } from '@workbench/hotkeys/types';
 
 import { Box } from '@chakra-ui/react';
 import { Toolbar, ToolbarButton } from '@platform/ui/Toolbar';
 import { GradientIcon } from '@platform/ui/VendoredIcon';
+import { useExtensionHotkeyDefinitions } from '@workbench/hotkeys/extensionHotkeys';
+import { applyCustomHotkeys } from '@workbench/hotkeys/resolve';
+import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import {
   BrushIcon,
   CircleIcon,
   EraserIcon,
-  FrameIcon,
   HandIcon,
   LassoIcon,
-  MoveIcon,
+  MousePointer2Icon,
   PenLineIcon,
   PentagonIcon,
   Rotate3dIcon,
-  SquareDashedIcon,
+  ScanIcon,
+  SquareDashedMousePointerIcon,
   SquareIcon,
   StarIcon,
   TriangleIcon,
@@ -114,6 +118,19 @@ const ShapeFamilyButton = ({
   );
 };
 
+/**
+ * A tool's effective bindings, remaps included, from the hotkeys the canvas widget registered; none outside a
+ * workbench or while unbound.
+ */
+const toolHotkeys = (
+  definitions: readonly HotkeyDefinition[],
+  customHotkeys: Record<string, string[]>,
+  hotkeyId: string
+): string[] | undefined => {
+  const definition = definitions.find((hotkey) => hotkey.id === hotkeyId);
+  return definition ? applyCustomHotkeys(definition, customHotkeys).keys : undefined;
+};
+
 /** The Select slot: marquee and lasso as one family; the slot stands for the last one used. */
 const SelectFamilyButton = ({
   engine,
@@ -132,12 +149,26 @@ const SelectFamilyButton = ({
     }
   }, [activeTool]);
   const current: SelectFamilyTool = activeTool === 'marquee' || activeTool === 'lasso' ? activeTool : stored;
+  const hotkeyDefinitions = useExtensionHotkeyDefinitions();
+  const customHotkeys = useWorkbenchPreferenceSelector((preferences) => preferences.customHotkeys);
   const items: ToolFlyoutItem[] = useMemo(
     () => [
-      { icon: SquareDashedIcon, id: 'marquee', label: t('widgets.canvas.tools.marquee') },
-      { icon: LassoIcon, id: 'lasso', label: t('widgets.canvas.tools.lasso') },
+      {
+        description: t('widgets.canvas.tools.marqueeHelp'),
+        icon: SquareDashedMousePointerIcon,
+        id: 'marquee',
+        label: t('widgets.canvas.tools.marquee'),
+        hotkeys: toolHotkeys(hotkeyDefinitions, customHotkeys, 'canvas.tool.marquee'),
+      },
+      {
+        description: t('widgets.canvas.tools.lassoHelp'),
+        icon: LassoIcon,
+        id: 'lasso',
+        label: t('widgets.canvas.tools.lasso'),
+        hotkeys: toolHotkeys(hotkeyDefinitions, customHotkeys, 'canvas.tool.lasso'),
+      },
     ],
-    [t]
+    [customHotkeys, hotkeyDefinitions, t]
   );
   const onActivate = useCallback(() => engine.tools.setTool(current), [current, engine]);
   const onSelectSubtool = useCallback(
@@ -151,7 +182,7 @@ const SelectFamilyButton = ({
     <ToolFamilyButton
       currentId={current}
       disabled={!isCanvasToolEnabled(current, isInteractionLocked)}
-      icon={current === 'lasso' ? LassoIcon : SquareDashedIcon}
+      icon={current === 'lasso' ? LassoIcon : SquareDashedMousePointerIcon}
       isActive={activeTool === 'marquee' || activeTool === 'lasso'}
       items={items}
       label={t(current === 'lasso' ? 'widgets.canvas.tools.lasso' : 'widgets.canvas.tools.marquee')}
@@ -190,7 +221,7 @@ const ToolStripRoot = ({
         />
         <ToolStripButton
           engine={engine}
-          icon={MoveIcon}
+          icon={MousePointer2Icon}
           isInteractionLocked={isInteractionLocked}
           label={t('widgets.canvas.tools.move')}
           toolId="move"
@@ -204,7 +235,7 @@ const ToolStripRoot = ({
         />
         <ToolStripButton
           engine={engine}
-          icon={FrameIcon}
+          icon={ScanIcon}
           isInteractionLocked={isInteractionLocked}
           label={t('widgets.canvas.tools.bbox')}
           toolId="bbox"

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { isAbsoluteModelPath, mainDefaultSettingsSchema, modelPathSchema, resolveModelAbsolutePath } from './schemas';
+import {
+  isAbsoluteModelPath,
+  canonicalLocalPath,
+  isInModelsDir,
+  mainDefaultSettingsSchema,
+  modelPathSchema,
+  resolveModelAbsolutePath,
+} from './schemas';
 
 describe('isAbsoluteModelPath', () => {
   it.each([
@@ -82,5 +89,42 @@ describe('mainDefaultSettingsSchema', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe('canonicalLocalPath', () => {
+  it.each([
+    ['C:\\Users\\Me\\x.safetensors', 'c:/users/me/x.safetensors'],
+    ['  C:/Users/Me/loras/  ', 'c:/users/me/loras'],
+    ['C:\\', 'c:'],
+    ['\\\\NAS\\Models\\', '//nas/models'],
+    ['/home/Me/Models//', '/home/Me/Models'],
+    ['loras/X.safetensors', 'loras/X.safetensors'],
+  ])('spells %j as %j', (path, canonical) => {
+    expect(canonicalLocalPath(path)).toBe(canonical);
+  });
+});
+
+describe('isInModelsDir', () => {
+  it.each([
+    ['/data/models', '/data/models'],
+    ['/data/models/', '/data/models'],
+    ['/data/models/sdxl/model.safetensors', '/data/models'],
+    ['/data/models/sdxl/model.safetensors', '/data/models/'],
+    ['C:\\Invoke\\Models\\sdxl.safetensors', 'C:/invoke/models'],
+    ['c:/invoke/models', 'C:/Invoke/Models'],
+    ['\\\\NAS\\Models\\sdxl.safetensors', '//nas/models'],
+  ])('places %s in the models folder %s', (path, modelsDir) => {
+    expect(isInModelsDir(path, modelsDir)).toBe(true);
+  });
+
+  it.each([
+    ['/data/models-extra/model.safetensors', '/data/models'],
+    ['/data/Models/model.safetensors', '/data/models'],
+    ['/data', '/data/models'],
+    ['/data/models/../elsewhere/model.safetensors', '/data/models'],
+    ['/data/models/model.safetensors', null],
+  ])('keeps %s outside the models folder %s', (path, modelsDir) => {
+    expect(isInModelsDir(path, modelsDir)).toBe(false);
   });
 });

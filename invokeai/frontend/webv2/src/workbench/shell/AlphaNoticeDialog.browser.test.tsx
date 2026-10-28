@@ -1,6 +1,6 @@
 import { ChakraProvider } from '@chakra-ui/react';
+import { isModalPresent } from '@platform/ui/modalPresence';
 import { system } from '@theme/system';
-import { isHotkeyModalLayerActive } from '@workbench/hotkeys/modalLayer';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -80,7 +80,7 @@ describe('AlphaNoticeDialog', () => {
     await setSnapshot({ preferences: { alphaNoticeAcknowledged: false }, status: 'ready' });
     await expect.element(page.getByRole('alertdialog', { name: i18n.t('alphaNotice.title') })).toBeVisible();
     await expect.element(page.getByRole('button', { name: i18n.t('alphaNotice.dismiss') })).toHaveFocus();
-    expect(isHotkeyModalLayerActive()).toBe(true);
+    expect(isModalPresent()).toBe(true);
     expect(page.getByRole('link', { name: i18n.t('alphaNotice.reportLink') }).element()).toHaveAttribute(
       'rel',
       'noreferrer'
@@ -91,13 +91,13 @@ describe('AlphaNoticeDialog', () => {
 
     await setSnapshot({ preferences: { alphaNoticeAcknowledged: true }, status: 'ready' });
     await expect.element(page.getByRole('alertdialog')).not.toBeInTheDocument();
-    expect(isHotkeyModalLayerActive()).toBe(false);
+    expect(isModalPresent()).toBe(false);
   });
 
   it('stays closed for an account that already acknowledged it', async () => {
     await setSnapshot({ preferences: { alphaNoticeAcknowledged: true }, status: 'ready' });
 
     expect(document.querySelector('[role="alertdialog"]')).toBeNull();
-    expect(isHotkeyModalLayerActive()).toBe(false);
+    expect(isModalPresent()).toBe(false);
   });
 });

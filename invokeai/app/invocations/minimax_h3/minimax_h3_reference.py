@@ -125,8 +125,7 @@ class MiniMaxH3VideoReferenceInvocation(BaseInvocation):
     """Describes one video reference for MiniMax H3 Ref2VA.
 
     'Audio only' conditions on the video's soundtrack alone (the standalone audio-reference
-    kind). At least one reference of the request must contribute visuals, and a conditioning
-    choice that includes audio requires the video to actually carry a soundtrack.
+    kind). A conditioning choice that includes audio requires the video to actually carry a soundtrack.
     """
 
     video: VideoField = InputField(description="The reference video.")

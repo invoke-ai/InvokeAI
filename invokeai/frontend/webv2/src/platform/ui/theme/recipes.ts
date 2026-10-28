@@ -54,6 +54,14 @@ export const tooltipSlotRecipe = defineSlotRecipe({
       ...chakraSlotRecipes.tooltip.base?.arrowTip,
       borderColor: 'border.emphasized',
     },
+    positioner: {
+      ...chakraSlotRecipes.tooltip.base?.positioner,
+      // Zag translates the positioner by `--x`/`--y`, which it sets inline a frame after opening. Unset, they leave it
+      // at the page's origin, where a tooltip closed within that frame (focus, then a click that disables the trigger)
+      // would fade out. Default off-screen, as Zag does for a positioner with no placement.
+      '--x': '0px',
+      '--y': '-100vh',
+    },
   },
 });
 
@@ -111,8 +119,24 @@ export const toastSlotRecipe = defineSlotRecipe({
     ...chakraSlotRecipes.toast.base,
     root: {
       ...chakraSlotRecipes.toast.base?.root,
-      '&[data-type=success]': { ...chakraSlotRecipes.toast.base?.root?.['&[data-type=success]'], bg: 'green.700' },
-      '&[data-type=warning]': { ...chakraSlotRecipes.toast.base?.root?.['&[data-type=warning]'], bg: 'orange.700' },
+      // Chakra's `*.contrast` text is black on these fills in dark color modes; the 700 steps need white. Its
+      // lightening trigger hover drops white text below AA on red, so status toasts darken on hover instead.
+      '&[data-type=error]': {
+        ...chakraSlotRecipes.toast.base?.root?.['&[data-type=error]'],
+        '--toast-trigger-bg': '{black/20}',
+      },
+      '&[data-type=success]': {
+        ...chakraSlotRecipes.toast.base?.root?.['&[data-type=success]'],
+        bg: 'green.700',
+        color: 'white',
+        '--toast-trigger-bg': '{black/20}',
+      },
+      '&[data-type=warning]': {
+        ...chakraSlotRecipes.toast.base?.root?.['&[data-type=warning]'],
+        bg: 'orange.700',
+        color: 'white',
+        '--toast-trigger-bg': '{black/20}',
+      },
     },
     description: { ...chakraSlotRecipes.toast.base?.description, opacity: 1 },
   },
@@ -687,6 +711,51 @@ export const scrollAreaSlotRecipe = defineSlotRecipe({
       '&[data-orientation="horizontal"]:not([data-overflow-x])': { display: 'none' },
       // Above sticky content (z-index 1) so opaque pinned headers never cover the thumb.
       zIndex: 2,
+    },
+  },
+});
+
+/**
+ * Extend the control's hit area past its box with an invisible outset; the root is a label, so a press there toggles
+ * the input. 6px gives the smallest (sm, 12px) control a 24px target and stays under the 8px minimum spacing between
+ * neighbouring controls, so it never reaches a neighbour's box. Insets resolve from the padding box, so the outset
+ * also clears the control's 1px border.
+ *
+ * Ark marks the control hovered while any part of the root is, so the label and the outset show the hover too. The
+ * hover is defined for the `solid` variant only, the default every checkbox uses.
+ */
+export const checkboxSlotRecipe = defineSlotRecipe({
+  ...chakraSlotRecipes.checkbox,
+  base: {
+    ...chakraSlotRecipes.checkbox.base,
+    control: {
+      ...chakraSlotRecipes.checkbox.base?.control,
+      position: 'relative',
+      transitionDuration: 'fast',
+      transitionProperty: 'border-color, background',
+      _before: { content: '""', inset: 'calc(-1px - {spacing.1.5})', position: 'absolute' },
+    },
+  },
+  variants: {
+    ...chakraSlotRecipes.checkbox.variants,
+    variant: {
+      ...chakraSlotRecipes.checkbox.variants?.variant,
+      solid: {
+        control: {
+          ...chakraSlotRecipes.checkbox.variants?.variant?.solid?.control,
+          _hover: {
+            // Halfway to the foreground is stronger than the rest border in every theme, high contrast included,
+            // where the rest border already matches the muted foreground. An invalid control keeps its error border.
+            '&[data-state=unchecked]:not([data-invalid])': {
+              borderColor: 'color-mix(in oklab, {colors.border.emphasized}, {colors.fg})',
+            },
+            '&:is([data-state=checked], [data-state=indeterminate]):not([data-invalid])': {
+              bg: 'colorPalette.solid/90',
+              borderColor: 'colorPalette.solid/90',
+            },
+          },
+        },
+      },
     },
   },
 });

@@ -7,7 +7,11 @@ import {
   WandSparklesIcon,
   ContrastIcon,
   DropletIcon,
+  FilmIcon,
+  FingerprintPatternIcon,
+  FocusIcon,
   GaugeIcon,
+  HazeIcon,
   ImageIcon,
   RainbowIcon,
   SlidersVerticalIcon,
@@ -21,7 +25,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { LayerRowCommands } from './layerRowCommands';
 
-import { LayerActiveDot, ROW_SELECTION_FOCUS } from './LayerActiveDot';
+import { LayerActiveDot, TREE_ROW_FOCUS } from './LayerActiveDot';
 import { childRowNameKey, isOrderedChildKind, type LayerChildRowKind, type ProjectedChildRow } from './layerChildRows';
 import { recordLayerRowCommit } from './layerPanelDiagnostics';
 import { LAYER_TREE_INDENT_PX } from './layerPanelRows';
@@ -34,12 +38,16 @@ const stopPropagation = (event: { stopPropagation: () => void }): void => event.
 
 const CHILD_ROW_GLYPHS: Record<LayerChildRowKind, LucideIcon> = {
   'adjustment-brightness-contrast': SunMediumIcon,
+  'adjustment-clarity': FocusIcon,
   'adjustment-curves': SplineIcon,
+  'adjustment-dehaze': HazeIcon,
   'adjustment-exposure': ApertureIcon,
   'adjustment-hsl': DropletIcon,
   'adjustment-hue': RainbowIcon,
   'adjustment-invert': ContrastIcon,
   'adjustment-levels': SlidersVerticalIcon,
+  'adjustment-noise': FilmIcon,
+  'adjustment-texture': FingerprintPatternIcon,
   'layer-region': WandSparklesIcon,
   'mask-denoise': GaugeIcon,
   'mask-noise': WavesIcon,
@@ -123,6 +131,9 @@ const LayerChildRowComponent = ({
     return rest;
   }, [dragDisabled, listeners]);
   const name = childRowName(child, t);
+  const detail = child.detailLabelKey
+    ? [child.detail, t(child.detailLabelKey)].filter((part) => part !== null).join(' · ')
+    : child.detail;
 
   const indentStyle = useMemo(() => ({ paddingLeft: `${child.depth * LAYER_TREE_INDENT_PX}px` }), [child.depth]);
   const handleSelect = useCallback(() => commands.selectChild(child), [child, commands]);
@@ -238,10 +249,11 @@ const LayerChildRowComponent = ({
       h="full"
       opacity={dimmed ? 0.4 : undefined}
       pb="0.5"
+      position="relative"
       role="treeitem"
       rounded="sm"
       tabIndex={focused ? 0 : -1}
-      _focusVisible={ROW_SELECTION_FOCUS}
+      _focusVisible={TREE_ROW_FOCUS}
       onClick={handleSelect}
       onContextMenu={handleContextMenu}
       onDoubleClick={startRename}
@@ -295,9 +307,9 @@ const LayerChildRowComponent = ({
             {name}
           </Text>
         )}
-        {child.detail !== null && !renaming ? (
+        {detail !== null && !renaming ? (
           <Text color="fg.subtle" flexShrink={0} fontSize="xs" fontVariantNumeric="tabular-nums">
-            {child.detail}
+            {detail}
           </Text>
         ) : null}
       </LayerRowSurface>

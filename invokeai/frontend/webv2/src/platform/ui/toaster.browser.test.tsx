@@ -1,9 +1,9 @@
 import { ChakraProvider } from '@chakra-ui/react';
-import { AppToaster, toaster } from '@platform/ui/toaster';
+import { AppToaster, createActionToast, toaster } from '@platform/ui/toaster';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -43,5 +43,45 @@ describe('AppToaster', () => {
 
     expect(description.getBoundingClientRect().right).toBeLessThanOrEqual(toastRoot.getBoundingClientRect().right);
     expect(description.scrollWidth).toBeLessThanOrEqual(description.clientWidth);
+  });
+
+  it('offers its actions as matching buttons, each dismissing the toast before it acts', async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <AppToaster />
+        </ChakraProvider>
+      );
+    });
+    const calls: string[] = [];
+    const dismiss = vi.spyOn(toaster, 'dismiss').mockImplementation((toastId) => {
+      calls.push(`dismiss:${String(toastId)}`);
+    });
+    let id = '';
+    await act(() => {
+      id = createActionToast({
+        actions: [
+          { label: 'Retry', onClick: vi.fn() },
+          { label: 'Show in Gallery', onClick: () => calls.push('show') },
+        ],
+        title: 'Saved to Gallery, but not to its board',
+        type: 'warning',
+      });
+    });
+    await expect.poll(() => document.querySelectorAll('[data-part="root"][data-scope="toast"] button').length).toBe(3);
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>('[data-part="root"][data-scope="toast"] button')];
+    const retry = buttons.find((button) => button.textContent === 'Retry')!;
+    const show = buttons.find((button) => button.textContent === 'Show in Gallery')!;
+
+    expect(getComputedStyle(show).fontSize).toBe(getComputedStyle(retry).fontSize);
+    expect(show.getBoundingClientRect().height).toBe(retry.getBoundingClientRect().height);
+
+    await act(() => show.click());
+
+    expect(calls).toEqual([`dismiss:${id}`, 'show']);
+    dismiss.mockRestore();
   });
 });

@@ -30,6 +30,7 @@ from invokeai.app.services.events.events_common import (
     ModelInstallDownloadsCompleteEvent,
     ModelInstallDownloadStartedEvent,
     ModelInstallErrorEvent,
+    ModelInstallPausedEvent,
     ModelInstallStartedEvent,
     ModelLoadCompleteEvent,
     ModelLoadStartedEvent,
@@ -41,6 +42,7 @@ from invokeai.app.services.events.events_common import (
     UserAccessChangedEvent,
     VideoRecallAction,
     VideoRecallConditioningRole,
+    VideoRecallImage,
     VideoRecallMode,
     VideoRecallRequestedEvent,
     VideoRecallVideo,
@@ -52,7 +54,6 @@ from invokeai.app.services.events.events_common import (
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
-    from invokeai.app.services.board_records.board_records_common import BoardRecord
     from invokeai.app.services.download.download_base import DownloadJob
     from invokeai.app.services.images.images_common import ImageDTO
     from invokeai.app.services.intermediates.intermediates_common import IntermediatesOperation
@@ -165,11 +166,13 @@ class EventServiceBase:
         parameters: dict | None = None,
         video: VideoRecallVideo | None = None,
         conditioning_role: VideoRecallConditioningRole | None = None,
+        image: VideoRecallImage | None = None,
+        append: bool = False,
     ) -> None:
         """Emitted when an external caller asks for a user's Video panel to be updated"""
         self.dispatch(
             VideoRecallRequestedEvent.build(
-                queue_id, user_id, action, mode, strict, parameters, video, conditioning_role
+                queue_id, user_id, action, mode, strict, parameters, video, conditioning_role, image, append
             )
         )
 
@@ -269,6 +272,10 @@ class EventServiceBase:
 
     def emit_model_install_downloads_complete(self, job: "ModelInstallJob") -> None:
         self.dispatch(ModelInstallDownloadsCompleteEvent.build(job))
+
+    def emit_model_install_paused(self, job: "ModelInstallJob") -> None:
+        """Emitted when a model install is paused and can be resumed."""
+        self.dispatch(ModelInstallPausedEvent.build(job))
 
     def emit_model_install_started(self, job: "ModelInstallJob") -> None:
         """Emitted once when an install job is started (after any download)."""
@@ -392,38 +399,26 @@ class EventServiceBase:
 
     # region Media uploads
 
-    def emit_image_uploaded(
-        self, image_dto: "ImageDTO", user_id: str, board: Optional["BoardRecord"], shared_user_ids: list[str]
-    ) -> None:
-        """Emitted when a gallery-visible image arrives through the upload API; `board` is the one it was sent to"""
+    def emit_image_uploaded(self, image_dto: "ImageDTO", user_id: str) -> None:
+        """Emitted when a gallery-visible image arrives through the upload API"""
         # The board attach can fail quietly inside create(); the DTO says where the image actually is.
-        board = board if image_dto.board_id is not None else None
         self.dispatch(
             ImageUploadedEvent.build(
                 image_name=image_dto.image_name,
                 image_category=image_dto.image_category,
                 user_id=user_id,
                 board_id=image_dto.board_id,
-                board_owner_id=board.user_id if board else None,
-                board_visibility=board.board_visibility if board else None,
-                shared_user_ids=shared_user_ids if board else [],
             )
         )
 
-    def emit_video_uploaded(
-        self, video_dto: "VideoDTO", user_id: str, board: Optional["BoardRecord"], shared_user_ids: list[str]
-    ) -> None:
-        """Emitted when a gallery-visible video arrives through the upload API; `board` is the one it was sent to"""
-        board = board if video_dto.board_id is not None else None
+    def emit_video_uploaded(self, video_dto: "VideoDTO", user_id: str) -> None:
+        """Emitted when a gallery-visible video arrives through the upload API"""
         self.dispatch(
             VideoUploadedEvent.build(
                 video_name=video_dto.video_name,
                 video_category=video_dto.video_category,
                 user_id=user_id,
                 board_id=video_dto.board_id,
-                board_owner_id=board.user_id if board else None,
-                board_visibility=board.board_visibility if board else None,
-                shared_user_ids=shared_user_ids if board else [],
             )
         )
 

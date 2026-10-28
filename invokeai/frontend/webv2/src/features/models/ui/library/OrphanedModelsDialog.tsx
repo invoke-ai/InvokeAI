@@ -1,7 +1,7 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { OrphanedModelInfo } from '@features/models/core/types';
 
-import { Checkbox, Dialog, Flex, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Checkbox, Flex, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { deleteOrphanedModels, getOrphanedModels } from '@features/models/data/api';
 import { refreshModels } from '@features/models/data/modelsStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
@@ -16,6 +16,7 @@ import {
 } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, CloseButton } from '@platform/ui/Button';
+import { Dialog } from '@platform/ui/Dialog';
 import { Panel } from '@platform/ui/Panel';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';

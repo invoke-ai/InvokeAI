@@ -2,10 +2,12 @@ import type { GraphPreviewSourceState, WorkflowInvocationSourceId } from '@featu
 import type { ReactFlowInstance } from '@xyflow/react';
 import type { ReactNode } from 'react';
 
-import { Box, Center, Dialog, Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Box, Center, Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { localizeForLoopValidationReason } from '@features/workflow/core/forLoops';
 import { useWorkflowGraphPreview } from '@features/workflow/ui/WorkflowUiContext';
+import { canCopyText, copyText } from '@platform/browser/clipboard';
 import { Button, JsonPreview, SegmentTabs, segmentTabsPanelId, segmentTabsTabId, toaster } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { CheckIcon, ChevronUpIcon, CopyIcon, TriangleAlertIcon } from 'lucide-react';
 import { lazy, Suspense, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -173,11 +175,11 @@ export const GraphPreviewDialog = ({
     [mode]
   );
 
+  const canCopy = canCopyText();
   const copyJson = useCallback(() => {
     const json = JSON.stringify(graph?.backendGraph ?? graph, null, 2);
 
-    navigator.clipboard
-      .writeText(json)
+    copyText(json)
       .then(() => {
         setHasCopied(true);
 
@@ -275,7 +277,12 @@ export const GraphPreviewDialog = ({
             </Dialog.Body>
             <Dialog.Footer justifyContent="space-between">
               <Box display="flex" gap="2">
-                <Button disabled={!graph} variant="outline" onClick={copyJson}>
+                <Button
+                  unavailableReason={canCopy ? undefined : t('common.copyUnavailable')}
+                  disabled={!graph}
+                  variant="outline"
+                  onClick={copyJson}
+                >
                   <Icon
                     as={hasCopied ? CheckIcon : CopyIcon}
                     boxSize="3.5"
@@ -304,7 +311,7 @@ export const GraphPreviewDialog = ({
                     cursor={canInvoke ? undefined : 'not-allowed'}
                     opacity={canInvoke ? undefined : 0.6}
                     title={validationMessage}
-                    onClick={invokeRoute}
+                    onClick={canInvoke ? invokeRoute : undefined}
                   >
                     {t('graphPreview.invokeRoute', { route: dialogRoute.label })}
                   </Button>

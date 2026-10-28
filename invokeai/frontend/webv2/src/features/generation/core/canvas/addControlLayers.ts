@@ -5,12 +5,14 @@ import type { BackendGraphContract, BackendInvocationContract } from '@features/
 
 import { addEdge, addNode } from '@features/generation/core/graphBuilder';
 
-import type { ControlAdapterKind, ControlValidationReason } from './controlValidation';
+import type { ControlAdapterKind } from './controlValidation';
 
-import { getControlValidationReason } from './controlValidation';
+import { createControlValidationSequence } from './controlValidation';
 
 /** The deterministic denoise node id every canvas base graph uses. */
 export const CONTROL_DENOISE_NODE_ID = 'denoise_latents';
+
+const LLLITE_COLLECTOR_NODE_ID = 'control_lllite_collector';
 
 /** The control-adapter kinds a control layer can carry. */
 export type { ControlAdapterKind } from './controlValidation';
@@ -36,27 +38,119 @@ export interface ControlLayerGraphInput {
   weight: number;
   beginEndStepPct: [number, number];
   controlMode: 'balanced' | 'more_prompt' | 'more_control' | 'unbalanced' | null;
+  /** The resolved model's `cond_in_channels`; required to validate an Anima ControlNet-LLLite layer. */
+  modelCondInChannels?: number | null;
+  /** FLUX InstantX Union only: the mode for the layer's control type; other models and bases ignore it. */
+  instantxControlMode?: number | null;
 }
 
 /** Kind support is separate from control-mode/model compatibility. */
 export { isControlKindSupportedForBase } from './controlValidation';
 
+/** A node feeding an image input through an edge, or a fixed image field when no node produces it. */
+export type ImageSource = { node: BackendInvocationContract; field: string } | { image_name: string };
+
+/**
+ * What the canvas inpaint and outpaint graphs regenerate: the image the denoise encodes, at processing size, and
+ * the canvas mask as uploaded (white = keep). Adapters that condition on the region read both.
+ */
+export interface CanvasInpaintSources {
+  image: ImageSource;
+  mask: ImageSource;
+}
+
+/** Feeds `field` of `node` from `source`: an edge from the producing node, or the fixed image field. */
+const feedImage = (
+  graph: BackendGraphContract,
+  node: BackendInvocationContract,
+  field: string,
+  source: ImageSource
+): void => {
+  if ('node' in source) {
+    addEdge(graph, source.node, source.field, node, field);
+  } else {
+    node[field] = source;
+  }
+};
+
 /** Options for {@link addControlLayers}. */
 export interface AddControlLayersOptions {
-  /** The main model base — selects controlnet vs flux_controlnet and support. */
+  /** The main model base — selects the adapter nodes and support. */
   base: SupportedGenerateBase;
-  /** The main model variant (a FLUX `dev_fill` blocks Control LoRA). */
+  /**
+   * The main model variant (a FLUX `dev_fill` blocks Control LoRA; a Qwen-Image `edit` blocks its control; FLUX.2's
+   * control needs `dev`).
+   */
   modelVariant?: string;
   /** The valid, resolved control layers to graft (in document order). */
   layers: readonly ControlLayerGraphInput[];
+  /**
+   * Present when the canvas compiles in inpaint or outpaint mode. The Qwen-Image and FLUX.2 control nodes also
+   * condition on the inpainted region and take them; the other kinds ignore them.
+   */
+  inpaint?: CanvasInpaintSources;
 }
+
+/**
+ * The Fun-ControlNet-Union nodes (`qwen_image_control`, `flux2_control`): the control image, plus the region being
+ * regenerated when the canvas inpaints or outpaints, wired straight to the denoise's single `control` field.
+ * Validation admits one per generation, so there is no collector.
+ */
+const addFunUnionControl = (
+  graph: BackendGraphContract,
+  denoise: BackendInvocationContract,
+  layer: ControlLayerGraphInput,
+  type: 'qwen_image_control' | 'flux2_control',
+  inpaint: CanvasInpaintSources | undefined
+): void => {
+  const node = addNode(graph, {
+    begin_step_percent: layer.beginEndStepPct[0],
+    control_context_scale: layer.weight,
+    control_model: layer.model,
+    end_step_percent: layer.beginEndStepPct[1],
+    id: `${type}_${layer.id}`,
+    image: { image_name: layer.imageName },
+    type,
+  });
+  if (inpaint) {
+    // The union's inpainting condition. The canvas mask is white = keep and the node wants white = regenerate,
+    // so `img_lerp` 255 → 0 inverts it first, as the Anima inpaint adapter does.
+    const invertMask = addNode(graph, {
+      id: `${type}_mask_${layer.id}`,
+      max: 0,
+      min: 255,
+      type: 'img_lerp',
+    });
+    feedImage(graph, invertMask, 'image', inpaint.mask);
+    feedImage(graph, node, 'inpaint_image', inpaint.image);
+    addEdge(graph, invertMask, 'image', node, 'inpaint_mask');
+  }
+  addEdge(graph, node, 'control', denoise, 'control');
+};
+
+/**
+ * The one collector every Anima ControlNet-LLLite adapter joins. `anima_denoise.control_lllite` takes one field or a
+ * list, and the denoiser applies each model once, so control layers and the canvas inpaint adapter share it.
+ */
+export const getOrAddLliteCollector = (
+  graph: BackendGraphContract,
+  denoise: BackendInvocationContract
+): BackendInvocationContract => {
+  const existing = graph.nodes[LLLITE_COLLECTOR_NODE_ID];
+  if (existing) {
+    return existing;
+  }
+  const collector = addNode(graph, { id: LLLITE_COLLECTOR_NODE_ID, type: 'collect' });
+  addEdge(graph, collector, 'collection', denoise, 'control_lllite');
+  return collector;
+};
 
 /** Resolves the backend node type for a controlnet layer on `base`. */
 const controlNetNodeType = (base: string): string => (base === 'flux' ? 'flux_controlnet' : 'controlnet');
 
 /** Validate defensively through the shared policy before graph wiring. */
 export const addControlLayers = (graph: BackendGraphContract, options: AddControlLayersOptions): void => {
-  const { base, layers, modelVariant } = options;
+  const { base, inpaint, layers, modelVariant } = options;
   const denoise = graph.nodes[CONTROL_DENOISE_NODE_ID];
   if (!denoise) {
     throw new Error('addControlLayers: base graph is missing the denoise node.');
@@ -64,8 +158,7 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
 
   let controlNetCollector: BackendInvocationContract | null = null;
   let t2iAdapterCollector: BackendInvocationContract | null = null;
-  let controlLoraCount = 0;
-  let zImageControlCount = 0;
+  const validate = createControlValidationSequence({ base, variant: modelVariant });
 
   const ensureControlNetCollector = (): BackendInvocationContract => {
     if (!controlNetCollector) {
@@ -84,15 +177,11 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
   };
 
   for (const layer of layers) {
-    const reason = getControlValidationReason({
-      adapterModel: layer.model,
+    const reason = validate({
+      adapterModel: { ...layer.model, cond_in_channels: layer.modelCondInChannels },
       beginEndStepPct: layer.beginEndStepPct,
-      controlLoraIndex: layer.kind === 'control_lora' ? controlLoraCount : 0,
       kind: layer.kind,
-      mainBase: base,
-      mainVariant: modelVariant,
       weight: layer.weight,
-      zImageControlIndex: layer.kind === 'z_image_control' ? zImageControlCount : 0,
     });
     if (reason) {
       throw new Error(`Invalid control layer: ${reason}`);
@@ -108,8 +197,12 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
         image: { image_name: layer.imageName },
         resize_mode: 'just_resize',
         type: controlNetNodeType(base),
-        // FLUX ControlNet has no control_mode; SD-family carries it.
-        ...(base === 'flux' ? {} : { control_mode: layer.controlMode ?? 'balanced' }),
+        // FLUX ControlNet has no control_mode; SD-family carries it. A FLUX union model takes its InstantX mode.
+        ...(base === 'flux'
+          ? typeof layer.instantxControlMode === 'number'
+            ? { instantx_control_mode: layer.instantxControlMode }
+            : {}
+          : { control_mode: layer.controlMode ?? 'balanced' }),
       });
       addEdge(graph, node, 'control', ensureControlNetCollector(), 'item');
     } else if (layer.kind === 't2i_adapter') {
@@ -133,7 +226,20 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
         weight: layer.weight,
       });
       addEdge(graph, node, 'control_lora', denoise, 'control_lora');
-      controlLoraCount += 1;
+    } else if (layer.kind === 'anima_lllite') {
+      // No mask: a control layer supplies a control image, and validation admits only 3-channel adapters.
+      const node = addNode(graph, {
+        begin_step_percent: layer.beginEndStepPct[0],
+        control_model: layer.model,
+        end_step_percent: layer.beginEndStepPct[1],
+        id: `anima_lllite_${layer.id}`,
+        image: { image_name: layer.imageName },
+        type: 'anima_lllite',
+        weight: layer.weight,
+      });
+      addEdge(graph, node, 'control', getOrAddLliteCollector(graph, denoise), 'item');
+    } else if (layer.kind === 'qwen_image_control' || layer.kind === 'flux2_control') {
+      addFunUnionControl(graph, denoise, layer, layer.kind, inpaint);
     } else {
       const node = addNode(graph, {
         begin_step_percent: layer.beginEndStepPct[0],
@@ -145,78 +251,6 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
         type: 'z_image_control',
       });
       addEdge(graph, node, 'control', denoise, 'control');
-      zImageControlCount += 1;
     }
   }
-};
-
-/** Return null when valid, otherwise the rejection reason. */
-export const getControlLayerRejectionReason = (params: {
-  layerName: string;
-  hasContent: boolean;
-  kind: ControlAdapterKind;
-  adapterModel: { base: string; type?: string } | null;
-  beginEndStepPct: [number, number];
-  controlLoraIndex?: number;
-  mainBase: string;
-  mainVariant?: string;
-  weight: number;
-  zImageControlIndex?: number;
-}): string | null => {
-  const {
-    adapterModel,
-    beginEndStepPct,
-    controlLoraIndex = 0,
-    hasContent,
-    kind,
-    layerName,
-    mainBase,
-    mainVariant,
-    weight,
-    zImageControlIndex = 0,
-  } = params;
-
-  if (!hasContent) {
-    return `Control layer "${layerName}" has no control content.`;
-  }
-  const reason = getControlValidationReason({
-    adapterModel: adapterModel ? { base: adapterModel.base, type: adapterModel.type ?? kind } : null,
-    beginEndStepPct,
-    controlLoraIndex,
-    kind,
-    mainBase,
-    mainVariant,
-    weight,
-    zImageControlIndex,
-  });
-  return reason ? getControlValidationReasonMessage(reason, layerName) : null;
-};
-
-/** The human-readable sentence for a control validation reason code. */
-export const getControlValidationReasonMessage = (reason: ControlValidationReason, layerName: string): string => {
-  if (reason === 'missing_model') {
-    return `Control layer "${layerName}" has no control model selected.`;
-  }
-  if (reason === 'capabilities_unavailable') {
-    return `Control layer "${layerName}" cannot be checked until model capabilities have loaded.`;
-  }
-  if (reason === 'unsupported_adapter') {
-    return `Control layer "${layerName}" is not supported for the selected base model.`;
-  }
-  if (reason === 'incompatible_base') {
-    return `Control layer "${layerName}" uses an incompatible base model.`;
-  }
-  if (reason === 'invalid_adapter_values') {
-    return `Control layer "${layerName}" has invalid control adapter settings.`;
-  }
-  if (reason === 'control_lora_limit') {
-    return 'Only one Control LoRA can be used at a time.';
-  }
-  if (reason === 'z_image_control_limit') {
-    return 'Only one Z-Image control layer can be used at a time.';
-  }
-  if (reason === 'flux_fill_control_lora') {
-    return 'Control LoRA is not compatible with FLUX Fill.';
-  }
-  return `Control layer "${layerName}" uses an incompatible control adapter.`;
 };

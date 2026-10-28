@@ -13,7 +13,11 @@ Deliberately not marked `slow`: pytest's `addopts` carries `-m "not slow"`, so a
 mean this never runs in CI.
 """
 
+import pytest
+
 from tests.dangerously_run_function_in_subprocess import dangerously_run_function_in_subprocess
+
+pytestmark = pytest.mark.platform_independent
 
 
 def _registry_is_full_after_importing_dependencies() -> None:

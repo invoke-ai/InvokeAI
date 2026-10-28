@@ -1,4 +1,3 @@
-/* oxlint-disable react-perf/jsx-no-new-function-as-prop -- the canvas ref callback is memoized on [engine, layerId, version]; it is intentionally re-created when the layer's thumbnail version bumps so the cache is re-blitted. */
 import type {
   CanvasCoreStoreCapability,
   CanvasLayerContract,
@@ -22,6 +21,7 @@ import { useCallback, useState } from 'react';
 const THUMBNAIL_MAX_PX = 96;
 
 const CANVAS_STYLE: CSSProperties = { height: '100%', objectFit: 'contain', width: '100%' };
+const HIDDEN_STYLE: CSSProperties = { display: 'none' };
 const IMG_STYLE: CSSProperties = { height: '100%', objectFit: 'cover', width: '100%' };
 
 export type LayerThumbnailEngine = CanvasCoreStoreCapability & {
@@ -37,7 +37,7 @@ const LayerThumbnailContent = ({
   engine: LayerThumbnailEngine | null;
   layer: CanvasLayerContract;
 }) => {
-  // Re-renders (and thus re-runs the ref callback below) when the cache repaints.
+  // Each repaint keys a fresh canvas below, which binds and so re-blits the cache.
   const version = useLayerThumbnailVersion(engine, layer.id);
   const status = useLayerThumbnailStatus(engine, layer.id);
   const [drawn, setDrawn] = useState(false);
@@ -45,9 +45,6 @@ const LayerThumbnailContent = ({
 
   const bindCanvas = useCallback(
     (canvas: HTMLCanvasElement | null) => {
-      // `version` is read purely so a repaint (a new version) re-creates this
-      // callback, which React re-runs to re-blit the layer cache onto the canvas.
-      void version;
       if (!canvas || !engine) {
         setDrawn(false);
         return;
@@ -61,8 +58,7 @@ const LayerThumbnailContent = ({
         setFallbackStage('thumbnail');
       }
     },
-    // Version changes intentionally replace the ref callback to re-blit repainted pixels.
-    [engine, layer.id, status, version]
+    [engine, layer.id, status]
   );
 
   const retry = useCallback(() => {
@@ -94,7 +90,8 @@ const LayerThumbnailContent = ({
       rounded="sm"
       w="full"
     >
-      <canvas ref={bindCanvas} style={drawn ? CANVAS_STYLE : { display: 'none' }} />
+      {/* A ref callback runs only when its element or identity changes, so the version keys the element. */}
+      <canvas key={version ?? 'none'} ref={bindCanvas} style={drawn ? CANVAS_STYLE : HIDDEN_STYLE} />
       {showFallback &&
         (fallbackUrl ? (
           <img alt={layer.name} onError={onFallbackError} src={fallbackUrl} style={IMG_STYLE} />

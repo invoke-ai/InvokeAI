@@ -4,15 +4,21 @@ import type { AccountScope } from '@platform/state/accountLifecycle';
 import { isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 
 import type { InvocationSourceId } from './invocationContracts';
+import type { SubmitResolvedInvocationDeps } from './invocationSubmit';
 import type { Project } from './projectContracts';
 import type { prepareCanvasInvocation } from './widgets/canvas/invoke/prepareCanvasInvocation';
 import type { WorkbenchCommands } from './workbenchStore';
 
 import { isInvocationRouteValid, resolveInvocationRoute } from './invocation';
+import { beginInvocationPreparation, endInvocationPreparation } from './invocationPreparation';
 import { submitResolvedInvocation } from './invocationSubmit';
 
 export interface GraphPreviewInvokeDeps {
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
+  /** Words a blocked canvas preview's control layer for the notice. */
+  formatControlLayerError: Parameters<typeof prepareCanvasInvocation>[0]['formatControlLayerError'];
+  /** Words a Model only upscale preview whose input metadata could not be read. */
+  formatUpscaleMetadataFailure: SubmitResolvedInvocationDeps['formatUpscaleMetadataFailure'];
   models: readonly ModelConfig[] | undefined;
   owner: AccountScope;
   prepareCanvasInvocation: typeof prepareCanvasInvocation;
@@ -20,9 +26,14 @@ export interface GraphPreviewInvokeDeps {
   sourceId: InvocationSourceId | undefined;
 }
 
-/** Resolves and submits a preview against the post-draft-flush project snapshot. */
+/**
+ * Resolves and submits a preview against the post-draft-flush project snapshot. Shares the active submission's
+ * preparation lease, so it reports false while another submission for the project is still preparing.
+ */
 export const resolveAndSubmitGraphPreviewInvocation = ({
   commands,
+  formatControlLayerError,
+  formatUpscaleMetadataFailure,
   models,
   owner,
   prepareCanvasInvocation: prepareCanvas,
@@ -44,6 +55,21 @@ export const resolveAndSubmitGraphPreviewInvocation = ({
     return false;
   }
 
-  void submitResolvedInvocation({ commands, models, owner, prepareCanvasInvocation: prepareCanvas, project, route });
+  const preparationLease = beginInvocationPreparation(project.id);
+
+  if (!preparationLease) {
+    return false;
+  }
+
+  void submitResolvedInvocation({
+    commands,
+    formatControlLayerError,
+    formatUpscaleMetadataFailure,
+    models,
+    owner,
+    prepareCanvasInvocation: prepareCanvas,
+    project,
+    route,
+  }).finally(() => endInvocationPreparation(preparationLease));
   return true;
 };

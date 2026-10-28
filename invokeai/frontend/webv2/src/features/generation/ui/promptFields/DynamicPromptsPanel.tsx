@@ -54,12 +54,17 @@ export const DynamicPromptsPanel = ({
   const { onChange } = config;
   // Explicit sibling input IDs prevent labels from targeting the wrong control.
   const seedSwitchId = useId();
+  const resampleSwitchId = useId();
   const modeFieldId = useId();
   const modeTriggerId = useId();
   // aria-labelledby combines the field label and value for the composite trigger's accessible name.
   const modeLabelledBy = `${modeFieldId}-label ${modeTriggerId}`;
   const modeMenuIds = useMemo(() => ({ trigger: modeTriggerId }), [modeTriggerId]);
   const seedSwitchIds = useMemo(() => ({ hiddenInput: seedSwitchId, label: `${seedSwitchId}-label` }), [seedSwitchId]);
+  const resampleSwitchIds = useMemo(
+    () => ({ hiddenInput: resampleSwitchId, label: `${resampleSwitchId}-label` }),
+    [resampleSwitchId]
+  );
   const seedHeldNoteId = `${seedSwitchId}-held`;
   const visiblePrompts = expansion.prompts.slice(0, MAX_PREVIEW_ROWS);
   const hiddenPromptCount = expansion.prompts.length - visiblePrompts.length;
@@ -78,6 +83,10 @@ export const DynamicPromptsPanel = ({
   );
   const handleSeedBehaviourChange = useCallback(
     (event: { checked: boolean }) => onChange({ seedBehaviour: event.checked ? 'per-image' : 'per-iteration' }),
+    [onChange]
+  );
+  const handleResampleChange = useCallback(
+    (event: { checked: boolean }) => onChange({ resample: event.checked }),
     [onChange]
   );
   const handleShuffle = useCallback(() => onChange({ sampleSeed: createDynamicPromptsSampleSeed() }), [onChange]);
@@ -178,6 +187,18 @@ export const DynamicPromptsPanel = ({
           </IconButton>
         </Tooltip>
       </HStack>
+
+      {config.combinatorial ? null : (
+        <Switch.Root checked={config.resample} ids={resampleSwitchIds} onCheckedChange={handleResampleChange}>
+          <Switch.HiddenInput />
+          <Switch.Control _checked={SWITCH_CHECKED}>
+            <Switch.Thumb />
+          </Switch.Control>
+          <Switch.Label color="fg.muted" fontSize="xs">
+            {t('widgets.generate.dynamicPrompts.newSampleEveryInvoke')}
+          </Switch.Label>
+        </Switch.Root>
+      )}
 
       <Switch.Root
         checked={config.seedBehaviour === 'per-image'}

@@ -149,10 +149,42 @@ class Krea2ConditioningInfo:
     prompt_embeds_mask: torch.Tensor | None = None
     """Attention mask for prompt_embeds. Shape: (batch_size, seq_len). 1/True for valid, 0/False for padding."""
 
+    num_reference_images: int = 0
+    """How many reference images the prompt was encoded with (edit mode), as ``Picture 1..N`` in that order.
+
+    0 for a text-only prompt. A denoise that receives reference latents needs as many, in the same order: the
+    encoder and the transformer must see the same references, or the LoRA reads one image and edits another.
+    """
+
     def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
         self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
         if self.prompt_embeds_mask is not None:
             self.prompt_embeds_mask = self.prompt_embeds_mask.to(device=device)
+        return self
+
+
+@dataclass
+class QwenImage21ConditioningInfo:
+    """Qwen-Image-2.1 text conditioning from the Qwen3-VL-8B encoder.
+
+    The last decoder layer's output before the final norm, with the system-prompt prefix removed.
+    """
+
+    prompt_embeds: torch.Tensor
+    """Shape: (1, seq_len, hidden=4096). One prompt, so no padding and no mask."""
+
+    image_pad_mask: torch.Tensor | None = None
+    """Shape: (1, seq_len), True at the reference images' `<|image_pad|>` slots; None without references. Each
+    slot stands for 2x2 latent tokens of a reference, in the order the references were encoded."""
+
+    reference_grids: tuple[tuple[int, int], ...] = ()
+    """Per reference, in order: its slots as (rows, columns), so the denoise node can match each reference's
+    latents by shape, not only by count."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        if self.image_pad_mask is not None:
+            self.image_pad_mask = self.image_pad_mask.to(device=device)
         return self
 
 
@@ -283,6 +315,18 @@ class WanConditioningInfo:
 
 
 @dataclass
+class MossImageConditioningInfo:
+    """MOSS-Image text conditioning: Qwen3.5-9B's last hidden state, after its final norm, for one unpadded prompt."""
+
+    prompt_embeds: torch.Tensor
+    """Shape: (seq_len, 4096)."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        return self
+
+
+@dataclass
 class ConditioningFieldData:
     # If you change this class, adding more types, you _must_ update the instantiation of ObjectSerializerDisk in
     # invokeai/app/api/dependencies.py, adding the types to the list of safe globals. If you do not, torch will be
@@ -298,10 +342,12 @@ class ConditioningFieldData:
         | List[Ideogram4ConditioningInfo]
         | List[QwenImageConditioningInfo]
         | List[Krea2ConditioningInfo]
+        | List[QwenImage21ConditioningInfo]
         | List[AnimaConditioningInfo]
         | List[WanConditioningInfo]
         | List[MiniMaxH3ConditioningInfo]
         | List[LTX2ConditioningInfo]
+        | List[MossImageConditioningInfo]
     )
 
 

@@ -218,3 +218,77 @@ describe('Launchpad preferences page', () => {
     await expect.poll(() => router.state.location.pathname).toBe('/preferences/hotkeys');
   });
 });
+
+describe('Launchpad preferences page in a single pane', () => {
+  const back = () => page.getByRole('button', { name: i18n.t('settingsDialog.backToList'), exact: true });
+
+  beforeEach(() => {
+    // Below the 50rem both panes need.
+    host.style.width = '640px';
+  });
+
+  it('opens on the section list from the bare route and on a section from its route', async () => {
+    await render('/preferences');
+
+    await expect.element(sectionItem('Behavior')).toBeVisible();
+    await expect.element(detailHeading('Appearance')).not.toBeInTheDocument();
+    await act(() => root.unmount());
+    root = createRoot(host);
+
+    await render('/preferences/appearance');
+
+    await expect.element(detailHeading('Appearance')).toBeVisible();
+    await expect.element(back()).toBeVisible();
+    await expect.element(sectionItem('Behavior')).not.toBeInTheDocument();
+  });
+
+  it('moves focus between a section and its row, and keeps browser history on the same panes', async () => {
+    const router = await render('/preferences/appearance');
+
+    await back().click();
+    await expect.poll(() => router.state.location.pathname).toBe('/preferences');
+    await expect.element(sectionItem('Appearance')).toHaveFocus();
+
+    await act(() => sectionItem('Behavior').click());
+    await expect.poll(() => router.state.location.pathname).toBe('/preferences/behavior');
+    await expect.element(detailHeading('Behavior')).toBeVisible();
+    await expect.element(back()).toHaveFocus();
+
+    // The browser's Back returns to the list Back left, not to the Appearance settings before it.
+    await act(async () => {
+      router.history.back();
+      await new Promise((resolve) => {
+        setTimeout(resolve, 50);
+      });
+    });
+    await expect.poll(() => router.state.location.pathname).toBe('/preferences');
+    await expect.element(sectionItem('Behavior')).toBeVisible();
+    await expect.element(detailHeading('Behavior')).not.toBeInTheDocument();
+  });
+
+  it('opens search results from the list and returns to it', async () => {
+    await render('/preferences');
+
+    await act(() => search().fill('numeric attention'));
+    await act(() => page.getByRole('button', { name: new RegExp(`^${i18n.t('settingsDialog.allResults')}`) }).click());
+
+    await expect.element(detailHeading(i18n.t('settingsDialog.results'))).toBeVisible();
+    await expect.element(page.getByText('Prefer numeric attention style', { exact: true })).toBeVisible();
+    await back().click();
+    await expect.element(search()).toHaveValue('numeric attention');
+    await expect.element(detailHeading(i18n.t('settingsDialog.results'))).not.toBeInTheDocument();
+  });
+
+  it('leaves `/` alone while the search field is out of view', async () => {
+    await render('/preferences/appearance');
+    await back().click();
+    await act(() => sectionItem('Behavior').click());
+    await expect.element(back()).toHaveFocus();
+
+    const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: '/' });
+    back().element().dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+    await expect.element(back()).toHaveFocus();
+  });
+});

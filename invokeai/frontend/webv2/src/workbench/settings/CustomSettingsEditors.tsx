@@ -22,6 +22,8 @@ import { clearWorkspaceData, rememberWorkspaceClearFailure } from './clearWorksp
 import { GenerationDevicesSettings } from './GenerationDevicesSettings';
 import { HotkeysSettingsSection } from './HotkeysSettingsSection';
 import { ImageMapVocabularySettings } from './ImageMapVocabularySettings';
+import { ImageStorageSettings } from './ImageStorageSettings';
+import { MaxQueueHistorySettings } from './MaxQueueHistorySettings';
 import {
   clearWorkbenchSettings,
   DEFAULT_PREFERENCES,
@@ -36,6 +38,9 @@ const DEVELOPER_GRID_COLUMNS = { base: 1, md: 2 };
 const DANGER_BUTTON_HOVER_STYLES = { bg: 'fg.error', color: 'bg.subtle' };
 const LazyDatabaseMaintenanceDialog = lazy(() =>
   import('./DatabaseMaintenanceDialog').then((module) => ({ default: module.DatabaseMaintenanceDialog }))
+);
+const LazyGalleryMaintenance = lazy(() =>
+  import('./GalleryMaintenance').then((module) => ({ default: module.GalleryMaintenance }))
 );
 
 export const ThemeSettings = () => {
@@ -232,6 +237,11 @@ export const WorkspaceSettings = ({ onReveal }: Pick<SettingFieldProps, 'onRevea
           Clear saved data…
         </Button>
       </HStack>
+      {canManageAppConfig ? (
+        <Suspense fallback={null}>
+          <LazyGalleryMaintenance />
+        </Suspense>
+      ) : null}
       <ConfirmDialog
         body={
           scope === 'user'
@@ -295,6 +305,9 @@ const CustomSettingField = ({ field, onReveal }: SettingFieldProps) => {
     case 'generationDevices':
       editor = <GenerationDevicesSettings />;
       break;
+    case 'maxQueueHistory':
+      editor = <MaxQueueHistorySettings />;
+      break;
     case 'hotkeys':
       // The hotkey editor owns its heading and fills the dialog's allocated height.
       return (
@@ -304,6 +317,9 @@ const CustomSettingField = ({ field, onReveal }: SettingFieldProps) => {
       );
     case 'imageMapVocabulary':
       editor = <ImageMapVocabularySettings />;
+      break;
+    case 'imageStorage':
+      editor = <ImageStorageSettings />;
       break;
     default:
       return null;

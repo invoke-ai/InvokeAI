@@ -1,27 +1,48 @@
 import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 import type { WorkflowRecordDTO } from '@features/workflow/data/api';
-import type { WorkflowReadPort, WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext';
+import type {
+  WorkflowGraphPreviewPort,
+  WorkflowReadPort,
+  WorkflowUiAdapter,
+} from '@features/workflow/ui/WorkflowUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { WorkflowLibraryWriteRefusedError } from '@features/workflow/data/api';
-import { WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
+import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import { requestWorkflowPublication, workflowUiStore } from '@features/workflow/ui/workflowUiStore';
 import { createProjectGraph, serializeWorkflowJson } from '@features/workflow/utility';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { loadGraphPreview } from './libraryPreviewSource';
 import { WorkflowPublicationHost } from './WorkflowPublicationHost';
 
 /**
  * The publication controller reaches the transport through the API module itself (not the queries barrel), so
  * that is where the library is stubbed; the barrel re-exports the same stubs to the host's review fetch.
  */
+const identity = vi.hoisted(() => ({
+  session: { multiuserEnabled: false, phase: 'ready', user: null } as {
+    multiuserEnabled: boolean;
+    phase: 'ready';
+    user: { is_admin?: boolean; user_id: string } | null;
+  },
+}));
+
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  getAuthSession: () => identity.session,
+  useAuthSession: () => identity.session,
+}));
+
 const api = vi.hoisted(() => ({
   createLibraryWorkflowRecord: vi.fn(),
   getLibraryWorkflowRecord: vi.fn(),
+  setLibraryWorkflowPublic: vi.fn(),
   updateLibraryWorkflow: vi.fn(),
 }));
 
@@ -58,21 +79,33 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.saveAsNew': 'Save as new',
   'workflowLibrary.saveFailed': 'Failed to save workflow',
   'workflowLibrary.saveToLibraryConfirm': 'Save',
+  'workflowLibrary.saveToLibraryRelink':
+    'Update library template will then write to the new template instead of "{{template}}".',
+  'workflowLibrary.saveToLibraryRelinkUnnamed':
+    'Update library template will then write to the new template instead of the one this workflow is linked to now.',
   'workflowLibrary.saveToLibraryExplanation':
     "Creates a new library template from this workflow. Its current input values become the template's defaults.",
   'workflowLibrary.saveToLibraryTitle': 'Save to library',
+  'workflowLibrary.publicVisibilityHelp': 'Visible to users of this InvokeAI instance.',
+  'workflowLibrary.publicVisibilityPartial':
+    'The template was saved, but its public visibility could not be confirmed ({{message}}). Retry to make it public.',
+  'workflowLibrary.publicWorkflow': 'Public workflow',
   'workflowLibrary.saved': 'Workflow saved',
   'workflowLibrary.savedCreatedBody': 'Saved "{{name}}" to the library.',
   'workflowLibrary.savedUpdatedBody': 'Updated "{{name}}" in the library.',
   'workflowLibrary.templateName': 'Template name',
   'workflowLibrary.unavailableBundledBody':
     '"{{name}}" came from a bundled template, which cannot be changed. Save it as a new template instead.',
+  'workflowLibrary.unavailableForbiddenBody':
+    'The library template behind "{{name}}" belongs to someone else. Save it as a new template instead.',
   'workflowLibrary.unavailableTitle': 'Template cannot be updated',
   'workflowLibrary.untitled': 'Untitled Workflow',
   'workflowLibrary.updateConfirm': 'Update template',
   'workflowLibrary.updateConfirmBody':
-    'Replace the library template with the current graph, form, and input values of "{{name}}"?',
+    "Replace this workflow's library template with its current graph, form, and input values?",
   'workflowLibrary.updateConfirmCallers': 'Workflows that call this template will use the new version.',
+  'workflowLibrary.updateConfirmNamedBody':
+    'Replace the library template "{{template}}" with this workflow\'s current graph, form, and input values?',
   'workflowLibrary.updateTitle': 'Update library template',
 };
 
@@ -113,10 +146,23 @@ const WORKFLOW_ID = 'wf-1';
 const LIBRARY_ID = 'lib-1';
 
 const UNLINKED: ProjectWorkflowEntry = { document: { ...createProjectGraph(WORKFLOW_ID), name: 'Alpha' } };
-const LINKED: ProjectWorkflowEntry = { ...UNLINKED, source: { libraryWorkflowId: LIBRARY_ID, revision: 3 } };
-const LINKED_UNKNOWN: ProjectWorkflowEntry = { ...UNLINKED, source: { libraryWorkflowId: LIBRARY_ID, revision: null } };
+const LINKED: ProjectWorkflowEntry = {
+  ...UNLINKED,
+  source: { libraryWorkflowId: LIBRARY_ID, ownerUserId: 'user-a', revision: 3 },
+};
+const LINKED_UNKNOWN: ProjectWorkflowEntry = {
+  ...UNLINKED,
+  source: { libraryWorkflowId: LIBRARY_ID, ownerUserId: 'user-a', revision: null },
+};
 const BUNDLED: ProjectWorkflowEntry = { ...UNLINKED, source: { libraryWorkflowId: 'default_alpha', revision: 1 } };
 const OTHER: ProjectWorkflowEntry = { document: { ...createProjectGraph('wf-2'), name: 'Beta' } };
+const GRAPH_PREVIEW: WorkflowGraphPreviewPort = {
+  focusSource: vi.fn(),
+  getRoute: () => null,
+  invoke: () => Promise.resolve(false),
+  openDocumentInNewProject: vi.fn(),
+  openWorkflowEditor: vi.fn(),
+};
 
 const projectSnapshot = (workflows: readonly ProjectWorkflowEntry[]) => ({
   activeWorkflow: workflows[0]!,
@@ -130,12 +176,16 @@ const projectSnapshot = (workflows: readonly ProjectWorkflowEntry[]) => ({
 });
 
 const record = (overrides: Partial<WorkflowRecordDTO> = {}): WorkflowRecordDTO => ({
-  category: 'user',
-  description: '',
+  created_at: '2026-10-20T00:00:00Z',
+  is_public: false,
   name: 'Alpha',
   revision: 4,
   updated_at: new Date().toISOString(),
-  workflow: serializeWorkflowJson({ ...createProjectGraph('lib-doc'), name: 'Alpha' }),
+  user_id: 'user-a',
+  workflow: {
+    ...serializeWorkflowJson({ ...createProjectGraph('lib-doc'), name: 'Alpha' }),
+    meta: { category: 'user', version: '3.0.0' },
+  },
   workflow_id: LIBRARY_ID,
   ...overrides,
 });
@@ -155,7 +205,7 @@ describe('WorkflowPublicationHost', () => {
   let host: HTMLDivElement;
   let root: Root;
   let project: ReturnType<typeof createMutablePort<ReturnType<typeof projectSnapshot>>>;
-  let commands: { setWorkflowSource: ReturnType<typeof vi.fn> };
+  let commands: { renameWorkflow: ReturnType<typeof vi.fn>; setWorkflowSource: ReturnType<typeof vi.fn> };
   let notifications: {
     error: ReturnType<typeof vi.fn>;
     info: ReturnType<typeof vi.fn>;
@@ -187,11 +237,15 @@ describe('WorkflowPublicationHost', () => {
     await act(async () => {
       root.render(
         <StrictMode>
-          <ChakraProvider value={system}>
-            <WorkflowUiProvider adapter={adapter}>
-              <WorkflowPublicationHost />
-            </WorkflowUiProvider>
-          </ChakraProvider>
+          <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+            <ChakraProvider value={system}>
+              <WorkflowUiProvider adapter={adapter}>
+                <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
+                  <WorkflowPublicationHost />
+                </WorkflowGraphPreviewProvider>
+              </WorkflowUiProvider>
+            </ChakraProvider>
+          </QueryClientProvider>
         </StrictMode>
       );
       await settleFrame();
@@ -216,6 +270,8 @@ describe('WorkflowPublicationHost', () => {
   const saveDialog = () => document.querySelector<HTMLElement>('[data-save-to-library-dialog][data-state="open"]');
   const reviewDialog = () => document.querySelector<HTMLElement>('[data-workflow-review-dialog][data-state="open"]');
   const choice = (value: string) => document.querySelector<HTMLButtonElement>(`[data-choice="${value}"]`);
+  const publicWorkflowChoice = () =>
+    saveDialog()?.querySelector<HTMLInputElement>('input[type="checkbox"][name="isPublic"]') ?? null;
   const buttonWithText = (scope: ParentNode | null, text: string) =>
     [...(scope?.querySelectorAll('button') ?? [])].find((candidate) => (candidate.textContent ?? '').trim() === text);
 
@@ -229,9 +285,13 @@ describe('WorkflowPublicationHost', () => {
     await flush();
   };
 
-  const submitSaveAsNew = async (name: string) => {
+  const submitSaveAsNew = async (name: string, isPublic = false) => {
     const dialog = saveDialog();
     expect(dialog).not.toBeNull();
+
+    if (isPublic) {
+      await click(publicWorkflowChoice());
+    }
 
     const input = dialog?.querySelector<HTMLInputElement>('input[name="templateName"]');
     const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
@@ -254,11 +314,13 @@ describe('WorkflowPublicationHost', () => {
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
-    commands = { setWorkflowSource: vi.fn() };
+    commands = { renameWorkflow: vi.fn(), setWorkflowSource: vi.fn() };
     notifications = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
     api.createLibraryWorkflowRecord.mockReset();
     api.getLibraryWorkflowRecord.mockReset();
+    api.setLibraryWorkflowPublic.mockReset();
     api.updateLibraryWorkflow.mockReset();
+    identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
     // A fresh controller and an empty intent for every test.
     accountLifecycle.invalidate();
   });
@@ -277,6 +339,7 @@ describe('WorkflowPublicationHost', () => {
     await request('save-as-new');
 
     expect(saveDialog()?.querySelector<HTMLInputElement>('input[name="templateName"]')?.value).toBe('Alpha');
+    expect(publicWorkflowChoice()).toBeNull();
     expect(workflowUiStore.getSnapshot().publicationIntent).toBeNull();
 
     await submitSaveAsNew('Alpha, published');
@@ -288,24 +351,230 @@ describe('WorkflowPublicationHost', () => {
     ];
     expect(workflow).toMatchObject({ ...serializeWorkflowJson(UNLINKED.document), name: 'Alpha, published' });
     expect(options.reservedId).toEqual(expect.any(String));
+    expect(options).not.toHaveProperty('isPublic');
     // The project workflow now knows which template, at which revision, it can update later.
     expect(commands.setWorkflowSource).toHaveBeenCalledWith(
       { projectId: PROJECT_ID, workflowId: WORKFLOW_ID },
-      { libraryWorkflowId: 'lib-new', revision: 1 }
+      { libraryWorkflowId: 'lib-new', ownerUserId: 'user-a', revision: 1 }
     );
+    // It is now that template's working copy, so it takes the template's name.
+    expect(commands.renameWorkflow).toHaveBeenCalledWith(WORKFLOW_ID, 'Alpha, published', PROJECT_ID);
     expect(notifications.success).toHaveBeenCalledWith('Workflow saved', 'Saved "Alpha, published" to the library.');
+    expect(api.setLibraryWorkflowPublic).not.toHaveBeenCalled();
     expect(saveDialog()).toBeNull();
   });
 
+  it('defaults a multiuser save to private', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    api.createLibraryWorkflowRecord.mockImplementation((workflow: Record<string, unknown>) =>
+      Promise.resolve(record({ name: String(workflow.name), is_public: false, workflow, workflow_id: 'lib-new' }))
+    );
+
+    await renderHost([UNLINKED]);
+    await request('save-as-new');
+
+    expect(publicWorkflowChoice()?.checked).toBe(false);
+    await submitSaveAsNew('Alpha, private');
+
+    expect(api.createLibraryWorkflowRecord).toHaveBeenCalledTimes(1);
+    expect(api.createLibraryWorkflowRecord.mock.calls[0]?.[1]).not.toHaveProperty('isPublic');
+    expect(api.setLibraryWorkflowPublic).not.toHaveBeenCalled();
+    expect(commands.setWorkflowSource).toHaveBeenCalledWith(
+      { projectId: PROJECT_ID, workflowId: WORKFLOW_ID },
+      { libraryWorkflowId: 'lib-new', ownerUserId: 'user-a', revision: 4 }
+    );
+  });
+
+  it('retries a failed public visibility update before linking the workflow', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    api.createLibraryWorkflowRecord.mockImplementation(
+      (workflow: Record<string, unknown>, options: { reservedId?: string }) =>
+        Promise.resolve(
+          record({
+            is_public: false,
+            name: String(workflow.name),
+            revision: 4,
+            workflow,
+            workflow_id: options.reservedId,
+          })
+        )
+    );
+    api.setLibraryWorkflowPublic
+      .mockRejectedValueOnce(new Error('visibility unavailable'))
+      .mockImplementationOnce((workflowId: string) =>
+        Promise.resolve(record({ is_public: true, revision: 4, workflow_id: workflowId }))
+      );
+
+    await renderHost([UNLINKED]);
+    await request('save-as-new');
+
+    expect(publicWorkflowChoice()?.checked).toBe(false);
+    await submitSaveAsNew('Alpha, public', true);
+
+    const createOptions = api.createLibraryWorkflowRecord.mock.calls[0]?.[1] as { reservedId: string };
+    expect(api.createLibraryWorkflowRecord).toHaveBeenCalledTimes(1);
+    expect(api.setLibraryWorkflowPublic).toHaveBeenCalledTimes(1);
+    expect(api.setLibraryWorkflowPublic.mock.calls[0]?.slice(0, 2)).toEqual([createOptions.reservedId, true]);
+    expect(commands.setWorkflowSource).not.toHaveBeenCalled();
+    expect(choice('retry')).not.toBeNull();
+    expect(document.body.textContent).toContain(
+      'The template was saved, but its public visibility could not be confirmed (visibility unavailable). Retry to make it public.'
+    );
+
+    await click(choice('retry'));
+
+    expect(api.createLibraryWorkflowRecord).toHaveBeenCalledTimes(1);
+    expect(api.setLibraryWorkflowPublic.mock.calls.map((call) => call.slice(0, 2))).toEqual([
+      [createOptions.reservedId, true],
+      [createOptions.reservedId, true],
+    ]);
+    expect(commands.setWorkflowSource).toHaveBeenCalledWith(
+      { projectId: PROJECT_ID, workflowId: WORKFLOW_ID },
+      { libraryWorkflowId: createOptions.reservedId, ownerUserId: 'user-a', revision: 4 }
+    );
+  });
+
+  it('says which template Update stops writing to when a linked workflow is saved as new, and only then', async () => {
+    api.getLibraryWorkflowRecord.mockResolvedValue(record({ name: 'Library alpha' }));
+    const relinkNotice = () => saveDialog()?.querySelector('[data-save-to-library-relink]')?.textContent ?? null;
+
+    await renderHost([LINKED]);
+    await request('save-as-new');
+    await flush();
+    expect(relinkNotice()).toBe(
+      'Update library template will then write to the new template instead of "Library alpha".'
+    );
+
+    for (const entry of [UNLINKED, BUNDLED]) {
+      await act(() => root.unmount());
+      root = createRoot(host);
+      accountLifecycle.invalidate();
+      await renderHost([entry]);
+      await request('save-as-new');
+      await flush();
+      expect(saveDialog()).not.toBeNull();
+      expect(relinkNotice()).toBeNull();
+    }
+  });
+
+  it('shows the relink notice with public publishing and links only after visibility is confirmed', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    api.getLibraryWorkflowRecord.mockResolvedValue(record({ name: 'Library alpha' }));
+    api.createLibraryWorkflowRecord.mockImplementation(
+      (workflow: Record<string, unknown>, options: { reservedId?: string }) =>
+        Promise.resolve(
+          record({
+            is_public: false,
+            name: String(workflow.name),
+            revision: 5,
+            workflow,
+            workflow_id: options.reservedId,
+          })
+        )
+    );
+    const visibility = deferred<WorkflowRecordDTO>();
+    api.setLibraryWorkflowPublic.mockReturnValueOnce(visibility.promise);
+
+    await renderHost([LINKED]);
+    await request('save-as-new');
+    await flush();
+
+    expect(saveDialog()?.querySelector('[data-save-to-library-relink]')?.textContent).toBe(
+      'Update library template will then write to the new template instead of "Library alpha".'
+    );
+    expect(publicWorkflowChoice()?.checked).toBe(false);
+
+    await submitSaveAsNew('Alpha, public', true);
+
+    const createOptions = api.createLibraryWorkflowRecord.mock.calls[0]?.[1] as { reservedId: string };
+    expect(api.setLibraryWorkflowPublic).toHaveBeenCalledWith(createOptions.reservedId, true, expect.anything());
+    expect(commands.setWorkflowSource).not.toHaveBeenCalled();
+
+    await act(async () => {
+      visibility.resolve(record({ is_public: true, revision: 5, workflow_id: createOptions.reservedId }));
+      await settleFrame();
+    });
+    await flush();
+
+    expect(commands.setWorkflowSource).toHaveBeenCalledWith(
+      { projectId: PROJECT_ID, workflowId: WORKFLOW_ID },
+      { libraryWorkflowId: createOptions.reservedId, ownerUserId: 'user-a', revision: 5 }
+    );
+  });
+
+  it('keeps a rename made while the save was in flight instead of adopting the template name', async () => {
+    const pending = deferred<WorkflowRecordDTO>();
+    api.createLibraryWorkflowRecord.mockReturnValueOnce(pending.promise);
+
+    await renderHost([UNLINKED]);
+    await request('save-as-new');
+    await submitSaveAsNew('Alpha, published');
+    expect(api.createLibraryWorkflowRecord).toHaveBeenCalledTimes(1);
+
+    const renamed: ProjectWorkflowEntry = { ...UNLINKED, document: { ...UNLINKED.document, name: 'Alpha, renamed' } };
+    await act(() => project.setSnapshot(projectSnapshot([renamed])));
+
+    await act(async () => {
+      pending.resolve(record({ name: 'Alpha, published', revision: 1, workflow_id: 'lib-new' }));
+      await settleFrame();
+    });
+    await flush();
+
+    // The copy still links to the template it created; the name chosen meanwhile stands.
+    expect(commands.setWorkflowSource).toHaveBeenCalledWith(
+      { projectId: PROJECT_ID, workflowId: WORKFLOW_ID },
+      { libraryWorkflowId: 'lib-new', ownerUserId: 'user-a', revision: 1 }
+    );
+    expect(commands.renameWorkflow).not.toHaveBeenCalled();
+    expect(notifications.success).toHaveBeenCalledWith('Workflow saved', 'Saved "Alpha, published" to the library.');
+  });
+
+  it('updates the template a save as new linked, naming it in the confirmation', async () => {
+    api.createLibraryWorkflowRecord.mockImplementation((workflow: Record<string, unknown>) =>
+      Promise.resolve(record({ name: String(workflow.name), revision: 1, workflow, workflow_id: 'lib-demo' }))
+    );
+    api.getLibraryWorkflowRecord.mockImplementation((id: string) =>
+      Promise.resolve(
+        record({ name: id === 'lib-demo' ? 'demo' : 'Library alpha', revision: id === 'lib-demo' ? 1 : 3 })
+      )
+    );
+    api.updateLibraryWorkflow.mockResolvedValue(record({ name: 'demo', revision: 2, workflow_id: 'lib-demo' }));
+    // Opened from a library template, then saved as a new one: the app re-links the copy to what was saved.
+    commands.setWorkflowSource.mockImplementation((_target, source: ProjectWorkflowEntry['source']) =>
+      project.setSnapshot(projectSnapshot([{ ...LINKED, source }]))
+    );
+
+    await renderHost([LINKED]);
+    await request('save-as-new');
+    await submitSaveAsNew('demo');
+    await request('update-source');
+    await flush();
+
+    const dialog = dialogTitled('Update library template');
+    // Only the template being replaced is named, never the one the workflow was first opened from.
+    expect(dialog?.textContent).toContain(
+      'Replace the library template "demo" with this workflow\'s current graph, form, and input values?'
+    );
+    expect(dialog?.textContent).not.toContain('Alpha');
+    await confirmUpdate();
+
+    expect(api.updateLibraryWorkflow).toHaveBeenCalledTimes(1);
+    expect(api.updateLibraryWorkflow.mock.calls[0]![0]).toBe('lib-demo');
+    expect(api.updateLibraryWorkflow.mock.calls[0]![2]).toMatchObject({ expectedRevision: 1 });
+  });
+
   it('updates the template at the revision the copy knows, after confirmation, keeping its own name', async () => {
-    api.getLibraryWorkflowRecord.mockResolvedValue(record({ name: 'Library alpha', revision: 3 }));
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    api.getLibraryWorkflowRecord.mockResolvedValue(record({ is_public: true, name: 'Library alpha', revision: 3 }));
     api.updateLibraryWorkflow.mockResolvedValue(record({ name: 'Library alpha', revision: 4 }));
 
     await renderHost([LINKED]);
     await request('update-source');
 
     const dialog = dialogTitled('Update library template');
-    expect(dialog?.textContent).toContain('input values of "Alpha"?');
+    expect(publicWorkflowChoice()).toBeNull();
+    await flush();
+    expect(dialog?.textContent).toContain('Replace the library template "Library alpha" with');
     expect(api.updateLibraryWorkflow).not.toHaveBeenCalled();
 
     await confirmUpdate();
@@ -321,9 +590,10 @@ describe('WorkflowPublicationHost', () => {
     expect(options.expectedRevision).toBe(3);
     expect(commands.setWorkflowSource).toHaveBeenCalledWith(
       { projectId: PROJECT_ID, workflowId: WORKFLOW_ID },
-      { libraryWorkflowId: LIBRARY_ID, revision: 4 }
+      { libraryWorkflowId: LIBRARY_ID, ownerUserId: 'user-a', revision: 4 }
     );
     expect(notifications.success).toHaveBeenCalledWith('Workflow saved', 'Updated "Library alpha" in the library.');
+    expect(api.setLibraryWorkflowPublic).not.toHaveBeenCalled();
     expect(dialogTitled('Update library template')).toBeNull();
   });
 
@@ -346,7 +616,9 @@ describe('WorkflowPublicationHost', () => {
   });
 
   it('asks before writing when the copy never knew its template revision, and reviews before replacing', async () => {
-    api.getLibraryWorkflowRecord.mockResolvedValue(record({ description: 'Edited elsewhere', revision: 5 }));
+    api.getLibraryWorkflowRecord.mockResolvedValue(
+      record({ revision: 5, workflow: { ...record().workflow, description: 'Edited elsewhere' } })
+    );
     api.updateLibraryWorkflow.mockResolvedValue(record({ revision: 6 }));
 
     await renderHost([LINKED_UNKNOWN]);
@@ -371,10 +643,35 @@ describe('WorkflowPublicationHost', () => {
     expect(api.updateLibraryWorkflow.mock.calls[0]?.[2]).toMatchObject({ expectedRevision: 5 });
     expect(commands.setWorkflowSource).toHaveBeenCalledWith(
       { projectId: PROJECT_ID, workflowId: WORKFLOW_ID },
-      { libraryWorkflowId: LIBRARY_ID, revision: 6 }
+      { libraryWorkflowId: LIBRARY_ID, ownerUserId: 'user-a', revision: 6 }
     );
     expect(notifications.success).toHaveBeenCalledWith('Workflow saved', 'Updated "Alpha" in the library.');
     expect(dialogs()).toHaveLength(0);
+  });
+
+  it('dates the revision against the arriving review record instead of the loading view mount', async () => {
+    await loadGraphPreview();
+    vi.useFakeTimers({ toFake: ['Date'] });
+
+    try {
+      vi.setSystemTime(new Date('2026-10-20T10:00:00Z'));
+      const pendingRecord = deferred<WorkflowRecordDTO>();
+      api.getLibraryWorkflowRecord.mockReturnValue(pendingRecord.promise);
+      await renderHost([LINKED_UNKNOWN]);
+      await request('update-source');
+      await click(choice('review'));
+      expect(reviewDialog()?.textContent).toContain('Loading the current template…');
+
+      vi.setSystemTime(new Date('2026-10-20T12:00:00Z'));
+      await act(async () => {
+        pendingRecord.resolve(record({ revision: 5, updated_at: '2026-10-20T10:05:00Z' }));
+        await settleFrame();
+      });
+
+      expect(reviewDialog()?.textContent).toContain('Revision 5 · updated 2 hours ago');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('lets a conflict be resolved by saving as a new template instead', async () => {
@@ -394,6 +691,44 @@ describe('WorkflowPublicationHost', () => {
 
     expect(dialogTitled('Template cannot be updated')?.textContent).toContain('came from a bundled template');
     expect(api.updateLibraryWorkflow).not.toHaveBeenCalled();
+  });
+
+  it('fails closed for a multiuser source with no verified owner', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'user-a' } };
+    await renderHost([{ ...UNLINKED, source: { libraryWorkflowId: LIBRARY_ID, revision: 3 } }]);
+    await request('update-source');
+
+    expect(dialogTitled('Template cannot be updated')?.textContent).toContain('belongs to someone else');
+    expect(choice('save-as-new')).not.toBeNull();
+    expect(api.updateLibraryWorkflow).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])('lets an admin update another account’s %s workflow', async (isPublic) => {
+    identity.session = {
+      multiuserEnabled: true,
+      phase: 'ready',
+      user: { is_admin: true, user_id: 'admin-user' },
+    };
+    const workflowFromAnotherAccount: ProjectWorkflowEntry = {
+      ...LINKED,
+      source: { ...LINKED.source!, ownerUserId: 'owner-user' },
+    };
+    api.getLibraryWorkflowRecord.mockResolvedValue(record({ is_public: isPublic, user_id: 'owner-user', revision: 3 }));
+    api.updateLibraryWorkflow.mockResolvedValue(record({ is_public: isPublic, user_id: 'owner-user', revision: 4 }));
+
+    await renderHost([workflowFromAnotherAccount]);
+    await request('update-source');
+
+    expect(dialogTitled('Update library template')).not.toBeNull();
+    expect(api.updateLibraryWorkflow).not.toHaveBeenCalled();
+
+    await confirmUpdate();
+
+    expect(api.updateLibraryWorkflow).toHaveBeenCalledWith(
+      LIBRARY_ID,
+      expect.anything(),
+      expect.objectContaining({ expectedRevision: 3 })
+    );
   });
 
   it('offers a retry after a lost answer and resends under the same reserved id', async () => {
@@ -434,7 +769,7 @@ describe('WorkflowPublicationHost', () => {
 
     expect(commands.setWorkflowSource).toHaveBeenCalledWith(
       { projectId: PROJECT_ID, workflowId: WORKFLOW_ID },
-      { libraryWorkflowId: 'lib-new', revision: 1 }
+      { libraryWorkflowId: 'lib-new', ownerUserId: 'user-a', revision: 1 }
     );
     expect(notifications.success).toHaveBeenCalledWith('Workflow saved', 'Saved "Alpha" to the library.');
   });
@@ -476,7 +811,7 @@ describe('WorkflowPublicationHost', () => {
     expect(api.updateLibraryWorkflow).toHaveBeenCalledTimes(1);
     expect(commands.setWorkflowSource).toHaveBeenCalledWith(
       { projectId: 'project-2', workflowId: WORKFLOW_ID },
-      { libraryWorkflowId: 'lib-C', revision: expect.any(Number) }
+      { libraryWorkflowId: 'lib-C', ownerUserId: 'user-a', revision: expect.any(Number) }
     );
   });
 
@@ -574,7 +909,7 @@ describe('WorkflowPublicationHost', () => {
     expect(second.reservedId).toBe(first.reservedId);
     expect(commands.setWorkflowSource).toHaveBeenCalledWith(
       { projectId: PROJECT_ID, workflowId: WORKFLOW_ID },
-      { libraryWorkflowId: first.reservedId, revision: 1 }
+      { libraryWorkflowId: first.reservedId, ownerUserId: 'user-a', revision: 1 }
     );
     expect(dialogs()).toHaveLength(0);
 

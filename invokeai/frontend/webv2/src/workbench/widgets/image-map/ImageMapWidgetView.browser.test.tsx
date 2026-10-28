@@ -13,6 +13,7 @@ import { page } from 'vitest/browser';
 const workbench = vi.hoisted(() => ({
   galleryValues: {} as Record<string, unknown>,
   patchValues: vi.fn(),
+  updateGallerySettings: vi.fn(),
 }));
 
 const recovery = vi.hoisted(() => ({ status: vi.fn(), points: vi.fn() }));
@@ -28,7 +29,10 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   // setting that is a number or null makes the widget act on a value it could never be given in production.
   useWidgetValuesSelector: (widgetId: string, select: (values: Record<string, unknown>) => unknown) =>
     select(widgetId === 'gallery' ? workbench.galleryValues : {}),
-  useWorkbenchCommands: () => ({ widgets: { patchValues: workbench.patchValues } }),
+  useWorkbenchCommands: () => ({
+    gallery: { updateSettings: workbench.updateGallerySettings },
+    widgets: { patchValues: workbench.patchValues },
+  }),
   useWorkbenchQueries: () => ({ getSnapshot: () => ({ activeProject: {} }) }),
 }));
 vi.mock('@workbench/widgetState', async (importOriginal) => ({
@@ -113,11 +117,18 @@ vi.mock('@workbench/image-map/imageMapStore', async (importOriginal) => {
     refreshImageIndexStatus: vi.fn(),
     refreshImageMapPoints: vi.fn(),
     setClusterLabelsEnabled: vi.fn(),
+    setImageMapMediaKind: vi.fn(),
   };
 });
 
 import { registerImageCluster } from '@features/gallery/contracts';
-import { imageMapStore, refreshImageIndexStatus, refreshImageMapPoints } from '@workbench/image-map/imageMapStore';
+import {
+  ensureImageMapLoaded,
+  imageMapStore,
+  refreshImageIndexStatus,
+  refreshImageMapPoints,
+  setImageMapMediaKind,
+} from '@workbench/image-map/imageMapStore';
 
 import { ImageMapWidgetView } from './ImageMapWidgetView';
 
@@ -256,6 +267,73 @@ describe('Image Map unavailable states', () => {
       expect(buttonLabels()).toEqual(['Retry']);
     }
   );
+});
+
+describe('Image Map media filter', () => {
+  it('says the shared media filter emptied the map and offers to show both kinds', async () => {
+    workbench.galleryValues = { mediaFilter: 'video' };
+    imageMapStore.setSnapshot({
+      clusterLabels: null,
+      clusterLabelsEps: null,
+      clusterLabelsHash: null,
+      data: { ...dataFor('disabled'), state: 'empty' },
+      error: null,
+      indexCounts: null,
+      indexUpdatedAt: null,
+      loadState: 'loaded',
+      renderError: null,
+    });
+
+    await act(() =>
+      root?.render(
+        <ChakraProvider value={system}>
+          <ImageMapWidgetView {...viewProps} />
+        </ChakraProvider>
+      )
+    );
+
+    expect(host?.textContent).toContain('No videos to map');
+    expect(host?.textContent).not.toContain('Nothing to map yet');
+
+    // The header's trigger, which the frame renders outside the view.
+    const trigger = document.createElement('button');
+    trigger.id = 'image-map-media-filter-trigger';
+    document.body.append(trigger);
+
+    await page.getByRole('button', { name: 'Show all media' }).click();
+
+    expect(workbench.updateGallerySettings).toHaveBeenCalledExactlyOnceWith({ mediaFilter: 'all' });
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+
+  it('pushes the shared media filter into the store before the first load', async () => {
+    workbench.galleryValues = { mediaFilter: 'video' };
+    imageMapStore.setSnapshot({
+      clusterLabels: null,
+      clusterLabelsEps: null,
+      clusterLabelsHash: null,
+      data: null,
+      error: null,
+      indexCounts: null,
+      indexUpdatedAt: null,
+      loadState: 'idle',
+      renderError: null,
+    });
+
+    await act(() =>
+      root?.render(
+        <ChakraProvider value={system}>
+          <ImageMapWidgetView {...viewProps} />
+        </ChakraProvider>
+      )
+    );
+
+    expect(setImageMapMediaKind).toHaveBeenCalledWith('video');
+    expect(vi.mocked(setImageMapMediaKind).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(ensureImageMapLoaded).mock.invocationCallOrder[0]!
+    );
+  });
 });
 
 describe('Image Map missing-model link', () => {

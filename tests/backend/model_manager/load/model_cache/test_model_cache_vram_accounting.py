@@ -216,6 +216,33 @@ def test_the_windows_video_memory_budget_caps_the_measured_free_vram(monkeypatch
     assert cache._get_vram_available(None) == 6 * GB
 
 
+@pytest.mark.parametrize("cache_cap_gb", [None, 12.0])
+@pytest.mark.parametrize("reserve_vram_gb", [0.0, 1.5])
+def test_reserve_vram_reduces_available_memory(
+    monkeypatch: pytest.MonkeyPatch, cache_cap_gb: float | None, reserve_vram_gb: float
+):
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=True,
+        keep_ram_copy_of_weights=True,
+        max_vram_cache_size_gb=cache_cap_gb,
+        reserve_vram_gb=reserve_vram_gb,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=MagicMock(),
+        shared_cpu_weights=None,
+    )
+    cache._execution_device = torch.device("cuda")  # Avoid requiring a physical GPU.
+    monkeypatch.setattr(TorchDevice, "cuda_mem_get_info", classmethod(lambda cls, device: (8 * GB, 16 * GB)))
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device: 2 * GB)
+    monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 0)
+
+    reserved_bytes = int(reserve_vram_gb * GB)
+    expected_cache = (9 if cache_cap_gb is not None else 7) * GB - reserved_bytes
+    assert cache._get_vram_available(None) == expected_cache
+    assert cache._get_physical_vram_available() == 7 * GB - reserved_bytes
+
+
 @pytest.mark.parametrize("peer_busy", [False, True], ids=["alone", "peer-device-busy"])
 def test_offloading_under_expandable_segments_stops_once_enough_is_free(monkeypatch: pytest.MonkeyPatch, peer_busy):
     """Under expandable segments the driver sees an offloaded model's pages only after empty_cache(), and no
@@ -296,7 +323,7 @@ class TestReserveRelease:
             TorchDevice, "cuda_mem_get_info", classmethod(lambda cls, d: (driver_free_mb * MB, 24 * GB))
         )
         monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: releasable_mb * MB)
-        monkeypatch.setattr(model_cache_module, "_expandable_segments_enabled", lambda: False)
+        monkeypatch.setattr(model_cache_module, "expandable_segments_enabled", lambda: False)
         monkeypatch.setattr(TorchDevice, "empty_cache", classmethod(lambda cls, force=False: calls.append(force)))
         cache._release_allocator_blocks_for_reserve(None if working_mb is None else working_mb * MB)
         return calls
@@ -332,7 +359,7 @@ class TestReserveRelease:
         cache = self._cache("cuda")
         calls: list = []
         monkeypatch.setattr(TorchDevice, "cuda_mem_get_info", classmethod(lambda cls, d: (2 * GB, 24 * GB)))
-        monkeypatch.setattr(model_cache_module, "_expandable_segments_enabled", lambda: True)
+        monkeypatch.setattr(model_cache_module, "expandable_segments_enabled", lambda: True)
         monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 0)
         monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device=None: 9 * GB)
         monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device=None: 6 * GB)
@@ -375,3 +402,45 @@ def test_lock_hands_cached_blocks_back_when_the_reserve_is_not_driver_free():
     finally:
         cache.unlock(record)
         torch.cuda.empty_cache()
+
+
+def _calibrating_cache(device: str, cap_gb: float | None) -> ModelCache:
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=True,
+        keep_ram_copy_of_weights=True,
+        max_vram_cache_size_gb=cap_gb,
+        reserve_vram_gb=0.5,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=MagicMock(),
+        shared_cpu_weights=None,
+    )
+    cache._execution_device = torch.device(device)  # policy only; every memory query below is patched out
+    return cache
+
+
+@pytest.mark.parametrize("cap_gb", [None, 8.0], ids=["uncapped", "capped"])
+def test_a_calibration_on_a_shared_memory_device_plans_with_what_its_lock_budgets(
+    monkeypatch: pytest.MonkeyPatch, cap_gb: float | None
+):
+    """On MPS the calibration's pre-lock offload moves nothing, so what is live stays live: the capacity it plans with
+    is the lock's budget with the working memory given back. 10 GB available and 2 GB the driver holds, 3 GB live:
+    9 GB, or 5 GB under an 8 GB cap; less the 0.5 GB reserve."""
+    monkeypatch.setattr(model_cache_module.psutil, "virtual_memory", lambda: MagicMock(available=10 * GB))
+    monkeypatch.setattr(torch.mps, "driver_allocated_memory", lambda: 2 * GB)
+    monkeypatch.setattr(torch.mps, "current_allocated_memory", lambda: 3 * GB)
+    cache = _calibrating_cache("mps", cap_gb)
+    working = 4 * GB
+
+    assert cache.calibration_capacity() == (8.5 if cap_gb is None else 4.5) * GB
+    assert cache.calibration_capacity() == cache._get_vram_available(working) + working
+
+
+def test_a_calibration_on_a_dedicated_card_counts_the_models_its_offload_moves_out(monkeypatch: pytest.MonkeyPatch):
+    """6 GB free and 2 GB the resident models hold: the offload moves them out before the lock, so 8 GB, less the
+    reserve."""
+    monkeypatch.setattr(TorchDevice, "cuda_mem_get_info", classmethod(lambda cls, device: (6 * GB, 24 * GB)))
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device=None: 2 * GB)
+
+    assert _calibrating_cache("cuda", None).calibration_capacity() == 7.5 * GB

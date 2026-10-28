@@ -32,6 +32,8 @@ interface HarnessOptions {
   /** Mirror refresh fails, so an accepted mutation can never be mirrored. */
   readonly mirrorBroken?: boolean;
   readonly staged?: boolean;
+  /** Overrides the initial project's selection (its default inpaint mask). */
+  readonly selectedLayerId?: string | null;
 }
 
 /** A real reducer, history and transaction protocol around the controller; the mirror follows the reducer. */
@@ -41,6 +43,10 @@ const createHarness = (options: HarnessOptions = {}) => {
     ...base,
     canvas: {
       ...base.canvas,
+      document:
+        options.selectedLayerId === undefined
+          ? base.canvas.document
+          : { ...base.canvas.document, selectedLayerId: options.selectedLayerId },
       stagingArea: {
         ...base.canvas.stagingArea,
         isVisible: true,
@@ -116,8 +122,11 @@ describe('StagedResultController', () => {
   it('commits the selected candidate as one undo step that replays both ways', async () => {
     const h = createHarness();
     const initial = h.project().canvas.document;
+    // The new project's inpaint mask stays the editing target throughout.
+    expect(getDocumentLayer(initial, initial.selectedLayerId)?.type).toBe('inpaint_mask');
 
     expect(h.controller.commit(selection)).toEqual({ layerId: 'layer-1', status: 'committed' });
+    expect(h.project().canvas.document.selectedLayerId).toBe(initial.selectedLayerId);
     expect(getDocumentLayer(h.project().canvas.document, 'layer-1')).toMatchObject({
       id: 'layer-1',
       opacity: 0.5,
@@ -134,6 +143,18 @@ describe('StagedResultController', () => {
 
     expect(await h.history.redo()).toEqual({ status: 'applied' });
     expect(getDocumentLayer(h.project().canvas.document, 'layer-1')).not.toBeNull();
+    expect(h.project().canvas.document.selectedLayerId).toBe(initial.selectedLayerId);
+  });
+
+  it('selects the accepted layer when no editing target was selected, and restores none on undo', async () => {
+    const h = createHarness({ selectedLayerId: null });
+
+    expect(h.controller.commit(selection)).toEqual({ layerId: 'layer-1', status: 'committed' });
+    expect(h.project().canvas.document.selectedLayerId).toBe('layer-1');
+
+    expect(await h.history.undo()).toEqual({ status: 'applied' });
+    expect(h.project().canvas.document.selectedLayerId).toBeNull();
+    expect(await h.history.redo()).toEqual({ status: 'applied' });
     expect(h.project().canvas.document.selectedLayerId).toBe('layer-1');
   });
 

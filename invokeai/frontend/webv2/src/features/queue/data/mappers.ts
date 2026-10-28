@@ -1,5 +1,6 @@
 import type {
   QueueBackendItem,
+  QueueItemDetailReadModel,
   QueueItemIdsReadModel,
   QueueItemReadModel,
   QueueNodeFieldValue,
@@ -7,6 +8,7 @@ import type {
 } from '@features/queue/core/types';
 
 import { getOutputImageNames } from '@platform/core/outputImages';
+import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
 
 import type {
   QueueAndProcessorStatusDTO,
@@ -21,14 +23,18 @@ const mapNodeFieldValue = (dto: QueueNodeFieldValueDTO): QueueNodeFieldValue => 
   value: dto.value && typeof dto.value === 'object' ? { imageName: dto.value.image_name } : dto.value,
 });
 
+/** The server sends naive UTC; absent and null stay as they are. */
+const normalizeOptionalTimestamp = <T extends string | null | undefined>(value: T): T =>
+  (typeof value === 'string' ? normalizeServerTimestamp(value) : value) as T;
+
 const getResultImageNames = (dto: QueueServerItemDTO): string[] => {
   return Object.values(dto.session?.results ?? {}).flatMap(getOutputImageNames);
 };
 
 export const mapQueueItemDTO = (dto: QueueServerItemDTO): QueueItemReadModel => ({
   batchId: dto.batch_id,
-  completedAt: dto.completed_at,
-  createdAt: dto.created_at,
+  completedAt: normalizeOptionalTimestamp(dto.completed_at),
+  createdAt: normalizeServerTimestamp(dto.created_at),
   destination: dto.destination,
   device: dto.device,
   errorMessage: dto.error_message,
@@ -40,15 +46,30 @@ export const mapQueueItemDTO = (dto: QueueServerItemDTO): QueueItemReadModel => 
       : dto.field_values.map(mapNodeFieldValue),
   id: dto.item_id,
   origin: dto.origin,
+  parentItemId: dto.parent_item_id,
   resultImageNames: getResultImageNames(dto),
   retriedFromItemId: dto.retried_from_item_id,
   sessionId: dto.session_id,
-  startedAt: dto.started_at,
+  startedAt: normalizeOptionalTimestamp(dto.started_at),
   status: dto.status,
-  updatedAt: dto.updated_at,
+  updatedAt: normalizeServerTimestamp(dto.updated_at),
   userDisplayName: dto.user_display_name,
   userEmail: dto.user_email,
   userId: dto.user_id,
+});
+
+/** The saved execution data alone; the live row keeps its own narrower mapping. */
+export const mapQueueItemDetailDTO = (dto: QueueServerItemDTO): QueueItemDetailReadModel => ({
+  errorMessage: dto.error_message ?? null,
+  errorTraceback: dto.error_traceback ?? null,
+  errorType: dto.error_type ?? null,
+  graph: dto.session?.graph ?? {},
+  id: dto.item_id,
+  priority: dto.priority ?? null,
+  results: dto.session?.results ?? {},
+  sessionId: dto.session_id,
+  status: dto.status,
+  workflow: dto.workflow ?? null,
 });
 
 export const mapQueueBackendItemDTO = (dto: QueueServerItemDTO): QueueBackendItem => ({
@@ -63,7 +84,6 @@ export const mapQueueBackendItemDTO = (dto: QueueServerItemDTO): QueueBackendIte
 
 export const mapQueueItemIdsDTO = (dto: QueueItemIdsResultDTO): QueueItemIdsReadModel => ({
   itemIds: dto.item_ids,
-  totalCount: dto.total_count,
 });
 
 export const mapQueueStatusDTO = (dto: QueueAndProcessorStatusDTO): QueueStatusReadModel => ({

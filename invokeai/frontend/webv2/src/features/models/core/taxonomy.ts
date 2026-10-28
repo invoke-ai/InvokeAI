@@ -1,4 +1,4 @@
-import type { ModelFileFormat, ModelTaxonomyType } from './types';
+import type { ModelConfig, ModelFileFormat, ModelTaxonomyType } from './types';
 
 import { toTitleCase } from './baseIdentity';
 
@@ -135,8 +135,11 @@ export const MODEL_VARIANT_LABELS: Record<string, string> = {
   qwen3_4b: 'Qwen3 4B',
   qwen3_8b: 'Qwen3 8B',
   qwen3_5_4b: 'Qwen3.5 4B (Anima-3.8B)',
+  qwen3_5_9b: 'Qwen3.5 9B (MOSS-Image)',
   qwen3_vl_4b: 'Qwen3-VL 4B (Krea-2)',
-  qwen3_vl_8b: 'Qwen3-VL 8B (Ideogram 4)',
+  qwen3_vl_8b: 'Qwen3-VL 8B (Ideogram 4, Qwen-Image-2.1)',
+  qwen_image_21_base: 'Qwen-Image-2.1 Base',
+  qwen_image_21_turbo: 'Qwen-Image-2.1 Turbo',
   ref2va: 'MiniMax H3 Ref2VA',
   res2k_sr4x: 'PiD 2K (4x SR)',
   res2kto4k_sr4x: 'PiD 4K (4x SR Upscale)',
@@ -161,6 +164,7 @@ const MAIN_VARIANTS_BY_BASE: Record<string, readonly string[]> = {
   'ltx-2': ['ltx2_dev', 'ltx2_distilled'],
   'minimax-h3': ['fl2va', 'ref2va'],
   'qwen-image': ['generate', 'edit'],
+  'qwen-image-2-1': ['qwen_image_21_base', 'qwen_image_21_turbo'],
   'sd-1': ['normal', 'inpaint'],
   'sd-2': ['normal', 'inpaint', 'depth'],
   sdxl: ['normal', 'inpaint'],
@@ -174,7 +178,7 @@ const VARIANTS_BY_TYPE: Record<string, readonly string[]> = {
   mistral_encoder: ['cow_mistral3_small', 'mistral3_24b', 'ministral3_3b'],
   pid_decoder: ['res2k_sr4x', 'res2kto4k_sr4x'],
   qwen3_encoder: ['qwen3_4b', 'qwen3_8b', 'qwen3_06b'],
-  qwen3_5_encoder: ['qwen3_5_4b'],
+  qwen3_5_encoder: ['qwen3_5_4b', 'qwen3_5_9b'],
   // Required variant configs need explicit choices; a fallback None would fail database validation.
   qwen3_vl_encoder: ['qwen3_vl_4b', 'qwen3_vl_8b'],
 };
@@ -198,4 +202,26 @@ export const getVariantOptionsFor = (base: string, type: string): readonly strin
   }
 
   return VARIANTS_BY_TYPE[type] ?? [];
+};
+
+/** A fact the probe records that this model's record predates; re-identifying fills it in. */
+export type UnrecordedModelFact = 'adapter_type' | 'native_scale';
+
+/**
+ * What re-identifying would record for a model installed before the probe recorded it, or null. No migration fills
+ * these fields.
+ * - `adapter_type`: an Anima ControlNet-LLLite without `cond_in_channels`. Control layers cannot tell a control
+ *   adapter from an inpaint one, so it stays unusable there.
+ * - `native_scale`: a Spandrel upscaler without `scale`. Upscale cannot show how it will run it.
+ */
+export const getUnrecordedModelFact = (
+  model: Pick<ModelConfig, 'base' | 'cond_in_channels' | 'scale' | 'type'>
+): UnrecordedModelFact | null => {
+  if (model.type === 'controlnet' && model.base === 'anima' && (model.cond_in_channels ?? null) === null) {
+    return 'adapter_type';
+  }
+  if (model.type === 'spandrel_image_to_image' && (model.scale ?? null) === null) {
+    return 'native_scale';
+  }
+  return null;
 };

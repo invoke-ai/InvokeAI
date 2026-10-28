@@ -1,52 +1,9 @@
 import type { HotkeyDefinition } from '@workbench/hotkeys/types';
 
 import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
-import { formatHotkeyForPlatform, IS_MAC_OS } from '@workbench/hotkeys/keys';
+import { formatHotkeyAriaLabel, formatHotkeyForPlatform, formatHotkeyLabel } from '@workbench/hotkeys/keys';
 import { applyCustomHotkeys } from '@workbench/hotkeys/resolve';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
-
-/** Use adjacent modifier glyphs on macOS and word labels joined by + elsewhere. */
-const MAC_GLYPHS: Record<string, string> = {
-  alt: '⌥',
-  cmd: '⌘',
-  ctrl: '⌃',
-  enter: '↵',
-  option: '⌥',
-  shift: '⇧',
-};
-
-const OTHER_LABELS: Record<string, string> = {
-  alt: 'Alt',
-  ctrl: 'Ctrl',
-  enter: 'Enter',
-  meta: 'Win',
-  shift: 'Shift',
-};
-
-const formatPart = (part: string): string =>
-  IS_MAC_OS ? (MAC_GLYPHS[part] ?? part.toUpperCase()) : (OTHER_LABELS[part] ?? part.toUpperCase());
-
-/** One key's text label, for render sites that draw icons for some keys and need the text for the rest. */
-export const formatTopbarShortcutPart = formatPart;
-
-export const formatTopbarShortcut = (hotkey: string): string =>
-  formatHotkeyForPlatform(hotkey)
-    .map(formatPart)
-    .join(IS_MAC_OS ? '' : '+');
-
-const ARIA_LABELS: Record<string, string> = {
-  alt: 'Alt',
-  cmd: 'Meta',
-  ctrl: 'Control',
-  enter: 'Enter',
-  option: 'Alt',
-  shift: 'Shift',
-};
-
-export const formatTopbarShortcutForAria = (hotkey: string): string =>
-  formatHotkeyForPlatform(hotkey)
-    .map((part) => ARIA_LABELS[part] ?? (part.length === 1 ? part.toUpperCase() : part))
-    .join('+');
 
 const findDefinition = (commandId: string): HotkeyDefinition | undefined =>
   firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === commandId);
@@ -72,8 +29,8 @@ export const useTopbarShortcutBinding = (commandId: string): TopbarShortcutBindi
 
   return firstKey
     ? {
-        aria: formatTopbarShortcutForAria(firstKey),
-        display: formatTopbarShortcut(firstKey),
+        aria: formatHotkeyAriaLabel(firstKey),
+        display: formatHotkeyLabel(firstKey),
         parts: formatHotkeyForPlatform(firstKey),
       }
     : null;

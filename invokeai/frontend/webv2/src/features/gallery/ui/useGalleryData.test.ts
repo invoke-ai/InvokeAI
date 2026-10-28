@@ -4,7 +4,12 @@ import type { GalleryImage, GeneratedImageContract } from '@features/gallery/cor
 import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
 import { describe, expect, it } from 'vitest';
 
-import { isGalleryWindowTruncated, mergeGalleryItemWindow } from './useGalleryData';
+import {
+  getGalleryRecentItems,
+  isGalleryWindowTruncated,
+  mapGalleryItemPageSlots,
+  mergeGalleryItemWindow,
+} from './useGalleryData';
 
 const createImage = (index: number, overrides: Partial<GalleryImage> = {}): GalleryImage => ({
   boardId: 'none',
@@ -41,6 +46,93 @@ const createBackendItem = (name: string, createdAt: string): GalleryItem => ({
   starred: false,
   thumbnailUrl: `/thumbnails/${name}`,
   width: 512,
+});
+
+describe('mapGalleryItemPageSlots', () => {
+  it('retains omitted hydration slots and offsets distant pages absolutely', () => {
+    const first = createBackendItem('first.png', '2026-01-01T00:00:00.000Z');
+    const third = createBackendItem('third.png', '2026-01-01T00:00:02.000Z');
+    const slots = mapGalleryItemPageSlots({
+      pageOffsets: [600],
+      pages: [{ itemIndices: [600, 602], items: [first, third], offset: 600 }],
+    });
+
+    expect([...slots.entries()]).toEqual([
+      [600, first],
+      [602, third],
+    ]);
+    expect(slots.has(601)).toBe(false);
+  });
+
+  it('falls back to requested offset for legacy page fixtures and makes paginated positions page-local', () => {
+    const first = createBackendItem('first.png', '2026-01-01T00:00:00.000Z');
+    const second = createBackendItem('second.png', '2026-01-01T00:00:01.000Z');
+    const slots = mapGalleryItemPageSlots({
+      pageLocalOffset: 120,
+      pageOffsets: [120],
+      pages: [{ items: [first, second] }],
+    });
+
+    expect([...slots.entries()]).toEqual([
+      [0, first],
+      [1, second],
+    ]);
+  });
+});
+
+describe('getGalleryRecentItems', () => {
+  it('keeps local outputs separate and follows the selected order direction', () => {
+    const first = asGenerated(createImage(1, { imageName: 'recent-1.png' }));
+    const second = asGenerated(createImage(2, { imageName: 'recent-2.png' }));
+
+    expect(
+      getGalleryRecentItems({ backendItems: [], filter, recentImages: [first, second] }).map((item) => item.name)
+    ).toEqual(['recent-2.png', 'recent-1.png']);
+    expect(
+      getGalleryRecentItems({
+        backendItems: [],
+        filter: { ...filter, orderDir: 'ASC' },
+        recentImages: [first, second],
+      }).map((item) => item.name)
+    ).toEqual(['recent-1.png', 'recent-2.png']);
+    expect(
+      getGalleryRecentItems({
+        backendItems: [createBackendItem('recent-1.png', first.queuedAt)],
+        filter,
+        recentImages: [first],
+      })
+    ).toEqual([]);
+  });
+
+  it('omits recents no newer than the given listing instant, in either order direction', () => {
+    // The listing instant in SQLite form; recents in ISO form, so the cut compares instants rather than strings.
+    const newerThan = '2026-08-29 13:01:20.649';
+    const recentImages = [
+      asGenerated(createImage(1, { createdAt: '2026-08-29T02:28:40.566Z', imageName: 'echoed-old.png' })),
+      asGenerated(createImage(2, { createdAt: '2026-08-29T13:01:20.649Z', imageName: 'same-instant.png' })),
+      asGenerated(createImage(3, { createdAt: '2026-08-29T13:01:20.650Z', imageName: 'fresh.png' })),
+    ];
+    const namesFor = (orderDir: 'ASC' | 'DESC', cut?: string) =>
+      getGalleryRecentItems({ backendItems: [], filter: { ...filter, orderDir }, newerThan: cut, recentImages }).map(
+        (item) => item.name
+      );
+
+    expect(namesFor('DESC', newerThan)).toEqual(['fresh.png']);
+    expect(namesFor('ASC', newerThan)).toEqual(['fresh.png']);
+    // Without a cut (an empty listing, or the dense window, which interleaves) every recent stays overlaid.
+    expect(namesFor('DESC')).toEqual(['fresh.png', 'same-instant.png', 'echoed-old.png']);
+  });
+
+  it('hides local outputs whose media kind the listing excludes', () => {
+    const recent = asGenerated(createImage(1, { imageName: 'recent-1.png' }));
+    const namesFor = (mediaKind: 'image' | 'video') =>
+      getGalleryRecentItems({ backendItems: [], filter: { ...filter, mediaKind }, recentImages: [recent] }).map(
+        (item) => item.name
+      );
+
+    expect(namesFor('video')).toEqual([]);
+    expect(namesFor('image')).toEqual(['recent-1.png']);
+  });
 });
 
 describe('mergeGalleryItemWindow', () => {

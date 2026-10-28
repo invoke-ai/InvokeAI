@@ -3,7 +3,7 @@ import type { ProjectGraphState } from '@features/workflow/contracts';
 import type { CanvasExportCapability, CanvasLayerCapability } from '@workbench/canvas-engine/api';
 import type { FormEvent } from 'react';
 
-import { chakra, createListCollection, Dialog, Portal, Stack, Text } from '@chakra-ui/react';
+import { chakra, createListCollection, Portal, Stack, Text } from '@chakra-ui/react';
 import { galleryDurability, galleryImages } from '@features/gallery';
 import { invalidateGalleryItems } from '@features/gallery/queries';
 import { runUtilityGraph } from '@features/queue/utility';
@@ -23,10 +23,12 @@ import { createUuid } from '@platform/browser/randomUuid';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { socketHub } from '@platform/transport/socketHub';
 import { Button, CloseButton, Field, Select } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { getCanvasOperations } from '@workbench/canvas-operations/api';
 import { getActiveProjectGraph } from '@workbench/projectWorkflows';
 import { useNotify } from '@workbench/useNotify';
+import { describeAdjustmentRefusal } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -163,7 +165,10 @@ const SUCCESS_KEYS: Record<LayerWorkflowDestination, string> = {
   staging: 'widgets.layers.runWorkflow.stagingSuccess',
 };
 
-const FAILURE_KEYS: Record<Exclude<RunLayerWorkflowResult['status'], 'completed' | 'failed'>, string> = {
+const FAILURE_KEYS: Record<
+  Exclude<RunLayerWorkflowResult['status'], 'completed' | 'failed' | 'adjustment-refused'>,
+  string
+> = {
   aborted: 'widgets.layers.runWorkflow.aborted',
   busy: 'widgets.layers.runWorkflow.busy',
   disabled: 'widgets.layers.runWorkflow.disabled',
@@ -173,6 +178,7 @@ const FAILURE_KEYS: Record<Exclude<RunLayerWorkflowResult['status'], 'completed'
   'not-ready': 'widgets.layers.runWorkflow.notReady',
   'over-budget': 'widgets.layers.runWorkflow.overBudget',
   stale: 'widgets.layers.runWorkflow.stale',
+  unreadable: 'widgets.layers.runWorkflow.unreadable',
   unsupported: 'widgets.layers.runWorkflow.unsupported',
 };
 
@@ -432,7 +438,9 @@ export const RunLayerWorkflowDialog = ({
         return;
       }
 
-      setError(t(FAILURE_KEYS[result.status]));
+      setError(
+        result.status === 'adjustment-refused' ? describeAdjustmentRefusal(result, t) : t(FAILURE_KEYS[result.status])
+      );
     } catch (error) {
       if (session.isCurrent(request.token)) {
         setError(t('widgets.layers.runWorkflow.failed', { message: messageOf(error) }));

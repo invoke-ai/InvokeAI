@@ -5,7 +5,12 @@ Init file for the model loader.
 from importlib import import_module
 from pathlib import Path
 
-from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig, ModelLoaderBase
+from invokeai.backend.model_manager.load.load_base import (
+    LoadedModel,
+    LoadedModelWithoutConfig,
+    ModelLoaderBase,
+    StaleModelConfigError,
+)
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry, ModelLoaderRegistryBase
@@ -23,4 +28,5 @@ __all__ = [
     "ModelLoader",
     "ModelLoaderRegistryBase",
     "ModelLoaderRegistry",
+    "StaleModelConfigError",
 ]

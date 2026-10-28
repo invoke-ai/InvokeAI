@@ -1,7 +1,7 @@
 import { ChakraProvider } from '@chakra-ui/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { isModalPresent } from '@platform/ui/modalPresence';
 import { system } from '@theme/system';
-import { isHotkeyModalLayerActive } from '@workbench/hotkeys/modalLayer';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -42,6 +42,9 @@ vi.mock('@workbench/settings/store', async () => {
   };
 });
 
+const session = vi.hoisted(() => ({ multiuserEnabled: false }));
+vi.mock('@features/identity', () => ({ useAuthSession: () => session }));
+
 vi.mock('@platform/transport/http', () => ({
   apiFetchJson: vi.fn((path: string) =>
     path === '/api/v1/app/version'
@@ -51,7 +54,11 @@ vi.mock('@platform/transport/http', () => ({
 }));
 
 const catalog = (await fetch('/locales/en.json').then((response) => response.json())) as {
-  whatsNew: { highlights: Record<string, { description: string; title: string }>; items: string[] };
+  whatsNew: {
+    highlights: Record<string, { description: string; title: string }>;
+    items: string[];
+    multiuserItems: string[];
+  };
 };
 
 const i18n = createInstance();
@@ -79,6 +86,7 @@ describe('WhatsNewDialog', () => {
 
   beforeEach(async () => {
     settings.patchWorkbenchPreferences.mockReset();
+    session.multiuserEnabled = false;
     settings.snapshot = { preferences: { alphaNoticeAcknowledged: true, whatsNewSeenVersion: null }, status: 'idle' };
     // An account switch drops the previous test's request and dismissal; the version is not account data.
     accountLifecycle.invalidate();
@@ -111,10 +119,13 @@ describe('WhatsNewDialog', () => {
     await expect.element(page.getByText('v7.0.0-rc1')).toBeVisible();
     // An automatic open has no click behind it, so focus on a link would draw its keyboard ring; start on the panel.
     await expect.element(page.getByRole('dialog', { name: title() })).toHaveFocus();
-    expect(isHotkeyModalLayerActive()).toBe(true);
+    expect(isModalPresent()).toBe(true);
 
-    // Every catalogued highlight renders with its title, and the smaller notes list beneath them.
-    for (const { description, title } of Object.values(catalog.whatsNew.highlights)) {
+    // Every catalogued highlight renders with its title, and the smaller notes list beneath them. Sharing is for
+    // servers with other accounts, so this single-account one shows none of it.
+    const { sharing, ...singleAccountHighlights } = catalog.whatsNew.highlights;
+    await expect.element(page.getByText(sharing!.title, { exact: true })).not.toBeInTheDocument();
+    for (const { description, title } of Object.values(singleAccountHighlights)) {
       await expect.element(page.getByText(title, { exact: true })).toBeVisible();
       await expect.element(page.getByText(description, { exact: true })).toBeVisible();
     }
@@ -131,7 +142,7 @@ describe('WhatsNewDialog', () => {
     );
     expect(page.getByRole('link', { name: i18n.t('whatsNew.readTheDocs') }).element()).toHaveAttribute(
       'href',
-      'https://invoke-ai.github.io/InvokeAI-7/'
+      'https://v7.invoke.ai/'
     );
 
     await page.getByRole('button', { name: /close/i }).click();
@@ -139,7 +150,21 @@ describe('WhatsNewDialog', () => {
 
     await setSnapshot(ready({ alphaNoticeAcknowledged: true, whatsNewSeenVersion: '7.0.0-rc1' }));
     await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
-    expect(isHotkeyModalLayerActive()).toBe(false);
+    expect(isModalPresent()).toBe(false);
+  });
+
+  it('tells a server with other accounts about sharing boards', async () => {
+    session.multiuserEnabled = true;
+    await act(() => store.loadAppVersion());
+    await setSnapshot(ready({ alphaNoticeAcknowledged: true, whatsNewSeenVersion: '6.14.2' }));
+
+    await expect.element(page.getByText(catalog.whatsNew.highlights.sharing!.title, { exact: true })).toBeVisible();
+    expect(
+      page
+        .getByRole('listitem')
+        .elements()
+        .map((item) => item.textContent)
+    ).toEqual([...catalog.whatsNew.multiuserItems, ...catalog.whatsNew.items]);
   });
 
   it('waits for the alpha notice to be dismissed first', async () => {

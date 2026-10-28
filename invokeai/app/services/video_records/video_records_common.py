@@ -26,26 +26,6 @@ class VideoRecordSaveException(Exception):
         super().__init__(message)
 
 
-class VideoRecordDeleteException(Exception):
-    """Raised when a video record cannot be deleted."""
-
-    def __init__(self, message="Video record not deleted"):
-        super().__init__(message)
-
-
-# The `media_origin` marker, projected out of the `metadata` JSON blob. Kept as a bare
-# expression so the polymorphic gallery query can alias it into its own UNION half.
-#
-# The `json_valid` guard is not decoration: `json_extract` RAISES on unparseable text, and
-# this expression now runs on every row of every video listing. An unguarded call would let
-# a single malformed blob fail the whole page rather than one video -- and the column is
-# plain TEXT with no CHECK constraint, so nothing but convention keeps one out. Every
-# in-tree writer goes through `MetadataField`, so this is insurance, not a live bug.
-MEDIA_ORIGIN_JSON_EXPR = (
-    "CASE WHEN json_valid(videos.metadata) THEN json_extract(videos.metadata, '$.media_origin') END"
-)
-MEDIA_ORIGIN_SQL_EXPR = f"{MEDIA_ORIGIN_JSON_EXPR} AS media_origin"
-
 # The longest marker worth carrying. Only `audio_upload` has meaning today, but the field is
 # an open vocabulary, so this is a sanity bound rather than an allowlist. It matters because
 # upload metadata is client-supplied and unbounded, and this one key now rides EVERY row of
@@ -78,39 +58,6 @@ def coerce_media_origin(value: Any) -> Optional[str]:
     if not isinstance(value, str) or len(value) > MEDIA_ORIGIN_MAX_LENGTH:
         return None
     return value if MEDIA_ORIGIN_PATTERN.match(value) else None
-
-
-VIDEO_DTO_COLS = ", ".join(
-    [
-        "videos." + c
-        for c in [
-            "video_name",
-            "video_origin",
-            "video_category",
-            "width",
-            "height",
-            "duration",
-            "fps",
-            "session_id",
-            "node_id",
-            "has_workflow",
-            "is_intermediate",
-            "created_at",
-            "updated_at",
-            "deleted_at",
-            "starred",
-            "video_subfolder",
-            "project_id",
-            "file_size_bytes",
-        ]
-    ]
-    # `media_origin` is not a column: it is the one key of the `metadata` JSON blob the
-    # frontend needs on every row (it marks an upload the ingest converter wrapped from an
-    # audio file). Extracting just that key keeps listings from carrying whole metadata
-    # blobs. `json_extract` yields NULL for a NULL or non-object blob; what it yields for a
-    # non-string value is `coerce_media_origin`'s problem, not the query's.
-    + [MEDIA_ORIGIN_SQL_EXPR]
-)
 
 
 class VideoRecord(BaseModelExcludeNull):

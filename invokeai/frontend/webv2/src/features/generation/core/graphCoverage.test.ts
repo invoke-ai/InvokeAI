@@ -6,13 +6,15 @@ import { seedArchitectureCapabilities } from '@features/generation/core/architec
 import { describe, expect, it } from 'vitest';
 
 import type { GenerateComponentValueKey, SupportedGenerateBase } from './baseGenerationPolicies';
-import type { ModelIdentifierConfig, VaeModelConfig } from './types';
+import type { MainModelConfig, ModelIdentifierConfig, VaeModelConfig } from './types';
 
 import {
   getComponentSectionPolicy,
   getGenerationValidationReasons,
   isLoraSupported,
+  isReferenceImageSupported,
   SUPPORTED_GENERATE_BASES,
+  withAddedReferenceImages,
 } from './baseGenerationPolicies';
 import { compileGenerateGraph, GRAPH_BUILDERS } from './graph';
 import {
@@ -22,18 +24,114 @@ import {
   type ModelShape,
   satisfiedSettingsFor,
   SHAPE_OVERRIDES,
+  tunedSettingsFor,
 } from './graphCoverage.testing';
+import { COMPEL_NODE_TYPES, supportsPromptAttentionSyntax } from './prompt/compel';
+import { REFINER_DENOISE_NODE_ID } from './sdxlRefinerGraph';
 
 const compileForShape = (
   base: SupportedGenerateBase,
-  shape: ModelShape
+  shape: ModelShape,
+  tuned = false
 ): { filled: GenerateComponentValueKey[]; graph: BackendGraphContract } => {
-  const { filled, model, settings } = satisfiedSettingsFor(base, shape);
+  const {
+    filled,
+    model,
+    projectSettings,
+    settings: satisfied,
+  } = tuned
+    ? tunedSettingsFor(base, shape)
+    : {
+        ...satisfiedSettingsFor(base, shape),
+        projectSettings: { useCpuNoise: true, useNsfwChecker: false, useWatermark: false },
+      };
+  // One enabled reference image wherever the model takes one, so reference nodes and their fields enter the contract.
+  const settings = isReferenceImageSupported(model)
+    ? {
+        ...satisfied,
+        referenceImages: withAddedReferenceImages(
+          model,
+          [{ base, key: `${base}-ip-adapter`, name: `${base} IP Adapter`, type: 'ip_adapter' }],
+          [],
+          [
+            {
+              id: 'coverage-reference',
+              image: { original: { image: { height: 512, image_name: 'reference.png', width: 512 } } },
+            },
+          ]
+        ),
+      }
+    : satisfied;
 
   // Assert every requirement before compilation for complete diagnostics.
   expect(getGenerationValidationReasons(model, settings), `${base}/${shape.label} is not satisfiable`).toEqual([]);
 
-  return { filled, graph: compileGenerateGraph(settings, model, 'gallery', { useCpuNoise: true }).backendGraph };
+  return { filled, graph: compileGenerateGraph(settings, model, 'gallery', projectSettings).backendGraph };
+};
+
+const SDXL_REFINER_SHAPE: ModelShape = { label: 'diffusers-with-refiner', overrides: { format: 'diffusers' } };
+const KREA2_EDIT_SHAPE: ModelShape = { label: 'diffusers-with-edit-references', overrides: { format: 'diffusers' } };
+const SDXL_REFINER_MODEL: MainModelConfig = {
+  base: 'sdxl-refiner',
+  key: 'sdxl-refiner',
+  name: 'SDXL Refiner',
+  type: 'main',
+};
+
+// The refiner is a per-image choice, not a component slot, so it needs its own SDXL case.
+const refinerCase = () => {
+  const { filled, model, settings } = satisfiedSettingsFor('sdxl', SDXL_REFINER_SHAPE);
+  const withRefiner = { ...settings, refinerModel: SDXL_REFINER_MODEL };
+
+  expect(getGenerationValidationReasons(model, withRefiner)).toEqual([]);
+
+  return {
+    base: 'sdxl' as const,
+    filled,
+    graph: compileGenerateGraph(withRefiner, model, 'gallery', {
+      useCpuNoise: true,
+      useNsfwChecker: false,
+      useWatermark: false,
+    }).backendGraph,
+    shape: SDXL_REFINER_SHAPE,
+  };
+};
+
+// Edit references replace the style reference the tuned Krea-2 recipe carries, so they need their own case.
+const krea2EditCase = () => {
+  const { filled, model, settings } = satisfiedSettingsFor('krea-2', KREA2_EDIT_SHAPE);
+  const image = { original: { image: { height: 1024, image_name: 'edit-reference.png', width: 1024 } } };
+  const withEditReferences = {
+    ...settings,
+    // CFG builds the negative prompt, which reads the references too.
+    cfgScale: 4.5,
+    krea2ReferenceKvCache: true,
+    // The K/V cache switch is sent only while a LoRA reads the references.
+    loras: [
+      {
+        isEnabled: true,
+        model: { base: 'krea-2', key: 'edit-lora', name: 'edit-lora', type: 'lora' as const },
+        weight: 1,
+      },
+    ],
+    referenceImages: [
+      { config: { image, type: 'krea2_edit_reference_image' as const }, id: 'edit-1', isEnabled: true },
+      { config: { image, type: 'krea2_edit_reference_image' as const }, id: 'edit-2', isEnabled: true },
+    ],
+  };
+
+  expect(getGenerationValidationReasons(model, withEditReferences)).toEqual([]);
+
+  return {
+    base: 'krea-2' as const,
+    filled,
+    graph: compileGenerateGraph(withEditReferences, model, 'gallery', {
+      useCpuNoise: true,
+      useNsfwChecker: false,
+      useWatermark: false,
+    }).backendGraph,
+    shape: KREA2_EDIT_SHAPE,
+  };
 };
 
 seedArchitectureCapabilities();
@@ -47,6 +145,37 @@ describe('generate graph coverage', () => {
     expect(Object.keys(SHAPE_OVERRIDES).filter((base) => !SUPPORTED_GENERATE_BASES.includes(base as never))).toEqual(
       []
     );
+  });
+
+  // The prompt editor highlights and weights attention syntax by this capability; only Compel reads it.
+  it.each(generateGraphCases)(
+    'encodes $label prompts with Compel exactly when attention syntax is offered',
+    ({ base, shape }) => {
+      const { graph } = compileForShape(base, shape);
+      const usesCompel = Object.values(graph.nodes).some((node) => COMPEL_NODE_TYPES.has(node.type));
+
+      expect(usesCompel).toBe(supportsPromptAttentionSyntax(base));
+    }
+  );
+
+  // SDXL attention syntax carries through the refiner stage, which re-encodes the prompts with its own encoders.
+  it('conditions the SDXL refiner denoise with Compel encoders', () => {
+    const { graph } = refinerCase();
+    const conditioningSource = (field: string) => {
+      const sources = graph.edges.filter(
+        (edge) => edge.destination.node_id === REFINER_DENOISE_NODE_ID && edge.destination.field === field
+      );
+
+      expect(sources, `refiner denoise ${field} has no single source`).toHaveLength(1);
+
+      return graph.nodes[sources[0]!.source.node_id]!.type;
+    };
+
+    for (const field of ['positive_conditioning', 'negative_conditioning']) {
+      const sourceType = conditioningSource(field);
+
+      expect(COMPEL_NODE_TYPES.has(sourceType), `refiner ${field} is encoded by ${sourceType}`).toBe(true);
+    }
   });
 
   it.each(generateGraphCases)('compiles a structurally sound graph for $label', ({ base, shape }) => {
@@ -95,6 +224,8 @@ describe('generate graph coverage', () => {
       for (const vae of offered.values()) {
         const { backendGraph } = compileGenerateGraph({ ...settings, vae: vae as VaeModelConfig }, model, 'gallery', {
           useCpuNoise: true,
+          useNsfwChecker: false,
+          useWatermark: false,
         });
         // Metadata records the selection whether or not the builder used it, so it does not count.
         const sent = Object.values(backendGraph.nodes).some(
@@ -134,7 +265,7 @@ describe('generate graph coverage', () => {
       },
       model,
       'gallery',
-      { useCpuNoise: true }
+      { useCpuNoise: true, useNsfwChecker: false, useWatermark: false }
     );
     const nodes = Object.values(backendGraph.nodes);
     const loaded = nodes
@@ -162,8 +293,16 @@ describe('generate graph coverage', () => {
     const fieldsFor = (nodeType: string) =>
       (fields[nodeType] ??= { inputs: new Set(), literals: new Map(), outputs: new Set() });
 
-    for (const { base, shape } of generateGraphCases) {
-      const { filled, graph } = compileForShape(base, shape);
+    // Each shape compiles twice: at its defaults, and with every optional tuning and output filter switched on.
+    const compilations = [
+      ...generateGraphCases.flatMap(({ base, shape }) =>
+        [false, true].map((tuned) => ({ base, shape, ...compileForShape(base, shape, tuned) }))
+      ),
+      refinerCase(),
+      krea2EditCase(),
+    ];
+
+    for (const { base, filled, graph, shape } of compilations) {
       const entry = (byBase[base] ??= { componentsFilled: {}, nodeTypes: [] });
 
       entry.componentsFilled[shape.label] = filled;

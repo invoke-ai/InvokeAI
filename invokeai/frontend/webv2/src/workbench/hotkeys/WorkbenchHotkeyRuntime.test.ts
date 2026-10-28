@@ -30,7 +30,10 @@ describe('getHotkeyExecutionSource', () => {
 
   it('uses the focused source for widget-scoped hotkeys', () => {
     expect(
-      getHotkeyExecutionSource(createHotkey({ scope: { kind: 'widget', typeId: 'test-widget' }, source }), activeSource)
+      getHotkeyExecutionSource(
+        createHotkey({ scope: { kind: 'widget', typeIds: ['test-widget'] }, source }),
+        activeSource
+      )
     ).toBe(activeSource);
   });
 });
@@ -69,13 +72,13 @@ describe('shouldPreventHotkeyDefault', () => {
       id: 'canvas.deselect',
       keys: ['mod+d'],
       preventDefault: undefined,
-      scope: { kind: 'widget', typeId: 'canvas' },
+      scope: { kind: 'widget', typeIds: ['canvas'] },
     });
     const context: HotkeyContext = {
       activeInstanceId: 'canvas',
       activeWidgetTypeId: 'canvas',
       focusedRegion: null,
-      isModalLayerActive: false,
+      isModalPresent: false,
       projectId: 'project-1',
     };
 

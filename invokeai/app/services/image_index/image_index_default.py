@@ -21,10 +21,16 @@ from invokeai.app.services.image_index.image_index_common import (
     IndexedItem,
     MediaKind,
 )
-from invokeai.app.services.image_index.projection import compute_umap, projection_params, scope_hash
+from invokeai.app.services.image_index.projection import (
+    compute_umap,
+    projection_method_is_current,
+    projection_params,
+    scope_hash,
+)
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID
+from invokeai.app.services.shared.database.errors import TransientDatabaseError
 from invokeai.app.services.videos.videos_common import VideoDTO
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
@@ -970,20 +976,17 @@ class ImageIndexService(ImageIndexServiceBase):
 
         The shared cache is keyed by model key alone, so an encoder that keeps its key across a
         reinstall would be served from the retired weights while its embeddings are stored under
-        the replacement's hash, and those survive a restart. The write lock keeps a concurrent
-        load from re-registering the old shared CPU weights around the drop. It is taken under
-        _activation_lock, so map polls, searches and stop() wait out any model load or VRAM move
-        in flight; that cannot deadlock, because the worker and request users have drained and
-        nothing takes _activation_lock while holding the load lock.
+        the replacement's hash, and those survive a restart. The drop takes MODEL_LOAD_LOCK's write
+        lock, so a concurrent load cannot re-register the old shared CPU weights around it. It is
+        taken under _activation_lock, so map polls, searches and stop() wait out any model load or
+        VRAM move in flight; that cannot deadlock, because the worker and request users have drained
+        and nothing takes _activation_lock while holding the load lock.
         """
         keys = {config.key for config in configs if config is not None}
         if not keys:
             # Still missing: this runs on every throttled recheck, and must not queue behind a load.
             return
-        with MODEL_LOAD_LOCK.write_lock():
-            for cache in set(invoker.services.model_manager.load.ram_caches.values()):
-                for key in keys:
-                    cache.drop_model(key)
+        invoker.services.model_manager.load.drop_cached_models(keys)
 
     def _reset_model_resources(self) -> None:
         """Retire caches only after the worker and request users have drained.
@@ -1537,7 +1540,7 @@ class ImageIndexService(ImageIndexServiceBase):
         terminal: /points answers `state: "empty", stale: false` (so the client
         stops asking) and every later job returns early (so the fit is never
         re-entered). The map stays blank until the accessible image set
-        changes, and the row is in SQLite, so restarting does not clear it.
+        changes, and the row is in the database, so restarting does not clear it.
 
         Retrying a failed scope once splits the difference the original code
         could not: a transient failure — a MemoryError while a generation holds
@@ -1577,15 +1580,15 @@ class ImageIndexService(ImageIndexServiceBase):
             items = records.list_accessible_embedded_items(scope_user, self._model_id)
             current_hash = scope_hash(self._model_id, items)
             cached = records.get_projection(user_id, self._model_id)
-        except Exception:
+        except Exception as e:
             # The DB reads are as failure-prone as the fit ("database is
             # locked" is a designed-for condition here), and the job was
             # already popped from the dedup map. Re-queue it rather than let
             # the generic worker handler swallow it: /refresh has already
             # answered `enqueued: true`, and a client waiting on
             # image_map_projection_ready would otherwise wait forever.
-            logger.exception(f"Image map: could not read the projection scope for user '{user_id}'; re-queueing")
-            self._requeue_projection(user_id, all_images)
+            logger.exception(f"Image map: could not read the projection scope for user '{user_id}'")
+            self._retry_projection_or_give_up(e, user_id, all_images, point_count=0)
             return
 
         retrying_failed_scope = (
@@ -1605,7 +1608,11 @@ class ImageIndexService(ImageIndexServiceBase):
             and bool(items)
             and self._failed_scope_retry_available(user_id, current_hash)
         )
-        if cached is not None and cached.scope_hash == current_hash and not retrying_failed_scope:
+        # A map projected by the fallback PCA is stale once the projector it fell back from is
+        # installed: same scope, but not the map a fit would give now. Failed (empty) rows are left
+        # to the retry budget above, so a doomed fit is not re-run on every request.
+        method_is_current = cached is None or projection_method_is_current(cached.params, cached.point_count)
+        if cached is not None and cached.scope_hash == current_hash and method_is_current and not retrying_failed_scope:
             # Nothing the projection depends on has changed, and the fit is
             # seeded, so recomputing would burn minutes of single-threaded CPU
             # to arrive at identical coordinates. Still emit, so a client that
@@ -1620,9 +1627,11 @@ class ImageIndexService(ImageIndexServiceBase):
             # accessible embedding (hundreds of MB on a large gallery), which is
             # pure waste on the no-op path that /points and /refresh drive.
             found_items, matrix = records.get_embeddings(items, self._model_id)
-        except Exception:
-            logger.exception(f"Image map: could not read embeddings for user '{user_id}'; re-queueing")
-            self._requeue_projection(user_id, all_images)
+        except Exception as e:
+            logger.exception(f"Image map: could not read embeddings for user '{user_id}'")
+            self._retry_projection_or_give_up(
+                e, user_id, all_images, point_count=cached.point_count if cached is not None else 0
+            )
             return
 
         if self._stop_event.is_set():
@@ -1666,11 +1675,13 @@ class ImageIndexService(ImageIndexServiceBase):
                     found_items,
                     coords,
                 )
-        except Exception:
+        except Exception as e:
             # Same reasoning as the read above: the fit is done but unsaved, so
             # re-queue rather than drop it and leave /refresh's promise unmet.
-            logger.exception(f"Image map: could not cache the projection for user '{user_id}'; re-queueing")
-            self._requeue_projection(user_id, all_images)
+            logger.exception(f"Image map: could not cache the projection for user '{user_id}'")
+            self._retry_projection_or_give_up(
+                e, user_id, all_images, point_count=cached.point_count if cached is not None else 0
+            )
             return
 
         # The budget moves only once the outcome is durable. Spending it before
@@ -1698,6 +1709,18 @@ class ImageIndexService(ImageIndexServiceBase):
             # the generic worker handler, which would re-sweep the backfill for
             # what is purely a delivery failure.
             logger.exception(f"Image map: could not emit projection_ready for user '{user_id}'")
+
+    def _retry_projection_or_give_up(self, error: Exception, user_id: str, all_images: bool, point_count: int) -> None:
+        """Re-queues a projection whose database work failed for the moment (the database was busy, or the call lost
+        a race); gives up on one whose work failed for good, which would fail again on every retry, forever (a
+        projection larger than a server takes in one statement, for one). Giving up still tells a waiting client that
+        nothing newer is coming: `point_count` is what it is served."""
+        assert self._invoker is not None
+        if isinstance(error, TransientDatabaseError):
+            self._invoker.services.logger.info(f"Image map: re-queueing the projection for user '{user_id}'")
+            self._requeue_projection(user_id, all_images)
+            return
+        self._invoker.services.events.emit_image_map_projection_ready(user_id=user_id, point_count=point_count)
 
     def _requeue_projection(self, user_id: str, all_images: bool) -> None:
         """Put a popped job back, without clobbering a newer request for that user."""
@@ -1818,11 +1841,9 @@ class ImageIndexService(ImageIndexServiceBase):
             configs = store.search_by_attr(model_name=model_name, model_type=model_type)
             if not configs:
                 continue
-            # Names are not unique (the UNIQUE(name, base, type) constraint is gone), and
-            # `search_by_attr` orders by type/base/name/format — so for two otherwise identical
-            # rows the tiebreak is insertion order, and reinstalling one moves the winner. That
-            # changes the model hash, and `start()` then discards every embedding computed under
-            # the old one. Order by key instead: stable across reinstalls of the same set.
+            # Names are not unique (the UNIQUE(name, base, type) constraint is gone). Choose by key,
+            # which is stable across reinstalls of the same set: a different winner changes the
+            # model hash, and `start()` then discards every embedding computed under the old one.
             chosen = min(configs, key=lambda config: config.key)
             if len(configs) > 1 and (self._model_config is None or chosen.key != self._model_config.key):
                 self._invoker.services.logger.warning(

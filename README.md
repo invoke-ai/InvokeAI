@@ -4,7 +4,7 @@
 
 # Invoke - Professional Creative AI Tools for Visual Media
 
-[![discord badge]][discord link] [![latest release badge]][latest release link] [![github stars badge]][github stars link] [![github forks badge]][github forks link] [![CI checks on main badge]][CI checks on main link] [![latest commit to main badge]][latest commit to main link] [![github open issues badge]][github open issues link] [![github open prs badge]][github open prs link] [![translation status badge]][translation status link]
+[![discord badge]][discord link] [![latest release badge]][latest release link] [![github stars badge]][github stars link] [![github forks badge]][github forks link] [![latest commit to main badge]][latest commit to main link] [![github open issues badge]][github open issues link] [![github open prs badge]][github open prs link] [![translation status badge]][translation status link]
 
 [![Sponsor Invoke](https://img.shields.io/badge/Sponsor-Invoke-ea4aaa?logo=githubsponsors&logoColor=white)][sponsor link]
 
@@ -114,15 +114,28 @@ Invoke's open-source development is powered by our sponsors. If Invoke is valuab
 
 We very much thank the following sponsors:
 
+### Blacksmith
+
+[![Blacksmith](https://raw.githubusercontent.com/invoke-ai/InvokeAI/main/docs/src/content/docs/assets/blacksmith-logo.png)](https://www.blacksmith.sh/)
+
+Blacksmith provides InvokeAI with virtual machines for continuous
+integration and continuous deployment.
+
 ### Backers ($15/mo)
 
 * [apokolypsse](https://github.com/apokolypsse)
 * [Romeotechguy](https://github.com/Romeotechguy)
+* [Pynshe9](https://github.com/Pynshe9)
+* [CarstenD74](https://github.com/CarstenD74)
+* [zamjoor](https://github.com/zamjoor)
+* [FusionBreak](https://github.com/FusionBreak)
+* and 2 anonymous donors
 
 ### Power Users ($50/mo)
 
 * [mickr777](https://github.com/mickr777)
 * [Astroburner](https://github.com/Astroburner)
+* and 2 anonymous donors
 
 ## Thanks
 

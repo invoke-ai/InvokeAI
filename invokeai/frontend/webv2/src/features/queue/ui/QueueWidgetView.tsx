@@ -1,5 +1,6 @@
 import { Stack } from '@chakra-ui/react';
 import { getPersonalQueueActivity } from '@features/queue/core/types';
+import { Scrollable } from '@platform/ui/Scrollable';
 import { StatusWidgetChip } from '@platform/ui/StatusWidgetChip';
 import { ListOrderedIcon } from 'lucide-react';
 import { useState } from 'react';
@@ -41,6 +42,7 @@ export const QueueWidgetView = ({
 };
 
 const QueueContent = () => {
+  const { t } = useTranslation();
   const [filter, setFilter] = useState<QueueFilterId>('all');
   const revealRequest = usePendingQueueItemReveal();
   const [handledRevealRequestId, setHandledRevealRequestId] = useState<number | null>(null);
@@ -51,12 +53,19 @@ const QueueContent = () => {
     setFilter('all');
   }
 
+  // The stats and filter stay put while the item lists scroll on their own.
   return (
-    <Stack gap="3" p="3">
-      <QueueStats />
-      <QueueFilterTabs value={filter} onChange={setFilter} />
-      <CurrentBatchSection revealRequest={revealRequest} />
-      <RecentSection filter={filter} revealRequest={revealRequest} />
+    <Stack gap="3" h="full" minH="0" pt="3">
+      <Stack flexShrink={0} gap="3" px="3">
+        <QueueStats />
+        <QueueFilterTabs value={filter} onChange={setFilter} />
+      </Stack>
+      <Scrollable flex="1" label={t('widgets.queue.items')} minH="0" overflowX="hidden">
+        <Stack gap="3" pb="3" px="3">
+          <CurrentBatchSection revealRequest={revealRequest} />
+          <RecentSection filter={filter} revealRequest={revealRequest} />
+        </Stack>
+      </Scrollable>
     </Stack>
   );
 };

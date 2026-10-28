@@ -34,7 +34,7 @@ jobs:
         - cuda
         - cpu
         - rocm
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     name: ${{ matrix.gpu-driver }}
     env:
       # torch/arm64 does not support GPU currently, so arm64 builds
@@ -66,11 +66,11 @@ jobs:
           df -h
 
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
 
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           images: |
@@ -86,14 +86,12 @@ jobs:
             latest=${{ matrix.gpu-driver == 'cuda' && github.ref == 'refs/heads/main' }}
             suffix=-${{ matrix.gpu-driver }},onlatest=false
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-        with:
-          platforms: ${{ env.PLATFORMS }}
+      - name: Setup Blacksmith Builder
+        uses: useblacksmith/setup-docker-builder@e4c1c000c95f9cc255f72940e9c56bcbd1239436 # v1.13.0
 
       - name: Login to GitHub Container Registry
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -108,7 +106,7 @@ jobs:
         # 2026-09-22).
         timeout-minutes: 90
         id: docker_build
-        uses: docker/build-push-action@v7
+        uses: useblacksmith/build-push-action@9b0579bbec7a6cad2f171596c57e7ac1e7658850 # v2.3.0
         with:
           context: .
           file: docker/Dockerfile

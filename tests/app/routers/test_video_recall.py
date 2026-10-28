@@ -16,7 +16,11 @@ from fastapi.testclient import TestClient
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers import videos
 from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardVisibility
-from invokeai.app.services.events.events_common import VideoRecallRequestedEvent, VideoUploadedEvent
+from invokeai.app.services.events.events_common import (
+    VideoRecallImage,
+    VideoRecallRequestedEvent,
+    VideoUploadedEvent,
+)
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
@@ -109,7 +113,7 @@ def _save_image(invoker: Invoker, image_name: str, user_id: str = "system") -> N
     )
 
 
-def _save_video(invoker: Invoker, video_name: str, user_id: str = "system") -> None:
+def _save_video(invoker: Invoker, video_name: str, user_id: str = "system", project_id: str | None = None) -> None:
     invoker.services.video_records.save(
         video_name=video_name,
         video_origin=ResourceOrigin.INTERNAL,
@@ -120,6 +124,7 @@ def _save_video(invoker: Invoker, video_name: str, user_id: str = "system") -> N
         fps=16.0,
         has_workflow=False,
         user_id=user_id,
+        project_id=project_id,
     )
 
 
@@ -132,7 +137,7 @@ def invoker(monkeypatch: Any, mock_invoker: Invoker) -> Invoker:
     def get_dto(video_name: str) -> VideoDTO:
         if not mock_invoker.services.video_records.exists(video_name):
             raise VideoRecordNotFoundException(video_name)
-        return _video_dto(video_name)
+        return _video_dto(video_name, project_id=mock_invoker.services.video_records.get(video_name).project_id)
 
     mock_invoker.services.videos = MagicMock()
     mock_invoker.services.videos.get_dto.side_effect = get_dto
@@ -466,14 +471,23 @@ class TestParameterRecall:
                     "ltx2_conditioning_video": {"video_name": "song.mp4"},
                     "ltx2_conditioning_role": "audio",
                 },
-                {"ltx2_conditioning_video", "ltx2_conditioning_role"},
+                {"ltx2_conditioning_video", "ltx2_conditioning_role", "first_frame_image"},
                 {
-                    "first_frame_image": "ltx2_conditioning_video",
                     "source_video": "ltx2_conditioning_video",
                     "source_video_start_frame": "ltx2_conditioning_video",
                     "source_video_end_frame": "ltx2_conditioning_video",
                     "minimax_h3_references": "ltx2_conditioning_video",
                 },
+            ),
+            (
+                {
+                    "first_frame_image": {"image_name": "first.png"},
+                    "last_frame_image": {"image_name": "last.png"},
+                    "ltx2_conditioning_video": {"video_name": "clip.mp4"},
+                    "ltx2_conditioning_role": "video",
+                },
+                {"ltx2_conditioning_video", "ltx2_conditioning_role"},
+                {"first_frame_image": "ltx2_conditioning_video", "last_frame_image": "ltx2_conditioning_video"},
             ),
             (
                 {"first_frame_image": {"image_name": "first.png"}, "minimax_h3_references": []},
@@ -493,7 +507,8 @@ class TestParameterRecall:
         ids=[
             "initial-video-over-first-frame",
             "references-over-frames",
-            "conditioning-clip-over-all",
+            "soundtrack-clip-over-all-but-frames",
+            "picture-clip-over-frames",
             "empty-list-beside-a-frame",
             "empty-list-beside-a-clip",
         ],
@@ -699,6 +714,70 @@ class TestGalleryVideoPlacement:
         assert _recall_events(invoker) == []
 
 
+class TestGalleryImagePlacement:
+    @pytest.mark.parametrize("append", [False, True])
+    def test_a_gallery_image_is_delivered_with_its_size_and_append_flag(
+        self, invoker: Invoker, client: TestClient, append: bool
+    ) -> None:
+        _save_image(invoker, "still.png")
+
+        response = client.post(
+            "/api/v1/recall/video/queue-b/image", params={"image_name": "still.png", "append": str(append).lower()}
+        )
+
+        assert response.status_code == 200
+        expected_image = {"image_name": "still.png", "width": 64, "height": 64}
+        assert response.json() == {
+            "status": "success",
+            "queue_id": "queue-b",
+            "image": expected_image,
+            "append": append,
+        }
+        event = _only_recall_event(invoker)
+        assert event.action == "image"
+        assert event.queue_id == "queue-b"
+        assert event.append is append
+        assert event.image is not None and event.image.model_dump() == expected_image
+        assert event.video is None and event.parameters is None
+
+    def test_an_image_replaces_unless_asked_to_append(self, invoker: Invoker, client: TestClient) -> None:
+        _save_image(invoker, "still.png")
+
+        client.post("/api/v1/recall/video/default/image", params={"image_name": "still.png"})
+
+        assert _only_recall_event(invoker).append is False
+
+    def test_an_unknown_image_is_a_404(self, invoker: Invoker, client: TestClient) -> None:
+        response = client.post("/api/v1/recall/video/default/image", params={"image_name": "nope.png"})
+
+        assert response.status_code == 404
+        assert _recall_events(invoker) == []
+
+    def test_blocked_during_image_move_maintenance(self, invoker: Invoker, client: TestClient) -> None:
+        _save_image(invoker, "still.png")
+        invoker.services.image_moves.is_maintenance_active.return_value = True  # type: ignore[attr-defined]
+
+        response = client.post("/api/v1/recall/video/default/image", params={"image_name": "still.png"})
+
+        assert response.status_code == 409
+        assert _recall_events(invoker) == []
+
+    @pytest.mark.parametrize(
+        ("action", "image", "append"),
+        [
+            ("image", None, False),
+            ("reference_video", VideoRecallImage(image_name="still.png", width=64, height=64), False),
+            ("parameters", None, True),
+        ],
+        ids=["missing-image", "stray-image", "stray-append"],
+    )
+    def test_the_event_carries_an_image_and_append_with_and_only_with_an_image_action(
+        self, action: str, image: VideoRecallImage | None, append: bool
+    ) -> None:
+        with pytest.raises(ValueError):
+            VideoRecallRequestedEvent.build("default", "owner", action, image=image, append=append)  # type: ignore[arg-type]
+
+
 def _create_board(invoker: Invoker, owner_id: str, visibility: BoardVisibility) -> str:
     board = invoker.services.board_records.save("Board", owner_id)
     invoker.services.board_records.update(board.board_id, BoardChanges(board_visibility=visibility))
@@ -830,8 +909,9 @@ class TestMultiUserAccess:
             ("/api/v1/recall/video/default/reference-video", {"params": {"video_name": "clip.mp4"}}),
             ("/api/v1/recall/video/default/initial-video/upload", {"files": {"file": ("c.mp4", MP4_BYTES)}}),
             ("/api/v1/recall/video/default/reference-video/upload", {"files": {"file": ("c.mp4", MP4_BYTES)}}),
+            ("/api/v1/recall/video/default/image", {"params": {"image_name": "still.png"}}),
         ],
-        ids=["parameters", "initial-video", "reference-video", "initial-upload", "reference-upload"],
+        ids=["parameters", "initial-video", "reference-video", "initial-upload", "reference-upload", "image"],
     )
     def test_every_route_requires_authentication(
         self, invoker: Invoker, client: TestClient, multiuser: dict[str, Any], method_path: str, kwargs: dict
@@ -849,6 +929,32 @@ class TestMultiUserAccess:
         response = client.post(
             "/api/v1/recall/video/default/reference-video",
             params={"video_name": "private.mp4"},
+            headers=multiuser["other"]["headers"],
+        )
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert _recall_events(invoker) == []
+
+    def test_an_unknown_image_is_a_404_for_a_non_admin_too(
+        self, invoker: Invoker, client: TestClient, multiuser: dict[str, Any]
+    ) -> None:
+        response = client.post(
+            "/api/v1/recall/video/default/image",
+            params={"image_name": "nope.png"},
+            headers=multiuser["other"]["headers"],
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert _recall_events(invoker) == []
+
+    def test_another_users_private_image_cannot_be_placed(
+        self, invoker: Invoker, client: TestClient, multiuser: dict[str, Any]
+    ) -> None:
+        _save_image(invoker, "private.png", multiuser["owner"]["id"])
+
+        response = client.post(
+            "/api/v1/recall/video/default/image",
+            params={"image_name": "private.png"},
             headers=multiuser["other"]["headers"],
         )
 
@@ -893,6 +999,31 @@ class TestMultiUserAccess:
 
         assert response.status_code == 200
         assert _only_recall_event(invoker).user_id == multiuser["other"]["id"]
+
+    def test_a_placed_videos_project_is_shown_only_to_its_maker_and_admins(
+        self, invoker: Invoker, client: TestClient, multiuser: dict[str, Any]
+    ) -> None:
+        """The placement answers with the video's DTO as the videos API does: a viewer of the shared board learns
+        nothing of the project the video was made in (the rule is pinned on the videos routes themselves in
+        `test_boards_projects.py`; this is the one other route that answers a gallery video's DTO)."""
+        owner = multiuser["owner"]["id"]
+        project_id = invoker.services.project_records.create(owner, "Mine", {}).project_id
+        _save_video(invoker, "made.mp4", owner, project_id=project_id)
+        board_id = _create_board(invoker, owner, BoardVisibility.Shared)
+        invoker.services.board_video_records.add_video_to_board(board_id, "made.mp4")
+
+        def shown_to(user: str) -> str | None:
+            response = client.post(
+                "/api/v1/recall/video/default/initial-video",
+                params={"video_name": "made.mp4"},
+                headers=multiuser[user]["headers"],
+            )
+            assert response.status_code == 200
+            return response.json()["video"].get("project_id")
+
+        assert shown_to("owner") == project_id
+        assert shown_to("admin") == project_id
+        assert shown_to("other") is None
 
     def test_an_upload_to_another_users_board_is_refused_before_ingest(
         self, invoker: Invoker, client: TestClient, multiuser: dict[str, Any], upload_ready: MagicMock

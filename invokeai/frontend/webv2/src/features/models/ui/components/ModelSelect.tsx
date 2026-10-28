@@ -2,7 +2,19 @@
 import type { ModelConfig, ModelTaxonomyType } from '@features/models/core/types';
 import type { PickerGroup, PickerOptionState } from '@platform/ui/Picker';
 
-import { Badge, Box, HStack, Icon, Image, Popover, Portal, Spacer, Stack, Text } from '@chakra-ui/react';
+import {
+  Badge,
+  Box,
+  HStack,
+  Icon,
+  Image,
+  Popover,
+  Portal,
+  Spacer,
+  Stack,
+  Text,
+  useFieldContext,
+} from '@chakra-ui/react';
 import { getModelBaseColorPalette, getModelBaseLabel, getModelBaseLongLabel } from '@features/models/core/baseIdentity';
 import { getModelPickerGroups, hasModelPickerCandidates } from '@features/models/core/library';
 import { getModelTypeLabel, getModelTypePluralLabel } from '@features/models/core/taxonomy';
@@ -14,6 +26,7 @@ import { formatBytes } from '@platform/i18n/languages';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { areArraysEqual } from '@platform/state/selectors';
 import { Button, CloseButton, IconButton, PopoverContent, Tooltip } from '@platform/ui';
+import { useFieldLabelId } from '@platform/ui/Field';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Picker } from '@platform/ui/Picker';
 import { Link } from '@tanstack/react-router';
@@ -28,7 +41,7 @@ import {
   RotateCcwIcon,
   XIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const EMPTY_BASES: ReadonlySet<string> = new Set();
@@ -118,7 +131,17 @@ export const ModelSelect = ({
   const loadError = useModelsSelector((snapshot) => snapshot.error);
   const loadStatus = useModelsSelector((snapshot) => snapshot.status);
   const [isOpen, setIsOpen] = useState(false);
-  const [lastDisabled, setLastDisabled] = useState(Boolean(disabled));
+  // Like Select, an enclosing Field names the trigger and supplies its description, invalid and disabled states.
+  const field = useFieldContext();
+  const fieldControlProps = field?.getInputProps();
+  const fieldLabelId = useFieldLabelId();
+  const valueTextId = useId();
+  const isDisabled = Boolean(disabled || field?.disabled);
+  const isInvalid = Boolean(invalid || field?.invalid);
+  const describedBy =
+    [fieldControlProps?.['aria-describedby'], fieldControlProps?.['aria-errormessage']].filter(Boolean).join(' ') ||
+    undefined;
+  const [lastDisabled, setLastDisabled] = useState(isDisabled);
 
   const pickerId = id ?? `models:${modelTypes.join('+')}`;
   const isCompact = useModelsUiSelector((snapshot) => snapshot.pickerCompactViews[pickerId] ?? false);
@@ -149,7 +172,7 @@ export const ModelSelect = ({
     () => isEmpty && Boolean(excludeKeys?.size) && hasModelPickerCandidates(models, { filter, modelTypes }),
     [excludeKeys, filter, isEmpty, modelTypes, models]
   );
-  const isInert = disabled || isEmpty;
+  const isInert = isDisabled || isEmpty;
 
   if (isInert !== lastDisabled) {
     setLastDisabled(isInert);
@@ -180,6 +203,7 @@ export const ModelSelect = ({
     (modelTypes.length === 1
       ? getModelTypePluralLabel(modelTypes[0] ?? 'main').toLowerCase()
       : t('models.scopeModels'));
+  const listLabel = t('models.scopeAvailable', { scope: scopeLabel });
   const emptyMessage = isAllExcluded
     ? t('models.scopeAllAdded', { scope: scopeLabel })
     : t('models.scopeNoCompatibleInstalled', { scope: scopeLabel });
@@ -231,6 +255,8 @@ export const ModelSelect = ({
     <Box className={className} minW="0" w="full">
       <Popover.Root
         ids={id ? { trigger: id } : undefined}
+        // Like Select: closed pickers hold no list, virtualizer or observers, and each open starts a fresh search.
+        lazyMount
         open={isOpen}
         positioning={{
           fitViewport: true,
@@ -241,6 +267,7 @@ export const ModelSelect = ({
           sameWidth: true,
           strategy: 'fixed',
         }}
+        unmountOnExit
         onOpenChange={(event) => {
           if (isInert) {
             setIsOpen(false);
@@ -253,11 +280,14 @@ export const ModelSelect = ({
         <Box minW="0" position="relative" w="full">
           <Popover.Trigger asChild>
             <Button
-              aria-invalid={invalid ? true : undefined}
+              aria-describedby={describedBy}
               aria-haspopup="listbox"
+              aria-invalid={isInvalid || undefined}
+              // As on Select's trigger: the field label names the control, and the current choice follows as its value.
+              aria-labelledby={fieldLabelId ? `${fieldLabelId} ${valueTextId}` : undefined}
               className={className}
-              borderColor={invalid ? undefined : isOpen ? 'accent.solid' : 'border'}
-              colorPalette={invalid ? 'red' : 'gray'}
+              borderColor={isInvalid ? undefined : isOpen ? 'accent.solid' : 'border'}
+              colorPalette={isInvalid ? 'red' : 'gray'}
               disabled={isInert}
               justifyContent="space-between"
               minW="0"
@@ -270,13 +300,13 @@ export const ModelSelect = ({
               w="full"
               _hover={{
                 bg: 'transparent',
-                borderColor: invalid ? undefined : isOpen ? 'accent.solid' : 'border.emphasized',
+                borderColor: isInvalid ? undefined : isOpen ? 'accent.solid' : 'border.emphasized',
               }}
             >
               {selectedModel ? (
-                <ModelButtonContent model={selectedModel} />
+                <ModelButtonContent id={valueTextId} model={selectedModel} />
               ) : (
-                <Text as="span" color="fg.muted" minW="0" truncate>
+                <Text as="span" id={valueTextId} color="fg.muted" minW="0" truncate>
                   {isEmpty ? emptyMessage : (placeholder ?? t('models.scopeSelect', { scope: scopeLabel }))}
                 </Text>
               )}
@@ -286,7 +316,7 @@ export const ModelSelect = ({
           {canClear ? (
             <CloseButton
               aria-label={t('models.clearSelectedModel')}
-              disabled={disabled}
+              disabled={isDisabled}
               insetEnd="1"
               position="absolute"
               size="sm"
@@ -309,6 +339,7 @@ export const ModelSelect = ({
         <Portal>
           <Popover.Positioner>
             <PopoverContent
+              aria-label={listLabel}
               css={dropdownContent}
               maxH="min(24rem, var(--available-height))"
               maxW="min(26rem, calc(100vw - 1rem))"
@@ -323,7 +354,7 @@ export const ModelSelect = ({
                 groups={pickerGroups}
                 isCompact={isCompact}
                 isMatch={matchesModel}
-                listLabel={t('models.scopeAvailable', { scope: scopeLabel })}
+                listLabel={listLabel}
                 noMatchesMessage={
                   selectedBases.size > 0
                     ? t('models.scopeNoMatchBases', { scope: scopeLabel })
@@ -338,25 +369,16 @@ export const ModelSelect = ({
                   </>
                 }
                 selectedId={value}
-                statusSlot={
-                  loadStatus === 'idle' || loadStatus === 'loading' ? (
-                    <Text color="fg.subtle" fontSize="xs" p="2">
-                      {t('models.loadingModels')}
-                    </Text>
-                  ) : loadStatus === 'error' ? (
-                    <Stack alignItems="start" gap="1.5" p="2">
-                      <Text color="fg.error" fontSize="xs">
-                        {loadError ?? t('models.failedToLoadModels')}
-                      </Text>
-                      <Button size="sm" variant="outline" onClick={() => void ensureModelsLoaded()}>
-                        {t('common.retry')}
-                      </Button>
-                    </Stack>
-                  ) : candidates.length === 0 ? (
-                    <Text color="fg.subtle" fontSize="xs" p="2">
-                      {emptyMessage}
-                    </Text>
-                  ) : undefined
+                status={
+                  loadStatus === 'idle' || loadStatus === 'loading'
+                    ? { message: t('models.loadingModels') }
+                    : loadStatus === 'error'
+                      ? {
+                          isError: true,
+                          message: loadError ?? t('models.failedToLoadModels'),
+                          onRetry: () => void ensureModelsLoaded(),
+                        }
+                      : undefined
                 }
                 toolbarSlot={
                   availableBases.length >= 2 ? (
@@ -461,8 +483,8 @@ const BaseChip = ({
   </Badge>
 );
 
-const ModelButtonContent = ({ model }: { model: ModelConfig }) => (
-  <HStack as="span" flex="1" gap="2" minW="0">
+const ModelButtonContent = ({ id, model }: { id: string; model: ModelConfig }) => (
+  <HStack as="span" id={id} flex="1" gap="2" minW="0">
     <MiddleTruncate as="span" minW="0" text={model.name} />
     <Badge colorPalette={getModelBaseColorPalette(model.base)} flexShrink={0} fontSize="xs" size="lg" variant="surface">
       {getModelBaseLabel(model.base)}

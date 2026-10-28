@@ -4,82 +4,75 @@ import { useModelsSelector } from '@features/models/data/modelsStore';
 import { AddModelsView } from '@features/models/ui/add-models/AddModelsView';
 import { ApiKeysSection } from '@features/models/ui/credentials/ApiKeysSection';
 import { ModelDetail } from '@features/models/ui/detail/ModelDetail';
-import { InstallQueueBar } from '@features/models/ui/install-queue/InstallQueueBar';
 import { ModelActionConfirmDialog, type PendingModelAction } from '@features/models/ui/shared/ModelActionsMenu';
-import { updateModelsUi, useModelsUiSelector, type ModelManagerTab } from '@features/models/ui/uiStore';
+import {
+  openModelManagerTab,
+  updateModelsUi,
+  useModelsUiSelector,
+  type ModelManagerTab,
+} from '@features/models/ui/uiStore';
 import { Scrollable, Tabs } from '@platform/ui';
 import { ManagerDetailHeader } from '@platform/ui/ManagerLayout';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { BoxIcon, KeyRoundIcon, PlusIcon } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-/** The tabbed detail pane: selected model, Add Models, API Keys, and queue footer. */
+/** The tabbed detail pane: selected model, Add Models and API Keys. The install queue is the layout's footer. */
 export const DetailPane = () => {
   const { t } = useTranslation();
-  const { activeModelKey, activeTab, queueFillsPane } = useModelsUiSelector(
-    (snapshot) => ({
-      activeModelKey: snapshot.activeModelKey,
-      activeTab: snapshot.activeTab,
-      queueFillsPane: snapshot.queueExpanded && snapshot.queueMaximized,
-    }),
-    (left, right) =>
-      left.activeModelKey === right.activeModelKey &&
-      left.activeTab === right.activeTab &&
-      left.queueFillsPane === right.queueFillsPane
+  const { activeModelKey, activeTab } = useModelsUiSelector(
+    (snapshot) => ({ activeModelKey: snapshot.activeModelKey, activeTab: snapshot.activeTab }),
+    (left, right) => left.activeModelKey === right.activeModelKey && left.activeTab === right.activeTab
   );
   const detailLabel = useModelsSelector(
     (snapshot) => (activeModelKey ? snapshot.modelsByKey.get(activeModelKey)?.name : undefined) ?? t('models.details')
   );
 
   return (
-    <Flex direction="column" flex="1" minH="0" minW="0">
-      <Tabs.Root
-        display={queueFillsPane ? 'none' : 'flex'}
-        flex="1"
-        flexDirection="column"
-        minH="0"
-        minW="0"
-        size="xl"
-        value={activeTab}
-        onValueChange={(event) => updateModelsUi({ activeTab: event.value as ModelManagerTab })}
-      >
-        <ManagerDetailHeader>
-          <Tabs.List mb="-1px">
-            <Tabs.Trigger value="details">
-              <Icon as={BoxIcon} boxSize="3" />
-              <MiddleTruncate maxW="14rem" text={detailLabel} />
-            </Tabs.Trigger>
-            <Tabs.Trigger value="add">
-              <Icon as={PlusIcon} boxSize="3" />
-              {t('models.addModels')}
-            </Tabs.Trigger>
-            <Tabs.Trigger value="keys">
-              <Icon as={KeyRoundIcon} boxSize="3" />
-              {t('models.apiKeys')}
-            </Tabs.Trigger>
-          </Tabs.List>
-        </ManagerDetailHeader>
+    <Tabs.Root
+      display="flex"
+      flex="1"
+      flexDirection="column"
+      minH="0"
+      minW="0"
+      size="xl"
+      value={activeTab}
+      onValueChange={(event) => openModelManagerTab(event.value as ModelManagerTab)}
+    >
+      <ManagerDetailHeader>
+        <Tabs.List mb="-1px">
+          <Tabs.Trigger data-manager-item-tab="" value="details">
+            <Icon as={BoxIcon} boxSize="3" />
+            <MiddleTruncate maxW="14rem" minW="0" text={detailLabel} />
+          </Tabs.Trigger>
+          <Tabs.Trigger value="add">
+            <Icon as={PlusIcon} boxSize="3" />
+            {t('models.addModels')}
+          </Tabs.Trigger>
+          <Tabs.Trigger value="keys">
+            <Icon as={KeyRoundIcon} boxSize="3" />
+            {t('models.apiKeys')}
+          </Tabs.Trigger>
+        </Tabs.List>
+      </ManagerDetailHeader>
 
-        <Box flex="1" minH="0">
-          <Tabs.Content h="full" m="0" p="0" value="details">
-            {activeTab === 'details' ? <DetailTab modelKey={activeModelKey} /> : null}
-          </Tabs.Content>
-          <Tabs.Content h="full" m="0" p="0" value="add">
-            {activeTab === 'add' ? <AddModelsView /> : null}
-          </Tabs.Content>
-          <Tabs.Content h="full" m="0" p="0" value="keys">
-            {activeTab === 'keys' ? (
-              <Scrollable h="full" label={t('models.apiKeys')} minH="0" p="3">
-                <ApiKeysSection />
-              </Scrollable>
-            ) : null}
-          </Tabs.Content>
-        </Box>
-      </Tabs.Root>
-
-      <InstallQueueBar />
-    </Flex>
+      <Box flex="1" minH="0">
+        <Tabs.Content h="full" m="0" p="0" value="details">
+          {activeTab === 'details' ? <DetailTab modelKey={activeModelKey} /> : null}
+        </Tabs.Content>
+        <Tabs.Content h="full" m="0" p="0" value="add">
+          {activeTab === 'add' ? <AddModelsView /> : null}
+        </Tabs.Content>
+        <Tabs.Content h="full" m="0" p="0" value="keys">
+          {activeTab === 'keys' ? (
+            <Scrollable h="full" label={t('models.apiKeys')} minH="0" p="3">
+              <ApiKeysSection />
+            </Scrollable>
+          ) : null}
+        </Tabs.Content>
+      </Box>
+    </Tabs.Root>
   );
 };
 
@@ -88,6 +81,26 @@ const DetailTab = ({ modelKey }: { modelKey: string | null }) => {
   // Owned above the keyed detail: a delete unmounts it while this dialog is still animating out.
   const [pendingAction, setPendingAction] = useState<PendingModelAction>(null);
   const handleDeleted = useCallback(() => updateModelsUi({ activeModelKey: null }), []);
+  const detailRef = useRef<HTMLDivElement | null>(null);
+  const confirmOpenerRef = useRef<{ element: HTMLElement | null; kind: NonNullable<PendingModelAction>['kind'] }>({
+    element: null,
+    kind: 'delete',
+  });
+  const requestConfirm = useCallback((pending: NonNullable<PendingModelAction>) => {
+    confirmOpenerRef.current = {
+      element: document.activeElement instanceof HTMLElement ? document.activeElement : null,
+      kind: pending.kind,
+    };
+    setPendingAction(pending);
+  }, []);
+  // A confirmed re-identify clears the notice whose button opened the dialog; focus the model's actions instead.
+  const getConfirmFinalFocus = useCallback(() => {
+    const { element, kind } = confirmOpenerRef.current;
+    if (kind !== 'reidentify' || element?.isConnected) {
+      return null;
+    }
+    return detailRef.current?.querySelector<HTMLElement>('[data-model-actions-trigger]') ?? null;
+  }, []);
 
   return (
     <>
@@ -102,11 +115,12 @@ const DetailTab = ({ modelKey }: { modelKey: string | null }) => {
           </Text>
         </Flex>
       ) : (
-        <Scrollable h="full" label={t('models.details')} minH="0" p="3">
-          <ModelDetail key={modelKey} modelKey={modelKey} onRequestConfirm={setPendingAction} />
+        <Scrollable h="full" label={t('models.details')} minH="0" p="3" viewportRef={detailRef}>
+          <ModelDetail key={modelKey} modelKey={modelKey} onRequestConfirm={requestConfirm} />
         </Scrollable>
       )}
       <ModelActionConfirmDialog
+        finalFocusEl={getConfirmFinalFocus}
         pending={pendingAction}
         onClose={() => setPendingAction(null)}
         onDeleted={handleDeleted}

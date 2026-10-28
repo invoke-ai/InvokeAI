@@ -21,18 +21,29 @@ import {
   galleryVideos,
   type GalleryVideoItem,
 } from '@features/gallery';
-import { getGalleryBoardLabel, getGalleryDeletionSuccessor } from '@features/gallery/contracts';
 import {
+  getGalleryAutoAddBoardId,
+  getGalleryBoardLabel,
+  getGalleryDeletionSuccessor,
+  getPersistedSelectedGalleryItemKeys,
+} from '@features/gallery/contracts';
+import {
+  canAddToCachedGalleryBoard,
+  ensureGalleryBoardDestinations,
   getGalleryItemBoardIdsFromCaches,
   getGalleryItemStarredFromCaches,
   invalidateGallery,
+  invalidateGalleryBoardDestinations,
   patchGalleryItemCaches,
 } from '@features/gallery/queries';
-import { flushGenerateDrafts, setPendingPromptTemplateDraft } from '@features/generation/react';
+import { setPendingPromptTemplateDraft } from '@features/generation/react';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { submitUtilityGraph, type UtilityGraphSubmission, UtilityQueueError } from '@features/queue/utility';
+import { copyImage } from '@platform/browser/clipboard';
 import { downloadBlob } from '@platform/browser/downloadBlob';
+import { createLogger } from '@platform/logging/logger';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
   assertAccountScopeCurrent,
@@ -40,16 +51,21 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { useExternalStoreSelector } from '@platform/state/selectors';
+import { getApiErrorMessage } from '@platform/transport/http';
+import { socketHub } from '@platform/transport/socketHub';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   createCanvasFromImages,
   getCanvasImportNotice,
   getCanvasEngine,
+  getSendAsControlNotice,
   importGalleryImagesToCanvas,
+  sendGalleryImageAsControl,
   type GalleryCanvasImportDestination,
 } from '@workbench/canvas-operations/api';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { useRevealLayerProperties } from '@workbench/widgets/layers/revealLayerProperties';
 import { getProjectWidgetInstance, getProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchQueries, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo } from 'react';
@@ -59,7 +75,7 @@ import type { RequestDeletionConfirmation } from './useDeletionConfirmation';
 
 import { appendReferenceImage } from './appendReferenceImage';
 import { recordCanvasImportError } from './canvasImportError';
-import { executeImageRecall, executeLoadImageWorkflow, getCurrentGenerateValues } from './executeImageRecall';
+import { executeImageRecall, executeLoadMediaWorkflow, getCurrentGenerateValues } from './executeImageRecall';
 import {
   appendReferenceVideo,
   executeVideoRecall,
@@ -83,6 +99,8 @@ import {
   type ImageRecallCapabilities,
   type ImageRecallKind,
 } from './imageRecall';
+import { collectMediaUsage } from './mediaUsage';
+import { buildPbrMapsGraph } from './pbrMapsGraph';
 import {
   EMPTY_VIDEO_RECALL_CAPABILITIES,
   getVideoRecallCapabilities as deriveVideoRecallCapabilitiesFromMetadata,
@@ -112,11 +130,17 @@ export interface ImageActions extends GalleryItemActions {
   ) => ImageRecallCapabilities;
   downloadImage: (image: GalleryImage) => Promise<void>;
   downloadImages: (imageNames: string[]) => Promise<void>;
+  /** Queues normal, roughness and displacement maps of the image into the project's auto-add board. */
+  generatePbrMaps: (image: GalleryImage) => Promise<void>;
   getImageRecallCapabilities: (image: GalleryImage, signal?: AbortSignal) => Promise<ImageRecallCapabilities>;
-  /** Replaces the project graph with the workflow embedded in the image and opens the editor on it. */
+  /** Opens the image's embedded workflow or generation graph in the workflow editor. */
   loadImageWorkflow: (image: GalleryImage) => Promise<void>;
   /** Recall availability for a gallery video, from its recorded core_metadata. */
   getVideoRecallCapabilities: (item: GalleryVideoItem, signal?: AbortSignal) => Promise<VideoRecallCapabilities>;
+  /** Whether the video embeds a workflow; the listing does not say, so an unknown answer reads the record. */
+  hasVideoWorkflow: (item: GalleryVideoItem, signal?: AbortSignal) => Promise<boolean>;
+  /** Opens the video's embedded workflow or generation graph in the workflow editor. */
+  loadVideoWorkflow: (item: GalleryVideoItem) => Promise<void>;
   moveImagesToBoard: (imageNames: string[], boardId: string) => Promise<void>;
   openImageInPreview: (image: GalleryImage) => void;
   recallImageData: (image: GalleryImage, kind: ImageRecallKind) => Promise<void>;
@@ -128,6 +152,8 @@ export interface ImageActions extends GalleryItemActions {
   savePromptAsTemplate: (image: GalleryImage) => Promise<void>;
   selectForCompare: (image: GalleryImage) => void;
   sendToCanvas: (images: readonly GalleryImage[], destination: GalleryCanvasImportDestination) => Promise<void>;
+  /** Fills the selected control layer when it has no image yet, else adds a control layer; shows its Properties. */
+  sendImageAsControl: (image: GalleryImage) => Promise<void>;
   setImagesStarred: (imageNames: string[], starred: boolean) => Promise<void>;
   useAsReferenceImage: (image: GalleryImage) => void;
   useAsReferenceVideo: (item: GalleryVideoItem) => void;
@@ -161,7 +187,9 @@ const createVideoPlacementRoomSelector = (models: readonly ModelConfig[], projec
   };
 };
 
-const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+// The server's own words for a refusal (an item on someone else's board, say), not its JSON body.
+const toErrorMessage = (error: unknown): string =>
+  getApiErrorMessage(error, error instanceof Error ? error.message : String(error));
 
 const toPngBlob = async (blob: Blob): Promise<Blob> => {
   if (blob.type === 'image/png') {
@@ -196,6 +224,7 @@ export const useImageActions = ({
   requestDeletionConfirmation: RequestDeletionConfirmation;
 }): ImageActions => {
   const openWorkbenchWidget = useOpenWorkbenchWidget();
+  const revealLayerProperties = useRevealLayerProperties();
   const commands = useWorkbenchCommands();
   const { gallery, generation, notifications } = commands;
   const queries = useWorkbenchQueries();
@@ -236,6 +265,12 @@ export const useImageActions = ({
     void ensureModelsLoaded();
   });
 
+  // Selection-independent, so callers can hand it to every thumbnail without re-rendering them per selection.
+  const selectForCompare = useCallback(
+    (image: GalleryImage) => gallery.setCompareImage(image, projectId),
+    [gallery, projectId]
+  );
+
   return useMemo<ImageActions>(() => {
     const recordError = (error: unknown) =>
       notifications.reportError({
@@ -250,21 +285,27 @@ export const useImageActions = ({
 
       return board ? getGalleryBoardLabel(board, t) : t('widgets.gallery.uncategorized');
     };
-    const getLatestGenerateValues = () => {
+    const getLatestProject = () => {
       const snapshot = queries.getSnapshot();
-      const project = projectId
-        ? snapshot.projects.find((candidate) => candidate.id === projectId)
-        : snapshot.activeProject;
 
-      return project ? getProjectWidgetValues(project, 'generate') : {};
+      return projectId ? snapshot.projects.find((candidate) => candidate.id === projectId) : snapshot.activeProject;
     };
-    const getLatestVideoValues = () => {
-      const snapshot = queries.getSnapshot();
-      const project = projectId
-        ? snapshot.projects.find((candidate) => candidate.id === projectId)
-        : snapshot.activeProject;
+    const getLatestWidgetValues = (widgetId: 'gallery' | 'generate' | 'video') => {
+      const project = getLatestProject();
 
-      return project ? getProjectWidgetValues(project, 'video') : {};
+      return project ? getProjectWidgetValues(project, widgetId) : {};
+    };
+    const getLatestGenerateValues = () => getLatestWidgetValues('generate');
+    const getLatestVideoValues = () => getLatestWidgetValues('video');
+    // The persisted selection, primary and members, as one comparable key: a host's action context only sees
+    // loaded items, so it cannot tell a cleared selection from one moved to an item it has not loaded.
+    const getPersistedGallerySelectionKey = (): string => {
+      const values = getLatestWidgetValues('gallery');
+
+      return JSON.stringify([
+        typeof values.selectedImageName === 'string' ? values.selectedImageName : null,
+        getPersistedSelectedGalleryItemKeys(values),
+      ]);
     };
     // Snapshot deletion-sensitive widget values across all projects; cache rollback cannot restore them. Diff
     // before/after values for conflict-safe restoration.
@@ -367,8 +408,8 @@ export const useImageActions = ({
       reportMutationOutcome(action, requested.length, result, boardId);
     };
     const deleteItemsConfirmed = (items: GalleryItemRef[]): Promise<void> => {
-      // Capture successor context before optimistic removal. Partial failures reconcile via invalidation; total
-      // failures restore widget snapshots directly.
+      // Capture successor context before optimistic removal. Any rejected items restore the widget snapshot; the
+      // confirmed removals then apply again.
       const deletionContext = getItemActionContext?.() ?? null;
       let orderedRefs: GalleryItemRef[] | null = null;
       const isDeletionContextCurrent = (): boolean => {
@@ -378,10 +419,14 @@ export const useImageActions = ({
 
         const current = getItemActionContext();
 
+        // The optimistic removal below clears the deleted primary from the host's selection, so the selection is
+        // still this deletion's while the store holds what that removal (or restoring rejected items) left;
+        // anything selected since, loaded by the host or not, makes the successor stale.
         return Boolean(
           current &&
           current.filterIdentity === deletionContext.filterIdentity &&
-          current.selectedItemKey === deletionContext.selectedItemKey
+          (current.selectedItemKey === deletionContext.selectedItemKey ||
+            getPersistedGallerySelectionKey() === selectionAfterRemoval)
         );
       };
       const rollbackCaches = patchGalleryItemCaches(queryClient, {
@@ -402,12 +447,24 @@ export const useImageActions = ({
       // Once backend-confirmed deletion starts applying, later callback failures must not restore deleted items.
       let confirmedApplied = false;
       const galleryWidgetSnapshot = applyGalleryItemRemoval(items.map(toGalleryItemKey));
+      let selectionAfterRemoval = getPersistedGallerySelectionKey();
 
       return runItemMutation({
         action: 'delete',
         applyConfirmed: async (result, signal) => {
+          // A rejected request reports its items as failed rather than throwing. Those items remain, so restore what
+          // the optimistic removal cleared; confirmed removals are applied again below.
           if (result.failed.length > 0) {
+            // Restoring changes the persisted selection the successor fence compares against: adopt it only when
+            // the selection was still this deletion's, so a choice made meanwhile still wins.
+            const wasCurrent = isDeletionContextCurrent();
+
             rollbackCachesOnce();
+            restoreGalleryItemRemoval(galleryWidgetSnapshot);
+
+            if (wasCurrent) {
+              selectionAfterRemoval = getPersistedGallerySelectionKey();
+            }
           }
 
           if (result.succeeded.length === 0) {
@@ -444,7 +501,13 @@ export const useImageActions = ({
           }
 
           confirmedApplied = true;
-          patchGalleryItemCaches(queryClient, { kind: 'delete', result });
+          // Without a rollback the optimistic patch already lowered every page's total; only pages refetched since
+          // still count the deleted items.
+          patchGalleryItemCaches(
+            queryClient,
+            { kind: 'delete', result },
+            { totals: cachesRolledBack ? 'listing' : 'holder' }
+          );
           gallery.removeItems(result.succeeded.map(toGalleryItemKey));
           if (successor) {
             const failedKeys = new Set(result.failed.map(toGalleryItemKey));
@@ -462,7 +525,7 @@ export const useImageActions = ({
               if (selectionPage === undefined) {
                 gallery.setItemMultiSelection(itemKeys, successor, projectId);
               } else {
-                gallery.setItemMultiSelection(itemKeys, successor, projectId, selectionPage);
+                gallery.setItemMultiSelection(itemKeys, successor, projectId, selectionPage, true);
               }
             } else if (selectionPage === undefined) {
               gallery.selectItem(successor, projectId);
@@ -498,10 +561,16 @@ export const useImageActions = ({
         },
       });
     };
-    const deleteItems = (items: GalleryItemRef[]): Promise<void> =>
-      confirmImageDeletion
-        ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items))
+    const deleteItems: ImageActions['deleteItems'] = (items, options) => {
+      const project = projectId ? queries.getProject(projectId) : queries.getSnapshot().activeProject;
+      const usage = project ? collectMediaUsage(project, items) : [];
+
+      // Media the project still uses is always confirmed: the opt-out covers routine deletions, not ones that
+      // leave authored work pointing at nothing.
+      return confirmImageDeletion || usage.length > 0
+        ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items), options?.returnFocus, usage)
         : deleteItemsConfirmed(items);
+    };
     const moveItemsToBoard = (items: GalleryItemRef[], boardId: string): Promise<void> => {
       // On partial move failure, restore then reapply confirmed items. Capture prior boards from cache and store,
       // preferring cache; invalidation reconciles conflicts.
@@ -814,7 +883,7 @@ export const useImageActions = ({
           const blob = await toPngBlob(sourceBlob);
 
           assertAccountScopeCurrent(owner);
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          await copyImage(blob);
           assertAccountScopeCurrent(owner);
           recordSuccess('Copied image to clipboard');
         } catch (error: unknown) {
@@ -845,6 +914,95 @@ export const useImageActions = ({
         }
       },
       downloadImages: (imageNames) => downloadItems(imageNames.map((name) => ({ kind: 'image', name }))),
+      generatePbrMaps: async (image) => {
+        const owner = captureAccountScope();
+        const galleryValues = getLatestWidgetValues('gallery');
+        let submission: UtilityGraphSubmission;
+        const reportFailure = (error: unknown) => {
+          const message = toErrorMessage(error);
+
+          createLogger({ area: 'image-actions', namespace: 'gallery', projectId }, { owner }).error({ error, message });
+          notifications.add({ kind: 'error', message, title: t('widgets.gallery.itemActions.pbrMaps.failed') });
+        };
+
+        try {
+          const pendingBoards = ensureGalleryBoardDestinations(queryClient);
+
+          if (pendingBoards) {
+            await pendingBoards;
+          }
+          assertAccountScopeCurrent(owner);
+          const boardId = getGalleryAutoAddBoardId(galleryValues, (id) => canAddToCachedGalleryBoard(id, queryClient));
+
+          // Ahead of queued generations, as the legacy action was; the account signal ends the watch, not the item.
+          submission = await submitUtilityGraph({
+            graph: buildPbrMapsGraph({ boardId, imageName: image.imageName }),
+            hub: socketHub,
+            prepend: true,
+            signal: owner.signal,
+          });
+        } catch (error: unknown) {
+          if (isAccountScopeCurrent(owner)) {
+            void invalidateGalleryBoardDestinations(queryClient, owner);
+            reportFailure(error);
+          }
+          return;
+        }
+
+        // Handle settlement before anything else can throw, so an aborted watch never rejects unobserved. The
+        // utility item is not project work, so the queue runtime does not refresh the gallery for it.
+        void submission.settled.then(
+          () => {
+            if (!isAccountScopeCurrent(owner)) {
+              return;
+            }
+
+            void invalidateGallery(queryClient, owner);
+            recordSuccess(
+              t('widgets.gallery.itemActions.pbrMaps.completed'),
+              t('widgets.gallery.itemActions.pbrMaps.completedMessage', { name: image.imageName })
+            );
+          },
+          (error: unknown) => {
+            if (!isAccountScopeCurrent(owner)) {
+              return;
+            }
+            if (error instanceof UtilityQueueError && error.reason === 'canceled') {
+              notifications.add({
+                kind: 'info',
+                message: t('widgets.gallery.itemActions.pbrMaps.canceledMessage', { name: image.imageName }),
+                title: t('widgets.gallery.itemActions.pbrMaps.canceled'),
+              });
+              return;
+            }
+            // The item is gone without a terminal event: cleared while pending, or pruned after completing while
+            // the socket was down. Either way the gallery may hold its maps.
+            if (error instanceof UtilityQueueError && error.reason === 'removed') {
+              void invalidateGallery(queryClient, owner);
+              notifications.add({
+                kind: 'info',
+                message: t('widgets.gallery.itemActions.pbrMaps.removedMessage', { name: image.imageName }),
+                title: t('widgets.gallery.itemActions.pbrMaps.removed'),
+              });
+              return;
+            }
+            // An abort only ends the watch; the backend item keeps running.
+            if (!(error instanceof UtilityQueueError && error.reason === 'aborted')) {
+              void invalidateGalleryBoardDestinations(queryClient, owner);
+              reportFailure(error);
+            }
+          }
+        );
+
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
+        recordSuccess(
+          t('widgets.gallery.itemActions.pbrMaps.queued'),
+          t('widgets.gallery.itemActions.pbrMaps.queuedMessage', { name: image.imageName })
+        );
+      },
       getImageRecallCapabilities: async (image, signal) => {
         const owner = captureAccountScope();
         const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
@@ -884,9 +1042,9 @@ export const useImageActions = ({
         }
       },
       loadImageWorkflow: (image) =>
-        executeLoadImageWorkflow({
-          image,
+        executeLoadMediaWorkflow({
           isProjectActive: () => !projectId || queries.isActiveProject(projectId),
+          media: { kind: 'image', name: image.imageName },
           notifications,
           openWorkflowEditor: () =>
             openWorkbenchWidget('workflow', { preferredRegions: ['center'], requireCenterView: true }).ok,
@@ -905,6 +1063,31 @@ export const useImageActions = ({
           return EMPTY_VIDEO_RECALL_CAPABILITIES;
         }
       },
+      hasVideoWorkflow: async (item, signal) => {
+        if (item.hasWorkflow !== undefined) {
+          return item.hasWorkflow;
+        }
+
+        const owner = captureAccountScope();
+
+        try {
+          const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
+          const record = await galleryItems.resolve({ kind: 'video', name: item.name }, requestSignal);
+
+          return record.kind === 'video' && record.hasWorkflow === true;
+        } catch {
+          return false;
+        }
+      },
+      loadVideoWorkflow: (item) =>
+        executeLoadMediaWorkflow({
+          isProjectActive: () => !projectId || queries.isActiveProject(projectId),
+          media: { kind: 'video', name: item.name },
+          notifications,
+          openWorkflowEditor: () =>
+            openWorkbenchWidget('workflow', { preferredRegions: ['center'], requireCenterView: true }).ok,
+          t,
+        }),
       recallVideoData: async (item, kind) => {
         const owner = captureAccountScope();
         const didRecall = await executeVideoRecall({
@@ -962,6 +1145,7 @@ export const useImageActions = ({
           generateValues,
           getGenerateValues: getLatestGenerateValues,
           image,
+          isCanvasFrame: getLatestProject()?.invocation.sourceId === 'canvas',
           kind,
           models,
           projectId,
@@ -972,12 +1156,9 @@ export const useImageActions = ({
           openWorkbenchWidget('generate', { preferredRegions: ['left'] });
         }
       },
-      selectForCompare: (image) => {
-        gallery.setCompareImage(image, projectId);
-      },
+      selectForCompare,
       createCanvasFromImages: async (images) => {
         const owner = captureAccountScope();
-        flushGenerateDrafts();
         try {
           const result = await createCanvasFromImages({
             applyCanvasMutation: commands.canvas.apply,
@@ -991,7 +1172,7 @@ export const useImageActions = ({
           if (result.status === 'imported' && result.failedImageNames.length === 0) {
             notifications.add({
               kind: 'success',
-              title: t('widgets.canvas.import.newCanvasSuccess', { count: result.layerIds.length }),
+              title: t('widgets.canvas.import.newProjectSuccess', { count: result.layerIds.length }),
             });
           } else {
             const notice = getCanvasImportNotice(result);
@@ -1041,6 +1222,45 @@ export const useImageActions = ({
 
           if (result.status === 'imported' && queries.isActiveProject(project.id)) {
             openWorkbenchWidget('canvas', { preferredRegions: ['center'], requireCenterView: true });
+          }
+        } catch (error: unknown) {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
+          recordCanvasImportError({
+            error,
+            localizedMessage: t('widgets.canvas.import.failed'),
+            notifications,
+            projectId,
+          });
+        }
+      },
+      sendImageAsControl: async (image) => {
+        const owner = captureAccountScope();
+
+        try {
+          const targetProjectId = projectId ?? queries.getSnapshot().activeProject.id;
+          const project = queries.getProject(targetProjectId);
+          const result = project
+            ? await sendGalleryImageAsControl({
+                applyCanvasMutation: commands.canvas.apply,
+                engine: getCanvasEngine(project.id) ?? null,
+                getProject: queries.getProject,
+                image,
+                isActiveProject: queries.isActiveProject,
+                project,
+              })
+            : ({ status: 'stale-project' } as const);
+
+          assertAccountScopeCurrent(owner);
+          const notice = getSendAsControlNotice(result);
+          notifications.add({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}) });
+
+          if ((result.status === 'filled' || result.status === 'created') && queries.isActiveProject(targetProjectId)) {
+            // The menu that asked has no trigger to hand focus back to, so the Canvas takes it, as for any import.
+            openWorkbenchWidget('canvas', { preferredRegions: ['center'], requireCenterView: true });
+            revealLayerProperties(result.layerId);
           }
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {
@@ -1164,6 +1384,8 @@ export const useImageActions = ({
     queryClient,
     queries,
     requestDeletionConfirmation,
+    revealLayerProperties,
+    selectForCompare,
     supportedModels,
     t,
     vaeModels,

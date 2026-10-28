@@ -208,7 +208,7 @@ def test_gguf_loader_constructs_and_materializes_model(monkeypatch, tmp_path) ->
     monkeypatch.setattr(diffusers, "Krea2Transformer2DModel", _TinyKrea2Transformer, raising=False)
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.krea2.gguf_sd_loader",
-        lambda _path, *, compute_dtype: {"weight": torch.ones(2, 2, dtype=compute_dtype)},
+        lambda _path, *, compute_dtype, **_kwargs: {"weight": torch.ones(2, 2, dtype=compute_dtype)},
     )
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_torch_device",
@@ -224,6 +224,70 @@ def test_gguf_loader_constructs_and_materializes_model(monkeypatch, tmp_path) ->
     assert isinstance(model, _TinyKrea2Transformer)
     assert model.weight.device.type == "cpu"
     assert torch.equal(model.weight, torch.ones(2, 2))
+
+
+def _gguf_driver(monkeypatch, path, model_class):
+    import diffusers
+
+    config = Main_GGUF_Krea2_Config.model_construct(path=str(path), variant=Krea2VariantType.Turbo)
+    loader = object.__new__(Krea2GGUFCheckpointModel)
+    loader._logger = MagicMock()
+    monkeypatch.setattr(diffusers, "Krea2Transformer2DModel", model_class, raising=False)
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_torch_device",
+        lambda: torch.device("cpu"),
+    )
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_bfloat16_safe_dtype",
+        lambda _device: torch.float32,
+    )
+    return loader, config
+
+
+def test_gguf_loader_keeps_a_q8_cr_layer_int8_through_the_native_rename(monkeypatch, tmp_path) -> None:
+    """A ComfyUI-GGUF Q8_CR file names its layers natively, and its markers are read before the rename
+    to diffusers keys -- which carries the scale along with the weight but not the marker. The marker has
+    to follow the weight's own rename, or `wq` never becomes an `Int8ConvrotLinear` and its codes land in
+    a plain Linear. The dense neighbours stay the GGMLTensors the GGUF path always produced."""
+    from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+    from tests.fixtures.quantized_payloads import q8_cr_marker, quantize_convrot, write_gguf
+
+    width = _TinyNativeKrea2.WIDTH
+    # The smallest regular Hadamard: the tiny model is narrower than the 256 every real build uses.
+    group_size = 4
+    torch.manual_seed(7)
+    payload = quantize_convrot(torch.randn(width, width), group_size=group_size)
+    tensors = {
+        **_native_block(width),
+        "blocks.0.attn.wq.weight": payload.codes,
+        "blocks.0.attn.wq.weight_scale": payload.scale,
+    }
+    path = tmp_path / "krea2_q8_cr.gguf"
+    write_gguf(path, tensors, quant={"blocks.0.attn.wq.weight": q8_cr_marker(group_size=group_size)})
+    loader, config = _gguf_driver(monkeypatch, path, _TinyNativeKrea2)
+
+    model = loader._load_from_gguf(config)
+
+    to_q = model.transformer_blocks[0].attn.to_q
+    assert isinstance(to_q, Int8ConvrotLinear)
+    assert to_q.weight.dtype is torch.int8
+    assert torch.allclose(to_q._dequantized_weight(torch.device("cpu"), torch.float32), payload.dequantized, atol=1e-5)
+    assert isinstance(model.img_in.weight, GGMLTensor)
+
+
+def test_gguf_loader_refuses_an_i8_tensor_no_metadata_claims(monkeypatch, tmp_path) -> None:
+    """`gguf` has no dequantizer for `I8`, so an unclaimed int8 tensor used to load and then fail on the
+    first denoise step with `Dequantization for I8 is not yet implemented`."""
+    from tests.fixtures.quantized_payloads import write_gguf
+
+    path = tmp_path / "krea2_unmarked.gguf"
+    write_gguf(
+        path, {**_native_block(_TinyNativeKrea2.WIDTH), "blocks.0.attn.wq.weight": torch.zeros(8, 8, dtype=torch.int8)}
+    )
+    loader, config = _gguf_driver(monkeypatch, path, _TinyNativeKrea2)
+
+    with pytest.raises(ValueError, match="blocks.0.attn.wq.weight"):
+        loader._load_from_gguf(config)
 
 
 def test_checkpoint_encoder_loader_decodes_int8_and_does_not_call_it_fp8(monkeypatch, tmp_path) -> None:
