@@ -103,7 +103,7 @@ def test_every_connection_the_panel_compiles_is_one_the_queue_will_accept(contra
 # The number of architectures each panel supports. A contract that silently stopped being
 # regenerated would make every assertion below vacuous, so the count is pinned: a new architecture
 # updates this number and the fixture in the same commit.
-SUPPORTED_BASE_COUNTS = {"generate": 15, "video": 3, "upscale": 8}
+SUPPORTED_BASE_COUNTS = {"generate": 16, "video": 3, "upscale": 8}
 
 # Floors separating "the fixture records literals" from "it records a fraction of them". Set just
 # under the current numbers (generate: 58 node types carrying 252 scalar values; video: 25 carrying
@@ -187,6 +187,10 @@ SILENTLY_IGNORED: dict[str, dict[str, set[str]]] = {
         # extra fields rather than rejecting them, which is why this never surfaced as an enqueue
         # error.
         "l2i": {"color_compensation"},
+        # `flux_ip_adapter` has no `method`: the FLUX adapter applies the whole image. webv2 shares
+        # the SD reference-image card with FLUX, so its Full/Style/Composition mode is offered there
+        # and sent, and changes nothing.
+        "flux_ip_adapter": {"method"},
     },
 }
 """Inputs webv2 writes that the invocation does not declare, per contract.

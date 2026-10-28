@@ -128,7 +128,7 @@ Regional guidance gives one area of the image its own prompt. For example, keep 
 
 To guide a region with an image instead of, or as well as, words, choose **Add reference image** from the regional guidance layer's right-click menu, or add a **Regional reference image** layer from the **+** menu. The reference appears as a row under the layer; select that row to choose its image, model and weight in Properties.
 
-Regional guidance works with SD 1.5, SDXL, FLUX.1, FLUX.2, Krea-2, Z-Image and Anima. Regional negative prompts are available for SD 1.5 and SDXL, and regional reference images for SD 1.5, SDXL (IP-Adapter) and FLUX.1 (FLUX Redux). With other models, regional layers are skipped, and the layer's Properties say so. For a reference image that applies to the whole picture, use **Add reference image** in the Generate panel instead.
+Regional guidance works with SD 1.5, SDXL, FLUX.1, FLUX.2, Krea-2, Z-Image, Anima and MOSS-Image. MOSS-Image places each region as a box in a JSON layout instead of masking its prompt, and offers a **Region type** (Object by default, Character or Text); see [MOSS-Image](/users-guide/models/local-models/moss-image/#layout-with-canvas-regions). Regional negative prompts are available for SD 1.5 and SDXL, and regional reference images for SD 1.5, SDXL (IP-Adapter) and FLUX.1 (FLUX Redux). With other models, regional layers are skipped, and the layer's Properties say so. For a reference image that applies to the whole picture, use **Add reference image** in the Generate panel instead.
 
 ## Control layers
 
@@ -179,4 +179,4 @@ There are three ways to bring an existing image onto the canvas:
 * **Use the image's menu.** Right-click an image in the Gallery or Preview and choose **Add to Current Canvas**, then the kind of layer. **New Project from Image** instead starts a new project whose canvas holds the image, sized to fit it; the current project is left as it is.
 * **Paste it.** Copy an image, click the canvas and press **Ctrl+V** (**Cmd+V** on macOS). It is added as a new raster layer at the generation frame.
 
-A new raster layer from an image is placed at its full size at the top-left of the generation frame. Use the **Move** (**V**) or **Transform** (**Ctrl+T**) tool to position and scale it.
+A new raster layer from an image is placed at its full size at the top-left of the generation frame. Use the **Move** (**V**) or **Transform** (**Shift+T**) tool to position and scale it.

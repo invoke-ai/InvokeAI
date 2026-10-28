@@ -88,6 +88,31 @@ describe('calculateActiveFrameLayerIds', () => {
     ).toEqual(new Set(['off']));
   });
 
+  it('demands nothing from a hidden overlay stack unless an isolated operation reads it', () => {
+    const mask: CanvasLayerContract = {
+      blendMode: 'normal',
+      id: 'mask',
+      isEnabled: true,
+      isLocked: false,
+      mask: { bitmap: { height: 100, imageName: 'mask.png', width: 100 }, fill: { color: '#e07575', style: 'solid' } },
+      name: 'mask',
+      opacity: 1,
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'inpaint_mask',
+    };
+    const doc = document([mask, { ...hiddenControl('control'), isHidden: false }, layer('base', 0, 0)]);
+    const viewport = { height: 200, width: 200, x: 0, y: 0 };
+    const showOverlayStacks = { control: true, inpaint_mask: false, regional_guidance: false };
+
+    expect(calculateActiveFrameLayerIds({ document: doc, viewport })).toEqual(new Set(['base', 'control', 'mask']));
+    expect(calculateActiveFrameLayerIds({ document: doc, showOverlayStacks, viewport })).toEqual(
+      new Set(['base', 'control'])
+    );
+    expect(
+      calculateActiveFrameLayerIds({ document: doc, isolationLayerId: 'mask', showOverlayStacks, viewport })
+    ).toEqual(new Set(['mask']));
+  });
+
   it('limits demand to isolated layers', () => {
     const doc = document([layer('isolated', 0, 0), layer('covered', 0, 0)]);
 

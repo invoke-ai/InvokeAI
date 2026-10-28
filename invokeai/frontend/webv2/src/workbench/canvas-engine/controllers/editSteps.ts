@@ -8,6 +8,7 @@ import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/c
 import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import type { CanvasTransactionOutcome, SubsetOf } from '@workbench/canvas-engine/editConcurrency';
 import type { HeldAssetRefs } from '@workbench/canvas-engine/history/history';
+import type { LayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
@@ -15,6 +16,7 @@ import type { Rect } from '@workbench/canvas-engine/types';
 
 import { getDocumentLayer, isNodeAbsent } from '@workbench/canvas-engine/document/documentIndex';
 import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
+import { isLayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 
 import type {
   CanvasMutationContext,
@@ -33,6 +35,17 @@ export interface LayerPixels {
 export const rgbaBytes = (rect: Rect): number => Math.max(0, rect.width) * Math.max(0, rect.height) * 4;
 
 // ---- Publication outcomes ----------------------------------------------------------------------------------
+
+/**
+ * Whether a layer operation can read a layer's cache now: `not-ready` while its pixels load or cannot be fetched for
+ * now (waiting helps), {@link LayerUnreadable} once rasterizing its current source failed (waiting does not; the
+ * operation refuses and names the layer).
+ */
+export type LayerCacheReadiness = 'ready' | 'not-ready' | LayerUnreadable;
+
+/** Layers read together: the first that cannot be read refuses the set even while others still load. */
+export const readinessOfAll = (readiness: readonly LayerCacheReadiness[]): LayerCacheReadiness =>
+  readiness.find(isLayerUnreadable) ?? (readiness.includes('not-ready') ? 'not-ready' : 'ready');
 
 /** A refused admission as callers report it; a gesture in progress reads as contention. */
 export type LayerEditRefusal = SubsetOf<CanvasTransactionOutcome, 'busy' | 'not-ready' | 'over-budget'>;
@@ -116,6 +129,43 @@ export const replayWithPixels = (
 
 // ---- Steps ---------------------------------------------------------------------------------------------------
 
+/** Options shared by the in-place replace steps. */
+export interface ReplaceLayerStepOptions {
+  readonly persist?: boolean;
+  /** Runs just before each layer's pixels install, once the document accepted the contracts. */
+  readonly beforeInstall?: (layerId: string) => void;
+  readonly notify?: () => void;
+}
+
+/** Whether `document` holds exactly these contracts, by identity. */
+const holdsContracts =
+  (contracts: readonly CanvasLayerContract[]) =>
+  (document: CanvasDocumentContractV3 | null): boolean =>
+    contracts.every((contract) => getDocumentLayer(document, contract.id) === contract);
+
+/** Installs each replacement's prepared pixels in order, after its `beforeInstall`; nothing to do yields undefined. */
+const installReplacements = (
+  ctx: Pick<CanvasMutationContext, 'installPrepared'>,
+  replacements: readonly LayerReplacement[],
+  options: ReplaceLayerStepOptions
+): (() => void) | undefined =>
+  options.beforeInstall || replacements.some(({ prepared }) => prepared)
+    ? () => {
+        for (const { contract, prepared } of replacements) {
+          options.beforeInstall?.(contract.id);
+          if (prepared) {
+            ctx.installPrepared(prepared, options.persist);
+          }
+        }
+      }
+    : undefined;
+
+/** A layer's replacement contract and the pixels that land with it. */
+export interface LayerReplacement {
+  readonly contract: CanvasLayerContract;
+  readonly prepared: PreparedLayerCacheReplacement | null;
+}
+
 /**
  * Swaps `contract` in for its layer and, once the document accepted it, installs the prepared pixels. A step with a
  * `restore` contract rolls back to it when its postconditions fail.
@@ -124,33 +174,48 @@ export const replaceLayerStep = (
   ctx: Pick<CanvasMutationContext, 'installPrepared'>,
   contract: CanvasLayerContract,
   prepared: PreparedLayerCacheReplacement | null,
-  options: {
-    readonly restore: CanvasLayerContract | undefined;
-    readonly persist?: boolean;
-    /** Runs just before the pixels install, once the document accepted the contract. */
-    readonly beforeInstall?: () => void;
-    readonly notify?: () => void;
-  }
+  options: ReplaceLayerStepOptions & { readonly restore: CanvasLayerContract | undefined }
 ): EditStep => ({
-  accepted: (document) => getDocumentLayer(document, contract.id) === contract,
-  install:
-    prepared || options.beforeInstall
-      ? () => {
-          options.beforeInstall?.();
-          if (prepared) {
-            ctx.installPrepared(prepared, options.persist);
-          }
-        }
-      : undefined,
+  accepted: holdsContracts([contract]),
+  install: installReplacements(ctx, [{ contract, prepared }], options),
   mutation: { layer: contract, layerId: contract.id, type: 'replaceCanvasLayer' },
   notify: options.notify,
   rollback: options.restore
     ? {
         mutation: { layer: options.restore, layerId: contract.id, type: 'replaceCanvasLayer' },
-        restored: (document) => getDocumentLayer(document, contract.id) === options.restore,
+        restored: holdsContracts([options.restore]),
       }
     : undefined,
 });
+
+/**
+ * {@link replaceLayerStep} for several same-type leaves at once, as one `replaceCanvasLayers`. It rolls back to
+ * `restore` (one contract per replaced layer) when its postconditions fail; without a complete restore set it has no
+ * rollback.
+ */
+export const replaceLayersStep = (
+  ctx: Pick<CanvasMutationContext, 'installPrepared'>,
+  replacements: readonly LayerReplacement[],
+  options: ReplaceLayerStepOptions & { readonly restore: readonly CanvasLayerContract[] | undefined }
+): EditStep => {
+  const contracts = replacements.map(({ contract }) => contract);
+  const restore = options.restore?.length === contracts.length ? options.restore : undefined;
+  return {
+    accepted: holdsContracts(contracts),
+    install: installReplacements(ctx, replacements, options),
+    mutation: { replacements: contracts.map((layer) => ({ layer, layerId: layer.id })), type: 'replaceCanvasLayers' },
+    notify: options.notify,
+    rollback: restore
+      ? {
+          mutation: {
+            replacements: restore.map((layer) => ({ layer, layerId: layer.id })),
+            type: 'replaceCanvasLayers',
+          },
+          restored: holdsContracts(restore),
+        }
+      : undefined,
+  };
+};
 
 const removeLayerMutation = (layerId: string, selectedLayerId: string | null) =>
   ({ enabledUpdates: [], removeIds: [layerId], selectedLayerId, type: 'applyCanvasLayerStackMutation' }) as const;

@@ -1431,6 +1431,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_LTX2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_MossImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -1477,6 +1480,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_MossImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -1786,6 +1792,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
@@ -1934,6 +1943,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_LTX2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_MossImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -1980,6 +1992,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_MossImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -2289,6 +2304,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
@@ -2437,6 +2455,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_LTX2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_MossImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -2483,6 +2504,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_MossImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -2792,6 +2816,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
@@ -2985,6 +3012,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_LTX2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_MossImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -3031,6 +3061,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_MossImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -3340,6 +3373,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
@@ -3560,6 +3596,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_LTX2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_MossImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -3606,6 +3645,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_MossImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -3915,6 +3957,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
@@ -5010,6 +5055,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_LTX2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_MossImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -5056,6 +5104,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_MossImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -5365,6 +5416,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
                     },
                     {
                       "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
@@ -5697,6 +5751,351 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/v2/models/i/{key}/working_memory/calibrate": {
+      "post": {
+        "tags": ["model_manager"],
+        "summary": "Calibrate Model Working Memory",
+        "description": "Start a working-memory calibration run: enqueue the batch with every node uncached and measure each node's\nmodel operations on the generation device. Needs exactly one generation device, and it must be a GPU. The queue\ntakes all of the batch's items or none.\n\nOnce the items are queued, a request without an `idempotency_key` succeeds even when the store fails for a passing\nreason (an unwritable root, a lock timeout) to record them: they run all the same, and the status finds them by\ntheir origin. With a key, that failure is a 503 although the items are queued. A run removed meanwhile (404) or an\nunusable store file (409) fails the request with or without a key; its queued items then fail when they start.\n\nWith a key, repeating the request (also after a lost response) records the queued items and returns the run; it\nenqueues nothing new. The items come from the queue's enqueue receipt for the key while it exists, otherwise from\nthe queue items that carry the run's origin and those the runner saw. Once a reset removed the run, a repeat is\nrefused (404). Acknowledge the key through the queue's enqueue_batch/acknowledge route once the response\narrived.",
+        "operationId": "calibrate_model_working_memory",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Key of the model the run calibrates",
+              "title": "Key"
+            },
+            "description": "Key of the model the run calibrates"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkingMemoryCalibrationRequest",
+                "description": "The batch to measure"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingMemoryCalibrationRunCreated"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The model could not be found; the run was removed while it was being created, whose items are queued then and fail when they start; or a reset removed the run the idempotency key started"
+          },
+          "409": {
+            "description": "This machine cannot calibrate now (no GPU, or several generation devices), the device class's store file is unusable and kept as it is (possibly after the items were queued, which then fail when they start), the queue has no room for all of the run's items (it then takes none), or the idempotency key was used for another request"
+          },
+          "422": {
+            "description": "The graph cannot be measured as a calibration run"
+          },
+          "429": {
+            "description": "Too many unacknowledged idempotency keys; acknowledge or wait, then retry"
+          },
+          "503": {
+            "description": "The calibration store cannot be read or written (unwritable root, lock timeout); with an idempotency key, possibly after the items were queued"
+          }
+        }
+      }
+    },
+    "/api/v2/models/working_memory/status": {
+      "get": {
+        "tags": ["model_manager"],
+        "summary": "Get Working Memory Calibration Status",
+        "description": "Every device class's calibration runs, with their derived status, point counts and environments.",
+        "operationId": "get_working_memory_calibration_status",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingMemoryCalibrationStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The calibration store cannot be read or written (unwritable root, lock timeout)"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v2/models/working_memory/runs/{run_id}": {
+      "delete": {
+        "tags": ["model_manager"],
+        "summary": "Delete Working Memory Calibration Run",
+        "description": "Remove a calibration run and its measurements. Its queue items that have not run yet fail when they start.",
+        "operationId": "delete_working_memory_calibration_run",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The calibration run to remove",
+              "title": "Run Id"
+            },
+            "description": "The calibration run to remove"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingMemoryCalibrationResetResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No usable store file holds the run"
+          },
+          "409": {
+            "description": "The run's store file became unusable after the run was found; it is kept as it is"
+          },
+          "503": {
+            "description": "The calibration store cannot be read or written (unwritable root, lock timeout)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/models/i/{key}/working_memory": {
+      "delete": {
+        "tags": ["model_manager"],
+        "summary": "Reset Model Working Memory Calibration",
+        "description": "Remove a model's calibration runs with all their measurements, and every measurement of the model taken in\nother runs (a VAE measured inside a transformer's run, say), from one device class.",
+        "operationId": "reset_model_working_memory_calibration",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Key of the model whose runs and measurements to remove",
+              "title": "Key"
+            },
+            "description": "Key of the model whose runs and measurements to remove"
+          },
+          {
+            "name": "device_class_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{16}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The device class to act on; the current generation device's by default",
+              "title": "Device Class Id"
+            },
+            "description": "The device class to act on; the current generation device's by default"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingMemoryCalibrationResetResult"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No device_class_id was given and there is no current one (no GPU, or several generation devices), or the device class's store file is unusable and kept as it is"
+          },
+          "503": {
+            "description": "The calibration store cannot be read or written (unwritable root, lock timeout)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/models/working_memory": {
+      "delete": {
+        "tags": ["model_manager"],
+        "summary": "Reset Working Memory Calibration",
+        "description": "Remove every calibration run and measurement of one device class.",
+        "operationId": "reset_working_memory_calibration",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_class_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{16}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The device class to act on; the current generation device's by default",
+              "title": "Device Class Id"
+            },
+            "description": "The device class to act on; the current generation device's by default"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingMemoryCalibrationResetResult"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No device_class_id was given and there is no current one (no GPU, or several generation devices), or the device class's store file is unusable and kept as it is"
+          },
+          "503": {
+            "description": "The calibration store cannot be read or written (unwritable root, lock timeout)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/models/working_memory/export": {
+      "get": {
+        "tags": ["model_manager"],
+        "summary": "Export Working Memory Calibration",
+        "description": "The device class's calibration store file as it is on disk, readable by this version or not.",
+        "operationId": "export_working_memory_calibration",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_class_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{16}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The device class to act on; the current generation device's by default",
+              "title": "Device Class Id"
+            },
+            "description": "The device class to act on; the current generation device's by default"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The device class's store file byte for byte: a CalibrationStoreFile (schema_version 1) when this version can read it, otherwise whatever the file holds",
+            "content": {
+              "application/json": {}
+            }
+          },
+          "404": {
+            "description": "The device class has no store file"
+          },
+          "409": {
+            "description": "No device_class_id was given and there is no current one"
+          },
+          "503": {
+            "description": "The calibration store cannot be read or written (unwritable root, lock timeout)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/image_moves/start": {
@@ -12596,6 +12995,9 @@
             },
             "description": "Created"
           },
+          "400": {
+            "description": "The batch's origin starts with 'invokeai:wm-calibration:' (in any case), which is reserved for working-memory calibration runs"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -18601,6 +19003,29 @@
             "orig_required": false,
             "title": "Control Lllite"
           },
+          "ip_adapter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnimaIPAdapterField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AnimaIPAdapterField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Anima IP-Adapter reference images. Images that share an adapter model are attended together.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "IP-Adapter"
+          },
           "scheduler": {
             "default": "euler",
             "description": "Scheduler (sampler) for the denoising process.",
@@ -18632,7 +19057,7 @@
         "tags": ["image", "anima"],
         "title": "Denoise - Anima",
         "type": "object",
-        "version": "1.8.0",
+        "version": "1.9.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -18904,6 +19329,29 @@
             "orig_required": false,
             "title": "Control Lllite"
           },
+          "ip_adapter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnimaIPAdapterField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AnimaIPAdapterField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Anima IP-Adapter reference images. Images that share an adapter model are attended together.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "IP-Adapter"
+          },
           "scheduler": {
             "default": "euler",
             "description": "Scheduler (sampler) for the denoising process.",
@@ -18969,10 +19417,195 @@
         "tags": ["anima", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - Anima + Metadata",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
+      },
+      "AnimaIPAdapterField": {
+        "description": "A reference image encoded for an Anima IP-Adapter.",
+        "properties": {
+          "tokens_name": {
+            "description": "The name of the SigLIP2 image tokens tensor (strength not applied)",
+            "title": "Tokens Name",
+            "type": "string"
+          },
+          "image_name": {
+            "description": "The name of the reference image the tokens encode",
+            "title": "Image Name",
+            "type": "string"
+          },
+          "ip_adapter_model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "The Anima IP-Adapter model"
+          },
+          "strength": {
+            "default": 1.0,
+            "description": "Scales the image tokens; 0 turns it off",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Strength",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the IP-Adapter is first applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the IP-Adapter is last applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "End Step Percent",
+            "type": "number"
+          }
+        },
+        "required": ["tokens_name", "image_name", "ip_adapter_model"],
+        "title": "AnimaIPAdapterField",
+        "type": "object"
+      },
+      "AnimaIPAdapterInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Encodes a reference image with SigLIP2 for an Anima IP-Adapter, which carries its appearance into the image.\n\nThe SigLIP2 encoder (google/siglip2-base-patch16-512) is installed on first use.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The reference image.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "ip_adapter_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "IP-Adapter to apply",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "IP-Adapter Model",
+            "ui_model_base": ["anima"],
+            "ui_model_type": ["ip_adapter"]
+          },
+          "strength": {
+            "default": 1.0,
+            "description": "Scales the image tokens before the adapter projects them. 0 turns the adapter off.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Strength",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the IP-Adapter is first applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the IP-Adapter is last applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "End Step Percent",
+            "type": "number"
+          },
+          "type": {
+            "const": "anima_ip_adapter",
+            "default": "anima_ip_adapter",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["ip_adapter", "anima", "reference", "image"],
+        "title": "IP-Adapter - Anima",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/AnimaIPAdapterOutput"
+        }
+      },
+      "AnimaIPAdapterOutput": {
+        "class": "output",
+        "properties": {
+          "ip_adapter": {
+            "$ref": "#/components/schemas/AnimaIPAdapterField",
+            "description": "IP-Adapter to apply",
+            "field_kind": "output",
+            "title": "IP-Adapter",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "anima_ip_adapter_output",
+            "default": "anima_ip_adapter_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "ip_adapter", "type", "type"],
+        "title": "AnimaIPAdapterOutput",
+        "type": "object"
       },
       "AnimaImageToLatentsInvocation": {
         "category": "image",
@@ -20008,6 +20641,9 @@
             "$ref": "#/components/schemas/Main_Diffusers_LTX2_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_Diffusers_MossImage_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
           },
           {
@@ -20054,6 +20690,9 @@
           },
           {
             "$ref": "#/components/schemas/Main_Checkpoint_LTX2_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_Checkpoint_MossImage_Config"
           },
           {
             "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -20363,6 +21002,9 @@
           },
           {
             "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+          },
+          {
+            "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
           },
           {
             "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
@@ -20796,6 +21438,18 @@
             "title": "Reference Images Require Variant",
             "description": "If set, reference images are only accepted for models of this variant."
           },
+          "reference_images_require_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Images Require Format",
+            "description": "If set, reference images are only accepted for models of this format."
+          },
           "supports_regional_guidance": {
             "type": "boolean",
             "title": "Supports Regional Guidance",
@@ -21148,6 +21802,7 @@
           "wan",
           "minimax-h3",
           "ltx-2",
+          "moss-image",
           "unknown"
         ],
         "title": "BaseModelType",
@@ -24686,6 +25341,48 @@
         "required": ["output_meta", "tiles", "type", "type"],
         "title": "CalculateImageTilesOutput",
         "type": "object"
+      },
+      "CalibrationDeviceClass": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "A short stable hash of the other fields"
+          },
+          "vendor": {
+            "type": "string",
+            "title": "Vendor"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "total_mib": {
+            "type": "integer",
+            "title": "Total Mib"
+          },
+          "backend": {
+            "type": "string",
+            "enum": ["cuda", "hip", "mps", "xpu"],
+            "title": "Backend"
+          },
+          "arch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arch"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["id", "vendor", "name", "total_mib", "backend", "arch"],
+        "title": "CalibrationDeviceClass",
+        "description": "A `fingerprint.DeviceClass` with its id as a plain field, as it is stored and returned."
       },
       "CallSavedWorkflowInvocation": {
         "category": "workflow",
@@ -29962,6 +30659,10 @@
                   "qwen_image_2_1_img2img",
                   "qwen_image_2_1_inpaint",
                   "qwen_image_2_1_outpaint",
+                  "moss_image_txt2img",
+                  "moss_image_img2img",
+                  "moss_image_inpaint",
+                  "moss_image_outpaint",
                   "wan_txt2img",
                   "wan_img2img",
                   "wan_inpaint",
@@ -30414,6 +31115,23 @@
             "orig_default": null,
             "orig_required": false,
             "title": "Ideogram4 Caption"
+          },
+          "moss_image_layout_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The JSON layout prompt encoded for MOSS-Image inference",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Moss Image Layout Prompt"
           },
           "num_frames": {
             "anyOf": [
@@ -30929,7 +31647,7 @@
         "tags": ["metadata"],
         "title": "Core Metadata",
         "type": "object",
-        "version": "2.7.0",
+        "version": "2.8.0",
         "output": {
           "$ref": "#/components/schemas/MetadataOutput"
         }
@@ -44204,6 +44922,9 @@
                   "$ref": "#/components/schemas/AnimaDenoiseMetaInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/AnimaIPAdapterInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
                 },
                 {
@@ -44927,6 +45648,18 @@
                   "$ref": "#/components/schemas/ModelIdentifierInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/MossImageDenoiseInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/MossImageLayoutPromptInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/MossImageModelLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/MossImageTextEncoderInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/MultiplyInvocation"
                 },
                 {
@@ -45314,6 +46047,9 @@
                   "$ref": "#/components/schemas/AnimaConditioningOutput"
                 },
                 {
+                  "$ref": "#/components/schemas/AnimaIPAdapterOutput"
+                },
+                {
                   "$ref": "#/components/schemas/AnimaLLLiteOutput"
                 },
                 {
@@ -45624,6 +46360,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/ModelLoaderOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/MossImageConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/MossImageModelLoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/NoiseOutput"
@@ -46804,6 +47546,128 @@
         "required": ["model_name"],
         "title": "IPAdapterRecallParameter",
         "description": "IP Adapter configuration for recall"
+      },
+      "IPAdapter_Checkpoint_Anima_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "ip_adapter",
+            "title": "Type",
+            "default": "ip_adapter"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "anima",
+            "title": "Base",
+            "default": "anima"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "format",
+          "base"
+        ],
+        "title": "IPAdapter_Checkpoint_Anima_Config"
       },
       "IPAdapter_Checkpoint_FLUX_Config": {
         "properties": {
@@ -54483,6 +55347,9 @@
                 "$ref": "#/components/schemas/AnimaDenoiseMetaInvocation"
               },
               {
+                "$ref": "#/components/schemas/AnimaIPAdapterInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
               },
               {
@@ -55204,6 +56071,18 @@
               },
               {
                 "$ref": "#/components/schemas/ModelIdentifierInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MossImageDenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MossImageLayoutPromptInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MossImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MossImageTextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/MultiplyInvocation"
@@ -55589,6 +56468,9 @@
                 "$ref": "#/components/schemas/AnimaConditioningOutput"
               },
               {
+                "$ref": "#/components/schemas/AnimaIPAdapterOutput"
+              },
+              {
                 "$ref": "#/components/schemas/AnimaLLLiteOutput"
               },
               {
@@ -55901,6 +56783,12 @@
                 "$ref": "#/components/schemas/ModelLoaderOutput"
               },
               {
+                "$ref": "#/components/schemas/MossImageConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/MossImageModelLoaderOutput"
+              },
+              {
                 "$ref": "#/components/schemas/NoiseOutput"
               },
               {
@@ -56117,6 +57005,9 @@
               },
               {
                 "$ref": "#/components/schemas/AnimaDenoiseMetaInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/AnimaIPAdapterInvocation"
               },
               {
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
@@ -56840,6 +57731,18 @@
               },
               {
                 "$ref": "#/components/schemas/ModelIdentifierInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MossImageDenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MossImageLayoutPromptInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MossImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MossImageTextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/MultiplyInvocation"
@@ -57275,6 +58178,9 @@
           },
           "anima_i2l": {
             "$ref": "#/components/schemas/LatentsOutput"
+          },
+          "anima_ip_adapter": {
+            "$ref": "#/components/schemas/AnimaIPAdapterOutput"
           },
           "anima_l2i": {
             "$ref": "#/components/schemas/ImageOutput"
@@ -57999,6 +58905,18 @@
           "model_identifier": {
             "$ref": "#/components/schemas/ModelIdentifierOutput"
           },
+          "moss_image_denoise": {
+            "$ref": "#/components/schemas/LatentsOutput"
+          },
+          "moss_image_layout_prompt": {
+            "$ref": "#/components/schemas/StringOutput"
+          },
+          "moss_image_model_loader": {
+            "$ref": "#/components/schemas/MossImageModelLoaderOutput"
+          },
+          "moss_image_text_encoder": {
+            "$ref": "#/components/schemas/MossImageConditioningOutput"
+          },
           "mul": {
             "$ref": "#/components/schemas/IntegerOutput"
           },
@@ -58036,7 +58954,7 @@
             "$ref": "#/components/schemas/PromptTemplateOutput"
           },
           "qwen_image_2_1_denoise": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "qwen_image_2_1_i2l": {
             "$ref": "#/components/schemas/LatentsOutput"
@@ -58334,6 +59252,7 @@
           "anima_denoise",
           "anima_denoise_meta",
           "anima_i2l",
+          "anima_ip_adapter",
           "anima_l2i",
           "anima_lllite",
           "anima_lora_collection_loader",
@@ -58575,6 +59494,10 @@
           "minimax_h3_video_reference",
           "mlsd_detection",
           "model_identifier",
+          "moss_image_denoise",
+          "moss_image_layout_prompt",
+          "moss_image_model_loader",
+          "moss_image_text_encoder",
           "mul",
           "noise",
           "normal_map",
@@ -58763,6 +59686,9 @@
               },
               {
                 "$ref": "#/components/schemas/AnimaDenoiseMetaInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/AnimaIPAdapterInvocation"
               },
               {
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
@@ -59486,6 +60412,18 @@
               },
               {
                 "$ref": "#/components/schemas/ModelIdentifierInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MossImageDenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MossImageLayoutPromptInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MossImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MossImageTextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/MultiplyInvocation"
@@ -60025,6 +60963,9 @@
                 "$ref": "#/components/schemas/AnimaDenoiseMetaInvocation"
               },
               {
+                "$ref": "#/components/schemas/AnimaIPAdapterInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/AnimaImageToLatentsInvocation"
               },
               {
@@ -60746,6 +61687,18 @@
               },
               {
                 "$ref": "#/components/schemas/ModelIdentifierInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MossImageDenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MossImageLayoutPromptInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MossImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MossImageTextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/MultiplyInvocation"
@@ -63676,6 +64629,39 @@
             "orig_required": false,
             "title": "Style Reference Prompt"
           },
+          "reference_latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LatentsField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Edit references for Krea-2 edit LoRAs, encoded by 'Image to Latents - Qwen Image' with 'reference' enabled. Up to 3. They join every transformer pass as clean (t=0) image tokens, about 4096 tokens per megapixel each; with Reference K/V Cache on they run once instead of in every pass. Not combinable with style reference or regional prompts.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Reference Latents"
+          },
+          "reference_kv_cache": {
+            "default": false,
+            "description": "For edit LoRAs trained with ai-toolkit's 'kv_cache' option, where reference tokens attend only to each other. The references then run through the transformer once per generation instead of in every pass, which is faster. Leave off for normal edit LoRAs. The LoRA file does not say which kind it is; check its model card. No effect without reference latents.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Reference K/V Cache",
+            "type": "boolean"
+          },
           "type": {
             "const": "krea2_denoise",
             "default": "krea2_denoise",
@@ -63688,7 +64674,7 @@
         "tags": ["image", "krea2", "krea-2"],
         "title": "Denoise - Krea-2",
         "type": "object",
-        "version": "1.3.1",
+        "version": "1.4.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -64565,7 +65551,7 @@
         "category": "conditioning",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Encodes a text prompt for Krea-2 using the Qwen3-VL text encoder.\n\nThe encoder taps 12 decoder hidden-state layers and stacks them per token, producing a 4D\nconditioning tensor (B, seq, 12, hidden) that the Krea-2 transformer's text-fusion stage consumes.",
+        "description": "Encodes a text prompt for Krea-2 using the Qwen3-VL text encoder.\n\nThe encoder taps 12 decoder hidden-state layers and stacks them per token, producing a 4D\nconditioning tensor (B, seq, 12, hidden) that the Krea-2 transformer's text-fusion stage consumes.\n\nWith reference images (edit mode, for edit LoRAs) the Qwen3-VL vision tower reads them into the prompt,\nahead of the text, and the conditioning has the prompt's natural length rather than 512 tokens.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -64641,6 +65627,20 @@
             "orig_required": true,
             "title": "Qwen3-VL Encoder"
           },
+          "reference_images": {
+            "default": [],
+            "description": "Up to three reference images for an edit LoRA, read by the Qwen3-VL vision tower in this order (Picture 1, 2, 3). Needs a safetensors or Diffusers encoder: a GGUF encoder has no vision tower.",
+            "field_kind": "input",
+            "input": "any",
+            "items": {
+              "$ref": "#/components/schemas/ImageField"
+            },
+            "maxItems": 3,
+            "orig_default": [],
+            "orig_required": false,
+            "title": "Reference Images",
+            "type": "array"
+          },
           "type": {
             "const": "krea2_text_encoder",
             "default": "krea2_text_encoder",
@@ -64653,7 +65653,7 @@
         "tags": ["prompt", "conditioning", "krea2", "krea-2"],
         "title": "Prompt - Krea-2",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/Krea2ConditioningOutput"
         }
@@ -74203,6 +75203,171 @@
         "title": "Main_Checkpoint_MiniMaxH3_Config",
         "description": "Model config for MiniMax H3 single-file transformer checkpoints (safetensors).\n\nCovers MiniMax's single-file FL2VA transformer repacks (Comfy-Org and mirrors): bf16 or\nComfy ``int8_tensorwise``(+convrot) quantized, full or AdaLN-pruned (\"adaln curves\"). The\nfile holds ONLY the transformer - the text encoder, VAEs, tokenizer and processor must come\nfrom an installed H3 diffusers-layout folder.\n\nThe FL2VA and Ref2VA task transformers are key-for-key (and, except the non-pruned\nint8_convrot repacks, byte-size) indistinguishable, so the FILENAME is the variant\nclassifier and ``variant`` is the user-correctable override for renamed files (e.g.\nre-uploads). A misclassified variant loads and runs but produces degraded output - FL2VA\nexpects no reference conditioning rows, Ref2VA expects them - which is why the override\nexists rather than any attempt at content sniffing."
       },
+      "Main_Checkpoint_MossImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "moss-image",
+            "title": "Base",
+            "default": "moss-image"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format"
+        ],
+        "title": "Main_Checkpoint_MossImage_Config",
+        "description": "Model config for MOSS-Image single-file transformers (safetensors), such as the ComfyUI export.\n\nThe file holds the transformer alone; the Qwen3.5-9B encoder and the FLUX.2 VAE are separate models, selected on\nthe loader node. Only dense (bf16/fp16/fp32) files load. A quantized one is refused at install with\n`InvalidMatchError`: the loader has no quantization path, and `NotAMatchError` would let it register as an unknown\nmodel instead."
+      },
       "Main_Checkpoint_QwenImage21_Config": {
         "properties": {
           "key": {
@@ -76885,6 +78050,163 @@
         ],
         "title": "Main_Diffusers_MiniMaxH3_Config",
         "description": "Model config for MiniMax H3 (Hailuo 3.0) diffusers-format models."
+      },
+      "Main_Diffusers_MossImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "base": {
+            "type": "string",
+            "const": "moss-image",
+            "title": "Base",
+            "default": "moss-image"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "repo_variant",
+          "base"
+        ],
+        "title": "Main_Diffusers_MossImage_Config",
+        "description": "Model config for MOSS-Image diffusers pipelines (MOSS-Image Base and SFT).\n\nThe folder bundles the transformer, the Qwen3.5-9B text encoder with its tokenizer, and a FLUX.2 VAE. Base and SFT\ndiffer only in their transformer weights, so there is no variant."
       },
       "Main_Diffusers_QwenImage21_Config": {
         "properties": {
@@ -87601,6 +88923,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_LTX2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_MossImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
               },
               {
@@ -87647,6 +88972,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_LTX2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Checkpoint_MossImage_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -87956,6 +89284,9 @@
               },
               {
                 "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
               },
               {
                 "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
@@ -88350,6 +89681,9 @@
                     "$ref": "#/components/schemas/Main_Diffusers_LTX2_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Diffusers_MossImage_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                   },
                   {
@@ -88396,6 +89730,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/Main_Checkpoint_LTX2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_MossImage_Config"
                   },
                   {
                     "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -88705,6 +90042,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
                   },
                   {
                     "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
@@ -89029,6 +90369,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_LTX2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_MossImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
               },
               {
@@ -89075,6 +90418,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_LTX2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Checkpoint_MossImage_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -89384,6 +90730,9 @@
               },
               {
                 "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
               },
               {
                 "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
@@ -89519,6 +90868,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_LTX2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_MossImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
               },
               {
@@ -89565,6 +90917,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_LTX2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Checkpoint_MossImage_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -89874,6 +91229,9 @@
               },
               {
                 "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
               },
               {
                 "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
@@ -90502,6 +91860,9 @@
                   "$ref": "#/components/schemas/Main_Diffusers_LTX2_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/Main_Diffusers_MossImage_Config"
+                },
+                {
                   "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                 },
                 {
@@ -90548,6 +91909,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_Checkpoint_LTX2_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_Checkpoint_MossImage_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -90859,6 +92223,9 @@
                   "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/IPAdapter_Checkpoint_Anima_Config"
+                },
+                {
                   "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
                 },
                 {
@@ -90913,6 +92280,628 @@
         "required": ["models"],
         "title": "ModelsList",
         "description": "Return list of configs."
+      },
+      "MossImageConditioningField": {
+        "description": "A MOSS-Image conditioning tensor primitive value.",
+        "properties": {
+          "conditioning_name": {
+            "description": "The name of conditioning tensor",
+            "title": "Conditioning Name",
+            "type": "string"
+          }
+        },
+        "required": ["conditioning_name"],
+        "title": "MossImageConditioningField",
+        "type": "object"
+      },
+      "MossImageConditioningOutput": {
+        "class": "output",
+        "description": "Base class for nodes that output a MOSS-Image conditioning tensor.",
+        "properties": {
+          "conditioning": {
+            "$ref": "#/components/schemas/MossImageConditioningField",
+            "description": "Conditioning tensor",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "moss_image_conditioning_output",
+            "default": "moss_image_conditioning_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "conditioning", "type", "type"],
+        "title": "MossImageConditioningOutput",
+        "type": "object"
+      },
+      "MossImageDenoiseInvocation": {
+        "category": "image",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Run the MOSS-Image denoising loop.\n\nTakes and returns latents in the FLUX.2 VAE's raw layout, so the FLUX.2 VAE encode and decode nodes work on either\nside. The schedule is the model's own shifted Euler schedule; with CFG the negative branch skips the transformer\nblocks in `uncond_skip_layers`, as the reference pipeline does.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Starting latents for img2img or inpainting: a FLUX.2 VAE encode of the source image.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "denoise_mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DenoiseMaskField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "denoising_start": {
+            "default": 0.0,
+            "description": "When to start denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Denoising Start",
+            "type": "number"
+          },
+          "denoising_end": {
+            "default": 1.0,
+            "description": "When to stop denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Denoising End",
+            "type": "number"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "positive_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MossImageConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Positive conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "negative_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MossImageConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Negative conditioning tensor. Required when cfg_scale > 1; an empty prompt is the reference default.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "cfg_scale": {
+            "default": 3.0,
+            "description": "Classifier-Free Guidance scale",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 1.0,
+            "orig_default": 3.0,
+            "orig_required": false,
+            "title": "CFG Scale",
+            "type": "number"
+          },
+          "width": {
+            "default": 1024,
+            "description": "Width of the generated image.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 1024,
+            "description": "Height of the generated image.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "steps": {
+            "default": 50,
+            "description": "Number of steps to run",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 50,
+            "orig_required": false,
+            "title": "Steps",
+            "type": "integer"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Randomness seed for reproducibility.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The FLUX.2 VAE whose BatchNorm statistics define the latent space the transformer denoises in.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "uncond_skip_layers": {
+            "default": [22],
+            "description": "Zero-based transformer blocks the negative (unconditional) branch skips. Empty skips none. Used only when cfg_scale > 1.",
+            "field_kind": "input",
+            "input": "any",
+            "items": {
+              "type": "integer"
+            },
+            "orig_default": [22],
+            "orig_required": false,
+            "title": "Uncond Skip Layers",
+            "type": "array"
+          },
+          "type": {
+            "const": "moss_image_denoise",
+            "default": "moss_image_denoise",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "moss_image", "moss-image"],
+        "title": "Denoise - MOSS-Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/LatentsOutput"
+        }
+      },
+      "MossImageLayoutPromptInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Places regions on a MOSS-Image prompt as a JSON layout, at generation time.\n\nThe layout is built here rather than by the graph builder so the prompt that dynamic prompts and batching vary is\nthe one laid out. Without regions the prompt passes through unchanged; a prompt that already is a layout gets the\nregions appended to its items.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "default": "",
+            "description": "The image prompt: plain text becomes the layout's summary caption, a compiled layout gets the regions appended.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Prompt",
+            "type": "string",
+            "ui_component": "textarea"
+          },
+          "regions": {
+            "default": [],
+            "description": "Layout elements, in pixels of the width x height image, assembled from Canvas Regional Guidance layers.",
+            "field_kind": "input",
+            "input": "any",
+            "items": {
+              "$ref": "#/components/schemas/MossImageLayoutRegion"
+            },
+            "orig_default": [],
+            "orig_required": false,
+            "title": "Regions",
+            "type": "array"
+          },
+          "width": {
+            "default": 1024,
+            "description": "Width of the generated image.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 1024,
+            "description": "Height of the generated image.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "type": {
+            "const": "moss_image_layout_prompt",
+            "default": "moss_image_layout_prompt",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "layout", "moss_image", "moss-image"],
+        "title": "Layout Prompt - MOSS-Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/StringOutput"
+        }
+      },
+      "MossImageLayoutRegion": {
+        "description": "One MOSS-Image layout element: what a canvas region depicts, and where.",
+        "properties": {
+          "kind": {
+            "description": "What the region depicts. Becomes the layout item's `label`.",
+            "enum": ["object", "character", "text"],
+            "title": "Kind",
+            "type": "string"
+          },
+          "caption": {
+            "description": "The region's visible appearance. Must not be blank.",
+            "title": "Caption",
+            "type": "string"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The exact visible characters of a `text` region (required and non-blank there). Must be null for other kinds.",
+            "title": "Text"
+          },
+          "bbox": {
+            "description": "Pixel box [x1, y1, x2, y2] from the image's top-left, with x1 < x2 and y1 < y2. Checked against the image size when the prompt is built.",
+            "items": {
+              "minimum": 0,
+              "type": "number"
+            },
+            "maxItems": 4,
+            "minItems": 4,
+            "title": "Bbox",
+            "type": "array"
+          }
+        },
+        "required": ["kind", "caption", "bbox"],
+        "title": "MossImageLayoutRegion",
+        "type": "object"
+      },
+      "MossImageModelLoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Loads a MOSS-Image model, outputting its submodels.\n\nThe transformer always comes from the main model. The Qwen3.5-9B encoder and the FLUX.2 VAE come from the\nstandalone models where selected, and from the MOSS-Image diffusers pipeline otherwise; a single-file transformer\nhas neither, so it needs both.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "MOSS-Image model (Transformer) to load",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Transformer",
+            "ui_model_base": ["moss-image"],
+            "ui_model_type": ["main"]
+          },
+          "vae_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone VAE model. MOSS-Image uses the FLUX.2 VAE (32-channel). If not provided, the VAE is loaded from the MOSS-Image (diffusers) model.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "VAE",
+            "ui_model_base": ["flux2"],
+            "ui_model_type": ["vae"]
+          },
+          "qwen3_5_encoder_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Qwen3.5 9B encoder model. If not provided, the encoder is loaded from the MOSS-Image (diffusers) model.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Qwen3.5 Encoder",
+            "ui_model_type": ["qwen3_5_encoder"]
+          },
+          "type": {
+            "const": "moss_image_model_loader",
+            "default": "moss_image_model_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["model", "type", "id"],
+        "tags": ["model", "moss_image", "moss-image"],
+        "title": "Main Model - MOSS-Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/MossImageModelLoaderOutput"
+        }
+      },
+      "MossImageModelLoaderOutput": {
+        "class": "output",
+        "description": "MOSS-Image model loader output.",
+        "properties": {
+          "transformer": {
+            "$ref": "#/components/schemas/TransformerField",
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "qwen3_5_encoder": {
+            "$ref": "#/components/schemas/Qwen35EncoderField",
+            "description": "Qwen3.5 tokenizer and text encoder",
+            "field_kind": "output",
+            "title": "Qwen3.5 Encoder",
+            "ui_hidden": false
+          },
+          "vae": {
+            "$ref": "#/components/schemas/VAEField",
+            "description": "VAE",
+            "field_kind": "output",
+            "title": "VAE",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "moss_image_model_loader_output",
+            "default": "moss_image_model_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "qwen3_5_encoder", "vae", "type", "type"],
+        "title": "MossImageModelLoaderOutput",
+        "type": "object"
+      },
+      "MossImageTextEncoderInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Encodes a prompt for MOSS-Image with its Qwen3.5-9B text encoder.\n\nThe prompt is the user turn of a chat, read after the encoder's final norm, as the reference pipeline encodes it.\nNatural language, tag sequences and MOSS layout JSON all go in as they are.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Text prompt to encode.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt",
+            "ui_component": "textarea"
+          },
+          "qwen3_5_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Qwen35EncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen3.5 tokenizer and text encoder",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Qwen3.5 Encoder"
+          },
+          "type": {
+            "const": "moss_image_text_encoder",
+            "default": "moss_image_text_encoder",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "conditioning", "moss_image", "moss-image"],
+        "title": "Prompt - MOSS-Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/MossImageConditioningOutput"
+        }
       },
       "MultiplyInvocation": {
         "category": "math",
@@ -94859,7 +96848,7 @@
         "type": "object"
       },
       "Qwen35EncoderField": {
-        "description": "Field for the Qwen3.5 text encoder Anima-3.8B's semantic connector reads.",
+        "description": "Field for a Qwen3.5 text encoder: the 4B Anima-3.8B's semantic connector reads, or MOSS-Image's 9B.",
         "properties": {
           "tokenizer": {
             "$ref": "#/components/schemas/ModelIdentifierField",
@@ -95030,7 +97019,7 @@
       },
       "Qwen35VariantType": {
         "type": "string",
-        "enum": ["qwen3_5_4b"],
+        "enum": ["qwen3_5_4b", "qwen3_5_9b"],
         "title": "Qwen35VariantType",
         "description": "Qwen3.5 text encoder variants, by language-model width.\n\nA family of its own: Qwen3.5 interleaves Gated DeltaNet linear-attention layers with gated full\nattention, so its checkpoints share neither architecture nor key layout with `Qwen3VariantType`,\neven at the same width."
       },
@@ -96268,7 +98257,7 @@
           "cpu_only"
         ],
         "title": "Qwen3VLEncoder_GGUF_Config",
-        "description": "Configuration for a single-file GGUF Qwen3-VL encoder (llama.cpp, e.g.\n``Qwen3VL-4B-Instruct-Q4_K_M.gguf``).\n\nllama.cpp splits Qwen3-VL across two files: the language tower -- all Krea-2 and Ideogram 4\ncondition on -- and a companion ``mmproj-*.gguf`` holding the visual tower. Only the language\ntower is accepted here; the ``mmproj`` file is turned away with its own reason.\n\nIdentified by the ``general.architecture`` metadata, which is the only honest discriminator: a\nQwen3-VL language tower is structurally indistinguishable from a text-only Qwen3 of the same\nsize (both 36 layers at hidden 2560 for the 4B), so a shape probe would accept a stock Qwen3\nGGUF as a Krea-2 encoder. That file loads without error and produces silently wrong\nconditioning, which is precisely the failure identification exists to prevent."
+        "description": "Configuration for a single-file GGUF Qwen3-VL encoder (llama.cpp, e.g.\n``Qwen3VL-4B-Instruct-Q4_K_M.gguf``).\n\nllama.cpp splits Qwen3-VL across two files: the language tower -- all a text prompt needs -- and a\ncompanion ``mmproj-*.gguf`` holding the visual tower, which reads Krea-2 edit reference images.\nOnly the language tower is accepted here; the ``mmproj`` file is turned away with its own reason,\nso a GGUF encoder encodes text only.\n\nIdentified by the ``general.architecture`` metadata, which is the only honest discriminator: a\nQwen3-VL language tower is structurally indistinguishable from a text-only Qwen3 of the same\nsize (both 36 layers at hidden 2560 for the 4B), so a shape probe would accept a stock Qwen3\nGGUF as a Krea-2 encoder. That file loads without error and produces silently wrong\nconditioning, which is precisely the failure identification exists to prevent."
       },
       "Qwen3VLEncoder_Qwen3VLEncoder_Config": {
         "properties": {
@@ -96553,6 +98542,29 @@
             "orig_default": null,
             "orig_required": false
           },
+          "reference_latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LatentsField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents of the reference images an edit reads, from Image to Latents in reference mode, in the order the prompts were encoded with them.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Reference Latents"
+          },
           "denoising_start": {
             "default": 0.0,
             "description": "When to start denoising, expressed a percentage of total steps",
@@ -96701,16 +98713,16 @@
         "tags": ["image", "qwen_image_2_1", "qwen-image-2.1"],
         "title": "Denoise - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.1.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "QwenImage21ImageToLatentsInvocation": {
         "category": "image",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Encodes an image into Qwen-Image-2.1 latents. The image is encoded opaque; its alpha is not read.",
+        "description": "Encodes an image into Qwen-Image-2.1 latents.\n\nFor image-to-image and the canvas, the image is encoded opaque at its own size; its alpha is not read. As a\nreference for an edit, it is resized to the area the text encoder reads it at and keeps its alpha.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -96821,6 +98833,16 @@
             "title": "Tile Size",
             "type": "integer"
           },
+          "reference": {
+            "default": false,
+            "description": "Encode as a reference image for the denoise node's reference latents: resized to ~1 megapixel, as the text encoder reads it, with its alpha kept.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Reference",
+            "type": "boolean"
+          },
           "type": {
             "const": "qwen_image_2_1_i2l",
             "default": "qwen_image_2_1_i2l",
@@ -96833,7 +98855,7 @@
         "tags": ["image", "latents", "vae", "i2l", "qwen_image_2_1"],
         "title": "Image to Latents - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -97107,7 +99129,7 @@
         "category": "conditioning",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Encodes a text prompt for Qwen-Image-2.1 with its Qwen3-VL-8B encoder.",
+        "description": "Encodes a prompt for Qwen-Image-2.1 with its Qwen3-VL-8B encoder, with the reference images an edit reads.\n\nEach reference also goes to the denoise node, encoded by Image to Latents in its reference mode, in the same\norder.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -97167,6 +99189,19 @@
             "orig_required": true,
             "title": "Qwen3-VL Encoder"
           },
+          "reference_images": {
+            "default": [],
+            "description": "Reference images to edit or draw from, in the order the denoise node receives their latents, at most 4. Needs a Qwen-Image-2.1 Diffusers model's own encoder.",
+            "field_kind": "input",
+            "input": "any",
+            "items": {
+              "$ref": "#/components/schemas/ImageField"
+            },
+            "orig_default": [],
+            "orig_required": false,
+            "title": "Reference Images",
+            "type": "array"
+          },
           "type": {
             "const": "qwen_image_2_1_text_encoder",
             "default": "qwen_image_2_1_text_encoder",
@@ -97179,7 +99214,7 @@
         "tags": ["prompt", "conditioning", "qwen_image_2_1", "qwen-image-2.1"],
         "title": "Prompt - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/QwenImage21ConditioningOutput"
         }
@@ -97967,6 +100002,16 @@
             "orig_required": false,
             "title": "Height"
           },
+          "reference": {
+            "default": false,
+            "description": "Encode as a Krea-2 edit reference (for 'Denoise - Krea-2' reference latents), sized as ai-toolkit trains Krea-2 edit LoRAs: RGB with alpha dropped; an image above 1 megapixel is scaled to about 1 megapixel keeping its aspect ratio; each side is rounded to a multiple of 16; resized bilinearly. Not the Qwen-Image Edit path. Width and height must be left unset.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Reference",
+            "type": "boolean"
+          },
           "type": {
             "const": "qwen_image_i2l",
             "default": "qwen_image_i2l",
@@ -97979,7 +100024,7 @@
         "tags": ["image", "latents", "vae", "i2l", "qwen_image"],
         "title": "Image to Latents - Qwen Image",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -99985,7 +102030,7 @@
         "type": "object",
         "required": ["image_name"],
         "title": "ReferenceImageRecallParameter",
-        "description": "Global reference-image configuration for recall.\n\nUsed for reference images that feed directly into the main model rather\nthan through a separate IP-Adapter / ControlNet model \u2014 for example\nFLUX.2 Klein, FLUX Kontext, and Qwen Image Edit. The receiving frontend\npicks the correct config type (``flux2_reference_image`` /\n``qwen_image_reference_image`` / ``flux_kontext_reference_image``) based\non the currently-selected main model."
+        "description": "Global reference-image configuration for recall.\n\nUsed for reference images that feed directly into the main model rather\nthan through a separate IP-Adapter / ControlNet model \u2014 for example\nFLUX.2 Klein, FLUX Kontext, Qwen Image Edit and Qwen-Image-2.1. The\nreceiving frontend picks the correct config type (``flux2_reference_image`` /\n``qwen_image_reference_image`` / ``qwen_image_2_1_reference_image`` /\n``flux_kontext_reference_image``) based on the currently-selected main model."
       },
       "RemoteModelFile": {
         "properties": {
@@ -106364,6 +108409,7 @@
           "tokenizer_2",
           "tokenizer_3",
           "processor",
+          "vision_encoder",
           "pe",
           "pe_tokenizer",
           "vae",
@@ -118036,6 +120082,380 @@
           "edges"
         ],
         "title": "WorkflowWithoutID"
+      },
+      "WorkingMemoryCalibrationDeviceClass": {
+        "properties": {
+          "device_class_id": {
+            "type": "string",
+            "title": "Device Class Id"
+          },
+          "device_class": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalibrationDeviceClass"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the file is unusable"
+          },
+          "usable": {
+            "type": "boolean",
+            "title": "Usable"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem",
+            "description": "Why the file is unusable. It is kept as it is and never written"
+          },
+          "is_current": {
+            "type": "boolean",
+            "title": "Is Current"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationRunSummary"
+            },
+            "type": "array",
+            "title": "Runs"
+          },
+          "point_counts": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationPointCount"
+            },
+            "type": "array",
+            "title": "Point Counts"
+          },
+          "envs": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationEnvironment"
+            },
+            "type": "array",
+            "title": "Envs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_class_id",
+          "device_class",
+          "usable",
+          "problem",
+          "is_current",
+          "runs",
+          "point_counts",
+          "envs"
+        ],
+        "title": "WorkingMemoryCalibrationDeviceClass"
+      },
+      "WorkingMemoryCalibrationEnvironment": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "hard": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Hard"
+          },
+          "soft": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Soft"
+          },
+          "hard_matches_current": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hard Matches Current",
+            "description": "Whether the current environment has the same hard facts; null off the current device class"
+          },
+          "soft_matches_current": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Soft Matches Current",
+            "description": "Whether the current environment has the same soft facts; null off the current device class"
+          },
+          "point_count": {
+            "type": "integer",
+            "title": "Point Count"
+          }
+        },
+        "type": "object",
+        "required": ["id", "hard", "soft", "hard_matches_current", "soft_matches_current", "point_count"],
+        "title": "WorkingMemoryCalibrationEnvironment"
+      },
+      "WorkingMemoryCalibrationPointCount": {
+        "properties": {
+          "estimator": {
+            "type": "string",
+            "title": "Estimator"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "fit_eligible": {
+            "type": "boolean",
+            "title": "Fit Eligible"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": ["estimator", "version", "valid", "fit_eligible", "count"],
+        "title": "WorkingMemoryCalibrationPointCount"
+      },
+      "WorkingMemoryCalibrationRequest": {
+        "properties": {
+          "graph": {
+            "$ref": "#/components/schemas/Graph",
+            "description": "The graph to measure"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "$ref": "#/components/schemas/BatchDatum"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data",
+            "description": "The batch data collection"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key",
+            "description": "A caller-owned retry key. Repeating the request with it returns the run it created and enqueues nothing new; once a reset removed that run, the repeat is refused. Reusing the key for another request (another model, graph or batch data) is rejected while the queue keeps the key's enqueue receipt."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["graph"],
+        "title": "WorkingMemoryCalibrationRequest",
+        "description": "The batch a calibration run enqueues, built by the client. The server sets origin, destination, runs and the\ngraph's id, and turns the node cache off."
+      },
+      "WorkingMemoryCalibrationResetResult": {
+        "properties": {
+          "runs_removed": {
+            "type": "integer",
+            "title": "Runs Removed"
+          },
+          "points_removed": {
+            "type": "integer",
+            "title": "Points Removed"
+          }
+        },
+        "type": "object",
+        "required": ["runs_removed", "points_removed"],
+        "title": "WorkingMemoryCalibrationResetResult"
+      },
+      "WorkingMemoryCalibrationRunCreated": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "device_class_id": {
+            "type": "string",
+            "title": "Device Class Id"
+          },
+          "item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Item Ids",
+            "description": "The queue items the run enqueued. A repeat of the request that finds them unrecorded takes over every queue item carrying the run's origin, retries included; none when the queue no longer has them and the runner never saw them"
+          }
+        },
+        "type": "object",
+        "required": ["run_id", "device_class_id", "item_ids"],
+        "title": "WorkingMemoryCalibrationRunCreated"
+      },
+      "WorkingMemoryCalibrationRunSummary": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "model_key": {
+            "type": "string",
+            "title": "Model Key"
+          },
+          "model_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Hash"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "env_id": {
+            "type": "string",
+            "title": "Env Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["running", "completed", "failed", "partial", "canceled"],
+            "title": "Status",
+            "description": "Derived from the run's queue items, a retry standing in for the item it retried: running while any is pending or running; failed when any failed; completed when all completed; otherwise partial when valid points were recorded, else canceled"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "The error of a failed item, when the run failed"
+          },
+          "item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Item Ids",
+            "description": "Every queue item of the run known, retries and the items they retried"
+          },
+          "point_count": {
+            "type": "integer",
+            "title": "Point Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "model_key",
+          "model_hash",
+          "user_id",
+          "created_at",
+          "env_id",
+          "status",
+          "error",
+          "item_ids",
+          "point_count"
+        ],
+        "title": "WorkingMemoryCalibrationRunSummary"
+      },
+      "WorkingMemoryCalibrationStatus": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "description": "Whether a calibration run can start now: one GPU generation device whose store file is usable and can be written"
+          },
+          "unavailable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Reason"
+          },
+          "current_device_class_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Device Class Id"
+          },
+          "current_env_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Env Id"
+          },
+          "device_classes": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationDeviceClass"
+            },
+            "type": "array",
+            "title": "Device Classes"
+          }
+        },
+        "type": "object",
+        "required": ["available", "unavailable_reason", "current_device_class_id", "current_env_id", "device_classes"],
+        "title": "WorkingMemoryCalibrationStatus"
       },
       "ZImageConditioningField": {
         "description": "A Z-Image conditioning tensor primitive value",

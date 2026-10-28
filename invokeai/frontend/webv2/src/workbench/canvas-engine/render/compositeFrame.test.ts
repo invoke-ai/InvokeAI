@@ -47,6 +47,7 @@ const documentOf = (layers: CanvasLayerContract[]): CanvasDocumentContractV3 =>
 interface Harness {
   deps: CreateCompositeFrameDeps;
   controlView: ReturnType<CreateCompositeFrameDeps['getControlView']>;
+  staging: { candidates: boolean };
   stores: ReturnType<typeof createEngineStores>;
   previews: PreviewStateController;
   overrides: Map<string, { x: number; y: number }>;
@@ -71,10 +72,13 @@ const makeHarness = (): Harness => {
   const rasterizeLayer = vi.fn();
   const beginFrame = vi.fn(() => FRAME_USAGE);
   const enforce = vi.fn(() => ({ evictedBaseLayerIds: [] as string[], overageBytes: 0 }));
+  const staging = { candidates: false };
   const harness: Harness = {
     beginFrame,
     controlView: null,
+    staging,
     deps: {
+      hasStagedCandidates: () => staging.candidates,
       backend: {} as CreateCompositeFrameDeps['backend'],
       derivedSurfaceCache: { byteSize: () => 0 } as CreateCompositeFrameDeps['derivedSurfaceCache'],
       diagnostics: {} as CreateCompositeFrameDeps['diagnostics'],
@@ -340,5 +344,59 @@ describe('the surface budget', () => {
   it('enforces the budget after compositing, never before', () => {
     draw();
     expect(composite.mock.invocationCallOrder[0]).toBeLessThan(harness.enforce.mock.invocationCallOrder[0]!);
+  });
+});
+
+describe('masks while a result is staged', () => {
+  const mask = (id: string) =>
+    layer(id, {
+      mask: { bitmap: { height: 8, imageName: `${id}.png`, width: 8 }, fill: { color: '#e07575', style: 'solid' } },
+      source: undefined,
+      type: 'inpaint_mask',
+    });
+  const region = (id: string) => ({ ...mask(id), type: 'regional_guidance' }) as unknown as CanvasLayerContract;
+  const control = (id: string) => layer(id, { type: 'control' });
+  const doc = documentOf([layer('a'), control('c'), mask('m'), region('r')]);
+  const drawnIds = () =>
+    (lastCompositeOptions().preparation as compositor.CompositePreparation).leaves.map((leaf) => leaf.id).sort();
+  const demandedIds = () => [...(harness.enforce.mock.calls.at(-1)![0] as Set<string>)].sort();
+  for (const id of ['c', 'm', 'r']) {
+    beforeEach(() => harness.entries.set(id, entryFor()));
+  }
+
+  it('hides mask and region stacks and the region tint, rebuilding the frame description once per flip', () => {
+    const frame = createCompositeFrame(harness.deps);
+    const drawFrame = () => frame.draw(surface(), doc, VIEW, null, null);
+
+    const description = () => (lastCompositeOptions().preparation as compositor.CompositePreparation).leaves;
+    drawFrame();
+    const shown = description();
+    expect(drawnIds()).toEqual(['a', 'c', 'm', 'r']);
+    expect(lastCompositeOptions().regionOverlays).toBe(true);
+
+    harness.staging.candidates = true;
+    drawFrame();
+    const hidden = description();
+    expect(hidden).not.toBe(shown);
+    expect(drawnIds()).toEqual(['a', 'c']);
+    expect(demandedIds()).toEqual(['a', 'c']);
+    expect(lastCompositeOptions().regionOverlays).toBe(false);
+    drawFrame();
+    expect(description()).toBe(hidden);
+
+    harness.staging.candidates = false;
+    drawFrame();
+    expect(drawnIds()).toEqual(['a', 'c', 'm', 'r']);
+    expect(demandedIds()).toEqual(['a', 'c', 'm', 'r']);
+  });
+
+  it('also hides them while only a staged or progress preview is published', () => {
+    harness.previews.publishStaged(harness.previews.nextStagedToken(), {
+      height: 8,
+      surface: surface(8, 8),
+      width: 8,
+    } as never);
+    draw(doc);
+    expect(drawnIds()).toEqual(['a', 'c']);
   });
 });
