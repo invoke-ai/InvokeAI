@@ -36,6 +36,9 @@ def taesd() -> TaesdDecoder:
     return Decoder(4).eval()
 
 
+MIB = 2**20
+
+
 def _latent(*shape: int, seed: int = 1) -> torch.Tensor:
     return torch.randn(*shape, generator=torch.Generator().manual_seed(seed))
 
@@ -134,11 +137,12 @@ def test_a_decode_reserves_its_full_resolution_activations_at_the_capped_size(ta
     monkeypatch.setattr(taesd, "max_preview_edge", 48)
     half = copy.deepcopy(taesd).half()
 
-    # Three live 64-channel activations and two of convolution workspace per output pixel, at the element size.
-    assert decode_working_memory_bytes(taesd, _latent(4, 3, 5)) == (3 + 2) * 64 * (24 * 40) * 4
-    assert decode_working_memory_bytes(half, _latent(4, 3, 5)) == (3 + 2) * 64 * (24 * 40) * 2
+    # Three live 64-channel activations and two of convolution workspace per output pixel, at the element size, and
+    # the fixed 5 MiB allowance.
+    assert decode_working_memory_bytes(taesd, _latent(4, 3, 5)) == (3 + 2) * 64 * (24 * 40) * 4 + 5 * MIB
+    assert decode_working_memory_bytes(half, _latent(4, 3, 5)) == (3 + 2) * 64 * (24 * 40) * 2 + 5 * MIB
     # 12 x 18 latents exceed the cap and are decoded at 4 x 6.
-    assert decode_working_memory_bytes(taesd, _latent(1, 4, 12, 18)) == (3 + 2) * 64 * (32 * 48) * 4
+    assert decode_working_memory_bytes(taesd, _latent(1, 4, 12, 18)) == (3 + 2) * 64 * (32 * 48) * 4 + 5 * MIB
 
 
 @pytest.fixture(scope="module")
@@ -398,13 +402,15 @@ def test_a_video_decode_reserves_its_live_activations_and_workspace_per_output_f
 ) -> None:
     decoder = build_taehv_decoder(layout)
 
-    # 2.25 live 64-channel float32 activations and 2 of workspace per output frame of the full-resolution stage.
+    # 2.25 live 64-channel float32 activations and 2 of workspace per output frame of the full-resolution stage, and
+    # the fixed 5 MiB allowance.
     per_output_frame = (2.25 + 2) * 64 * stage_pixels * 4
-    assert decode_working_memory_bytes(decoder, _latent(*latent)) == per_output_frame * frames_per_latent
+    assert decode_working_memory_bytes(decoder, _latent(*latent)) == per_output_frame * frames_per_latent + 5 * MIB
     window = _latent(latent[0], latent[1], 2, *latent[2:])
-    assert decode_working_memory_bytes(decoder, window) == per_output_frame * frames_per_latent * 2
+    assert decode_working_memory_bytes(decoder, window) == per_output_frame * frames_per_latent * 2 + 5 * MIB
 
 
 def test_a_video_decode_is_priced_at_its_own_cap(taew2_1: TinyAutoencoderDecoder) -> None:
     """taew2_1's 512-pixel cap decodes a 128 x 128 latent (1024 pixels) at 64 x 64."""
-    assert decode_working_memory_bytes(taew2_1, _latent(1, 16, 128, 128)) == (2.25 + 2) * 64 * 512 * 512 * 4 * 4
+    expected = (2.25 + 2) * 64 * 512 * 512 * 4 * 4 + 5 * MIB
+    assert decode_working_memory_bytes(taew2_1, _latent(1, 16, 128, 128)) == expected

@@ -41,7 +41,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from invokeai.backend.tiny_autoencoder.decoder import TinyAutoencoderDecoder
+from invokeai.backend.tiny_autoencoder.decoder import PREVIEW_FIXED_ALLOWANCE_BYTES, TinyAutoencoderDecoder
 
 
 def conv(n_in: int, n_out: int, **kwargs) -> nn.Conv2d:
@@ -93,11 +93,13 @@ plus one frame of padding, at half resolution, at most a quarter more per output
 """
 
 _CONV_WORKSPACE_ACTIVATIONS_PER_FRAME: Final = 2
-"""The convolutions' workspace on top, in activation-sized buffers per output frame. Measured, and it depends on the
-algorithm the backend picks: on an RTX 4090 in fp16, one latent decoded at 1024x1024 grew `max_memory_allocated` by
+"""The convolutions' workspace on top, in activation-sized buffers per output frame. Measured with cuDNN on an RTX 4090
+(fp16 and bf16, single latents and two-frame windows): one latent decoded at 1024x1024 grew `max_memory_allocated` by
 2145 MiB for taew2_1, 536 MiB for taew2_2 and 266 MiB for taeltx2_3, 16.75, 16.76 and 33.3 activations of their
 full-resolution stage. Their structure holds 8.75, 8.75 and 17.25 (four, four and eight output frames): two more per
-output frame.
+output frame, and a two-frame window takes twice that. It depends on the algorithm the backend picks and is unmeasured
+on MIOpen, MPS and XPU; there, as everywhere at the default settings, the 3 GB `device_working_mem_gb` floor still
+covers the whole bound.
 """
 
 
@@ -134,19 +136,20 @@ class TaehvDecoder(TinyAutoencoderDecoder):
         self.frames_to_trim = self.t_upscale - 1
         # Every latent frame decodes `t_upscale` frames through the full-resolution stages, which is what an
         # 8x decoder pays for. Measured for one latent (RTX 4090, fp16, `decode_preview`): taew2_1 needs
-        # 2.1 GB and 63 ms at 1024 but 536 MB and 22 ms at 512; the 16x and 32x decoders run those stages
-        # at a half or a quarter of the edge and stay at 536 MB (taew2_2) and 266 MB (taeltx2_3) at 1024,
-        # under TAESD's ~640 MB. A window of latent frames costs about that per frame: Wan video's
+        # 2145 MiB and 63 ms at 1024 but 536 MiB and 22 ms at 512; the 16x and 32x decoders run those stages
+        # at a half or a quarter of the edge and stay at 536 MiB (taew2_2) and 266 MiB (taeltx2_3) at 1024,
+        # under TAESD's 640 MiB. A window of latent frames costs about that per frame: Wan video's
         # two-frame window doubles the memory (see `PREVIEW_LATENT_WINDOW` in `wan_video_denoise.py`).
         self.max_preview_edge = 512 if patch_size == 1 else 1024
 
     def preview_working_memory_bytes(self, height: int, width: int, frames: int) -> int:
-        """2176 MiB for taew2_1 at 1024x1024 in fp16, 544 MiB at its 512 cap; that again per latent frame of a window."""
+        """2181 MiB for taew2_1 at 1024x1024 in fp16, 549 MiB at its 512 cap, the activations and workspace again per
+        latent frame of a window."""
         output_frames = frames * self.t_upscale
         stage_pixels = height * width * (self.spatial_compression // self.patch_size) ** 2
         activation_bytes = _LAST_STAGE_CHANNELS * stage_pixels * next(self.parameters()).element_size()
         per_frame = _LIVE_ACTIVATIONS_PER_FRAME + _CONV_WORKSPACE_ACTIVATIONS_PER_FRAME
-        return math.ceil(per_frame * output_frames * activation_bytes)
+        return math.ceil(per_frame * output_frames * activation_bytes) + PREVIEW_FIXED_ALLOWANCE_BYTES
 
     def _decode_frames(self, x: torch.Tensor) -> torch.Tensor:
         """`(N, T, C, h, w)` latents to `(N, T * t_upscale, 3, H, W)` frames in [0, 1], untrimmed.

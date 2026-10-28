@@ -80,8 +80,8 @@ Measured on an RTX 4090 in fp16, decoding one latent at the cap:
 | TAEW2.2 | 1024 pixels | about 24 ms | about 0.54 GB |
 | TAELTX2.3 | 1024 pixels | about 29 ms | about 0.27 GB |
 
-A Wan 2.2 video preview, which decodes two latent frames, takes under about 32 ms and about 0.6 GB of VRAM from
-832×480 to 1280×720, and up to about 1.06 GB at 1024×1024. Without a GPU a preview takes about 2 seconds, so TAE
+A Wan 2.2 video preview, which decodes two latent frames, takes under about 32 ms. InvokeAI reserves up to 617 MiB
+of VRAM for it from 832×480 to 1280×720 and 1093 MiB at 1024×1024; on an RTX 4090 it used up to 599 and 1064 MiB. Without a GPU a preview takes about 2 seconds, so TAE
 previews are not recommended on CPU-only installs.
 
 InvokeAI spaces TAE preview frames so that previews cost at most about a tenth of the denoising time. On fast models

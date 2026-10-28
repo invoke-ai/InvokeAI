@@ -232,8 +232,8 @@ def test_the_tae_lock_reserves_the_working_memory_of_a_decode() -> None:
     previews.render(BaseModelType.StableDiffusion1, _sample(height=16, width=24))
 
     # One lock for the invocation, keeping three live 64-channel float32 activations of the 128 x 192 image and two
-    # of convolution workspace free.
-    assert load.loaded.working_mem_requests == [(3 + 2) * 64 * (128 * 192) * 4]
+    # of convolution workspace free, and the fixed 5 MiB allowance.
+    assert load.loaded.working_mem_requests == [(3 + 2) * 64 * (128 * 192) * 4 + 5 * 2**20]
 
 
 def test_tae_frame_is_full_resolution_and_reports_the_linear_display_size() -> None:
@@ -575,8 +575,8 @@ def test_a_latent_window_is_decoded_by_the_video_tae_of_its_space() -> None:
     assert np.array_equal(np.asarray(image), expected)
     assert size == (64, 48)
     # The lock keeps the whole window's decode free: two latent frames, four output frames each, of the 48 x 64
-    # image, at 2.25 live float32 activations and 2 of workspace per output frame.
-    assert load.loaded.working_mem_requests == [(2.25 + 2) * 64 * (48 * 64) * 4 * 8]
+    # image, at 2.25 live float32 activations and 2 of workspace per output frame, and the fixed 5 MiB allowance.
+    assert load.loaded.working_mem_requests == [(2.25 + 2) * 64 * (48 * 64) * 4 * 8 + 5 * 2**20]
 
 
 def test_a_missing_tae_names_the_starter_of_its_space_even_under_another_base(caplog: pytest.LogCaptureFixture) -> None:

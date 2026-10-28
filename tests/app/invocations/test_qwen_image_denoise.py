@@ -1,6 +1,7 @@
 """Tests for the Qwen Image denoise invocation."""
 
 import json
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -329,22 +330,30 @@ def test_an_explicit_shift_reaches_the_scheduler(monkeypatch, tmp_path) -> None:
     assert mu == pytest.approx(1.0986122886681098, abs=1e-12)  # ln 3
 
 
-def test_no_preview_is_sent_before_the_transformer_is_locked(monkeypatch, tmp_path) -> None:
+def test_the_first_preview_is_sent_inside_the_transformer_lock(monkeypatch, tmp_path) -> None:
     """A Tiny AutoEncoder preview places its TAE next to the locked model; before the lock there is none to fit."""
     monkeypatch.setattr(qwen_image_denoise, "QwenImageTransformer2DModel", _TinyQwenImageTransformer)
     monkeypatch.setattr(qwen_image_denoise.TorchDevice, "choose_torch_device", lambda: torch.device("cpu"))
     events: list[str] = []
 
-    class _Locked(Exception):
-        """Ends the run once the transformer is locked: what follows needs a real transformer."""
+    class _Previewed(Exception):
+        """Ends the run at the first preview: what follows needs a real transformer."""
 
     class _Transformer(_TinyQwenImageTransformer):
         def modules(self):
             return iter(())
 
+    @contextmanager
     def lock(**_kwargs):
         events.append("lock")
-        raise _Locked
+        try:
+            yield ({}, _Transformer())
+        finally:
+            events.append("unlock")
+
+    def preview(*_args) -> None:
+        events.append("preview")
+        raise _Previewed
 
     conditioning = ConditioningFieldData(conditionings=[QwenImageConditioningInfo(prompt_embeds=torch.zeros(1, 4, 8))])
     context = SimpleNamespace(
@@ -354,7 +363,7 @@ def test_no_preview_is_sent_before_the_transformer_is_locked(monkeypatch, tmp_pa
             get_absolute_path=lambda _config: tmp_path / "qwen-image.gguf",
         ),
         conditioning=SimpleNamespace(load=lambda _name: conditioning),
-        util=SimpleNamespace(sd_step_callback=lambda *_args: events.append("preview")),
+        util=SimpleNamespace(sd_step_callback=preview),
     )
     node = QwenImageDenoiseInvocation.model_construct(
         latents=None,
@@ -374,7 +383,7 @@ def test_no_preview_is_sent_before_the_transformer_is_locked(monkeypatch, tmp_pa
         shift=None,
     )
 
-    with pytest.raises(_Locked):
+    with pytest.raises(_Previewed):
         node._run_diffusion(context)
 
-    assert events == ["lock"]
+    assert events == ["lock", "preview", "unlock"]

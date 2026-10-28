@@ -42,7 +42,7 @@ from typing import Final
 import torch
 import torch.nn as nn
 
-from invokeai.backend.tiny_autoencoder.decoder import TinyAutoencoderDecoder
+from invokeai.backend.tiny_autoencoder.decoder import PREVIEW_FIXED_ALLOWANCE_BYTES, TinyAutoencoderDecoder
 
 
 def conv(n_in: int, n_out: int, **kwargs) -> nn.Conv2d:
@@ -90,9 +90,10 @@ quarter of this; the bound reserves it the same.
 """
 
 _CONV_WORKSPACE_ACTIVATIONS: Final = 2
-"""The convolutions' workspace on top, in activation-sized buffers. Measured, and it depends on the algorithm the
-backend picks: on an RTX 4090 in fp16, `max_memory_allocated` grew by 640 MiB over a 1024x1024 decode, five
-activations, two more than the structure holds.
+"""The convolutions' workspace on top, in activation-sized buffers. Measured with cuDNN on an RTX 4090 (fp16 and bf16):
+`max_memory_allocated` grew by 640 MiB over a 1024x1024 decode, five activations, two more than the structure holds.
+It depends on the algorithm the backend picks and is unmeasured on MIOpen, MPS and XPU; there, as everywhere at the
+default settings, the 3 GB `device_working_mem_gb` floor still covers the whole bound.
 """
 
 
@@ -110,10 +111,10 @@ class TaesdDecoder(TinyAutoencoderDecoder, nn.Sequential):
         self.max_preview_edge = 1024
 
     def preview_working_memory_bytes(self, height: int, width: int, frames: int) -> int:
-        """640 MiB at 1024x1024 in fp16. `frames` is always 1: a TAESD decoder decodes no windows."""
+        """645 MiB at 1024x1024 in fp16. `frames` is always 1: a TAESD decoder decodes no windows."""
         pixels = height * width * self.spatial_compression**2
         activation_bytes = _LAST_STAGE_CHANNELS * pixels * next(self.parameters()).element_size()
-        return (_LIVE_ACTIVATIONS + _CONV_WORKSPACE_ACTIVATIONS) * activation_bytes
+        return (_LIVE_ACTIVATIONS + _CONV_WORKSPACE_ACTIVATIONS) * activation_bytes + PREVIEW_FIXED_ALLOWANCE_BYTES
 
 
 def Decoder(latent_channels: int = 4, use_midblock_gn: bool = False, image_channels: int = 3) -> TaesdDecoder:
