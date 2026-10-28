@@ -245,6 +245,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         graph: Optional[str] = None,
         thumbnail_size: int = 256,
         image_subfolder: str = "",
+        resolved_inputs: Optional[str] = None,
     ) -> None:
         image_path: Optional[Path] = None
         thumbnail_path: Optional[Path] = None
@@ -270,6 +271,9 @@ class DiskImageFileStorage(ImageFileStorageBase):
             if graph is not None:
                 info_dict["invokeai_graph"] = graph
                 pnginfo.add_text("invokeai_graph", graph)
+            if resolved_inputs is not None:
+                info_dict["invokeai_resolved_inputs"] = resolved_inputs
+                pnginfo.add_text("invokeai_resolved_inputs", resolved_inputs)
 
             thumbnail_path = self.get_path(image_name, thumbnail=True, image_subfolder=image_subfolder)
             thumbnail_existed = thumbnail_path.exists()

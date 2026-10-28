@@ -76,6 +76,7 @@ class ImageService(ImageServiceABC):
         graph: Optional[str] = None,
         user_id: Optional[str] = None,
         project_id: Optional[str] = None,
+        resolved_inputs: Optional[str] = None,
     ) -> ImageDTO:
         if image_origin not in ResourceOrigin:
             raise InvalidOriginException
@@ -133,6 +134,7 @@ class ImageService(ImageServiceABC):
                     metadata=metadata,
                     workflow=workflow,
                     graph=graph,
+                    resolved_inputs=resolved_inputs,
                     image_subfolder=image_subfolder,
                 )
                 self._record_file_size(image_name, image_subfolder)

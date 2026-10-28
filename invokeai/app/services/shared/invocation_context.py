@@ -322,9 +322,12 @@ class ImagesInterface(InvocationContextInterface):
         workflow_ = self._get_workflow_json()
 
         graph_ = None
+        resolved_inputs = None
         if self._data.queue_item.session.graph:
+            # The editor's graph-only fallback needs the complete authoring graph.
+            graph_ = self._data.queue_item.session.graph.model_dump_json()
             # Record resolved inputs for this image, without expanding metadata with sibling iterations.
-            graph_ = self._data.queue_item.session.execution_graph._get_invocation_input_graph(
+            resolved_inputs = self._data.queue_item.session.execution_graph._get_invocation_input_graph(
                 self._data.invocation
             ).model_dump_json()
 
@@ -337,6 +340,7 @@ class ImagesInterface(InvocationContextInterface):
             image_origin=ResourceOrigin.INTERNAL,
             workflow=workflow_,
             graph=graph_,
+            resolved_inputs=resolved_inputs,
             session_id=self._data.queue_item.session_id,
             node_id=self._data.invocation.id,
             user_id=self._data.queue_item.user_id,

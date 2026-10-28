@@ -58,8 +58,9 @@ class ImageServiceABC(ABC):
         graph: Optional[str] = None,
         user_id: Optional[str] = None,
         project_id: Optional[str] = None,
+        resolved_inputs: Optional[str] = None,
     ) -> ImageDTO:
-        """Creates an image, storing the file and its metadata."""
+        """Creates an image, storing its metadata and optional per-image resolved-input Graph JSON."""
         pass
 
     @abstractmethod

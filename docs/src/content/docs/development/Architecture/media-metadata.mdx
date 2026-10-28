@@ -9,15 +9,17 @@ download dropped into any Invoke instance is recallable and remixable without ac
 database that produced it. This page is the reference for that contract: where the record lives
 in each container, the record's fields, and how the format evolves.
 
-## Envelope: three keys, two containers
+## Envelope: shared keys and image inputs
 
-The same three strings are written to every media file. Each value is compact UTF-8 JSON.
+Three keys are shared by images and videos. Images generated from a graph also carry a
+separate resolved-input record. Values are JSON strings; saved workflow JSON retains its original bytes.
 
 | Key | Content | Required |
 |---|---|---|
 | `invokeai_metadata` | The generation record (schema below) | when the graph produced one |
 | `invokeai_workflow` | The `WorkflowWithoutID` the session ran, verbatim | only when a workflow was run |
-| `invokeai_graph` | The executed `Graph`, verbatim | when available |
+| `invokeai_graph` | For generated images, the complete session source `Graph`; videos retain their existing graph record | when available |
+| `invokeai_resolved_inputs` | PNG only: compact Graph JSON containing the active invocation's resolved inputs and ordinary ancestors | images generated from a graph |
 
 | Container | Where the keys live | Writer | Reader |
 |---|---|---|---|
@@ -29,6 +31,20 @@ validation rules: the metadata must parse to a JSON object, the workflow must va
 `WorkflowWithoutID`, and the graph must be an object with a `nodes` object and an `edges` list.
 Anything else degrades to "absent". On upload, a client-supplied `metadata` form field wins over
 the embedded copy; workflow and graph are never client-overridable.
+
+When workflow JSON is absent, the image editor converts `invokeai_graph` into an editable
+workflow. Keeping the source graph preserves original `Iterate`, `If`, and `Collect` nodes
+and their edges. `invokeai_resolved_inputs` is a separate PNG text chunk available through
+Pillow's `Image.info`; the workflow/graph API and metadata extraction above keep their existing
+three-key contract. It does not reserve or replace any key inside user `invokeai_metadata`.
+Older PNGs and callers without resolved inputs need no migration.
+
+The resolved-input record includes ordinary ancestors, such as math nodes and a Noise node's
+actual seed, and stops at loop/control and collection boundaries. Values crossing those
+boundaries are already resolved on the retained downstream invocation. Each image stores one
+source graph plus this record, avoiding copies of the expanded runtime graph in nested batches.
+Literal collections in the source graph and collection inputs on retained invocations still
+contribute their full size; neither graph field is guaranteed to contain a single node.
 
 The MP4 layout is the one `ffprobe`, `exiftool` and `mediainfo` display. Like PNG chunks it
 survives a container-aware copy — for ffmpeg that is a remux with `-movflags use_metadata_tags`;

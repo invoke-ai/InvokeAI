@@ -900,7 +900,11 @@ In normal execution, all runtime expansion occurs in `execution_graph` with trac
 
 ### Image input records
 
-`ImagesInterface.save()` embeds an `invokeai_graph` input record in the existing Graph JSON envelope. It contains the
+`ImagesInterface.save()` preserves the complete session source graph in `invokeai_graph`, including all original
+nodes, input literals and edges. The editor uses it to restore the authoring structure when `invokeai_workflow` is
+absent. The workflow JSON, when present, is saved unchanged and takes precedence in the editor.
+
+A separate `invokeai_resolved_inputs` PNG text field contains a compact Graph JSON input record. It contains the
 active invocation with its runtime ID and resolved inputs, plus ordinary upstream invocations and the edges connecting
 them. This preserves inputs such as a Noise invocation's actual seed and intermediate math values. Traversal uses the
 execution graph's indexed input edges and stops before `Iterate`, `Collect`, `If`, `For`, `ForReturn`, saved-workflow
@@ -909,10 +913,15 @@ those boundaries are already resolved on the retained downstream invocation. Fut
 iterations, and upstream collections beyond those boundaries are excluded. Before runtime materialization, only the
 active invocation's inputs are recorded.
 
-This is an input record for the image's invocation, not a complete executable graph or workflow replay. The authoring
-workflow remains separately preserved, unchanged, in `invokeai_workflow`. Legacy PNG readers still accept the Graph
-envelope; graph-to-workflow conversion can recover only the retained nodes and edges. Existing PNG records are read
-without rewriting them.
+The resolved-input record describes the image's invocation; it is not used for editor restoration. Optional internal
+`resolved_inputs` parameters carry it through `ImageService.create()` and `DiskImageFileStorage.save()`. It can be read
+from the PNG's `Image.info`; it is not merged into user-owned `invokeai_metadata` or returned in the workflow/graph API.
+Legacy calls omit the field, and old PNGs remain readable without rewriting. Image file copies preserve all chunks.
+
+No expanded runtime graph is serialized for either field. Each image stores one source graph plus one compact input
+record. Nested-loop tests count their combined UTF-8 bytes. A source with a literal collection includes that collection
+in every image, so its authoring payload grows with the collection size. Resolved collection inputs retained on the
+active invocation can also grow; the compact record is not universally a single node or constant-size.
 
 ## 6) Invariants
 

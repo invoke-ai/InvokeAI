@@ -223,7 +223,8 @@ def test_image_save_graph_records_resolved_runtime_inputs() -> None:
     images.save(MagicMock())
 
     saved_kwargs = services.images.create.call_args.kwargs
-    saved_graph = Graph.model_validate_json(saved_kwargs["graph"])
+    assert saved_kwargs["graph"] == source_graph_json
+    saved_graph = Graph.model_validate_json(saved_kwargs["resolved_inputs"])
     saved_add_node = saved_graph.nodes[next(iter(session.source_prepared_mapping["add"]))]
     assert isinstance(saved_add_node, AddInvocation)
     assert saved_add_node.a == 17
@@ -268,7 +269,9 @@ def test_image_save_graph_uses_active_inputs_before_materialization() -> None:
 
     images.save(MagicMock())
 
-    saved_graph_json = services.images.create.call_args.kwargs["graph"]
+    saved_kwargs = services.images.create.call_args.kwargs
+    assert saved_kwargs["graph"] == source_json
+    saved_graph_json = saved_kwargs["resolved_inputs"]
     saved_graph = Graph.model_validate_json(saved_graph_json)
     saved_add_node = saved_graph.nodes["resolved-add"]
     assert isinstance(saved_add_node, AddInvocation)
@@ -279,7 +282,8 @@ def test_image_save_graph_uses_active_inputs_before_materialization() -> None:
     assert not session.execution_graph.nodes
 
 
-def test_image_save_graph_png_round_trip(tmp_path: Path) -> None:
+@pytest.mark.parametrize("cached_workflow", [False, True])
+def test_image_save_graph_png_round_trip(tmp_path: Path, cached_workflow: bool) -> None:
     session = GraphExecutionState(
         graph=Graph(
             nodes={
@@ -344,7 +348,12 @@ def test_image_save_graph_png_round_trip(tmp_path: Path) -> None:
             ],
         }
     )
-    workflow_json = workflow.model_dump_json()
+    source_json = session.graph.model_dump_json()
+    workflow_model_json = workflow.model_dump_json()
+    # A recovered queue item's original workflow JSON can have different whitespace from model_dump_json().
+    workflow_json = (
+        json.dumps(json.loads(workflow_model_json), indent=2) + "\n" if cached_workflow else workflow_model_json
+    )
     services = MagicMock()
     services.configuration.multiuser = False
     services.configuration.pil_compress_level = 6
@@ -353,19 +362,31 @@ def test_image_save_graph_png_round_trip(tmp_path: Path) -> None:
     invoker.services = services
     storage.start(invoker)
 
-    # Replace only ImageService's record/DTO boundary; PNG persistence and extraction are real.
+    # PNG persistence and extraction are real; the owning image-service path is covered in its SQLite suite.
     def create_image(
-        image: Image.Image, metadata: str | None, workflow: str | None, graph: str | None, **kwargs: object
+        image: Image.Image,
+        metadata: str | None,
+        workflow: str | None,
+        graph: str | None,
+        resolved_inputs: str | None,
+        **kwargs: object,
     ) -> None:
-        storage.save(image=image, image_name="runtime.png", metadata=metadata, workflow=workflow, graph=graph)
+        storage.save(
+            image=image,
+            image_name="runtime.png",
+            metadata=metadata,
+            workflow=workflow,
+            graph=graph,
+            resolved_inputs=resolved_inputs,
+        )
 
     services.images.create.side_effect = create_image
     data = MagicMock()
     data.queue_item.user_id = "queue-user"
     data.queue_item.workflow = workflow
     data.queue_item.root_item_id = None
-    data.queue_item._workflow_json_loaded = False
-    data.queue_item._workflow_json_snapshot = None
+    data.queue_item._workflow_json_loaded = cached_workflow
+    data.queue_item._workflow_json_snapshot = workflow_json if cached_workflow else None
     data.queue_item.session = session
     data.queue_item.session_id = "session"
     data.queue_item.project_id = "project-1"
@@ -386,9 +407,9 @@ def test_image_save_graph_png_round_trip(tmp_path: Path) -> None:
             invokeai_graph_override=None,
             logger=services.logger,
         )
+        saved_graph = Graph.model_validate_json(reopened.info["invokeai_resolved_inputs"])
 
-    assert extracted.invokeai_graph is not None
-    saved_graph = Graph.model_validate_json(extracted.invokeai_graph)
+    assert extracted.invokeai_graph == source_json
     saved_node_id = services.images.create.call_args.kwargs["node_id"]
     assert saved_node_id == runtime_add_node.id
     saved_add_node = saved_graph.nodes[saved_node_id]
@@ -404,7 +425,8 @@ def test_image_save_graph_png_round_trip(tmp_path: Path) -> None:
         ]
     )
     assert extracted.invokeai_workflow == workflow_json
-    assert data.queue_item.workflow.model_dump_json() == workflow_json
+    assert data.queue_item.workflow.model_dump_json() == workflow_model_json
+    assert session.graph.model_dump_json() == source_json
 
 
 def test_image_save_graph_retains_resolved_noise_seed_and_math_ancestors() -> None:
@@ -459,7 +481,8 @@ def test_image_save_graph_retains_resolved_noise_seed_and_math_ancestors() -> No
         pytest.fail("Image invocation was not scheduled")
 
     saved_kwargs = services.images.create.call_args.kwargs
-    saved_graph = Graph.model_validate_json(saved_kwargs["graph"])
+    assert saved_kwargs["graph"] == source_json
+    saved_graph = Graph.model_validate_json(saved_kwargs["resolved_inputs"])
     ids = {name: next(iter(session.source_prepared_mapping[name])) for name in ("random", "add", "noise", "image")}
     assert set(saved_graph.nodes) == set(ids.values())
     assert saved_kwargs["node_id"] == ids["image"]
@@ -551,21 +574,22 @@ def test_image_save_graph_nested_iterate_keeps_one_resolved_record_per_image(tmp
         data.queue_item._workflow_json_snapshot = None
         storage = DiskImageFileStorage(tmp_path / f"{outer_size}x{inner_size}")
         storage.start(SimpleNamespace(services=services))
-        saved: list[tuple[str, str, str, int]] = []
+        saved: list[tuple[str, str, str, str, int]] = []
 
         def create_image(
             image: Image.Image,
             graph: str,
+            resolved_inputs: str,
             *,
             _storage: DiskImageFileStorage = storage,
-            _saved: list[tuple[str, str, str, int]] = saved,
+            _saved: list[tuple[str, str, str, str, int]] = saved,
             **kwargs: object,
         ) -> SimpleNamespace:
             image_name = f"{len(_saved)}.png"
-            _storage.save(image=image, image_name=image_name, graph=graph)
+            _storage.save(image=image, image_name=image_name, graph=graph, resolved_inputs=resolved_inputs)
             node_id = kwargs["node_id"]
             assert isinstance(node_id, str)
-            _saved.append((image_name, graph, node_id, image.width))
+            _saved.append((image_name, graph, resolved_inputs, node_id, image.width))
             return SimpleNamespace(image_name=image_name, width=image.width, height=image.height)
 
         services.images.create.side_effect = create_image
@@ -584,29 +608,41 @@ def test_image_save_graph_nested_iterate_keeps_one_resolved_record_per_image(tmp
             pytest.fail("Nested Iterate graph did not finish")
 
         assert session.is_complete()
-        assert [width for _, _, _, width in saved] == [value for group in values for value in group]
+        assert [width for _, _, _, _, width in saved] == [value for group in values for value in group]
         assert graph.model_dump_json() == source_json
         reader = DiskImageFileStorage(storage.image_root)
-        for image_name, graph_json, _, _ in saved:
+        for image_name, graph_json, resolved_json, _, _ in saved:
             assert reader.get_graph(image_name) == graph_json
-        payloads = [json.loads(graph_json) for _, graph_json, _, _ in saved]
-        byte_counts = [len(graph_json.encode("utf-8")) for _, graph_json, _, _ in saved]
+            with reader.get(image_name) as reopened:
+                assert reopened.info["invokeai_resolved_inputs"] == resolved_json
+            assert graph_json == source_json
+        payloads = [json.loads(resolved_json) for _, _, resolved_json, _, _ in saved]
+        source_byte_counts = [len(graph_json.encode("utf-8")) for _, graph_json, _, _, _ in saved]
+        resolved_byte_counts = [len(resolved_json.encode("utf-8")) for _, _, resolved_json, _, _ in saved]
+        byte_counts = [
+            source_bytes + resolved_bytes
+            for source_bytes, resolved_bytes in zip(source_byte_counts, resolved_byte_counts, strict=True)
+        ]
         measurements.append(
             {
                 "shape": [outer_size, inner_size],
                 "images": len(saved),
                 "per_image_bytes": byte_counts,
                 "total_bytes": sum(byte_counts),
-                "node_counts": [len(payload["nodes"]) for payload in payloads],
+                "source_bytes": len(source_json.encode("utf-8")),
+                "per_image_resolved_bytes": resolved_byte_counts,
+                "total_resolved_bytes": sum(resolved_byte_counts),
+                "resolved_node_counts": [len(payload["nodes"]) for payload in payloads],
+                "source_node_counts": [len(json.loads(graph_json)["nodes"]) for _, graph_json, _, _, _ in saved],
             }
         )
         saved_runs.append(saved)
 
-    # Capture both actual runs before asserting the compact contract, including on the original implementation.
+    # Count both persisted channels: the complete source graph and the compact input record.
     print("NESTED_IMAGE_GRAPH_MEASUREMENTS=" + json.dumps(measurements))
     for saved in saved_runs:
-        for _, graph_json, node_id, width in saved:
-            saved_graph = Graph.model_validate_json(graph_json)
+        for _, _, resolved_json, node_id, width in saved:
+            saved_graph = Graph.model_validate_json(resolved_json)
             assert set(saved_graph.nodes) == {node_id}
             assert saved_graph.edges == []
             saved_node = saved_graph.nodes[node_id]
@@ -614,6 +650,10 @@ def test_image_save_graph_nested_iterate_keeps_one_resolved_record_per_image(tmp
             assert (saved_node.id, saved_node.width, saved_node.height) == (node_id, width, 2)
             assert node_id != "image"
             assert len(node_id) == len(saved_graph.id) == 36
-    # All inputs here have fixed-width values and UUIDs: unrelated loop size must cost no bytes per image.
-    assert len(set(measurements[0]["per_image_bytes"] + measurements[1]["per_image_bytes"])) == 1
-    assert measurements[1]["total_bytes"] == 4 * measurements[0]["total_bytes"]
+    # Fixed-width resolved inputs cost no extra bytes as runtime copies grow. The authoring collection grows.
+    assert len(set(measurements[0]["per_image_resolved_bytes"] + measurements[1]["per_image_resolved_bytes"])) == 1
+    assert measurements[1]["total_resolved_bytes"] == 4 * measurements[0]["total_resolved_bytes"]
+    for measurement in measurements:
+        assert measurement["total_bytes"] == (
+            measurement["images"] * measurement["source_bytes"] + measurement["total_resolved_bytes"]
+        )
