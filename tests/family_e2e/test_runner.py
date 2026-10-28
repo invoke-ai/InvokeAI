@@ -2,6 +2,7 @@ import errno
 import json
 import os
 import socket
+import sqlite3
 import subprocess
 import sys
 import time
@@ -13,6 +14,7 @@ import psutil
 import pytest
 import yaml
 
+import scripts.family_e2e.__main__ as cli
 from scripts.family_e2e import calibration, runner, server
 from scripts.family_e2e.__main__ import main
 from scripts.family_e2e.gpu_memory import Adapter, MemoryTrace, ProcessUsage, UnsupportedPlatformError
@@ -478,6 +480,119 @@ def test_a_runner_refuses_and_keeps_heartbeat_and_scratch_root_while_a_left_serv
     assert {role: heartbeat[role] for role in SERVER_ROLES} == dict.fromkeys(SERVER_ROLES, surviving_server)
     assert _scratch_file(killed_run).read_text() == "left by the killed runner"
     assert runner.is_alive(surviving_server)
+
+
+@pytest.mark.parametrize("failure", ["survives the kill", "kill refused"])
+def test_stop_keeps_the_run_while_a_recorded_process_survives_the_kill(
+    killed_run: Path,
+    surviving_server: list[float],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    failure: str,
+) -> None:
+    write_run_info(killed_run, load_run_info(killed_run).model_copy(update={"calibrate": True}))
+    store = _scratch_file(killed_run).parent / "databases" / calibration.STORE_DIR / "0123456789abcdef.json"
+    store.parent.mkdir(parents=True)
+    store.write_text('{"points": []}')
+    _write_heartbeat(killed_run, server=surviving_server, server_launcher=surviving_server)
+
+    def kill_process(process: psutil.Process) -> None:
+        if failure == "kill refused":
+            raise psutil.AccessDenied(process.pid)
+
+    def killpg(pgid: int, sig: int) -> None:
+        if failure == "kill refused":
+            raise PermissionError(errno.EPERM, "Operation not permitted")
+
+    with monkeypatch.context() as m:
+        m.setattr(runner, "KILL_WAIT_S", 0.05)
+        m.setattr(psutil.Process, "kill", kill_process)
+        if sys.platform != "win32":
+            m.setattr(os, "killpg", killpg)
+        capsys.readouterr()
+        assert main(["stop", str(killed_run)]) == 2
+
+    cause = "the kill was refused: AccessDenied" if failure == "kill refused" else "0.05s after the kill; still running"
+    assert f"survived the kill: pid {int(surviving_server[0])} ({cause}" in capsys.readouterr().err
+    assert runner.is_alive(surviving_server)
+    # The server may still write to its scratch root and store: neither is saved nor removed.
+    assert _scratch_file(killed_run).read_text() == "left by the killed runner"
+    assert store.read_text() == '{"points": []}'
+    info = load_run_info(killed_run)
+    assert (info.status, info.calibration_exports) == ("stopped", [])
+
+    # Once the kill works, a second stop saves the store and removes the root.
+    assert main(["stop", str(killed_run)]) == 0
+    assert not runner.is_alive(surviving_server)
+    assert not _scratch_file(killed_run).exists()
+    assert [e.source for e in load_run_info(killed_run).calibration_exports] == ["store_file"]
+
+
+def test_stop_reads_the_heartbeat_again_once_the_runner_is_dead_and_kills_the_server_it_names(
+    killed_run: Path,
+    surviving_server: list[float],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # The runner launched its server after `stop` had read the heartbeat, and recorded it before it was killed.
+    _write_heartbeat(killed_run, server_launcher=surviving_server)
+    reads = [{**runner.read_heartbeat(killed_run), "server_launcher": None}]
+    monkeypatch.setattr(cli, "read_heartbeat", lambda d: reads.pop() if reads else runner.read_heartbeat(d))
+
+    capsys.readouterr()
+    assert main(["stop", str(killed_run)]) == 0
+
+    assert not runner.is_alive(surviving_server)
+    assert f"killed server_launcher (pid {int(surviving_server[0])})" in capsys.readouterr().out
+    assert not _scratch_file(killed_run).exists()
+
+
+def test_the_heartbeat_names_the_serving_process_as_captured_at_its_start(killed_run: Path, tmp_path: Path) -> None:
+    # Once the serving process has exited, its pid can name an unrelated process that `stop` would then kill.
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    serving = psutil.Process(process.pid)
+    captured = [process.pid, serving.create_time()]
+    session = runner._Session(killed_run, runner.load_run_manifest(load_run_info(killed_run)), _fake_gpu("Fake"), None)
+    with open(tmp_path / "console.log", "wb") as console:
+        session.server = server.ServerProcess(
+            process, console, tmp_path / "server.log", "http://127.0.0.1:1", serving, [], "", None
+        )
+        process.kill()
+        process.wait()
+
+        session.heartbeat()
+
+    assert runner.read_heartbeat(killed_run)["server"] == captured
+
+
+class _ServerStarting(Exception):
+    pass
+
+
+def test_a_runner_records_the_server_launcher_before_it_waits_for_the_server_to_start(
+    killed_run: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # On POSIX a runner killed while its server starts leaves the server running: what heartbeat.json names by then
+    # is all `stop` and `resume` find it by.
+    code, template = killed_run.parents[2] / "code", killed_run.parents[2] / "template"
+    (code / "scripts" / "invokeai-web.py").write_text("import time\ntime.sleep(60)\n")
+    (code / "invokeai").mkdir()
+    (code / "invokeai" / "__init__.py").write_text("")
+    (template / "databases").mkdir()
+    sqlite3.connect(template / "databases" / "invokeai.db").close()
+    seen: list[tuple[object, object]] = []
+
+    def wait_for_port(process: subprocess.Popen[bytes], *args: object) -> int:
+        seen.append((runner.read_heartbeat(killed_run).get("server_launcher"), runner.process_identity(process.pid)))
+        raise _ServerStarting
+
+    monkeypatch.setattr(server, "_wait_for_port", wait_for_port)
+    with pytest.raises(_ServerStarting):
+        runner.run(killed_run, gpu_factory=_fake_gpu)
+
+    [(recorded, launched)] = seen
+    assert launched is not None
+    assert recorded == launched
 
 
 class _SavingStore(Exception):

@@ -39,5 +39,8 @@ register(
         # The denoise node takes no scheduler: the set only names the default for the UI, which keeps the picker
         # hidden (`scheduler_applies_to_graph` stays False), as for Ideogram 4.
         scheduler_set="flow",
+        # Regions are not masked: each becomes a box in the JSON layout prompt (`moss_image_layout_prompt`), which
+        # has no negative counterpart, so `regional_negative` keeps its False default.
+        supports_regional_guidance=True,
     ),
 )

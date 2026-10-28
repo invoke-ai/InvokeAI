@@ -21,8 +21,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     WorkingMemoryCalibrationRepetitions,
     WorkingMemoryCalibrationSharedModel,
 )
-from invokeai.backend.architectures import VaeFacet
-from invokeai.backend.architectures import get as get_facet
+from invokeai.backend.architectures import accepts_vae
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     Flux2VariantType,
@@ -202,6 +201,34 @@ def _ignores_vae_pick(model: ModelConfig) -> bool:
     return model.base == BaseModelType.Flux and ships_its_vae(model)
 
 
+DEFAULT_VAE_BASES: Final = frozenset(
+    {
+        BaseModelType.StableDiffusion1,
+        BaseModelType.StableDiffusion2,
+        BaseModelType.StableDiffusionXL,
+        BaseModelType.StableDiffusion3,
+        BaseModelType.Flux,
+        BaseModelType.Flux2,
+        BaseModelType.ZImage,
+    }
+)
+"""Plannable bases whose Generate graph decodes with the `vae` setting, which selecting a model fills with the VAE its
+default settings name. The CogView4 graph sends no VAE."""
+
+
+def default_vae(model: ModelConfig, models: Sequence[ModelConfig]) -> Optional[ModelConfig]:
+    """The installed VAE a main model decodes with by its default settings (`default_settings.vae`), as Generate applies
+    them when the model is selected (`getModelDefaultVae`): one the model accepts; a key naming no such VAE leaves the
+    `vae` setting empty. It fills the `vae` slot, so the model loader nodes take it over a pipeline's own VAE. None
+    where the graph sends no VAE (`DEFAULT_VAE_BASES`, `_ignores_vae_pick`)."""
+    if not _is_main(model) or model.base not in DEFAULT_VAE_BASES or _ignores_vae_pick(model):
+        return None
+    key = getattr(getattr(model, "default_settings", None), "vae", None)
+    if not key:
+        return None
+    return next((vae for vae in models if vae.key == key and _is_vae(vae) and _accepts(model, vae)), None)
+
+
 _KLEIN_QWEN3: Final = {variant.value: encoder.value for variant, encoder in KLEIN_TO_QWEN3_VARIANT.items()}
 """The Qwen3 encoder variant each FLUX.2 Klein variant takes."""
 
@@ -266,8 +293,10 @@ def vae_source(model: ModelConfig, models: Sequence[ModelConfig]) -> Optional[Mo
     keeps, whose VAE the FLUX.2 model loader node takes: the first fitting installed FLUX.2 pipeline, else the first
     one (`getAutoFlux2ComponentSourceModel`), which the graph keeps only beside a standalone text encoder
     (`getFlux2DiffusersComponentSource`). Generate lists the models in the order the server does, which is `models`'
-    order. None: a standalone VAE decodes, or, for a FLUX.2 model without an encoder, no graph compiles
-    (`_lacks_text_encoder`)."""
+    order. None: a standalone VAE decodes, the model's default one included (`default_vae`), or, for a FLUX.2 model
+    without an encoder, no graph compiles (`_lacks_text_encoder`)."""
+    if default_vae(model, models) is not None:
+        return None
     if ships_its_vae(model):
         return model
     if not _is_main(model) or model.base != BaseModelType.Flux2:
@@ -310,11 +339,10 @@ def _runs_on_gpu(vae: ModelConfig) -> bool:
     return getattr(vae, "cpu_only", None) is not True
 
 
-def _accepts(main_base: BaseModelType, vae_base: BaseModelType) -> bool:
-    facet = get_facet(main_base, VaeFacet)
-    if facet is None:
-        return main_base == vae_base
-    return any(compatibility.base == vae_base for compatibility in facet.accepted)
+def _accepts(main: ModelConfig, vae: ModelConfig) -> bool:
+    """Whether the main model can decode with the VAE, by the rule its model loader node and Generate's VAE picker
+    read (`accepts_vae`): base, latent channels where they matter, and the main model's variant."""
+    return accepts_vae(main.base, vae.base, getattr(vae, "latent_channels", None), getattr(main, "variant", None))
 
 
 def _is_main(config: ModelConfig) -> bool:
@@ -452,7 +480,7 @@ _STANDALONE_VAE_BASES: Final = frozenset({BaseModelType.Flux, BaseModelType.Flux
 
 
 def _accepted_vaes(main: ModelConfig, models: Sequence[ModelConfig]) -> list[ModelConfig]:
-    return [model for model in models if _is_vae(model) and _accepts(main.base, model.base)]
+    return [model for model in models if _is_vae(model) and _accepts(main, model)]
 
 
 def _needs_gpu_vae(main: ModelConfig, models: Sequence[ModelConfig]) -> bool:
@@ -463,14 +491,37 @@ def _needs_gpu_vae(main: ModelConfig, models: Sequence[ModelConfig]) -> bool:
     return not any(_runs_on_gpu(vae) for vae in _accepted_vaes(main, models))
 
 
+def _cpu_default_vae(main: ModelConfig, models: Sequence[ModelConfig]) -> Optional[ModelConfig]:
+    """The main model's default VAE (`default_vae`), where it runs on the CPU."""
+    vae = default_vae(main, models)
+    return vae if vae is not None and not _runs_on_gpu(vae) else None
+
+
+def _can_pick_gpu_vae(main: ModelConfig, models: Sequence[ModelConfig]) -> bool:
+    """Whether a case can pick a VAE for the main model that runs on the GPU: its base has a `vae` slot, and a VAE it
+    accepts runs on the GPU."""
+    return main.base in VAE_SLOT_BASES and any(_runs_on_gpu(vae) for vae in _accepted_vaes(main, models))
+
+
+def _decodes_on_the_gpu(main: ModelConfig, models: Sequence[ModelConfig]) -> bool:
+    """Whether a case of the main model can decode on the GPU as far as its default VAE goes: it has none on the CPU, or
+    a case can pick one on the GPU instead (`_gpu_vae_pick`)."""
+    return _cpu_default_vae(main, models) is None or _can_pick_gpu_vae(main, models)
+
+
 def _gpu_vae_pick(main: ModelConfig, models: Sequence[ModelConfig]) -> dict[str, str]:
-    """A `vae` pick where Generate's own fill could land on a VAE that runs on the CPU: the first GPU VAE the main
-    model accepts. None needed where every accepted VAE runs on the GPU, where the base has no VAE slot, or where a
-    pipeline's own VAE decodes (`vae_source`), so Generate fills none."""
+    """A `vae` pick where the main model's default VAE runs on the CPU, or where Generate's own fill could land on a VAE
+    that does: the first GPU VAE the main model accepts. None needed where the default VAE runs on the GPU, where every
+    accepted VAE does, where the base has no VAE slot, or where a pipeline's own VAE decodes (`vae_source`), so Generate
+    fills none."""
     if main.base not in VAE_SLOT_BASES or vae_source(main, models) is not None:
         return {}
+    default = default_vae(main, models)
     accepted = _accepted_vaes(main, models)
-    if all(_runs_on_gpu(vae) for vae in accepted):
+    if default is not None:
+        if _runs_on_gpu(default):
+            return {}
+    elif all(_runs_on_gpu(vae) for vae in accepted):
         return {}
     gpu = sorted((vae for vae in accepted if _runs_on_gpu(vae)), key=lambda vae: (vae.name, vae.key))
     return {"vae": gpu[0].key} if gpu else {}
@@ -543,7 +594,7 @@ def build_plan(
             (
                 model
                 for model in models
-                if _plannable_main(model) and _accepts(model.base, target.base) and not _ignores_vae_pick(model)
+                if _plannable_main(model) and _accepts(model, target) and not _ignores_vae_pick(model)
             ),
             key=lambda model: (model.name, model.key),
         )
@@ -555,8 +606,15 @@ def build_plan(
                 device_class,
                 estimators,
             )
-        # One whose graph compiles, where there is one; otherwise the first says what it lacks.
-        main = next((model for model in candidates if not _lacks_text_encoder(model, models)), candidates[0])
+        # One whose graph compiles and decodes on the GPU, where there is one; otherwise the first says what it lacks.
+        main = next(
+            (
+                model
+                for model in candidates
+                if not _lacks_text_encoder(model, models) and _decodes_on_the_gpu(model, models)
+            ),
+            candidates[0],
+        )
     elif target.base not in PLANNABLE_BASES:
         return _unsupported(
             target,
@@ -591,6 +649,22 @@ def build_plan(
             f"{main.name} has no text encoder Generate can use, so no case compiles: Generate takes it from a FLUX.2 "
             f"pipeline whose encoder fits the model or from a standalone {encoder} encoder, and a pipeline that does "
             f"not fit gives only its VAE. Install a {encoder} encoder or a fitting FLUX.2 pipeline.",
+            device_class,
+            estimators,
+        )
+    if not _decodes_on_the_gpu(main, models):
+        cpu_vae = _cpu_default_vae(main, models)
+        assert cpu_vae is not None
+        instead = (
+            "no compatible VAE that runs on the GPU is installed to pick instead"
+            if main.base in VAE_SLOT_BASES
+            else "a calibration cannot pick another VAE for this model"
+        )
+        return _unsupported(
+            target,
+            f"{main.name} decodes with its default VAE, {cpu_vae.name}, which runs on the CPU (cpu_only): a decode on "
+            f"the CPU measures no GPU memory, and {instead}. Clear cpu_only on {cpu_vae.name}, or set another default "
+            f"VAE for {main.name}.",
             device_class,
             estimators,
         )

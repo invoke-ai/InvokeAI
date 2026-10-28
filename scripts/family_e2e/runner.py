@@ -31,7 +31,7 @@ import logging
 import os
 import sys
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -363,7 +363,7 @@ def _led_group(process: psutil.Process) -> list[int]:
     return living_members(process.pid)
 
 
-def _still_running(identity: list[float] | None) -> list[int]:
+def still_running(identity: list[float] | None) -> list[int]:
     """The pids that still run of the process named by `identity`: itself unless it is a zombie, and the living
     members of the group it leads."""
     process = _identified(identity)
@@ -373,8 +373,8 @@ def _still_running(identity: list[float] | None) -> list[int]:
 
 
 def kill_identified(identity: list[float] | None) -> bool:
-    """Kills what still runs of the process named by [pid, create time] and its descendants, and waits until it has
-    exited. Returns whether anything ran.
+    """Kills what still runs of the process named by [pid, create time] and its descendants, and waits up to
+    KILL_WAIT_S until it has exited. Returns whether anything ran, not whether it exited: `kill_recorded` checks that.
 
     Descendants come from psutil, which drops processes older than their supposed parent; a raw parent-pid walk
     (taskkill /T) can follow a reused pid into an unrelated tree. On POSIX the groups that processes of the tree lead
@@ -410,6 +410,29 @@ def kill_identified(identity: list[float] | None) -> bool:
     ):
         time.sleep(KILL_POLL_S)
     return True
+
+
+def kill_recorded(processes: Sequence[tuple[str, list[float] | None]]) -> tuple[list[tuple[str, int]], str]:
+    """Kills the processes given as (role, identity), in that order, then checks that each has exited.
+
+    Returns the roles and pids of the processes that ran, and what still runs, per pid with the cause; empty once all
+    exited. A process stuck in the GPU driver outlives SIGKILL until it leaves the kernel, and another user's refuses it.
+    """
+    ran: list[tuple[str, int]] = []
+    refused: dict[int, str] = {}
+    for role, identity in processes:
+        try:
+            if kill_identified(identity):
+                ran.append((role, int(identity[0])))
+        except psutil.Error as e:
+            refused[int(identity[0])] = f"the kill was refused: {type(e).__name__} {e}"
+    left = {int(identity[0]): running for _, identity in processes if (running := still_running(identity))}
+    waited = f"{KILL_WAIT_S:g}s after the kill"
+    survivors = ", ".join(
+        f"pid {pid} ({refused.get(pid, waited)}; still running: {', '.join(str(p) for p in running)})"
+        for pid, running in left.items()
+    )
+    return ran, survivors
 
 
 def scratch_root(data_dir: Path, run_id: str, arm: str) -> Path:
@@ -519,25 +542,15 @@ def stop_surviving_server(run_dir: Path) -> None:
     """
     heartbeat = read_heartbeat(run_dir)
     survivors = {
-        int(heartbeat[role][0]): heartbeat[role] for role in SERVER_ROLES if _still_running(heartbeat.get(role))
+        int(heartbeat[role][0]): running for role in SERVER_ROLES if (running := still_running(heartbeat.get(role)))
     }
-    refused: dict[int, str] = {}
-    for pid, identity in survivors.items():
-        running = ", ".join(str(p) for p in _still_running(identity))
-        logger.warning("an earlier runner of this run left its server running (pid %d: %s); stopping it", pid, running)
-        try:
-            kill_identified(identity)
-        except psutil.Error as e:
-            refused[pid] = f"the kill was refused: {type(e).__name__} {e}"
-    left = {pid: running for pid, identity in survivors.items() if (running := _still_running(identity))}
+    for pid, running in survivors.items():
+        pids = ", ".join(str(p) for p in running)
+        logger.warning("an earlier runner of this run left its server running (pid %d: %s); stopping it", pid, pids)
+    _, left = kill_recorded([(role, heartbeat.get(role)) for role in SERVER_ROLES])
     if left:
-        waited = f"{KILL_WAIT_S:g}s after the kill"
-        details = ", ".join(
-            f"pid {pid} ({refused.get(pid, waited)}; still running: {', '.join(str(p) for p in running)})"
-            for pid, running in left.items()
-        )
         raise RunnerError(
-            f"the server an earlier runner left running cannot be stopped: {details}. heartbeat.json and the scratch "
+            f"the server an earlier runner left running cannot be stopped: {left}. heartbeat.json and the scratch "
             f"roots stay as they are; end it, e.g. with `python -m scripts.family_e2e stop {run_dir}`, then resume"
         )
 
@@ -766,6 +779,8 @@ class _Session:
         self.records = load_records(run_dir)
         self.tracker = ResidencyTracker()
         self.server: ServerProcess | None = None
+        # Recorded once at the spawn: a pid read again later could belong to a process that reused it.
+        self.launcher: list[float] | None = None
         self.step_label = "starting"
         self.last_beat = 0.0
         # Per server lifetime: the device classes its calibration runs were created for, and whether their stores
@@ -780,8 +795,9 @@ class _Session:
             self.step_label = step_label
         data = {
             "runner": process_identity(os.getpid()),
-            "server": process_identity(self.server.pid) if self.server else None,
-            "server_launcher": process_identity(self.server.process.pid) if self.server else None,
+            # The create time captured with the serving process, as for the launcher.
+            "server": [self.server.pid, self.server.serving.create_time()] if self.server else None,
+            "server_launcher": self.launcher,
             "step": self.step_label,
             "updated_at": now_iso(),
         }
@@ -837,22 +853,25 @@ class _Session:
             pin = device_env(self.gpu.adapter, self.manifest.server.env)
             build_scratch_root(self.manifest.server.template_root, root, log_path, free_port(), bool(pin))
             self.heartbeat("starting the server")
-            self.server = launch_server(
-                self.manifest.server,
-                root,
-                log_path,
-                self.run_dir / f"server-{self.arm}.console.log",
-                pin,
-            )
             try:
+                self.server = launch_server(
+                    self.manifest.server,
+                    root,
+                    log_path,
+                    self.run_dir / f"server-{self.arm}.console.log",
+                    pin,
+                    on_spawn=self.server_spawned,
+                )
                 self.heartbeat("server ready")
                 self.serve(self.server, todo)
             except ServerCrashed as e:
                 logger.error("%s; starting a new server", e)
                 return True
             finally:
-                self.server.stop()
-                self.server = None
+                # A launch that failed has stopped its server itself.
+                if self.server is not None:
+                    self.server.stop()
+                self.server, self.launcher = None, None
         except (KeyboardInterrupt, RunStopped):
             stopping = True
             raise
@@ -879,6 +898,10 @@ class _Session:
                 if leftovers:
                     logger.warning("could not remove the scratch root %s: %s", root, ", ".join(leftovers))
         return False
+
+    def server_spawned(self, pid: int) -> None:
+        self.launcher = process_identity(pid)
+        self.heartbeat()
 
     def serve(self, server: ServerProcess, todo: list[PlannedStep]) -> None:
         client = InvokeClient(server.base_url)

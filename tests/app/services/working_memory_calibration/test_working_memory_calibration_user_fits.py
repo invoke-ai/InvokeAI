@@ -674,6 +674,31 @@ def test_a_retry_of_a_failed_step_canceled_before_it_ran_aborts_its_attempt(tmp_
     assert {run.held_back for run in summary.runs} == {"aborted_attempt"}
 
 
+def test_a_retry_of_a_judged_failed_step_cleared_before_the_next_refresh_aborts_its_attempt(
+    tmp_path: Path, started
+) -> None:
+    """The failed step was judged (its outcome read from the queue, the attempt feeding the fit), then retried, and a
+    queue clear deleted the retry's row before anything refreshed: no read of the queue finds the retry any more. The
+    store recorded it as the queue committed it, so the attempt is aborted and its measurements leave the fit."""
+    service = started(tmp_path)
+    _, largest = _queue_attempt(service, "retried-then-cleared", 2)
+    queue = service._services.session_queue
+    queue.fail_queue_item(largest.item_ids[0], "OutOfMemoryError", "out of memory", "")
+    service.refresh_user_fits()
+    assert _estimate() == _user_bytes(1024)
+
+    [retried] = queue.retry_items_by_id("default", largest.item_ids).retried_items
+    queue.clear("default")
+    service.refresh_user_fits()
+
+    assert queue.get_queue_item_ids("default").item_ids == []
+    assert _estimate() == _shipped()
+    summary = service.get_model_summary("model-a")
+    assert {run.held_back for run in summary.runs} == {"aborted_attempt"}
+    sizes = {(size.counted, size.excluded_reason) for line in summary.lines for size in line.sizes}
+    assert sizes == {(False, "aborted_attempt")}
+
+
 def test_a_queue_item_id_that_now_names_another_item_is_not_taken_for_the_runs(
     tmp_path: Path, started, mock_invoker: Invoker
 ) -> None:
@@ -741,6 +766,148 @@ def test_removing_a_run_of_a_complete_attempt_discards_only_its_own_measurements
     assert _stored(tmp_path)["removed_attempt_steps"] == [
         {"user_id": "system", "attempt_id": "complete", "removed": 1, "aborted": False, "attempt_steps": 3}
     ]
+
+
+def test_each_reset_forgets_what_the_service_kept_of_the_runs_it_removed(tmp_path: Path, started) -> None:
+    """The service keeps, for the runs it judged, which file holds each and the outcomes of their items it read from
+    the queue, retries included. Those last as long as the runs: calibrating and resetting again and again leaves
+    nothing behind."""
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    items: dict[str, set[int]] = {}
+    for index, model_key in enumerate(("model-a", "model-a", "model-b", "model-c")):
+        request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id=f"attempt-{index}", attempt_steps=1)
+        created = asyncio.run(service.create_run(model_key, request, "system"))
+        items[created.run_id] = set(created.item_ids)
+        if index != 1:
+            _finish(service, created.item_ids)
+            continue
+        # Out of memory, then a retry that completed: the store records the retry beside the item it retried.
+        [item] = created.item_ids
+        queue.fail_queue_item(item, "OutOfMemoryError", "out of memory", "")
+        [retried] = queue.retry_items_by_id("default", [item]).retried_items
+        queue.complete_queue_item(retried.item_id)
+        items[created.run_id].add(retried.item_id)
+    service.refresh_user_fits()
+
+    def kept() -> tuple[set[tuple[str, int]], set[str]]:
+        return set(service._item_outcomes), set(service._run_files)
+
+    def of(*ids: str) -> tuple[set[tuple[str, int]], set[str]]:
+        return {(run_id, item_id) for run_id in ids for item_id in items[run_id]}, set(ids)
+
+    first, retried_run, third, fourth = items
+    assert len(items[retried_run]) == 2 and kept() == of(*items)
+    service.reset_run(retried_run)
+    assert kept() == of(first, third, fourth)
+    service.reset_model("model-b")
+    assert kept() == of(first, fourth)
+    service.reset_all()
+    assert kept() == (set(), set())
+
+
+def test_every_judgement_of_item_outcomes_holds_the_lock_removals_hold(tmp_path: Path, started, monkeypatch) -> None:
+    """A removal drops its runs' outcomes under the fits' lock, in the same hold as its store change. Every other
+    judgement of the store's items (the summary, a new attempt's check of an attempt between its steps, a reset's hold
+    reasons) reads the queue under it too: none can write back an outcome of a run a removal just dropped, or find
+    one dropped between checking and reading it."""
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    settled = _create(service, attempt_id="settled", attempt_steps=1)
+    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="between-steps", attempt_steps=2)
+    _finish(service, asyncio.run(service.create_run("model-b", request, "other-admin")).item_ids)
+    read_by_id = queue.get_queue_item_summaries_by_ids
+    held: dict[str, list[bool]] = {}
+    phase = ""
+
+    def read_noting_the_lock(*args, **kwargs):
+        held.setdefault(phase, []).append(service._fits_lock.locked())
+        return read_by_id(*args, **kwargs)
+
+    monkeypatch.setattr(queue, "get_queue_item_summaries_by_ids", read_noting_the_lock)
+    phase = "summary"
+    service._item_outcomes.clear()
+    service.get_model_summary("model-a")
+    phase = "attempt check"
+    service._item_outcomes.clear()
+    with pytest.raises(CalibrationAttemptBusyError):
+        _create(service, attempt_id="next", attempt_steps=1)
+    phase = "reset"
+    service._item_outcomes.clear()
+    service.reset_run(settled)
+
+    assert held == {"summary": [True], "attempt check": [True], "reset": [True]}
+
+
+def _renumber(tmp_path: Path, run_id: str, item_ids: list[int]) -> None:
+    """Record `item_ids` as the run's items, as a store kept beside a recreated database that numbered them anew."""
+    path = next((tmp_path / "working_memory").glob("*.json"))
+    stored = json.loads(path.read_bytes())
+    [run] = [run for run in stored["runs"] if run["run_id"] == run_id]
+    run["queue_item_ids"] = item_ids
+    path.write_text(json.dumps(stored))
+
+
+def _off_the_line(run_id: str) -> list[MeasuredWindow]:
+    return [_window(run_id, side, 1800 * side**2 + 400 * MIB) for side in (512, 768, 1024)]
+
+
+def test_a_new_attempt_whose_item_id_an_old_run_recorded_counts_when_judged_after_the_old_run(
+    tmp_path: Path, started, mock_invoker: Invoker
+) -> None:
+    """A restored database gave the new attempt's item the id an old, finished attempt recorded. The old run is judged
+    while the new one runs: its id now names another run's item, so its own item is gone. That says nothing about the
+    new run, which feeds the fit once it finished."""
+    service = started(tmp_path)
+    old = _create(service, attempt_id="old", attempt_steps=1)
+    service.record_windows(old, _off_the_line(old))
+    request = WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="new", attempt_steps=1)
+    new = asyncio.run(service.create_run("model-a", request, "system"))
+    service.stop(mock_invoker)
+    _renumber(tmp_path, old, new.item_ids)
+    service = started(tmp_path)
+
+    service.refresh_user_fits()
+    assert {run.run_id: run.held_back for run in service.get_model_summary("model-a").runs}[new.run_id] == "running"
+    service.record_windows(new.run_id, _on_the_line(new.run_id))
+    _finish(service, new.item_ids)
+    service.refresh_user_fits()
+
+    held = {run.run_id: run.held_back for run in service.get_model_summary("model-a").runs}
+    assert held == {old: "aborted_attempt", new.run_id: None}
+    assert _estimate() == _user_bytes(1024)
+
+
+def test_an_old_run_whose_item_id_a_new_attempt_took_is_not_judged_by_the_new_item(
+    tmp_path: Path, started, mock_invoker: Invoker
+) -> None:
+    """As above, with both runs settled and judged in one refresh: the old run's own item is gone (canceled), however
+    the new run's item with its id ended, so the old attempt never feeds the fit."""
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    old_created = asyncio.run(
+        service.create_run(
+            "model-a",
+            WorkingMemoryCalibrationRequest(graph=_add_graph(), attempt_id="old", attempt_steps=1),
+            "system",
+        )
+    )
+    old = old_created.run_id
+    service.record_windows(old, _off_the_line(old))
+    _finish(service, old_created.item_ids)
+    for item_id in old_created.item_ids:
+        queue.delete_queue_item(item_id)
+    new = _create(service, attempt_id="new", attempt_steps=1)
+    service.record_windows(new, _on_the_line(new))
+    service.stop(mock_invoker)
+    _renumber(tmp_path, old, _stored_run(tmp_path, new)["queue_item_ids"])
+    service = started(tmp_path)
+
+    service.refresh_user_fits()
+
+    held = {run.run_id: run.held_back for run in service.get_model_summary("model-a").runs}
+    assert held == {old: "aborted_attempt", new: None}
+    assert _estimate() == _user_bytes(1024)
 
 
 def test_removing_a_canceled_run_keeps_its_attempt_aborted(tmp_path: Path, started) -> None:
