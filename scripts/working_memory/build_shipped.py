@@ -45,14 +45,7 @@ from invokeai.backend.working_memory.coefficients import (
     WorkingMemoryData,
     load_data,
 )
-from invokeai.backend.working_memory.fit import (
-    capping_spans,
-    entry_key,
-    fit_points,
-    fitted_values,
-    line_values,
-    shipped_pair,
-)
+from invokeai.backend.working_memory.fit import capping_spans, entry_key, fit_points, fitted_values, shipped_pair
 from invokeai.backend.working_memory.platform import Platform, is_measured, platform_for_environment
 from invokeai.backend.working_memory.spec import EstimatorSpec, import_estimator_modules
 
@@ -398,8 +391,8 @@ def review_lines(
         old_entries = {entry_key(entry): entry for entry in before[name].coefficients}
         for entry in file.coefficients:
             old_values, values = old_entries[entry_key(entry)].values or {}, entry.values or {}
-            # The pixel lines only: a hand-set value on no line (`line_values`) is not refitted, so it never moves.
-            for suffix in sorted({name[2:] for name in line_values(entry)}):
+            # Only a line points are fitted on can move. A hand-set value (`fit.hand_set_values`) is on none.
+            for suffix in sorted(line for key, line in fitted_on if key == entry_key(entry)):
                 old = (old_values[f"k_{suffix}"], old_values[f"b_{suffix}"])
                 new = (values[f"k_{suffix}"], values[f"b_{suffix}"])
                 if old == new:

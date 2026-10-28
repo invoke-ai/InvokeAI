@@ -536,7 +536,8 @@ def test_a_raise_that_pushes_fresh_process_points_over_their_bound_is_refused_ev
         assert "reserved MiB 8020, 13000 while allocated MiB 8020, 8020" in captured.out
         assert "decode_fp32: k 5988 -> " in captured.out and "1 flagged as fragmentation" in captured.out
         assert "the bounds of these points reject the result" in captured.err
-        assert "vae.sd-miopen,expandable,windows-decode-fp32-1280x1280-RX9060XT-demand_peak: reserves" in captured.err
+        violation = "vae.sd-miopen,expandable,windows-decode-fp32-1280x1280-scores-RX9060XT-demand_peak: reserves"
+        assert violation in captured.err
         assert _files(data_dir) == before
 
 

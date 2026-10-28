@@ -33,11 +33,11 @@ environment variable could move."""
 
 UPPER_BOUND_EXCEPTIONS: Final[Mapping[str, float]] = MappingProxyType(
     {
-        "vae.sd-miopen,native,windows-decode-fp16-1280x1280-RX9060XT-demand_peak": 1.33,
-        "vae.sd-miopen,native,windows-encode-fp16-1024x1024-RX9060XT-demand_peak": 1.57,
-        "vae.sd-miopen,native,windows-encode-fp16-1280x1280-RX9060XT-demand_peak": 1.78,
-        "vae.flux-miopen,native,windows-decode-bf16-512x512-RX9060XT-demand_peak": 1.33,
-        "vae.flux2-miopen,native,windows-decode-bf16-512x512-RX9060XT-demand_peak": 1.33,
+        "vae.sd-miopen,native,windows-decode-fp16-1280x1280-scores-RX9060XT-demand_peak": 1.33,
+        "vae.sd-miopen,native,windows-encode-fp16-1024x1024-scores-RX9060XT-demand_peak": 1.57,
+        "vae.sd-miopen,native,windows-encode-fp16-1280x1280-scores-RX9060XT-demand_peak": 1.78,
+        "vae.flux-miopen,native,windows-decode-bf16-512x512-scores-RX9060XT-demand_peak": 1.33,
+        "vae.flux2-miopen,native,windows-decode-bf16-512x512-scores-RX9060XT-demand_peak": 1.33,
     }
 )
 """In-fit points, by `point_id`, whose envelope sits more than 1.3x above them, with the ratio they are held to
@@ -47,9 +47,10 @@ cannot stay within 1.3x of all of them. Windows ROCm defaults to expandable segm
 
 
 def point_id(point: MeasuredPoint) -> str:
-    """A readable id of a point: estimator, platform, operation, dtype, size, tile, batch, prompt tokens, card and
-    method. The platform, operation and dtype show where the point names them: an estimator keyed by no platform trait
-    records none, and one whose features name no operation or dtype (the MOSS-Image denoise) none of those."""
+    """A readable id of a point: estimator, platform, operation, dtype, size, tile, batch, prompt tokens, a
+    materialized score matrix, card and method. The platform, operation and dtype show where the point names them: an
+    estimator keyed by no platform trait records none, and one whose features name no operation or dtype (the
+    MOSS-Image denoise) none of those."""
     features = point.features
     platform = ",".join(point.platform.values())
     head = [point.estimator, *([platform] if platform else [])]
@@ -58,17 +59,22 @@ def point_id(point: MeasuredPoint) -> str:
     tile = f"-tile{features['tile']}" if features.get("tile") is not None else ""
     batch = f"-b{features['batch_size']}" if features.get("batch_size", 1) != 1 else ""
     text = f"-text{features['text_tokens']}" if "text_tokens" in features else ""
+    scores = "-scores" if features.get("score_matrix_bytes") else ""
     out_of_fit = "-outfit" if not point.in_fit else ""
     card = point.device.split(" (")[0].replace(" ", "")
-    return f"{'-'.join(head)}-{shape}{tile}{batch}{text}{out_of_fit}-{card}-{point.method}"
+    return f"{'-'.join(head)}-{shape}{tile}{batch}{text}{scores}{out_of_fit}-{card}-{point.method}"
 
 
-def platform_of(point: MeasuredPoint) -> Optional[Platform]:
-    """The platform a point is evaluated on. One that names no OS measured what holds on every OS. One that names no
-    trait at all is of an estimator keyed by none (`platform_keys=()`), which every platform prices alike: None, which
-    `resolve_coefficients` accepts for such an estimator only."""
-    if not point.platform:
-        return None
+_ANY_PLATFORM: Final = Platform("cudnn", "native", "linux")
+"""Where a point of an estimator keyed by no platform trait is evaluated. Its one entry resolves alike on every
+platform, so any will do; this one is measured."""
+
+
+def _platform_of(point: MeasuredPoint, spec: "EstimatorSpec") -> Platform:
+    """The platform a point is evaluated on. One that names no OS measured what holds on every OS. One of an estimator
+    keyed by no platform trait names nothing (`_ANY_PLATFORM`)."""
+    if not spec.platform_keys:
+        return _ANY_PLATFORM
     return Platform(**({"os": "other"} | point.platform))  # type: ignore[arg-type]
 
 
@@ -76,7 +82,7 @@ def evaluate_point(
     point: MeasuredPoint, spec: "EstimatorSpec", data: Iterable[WorkingMemoryData]
 ) -> WorkingMemoryEstimate:
     """The estimate for the point's features, priced with the coefficients `data` gives its platform."""
-    return spec.evaluate(point.features, resolve_coefficients(data, spec, platform_of(point), origin="data"))
+    return spec.evaluate(point.features, resolve_coefficients(data, spec, _platform_of(point, spec), origin="data"))
 
 
 def fitted_decides(estimate: WorkingMemoryEstimate) -> bool:

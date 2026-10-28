@@ -15,16 +15,20 @@ below.
 
 `tests/backend/working_memory/test_shipped_coefficients.py` holds every carried value on such a line that is not a
 declared stand-in to `fitted_values` of the shipped points, so a new point that moves a fit fails there with the value
-to ship. A value on no pixel line (`line_values`) is hand-set: the MOSS-Image denoise's `k_token`, bytes per attended
-token with no base. Its points still decide and bound it (`bounds.py`); this module fits pixel lines only.
+to ship. A value on no pixel line is hand-set, which `hand_set_values` allows only for an estimator keyed by no platform
+trait: the MOSS-Image denoise's `k_token`, bytes per attended token with no base. Its points still decide and bound it
+there; this module fits pixel lines only.
 """
 
 import math
 from collections.abc import Iterable, Mapping, Sequence
 from fractions import Fraction
-from typing import Final, NamedTuple, Optional
+from typing import TYPE_CHECKING, Final, NamedTuple, Optional
 
 from invokeai.backend.working_memory.coefficients import CoefficientEntry, MeasuredPoint, WorkingMemoryData, find_entry
+
+if TYPE_CHECKING:
+    from invokeai.backend.working_memory.spec import EstimatorSpec
 
 SHIPPED_MARGIN: Final = Fraction(1, 20)
 """What the shipped slope and intercept add over the envelope of their points: 5%, for the runs and cards the points
@@ -119,14 +123,14 @@ def _pairs(entry: CoefficientEntry) -> set[str]:
     return {name[2:] for name in names if name.startswith("k_") and f"b_{name[2:]}" in names}
 
 
-def line_values(entry: CoefficientEntry) -> set[str]:
-    """The values of `entry` that `fitted_values` reproduces: both halves of each pixel line it carries, stand-ins
-    included. Any other value is hand-set (see the module docstring), which the data test allows only for an estimator
-    keyed by no platform trait.
-
-    Where per-estimator lines take over (`EstimatorSpec.line`, PR #9919), a line in attended tokens such as the
-    MOSS-Image denoise's is fitted too, and this distinction goes."""
-    return {f"{part}_{suffix}" for suffix in _pairs(entry) for part in ("k", "b")}
+def hand_set_values(entry: CoefficientEntry, spec: "EstimatorSpec") -> set[str]:
+    """The values `entry` may carry that no fit reproduces: those on no pixel line, for a `spec` keyed by no platform
+    trait. Any other spec prices convolutions, whose every value is half of a line, so a value off one there is a typo
+    or a term the fit never checks, and none is exempt."""
+    if spec.platform_keys:
+        return set()
+    lines = {f"{part}_{suffix}" for suffix in _pairs(entry) for part in ("k", "b")}
+    return set(entry.values or {}) - lines
 
 
 def fit_points(data: Iterable[WorkingMemoryData]) -> Mapping[tuple[EntryKey, str], list[FitPoint]]:
