@@ -232,8 +232,8 @@ export const List = <T,>({
     overscan: OVERSCAN_ROWS,
     rangeExtractor,
     scrollPaddingStart: hasHeaders ? LIST_SECTION_HEADER_HEIGHT_PX : 0,
-    // Scrollable's phantom-scrollbar heal dispatches a scroll event from a mount effect, where flushSync is a
-    // React error; useSyncExternalStore already commits scroll snapshots synchronously.
+    // useSyncExternalStore already commits scroll snapshots synchronously; flushSync would only add a React error
+    // for any scroll event dispatched while React is rendering or flushing effects.
     useFlushSync: false,
   });
   const { scrollToIndex, virtualItems } = virtualizer;

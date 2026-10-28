@@ -132,6 +132,9 @@ export const ProjectsBrowser = ({
     getItemKey,
     getScrollElement,
     overscan: 4,
+    // useSyncExternalStore already commits scroll snapshots synchronously; flushSync would only add a React error
+    // for any scroll event dispatched while React is rendering or flushing effects.
+    useFlushSync: false,
   });
 
   // The virtualizer caches measurements and will not re-read `estimateSize` on
