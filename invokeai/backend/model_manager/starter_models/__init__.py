@@ -22,6 +22,7 @@ from invokeai.backend.model_manager.starter_models.anima import (
     anima_lllite_scribble_preview3,
     anima_lllite_sketch,
     anima_qwen3_5_encoder,
+    anima_turbo_gguf_q8_0,
     anima_vae,
 )
 from invokeai.backend.model_manager.starter_models.cogview4 import cogview4
@@ -572,6 +573,7 @@ STARTER_MODELS: list[StarterModel] = [
     alibabacloud_wan26_t2i,
     alibabacloud_qwen_image_edit_max,
     anima_base,
+    anima_turbo_gguf_q8_0,
     anima_2_9b,
     anima_2_9b_int8,
     anima_3_8b,
