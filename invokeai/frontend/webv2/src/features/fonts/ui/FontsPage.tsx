@@ -39,12 +39,12 @@ import {
   ArrowRightIcon,
   CircleAlertIcon,
   FileTypeIcon,
-  PackageOpenIcon,
   PlusIcon,
   RefreshCwIcon,
   SearchIcon,
   SlidersHorizontalIcon,
   Trash2Icon,
+  TypeIcon,
   UploadIcon,
 } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -57,7 +57,7 @@ const getFontId = (font: FontRecord): string => font.id;
 const FILTER_POSITION = { placement: 'bottom-end' } as const;
 const PREVIEW_TEXT_SX = { textWrap: 'pretty' } as const;
 const ERROR_ICON = <CircleAlertIcon />;
-const EMPTY_ICON = <Icon as={PackageOpenIcon} />;
+const EMPTY_ICON = <Icon as={TypeIcon} />;
 const EMPTY_SEARCH_ICON = <Icon as={SearchIcon} />;
 let nextUploadId = 1;
 

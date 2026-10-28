@@ -1280,7 +1280,7 @@ export const dataListSlotRecipe = defineSlotRecipe({
     ...chakraSlotRecipes.dataList.base,
     item: {
       ...chakraSlotRecipes.dataList.base?.item,
-      '&:not(:first-child)': {
+      '&:not(:first-of-type)': {
         // Use borderColor plus top width; side-specific color does not resolve the semantic token.
         borderColor: 'border.subtle',
         borderTopWidth: '1px',

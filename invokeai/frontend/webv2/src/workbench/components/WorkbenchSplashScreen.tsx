@@ -1,5 +1,5 @@
 import splashImageUrl from '@assets/SplashImage.webp';
-import { Box, Flex, Heading, HStack, Spinner, Text, VStack } from '@chakra-ui/react';
+import { Badge, Box, Flex, Heading, HStack, Spinner, Text, VStack } from '@chakra-ui/react';
 import { APP_VERSION } from '@platform/runtime/appMetadata';
 import { InvokeMark } from '@platform/ui/InvokeMark';
 import { useState } from 'react';
@@ -29,7 +29,12 @@ export const WorkbenchSplashScreen = ({ messageKey = 'splash.loadingWorkspace' }
             <InvokeMark size={164} />
           </Box>
           <VStack align="start" flex="1" minH="full" minW="80" textAlign="start" py="2">
-            <Heading size="4xl">{t('app.nameWithVersion', { name: t('app.name'), version: APP_VERSION })}</Heading>
+            <VStack align="start" gap="1.5">
+              <Heading size="4xl">{t('app.name')}</Heading>
+              <Badge fontFamily="mono" size="lg" variant="subtle">
+                v{APP_VERSION}
+              </Badge>
+            </VStack>
             <Text fontSize="xl">{t('splash.tagline')}</Text>
             <Text fontSize="md">{t('splash.artworkBy', { artist: 'Jonathan Pollack' })}</Text>
             <Flex alignItems="center" gap="2" mt="auto">

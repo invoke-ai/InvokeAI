@@ -1411,7 +1411,10 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
           onUndo={undo}
           onUpdateNodes={onUpdateNodes}
         />
-        {workflowShowMinimap && (!isLargeGraph || isMinimapReady) ? <FlowMiniMap /> : null}
+        {/* An empty graph's minimap is a bare panel that reads as a broken element. */}
+        {workflowShowMinimap && projectGraph.nodes.length > 0 && (!isLargeGraph || isMinimapReady) ? (
+          <FlowMiniMap />
+        ) : null}
       </ReactFlow>
       {ExportView ? (
         <ExportView

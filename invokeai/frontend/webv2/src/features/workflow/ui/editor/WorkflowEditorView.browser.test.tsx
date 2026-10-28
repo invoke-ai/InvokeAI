@@ -137,7 +137,10 @@ const createProjectStore = (graph: ProjectGraphState) => {
   };
 };
 
-const createAdapter = (project: ReturnType<typeof createProjectStore>): WorkflowUiAdapter => {
+const createAdapter = (
+  project: ReturnType<typeof createProjectStore>,
+  { showMinimap = false }: { showMinimap?: boolean } = {}
+): WorkflowUiAdapter => {
   const subscribe = () => () => {};
 
   return {
@@ -170,7 +173,7 @@ const createAdapter = (project: ReturnType<typeof createProjectStore>): Workflow
         themeId: 'classic',
         workflowEdgeStyle: 'curved',
         workflowEdgesBehindNodes: false,
-        workflowShowMinimap: false,
+        workflowShowMinimap: showMinimap,
         workflowSnapToGrid: false,
         workflowValidateConnections: true,
       }),
@@ -198,8 +201,12 @@ const runtime = {
 } as const;
 
 /** Mounts the editor over the project port and returns the adapter, whose commands the test inspects. */
-const renderEditor = async (root: Root, project: ReturnType<typeof createProjectStore>) => {
-  const adapter = createAdapter(project);
+const renderEditor = async (
+  root: Root,
+  project: ReturnType<typeof createProjectStore>,
+  options?: { showMinimap?: boolean }
+) => {
+  const adapter = createAdapter(project, options);
 
   await act(() =>
     root.render(
@@ -287,6 +294,21 @@ describe('WorkflowEditorView first open', () => {
     expect(rect.left).toBeGreaterThanOrEqual(toolbar.right);
     const hit = document.elementFromPoint(rect.left + 4, rect.top + rect.height / 2);
     expect(hit !== null && left.contains(hit)).toBe(true);
+  });
+
+  it('shows the enabled minimap only once the graph has a node', async () => {
+    const empty = createProjectGraph('workflow-empty');
+    const project = createProjectStore(empty);
+    const minimap = () => host.querySelector('.react-flow__minimap');
+
+    await renderEditor(root, project, { showMinimap: true });
+    await expect.poll(getWorkflowFlowInstance).toBeTruthy();
+
+    expect(minimap()).toBeNull();
+
+    await act(() => project.setGraph({ ...empty, nodes: [addNode('only', 0, 0)] }));
+
+    await expect.poll(minimap).not.toBeNull();
   });
 
   it('gives the next workflow its own flow, without errors from the outgoing one', async () => {

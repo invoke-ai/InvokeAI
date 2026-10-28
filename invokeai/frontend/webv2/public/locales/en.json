@@ -301,8 +301,7 @@
     "increaseValue": "Increase value"
   },
   "app": {
-    "name": "Invoke AI",
-    "nameWithVersion": "{{name}} {{version}}"
+    "name": "Invoke AI"
   },
   "auth": {
     "account": "Account",
