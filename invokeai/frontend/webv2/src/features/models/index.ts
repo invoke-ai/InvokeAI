@@ -30,9 +30,16 @@ export { useInstallActions } from './ui/add-models/useInstallActions';
 export { getStarterModelInstallSources, type StarterInstallSource } from './ui/add-models/starterModelInstallSources';
 export { ModelInstallRuntime } from './ui/ModelInstallRuntime';
 export { ModelsPage } from './ui/ModelsPage';
+export type { CalibrationGraph, CalibrationGraphCompiler, WorkingMemoryCase } from './core/workingMemory';
 export {
+  CalibrationGraphCompilerProvider,
   ModelsUiProvider,
+  useModelsUi,
   useOpenAddModelsSearch,
   useOpenModelInManager,
+  type ModelSchedulerPolicy,
   type ModelsUiAdapter,
+  type SchedulerPolicyReader,
+  type SchedulerPolicySource,
+  type SchedulerPolicyState,
 } from './ui/ModelsUiContext';

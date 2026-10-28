@@ -219,10 +219,8 @@ void i18n.use(initReactI18next).init({
             noStarredItemsMatch: 'No starred items',
             showAllStarred: 'Show all',
             showAllStarredItems: 'Show all starred items',
-            collapseStarredItems: 'Collapse starred items',
             dropMediaToUploadToBoard: 'Drop media to {{name}}',
             emptyBoardUploadHint: 'Drop media here or click to upload',
-            expandStarredItems: 'Expand starred items',
             selectImageForPreview: 'Select {{name}} for preview',
             selectVideoForPreview: 'Select video {{name}}, duration {{duration}}, for preview',
             selectedBoardFallback: 'selected board',
@@ -332,12 +330,15 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateV
     compareImageKey: null,
     galleryView: 'images',
     isComparisonActive: false,
+    isSearchActive: false,
     items,
+    listingBoardId: overrides.selectedBoardId ?? board.id,
     page: 0,
     // A visible selection is the persisted primary; tests whose primary is off-page name it explicitly.
     primarySelectedItemKey: overrides.selectedItemKey === undefined ? 'image:first.png' : overrides.selectedItemKey,
     revealTargetPage: null,
     projectBoardId: null,
+    searchScope: 'board',
     searchTerm: '',
     selectedBoardId: board.id,
     selectedItemKey: 'image:first.png',
@@ -719,6 +720,22 @@ const getButton = (label: string): HTMLButtonElement => {
   return button;
 };
 
+/** The starred disclosure is named by its visible heading and count; `aria-expanded` carries its state. */
+const findStarredToggle = (expanded: boolean): HTMLButtonElement | null =>
+  [...(host?.querySelectorAll<HTMLButtonElement>(`button[aria-expanded="${String(expanded)}"]`) ?? [])].find((button) =>
+    button.textContent?.startsWith('Starred')
+  ) ?? null;
+
+const getStarredToggle = (expanded: boolean): HTMLButtonElement => {
+  const button = findStarredToggle(expanded);
+
+  if (!button) {
+    throw new Error(`Expected the ${expanded ? 'expanded' : 'collapsed'} starred disclosure`);
+  }
+
+  return button;
+};
+
 const click = (button: HTMLButtonElement, init: MouseEventInit = {}): Promise<void> =>
   interact(() => button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ...init })));
 
@@ -796,7 +813,9 @@ describe('GalleryImageGrid mixed item cells', () => {
     expect(viewport.scrollTop).toBe(initialScrollTop);
 
     await interact(() => pointer('pointermove', document, x, edgeY - 20), 100);
-    await interact(() => pointer('pointerup', document, x, edgeY - 20));
+    // dnd-kit briefly suppresses the click following a completed drag. Let
+    // that document-level guard expire before the next interaction test.
+    await interact(() => pointer('pointerup', document, x, edgeY - 20), 300);
     expect(viewport.scrollTop).toBe(initialScrollTop);
   });
 
@@ -810,12 +829,13 @@ describe('GalleryImageGrid mixed item cells', () => {
     setStrip([starred]);
     await renderGallery(createGallery({ items: [createItem('image', 'regular.png')], settings: DENSE_SETTINGS }));
 
-    const trigger = getButton('Collapse starred items');
+    const trigger = getStarredToggle(true);
     const starredSection = host?.querySelector('[data-gallery-section="starred"]');
     const regularSection = host?.querySelector('[data-gallery-section="regular"]');
 
     expect(trigger.getAttribute('aria-expanded')).toBe('true');
-    expect(trigger.textContent).toContain('Starred');
+    // The visible heading and count are the whole name (WCAG 2.5.3).
+    await expect.element(trigger).toHaveAccessibleName(/^Starred\s+1$/);
     expect(trigger.closest('[role="list"]')).toBeNull();
     expect(starredSection?.querySelector('button[aria-label="Select starred.png for preview"]')).not.toBeNull();
     expect(regularSection?.querySelector('button[aria-label="Select regular.png for preview"]')).not.toBeNull();
@@ -829,7 +849,7 @@ describe('GalleryImageGrid mixed item cells', () => {
     setStrip([starred], 7);
     await renderGallery(createGallery({ items: [createItem('image', 'regular.png')], settings: DENSE_SETTINGS }));
 
-    const trigger = getButton('Collapse starred items');
+    const trigger = getStarredToggle(true);
     expect([...trigger.querySelectorAll<HTMLElement>('span')].some((span) => span.textContent === '7')).toBe(true);
 
     await click(getButton('Show all starred items'));
@@ -845,7 +865,7 @@ describe('GalleryImageGrid mixed item cells', () => {
       background
     );
 
-    const trigger = getButton('Collapse starred items');
+    const trigger = getStarredToggle(true);
     const count = [...trigger.querySelectorAll<HTMLElement>('span')].find((span) => span.textContent === '1');
     const surface = host?.querySelector<HTMLElement>('[data-testid="gallery-surface"]');
 
@@ -867,7 +887,7 @@ describe('GalleryImageGrid mixed item cells', () => {
     setStrip([starred], 3);
     await renderGallery(createGallery({ items: [createItem('image', 'regular.png')], settings: DENSE_SETTINGS }));
 
-    const trigger = getButton('Collapse starred items');
+    const trigger = getStarredToggle(true);
     const header = trigger.parentElement;
 
     expect(header?.getBoundingClientRect().height).toBe(24);
@@ -883,10 +903,10 @@ describe('GalleryImageGrid mixed item cells', () => {
 
     const pinned = host!.querySelector<HTMLElement>('[data-gallery-pinned]')!;
     const listingTop = () => host!.querySelector('[data-gallery-section="regular"]')!.getBoundingClientRect().top;
-    const headerRect = getButton('Collapse starred items').parentElement?.getBoundingClientRect();
+    const headerRect = getStarredToggle(true).parentElement?.getBoundingClientRect();
     const starredRect = getButton('Select starred.png for preview').getBoundingClientRect();
 
-    expect(pinned.contains(getButton('Collapse starred items'))).toBe(true);
+    expect(pinned.contains(getStarredToggle(true))).toBe(true);
     expect(pinned.contains(getButton('Select starred.png for preview'))).toBe(true);
     expect(pinned.contains(getButton('Select regular.png for preview'))).toBe(false);
     expect(starredRect.top - (headerRect?.bottom ?? 0)).toBeLessThan(4);
@@ -894,12 +914,12 @@ describe('GalleryImageGrid mixed item cells', () => {
     expect(getComputedStyle(pinned).borderBottomWidth).toBe('1px');
     expect(listingTop() - pinned.getBoundingClientRect().bottom).toBeCloseTo(GALLERY_PINNED_FOOTER_PX - 1, 0);
 
-    await click(getButton('Collapse starred items'));
+    await click(getStarredToggle(true));
     expect(actionMocks.updateSettings).toHaveBeenCalledExactlyOnceWith({ starredSectionCollapsed: true });
     await renderGallery({ ...gallery, settings: { ...DENSE_SETTINGS, starredSectionCollapsed: true } });
 
     const collapsedPinned = host!.querySelector<HTMLElement>('[data-gallery-pinned]')!;
-    const collapsedHeaderRect = getButton('Expand starred items').parentElement?.getBoundingClientRect();
+    const collapsedHeaderRect = getStarredToggle(false).parentElement?.getBoundingClientRect();
 
     expect(collapsedPinned.getBoundingClientRect().bottom - (collapsedHeaderRect?.bottom ?? 0)).toBeCloseTo(1, 0);
     expect(listingTop() - collapsedPinned.getBoundingClientRect().bottom).toBeCloseTo(GALLERY_PINNED_FOOTER_PX - 1, 0);
@@ -914,7 +934,7 @@ describe('GalleryImageGrid mixed item cells', () => {
       })
     );
 
-    const trigger = getButton('Expand starred items');
+    const trigger = getStarredToggle(false);
 
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
     expect([...trigger.querySelectorAll<HTMLElement>('span')].some((span) => span.textContent === '4')).toBe(true);
@@ -929,21 +949,21 @@ describe('GalleryImageGrid mixed item cells', () => {
     setStrip([]);
     await renderGallery(createGallery({ items: [createItem('image', 'regular.png')], settings: DENSE_SETTINGS }));
 
-    expect(host?.querySelector('button[aria-label="Expand starred items"]')).toBeNull();
-    expect(host?.querySelector('button[aria-label="Collapse starred items"]')).toBeNull();
+    expect(findStarredToggle(false)).toBeNull();
+    expect(findStarredToggle(true)).toBeNull();
   });
 
   it('shows the strip on paginated pages too, and no chrome when the strip is empty', async () => {
     setStrip([starred]);
     await renderGallery(createGallery({ items: [createItem('image', 'regular.png')] }));
 
-    expect(host?.querySelector('button[aria-label="Collapse starred items"]')).not.toBeNull();
+    expect(findStarredToggle(true)).not.toBeNull();
     expect(sectionOrder()).toEqual(['starred', 'regular']);
 
     setStrip([]);
     await renderGallery(createGallery({ items: [createItem('image', 'regular.png')] }));
 
-    expect(host?.querySelector('button[aria-label="Collapse starred items"]')).toBeNull();
+    expect(findStarredToggle(true)).toBeNull();
     expect(sectionOrder()).toEqual(['regular']);
   });
 
@@ -967,7 +987,7 @@ describe('GalleryImageGrid mixed item cells', () => {
     setStrip([starred]);
     await renderGallery(createGallery({ items: [], settings: DENSE_SETTINGS }));
 
-    expect(getButton('Collapse starred items')).not.toBeNull();
+    expect(getStarredToggle(true)).not.toBeNull();
     expect(host?.querySelector('button[aria-label="Select starred.png for preview"]')).not.toBeNull();
     expect(host?.querySelector('[role="button"]')).toBeNull();
     expect(host?.textContent).not.toContain('Drop media');
@@ -3363,14 +3383,15 @@ describe('GalleryImageGrid virtualization', () => {
       return countAttempts === 1 ? Promise.reject(new Error('Count unavailable')) : Promise.resolve(65);
     });
     mocks.fetchSparsePage.mockImplementation((_filter, offset) => Promise.resolve({ items, offset, total: 65 }));
+    const gallery = createGallery({
+      items: [],
+      page: 1,
+      settings: { ...DENSE_SETTINGS, paginationMode: 'paginated' },
+    });
+    // The selected board resolves against the boards query; left to load, its answer would re-key the count query.
+    queryClient!.setQueryData(galleryBoardsOptions(getGalleryListingBoardsQuery(gallery.settings)).queryKey, [board]);
 
-    await renderQueryBackedGallery(
-      createGallery({
-        items: [],
-        page: 1,
-        settings: { ...DENSE_SETTINGS, paginationMode: 'paginated' },
-      })
-    );
+    await renderQueryBackedGallery(gallery);
 
     await vi.waitFor(() => {
       expect(host?.querySelector('[data-gallery-page-error="0"]')).not.toBeNull();

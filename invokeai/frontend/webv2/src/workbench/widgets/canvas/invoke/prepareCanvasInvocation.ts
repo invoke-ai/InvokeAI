@@ -1,7 +1,7 @@
 /**
  * Resolve the active engine, flush paint uploads, compose the fresh snapshot, compile, and enqueue. Invalid
- * controls block; rejected regions skip. Publish dedupe only after dispatch succeeds and report failures as
- * notices. A per-project in-flight guard prevents overlapping preparation.
+ * controls and unsupported hosted-provider regions block. Publish dedupe only after dispatch succeeds and report
+ * failures as notices. A per-project in-flight guard prevents overlapping preparation.
  */
 
 import type {
@@ -16,25 +16,27 @@ import type {
   RegionalGuidanceReferenceImage,
 } from '@workbench/canvas-engine/api';
 import type { ComposeForGenerationOptions, ComposeForGenerationResult } from '@workbench/canvas-operations/api';
+import type { ControlLayerIssueCode } from '@workbench/controlLayerChecks';
+import type { ControlModelMemory } from '@workbench/controlModelResolution';
 import type { ExpandedPositivePrompts, ResultDestination } from '@workbench/invocationContracts';
 import type { WorkbenchNotificationKind } from '@workbench/projectContracts';
 import type { WorkbenchCommands, WorkbenchNotificationCommands } from '@workbench/workbenchStore';
 
 import { compileCanvasGraph, type CanvasCompileMode } from '@features/generation/canvasGraph';
 import {
-  type ControlAdapterKind,
-  createControlValidationSequence,
   detectCanvasMode,
-  getSuggestedControlKind,
   getRegionalGuidanceRejectionReason,
   getRegionalGuidanceSupport,
   type ControlLayerGraphInput,
-  type ControlValidationReason,
   type RegionalGuidanceInput,
   type RegionalReferenceImageInput,
   resolveGenerateSeed,
 } from '@features/generation/graph';
-import { normalizeGenerateWidgetValues, syncGenerateWidgetValuesWithModels } from '@features/generation/settings';
+import {
+  describeExternalCanvasRefusal,
+  normalizeGenerateWidgetValues,
+  syncGenerateWidgetValuesWithModels,
+} from '@features/generation/settings';
 import { getGenerationDevicesSnapshot, resolveRandDeviceMetadata } from '@features/queue/devices';
 import {
   captureAccountScope,
@@ -43,6 +45,8 @@ import {
   type AccountScope,
 } from '@platform/state/accountLifecycle';
 import { getCanvasEngine, getCanvasOperations } from '@workbench/canvas-operations/api';
+import { createControlLayerCheckContext, createControlLayerSequence } from '@workbench/controlLayerChecks';
+import { getWorkbenchPreferences } from '@workbench/settings/store';
 import {
   DEFAULT_CANVAS_COMPOSITING,
   type CanvasCompositingSettings,
@@ -55,17 +59,15 @@ export const CANVAS_INVOKE_ERROR_TITLE = 'Canvas generation failed';
 
 /** A control layer that blocks the invocation, as `formatControlLayerError` words it for the notice. */
 export interface ControlLayerRejection {
-  code: ControlValidationReason;
+  code: ControlLayerIssueCode;
   layerName: string;
-  suggestedKind: ControlAdapterKind | null;
 }
 
 /** Structured control-layer rejection: callers word it from the locale; the message is for logs only. */
 export class ControlLayerValidationError extends Error implements ControlLayerRejection {
   constructor(
-    readonly code: ControlValidationReason,
-    readonly layerName: string,
-    readonly suggestedKind: ControlAdapterKind | null
+    readonly code: ControlLayerIssueCode,
+    readonly layerName: string
   ) {
     super(`Control layer "${layerName}" is invalid: ${code}.`);
     this.name = 'ControlLayerValidationError';
@@ -100,6 +102,8 @@ export interface RunCanvasInvocationDeps {
   generateValues: Record<string, unknown>;
   /** Loaded models, for the same value/model sync the generate path performs. */
   models?: readonly ModelConfig[];
+  /** Remembered control-model picks, which resolve control layers left on automatic. */
+  controlModelMemory: ControlModelMemory;
   /** The project settings the compiler consults. */
   projectSettings: GenerationProjectSettings;
   /** Runtime-derived accelerator family recorded in generation metadata. */
@@ -124,41 +128,47 @@ const recordNotice = (
 };
 
 /**
- * Validate enabled content-bearing controls in z-order and resolve adapters; invalid controls throw and block
- * invocation. Join uploaded names with captured model metadata for graph inputs.
+ * Validate enabled content-bearing controls in z-order with the same judge Invoke readiness uses, resolving each
+ * layer's model; invalid controls throw and block invocation, and layers with no type or model are left out. Join
+ * uploaded names with captured model metadata for graph inputs.
  */
 const createControlLayerCollector = (
   model: GenerateModelConfig,
-  models: readonly ModelConfig[] | undefined
+  models: readonly ModelConfig[] | undefined,
+  remembered: ControlModelMemory
 ): {
   shouldComposite(layer: CanvasControlLayerContract): boolean;
   toGraphInputs(images: readonly { layerId: string; imageName: string }[]): ControlLayerGraphInput[];
 } => {
   const metadata = new Map<string, Omit<ControlLayerGraphInput, 'imageName'>>();
-  const validate = createControlValidationSequence(model);
+  const judge = models
+    ? createControlLayerSequence(model, models, createControlLayerCheckContext(model.base, remembered))
+    : null;
 
   return {
     shouldComposite: (layer) => {
+      if (model.type === 'external_image_generator') {
+        throw new Error(describeExternalCanvasRefusal(model, { kind: 'control_layer', layerName: layer.name }));
+      }
       const { adapter } = layer;
-      const resolved = adapter.model ? models?.find((candidate) => candidate.key === adapter.model) : undefined;
-      const rejection = validate({
-        adapterModel: resolved ?? null,
-        beginEndStepPct: adapter.beginEndStepPct,
-        kind: adapter.kind,
-        weight: adapter.weight,
-      });
-      if (rejection || !resolved) {
-        throw new ControlLayerValidationError(
-          rejection ?? 'missing_model',
-          layer.name,
-          rejection === 'switch_adapter_kind' ? getSuggestedControlKind(model.base) : null
-        );
+      // Readiness skips control checks until models load; resolving against nothing would drop or misjudge layers.
+      if (!judge) {
+        throw new ControlLayerValidationError('models_unavailable', layer.name);
+      }
+      const { reason, resolution, skip } = judge(layer);
+      if (skip) {
+        return false;
+      }
+      const resolved = resolution.model;
+      if (reason || !resolved) {
+        throw new ControlLayerValidationError(reason ?? 'missing_model', layer.name);
       }
       metadata.set(layer.id, {
         beginEndStepPct: adapter.beginEndStepPct,
         controlMode: adapter.controlMode,
         id: layer.id,
-        kind: adapter.kind,
+        instantxControlMode: resolution.instantxControlMode,
+        kind: resolution.kind,
         model: {
           base: resolved.base,
           key: resolved.key,
@@ -243,23 +253,30 @@ export const resolveRegionalReferenceImages = (
 };
 
 /**
- * Resolve regional references and silently skip unsupported/noncontributing regions. Join uploaded masks with
- * captured prompt/reference metadata for graph inputs.
+ * Reject hosted-provider regions; resolve local references and skip unsupported/noncontributing local regions (on
+ * layout bases the region's settings name the reason). Join uploaded masks and their bounds with captured
+ * prompt/reference/layout metadata for graph inputs.
  */
 const createRegionalGuidanceCollector = (
   model: GenerateModelConfig
 ): {
   shouldComposite(layer: CanvasRegionalGuidanceLayerContract): boolean;
-  toGraphInputs(images: readonly { layerId: string; imageName: string }[]): RegionalGuidanceInput[];
+  toGraphInputs(
+    images: readonly { layerId: string; imageName: string; bounds: RegionalGuidanceInput['maskBounds'] }[]
+  ): RegionalGuidanceInput[];
 } => {
-  const metadata = new Map<string, Omit<RegionalGuidanceInput, 'maskImageName'>>();
+  const metadata = new Map<string, Omit<RegionalGuidanceInput, 'maskImageName' | 'maskBounds'>>();
 
   return {
     shouldComposite: (layer) => {
+      if (model.type === 'external_image_generator') {
+        throw new Error(describeExternalCanvasRefusal(model, { kind: 'regional_guidance', layerName: layer.name }));
+      }
       const referenceImages = resolveRegionalReferenceImages(layer, model.base);
       const rejection = getRegionalGuidanceRejectionReason({
         hasContent: true,
         layerName: layer.name,
+        layout: layer.layout,
         mainBase: model.base,
         negativePrompt: layer.negativePrompt,
         positivePrompt: layer.positivePrompt,
@@ -271,6 +288,8 @@ const createRegionalGuidanceCollector = (
       metadata.set(layer.id, {
         autoNegative: layer.autoNegative,
         id: layer.id,
+        // Typed against Generation's layout roles: a persisted role the graph cannot send fails to compile here.
+        ...(layer.layout ? { layout: layer.layout } : {}),
         negativePrompt: layer.negativePrompt,
         positivePrompt: layer.positivePrompt,
         referenceImages,
@@ -278,11 +297,21 @@ const createRegionalGuidanceCollector = (
       return true;
     },
     toGraphInputs: (images) =>
-      images.flatMap(({ imageName, layerId }) => {
+      images.flatMap(({ bounds, imageName, layerId }) => {
         const meta = metadata.get(layerId);
-        return meta ? [{ ...meta, maskImageName: imageName }] : [];
+        return meta ? [{ ...meta, maskBounds: bounds, maskImageName: imageName }] : [];
       }),
   };
+};
+
+/** Why generation refused a layer's or group's Clarity, Texture or Dehaze, which it never leaves out. */
+const ADJUSTMENT_REFUSAL_NOTICES: Record<'too-large' | 'over-budget' | 'error', (name: string) => string> = {
+  error: (name) =>
+    `Clarity, Texture or Dehaze failed on “${name}”. Change a setting or disable them, then invoke again.`,
+  'over-budget': (name) =>
+    `Not enough canvas memory to apply Clarity, Texture or Dehaze to “${name}”. Delete layers you no longer need, then invoke again.`,
+  'too-large': (name) =>
+    `Clarity, Texture and Dehaze can’t run on “${name}”: its content is larger than 16.8 megapixels (4096 × 4096 px). Disable or remove them, or crop the content, then invoke again.`,
 };
 
 /**
@@ -315,13 +344,16 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
     // Flush persisted paint before capture so planning sees current bitmap references and bbox.
     await deps.flushPendingUploads();
 
-    const controls = createControlLayerCollector(model, deps.models);
+    const controls = createControlLayerCollector(model, deps.models, deps.controlModelMemory);
     const regions = createRegionalGuidanceCollector(model);
     const composed = await deps.composeForGeneration({
       // Mode-union drift guard: `detectCanvasMode`'s facts/mode types must stay
       // structurally identical to canvas-operations' `GenerationModeFacts` /
       // `GenerationCompositeMode` — tsc fails here on drift in either direction.
-      detectMode: (facts) => detectCanvasMode(facts),
+      // A hosted model takes the frame's pixels as they are, with no masked tail: bounds that overlap the frame with
+      // nothing visible inside it leave an empty frame, which it generates from text.
+      detectMode: (facts) =>
+        model.type === 'external_image_generator' && !facts.bboxHasContent ? 'txt2img' : detectCanvasMode(facts),
       shouldCompositeControlLayer: controls.shouldComposite,
       shouldCompositeRegionalMask: regions.shouldComposite,
       signal: deps.signal,
@@ -335,7 +367,13 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
           ? 'The canvas has no active document to generate from.'
           : composed.status === 'stale'
             ? 'The canvas changed while generation was being prepared. Please invoke again.'
-            : `The canvas could not be captured for generation (${composed.status}).`
+            : composed.status === 'adjustment-refused'
+              ? ADJUSTMENT_REFUSAL_NOTICES[composed.reason](composed.ownerName)
+              : composed.status === 'unreadable'
+                ? `“${composed.layerName}” could not be read (its image may have been deleted or damaged). Disable or delete that layer, then invoke again.`
+                : composed.status === 'not-ready'
+                  ? 'Some layers are still loading. Wait a moment, then invoke again.'
+                  : `The canvas could not be captured for generation (${composed.status}).`
       );
       return;
     }
@@ -459,6 +497,7 @@ export const prepareCanvasInvocation = async (args: PrepareCanvasInvocationArgs)
     commands: args.commands,
     expansion: args.expansion,
     composeForGeneration: (composeOptions) => operations.composeForGeneration(composeOptions),
+    controlModelMemory: getWorkbenchPreferences().controlModelMemory,
     flushPendingUploads: () => engine.lifecycle.flushPendingUploads(),
     formatControlLayerError: args.formatControlLayerError,
     generateValues: args.generateValues,

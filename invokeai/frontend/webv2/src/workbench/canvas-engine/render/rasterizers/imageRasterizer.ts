@@ -6,14 +6,50 @@ import { createDecodedBitmapPool } from '@workbench/canvas-engine/render/decoded
 
 import type { RasterizeDeps, RasterizeResult } from './types';
 
-/** Acquires a short-lived decoded bitmap lease, coalescing concurrent decodes by image name. */
+/**
+ * Thrown by an `ImageResolver` for an image that is missing (deleted, or never stored) or not readable by this user;
+ * either lasts, so the layer reads as unreadable.
+ */
+export class CanvasImageMissingError extends Error {
+  constructor(readonly imageName: string) {
+    super(`Canvas image "${imageName}" is missing or not readable.`);
+    this.name = 'CanvasImageMissingError';
+  }
+}
+
+/**
+ * The resolver could not fetch an image that may still be readable (network, server, an expired session): a
+ * rasterization that fails with it can succeed later, unlike a missing image or one that does not decode.
+ */
+export class ImageUnavailableError extends Error {
+  constructor(
+    readonly imageName: string,
+    options: { cause: unknown }
+  ) {
+    super(`Canvas image "${imageName}" could not be fetched.`, options);
+    this.name = 'ImageUnavailableError';
+  }
+}
+
+/**
+ * Acquires a short-lived decoded bitmap lease, coalescing concurrent decodes by image name. A resolver failure other
+ * than {@link CanvasImageMissingError} or cancellation rejects as {@link ImageUnavailableError}.
+ */
 export const resolveBitmap = async (image: CanvasImageRef, deps: RasterizeDeps): Promise<DecodedBitmapLease> => {
   deps.signal?.throwIfAborted();
   const pool = deps.bitmapPool ?? createDecodedBitmapPool();
   const lease = await pool.acquire(
     image.imageName,
     async (decodeSignal) => {
-      const blob = await deps.resolver(image.imageName, decodeSignal);
+      let blob: Blob;
+      try {
+        blob = await deps.resolver(image.imageName, decodeSignal);
+      } catch (error) {
+        if (error instanceof CanvasImageMissingError || decodeSignal?.aborted) {
+          throw error;
+        }
+        throw new ImageUnavailableError(image.imageName, { cause: error });
+      }
       decodeSignal?.throwIfAborted();
       const bitmap = await deps.backend.createImageBitmap(blob);
       if (decodeSignal?.aborted) {

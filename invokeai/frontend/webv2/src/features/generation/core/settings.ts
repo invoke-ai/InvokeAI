@@ -29,7 +29,16 @@ import {
   isValidKrea2RebalanceWeights,
   KREA2_REBALANCE_WEIGHT_COUNT,
 } from './conditioningRebalance';
+import { MAX_DIMENSION, MIN_DIMENSION } from './dimensionLimits';
 import { isDynamicPromptsSeedBehaviour, sanitizeMaxPrompts, sanitizeSampleSeed } from './dynamicPrompts';
+import {
+  GEMINI_TEMPERATURE_MAX,
+  GEMINI_TEMPERATURE_MIN,
+  isGeminiThinkingLevel,
+  isOpenAIImageBackground,
+  isOpenAIImageQuality,
+  isOpenAIInputFidelity,
+} from './externalProvider';
 import { clampPidSteps, DEFAULT_PID_STEPS, isPidMode } from './pid';
 import { isCanonicalPromptTemplateSnapshot, sanitizePromptTemplateSnapshot } from './promptTemplates';
 import { cloneCroppableImage, normalizeCroppableImage } from './referenceImage';
@@ -85,8 +94,6 @@ export const isAspectRatioId = (value: unknown): value is AspectRatioId =>
   value === 'Free' || (typeof value === 'string' && value in ASPECT_RATIO_MAP);
 
 export const DIMENSION_GRID = 8;
-export const MIN_DIMENSION = 64;
-export const MAX_DIMENSION = 4096;
 
 /** The expansion config the settings describe, under the names the expansion route and preview use. */
 export const getDynamicPromptsConfig = (
@@ -263,6 +270,37 @@ export const MAX_ZIMAGE_SEED_VARIANCE_STRENGTH = 2;
 export const MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT = 1;
 export const DEFAULT_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT = 50;
 export const QWEN_IMAGE_ENCODER_QUANTIZATIONS: QwenImageEncoderQuantization[] = ['none', 'int8', 'nf4'];
+/** `moss_image_denoise.uncond_skip_layers` defaults to block 22, as the reference pipeline does. */
+export const DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS: readonly number[] = [22];
+/** MOSS-Image has 42 transformer blocks. The node checks the list against the loaded model's count again. */
+export const MAX_MOSS_IMAGE_SKIP_LAYER = 41;
+
+const toUniqueAscending = (values: readonly number[]): number[] =>
+  [...new Set(values)].sort((left, right) => left - right);
+
+/**
+ * Comma-separated block indices to the stored form, unique and ascending; empty entries are ignored, so an empty
+ * field skips none. Null when an entry is not a whole number. The range is checked separately, by
+ * `isValidMossImageSkipLayers`.
+ */
+export const parseMossImageSkipLayers = (text: string): number[] | null => {
+  const entries = text
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== '');
+
+  return entries.every((entry) => /^\d+$/.test(entry)) ? toUniqueAscending(entries.map(Number)) : null;
+};
+
+export const isValidMossImageSkipLayers = (layers: readonly number[]): boolean =>
+  layers.every((layer) => Number.isInteger(layer) && layer >= 0 && layer <= MAX_MOSS_IMAGE_SKIP_LAYER);
+
+/**
+ * A stored or recorded list in the stored form, or null unless it is a list of integers. Keeps out-of-range blocks, so
+ * validation names them rather than the list changing silently.
+ */
+export const normalizeMossImageSkipLayers = (value: unknown): number[] | null =>
+  Array.isArray(value) && value.every((entry) => Number.isInteger(entry)) ? toUniqueAscending(value) : null;
 
 const isIdeogram4SamplerPreset = (value: unknown): value is Ideogram4SamplerPreset =>
   IDEOGRAM4_SAMPLER_PRESETS.includes(value as Ideogram4SamplerPreset);
@@ -310,8 +348,10 @@ const REFERENCE_IMAGE_CONFIG_TYPES = new Set([
   'flux_kontext_reference_image',
   'flux_redux',
   'ip_adapter',
+  'krea2_edit_reference_image',
   'krea2_reference_image',
   'qwen_image_reference_image',
+  'qwen_image_2_1_reference_image',
 ]);
 
 const isClipVisionModel = (value: unknown): value is 'ViT-H' | 'ViT-G' | 'ViT-L' =>
@@ -346,7 +386,9 @@ const normalizeReferenceImageConfig = (value: unknown): GenerateReferenceImageCo
   switch (value.type) {
     case 'external_reference_image':
     case 'flux2_reference_image':
+    case 'krea2_edit_reference_image':
     case 'qwen_image_reference_image':
+    case 'qwen_image_2_1_reference_image':
       return { image, type: value.type };
     case 'flux_kontext_reference_image':
       return { image, model: getMainModelOrNull(value.model), type: value.type };
@@ -417,8 +459,10 @@ const cloneReferenceImageConfig = (config: GenerateReferenceImageConfig): Genera
   switch (config.type) {
     case 'external_reference_image':
     case 'flux2_reference_image':
+    case 'krea2_edit_reference_image':
     case 'krea2_reference_image':
     case 'qwen_image_reference_image':
+    case 'qwen_image_2_1_reference_image':
       return { ...config, image: config.image ? cloneCroppableImage(config.image) : null };
     case 'flux_kontext_reference_image':
       return {
@@ -564,6 +608,7 @@ export const cloneGenerateWidgetValues = (
   ideogram4UnconditionalModel: values.ideogram4UnconditionalModel ? { ...values.ideogram4UnconditionalModel } : null,
   refinerModel: values.refinerModel ? { ...values.refinerModel } : null,
   ideogram4ColorPalette: [...values.ideogram4ColorPalette],
+  mossImageUncondSkipLayers: [...values.mossImageUncondSkipLayers],
   referenceImages: cloneReferenceImages(values.referenceImages),
   t5EncoderModel: values.t5EncoderModel ? { ...values.t5EncoderModel } : null,
   vae: values.vae ? { ...values.vae } : null,
@@ -587,8 +632,10 @@ const syncReferenceImageConfigWithModels = (
     }
     case 'external_reference_image':
     case 'flux2_reference_image':
+    case 'krea2_edit_reference_image':
     case 'krea2_reference_image':
     case 'qwen_image_reference_image':
+    case 'qwen_image_2_1_reference_image':
       return config;
   }
 };
@@ -852,6 +899,8 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     qwen3VLEncoderModel: getModelIdentifierOrNull(values.qwen3VLEncoderModel),
     qwen35EncoderModel: getModelIdentifierOrNull(values.qwen35EncoderModel),
     animaInpaintAdapterModel: getModelIdentifierOrNull(values.animaInpaintAdapterModel),
+    // Projects saved before the toggle existed wired the adapter whenever one was selected.
+    animaInpaintAdapterEnabled: values.animaInpaintAdapterEnabled !== false,
     animaInpaintAdapterWeight: clampAnimaInpaintAdapterWeight(
       hasFiniteNumber(values, 'animaInpaintAdapterWeight')
         ? (values.animaInpaintAdapterWeight as number)
@@ -890,6 +939,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
       100,
       DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT
     ),
+    krea2ReferenceKvCache: values.krea2ReferenceKvCache === true,
     fluxDypePreset: isFluxDypePreset(values.fluxDypePreset) ? values.fluxDypePreset : 'off',
     fluxDypeScale: getClampedNumber(values, 'fluxDypeScale', 0, MAX_FLUX_DYPE_SCALE, DEFAULT_FLUX_DYPE_SCALE),
     fluxDypeExponent: getClampedNumber(
@@ -919,10 +969,27 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     qwenImageEncoderQuantization: isQwenImageEncoderQuantization(values.qwenImageEncoderQuantization)
       ? values.qwenImageEncoderQuantization
       : 'none',
+    mossImageUncondSkipLayers: normalizeMossImageSkipLayers(values.mossImageUncondSkipLayers) ?? [
+      ...DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS,
+    ],
     pidMode: isPidMode(values.pidMode) ? values.pidMode : 'off',
     pidDecoderModel: getModelIdentifierOrNull(values.pidDecoderModel),
     gemma2EncoderModel: getModelIdentifierOrNull(values.gemma2EncoderModel),
     pidSteps: clampPidSteps(hasFiniteNumber(values, 'pidSteps') ? (values.pidSteps as number) : DEFAULT_PID_STEPS),
+    externalImageSize:
+      typeof values.externalImageSize === 'string' && values.externalImageSize !== '' ? values.externalImageSize : null,
+    openaiQuality: isOpenAIImageQuality(values.openaiQuality) ? values.openaiQuality : 'auto',
+    openaiBackground: isOpenAIImageBackground(values.openaiBackground) ? values.openaiBackground : 'auto',
+    openaiInputFidelity: isOpenAIInputFidelity(values.openaiInputFidelity) ? values.openaiInputFidelity : null,
+    geminiTemperature:
+      hasFiniteNumber(values, 'geminiTemperature') &&
+      (values.geminiTemperature as number) >= GEMINI_TEMPERATURE_MIN &&
+      (values.geminiTemperature as number) <= GEMINI_TEMPERATURE_MAX
+        ? (values.geminiTemperature as number)
+        : null,
+    geminiThinkingLevel: isGeminiThinkingLevel(values.geminiThinkingLevel) ? values.geminiThinkingLevel : null,
+    seedreamWatermark: values.seedreamWatermark === true,
+    seedreamOptimizePrompt: values.seedreamOptimizePrompt === true,
     refinerModel: getRefinerModelOrNull(values.refinerModel),
     refinerSteps: hasFiniteNumber(values, 'refinerSteps')
       ? Math.max(MIN_REFINER_STEPS, Math.round(values.refinerSteps as number))

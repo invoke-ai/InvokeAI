@@ -15,7 +15,7 @@ import { Scrollable, Tabs } from '@platform/ui';
 import { ManagerDetailHeader } from '@platform/ui/ManagerLayout';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { BoxIcon, KeyRoundIcon, PlusIcon } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /** The tabbed detail pane: selected model, Add Models and API Keys. The install queue is the layout's footer. */
@@ -81,6 +81,26 @@ const DetailTab = ({ modelKey }: { modelKey: string | null }) => {
   // Owned above the keyed detail: a delete unmounts it while this dialog is still animating out.
   const [pendingAction, setPendingAction] = useState<PendingModelAction>(null);
   const handleDeleted = useCallback(() => updateModelsUi({ activeModelKey: null }), []);
+  const detailRef = useRef<HTMLDivElement | null>(null);
+  const confirmOpenerRef = useRef<{ element: HTMLElement | null; kind: NonNullable<PendingModelAction>['kind'] }>({
+    element: null,
+    kind: 'delete',
+  });
+  const requestConfirm = useCallback((pending: NonNullable<PendingModelAction>) => {
+    confirmOpenerRef.current = {
+      element: document.activeElement instanceof HTMLElement ? document.activeElement : null,
+      kind: pending.kind,
+    };
+    setPendingAction(pending);
+  }, []);
+  // A confirmed re-identify clears the notice whose button opened the dialog; focus the model's actions instead.
+  const getConfirmFinalFocus = useCallback(() => {
+    const { element, kind } = confirmOpenerRef.current;
+    if (kind !== 'reidentify' || element?.isConnected) {
+      return null;
+    }
+    return detailRef.current?.querySelector<HTMLElement>('[data-model-actions-trigger]') ?? null;
+  }, []);
 
   return (
     <>
@@ -95,11 +115,12 @@ const DetailTab = ({ modelKey }: { modelKey: string | null }) => {
           </Text>
         </Flex>
       ) : (
-        <Scrollable h="full" label={t('models.details')} minH="0" p="3">
-          <ModelDetail key={modelKey} modelKey={modelKey} onRequestConfirm={setPendingAction} />
+        <Scrollable h="full" label={t('models.details')} minH="0" p="3" viewportRef={detailRef}>
+          <ModelDetail key={modelKey} modelKey={modelKey} onRequestConfirm={requestConfirm} />
         </Scrollable>
       )}
       <ModelActionConfirmDialog
+        finalFocusEl={getConfirmFinalFocus}
         pending={pendingAction}
         onClose={() => setPendingAction(null)}
         onDeleted={handleDeleted}

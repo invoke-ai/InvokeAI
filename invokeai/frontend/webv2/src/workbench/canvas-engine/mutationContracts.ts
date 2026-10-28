@@ -14,6 +14,7 @@ import type {
   CanvasMaskNoiseContract,
   CanvasRasterLayerContractV2,
   CanvasRegionalGuidanceLayerContract,
+  CanvasRegionalLayoutContract,
   CanvasStagingAreaContractV2,
 } from './contracts';
 import type { CanvasNodeInsertion, CanvasNodeInsertionAnchor, CanvasNodeMove } from './document/insertionAnchors';
@@ -69,6 +70,8 @@ export type CanvasLayerConfigPatch =
       negativePrompt?: string | null;
       autoNegative?: boolean;
       referenceImages?: CanvasRegionalGuidanceLayerContract['referenceImages'];
+      /** Replaces the layout role whole; `null` (or the `undefined` an inverse records) removes it. */
+      layout?: CanvasRegionalLayoutContract | null;
     }
   | {
       layerType: 'inpaint_mask';
@@ -124,6 +127,14 @@ export type CanvasProjectMutation =
   | { type: 'reorderCanvasSiblings'; orders: readonly ReorderSiblingsCommand[] }
   | { type: 'updateCanvasLayer'; id: string; patch: CanvasLayerBasePatch }
   | { type: 'replaceCanvasLayer'; layerId: string; layer: CanvasLayerContract }
+  | {
+      /**
+       * Replaces several leaves in place, each by a contract of the same id and type, as one value edit. The whole
+       * mutation is refused when any id is missing, repeated, names a group, or would change its leaf's type.
+       */
+      type: 'replaceCanvasLayers';
+      replacements: readonly { layerId: string; layer: CanvasLayerContract }[];
+    }
   | { type: 'setCanvasLayersEnabled'; updates: readonly { id: string; isEnabled: boolean }[] }
   | { type: 'setCanvasLayerPositions'; updates: readonly { id: string; x: number; y: number }[] }
   | { type: 'setCanvasLayersHidden'; updates: readonly { id: string; isHidden: boolean }[] }

@@ -18,6 +18,7 @@ export const SUPPORTED_GENERATE_BASES = [
   'qwen-image-2-1',
   'wan',
   'anima',
+  'moss-image',
 ] as const satisfies readonly KnownGenerationModelBase[];
 
 export type SupportedGenerateBase = (typeof SUPPORTED_GENERATE_BASES)[number];

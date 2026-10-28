@@ -11,6 +11,8 @@ export interface FrameDemandInput {
   readonly document: CanvasDocumentContractV3;
   readonly isolationLayerId?: string | null;
   readonly liveCacheRects?: ReadonlyMap<string, Rect>;
+  /** Overlay stacks the frame draws; a hidden stack demands nothing. */
+  readonly showOverlayStacks?: CompositeOptions['showOverlayStacks'];
   readonly transformOverrides?: CompositeOptions['transformOverrides'];
   readonly viewport: Rect;
   /** The frame description to plan against; prepared from the other inputs when absent. */
@@ -42,6 +44,7 @@ export const calculateActiveFrameLayerIds = (input: FrameDemandInput): Set<strin
     input.preparation ??
     prepareComposite(input.document, {
       isolationLayerId: input.isolationLayerId ?? null,
+      showOverlayStacks: input.showOverlayStacks,
       transformOverrides: input.transformOverrides,
     });
   const active = new Set<string>();

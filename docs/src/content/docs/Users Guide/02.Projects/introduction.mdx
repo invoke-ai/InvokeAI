@@ -29,7 +29,7 @@ Invoke saves projects automatically on the server, so there is no Save button to
 | Panel layout and floating widgets | Saved layout presets |
 | Prompt history, and the Invoke routing (source and destination) | Preferences, theme and hotkeys |
 | Widget settings, such as gallery filters | Boards in the Library |
-| Project settings: **Use CPU noise**, the **NSFW checker** and **Invisible watermark** output filters, **Antialias progress images** and the Preview's progress image toggle | Generate recipes |
+| Project settings: **Use CPU noise**, the **NSFW checker** and **Invisible watermark** output filters, **Antialias progress images** and the Preview's **Auto-switch** mode | Generate recipes |
 | The project's boards and the images and videos on them | |
 
 In **Settings**, a badge next to each option says where it is stored: **Saved with this project**, **Saved with this widget in this project**, or **Saved in your preferences** for options that follow you across projects.
@@ -48,7 +48,7 @@ To create a project, click **New project**. The arrow beside it (**Choose how to
 | **Edit on canvas** | The Edit layout, with the canvas in front |
 | **Upscale an image** | The Compose layout, set up for upscaling |
 | **Generate a video** | The Video layout |
-| **Build a workflow** | The Automate layout, for the workflow editor |
+| **Build a workflow** | The Workflow layout, for the workflow editor |
 
 The starting point only chooses the initial layout. Every tool remains available, and you can [rearrange the workspace](/users-guide/workbench/introduction/) at any time.
 
@@ -170,6 +170,6 @@ In the Workflow Library dialog, **This project** lists the project's own workflo
 - **Projects belong to one account.** With [multiple users](/configuration/multi-user-mode/user-guide/) enabled, each person sees only their own projects, and there is no project sharing. Export and import a `.invk` file to pass a project to someone else.
 - **Undo history is not saved** with the project; it is cleared when you reload or close it.
 - **Invoke needs the server to open projects.** If it cannot reach the server, a **Projects are temporarily unavailable** screen offers to retry and to export any unsaved work your browser is holding.
-- **Newer projects need a newer Invoke.** A project saved by a newer version of Invoke shows **Requires a newer Invoke** and cannot be opened until you upgrade.
+- **Newer projects need a newer Invoke.** A project saved by a newer version of Invoke shows **Requires a newer Invoke** and cannot be opened until you upgrade. Some features raise this requirement for good: once a project has had a Noise, Texture, Clarity or Dehaze adjustment on the canvas, versions of Invoke without those adjustments refuse to open it, even after you remove the adjustment.
 - **Size limits.** A project file can be up to 2 GB, with up to 20,000 files. Export reports a project that is too large to package.
 - **Clear saved data…** under **Data & workspace** in Settings deletes *all* of your projects and settings at once, and cannot be undone.
