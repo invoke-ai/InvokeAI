@@ -898,6 +898,22 @@ the invocation cache is empty.
 
 In normal execution, all runtime expansion occurs in `execution_graph` with traceability back to source nodes.
 
+### Image input records
+
+`ImagesInterface.save()` embeds an `invokeai_graph` input record in the existing Graph JSON envelope. It contains the
+active invocation with its runtime ID and resolved inputs, plus ordinary upstream invocations and the edges connecting
+them. This preserves inputs such as a Noise invocation's actual seed and intermediate math values. Traversal uses the
+execution graph's indexed input edges and stops before `Iterate`, `Collect`, `If`, `For`, `ForReturn`, saved-workflow
+calls, collection-valued output edges, and edges whose resolved destination input is a list. Inputs received across
+those boundaries are already resolved on the retained downstream invocation. Future nodes, unrelated branches, sibling
+iterations, and upstream collections beyond those boundaries are excluded. Before runtime materialization, only the
+active invocation's inputs are recorded.
+
+This is an input record for the image's invocation, not a complete executable graph or workflow replay. The authoring
+workflow remains separately preserved, unchanged, in `invokeai_workflow`. Legacy PNG readers still accept the Graph
+envelope; graph-to-workflow conversion can recover only the retained nodes and edges. Existing PNG records are read
+without rewriting them.
+
 ## 6) Invariants
 
 - Source **Graph** remains a DAG and type-consistent.

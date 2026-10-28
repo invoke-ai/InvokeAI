@@ -1,11 +1,21 @@
+import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
 
 from invokeai.app.api.extract_metadata import extract_metadata_from_image
+from invokeai.app.invocations.baseinvocation import BaseInvocation
+from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
+from invokeai.app.invocations.collections import CollectionConcatInvocation
+from invokeai.app.invocations.fields import LatentsField
+from invokeai.app.invocations.image import BlankImageInvocation
+from invokeai.app.invocations.logic import IfInvocation
+from invokeai.app.invocations.loops import ForInvocation, ForReturnInvocation
 from invokeai.app.invocations.math import AddInvocation, RandomIntInvocation
+from invokeai.app.invocations.noise import NoiseInvocation, NoiseOutput
 from invokeai.app.services.board_access.board_access_common import (
     BoardAccessDeniedError,
     BoardAction,
@@ -13,9 +23,17 @@ from invokeai.app.services.board_access.board_access_common import (
     ItemAction,
 )
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
-from invokeai.app.services.shared.graph import Edge, EdgeConnection, Graph, GraphExecutionState
+from invokeai.app.services.shared.graph import (
+    CollectInvocation,
+    Edge,
+    EdgeConnection,
+    Graph,
+    GraphExecutionState,
+    IterateInvocation,
+)
 from invokeai.app.services.shared.invocation_context import ImagesInterface
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
+from tests.test_nodes import AnyTypeTestInvocation
 
 
 def _make_interface(allowed: bool) -> tuple[ImagesInterface, MagicMock]:
@@ -200,6 +218,7 @@ def test_image_save_graph_records_resolved_runtime_inputs() -> None:
     data.queue_item.project_id = "project-1"
     data.invocation = runtime_add_node
     images = ImagesInterface(services, data, MagicMock())
+    execution_graph_json = session.execution_graph.model_dump_json()
 
     images.save(MagicMock())
 
@@ -209,28 +228,24 @@ def test_image_save_graph_records_resolved_runtime_inputs() -> None:
     assert isinstance(saved_add_node, AddInvocation)
     assert saved_add_node.a == 17
     assert saved_kwargs["node_id"] == saved_add_node.id
-    downstream_id = next(iter(session.source_prepared_mapping["downstream"]))
-    assert set(saved_graph.nodes) == {random_node.id, runtime_add_node.id, downstream_id}
-    saved_downstream_node = saved_graph.nodes[downstream_id]
-    assert isinstance(saved_downstream_node, AddInvocation)
-    assert saved_downstream_node.b == 2
+    assert set(saved_graph.nodes) == {random_node.id, runtime_add_node.id}
     assert sorted(
         (edge.source.node_id, edge.source.field, edge.destination.node_id, edge.destination.field)
         for edge in saved_graph.edges
     ) == sorted(
         [
             (random_node.id, "value", runtime_add_node.id, "a"),
-            (runtime_add_node.id, "value", downstream_id, "a"),
         ]
     )
     assert graph.nodes["add"].a == 0
     assert session.graph.model_dump_json() == source_graph_json
     assert graph.model_dump_json() == source_graph_json
+    assert session.execution_graph.model_dump_json() == execution_graph_json
     assert saved_kwargs["workflow"] is None
     assert data.queue_item.workflow is None
 
 
-def test_image_save_graph_falls_back_to_source_graph_before_materialization() -> None:
+def test_image_save_graph_uses_active_inputs_before_materialization() -> None:
     graph = Graph()
     graph.add_node(AddInvocation(id="add", a=2, b=3))
     session = GraphExecutionState(graph=graph)
@@ -247,17 +262,20 @@ def test_image_save_graph_falls_back_to_source_graph_before_materialization() ->
     data.queue_item.session = session
     data.queue_item.session_id = "session"
     data.queue_item.project_id = "project-1"
-    data.invocation = graph.nodes["add"]
+    data.invocation = AddInvocation(id="resolved-add", a=17, b=1)
     images = ImagesInterface(services, data, MagicMock())
+    source_json = graph.model_dump_json()
 
     images.save(MagicMock())
 
     saved_graph_json = services.images.create.call_args.kwargs["graph"]
     saved_graph = Graph.model_validate_json(saved_graph_json)
-    saved_add_node = saved_graph.nodes["add"]
+    saved_add_node = saved_graph.nodes["resolved-add"]
     assert isinstance(saved_add_node, AddInvocation)
-    assert (saved_add_node.a, saved_add_node.b) == (2, 3)
-    assert saved_graph == graph
+    assert (saved_add_node.a, saved_add_node.b) == (17, 1)
+    assert set(saved_graph.nodes) == {"resolved-add"}
+    assert saved_graph.edges == []
+    assert graph.model_dump_json() == source_json
     assert not session.execution_graph.nodes
 
 
@@ -297,11 +315,33 @@ def test_image_save_graph_png_round_trip(tmp_path: Path) -> None:
             "version": "1.0.0",
             "contact": "",
             "tags": "",
-            "notes": "Keep the authoring workflow separate from the resolved runtime graph.",
+            "notes": "Keep the authoring workflow separate from the resolved input record.",
             "exposedFields": [],
             "meta": {"category": "user", "version": "3.0.0"},
-            "nodes": [],
-            "edges": [],
+            "nodes": [
+                {
+                    "id": "random",
+                    "type": "invocation",
+                    "position": {"x": 0, "y": 0},
+                    "data": {"id": "random", "type": "rand_int", "inputs": {"low": {"value": 17}}},
+                },
+                {
+                    "id": "add",
+                    "type": "invocation",
+                    "position": {"x": 100, "y": 0},
+                    "data": {"id": "add", "type": "add", "inputs": {"a": {"value": 0}, "b": {"value": 1}}},
+                },
+            ],
+            "edges": [
+                {
+                    "id": "random-to-add",
+                    "source": "random",
+                    "sourceHandle": "value",
+                    "target": "add",
+                    "targetHandle": "a",
+                    "type": "default",
+                }
+            ],
         }
     )
     workflow_json = workflow.model_dump_json()
@@ -354,16 +394,226 @@ def test_image_save_graph_png_round_trip(tmp_path: Path) -> None:
     saved_add_node = saved_graph.nodes[saved_node_id]
     assert isinstance(saved_add_node, AddInvocation)
     assert (saved_add_node.id, saved_add_node.a, saved_add_node.b) == (runtime_add_node.id, 17, 1)
-    downstream_id = next(iter(session.source_prepared_mapping["downstream"]))
-    assert set(saved_graph.nodes) == {random_node.id, runtime_add_node.id, downstream_id}
+    assert set(saved_graph.nodes) == {random_node.id, runtime_add_node.id}
     assert sorted(
         (edge.source.node_id, edge.source.field, edge.destination.node_id, edge.destination.field)
         for edge in saved_graph.edges
     ) == sorted(
         [
             (random_node.id, "value", runtime_add_node.id, "a"),
-            (runtime_add_node.id, "value", downstream_id, "a"),
         ]
     )
     assert extracted.invokeai_workflow == workflow_json
     assert data.queue_item.workflow.model_dump_json() == workflow_json
+
+
+def test_image_save_graph_retains_resolved_noise_seed_and_math_ancestors() -> None:
+    graph = Graph(
+        nodes={
+            "random": RandomIntInvocation(id="random", low=17, high=18),
+            "add": AddInvocation(id="add", b=1),
+            "noise": NoiseInvocation(id="noise", width=8, height=8),
+            "image": BlankImageInvocation(id="image", width=1, height=2),
+            "future": AddInvocation(id="future", b=2),
+        },
+        edges=[
+            Edge(
+                source=EdgeConnection(node_id=source, field=output),
+                destination=EdgeConnection(node_id=destination, field=input_),
+            )
+            for source, output, destination, input_ in [
+                ("random", "value", "add", "a"),
+                ("add", "value", "noise", "seed"),
+                ("noise", "width", "image", "width"),
+                ("image", "width", "future", "a"),
+            ]
+        ],
+    )
+    source_json = graph.model_dump_json()
+    session = GraphExecutionState(graph=graph)
+    images, services = _make_interface(allowed=True)
+    services.configuration.multiuser = False
+    data = images._data
+    data.queue_item.session = session
+    data.queue_item.root_item_id = None
+    data.queue_item._workflow_json_loaded = False
+    data.queue_item._workflow_json_snapshot = None
+    services.images.create.return_value = SimpleNamespace(image_name="resolved.png", width=8, height=2)
+    for _ in range(5):
+        node = session.next()
+        assert node is not None
+        data.invocation = node
+        if isinstance(node, BlankImageInvocation):
+            execution_json = session.execution_graph.model_dump_json()
+            node.invoke(MagicMock(images=images))
+            assert session.execution_graph.model_dump_json() == execution_json
+            break
+        if isinstance(node, NoiseInvocation):
+            assert node.seed == 18
+            # Substitute only the tensor-generation boundary. The downstream leaf has no seed input.
+            result = NoiseOutput(noise=LatentsField(latents_name="opaque-noise"), width=8, height=8)
+        else:
+            result = node.invoke(MagicMock())
+        session.complete(node.id, result)
+    else:
+        pytest.fail("Image invocation was not scheduled")
+
+    saved_kwargs = services.images.create.call_args.kwargs
+    saved_graph = Graph.model_validate_json(saved_kwargs["graph"])
+    ids = {name: next(iter(session.source_prepared_mapping[name])) for name in ("random", "add", "noise", "image")}
+    assert set(saved_graph.nodes) == set(ids.values())
+    assert saved_kwargs["node_id"] == ids["image"]
+    assert saved_graph.nodes[ids["add"]].a == 17
+    assert saved_graph.nodes[ids["noise"]].seed == 18
+    assert saved_graph.nodes[ids["image"]].width == 8
+    assert {
+        (e.source.node_id, e.source.field, e.destination.node_id, e.destination.field) for e in saved_graph.edges
+    } == {
+        (ids["random"], "value", ids["add"], "a"),
+        (ids["add"], "value", ids["noise"], "seed"),
+        (ids["noise"], "width", ids["image"], "width"),
+    }
+    assert graph.nodes["add"].a == graph.nodes["noise"].seed == 0
+    assert graph.model_dump_json() == source_json
+
+
+@pytest.mark.parametrize(
+    ("boundary", "output", "resolved_value"),
+    [
+        (IterateInvocation(id="boundary", collection=[17, 18]), "item", 17),
+        (CollectInvocation(id="boundary", collection=[17, 18]), "collection", [17, 18]),
+        (IfInvocation(id="boundary", condition=True, true_input=17, false_input=90), "value", 17),
+        (ForInvocation(id="boundary", collection=[17, 18], index=0), "item", 17),
+        (ForReturnInvocation(id="boundary", output=17), "output", 17),
+        (CallSavedWorkflowInvocation(id="boundary", workflow_id="saved"), "values", {"seed": 17}),
+        (CollectionConcatInvocation(id="boundary", first=[17, 18]), "collection", [17, 18]),
+        (AnyTypeTestInvocation(id="boundary", value=[17, 18]), "value", [17, 18]),
+    ],
+)
+def test_image_graph_projection_keeps_resolved_inputs_across_boundaries(
+    boundary: BaseInvocation, output: str, resolved_value: object
+) -> None:
+    graph = Graph(
+        nodes={"boundary": boundary, "active": AnyTypeTestInvocation(id="active")},
+        edges=[
+            Edge(
+                source=EdgeConnection(node_id="boundary", field=output),
+                destination=EdgeConnection(node_id="active", field="value"),
+            )
+        ],
+    )
+    before = graph.model_dump_json()
+    active = AnyTypeTestInvocation(id="active", value=resolved_value)
+
+    record = graph._get_invocation_input_graph(active)
+
+    assert set(record.nodes) == {active.id}
+    assert record.nodes[active.id].value == resolved_value
+    assert record.edges == []
+    assert graph.model_dump_json() == before
+
+
+def test_image_save_graph_nested_iterate_keeps_one_resolved_record_per_image(tmp_path: Path) -> None:
+    measurements = []
+    saved_runs = []
+    for outer_size, inner_size in [(2, 3), (4, 6)]:
+        values = [[10 + i * inner_size + j for j in range(inner_size)] for i in range(outer_size)]
+        graph = Graph(
+            nodes={
+                "source": CollectionConcatInvocation(id="source", first=values),
+                "outer": IterateInvocation(id="outer"),
+                "prepare": CollectionConcatInvocation(id="prepare"),
+                "inner": IterateInvocation(id="inner"),
+                "image": BlankImageInvocation(id="image", width=1, height=2),
+            },
+            edges=[
+                Edge(
+                    source=EdgeConnection(node_id=source, field=output),
+                    destination=EdgeConnection(node_id=destination, field=input_),
+                )
+                for source, output, destination, input_ in [
+                    ("source", "collection", "outer", "collection"),
+                    ("outer", "item", "prepare", "first"),
+                    ("prepare", "collection", "inner", "collection"),
+                    ("inner", "item", "image", "width"),
+                ]
+            ],
+        )
+        source_json = graph.model_dump_json()
+        session = GraphExecutionState(graph=graph)
+        images, services = _make_interface(allowed=True)
+        services.configuration.multiuser = False
+        services.configuration.pil_compress_level = 6
+        data = images._data
+        data.queue_item.session = session
+        data.queue_item.root_item_id = None
+        data.queue_item._workflow_json_loaded = False
+        data.queue_item._workflow_json_snapshot = None
+        storage = DiskImageFileStorage(tmp_path / f"{outer_size}x{inner_size}")
+        storage.start(SimpleNamespace(services=services))
+        saved: list[tuple[str, str, str, int]] = []
+
+        def create_image(
+            image: Image.Image,
+            graph: str,
+            *,
+            _storage: DiskImageFileStorage = storage,
+            _saved: list[tuple[str, str, str, int]] = saved,
+            **kwargs: object,
+        ) -> SimpleNamespace:
+            image_name = f"{len(_saved)}.png"
+            _storage.save(image=image, image_name=image_name, graph=graph)
+            node_id = kwargs["node_id"]
+            assert isinstance(node_id, str)
+            _saved.append((image_name, graph, node_id, image.width))
+            return SimpleNamespace(image_name=image_name, width=image.width, height=image.height)
+
+        services.images.create.side_effect = create_image
+        context = MagicMock(images=images)
+        # Bound scheduler calls to catch a stalled loop without asserting execution time.
+        for _ in range(2 + 2 * outer_size + 2 * outer_size * inner_size):
+            node = session.next()
+            if node is None:
+                break
+            data.invocation = node
+            execution_json = session.execution_graph.model_dump_json()
+            result = node.invoke(context)
+            assert session.execution_graph.model_dump_json() == execution_json
+            session.complete(node.id, result)
+        else:
+            pytest.fail("Nested Iterate graph did not finish")
+
+        assert session.is_complete()
+        assert [width for _, _, _, width in saved] == [value for group in values for value in group]
+        assert graph.model_dump_json() == source_json
+        reader = DiskImageFileStorage(storage.image_root)
+        for image_name, graph_json, _, _ in saved:
+            assert reader.get_graph(image_name) == graph_json
+        payloads = [json.loads(graph_json) for _, graph_json, _, _ in saved]
+        byte_counts = [len(graph_json.encode("utf-8")) for _, graph_json, _, _ in saved]
+        measurements.append(
+            {
+                "shape": [outer_size, inner_size],
+                "images": len(saved),
+                "per_image_bytes": byte_counts,
+                "total_bytes": sum(byte_counts),
+                "node_counts": [len(payload["nodes"]) for payload in payloads],
+            }
+        )
+        saved_runs.append(saved)
+
+    # Capture both actual runs before asserting the compact contract, including on the original implementation.
+    print("NESTED_IMAGE_GRAPH_MEASUREMENTS=" + json.dumps(measurements))
+    for saved in saved_runs:
+        for _, graph_json, node_id, width in saved:
+            saved_graph = Graph.model_validate_json(graph_json)
+            assert set(saved_graph.nodes) == {node_id}
+            assert saved_graph.edges == []
+            saved_node = saved_graph.nodes[node_id]
+            assert isinstance(saved_node, BlankImageInvocation)
+            assert (saved_node.id, saved_node.width, saved_node.height) == (node_id, width, 2)
+            assert node_id != "image"
+            assert len(node_id) == len(saved_graph.id) == 36
+    # All inputs here have fixed-width values and UUIDs: unrelated loop size must cost no bytes per image.
+    assert len(set(measurements[0]["per_image_bytes"] + measurements[1]["per_image_bytes"])) == 1
+    assert measurements[1]["total_bytes"] == 4 * measurements[0]["total_bytes"]

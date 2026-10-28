@@ -323,9 +323,10 @@ class ImagesInterface(InvocationContextInterface):
 
         graph_ = None
         if self._data.queue_item.session.graph:
-            session = self._data.queue_item.session
-            graph = session.execution_graph if session.execution_graph.nodes else session.graph
-            graph_ = graph.model_dump_json()
+            # Record resolved inputs for this image, without expanding metadata with sibling iterations.
+            graph_ = self._data.queue_item.session.execution_graph._get_invocation_input_graph(
+                self._data.invocation
+            ).model_dump_json()
 
         return self._services.images.create(
             image=image,
