@@ -77,7 +77,9 @@ class LoHALayer(LoRALayerBase):
 
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         if self.t1 is None:
-            weight: torch.Tensor = (self.w1_a @ self.w1_b) * (self.w2_a @ self.w2_b)
+            w1 = self.w1_a.reshape(self.w1_a.shape[0], -1) @ self.w1_b.reshape(self.w1_b.shape[0], -1)
+            w2 = self.w2_a.reshape(self.w2_a.shape[0], -1) @ self.w2_b.reshape(self.w2_b.shape[0], -1)
+            weight: torch.Tensor = w1 * w2
         else:
             rebuild1 = torch.einsum("i j k l, j r, i p -> p r k l", self.t1, self.w1_b, self.w1_a)
             rebuild2 = torch.einsum("i j k l, j r, i p -> p r k l", self.t2, self.w2_b, self.w2_a)

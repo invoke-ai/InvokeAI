@@ -5,7 +5,14 @@ from fractions import Fraction
 import pytest
 
 from invokeai.backend.working_memory.coefficients import CoefficientEntry, MeasuredPoint, ValuesFrom, WorkingMemoryData
-from invokeai.backend.working_memory.fit import SHIPPED_MARGIN, fitted_values, shipped_pair, upper_envelope
+from invokeai.backend.working_memory.fit import (
+    SHIPPED_MARGIN,
+    fitted_values,
+    hand_set_values,
+    shipped_pair,
+    upper_envelope,
+)
+from invokeai.backend.working_memory.spec import EstimatorSpec
 
 MIB = 2**20
 
@@ -181,6 +188,23 @@ def test_a_declared_stand_in_line_is_not_fitted() -> None:
     )
     data = WorkingMemoryData(schema_version=1, coefficients=[entry], points=[])
     assert fitted_values([data]) == {}
+
+
+@pytest.mark.parametrize(
+    "platform_keys, exempt", [(("conv_backend",), set()), ((), {"k_token"})], ids=["keyed", "unkeyed"]
+)
+def test_only_an_estimator_keyed_by_no_platform_trait_carries_a_value_off_a_pixel_line(platform_keys, exempt) -> None:
+    """A keyed estimator's value off a line counts as unfitted; an unkeyed one's is hand-set. Lines are fitted either
+    way."""
+    entry = _entry("estimator", {"k_decode_bf16": 1.0, "b_decode_bf16": 0.0, "k_token": 220000.0})
+    spec = EstimatorSpec(
+        id="estimator",
+        version=1,
+        coefficients=frozenset(entry.values or {}),
+        platform_keys=platform_keys,
+        terms=lambda features, values: (),
+    )
+    assert hand_set_values(entry, spec) == exempt
 
 
 def test_points_that_cap_nothing_are_covered_but_do_not_choose_the_line() -> None:
