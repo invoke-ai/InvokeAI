@@ -9,7 +9,10 @@ line (`measure_in_this_process`). The driving process prints a table and appends
 
 A line is a JSON object: `status` (`point`, `invalid`, `skipped` or `failed`), the script's `fit` and `point` (the grid
 entry), and for a measured point the fields of a `MeasuredPoint` and `raw` (each window's counter deltas, the prediction
-and the runtime facts). Which of a point's windows decides its bytes is `measurement.measured_bytes_and_method`'s.
+and the runtime facts). Which of a point's windows decides its bytes is `measurement.measured_bytes_and_method`'s. A
+point is `in_fit` where it is a fit point and its estimator's line admits its features (`fit.Line.fits`): a fit-grid
+forward with a term on top of the line, such as the score matrix a build's SDPA kernel materializes, measures that term
+rather than the line, as a check does.
 
 A measuring process that raises -- the operation's own error, or a synchronization or a peak reset that failed
 (`measurement.measure`) -- leaves without a result line. The driving process records that point as `failed`, with the
@@ -65,6 +68,7 @@ def point_line(
     and device. `windows` are the point's fresh windows, cold first; `raw` the point's other facts.
     """
     from invokeai.backend.working_memory.measurement import measured_bytes_and_method, point_reasons
+    from invokeai.backend.working_memory.spec import import_estimator_modules
 
     reasons = point_reasons(windows)
     line = {"status": "invalid" if reasons else "point", "fit": point.fit, "point": dataclasses.asdict(point), **common}
@@ -72,11 +76,12 @@ def point_line(
     if reasons:
         return line | {"reasons": reasons, "raw": raw}
     measured, method = measured_bytes_and_method(windows)
+    on_line = import_estimator_modules()[common["estimator"]].line(common["features"])
     return line | {
         "measured_bytes": measured,
         "method": method,
         "provenance": provenance,
-        "in_fit": point.fit,
+        "in_fit": point.fit and on_line is not None and on_line.fits,
         "raw": raw,
     }
 

@@ -57,7 +57,9 @@ whole 2x2 patches. A 1024px reference is 4096 tokens, a 2024px one 16129.
 The fit grid's and the large grid's points are fit points (`"fit": true`): the plain forwards, reference images and
 batches included, which the estimator's line admits (`denoise_working_memory._line`). The checks' points, the
 extra-blocks forward included, test analytic terms or assumptions rather than the line: they are marked `"fit": false`,
-and their `in_fit` is false.
+and their `in_fit` is false. A fit point is `in_fit` only where the line admits its features: on a build whose SDPA
+kernel materializes the score matrix, the fit grid's forwards carry a score term on top of the line, so they measure
+that term rather than the line, as a check does.
 
 Output
 ------
@@ -417,7 +419,9 @@ def _px(line: Mapping[str, Any]) -> int:
 
 def _summarize_fit(lines: Sequence[Mapping[str, Any]], text_tokens: int) -> None:
     measured = [line for line in lines if line["status"] == "point"]
-    fit = [line for line in measured if line["fit"]]
+    grid = [line for line in measured if line["fit"]]
+    # The line's slopes from the points that fit it; the extra-blocks forward compares with any grid point.
+    fit = [line for line in grid if line["in_fit"]]
     for width in dict.fromkeys(line["point"]["hidden_size"] for line in fit):
         of_width = [line for line in fit if line["point"]["hidden_size"] == width]
         plain = [line for line in of_width if line["point"]["references"] == 0 and line["point"]["batch"] == 1]
@@ -443,7 +447,7 @@ def _summarize_fit(lines: Sequence[Mapping[str, Any]], text_tokens: int) -> None
             )
     for line in (line for line in measured if line["point"]["kind"] == "blocks"):
         same = ("hidden_size", "px", "text_tokens", "references", "batch")
-        base_line = next((ref for ref in fit if all(ref["point"][key] == line["point"][key] for key in same)), None)
+        base_line = next((ref for ref in grid if all(ref["point"][key] == line["point"][key] for key in same)), None)
         if base_line is not None:
             extra = line["measured_bytes"] - base_line["measured_bytes"]
             print(

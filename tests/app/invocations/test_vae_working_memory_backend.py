@@ -6,6 +6,7 @@ machine runs the suite -- on the RX 9060 XT an fp16 SDXL decode costs a third of
 whatever dtype the cached VAE holds -- so it is pinned here rather than left to the card.
 """
 
+import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -16,6 +17,10 @@ from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
 
 from invokeai.app.invocations.vae.image_to_latents import ImageToLatentsInvocation
 from invokeai.app.invocations.vae.latents_to_image import LatentsToImageInvocation
+from invokeai.backend.model_manager.load.load_base import LoadedModel
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
+from invokeai.backend.quantization.sdnq.utils import SDNQQuantizationType
 from invokeai.backend.util.vae_tiling_scope import scoped_vae_tiling
 from invokeai.backend.util.vae_working_memory import (
     VAE_COGVIEW4_SPEC,
@@ -193,7 +198,7 @@ def test_the_cogview4_vae_is_priced_on_its_own_lines_without_a_score_matrix(on) 
 def test_the_sd_estimate_prices_the_dtype_the_node_casts_to_not_the_cached_one(
     on, operation, fp32, device, run_dtype, vae_dtype
 ) -> None:
-    """The cached VAE holds whatever the previous run cast it to; the node casts it again before it runs."""
+    """The node casts the VAE from the dtype it was loaded in to the one it runs, and prices the latter."""
     on(Platform("cudnn", "native", "linux"))
     assert sd_vae_run_dtype(operation, fp32, device) == run_dtype
     image = LATENTS_1024[:, :4] if operation == "decode" else torch.zeros(1, 3, 1024, 1024)
@@ -212,41 +217,74 @@ def _tiny_sd_vae() -> AutoencoderKL:
     )
 
 
-def _vae_info(vae: AutoencoderKL, estimates: list) -> MagicMock:
-    def model_on_device(working_memory):
-        estimates.append(working_memory)
-        cm = MagicMock()
-        cm.__enter__.return_value = (None, vae)
-        cm.__exit__.return_value = None
-        return cm
+@pytest.fixture
+def cached_vae():
+    """The VAE as a node loads it: cached for the CPU, locked and unlocked by the model cache. Each lock's working
+    memory is recorded."""
+    caches: list[ModelCache] = []
 
-    vae_info = MagicMock(model=vae, compute_device=torch.device("cpu"))
-    vae_info.model_on_device.side_effect = model_on_device
-    return vae_info
+    def load(vae: AutoencoderKL, estimates: list) -> LoadedModel:
+        logger = MagicMock()
+        logger.getEffectiveLevel.return_value = logging.INFO
+        cache = ModelCache(
+            execution_device_working_mem_gb=1.0,
+            enable_partial_loading=True,
+            keep_ram_copy_of_weights=True,
+            execution_device="cpu",
+            storage_device="cpu",
+            logger=logger,
+        )
+        caches.append(cache)
+        cache.put("vae", vae)
+        vae_info = LoadedModel(config=None, cache_record=cache.get("vae"), cache=cache)
+        model_on_device = vae_info.model_on_device
+
+        def recording_model_on_device(working_memory):
+            estimates.append(working_memory)
+            return model_on_device(working_memory=working_memory)
+
+        vae_info.model_on_device = recording_model_on_device  # type: ignore[method-assign]
+        return vae_info
+
+    yield load
+    for cache in caches:
+        cache.shutdown()
 
 
 @pytest.mark.parametrize("fp32", [False, True])
-def test_the_decode_node_casts_the_vae_to_the_dtype_its_estimate_priced(fp32) -> None:
-    """On the CPU both requests decode in fp32: the node and the estimate share `sd_vae_run_dtype`."""
-    vae, estimates = _tiny_sd_vae().to(torch.bfloat16), []
+def test_every_decode_runs_the_dtype_its_estimate_priced_and_prices_the_same_upcast(cached_vae, fp32) -> None:
+    """On the CPU both requests decode in fp32: the node and the estimate share `sd_vae_run_dtype`. The cache returns the
+    VAE to bf16 when a decode's lock ends, so the next decode's estimate prices the same upcast: reading a VAE left in
+    fp32, it reserved nothing for the cast."""
+    vae, estimates, decoded_in = _tiny_sd_vae().to(torch.bfloat16), [], []
+    decode = vae.decode
+
+    def recording_decode(*args, **kwargs):
+        decoded_in.append(next(vae.decoder.parameters()).dtype)
+        return decode(*args, **kwargs)
+
     context = MagicMock()
     context.tensors.load.return_value = torch.zeros(1, 4, 8, 8)
     context.config.get.return_value.force_tiled_decode = False
-    context.models.load.return_value = _vae_info(vae, estimates)
+    context.models.load.return_value = cached_vae(vae, estimates)
     context.images.save.return_value = MagicMock(image_name="x.png", width=8, height=8)
     node = LatentsToImageInvocation.model_construct(
         latents=MagicMock(latents_name="x"), vae=MagicMock(seamless_axes=[]), tiled=False, tile_size=0, fp32=fp32
     )
 
-    node.invoke(context)
+    with patch.object(vae, "decode", side_effect=recording_decode):
+        node.invoke(context)
+        node.invoke(context)
 
-    (estimate,) = estimates
-    assert estimate.features["dtype"] == "fp32"
-    assert {p.dtype for p in vae.parameters()} == {torch.float32}
+    assert decoded_in == [torch.float32, torch.float32]
+    assert [estimate.features["dtype"] for estimate in estimates] == ["fp32", "fp32"]
+    assert estimates[1].features["upcast_weight_bytes"] == estimates[0].features["upcast_weight_bytes"] > 0
 
 
 @pytest.mark.parametrize("upcast, run_dtype", [(False, torch.float16), (True, torch.float32)])
-def test_the_encode_node_casts_the_vae_to_the_dtype_its_estimate_priced(upcast, run_dtype) -> None:
+def test_the_encode_node_runs_the_dtype_its_estimate_priced_and_returns_latents_in_the_vaes(
+    cached_vae, upcast, run_dtype
+) -> None:
     vae, estimates, encoded_in = _tiny_sd_vae().to(torch.bfloat16), [], []
 
     def encode(vae, image):
@@ -254,11 +292,24 @@ def test_the_encode_node_casts_the_vae_to_the_dtype_its_estimate_priced(upcast, 
         return torch.zeros(1, 4, 2, 2)
 
     with patch.object(ImageToLatentsInvocation, "_encode_to_tensor", side_effect=encode):
-        ImageToLatentsInvocation.vae_encode(_vae_info(vae, estimates), upcast, False, torch.zeros(1, 3, 16, 16))
+        latents = ImageToLatentsInvocation.vae_encode(
+            cached_vae(vae, estimates), upcast, False, torch.zeros(1, 3, 16, 16)
+        )
 
     (estimate,) = estimates
     assert encoded_in == [run_dtype]
     assert estimate.features["dtype"] == {torch.float16: "fp16", torch.float32: "fp32"}[run_dtype]
+    assert latents.dtype == torch.bfloat16
+
+
+def test_a_failed_encode_leaves_the_vae_in_the_dtype_it_was_loaded_in(cached_vae) -> None:
+    vae = _tiny_sd_vae().to(torch.bfloat16)
+
+    with patch.object(ImageToLatentsInvocation, "_encode_to_tensor", side_effect=RuntimeError("encode failed")):
+        with pytest.raises(RuntimeError, match="encode failed"):
+            ImageToLatentsInvocation.vae_encode(cached_vae(vae, []), True, False, torch.zeros(1, 3, 16, 16))
+
+    assert {p.dtype for p in vae.parameters()} == {torch.bfloat16}
 
 
 @pytest.mark.parametrize(
@@ -449,11 +500,14 @@ def _flux2_shaped_vae() -> AutoencoderKLFlux2:
     )
 
 
-def _run_sd_node(operation: str, vae: AutoencoderKL | AutoencoderTiny, field: int, image: torch.Tensor) -> list:
-    """Run `l2i` (decode) or `i2l` (encode) tiled at the tile field `field` on the CPU, and return the estimates the
-    node priced, one per `model_on_device`. The VAE's own `decode` and `encode` still run; a caller spies on them."""
+def _run_sd_node(
+    cached_vae, operation: str, vae: AutoencoderKL | AutoencoderTiny, field: int, image: torch.Tensor
+) -> list:
+    """Run `l2i` (decode) or `i2l` (encode) tiled at the tile field `field` on the CPU, the VAE loaded through
+    `cached_vae`, and return the estimates the node priced, one per `model_on_device`. The VAE's own `decode` and
+    `encode` still run; a caller spies on them."""
     estimates: list = []
-    vae_info = _vae_info(vae, estimates)
+    vae_info = cached_vae(vae, estimates)
     if operation == "decode":
         context = MagicMock()
         context.tensors.load.return_value = image
@@ -490,7 +544,7 @@ def _run_sd_node(operation: str, vae: AutoencoderKL | AutoencoderTiny, field: in
     ],
 )
 @pytest.mark.parametrize("operation", ["decode", "encode"])
-def test_the_sd_nodes_price_the_tile_their_vae_runs(operation, build, field, runs) -> None:
+def test_the_sd_nodes_price_the_tile_their_vae_runs(cached_vae, operation, build, field, runs) -> None:
     """`patch_vae_tiling_params` gives the VAE the largest tile at or below the field that it can assemble at the
     overlap the node patches in, 32 px at the least, and the node's estimate prices that tile rather than the field: a
     24 px field priced at 24 px under-reserves the 32 px tile that runs, a 200 px one priced at 200 px over-reserves a
@@ -504,7 +558,7 @@ def test_the_sd_nodes_price_the_tile_their_vae_runs(operation, build, field, run
         return real(*args, **kwargs)
 
     setattr(vae, operation, MagicMock(side_effect=record))
-    (estimate,) = _run_sd_node(operation, vae, field, _image(operation, 32, 544, 4))
+    (estimate,) = _run_sd_node(cached_vae, operation, vae, field, _image(operation, 32, 544, 4))
 
     assert ran == [(runs, runs // 8)]
     assert estimate.features["tile"] == runs
@@ -533,7 +587,7 @@ def test_the_flux_estimates_price_the_tile_scoped_vae_tiling_runs(
 
 @pytest.mark.parametrize("family", ["sd", "flux", "flux2"])
 def test_a_field_as_large_as_the_image_that_runs_a_smaller_tile_prices_the_tiled_decode(
-    flux_shaped_vae, family
+    cached_vae, flux_shaped_vae, family
 ) -> None:
     """A 200 px field on a 200 px image reads as a covering tile, which the VAE would decode in a single pass; it runs a
     192 px tile, smaller than the image, so the VAE tiles and the estimate has to price the tiled decode."""
@@ -542,7 +596,7 @@ def test_a_field_as_large_as_the_image_that_runs_a_smaller_tile_prices_the_tiled
     vae.tiled_decode = MagicMock(wraps=vae.tiled_decode)
 
     if family == "sd":
-        (result,) = _run_sd_node("decode", vae, 200, latents)
+        (result,) = _run_sd_node(cached_vae, "decode", vae, 200, latents)
     else:
         estimate = estimate_vae_working_memory_flux if family == "flux" else estimate_vae_working_memory_flux2
         result = estimate("decode", latents, vae, 200, torch.device("cpu"))
@@ -619,6 +673,21 @@ def test_the_compute_dtype_skips_weights_stored_narrower_than_they_compute(on, l
     device = on(Platform("cudnn", "native", "linux"))
     vae = _vae(params=[leading, torch.zeros(1, dtype=torch.bfloat16)])
     assert estimate_vae_working_memory_flux("decode", LATENTS_1024, vae, device=device).features["dtype"] == dtype
+
+
+def test_an_sdnq_vae_is_priced_in_its_packed_weights_compute_dtype_not_an_fp32_bias(on) -> None:
+    """The packed weight dequantizes to its `compute_dtype`, and every other operand of its layer is cast to that dtype
+    with it, so a bias stored in fp32 does not make the layer compute in fp32."""
+    device = on(Platform("cudnn", "native", "linux"))
+    packed_weight = SDNQTensor(
+        data=torch.zeros(4, 4, dtype=torch.int8),
+        quantization_type=SDNQQuantizationType.INT8_SYM,
+        tensor_shape=torch.Size([4, 4]),
+        compute_dtype=torch.bfloat16,
+        scale=torch.ones(4, 1, dtype=torch.float32),
+    )
+    vae = _vae(params=[packed_weight, torch.zeros(4, dtype=torch.float32)])
+    assert estimate_vae_working_memory_flux("decode", LATENTS_1024, vae, device=device).features["dtype"] == "bf16"
 
 
 def test_every_stand_in_slope_is_at_least_the_pre_dtype_figure() -> None:

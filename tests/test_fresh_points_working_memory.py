@@ -10,6 +10,8 @@ its bytes is `measurement`'s, tested there; each script's grid, model and inputs
 
 import dataclasses
 import json
+import re
+import shutil
 import subprocess
 import sys
 from importlib.util import module_from_spec, spec_from_file_location
@@ -20,19 +22,20 @@ import torch
 from pydantic import ValidationError
 
 from invokeai.backend.working_memory import counters
-from invokeai.backend.working_memory.coefficients import MeasuredPoint, shipped_data
+from invokeai.backend.working_memory.coefficients import MeasuredPoint, load_data, shipped_data
 from invokeai.backend.working_memory.counters import CounterReading
 from invokeai.backend.working_memory.measurement import FreshWindow, fresh_window, measure
 from invokeai.backend.working_memory.platform import Platform
 from invokeai.backend.working_memory.spec import import_estimator_modules
 from invokeai.backend.z_image.denoise_working_memory import estimate_z_image_denoise_working_memory
-from scripts.working_memory import fresh_points
+from scripts.working_memory import build_shipped, fresh_points
 from scripts.working_memory.build_shipped import read_point_files
 
 pytestmark = pytest.mark.platform_independent
 
 SCRIPTS = Path(__file__).parents[1] / "scripts"
 MIB = 2**20
+GIB = 2**30
 
 
 def _load(name: str):
@@ -359,6 +362,43 @@ def test_a_check_point_stays_out_of_the_fit() -> None:
 
     assert line["fit"] is False
     assert _measured_point(line).in_fit is False
+
+
+def test_a_fit_grid_forward_its_line_does_not_admit_ships_out_of_the_fit_and_an_admitted_one_stays_bounded(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """On a build whose SDPA kernel materializes the score matrix, a fit-grid forward carries a score term its line
+    does not price: it measures that term, as a check does. The data builder takes it out of the fit, so the estimate,
+    its line plus the term, only has to cover the measured peak. The same peak of a forward its line admits stays in
+    the fit, and the upper bound still refuses an estimate over 1.3x of it."""
+    # A card of its own: no shipped point of the same measurement keeps its place.
+    features = _z_image_features()
+    common = _common(features) | {"device": "Test GPU"}
+    with_scores = common | {"features": features | {"score_matrix_bytes": GIB}}
+    windows = [_window(peak_reserved=GIB), _window(peak_reserved=GIB)]
+    data_dir = tmp_path / "data"
+    shutil.copytree(build_shipped.DATA_DIR, data_dir)
+
+    def build(name: str, common: dict, *flags: str) -> tuple[dict, int]:
+        line = fresh_points.point_line(
+            ZPoint("fit", 1024, 512, "float32", 2), common=common, provenance="m", windows=windows, raw={}
+        )
+        points = tmp_path / f"{name}.jsonl"
+        points.write_text(json.dumps(fresh_points.file_record(line)) + "\n", encoding="utf-8")
+        return line, build_shipped.main(["--points", str(points), "--data-dir", str(data_dir), *flags])
+
+    admitted, refused = build("admitted", common)
+    assert admitted["in_fit"] is True and refused == 1
+    point_id = "denoise.z_image-cudnn,native-denoise-fp32-4096+512tok-TestGPU-demand_peak"
+    assert re.search(
+        rf"{re.escape(point_id)}: reserves [0-9.]+x the measured peak, over 1\.3x", capsys.readouterr().err
+    )
+
+    off_line, written = build("with_scores", with_scores, "--write")
+    assert written == 0, capsys.readouterr().err
+    assert off_line["fit"] is True and off_line["in_fit"] is False
+    points = load_data(data_dir)["denoise.json"].points
+    assert [point.in_fit for point in points if point.device == "Test GPU"] == [False]
 
 
 def test_an_invalid_forward_is_no_measured_point_and_stays_out_of_the_file() -> None:

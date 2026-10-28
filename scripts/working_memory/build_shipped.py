@@ -10,9 +10,10 @@ becomes a `probe_demand` point: per card (device class), estimator, version, pla
 
 A point file is what a calibration script such as `scripts/calibrate_z_image_working_memory.py` writes: one JSON
 object per line, a `MeasuredPoint`'s fields and any other keys, which are ignored. Its points are fresh-process
-measurements, so they hold the upper bound as well. A check's point, which tests an analytic term or an assumption
-rather than the line (a forced math kernel, a ControlNet, more blocks), says `in_fit: false`: it ships as an
-out-of-fit point that bounds its estimate from below only.
+measurements, so they hold the upper bound as well. A point that tests an analytic term or an assumption rather than
+the line says `in_fit: false`: a check's (a forced math kernel, a ControlNet, more blocks), and a fit-grid forward whose
+features its estimator's line does not admit (`fit.Line.fits`), such as one with a materialized score matrix. It ships
+as an out-of-fit point that bounds its estimate from below only.
 
 A point joins the data file that declares its estimator's coefficients, keeping the larger of itself and a shipped
 point of the same measurement (`point_identity`), and says which it kept; the carried values are then refitted with

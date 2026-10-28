@@ -120,9 +120,10 @@ class MeasuredPoint(_DataModel):
     """A tighter upper bound than the default 1.3, as a multiple of `measured_bytes`, for a point the estimate has to
     stay closer to. It applies whichever term decides the estimate."""
     in_fit: bool = True
-    """False for a point measured in a regime its platform does not run, kept to check another term: CUDA with the
-    math attention kernel forced, whose score matrix shares the forward with the convolutions. The fit leaves it out,
-    and it gets the lower bound only."""
+    """False for a point whose demand is not its line's alone, kept to check another term: one measured in a regime its
+    platform does not run (CUDA with the math attention kernel forced, whose score matrix shares the forward with the
+    convolutions), or one whose features carry a term on top of the line (`fit.Line.fits`), such as the score matrix a
+    build's own SDPA kernel materializes. The fit leaves it out, and it gets the lower bound only."""
 
     @model_validator(mode="after")
     def _max_ratio_needs_an_upper_bound(self) -> Self:

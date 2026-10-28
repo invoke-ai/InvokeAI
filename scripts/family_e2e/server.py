@@ -17,6 +17,7 @@ import socket
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Any
@@ -538,8 +539,14 @@ def launch_server(
     log_path: Path,
     console_path: Path,
     device_env: dict[str, str] | None = None,
+    *,
+    on_spawn: Callable[[int], None],
 ) -> ServerProcess:
-    """Starts the server on a prepared scratch root and waits until its API answers."""
+    """Starts the server on a prepared scratch root and waits until its API answers.
+
+    `on_spawn` gets the launcher's pid right after the spawn, before the wait: on POSIX the server outlives a runner
+    killed while it starts, and only what the runner records then names it for `stop` and `resume`.
+    """
     env = server_env(spec, device_env)
     invokeai_file = verify_interpreter(spec, env)
     cmd = [str(spec.python), str(spec.code_dir / "scripts" / "invokeai-web.py"), "--root", str(scratch_root)]
@@ -553,6 +560,7 @@ def launch_server(
         console.close()
         raise
     try:
+        on_spawn(process.pid)
         port = _wait_for_port(process, log_path, log_offset, console_path)
         base_url = f"http://127.0.0.1:{port}"
         _wait_for_api(process, base_url, console_path)
