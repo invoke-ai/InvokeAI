@@ -1,6 +1,7 @@
 import gc
 import json
 import math
+import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Callable, Literal
@@ -17,12 +18,48 @@ from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger()
 
+#: The names `GGUFReader` gives the file header's own values, in the same namespace as the metadata.
+_HEADER_FIELD_NAMES = frozenset({"GGUF.version", "GGUF.tensor_count", "GGUF.kv_count"})
+#: How `GGUFReader` refuses a metadata entry named like one of those, as the `KeyError`'s message.
+_REPEATED_HEADER_FIELD = re.compile(rf"^Duplicate ({'|'.join(map(re.escape, sorted(_HEADER_FIELD_NAMES)))}) ")
+
+
+class _HeaderTolerantGGUFReader(gguf.GGUFReader):
+    """`GGUFReader` for a file that repeats the header fields as metadata; see `_open_gguf_reader`.
+
+    Some converters copy a reader's fields back into the file they write, the three header fields among
+    them: every file of vanes430's Anima-2.9B GGUFs carries them. The header is read first and wins; the
+    copies are dropped, and they may be stale (that file's copied `GGUF.kv_count` is 3, its header's 6).
+    """
+
+    def _push_field(self, field: gguf.ReaderField, *args: Any, **kwargs: Any) -> int:
+        # The reader pushes the header before any metadata, so a second field of one of its names is a copy.
+        # Arguments are forwarded as given: `_push_field` is gguf-py's private method, and this override only
+        # runs for the files above.
+        if field.name in _HEADER_FIELD_NAMES and field.name in self.fields:
+            return 0
+        return super()._push_field(field, *args, **kwargs)
+
+
+def _open_gguf_reader(path: Path) -> gguf.GGUFReader:
+    """gguf-py's own reader; for a file that repeats the header as metadata, which it refuses, the tolerant one.
+
+    The retry is narrow on purpose: every other file never meets the subclass, so a gguf-py release that
+    changes the private method it overrides can break only the files gguf-py itself cannot read.
+    """
+    try:
+        return gguf.GGUFReader(path)
+    except KeyError as e:
+        if not (e.args and isinstance(e.args[0], str) and _REPEATED_HEADER_FIELD.match(e.args[0])):
+            raise
+    return _HeaderTolerantGGUFReader(path)
+
 
 class WrappedGGUFReader:
     """Wrapper around GGUFReader that adds a close() method."""
 
     def __init__(self, path: Path):
-        self.reader = gguf.GGUFReader(path)
+        self.reader = _open_gguf_reader(path)
 
     def __enter__(self):
         return self.reader
@@ -32,7 +69,12 @@ class WrappedGGUFReader:
         return False
 
     def close(self):
-        """Explicitly close the memory-mapped file."""
+        """Drop this wrapper's references to the reader and its memory map, then collect.
+
+        The map closes once nothing references it. A caller's `with WrappedGGUFReader(path) as reader:` keeps the
+        reader, and through its tensor views the map, until that name goes out of scope -- for the callers here,
+        when they return -- so the collection releases only what reference cycles would otherwise hold.
+        """
         if hasattr(self.reader, "data"):
             try:
                 self.reader.data.flush()
@@ -41,6 +83,17 @@ class WrappedGGUFReader:
                 logger.warning(f"Wasn't able to close GGUF memory map: {e}")
         del self.reader
         gc.collect()
+
+
+def gguf_tensor_bytes(path: Path) -> dict[str, int]:
+    """The stored size of each of a GGUF file's tensors, by name, from its header alone; no tensor data is read.
+
+    For a loader that decides from the names which tensors to read, and sizes what it will read. The reader is
+    referenced by this expression only, so the memory map is released as soon as the sizes are read, without the
+    full collection `WrappedGGUFReader.close` runs, which costs most of a second on a loaded process (measured on
+    Windows, where a file still mapped cannot be deleted: it deletes at once with the collector disabled).
+    """
+    return {tensor.name: int(tensor.n_bytes) for tensor in _open_gguf_reader(path).tensors}
 
 
 ORIG_SHAPE_KEY_PREFIX = "comfy.gguf.orig_shape."
@@ -184,8 +237,20 @@ def gguf_header_state_dict(path: Path, compute_dtype: torch.dtype) -> dict[str, 
         return sd
 
 
-def gguf_sd_loader(path: Path, compute_dtype: torch.dtype, *, q8_cr: Q8CRMode = "refuse") -> dict[str, torch.Tensor]:
+def gguf_sd_loader(
+    path: Path,
+    compute_dtype: torch.dtype,
+    *,
+    q8_cr: Q8CRMode = "refuse",
+    keep: Callable[[str], bool] | None = None,
+) -> dict[str, torch.Tensor]:
     """Read a GGUF file into a state dict of ``GGMLTensor``s, dequantized on the fly at use.
+
+    ``keep`` selects the tensors to read by name. The rest are skipped before their data is copied, so a
+    loader that uses only part of a file -- a transformer with its text connectors bundled beside it, an
+    encoder with its tokenizer packed in -- does not pay RAM for the part it drops. It selects tensors
+    only: ``Q8_CR`` markers are read for the whole file, so ``"refuse"`` refuses a file even if ``keep``
+    would skip every marked layer.
 
     ``q8_cr`` says what to do with ComfyUI-GGUF ``Q8_CR`` layers (see :func:`parse_q8_cr_markers`):
 
@@ -216,6 +281,8 @@ def gguf_sd_loader(path: Path, compute_dtype: torch.dtype, *, q8_cr: Q8CRMode = 
             raise ValueError(f"{path.name}: Q8_CR metadata names layers the file does not hold, e.g. {missing[0]!r}.")
 
         for tensor in reader.tensors:
+            if keep is not None and not keep(tensor.name):
+                continue
             # Use .copy() to create a true copy of the data, not a view.
             # This is critical on Windows where the memory-mapped file cannot be deleted
             # while tensors still hold references to the mapped memory.
