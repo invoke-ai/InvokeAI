@@ -183,15 +183,23 @@ describe('GenerateConditioningRebalanceField', () => {
     expect(document.querySelector('svg[aria-hidden]')).not.toBeNull();
   });
 
-  it('turns the editor on from the collapsed row', async () => {
+  it('turns the editor on and off from the collapsed row label', async () => {
     await renderField({ krea2RebalanceEnabled: false });
 
-    const toggle = byLabel('Conditioning rebalance');
+    const label = () =>
+      [...document.querySelectorAll<HTMLElement>('[data-scope="switch"][data-part="label"]')].find(
+        (element) => element.textContent === 'Conditioning rebalance'
+      );
 
-    await interact(() => toggle?.click());
+    await interact(() => label()?.click());
 
     expect(onCommitImmediate).toHaveBeenCalledWith({ krea2RebalanceEnabled: true });
     expect(bars()).toHaveLength(12);
+
+    await interact(() => label()?.click());
+
+    expect(onCommitImmediate).toHaveBeenLastCalledWith({ krea2RebalanceEnabled: false });
+    expect(bars()).toHaveLength(0);
   });
 
   it('labels the axis by encoder depth rather than a frequency metaphor', async () => {

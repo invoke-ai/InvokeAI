@@ -5,7 +5,7 @@ import type {
   QwenImageEncoderQuantization,
 } from '@features/generation/core/types';
 
-import { Badge, createListCollection, HStack, Stack } from '@chakra-ui/react';
+import { Badge, Box, chakra, createListCollection, HStack, Stack, useRecipe } from '@chakra-ui/react';
 import {
   getDefaultGenerateSettings,
   getGenerationUiPolicy,
@@ -23,9 +23,11 @@ import {
 } from '@features/generation/core/settings';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Field, Select } from '@platform/ui';
+import { FEATURE_HINT_FIELD_PROPS, FeatureHint } from '@platform/ui/hints';
 import { ModelDefaultButton } from '@platform/ui/ModelDefaultButton';
 import { ScrubberField } from '@platform/ui/ScrubberField';
-import { useMemo } from 'react';
+import { fieldLabelRecipe } from '@theme/recipes';
+import { useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { type GenerateDraft, pickGenerateSettings } from './generateDebounce';
@@ -86,6 +88,8 @@ export const GenerateAdvancedFields = ({
   selectedModel,
 }: GenerateAdvancedFieldsProps) => {
   const { t } = useTranslation();
+  const fieldLabel = useRecipe({ recipe: fieldLabelRecipe });
+  const seamlessLabelId = useId();
   const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectAdvancedSettings);
   // A string, so editing a reference or a concept re-renders this section only when the K/V cache starts or stops
   // applying.
@@ -282,31 +286,26 @@ export const GenerateAdvancedFields = ({
 
       {policy.hiDiffusionVisible ? (
         <Stack gap="2" p="2">
-          <Field hint="hidiffusion" label={t('widgets.generate.hiDiffusion')}>
-            <GenerateToggleSwitch
-              checked={settings.hiDiffusionEnabled}
-              label={t('widgets.generate.hiDiffusion')}
-              onCheckedChange={(checked) => onCommit({ hiDiffusionEnabled: checked })}
-            />
-          </Field>
-          <HStack alignItems="flex-start" gap="2">
-            <Field flex="1" hint="hidiffusionRauNet" label={t('widgets.generate.hiDiffusionRauNet')}>
-              <GenerateToggleSwitch
-                checked={settings.hiDiffusionRauNetEnabled}
-                disabled={!settings.hiDiffusionEnabled}
-                label={t('widgets.generate.hiDiffusionRauNet')}
-                onCheckedChange={(checked) => onCommit({ hiDiffusionRauNetEnabled: checked })}
-              />
-            </Field>
-            <Field flex="1" hint="hidiffusionWindowAttn" label={t('widgets.generate.hiDiffusionWindowAttn')}>
-              <GenerateToggleSwitch
-                checked={settings.hiDiffusionWindowAttentionEnabled}
-                disabled={!settings.hiDiffusionEnabled}
-                label={t('widgets.generate.hiDiffusionWindowAttn')}
-                onCheckedChange={(checked) => onCommit({ hiDiffusionWindowAttentionEnabled: checked })}
-              />
-            </Field>
-          </HStack>
+          <GenerateToggleSwitch
+            checked={settings.hiDiffusionEnabled}
+            hint="hidiffusion"
+            label={t('widgets.generate.hiDiffusion')}
+            onCheckedChange={(checked) => onCommit({ hiDiffusionEnabled: checked })}
+          />
+          <GenerateToggleSwitch
+            checked={settings.hiDiffusionRauNetEnabled}
+            disabled={!settings.hiDiffusionEnabled}
+            hint="hidiffusionRauNet"
+            label={t('widgets.generate.hiDiffusionRauNet')}
+            onCheckedChange={(checked) => onCommit({ hiDiffusionRauNetEnabled: checked })}
+          />
+          <GenerateToggleSwitch
+            checked={settings.hiDiffusionWindowAttentionEnabled}
+            disabled={!settings.hiDiffusionEnabled}
+            hint="hidiffusionWindowAttn"
+            label={t('widgets.generate.hiDiffusionWindowAttn')}
+            onCheckedChange={(checked) => onCommit({ hiDiffusionWindowAttentionEnabled: checked })}
+          />
           <GenerateFieldContextMenu
             copyValue={() => String(settings.hiDiffusionT1Ratio)}
             isAtDefault={settings.hiDiffusionT1Ratio === DEFAULT_HIDIFFUSION_T1_RATIO}
@@ -345,13 +344,14 @@ export const GenerateAdvancedFields = ({
       ) : null}
 
       {policy.colorCompensationVisible ? (
-        <Field hint="colorCompensation" label={t('widgets.generate.colorCompensation')} p="2">
+        <Box p="2">
           <GenerateToggleSwitch
             checked={settings.colorCompensation}
+            hint="colorCompensation"
             label={t('widgets.generate.colorCompensation')}
             onCheckedChange={(checked) => onCommit({ colorCompensation: checked })}
           />
-        </Field>
+        </Box>
       ) : null}
 
       {policy.pidVisible ? (
@@ -407,40 +407,41 @@ export const GenerateAdvancedFields = ({
       ) : null}
 
       {policy.krea2ReferenceKvCacheVisible ? (
-        <Field
-          disabled={!krea2ReferenceKvCacheApplies}
-          helpText={t(KREA2_REFERENCE_KV_CACHE_HELP_KEYS[krea2EditLoraState])}
-          hint="krea2ReferenceKvCache"
-          label={t('widgets.generate.krea2ReferenceKvCache')}
-          p="2"
-        >
+        <Box p="2">
           {/* Shown off while it is not sent; the stored value stays and is back once it applies again. */}
           <GenerateToggleSwitch
             checked={krea2ReferenceKvCacheApplies && settings.krea2ReferenceKvCache}
             disabled={!krea2ReferenceKvCacheApplies}
+            helpText={t(KREA2_REFERENCE_KV_CACHE_HELP_KEYS[krea2EditLoraState])}
+            hint="krea2ReferenceKvCache"
             label={t('widgets.generate.krea2ReferenceKvCache')}
             onCheckedChange={(checked) => onCommit({ krea2ReferenceKvCache: checked })}
           />
-        </Field>
+        </Box>
       ) : null}
 
       {policy.seamlessVisible ? (
-        <Field hint="seamlessTiling" label={t('widgets.generate.seamlessTiling')} p="2">
-          <HStack gap="4">
+        // A heading over its rows: more room below it than between the rows, so it does not read as a third row.
+        <Stack aria-labelledby={seamlessLabelId} gap="3" p="2" role="group" {...FEATURE_HINT_FIELD_PROPS}>
+          {/* The hint trigger takes over its child's id, so it wraps the text inside the named heading. */}
+          <chakra.span css={fieldLabel()} id={seamlessLabelId}>
+            <FeatureHint hint="seamlessTiling">
+              <chakra.span>{t('widgets.generate.seamlessTiling')}</chakra.span>
+            </FeatureHint>
+          </chakra.span>
+          <Stack gap="2">
             <GenerateToggleSwitch
               checked={settings.seamlessXAxis}
               label={t('widgets.generate.xAxis')}
-              labelVisible
               onCheckedChange={(checked) => onCommit({ seamlessXAxis: checked })}
             />
             <GenerateToggleSwitch
               checked={settings.seamlessYAxis}
               label={t('widgets.generate.yAxis')}
-              labelVisible
               onCheckedChange={(checked) => onCommit({ seamlessYAxis: checked })}
             />
-          </HStack>
-        </Field>
+          </Stack>
+        </Stack>
       ) : null}
     </GenerateCollapsibleSection>
   );

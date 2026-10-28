@@ -1,7 +1,7 @@
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
 import type { ComponentModelConfig, GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
-import { Stack, Text } from '@chakra-ui/react';
+import { Stack } from '@chakra-ui/react';
 import {
   getComponentSectionPolicy,
   getComponentSlotIssue,
@@ -212,15 +212,10 @@ const AnimaInpaintAdapterControls = ({
     <Stack gap="1.5">
       <GenerateToggleSwitch
         checked={enabled}
+        helpText={enabled ? undefined : t('widgets.generate.animaInpaintAdapterOffHelp')}
         label={t('widgets.generate.animaInpaintAdapterEnabled')}
-        labelVisible
         onCheckedChange={onEnabledChange}
       />
-      {enabled ? null : (
-        <Text color="fg.muted" fontSize="xs">
-          {t('widgets.generate.animaInpaintAdapterOffHelp')}
-        </Text>
-      )}
       <ScrubberField
         defaultValue={DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT}
         disabled={!enabled}

@@ -165,13 +165,12 @@ const Ideogram4SamplingFields = ({ onCommit, settings }: RenderFieldsProps) => {
         />
       </Field>
       {/* Null inherits the preset; switches avoid numeric sentinels. */}
-      <Field label={t('widgets.generate.ideogram4Steps')} helpText={t('widgets.generate.ideogram4PresetDerived')}>
-        <GenerateToggleSwitch
-          checked={settings.ideogram4Steps !== null}
-          label={t('widgets.generate.override')}
-          labelVisible
-          onCheckedChange={(checked) => onCommit({ ideogram4Steps: checked ? 48 : null })}
-        />
+      <GenerateToggleSwitch
+        checked={settings.ideogram4Steps !== null}
+        helpText={t('widgets.generate.ideogram4PresetDerived')}
+        label={t('widgets.generate.ideogram4Steps')}
+        onCheckedChange={(checked) => onCommit({ ideogram4Steps: checked ? 48 : null })}
+      >
         {settings.ideogram4Steps !== null ? (
           <SliderNumberField
             ariaLabel={t('widgets.generate.ideogram4Steps')}
@@ -182,17 +181,13 @@ const Ideogram4SamplingFields = ({ onCommit, settings }: RenderFieldsProps) => {
             onChange={(value) => onCommit({ ideogram4Steps: value })}
           />
         ) : null}
-      </Field>
-      <Field
-        label={t('widgets.generate.ideogram4GuidanceScale')}
+      </GenerateToggleSwitch>
+      <GenerateToggleSwitch
+        checked={settings.ideogram4GuidanceScale !== null}
         helpText={t('widgets.generate.ideogram4PresetDerived')}
+        label={t('widgets.generate.ideogram4GuidanceScale')}
+        onCheckedChange={(checked) => onCommit({ ideogram4GuidanceScale: checked ? 5 : null })}
       >
-        <GenerateToggleSwitch
-          checked={settings.ideogram4GuidanceScale !== null}
-          label={t('widgets.generate.override')}
-          labelVisible
-          onCheckedChange={(checked) => onCommit({ ideogram4GuidanceScale: checked ? 5 : null })}
-        />
         {settings.ideogram4GuidanceScale !== null ? (
           <SliderNumberField
             ariaLabel={t('widgets.generate.ideogram4GuidanceScale')}
@@ -203,14 +198,13 @@ const Ideogram4SamplingFields = ({ onCommit, settings }: RenderFieldsProps) => {
             onChange={(value) => onCommit({ ideogram4GuidanceScale: value })}
           />
         ) : null}
-      </Field>
-      <Field label={t('widgets.generate.ideogram4Mu')} helpText={t('widgets.generate.ideogram4MuHelp')}>
-        <GenerateToggleSwitch
-          checked={settings.ideogram4Mu !== null}
-          label={t('widgets.generate.override')}
-          labelVisible
-          onCheckedChange={(checked) => onCommit({ ideogram4Mu: checked ? 1 : null })}
-        />
+      </GenerateToggleSwitch>
+      <GenerateToggleSwitch
+        checked={settings.ideogram4Mu !== null}
+        helpText={t('widgets.generate.ideogram4MuHelp')}
+        label={t('widgets.generate.ideogram4Mu')}
+        onCheckedChange={(checked) => onCommit({ ideogram4Mu: checked ? 1 : null })}
+      >
         {settings.ideogram4Mu !== null ? (
           <SliderNumberField
             ariaLabel={t('widgets.generate.ideogram4Mu')}
@@ -221,7 +215,7 @@ const Ideogram4SamplingFields = ({ onCommit, settings }: RenderFieldsProps) => {
             onChange={(value) => onCommit({ ideogram4Mu: value })}
           />
         ) : null}
-      </Field>
+      </GenerateToggleSwitch>
       <Field label={t('widgets.generate.ideogram4ColorPalette')} helpText={t('widgets.generate.ideogram4ColorHelp')}>
         <Input
           value={settings.ideogram4ColorPalette.join(', ')}
@@ -328,13 +322,12 @@ const WanLowNoiseGuidanceField = ({ onCommit, settings }: RenderFieldsProps) => 
   const { t } = useTranslation();
 
   return (
-    <Field label={t('widgets.generate.wanGuidanceLowNoise')} helpText={t('widgets.generate.wanGuidanceLowNoiseHelp')}>
-      <GenerateToggleSwitch
-        checked={settings.wanGuidanceScaleLowNoise !== null}
-        label={t('widgets.generate.override')}
-        labelVisible
-        onCheckedChange={(checked) => onCommit({ wanGuidanceScaleLowNoise: checked ? settings.cfgScale : null })}
-      />
+    <GenerateToggleSwitch
+      checked={settings.wanGuidanceScaleLowNoise !== null}
+      helpText={t('widgets.generate.wanGuidanceLowNoiseHelp')}
+      label={t('widgets.generate.wanGuidanceLowNoise')}
+      onCheckedChange={(checked) => onCommit({ wanGuidanceScaleLowNoise: checked ? settings.cfgScale : null })}
+    >
       {settings.wanGuidanceScaleLowNoise !== null ? (
         <SliderNumberField
           ariaLabel={t('widgets.generate.wanGuidanceLowNoise')}
@@ -345,7 +338,7 @@ const WanLowNoiseGuidanceField = ({ onCommit, settings }: RenderFieldsProps) => 
           onChange={(value) => onCommit({ wanGuidanceScaleLowNoise: value })}
         />
       ) : null}
-    </Field>
+    </GenerateToggleSwitch>
   );
 };
 
@@ -372,20 +365,13 @@ const SeedVarianceFields = ({
 
   return (
     <>
-      <Field
+      <GenerateToggleSwitch
+        checked={enabled}
         helpText={t('widgets.generate.seedVarianceHelp')}
         hint="seedVariance"
         label={t('widgets.generate.seedVariance')}
-        labelEnd={
-          <GenerateToggleSwitch
-            checked={enabled}
-            label={t('widgets.generate.seedVariance')}
-            onCheckedChange={(checked) => onChange({ enabled: checked })}
-          />
-        }
-      >
-        {null}
-      </Field>
+        onCheckedChange={(checked) => onChange({ enabled: checked })}
+      />
       {enabled ? (
         <>
           <ScrubberField
@@ -525,13 +511,13 @@ const TimestepShiftField = ({
   const { t } = useTranslation();
 
   return (
-    <Field helpText={helpText} hint="timestepShift" label={t('widgets.generate.timestepShift')}>
-      <GenerateToggleSwitch
-        checked={shift !== null}
-        label={t('widgets.generate.override')}
-        labelVisible
-        onCheckedChange={(checked) => onChange(checked ? DEFAULT_TIMESTEP_SHIFT : null)}
-      />
+    <GenerateToggleSwitch
+      checked={shift !== null}
+      helpText={helpText}
+      hint="timestepShift"
+      label={t('widgets.generate.timestepShift')}
+      onCheckedChange={(checked) => onChange(checked ? DEFAULT_TIMESTEP_SHIFT : null)}
+    >
       {shift !== null ? (
         <SliderNumberField
           ariaLabel={t('widgets.generate.timestepShift')}
@@ -551,7 +537,7 @@ const TimestepShiftField = ({
           }}
         />
       ) : null}
-    </Field>
+    </GenerateToggleSwitch>
   );
 };
 

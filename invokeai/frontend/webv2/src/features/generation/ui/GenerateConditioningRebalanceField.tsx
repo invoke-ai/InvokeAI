@@ -2,7 +2,7 @@
 import type { RebalancePreset } from '@features/generation/core/conditioningRebalance';
 import type { GenerateSettings } from '@features/generation/core/types';
 
-import { createListCollection, HStack, Icon, Input, Menu, Portal, Stack, Switch, Text } from '@chakra-ui/react';
+import { createListCollection, HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import {
   BUILTIN_REBALANCE_PRESETS,
   DEFAULT_KREA2_REBALANCE_MULTIPLIER,
@@ -23,13 +23,14 @@ import { ScrubberField } from '@platform/ui/ScrubberField';
 import { Select } from '@platform/ui/Select';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { MoreHorizontalIcon, RotateCcwIcon } from 'lucide-react';
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useGenerationUi } from './GenerationUiContext';
 import { ConditioningRebalanceBars } from './shared/ConditioningRebalanceBars';
 import { ConditioningRebalanceSparkline } from './shared/ConditioningRebalanceSparkline';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
+import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
 
 /** The gain slider's practical range. Typed values may go to the legacy schema's bound. */
 const GAIN_SLIDER_MAX = 10;
@@ -65,9 +66,6 @@ export const GenerateConditioningRebalanceField = ({
 }: GenerateConditioningRebalanceFieldProps) => {
   const { t } = useTranslation();
   const { rebalancePresets } = useGenerationUi();
-  // Give sibling switches explicit IDs inside a shared Field.
-  const switchInputId = useId();
-
   const [previewWeights, setPreviewWeights] = useState<number[] | null>(null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   /** Non-null while the text field is being typed into, so a half-typed vector survives. */
@@ -183,25 +181,13 @@ export const GenerateConditioningRebalanceField = ({
 
   return (
     <>
-      <Field
+      <GenerateToggleSwitch
+        checked={isEnabled}
         helpText={isEnabled ? undefined : t('widgets.generate.krea2RebalanceHelp')}
         hint="conditioningRebalance"
         label={t('widgets.generate.krea2Rebalance')}
-        labelEnd={
-          <HStack gap="2">
-            <ConditioningRebalanceSparkline muted={!isEnabled} weights={committedWeights} />
-            <Switch.Root
-              checked={isEnabled}
-              ids={{ hiddenInput: switchInputId, label: `${switchInputId}-label` }}
-              onCheckedChange={({ checked }) => onCommitImmediate({ krea2RebalanceEnabled: checked })}
-            >
-              <Switch.HiddenInput aria-label={t('widgets.generate.krea2Rebalance')} />
-              <Switch.Control _checked={{ bg: 'accent.solid' }}>
-                <Switch.Thumb />
-              </Switch.Control>
-            </Switch.Root>
-          </HStack>
-        }
+        preview={<ConditioningRebalanceSparkline muted={!isEnabled} weights={committedWeights} />}
+        onCheckedChange={(checked) => onCommitImmediate({ krea2RebalanceEnabled: checked })}
       >
         {isEnabled ? (
           <Stack gap="2" w="full">
@@ -336,7 +322,7 @@ export const GenerateConditioningRebalanceField = ({
             </Field>
           </Stack>
         ) : null}
-      </Field>
+      </GenerateToggleSwitch>
 
       <RenameDialog
         initialName={presetDialog?.mode === 'rename' ? presetDialog.preset.label : ''}

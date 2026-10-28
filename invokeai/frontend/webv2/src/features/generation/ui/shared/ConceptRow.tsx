@@ -19,7 +19,7 @@ import { createContext, memo, use, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GenerateFieldContextMenu } from './GenerateFieldContextMenu';
-import { GenerateToggleSwitch } from './GenerateToggleSwitch';
+import { GenerateRowSwitch } from './GenerateToggleSwitch';
 
 const WEIGHT_MARKS = [-1, 0, 1, 2];
 
@@ -202,7 +202,7 @@ const ConceptRowContent = ({
         <ListItem
           actions={
             <Flex gap={1}>
-              <GenerateToggleSwitch
+              <GenerateRowSwitch
                 checked={isActive}
                 disabled={!isCompatible}
                 label={
