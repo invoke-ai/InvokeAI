@@ -3,14 +3,27 @@
 A calibration run is a batch an administrator enqueues to measure one model's working memory. Its queue items carry the
 reserved origin `CALIBRATION_ORIGIN_PREFIX` + run id; the session runner measures every node of such an item with the
 working-memory probe and hands the windows to the calibration service, which keeps them in one JSON file per device
-class (`CalibrationStoreFile`). Recording only: nothing here changes an estimate.
+class (`CalibrationStoreFile`). The service fits the windows of the current environment into user lines that estimates
+read (`backend/working_memory/user_fit.py`), plans the cases a client runs to calibrate a model, and summarises what a
+model's runs measured.
 """
 
 import datetime
-from typing import Final, Literal, Optional
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
+from typing import Any, Final, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    ValidationError,
+    model_serializer,
+    model_validator,
+)
 
+from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.session_queue.session_queue_common import QUEUE_ITEM_STATUS, BatchDataCollection
 from invokeai.app.services.shared.graph import Graph
 from invokeai.backend.working_memory.counters import Backend
@@ -22,6 +35,8 @@ CALIBRATION_ORIGIN_PREFIX: Final = "invokeai:wm-calibration:"
 CALIBRATION_DESTINATION: Final = "invokeai:wm-calibration"
 """The destination of calibration items: not a gallery or canvas destination, so no client routes their results."""
 STORE_SCHEMA_VERSION: Final = 1
+ATTEMPT_STEPS_MAX: Final = 256
+"""The most runs one attempt may plan. A plan has at most a few dozen steps (`working_memory_calibration_plan.py`)."""
 
 
 def calibration_origin(run_id: str) -> str:
@@ -33,6 +48,32 @@ def calibration_run_id(origin: Optional[str]) -> Optional[str]:
     if origin is None or not origin.startswith(CALIBRATION_ORIGIN_PREFIX):
         return None
     return origin[len(CALIBRATION_ORIGIN_PREFIX) :]
+
+
+def graph_model_identifiers(graph: Graph) -> Iterator[ModelIdentifierField]:
+    """The models a graph's nodes name: their model fields, also inside a field's model, list or mapping (a LoRA
+    collection's `LoRAField.lora`), and every mapping that reads as a model identifier, such as a model a metadata
+    node's untyped field records. A client sees the graph as JSON, where those look alike, so both count."""
+
+    def within(value: object) -> Iterator[ModelIdentifierField]:
+        if isinstance(value, ModelIdentifierField):
+            yield value
+        elif isinstance(value, BaseModel):
+            for _, field in value:
+                yield from within(field)
+        elif isinstance(value, Mapping):
+            try:
+                yield ModelIdentifierField.model_validate(value)
+            except ValidationError:
+                for entry in value.values():
+                    yield from within(entry)
+        elif isinstance(value, (list, tuple)):
+            for entry in value:
+                yield from within(entry)
+
+    for node in graph.nodes.values():
+        for _, value in node:
+            yield from within(value)
 
 
 def is_reserved_origin(origin: Optional[str]) -> bool:
@@ -100,14 +141,80 @@ class CalibrationPoint(MeasuredWindow):
     env_id: str
 
 
+CalibrationErrorCode = Literal["model_changed"]
+"""Why a run's item failed, where a client acts on it: model_changed, a model its graph names changed or was removed
+after the calibration was planned, so the item failed at admission; calibrate again."""
+
+MODEL_CHANGED: Final[CalibrationErrorCode] = "model_changed"
+CALIBRATION_RUNNING: Final = "calibration_running"
+"""The code of the 409 that refuses a new attempt while another one runs, or is still open, on the GPU's device
+class."""
+
+CALIBRATION_INTERLEAVED: Final = "calibration_interleaved"
+"""The code of the 409 that refuses a later step of an attempt once another calibration ran on the GPU since the
+attempt began."""
+
+
 class ObservedItem(_StoreModel):
-    """What the session runner saw of one of the run's queue items. Kept so that a run's status survives the queue
-    pruning its items."""
+    """What the session runner saw of one of the run's queue items, or what the calibration service recorded of a
+    retry as the queue committed it. Kept so that a run's status survives the queue pruning its items."""
 
     status: QUEUE_ITEM_STATUS
     error_message: Optional[str] = None
+    error_code: Optional[CalibrationErrorCode] = None
     retried_from_item_id: Optional[int] = None
     observed_at: datetime.datetime
+
+    @model_serializer(mode="wrap")
+    def _omit_absent_fields(self, handler: SerializerFunctionWrapHandler) -> dict:
+        # Written only when set: an observation without it stays readable by a version that forbids the unknown field.
+        data = handler(self)
+        if data.get("error_code") is None:
+            data.pop("error_code", None)
+        return data
+
+
+class CalibrationModelIdentity(_StoreModel):
+    """What a calibration run's model was when the run was created, beside its hash (`CalibrationRun.model_hash`): the
+    facts that decide which decode the graph runs and which line it measures."""
+
+    base: Optional[str] = None
+    type: Optional[str] = None
+    format: Optional[str] = None
+    variant: Optional[str] = None
+
+
+class CalibrationGraphModel(CalibrationModelIdentity):
+    """A model a calibration run's graph names, as it was when the run was created: its identity and its hash."""
+
+    hash: Optional[str] = None
+
+    def changes(self, current: "CalibrationGraphModel") -> list[str]:
+        """The facts in which `current` differs from this record. A hash this record lacks (stored before hashes were
+        recorded) is not compared."""
+        return [
+            fact
+            for fact in type(self).model_fields
+            if (value := getattr(self, fact)) != getattr(current, fact) and (fact != "hash" or value is not None)
+        ]
+
+    @model_serializer(mode="wrap")
+    def _omit_absent_hash(self, handler: SerializerFunctionWrapHandler) -> dict:
+        data = handler(self)
+        if data.get("hash") is None:
+            data.pop("hash", None)
+        return data
+
+
+class CalibrationCompiledModel(CalibrationGraphModel):
+    """A model a calibration request's graph names, as the record the client compiled the graph against has it. Every
+    fact is required: format and variant are null for a record without one, the rest is never null."""
+
+    hash: str = Field(description="The model's hash, as the graph's identifier names it")
+    base: str
+    type: str
+    format: Optional[str] = Field(description="The model's format; null for a record without one")
+    variant: Optional[str] = Field(description="The model's variant; null for a record without one")
 
 
 class CalibrationRun(_StoreModel):
@@ -127,6 +234,89 @@ class CalibrationRun(_StoreModel):
     observed: dict[int, ObservedItem] = Field(
         default_factory=dict, description="The last status the session runner saw per item, retries included"
     )
+    attempt_id: Optional[str] = Field(default=None, description="The client's attempt the run belongs to, if any")
+    attempt_steps: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="How many runs the attempt planned, as its runs sent it; only with attempt_id. Absent in runs "
+        "stored before it was sent, whose attempt is judged on the runs it recorded",
+    )
+    soft: Optional[dict[str, Optional[str]]] = Field(
+        default=None,
+        description="The soft facts of the environment the run was created under; absent in runs stored before they "
+        "were recorded, which fall back to the environment's",
+    )
+    model_identity: Optional[CalibrationModelIdentity] = Field(
+        default=None,
+        description="The model as it was when the run was created; an item fails at admission once it changed. Absent "
+        "in runs stored before it was recorded, which compare the hash alone",
+    )
+    graph_models: dict[str, CalibrationGraphModel] = Field(
+        default_factory=dict,
+        description="Per model key, each model the run's graph names as the client compiled the graph against it "
+        "(the request's graph_models), which the run's creation found unchanged. An item fails at admission once one "
+        "changed, and a later run of the attempt is refused once one differs from what this run recorded. Absent in "
+        "runs stored before it was recorded",
+    )
+    retries_in_flight: int = Field(
+        default=0,
+        ge=0,
+        description="How many retry operations of the queue that retry items of this run are in flight, however many "
+        "items each retries: counted up before the operation commits and down once its retries are recorded or it "
+        "rolled back (`retries_starting`, `retries_committed`). One left over means the server stopped, the commit "
+        "failed in a way that may have committed, or the store could not be written, between the count and the "
+        "record: a retry may exist that the run does not record, so the run's attempt never feeds a fit until a reset "
+        "removes the run",
+    )
+
+    @model_validator(mode="after")
+    def _steps_belong_to_an_attempt(self) -> "CalibrationRun":
+        if self.attempt_steps is not None and self.attempt_id is None:
+            raise ValueError(f"Run {self.run_id} plans attempt_steps without an attempt_id")
+        return self
+
+    @model_serializer(mode="wrap")
+    def _omit_absent_fields(self, handler: SerializerFunctionWrapHandler) -> dict:
+        # Written only when set: a run without them stays readable by a version that forbids the unknown fields.
+        data = handler(self)
+        for name in ("attempt_id", "attempt_steps", "soft", "model_identity"):
+            if data.get(name) is None:
+                data.pop(name, None)
+        if not data.get("graph_models"):
+            data.pop("graph_models", None)
+        if not data.get("retries_in_flight"):
+            data.pop("retries_in_flight", None)
+        return data
+
+
+class RemovedAttemptSteps(_StoreModel):
+    """What resets removed of one attempt, an owner's attempt_id: what judging the runs of it that are left needs."""
+
+    user_id: str = Field(description="The owner of the attempt's runs")
+    attempt_id: str
+    removed: int = Field(ge=1, description="How many of the attempt's runs resets removed; they count as queued")
+    aborted: bool = Field(
+        default=False,
+        description="Whether the attempt was running or already aborted when a reset removed a run of it: it then "
+        "never feeds a fit",
+    )
+    attempt_steps: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="The attempt_steps the removed runs sent, which a later run of the attempt must send too; null "
+        "for runs stored before it was sent",
+    )
+
+
+@dataclass(frozen=True)
+class RetriesInFlight:
+    """The calibration runs a retry is committing items of, as `retries_starting` counted them
+    (`CalibrationRun.retries_in_flight`), for `retries_committed` to record the retries on and count down again."""
+
+    runs: Mapping[str, frozenset[str]]
+    """Per device class, the runs counted on its file."""
+    lineages: Mapping[int, tuple[str, int]]
+    """Per item a retry is made of: its run, and the item the lineage started from, which the retry stands for."""
 
 
 class CalibrationStoreFile(_StoreModel):
@@ -147,20 +337,91 @@ class CalibrationStoreFile(_StoreModel):
         description="Per model key, how often the model was reset. A node's points of a model reset after the node "
         "started are dropped",
     )
+    removed_attempt_steps: list[RemovedAttemptSteps] = Field(
+        default_factory=list,
+        description="Per attempt (owner and attempt_id), what resets removed of it, so that the runs of it that are "
+        "left are judged on every run it queued. Kept while a stored run of the attempt is left, or a later step of it "
+        "may still come: the attempt was running when a reset removed a run of it",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _records_of_owners(cls, data: Any) -> Any:
+        # Development builds keyed the records by attempt id alone. Each becomes the record of every owner whose stored
+        # runs carry that attempt id; one no stored run carries any more judges nothing, and is dropped.
+        if not isinstance(data, dict) or not isinstance(data.get("removed_attempt_steps"), dict):
+            return data
+        runs = [run for run in data.get("runs") or [] if isinstance(run, dict)]
+        records = [
+            {**record, "user_id": owner, "attempt_id": attempt_id}
+            for attempt_id, record in data["removed_attempt_steps"].items()
+            for owner in sorted({run.get("user_id") for run in runs if run.get("attempt_id") == attempt_id})
+            if isinstance(record, dict) and isinstance(owner, str)
+        ]
+        return {**data, "removed_attempt_steps": records}
+
+    @model_serializer(mode="wrap")
+    def _omit_absent_fields(self, handler: SerializerFunctionWrapHandler) -> dict:
+        # Written only while a reset's record is kept: a file without one stays readable by a version that forbids the
+        # unknown field.
+        data = handler(self)
+        if not data.get("removed_attempt_steps"):
+            data.pop("removed_attempt_steps", None)
+        return data
 
 
 # endregion
 
 # region API
 
+ATTEMPT_ID_DESCRIPTION: Final = (
+    "A client-generated id of the calibration attempt the run belongs to (1-64 letters, digits, '_', '-', '.', ':'), "
+    "so a client that enqueues one run per step can group them. Sent together with attempt_steps, never alone (422). No "
+    "window of an attempt feeds an estimate until it queued attempt_steps runs and every one has finished; a run a "
+    "reset removed still counts as queued, without its measurements. An aborted attempt never feeds one: an item of "
+    "it ended canceled (Stop, a queue clear) or failed because a model changed after the calibration was planned "
+    "(error_code model_changed), it ended before it queued all its runs (Stop, a failed submission), another "
+    "calibration ran on the GPU between its runs, or a reset removed a run of it while it ran. An item that failed "
+    "ends that step, not the attempt. "
+    "The run id derives from the idempotency_key, the request and the attempt, so an idempotency_key names one run: "
+    "repeating the request under the same attempt returns that run, and reusing the key under another attempt is "
+    "refused with 409 while the queue keeps the key's receipt. Make each key unique per run of an attempt."
+)
+ATTEMPT_STEPS_DESCRIPTION: Final = (
+    f"How many runs the attempt (attempt_id) queues, 1-{ATTEMPT_STEPS_MAX}. Sent together with attempt_id, never "
+    "alone (422), and the same by every run of the attempt: a run that sends another number than the attempt's runs "
+    "already stored is refused with 409. The attempt's windows feed estimates only once it queued that many runs, "
+    "those a reset removed since included, and all of them have finished with no item canceled."
+)
+MEASUREMENT_METHOD_DESCRIPTION: Final = (
+    "Where a window on a GPU of this class here reads its driver figure (`counters.Method`): torch-only when this "
+    "platform has no driver reader; null when no generation device of this class is present"
+)
+MEASUREMENT_VERIFIED_DESCRIPTION: Final = (
+    "Whether that method was checked against real hardware on this backend (`counters.VERIFIED_METHODS`); null when "
+    "no generation device of this class is present"
+)
+
+
+GRAPH_MODELS_DESCRIPTION: Final = (
+    "Per model key, every model the graph names (in a node's field, inside one, or in a mapping that reads as a model "
+    "identifier), as the client compiled the graph against its record. Exactly the graph's models are named (422 "
+    "otherwise). "
+    "The run's creation compares each with the model's record now, and refuses the run with 409 `model_changed` when "
+    "any differs, so send the records the graph was compiled from, never ones read again before posting. The run "
+    "records them, and admission compares them again when its item starts."
+)
+
 
 class WorkingMemoryCalibrationRequest(BaseModel):
     """The batch a calibration run enqueues, built by the client. The server sets origin, destination, runs and the
-    graph's id, and turns the node cache off."""
+    graph's id, turns the node cache off, and makes every node's images intermediates on no board: never in the
+    gallery, and removed by clearing intermediates."""
 
     model_config = ConfigDict(extra="forbid")
 
     graph: Graph = Field(description="The graph to measure")
+    graph_models: dict[str, CalibrationCompiledModel] = Field(description=GRAPH_MODELS_DESCRIPTION)
     data: Optional[BatchDataCollection] = Field(default=None, description="The batch data collection")
     idempotency_key: Optional[str] = Field(
         default=None,
@@ -170,6 +431,37 @@ class WorkingMemoryCalibrationRequest(BaseModel):
         "nothing new; once a reset removed that run, the repeat is refused. Reusing the key for another request "
         "(another model, graph or batch data) is rejected while the queue keeps the key's enqueue receipt.",
     )
+    attempt_id: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9_.:-]+$",
+        description=ATTEMPT_ID_DESCRIPTION,
+    )
+    attempt_steps: Optional[int] = Field(
+        default=None, ge=1, le=ATTEMPT_STEPS_MAX, description=ATTEMPT_STEPS_DESCRIPTION
+    )
+
+    @model_validator(mode="after")
+    def _attempt_comes_with_its_steps(self) -> "WorkingMemoryCalibrationRequest":
+        if (self.attempt_id is None) != (self.attempt_steps is None):
+            raise ValueError("attempt_id and attempt_steps are sent together or not at all")
+        return self
+
+    @model_validator(mode="after")
+    def _graph_models_name_the_graphs_models(self) -> "WorkingMemoryCalibrationRequest":
+        named = {identifier.key for identifier in graph_model_identifiers(self.graph)}
+        problems = [
+            f"the graph names {key}, which graph_models lacks" for key in sorted(named - self.graph_models.keys())
+        ]
+        problems += [
+            f"graph_models names {key}, which the graph does not" for key in sorted(self.graph_models.keys() - named)
+        ]
+        if problems:
+            raise ValueError(
+                f"graph_models must name every model the graph names, and only those: {'; '.join(problems)}"
+            )
+        return self
 
 
 class WorkingMemoryCalibrationRunCreated(BaseModel):
@@ -183,6 +475,22 @@ class WorkingMemoryCalibrationRunCreated(BaseModel):
 
 
 CalibrationRunStatus = Literal["running", "completed", "failed", "partial", "canceled"]
+
+CalibrationHoldBack = Literal["running", "aborted_attempt"]
+"""Why no window of a run feeds a fit: running, the queue holds an unfinished item of it or of a run of its attempt;
+aborted_attempt, none is running and its attempt was aborted: an item of it ended canceled (Stop, a queue clear) or
+failed because a model changed after the calibration was planned (`model_changed`), it queued fewer runs than its
+attempt_steps (Stop, or a failed submission, ended it before it queued them all; a run a reset removed counts as
+queued), another calibration ran on the GPU between its runs, or a reset removed a run of it while it ran or after it
+was aborted. An aborted attempt never feeds a fit."""
+
+_RUN_ERROR_CODE_DESCRIPTION: Final = (
+    "Why the failed item failed, where a client acts on it (`CalibrationErrorCode`): model_changed, a model its graph "
+    "names changed or was removed after the calibration was planned. Null otherwise"
+)
+_RUN_ATTEMPT_STEPS_DESCRIPTION: Final = (
+    "How many runs the run's attempt planned; null without an attempt, and for a run stored before it was sent"
+)
 
 
 class WorkingMemoryCalibrationRunSummary(BaseModel):
@@ -198,8 +506,11 @@ class WorkingMemoryCalibrationRunSummary(BaseModel):
         "valid points were recorded, else canceled"
     )
     error: Optional[str] = Field(description="The error of a failed item, when the run failed")
+    error_code: Optional[CalibrationErrorCode] = Field(description=_RUN_ERROR_CODE_DESCRIPTION)
     item_ids: list[int] = Field(description="Every queue item of the run known, retries and the items they retried")
     point_count: int
+    attempt_id: Optional[str] = Field(description="The client's attempt the run belongs to; null when none was sent")
+    attempt_steps: Optional[int] = Field(description=_RUN_ATTEMPT_STEPS_DESCRIPTION)
 
 
 class WorkingMemoryCalibrationPointCount(BaseModel):
@@ -218,7 +529,8 @@ class WorkingMemoryCalibrationEnvironment(BaseModel):
         description="Whether the current environment has the same hard facts; null off the current device class"
     )
     soft_matches_current: Optional[bool] = Field(
-        description="Whether the current environment has the same soft facts; null off the current device class"
+        description="Whether the current environment has the soft facts first recorded with this environment (`soft`); "
+        "a later run's own soft facts are not compared here. Null off the current device class"
     )
     point_count: int
 
@@ -229,6 +541,8 @@ class WorkingMemoryCalibrationDeviceClass(BaseModel):
     usable: bool
     problem: Optional[str] = Field(description="Why the file is unusable. It is kept as it is and never written")
     is_current: bool
+    measurement_method: Optional[str] = Field(description=MEASUREMENT_METHOD_DESCRIPTION)
+    measurement_verified: Optional[bool] = Field(description=MEASUREMENT_VERIFIED_DESCRIPTION)
     runs: list[WorkingMemoryCalibrationRunSummary]
     point_counts: list[WorkingMemoryCalibrationPointCount]
     envs: list[WorkingMemoryCalibrationEnvironment]
@@ -248,6 +562,188 @@ class WorkingMemoryCalibrationStatus(BaseModel):
 class WorkingMemoryCalibrationResetResult(BaseModel):
     runs_removed: int
     points_removed: int
+
+
+class WorkingMemoryCalibrationDeviceClassRef(BaseModel):
+    id: str
+    name: str
+
+
+class WorkingMemoryCalibrationCase(BaseModel):
+    """One generation a calibration plan runs, in the fields of the client's graph-export case (mode txt2img)."""
+
+    id: str = Field(description="Unique within the plan; becomes the graph id")
+    mode: Literal["txt2img"] = "txt2img"
+    model_key: str = Field(description="The main model the case generates with")
+    components: dict[str, str] = Field(
+        description="Component picks by Generate slot key; `vae` when a standalone VAE is calibrated or a GPU VAE "
+        "must be picked over one that runs on the CPU"
+    )
+    width: int
+    height: int
+    steps: int = Field(description="The fewest steps that still run the whole pipeline")
+    seed: int
+    positive_prompt: str
+    negative_prompt: str
+    settings: dict[str, str] = Field(
+        description="Generate settings overrides: `vaePrecision` (fp16 or fp32) where the decode node casts the VAE"
+    )
+    estimator: str = Field(description="The working-memory estimator of the operation the case measures")
+    line: str = Field(description="The estimator line the case measures, `<operation>_<dtype>`")
+
+
+class WorkingMemoryCalibrationRepetitions(BaseModel):
+    warm_up: int = Field(description="Runs of each case before the measured ones; their windows count too")
+    measured: int
+
+
+class WorkingMemoryCalibrationSharedModel(BaseModel):
+    key: str
+    name: str
+    base: str
+    type: str
+    lines: list[str] = Field(description="The lines it shares with the planned model, `<operation>_<dtype>`")
+
+
+class WorkingMemoryCalibrationPlan(BaseModel):
+    """What calibrating one model on this machine's GPU runs, or why it cannot."""
+
+    model_key: str
+    supported: bool
+    reason: Optional[str] = Field(description="Why the model cannot be calibrated here, when it cannot")
+    device_class: Optional[WorkingMemoryCalibrationDeviceClassRef] = Field(
+        description="The class of the GPU the cases run on; null without exactly one GPU generation device"
+    )
+    calibrated_through: Optional[str] = Field(
+        description="For a standalone VAE, the installed main model the cases generate with"
+    )
+    estimators: list[str] = Field(description="The working-memory estimators of the model's covered operations")
+    cases: list[WorkingMemoryCalibrationCase]
+    repetitions: WorkingMemoryCalibrationRepetitions
+    estimated_seconds: Optional[int] = Field(
+        description="A rough order of magnitude for all cases and repetitions, model load included; not a measurement"
+    )
+    shared_with: list[WorkingMemoryCalibrationSharedModel] = Field(
+        description="Other installed models whose operations price with the same lines on this GPU, so a calibration "
+        "changes their estimates too"
+    )
+    not_covered: list[str] = Field(description="Operations of the model a calibration does not measure, and why")
+
+
+CalibrationLineState = Literal["in_use", "stale", "unusable", "insufficient"]
+
+CalibrationSizeExclusion = Literal["fragmented", "partial_residency", "aborted_attempt"]
+
+
+class WorkingMemoryCalibrationLineSize(BaseModel):
+    width: int
+    height: int
+    pixels: int
+    windows: int = Field(
+        description="Counted: the windows at this size that feed the line, valid, fit-eligible and not fragmented, of "
+        "every model in the environment; those of a calibration run still running are counted, and join the fit once "
+        "it finished. Not counted: the valid windows measured at this size"
+    )
+    measured_bytes: int = Field(description="The largest demand of those windows")
+    counted: bool = Field(description="Whether windows of this size feed the user line")
+    excluded_reason: Optional[CalibrationSizeExclusion] = Field(
+        description="Why a size is not counted: fragmented, its windows measured the allocator's fragmentation "
+        "(`backend/working_memory/fragmentation.py`); partial_residency, the model was not fully on the device; "
+        "aborted_attempt, its windows come from aborted attempts (Stop, a queue clear, a failed submission, a model "
+        "changed after the calibration was planned), which never feed a line. Null for a counted size"
+    )
+    shipped_bytes: Optional[int] = Field(
+        description="The shipped estimate at this size, priced with the line's estimator where one of its windows "
+        "measured the size, otherwise with that of the largest window; null when the platform of the environment is "
+        "unknown"
+    )
+    user_bytes: Optional[int] = Field(
+        description="The estimate with the user line applied, as estimates read it (without the windows of runs still "
+        "running); null without a user line"
+    )
+
+
+class WorkingMemoryCalibrationPixelRange(BaseModel):
+    min_pixels: int
+    max_pixels: int
+
+
+class WorkingMemoryCalibrationLineContributor(BaseModel):
+    """A model whose windows feed a line: the model a run calibrated, or the model a window measured."""
+
+    model_key: str
+    name: Optional[str] = Field(description="The model's name; null when it is no longer installed")
+    windows: int = Field(description="Its counted windows on the line: valid, fit-eligible and not fragmented")
+
+
+class WorkingMemoryCalibrationModelLine(BaseModel):
+    """One estimator line in one environment: one the model's windows measured, or, in the current environment, one
+    the model's decode prices on that other models' windows measured."""
+
+    estimator: str
+    version: int
+    line: str = Field(description="`<operation>_<dtype>`")
+    carrier: Optional[str] = Field(description="The estimator whose shipped entry carries the line on this platform")
+    env_id: str
+    state: CalibrationLineState = Field(
+        description="in_use: the user line applies; stale: it applies, but the soft facts of the newest finished run "
+        "that contributed a window differ from the current ones; unusable: hard facts "
+        "differ from the current environment (or no GPU of this class generates here), so shipped values apply; "
+        "insufficient: the windows of finished, complete attempts cannot fit a line (yet); `problem` says why"
+    )
+    changed_facts: list[str] = Field(
+        description="The soft facts that changed (stale) or the hard facts that differ (unusable)"
+    )
+    problem: Optional[str] = Field(description="Why no line could be fitted, when it could not")
+    measured_range: Optional[WorkingMemoryCalibrationPixelRange] = Field(
+        description="The sizes the user line was fitted on, over every model's windows of the line from finished runs"
+    )
+    slope_bytes_per_pixel: Optional[int]
+    base_bytes: Optional[int]
+    sizes: list[WorkingMemoryCalibrationLineSize]
+    own_windows: int = Field(description="The model's own windows that feed the line; 0 when only other models' do")
+    measured_by: list[WorkingMemoryCalibrationLineContributor] = Field(
+        description="Every model whose windows feed the line, this one included when it has any; by name, then key"
+    )
+
+
+class WorkingMemoryCalibrationModelRun(BaseModel):
+    run_id: str
+    status: CalibrationRunStatus
+    error: Optional[str]
+    error_code: Optional[CalibrationErrorCode] = Field(description=_RUN_ERROR_CODE_DESCRIPTION)
+    created_at: datetime.datetime
+    point_count: int
+    attempt_id: Optional[str] = Field(description="The client's attempt the run belongs to; null when none was sent")
+    attempt_steps: Optional[int] = Field(description=_RUN_ATTEMPT_STEPS_DESCRIPTION)
+    held_back: Optional[CalibrationHoldBack] = Field(
+        description="Why no window of the run feeds a fit: running, it or a run of its attempt is still in the queue, "
+        "and its windows join once all have finished; aborted_attempt, its attempt was aborted, and its windows never "
+        "feed one: an item of it ended canceled (Stop, a queue clear) or failed because a model changed after "
+        "the calibration was planned (model_changed), another calibration ran on the GPU between its runs, the "
+        "attempt ended before it queued all "
+        "attempt_steps runs (Stop, a failed submission), or a reset removed a run of it while it ran. Null when its "
+        "windows are judged like any finished run's"
+    )
+
+
+class WorkingMemoryCalibrationModelSummary(BaseModel):
+    """What one model's calibration runs measured on one device class, and what estimates make of it."""
+
+    model_key: str
+    device_class_id: str
+    usable: bool
+    problem: Optional[str] = Field(description="Why the store file is unusable")
+    current_env_id: Optional[str] = Field(description="Null when no generation device of this class is present")
+    measurement_method: Optional[str] = Field(description=MEASUREMENT_METHOD_DESCRIPTION)
+    measurement_verified: Optional[bool] = Field(description=MEASUREMENT_VERIFIED_DESCRIPTION)
+    lines: list[WorkingMemoryCalibrationModelLine]
+    excluded_windows: int = Field(
+        description="The model's windows that feed no line: invalid, not fit-eligible, fragmented, of an aborted "
+        "attempt, tiled, batched, upcast, a VAE outside the AutoencoderKL family, or no demand. The valid ones among "
+        "them still show as sizes that are not counted"
+    )
+    runs: list[WorkingMemoryCalibrationModelRun]
 
 
 # endregion
@@ -277,12 +773,42 @@ class CalibrationQueueFullError(Exception):
     """The queue had no room for all of the run's items, so it took none."""
 
 
+class CalibrationModelChangedError(Exception):
+    """A model the run's graph names is not the one it was planned with any more: changed, or removed. The route
+    answers 409 with `code` `model_changed`."""
+
+    code: Final = MODEL_CHANGED
+
+
+class CalibrationAttemptBusyError(Exception):
+    """Another calibration attempt still runs on the GPU's device class. The route answers 409 with `code`
+    `calibration_running`."""
+
+    code: Final = CALIBRATION_RUNNING
+
+
+class CalibrationAttemptInterleavedError(Exception):
+    """Another calibration ran on the GPU's device class after the attempt's first run: its later steps would measure
+    the GPU after that calibration, not after its own earlier steps. The route answers 409 with `code`
+    `calibration_interleaved`."""
+
+    code: Final = CALIBRATION_INTERLEAVED
+
+
+class CalibrationAttemptConflictError(Exception):
+    """The run's attempt_steps differs from that of the run, or of the attempt's other runs, already stored."""
+
+
 class CalibrationStoreError(Exception):
     """The store could not be read or written."""
 
 
 class CalibrationStoreUnusableError(CalibrationStoreError):
     """The device class's file has an unknown schema or is invalid; it is kept untouched and not written."""
+
+
+class CalibrationStoreLockTimeoutError(CalibrationStoreError):
+    """Another holder kept a store lock past `LOCK_TIMEOUT_S`; the same change may pass once it let go."""
 
 
 # endregion
