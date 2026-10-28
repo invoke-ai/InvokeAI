@@ -5,9 +5,15 @@ import numpy as np
 import pytest
 import torch
 
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.quantization.gguf import loaders
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
-from invokeai.backend.quantization.gguf.loaders import WrappedGGUFReader, gguf_sd_loader, gguf_tensor_bytes
+from invokeai.backend.quantization.gguf.loaders import (
+    WrappedGGUFReader,
+    gguf_header_state_dict,
+    gguf_sd_loader,
+    gguf_tensor_bytes,
+)
 from tests.fixtures.quantized_payloads import q8_cr_marker, quantize_convrot, write_gguf
 
 
@@ -115,16 +121,17 @@ def test_a_q8_cr_file_is_refused_unless_the_caller_decodes_int8(tmp_path):
         gguf_sd_loader(path, compute_dtype=torch.float32)
 
 
-def test_identification_reads_a_q8_cr_file_as_it_always_has(tmp_path):
+def test_the_header_read_reports_q8_cr_codes_as_i8_without_raising(tmp_path):
     """Identification asks only for shapes, once per candidate config. A format it cannot decode must not
     raise there -- the factory refuses it from the metadata, with its reason -- and nothing is translated."""
 
     path = tmp_path / "model.gguf"
     write_gguf(path, _q8_cr_layer("proj"), quant={"proj.weight": {"format": "int4_cr", "backing": "w4a4"}})
 
-    sd = gguf_sd_loader(path, compute_dtype=torch.float32, q8_cr="ignore")
+    sd = gguf_header_state_dict(path, compute_dtype=torch.float32)
 
     assert isinstance(sd["proj.weight"], GGMLTensor)
+    assert sd["proj.weight"]._ggml_quantization_type is gguf.GGMLQuantizationType.I8
     assert "proj.comfy_quant" not in sd
 
 
@@ -220,6 +227,27 @@ def _write_tagged(path, metadata: dict[str, int]) -> None:
     writer.close()
 
 
+def _write_mixed_gguf(path) -> None:
+    """One tensor of each storage the releases use: F32, F16, BF16, Q8_0, a K-quant, and a tensor stored flat
+    with its native shape in ``comfy.gguf.orig_shape``."""
+    rng = np.random.default_rng(0)
+    writer = gguf.GGUFWriter(str(path), "flux")
+    writer.add_tensor("norm.weight", rng.standard_normal(64).astype(np.float32))
+    writer.add_tensor("gate.weight", rng.standard_normal((8, 64)).astype(np.float16))
+    bf16 = gguf.quants.quantize(rng.standard_normal((8, 64)).astype(np.float32), gguf.GGMLQuantizationType.BF16)
+    writer.add_tensor("proj.bias", bf16, raw_shape=bf16.shape, raw_dtype=gguf.GGMLQuantizationType.BF16)
+    q8 = gguf.quants.quantize(rng.standard_normal((16, 64)).astype(np.float32), gguf.GGMLQuantizationType.Q8_0)
+    writer.add_tensor("proj.weight", q8, raw_shape=q8.shape, raw_dtype=gguf.GGMLQuantizationType.Q8_0)
+    q4k = rng.integers(0, 256, size=(4, 144), dtype=np.uint8)
+    writer.add_tensor("attn.weight", q4k, raw_shape=q4k.shape, raw_dtype=gguf.GGMLQuantizationType.Q4_K)
+    writer.add_tensor("embedding", rng.standard_normal(96).astype(np.float32))
+    writer.add_array("comfy.gguf.orig_shape.embedding", [1, 96])
+    writer.write_header_to_file()
+    writer.write_kv_data_to_file()
+    writer.write_tensors_to_file()
+    writer.close()
+
+
 def _write_with_stale_header_copies(path) -> None:
     """Laid out as vanes430's Anima-2.9B GGUFs are: the header's values repeated as metadata, and not all of them
     right (that file's copied `GGUF.kv_count` is 3, its header's 6)."""
@@ -276,3 +304,36 @@ def test_tensor_sizes_come_from_the_header_and_release_the_file(tmp_path):
 
     assert gguf_tensor_bytes(path) == {"blocks.0.proj.weight": 4 * 32 * 4}
     path.unlink()
+
+
+def test_the_header_state_dict_is_the_full_read_without_the_data(tmp_path):
+    """Identification probes the header version. Every candidate config reads names, shapes and quantization
+    types off it, so each tensor has to look exactly as the full read's does -- packed and logical shape, storage
+    dtype, type -- while holding nothing."""
+    path = tmp_path / "model.gguf"
+    _write_mixed_gguf(path)
+
+    full = gguf_sd_loader(path, compute_dtype=torch.float32)
+    header = gguf_header_state_dict(path, compute_dtype=torch.float32)
+
+    assert header.keys() == full.keys()
+    for name, read in full.items():
+        probed = header[name]
+        assert isinstance(probed, GGMLTensor) and isinstance(read, GGMLTensor), name
+        assert probed.quantized_data.is_meta, name
+        assert probed._ggml_quantization_type == read._ggml_quantization_type, name
+        assert probed.tensor_shape == read.tensor_shape, name
+        assert probed.quantized_data.shape == read.quantized_data.shape, name
+        assert probed.quantized_data.dtype == read.quantized_data.dtype, name
+        assert probed.compute_dtype == read.compute_dtype, name
+    assert header["embedding"].shape == (1, 96)
+
+
+def test_identification_reads_only_the_header(tmp_path):
+    """The install probes every file once per candidate config; for a GGUF that must not copy its tensors."""
+    path = tmp_path / "model.gguf"
+    _write_mixed_gguf(path)
+
+    sd = ModelOnDisk(path).load_state_dict()
+
+    assert sd and all(isinstance(value, GGMLTensor) and value.quantized_data.is_meta for value in sd.values())
