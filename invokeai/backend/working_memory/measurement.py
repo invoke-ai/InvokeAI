@@ -209,10 +209,15 @@ def point_reasons(windows: Sequence[FreshWindow]) -> list[ReadingReason]:
 def measured_bytes_and_method(windows: Sequence[FreshWindow]) -> tuple[int, FreshPointMethod]:
     """A valid fresh-process point's bytes and `MeasuredPoint.method`, from its windows (`measure_cold_and_warm`).
 
-    `demand_peak` where every window read the driver's figure: the largest demand. Otherwise `reserved_peak`, the
-    largest growth of torch's counters alone, so that the method names what the bytes were read from.
+    The largest of each window's figure: its demand where it read the driver, otherwise the growth of torch's counters
+    alone. A window without the driver's figure does not discard another's, which on ROCm maps a few hundred MiB above
+    torch's reserve on a first forward. The method names what the largest was read from: `demand_peak` for a demand,
+    `reserved_peak` for torch's counters.
     """
-    if all(window.driver is not None for window in windows):
-        return max(window.demand for window in windows if window.demand is not None), "demand_peak"
-    torch_counters = [delta for window in windows for delta in (window.reserved, window.allocated) if delta is not None]
-    return max(torch_counters), "reserved_peak"
+    figures: list[tuple[int, FreshPointMethod]] = []
+    for window in windows:
+        if window.driver is not None and window.demand is not None:
+            figures.append((window.demand, "demand_peak"))
+        else:
+            figures += [(delta, "reserved_peak") for delta in (window.reserved, window.allocated) if delta is not None]
+    return max(figures, key=lambda figure: figure[0])

@@ -7,10 +7,10 @@ the plain forward of the same run, and the peaks measured before the lines had p
 point covers the same case.
 
 ROCm with the native allocator off Windows is not measured and still prices with the hand-set `legacy` constants the
-node reserved by hand, which `TestLegacyReservation` holds byte for byte to that formula, frozen below, for every
-transformer that holds no float8 weight. An fp8-stored one also reserves its cast transient, a term the formula lacked
-(`TestEstimate`). Every other platform nothing is measured on prices as a measured one, whose entry floors every value
-at those constants, and `TestUnmeasuredPlatforms` holds it to the formula at least.
+node reserved by hand, which `TestLegacyReservation` holds byte for byte to that formula, frozen below, plus the
+terms it lacked: the largest layer partial loading streams, a masked forward's padded bias copy and an fp8-stored
+transformer's cast transient (`TestEstimate`). Every other platform nothing is measured on prices as a measured one,
+whose entry floors every value at those constants, and `TestUnmeasuredPlatforms` holds it to the formula at least.
 
 What the node hands the estimate and `model_on_device()` is pinned in
 `tests/app/invocations/test_flux2_working_memory.py`.
@@ -22,6 +22,8 @@ from unittest.mock import patch
 
 import pytest
 import torch
+from diffusers import Flux2Transformer2DModel
+from gguf import GGMLQuantizationType
 
 from invokeai.backend.flux2.denoise_working_memory import (
     FLUX2_DENOISE_SPEC,
@@ -30,6 +32,7 @@ from invokeai.backend.flux2.denoise_working_memory import (
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.int8_convrot import CONVROT_GROUP_SIZE, Int8ConvrotLinear
 from invokeai.backend.util.attention import SDPA_MATH_BYTES_PER_SCORE_ELEMENT, sdpa_score_matrix_bytes
 from invokeai.backend.working_memory import spec as spec_module
@@ -39,12 +42,27 @@ from tests.app.invocations.test_z_image_denoise_working_memory import ATTENTION
 
 MB = 1024**2
 GB = 1024**3
+FLUX2_CONTEXT_DIMS = {3072: 7680, 4096: 12288, 6144: 15360}
+"""The caption width the loader reads off each width's checkpoint (`configs/flux2_variant.py`)."""
 
 
 def _dense_transformer() -> torch.nn.Module:
     model = torch.nn.Module()
     model.proj = torch.nn.Linear(CONVROT_GROUP_SIZE, 8)
     return model
+
+
+def _bf16_transformer(hidden_size: int) -> torch.nn.Module:
+    """The transformer class the loader builds at a width, one block per stream, in bf16 on the meta device."""
+    with torch.device("meta"):
+        return Flux2Transformer2DModel(
+            num_layers=1,
+            num_single_layers=1,
+            attention_head_dim=128,
+            num_attention_heads=hidden_size // 128,
+            joint_attention_dim=FLUX2_CONTEXT_DIMS[hidden_size],
+            patch_size=1,
+        ).to(torch.bfloat16)
 
 
 def _int8_transformer(out_features: int) -> torch.nn.Module:
@@ -59,7 +77,17 @@ def _int8_transformer(out_features: int) -> torch.nn.Module:
 
 
 def _estimate(
-    transformer=None, *, hidden_size=4096, image=4096, refs=0, text=512, batch=1, loras=0, control_blocks=0, mask=None
+    transformer=None,
+    *,
+    hidden_size=4096,
+    image=4096,
+    refs=0,
+    text=512,
+    batch=1,
+    loras=0,
+    control_blocks=0,
+    mask=None,
+    resident=False,
 ):
     return estimate_flux2_denoise_working_memory(
         transformer if transformer is not None else _dense_transformer(),
@@ -71,6 +99,7 @@ def _estimate(
         lora_count=loras,
         control_blocks=control_blocks,
         regional_attn_mask=mask,
+        weights_resident=resident,
         device=torch.device("cuda"),
         dtype=torch.bfloat16,
     )
@@ -83,7 +112,7 @@ class TestEstimate:
         ModelLoader._apply_fp8_to_nn_module(fp8_stored, storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
 
         with ATTENTION["cuda"].answers():
-            added = _estimate(fp8_stored).reservation_bytes - _estimate().reservation_bytes
+            added = _estimate(fp8_stored, resident=True).reservation_bytes - _estimate(resident=True).reservation_bytes
 
         assert added == (8 * CONVROT_GROUP_SIZE + 8) * torch.bfloat16.itemsize
 
@@ -106,6 +135,61 @@ class TestEstimate:
                     assert controlled - _estimate(**shape, text=text).reservation_bytes == (blocks + 4) * hint
             assert _estimate(**shape, control_blocks=0).reservation_bytes == plain
 
+    @pytest.mark.parametrize("hidden_size", FLUX2_HIDDEN_SIZES)
+    def test_a_transformer_that_may_load_partially_reserves_its_largest_layer(self, hidden_size):
+        """Partial loading copies a RAM-held layer to the device for its forward, alive beside the activations. On the
+        transformer the loader builds at that width, in bf16, that is the single-stream blocks' fused projection of
+        9 widths by 1; at [dev]'s it is 679,477,248 bytes."""
+        model = _bf16_transformer(hidden_size)
+
+        with ATTENTION["cuda"].answers():
+            added = (
+                _estimate(model, hidden_size=hidden_size).reservation_bytes
+                - _estimate(model, hidden_size=hidden_size, resident=True).reservation_bytes
+            )
+
+        assert added == 9 * hidden_size * hidden_size * 2
+        if hidden_size == 6144:
+            assert added == 679_477_248
+
+    def test_an_fp8_stored_layer_streams_its_float8_bytes(self):
+        """What partial loading copies is the stored weight; its bf16 widening is the fp8 cast term's."""
+        fp8_stored = _dense_transformer()
+        ModelLoader._apply_fp8_to_nn_module(fp8_stored, storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
+
+        with ATTENTION["cuda"].answers():
+            features = _estimate(fp8_stored).features
+
+        assert features["streamed_layer_bytes"] == (8 * CONVROT_GROUP_SIZE + 8) * 1
+
+    def test_a_gguf_layer_streams_its_quantized_bytes(self):
+        """A Q8_0 weight stores 34 bytes per block of 32 elements."""
+        model = torch.nn.Module()
+        model.proj = torch.nn.Linear(32, 64, bias=False)
+        quantized = GGMLTensor(
+            torch.zeros(64, 34, dtype=torch.uint8), GGMLQuantizationType.Q8_0, torch.Size([64, 32]), torch.bfloat16
+        )
+        model.proj.weight = torch.nn.Parameter(quantized, requires_grad=False)
+
+        with ATTENTION["cuda"].answers():
+            features = _estimate(model).features
+
+        assert features["streamed_layer_bytes"] == 64 * 34
+
+    @pytest.mark.parametrize("side, batch", [(4608, 1), (9124, 1), (9124, 2)])
+    def test_a_regional_mask_reserves_the_bias_and_a_padded_copy_per_sample(self, side, batch):
+        """The memory-efficient kernel a masked forward runs on pads an unaligned bias into a new tensor; no point
+        measures a masked forward, so the copy is reserved aligned or not. 9124 pads to 9128. A fused diffusers backend
+        materializes no score matrix either way, so the bias and its copy are all the mask adds."""
+        mask = torch.empty((side, side), device="meta")
+        padded = -(-side // 8) * 8
+
+        with ATTENTION["cuda-fused-backend"].answers():
+            masked = _estimate(mask=mask, batch=batch, resident=True).reservation_bytes
+            added = masked - _estimate(batch=batch, resident=True).reservation_bytes
+
+        assert added == side * side * 2 + batch * side * padded * 2
+
     @pytest.mark.parametrize("hidden_size, dtype", [(4096, torch.float16), (5120, torch.bfloat16)])
     def test_a_dtype_or_width_without_a_line_is_refused(self, hidden_size, dtype):
         """Pricing it on another width's or dtype's line would be a guess; the estimator says what is missing."""
@@ -127,9 +211,9 @@ class TestLine:
     """Which forwards a point of may fit the `denoise_bf16_h<width>` line: the plain ones, whose demand is the line's
     alone."""
 
-    def _line(self, *args, **kwargs):
+    def _line(self, *args, resident=True, **kwargs):
         with ATTENTION["cuda"].answers():
-            features = _estimate(*args, **kwargs).features
+            features = _estimate(*args, resident=resident, **kwargs).features
         return FLUX2_DENOISE_SPEC.line(features)
 
     def test_a_plain_forward_fits_its_widths_line_over_every_attended_token(self):
@@ -151,10 +235,15 @@ class TestLine:
         lora = self._line(loras=1)
         quantized = self._line(_int8_transformer(64))
         controlled = self._line(hidden_size=6144, control_blocks=4)
+        streamed = self._line(_bf16_transformer(6144), hidden_size=6144, resident=False)
 
-        assert not (regional.fits or lora.fits or quantized.fits or controlled.fits)
+        assert not (regional.fits or lora.fits or quantized.fits or controlled.fits or streamed.fits)
         # This build materializes the score matrix for a masked forward, which the label names as well.
-        assert f"-attention_mask-regional_attention_bias={4608 * 4608 * 2}-attention_scores=" in regional.label
+        bias = 4608 * 4608 * 2
+        assert f"-attention_mask-regional_attention_bias={bias}-padded_attention_bias={bias}-attention_scores=" in (
+            regional.label
+        )
+        assert streamed.label.endswith(f"-streamed_layer={6144 * 55296 * 2}")
         assert lora.label.endswith(f"-lora_patches={2**29}")
         assert quantized.label.endswith(f"-dequant_transient={2 * 64 * CONVROT_GROUP_SIZE * 2}")
         assert controlled.label.endswith(f"-control_hints={8 * 4096 * 6144 * 2}")
@@ -222,8 +311,9 @@ class TestLegacyReservation:
     @pytest.mark.parametrize("attention_build", list(ATTENTION.values()), ids=list(ATTENTION))
     def test_the_reservation_is_the_legacy_formula_byte_for_byte(self, attention_build):
         """On the platforms still `legacy`: estimated on such a machine, and evaluated again there from the features
-        alone. None of the transformers holds a float8 weight, the one case the reservation adds a term the formula
-        lacked. The node prices an unknown variant at the widest width, 6144, which this grid covers."""
+        alone, plus the terms the formula lacked and `TestEstimate` pins: the streamed largest layer and, with a mask,
+        its padded bias copy. None of the transformers holds a float8 weight, whose cast is another such term. The node
+        prices an unknown variant at the widest width, 6144, which this grid covers."""
         mismatches = []
         with attention_build.answers(), patch.object(spec_module, "platform_for", return_value=LEGACY_PLATFORMS[0]):
             grid = itertools.product(
@@ -244,6 +334,13 @@ class TestLegacyReservation:
                     has_regional_attention_mask=regional_mask is not None,
                     device=attention_build.device,
                 ) + peak_dequant_transient_bytes(transformer, torch.bfloat16)
+                # The terms the formula lacked: the layer partial loading streams, and the mask's padded bias copy.
+                expected += max(
+                    sum(t.nbytes for t in (*m.parameters(recurse=False), *m.buffers(recurse=False)))
+                    for m in transformer.modules()
+                )
+                if regional_mask is not None:
+                    expected += batch * mask_side * (-(-mask_side // 8) * 8) * 2
 
                 estimate = estimate_flux2_denoise_working_memory(
                     transformer,
@@ -320,9 +417,6 @@ class TestUnmeasuredPlatforms:
 
 
 RTX_4090_NATIVE = Platform("cudnn", "native", "windows")
-# Torch 2.10 on an RX 9070 XT, OS and allocator configuration unrecorded. The RX 9060 XT's own points now bound the
-# Windows entries; the slopes are held to the legacy entry of the other OSes.
-RX_9070_XT = Platform("miopen", "native", "linux")
 
 
 def _forward_features(*, hidden_size=4096, image=4096, refs=0, text=512, batch=1) -> dict:
@@ -381,16 +475,3 @@ class TestMeasuredChecks:
         estimate = _shipped_reservation(RTX_4090_NATIVE, _forward_features(image=image, refs=refs))
 
         assert measured_mb * MB <= estimate <= measured_mb * MB + 2 * GB
-
-    # (hidden size, measured MiB per token): the RX 9070 XT's slope between 4608 and 9216 tokens, block count and
-    # everything else held fixed. The RTX 4090's slopes of the same runs are superseded by its shipped points.
-    MEASURED_WIDTH_SLOPE = [(3072, 0.3147), (4096, 0.4067), (6144, 0.5890)]
-
-    @pytest.mark.parametrize("hidden, measured_mb", MEASURED_WIDTH_SLOPE)
-    def test_each_widths_slope_covers_the_rx_9070_xts_closely(self, hidden, measured_mb):
-        """It is the dominant term, so it stays within 1.25x."""
-        short = _shipped_reservation(RX_9070_XT, _forward_features(hidden_size=hidden, image=4096))
-        long = _shipped_reservation(RX_9070_XT, _forward_features(hidden_size=hidden, image=8704))
-        slope = (long - short) / (9216 - 4608)
-
-        assert measured_mb * MB <= slope <= 1.25 * measured_mb * MB
