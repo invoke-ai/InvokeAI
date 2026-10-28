@@ -97,7 +97,7 @@ def _read_comfy_orig_shapes(reader: gguf.GGUFReader) -> dict[str, torch.Size]:
 
 COMFY_QUANT_KEY_PREFIX = "comfy.gguf.quant."
 
-Q8CRMode = Literal["refuse", "decode", "ignore"]
+Q8CRMode = Literal["refuse", "decode"]
 
 
 def parse_q8_cr_markers(fields: Mapping[str, Any], source: str) -> dict[str, dict[str, Any]]:
@@ -144,6 +144,46 @@ def parse_q8_cr_markers(fields: Mapping[str, Any], source: str) -> dict[str, dic
     return layers
 
 
+def _logical_shape(tensor: gguf.ReaderTensor, orig_shapes: Mapping[str, torch.Size]) -> torch.Size:
+    """The shape a tensor has in the model: GGUF's reversed dims, or the native shape ComfyUI recorded."""
+    shape = torch.Size(tuple(int(v) for v in reversed(tensor.shape)))
+    orig_shape = orig_shapes.get(tensor.name)
+    if orig_shape is None:
+        return shape
+    if orig_shape.numel() != shape.numel():
+        raise ValueError(
+            f"GGUF tensor {tensor.name!r} declares original shape {tuple(orig_shape)}, which has a "
+            f"different element count than its stored shape {tuple(shape)}."
+        )
+    return orig_shape
+
+
+def gguf_header_state_dict(path: Path, compute_dtype: torch.dtype) -> dict[str, torch.Tensor]:
+    """A GGUF file's tensors as `gguf_sd_loader` returns them, but on the `meta` device: read from the header.
+
+    Model identification needs names, shapes and quantization types, never values, and the header holds them
+    all. `gguf_sd_loader` copies every tensor out of the file -- for a 23.6 GB transformer, 22 GiB of RAM per
+    probe -- to answer questions the first few MB answer. Each tensor comes back as the `GGMLTensor` the full
+    read gives, with the same packed and logical shapes; a ComfyUI-GGUF ``Q8_CR`` layer comes back as its raw
+    ``I8`` codes, without the markers a decoding read adds, since whether it is supported is decided from the
+    metadata. The reader maps the file but touches only the header.
+    """
+    with WrappedGGUFReader(path) as reader:
+        orig_shapes = _read_comfy_orig_shapes(reader)
+        sd: dict[str, torch.Tensor] = {}
+        for tensor in reader.tensors:
+            shape = _logical_shape(tensor, orig_shapes)
+            stored_dtype = torch.from_numpy(np.empty(0, dtype=tensor.data.dtype)).dtype
+            stored_shape = shape if tensor.tensor_type in TORCH_COMPATIBLE_QTYPES else tensor.data.shape
+            sd[tensor.name] = GGMLTensor(
+                torch.empty(stored_shape, dtype=stored_dtype, device="meta"),
+                ggml_quantization_type=tensor.tensor_type,
+                tensor_shape=shape,
+                compute_dtype=compute_dtype,
+            )
+        return sd
+
+
 def gguf_sd_loader(path: Path, compute_dtype: torch.dtype, *, q8_cr: Q8CRMode = "refuse") -> dict[str, torch.Tensor]:
     """Read a GGUF file into a state dict of ``GGMLTensor``s, dequantized on the fly at use.
 
@@ -155,17 +195,14 @@ def gguf_sd_loader(path: Path, compute_dtype: torch.dtype, *, q8_cr: Q8CRMode = 
     - ``"refuse"``: any other loader. Raises before the tensors are read; without it the int8 codes reach
       a plain ``nn.Linear`` and the load fails on a dtype error that names neither the file nor the format.
       Identification refuses such files at install already, so this guards records made before it did.
-    - ``"ignore"``: model identification, which needs shapes and never builds a module. The file reads as
-      it always has; whether its quantization is supported is the installer's question, answered from
-      the metadata (see ``ModelConfigFactory``), so it is not raised here once per candidate config.
+
+    Model identification does not come here: it reads the header (`gguf_header_state_dict`).
     """
     with WrappedGGUFReader(path) as reader:
         sd: dict[str, torch.Tensor] = {}
         orig_shapes = _read_comfy_orig_shapes(reader)
-        int8_layers: dict[str, dict[str, Any]] = {}
-        if q8_cr != "ignore":
-            quant_fields = {k: f.contents() for k, f in reader.fields.items() if k.startswith(COMFY_QUANT_KEY_PREFIX)}
-            int8_layers = parse_q8_cr_markers(quant_fields, path.name)
+        quant_fields = {k: f.contents() for k, f in reader.fields.items() if k.startswith(COMFY_QUANT_KEY_PREFIX)}
+        int8_layers = parse_q8_cr_markers(quant_fields, path.name)
         if int8_layers and q8_cr == "refuse":
             raise ValueError(
                 f"{path.name} holds {len(int8_layers)} ComfyUI-GGUF Q8_CR (int8 convrot) layer(s), e.g. "
@@ -184,15 +221,7 @@ def gguf_sd_loader(path: Path, compute_dtype: torch.dtype, *, q8_cr: Q8CRMode = 
             # while tensors still hold references to the mapped memory.
             torch_tensor = torch.from_numpy(tensor.data.copy())
 
-            shape = torch.Size(tuple(int(v) for v in reversed(tensor.shape)))
-            orig_shape = orig_shapes.get(tensor.name)
-            if orig_shape is not None:
-                if orig_shape.numel() != shape.numel():
-                    raise ValueError(
-                        f"GGUF tensor {tensor.name!r} declares original shape {tuple(orig_shape)}, which has a "
-                        f"different element count than its stored shape {tuple(shape)}."
-                    )
-                shape = orig_shape
+            shape = _logical_shape(tensor, orig_shapes)
 
             if tensor.name in int8_layers or tensor.name in int8_scales:
                 expected = gguf.GGMLQuantizationType.I8 if tensor.name in int8_layers else gguf.GGMLQuantizationType.F32
