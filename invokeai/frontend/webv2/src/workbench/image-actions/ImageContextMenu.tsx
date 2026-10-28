@@ -5,7 +5,7 @@ import type { SpandrelModelConfig } from '@features/upscale';
 import type { VideoConditioningRole } from '@features/video';
 import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
 
-import { HStack, Icon, Menu, Portal, ScrollArea, Text } from '@chakra-ui/react';
+import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import {
   galleryImageItemToGalleryImage,
   isGalleryImageItem,
@@ -20,6 +20,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { MenuContent, MenuIconItem } from '@platform/ui';
 import { MenuActionItem, MenuItem } from '@platform/ui/Menu';
+import { ScrollableMenuContent } from '@platform/ui/ScrollableMenuContent';
 import { useQuery } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -1129,7 +1130,7 @@ const ChangeBoardSubMenu = ({
   const destinations = useMemo(() => boards.filter((board) => board.id !== currentBoardId), [boards, currentBoardId]);
 
   return (
-    <ContextSubMenu icon={FolderIcon} label={t('widgets.gallery.changeBoard')} scrollArea>
+    <ContextSubMenu icon={FolderIcon} label={t('widgets.gallery.changeBoard')}>
       {currentBoardId !== 'none' && (
         <ContextMenuItem
           icon={FolderIcon}
@@ -1309,14 +1310,12 @@ const ContextSubMenu = ({
   detail,
   icon,
   label,
-  scrollArea,
 }: {
   children: ReactNode;
   /** A short value after the label, such as an upscaler's native scale. */
   detail?: string;
   icon?: LucideIcon;
   label: string;
-  scrollArea?: boolean;
 }) => (
   <Menu.Root positioning={MENU_POSITIONING_PROPS}>
     <Menu.TriggerItem>
@@ -1336,20 +1335,8 @@ const ContextSubMenu = ({
     </Menu.TriggerItem>
     <Portal>
       <Menu.Positioner>
-        <MenuContent {...MENU_CONTENT_PROPS} maxH="18rem" overflowY={scrollArea ? undefined : 'auto'}>
-          {scrollArea ? (
-            <ScrollArea.Root maxH="inherit" variant="hover" w="full">
-              <ScrollArea.Viewport maxH="inherit" w="full">
-                <ScrollArea.Content>{children}</ScrollArea.Content>
-              </ScrollArea.Viewport>
-              <ScrollArea.Scrollbar>
-                <ScrollArea.Thumb />
-              </ScrollArea.Scrollbar>
-            </ScrollArea.Root>
-          ) : (
-            children
-          )}
-        </MenuContent>
+        {/* Boards and upscalers can run long: every submenu grows to the available height, then scrolls. */}
+        <ScrollableMenuContent {...MENU_CONTENT_PROPS}>{children}</ScrollableMenuContent>
       </Menu.Positioner>
     </Portal>
   </Menu.Root>

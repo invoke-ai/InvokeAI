@@ -14,6 +14,7 @@ import { DEFAULT_THEME_ID, THEMES } from '@theme/themes';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import type * as ModelOnlyUpscaleModule from './modelOnlyUpscale';
 import type { ImageActions } from './useImageActions';
@@ -824,7 +825,7 @@ describe('ImageContextMenu change-board destinations', () => {
     projectId: null,
     videoCount: 0,
   });
-  const renderWithBoards = async (boards: GalleryBoard[]) => {
+  const renderWithBoards = async (boards: GalleryBoard[], listedValue = 'board-theirs') => {
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
@@ -847,7 +848,7 @@ describe('ImageContextMenu change-board destinations', () => {
     expect(trigger).not.toBeUndefined();
     await hoverItem(trigger!);
     await settleUntil(
-      () => document.querySelector('[data-value="board-theirs"]') !== null,
+      () => document.querySelector(`[data-value="${listedValue}"]`) !== null,
       'the change-board submenu to list its boards'
     );
 
@@ -875,6 +876,71 @@ describe('ImageContextMenu change-board destinations', () => {
       ])
     ).toEqual(['widgets.gallery.boardGroups.library', 'widgets.gallery.boardGroups.otherUsers']);
     expect(document.querySelector('[data-value="board-mine"]')).not.toBeNull();
+  });
+
+  it('grows a long board list past the old 18rem cap, keeps it on screen, and scrolls to the last board by keyboard', async () => {
+    const owned = {
+      actions: ['read', 'add_media'],
+      adminOverride: false,
+      generalAccess: 'restricted',
+      role: 'owner',
+    } as const;
+    const boards = Array.from({ length: 30 }, (_, index) => board(`b${String(index + 1).padStart(2, '0')}`, owned));
+    await renderWithBoards(boards, 'board-b30');
+
+    const last = document.querySelector<HTMLElement>('[data-value="board-b30"]')!;
+    const content = last.closest<HTMLElement>('[data-scope="menu"][data-part="content"]')!;
+    const scroller = last.closest<HTMLElement>('[data-scope="scroll-area"][data-part="viewport"]')!;
+    const contentRect = content.getBoundingClientRect();
+    expect(contentRect.height).toBeGreaterThan(18 * 16);
+    expect(contentRect.top).toBeGreaterThanOrEqual(0);
+    expect(contentRect.bottom).toBeLessThanOrEqual(window.innerHeight);
+    // Thirty boards overflow even the taller list, so the Scrollable carries the rest.
+    expect(scroller.scrollHeight).toBeGreaterThan(scroller.clientHeight);
+    expect(last.getBoundingClientRect().top).toBeGreaterThanOrEqual(scroller.getBoundingClientRect().bottom);
+
+    await interact(() => content.focus());
+    await userEvent.keyboard('{End}');
+    await settleUntil(() => last.hasAttribute('data-highlighted'), 'the last board to be highlighted');
+    await settleUntil(() => {
+      const itemRect = last.getBoundingClientRect();
+      const viewRect = scroller.getBoundingClientRect();
+      return itemRect.top >= viewRect.top && itemRect.bottom <= viewRect.bottom;
+    }, 'the last board to scroll fully into view');
+  });
+
+  it('leaves the list where it is when the pointer highlights a row cut off at its edge', async () => {
+    const owned = {
+      actions: ['read', 'add_media'],
+      adminOverride: false,
+      generalAccess: 'restricted',
+      role: 'owner',
+    } as const;
+    await renderWithBoards(
+      Array.from({ length: 30 }, (_, index) => board(`b${String(index + 1).padStart(2, '0')}`, owned)),
+      'board-b30'
+    );
+    const scroller = document
+      .querySelector('[data-value="board-b30"]')!
+      .closest<HTMLElement>('[data-scope="scroll-area"][data-part="viewport"]')!;
+    // Leave the first board half scrolled away above the list's top edge.
+    const first = document.querySelector<HTMLElement>('[data-value="board-b01"]')!;
+    await interact(() => {
+      scroller.scrollTop = first.getBoundingClientRect().top - scroller.getBoundingClientRect().top + 8;
+    });
+    const scrollTop = scroller.scrollTop;
+    const firstRect = first.getBoundingClientRect();
+    const viewTop = scroller.getBoundingClientRect().top;
+    expect(firstRect.top).toBeLessThan(viewTop);
+    expect(firstRect.bottom).toBeGreaterThan(viewTop + 4);
+
+    // A real pointer on the part still showing. It targets the list, which is fully in view: Playwright would scroll a
+    // cut-off target into view itself before hovering it.
+    await userEvent.hover(scroller, { position: { x: 8, y: firstRect.bottom - viewTop - 3 } });
+    await settleUntil(() => first.hasAttribute('data-highlighted'), 'the cut-off board to be highlighted');
+    await interact(() => undefined);
+
+    expect(scroller.scrollTop).toBe(scrollTop);
   });
 });
 

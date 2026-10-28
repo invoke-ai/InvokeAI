@@ -4,7 +4,7 @@ import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { getGalleryBoardDestinationGroups, getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { parseGalleryItemKey } from '@features/gallery/core/items';
 import { IconButton } from '@platform/ui/Button';
-import { MenuContent } from '@platform/ui/Menu';
+import { ScrollableMenuContent } from '@platform/ui/ScrollableMenuContent';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { DownloadIcon, FolderInputIcon, StarIcon, Trash2Icon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
@@ -104,7 +104,7 @@ export const GallerySelectionBar = () => {
         </Tooltip>
         <Portal>
           <Menu.Positioner>
-            <MenuContent maxH="18rem" minW="12rem" overflowY="auto">
+            <ScrollableMenuContent minW="12rem">
               {moveGroups.map((group) => (
                 <Menu.ItemGroup key={group.id}>
                   <Menu.ItemGroupLabel>{group.label}</Menu.ItemGroupLabel>
@@ -113,7 +113,7 @@ export const GallerySelectionBar = () => {
                   ))}
                 </Menu.ItemGroup>
               ))}
-            </MenuContent>
+            </ScrollableMenuContent>
           </Menu.Positioner>
         </Portal>
       </Menu.Root>

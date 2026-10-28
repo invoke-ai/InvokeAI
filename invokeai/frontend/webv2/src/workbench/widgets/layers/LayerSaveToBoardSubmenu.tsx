@@ -1,11 +1,11 @@
 import type { GalleryBoard } from '@features/gallery';
 
-import { HStack, Icon, Menu, Portal, ScrollArea, Text } from '@chakra-ui/react';
+import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { getGalleryBoardLabel, getGallerySettings } from '@features/gallery/contracts';
 import { galleryBoardsOptions, getGalleryListingBoardsQuery } from '@features/gallery/queries';
 import { useHostGalleryBoards } from '@features/gallery/react';
-import { MenuContent } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { ScrollableMenuContent } from '@platform/ui/ScrollableMenuContent';
 import { useQuery } from '@tanstack/react-query';
 import { GalleryBoardDestinationGroups } from '@workbench/image-actions/GalleryBoardDestinationGroups';
 import { getProjectWidgetValues } from '@workbench/widgetState';
@@ -56,18 +56,9 @@ export const LayerSaveToBoardSubmenu = ({
       </Menu.TriggerItem>
       <Portal>
         <Menu.Positioner>
-          <MenuContent maxH="18rem" minW="13rem" py="1">
-            <ScrollArea.Root maxH="inherit" variant="hover" w="full">
-              <ScrollArea.Viewport maxH="inherit" w="full">
-                <ScrollArea.Content>
-                  <BoardChoices onSelect={handleSelect} />
-                </ScrollArea.Content>
-              </ScrollArea.Viewport>
-              <ScrollArea.Scrollbar>
-                <ScrollArea.Thumb />
-              </ScrollArea.Scrollbar>
-            </ScrollArea.Root>
-          </MenuContent>
+          <ScrollableMenuContent minW="13rem" py="1">
+            <BoardChoices onSelect={handleSelect} />
+          </ScrollableMenuContent>
         </Menu.Positioner>
       </Portal>
     </Menu.Root>

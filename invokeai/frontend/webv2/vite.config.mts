@@ -139,6 +139,8 @@ const EDITOR_BOOT_SHARED_MODULES = [
   // The image menu's canvas destinations and the lazy Layers widget share the layer-kind glyphs; alone they cost a
   // request.
   '/workbench/widgets/layers/layerTypeIcon.ts',
+  // The image menu, the Gallery's board menus and the lazy layer menu share the scrolling board list menu.
+  '/platform/ui/ScrollableMenuContent.tsx',
   '/app/GalleryUiAdapter.tsx',
   '/features/generation/core/prompt/ast.ts',
   '/features/generation/core/prompt/attention.ts',

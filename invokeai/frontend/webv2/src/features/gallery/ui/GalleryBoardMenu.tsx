@@ -7,6 +7,7 @@ import { Button } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
 import { MenuContent } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { ScrollableMenuContent } from '@platform/ui/ScrollableMenuContent';
 import {
   ArchiveIcon,
   ChevronRightIcon,
@@ -351,7 +352,7 @@ const BoardMoveSubMenu = ({
       </Menu.TriggerItem>
       <Portal>
         <Menu.Positioner>
-          <MenuContent maxH="18rem" minW="12rem" overflowY="auto">
+          <ScrollableMenuContent minW="12rem">
             {destinations.map((destination) => (
               <BoardMoveMenuItem
                 key={destination.id ?? 'library'}
@@ -361,7 +362,7 @@ const BoardMoveSubMenu = ({
                 onMove={handleMove}
               />
             ))}
-          </MenuContent>
+          </ScrollableMenuContent>
         </Menu.Positioner>
       </Portal>
     </Menu.Root>
