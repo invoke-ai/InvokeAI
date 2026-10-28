@@ -25,7 +25,9 @@ from invokeai.backend.model_manager.configs.clip_vision import CLIPVision_Diffus
 from invokeai.backend.model_manager.configs.controlnet import (
     ControlAdapterDefaultSettings,
     ControlNet_Checkpoint_Anima_Config,
+    ControlNet_Checkpoint_Flux2_Config,
     ControlNet_Checkpoint_FLUX_Config,
+    ControlNet_Checkpoint_QwenImage_Config,
     ControlNet_Checkpoint_SD1_Config,
     ControlNet_Checkpoint_SD2_Config,
     ControlNet_Checkpoint_SDXL_Config,
@@ -45,6 +47,7 @@ from invokeai.backend.model_manager.configs.gemma2_encoder import (
 from invokeai.backend.model_manager.configs.gemma4_encoder import Gemma4Encoder_Gemma4Encoder_LTX2_Config
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
 from invokeai.backend.model_manager.configs.ip_adapter import (
+    IPAdapter_Checkpoint_Anima_Config,
     IPAdapter_Checkpoint_FLUX_Config,
     IPAdapter_Checkpoint_SD1_Config,
     IPAdapter_Checkpoint_SD2_Config,
@@ -89,6 +92,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_Krea2_Config,
     Main_Checkpoint_LTX2_Config,
     Main_Checkpoint_MiniMaxH3_Config,
+    Main_Checkpoint_MossImage_Config,
     Main_Checkpoint_QwenImage21_Config,
     Main_Checkpoint_QwenImage_Config,
     Main_Checkpoint_SD1_Config,
@@ -105,6 +109,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_Krea2_Config,
     Main_Diffusers_LTX2_Config,
     Main_Diffusers_MiniMaxH3_Config,
+    Main_Diffusers_MossImage_Config,
     Main_Diffusers_QwenImage21_Config,
     Main_Diffusers_QwenImage_Config,
     Main_Diffusers_SD1_Config,
@@ -345,6 +350,8 @@ _PINNED_MODEL_CLASS_MARKERS = {
     "MiniMaxH3Transformer3DModel",
     "AutoencoderKLMiniMaxH3",
     "AutoencoderKLMiniMaxH3Audio",
+    # MOSS-Image's pipeline is remote code upstream; its classes are vendored under invokeai/backend/moss_image.
+    "MOSSImagePipeline",
 }
 
 
@@ -416,6 +423,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Diffusers_Krea2_Config, Main_Diffusers_Krea2_Config.get_tag()],
         Annotated[Main_Diffusers_MiniMaxH3_Config, Main_Diffusers_MiniMaxH3_Config.get_tag()],
         Annotated[Main_Diffusers_LTX2_Config, Main_Diffusers_LTX2_Config.get_tag()],
+        Annotated[Main_Diffusers_MossImage_Config, Main_Diffusers_MossImage_Config.get_tag()],
         # Main (Pipeline) - checkpoint format
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
         # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
@@ -435,6 +443,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Checkpoint_Anima_Config, Main_Checkpoint_Anima_Config.get_tag()],
         Annotated[Main_Checkpoint_MiniMaxH3_Config, Main_Checkpoint_MiniMaxH3_Config.get_tag()],
         Annotated[Main_Checkpoint_LTX2_Config, Main_Checkpoint_LTX2_Config.get_tag()],
+        Annotated[Main_Checkpoint_MossImage_Config, Main_Checkpoint_MossImage_Config.get_tag()],
         # Main (Pipeline) - quantized formats
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
         # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
@@ -493,6 +502,8 @@ AnyModelConfig = Annotated[
         Annotated[ControlNet_Checkpoint_FLUX_Config, ControlNet_Checkpoint_FLUX_Config.get_tag()],
         Annotated[ControlNet_Checkpoint_ZImage_Config, ControlNet_Checkpoint_ZImage_Config.get_tag()],
         Annotated[ControlNet_Checkpoint_Anima_Config, ControlNet_Checkpoint_Anima_Config.get_tag()],
+        Annotated[ControlNet_Checkpoint_QwenImage_Config, ControlNet_Checkpoint_QwenImage_Config.get_tag()],
+        Annotated[ControlNet_Checkpoint_Flux2_Config, ControlNet_Checkpoint_Flux2_Config.get_tag()],
         # ControlNet - diffusers format
         Annotated[ControlNet_Diffusers_SD1_Config, ControlNet_Diffusers_SD1_Config.get_tag()],
         Annotated[ControlNet_Diffusers_SD2_Config, ControlNet_Diffusers_SD2_Config.get_tag()],
@@ -595,6 +606,7 @@ AnyModelConfig = Annotated[
         Annotated[IPAdapter_Checkpoint_SD2_Config, IPAdapter_Checkpoint_SD2_Config.get_tag()],
         Annotated[IPAdapter_Checkpoint_SDXL_Config, IPAdapter_Checkpoint_SDXL_Config.get_tag()],
         Annotated[IPAdapter_Checkpoint_FLUX_Config, IPAdapter_Checkpoint_FLUX_Config.get_tag()],
+        Annotated[IPAdapter_Checkpoint_Anima_Config, IPAdapter_Checkpoint_Anima_Config.get_tag()],
         # T2I Adapter - diffusers format
         Annotated[T2IAdapter_Diffusers_SD1_Config, T2IAdapter_Diffusers_SD1_Config.get_tag()],
         Annotated[T2IAdapter_Diffusers_SDXL_Config, T2IAdapter_Diffusers_SDXL_Config.get_tag()],

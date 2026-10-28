@@ -9,11 +9,17 @@ import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CanvasProjectMutation } from './canvasProjectMutations';
 
-import { type CanvasDimsSnapshot, createCanvasDimsSync, reconcileCanvasDims } from './canvasDimsSync';
+import {
+  type CanvasDimsSnapshot,
+  createCanvasDimsSync,
+  reconcileCanvasDims,
+  resetGenerateDims,
+  resizeBboxAroundCentre,
+} from './canvasDimsSync';
 import { getProjectWidgetValues } from './widgetState';
 import { createWorkbenchStore } from './workbenchStore';
 
@@ -264,6 +270,82 @@ const setupCanvasStore = () => {
 
   return { getSyncDispatches: () => syncDispatches, store, sync };
 };
+
+describe('resizeBboxAroundCentre (pure)', () => {
+  it('keeps the centre of the frame', () => {
+    // Centre (516, 708); a 1024 square around it starts at (4, 196).
+    expect(resizeBboxAroundCentre(bbox(832, 1216, 100, 100), { height: 1024, width: 1024 })).toEqual(
+      bbox(1024, 1024, 4, 196)
+    );
+  });
+
+  it('rounds a half-pixel offset from an odd size difference to whole pixels', () => {
+    // 10 + (513 - 512) / 2 = 10.5 and 20 + (512 - 515) / 2 = 18.5.
+    expect(resizeBboxAroundCentre(bbox(513, 512, 10, 20), { height: 515, width: 512 })).toEqual(bbox(512, 515, 11, 19));
+    // -0.5 rounds to zero, not negative zero.
+    expect(resizeBboxAroundCentre(bbox(513, 512, 0, 0), { height: 512, width: 514 }).x).toBe(0);
+  });
+});
+
+describe('resetGenerateDims (wiring)', () => {
+  seedArchitectureCapabilities();
+
+  const SQUARE_RESET = {
+    aspectRatioId: '1:1',
+    aspectRatioIsLocked: true,
+    aspectRatioValue: 1,
+    height: 1024,
+    width: 1024,
+  } as const;
+
+  it('resizes the canvas frame around its centre with system writes only, then settles', () => {
+    const { store, sync } = setupCanvasStore();
+    dispatchCanvas(store, { bbox: { height: 1216, width: 832, x: 100, y: 100 }, type: 'setCanvasBbox' });
+    const apply = vi.spyOn(store.commands.canvas, 'apply');
+
+    resetGenerateDims(store, SQUARE_RESET);
+
+    const { bbox: nextBbox, values } = getActiveGenerate(store.getState());
+    expect(nextBbox).toEqual({ height: 1024, width: 1024, x: 4, y: 196 });
+    expect(values).toMatchObject(SQUARE_RESET);
+    expect(store.getState().projects[0]?.invocation.sourceId).toBe('canvas');
+    // Frame writes stay out of canvas history.
+    expect(apply.mock.calls.length).toBeGreaterThan(0);
+    for (const call of apply.mock.calls) {
+      expect(call[2]).toBe('system');
+    }
+
+    // Frame and size now agree, so the next reconciliation writes nothing.
+    apply.mockClear();
+    store.commands.generation.patchSettings({ steps: 31 });
+    expect(apply).not.toHaveBeenCalled();
+    expect(getActiveGenerate(store.getState()).bbox).toEqual({ height: 1024, width: 1024, x: 4, y: 196 });
+
+    // A later size edit keeps the top-left as before.
+    store.commands.generation.patchSettings({ width: 512 });
+    expect(getActiveGenerate(store.getState()).bbox).toEqual({ height: 1024, width: 512, x: 4, y: 196 });
+    sync.dispose();
+  });
+
+  it('changes only the fields when the project is not generating into the canvas', () => {
+    const store = createWorkbenchStore();
+    store.commands.generation.setSource('generate');
+    store.commands.generation.toggleSourceLock();
+    store.commands.generation.patchSettings({ height: 1216, model, modelKey: model.key, width: 832 });
+    dispatchCanvas(store, { bbox: { height: 1216, width: 832, x: 100, y: 100 }, type: 'setCanvasBbox' });
+    const sync = createCanvasDimsSync(store);
+    const apply = vi.spyOn(store.commands.canvas, 'apply');
+
+    resetGenerateDims(store, SQUARE_RESET);
+
+    expect(getActiveGenerate(store.getState())).toMatchObject({
+      bbox: { height: 1216, width: 832, x: 100, y: 100 },
+      values: SQUARE_RESET,
+    });
+    expect(apply).not.toHaveBeenCalled();
+    sync.dispose();
+  });
+});
 
 describe('createCanvasDimsSync (wiring)', () => {
   seedArchitectureCapabilities();

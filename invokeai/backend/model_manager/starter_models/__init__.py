@@ -14,6 +14,7 @@ from invokeai.backend.model_manager.starter_models.anima import (
     anima_2_9b_int8,
     anima_3_8b,
     anima_base,
+    anima_ip_adapter_character_reference,
     anima_lllite_depth_preview3,
     anima_lllite_inpainting,
     anima_lllite_lineart_preview3,
@@ -131,6 +132,7 @@ from invokeai.backend.model_manager.starter_models.flux import (
 from invokeai.backend.model_manager.starter_models.flux2 import (
     flux2_dev_diffusers,
     flux2_dev_diffusers_nf4,
+    flux2_dev_fun_controlnet_union,
     flux2_dev_gguf_q3_k_m,
     flux2_dev_gguf_q4_k_m,
     flux2_dev_gguf_q5_k_m,
@@ -196,6 +198,7 @@ from invokeai.backend.model_manager.starter_models.minimax_h3 import (
     minimax_h3_ref2va_int8_transformer,
     minimax_h3_turbo_lora,
 )
+from invokeai.backend.model_manager.starter_models.moss_image import moss_image_base, moss_image_sft
 from invokeai.backend.model_manager.starter_models.qwen_image import (
     pid_1_5_decoder_qwenimage_2kto4k,
     pid_1_5_decoder_qwenimage_2kto4k_int8,
@@ -208,6 +211,7 @@ from invokeai.backend.model_manager.starter_models.qwen_image import (
     qwen_image_edit_gguf_q8_0,
     qwen_image_edit_lightning_4step,
     qwen_image_edit_lightning_8step,
+    qwen_image_fun_controlnet_union,
     qwen_image_gguf_q2_k,
     qwen_image_gguf_q4_k_m,
     qwen_image_gguf_q6_k,
@@ -442,6 +446,7 @@ STARTER_MODELS: list[StarterModel] = [
     flux2_dev_gguf_q5_k_m,
     flux2_dev_gguf_q6_k,
     flux2_dev_gguf_q8_0,
+    flux2_dev_fun_controlnet_union,
     cogview4,
     qwen_image_vae,
     qwen_vl_encoder_fp8,
@@ -461,6 +466,7 @@ STARTER_MODELS: list[StarterModel] = [
     qwen_image_gguf_q8_0,
     qwen_image_lightning_4step,
     qwen_image_lightning_8step,
+    qwen_image_fun_controlnet_union,
     flux_krea,
     flux_krea_quantized,
     z_image_turbo,
@@ -493,6 +499,8 @@ STARTER_MODELS: list[StarterModel] = [
     qwen_image_2_1_gguf_q4_k_m,
     qwen_image_2_1_vae,
     qwen3_vl_encoder_8b,
+    moss_image_base,
+    moss_image_sft,
     wan_22_t5_encoder,
     wan_22_a14b_vae,
     wan_22_5b_vae,
@@ -572,6 +580,7 @@ STARTER_MODELS: list[StarterModel] = [
     anima_lllite_scribble_preview3,
     anima_lllite_lineart_preview3,
     anima_lllite_pose_preview3,
+    anima_ip_adapter_character_reference,
     gemma2_2b_encoder,
     pid_decoder_flux_2k,
     pid_decoder_flux_2kto4k,
@@ -681,6 +690,7 @@ qwen_image_bundle: list[StarterModel] = [
     qwen_image_gguf_q8_0,
     qwen_image_lightning_4step,
     qwen_image_lightning_8step,
+    qwen_image_fun_controlnet_union,
 ]
 
 anima_bundle: list[StarterModel] = [
@@ -738,6 +748,11 @@ minimax_h3_bundle: list[StarterModel] = [
     minimax_h3_lightx2v_ref2v_turbo_lora,
 ]
 
+# Base only: each pipeline bundles its own copy of the ~17GB encoder, so the bundle does not download it twice.
+moss_image_bundle: list[StarterModel] = [
+    moss_image_base,
+]
+
 ltx2_bundle: list[StarterModel] = [
     ltx2_5_components,
     ltx2_5_text_encoder_int8,
@@ -759,6 +774,7 @@ STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.MiniMaxH3: StarterModelBundle(name="MiniMax H3", models=minimax_h3_bundle),
     BaseModelType.LTX2: StarterModelBundle(name="LTX 2.5", models=ltx2_bundle),
     BaseModelType.Ideogram4: StarterModelBundle(name="Ideogram 4", models=ideogram_bundle),
+    BaseModelType.MossImage: StarterModelBundle(name="MOSS-Image", models=moss_image_bundle),
 }
 
 assert len(STARTER_MODELS) == len({m.source for m in STARTER_MODELS}), "Duplicate starter models"

@@ -18,6 +18,7 @@ from invokeai.app.invocations.video_frame_extract_range import _validate_even_di
 from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav
 
 
+@pytest.mark.ffmpeg
 def test_non_multiple_of_16_dimensions_are_preserved(tmp_path: Path) -> None:
     # 120x84: even (so yuv420p-encodable) but not a multiple of 16 — the imageio
     # default would silently rescale this to 128x96.
@@ -55,7 +56,9 @@ def _ffmpeg_has_encoder(name: str) -> bool:
             text=True,
             timeout=30,
         ).stdout
-    except (OSError, subprocess.SubprocessError):
+    # RuntimeError: imageio-ffmpeg found no runnable binary. This runs at collection, so it must
+    # not raise where the `ffmpeg` tests are deselected.
+    except (OSError, RuntimeError, subprocess.SubprocessError):
         return False
     return any(line.split()[1:2] == [name] for line in encoders.splitlines() if line.strip())
 
@@ -66,6 +69,7 @@ def _write_sine_wav(path: Path, duration_s: float, sample_rate: int = 32_000) ->
     write_stereo_wav(path, samples, sample_rate)
 
 
+@pytest.mark.ffmpeg
 def test_audio_path_muxes_an_aac_stream(tmp_path: Path) -> None:
     fps, num_frames = 8.0, 8
     wav_path = tmp_path / "audio.wav"
@@ -91,6 +95,7 @@ def test_audio_path_muxes_an_aac_stream(tmp_path: Path) -> None:
     assert meta["size"] == (120, 84)
 
 
+@pytest.mark.ffmpeg
 @pytest.mark.skipif(not _ffmpeg_has_encoder("libmp3lame"), reason="ffmpeg build lacks the libmp3lame encoder")
 def test_audio_codec_is_forwarded_not_defaulted(tmp_path: Path) -> None:
     # ffmpeg's default MP4 audio encoder is aac, so the aac test above cannot
@@ -120,6 +125,7 @@ def test_missing_audio_file_fails_fast(tmp_path: Path) -> None:
         make_mp4_writer(tmp_path / "out.mp4", fps=8.0, audio_path=tmp_path / "does-not-exist.wav")
 
 
+@pytest.mark.ffmpeg
 def test_no_audio_path_produces_no_audio_stream(tmp_path: Path) -> None:
     path = tmp_path / "out.mp4"
     writer = make_mp4_writer(path, fps=8.0)

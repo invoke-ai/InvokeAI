@@ -136,6 +136,7 @@ const renderSizeSection = async (project: HarnessProject) => {
       projectId="project"
       selectedModel={SD1_MODEL}
       onCommit={vi.fn()}
+      onResetSize={vi.fn()}
     />
   );
 };
@@ -148,7 +149,7 @@ const badgeText = () =>
   )?.textContent;
 const statusText = () =>
   [...(host?.querySelectorAll('p') ?? [])].find((element) => element.textContent?.includes('MP'))?.textContent;
-const optimalSizeButton = () => page.getByRole('button', { name: 'Set optimal size' });
+const resetSizeButton = () => page.getByRole('button', { name: 'Reset size' });
 const renderAt = () => page.getByRole('combobox', { name: 'Render at' });
 
 /** The dashed ghost in the size preview, in preview pixels. */
@@ -336,26 +337,14 @@ describe('Size section in canvas mode', () => {
     await expect.element(width).toHaveValue('1608');
   });
 
-  it('offers the optimal frame size only while the frame renders at its own size', async () => {
-    // An undersized frame: Auto grows it and Custom sets its own, so resizing the frame adds nothing.
+  it('offers the Reset size menu in every render mode, without a footer optimal-size button', async () => {
     await renderSizeSection(createProject({ frame: { height: 384, width: 384 }, model: SD1_MODEL }));
-    await expect.element(optimalSizeButton()).not.toBeInTheDocument();
+    await expect.element(resetSizeButton()).toBeInTheDocument();
     await chooseRenderAt('Custom');
-    await expect.element(optimalSizeButton()).not.toBeInTheDocument();
+    await expect.element(resetSizeButton()).toBeInTheDocument();
     await chooseRenderAt('Frame size');
-    await expect.element(optimalSizeButton()).toBeInTheDocument();
-    await unmount();
-
-    // An oversized frame: Auto never shrinks it.
-    await renderSizeSection(createProject({ frame: { height: 768, width: 768 }, model: SD1_MODEL }));
-    await expect.element(optimalSizeButton()).toBeInTheDocument();
-    await unmount();
-
-    // A frame already at the recommended size has nothing to offer in any mode.
-    await renderSizeSection(
-      createProject({ canvas: { scaleMethod: 'none' }, frame: { height: 512, width: 512 }, model: SD1_MODEL })
-    );
-    await expect.element(optimalSizeButton()).not.toBeInTheDocument();
+    await expect.element(resetSizeButton()).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'Set optimal size' })).not.toBeInTheDocument();
   });
 
   it('leaves the Size section as it is when the canvas is not the invocation source', async () => {
@@ -371,7 +360,7 @@ describe('Size section in canvas mode', () => {
     await expect.element(renderAt()).not.toBeInTheDocument();
     expect(badgeText()).toBe('384x384');
     expect(statusText()).toMatch(/^0\.15 MP/);
-    await expect.element(optimalSizeButton()).toBeInTheDocument();
+    await expect.element(resetSizeButton()).toBeInTheDocument();
     // The ghost is the recommended 512x512, not the canvas's custom render size.
     expect(ghostSize()).toEqual([88, 88]);
   });

@@ -139,21 +139,6 @@ def unpack_flux2(x: torch.Tensor, height: int, width: int) -> torch.Tensor:
     )
 
 
-# Config for the scheduler the FLUX.2 txt2img path builds. Shared with the schedule-shift test so the
-# manual shift used by img2img/inpainting is always checked against the scheduler the node actually
-# uses, rather than against a copy that can drift out of sync.
-FLUX2_TXT2IMG_SCHEDULER_KWARGS = {
-    "num_train_timesteps": 1000,
-    "shift": 3.0,
-    "use_dynamic_shifting": True,
-    "base_shift": 0.5,
-    "max_shift": 1.15,
-    "base_image_seq_len": 256,
-    "max_image_seq_len": 4096,
-    "time_shift_type": "exponential",
-}
-
-
 def compute_empirical_mu(image_seq_len: int, num_steps: int) -> float:
     """Compute mu for FLUX.2 schedule shifting.
 
@@ -184,14 +169,13 @@ def get_schedule_flux2(
 ) -> list[float]:
     """Get linear timestep schedule for FLUX.2.
 
-    Returns a linear sigma schedule from 1.0 to 1/num_steps.
-    The actual schedule shifting is handled by the FlowMatchEulerDiscreteScheduler
-    using the mu parameter and use_dynamic_shifting=True.
+    Returns a linear sigma schedule from 1.0 to 1/num_steps, unshifted. Callers shift it with
+    ``time_shift_flux2()``.
 
     Args:
         num_steps: Number of denoising steps.
         image_seq_len: Number of image tokens (packed_h * packed_w). Currently unused,
-            but kept for API compatibility. The scheduler computes shifting internally.
+            but kept for API compatibility.
 
     Returns:
         List of linear sigmas from 1.0 to 1/num_steps, plus final 0.0.
@@ -199,7 +183,6 @@ def get_schedule_flux2(
     import numpy as np
 
     # Create linear sigmas from 1.0 to 1/num_steps
-    # The scheduler will apply dynamic shifting using mu parameter
     sigmas = np.linspace(1.0, 1 / num_steps, num_steps)
     sigmas_list = [float(s) for s in sigmas]
 
@@ -210,18 +193,15 @@ def get_schedule_flux2(
 
 
 def time_shift_flux2(sigmas: list[float], mu: float) -> list[float]:
-    """Apply the exponential schedule shift that the txt2img scheduler applies internally.
+    """Apply the exponential schedule shift that diffusers' Flux2KleinPipeline scheduler applies.
 
-    ``get_schedule_flux2()`` returns an unshifted linear schedule because the
-    FlowMatchEulerDiscreteScheduler used for txt2img shifts it itself from ``mu``. Code paths that
-    step the schedule manually (img2img, inpainting) must apply the shift themselves, otherwise they
-    run the model on a completely different sigma trajectory than txt2img does: with 9 steps the
-    shifted schedule bottoms out at sigma 0.485, the linear one at 0.111. A distilled model such as
-    FLUX.2 Klein is never trained at the low end of the linear schedule and leaves a grainy residue
-    there.
+    ``get_schedule_flux2()`` returns an unshifted linear schedule. Every FLUX.2 path runs it shifted,
+    otherwise the model sees a completely different sigma trajectory: with 9 steps the shifted
+    schedule bottoms out at sigma 0.485, the linear one at 0.111. A distilled model such as FLUX.2
+    Klein is never trained at the low end of the linear schedule and leaves a grainy residue there.
 
     Mirrors diffusers' ``FlowMatchEulerDiscreteScheduler._time_shift_exponential`` with an exponent
-    of 1.0, which is how the scheduler invokes it::
+    of 1.0, which is how the scheduler invokes it under dynamic shifting::
 
         sigma' = exp(mu) / (exp(mu) + (1 / sigma - 1))
 

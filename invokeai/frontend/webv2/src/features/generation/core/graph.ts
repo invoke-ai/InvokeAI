@@ -21,10 +21,12 @@ import type {
 
 import {
   coerceSchedulerForGraph,
+  getExternalModeReason,
   getExternalProviderNodeType,
   getFlux2DiffusersComponentSource,
   getGenerationDimensions,
   getGenerationValidationReasons,
+  isStrengthOnlyIPAdapterBase,
   type SupportedGenerateBase,
 } from './baseGenerationPolicies';
 import {
@@ -37,11 +39,18 @@ import {
   isFlux2Qwen3EncoderForModel,
   isQwen3Vl8bEncoder,
   isKrea2Qwen3VlEncoder,
-  isNonAnimaQwen3Encoder,
+  isMossImageQwen35Encoder,
   isSelfContainedSDNQFlux1Pipeline,
   isVaeCompatibleWithGenerateModel,
+  isZImageQwen3Encoder,
   type GenerateComponentFilter,
 } from './componentCompatibility';
+import {
+  getExternalProviderInvocationOptions,
+  getExternalProviderMetadata,
+  getExternalReferenceImages,
+  resolveExternalImageSize,
+} from './externalProvider';
 import {
   addEdge,
   addMetadata,
@@ -118,7 +127,11 @@ const addIPAdapterReferenceImages = (
   model: MainModelConfig,
   denoise: BackendInvocationContract
 ) => {
-  const refs = getEnabledReferenceImages(settings, 'ip_adapter').filter((ref) => ref.config.model?.base === model.base);
+  const strengthOnly = isStrengthOnlyIPAdapterBase(model.base);
+  // Anima drops a strength-0 adapter anyway; sending one would still encode the image, or install the encoder.
+  const refs = getEnabledReferenceImages(settings, 'ip_adapter').filter(
+    (ref) => ref.config.model?.base === model.base && !(strengthOnly && ref.config.weight === 0)
+  );
 
   if (refs.length === 0) {
     return;
@@ -133,17 +146,23 @@ const addIPAdapterReferenceImages = (
       continue;
     }
 
-    const node = addNode(graph, {
+    const shared = {
       begin_step_percent: beginEndStepPct[0],
-      clip_vision_model: clipVisionModel,
       end_step_percent: beginEndStepPct[1],
-      id: createId('ip_adapter'),
       image: toImageField(image),
       ip_adapter_model: adapterModel,
-      method,
-      type: model.base === 'flux' ? 'flux_ip_adapter' : 'ip_adapter',
-      weight,
-    });
+    };
+    // Anima's adapter brings its own SigLIP2 encoder and has no method: it takes a strength alone.
+    const node = strengthOnly
+      ? addNode(graph, { ...shared, id: createId('anima_ip_adapter'), strength: weight, type: 'anima_ip_adapter' })
+      : addNode(graph, {
+          ...shared,
+          clip_vision_model: clipVisionModel,
+          id: createId('ip_adapter'),
+          method,
+          type: model.base === 'flux' ? 'flux_ip_adapter' : 'ip_adapter',
+          weight,
+        });
 
     addEdge(graph, node, 'ip_adapter', collector, 'item');
   }
@@ -1025,6 +1044,8 @@ const buildQwenImageGraph = (
   });
 
   addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
+  // The denoise encodes a ControlNet's control and inpaint images with this VAE; without one the input is idle.
+  addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, modelLoader, 'qwen_vl_encoder', posCond, 'qwen_vl_encoder');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
@@ -1101,9 +1122,7 @@ const buildZImageGraph = (
 ): BackendGraphContract => {
   const sourceModel = getDiffusersSource(settings, model);
   const qwen3EncoderModel =
-    settings.qwen3EncoderModel && isNonAnimaQwen3Encoder(settings.qwen3EncoderModel)
-      ? settings.qwen3EncoderModel
-      : null;
+    settings.qwen3EncoderModel && isZImageQwen3Encoder(settings.qwen3EncoderModel) ? settings.qwen3EncoderModel : null;
   const vaeModel = getCompatibleVae(settings, model);
 
   if (!sourceModel && (!vaeModel || !qwen3EncoderModel)) {
@@ -1278,14 +1297,65 @@ const buildAnimaGraph = (
 
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
+  addIPAdapterReferenceImages(graph, settings, model, denoise);
   addMetadata(graph, output, settings, model, 'anima_txt2img', projectSettings, {
     qwen3_encoder: qwen3EncoderModel,
     ...(qwen35EncoderModel ? { qwen3_5_encoder: qwen35EncoderModel } : {}),
     scheduler,
     vae: vaeModel,
   });
+  addReferenceImageMetadata(graph, output, settings);
 
   return graph;
+};
+
+/**
+ * Edit references reach the model twice, in the same order: each prompt the denoise checks reads them through the
+ * encoder's vision tower, and their latents join the denoise as clean image tokens. Chained collects keep that order,
+ * which a single collect would take from execution order.
+ */
+const addKrea2EditReferences = (
+  graph: BackendGraphContract,
+  {
+    denoise,
+    prompts,
+    referenceImages,
+    referenceKvCache,
+    vaeSource,
+  }: {
+    denoise: BackendInvocationContract;
+    prompts: readonly BackendInvocationContract[];
+    referenceImages: readonly { image_name: string }[];
+    /** Unset leaves the denoise default. */
+    referenceKvCache: boolean | undefined;
+    vaeSource: BackendInvocationContract;
+  }
+) => {
+  for (const prompt of prompts) {
+    prompt.reference_images = referenceImages.map((image) => ({ ...image }));
+  }
+
+  let previousCollect: BackendInvocationContract | null = null;
+
+  for (const image of referenceImages) {
+    // `reference` sizes the image as ai-toolkit trains edit LoRAs, so width and height stay unset.
+    const encode = addNode(graph, { id: createId('krea2_ref_i2l'), image, reference: true, type: 'qwen_image_i2l' });
+    const collect = addNode(graph, { id: createId('krea2_ref_latents_collect'), type: 'collect' });
+
+    addEdge(graph, vaeSource, 'vae', encode, 'vae');
+    addEdge(graph, encode, 'latents', collect, 'item');
+    if (previousCollect) {
+      addEdge(graph, previousCollect, 'collection', collect, 'collection');
+    }
+    previousCollect = collect;
+  }
+
+  if (previousCollect) {
+    addEdge(graph, previousCollect, 'collection', denoise, 'reference_latents');
+  }
+  if (referenceKvCache !== undefined) {
+    denoise.reference_kv_cache = referenceKvCache;
+  }
 };
 
 const buildKrea2Graph = (
@@ -1359,11 +1429,33 @@ const buildKrea2Graph = (
 
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
-  // Shared-KV reference attention takes exactly one reference; zero strength is a full bypass, so it is not run.
-  const styleReference = getEnabledReferenceImages(settings, 'krea2_reference_image').find(
-    (referenceImage) => referenceImage.config.styleStrength > 0
+  // Validation keeps edit and style references apart; the denoise refuses the two together.
+  const editReferenceImages = getEnabledReferenceImages(settings, 'krea2_edit_reference_image').flatMap(({ config }) =>
+    config.image ? [toImageField(config.image)] : []
   );
-  if (styleReference?.config.image) {
+  // Shared-KV reference attention takes exactly one reference; zero strength is a full bypass, so it is not run.
+  const styleReference =
+    editReferenceImages.length > 0
+      ? undefined
+      : getEnabledReferenceImages(settings, 'krea2_reference_image').find(
+          (referenceImage) => referenceImage.config.styleStrength > 0
+        );
+
+  // The cache changes how edit references run, and only an edit LoRA trained with it (ai-toolkit's `kv_cache`) reads
+  // them that way; the base model alone sees them through attention it never learned. Without a LoRA the stored
+  // switch is kept but not sent, so the denoise runs its default and the record says nothing about it.
+  const referenceKvCache =
+    editReferenceImages.length > 0 && activeLoras.length > 0 ? settings.krea2ReferenceKvCache : undefined;
+
+  if (editReferenceImages.length > 0) {
+    addKrea2EditReferences(graph, {
+      denoise,
+      prompts: negCond ? [posCond, negCond] : [posCond],
+      referenceImages: editReferenceImages,
+      referenceKvCache,
+      vaeSource: modelLoader,
+    });
+  } else if (styleReference?.config.image) {
     const styleReferenceNode = addNode(graph, {
       // The reference's image tokens are appended to the target's, so both must be the same size.
       height: settings.height,
@@ -1385,6 +1477,7 @@ const buildKrea2Graph = (
     krea2_seed_variance_randomize_percent: settings.krea2SeedVarianceRandomizePercent,
     krea2_seed_variance_strength: settings.krea2SeedVarianceStrength,
     ...(styleReference ? { krea2_style_strength: styleReference.config.styleStrength } : {}),
+    ...(referenceKvCache === undefined ? {} : { krea2_reference_kv_cache: referenceKvCache }),
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
     vae: vaeModel ?? undefined,
   });
@@ -1439,9 +1532,157 @@ const buildQwenImage21Graph = (
   }
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
-  addMetadata(graph, output, settings, model, 'qwen_image_2_1_txt2img', projectSettings, {
+  addQwenImage21ReferenceImages(graph, settings, {
+    conditionings: negCond ? [posCond, negCond] : [posCond],
+    denoise,
+    modelLoader,
+  });
+  // The denoise adds the prefix-cache mode it ran to the record, which changes the image, so the metadata passes
+  // through it on the way to the decoder.
+  addMetadata(graph, denoise, settings, model, 'qwen_image_2_1_txt2img', projectSettings, {
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
     vae: vaeModel ?? undefined,
+  });
+  addEdge(graph, denoise, 'metadata', output, 'metadata');
+  addReferenceImageMetadata(graph, output, settings);
+
+  return graph;
+};
+
+/**
+ * Qwen-Image-2.1 reads each reference twice, at one size: the prompt encoder sees it through the vision tower, and
+ * the denoise node places its clean latents in the prompt's image slots. Both prompts are encoded with the
+ * references, and the latents follow in the same order.
+ */
+const addQwenImage21ReferenceImages = (
+  graph: BackendGraphContract,
+  settings: GenerateSettings,
+  nodes: {
+    conditionings: BackendInvocationContract[];
+    denoise: BackendInvocationContract;
+    modelLoader: BackendInvocationContract;
+  }
+): void => {
+  const referenceImages = getEnabledReferenceImages(settings, 'qwen_image_2_1_reference_image');
+  if (referenceImages.length === 0) {
+    return;
+  }
+
+  let imageCollect: BackendInvocationContract | null = null;
+  let latentsCollect: BackendInvocationContract | null = null;
+
+  for (const { config } of referenceImages) {
+    if (!config.image) {
+      continue;
+    }
+
+    const imageNode = addNode(graph, {
+      id: createId('qwen21_ref_img'),
+      image: toImageField(config.image),
+      type: 'image',
+    });
+    const i2l = addNode(graph, { id: createId('qwen21_ref_i2l'), reference: true, type: 'qwen_image_2_1_i2l' });
+    addEdge(graph, imageNode, 'image', i2l, 'image');
+    addEdge(graph, nodes.modelLoader, 'vae', i2l, 'vae');
+
+    const nextImageCollect = addNode(graph, { id: createId('qwen21_ref_img_collect'), type: 'collect' });
+    addEdge(graph, imageNode, 'image', nextImageCollect, 'item');
+    if (imageCollect) {
+      addEdge(graph, imageCollect, 'collection', nextImageCollect, 'collection');
+    }
+    imageCollect = nextImageCollect;
+
+    const nextLatentsCollect = addNode(graph, { id: createId('qwen21_ref_latents_collect'), type: 'collect' });
+    addEdge(graph, i2l, 'latents', nextLatentsCollect, 'item');
+    if (latentsCollect) {
+      addEdge(graph, latentsCollect, 'collection', nextLatentsCollect, 'collection');
+    }
+    latentsCollect = nextLatentsCollect;
+  }
+
+  if (!imageCollect || !latentsCollect) {
+    return;
+  }
+  for (const conditioning of nodes.conditionings) {
+    addEdge(graph, imageCollect, 'collection', conditioning, 'reference_images');
+  }
+  addEdge(graph, latentsCollect, 'collection', nodes.denoise, 'reference_latents');
+};
+
+const buildMossImageGraph = (
+  settings: GenerateSettings,
+  model: MainModelConfig,
+  outputIsIntermediate: boolean,
+  projectSettings: GenerationProjectSettings
+): BackendGraphContract => {
+  // A Diffusers pipeline brings its encoder and VAE; a single-file transformer needs both. The filter drops a stale
+  // Qwen3.5 4B selection left over from Anima-3.8B, which shares the setting.
+  const isDiffusers = model.format === 'diffusers';
+  const vaeModel = getCompatibleVae(settings, model);
+  const qwen35EncoderModel = getCompatibleComponent(settings.qwen35EncoderModel, isMossImageQwen35Encoder);
+
+  if (!isDiffusers) {
+    requireComponent(qwen35EncoderModel, 'Qwen3.5 9B Encoder');
+    requireComponent(vaeModel, 'MOSS-Image VAE');
+  }
+
+  const graph: BackendGraphContract = { edges: [], id: createId('moss_image_graph'), nodes: {} };
+  const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);
+  // The negative branch runs only above CFG 1, where the node requires its conditioning.
+  const useCfg = settings.cfgScale > 1;
+  const modelLoader = addNode(graph, {
+    id: 'model_loader',
+    model,
+    qwen3_5_encoder_model: qwen35EncoderModel ?? undefined,
+    type: 'moss_image_model_loader',
+    vae_model: vaeModel ?? undefined,
+  });
+  const posCond = addNode(graph, { id: 'pos_cond', type: 'moss_image_text_encoder' });
+  const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'moss_image_text_encoder' }) : null;
+  const denoiseSize = getDenoiseSize(settings, model);
+  const denoise = addNode(graph, {
+    cfg_scale: settings.cfgScale,
+    denoising_end: 1,
+    denoising_start: 0,
+    height: denoiseSize.height,
+    id: 'denoise_latents',
+    steps: settings.steps,
+    type: 'moss_image_denoise',
+    uncond_skip_layers: [...settings.mossImageUncondSkipLayers],
+    width: denoiseSize.width,
+  });
+  // MOSS-Image denoises into the FLUX.2 VAE's raw latent layout, so it decodes, and PiD-decodes, as FLUX.2 does.
+  const output = addDecodeOutput({
+    denoise,
+    graph,
+    l2iType: 'flux2_vae_decode',
+    model,
+    outputIsIntermediate,
+    positivePrompt,
+    seed,
+    settings,
+    vaeSource: modelLoader,
+  });
+
+  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  // The denoise node reads the VAE's BatchNorm statistics, which define the latent space it works in.
+  addEdge(graph, modelLoader, 'vae', denoise, 'vae');
+  addEdge(graph, modelLoader, 'qwen3_5_encoder', posCond, 'qwen3_5_encoder');
+  addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
+  addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
+
+  if (negCond) {
+    addEdge(graph, modelLoader, 'qwen3_5_encoder', negCond, 'qwen3_5_encoder');
+    addEdge(graph, negativePrompt, 'value', negCond, 'prompt');
+    addEdge(graph, negCond, 'conditioning', denoise, 'negative_conditioning');
+  }
+
+  addEdge(graph, seed, 'value', denoise, 'seed');
+  addMetadata(graph, output, settings, model, 'moss_image_txt2img', projectSettings, {
+    moss_image_uncond_skip_layers: [...settings.mossImageUncondSkipLayers],
+    qwen3_5_encoder: qwen35EncoderModel ?? undefined,
+    vae: vaeModel ?? undefined,
+    ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
 
   return graph;
@@ -1592,18 +1833,29 @@ const buildWanGraph = (
   return graph;
 };
 
-const buildExternalGraph = (
+/** Canvas inputs per external mode: the composited bbox is the init image for img2img. */
+export type ExternalCanvasInputs = { mode: 'txt2img' } | { mode: 'img2img'; initImageName: string };
+
+/**
+ * Hosted providers take the whole request on one node: prompt, seed, size, provider options, and (on the canvas) the
+ * init image. The Canvas keep-mask does not match any provider's edit-mask contract, so inpaint is not compiled.
+ */
+export const buildExternalGraph = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
   outputIsIntermediate: boolean,
-  projectSettings: GenerationProjectSettings
+  projectSettings: GenerationProjectSettings,
+  canvas: ExternalCanvasInputs | null = null
 ): BackendGraphContract => {
   if (model.type !== 'external_image_generator') {
     throw new Error('Selected model is not an external image generator.');
   }
 
-  if (model.capabilities?.modes && !model.capabilities.modes.includes('txt2img')) {
-    throw new Error(`${model.name} does not support text-to-image generation.`);
+  const mode = canvas?.mode ?? 'txt2img';
+  const modeReason = getExternalModeReason(model, mode);
+
+  if (modeReason) {
+    throw new Error(modeReason);
   }
 
   const providerId = typeof model.provider_id === 'string' ? model.provider_id : '';
@@ -1618,14 +1870,16 @@ const buildExternalGraph = (
   const output = addNode(graph, {
     height: settings.height,
     id: 'canvas_output',
-    image_size: null,
+    image_size: resolveExternalImageSize(settings, model),
     is_intermediate: outputIsIntermediate,
-    mode: 'txt2img',
+    mode,
     model,
     num_images: 1,
     type: nodeType,
     use_cache: false,
     width: settings.width,
+    ...getExternalProviderInvocationOptions(settings, model),
+    ...(canvas?.mode === 'img2img' ? { init_image: { image_name: canvas.initImageName } } : {}),
   });
 
   addEdge(graph, positivePrompt, 'value', output, 'prompt');
@@ -1636,17 +1890,15 @@ const buildExternalGraph = (
   if (model.capabilities?.supports_seed === true) {
     addEdge(graph, seed, 'value', output, 'seed');
   }
-  if (model.capabilities?.supports_reference_images === true) {
-    const referenceImages = getEnabledReferenceImages(settings, 'external_reference_image')
-      .map((referenceImage) => referenceImage.config.image)
-      .filter((image): image is GenerateReferenceImageAsset => image !== null)
-      .map(toImageField);
+  const referenceImages = getExternalReferenceImages(settings, model).map(toImageField);
 
-    if (referenceImages.length > 0) {
-      (output as Record<string, unknown>).reference_images = referenceImages;
-    }
+  if (referenceImages.length > 0) {
+    (output as Record<string, unknown>).reference_images = referenceImages;
   }
-  addMetadata(graph, output, settings, model, null, projectSettings, { scheduler: undefined });
+  addMetadata(graph, output, settings, model, null, projectSettings, {
+    scheduler: undefined,
+    ...getExternalProviderMetadata(settings, model),
+  });
   addReferenceImageMetadata(graph, output, settings);
 
   return graph;
@@ -1674,6 +1926,7 @@ export const GRAPH_BUILDERS = {
   'krea-2': buildKrea2Graph,
   'qwen-image-2-1': buildQwenImage21Graph,
   anima: buildAnimaGraph,
+  'moss-image': buildMossImageGraph,
   wan: buildWanGraph,
 } satisfies Record<SupportedGenerateBase, GenerateGraphBuilder>;
 

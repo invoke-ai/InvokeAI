@@ -2082,6 +2082,28 @@ describe('InvocationFlowNode template version', () => {
       'Version 1.0.0 cannot be updated to 2.0.0; delete and re-add the node'
     );
   });
+
+  it('waits neutrally for node definitions and warns of an unknown type only once they have loaded', async () => {
+    await render(flowNodes);
+    const knownBorder = borderColor();
+    const nodeText = () => host.querySelector('.react-flow__node')!.textContent;
+
+    for (const isCompact of [false, true]) {
+      await render(toFlowNodes(projectGraph, [], undefined, undefined, isCompact, false, 'loading'));
+      expect(borderColor()).toBe(knownBorder);
+      expect(nodeText()).toContain('preview');
+      expect(nodeText()).toContain('Loading node…');
+      expect(nodeText()).not.toContain('Unknown node type');
+    }
+
+    await render(toFlowNodes(projectGraph, [], undefined, undefined, false, false, 'error'));
+    expect(borderColor()).toBe(knownBorder);
+    expect(nodeText()).toContain('Node definitions could not be loaded.');
+
+    await render(toFlowNodes(projectGraph, [], undefined, undefined, false, false, 'loaded'));
+    expect(borderColor()).not.toBe(knownBorder);
+    expect(nodeText()).toContain('Unknown node type "preview". It cannot run on this backend.');
+  });
 });
 
 describe('InvocationFlowNode batch nodes', () => {

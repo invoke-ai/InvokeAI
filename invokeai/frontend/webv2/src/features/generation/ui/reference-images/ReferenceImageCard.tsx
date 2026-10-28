@@ -9,6 +9,7 @@ import type { CSSProperties } from 'react';
 
 import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { FindInGalleryButton } from '@features/gallery/mediaSlot';
+import { isStrengthOnlyIPAdapterBase } from '@features/generation/core/baseGenerationPolicies';
 import { getEffectiveReferenceImage } from '@features/generation/core/referenceImage';
 import { getReferenceImageUrls } from '@features/generation/data/referenceImageUrls';
 import { GenerationModelSelect as ModelSelect } from '@features/generation/ui/GenerationUiContext';
@@ -24,6 +25,7 @@ import {
   FieldHeader,
   FluxReduxControls,
   IPAdapterControls,
+  Krea2ReferenceModeControl,
   Krea2StyleReferenceControls,
 } from './ReferenceImageControls';
 import { ReferenceImageCropDialog } from './ReferenceImageCropDialog';
@@ -149,7 +151,9 @@ const ReferenceImageCardBase = ({
               {config.type === 'ip_adapter' ? (
                 <>
                   {' · '}
-                  {t(getModeLabelKey(config.method))}{' '}
+                  {isStrengthOnlyIPAdapterBase(selectedBase)
+                    ? t('widgets.generate.strength')
+                    : t(getModeLabelKey(config.method))}{' '}
                   <Text as="span" color="fg.subtle" fontFamily="mono">
                     {formatWeight(config.weight)}
                   </Text>
@@ -161,6 +165,11 @@ const ReferenceImageCardBase = ({
                   <Text as="span" color="fg.subtle" fontFamily="mono">
                     {formatWeight(config.styleStrength)}
                   </Text>
+                </>
+              ) : config.type === 'krea2_edit_reference_image' ? (
+                <>
+                  {' · '}
+                  {t('widgets.generate.modeEdit')}
                 </>
               ) : null}
             </Text>
@@ -246,6 +255,7 @@ const ReferenceImageCardBase = ({
                 key={config.model?.key ?? 'no-model'}
                 config={config}
                 disabled={!isEnabled}
+                strengthOnly={isStrengthOnlyIPAdapterBase(selectedBase)}
                 onChange={changeConfig}
               >
                 <ReferenceModelSelector
@@ -272,8 +282,13 @@ const ReferenceImageCardBase = ({
                 selectedBase={selectedBase}
                 onConfigChange={changeConfig}
               />
-            ) : config.type === 'krea2_reference_image' ? (
-              <Krea2StyleReferenceControls config={config} disabled={!isEnabled} onChange={changeConfig} />
+            ) : config.type === 'krea2_reference_image' || config.type === 'krea2_edit_reference_image' ? (
+              <>
+                <Krea2ReferenceModeControl config={config} onChange={changeConfig} />
+                {config.type === 'krea2_reference_image' ? (
+                  <Krea2StyleReferenceControls config={config} disabled={!isEnabled} onChange={changeConfig} />
+                ) : null}
+              </>
             ) : null}
           </Stack>
         </HStack>
@@ -343,7 +358,7 @@ const ReferenceModelSelector = ({
           value={config.model?.key ?? null}
           onChange={selectReferenceModel}
         />
-        {config.type === 'ip_adapter' ? (
+        {config.type === 'ip_adapter' && !isStrengthOnlyIPAdapterBase(selectedBase) ? (
           <ClipVisionSelect
             key={config.model?.key ?? 'no-model'}
             config={config}
