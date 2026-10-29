@@ -468,14 +468,21 @@ describe('durable project persistence', () => {
       saveDraftAsNew,
       writerToken: 'writer-1',
     });
-    const loaded = await service.loadWorkbench();
+    // A plain-HTTP origin has no navigator.locks; Node 24 defines one, so remove it explicitly.
+    vi.stubGlobal('navigator', {});
 
-    await service.resolveConflictDiscard(discarded.id);
-    const copy = await service.resolveConflictSaveAsNew(loaded.state.projects.find(({ id }) => id === copied.id)!);
+    try {
+      const loaded = await service.loadWorkbench();
 
-    await expect(draftStore.get(discarded.id, 'editor-1')).resolves.toMatchObject({ kind: 'empty' });
-    expect(saveDraftAsNew).toHaveBeenCalledOnce();
-    expect(api.records.has(copy.targetProjectId)).toBe(true);
+      await service.resolveConflictDiscard(discarded.id);
+      const copy = await service.resolveConflictSaveAsNew(loaded.state.projects.find(({ id }) => id === copied.id)!);
+
+      await expect(draftStore.get(discarded.id, 'editor-1')).resolves.toMatchObject({ kind: 'empty' });
+      expect(saveDraftAsNew).toHaveBeenCalledOnce();
+      expect(api.records.has(copy.targetProjectId)).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('refuses conflict resolution when the lock request fails although the browser has Web Locks', async () => {
@@ -521,9 +528,14 @@ describe('durable project persistence', () => {
       settle: vi.fn(),
     });
     const service = createService(owner, api);
+    vi.stubGlobal('navigator', {});
 
-    await expect(service.resolveConflictSaveAsNew(project)).rejects.toThrow('active queue runs');
-    await expect(service.resolveConflictDiscard(project.id)).rejects.toThrow('active queue runs');
+    try {
+      await expect(service.resolveConflictSaveAsNew(project)).rejects.toThrow('active queue runs');
+      await expect(service.resolveConflictDiscard(project.id)).rejects.toThrow('active queue runs');
+    } finally {
+      vi.unstubAllGlobals();
+    }
 
     expect(api.createProject).not.toHaveBeenCalled();
   });

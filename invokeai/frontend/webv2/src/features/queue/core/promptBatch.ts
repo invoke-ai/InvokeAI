@@ -339,3 +339,37 @@ export const buildGeneratePromptBatchPlan = ({
     runs: isHeld ? iterations : 1,
   };
 };
+
+/** The prompt and seed fields of a generate submission, from compilation to `enqueue_batch`. */
+export interface GeneratePromptSubmission {
+  batchCount: number;
+  negativePrompt: string;
+  negativePromptNodeId: string;
+  positivePrompt: string;
+  positivePromptNodeId: string;
+  /**
+   * Prompts to submit as a batch dimension, already expanded by the caller.
+   * Absent or empty submits `positivePrompt` verbatim.
+   */
+  positivePrompts?: string[];
+  seed: number;
+  seedBehaviour?: QueuePromptSeedBehaviour;
+  seedNodeId: string;
+  seedStep: QueueSeedStep;
+  /** Legacy recovery maps the old random toggle to seedStep and preserves its expansion rules. */
+  legacySeedPlan?: true;
+}
+
+/** The batch data and run count `enqueue_batch` receives for a generate submission. */
+export const planGenerateSubmissionBatch = (submission: GeneratePromptSubmission): GeneratePromptBatchPlan =>
+  (submission.legacySeedPlan ? buildLegacyGeneratePromptBatchPlan : buildGeneratePromptBatchPlan)({
+    batchCount: sanitizeBatchCount(submission.batchCount),
+    negativePrompt: submission.negativePrompt,
+    negativePromptNodeId: submission.negativePromptNodeId,
+    positivePromptNodeId: submission.positivePromptNodeId,
+    prompts: submission.positivePrompts?.length ? submission.positivePrompts : [submission.positivePrompt],
+    seed: submission.seed,
+    seedBehaviour: submission.seedBehaviour ?? 'per-iteration',
+    seedNodeId: submission.seedNodeId,
+    seedStep: submission.seedStep,
+  });
