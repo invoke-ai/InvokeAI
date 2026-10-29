@@ -27,6 +27,7 @@ from types import MappingProxyType
 from typing import Any, Optional
 
 import torch
+from einops import rearrange
 from torch import Tensor
 
 from invokeai.backend.model_manager.taxonomy import BaseModelType
@@ -594,7 +595,9 @@ class PiDDecoder:
 
         Args:
             latent: ``[B, C_lat, H_lat, W_lat]`` LQ latent (the LDM's x0
-                output, scaled per the backbone's VAE convention).
+                output) in the backbone VAE's *normalized* space — what the
+                upstream tokenizers' ``encode`` returns and the transformer
+                denoises in. Never the raw latent a VAE's conv decoder consumes.
             caption_embs: ``[B, T, 2304]`` Gemma-2-2b-it caption embeddings
                 (output of `_encode_text_raw` upstream — InvokeAI callers
                 produce this via `Gemma2EncoderLoader`).
@@ -754,6 +757,29 @@ def assert_pid_decoder_matches_base(decoder_base: BaseModelType, node_base: Base
         )
 
 
+def pack_flux2_latent_for_pid(latents: Tensor, bn_mean: Tensor, bn_std: Tensor) -> Tensor:
+    """Bring a stored FLUX.2 latent into the layout and normalization PiD's FLUX.2 backbone was trained on.
+
+    ``flux2_denoise`` stores the raw ``(B, 32, H/8, W/8)`` latent: it inverts the VAE's BatchNorm before
+    unpacking. PiD instead takes the latent the upstream FLUX.2 tokenizer encodes to (``flux2_vae.py``):
+    2x2-patchified to ``(B, 128, H/16, W/16)`` with channel order ``(c ph pw)`` — the order ``pack_flux2``
+    uses, so the BN statistics index the same channels — and then BN-normalized.
+    """
+    if latents.ndim != 4 or latents.shape[1] != 32:
+        raise ValueError(
+            f"FLUX.2 PiD decode expected an unpacked 32-channel FLUX.2 latent, got shape {tuple(latents.shape)}."
+        )
+    packed = rearrange(latents, "b c (h ph) (w pw) -> b (c ph pw) h w", ph=2, pw=2)
+    if bn_mean.numel() != packed.shape[1] or bn_std.numel() != packed.shape[1]:
+        raise ValueError(
+            f"FLUX.2 PiD decode needs BatchNorm statistics for {packed.shape[1]} channels, got "
+            f"{bn_mean.numel()}. Connect the FLUX.2 VAE."
+        )
+    bn_mean = bn_mean.to(device=packed.device, dtype=packed.dtype).view(1, -1, 1, 1)
+    bn_std = bn_std.to(device=packed.device, dtype=packed.dtype).view(1, -1, 1, 1)
+    return (packed - bn_mean) / bn_std
+
+
 __all__ = [
     "BACKBONE_DISCRIMINATOR_KEY",
     "PID_CHI_PROMPT",
@@ -765,5 +791,6 @@ __all__ = [
     "build_pid_net",
     "encode_caption_for_pid",
     "load_pid_decoder",
+    "pack_flux2_latent_for_pid",
     "required_pid_net_shapes",
 ]
