@@ -3,7 +3,9 @@
 The app keeps a device class's calibration windows (`app/services/working_memory_calibration/`); this module owns the
 rule that turns them into lines and the rule by which an estimate uses them. Lines are those of `fit.py`: a window
 joins the line its estimator resolves to on the platform it ran on -- the lender's, where the estimator borrows its
-values -- so a calibration of one model's decode moves every estimator that prices with the same line.
+values -- so a calibration of one model's decode moves every estimator that prices with the same line. Only the
+estimators that opt in (`EstimatorSpec.user_calibrated`) take part: the others' windows fit no user line, and no user
+line moves their estimates.
 
 An estimate reads a user line through the provider seam: the app registers one (`set_user_fit_provider`) that answers
 from memory, and `EstimatorSpec.estimate` asks it per estimate. Without a provider, or when it has no fit for the
@@ -24,14 +26,14 @@ import torch
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.working_memory.coefficients import ResolvedCoefficients, find_entry, shipped_data
 from invokeai.backend.working_memory.estimate import FeatureValue, WorkingMemoryEstimate
-from invokeai.backend.working_memory.fit import EntryKey, entry_key, fits_a_line, line_of, user_pair
+from invokeai.backend.working_memory.fit import EntryKey, carried_lines, entry_key, user_pair
 from invokeai.backend.working_memory.platform import Platform, priced_as
 
 if TYPE_CHECKING:
     from invokeai.backend.working_memory.spec import EstimatorSpec
 
 LineKey = tuple[EntryKey, str]
-"""A line: the entry that carries its values, and its ``<operation>_<dtype>`` suffix."""
+"""A line: the entry that carries its values, and its suffix (`fit.Line.suffix`)."""
 
 
 @dataclass(frozen=True)
@@ -49,13 +51,13 @@ class UserLine:
     """A line fitted on a user's windows (`fit.user_pair`), and the sizes it was fitted on."""
 
     k: int
-    """Bytes per output pixel."""
+    """Bytes per unit of the line's size (`fit.Line.size`)."""
     b: int
     """Bytes whatever the size."""
     x_min: int
-    """The smallest size measured, in output pixels."""
+    """The smallest size measured."""
     x_max: int
-    """The largest size measured, in output pixels."""
+    """The largest size measured."""
     points: int
 
 
@@ -102,30 +104,32 @@ def _carried_lines(key: EntryKey) -> frozenset[str]:
     entries = [entry for file in shipped_data().values() for entry in file.coefficients]
     for entry in entries:
         if entry_key(entry) == key and entry.values is not None:
-            names = set(entry.values)
-            return frozenset(name[2:] for name in names if name.startswith("k_") and f"b_{name[2:]}" in names)
+            return frozenset(carried_lines(entry))
     return frozenset()
 
 
 def fit_user_lines(
-    points: Iterable[UserPoint], platform: Platform
+    points: Iterable[UserPoint], platform: Platform, specs: Mapping[str, "EstimatorSpec"]
 ) -> tuple[Mapping[LineKey, UserLine], Mapping[LineKey, str]]:
     """The user lines `points`, measured on `platform`, fit; and, per line they measure but cannot fit, why.
 
-    A point joins a line where `fit.fits_a_line` admits its features, its estimator version has shipped values on
-    the platform, the entry carrying them has the line, and it demanded more than nothing. Each line is
-    `fit.user_pair` of its points: two sizes at least `fit.MIN_AREA_RATIO` apart, or no line.
+    A point joins a line where its estimator, as `specs` registers it, is `user_calibrated` and its `line` admits the
+    point's features, its estimator version has shipped values on the platform, the entry carrying them has the line,
+    and it demanded more than nothing. Each line is `fit.user_pair` of its points: two sizes at least
+    `fit.MIN_AREA_RATIO` apart, or no line.
     """
     groups: dict[LineKey, list[tuple[int, int]]] = {}
     for point in points:
-        found = line_of(point.features)
-        if found is None or point.demand_bytes <= 0 or not fits_a_line(point.features):
+        spec = specs.get(point.estimator)
+        if spec is None or not spec.user_calibrated or point.demand_bytes <= 0:
+            continue
+        found = spec.line(point.features)
+        if found is None or not found.fits:
             continue
         carrier = carrier_key(point.estimator, point.version, platform)
-        suffix, pixels = found
-        if carrier is None or suffix not in _carried_lines(carrier):
+        if carrier is None or found.suffix not in _carried_lines(carrier):
             continue
-        groups.setdefault((carrier, suffix), []).append((pixels, point.demand_bytes))
+        groups.setdefault((carrier, found.suffix), []).append((found.size, point.demand_bytes))
 
     lines: dict[LineKey, UserLine] = {}
     problems: dict[LineKey, str] = {}
@@ -135,7 +139,7 @@ def fit_user_lines(
         except ValueError as e:
             problems[key] = str(e)
             continue
-        sizes = [pixels for pixels, _ in measured]
+        sizes = [size for size, _ in measured]
         lines[key] = UserLine(k=k, b=b, x_min=min(sizes), x_max=max(sizes), points=len(measured))
     return MappingProxyType(lines), MappingProxyType(problems)
 
@@ -146,20 +150,21 @@ def resolve(
     shipped: ResolvedCoefficients,
     fit: UserFit,
 ) -> WorkingMemoryEstimate:
-    """The estimate for `features` with `fit`'s line in place of the shipped one, where `fit` has the line.
+    """The estimate for `features` with `fit`'s line in place of the shipped one, where `fit` has the line and `spec`
+    is `user_calibrated`.
 
-    The line and its size are read as `fit.py` reads a point's (`line_of`): the output's pixels, also for a tiled
-    operation, whose image is at least its tile, so a tiled operation past the measured sizes takes the larger
-    estimate. At or below `UserLine.x_max` the user line decides; above, the larger estimate wins, the shipped one on
-    a tie. `source` names the user fit and the line wherever the user line decides.
+    The line and its size are read as `fit.py` reads a point's (`EstimatorSpec.line`): for the convolution lines the
+    output's pixels, also for a tiled operation, whose image is at least its tile, so a tiled operation past the
+    measured sizes takes the larger estimate. At or below `UserLine.x_max` the user line decides; above, the larger
+    estimate wins, the shipped one on a tie. `source` names the user fit and the line wherever the user line decides.
     """
-    found = line_of(features)
-    line = fit.lines_for(spec).get(found[0]) if found is not None else None
+    found = spec.line(features) if spec.user_calibrated else None
+    line = fit.lines_for(spec).get(found.suffix) if found is not None else None
     if found is None or line is None:
         return spec.evaluate(features, shipped)
-    suffix, pixels = found
+    suffix = found.suffix
     values = MappingProxyType({**shipped.values, f"k_{suffix}": line.k, f"b_{suffix}": line.b})
-    within = pixels <= line.x_max
+    within = found.size <= line.x_max
     where = "within its measured sizes" if within else "above its measured sizes, over shipped"
     user = spec.evaluate(
         features, ResolvedCoefficients(values=values, source=f"{fit.label} ({suffix} {where}) + {shipped.source}")
