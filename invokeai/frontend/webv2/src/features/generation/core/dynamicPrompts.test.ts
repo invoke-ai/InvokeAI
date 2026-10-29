@@ -280,6 +280,7 @@ describe('getWildcardValuesError', () => {
 
 const source = (overrides: Partial<GenerateSubmissionSource> = {}): GenerateSubmissionSource => ({
   batchCount: 2,
+  dynamicPromptsEnabled: true,
   negativePrompt: 'blurry',
   negativePromptEnabled: true,
   positivePrompt: 'a cat',
@@ -336,6 +337,26 @@ describe('planGenerateSubmission', () => {
       seedStep: 1,
     });
     expect(plain.seedPlan.nextSeed).toBe(12);
+  });
+
+  it('sends a prompt with dynamic syntax as typed when dynamic prompts are off', () => {
+    const { seedPlan, submission } = planGenerateSubmission(
+      source({
+        dynamicPromptsEnabled: false,
+        dynamicPromptsSeedBehaviour: 'per-image',
+        positivePrompt: 'a {red|green} cat',
+      }),
+      ['a red cat', 'a green cat']
+    );
+
+    expect(submission).toEqual({
+      batchCount: 2,
+      negativePrompt: 'blurry',
+      positivePrompt: 'a {red|green} cat',
+      seed: 10,
+      seedStep: 1,
+    });
+    expect(seedPlan.nextSeed).toBe(12);
   });
 
   it('holds a fixed seed', () => {

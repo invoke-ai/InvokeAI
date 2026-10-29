@@ -380,6 +380,7 @@ export interface GenerateSubmissionSource {
   promptTemplate?: PromptTemplateSnapshot | null;
   seed: number;
   seedMode: SeedMode;
+  dynamicPromptsEnabled: boolean;
   dynamicPromptsSeedBehaviour?: DynamicPromptsSeedBehaviour;
 }
 
@@ -404,7 +405,8 @@ export interface GenerateSubmissionPlan {
 
 /**
  * The prompts and seeds a submission sends. `expandedPositivePrompts` are what the host expanded the merged positive
- * prompt into; they count only when that prompt has dynamic syntax, so templates that introduce syntax count too.
+ * prompt into; they count only when dynamic prompts are on and that prompt has their syntax, so templates that introduce
+ * syntax count too. With dynamic prompts off the prompt is sent as typed.
  */
 export const planGenerateSubmission = (
   source: GenerateSubmissionSource,
@@ -415,7 +417,7 @@ export const planGenerateSubmission = (
   const positivePrompts =
     expandedPositivePrompts &&
     expandedPositivePrompts.length > 0 &&
-    hasDynamicPromptSyntax(effectivePrompts.positivePrompt)
+    expandsDynamicPrompts(effectivePrompts.positivePrompt, source.dynamicPromptsEnabled)
       ? expandedPositivePrompts
       : undefined;
   const seedBehaviour = positivePrompts ? source.dynamicPromptsSeedBehaviour : undefined;

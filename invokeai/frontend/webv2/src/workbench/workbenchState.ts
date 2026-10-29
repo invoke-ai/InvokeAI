@@ -3884,27 +3884,20 @@ const enqueueCompiledSnapshot = (
   const videoSettings = route.sourceId === 'video' ? normalizeVideoWidgetValues(widgetStates.video.values) : null;
   const backendGraph = graph.backendGraph;
   const canvasGenerateSettings = route.sourceId === 'canvas' ? normalizeGenerateSettings(generate?.values) : null;
+  // Upscale and Video have no dynamic prompts switch: their prompts always run as typed.
+  const nonExpandingSettings = upscaleSettings ?? videoSettings;
   const sourceGenerateSettings =
     route.sourceId === 'canvas'
       ? canvasGenerateSettings
       : route.sourceId === 'generate'
         ? generateSettings
-        : route.sourceId === 'upscale'
-          ? upscaleSettings
-          : route.sourceId === 'video'
-            ? videoSettings
-            : null;
-  // Resolve template-merged prompts and seeds here, where Generate and Canvas submissions converge; Upscale and Video
-  // merge to identity and never expand. With dynamic prompts off the prompt runs as typed, so no expansion counts.
+        : nonExpandingSettings
+          ? { ...nonExpandingSettings, dynamicPromptsEnabled: false }
+          : null;
+  // Resolve template-merged prompts and seeds here, where Generate, Canvas, Upscale and Video submissions converge; the
+  // planner decides whether the expansion counts.
   const submissionPlan = sourceGenerateSettings
-    ? planGenerateSubmission(
-        sourceGenerateSettings,
-        route.sourceId === 'upscale' ||
-          route.sourceId === 'video' ||
-          (canvasGenerateSettings ?? generateSettings)?.dynamicPromptsEnabled !== true
-          ? undefined
-          : compiled.positivePrompts
-      )
+    ? planGenerateSubmission(sourceGenerateSettings, compiled.positivePrompts)
     : null;
   const effectivePrompts = submissionPlan?.effectivePrompts ?? null;
   const expandedPositivePrompts = submissionPlan?.submission.positivePrompts;
