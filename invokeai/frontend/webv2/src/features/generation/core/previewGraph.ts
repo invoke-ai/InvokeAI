@@ -31,7 +31,11 @@ export type GeneratePreviewResult =
 
 const CREATED_ID_PATTERN = /^(.+)_[a-z0-9]{7,9}_[a-z0-9]{4,6}$/;
 
-export const stabilizeBackendGraphIds = (graph: BackendGraphContract): BackendGraphContract => {
+/** Stabilize ids and follow `nodeIds` through the renames: a fixed id loses its name to an earlier created one. */
+export const stabilizeBackendGraphNodeIds = <T extends Record<string, string>>(
+  graph: BackendGraphContract,
+  nodeIds: T
+): { graph: BackendGraphContract; nodeIds: T } => {
   const rename = new Map<string, string>();
   const used = new Set<string>();
 
@@ -50,25 +54,26 @@ export const stabilizeBackendGraphIds = (graph: BackendGraphContract): BackendGr
     rename.set(id, candidate);
   }
 
-  return {
-    edges: graph.edges.map((edge) => ({
-      destination: {
-        field: edge.destination.field,
-        node_id: rename.get(edge.destination.node_id) ?? edge.destination.node_id,
-      },
-      source: { field: edge.source.field, node_id: rename.get(edge.source.node_id) ?? edge.source.node_id },
-      ...(edge.type ? { type: edge.type } : {}),
-    })),
-    id: 'generate-preview',
-    nodes: Object.fromEntries(
-      Object.entries(graph.nodes).map(([id, node]) => {
-        const nextId = rename.get(id) ?? id;
+  const renamed = (id: string): string => rename.get(id) ?? id;
 
-        return [nextId, { ...node, id: nextId }];
-      })
-    ),
+  return {
+    graph: {
+      edges: graph.edges.map((edge) => ({
+        destination: { field: edge.destination.field, node_id: renamed(edge.destination.node_id) },
+        source: { field: edge.source.field, node_id: renamed(edge.source.node_id) },
+        ...(edge.type ? { type: edge.type } : {}),
+      })),
+      id: 'generate-preview',
+      nodes: Object.fromEntries(
+        Object.entries(graph.nodes).map(([id, node]) => [renamed(id), { ...node, id: renamed(id) }])
+      ),
+    },
+    nodeIds: Object.fromEntries(Object.entries(nodeIds).map(([key, id]) => [key, renamed(id)])) as T,
   };
 };
+
+export const stabilizeBackendGraphIds = (graph: BackendGraphContract): BackendGraphContract =>
+  stabilizeBackendGraphNodeIds(graph, {}).graph;
 
 const toPreviewContract = (backendGraph: BackendGraphContract, label: string): GraphContract => ({
   backendGraph,

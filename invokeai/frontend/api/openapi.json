@@ -1515,6 +1515,12 @@
                       "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                     },
                     {
@@ -1744,6 +1750,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
@@ -2030,6 +2039,12 @@
                       "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                     },
                     {
@@ -2259,6 +2274,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
@@ -2545,6 +2563,12 @@
                       "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                     },
                     {
@@ -2774,6 +2798,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
@@ -3105,6 +3132,12 @@
                       "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                     },
                     {
@@ -3334,6 +3367,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
@@ -3692,6 +3728,12 @@
                       "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                     },
                     {
@@ -3921,6 +3963,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
@@ -5154,6 +5199,12 @@
                       "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                     },
                     {
@@ -5383,6 +5434,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
@@ -5775,7 +5829,7 @@
       "post": {
         "tags": ["model_manager"],
         "summary": "Calibrate Model Working Memory",
-        "description": "Start a working-memory calibration run: enqueue the batch with every node uncached and measure each node's\nmodel operations on the generation device. Needs exactly one generation device, and it must be a GPU. The queue\ntakes all of the batch's items or none.\n\nOnce the items are queued, a request without an `idempotency_key` succeeds even when the store fails for a passing\nreason (an unwritable root, a lock timeout) to record them: they run all the same, and the status finds them by\ntheir origin. With a key, that failure is a 503 although the items are queued. A run removed meanwhile (404) or an\nunusable store file (409) fails the request with or without a key; its queued items then fail when they start.\n\nWith a key, repeating the request (also after a lost response) records the queued items and returns the run; it\nenqueues nothing new. The items come from the queue's enqueue receipt for the key while it exists, otherwise from\nthe queue items that carry the run's origin and those the runner saw. Once a reset removed the run, a repeat is\nrefused (404). Acknowledge the key through the queue's enqueue_batch/acknowledge route once the response\narrived.",
+        "description": "Start a working-memory calibration run: enqueue the batch with every node uncached, its images intermediates\non no board (never in the gallery; clearing intermediates removes them), and measure each node's model operations\non the generation device. Needs exactly one generation device, and it must be a GPU. The queue\ntakes all of the batch's items or none.\n\nOnce the items are queued, a request without an `idempotency_key` succeeds even when the store fails for a passing\nreason (an unwritable root, a lock timeout) to record them: they run all the same, and the status finds them by\ntheir origin. With a key, that failure is a 503 although the items are queued. A run removed meanwhile (404) or an\nunusable store file (409) fails the request with or without a key; its queued items then fail when they start.\n\nWith a key, repeating the request (also after a lost response) records the queued items and returns the run; it\nenqueues nothing new. The items come from the queue's enqueue receipt for the key while it exists, otherwise from\nthe queue items that carry the run's origin and those the runner saw. Once a reset removed the run, a repeat is\nrefused (404). Acknowledge the key through the queue's enqueue_batch/acknowledge route once the response\narrived.",
         "operationId": "calibrate_model_working_memory",
         "security": [
           {
@@ -5821,10 +5875,10 @@
             "description": "The model could not be found; the run was removed while it was being created, whose items are queued then and fail when they start; or a reset removed the run the idempotency key started"
           },
           "409": {
-            "description": "This machine cannot calibrate now (no GPU, or several generation devices), the device class's store file is unusable and kept as it is (possibly after the items were queued, which then fail when they start), the queue has no room for all of the run's items (it then takes none), or the idempotency key was used for another request"
+            "description": "This machine cannot calibrate now (no GPU, or several generation devices), the device class's store file is unusable and kept as it is (possibly after the items were queued, which then fail when they start), the queue has no room for all of the run's items (it then takes none), the idempotency key was used for another request, or attempt_steps differs from that of the attempt's runs already stored (or of the run a repeated request names). Three of them carry a code, as `{\"code\": ..., \"message\": ...}` in `detail`: `calibration_running`, another calibration attempt still runs on this GPU, or another owner's attempt is between its steps and was active in the last two minutes (an owner's new attempt replaces its own attempt that stopped between steps); `calibration_interleaved`, a later step of an attempt after another calibration ran on this GPU since the attempt began; `model_changed`, a model the graph names changed or was removed since the graph was compiled (its record differs from the graph's identifier or its graph_models entry), or since an earlier step of the attempt"
           },
           "422": {
-            "description": "The graph cannot be measured as a calibration run"
+            "description": "The graph cannot be measured as a calibration run, graph_models does not state exactly the graph's models, or attempt_id and attempt_steps were not sent together"
           },
           "429": {
             "description": "Too many unacknowledged idempotency keys; acknowledge or wait, then retry"
@@ -5863,11 +5917,138 @@
         ]
       }
     },
+    "/api/v2/models/i/{key}/working_memory/plan": {
+      "get": {
+        "tags": ["model_manager"],
+        "summary": "Get Model Working Memory Calibration Plan",
+        "description": "The text-to-image cases that calibrate the model's decode on this machine's GPU, how often each runs, which\nother installed models the calibration also moves, or why the model cannot be calibrated here (`supported`).",
+        "operationId": "get_model_working_memory_calibration_plan",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Key of the model to calibrate",
+              "title": "Key"
+            },
+            "description": "Key of the model to calibrate"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingMemoryCalibrationPlan"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The model could not be found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/models/i/{key}/working_memory/summary": {
+      "get": {
+        "tags": ["model_manager"],
+        "summary": "Get Model Working Memory Calibration Summary",
+        "description": "What the calibration windows of the model's lines measured on one device class, per estimator line and\nenvironment: the sizes, the largest demand, the shipped and the user estimate, whether the user line is in use,\nstale or unusable, and which models measured it, also for a line the model's decode shares with other models'\nmeasurements; and the model's runs.",
+        "operationId": "get_model_working_memory_calibration_summary",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Key of the model whose measurements to summarise",
+              "title": "Key"
+            },
+            "description": "Key of the model whose measurements to summarise"
+          },
+          {
+            "name": "device_class_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{16}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The device class to act on; the current generation device's by default",
+              "title": "Device Class Id"
+            },
+            "description": "The device class to act on; the current generation device's by default"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingMemoryCalibrationModelSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The model could not be found"
+          },
+          "409": {
+            "description": "No device_class_id was given and there is no current one"
+          },
+          "503": {
+            "description": "The calibration store cannot be read or written (unwritable root, lock timeout)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/models/working_memory/runs/{run_id}": {
       "delete": {
         "tags": ["model_manager"],
         "summary": "Delete Working Memory Calibration Run",
-        "description": "Remove a calibration run and its measurements. Its queue items that have not run yet fail when they start.",
+        "description": "Remove a calibration run and its measurements. Its queue items that have not run yet fail when they start.\n\nA removed run of an attempt still counts toward the attempt's runs (`attempt_steps`), so the rest of a finished\nattempt is judged as before. Removing a run while its attempt runs, or after it was stopped (a canceled item),\nstops the attempt for good: none of its measurements count.",
         "operationId": "delete_working_memory_calibration_run",
         "security": [
           {
@@ -5924,7 +6105,7 @@
       "delete": {
         "tags": ["model_manager"],
         "summary": "Reset Model Working Memory Calibration",
-        "description": "Remove a model's calibration runs with all their measurements, and every measurement of the model taken in\nother runs (a VAE measured inside a transformer's run, say), from one device class.",
+        "description": "Remove a model's calibration runs with all their measurements, and every measurement of the model taken in\nother runs (a VAE measured inside a transformer's run, say), from one device class. Removed runs of an attempt\nstill count toward its runs; an attempt that was running is stopped for good, its later steps included.",
         "operationId": "reset_model_working_memory_calibration",
         "security": [
           {
@@ -5997,7 +6178,7 @@
       "delete": {
         "tags": ["model_manager"],
         "summary": "Reset Working Memory Calibration",
-        "description": "Remove every calibration run and measurement of one device class.",
+        "description": "Remove every calibration run and measurement of one device class. An attempt that was running is stopped\nfor good: its later steps never count either.",
         "operationId": "reset_working_memory_calibration",
         "security": [
           {
@@ -13827,7 +14008,7 @@
       "put": {
         "tags": ["queue"],
         "summary": "Retry Items By Id",
-        "description": "Retries the given queue items. Users can only retry their own items unless they are an admin.",
+        "description": "Retries the given queue items. Users can only retry their own items unless they are an admin.\n\nA calibration item's retry is recorded in the calibration store as it commits. When that store cannot be written,\nthe request retries nothing, also its items that are no calibration's (503); retry again once it can.",
         "operationId": "retry_items_by_id",
         "security": [
           {
@@ -13872,6 +14053,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "The items include a working-memory calibration's, and its store cannot be written now (unwritable root, lock timeout): no item is retried, the request's other items included"
           },
           "422": {
             "description": "Validation Error",
@@ -20743,6 +20927,12 @@
             "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
           },
           {
@@ -20972,6 +21162,9 @@
           },
           {
             "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
           },
           {
             "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
@@ -25363,6 +25556,52 @@
         "title": "CalculateImageTilesOutput",
         "type": "object"
       },
+      "CalibrationCompiledModel": {
+        "properties": {
+          "base": {
+            "type": "string",
+            "title": "Base"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format",
+            "description": "The model's format; null for a record without one"
+          },
+          "variant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant",
+            "description": "The model's variant; null for a record without one"
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The model's hash, as the graph's identifier names it"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["base", "type", "format", "variant", "hash"],
+        "title": "CalibrationCompiledModel",
+        "description": "A model a calibration request's graph names, as the record the client compiled the graph against has it. Every\nfact is required: format and variant are null for a record without one, the rest is never null."
+      },
       "CalibrationDeviceClass": {
         "properties": {
           "id": {
@@ -29335,6 +29574,13 @@
                 "type": "null"
               }
             ]
+          },
+          "control_architecture": {
+            "type": "string",
+            "enum": ["fun_union", "instantx_union"],
+            "title": "Control Architecture",
+            "description": "Which Qwen-Image ControlNet design the file holds: 'fun_union' (alibaba-pai Fun-ControlNet-Union, control and inpainting) or 'instantx_union' (InstantX ControlNet-Union, control only). Records written before the field existed are Fun-ControlNets.",
+            "default": "fun_union"
           }
         },
         "type": "object",
@@ -29354,10 +29600,11 @@
           "type",
           "format",
           "base",
-          "default_settings"
+          "default_settings",
+          "control_architecture"
         ],
         "title": "ControlNet_Checkpoint_QwenImage_Config",
-        "description": "Model config for Qwen-Image Fun-ControlNet adapter models (Safetensors checkpoint).\n\nQwen-Image Fun-ControlNets are standalone adapters containing only the control branch\n(control_img_in, control_blocks) that extends the base Qwen-Image transformer with spatial\nconditioning capabilities.\n\nSupports: Canny, HED, Depth, Pose, MLSD, Scribble, Gray, inpainting.\nRecommended control_context_scale: 0.70-0.95."
+        "description": "Model config for Qwen-Image ControlNet models (Safetensors checkpoint), in either of two designs.\n\nalibaba-pai's Fun-ControlNet-Union is a control branch (control_img_in, control_blocks) hooked into the base\nQwen-Image transformer. Supports Canny, HED, Depth, Pose, MLSD, Scribble, Gray and inpainting; recommended\ncontrol_context_scale 0.70-0.95.\n\nInstantX's ControlNet-Union is a five-block copy of the transformer (controlnet_x_embedder, transformer_blocks,\ncontrolnet_blocks) whose block outputs are added to the base image stream. Supports Canny, Soft Edge, Depth and\nPose; recommended control_context_scale 0.80-1.00 on the original Qwen Image it was trained on, about 1.5-2.0 on\nQwen Image 2512. It takes no inpainting condition."
       },
       "ControlNet_Checkpoint_SD1_Config": {
         "properties": {
@@ -39348,7 +39595,7 @@
         "category": "latents",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Decode a FLUX.2 Klein latent with the PiD pixel-diffusion decoder.\n\nProduces a 4x super-resolved image in a single pass. The stored FLUX.2 latent\nis patchified from ``(B, 32, H/8, W/8)`` to the ``(B, 128, H/16, W/16)`` layout\nPiD's FLUX.2 backbone expects, then decoded directly (it is already in raw,\nBN-denormalized space; see the module docstring).",
+        "description": "Decode a FLUX.2 Klein latent with the PiD pixel-diffusion decoder.\n\nProduces a 4x super-resolved image in a single pass. The stored FLUX.2 latent\nis patchified from ``(B, 32, H/8, W/8)`` to ``(B, 128, H/16, W/16)`` and\nBN-normalized with the VAE's statistics, the form PiD's FLUX.2 backbone expects.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -39481,11 +39728,10 @@
               }
             ],
             "default": null,
-            "description": "FLUX.2 VAE, used only to read a scalar scaling_factor / shift_factor if one exists. FLUX.2 normalises latents with BatchNorm (already inverted in flux2_denoise), so this is normally an identity transform and the input can be left unconnected.",
+            "description": "FLUX.2 VAE. Its BatchNorm statistics normalize the latent the way PiD was trained on.",
             "field_kind": "input",
             "input": "connection",
-            "orig_default": null,
-            "orig_required": false,
+            "orig_required": true,
             "title": "VAE"
           },
           "num_inference_steps": {
@@ -39522,7 +39768,7 @@
         "tags": ["latents", "image", "pid", "flux2", "klein", "upscale"],
         "title": "Latents to Image - FLUX.2 + PiD (4x SR)",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -42035,7 +42281,7 @@
         "category": "latents",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Decode a FLUX latent with the PiD pixel-diffusion decoder.\n\nThe FLUX AutoEncoder usually denormalises the stored latent internally\nbefore its conv decoder runs (`z / scale + shift`); we apply the same\ntransform manually here so PiD sees the raw latent it was trained on.",
+        "description": "Decode a FLUX latent with the PiD pixel-diffusion decoder.\n\nProduces a 4x super-resolved image in a single pass. PiD takes the stored,\nFLUX-normalized latent as is.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -42192,7 +42438,7 @@
         "tags": ["latents", "image", "pid", "flux", "upscale"],
         "title": "Latents to Image - FLUX + PiD (4x SR)",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -44595,6 +44841,155 @@
         ],
         "title": "Gemma2Encoder_Gemma2Encoder_Config",
         "description": "Standalone Gemma-2 causal LM directory used as a text encoder by PiD.\n\nExpected directory layout (HuggingFace `from_pretrained`-compatible)::\n\n    <model_root>/\n        config.json             # architectures: [\"Gemma2ForCausalLM\"]\n        tokenizer.json\n        tokenizer_config.json\n        model-*.safetensors     # or model.safetensors / *.bin"
+      },
+      "Gemma4Encoder_GGUF_LTX2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "ltx-2",
+            "title": "Base",
+            "default": "ltx-2"
+          },
+          "type": {
+            "type": "string",
+            "const": "gemma4_encoder",
+            "title": "Type",
+            "default": "gemma4_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format",
+          "cpu_only"
+        ],
+        "title": "Gemma4Encoder_GGUF_LTX2_Config",
+        "description": "The LTX-2.5 Gemma-4-12B text encoder as one GGUF file, with its tokenizer and config packed in."
       },
       "Gemma4Encoder_Gemma4Encoder_LTX2_Config": {
         "properties": {
@@ -75047,7 +75442,7 @@
           "generation"
         ],
         "title": "Main_Checkpoint_LTX2_Config",
-        "description": "An LTX-2 single-file transformer (safetensors) in the official key layout.\n\nCovers the bf16, Comfy ``int8_tensorwise``(+convrot) and ``nvfp4`` releases; the quantization\nscheme is read from the file's own markers by the loader, not recorded here. The file may hold\nonly the transformer (the 2.5 releases) or bundle other components beside it (earlier\ngenerations) -- either way everything else comes from an installed LTX-2 component folder.\n\nDev and Distilled transformers are key-for-key identical, so the FILENAME is the variant\nclassifier and ``variant`` is the user-correctable override for renamed files. A misclassified\nvariant runs but samples with the wrong recipe (guided schedule vs fixed distilled sigmas)."
+        "description": "An LTX-2 single-file transformer (safetensors) in the official key layout.\n\nCovers the bf16, Comfy ``int8_tensorwise``(+convrot) and ``nvfp4`` releases; the quantization\nscheme is read from the file's own markers by the loader, not recorded here. The file may hold\nonly the transformer (the 2.5 releases) or bundle other components beside it (earlier\ngenerations) -- either way everything else comes from an installed LTX-2 component folder. Dev and\nDistilled are told apart by the filename."
       },
       "Main_Checkpoint_MiniMaxH3_Config": {
         "properties": {
@@ -79731,6 +80126,176 @@
         "title": "Main_Diffusers_ZImage_Config",
         "description": "Model config for Z-Image diffusers models (Z-Image-Turbo, Z-Image-Base)."
       },
+      "Main_GGUF_Anima_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "anima",
+            "title": "Base",
+            "default": "anima"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/AnimaVariantType",
+            "description": "Which text encoders the model is conditioned on."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant"
+        ],
+        "title": "Main_GGUF_Anima_Config",
+        "description": "Model config for GGUF-quantized Anima transformers (ComfyUI-GGUF, stable-diffusion.cpp).\n\nRecognized by its keys under any of Anima's wrappers, never by the header: some converters write none.\nUnlike the checkpoint config it checks every tensor's shape against the transformer the loader builds,\nbecause broken conversions are published: one quantized the bf16 weights' bytes, doubling every\nquantized tensor's columns, and would otherwise install and fail at the first render."
+      },
       "Main_GGUF_ErnieImage_Config": {
         "properties": {
           "key": {
@@ -80574,6 +81139,181 @@
         ],
         "title": "Main_GGUF_Krea2_Config",
         "description": "Model config for GGUF-quantized Krea-2 transformer models (single-file)."
+      },
+      "Main_GGUF_LTX2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "ltx-2",
+            "title": "Base",
+            "default": "ltx-2"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/LTX2VariantType"
+          },
+          "generation": {
+            "type": "string",
+            "title": "Generation",
+            "description": "The LTX-2 generation the transformer belongs to, e.g. '2.5'."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant",
+          "generation"
+        ],
+        "title": "Main_GGUF_LTX2_Config",
+        "description": "An LTX-2 single-file transformer in GGUF, in the official key layout.\n\nThe community builds are conversions of the official single files: the transformer's keys, bare or\nunder ``model.diffusion_model.``, with the two text connectors bundled beside them -- which, as for\nthe official files, the component folder supplies instead. Their ``general.architecture`` is ``ltxv``\nfor every generation, and some carry another model's metadata outright, so the keys identify them,\nexactly as they do the safetensors files. Some keep the official ``model_version`` string and some\ndrop it; the structure dates those. Dev and Distilled are told apart by the filename."
       },
       "Main_GGUF_QwenImage21_Config": {
         "properties": {
@@ -89028,6 +89768,12 @@
                 "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
               },
               {
@@ -89257,6 +90003,9 @@
               },
               {
                 "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
               },
               {
                 "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
@@ -89789,6 +90538,12 @@
                     "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                   },
                   {
@@ -90018,6 +90773,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
                   },
                   {
                     "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
@@ -90480,6 +91238,12 @@
                 "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
               },
               {
@@ -90709,6 +91473,9 @@
               },
               {
                 "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
               },
               {
                 "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
@@ -90982,6 +91749,12 @@
                 "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
               },
               {
@@ -91211,6 +91984,9 @@
               },
               {
                 "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
               },
               {
                 "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
@@ -91977,6 +92753,12 @@
                   "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
+                },
+                {
                   "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                 },
                 {
@@ -92206,6 +92988,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
@@ -95392,7 +96177,7 @@
               }
             ],
             "default": null,
-            "description": "The FLUX.1 VAE, which Z-Image also uses. PiD upscale runs the FLUX backbone and undoes FLUX VAE scaling, so a VAE of another family is not accepted.",
+            "description": "The FLUX.1 VAE, which Z-Image also uses. PiD's FLUX decoder was trained on latents normalized with its constants, so a VAE of another family is not accepted.",
             "field_kind": "input",
             "input": "connection",
             "orig_required": true
@@ -95474,7 +96259,7 @@
         "tags": ["upscale", "image", "pid", "super-resolution", "flux"],
         "title": "PiD Upscale (4x) - FLUX VAE",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -99297,7 +100082,7 @@
         "type": "object"
       },
       "QwenImageControlField": {
-        "description": "Qwen Image Fun-ControlNet conditioning: a control image, an inpaint image with its mask, or both.",
+        "description": "Qwen Image ControlNet conditioning: a control image, an inpaint image with its mask, or both (the InstantX\nControlNet takes the control image alone).",
         "properties": {
           "image_name": {
             "anyOf": [
@@ -99344,7 +100129,7 @@
           },
           "control_context_scale": {
             "default": 0.85,
-            "description": "Strength of the control signal. Recommended range: 0.70-0.95.",
+            "description": "Strength of the control signal. Recommended range: 0.70-0.95 for the Fun-ControlNet-Union; for the InstantX ControlNet-Union 0.80-1.00 on the original Qwen Image, about 1.5-2.0 on Qwen Image 2512.",
             "maximum": 2.0,
             "minimum": 0.0,
             "title": "Control Context Scale",
@@ -99389,7 +100174,7 @@
         "category": "conditioning",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Configure the Qwen Image Fun-ControlNet-Union for spatial control, inpainting, or both.\n\nTakes a preprocessed control image (Canny, HED, depth, pose, MLSD, ...) and/or an image to inpaint with its mask\n(white is regenerated), plus the Qwen Image ControlNet model. Recommended control scale: 0.70-0.95.",
+        "description": "Configure a Qwen Image ControlNet for spatial control, inpainting, or both.\n\nTakes a preprocessed control image (Canny, HED, depth, pose, MLSD, ...) and/or an image to inpaint with its mask\n(white is regenerated), plus the Qwen Image ControlNet model. The Fun-ControlNet-Union takes either or both\n(recommended scale 0.70-0.95); the InstantX ControlNet-Union takes the control image only (0.80-1.00 on the\noriginal Qwen Image, about 1.5-2.0 on Qwen Image 2512).",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -99484,7 +100269,7 @@
           },
           "control_context_scale": {
             "default": 0.85,
-            "description": "Strength of the control signal. Recommended range: 0.70-0.95.",
+            "description": "Strength of the control signal. Recommended range: 0.70-0.95 for the Fun-ControlNet-Union; for the InstantX ControlNet-Union 0.80-1.00 on the original Qwen Image, about 1.5-2.0 on Qwen Image 2512.",
             "field_kind": "input",
             "input": "any",
             "maximum": 2.0,
@@ -100566,7 +101351,7 @@
         "category": "latents",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Decode a Qwen-Image latent with the PiD pixel-diffusion decoder.\n\nProduces a 4x super-resolved image in a single pass. The 5D Qwen latent is\nreduced to 2D and per-channel denormalized (``z * std + mean``) before PiD.",
+        "description": "Decode a Qwen-Image latent with the PiD pixel-diffusion decoder.\n\nProduces a 4x super-resolved image in a single pass. The 5D Qwen latent is\nreduced to 2D and otherwise handed to PiD in its normalized form.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -100699,7 +101484,7 @@
               }
             ],
             "default": null,
-            "description": "Qwen-Image VAE, used to read the per-channel latents_mean / latents_std. If omitted, the diffusers default Qwen-Image constants are used.",
+            "description": "Not used: PiD decodes the normalized latent directly. Kept so existing workflows that connect a VAE stay valid.",
             "field_kind": "input",
             "input": "connection",
             "orig_default": null,
@@ -100740,7 +101525,7 @@
         "tags": ["latents", "image", "pid", "qwen-image", "upscale"],
         "title": "Latents to Image - Qwen-Image + PiD (4x SR)",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -103126,7 +103911,7 @@
         "tags": ["latents", "image", "pid", "sd3", "upscale"],
         "title": "Latents to Image - SD3 + PiD (4x SR)",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -103734,7 +104519,7 @@
         "category": "latents",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Decode an SDXL latent with the PiD pixel-diffusion decoder.\n\nProduces a 4x super-resolved image in a single pass. The SDXL latent is\n4-channel at an 8x down-factor, so it is denormalized (``z / scaling_factor``)\nand handed straight to PiD - no packing needed.",
+        "description": "Decode an SDXL latent with the PiD pixel-diffusion decoder.\n\nProduces a 4x super-resolved image in a single pass. The stored, scaled SDXL\nlatent goes to PiD as is.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -103867,7 +104652,7 @@
               }
             ],
             "default": null,
-            "description": "SDXL VAE, used to read scaling_factor / shift_factor. If omitted, the SDXL fallback constants (0.13025 / 0.0) are used.",
+            "description": "Not used: PiD decodes the normalized latent directly. Kept so existing workflows that connect a VAE stay valid.",
             "field_kind": "input",
             "input": "connection",
             "orig_default": null,
@@ -103908,7 +104693,7 @@
         "tags": ["latents", "image", "pid", "sdxl", "upscale"],
         "title": "Latents to Image - SDXL + PiD (4x SR)",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -120268,6 +121053,94 @@
         ],
         "title": "WorkflowWithoutID"
       },
+      "WorkingMemoryCalibrationCase": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique within the plan; becomes the graph id"
+          },
+          "mode": {
+            "type": "string",
+            "const": "txt2img",
+            "title": "Mode",
+            "default": "txt2img"
+          },
+          "model_key": {
+            "type": "string",
+            "title": "Model Key",
+            "description": "The main model the case generates with"
+          },
+          "components": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Components",
+            "description": "Component picks by Generate slot key; `vae` when a standalone VAE is calibrated or a GPU VAE must be picked over one that runs on the CPU"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height"
+          },
+          "steps": {
+            "type": "integer",
+            "title": "Steps",
+            "description": "The fewest steps that still run the whole pipeline"
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed"
+          },
+          "positive_prompt": {
+            "type": "string",
+            "title": "Positive Prompt"
+          },
+          "negative_prompt": {
+            "type": "string",
+            "title": "Negative Prompt"
+          },
+          "settings": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Settings",
+            "description": "Generate settings overrides: `vaePrecision` (fp16 or fp32) where the decode node casts the VAE"
+          },
+          "estimator": {
+            "type": "string",
+            "title": "Estimator",
+            "description": "The working-memory estimator of the operation the case measures"
+          },
+          "line": {
+            "type": "string",
+            "title": "Line",
+            "description": "The estimator line the case measures, `<operation>_<dtype>`"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "model_key",
+          "components",
+          "width",
+          "height",
+          "steps",
+          "seed",
+          "positive_prompt",
+          "negative_prompt",
+          "settings",
+          "estimator",
+          "line"
+        ],
+        "title": "WorkingMemoryCalibrationCase",
+        "description": "One generation a calibration plan runs, in the fields of the client's graph-export case (mode txt2img)."
+      },
       "WorkingMemoryCalibrationDeviceClass": {
         "properties": {
           "device_class_id": {
@@ -120305,6 +121178,30 @@
             "type": "boolean",
             "title": "Is Current"
           },
+          "measurement_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measurement Method",
+            "description": "Where a window on a GPU of this class here reads its driver figure (`counters.Method`): torch-only when this platform has no driver reader; null when no generation device of this class is present"
+          },
+          "measurement_verified": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measurement Verified",
+            "description": "Whether that method was checked against real hardware on this backend (`counters.VERIFIED_METHODS`); null when no generation device of this class is present"
+          },
           "runs": {
             "items": {
               "$ref": "#/components/schemas/WorkingMemoryCalibrationRunSummary"
@@ -120334,11 +121231,28 @@
           "usable",
           "problem",
           "is_current",
+          "measurement_method",
+          "measurement_verified",
           "runs",
           "point_counts",
           "envs"
         ],
         "title": "WorkingMemoryCalibrationDeviceClass"
+      },
+      "WorkingMemoryCalibrationDeviceClassRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": ["id", "name"],
+        "title": "WorkingMemoryCalibrationDeviceClassRef"
       },
       "WorkingMemoryCalibrationEnvironment": {
         "properties": {
@@ -120389,7 +121303,7 @@
               }
             ],
             "title": "Soft Matches Current",
-            "description": "Whether the current environment has the same soft facts; null off the current device class"
+            "description": "Whether the current environment has the soft facts first recorded with this environment (`soft`); a later run's own soft facts are not compared here. Null off the current device class"
           },
           "point_count": {
             "type": "integer",
@@ -120399,6 +121313,565 @@
         "type": "object",
         "required": ["id", "hard", "soft", "hard_matches_current", "soft_matches_current", "point_count"],
         "title": "WorkingMemoryCalibrationEnvironment"
+      },
+      "WorkingMemoryCalibrationLineContributor": {
+        "properties": {
+          "model_key": {
+            "type": "string",
+            "title": "Model Key"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "The model's name; null when it is no longer installed"
+          },
+          "windows": {
+            "type": "integer",
+            "title": "Windows",
+            "description": "Its counted windows on the line: valid, fit-eligible and not fragmented"
+          }
+        },
+        "type": "object",
+        "required": ["model_key", "name", "windows"],
+        "title": "WorkingMemoryCalibrationLineContributor",
+        "description": "A model whose windows feed a line: the model a run calibrated, or the model a window measured."
+      },
+      "WorkingMemoryCalibrationLineSize": {
+        "properties": {
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height"
+          },
+          "pixels": {
+            "type": "integer",
+            "title": "Pixels"
+          },
+          "windows": {
+            "type": "integer",
+            "title": "Windows",
+            "description": "Counted: the windows at this size that feed the line, valid, fit-eligible and not fragmented, of every model in the environment; those of a calibration run still running are counted, and join the fit once it finished. Not counted: the valid windows measured at this size"
+          },
+          "measured_bytes": {
+            "type": "integer",
+            "title": "Measured Bytes",
+            "description": "The largest demand of those windows"
+          },
+          "counted": {
+            "type": "boolean",
+            "title": "Counted",
+            "description": "Whether windows of this size feed the user line"
+          },
+          "excluded_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["fragmented", "partial_residency", "aborted_attempt"]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded Reason",
+            "description": "Why a size is not counted: fragmented, its windows measured the allocator's fragmentation (`backend/working_memory/fragmentation.py`); partial_residency, the model was not fully on the device; aborted_attempt, its windows come from aborted attempts (Stop, a queue clear, a failed submission, a model changed after the calibration was planned), which never feed a line. Null for a counted size"
+          },
+          "shipped_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shipped Bytes",
+            "description": "The shipped estimate at this size, priced with the line's estimator where one of its windows measured the size, otherwise with that of the largest window; null when the platform of the environment is unknown"
+          },
+          "user_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Bytes",
+            "description": "The estimate with the user line applied, as estimates read it (without the windows of runs still running); null without a user line"
+          }
+        },
+        "type": "object",
+        "required": [
+          "width",
+          "height",
+          "pixels",
+          "windows",
+          "measured_bytes",
+          "counted",
+          "excluded_reason",
+          "shipped_bytes",
+          "user_bytes"
+        ],
+        "title": "WorkingMemoryCalibrationLineSize"
+      },
+      "WorkingMemoryCalibrationModelLine": {
+        "properties": {
+          "estimator": {
+            "type": "string",
+            "title": "Estimator"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "line": {
+            "type": "string",
+            "title": "Line",
+            "description": "`<operation>_<dtype>`"
+          },
+          "carrier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Carrier",
+            "description": "The estimator whose shipped entry carries the line on this platform"
+          },
+          "env_id": {
+            "type": "string",
+            "title": "Env Id"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["in_use", "stale", "unusable", "insufficient"],
+            "title": "State",
+            "description": "in_use: the user line applies; stale: it applies, but the soft facts of the newest finished run that contributed a window differ from the current ones; unusable: hard facts differ from the current environment (or no GPU of this class generates here), so shipped values apply; insufficient: the windows of finished, complete attempts cannot fit a line (yet); `problem` says why"
+          },
+          "changed_facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Changed Facts",
+            "description": "The soft facts that changed (stale) or the hard facts that differ (unusable)"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem",
+            "description": "Why no line could be fitted, when it could not"
+          },
+          "measured_range": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkingMemoryCalibrationPixelRange"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The sizes the user line was fitted on, over every model's windows of the line from finished runs"
+          },
+          "slope_bytes_per_pixel": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slope Bytes Per Pixel"
+          },
+          "base_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Bytes"
+          },
+          "sizes": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationLineSize"
+            },
+            "type": "array",
+            "title": "Sizes"
+          },
+          "own_windows": {
+            "type": "integer",
+            "title": "Own Windows",
+            "description": "The model's own windows that feed the line; 0 when only other models' do"
+          },
+          "measured_by": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationLineContributor"
+            },
+            "type": "array",
+            "title": "Measured By",
+            "description": "Every model whose windows feed the line, this one included when it has any; by name, then key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "estimator",
+          "version",
+          "line",
+          "carrier",
+          "env_id",
+          "state",
+          "changed_facts",
+          "problem",
+          "measured_range",
+          "slope_bytes_per_pixel",
+          "base_bytes",
+          "sizes",
+          "own_windows",
+          "measured_by"
+        ],
+        "title": "WorkingMemoryCalibrationModelLine",
+        "description": "One estimator line in one environment: one the model's windows measured, or, in the current environment, one\nthe model's decode prices on that other models' windows measured."
+      },
+      "WorkingMemoryCalibrationModelRun": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["running", "completed", "failed", "partial", "canceled"],
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "model_changed"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code",
+            "description": "Why the failed item failed, where a client acts on it (`CalibrationErrorCode`): model_changed, a model its graph names changed or was removed after the calibration was planned. Null otherwise"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "point_count": {
+            "type": "integer",
+            "title": "Point Count"
+          },
+          "attempt_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id",
+            "description": "The client's attempt the run belongs to; null when none was sent"
+          },
+          "attempt_steps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Steps",
+            "description": "How many runs the run's attempt planned; null without an attempt, and for a run stored before it was sent"
+          },
+          "held_back": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["running", "aborted_attempt"]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Held Back",
+            "description": "Why no window of the run feeds a fit: running, it or a run of its attempt is still in the queue, and its windows join once all have finished; aborted_attempt, its attempt was aborted, and its windows never feed one: an item of it ended canceled (Stop, a queue clear) or failed because a model changed after the calibration was planned (model_changed), another calibration ran on the GPU between its runs, the attempt ended before it queued all attempt_steps runs (Stop, a failed submission), or a reset removed a run of it while it ran. Null when its windows are judged like any finished run's"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "status",
+          "error",
+          "error_code",
+          "created_at",
+          "point_count",
+          "attempt_id",
+          "attempt_steps",
+          "held_back"
+        ],
+        "title": "WorkingMemoryCalibrationModelRun"
+      },
+      "WorkingMemoryCalibrationModelSummary": {
+        "properties": {
+          "model_key": {
+            "type": "string",
+            "title": "Model Key"
+          },
+          "device_class_id": {
+            "type": "string",
+            "title": "Device Class Id"
+          },
+          "usable": {
+            "type": "boolean",
+            "title": "Usable"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem",
+            "description": "Why the store file is unusable"
+          },
+          "current_env_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Env Id",
+            "description": "Null when no generation device of this class is present"
+          },
+          "measurement_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measurement Method",
+            "description": "Where a window on a GPU of this class here reads its driver figure (`counters.Method`): torch-only when this platform has no driver reader; null when no generation device of this class is present"
+          },
+          "measurement_verified": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measurement Verified",
+            "description": "Whether that method was checked against real hardware on this backend (`counters.VERIFIED_METHODS`); null when no generation device of this class is present"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationModelLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "excluded_windows": {
+            "type": "integer",
+            "title": "Excluded Windows",
+            "description": "The model's windows that feed no line: invalid, not fit-eligible, fragmented, of an aborted attempt, tiled, batched, upcast, a VAE outside the AutoencoderKL family, no demand, or of an estimator a user calibration does not move, such as the Z-Image denoise. Of these, only the not fit-eligible, the fragmented and the aborted attempt's windows show among a line's sizes, as a size that is not counted where no counted window measured it"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationModelRun"
+            },
+            "type": "array",
+            "title": "Runs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_key",
+          "device_class_id",
+          "usable",
+          "problem",
+          "current_env_id",
+          "measurement_method",
+          "measurement_verified",
+          "lines",
+          "excluded_windows",
+          "runs"
+        ],
+        "title": "WorkingMemoryCalibrationModelSummary",
+        "description": "What one model's calibration runs measured on one device class, and what estimates make of it."
+      },
+      "WorkingMemoryCalibrationPixelRange": {
+        "properties": {
+          "min_pixels": {
+            "type": "integer",
+            "title": "Min Pixels"
+          },
+          "max_pixels": {
+            "type": "integer",
+            "title": "Max Pixels"
+          }
+        },
+        "type": "object",
+        "required": ["min_pixels", "max_pixels"],
+        "title": "WorkingMemoryCalibrationPixelRange"
+      },
+      "WorkingMemoryCalibrationPlan": {
+        "properties": {
+          "model_key": {
+            "type": "string",
+            "title": "Model Key"
+          },
+          "supported": {
+            "type": "boolean",
+            "title": "Supported"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why the model cannot be calibrated here, when it cannot"
+          },
+          "device_class": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkingMemoryCalibrationDeviceClassRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The class of the GPU the cases run on; null without exactly one GPU generation device"
+          },
+          "calibrated_through": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibrated Through",
+            "description": "For a standalone VAE, the installed main model the cases generate with"
+          },
+          "estimators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Estimators",
+            "description": "The working-memory estimators of the model's covered operations"
+          },
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationCase"
+            },
+            "type": "array",
+            "title": "Cases"
+          },
+          "repetitions": {
+            "$ref": "#/components/schemas/WorkingMemoryCalibrationRepetitions"
+          },
+          "estimated_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Seconds",
+            "description": "A rough order of magnitude for all cases and repetitions, model load included; not a measurement"
+          },
+          "shared_with": {
+            "items": {
+              "$ref": "#/components/schemas/WorkingMemoryCalibrationSharedModel"
+            },
+            "type": "array",
+            "title": "Shared With",
+            "description": "Other installed models whose operations price with the same lines on this GPU, so a calibration changes their estimates too"
+          },
+          "not_covered": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Not Covered",
+            "description": "Operations of the model a calibration does not measure, and why"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model_key",
+          "supported",
+          "reason",
+          "device_class",
+          "calibrated_through",
+          "estimators",
+          "cases",
+          "repetitions",
+          "estimated_seconds",
+          "shared_with",
+          "not_covered"
+        ],
+        "title": "WorkingMemoryCalibrationPlan",
+        "description": "What calibrating one model on this machine's GPU runs, or why it cannot."
       },
       "WorkingMemoryCalibrationPointCount": {
         "properties": {
@@ -120427,11 +121900,35 @@
         "required": ["estimator", "version", "valid", "fit_eligible", "count"],
         "title": "WorkingMemoryCalibrationPointCount"
       },
+      "WorkingMemoryCalibrationRepetitions": {
+        "properties": {
+          "warm_up": {
+            "type": "integer",
+            "title": "Warm Up",
+            "description": "Runs of each case before the measured ones; their windows count too"
+          },
+          "measured": {
+            "type": "integer",
+            "title": "Measured"
+          }
+        },
+        "type": "object",
+        "required": ["warm_up", "measured"],
+        "title": "WorkingMemoryCalibrationRepetitions"
+      },
       "WorkingMemoryCalibrationRequest": {
         "properties": {
           "graph": {
             "$ref": "#/components/schemas/Graph",
             "description": "The graph to measure"
+          },
+          "graph_models": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CalibrationCompiledModel"
+            },
+            "type": "object",
+            "title": "Graph Models",
+            "description": "Per model key, every model the graph names (in a node's field, inside one, or in a mapping that reads as a model identifier), as the client compiled the graph against its record. Exactly the graph's models are named (422 otherwise). The run's creation compares each with the model's record now, and refuses the run with 409 `model_changed` when any differs, so send the records the graph was compiled from, never ones read again before posting. The run records them, and admission compares them again when its item starts."
           },
           "data": {
             "anyOf": [
@@ -120464,13 +121961,42 @@
             ],
             "title": "Idempotency Key",
             "description": "A caller-owned retry key. Repeating the request with it returns the run it created and enqueues nothing new; once a reset removed that run, the repeat is refused. Reusing the key for another request (another model, graph or batch data) is rejected while the queue keeps the key's enqueue receipt."
+          },
+          "attempt_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id",
+            "description": "A client-generated id of the calibration attempt the run belongs to (1-64 letters, digits, '_', '-', '.', ':'), so a client that enqueues one run per step can group them. Sent together with attempt_steps, never alone (422). No window of an attempt feeds an estimate until it queued attempt_steps runs and every one has finished; a run a reset removed still counts as queued, without its measurements. An aborted attempt never feeds one: an item of it ended canceled (Stop, a queue clear) or failed because a model changed after the calibration was planned (error_code model_changed), it ended before it queued all its runs (Stop, a failed submission), another calibration ran on the GPU between its runs, or a reset removed a run of it while it ran. An item that failed ends that step, not the attempt. The run id derives from the idempotency_key, the request and the attempt, so an idempotency_key names one run: repeating the request under the same attempt returns that run, and reusing the key under another attempt is refused with 409 while the queue keeps the key's receipt. Make each key unique per run of an attempt."
+          },
+          "attempt_steps": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 256.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Steps",
+            "description": "How many runs the attempt (attempt_id) queues, 1-256. Sent together with attempt_id, never alone (422), and the same by every run of the attempt: a run that sends another number than the attempt's runs already stored is refused with 409. The attempt's windows feed estimates only once it queued that many runs, those a reset removed since included, and all of them have finished with no item canceled."
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["graph"],
+        "required": ["graph", "graph_models"],
         "title": "WorkingMemoryCalibrationRequest",
-        "description": "The batch a calibration run enqueues, built by the client. The server sets origin, destination, runs and the\ngraph's id, and turns the node cache off."
+        "description": "The batch a calibration run enqueues, built by the client. The server sets origin, destination, runs and the\ngraph's id, turns the node cache off, and makes every node's images intermediates on no board: never in the\ngallery, and removed by clearing intermediates."
       },
       "WorkingMemoryCalibrationResetResult": {
         "properties": {
@@ -120562,6 +122088,19 @@
             "title": "Error",
             "description": "The error of a failed item, when the run failed"
           },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "model_changed"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code",
+            "description": "Why the failed item failed, where a client acts on it (`CalibrationErrorCode`): model_changed, a model its graph names changed or was removed after the calibration was planned. Null otherwise"
+          },
           "item_ids": {
             "items": {
               "type": "integer"
@@ -120573,6 +122112,30 @@
           "point_count": {
             "type": "integer",
             "title": "Point Count"
+          },
+          "attempt_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Id",
+            "description": "The client's attempt the run belongs to; null when none was sent"
+          },
+          "attempt_steps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt Steps",
+            "description": "How many runs the run's attempt planned; null without an attempt, and for a run stored before it was sent"
           }
         },
         "type": "object",
@@ -120585,10 +122148,44 @@
           "env_id",
           "status",
           "error",
+          "error_code",
           "item_ids",
-          "point_count"
+          "point_count",
+          "attempt_id",
+          "attempt_steps"
         ],
         "title": "WorkingMemoryCalibrationRunSummary"
+      },
+      "WorkingMemoryCalibrationSharedModel": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "base": {
+            "type": "string",
+            "title": "Base"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Lines",
+            "description": "The lines it shares with the planned model, `<operation>_<dtype>`"
+          }
+        },
+        "type": "object",
+        "required": ["key", "name", "base", "type", "lines"],
+        "title": "WorkingMemoryCalibrationSharedModel"
       },
       "WorkingMemoryCalibrationStatus": {
         "properties": {
@@ -122356,7 +123953,7 @@
               }
             ],
             "default": null,
-            "description": "Z-Image VAE used to read scaling_factor / shift_factor. If omitted, the FLUX.1 fallback constants (0.3611 / 0.1159) are used.",
+            "description": "Not used: PiD decodes the normalized latent directly. Kept so existing workflows that connect a VAE stay valid.",
             "field_kind": "input",
             "input": "connection",
             "orig_default": null,
@@ -122397,7 +123994,7 @@
         "tags": ["latents", "image", "pid", "z-image", "upscale"],
         "title": "Latents to Image - Z-Image + PiD (4x SR)",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }

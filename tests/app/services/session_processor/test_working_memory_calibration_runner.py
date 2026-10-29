@@ -19,19 +19,23 @@ from unittest.mock import MagicMock
 
 import pytest
 import torch
+from PIL import Image
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
-from invokeai.app.invocations.fields import InputField
-from invokeai.app.invocations.primitives import IntegerOutput
+from invokeai.app.invocations.fields import BoardField, InputField, WithBoard
+from invokeai.app.invocations.primitives import ImageOutput, IntegerOutput
+from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.names.names_default import SimpleNameService
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.session_processor.session_processor_default import DefaultSessionRunner
-from invokeai.app.services.session_queue.session_queue_common import Batch, SessionQueueItem
+from invokeai.app.services.session_queue.session_queue_common import Batch, BatchDatum, SessionQueueItem
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.users.users_common import UserCreateRequest, UserUpdateRequest
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
     WorkingMemoryCalibrationRequest,
@@ -40,6 +44,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import (
     WorkingMemoryCalibrationService,
 )
+from invokeai.backend.util.vae_working_memory import VAE_SD_SPEC
 from invokeai.backend.working_memory import probe
 from tests.fixtures.sqlite_database import sqlite_cursor_of
 from tests.fixtures.working_memory_calibration import GPU, GPU_CLASS, OTHER_CLASS, calibration_service, measured_window
@@ -72,6 +77,20 @@ class CalibrationProbeNodeInvocation(BaseInvocation):
         return IntegerOutput(value=1)
 
 
+# The images each image node saved.
+_SAVED: list[str] = []
+
+
+@invocation("test_working_memory_calibration_image_node", version="1.0.0")
+class CalibrationImageNodeInvocation(BaseInvocation, WithBoard):
+    """Saves an image, as a decode node does."""
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.images.save(image=Image.new("RGB", (8, 8)))
+        _SAVED.append(image.image_name)
+        return ImageOutput.build(image)
+
+
 class _Stats:
     @contextmanager
     def collect_stats(self, invocation, graph_execution_state_id) -> Iterator[None]:
@@ -89,10 +108,12 @@ def _reset_seen() -> Iterator[None]:
     _SEEN.clear()
     _ON_CANCEL.clear()
     _WHILE_RUNNING.clear()
+    _SAVED.clear()
     yield
     _SEEN.clear()
     _ON_CANCEL.clear()
     _WHILE_RUNNING.clear()
+    _SAVED.clear()
 
 
 @pytest.fixture
@@ -110,11 +131,12 @@ def queue(mock_invoker: Invoker, mock_sqlite_database: Database) -> SessionQueue
 
 
 @pytest.fixture
-def service(tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue) -> WorkingMemoryCalibrationService:
+def service(tmp_path: Path, mock_invoker: Invoker, queue: SessionQueue) -> Iterator[WorkingMemoryCalibrationService]:
     service = calibration_service(tmp_path)
     service.start(mock_invoker)
     mock_invoker.services.working_memory_calibration = service
-    return service
+    yield service
+    service.stop(mock_invoker)
 
 
 @pytest.fixture
@@ -134,7 +156,9 @@ def _graph(*behaviours: str) -> Graph:
 
 def _create(service: WorkingMemoryCalibrationService, user_id: str, *behaviours: str) -> tuple[str, int]:
     created = asyncio.run(
-        service.create_run("model-key", WorkingMemoryCalibrationRequest(graph=_graph(*behaviours)), user_id)
+        service.create_run(
+            "model-key", WorkingMemoryCalibrationRequest(graph_models={}, graph=_graph(*behaviours)), user_id
+        )
     )
     return created.run_id, created.item_ids[0]
 
@@ -144,6 +168,17 @@ def _run_next(queue: SessionQueue, runner: DefaultSessionRunner) -> SessionQueue
     assert item is not None
     runner.workflow_call_queue_lifecycle.run_queue_item(item)
     return queue.get_queue_item(item.item_id)
+
+
+@pytest.fixture
+def image_storage(tmp_path: Path, mock_invoker: Invoker) -> None:
+    """Images saved to disk under `tmp_path`, with their records in the test database."""
+    services = mock_invoker.services
+    services.image_files = DiskImageFileStorage(tmp_path / "images")
+    services.names = SimpleNameService()
+    services.urls = LocalUrlService()
+    services.image_files.start(mock_invoker)
+    services.images.start(mock_invoker)
 
 
 def _stored_points(tmp_path: Path) -> list[dict]:
@@ -298,6 +333,150 @@ def test_an_ordinary_item_runs_without_a_probe_scope(
     assert item.status == "completed"
     assert _SEEN == [None]
     assert not (tmp_path / "working_memory").exists()
+
+
+def test_a_calibration_items_images_are_intermediates_on_no_board(
+    service: WorkingMemoryCalibrationService, queue: SessionQueue, runner, mock_invoker: Invoker, image_storage: None
+) -> None:
+    """The client sent the node as a gallery output on a board; the server made it an intermediate on none, which
+    Clear Intermediates removes like any other."""
+    services = mock_invoker.services
+    board = services.board_records.save("Gallery board", "system")
+    graph = Graph()
+    graph.add_node(
+        CalibrationImageNodeInvocation(id="image", board=BoardField(board_id=board.board_id), is_intermediate=False)
+    )
+    asyncio.run(
+        service.create_run("model-key", WorkingMemoryCalibrationRequest(graph_models={}, graph=graph), "system")
+    )
+
+    assert _run_next(queue, runner[0]).status == "completed"
+    [name] = _SAVED
+    assert services.image_records.get(name).is_intermediate is True
+    assert services.board_image_records.get_board_for_image(name) is None
+    assert services.images.get_image_names(is_intermediate=False, is_admin=True).image_names == []
+
+
+_ESTIMATED: list[str] = []
+
+
+@invocation("test_working_memory_estimate_node", version="1.0.0")
+class EstimateNodeInvocation(BaseInvocation):
+    """Prices a 1024px fp16 SD decode on the GPU, as `l2i` does, and records where the estimate's values came from."""
+
+    def invoke(self, context: InvocationContext) -> IntegerOutput:
+        features = {
+            "operation": "decode",
+            "height": 1024,
+            "width": 1024,
+            "tile": None,
+            "dtype": "fp16",
+            "vae_class": "AutoencoderKL",
+            "upcast_weight_bytes": 0,
+            "score_matrix_bytes": 0,
+        }
+        _ESTIMATED.append(VAE_SD_SPEC.estimate(features, GPU).source)
+        return IntegerOutput(value=1)
+
+
+def _line_windows(run_id: str) -> list:
+    """Windows that fit the fp16 decode line the estimate node prices with."""
+    return [
+        measured_window(run_id, estimator="vae.sd", version=VAE_SD_SPEC.version).model_copy(
+            update={
+                "features": {
+                    "operation": "decode",
+                    "height": side,
+                    "width": side,
+                    "tile": None,
+                    "dtype": "fp16",
+                    "upcast_weight_bytes": 0,
+                },
+                "demand_bytes": 900 * side**2 + 400 * 2**20,
+            }
+        )
+        for side in (512, 1024)
+    ]
+
+
+def test_each_item_start_reads_the_calibrations_recorded_before_it(
+    service: WorkingMemoryCalibrationService, queue: SessionQueue, runner
+) -> None:
+    _ESTIMATED.clear()
+    graph = Graph()
+    graph.add_node(EstimateNodeInvocation(id="estimate"))
+    batch = Batch(graph=graph, origin="canvas")
+    run_id, _ = _create(service, "system", "complete")
+
+    asyncio.run(queue.enqueue_batch("default", batch, prepend=False))
+    queue.cancel_queue_item(queue.dequeue().item_id)  # type: ignore[union-attr]  # the calibration item
+    service.record_windows(run_id, _line_windows(run_id))
+    _run_next(queue, runner[0])
+    service.reset_run(run_id)
+    asyncio.run(queue.enqueue_batch("default", batch, prepend=False))
+    _run_next(queue, runner[0])
+
+    first, second = _ESTIMATED
+    assert first.startswith(f"user:{GPU_CLASS.id}:") and second.startswith("shipped:")
+
+
+def test_windows_of_a_run_still_running_join_no_fit_until_it_finished(
+    service: WorkingMemoryCalibrationService, queue: SessionQueue, runner
+) -> None:
+    """Every item start refreshes the fits, yet the windows of a run still running join none: an item that runs
+    between a run's items (an ordinary generation here) is priced without them, and the next one after the run
+    finished with them."""
+    _ESTIMATED.clear()
+    estimate = Graph()
+    estimate.add_node(EstimateNodeInvocation(id="estimate"))
+    two_items = WorkingMemoryCalibrationRequest(
+        graph_models={},
+        graph=_graph("complete"),
+        data=[[BatchDatum(node_path="node0", field_name="behaviour", items=["complete", "complete"])]],
+    )
+    run_id = asyncio.run(service.create_run("model-key", two_items, "system")).run_id
+
+    def generate() -> None:
+        asyncio.run(queue.enqueue_batch("default", Batch(graph=estimate, origin="canvas"), prepend=True))
+        assert _run_next(queue, runner[0]).status == "completed"
+
+    assert _run_next(queue, runner[0]).status == "completed"  # the run's first item
+    service.record_windows(run_id, _line_windows(run_id))
+    generate()
+    assert _run_next(queue, runner[0]).status == "completed"  # its second, which finishes it
+    generate()
+
+    assert [source.split(":")[0] for source in _ESTIMATED] == ["shipped", "user"]
+
+
+def test_the_finished_steps_of_an_attempt_join_no_fit_while_a_later_step_waits(
+    service: WorkingMemoryCalibrationService, queue: SessionQueue, runner
+) -> None:
+    """A client posts every step of an attempt up front, each as its own run: the first step finishing must not price
+    the later, larger steps, so its windows wait for the whole attempt."""
+    _ESTIMATED.clear()
+    estimate = Graph()
+    estimate.add_node(EstimateNodeInvocation(id="estimate"))
+
+    def step() -> str:
+        request = WorkingMemoryCalibrationRequest(
+            graph_models={}, graph=_graph("complete"), attempt_id="attempt", attempt_steps=2
+        )
+        return asyncio.run(service.create_run("model-key", request, "system")).run_id
+
+    first, _ = step(), step()
+
+    def generate() -> None:
+        asyncio.run(queue.enqueue_batch("default", Batch(graph=estimate, origin="canvas"), prepend=True))
+        assert _run_next(queue, runner[0]).status == "completed"
+
+    assert _run_next(queue, runner[0]).status == "completed"  # step 1 finishes; step 2 still waits
+    service.record_windows(first, _line_windows(first))
+    generate()
+    assert _run_next(queue, runner[0]).status == "completed"  # step 2, which finishes the attempt
+    generate()
+
+    assert [source.split(":")[0] for source in _ESTIMATED] == ["shipped", "user"]
 
 
 def test_a_store_failure_fails_the_item_and_stops_the_session(
