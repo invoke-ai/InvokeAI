@@ -110,9 +110,18 @@ Two Z-Image ControlNets are available as starters (both are part of the bundle):
 - **Z-Image ControlNet Tile** is useful for upscaling and adding detail. The **Upscale** tool can use it as an
   optional anchor; see [Upscaling](/users-guide/image-generation/upscale/).
 
+Every Z-Image Turbo Fun-ControlNet alibaba-pai has published can be installed from its `.safetensors` file:
+the first Union release, Union 2.0, the Union and Tile 2.1 builds (8-step, 2601 and 2602 included) and the 2.1
+Lite builds. Invoke tells them apart by their weights. Invoke does not inpaint through a Z-Image ControlNet:
+a control layer takes a control image only.
+
 On the Canvas, add a **Control Layer** while a Z-Image model is selected. The layer uses a Z-Image
 ControlNet with a default weight of `0.75`. The weight ranges from `0` to `2`, and `0.65` to `0.80` is the
 recommended range. **Only one** Z-Image control layer can be used per generation.
+
+Earlier Invoke versions placed the hints of the Lite and first Union builds after the wrong layers, and left
+out the refiner hints of 2.0 and 2.1 (2.0 also refined its control through the wrong blocks). Applied as they were trained, these ControlNets now follow the control image
+more strongly at the same weight; lower the weight if a control image constrains the result too much.
 
 In the workflow editor, the same thing is the **Z-Image ControlNet** node feeding the **Control** input of
 **Denoise - Z-Image**. That node also needs the **VAE** input connected, which it uses to encode the
@@ -120,8 +129,9 @@ control image.
 
 ## Regional prompting
 
-Z-Image supports **Regional Guidance** layers on the Canvas with **positive** prompts. Regional negative
-prompts, auto-negative and regional reference images are not supported for Z-Image.
+Z-Image supports **Regional Guidance** layers on the Canvas with **positive** prompts, together with a
+control layer if you like. Regional negative prompts, auto-negative and regional reference images are not
+supported for Z-Image.
 
 In the workflow editor, **Prompt - Z-Image** takes an optional mask, and **Denoise - Z-Image** accepts
 either one conditioning or a collection of them.
