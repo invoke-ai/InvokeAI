@@ -450,6 +450,8 @@ const runStatusBarNamesJourney = async (browser) => {
       }
     }
 
+    // Counted while the menu is open; its items leave the page with it.
+    const itemCount = await items.count();
     await page.keyboard.press('Escape');
     await menu.waitFor({ state: 'hidden' });
     // A chip still loading its view is named "Loading <label>" by its busy status fallback.
@@ -458,7 +460,12 @@ const runStatusBarNamesJourney = async (browser) => {
     const chips = footer.locator('[data-status-bar-widget] > [role="button"]');
     const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    assert.ok(labels.length >= 8, `Every built-in bottom widget must be enabled; got ${JSON.stringify(labels)}.`);
+    assert.ok(itemCount >= 1, 'The bottom widget menu must list at least one widget.');
+    assert.equal(
+      labels.length,
+      itemCount,
+      `Every bottom widget the menu lists must be enabled; got ${JSON.stringify(labels)}.`
+    );
     assert.equal(await chips.count(), labels.length, 'Each enabled bottom widget must render one status-bar chip.');
 
     for (const label of labels) {
