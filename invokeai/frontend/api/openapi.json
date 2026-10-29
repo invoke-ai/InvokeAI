@@ -38754,7 +38754,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Load a FLUX.2 [dev] transformer plus its Mistral text encoder and VAE.\n\nFLUX.2 [dev] is a 32B guidance-distilled rectified flow transformer that uses\nMistral Small 3.1 (24B) as its sole text encoder, sharing the 32-channel\nAutoencoderKLFlux2 VAE with FLUX.2 Klein.\n\nWhen the transformer is a Diffusers-format checkpoint, both VAE and Mistral\nencoder can be extracted directly from the main model. For single-file\nsafetensors or GGUF transformers, you must supply standalone VAE and\nMistral encoder models, or point at a Diffusers FLUX.2 [dev] checkout for\nsub-model extraction.",
+        "description": "Load a FLUX.2 [dev] transformer plus its Mistral text encoder and VAE.\n\nFLUX.2 [dev] is a 32B guidance-distilled rectified flow transformer that uses\nMistral Small 3.2 (24B) as its sole text encoder, sharing the 32-channel\nAutoencoderKLFlux2 VAE with FLUX.2 Klein.\n\nWhen the transformer is a Diffusers-format checkpoint, both VAE and Mistral\nencoder can be extracted directly from the main model. For single-file\nsafetensors or GGUF transformers, you must supply standalone VAE and\nMistral encoder models, or point at a Diffusers FLUX.2 [dev] checkout for\nsub-model extraction.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -38925,7 +38925,7 @@
         "category": "prompt",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Encode a prompt for FLUX.2 [dev] using its Mistral Small 3.1 text encoder.",
+        "description": "Encode a prompt for FLUX.2 [dev] using its Mistral Small 3.2 text encoder.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -89044,7 +89044,7 @@
           "variant"
         ],
         "title": "MistralEncoder_Checkpoint_Config",
-        "description": "Configuration for a single-file Mistral text encoder (safetensors).\n\nAccepts both 30-layer cow (Comfy-Org bf16/fp8/fp4) and 40-layer Mistral Small 3\n(BFL canonical / upstream Mistral 3.x single-files). The loader uses the\ndetected variant to decide whether to keep or strip the final RMSNorm."
+        "description": "Configuration for a single-file Mistral text encoder (safetensors).\n\nAccepts both 30-layer cow (Comfy-Org bf16/fp8/fp4) and 40-layer Mistral Small 3\n(BFL's release / upstream Mistral 3.x single-files). The loader uses the\ndetected variant to decide whether to keep or strip the final RMSNorm."
       },
       "MistralEncoder_Diffusers_Config": {
         "properties": {
@@ -89185,7 +89185,7 @@
           "variant"
         ],
         "title": "MistralEncoder_Diffusers_Config",
-        "description": "Configuration for a Mistral text encoder in HuggingFace transformers/diffusers folder layout.\n\nMatches:\n- Full pipelines downloaded as just the `text_encoder/` subfolder\n  (e.g. `black-forest-labs/FLUX.2-dev/text_encoder/`)\n- Quantized variants such as `diffusers/FLUX.2-dev-bnb-4bit/text_encoder/`\n\nDoes NOT match a full FLUX.2 pipeline directory \u2014 those are picked up by the\n`Main_Diffusers_Flux2_Config` instead.\n\nAccepts both:\n- 30-layer \"cow\" distillation (recommended, produces the cleanest output)\n- 40-layer Mistral Small 3 (BFL canonical / upstream Mistral 3.x \u2014 also works,\n  slightly weaker prompt adherence than cow in our tests)\n\nThe variant field records which one was probed so the loader can decide\nwhether to keep the final RMSNorm (40-layer) or strip it (30-layer cow)."
+        "description": "Configuration for a Mistral text encoder in HuggingFace transformers/diffusers folder layout.\n\nMatches:\n- Full pipelines downloaded as just the `text_encoder/` subfolder\n  (e.g. `black-forest-labs/FLUX.2-dev/text_encoder/`)\n- Quantized variants such as `diffusers/FLUX.2-dev-bnb-4bit/text_encoder/`\n\nDoes NOT match a full FLUX.2 pipeline directory \u2014 those are picked up by the\n`Main_Diffusers_Flux2_Config` instead.\n\nAccepts both:\n- 40-layer Mistral Small 3 (BFL's ``text_encoder/`` or upstream Mistral Small 3.x)\n- the 30-layer \"cow\" build, its first 30 layers\n\nThe variant field records which one was probed so the loader can decide\nwhether to keep the final RMSNorm (40-layer) or strip it (30-layer cow)."
       },
       "MistralEncoder_GGUF_Config": {
         "properties": {
