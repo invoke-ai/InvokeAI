@@ -1417,7 +1417,8 @@ class InvokeImageDilateOrErodeInvocation(BaseInvocation, WithMetadata):
         else:
             raise ValueError("Invalid mode selected")
         image_out = expand_fn(image_out, kernel, iterations=1)
-        return Image.fromarray(image_out, mode=image_in.mode)
+        # Pillow 13 rejects mode="I;16" for a uint16 array, but infers it (and its byte order) from the dtype.
+        return Image.fromarray(image_out, mode=None if image_in.mode.startswith("I;16") else image_in.mode)
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image_in = context.images.get_pil(self.image.image_name)
