@@ -935,6 +935,7 @@ const buildErnieImageGraph = (
   const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
   const useCfg = settings.cfgScale > 1;
+  const activeLoras = getActiveCompatibleLoras(settings, model);
   const modelLoader = addNode(graph, {
     id: 'model_loader',
     model,
@@ -944,6 +945,12 @@ const buildErnieImageGraph = (
     use_prompt_enhancer: false,
     vae_model: vaeModel ?? undefined,
   });
+  // ERNIE-Image LoRAs train the transformer only; the Ministral encoder field carries none.
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'ernie_image_lora_collection_loader', modelLoader, [
+        'transformer',
+      ])
+    : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'ernie_image_text_encoder' });
   const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'ernie_image_text_encoder' }) : null;
   const denoise = addNode(graph, {
@@ -959,7 +966,7 @@ const buildErnieImageGraph = (
   });
   const output = addImageOutputNode(graph, 'ernie_image_vae_decode', outputIsIntermediate);
 
-  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   addEdge(graph, modelLoader, 'text_encoder', posCond, 'text_encoder');
   addEdge(graph, modelLoader, 'vae', output, 'vae');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');

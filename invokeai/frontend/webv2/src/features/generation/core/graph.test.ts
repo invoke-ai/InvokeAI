@@ -1494,6 +1494,32 @@ describe('ERNIE-Image graphs', () => {
     expect(graph.nodes.model_loader?.text_encoder_model).toBeUndefined();
   });
 
+  it('routes the transformer through ERNIE-Image LoRAs and records only those it applied', () => {
+    const ernieLora: LoraModelConfig = { base: 'ernie-image', key: 'ernie-lora', name: 'ERNIE LoRA', type: 'lora' };
+    // Same `layers.N` container, different family: it must not reach the ERNIE-Image loader.
+    const zImageLora: LoraModelConfig = { base: 'z-image', key: 'z-image-lora', name: 'Z-Image LoRA', type: 'lora' };
+
+    const graph = compile(ernieModel, {
+      cfgScale: 4,
+      loras: [
+        { isEnabled: true, model: ernieLora, weight: 0.7 },
+        { isEnabled: true, model: zImageLora, weight: 1 },
+      ],
+    });
+    const loraLoader = getNodeByType(graph, 'ernie_image_lora_collection_loader');
+    const metadata = getNodeByType(graph, 'core_metadata');
+
+    expect(loraLoader).toBeDefined();
+    expect(getEdge(graph, loraLoader?.id ?? '', 'transformer')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loraLoader?.id);
+    // The Ministral encoder carries no LoRA layers, so both prompts keep reading it from the model loader.
+    expect(getEdge(graph, 'pos_cond', 'text_encoder')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'neg_cond', 'text_encoder')?.source.node_id).toBe('model_loader');
+    expect(metadata?.loras).toEqual([
+      { model: { base: 'ernie-image', key: 'ernie-lora', name: 'ERNIE LoRA', type: 'lora' }, weight: 0.7 },
+    ]);
+  });
+
   it('builds the rest of the graph out of the one bundled pipeline', () => {
     const graph = compile(ernieModel, { scheduler: 'dpmpp_2m' });
 
