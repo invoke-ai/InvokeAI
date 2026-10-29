@@ -196,6 +196,18 @@ def _fast_service_polling(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(image_index_default, "_POLL_SECONDS", 0.02)
 
 
+@pytest.fixture(autouse=True)
+def _working_memory_platform_from_the_test_not_the_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A working-memory estimate prices the allocator torch is configured with and the OS it runs on. Read from the
+    host, a developer's `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` or a Windows runner moves every expected
+    value. Tests start from no allocator configuration on Linux and set what they are about."""
+    from invokeai.backend.working_memory import platform
+
+    for var in ("PYTORCH_ALLOC_CONF", "PYTORCH_CUDA_ALLOC_CONF", "PYTORCH_HIP_ALLOC_CONF"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setattr(platform, "_host_os", lambda: "linux")
+
+
 @pytest.fixture
 def mock_sqlite_database() -> Database:
     """The in-memory database behind `mock_services`, for tests that need SQL of their own or a service that
