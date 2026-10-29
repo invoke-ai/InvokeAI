@@ -65,7 +65,8 @@ _SQUARE_1024 = {"width": 1024, "height": 1024}
 # refiner:    a canvas and nothing else. It is a second pass over an SDXL latent, driven by the
 #             UI's own refiner parameters, and is never run on its own.
 # sd-3:       stable-diffusion-3.5-medium, 40 steps at guidance 4.5. Medium, not Large (28/3.5):
-#             there is one `sd-3` row and no variant to tell them apart.
+#             there is one `sd-3` row and no variant to tell them apart. Large Turbo's card: 4 steps at
+#             guidance 0, which is CFG 1 here; reached by name hint, like ERNIE's.
 # cogview4:   THUDM/CogView4-6B, 50 steps at guidance 3.5 — true CFG, it takes a negative prompt.
 # flux:       `guidance` is the distilled guidance embedding, not CFG, so cfg_scale stays at its
 #             floor (1.0, meaning "off") for every FLUX and FLUX.2 variant. schnell is
@@ -121,6 +122,13 @@ DEFAULT_SETTINGS_MATRIX: list[tuple[str, BaseModelType, AnyVariant | None, str |
         None,
         None,
         {"scheduler": "euler_a", "steps": 40, "cfg_scale": 4.5, **_SQUARE_1024},
+    ),
+    (
+        "sd-3-large-turbo",
+        BaseModelType.StableDiffusion3,
+        None,
+        "sd3.5_large_turbo-Q4_0",
+        {"scheduler": "euler_a", "steps": 4, "cfg_scale": 1.0, **_SQUARE_1024},
     ),
     (
         "cogview4",

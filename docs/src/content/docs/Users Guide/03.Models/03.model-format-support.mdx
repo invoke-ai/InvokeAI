@@ -28,7 +28,7 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
 | Family | Diffusers | Single file (bf16) | fp8 scaled | int8 | nvfp4 | MXFP8 | GGUF | SDNQ | NF4 |
 |---|---|---|---|---|---|---|---|---|---|
 | [SD 1.x / 2.x](/users-guide/models/local-models/stable-diffusion-1-2/), [SDXL](/users-guide/models/local-models/sdxl/) | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | R | ✗ | ✗ |
-| [SD 3](/users-guide/models/local-models/sd-3/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| [SD 3](/users-guide/models/local-models/sd-3/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ (transformer only: T5, CLIP-L, CLIP-G and VAE installed separately) | ✗ | ✗ |
 | [FLUX.1](/users-guide/models/local-models/flux-1/) | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ |
 | [FLUX.2](/users-guide/models/local-models/flux-2/) | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | inside the Diffusers folder (FLUX.2 [dev]) |
 | [CogView4](/users-guide/models/local-models/cogview4/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
@@ -51,6 +51,8 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
   transformer at install, unscaled fp8 included.
 - **GGUF** covers the llama.cpp types (Q4_0 through Q8_0, the K-quants, BF16). ComfyUI-GGUF's `Q8_CR` files load
   for Krea-2 only; for every other model with GGUF support the install fails.
+- **SD 3 GGUF** covers city96's transformer-only builds and stable-diffusion.cpp's conversions, whose bundled VAE is
+  not used.
 - LTX-2.0/2.3 files, GGUF builds included, fail to install with a message. Wan 2.1, Wan Animate, S2V, Fun-Control
   and VACE single files and GGUFs are not recognized as Wan 2.2 and install as unknown models; a Wan 2.1 Diffusers
   folder is not detected and is not supported either.
