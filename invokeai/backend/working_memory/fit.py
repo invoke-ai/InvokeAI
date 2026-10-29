@@ -1,34 +1,44 @@
 """The shipped fit: the values under `data/` reproduced from their measured points.
 
-The AutoencoderKL estimators price their convolutions as a line in the output's pixel count, one per operation and
-dtype: `k_<operation>_<dtype>` bytes per pixel plus `b_<operation>_<dtype>` bytes, the base a process pays whatever the
-size. Each carried pair is the upper envelope of the points it is resolved for (see `upper_envelope`), plus
-`SHIPPED_MARGIN`. A point joins the fit of the entry its estimator resolves to on its platform -- the lender's, where
-the estimator borrows -- when it is a single-sample, untiled operation of that pair (`in_fit` unless measured out of
-regime) with no weight growth. Tiled points bound their estimates but fit nothing: the tile term reuses the untiled
-pair. Nor does a point whose VAE an in-place cast grew (`upcast_weight_bytes`): its demand includes the growth, which
-the estimate prices as a term of its own. A point that bounds its estimate from below only
+An estimator's fitted terms price a line per operation and dtype: `k_<suffix>` bytes per unit of the line's size plus
+`b_<suffix>` bytes, the base a process pays whatever the size. Its `EstimatorSpec.line` says which line an operation's
+features price on, their size on it, and whether a measurement of them can join its fit (`Line`). The AutoencoderKL
+estimators price their convolutions on a line in the output's pixels (`convolution_line`); the Z-Image denoise prices
+its forward on one in attended tokens. Each carried pair is the upper envelope of the points it is
+resolved for (see `upper_envelope`), plus `SHIPPED_MARGIN`. A point joins the fit of the entry its estimator resolves
+to on its platform -- the lender's, where the estimator borrows -- when it is `in_fit` (not measured out of regime) and
+its line admits it.
+
+A line is fitted on its points' demand as measured; no term is subtracted from it. So a line admits only measurements
+whose demand is the line's alone. Where an estimate adds a term of its own on top of the line, a measurement of it
+fits nothing: a tiled VAE operation (the tile term reuses the untiled pair), a VAE an in-place cast grew
+(`upcast_weight_bytes`), and every denoise forward with an analytic term. The VAE mid-block score matrix is not such a
+term: an estimate reserves the larger of it and the convolutions, which peak apart, and on the builds that materialize
+it the convolutions stay the larger over the measured sizes (`vae_working_memory._peak_of_two_phases`); the CUDA points
+that force a math kernel are out of fit. A point that bounds its estimate from below only
 (`MeasuredPoint.holds_upper_bound`, a `probe_demand` window) is covered by the line and can raise it, but takes no part
 in choosing it: the fresh-process points cap a line. A line is fitted only once its fresh-process points alone span
 two sizes `MIN_AREA_RATIO` apart (`fitted_pair`); until then it stays a stand-in, which the other points bound from
 below.
 
-`tests/backend/working_memory/test_shipped_coefficients.py` holds every carried value on such a line that is not a
-declared stand-in to `fitted_values` of the shipped points, so a new point that moves a fit fails there with the value
-to ship. A value on no pixel line is hand-set, which `hand_set_values` allows only for an estimator keyed by no platform
-trait: the MOSS-Image denoise's `k_token`, bytes per attended token with no base. Its points still decide and bound it
-there; this module fits pixel lines only.
+`tests/backend/working_memory/test_shipped_coefficients.py` holds every carried value that is not a declared stand-in
+to `fitted_values` of the shipped points, so a new point that moves a fit fails there with the value to ship. A
+`legacy` entry's hand-set values are neither fitted nor held to a fit. A value on no line its entry carries is hand-set
+too, which `hand_set_values` allows only for an estimator keyed by no platform trait: the MOSS-Image denoise's
+`k_token`, bytes per attended token, whose entry ships no base for its line. Its points still decide and bound it
+there.
 
 A user's own calibration fits the same lines from its windows (`user_pair`, read by `user_fit.py`), with
-`USER_MARGIN`, the same margin.
+`USER_MARGIN`, the same margin, for the estimators that opt in (`EstimatorSpec.user_calibrated`).
 """
 
 import math
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from fractions import Fraction
 from typing import TYPE_CHECKING, Final, NamedTuple, Optional
 
 from invokeai.backend.working_memory.coefficients import CoefficientEntry, MeasuredPoint, WorkingMemoryData, find_entry
+from invokeai.backend.working_memory.estimate import FeatureValue
 
 if TYPE_CHECKING:
     from invokeai.backend.working_memory.spec import EstimatorSpec
@@ -42,8 +52,8 @@ USER_MARGIN: Final = SHIPPED_MARGIN
 measures the card it prices, and the windows that would inflate it (fragmented, partly resident) never join it."""
 
 MIN_AREA_RATIO: Final = 2
-"""How far apart the sizes a line is fitted on must lie, as a ratio of pixel counts: closer points pin the intercept
-no better than their noise."""
+"""How far apart the sizes a line is fitted on must lie, as a ratio of its sizes (pixel or token counts): closer points
+pin the intercept no better than their noise."""
 
 _MIB: Final = 2**20
 
@@ -51,19 +61,66 @@ EntryKey = tuple[str, int, tuple[tuple[str, str], ...]]
 """An entry's estimator id, version and platform keys: what a point is resolved by."""
 
 
+class Line(NamedTuple):
+    """Where an operation's features place it on the line its estimator's fitted terms price it on."""
+
+    suffix: str
+    """``<operation>_<dtype>``, naming the line's coefficients ``k_<suffix>`` and ``b_<suffix>``."""
+    size: int
+    """The operation's size on the line, in the unit its slope is per: output pixels, attended tokens."""
+    fits: bool
+    """Whether a measurement of these features can join the line's fit: its demand is the line's alone."""
+    label: str
+    """How a point of these features reads in its id (`bounds.point_id`), e.g. ``decode-bf16-1024x1024-tile512``, with
+    ``-scores`` where a VAE operation's build materializes the mid-block score matrix."""
+
+
+LineFunction = Callable[[Mapping[str, FeatureValue]], Optional[Line]]
+"""What an `EstimatorSpec` declares about its fitted line: the `Line` an operation's features place it on, or None for
+features that name no line."""
+
+
+def convolution_line(features: Mapping[str, FeatureValue]) -> Optional[Line]:
+    """The AutoencoderKL convolution line ``<operation>_<dtype>``, in output pixels: every VAE estimator's.
+
+    An untiled single-sample operation of an AutoencoderKL whose VAE no in-place cast grew fits it. Tiled operations
+    reuse the untiled line, the cast's growth is a term of its own, and the lines are the AutoencoderKL convolutions':
+    the SD estimator also prices the tiny autoencoder (`vae_class` AutoencoderTiny) on them, a different network whose
+    windows say nothing about those lines. Estimators that name no `vae_class` price an AutoencoderKL only.
+    """
+    operation, dtype = features.get("operation"), features.get("dtype")
+    height, width = features.get("height"), features.get("width")
+    if not isinstance(operation, str) or not isinstance(dtype, str):
+        return None
+    if not isinstance(height, int) or not isinstance(width, int):
+        return None
+    tile, batch = features.get("tile"), features.get("batch_size", 1)
+    fits = (
+        tile is None
+        and batch == 1
+        and not features.get("upcast_weight_bytes", 0)
+        and features.get("vae_class", "AutoencoderKL") == "AutoencoderKL"
+    )
+    tiled = f"-tile{tile}" if tile is not None else ""
+    batched = f"-b{batch}" if batch != 1 else ""
+    scored = "-scores" if features.get("score_matrix_bytes") else ""
+    label = f"{operation}-{dtype}-{height}x{width}{tiled}{batched}{scored}"
+    return Line(f"{operation}_{dtype}", height * width, fits, label)
+
+
 def entry_key(entry: CoefficientEntry | MeasuredPoint) -> EntryKey:
     return (entry.estimator, entry.version, tuple(sorted(entry.platform.items())))
 
 
 class FitPoint(NamedTuple):
-    pixels: int
+    size: int
     bytes: int
     caps: bool
     """Whether the point takes part in choosing the line (`MeasuredPoint.holds_upper_bound`); every point is covered."""
 
 
 def spans(sizes: Iterable[int]) -> bool:
-    """Whether the pixel counts include two at least `MIN_AREA_RATIO` apart: enough to fit a line on."""
+    """Whether the sizes include two at least `MIN_AREA_RATIO` apart: enough to fit a line on."""
     distinct = sorted(set(sizes))
     return len(distinct) >= 2 and distinct[-1] >= MIN_AREA_RATIO * distinct[0]
 
@@ -86,7 +143,7 @@ def upper_envelope(
     sizes = sorted({x for x, _ in points})
     if not spans(sizes):
         raise ValueError(
-            f"an envelope needs two sizes at least {MIN_AREA_RATIO}x apart in pixels, got {sizes}; measure more sizes"
+            f"an envelope needs two sizes at least {MIN_AREA_RATIO}x apart, got {sizes}; measure more sizes"
         )
 
     highest = {x: max(y for px, y in points if px == x) for x in sizes}
@@ -118,7 +175,7 @@ def shipped_pair(
     points: Sequence[tuple[int, int]], capping: Optional[Sequence[tuple[int, int]]] = None
 ) -> tuple[int, int]:
     """The slope and intercept to ship for these points: the envelope plus `SHIPPED_MARGIN`, the slope rounded up to
-    a whole byte per pixel and the intercept to a whole MiB."""
+    a whole byte per unit of size and the intercept to a whole MiB."""
     k, b = upper_envelope(points, capping)
     margin = 1 + SHIPPED_MARGIN
     return math.ceil(k * margin), math.ceil(b * margin / _MIB) * _MIB
@@ -126,7 +183,7 @@ def shipped_pair(
 
 def user_pair(points: Sequence[tuple[int, int]]) -> tuple[int, int]:
     """The slope and intercept a user calibration's points give a line: the envelope plus `USER_MARGIN`, the slope
-    rounded up to a whole byte per pixel and the intercept to a whole MiB.
+    rounded up to a whole byte per unit of size and the intercept to a whole MiB.
 
     Every user point is a `probe_demand` window, so no point caps the line and all of them rate its edges (the
     fallback of `upper_envelope`). Raises like `upper_envelope` unless the points span two sizes `MIN_AREA_RATIO`
@@ -136,67 +193,46 @@ def user_pair(points: Sequence[tuple[int, int]]) -> tuple[int, int]:
     return math.ceil(k * margin), math.ceil(b * margin / _MIB) * _MIB
 
 
-def line_of(features: Mapping[str, object]) -> Optional[tuple[str, int]]:
-    """The convolution line an operation of these features is priced on, ``<operation>_<dtype>``, and its size in
-    output pixels; None for features that name no such line."""
-    operation, dtype = features.get("operation"), features.get("dtype")
-    height, width = features.get("height"), features.get("width")
-    if not isinstance(operation, str) or not isinstance(dtype, str):
-        return None
-    if not isinstance(height, int) or not isinstance(width, int):
-        return None
-    return f"{operation}_{dtype}", height * width
-
-
-def fits_a_line(features: Mapping[str, object]) -> bool:
-    """Whether a point of these features can join its line's fit: an untiled single-sample operation of an
-    AutoencoderKL whose VAE no in-place cast grew. Tiled points reuse the untiled line, the cast's growth is a term of
-    its own, and the lines are the AutoencoderKL convolutions': the SD estimator also prices the tiny autoencoder
-    (`vae_class` AutoencoderTiny) on them, a different network whose windows say nothing about those lines.
-    Estimators that name no `vae_class` price an AutoencoderKL only."""
-    return (
-        features.get("tile") is None
-        and features.get("batch_size", 1) == 1
-        and not features.get("upcast_weight_bytes", 0)
-        and features.get("vae_class", "AutoencoderKL") == "AutoencoderKL"
-        and line_of(features) is not None
-    )
-
-
-def _pairs(entry: CoefficientEntry) -> set[str]:
-    """The `<operation>_<dtype>` suffixes an entry carries both halves of a convolution line for."""
+def carried_lines(entry: CoefficientEntry) -> set[str]:
+    """The suffixes an entry carries both halves of a line for."""
     names = set(entry.values or {})
     return {name[2:] for name in names if name.startswith("k_") and f"b_{name[2:]}" in names}
 
 
 def hand_set_values(entry: CoefficientEntry, spec: "EstimatorSpec") -> set[str]:
-    """The values `entry` may carry that no fit reproduces: those on no pixel line, for a `spec` keyed by no platform
-    trait. Any other spec prices convolutions, whose every value is half of a line, so a value off one there is a typo
-    or a term the fit never checks, and none is exempt."""
+    """The values `entry` may carry that no fit reproduces: those on no line it carries (`carried_lines`), for a `spec`
+    keyed by no platform trait. The MOSS-Image denoise declares its line in attended tokens, but its entry carries the
+    slope alone; shipping a fitted base (`b_token`) with it makes that a carried line, and its exemption goes. Any
+    other spec prices lines whose every value is half of one, so a value off one there is a typo or a term the fit
+    never checks, and none is exempt."""
     if spec.platform_keys:
         return set()
-    lines = {f"{part}_{suffix}" for suffix in _pairs(entry) for part in ("k", "b")}
+    lines = {f"{part}_{suffix}" for suffix in carried_lines(entry) for part in ("k", "b")}
     return set(entry.values or {}) - lines
 
 
-def fit_points(data: Iterable[WorkingMemoryData]) -> Mapping[tuple[EntryKey, str], list[FitPoint]]:
+def fit_points(
+    data: Iterable[WorkingMemoryData], specs: Mapping[str, "EstimatorSpec"]
+) -> Mapping[tuple[EntryKey, str], list[FitPoint]]:
     """Per carried entry and line, the points that line is fitted on.
 
     A point belongs to the entry its own estimator's entry resolves to on its platform, one `values_from` hop, and to
-    the line its operation and dtype name. Lines no point measures are absent.
+    the line its estimator's `EstimatorSpec.line` places its features on, where that admits them. `specs` holds the
+    spec of every estimator a point names. Lines no point measures are absent.
     """
     files = list(data)
     entries = [entry for file in files for entry in file.coefficients]
     groups: dict[tuple[EntryKey, str], list[FitPoint]] = {}
     for point in (point for file in files for point in file.points):
-        found = line_of(point.features)
-        if not point.in_fit or found is None or not fits_a_line(point.features):
+        if not point.in_fit:
+            continue
+        line = specs[point.estimator].line(point.features)
+        if line is None or not line.fits:
             continue
         owner = carrier_of(entries, point)
-        suffix, pixels = found
-        if suffix in _pairs(owner):
-            line = groups.setdefault((entry_key(owner), suffix), [])
-            line.append(FitPoint(pixels, point.measured_bytes, point.holds_upper_bound))
+        if line.suffix in carried_lines(owner):
+            fitted_on = groups.setdefault((entry_key(owner), line.suffix), [])
+            fitted_on.append(FitPoint(line.size, point.measured_bytes, point.holds_upper_bound))
     return groups
 
 
@@ -210,31 +246,57 @@ def carrier_of(entries: Sequence[CoefficientEntry], point: MeasuredPoint) -> Coe
     return find_entry(entries, entry.values_from.estimator, entry.values_from.version, point.platform, where)
 
 
-def fitted_values(data: Iterable[WorkingMemoryData]) -> Mapping[EntryKey, Mapping[str, int]]:
-    """Per entry that carries values, what `fitted_pair` gives each line it does not declare a stand-in.
+def entry_fit(
+    entry: CoefficientEntry, groups: Mapping[tuple[EntryKey, str], Sequence[FitPoint]]
+) -> tuple[dict[str, int], dict[str, str]]:
+    """What `fitted_pair` gives each line `entry` carries and does not declare a stand-in, from `groups`
+    (`fit_points`); and, per such line its points cannot fit, why."""
+    key = entry_key(entry)
+    values: dict[str, int] = {}
+    problems: dict[str, str] = {}
+    for suffix in sorted(carried_lines(entry)):
+        if {f"k_{suffix}", f"b_{suffix}"} <= set(entry.stand_ins):
+            continue
+        line = groups.get((key, suffix), [])
+        if not line:
+            problems[suffix] = "no in-fit point measures it"
+            continue
+        try:
+            k, b = fitted_pair(line)
+        except ValueError as e:
+            problems[suffix] = str(e)
+            continue
+        values |= {f"k_{suffix}": k, f"b_{suffix}": b}
+    return values, problems
+
+
+def fitted_values(
+    data: Iterable[WorkingMemoryData], specs: Mapping[str, "EstimatorSpec"]
+) -> Mapping[EntryKey, Mapping[str, int]]:
+    """Per entry that carries values and is not `legacy`, what `fitted_pair` gives each line it does not declare a
+    stand-in (`entry_fit`).
 
     Raises, naming the entry and line, where the points cannot fit that line.
     """
     files = list(data)
-    groups = fit_points(files)
+    groups = fit_points(files, specs)
     fitted: dict[EntryKey, dict[str, int]] = {}
-    for entry in (entry for file in files for entry in file.coefficients if entry.values is not None):
-        key = entry_key(entry)
-        for suffix in sorted(_pairs(entry)):
-            if {f"k_{suffix}", f"b_{suffix}"} <= set(entry.stand_ins):
-                continue
-            try:
-                k, b = fitted_pair(groups.get((key, suffix), []))
-            except ValueError as e:
-                raise ValueError(f"{entry.estimator} on {entry.platform}, {suffix}: {e}") from e
-            fitted.setdefault(key, {}).update({f"k_{suffix}": k, f"b_{suffix}": b})
+    for entry in (entry for file in files for entry in file.coefficients):
+        if entry.values is None or entry.legacy:
+            continue
+        values, problems = entry_fit(entry, groups)
+        if problems:
+            suffix, problem = next(iter(problems.items()))
+            raise ValueError(f"{entry.estimator} on {entry.platform}, {suffix}: {problem}")
+        if values:
+            fitted[entry_key(entry)] = values
     return fitted
 
 
 def capping_spans(line: Sequence[FitPoint]) -> bool:
     """Whether a line's fresh-process points alone span the sizes a fit needs, as only then is it fitted. Warm
     windows, or one fresh size with warm windows at others, could pin it below what a cold first run needs."""
-    return spans(point.pixels for point in line if point.caps)
+    return spans(point.size for point in line if point.caps)
 
 
 def fitted_pair(line: Sequence[FitPoint]) -> tuple[int, int]:
@@ -243,12 +305,12 @@ def fitted_pair(line: Sequence[FitPoint]) -> tuple[int, int]:
     vertex and so lower one half of the line; the larger of the two keeps both at the fresh-process fit at least.
 
     Raises unless the fresh-process points span (`capping_spans`)."""
-    capping = [(p.pixels, p.bytes) for p in line if p.caps]
+    capping = [(p.size, p.bytes) for p in line if p.caps]
     if not capping_spans(line):
         raise ValueError(
-            f"its fresh-process points measure {sorted({x for x, _ in capping})} pixels, not two sizes at least "
+            f"its fresh-process points measure sizes {sorted({x for x, _ in capping})}, not two at least "
             f"{MIN_AREA_RATIO}x apart; keep it a stand-in until they do"
         )
-    k_all, b_all = shipped_pair([(p.pixels, p.bytes) for p in line], capping)
+    k_all, b_all = shipped_pair([(p.size, p.bytes) for p in line], capping)
     k_fresh, b_fresh = shipped_pair(capping)
     return max(k_all, k_fresh), max(b_all, b_fresh)

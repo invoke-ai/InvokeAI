@@ -16,6 +16,7 @@ from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.vae_tiling_scope import resolve_tile_size
 from invokeai.backend.working_memory.estimate import FeatureValue, WorkingMemoryEstimate, WorkingMemoryTerm
+from invokeai.backend.working_memory.fit import convolution_line
 from invokeai.backend.working_memory.platform import platform_for
 from invokeai.backend.working_memory.spec import EstimatorSpec, register
 
@@ -120,7 +121,8 @@ def _vae_mid_block_score_matrix_bytes(
 # bytes per pixel plus `b_<operation>_<dtype>` bytes the process pays whatever the size, shipped per convolution
 # backend and allocator (`platform_for`). The values ship in `backend/working_memory/data/vae.json` with the points
 # they are fitted on (`backend/working_memory/fit.py`); `scripts/calibrate_flux2_working_memory.py --only vae`
-# measures a build against them.
+# measures a build against them. Every spec here declares that line (`fit.convolution_line`) and opts in to user
+# calibration (`user_calibrated`), so a calibration run's decode windows refit these lines per device.
 #
 # None of the three scales out of the line. The demand does not follow the element size: on MIOpen fp16 needs about a
 # third of what bf16 does, and on both backends fp32 needs less per value byte than bf16. The allocator matters as
@@ -266,6 +268,8 @@ VAE_SD_SPEC = register(
         coefficients=_convolution_coefficients("fp16", "fp32"),
         platform_keys=_PLATFORM_KEYS,
         terms=_sd_terms,
+        line=convolution_line,
+        user_calibrated=True,
     )
 )
 
@@ -375,6 +379,8 @@ VAE_COGVIEW4_SPEC = register(
         coefficients=_convolution_coefficients("bf16"),
         platform_keys=_PLATFORM_KEYS,
         terms=_cogview4_terms,
+        line=convolution_line,
+        user_calibrated=True,
     )
 )
 
@@ -492,6 +498,8 @@ VAE_FLUX_SPEC = register(
         coefficients=_convolution_coefficients("fp16", "bf16", "fp32"),
         platform_keys=_PLATFORM_KEYS,
         terms=_flux_terms,
+        line=convolution_line,
+        user_calibrated=True,
     )
 )
 
@@ -590,6 +598,8 @@ VAE_FLUX2_SPEC = register(
         coefficients=_convolution_coefficients("bf16", "fp32"),
         platform_keys=_PLATFORM_KEYS,
         terms=_flux2_terms,
+        line=convolution_line,
+        user_calibrated=True,
     )
 )
 
@@ -1184,6 +1194,8 @@ VAE_SD3_SPEC = register(
         coefficients=_convolution_coefficients("fp16", "bf16", "fp32"),
         platform_keys=_PLATFORM_KEYS,
         terms=_single_pass_terms,
+        line=convolution_line,
+        user_calibrated=True,
     )
 )
 
