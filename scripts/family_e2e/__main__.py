@@ -15,10 +15,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from scripts.family_e2e.bundle import write_bundle
+from scripts.family_e2e.calibration import PROBE_REASON, CalibrationError, read_store_files
 from scripts.family_e2e.detach import RUNNER_LOG, DetachError, spawn_runner
 from scripts.family_e2e.gpu_memory import UnsupportedPlatformError
 from scripts.family_e2e.graphs import ExportError
-from scripts.family_e2e.manifest import Manifest, ManifestError, load_manifest
+from scripts.family_e2e.manifest import DEFAULT_ARM, Manifest, ManifestError, load_manifest
 from scripts.family_e2e.metrics import MB
 from scripts.family_e2e.records import RUN_INFO_FILE, load_records, load_run_info, run_id_profile, write_run_info
 from scripts.family_e2e.references import AcceptError, accept
@@ -30,19 +31,20 @@ from scripts.family_e2e.runner import (
     finish_run,
     gpu_lock,
     is_alive,
-    kill_identified,
+    kill_recorded,
     load_run_manifest,
     new_run,
     open_gpu,
     preflight,
     read_heartbeat,
     remaining_steps,
-    remove_scratch_roots,
     run,
     run_lock,
+    save_calibration,
+    scratch_root,
     wait_for_runner,
 )
-from scripts.family_e2e.server import ServerError
+from scripts.family_e2e.server import ServerError, remove_tree
 
 logger = logging.getLogger("family_e2e")
 # Windows refuses to open heartbeat.json for a moment while the runner replaces it.
@@ -56,6 +58,7 @@ EXPECTED_ERRORS = (
     AcceptError,
     DetachError,
     UnsupportedPlatformError,
+    CalibrationError,
     # load_records names the malformed line of a damaged records.jsonl.
     ValueError,
 )
@@ -114,7 +117,7 @@ def _start_runner(run_dir: Path) -> int:
 
 def cmd_start(args: argparse.Namespace) -> int:
     _check_startable(load_manifest(args.manifest))
-    run_dir = new_run(args.manifest, args.family, args.case)
+    run_dir = new_run(args.manifest, args.family, args.case, calibrate=args.calibrate)
     _print_started(run_dir, _start_runner(run_dir))
     return 0
 
@@ -161,8 +164,14 @@ def cmd_status(args: argparse.Namespace) -> int:
     print(f"run       {info.run_id} ({info.status})")
     print(f"dir       {run_dir}")
     print(f"progress  {len(info.plan) - len(left)}/{len(info.plan)} steps final, {len(records)} records")
-    print(f"invalid   {sum(1 for r in records if r.invalid_reasons)} records with invalid reasons")
+    # Every step of a calibration run carries the probe's reason; only the others make a record invalid there.
+    invalid = sum(1 for r in records if set(r.invalid_reasons) - {PROBE_REASON})
+    print(f"invalid   {invalid} records with invalid reasons")
     print(f"errors    {sum(1 for r in records if r.status != 'completed')} records not completed")
+    if info.calibrate:
+        print(
+            f"calibrate time and VRAM not rated; {len(info.calibration_exports)} store exports in {run_dir / 'calibration'}"
+        )
     if heartbeat:
         updated = datetime.fromisoformat(heartbeat["updated_at"])
         age = (datetime.now(timezone.utc) - updated).total_seconds()
@@ -178,8 +187,9 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 def cmd_stop(args: argparse.Namespace) -> int:
     run_dir = _resolve_run(args.run, args.manifest)
-    # Marked before the heartbeat is read, under the run lock a runner registers under: a runner registered before is
-    # in the heartbeat and is killed, one that registers after finds the run stopped and leaves it untouched.
+    # Marked before the heartbeat is read, under the run lock a runner registers and spawns each server under: a runner
+    # or server that came before is in the heartbeat and is killed, and none comes after (the runner finds the run
+    # stopped and leaves it untouched).
     was_running = finish_run(run_dir, "stopped")
     heartbeat = read_heartbeat(run_dir)
     # A running run has a registered runner, so an empty read is most likely one that met the runner's replace.
@@ -188,15 +198,39 @@ def cmd_stop(args: argparse.Namespace) -> int:
         time.sleep(STOP_HEARTBEAT_POLL_S)
         heartbeat = read_heartbeat(run_dir)
     # The runner first: it would otherwise notice its server dying and record a crash.
-    for role in ("runner", *SERVER_ROLES):
-        if kill_identified(heartbeat.get(role)):
-            print(f"killed {role} (pid {int(heartbeat[role][0])}) and its descendants")
+    killed, survivors = kill_recorded([("runner", heartbeat.get("runner"))])
+    killed_servers, left = kill_recorded([(role, heartbeat.get(role)) for role in SERVER_ROLES])
+    killed += killed_servers
+    survivors = ", ".join(s for s in (survivors, left) if s)
+    if survivors:
+        # What still runs may still write to its scratch root and the calibration store in it.
+        raise RunnerError(
+            f"the run's processes survived the kill: {survivors}. {run_dir.name} is marked stopped; its scratch roots "
+            "stay as they are. End them, then `stop` again"
+        )
+    for role, pid in killed:
+        print(f"killed {role} (pid {pid}) and its descendants")
     info = load_run_info(run_dir)
-    # Nothing of the run is alive any more, so its scratch roots are unused.
-    for leftover in remove_scratch_roots(_data_dir(run_dir), info):
-        print(f"could not remove {leftover}")
+    unsaved = []
+    for arm in sorted({DEFAULT_ARM, *info.environments}):
+        root = scratch_root(_data_dir(run_dir), info.run_id, arm)
+        if info.calibrate:
+            # The killed server left its calibration store in the scratch root; the root goes next.
+            try:
+                exports = save_calibration(run_dir, read_store_files(root))
+            except OSError as e:
+                # The root holds the only copy of the lifetime's windows; `resume` saves it first.
+                unsaved.append(f"could not save the calibration store ({e}); kept the scratch root {root} with it")
+                continue
+            for export in exports:
+                print(f"saved the calibration store {run_dir / export.export}")
+        # Nothing of the run is alive any more, so its scratch roots are unused.
+        for leftover in remove_tree(root):
+            print(f"could not remove {leftover}")
     print(f"{info.run_id} stopped; continue with: python -m scripts.family_e2e resume {run_dir}")
-    return 0
+    for message in unsaved:
+        print(f"error: {message}. Fix the cause and `resume`, which saves it first", file=sys.stderr)
+    return 2 if unsaved else 0
 
 
 def cmd_accept(args: argparse.Namespace) -> int:
@@ -239,6 +273,11 @@ def _parser() -> argparse.ArgumentParser:
     start.add_argument("--manifest", type=Path, required=True)
     start.add_argument("--family", action="append", default=[], help="only this family (repeatable)")
     start.add_argument("--case", action="append", default=[], help="only this case id (repeatable)")
+    start.add_argument(
+        "--calibrate",
+        action="store_true",
+        help="measure working memory: submit every step through the server's calibrate route and save its exports",
+    )
     start.set_defaults(handler=cmd_start)
 
     runner = commands.add_parser("run", help="run the remaining steps of a run in the foreground (what start launches)")

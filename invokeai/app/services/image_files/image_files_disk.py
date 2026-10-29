@@ -283,6 +283,10 @@ class DiskImageFileStorage(ImageFileStorageBase):
             thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
             thumbnail_image = make_thumbnail(image, thumbnail_size)
 
+            # PNG has no 32-bit integer mode, and Pillow 13 no longer clips "I" to 16 bits on save: do it here.
+            if image.mode == "I":
+                image = image.convert("I;16")
+
             # When saving the image, the image object's info field is not populated. We need to set it
             image.info = info_dict
             compress_level = self.__invoker.services.configuration.pil_compress_level
