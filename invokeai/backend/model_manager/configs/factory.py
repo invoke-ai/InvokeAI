@@ -44,7 +44,10 @@ from invokeai.backend.model_manager.configs.gemma2_encoder import (
     Gemma2Encoder_Gemma2Encoder_Config,
     Gemma2Encoder_GGUF_Config,
 )
-from invokeai.backend.model_manager.configs.gemma4_encoder import Gemma4Encoder_Gemma4Encoder_LTX2_Config
+from invokeai.backend.model_manager.configs.gemma4_encoder import (
+    Gemma4Encoder_Gemma4Encoder_LTX2_Config,
+    Gemma4Encoder_GGUF_LTX2_Config,
+)
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
 from invokeai.backend.model_manager.configs.ip_adapter import (
     IPAdapter_Checkpoint_Anima_Config,
@@ -119,11 +122,13 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_SDXLRefiner_Config,
     Main_Diffusers_Wan_Config,
     Main_Diffusers_ZImage_Config,
+    Main_GGUF_Anima_Config,
     Main_GGUF_ErnieImage_Config,
     Main_GGUF_Flux2_Config,
     Main_GGUF_FLUX_Config,
     Main_GGUF_Ideogram4_Config,
     Main_GGUF_Krea2_Config,
+    Main_GGUF_LTX2_Config,
     Main_GGUF_QwenImage21_Config,
     Main_GGUF_QwenImage_Config,
     Main_GGUF_Wan_Config,
@@ -223,7 +228,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     variant_type_adapter,
 )
-from invokeai.backend.quantization.gguf.loaders import parse_q8_cr_markers
+from invokeai.backend.quantization.gguf.loaders import COMFY_QUANT_KEY_PREFIX, parse_q8_cr_markers
 
 logger = logging.getLogger(__name__)
 
@@ -465,6 +470,8 @@ AnyModelConfig = Annotated[
         Annotated[Main_GGUF_Krea2_Config, Main_GGUF_Krea2_Config.get_tag()],
         Annotated[Main_GGUF_Ideogram4_Config, Main_GGUF_Ideogram4_Config.get_tag()],
         Annotated[Main_GGUF_ErnieImage_Config, Main_GGUF_ErnieImage_Config.get_tag()],
+        Annotated[Main_GGUF_LTX2_Config, Main_GGUF_LTX2_Config.get_tag()],
+        Annotated[Main_GGUF_Anima_Config, Main_GGUF_Anima_Config.get_tag()],
         # IMPORTANT: FLUX.2 must be listed BEFORE FLUX.1 here. An ambiguous SDNQ transformer
         # checkpoint (prefixed FLUX.2 keys) can look like a FLUX.1 main model, so FLUX.2 must get
         # first refusal. Main_SDNQ_FLUX_Config additionally rejects FLUX.2 state dicts to keep the
@@ -600,6 +607,7 @@ AnyModelConfig = Annotated[
         # Gemma 2 Encoder (used by PiD)
         Annotated[Gemma2Encoder_Gemma2Encoder_Config, Gemma2Encoder_Gemma2Encoder_Config.get_tag()],
         Annotated[Gemma4Encoder_Gemma4Encoder_LTX2_Config, Gemma4Encoder_Gemma4Encoder_LTX2_Config.get_tag()],
+        Annotated[Gemma4Encoder_GGUF_LTX2_Config, Gemma4Encoder_GGUF_LTX2_Config.get_tag()],
         Annotated[Gemma2Encoder_GGUF_Config, Gemma2Encoder_GGUF_Config.get_tag()],
         # Qwen VL Encoder (Qwen2.5-VL multimodal encoder for Qwen Image)
         Annotated[QwenVLEncoder_Diffusers_Config, QwenVLEncoder_Diffusers_Config.get_tag()],
@@ -719,15 +727,21 @@ class ModelConfigFactory:
         """
         if getattr(config, "format", None) is not ModelFormat.GGUFQuantized:
             return
+        metadata = mod.metadata()
+        if not type(config).DECODES_GGUF_Q8_CR:
+            # Nothing this config's loader runs decodes any of the converter's schemes, so whatever its
+            # JSON says is beside the point -- parsing it first would report a detail of the scheme (a
+            # marker on a tensor that is not a weight, say) in place of the reason the file is refused.
+            if any(key.startswith(COMFY_QUANT_KEY_PREFIX) for key in metadata):
+                raise InvalidMatchError(
+                    f"{mod.path.name} uses ComfyUI-GGUF's own quantization (Q8_CR or similar), which this model "
+                    "type cannot load yet. Use a GGML-quantized (Q8_0, Q4_K, ...) or safetensors build instead."
+                )
+            return
         try:
-            markers = parse_q8_cr_markers(mod.metadata(), mod.path.name)
+            parse_q8_cr_markers(metadata, mod.path.name)
         except ValueError as e:
             raise InvalidMatchError(str(e)) from None
-        if markers and not type(config).DECODES_GGUF_Q8_CR:
-            raise InvalidMatchError(
-                f"{mod.path.name} is a ComfyUI-GGUF Q8_CR (int8 convrot) file, which this model type cannot load "
-                "yet. Use a GGML-quantized (Q8_0, Q4_K, ...) or safetensors build instead."
-            )
 
     @staticmethod
     def from_dict(fields: dict[str, Any]) -> AnyModelConfig:
