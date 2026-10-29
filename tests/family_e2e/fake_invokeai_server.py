@@ -5,6 +5,11 @@ launch InvokeAI. It reads the scratch root's `invokeai.yaml` for its port and lo
 format, and executes a queued graph by walking its nodes: the model loader logs a full load once per cache flush, the
 `fake_denoise` node sends preview frames, and the non-intermediate node returns a PNG of its width and height.
 When `<code_dir>/crash-at-enqueue` holds N, the server deletes the file and dies while running its N-th queue item.
+The working-memory calibrate route enqueues like enqueue_batch and records one point per model node in a store file
+under the root's db_dir, as the real server does, and the request's `graph_models` with each run; a request without
+them is refused with 422, as the real server refuses it. `<code_dir>/calibration-refused` holds `{"at": N or null, "status":
+"<HTTP status line>", "detail": ...}`: the route answers the N-th request (every one for null) with that error.
+`<code_dir>/calibration-unavailable` makes the status report calibration unavailable, with the file's text as reason.
 Self-contained on purpose: it runs in a fresh interpreter with only the code directory on the path.
 """
 
@@ -26,13 +31,18 @@ import yaml
 from PIL import Image
 
 STEP_S = 0.01
-CRASH_MARKER = Path(__file__).resolve().parents[1] / "crash-at-enqueue"
+CODE_DIR = Path(__file__).resolve().parents[1]
+CRASH_MARKER = CODE_DIR / "crash-at-enqueue"
+CALIBRATION_REFUSED = CODE_DIR / "calibration-refused"
+CALIBRATION_UNAVAILABLE = CODE_DIR / "calibration-unavailable"
+DEVICE_CLASS_ID = "0123456789abcdef"
 MODEL_CONFIG = {
     "key": "fake-model",
     "name": "Fake",
     "base": "fake",
     "type": "main",
     "format": "checkpoint",
+    "variant": "normal",
     "hash": "blake3:fakehash",
     "path": "/models/fake.safetensors",
     "source": "https://example.com/fake.safetensors?token=fake-token",
@@ -51,8 +61,11 @@ class _QuietHandler(WSGIRequestHandler):
 
 
 class FakeInvoke:
-    def __init__(self, logger: logging.Logger) -> None:
+    def __init__(self, logger: logging.Logger, store_dir: Path) -> None:
         self.logger = logger
+        self.store_file = store_dir / f"{DEVICE_CLASS_ID}.json"
+        self.calibrate_requests = 0
+        self.calibration_runs = 0
         self.sio = socketio.Server(async_mode="threading")
         self.sio.on("subscribe_queue", self.subscribe)
         self.lock = threading.Lock()
@@ -109,12 +122,57 @@ class FakeInvoke:
             results[prepared] = result
             time.sleep(STEP_S)
             self.emit("invocation_complete", base | {"result": result})
+        run_id = item["batch"].get("origin", "").removeprefix("invokeai:wm-calibration:")
+        if run_id != item["batch"].get("origin", ""):
+            self.record_points(
+                run_id, item_id, [node_id for node_id, node in graph["nodes"].items() if "model" in node]
+            )
         item.update(
             status="completed",
             completed_at=str(datetime.now()),
             session={"source_prepared_mapping": mapping, "results": results},
         )
         self.emit("queue_item_status_changed", {"item_id": item_id, "status": "completed"})
+
+    def enqueue(self, batch: dict) -> int:
+        with self.lock:
+            item_id = len(self.items) + 1
+            self.items[item_id] = {"item_id": item_id, "status": "pending", "batch": batch, "session": {}}
+            crash = CRASH_MARKER.exists() and CRASH_MARKER.read_text() == str(item_id)
+            if crash:
+                CRASH_MARKER.unlink()
+        threading.Thread(target=self.execute, args=(item_id, crash), daemon=True).start()
+        return item_id
+
+    def store(self) -> dict:
+        if self.store_file.is_file():
+            return json.loads(self.store_file.read_text(encoding="utf-8"))
+        return {"schema_version": 1, "device_class": {"id": DEVICE_CLASS_ID}, "runs": [], "points": [], "envs": []}
+
+    def record_points(self, run_id: str, item_id: int, node_ids: list[str]) -> None:
+        with self.lock:
+            store = self.store()
+            store["points"] += [{"run_id": run_id, "queue_item_id": item_id, "node_id": n} for n in node_ids]
+            self.store_file.parent.mkdir(parents=True, exist_ok=True)
+            self.store_file.write_text(json.dumps(store), encoding="utf-8")
+
+    def calibrate(self, model_key: str, body: dict) -> tuple[dict, str]:
+        self.calibrate_requests += 1
+        if CALIBRATION_REFUSED.exists():
+            refusal = json.loads(CALIBRATION_REFUSED.read_text())
+            if refusal["at"] in (None, self.calibrate_requests):
+                return {"detail": refusal["detail"]}, refusal["status"]
+        if not isinstance(body.get("graph_models"), dict):
+            return {"detail": "graph_models: Field required"}, "422 Unprocessable Entity"
+        self.calibration_runs += 1
+        run_id = f"run-{self.calibration_runs}"
+        with self.lock:
+            store = self.store()
+            store["runs"].append({"run_id": run_id, "model_key": model_key, "graph_models": body["graph_models"]})
+            self.store_file.parent.mkdir(parents=True, exist_ok=True)
+            self.store_file.write_text(json.dumps(store), encoding="utf-8")
+        batch = {"graph": body["graph"], "data": body.get("data"), "origin": f"invokeai:wm-calibration:{run_id}"}
+        return {"run_id": run_id, "device_class_id": DEVICE_CLASS_ID, "item_ids": [self.enqueue(batch)]}, "201 Created"
 
     def __call__(self, environ, start_response):
         method, path = environ["REQUEST_METHOD"], environ["PATH_INFO"]
@@ -145,19 +203,18 @@ class FakeInvoke:
                 self.uploads += 1
                 return reply({"image_name": f"upload-{self.uploads}.png"}, status="201 Created")
         if path == "/api/v1/queue/default/enqueue_batch":
-            with self.lock:
-                item_id = len(self.items) + 1
-                self.items[item_id] = {
-                    "item_id": item_id,
-                    "status": "pending",
-                    "batch": json.loads(body)["batch"],
-                    "session": {},
-                }
-                crash = CRASH_MARKER.exists() and CRASH_MARKER.read_text() == str(item_id)
-                if crash:
-                    CRASH_MARKER.unlink()
-            threading.Thread(target=self.execute, args=(item_id, crash), daemon=True).start()
-            return reply({"item_ids": [item_id]}, status="201 Created")
+            return reply({"item_ids": [self.enqueue(json.loads(body)["batch"])]}, status="201 Created")
+        if match := re.fullmatch(r"/api/v2/models/i/([^/]+)/working_memory/calibrate", path):
+            payload, status = self.calibrate(match[1], json.loads(body))
+            return reply(payload, status=status)
+        if path == "/api/v2/models/working_memory/status":
+            reason = CALIBRATION_UNAVAILABLE.read_text() if CALIBRATION_UNAVAILABLE.exists() else None
+            status = {"available": reason is None, "unavailable_reason": reason}
+            return reply(status | {"current_device_class_id": DEVICE_CLASS_ID})
+        if path == "/api/v2/models/working_memory/export":
+            if not self.store_file.is_file() or environ.get("QUERY_STRING") != f"device_class_id={DEVICE_CLASS_ID}":
+                return reply({"detail": "no store"}, status="404 Not Found")
+            return reply(self.store_file.read_bytes())
         if path == "/api/v1/queue/default/status":
             states = [item["status"] for item in self.items.values()]
             return reply(
@@ -186,7 +243,7 @@ def main() -> None:
     logger.setLevel(logging.INFO)
     logger.addHandler(handler)
 
-    fake = FakeInvoke(logger)
+    fake = FakeInvoke(logger, root / config.get("db_dir", "databases") / "working_memory")
     app = socketio.WSGIApp(fake.sio, fake, socketio_path="/ws/socket.io")
     port = config["port"]
     while True:

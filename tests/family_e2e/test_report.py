@@ -15,6 +15,7 @@ from scripts.family_e2e.records import (
     Residency,
     Thresholds,
     append_record,
+    load_run_info,
     write_run_info,
 )
 from scripts.family_e2e.references import accept
@@ -344,6 +345,22 @@ def test_previous_run_is_the_latest_earlier_one_of_the_profile_with_the_case(tmp
     assert not any(run_id in report for run_id in ("20261002-", "20261004-"))
 
 
+def test_a_calibration_run_is_never_the_previous_run(tmp_path: Path) -> None:
+    """The probe changes time and VRAM, so a calibration run in between is passed over."""
+    current = "20261003-000000-rtx4090"
+    _write_run(tmp_path, "20261001-000000-rtx4090", _case_records("20261001-000000-rtx4090", totals=(20.0,) * 3))
+    calibration = _write_run(
+        tmp_path, "20261002-000000-rtx4090", _case_records("20261002-000000-rtx4090", totals=(5.0,) * 3)
+    )
+    write_run_info(calibration, load_run_info(calibration).model_copy(update={"calibrate": True}))
+    run_dir = _write_run(tmp_path, current, _case_records(current))
+
+    result = write_report(tmp_path, run_dir)
+
+    assert _summary(result)[CASE][4] == "**-50.0%**"
+    assert "20261002-000000-rtx4090" not in result.report_html.read_text(encoding="utf-8")
+
+
 def test_runs_of_other_profiles_are_never_read_but_an_unreadable_run_of_this_one_is_noted(tmp_path: Path) -> None:
     current = "20261003-000000-rtx4090"
     _write_run(tmp_path, "20261001-000000-rtx4090", _case_records("20261001-000000-rtx4090", totals=(20.0,) * 3))
@@ -351,7 +368,7 @@ def test_runs_of_other_profiles_are_never_read_but_an_unreadable_run_of_this_one
     # starts like this run's.
     for run_id in ("20261002-000000-rtx4090-vae", "20261002-060000-rtx4090"):
         (tmp_path / "runs" / run_id).mkdir()
-        (tmp_path / "runs" / run_id / "run.json").write_text(json.dumps({"calibrate": False}))
+        (tmp_path / "runs" / run_id / "run.json").write_text(json.dumps({"field_of_a_later_tool": False}))
     run_dir = _write_run(tmp_path, current, _case_records(current))
 
     result = write_report(tmp_path, run_dir)

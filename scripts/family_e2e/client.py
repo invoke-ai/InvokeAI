@@ -45,7 +45,10 @@ PREVIEW_INTERVAL_S = 0.1
 
 
 class ApiError(RuntimeError):
-    pass
+    def __init__(self, message: str, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        """The HTTP status of an error response; None for an accepted response the client cannot use."""
 
 
 class InvokeClient:
@@ -56,11 +59,14 @@ class InvokeClient:
     def _request(self, method: str, path: str, **kwargs: Any) -> requests.Response:
         response = self._http.request(method, self.base_url + path, timeout=REQUEST_TIMEOUT_S, **kwargs)
         if response.status_code >= 400:
-            raise ApiError(f"{method} {path} -> {response.status_code}: {response.text[:2000]}")
+            raise ApiError(f"{method} {path} -> {response.status_code}: {response.text[:2000]}", response.status_code)
         return response
 
     def get(self, path: str, **params: Any) -> Any:
         return self._request("GET", path, params=params or None).json()
+
+    def get_bytes(self, path: str, **params: Any) -> bytes:
+        return self._request("GET", path, params=params or None).content
 
     def post(self, path: str, body: Any = None) -> Any:
         return self._request("POST", path, json=body).json()

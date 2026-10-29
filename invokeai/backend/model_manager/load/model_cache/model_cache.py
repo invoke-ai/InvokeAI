@@ -2392,9 +2392,9 @@ class ModelCache:
             vram_total_available_to_cache = int(self._max_vram_cache_size_gb * GB) - working_mem_bytes
             return vram_total_available_to_cache - self._get_vram_in_use() - reserve_vram_bytes
 
-        if self._execution_device.type == "cuda":
-            vram_allocated = torch.cuda.memory_allocated(self._execution_device)
-            vram_free, _vram_total = TorchDevice.cuda_mem_get_info(self._execution_device)
+        # Shared-memory devices (MPS, Intel integrated GPUs) count free system RAM, not device totals.
+        vram_available_to_process = TorchDevice.memory_available_to_process(self._execution_device)
+        if device_has_dedicated_vram(self._execution_device):
             # Blocks the caching allocator holds but is not using are just as available to this
             # process as driver-free memory: the allocator reuses them directly, and empty_cache()
             # returns whole unoccupied segments to the driver. mem_get_info() alone counts them as
@@ -2404,25 +2404,9 @@ class ModelCache:
             # minimum weight set (observed: a fully-evictable multi-GB reserve left a 20 GB
             # transformer at 0% residency while the allocator happily reused the "missing" memory
             # for activations). Credit the reclaimable reserve, excluding intra-segment
-            # fragmentation slack that a large contiguous allocation could not use.
-            vram_available_to_process = vram_free + vram_allocated + self._get_reclaimable_allocator_bytes()
-        elif self._execution_device.type == "xpu" and device_has_dedicated_vram(self._execution_device):
-            vram_allocated = torch.xpu.memory_allocated(self._execution_device)
-            vram_free, _vram_total = TorchDevice.xpu_mem_get_info(self._execution_device)
-            vram_available_to_process = vram_free + vram_allocated + self._get_reclaimable_allocator_bytes()
-        elif self._execution_device.type in ("mps", "xpu"):
-            # Shared-memory devices: MPS, and Intel integrated GPUs, whose reported "VRAM" is
-            # system RAM. Budget against actual free system memory instead of device totals.
-            # TODO(ryand): Is it accurate that MPS shares memory with the CPU?
-            vram_reserved = (
-                torch.mps.driver_allocated_memory()
-                if self._execution_device.type == "mps"
-                else torch.xpu.memory_reserved(self._execution_device)
-            )
-            vram_free = psutil.virtual_memory().available
-            vram_available_to_process = vram_free + vram_reserved
-        else:
-            raise ValueError(f"Unsupported execution device: {self._execution_device.type}")
+            # fragmentation slack that a large contiguous allocation could not use. A shared
+            # device's figure already counts the backend's whole reserve.
+            vram_available_to_process += self._get_reclaimable_allocator_bytes()
 
         vram_total_available_to_cache = vram_available_to_process - working_mem_bytes
         vram_cur_available_to_cache = vram_total_available_to_cache - self._get_vram_in_use()
@@ -2474,6 +2458,23 @@ class ModelCache:
         expandable segments and by intra-segment slack — the measured-OOM cases that helper exists to exclude.
         """
         return self._get_vram_available(None, honor_cap=False)
+
+    def calibration_capacity(self) -> int:
+        """What the measured lock of a working-memory calibration can get on the execution device, its working memory
+        and the model it locks together: `_get_vram_available` without a working-memory reserve, which the calibration
+        sizes itself, as it stands once the calibration's pre-lock offload (`offload_unlocked_models_from_vram`) ran.
+
+        On a device with dedicated VRAM that offload moves every other unlocked model out, so what the cache holds now
+        counts as available. On one whose memory is system RAM (MPS, an integrated GPU) it moves nothing, so what is
+        allocated now stays subtracted, as the lock subtracts it. Within `max_vram_cache_size_gb` (the lock budgets
+        against the cap; the device must still hold it), less `reserve_vram_gb`. Without the allocator's reclaimable
+        credit: a plan does not count on blocks the offload's `empty_cache` returns only when it runs.
+        """
+        live = 0 if device_has_dedicated_vram(self._execution_device) else self._get_vram_in_use()
+        available = TorchDevice.memory_available_to_process(self._execution_device) - live
+        if self._max_vram_cache_size_gb is not None:
+            available = min(available, int(self._max_vram_cache_size_gb * GB) - live)
+        return available - int(self._reserve_vram_gb * GB)
 
     def _get_vram_in_use(self) -> int:
         """Get the amount of VRAM currently in use by the cache."""
@@ -3188,6 +3189,23 @@ class ModelCache:
             return 0
         keep = set(keep_model_keys)
         return self._offload_entries_from_vram(lambda key: key.split(":", 1)[0] not in keep)
+
+    @synchronized
+    def offload_unlocked_models_from_vram(self, keep_cache_keys: Collection[str] = ()) -> int:
+        """Move every unlocked entry but those in `keep_cache_keys` from VRAM to RAM whole, keeping it cached.
+
+        `keep_cache_keys` are exact cache keys: keeping a submodel (`<model key>:vae`) keeps none of its siblings, unlike
+        `offload_models_from_vram_except`. Each entry leaves whole, where `lock()` moves out only the shortfall it
+        predicts and so splits the last model it reaches. A working-memory calibration calls this before its measured
+        lock (`LoadedModelWithoutConfig.model_on_device`), so that lock has nothing to split.
+
+        Returns the number of VRAM bytes freed.
+        """
+        if not device_has_dedicated_vram(self._execution_device):
+            # CPU, MPS, integrated GPUs: their "VRAM" is system RAM, so moving models out frees nothing.
+            return 0
+        keep = set(keep_cache_keys)
+        return self._offload_entries_from_vram(lambda key: key not in keep)
 
     def _offload_entries_from_vram(self, select: Callable[[str], bool]) -> int:
         bytes_freed = 0
