@@ -24,6 +24,7 @@ from invokeai.backend.model_manager.load.model_loaders.comfyui_state_dict_utils 
 )
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.model_manager.load.quantized_embedding import materialize_quantized_embedding
+from invokeai.backend.model_manager.qwen_image_controlnet_keys import is_qwen_image_instantx_controlnet
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
@@ -287,6 +288,14 @@ class QwenImageCheckpointModel(ModelLoader):
 
         sd = load_file(str(model_path))
         sd = CheckpointPrefix.detect(sd).strip(sd)
+        # Earlier versions identified InstantX's Qwen-Image ControlNet, a trimmed copy of this transformer, as a main
+        # model. Such a record still exists; the file only needs identifying again.
+        if is_qwen_image_instantx_controlnet(sd):
+            raise ValueError(
+                f"'{config.name}' is a Qwen Image ControlNet, not a main model: an earlier version of Invoke "
+                "installed it as one. Run Re-identify model on it in the Model Manager to fix the record, then pick "
+                "it in a control layer."
+            )
 
         # Comfy's nvfp4 build keeps the image stream's attention and MLP in nvfp4, beside scaled fp8. Take those layers
         # out before the fold: `_dequantize_comfyui_fp8` multiplies every `.weight_scale` into its weight, nvfp4's

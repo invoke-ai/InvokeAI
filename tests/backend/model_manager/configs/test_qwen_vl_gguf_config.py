@@ -10,7 +10,8 @@ Each file's header is real, written with gguf-py and read by the configs as they
 through ``ModelOnDisk.metadata()``, the numeric context length through a reader of its own. Its tensors are
 shape-faithful stand-ins without data (``_HeaderOnDisk``), because a 7B encoder's embedding alone is gigabytes. The
 real unsloth header, tensor shapes included, is pinned by the stripped Q4_K_M fixture in
-``tests/model_identification/stripped_models``, which the first test reads.
+``tests/model_identification/stripped_models``, which the first test reads. The last tests write a whole encoder's
+tensor set at a small width and identify it through ``ModelOnDisk``, which reads the shapes from the header.
 """
 
 from collections.abc import Iterable
@@ -22,6 +23,7 @@ import numpy as np
 import pytest
 import torch
 
+from invokeai.backend.model_manager.configs import qwen_vl_encoder
 from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
 from invokeai.backend.model_manager.configs.qwen_vl_encoder import QwenVLEncoder_GGUF_Config
@@ -261,3 +263,61 @@ def test_a_file_that_is_not_a_gguf_is_reported_as_a_non_match(tmp_path: Path) ->
 
     with pytest.raises(NotAMatchError, match="general.architecture"):
         _config_from(ModelOnDisk(path))
+
+
+# A real file read as identification reads it: `ModelOnDisk` takes the tensors' names, shapes and quantization types
+# from the header and none of their data.
+
+_SMALL_WIDTH = 32  # One Q8_0 block per row.
+_SMALL_VOCAB_SIZE = 64
+
+
+def _write_small_encoder(path: Path) -> Path:
+    """A Qwen2.5-VL language model's complete tensor set at a small width: an unsloth header otherwise, 28 blocks.
+
+    The embedding is Q8_0, whose packed bytes have another shape than the matrix they decode to, so a probe that
+    read the storage shape would see the wrong width.
+    """
+    writer = gguf.GGUFWriter(str(path), "qwen2vl")
+    writer.add_uint32("qwen2vl.block_count", 28)
+    writer.add_uint32("qwen2vl.embedding_length", _SMALL_WIDTH)
+    writer.add_uint32("qwen2vl.context_length", 128000)
+    embedding = gguf.quants.quantize(
+        np.zeros((_SMALL_VOCAB_SIZE, _SMALL_WIDTH), dtype=np.float32), gguf.GGMLQuantizationType.Q8_0
+    )
+    writer.add_tensor(
+        "token_embd.weight", embedding, raw_shape=embedding.shape, raw_dtype=gguf.GGMLQuantizationType.Q8_0
+    )
+    writer.add_tensor("output_norm.weight", np.zeros(_SMALL_WIDTH, dtype=np.float32))
+    for layer in range(28):
+        for name in _BLOCK_TENSORS:
+            writer.add_tensor(f"blk.{layer}.{name}", np.zeros(_SMALL_WIDTH, dtype=np.float32))
+    writer.write_header_to_file()
+    writer.write_kv_data_to_file()
+    writer.write_tensors_to_file()
+    writer.close()
+    return path
+
+
+def test_a_real_file_is_measured_by_its_logical_shapes_read_from_the_header(tmp_path: Path) -> None:
+    mod = ModelOnDisk(_write_small_encoder(tmp_path / "Qwen2.5-VL-small-Q8_0.gguf"))
+
+    result = _identify(mod, allow_unknown=True)
+
+    assert result.config is None
+    [reason] = result.invalid_matches
+    assert f"{_SMALL_WIDTH} wide with 28 layers and a {_SMALL_VOCAB_SIZE}-token vocabulary" in str(reason)
+    assert all(tensor.quantized_data.is_meta for tensor in mod.load_state_dict().values())
+
+
+def test_a_real_file_of_the_expected_geometry_identifies_from_its_header_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The 7B's own embedding is gigabytes even as Q4_K, so the expected geometry is scaled down to the file's."""
+    monkeypatch.setattr(qwen_vl_encoder, "_QWEN_IMAGE_ENCODER_HIDDEN_SIZE", _SMALL_WIDTH)
+    monkeypatch.setattr(qwen_vl_encoder, "_QWEN_IMAGE_ENCODER_VOCAB_SIZE", _SMALL_VOCAB_SIZE)
+
+    result = _identify(ModelOnDisk(_write_small_encoder(tmp_path / "Qwen2.5-VL-small-Q8_0.gguf")))
+
+    assert result.match_count == 1
+    assert isinstance(result.config, QwenVLEncoder_GGUF_Config)
