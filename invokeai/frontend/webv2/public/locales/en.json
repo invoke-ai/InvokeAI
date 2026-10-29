@@ -5822,7 +5822,7 @@
       "progressShared": "Active gallery runs across all boards",
       "followSelectedBoardDescription": "New results go to whichever board the Gallery shows, instead of the board named under Saving to.",
       "savingTo": "Saving to",
-      "destinationTrigger": "Saving new results to {{name}}. Change where they go",
+      "destinationTriggerHint": "Change where new results go",
       "destinationTooltip": "New generations, canvas saves and pasted uploads go to {{name}}, as do workflow nodes whose board is Auto.",
       "destinationFollowingTooltip": "New results follow the selected board, now {{name}}.",
       "destinationDefault": "Default",

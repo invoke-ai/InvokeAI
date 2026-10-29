@@ -733,7 +733,7 @@ const runTopbarMenuJourney = async (browser) => {
     const whatsNewItem = page.getByRole('menuitem', { exact: true, name: "What's New in Invoke" });
     const documentationItem = page.getByRole('menuitem', { exact: true, name: 'Documentation' });
     const discordItem = page.getByRole('menuitem', { exact: true, name: 'Discord' });
-    const donationItem = appMenu.getByRole('menuitem', { exact: true, name: 'Donate to InvokeAI' });
+    const donationItem = appMenu.getByRole('menuitem', { exact: true, name: 'Donate to Invoke' });
     await commandPaletteItem.waitFor();
     await settingsItem.waitFor();
     await whatsNewItem.waitFor();
@@ -770,13 +770,14 @@ const runTopbarMenuJourney = async (browser) => {
     });
     assert.equal(await page.getByRole('tooltip', { name: /^Command palette/ }).count(), 0);
 
-    // Donate is its own group right after Manage (ending with Queue), above the footer icon row; this mock journey
+    // Donate is its own group right after Manage (ending with Queue and Widgets), above the footer icon row; this mock journey
     // is single-user, so no account section sits between them.
     const menuItemValues = await appMenu.evaluate((menu) =>
       [...menu.querySelectorAll('[role="menuitem"]')].map((item) => item.getAttribute('data-value'))
     );
     assert.deepEqual(menuItemValues.slice(menuItemValues.indexOf('queue')), [
       'queue',
+      'widgets',
       'donate',
       'command-palette',
       'settings',
@@ -785,10 +786,19 @@ const runTopbarMenuJourney = async (browser) => {
       'discord',
     ]);
     const queueItem = appMenu.locator('[role="menuitem"][data-value="queue"]');
+    const widgetsItem = appMenu.locator('[role="menuitem"][data-value="widgets"]');
 
     await appMenu.press('End');
     assert.equal(await appMenu.getAttribute('aria-activedescendant'), await discordItem.getAttribute('id'));
-    for (const item of [documentationItem, whatsNewItem, settingsItem, commandPaletteItem, donationItem, queueItem]) {
+    for (const item of [
+      documentationItem,
+      whatsNewItem,
+      settingsItem,
+      commandPaletteItem,
+      donationItem,
+      widgetsItem,
+      queueItem,
+    ]) {
       await appMenu.press('ArrowUp');
       assert.equal(await appMenu.getAttribute('aria-activedescendant'), await item.getAttribute('id'));
     }
