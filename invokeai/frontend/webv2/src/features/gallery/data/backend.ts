@@ -14,6 +14,7 @@ import type {
   GalleryGeneralAccess,
   GalleryBoardDeletionResult,
   GalleryBoardOrderBy,
+  GalleryDeleteOptions,
   GalleryDeletionResult,
   GalleryImage,
   GalleryImageMetadata,
@@ -1147,9 +1148,13 @@ export const updateGalleryBoard = async (
 export const deleteGalleryBoard = async (
   boardId: string,
   includeImages: boolean,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  { deleteStarred }: GalleryDeleteOptions = {}
 ): Promise<GalleryBoardDeletionResult> => {
-  const query = toSearchParams({ include_images: includeImages });
+  const query = toSearchParams({
+    delete_starred: deleteStarred === false ? false : undefined,
+    include_images: includeImages,
+  });
   const body = await apiFetchJson<{
     board_id: string;
     deleted_board_images: string[];
@@ -1158,6 +1163,8 @@ export const deleteGalleryBoard = async (
     deleted_videos?: string[];
     failed_images?: string[];
     failed_videos?: string[];
+    starred_images_skipped?: string[];
+    starred_videos_skipped?: string[];
   }>(`/api/v1/boards/${encodeURIComponent(boardId)}?${query}`, { method: 'DELETE', signal });
 
   return {
@@ -1168,12 +1175,29 @@ export const deleteGalleryBoard = async (
     deletedVideoNames: body.deleted_videos ?? [],
     failedImageNames: body.failed_images ?? [],
     failedVideoNames: body.failed_videos ?? [],
+    protectedImageNames: body.starred_images_skipped ?? [],
+    protectedVideoNames: body.starred_videos_skipped ?? [],
   };
+};
+
+/** Starred items on a board across both gallery views, so a delete can say what protection will keep. */
+export const countGalleryBoardStarredItems = async (boardId: string, signal?: AbortSignal): Promise<number> => {
+  const views: GalleryView[] = ['images', 'assets'];
+  // A zero-row page still reports the total, so no item is serialized for a count.
+  const pages = await Promise.all(
+    views.map((galleryView) =>
+      listGalleryItems({ boardId, galleryView, limit: 0, searchTerm: '', signal, starred: true })
+    )
+  );
+
+  return pages.reduce((total, page) => total + page.total, 0);
 };
 
 export interface GalleryItemOrganizationTransportResult {
   affectedBoardIds: string[];
   succeededNames: string[];
+  /** Starred names a delete left alone because protection was on. They still exist. */
+  protectedNames?: string[];
 }
 
 interface GalleryImageDeleteTransportResult extends GalleryItemOrganizationTransportResult {
@@ -1314,7 +1338,8 @@ export const unstarGalleryImages = (imageNames: string[], signal?: AbortSignal):
 
 export const deleteGalleryImageItems = async (
   imageNames: string[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  { deleteStarred }: GalleryDeleteOptions = {}
 ): Promise<GalleryImageDeleteTransportResult> => {
   if (imageNames.length === 0) {
     return { ...emptyGalleryItemOrganizationTransportResult(), failedNames: [] };
@@ -1322,7 +1347,7 @@ export const deleteGalleryImageItems = async (
 
   signal?.throwIfAborted();
   const body = await apiFetchJson<unknown>('/api/v1/images/delete', {
-    body: JSON.stringify({ image_names: imageNames }),
+    body: JSON.stringify({ delete_starred: deleteStarred === false ? false : undefined, image_names: imageNames }),
     method: 'POST',
     signal,
   });
@@ -1331,6 +1356,7 @@ export const deleteGalleryImageItems = async (
   return {
     ...mapGalleryItemOrganizationTransportResult(body, 'deleted_images'),
     failedNames: getOptionalStringArray(body, 'failed_images'),
+    protectedNames: getOptionalStringArray(body, 'starred_skipped'),
   };
 };
 
@@ -1351,7 +1377,8 @@ const mutateGalleryVideoItems = async (
   videoNames: string[],
   operation: 'delete' | 'star' | 'unstar',
   succeededField: 'deleted_videos' | 'starred_videos' | 'unstarred_videos',
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  extraBody: Record<string, unknown> = {}
 ): Promise<GalleryItemOrganizationTransportResult> => {
   if (videoNames.length === 0) {
     return emptyGalleryItemOrganizationTransportResult();
@@ -1359,20 +1386,27 @@ const mutateGalleryVideoItems = async (
 
   signal?.throwIfAborted();
   const body = await apiFetchJson<unknown>(`/api/v1/videos/${operation}`, {
-    body: JSON.stringify({ video_names: videoNames }),
+    body: JSON.stringify({ ...extraBody, video_names: videoNames }),
     method: 'POST',
     signal,
   });
   signal?.throwIfAborted();
 
-  return mapGalleryVideoOrganizationTransportResult(body, succeededField);
+  const result = mapGalleryVideoOrganizationTransportResult(body, succeededField);
+
+  return operation === 'delete'
+    ? { ...result, protectedNames: getOptionalStringArray(body, 'starred_skipped') }
+    : result;
 };
 
 export const deleteGalleryVideoItems = (
   videoNames: string[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  { deleteStarred }: GalleryDeleteOptions = {}
 ): Promise<GalleryItemOrganizationTransportResult> =>
-  mutateGalleryVideoItems(videoNames, 'delete', 'deleted_videos', signal);
+  mutateGalleryVideoItems(videoNames, 'delete', 'deleted_videos', signal, {
+    delete_starred: deleteStarred === false ? false : undefined,
+  });
 
 export const setGalleryVideoItemsStarred = (
   videoNames: string[],
