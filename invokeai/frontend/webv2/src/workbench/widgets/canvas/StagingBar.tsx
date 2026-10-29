@@ -2,23 +2,12 @@ import type { CanvasStagingAreaContractV2, CanvasStagingCandidateContract } from
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop */
 import type { CanvasStagingSlot } from '@workbench/canvasStagingView';
 
-import {
-  Box,
-  Flex,
-  HStack,
-  Menu,
-  Portal,
-  ProgressCircle,
-  ScrollArea,
-  Skeleton,
-  Spinner,
-  Stack,
-  Text,
-} from '@chakra-ui/react';
+import { Box, HStack, Menu, Portal, ScrollArea, Skeleton, Spinner, Stack, Text } from '@chakra-ui/react';
 import { galleryImageUrls } from '@features/gallery/utility';
 import { getDeterminateProgressPercent } from '@features/queue/contracts';
 import { useQueueItemProgress, useQueueItemProgressImage } from '@features/queue/react';
 import { Button, Group, IconButton, MenuContent, Tooltip, useTooltipTriggerIds } from '@platform/ui';
+import { ProgressBadge } from '@platform/ui/ProgressBadge';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
 import { wheelScrollsHorizontally } from '@platform/ui/wheelScrollsHorizontally';
@@ -677,27 +666,14 @@ const StagingPlaceholderProgress = ({ percentage }: { percentage: number | null 
   const { t } = useTranslation();
 
   return (
-    <Flex align="center" inset="0" justify="center" pointerEvents="none" position="absolute" zIndex="1">
-      {percentage === null ? (
-        // The app-wide spinner, not the ring's indeterminate sweep, for unknown progress; as large as the ring.
-        <Flex bg="bg/85" borderWidth={1} p={0.5} rounded="full">
-          <Spinner aria-label={t('widgets.gallery.generationProgress')} boxSize="6" role="progressbar" />
-        </Flex>
-      ) : (
-        <ProgressCircle.Root
-          aria-label={t('widgets.gallery.generationProgressPercent', { percentage })}
-          bg="bg/85"
-          borderWidth={1}
-          p={0.5}
-          rounded="full"
-          value={percentage}
-        >
-          <ProgressCircle.Circle>
-            <ProgressCircle.Track />
-            <ProgressCircle.Range />
-          </ProgressCircle.Circle>
-        </ProgressCircle.Root>
-      )}
-    </Flex>
+    <ProgressBadge
+      label={
+        percentage === null
+          ? t('widgets.gallery.generationProgress')
+          : t('widgets.gallery.generationProgressPercent', { percentage })
+      }
+      percentage={percentage}
+      state="running"
+    />
   );
 };

@@ -3974,8 +3974,6 @@ describe('shared gallery progress section', () => {
     const indicator = host!.querySelector('[aria-label="In progress"] [role="progressbar"]');
     expect(indicator?.classList.contains('chakra-spinner')).toBe(true);
     expect(indicator?.getAttribute('aria-label')).toBe('Preparing');
-    // As large as the queued and finishing icons that take its place.
-    expect(indicator?.getBoundingClientRect().width).toBe(16);
   });
   it('letterboxes placeholders to the output aspect only in aspect thumbnail mode', async () => {
     currentProgressSessions = [

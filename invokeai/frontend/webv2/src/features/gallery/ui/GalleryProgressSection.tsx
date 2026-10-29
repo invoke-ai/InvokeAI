@@ -1,13 +1,14 @@
 import type { GalleryThumbnailFit } from '@features/gallery/core/settings';
 import type { QueueProgressSession } from '@features/queue/contracts';
 
-import { Box, chakra, Icon, ProgressCircle, Skeleton, Spinner, Text } from '@chakra-ui/react';
+import { Box, chakra, Icon, Skeleton, Text } from '@chakra-ui/react';
 import { getDeterminateProgressPercent } from '@features/queue/contracts';
 import { useItemProgress, useQueueItemProgressImage } from '@features/queue/react';
+import { ProgressBadge } from '@platform/ui/ProgressBadge';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { CheckIcon, ChevronRightIcon, HourglassIcon } from 'lucide-react';
+import { ChevronRightIcon, HourglassIcon } from 'lucide-react';
 import { useCallback, useEffectEvent, useId, useLayoutEffect, useRef } from 'react';
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
 import { useTranslation } from 'react-i18next';
@@ -290,30 +291,11 @@ const GalleryProgressTile = ({
             <Skeleton aspectRatio={placeholderAspectRatio ?? undefined} {...placeholderSize} />
           )}
         </StreamingImageFrame>
-        <Box
-          position="absolute"
-          bottom="1"
-          right="1"
-          pointerEvents="none"
-          bg="bg/85"
-          rounded="full"
-          p="0.5"
-          display="flex"
-        >
-          {session.state === 'running' && percentage === null ? (
-            // The app-wide spinner, not the ring's indeterminate sweep, for unknown progress.
-            <Spinner aria-label={status} boxSize="4" role="progressbar" />
-          ) : session.state === 'running' ? (
-            <ProgressCircle.Root aria-label={status} value={percentage}>
-              <ProgressCircle.Circle>
-                <ProgressCircle.Track />
-                <ProgressCircle.Range />
-              </ProgressCircle.Circle>
-            </ProgressCircle.Root>
-          ) : (
-            <Icon as={session.state === 'queued' ? HourglassIcon : CheckIcon} boxSize="4" aria-label={status} />
-          )}
-        </Box>
+        <ProgressBadge
+          label={status}
+          percentage={percentage}
+          state={session.state === 'settling' ? 'completed' : session.state}
+        />
       </chakra.button>
     </Tooltip>
   );
