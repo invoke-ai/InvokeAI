@@ -223,6 +223,8 @@ export interface ControlModelClass {
  */
 const FUN_UNION_BASES: ReadonlySet<string> = new Set(['z-image', 'qwen-image', 'flux2']);
 const FUN_UNION_COVERS: readonly ControlFamily[] = ['canny', 'mlsd', 'softedge', 'depth', 'openpose'];
+/** The InstantX Qwen-Image ControlNet-Union, which also installs as a Qwen-Image `controlnet`: no MLSD. */
+const INSTANTX_QWEN_UNION_COVERS: readonly ControlFamily[] = ['canny', 'softedge', 'depth', 'openpose'];
 /** InstantX FLUX.1 Union modes the control types map onto. */
 const FLUX_UNION_COVERS: readonly ControlFamily[] = ['canny', 'tile', 'depth', 'openpose'];
 /** The xinsir SDXL Union (ProMax) conditions; upscale also takes an SDXL union as its tile ControlNet. */
@@ -292,12 +294,13 @@ const preprocessorFamily = (model: Pick<ModelConfig, 'default_settings'>): Contr
   return preprocessor && Object.hasOwn(PREPROCESSOR_FAMILY, preprocessor) ? PREPROCESSOR_FAMILY[preprocessor]! : null;
 };
 
-type ClassifiableModel = Pick<ModelConfig, 'name' | 'base' | 'type' | 'default_settings'>;
+type ClassifiableModel = Pick<ModelConfig, 'name' | 'base' | 'type' | 'default_settings' | 'control_architecture'>;
 
 const classify = (model: ClassifiableModel): ControlModelClass => {
   const tokens = nameTokens(model.name);
   if (model.type === 'controlnet' && FUN_UNION_BASES.has(model.base)) {
-    return { covers: FUN_UNION_COVERS, family: null, purpose: null, union: true };
+    const covers = model.control_architecture === 'instantx_union' ? INSTANTX_QWEN_UNION_COVERS : FUN_UNION_COVERS;
+    return { covers, family: null, purpose: null, union: true };
   }
   if (hasToken(tokens, 'union')) {
     // Other bases' union models need the backend to expose their control types; until then they are explicit picks.

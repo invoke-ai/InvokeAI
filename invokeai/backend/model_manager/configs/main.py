@@ -52,6 +52,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
 )
 from invokeai.backend.model_manager.configs.qwen3_encoder import _SDNQ_LOADABLE_QWEN_ARCHITECTURES
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
+from invokeai.backend.model_manager.qwen_image_controlnet_keys import is_qwen_image_instantx_controlnet
 from invokeai.backend.model_manager.taxonomy import (
     AnimaVariantType,
     BaseModelType,
@@ -2386,6 +2387,10 @@ def _has_qwen_image_keys(state_dict: dict[str | int, Any]) -> bool:
         and has_txt_norm
         and has_img_in
         and not has_context_embedder
+        # InstantX's Qwen-Image ControlNet is a trimmed copy of this transformer, `img_in`/`txt_in`/`txt_norm`
+        # included; the ControlNet config claims it. Asked of the stripped keys, as the loader asks: a prefixed copy
+        # identified as a main model would be refused at load, and identified as one again by Re-identify.
+        and not is_qwen_image_instantx_controlnet(set(keys))
         and not _has_qwen_image21_keys(state_dict)
     )
 
