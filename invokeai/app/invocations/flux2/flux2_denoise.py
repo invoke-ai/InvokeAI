@@ -37,6 +37,7 @@ from invokeai.backend.flux2.ref_image_extension import Flux2RefImageExtension
 from invokeai.backend.flux2.sampling_utils import (
     compute_empirical_mu,
     generate_img_ids_flux2,
+    get_flux2_bn_stats,
     get_noise_flux2,
     get_schedule_flux2,
     pack_flux2,
@@ -189,44 +190,9 @@ class Flux2DenoiseInvocation(BaseInvocation):
     )
 
     def _get_bn_stats(self, context: InvocationContext) -> Optional[Tuple[torch.Tensor, torch.Tensor]]:
-        """Extract BN statistics from the FLUX.2 VAE.
-
-        The FLUX.2 VAE uses batch normalization on the patchified 128-channel representation.
-        IMPORTANT: BFL FLUX.2 VAE uses affine=False, so there are NO learnable weight/bias.
-
-        BN formula (affine=False): y = (x - mean) / std
-        Inverse: x = y * std + mean
-
-        Returns:
-            Tuple of (bn_mean, bn_std) tensors of shape (128,), or None if BN layer not found.
-        """
+        """Extract the latent BN statistics (bn_mean, bn_std) from the wired FLUX.2 VAE, or None if it has none."""
         with context.models.load(self.vae.vae).model_on_device() as (_, vae):
-            # Ensure VAE is in eval mode to prevent BN stats from being updated
-            vae.eval()
-
-            # Try to find the BN layer - it may be at different locations depending on model format
-            bn_layer = None
-            if hasattr(vae, "bn"):
-                bn_layer = vae.bn
-            elif hasattr(vae, "batch_norm"):
-                bn_layer = vae.batch_norm
-            elif hasattr(vae, "encoder") and hasattr(vae.encoder, "bn"):
-                bn_layer = vae.encoder.bn
-
-            if bn_layer is None:
-                return None
-
-            # Verify running statistics are initialized
-            if bn_layer.running_mean is None or bn_layer.running_var is None:
-                return None
-
-            # Get BN running statistics from VAE
-            bn_mean = bn_layer.running_mean.clone()  # Shape: (128,)
-            bn_var = bn_layer.running_var.clone()  # Shape: (128,)
-            bn_eps = bn_layer.eps if hasattr(bn_layer, "eps") else 1e-4  # BFL uses 1e-4
-            bn_std = torch.sqrt(bn_var + bn_eps)
-
-        return bn_mean, bn_std
+            return get_flux2_bn_stats(vae)
 
     def _bn_normalize(
         self,
