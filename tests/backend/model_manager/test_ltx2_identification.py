@@ -9,6 +9,8 @@ does -- including that no other config claims these folders first.
 import json
 from pathlib import Path
 
+import gguf
+import numpy as np
 import pytest
 import torch
 from safetensors.torch import save_file
@@ -16,7 +18,10 @@ from safetensors.torch import save_file
 from invokeai.backend.ltx2 import checkpoint_layout as layout
 from invokeai.backend.ltx2 import component_configs as cc
 from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
-from invokeai.backend.model_manager.configs.gemma4_encoder import Gemma4Encoder_Gemma4Encoder_LTX2_Config
+from invokeai.backend.model_manager.configs.gemma4_encoder import (
+    Gemma4Encoder_Gemma4Encoder_LTX2_Config,
+    Gemma4Encoder_GGUF_LTX2_Config,
+)
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
 from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_LTX2_Config,
@@ -407,6 +412,153 @@ def test_a_gemma4_of_another_size_cannot_feed_the_connectors(tmp_path: Path) -> 
     _write_gemma4(tmp_path, ["te.safetensors"], config=_gemma4_config(hidden_size=2560, num_layers=32))
     rejection = _rejection(tmp_path, Gemma4Encoder_Gemma4Encoder_LTX2_Config)
     assert "hidden_size 3840" in str(rejection)
+
+
+# --- Gemma-4 encoder GGUF ------------------------------------------------------------------------
+
+
+def _write_gemma4_gguf(
+    path: Path,
+    *,
+    naming: str = "hf",
+    hidden_size: int = 3840,
+    num_layers: int = 48,
+    architecture: str = "ltxv",
+    config_key: str | None = "config",
+    assets: bool = True,
+    asset_type: gguf.GGMLQuantizationType = gguf.GGMLQuantizationType.I8,
+    layer_scalars: bool = True,
+) -> Path:
+    """A Gemma-4 GGUF with the published key set at its real width and depth, a few rows of data per tensor.
+
+    ``naming="hf"`` is the layout of the LTX conversions (elix3r, Rootport: Hugging Face names, the tokenizer
+    files and the unified config packed in); ``"llama.cpp"`` is Google's stock Gemma-4 as llama.cpp converts it.
+    """
+    writer = gguf.GGUFWriter(str(path), architecture)
+    rows = np.zeros((4, hidden_size), dtype=np.float32)
+    quantized = gguf.quants.quantize(np.zeros((32, hidden_size), dtype=np.float32), gguf.GGMLQuantizationType.Q8_0)
+    if naming == "hf":
+        writer.add_tensor("model.embed_tokens.weight", rows)
+        writer.add_tensor("model.norm.weight", np.ones(hidden_size, dtype=np.float32))
+        for layer in range(num_layers):
+            if layer_scalars:
+                writer.add_tensor(f"model.layers.{layer}.layer_scalar", np.ones(1, dtype=np.float32))
+            writer.add_tensor(
+                f"model.layers.{layer}.self_attn.q_proj.weight",
+                quantized,
+                raw_shape=quantized.shape,
+                raw_dtype=gguf.GGMLQuantizationType.Q8_0,
+            )
+        writer.add_tensor("text_embedding_projection.video_aggregate_embed.weight", np.zeros((4, 32), np.float32))
+        if assets:
+            for name in ("tokenizer_json", "hf_asset__tokenizer_config.json"):
+                data = np.frombuffer(b'{"tokenizer": true}', dtype=np.uint8)
+                as_stored = data.view(np.int8) if asset_type is gguf.GGMLQuantizationType.I8 else data.astype(np.int16)
+                writer.add_tensor(name, as_stored, raw_dtype=asset_type)
+    else:
+        writer.add_tensor("token_embd.weight", rows)
+        writer.add_tensor("output_norm.weight", np.ones(hidden_size, dtype=np.float32))
+        for layer in range(num_layers):
+            writer.add_tensor(
+                f"blk.{layer}.attn_q.weight",
+                quantized,
+                raw_shape=quantized.shape,
+                raw_dtype=gguf.GGMLQuantizationType.Q8_0,
+            )
+            writer.add_tensor(f"blk.{layer}.post_attention_norm.weight", np.ones(hidden_size, dtype=np.float32))
+    if config_key is not None:
+        text_config = {"model_type": "gemma4_text", "hidden_size": hidden_size, "num_hidden_layers": num_layers}
+        writer.add_string(
+            config_key,
+            json.dumps({"architectures": ["Gemma4UnifiedForConditionalGeneration"], "text_config": text_config}),
+        )
+    writer.write_header_to_file()
+    writer.write_kv_data_to_file()
+    writer.write_tensors_to_file()
+    writer.close()
+    return path
+
+
+@pytest.mark.parametrize(
+    ("architecture", "config_key", "asset_type"),
+    [
+        ("ltxv", "config", gguf.GGMLQuantizationType.I8),
+        ("gemma4", "source.safetensors.gemma_config", gguf.GGMLQuantizationType.I16),
+    ],
+    ids=["rootport", "elix3r"],
+)
+def test_an_ltx_gemma4_gguf_installs_as_the_encoder_whatever_its_header_says(
+    tmp_path: Path, architecture: str, config_key: str, asset_type
+) -> None:
+    path = _write_gemma4_gguf(
+        tmp_path / "gemma4-12b-ltx-text-encoder.gguf",
+        architecture=architecture,
+        config_key=config_key,
+        asset_type=asset_type,
+    )
+
+    result = _probe(path)
+
+    assert result.match_count == 1, [type(match).__name__ for match in result.all_matches]
+    assert isinstance(result.config, Gemma4Encoder_GGUF_LTX2_Config)
+    assert (result.config.base, result.config.format) == (BaseModelType.LTX2, ModelFormat.GGUFQuantized)
+
+
+def test_a_stock_llama_cpp_gemma4_12b_gguf_is_refused_as_not_the_ltx_fine_tune(tmp_path: Path) -> None:
+    """Same width and depth, different weights: Google's Gemma-4-12B cannot stand in for the LTX-tuned one."""
+    path = _write_gemma4_gguf(tmp_path / "gemma-4-12B-it-Q4_K_M.gguf", naming="llama.cpp", architecture="gemma4")
+
+    result = _probe(path)
+
+    assert result.config is None
+    assert any("llama.cpp layout" in str(reason) for reason in result.invalid_matches)
+
+
+@pytest.mark.parametrize("naming", ["llama.cpp", "hf"], ids=["llama.cpp", "hf-names-without-layer-scalars"])
+def test_a_gemma3_12b_gguf_is_left_unclaimed(tmp_path: Path, naming: str) -> None:
+    """Gemma-3-12B, LTX-2.0's encoder, has the Gemma-4-12B's width and depth. It is neither refused as the stock
+    Gemma-4 nor taken for the LTX tower: its header names it, and it has no layer scalars."""
+    path = _write_gemma4_gguf(
+        tmp_path / "gemma-3-12b-it-Q4_K_M.gguf", naming=naming, architecture="gemma3", layer_scalars=False
+    )
+
+    assert isinstance(_rejection(path, Gemma4Encoder_GGUF_LTX2_Config), NotAMatchError)
+
+
+@pytest.mark.parametrize(
+    ("missing", "named"),
+    [({"assets": False}, "carries no tokenizer"), ({"config_key": None}, "no model config")],
+    ids=["tokenizer", "config"],
+)
+def test_an_ltx_gemma4_gguf_without_what_it_needs_besides_the_weights_is_refused(
+    tmp_path: Path, missing: dict, named: str
+) -> None:
+    path = _write_gemma4_gguf(tmp_path / "gemma4-12b-ltx-text-encoder.gguf", **missing)
+
+    assert _refused_with(path, named)
+
+
+def _refused_with(path: Path, named: str) -> bool:
+    result = _probe(path)
+    return result.config is None and any(named in str(reason) for reason in result.invalid_matches)
+
+
+def test_a_gemma4_gguf_of_another_size_is_left_unclaimed(tmp_path: Path) -> None:
+    path = _write_gemma4_gguf(tmp_path / "gemma4-e4b.gguf", hidden_size=2560, num_layers=34)
+
+    assert isinstance(_rejection(path, Gemma4Encoder_GGUF_LTX2_Config), NotAMatchError)
+
+
+def test_an_mmproj_file_is_left_unclaimed(tmp_path: Path) -> None:
+    """The vision projector llama.cpp ships beside a Gemma-4 GGUF."""
+    path = tmp_path / "mmproj-gemma-4-12B-it-f16.gguf"
+    write_gguf(
+        path,
+        {"v.patch_embd.weight": torch.zeros(4, 4), "mm.input_projection.weight": torch.zeros(4, 4)},
+        architecture="clip",
+    )
+
+    assert isinstance(_rejection(path, Gemma4Encoder_GGUF_LTX2_Config), NotAMatchError)
 
 
 # --- key maps onto the diffusers classes --------------------------------------------------------

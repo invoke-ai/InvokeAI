@@ -190,6 +190,7 @@ from invokeai.backend.model_manager.starter_models.ltx_2 import (
     ltx2_5_duration_head,
     ltx2_5_prompt_enhancer,
     ltx2_5_text_encoder_bf16,
+    ltx2_5_text_encoder_gguf_q4_k_m,
     ltx2_5_text_encoder_int8,
 )
 from invokeai.backend.model_manager.starter_models.minimax_h3 import (
@@ -219,6 +220,7 @@ from invokeai.backend.model_manager.starter_models.qwen_image import (
     qwen_image_gguf_q4_k_m,
     qwen_image_gguf_q6_k,
     qwen_image_gguf_q8_0,
+    qwen_image_instantx_controlnet_union,
     qwen_image_lightning_4step,
     qwen_image_lightning_8step,
     qwen_image_vae,
@@ -470,6 +472,7 @@ STARTER_MODELS: list[StarterModel] = [
     qwen_image_lightning_4step,
     qwen_image_lightning_8step,
     qwen_image_fun_controlnet_union,
+    qwen_image_instantx_controlnet_union,
     flux_krea,
     flux_krea_quantized,
     z_image_turbo,
@@ -540,6 +543,7 @@ STARTER_MODELS: list[StarterModel] = [
     ltx2_5_dev_transformer_bf16,
     ltx2_5_text_encoder_int8,
     ltx2_5_text_encoder_bf16,
+    ltx2_5_text_encoder_gguf_q4_k_m,
     ltx2_5_components,
     ltx2_5_prompt_enhancer,
     ltx2_5_duration_head,

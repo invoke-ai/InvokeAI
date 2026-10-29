@@ -1,10 +1,11 @@
 import math
 from contextlib import ExitStack
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Optional
+from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Optional, TypeAlias
 
 import torch
 import torchvision.transforms as tv_transforms
+from diffusers.models.controlnets.controlnet_qwenimage import QwenImageControlNetModel
 from diffusers.models.transformers.transformer_qwenimage import QwenImageTransformer2DModel
 from PIL import Image
 from torchvision.transforms.functional import resize as tv_resize
@@ -67,6 +68,10 @@ QWEN_IMAGE_SCHEDULER_CONFIG = {
     "num_train_timesteps": 1000,
     "time_shift_type": "exponential",
 }
+
+QwenImageControlModel: TypeAlias = QwenImageFunControlBranch | QwenImageControlNetModel
+"""Either Qwen-Image ControlNet design: the Fun branch hooked into the transformer's blocks, or the InstantX
+ControlNet run beside it."""
 
 
 @invocation(
@@ -313,7 +318,7 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             getattr(transformer_info.model, "zero_cond_t", False)
             or getattr(transformer_info.model.config, "zero_cond_t", False)
         )
-        control_branch_info = self._load_control_branch(context, has_zero_cond_t)
+        control_info, control_model = self._load_control_model(context, has_zero_cond_t)
 
         # Load conditioning
         pos_prompt_embeds, pos_prompt_mask = self._load_text_conditioning(
@@ -485,12 +490,6 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         model_input_seq_len = noisy_seq_len + (ref_latents_packed.shape[1] if ref_latents_packed is not None else 0)
 
         transformer_config = context.models.get_config(self.transformer.transformer)
-        num_control_blocks = 0
-        control_hidden_size = 0
-        if control_branch_info is not None:
-            assert isinstance(control_branch_info.model, QwenImageFunControlBranch)
-            num_control_blocks = len(control_branch_info.model.control_blocks)
-            control_hidden_size = control_branch_info.model.hidden_size
         # The forward's activations, which the cache keeps free by offloading as much of the transformer as that
         # takes, plus the per-forward dequantization transient of an nvfp4 or GGUF build, alive alongside them and
         # invisible to the estimate. All read from the unlocked model, before the lock; the transient is zero for a
@@ -502,8 +501,7 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             image_seq_len=model_input_seq_len,
             text_seq_len=text_seq_len,
             element_size=inference_dtype.itemsize,
-            num_control_blocks=num_control_blocks,
-            control_hidden_size=control_hidden_size,
+            control_model=control_model,
         )
         # Where SDPA has no fused kernel for the joint [text ; image] sequence (ROCm on Windows, MPS) it materializes
         # the score matrices, which the linear term above was not priced for: 24 heads x 4608^2 scores is ~1 GB at
@@ -519,8 +517,8 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # Encoded ahead of the transformer's lock, so the VAE does not have to fit beside it.
         control_context: torch.Tensor | None = None
-        if control_branch_info is not None:
-            control_context = self._build_control_context(context, latent_height, latent_width)
+        if control_model is not None:
+            control_context = self._build_control_context(context, control_model, latent_height, latent_width)
             control_context = control_context.to(device=device, dtype=inference_dtype)
 
         with ExitStack() as exit_stack:
@@ -529,24 +527,30 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             )
             assert isinstance(transformer, QwenImageTransformer2DModel)
             control_hooks: FunControlHooks | None = None
-            if control_branch_info is not None:
+            controlnet: QwenImageControlNetModel | None = None
+            if control_info is not None:
                 assert self.control is not None and control_context is not None
-                # Locked with the same working memory: the transformer can no longer be offloaded, so a branch placed
-                # with only the default reservation would fill the room kept for the forward.
-                (_, control_branch) = exit_stack.enter_context(
-                    control_branch_info.model_on_device(working_mem_bytes=working_mem_bytes)
+                # Locked with the same working memory: the transformer can no longer be offloaded, so a control model
+                # placed with only the default reservation would fill the room kept for the forward.
+                (_, locked_control) = exit_stack.enter_context(
+                    control_info.model_on_device(working_mem_bytes=working_mem_bytes)
                 )
-                assert isinstance(control_branch, QwenImageFunControlBranch)
-                # Dtype invariant: the loader cast the branch to the device's bfloat16-safe dtype, the policy the
-                # transformer loaders follow, which is `inference_dtype` wherever this node runs. Should the safe
-                # dtype ever be another one, the branch still runs its chain in its own dtype and casts every tensor
-                # on the way in and the hint on the way out (`QwenImageFunControlBranch.block_runner` / `add_hint`),
-                # so no cache-managed module is cast here.
-                control_hooks = exit_stack.enter_context(
-                    install_fun_control(
-                        transformer, control_branch, control_context, scale=self.control.control_context_scale
+                if isinstance(locked_control, QwenImageControlNetModel):
+                    # Run beside the transformer and fed what it is fed: loaded by the same dtype policy, it takes the
+                    # same activations and hands its residuals back in the dtype the transformer adds them in.
+                    controlnet = locked_control
+                else:
+                    assert isinstance(locked_control, QwenImageFunControlBranch)
+                    # Dtype invariant: the loader cast the branch to the device's bfloat16-safe dtype, the policy the
+                    # transformer loaders follow, which is `inference_dtype` wherever this node runs. Should the safe
+                    # dtype ever be another one, the branch still runs its chain in its own dtype and casts every
+                    # tensor on the way in and the hint on the way out (`QwenImageFunControlBranch.block_runner` /
+                    # `add_hint`), so no cache-managed module is cast here.
+                    control_hooks = exit_stack.enter_context(
+                        install_fun_control(
+                            transformer, locked_control, control_context, scale=self.control.control_context_scale
+                        )
                     )
-                )
             # Quantized weights (packed nvfp4 Linears, GGUF, SDNQ) cannot take a direct patch, so their LoRAs ride as
             # sidecars. Asked of the loaded module tree: a `checkpoint` build may hold packed Linears.
             model_is_quantized = requires_sidecar_patching(transformer, transformer_config.format)
@@ -566,12 +570,12 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             exit_stack.enter_context(sage_attention_scope())
 
             for step_idx, t in enumerate(tqdm(timesteps_sched)):
+                # One gate per step: both guidance branches run with the control, or neither does.
+                control_active = self.control is not None and should_apply(
+                    step_idx, total_steps, self.control.begin_step_percent, self.control.end_step_percent
+                )
                 if control_hooks is not None:
-                    assert self.control is not None
-                    # One gate per step: both guidance branches run with the control, or neither does.
-                    control_hooks.active = should_apply(
-                        step_idx, total_steps, self.control.begin_step_percent, self.control.end_step_percent
-                    )
+                    control_hooks.active = control_active
 
                 # The pipeline passes timestep / 1000 to the transformer
                 timestep = t.expand(latents.shape[0]).to(inference_dtype)
@@ -583,12 +587,29 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 else:
                     model_input = latents
 
+                # The InstantX ControlNet runs once per step, on the positive prompt, and both guidance branches add
+                # its residuals, already scaled: diffusers' QwenImageControlNetPipeline. Skipped outside the step range.
+                controlnet_block_samples: list[torch.Tensor] | None = None
+                if controlnet is not None and control_active:
+                    assert self.control is not None
+                    controlnet_block_samples = controlnet(
+                        hidden_states=model_input,
+                        controlnet_cond=control_context,
+                        conditioning_scale=self.control.control_context_scale,
+                        encoder_hidden_states=pos_prompt_embeds,
+                        encoder_hidden_states_mask=pos_prompt_mask,
+                        timestep=timestep / 1000,
+                        img_shapes=img_shapes,
+                        return_dict=False,
+                    )
+
                 noise_pred_cond = transformer(
                     hidden_states=model_input,
                     encoder_hidden_states=pos_prompt_embeds,
                     encoder_hidden_states_mask=pos_prompt_mask,
                     timestep=timestep / 1000,
                     img_shapes=img_shapes,
+                    controlnet_block_samples=controlnet_block_samples,
                     return_dict=False,
                 )[0]
                 # Only keep the noisy-latent portion of the output
@@ -601,6 +622,7 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                         encoder_hidden_states_mask=neg_prompt_mask,
                         timestep=timestep / 1000,
                         img_shapes=img_shapes,
+                        controlnet_block_samples=controlnet_block_samples,
                         return_dict=False,
                     )[0]
                     noise_pred_uncond = noise_pred_uncond[:, :noisy_seq_len]
@@ -637,29 +659,41 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         latents = latents.unsqueeze(2)
         return latents
 
-    def _load_control_branch(self, context: InvocationContext, has_zero_cond_t: bool) -> LoadedModel | None:
-        """The control branch in RAM, ahead of the transformer's lock so the reservation can size its hints."""
+    def _load_control_model(
+        self, context: InvocationContext, has_zero_cond_t: bool
+    ) -> tuple[LoadedModel, QwenImageControlModel] | tuple[None, None]:
+        """The ControlNet in RAM, and the model it holds, ahead of the transformer's lock so the reservation can size
+        what the ControlNet keeps alive."""
         if self.control is None:
-            return None
+            return None, None
         if self.vae is None:
             raise ValueError(
                 "Qwen Image ControlNet needs the VAE that encodes its images: connect one to the 'vae' input."
             )
         if self.reference_latents is not None:
             raise ValueError("Qwen Image ControlNet cannot be combined with reference latents.")
-        # The Fun branch was trained beside the generation transformer. An Edit transformer takes a
-        # [noisy ; reference] sequence and modulates the two apart (zero_cond_t), a layout the branch never saw.
+        # Both ControlNets were trained beside the generation transformer. An Edit transformer takes a
+        # [noisy ; reference] sequence and modulates the two apart (zero_cond_t), a layout neither ever saw.
         if has_zero_cond_t:
             raise ValueError(
                 "Qwen Image ControlNet applies to the Qwen Image generation transformer, not to an Edit transformer."
             )
-        control_branch_info = context.models.load(self.control.control_model)
-        if not isinstance(control_branch_info.model, QwenImageFunControlBranch):
+        control_info = context.models.load(self.control.control_model)
+        control_model = control_info.model
+        if isinstance(control_model, QwenImageControlNetModel):
+            # Its control input is the control image's latent and nothing else: no mask or masked-image channels
+            # an inpainting condition could go into.
+            if self.control.inpaint_image_name is not None or self.control.inpaint_mask_name is not None:
+                raise ValueError(
+                    f"'{self.control.control_model.name}' is an InstantX Qwen Image ControlNet, which takes a control "
+                    "image only and has no inpainting condition: disconnect the inpaint image and mask."
+                )
+        elif not isinstance(control_model, QwenImageFunControlBranch):
             raise TypeError(
                 f"Expected a Qwen Image ControlNet for '{self.control.control_model.name}', "
-                f"got {type(control_branch_info.model).__name__}."
+                f"got {type(control_model).__name__}."
             )
-        return control_branch_info
+        return control_info, control_model
 
     @staticmethod
     def _estimate_working_memory(
@@ -667,8 +701,7 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         text_seq_len: int,
         element_size: int,
         *,
-        num_control_blocks: int = 0,
-        control_hidden_size: int = 0,
+        control_model: QwenImageControlModel | None = None,
     ) -> int:
         """Peak transformer activations, in bytes, for the model cache to keep free.
 
@@ -677,15 +710,31 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         for the allocator. The per-token term is a bf16 figure and scales with `element_size`, the compute dtype's
         width. The guidance branches run one after the other, so CFG adds nothing to the peak.
 
-        A control branch runs its blocks over the image sequence and keeps one hint per block alive until the last
-        listed base layer has consumed it. `num_control_blocks + 4` hint-sized tensors is what Z-Image measured for
-        its adapter over the plain forward (`z_image_denoise.py`), pending the same measurement here.
+        A ControlNet adds image-sized tensors (one batch item, `image_seq_len` tokens at its width):
+
+        - The Fun branch runs its blocks over the image sequence and keeps one hint per block alive until the last
+          listed base layer has consumed it. `blocks + 4` is what Z-Image measured for its adapter over the plain
+          forward (`z_image_denoise.py`), pending the same measurement here.
+        - The InstantX ControlNet adds no fitted coefficient, only what provably stays alive. It runs its forward
+          before the transformer's: its blocks are the transformer's at the same joint sequence and never run beside
+          them, so their activations are inside the base term, and so is the transient at the end of its forward
+          (block outputs, projections, scaled copies: three image-sized tensors per block, under a tenth of the
+          per-token base at Qwen-Image's width). What stays alive through both guidance forwards is the list of
+          scaled residuals, one per block: exactly `blocks` tensors.
         """
         mib, gib = 1024**2, 1024**3
         width = element_size / 2
         estimated = int((image_seq_len + text_seq_len) * 0.25 * mib * width) + gib
-        if num_control_blocks:
-            estimated += (num_control_blocks + 4) * image_seq_len * control_hidden_size * element_size
+        if control_model is None:
+            return estimated
+        if isinstance(control_model, QwenImageFunControlBranch):
+            estimated += (
+                (len(control_model.control_blocks) + 4) * image_seq_len * control_model.hidden_size * element_size
+            )
+        else:
+            # The alias's other member. Not `elif` + `assert_never`: mypy cannot narrow a diffusers model class out of
+            # a union, so the remainder would never type as `Never`.
+            estimated += len(control_model.controlnet_blocks) * image_seq_len * control_model.inner_dim * element_size
         return estimated
 
     @staticmethod
@@ -712,8 +761,12 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             via_diffusers_dispatch=True,
         )
 
-    def _build_control_context(self, context: InvocationContext, latent_height: int, latent_width: int) -> torch.Tensor:
-        """The packed ``(1, S_img, 132)`` control context at the generation size, from the control field's images."""
+    def _build_control_context(
+        self, context: InvocationContext, control_model: QwenImageControlModel, latent_height: int, latent_width: int
+    ) -> torch.Tensor:
+        """The packed control context at the generation size, from the control field's images, as ``control_model``
+        takes it: ``(1, S_img, 132)`` control, keep-mask and masked-image latents for the Fun branch, ``(1, S_img, 64)``
+        the control image's latents alone for the InstantX ControlNet (diffusers' QwenImageControlNetPipeline)."""
         assert self.control is not None and self.vae is not None
         control = self.control
         vae_info = context.models.load(self.vae.vae)
@@ -733,14 +786,19 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             # (1, C, H, W): pixels in [-1, 1], a mask in [0, 1].
             return image_resized_to_grid_as_tensor(image, normalize=mode == "RGB", multiple_of=16).unsqueeze(0)
 
-        context_4d = build_fun_control_context(
-            encode=encode,
-            control_image=pixels(control.image_name, "RGB") if control.image_name is not None else None,
-            inpaint_image=(
-                pixels(control.inpaint_image_name, "RGB") if control.inpaint_image_name is not None else None
-            ),
-            inpaint_mask=pixels(control.inpaint_mask_name, "L") if control.inpaint_mask_name is not None else None,
-        )
+        if isinstance(control_model, QwenImageFunControlBranch):
+            context_4d = build_fun_control_context(
+                encode=encode,
+                control_image=pixels(control.image_name, "RGB") if control.image_name is not None else None,
+                inpaint_image=(
+                    pixels(control.inpaint_image_name, "RGB") if control.inpaint_image_name is not None else None
+                ),
+                inpaint_mask=pixels(control.inpaint_mask_name, "L") if control.inpaint_mask_name is not None else None,
+            )
+        else:
+            # The InstantX ControlNet, the alias's other member (see `_estimate_working_memory`).
+            assert control.image_name is not None
+            context_4d = encode(pixels(control.image_name, "RGB"))
         return self._pack_latents(context_4d, 1, context_4d.shape[1], latent_height, latent_width)
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:

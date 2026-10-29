@@ -13,6 +13,7 @@ Three records make a generation (see ``configs/main.py`` for the split), the tra
   class here. A folder that also holds a transformer file serves that too.
 - ``Gemma4Encoder`` / ``Gemma4Encoder`` -- the Lightricks-tuned Gemma-4-12B text tower with its
   tokenizer, loaded into ``transformers.Gemma4TextModel`` (bf16 or int8-convrot).
+- ``Gemma4Encoder`` / ``GGUFQuantized`` -- the same tower from a GGUF conversion, tokenizer packed in.
 
 Every model class is the installed diffusers' / transformers' own; the pinned configs and key maps
 live in ``invokeai.backend.ltx2.component_configs`` and were verified shape-for-shape against the
@@ -26,6 +27,7 @@ reserves what a cast will produce *before* widening a tensor.
 import json
 from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Optional
 
 import accelerate
@@ -34,7 +36,13 @@ import torch
 from invokeai.backend.ltx2 import checkpoint_layout as layout
 from invokeai.backend.ltx2 import component_configs as cc
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.configs.gemma4_encoder import Gemma4Encoder_Gemma4Encoder_LTX2_Config
+from invokeai.backend.model_manager.configs.gemma4_encoder import (
+    GGUF_TOKENIZER_ASSETS,
+    Gemma4Encoder_Gemma4Encoder_LTX2_Config,
+    Gemma4Encoder_GGUF_LTX2_Config,
+    gguf_gemma4_text_config,
+)
+from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
 from invokeai.backend.model_manager.configs.ltx2_duration_head import LTX2DurationHead_Checkpoint_Config
 from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_LTX2_Config,
@@ -47,6 +55,7 @@ from invokeai.backend.model_manager.load.model_loaders._single_file_guards impor
     reject_float8_weights,
     reject_formats_declared_in_the_header,
 )
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
@@ -61,7 +70,8 @@ from invokeai.backend.quantization.fp8_scaled import (
     read_safetensors_metadata,
     strip_layer_path_prefix,
 )
-from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.gguf.loaders import WrappedGGUFReader, gguf_sd_loader, unpack_ggml_at_load
 from invokeai.backend.quantization.int8_convrot import (
     INT8_TENSORWISE_FORMAT,
     drop_unconsumed_quantization_sidecars,
@@ -515,6 +525,57 @@ class LTX2GGUFModel(ModelLoader):
         return model
 
 
+# The text tower's tensors. The unified layout nests them under ``model.language_model`` beside vision/audio
+# embedders and the tied head; Lightricks' with-proj release, and the GGUF conversions of it, add the text
+# projection (the connectors', which the component folder supplies), vision/audio stubs and packed tokenizer and
+# config files. Only what is named here is read; anything else a file carries is not the tower's. A bare
+# `Gemma4TextModel` save names the same tensors without a root.
+_GEMMA4_TOWER_PREFIXES = tuple(
+    f"{root}{part}"
+    for root in ("model.language_model.", "model.", "")
+    for part in ("embed_tokens.", "layers.", "norm.")
+)
+
+
+def _is_gemma4_tower_key(key: str) -> bool:
+    return key.startswith(_GEMMA4_TOWER_PREFIXES)
+
+
+def _normalize_gemma4_tower_keys(sd: dict[str, Any]) -> None:
+    """In place: drop what is not the tower and strip the prefix ``Gemma4TextModel`` names its tensors without."""
+    for key in list(sd):
+        if not _is_gemma4_tower_key(key):
+            del sd[key]
+            continue
+        bare = key
+        for prefix in ("model.language_model.", "model."):
+            if bare.startswith(prefix):
+                bare = bare[len(prefix) :]
+                break
+        if bare != key:
+            sd[bare] = sd.pop(key)
+
+
+def _gemma4_text_config(config: Mapping[str, Any]) -> Any:
+    """``Gemma4TextConfig`` from a config.json: the unified model's ``text_config``, or the text config itself."""
+    from transformers import Gemma4TextConfig
+
+    text_config = config.get("text_config") if isinstance(config.get("text_config"), dict) else config
+    return Gemma4TextConfig(
+        **{k: v for k, v in text_config.items() if k not in ("architectures", "model_type", "transformers_version")}
+    )
+
+
+def _assign_gemma4_tower(model: torch.nn.Module, sd: dict[str, Any], what: str) -> None:
+    missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
+    if unexpected:
+        raise RuntimeError(f"Unexpected keys loading {what}: {sorted(unexpected)[:5]}...")
+    # The rotary inverse-frequency buffers are computed by the constructor, not stored.
+    stray = [k for k in missing if not k.startswith("rotary_emb.")]
+    if stray:
+        raise RuntimeError(f"Missing keys loading {what}: {sorted(stray)[:5]}...")
+
+
 @ModelLoaderRegistry.register(base=BaseModelType.LTX2, type=ModelType.Gemma4Encoder, format=ModelFormat.Gemma4Encoder)
 class LTX2Gemma4EncoderModel(ModelLoader):
     """Loader for the LTX-2.5 Gemma-4-12B text tower (bf16 or Comfy int8-convrot) and its tokenizer.
@@ -566,7 +627,6 @@ class LTX2Gemma4EncoderModel(ModelLoader):
 
     def _load_text_encoder(self, weight_path: Path, config_path: Path) -> AnyModel:
         from safetensors.torch import load_file
-        from transformers import Gemma4TextConfig
         from transformers.models.gemma4.modeling_gemma4 import Gemma4TextModel
 
         what = "LTX-2 Gemma-4 encoder"
@@ -578,42 +638,14 @@ class LTX2Gemma4EncoderModel(ModelLoader):
         sd = load_file(weight_path)
         reject_float8_weights(sd, what, weight_path, _ENCODER_SUPPORTED_NOTE)
 
-        # The unified layout nests the tower under ``model.language_model`` beside vision/audio
-        # embedders and the tied head; Lightricks' with-proj files add the connector projections under
-        # ``hf_asset__``. None of that is the tower's. ``Gemma4TextModel`` names its own tensors
-        # without the ``model.`` prefix.
-        dropped = (
-            "hf_asset__",
-            "model.vision_tower.",
-            "model.audio_tower.",
-            "model.embed_vision.",
-            "model.embed_audio.",
-            "lm_head.",
-        )
-        for key in list(sd):
-            if key.startswith(dropped):
-                del sd[key]
-                continue
-            bare = key
-            for prefix in ("model.language_model.", "model."):
-                if bare.startswith(prefix):
-                    bare = bare[len(prefix) :]
-                    break
-            if bare != key:
-                sd[bare] = sd.pop(key)
+        _normalize_gemma4_tower_keys(sd)
 
         int8_markers = extract_int8_convrot_markers(sd)
         reject_unmarked_int8_weights(sd, int8_markers, "LTX-2 Gemma-4")
         for key in set(sd) - set(drop_unconsumed_quantization_sidecars(sd)):
             del sd[key]
 
-        config_dict = json.loads(config_path.read_text(encoding="utf-8"))
-        text_config = (
-            config_dict.get("text_config") if isinstance(config_dict.get("text_config"), dict) else config_dict
-        )
-        te_config = Gemma4TextConfig(
-            **{k: v for k, v in text_config.items() if k not in ("architectures", "model_type", "transformers_version")}
-        )
+        te_config = _gemma4_text_config(json.loads(config_path.read_text(encoding="utf-8")))
         with accelerate.init_empty_weights():
             model = Gemma4TextModel(te_config)
 
@@ -627,14 +659,96 @@ class LTX2Gemma4EncoderModel(ModelLoader):
             self._ram_cache.make_room(predict_cast_state_dict_size(sd, model_dtype, keep_fp8=False))
             cast_state_dict(sd, model_dtype, keep_fp8=False)
 
-        missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
-        if unexpected:
-            raise RuntimeError(f"Unexpected keys loading {what}: {sorted(unexpected)[:5]}...")
-        # The rotary inverse-frequency buffers are computed by the constructor, not stored.
-        stray = [k for k in missing if not k.startswith("rotary_emb.")]
-        if stray:
-            raise RuntimeError(f"Missing keys loading {what}: {sorted(stray)[:5]}...")
+        _assign_gemma4_tower(model, sd, what)
         sd.clear()
+        return model
+
+
+def _gguf_asset_bytes(value: torch.Tensor, name: str) -> bytes:
+    """A file a GGUF conversion packed in one byte per element: as ``I8``, or widened to ``I16`` (elix3r)."""
+    data = value.quantized_data if isinstance(value, GGMLTensor) else value
+    if data.dtype == torch.int8:
+        return data.view(torch.uint8).numpy().tobytes()
+    if data.dtype.is_floating_point or (data.numel() and (int(data.min()) < 0 or int(data.max()) > 255)):
+        raise ValueError(f"The GGUF's {name!r} is not a byte array.")
+    return data.to(torch.uint8).numpy().tobytes()
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.LTX2, type=ModelType.Gemma4Encoder, format=ModelFormat.GGUFQuantized)
+class LTX2Gemma4EncoderGGUFModel(ModelLoader):
+    """Loader for the LTX-2.5 Gemma-4-12B text tower from a GGUF conversion, and the tokenizer packed into it.
+
+    The tower keeps its Linear weights packed as ``GGMLTensor``. Everything read outside a matmul is unpacked
+    here (see `unpack_ggml_at_load`), and it has to be: ``Gemma4RMSNorm`` reads ``weight.float()``, the layer
+    scalars multiply activations directly and the embedding is indexed. The tokenizer is rebuilt from the
+    packed files with the same call the folder loader makes, and the model config from the metadata.
+    """
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        """The bytes a submodel reads from the file: the tower's tensors, or only the tokenizer's few MB."""
+        if not isinstance(config, Gemma4Encoder_GGUF_LTX2_Config):
+            return 0
+        if submodel_type is SubModelType.TextEncoder:
+            keep = _is_gemma4_tower_key
+        elif submodel_type is SubModelType.Tokenizer:
+            keep = GGUF_TOKENIZER_ASSETS.__contains__
+        else:
+            return 0
+        with WrappedGGUFReader(model_path) as reader:
+            return sum(int(tensor.n_bytes) for tensor in reader.tensors if keep(tensor.name))
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, Gemma4Encoder_GGUF_LTX2_Config):
+            raise ValueError(f"Unexpected config type {type(config).__name__} for an LTX-2 Gemma-4 GGUF loader.")
+        path = Path(config.path)
+        match submodel_type:
+            case SubModelType.Tokenizer:
+                return self._load_tokenizer(path)
+            case SubModelType.TextEncoder:
+                return self._load_text_encoder(path)
+            case _:
+                raise ValueError(
+                    "The LTX-2 Gemma-4 encoder serves the text encoder and its tokenizer. "
+                    f"Received: {submodel_type.value if submodel_type else 'None'}"
+                )
+
+    def _load_tokenizer(self, path: Path) -> AnyModel:
+        from transformers import AutoTokenizer
+
+        assets = gguf_sd_loader(path, torch.float32, keep=GGUF_TOKENIZER_ASSETS.__contains__)
+        # The fast tokenizer reads both files into memory; a scanner still holding one must not fail the load.
+        with TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            for name, file_name in GGUF_TOKENIZER_ASSETS.items():
+                (Path(folder) / file_name).write_bytes(_gguf_asset_bytes(assets[name], name))
+            # `fix_mistral_regex=False` for the reason the folder loader gives: the packed files are the
+            # folder's, byte for byte.
+            return AutoTokenizer.from_pretrained(folder, local_files_only=True, fix_mistral_regex=False)
+
+    def _load_text_encoder(self, path: Path) -> AnyModel:
+        from transformers.models.gemma4.modeling_gemma4 import Gemma4TextModel
+
+        what = "LTX-2 Gemma-4 encoder GGUF"
+        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        sd = gguf_sd_loader(path, compute_dtype, keep=_is_gemma4_tower_key)
+        try:
+            te_config = _gemma4_text_config(gguf_gemma4_text_config(ModelOnDisk(path).metadata()))
+        except NotAMatchError:
+            raise ValueError(f"{path.name} carries no Gemma-4 model config in its metadata.") from None
+        _normalize_gemma4_tower_keys(sd)
+        with accelerate.init_empty_weights():
+            model = Gemma4TextModel(te_config)
+        unpacked = unpack_ggml_at_load(sd, model, (), self._ram_cache.make_room)
+        _assign_gemma4_tower(model, sd, what)
+        sd.clear()
+        self._logger.info(
+            f"{what}: {unpacked} tensor(s) read outside a matmul unpacked at load, the Linear weights kept packed"
+        )
         return model
 
 

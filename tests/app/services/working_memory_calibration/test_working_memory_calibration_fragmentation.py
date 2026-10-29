@@ -35,6 +35,7 @@ from invokeai.backend.working_memory.spec import import_estimator_modules
 from tests.fixtures.working_memory_calibration import measured_window
 
 MIB = 2**20
+SPECS = import_estimator_modules()
 PLATFORM = Platform("miopen", "expandable", "windows")
 CARD = DeviceClass(vendor="amd", name="AMD Radeon RX 9060 XT", total_mib=16304, backend="hip", arch="gfx1200")
 ENV = Environment(hard={"os": "windows", "torch": "2.13", "hip": "7.15"}, soft={"driver": "test"})
@@ -126,7 +127,7 @@ def _features(dtype: str, side: int) -> dict:
 
 
 def test_the_fragmented_fp32_1216px_windows_drop_out_and_the_others_count() -> None:
-    reasons = exclusions(_file())
+    reasons = exclusions(_file(), SPECS)
 
     # Rows 15-17: the one fit-eligible window is a ratio outlier (1.47 against 1.10 at the smaller sizes); its two
     # partly resident neighbours never counted. Rows 6 and 8 are partly resident; the fp16 2112px window that ran
@@ -136,7 +137,7 @@ def test_the_fragmented_fp32_1216px_windows_drop_out_and_the_others_count() -> N
 
 
 def test_without_them_the_fp32_line_rests_on_576px_and_832px_and_1024px_prices_as_shipped() -> None:
-    fit, problems = user_fit_of(_file(), CalibrationEnvironment.of(ENV).id, PLATFORM)
+    fit, problems = user_fit_of(_file(), CalibrationEnvironment.of(ENV).id, PLATFORM, SPECS)
     assert fit is not None, problems
     [fp32] = [line for (_, suffix), line in fit.lines.items() if suffix == "decode_fp32"]
 
@@ -194,7 +195,7 @@ def test_a_measurement_whose_reserve_grew_around_a_flat_allocation_drops_out_wit
     file = _file()
     file.points = [point.model_copy(update={"fit_eligible": True, "reasons": []}) for point in file.points[15:18]]
 
-    assert exclusions(file) == {0: "fragmented", 1: "fragmented", 2: "fragmented"}
+    assert exclusions(file, SPECS) == {0: "fragmented", 1: "fragmented", 2: "fragmented"}
 
 
 # The RX 9060 XT's fp32 windows of two later attempts (store rows 28-35 and 46-53): the first of them fragmented at
@@ -238,7 +239,7 @@ def test_each_attempt_at_a_size_is_judged_on_its_own(order: str) -> None:
     attempts = [("fragmented", FRAGMENTED_ATTEMPT), ("clean", CLEAN_ATTEMPT)]
     file = _file(attempts if order == "fragmented-then-clean" else attempts[::-1])
 
-    assert _reasons_by_attempt(file, exclusions(file)) == {
+    assert _reasons_by_attempt(file, exclusions(file, SPECS)) == {
         "fragmented": ["partial_residency", "fragmented", "partial_residency"],
         "clean": [None, None, None],
     }
@@ -258,7 +259,7 @@ def test_two_owners_attempts_with_one_id_are_judged_apart() -> None:
         for run, owner in zip(file.runs, ("admin-a", "admin-b"), strict=True)
     ]
 
-    assert _reasons_by_attempt(file, exclusions(file)) == {
+    assert _reasons_by_attempt(file, exclusions(file, SPECS)) == {
         "fragmented": ["partial_residency", "fragmented", "partial_residency"],
         "clean": [None, None, None],
     }
@@ -270,5 +271,5 @@ def test_a_running_attempts_windows_set_no_standard_for_finished_sizes() -> None
     fragmented_1152 = [window for window in FRAGMENTED_ATTEMPT if window[1] == 1152]
     file = _file([("finished", fragmented_1152), ("running", CLEAN_ATTEMPT)])
 
-    assert "fragmented" in exclusions(file).values()
-    assert "fragmented" not in exclusions(file, {"running": "running"}).values()
+    assert "fragmented" in exclusions(file, SPECS).values()
+    assert "fragmented" not in exclusions(file, SPECS, {"running": "running"}).values()

@@ -1749,6 +1749,9 @@
                       "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
                     },
                     {
@@ -2267,6 +2270,9 @@
                       "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
                     },
                     {
@@ -2783,6 +2789,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
@@ -3346,6 +3355,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
@@ -3936,6 +3948,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
@@ -5401,6 +5416,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
@@ -21125,6 +21143,9 @@
             "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
           },
           {
+            "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
+          },
+          {
             "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
           },
           {
@@ -29532,6 +29553,13 @@
                 "type": "null"
               }
             ]
+          },
+          "control_architecture": {
+            "type": "string",
+            "enum": ["fun_union", "instantx_union"],
+            "title": "Control Architecture",
+            "description": "Which Qwen-Image ControlNet design the file holds: 'fun_union' (alibaba-pai Fun-ControlNet-Union, control and inpainting) or 'instantx_union' (InstantX ControlNet-Union, control only). Records written before the field existed are Fun-ControlNets.",
+            "default": "fun_union"
           }
         },
         "type": "object",
@@ -29551,10 +29579,11 @@
           "type",
           "format",
           "base",
-          "default_settings"
+          "default_settings",
+          "control_architecture"
         ],
         "title": "ControlNet_Checkpoint_QwenImage_Config",
-        "description": "Model config for Qwen-Image Fun-ControlNet adapter models (Safetensors checkpoint).\n\nQwen-Image Fun-ControlNets are standalone adapters containing only the control branch\n(control_img_in, control_blocks) that extends the base Qwen-Image transformer with spatial\nconditioning capabilities.\n\nSupports: Canny, HED, Depth, Pose, MLSD, Scribble, Gray, inpainting.\nRecommended control_context_scale: 0.70-0.95."
+        "description": "Model config for Qwen-Image ControlNet models (Safetensors checkpoint), in either of two designs.\n\nalibaba-pai's Fun-ControlNet-Union is a control branch (control_img_in, control_blocks) hooked into the base\nQwen-Image transformer. Supports Canny, HED, Depth, Pose, MLSD, Scribble, Gray and inpainting; recommended\ncontrol_context_scale 0.70-0.95.\n\nInstantX's ControlNet-Union is a five-block copy of the transformer (controlnet_x_embedder, transformer_blocks,\ncontrolnet_blocks) whose block outputs are added to the base image stream. Supports Canny, Soft Edge, Depth and\nPose; recommended control_context_scale 0.80-1.00 on the original Qwen Image it was trained on, about 1.5-2.0 on\nQwen Image 2512. It takes no inpainting condition."
       },
       "ControlNet_Checkpoint_SD1_Config": {
         "properties": {
@@ -39545,7 +39574,7 @@
         "category": "latents",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Decode a FLUX.2 Klein latent with the PiD pixel-diffusion decoder.\n\nProduces a 4x super-resolved image in a single pass. The stored FLUX.2 latent\nis patchified from ``(B, 32, H/8, W/8)`` to the ``(B, 128, H/16, W/16)`` layout\nPiD's FLUX.2 backbone expects, then decoded directly (it is already in raw,\nBN-denormalized space; see the module docstring).",
+        "description": "Decode a FLUX.2 Klein latent with the PiD pixel-diffusion decoder.\n\nProduces a 4x super-resolved image in a single pass. The stored FLUX.2 latent\nis patchified from ``(B, 32, H/8, W/8)`` to ``(B, 128, H/16, W/16)`` and\nBN-normalized with the VAE's statistics, the form PiD's FLUX.2 backbone expects.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -39678,11 +39707,10 @@
               }
             ],
             "default": null,
-            "description": "FLUX.2 VAE, used only to read a scalar scaling_factor / shift_factor if one exists. FLUX.2 normalises latents with BatchNorm (already inverted in flux2_denoise), so this is normally an identity transform and the input can be left unconnected.",
+            "description": "FLUX.2 VAE. Its BatchNorm statistics normalize the latent the way PiD was trained on.",
             "field_kind": "input",
             "input": "connection",
-            "orig_default": null,
-            "orig_required": false,
+            "orig_required": true,
             "title": "VAE"
           },
           "num_inference_steps": {
@@ -39719,7 +39747,7 @@
         "tags": ["latents", "image", "pid", "flux2", "klein", "upscale"],
         "title": "Latents to Image - FLUX.2 + PiD (4x SR)",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -42232,7 +42260,7 @@
         "category": "latents",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Decode a FLUX latent with the PiD pixel-diffusion decoder.\n\nThe FLUX AutoEncoder usually denormalises the stored latent internally\nbefore its conv decoder runs (`z / scale + shift`); we apply the same\ntransform manually here so PiD sees the raw latent it was trained on.",
+        "description": "Decode a FLUX latent with the PiD pixel-diffusion decoder.\n\nProduces a 4x super-resolved image in a single pass. PiD takes the stored,\nFLUX-normalized latent as is.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -42389,7 +42417,7 @@
         "tags": ["latents", "image", "pid", "flux", "upscale"],
         "title": "Latents to Image - FLUX + PiD (4x SR)",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -44792,6 +44820,155 @@
         ],
         "title": "Gemma2Encoder_Gemma2Encoder_Config",
         "description": "Standalone Gemma-2 causal LM directory used as a text encoder by PiD.\n\nExpected directory layout (HuggingFace `from_pretrained`-compatible)::\n\n    <model_root>/\n        config.json             # architectures: [\"Gemma2ForCausalLM\"]\n        tokenizer.json\n        tokenizer_config.json\n        model-*.safetensors     # or model.safetensors / *.bin"
+      },
+      "Gemma4Encoder_GGUF_LTX2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "ltx-2",
+            "title": "Base",
+            "default": "ltx-2"
+          },
+          "type": {
+            "type": "string",
+            "const": "gemma4_encoder",
+            "title": "Type",
+            "default": "gemma4_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format",
+          "cpu_only"
+        ],
+        "title": "Gemma4Encoder_GGUF_LTX2_Config",
+        "description": "The LTX-2.5 Gemma-4-12B text encoder as one GGUF file, with its tokenizer and config packed in."
       },
       "Gemma4Encoder_Gemma4Encoder_LTX2_Config": {
         "properties": {
@@ -89804,6 +89981,9 @@
                 "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
               },
               {
+                "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
               },
               {
@@ -90568,6 +90748,9 @@
                     "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
                   },
                   {
@@ -91262,6 +91445,9 @@
                 "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
               },
               {
+                "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
               },
               {
@@ -91765,6 +91951,9 @@
               },
               {
                 "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
               },
               {
                 "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
@@ -92763,6 +92952,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Gemma4Encoder_Gemma4Encoder_LTX2_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Gemma4Encoder_GGUF_LTX2_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Gemma2Encoder_GGUF_Config"
@@ -95949,7 +96141,7 @@
               }
             ],
             "default": null,
-            "description": "The FLUX.1 VAE, which Z-Image also uses. PiD upscale runs the FLUX backbone and undoes FLUX VAE scaling, so a VAE of another family is not accepted.",
+            "description": "The FLUX.1 VAE, which Z-Image also uses. PiD's FLUX decoder was trained on latents normalized with its constants, so a VAE of another family is not accepted.",
             "field_kind": "input",
             "input": "connection",
             "orig_required": true
@@ -96031,7 +96223,7 @@
         "tags": ["upscale", "image", "pid", "super-resolution", "flux"],
         "title": "PiD Upscale (4x) - FLUX VAE",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -99854,7 +100046,7 @@
         "type": "object"
       },
       "QwenImageControlField": {
-        "description": "Qwen Image Fun-ControlNet conditioning: a control image, an inpaint image with its mask, or both.",
+        "description": "Qwen Image ControlNet conditioning: a control image, an inpaint image with its mask, or both (the InstantX\nControlNet takes the control image alone).",
         "properties": {
           "image_name": {
             "anyOf": [
@@ -99901,7 +100093,7 @@
           },
           "control_context_scale": {
             "default": 0.85,
-            "description": "Strength of the control signal. Recommended range: 0.70-0.95.",
+            "description": "Strength of the control signal. Recommended range: 0.70-0.95 for the Fun-ControlNet-Union; for the InstantX ControlNet-Union 0.80-1.00 on the original Qwen Image, about 1.5-2.0 on Qwen Image 2512.",
             "maximum": 2.0,
             "minimum": 0.0,
             "title": "Control Context Scale",
@@ -99946,7 +100138,7 @@
         "category": "conditioning",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Configure the Qwen Image Fun-ControlNet-Union for spatial control, inpainting, or both.\n\nTakes a preprocessed control image (Canny, HED, depth, pose, MLSD, ...) and/or an image to inpaint with its mask\n(white is regenerated), plus the Qwen Image ControlNet model. Recommended control scale: 0.70-0.95.",
+        "description": "Configure a Qwen Image ControlNet for spatial control, inpainting, or both.\n\nTakes a preprocessed control image (Canny, HED, depth, pose, MLSD, ...) and/or an image to inpaint with its mask\n(white is regenerated), plus the Qwen Image ControlNet model. The Fun-ControlNet-Union takes either or both\n(recommended scale 0.70-0.95); the InstantX ControlNet-Union takes the control image only (0.80-1.00 on the\noriginal Qwen Image, about 1.5-2.0 on Qwen Image 2512).",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -100041,7 +100233,7 @@
           },
           "control_context_scale": {
             "default": 0.85,
-            "description": "Strength of the control signal. Recommended range: 0.70-0.95.",
+            "description": "Strength of the control signal. Recommended range: 0.70-0.95 for the Fun-ControlNet-Union; for the InstantX ControlNet-Union 0.80-1.00 on the original Qwen Image, about 1.5-2.0 on Qwen Image 2512.",
             "field_kind": "input",
             "input": "any",
             "maximum": 2.0,
@@ -101123,7 +101315,7 @@
         "category": "latents",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Decode a Qwen-Image latent with the PiD pixel-diffusion decoder.\n\nProduces a 4x super-resolved image in a single pass. The 5D Qwen latent is\nreduced to 2D and per-channel denormalized (``z * std + mean``) before PiD.",
+        "description": "Decode a Qwen-Image latent with the PiD pixel-diffusion decoder.\n\nProduces a 4x super-resolved image in a single pass. The 5D Qwen latent is\nreduced to 2D and otherwise handed to PiD in its normalized form.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -101256,7 +101448,7 @@
               }
             ],
             "default": null,
-            "description": "Qwen-Image VAE, used to read the per-channel latents_mean / latents_std. If omitted, the diffusers default Qwen-Image constants are used.",
+            "description": "Not used: PiD decodes the normalized latent directly. Kept so existing workflows that connect a VAE stay valid.",
             "field_kind": "input",
             "input": "connection",
             "orig_default": null,
@@ -101297,7 +101489,7 @@
         "tags": ["latents", "image", "pid", "qwen-image", "upscale"],
         "title": "Latents to Image - Qwen-Image + PiD (4x SR)",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -103683,7 +103875,7 @@
         "tags": ["latents", "image", "pid", "sd3", "upscale"],
         "title": "Latents to Image - SD3 + PiD (4x SR)",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -104291,7 +104483,7 @@
         "category": "latents",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Decode an SDXL latent with the PiD pixel-diffusion decoder.\n\nProduces a 4x super-resolved image in a single pass. The SDXL latent is\n4-channel at an 8x down-factor, so it is denormalized (``z / scaling_factor``)\nand handed straight to PiD - no packing needed.",
+        "description": "Decode an SDXL latent with the PiD pixel-diffusion decoder.\n\nProduces a 4x super-resolved image in a single pass. The stored, scaled SDXL\nlatent goes to PiD as is.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -104424,7 +104616,7 @@
               }
             ],
             "default": null,
-            "description": "SDXL VAE, used to read scaling_factor / shift_factor. If omitted, the SDXL fallback constants (0.13025 / 0.0) are used.",
+            "description": "Not used: PiD decodes the normalized latent directly. Kept so existing workflows that connect a VAE stay valid.",
             "field_kind": "input",
             "input": "connection",
             "orig_default": null,
@@ -104465,7 +104657,7 @@
         "tags": ["latents", "image", "pid", "sdxl", "upscale"],
         "title": "Latents to Image - SDXL + PiD (4x SR)",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -121346,7 +121538,7 @@
           "excluded_windows": {
             "type": "integer",
             "title": "Excluded Windows",
-            "description": "The model's windows that feed no line: invalid, not fit-eligible, fragmented, of an aborted attempt, tiled, batched, upcast, a VAE outside the AutoencoderKL family, or no demand. The valid ones among them still show as sizes that are not counted"
+            "description": "The model's windows that feed no line: invalid, not fit-eligible, fragmented, of an aborted attempt, tiled, batched, upcast, a VAE outside the AutoencoderKL family, no demand, or of an estimator a user calibration does not move, such as the Z-Image denoise. Of these, only the not fit-eligible, the fragmented and the aborted attempt's windows show among a line's sizes, as a size that is not counted where no counted window measured it"
           },
           "runs": {
             "items": {
@@ -123576,7 +123768,7 @@
               }
             ],
             "default": null,
-            "description": "Z-Image VAE used to read scaling_factor / shift_factor. If omitted, the FLUX.1 fallback constants (0.3611 / 0.1159) are used.",
+            "description": "Not used: PiD decodes the normalized latent directly. Kept so existing workflows that connect a VAE stay valid.",
             "field_kind": "input",
             "input": "connection",
             "orig_default": null,
@@ -123617,7 +123809,7 @@
         "tags": ["latents", "image", "pid", "z-image", "upscale"],
         "title": "Latents to Image - Z-Image + PiD (4x SR)",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
