@@ -373,13 +373,58 @@ def _corners(constraints: Sequence[_HalfPlane]) -> Iterator[tuple[Fraction, Frac
                 yield k, b
 
 
-def _conflict(floors: Sequence[_HalfPlane], others: Sequence[_HalfPlane]) -> list[_HalfPlane]:
-    """Of `others`, a set that no line at or above the floors satisfies, though one satisfies each of its proper
-    subsets: each constraint is dropped while the rest still conflict. In two dimensions at most three remain."""
+def _lowest_rounded(constraints: Sequence[_HalfPlane], middle: Fraction) -> Optional[tuple[int, int]]:
+    """The rounded line that satisfies every one of `constraints` with the smallest ``k * middle + b``, the steeper on
+    a tie; None where no rounded line does. A rounded line is what ships: a whole byte of slope per unit of size and a
+    whole MiB of base, ``(k, b)`` with ``k`` an integer and ``b`` a multiple of a MiB.
+
+    Exact and complete. The rounded lines that can satisfy the constraints lie in the real region they bound, so the
+    search runs over each whole MiB of base from the region's lowest base up. At a base, every constraint is a bound on
+    the slope, and the lowest whole slope within them is that base's best line, since the objective rises with the
+    slope. The search stops above the region's highest base, which caps that bound it in the base imply; without
+    such a cap, past every coverage limit, above which no constraint moves with the base; and once a base alone,
+    at the region's lowest slope, costs more than the best line found."""
+    corners = list(_corners(constraints))
+    if not corners:
+        return None
+    k_least = min(k for k, _ in corners)
+    b_least = min(b for _, b in corners)
+    if any(c.upper and c.bases > 0 for c in constraints):
+        b_most = max(b for _, b in corners)
+    else:
+        # Unbounded in the base: above every limit, a larger base satisfies nothing more.
+        b_most = max([b for _, b in corners] + [c.limit / c.bases for c in constraints if c.bases > 0]) + _MIB
+    best: Optional[tuple[Fraction, int, int]] = None
+    mib = math.ceil(b_least / _MIB)
+    while mib * _MIB <= b_most and (best is None or k_least * middle + mib * _MIB <= best[0]):
+        b = mib * _MIB
+        mib += 1
+        k_low, k_high = k_least, None
+        feasible = True
+        for c in constraints:
+            rest = c.limit - c.bases * b
+            if not c.size:
+                feasible = feasible and (rest >= 0 if c.upper else rest <= 0)
+            elif c.upper:
+                k_high = rest / c.size if k_high is None else min(k_high, rest / c.size)
+            else:
+                k_low = max(k_low, rest / c.size)
+        k = math.ceil(k_low)
+        if not feasible or (k_high is not None and k > k_high):
+            continue
+        cost = k * middle + b
+        if best is None or (cost, -k) < (best[0], -best[1]):
+            best = (cost, k, b)
+    return None if best is None else (best[1], best[2])
+
+
+def _conflict(floors: Sequence[_HalfPlane], others: Sequence[_HalfPlane], middle: Fraction) -> list[_HalfPlane]:
+    """Of `others`, a set that no rounded line at or above the floors satisfies (`_lowest_rounded`), though one
+    satisfies each of its proper subsets: each constraint is dropped while the rest still conflict."""
     kept = list(others)
     for constraint in others:
         rest = [c for c in kept if c is not constraint]
-        if next(_corners([*floors, *rest]), None) is None:
+        if _lowest_rounded([*floors, *rest], middle) is None:
             kept = rest
     return kept
 
@@ -387,23 +432,25 @@ def _conflict(floors: Sequence[_HalfPlane], others: Sequence[_HalfPlane]) -> lis
 def raised_pair(
     floor: tuple[float, float], line: Sequence[FitPoint], bounds: Sequence[LineBound]
 ) -> tuple[float, float]:
-    """The lowest line at or above `floor`, per coefficient, that covers every point of `line` by `SHIPPED_MARGIN`
-    and keeps every one of `bounds`.
+    """The lowest rounded line at or above `floor`, per coefficient, that covers every point of `line` by
+    `SHIPPED_MARGIN` and keeps every one of `bounds`.
 
     `floor` itself where it covers every point by the margin: a point it covers changes nothing, and `bounds` are not
     consulted, since the floor's own bounds are the data test's to hold. Otherwise every line is a candidate, not only
-    the edges of a hull: each constraint is a half-plane in ``(k, b)``, so the lines that satisfy them all form a convex
-    region, and the lowest of them is one of its corners, which `_corners` enumerates exactly. The lowest line is the
-    one with the smallest reservation averaged over the sizes the line's fresh-process points span (``k`` times the
-    middle of that range, plus ``b``), or all its points' sizes where none caps it; the steeper on a tie, as
-    `upper_envelope` breaks them. Probe sizes do not move that measure, so a line raised for some probes stays where it
-    is when another probe it covers arrives. The pair is rounded up as `shipped_pair` rounds it, and `bounds` are kept
-    with room for that rounding: one byte per unit of size and one MiB of base.
+    the edges of a hull, and the candidates are the lines that ship: rounded as `shipped_pair` rounds, a whole byte of
+    slope per unit of size and a whole MiB of base. Each constraint is a half-plane in ``(k, b)``, so the lines that
+    satisfy them all form a convex region; `_lowest_rounded` finds the lowest rounded line in it exactly, checking
+    each candidate against the constraints as they are, with no allowance. The lowest line is the one with the smallest
+    reservation averaged over the sizes the line's fresh-process points span (``k`` times the middle of that range,
+    plus ``b``), or all its points' sizes where none caps it; the steeper on a tie, as `upper_envelope` breaks them.
+    Probe sizes do not move that measure, so a line raised for some probes stays where it is when another probe it
+    covers arrives.
 
-    Raises `LineConflict`, naming the points that cannot be satisfied together, where no line at or above `floor`
-    covers the points within `bounds`. Raises `ValueError` where a raise is needed and `line` has fresh-process points
-    but `bounds` states none: those points always bound the line (`bounds.line_bounds`), so empty `bounds` there means
-    the caller left them out, and a raise without them could break every one."""
+    Raises `LineConflict`, naming the points that cannot be satisfied together, where no rounded line at or above
+    `floor` covers the points within `bounds`, also where only a line between whole bytes or MiB would. Raises
+    `ValueError` where a raise is needed and `line` has fresh-process points but `bounds` states none: those points
+    always bound the line (`bounds.line_bounds`), so empty `bounds` there means the caller left them out, and a raise
+    without them could break every one."""
     k_floor, b_floor = Fraction(floor[0]), Fraction(floor[1])
     margin = 1 + SHIPPED_MARGIN
     highest: dict[int, int] = {}
@@ -426,15 +473,12 @@ def raised_pair(
         _HalfPlane(Fraction(1), Fraction(0), k_floor, False, "the slope floor"),
         _HalfPlane(Fraction(0), Fraction(1), b_floor, False, "the base floor"),
     ]
-    caps = [
-        _HalfPlane(bound.size, bound.bases, bound.ceiling - bound.size - bound.bases * _MIB, True, bound.point)
-        for bound in bounds
-    ]
+    caps = [_HalfPlane(bound.size, bound.bases, bound.ceiling, True, bound.point) for bound in bounds]
     sizes = [point.size for point in line if point.caps] or list(highest)
     middle = Fraction(min(sizes) + max(sizes), 2)
-    best = min(_corners([*floors, *uncovered, *caps]), key=lambda kb: (kb[0] * middle + kb[1], -kb[0]), default=None)
+    best = _lowest_rounded([*floors, *uncovered, *caps], middle)
     if best is None:
-        conflict = _conflict(floors, [*uncovered, *caps])
+        conflict = _conflict(floors, [*uncovered, *caps], middle)
         covers = "; ".join(c.why for c in conflict if not c.upper)
         within = "; ".join(c.why for c in conflict if c.upper)
         at = f"k={floor[0]:.0f}, b={floor[1] / _MIB:.0f} MiB"
@@ -444,5 +488,4 @@ def raised_pair(
         raise LineConflict(
             f"no line at or above {at} covers {covers} by {SHIPPED_MARGIN:.0%} within the upper bound of {within}"
         )
-    k, b = best
-    return math.ceil(k), math.ceil(b / _MIB) * _MIB
+    return best

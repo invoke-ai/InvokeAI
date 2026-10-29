@@ -548,12 +548,15 @@ def test_a_stand_in_short_of_a_probe_is_raised_by_the_least_its_bounds_allow(spe
     """Probes of a 1 GiB base and 10000 bytes per pixel read 3524 MiB at 512px, above the stand-in's 3444 MiB, and
     11024 MiB at 1024px, below its 13734. Covering 512px by 5% takes 3700.2 MiB there: 256.2 MiB more base, or 1025
     more bytes per pixel. Averaged over the measured 512px to 1024px, the slope costs 2.5 times as much (the middle,
-    655360 px, over 512px's 262144), so the base rises, to 270.2 MiB, rounded up to 271, and the slope stays."""
+    655360 px, over 512px's 262144), so the base takes the raise, to 270.2 MiB. Of the lines as they ship, whole bytes
+    per pixel and whole MiB of base, 13720 with 271 MiB averages 8846 MiB over that range; 13721 with 270 MiB still
+    covers 512px and averages 8845.625: a byte per pixel more costs 0.625 MiB at the middle, a MiB of base less saves
+    a whole one."""
     entry = _refit_shipped(_cogview4_probes(10_000), specs, "vae.cogview4")
 
     assert entry.values is not None
     k, b = entry.values["k_decode_bf16"], entry.values["b_decode_bf16"]
-    assert (k, b) == (13720, 271 * MIB)
+    assert (k, b) == (13721, 270 * MIB)
     assert k * 512 * 512 + b >= 1.05 * (GIB + 10_000 * 512 * 512) > k * 512 * 512 + b - MIB
     assert {"k_decode_bf16", "b_decode_bf16"} <= set(entry.stand_ins)
     assert RAISE_NOTE in entry.provenance

@@ -626,3 +626,54 @@ def test_a_raise_without_the_bounds_of_its_fresh_process_points_is_refused() -> 
     to break all of them."""
     with pytest.raises(ValueError, match="no upper bounds are given"):
         fitted_values([_with_probe(1700)], SPECS, {})
+
+
+def test_a_raise_onto_a_bound_exactly_is_kept() -> None:
+    """Fresh decodes of 250 MiB at 512px and 1000 MiB at 1024px fit 1000 bytes per pixel and no base, shipped as 1050.
+    A 1238 MiB probe at 1024px needs 1299.9 MiB there, and both fresh decodes hold the line to 1.3x: 325 and 1300 MiB.
+    1300 bytes per pixel with no base reserves exactly that at both sizes, so it ships, though no line keeps a whole
+    byte per pixel and a MiB of room below them."""
+    fresh = [_point("lender", "decode", 512, 250), _point("lender", "decode", 1024, 1000)]
+    data = WorkingMemoryData(
+        schema_version=1,
+        coefficients=[_entry("lender", {"k_decode_bf16": 0.0, "b_decode_bf16": 0.0})],
+        points=[*fresh, _probe(1024, 1238)],
+    )
+
+    line = fitted_values([data], SPECS, _bounded_by(fresh))[("lender", 1, (("conv_backend", "cudnn"),))]
+
+    assert (line["k_decode_bf16"], line["b_decode_bf16"]) == (1300, 0)
+
+
+ODD_SIZE = 1024 * 1536
+"""1.5 MiB of pixels: at this size whole bytes per pixel step the reservation by 1.5 MiB, whole MiB of base by 1."""
+
+
+def test_a_raise_whose_real_optimum_rounds_onto_a_bound_takes_the_rounded_line_next_to_it() -> None:
+    """A probe at 1024x1536 px needs 6291980289 bytes with 5%, 4000 slope steps of 1.5 MiB and 0.5 MiB more. Averaged
+    over the fresh sizes, slope is the cheaper half, so the lowest real line is 4000.33 bytes per pixel and no base;
+    rounded up, 4001 reserves 1 MiB above the need, over the bound 0.6 MiB above it. 4000 bytes per pixel with a 1 MiB
+    base reserves 0.5 MiB above the need, within the bound: the lowest rounded line."""
+    fresh = [FitPoint(512 * 512, 100 * MIB, True), FitPoint(ODD_SIZE, 100 * MIB, True)]
+    need = 1572864 * 4000 + 524289
+    probe = FitPoint(ODD_SIZE, need * 20 // 21, False)
+    assert Fraction(21, 20) * probe.bytes == need
+    bound = LineBound(Fraction(ODD_SIZE), Fraction(1), Fraction(need + 629146), "fresh 1024x1536")
+
+    assert raised_pair((2000, 0), [*fresh, probe], [bound]) == (4000, MIB)
+
+
+def test_a_raise_only_a_line_between_whole_mib_could_make_is_refused() -> None:
+    """At 1024px a whole byte per pixel is a whole MiB, so every rounded line reserves a whole number of MiB there. A
+    probe that needs 1300.2 MiB under a bound of 1300.7 MiB leaves a slit of half a MiB: real lines fit it (1300.2 bytes
+    per pixel, say), rounded lines do not."""
+    fresh = [FitPoint(512 * 512, 100 * MIB, True), FitPoint(1024 * 1024, 100 * MIB, True)]
+    probe = FitPoint(1024 * 1024, 20 * 64921834, False)
+    need, ceiling = Fraction(21, 20) * probe.bytes, Fraction(13007, 10) * MIB
+    assert 1300 * MIB < need < ceiling < 1301 * MIB
+    bound = LineBound(Fraction(1024 * 1024), Fraction(1), ceiling, "fresh 1024px")
+
+    with pytest.raises(
+        LineConflict, match=r"covers 1238 MiB at size 1048576 by 5% within the upper bound of fresh 1024px$"
+    ):
+        raised_pair((1000, 0), [*fresh, probe], [bound])
