@@ -465,7 +465,12 @@ describe('InstallQueueBar', () => {
     updateModelsUi({ queueExpanded: true, queueMaximized: false });
     let resolvePrune!: (jobIds: number[]) => void;
     const afterPrune = [{ ...JOBS[0]!, status: 'completed' as const }, JOBS[1]!];
-    api.listModelInstalls.mockReset().mockResolvedValueOnce(JOBS).mockResolvedValueOnce(afterPrune);
+    // The completion event also schedules a coalesced refresh, which lands within this test on a slow machine.
+    api.listModelInstalls
+      .mockReset()
+      .mockResolvedValue(afterPrune)
+      .mockResolvedValueOnce(JOBS)
+      .mockResolvedValueOnce(afterPrune);
     api.pruneCompletedModelInstalls.mockReturnValue(
       new Promise<number[]>((resolve) => {
         resolvePrune = resolve;

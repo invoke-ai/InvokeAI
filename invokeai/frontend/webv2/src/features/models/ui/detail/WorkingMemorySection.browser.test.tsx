@@ -986,7 +986,7 @@ describe('WorkingMemorySection', () => {
     await act(() => userEvent.click(buttonNamed('common.reset')!));
     await expect.poll(openAlertDialog).not.toBeNull();
     // A destructive confirmation opens on Cancel.
-    expect(document.activeElement?.textContent).toBe('Cancel');
+    expect(document.activeElement?.textContent).toBe('common.cancel');
 
     api.resetWorkingMemory.mockImplementation(() => {
       serveSummary(summary());
