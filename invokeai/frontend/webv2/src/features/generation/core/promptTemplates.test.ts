@@ -4,6 +4,7 @@ import {
   applyPromptTemplate,
   flattenPromptTemplateExpansion,
   getEffectivePrompts,
+  getPositivePromptTemplateChunks,
   getPromptTemplateChunks,
   isCanonicalPromptTemplateSnapshot,
   sanitizePromptTemplateSnapshot,
@@ -37,6 +38,12 @@ describe('prompt template expansion', () => {
       negativePrompt: 'noise, blurry',
       positivePrompt: layout,
     });
+  });
+
+  it('splits the merged positive view as it generates, with a JSON prompt whole', () => {
+    const layout = '{"bbox_coord_space":"abs_centralized","items":[]}';
+    expect(getPositivePromptTemplateChunks(layout, template)).toEqual(['', layout, '']);
+    expect(getPositivePromptTemplateChunks('owl', template)).toEqual(['photo of ', 'owl', ', 35mm']);
   });
 
   it('merges both prompt sides and passes them through when no template is active', () => {

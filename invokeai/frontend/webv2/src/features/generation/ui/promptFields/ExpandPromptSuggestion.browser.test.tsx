@@ -198,7 +198,19 @@ afterEach(async () => {
   root = null;
 });
 
-const renderField = (suggestion: ExpandPromptSuggestion | null, savedPromptModels?: SavedPromptModels) =>
+/** What the field was last rendered with, so a saved slot can render its own change back. */
+let rendered: {
+  projectId: string;
+  savedPromptModels: SavedPromptModels | undefined;
+  suggestion: ExpandPromptSuggestion | null;
+} | null = null;
+
+const renderField = (
+  suggestion: ExpandPromptSuggestion | null,
+  savedPromptModels?: SavedPromptModels,
+  projectId = 'project-1'
+) => {
+  rendered = { projectId, savedPromptModels, suggestion };
   root?.render(
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={new QueryClient()}>
@@ -208,7 +220,7 @@ const renderField = (suggestion: ExpandPromptSuggestion | null, savedPromptModel
               expandPromptSuggestion={suggestion}
               heightPx={96}
               loras={[]}
-              projectId="project-1"
+              projectId={projectId}
               savedPromptModels={savedPromptModels}
               selectedModel={undefined}
               showSyntaxHighlighting={false}
@@ -222,6 +234,7 @@ const renderField = (suggestion: ExpandPromptSuggestion | null, savedPromptModel
       </QueryClientProvider>
     </I18nextProvider>
   );
+};
 
 const renderAndOpen = async (
   suggestion: ExpandPromptSuggestion | null,
@@ -236,12 +249,15 @@ const renderAndOpen = async (
   await act(() => host?.querySelector<HTMLButtonElement>(`[aria-label="${trigger}"]`)?.click());
 };
 
-const savedModels = (overrides: Partial<SavedPromptModels> = {}): SavedPromptModels => ({
-  expandPromptModelKey: null,
-  imageToPromptModelKey: null,
-  onChange: vi.fn(),
-  ...overrides,
-});
+/** A saved slot that, like Generate's draft, holds a saved pick by the next render. */
+const savedModels = (overrides: Partial<SavedPromptModels> = {}): SavedPromptModels => {
+  const onChange = vi.fn((patch: Partial<SavedPromptModels>) => {
+    if (rendered?.savedPromptModels?.onChange === onChange) {
+      renderField(rendered.suggestion, { ...rendered.savedPromptModels, ...patch }, rendered.projectId);
+    }
+  });
+  return { expandPromptModelKey: null, imageToPromptModelKey: null, ...overrides, onChange };
+};
 
 const select = (label: string) => document.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`);
 const choose = (label: string, value: string) =>
@@ -390,6 +406,23 @@ it('points to the MOSS-Image enhancer starter model when it is not installed', a
   expect(document.body.textContent).not.toContain('Recommended:');
 });
 
+it("starts another project from its own saved Expand Prompt model, not the previous project's pick", async () => {
+  await renderAndOpen(null, savedModels());
+  await choose('text llm', 'qwen');
+  expect(select('text llm')?.value).toBe('qwen');
+
+  await act(() => renderField(null, savedModels({ expandPromptModelKey: 'e2b' }), 'project-2'));
+  expect(select('text llm')?.value).toBe('e2b');
+});
+
+it('keeps the session pick of a surface without a saved slot across a project switch', async () => {
+  await renderAndOpen(null);
+  await choose('text llm', 'qwen');
+
+  await act(() => renderField(null, undefined, 'project-2'));
+  expect(select('text llm')?.value).toBe('qwen');
+});
+
 it('falls back when the saved pick is no longer installed', async () => {
   await renderAndOpen(null, savedModels({ expandPromptModelKey: 'uninstalled' }));
 
@@ -504,4 +537,14 @@ it('starts Image to Prompt from the first listed vision model and saves a differ
   await act(() => host?.querySelector<HTMLButtonElement>('[aria-label="widgets.generate.imageToPrompt"]')?.click());
   await choose('text llm', 'llava-b');
   expect(saved.onChange).toHaveBeenCalledExactlyOnceWith({ imageToPromptModelKey: 'llava-b' });
+});
+
+it("starts another project from its own saved Image to Prompt model, not the previous project's pick", async () => {
+  catalog = [VISION_A, VISION_B];
+  await renderAndOpen(null, savedModels(), 'widgets.generate.imageToPrompt');
+  await choose('text llm', 'llava-b');
+  expect(select('text llm')?.value).toBe('llava-b');
+
+  await act(() => renderField(null, savedModels({ imageToPromptModelKey: 'llava-a' }), 'project-2'));
+  expect(select('text llm')?.value).toBe('llava-a');
 });

@@ -97,8 +97,8 @@ const getFirstModelByName = (models: readonly ModelConfig[]): ModelConfig | null
   );
 
 /**
- * The model picked in this mount when it is still installed, else the surface's saved pick, else the suggested one,
- * else the first listed. A pick is saved to the surface when it keeps one, and only when it differs from what is saved.
+ * The picked model when it is still installed, else the suggested one, else the first listed. A pick is saved
+ * to the surface when it keeps one, and only when it differs from what is saved.
  */
 const usePromptModelPick = ({
   candidates,
@@ -112,21 +112,18 @@ const usePromptModelPick = ({
   suggestedKey?: string | null;
 }) => {
   const [sessionKey, setSessionKey] = useState<string | null>(null);
-  const findModel = (key: string | null | undefined) =>
-    key ? (candidates.find((model) => model.key === key) ?? null) : null;
-  const model =
-    findModel(sessionKey) ??
-    (onSave ? findModel(savedKey) : null) ??
-    findModel(suggestedKey) ??
-    getFirstModelByName(candidates);
+  const pickedKey = onSave ? (savedKey ?? null) : sessionKey;
+  const findModel = (key: string | null) => (key ? (candidates.find((model) => model.key === key) ?? null) : null);
+  const model = findModel(pickedKey) ?? findModel(suggestedKey) ?? getFirstModelByName(candidates);
   const pick = useCallback(
     (next: ModelConfig | null) => {
       if (!next) {
         return;
       }
 
-      setSessionKey(next.key);
-      if (onSave && next.key !== savedKey) {
+      if (!onSave) {
+        setSessionKey(next.key);
+      } else if (next.key !== savedKey) {
         onSave(next.key);
       }
     },

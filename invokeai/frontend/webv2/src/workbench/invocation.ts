@@ -263,7 +263,11 @@ const getGenerateSnapshotValidationReasons = (
     ),
     ...(models ? getGenerationModelAvailabilityReasons(values.model, values, models) : []),
     ...[
-      getLayoutDraftRejectionReason({ base: values.model.base, prompt: getEffectivePrompts(values).positivePrompt }),
+      getLayoutDraftRejectionReason({
+        base: values.model.base,
+        positivePrompt: values.positivePrompt,
+        promptTemplate: values.promptTemplate,
+      }),
     ].filter((reason) => reason !== null),
   ];
 };

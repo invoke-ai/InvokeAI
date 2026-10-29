@@ -676,7 +676,8 @@ describe('getLayoutDraftRejectionReason', () => {
       },
     ],
   };
-  const reason = (prompt: string, base = 'moss-image') => getLayoutDraftRejectionReason({ base, prompt });
+  const reason = (prompt: string, base = 'moss-image') =>
+    getLayoutDraftRejectionReason({ base, positivePrompt: prompt });
 
   it('accepts a well-formed draft, bare or fenced, and leaves plain prompts and other bases alone', () => {
     expect(reason(JSON.stringify(draft, null, 2))).toBeNull();
@@ -696,6 +697,25 @@ describe('getLayoutDraftRejectionReason', () => {
     expect(reason(JSON.stringify({ ...compiled, items: [] }))).toBeNull();
     expect(reason(`\`\`\`json\r\n${JSON.stringify(compiled, null, 2)}\r\n\`\`\``)).toBeNull();
     expect(reason('{"bbox_coord_space": "abs_centralized", "items": [')).toBeNull();
+  });
+
+  it('checks a draft both as authored and as the template makes it', () => {
+    const notJson =
+      'The prompt looks like a MOSS-Image layout draft but is not valid JSON. Run Expand Prompt again or fix it.';
+    const prefix = { id: 'photo', name: 'Photo', negativePrompt: '', positivePrompt: 'photo of {prompt}' };
+    const scaffold = {
+      id: 'poster',
+      name: 'Poster',
+      negativePrompt: '',
+      positivePrompt: JSON.stringify({ ...draft, summary: { ...draft.summary, caption: '{prompt}' } }),
+    };
+    const withTemplate = (positivePrompt: string, promptTemplate: typeof prefix) =>
+      getLayoutDraftRejectionReason({ base: 'moss-image', positivePrompt, promptTemplate });
+
+    expect(withTemplate('{"bbox_coord_space": "abs", "items": [', prefix)).toBe(notJson);
+    expect(withTemplate('a "neon" sign', scaffold)).toBe(notJson);
+    expect(withTemplate('a neon sign', scaffold)).toBeNull();
+    expect(withTemplate(JSON.stringify(draft), prefix)).toBeNull();
   });
 
   it('refuses a draft in a box format the layout node does not compile', () => {

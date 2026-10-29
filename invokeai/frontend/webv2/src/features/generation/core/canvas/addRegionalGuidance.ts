@@ -1,9 +1,10 @@
 import type { BackendGraphContract, BackendInvocationContract } from '@features/generation/core/contracts';
+import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 
 import { getArchitectureFeatures } from '@features/generation/core/architectureCapabilities';
 import { addEdge, addNode } from '@features/generation/core/graphBuilder';
 import { COMPEL_PROMPT_NODE_TYPES } from '@features/generation/core/prompt/compel';
-import { unwrapPromptFence } from '@features/generation/core/promptTemplates';
+import { getEffectivePositivePrompt, unwrapPromptFence } from '@features/generation/core/promptTemplates';
 
 import type { Rect } from './types';
 
@@ -131,16 +132,8 @@ export const getLayoutPromptRejectionReason = (params: {
 const LOOKS_LIKE_LAYOUT_DRAFT = /"bbox_coord_space"\s*:\s*"abs"/;
 const LAYOUT_DRAFT_FIX = 'Run Expand Prompt again or fix it.';
 
-/**
- * Why a MOSS-Image prompt holding a layout draft (as Expand Prompt writes it: a JSON object with
- * `bbox_coord_space: "abs"`, optionally in a ``` fence) cannot be compiled, or null. Plain text and compiled layouts
- * (`abs_centralized`) pass. Only the shape the layout node needs to start is checked; the backend validates the boxes.
- */
-export const getLayoutDraftRejectionReason = (params: { base: string; prompt: string }): string | null => {
-  if (getRegionalGuidanceSupport(params.base)?.mode !== 'layout') {
-    return null;
-  }
-  const body = unwrapPromptFence(params.prompt);
+const getDraftRejectionReason = (prompt: string): string | null => {
+  const body = unwrapPromptFence(prompt);
   let parsed: unknown;
   try {
     parsed = JSON.parse(body);
@@ -172,6 +165,28 @@ export const getLayoutDraftRejectionReason = (params: { base: string; prompt: st
     return `The MOSS-Image layout draft in the prompt needs a summary with a caption, at least one item, and a numeric width and height. ${LAYOUT_DRAFT_FIX}`;
   }
   return null;
+};
+
+/**
+ * Why a MOSS-Image prompt holding a layout draft (as Expand Prompt writes it: a JSON object with
+ * `bbox_coord_space: "abs"`, optionally in a ``` fence) cannot be compiled, or null. Plain text and compiled layouts
+ * (`abs_centralized`) pass. Only the shape the layout node needs to start is checked; the backend validates the boxes.
+ * Both the authored prompt and the one the template makes of it are checked: template text around a broken draft
+ * would hide it, and a template that is itself a draft can break around authored text (an unescaped quote).
+ */
+export const getLayoutDraftRejectionReason = (params: {
+  base: string;
+  positivePrompt: string;
+  promptTemplate?: PromptTemplateSnapshot | null;
+}): string | null => {
+  if (getRegionalGuidanceSupport(params.base)?.mode !== 'layout') {
+    return null;
+  }
+  const effectivePrompt = getEffectivePositivePrompt(params.positivePrompt, params.promptTemplate ?? null);
+  return (
+    getDraftRejectionReason(params.positivePrompt) ??
+    (effectivePrompt === params.positivePrompt ? null : getDraftRejectionReason(effectivePrompt))
+  );
 };
 
 /** A resolved reference-image (component) model identifier — the backend model field shape. */
