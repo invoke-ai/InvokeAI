@@ -1,5 +1,6 @@
 """The shipped fit: an upper envelope of the points, with a non-negative base, plus the shipped margin."""
 
+from dataclasses import replace
 from fractions import Fraction
 
 import pytest
@@ -17,6 +18,7 @@ from invokeai.backend.working_memory.fit import (
     fit_points,
     fitted_values,
     hand_set_values,
+    point_reading,
     shipped_pair,
     shipped_two_phase,
     two_phase_envelope,
@@ -111,6 +113,93 @@ def test_a_line_that_sits_on_another_covers_the_demand_above_it_and_is_rated_on_
 
 def test_a_line_that_sits_on_another_is_zero_where_nothing_lies_above_its_offset() -> None:
     assert upper_envelope([(1, 900, Fraction(1000)), (4, 950, Fraction(1000))]) == (0, 0)
+
+
+def _floored(x: int, y: int, floor: int) -> tuple[int, int, Fraction, Fraction, Fraction]:
+    """A point of a line that sits on none beneath, with what its estimate reserves whatever the line: its floor, the
+    shipped margin included, which covers the point where it is at least the reading plus that margin."""
+    return (x, y, Fraction(0), Fraction(0), Fraction(floor))
+
+
+def test_a_point_its_floor_covers_lifts_no_line() -> None:
+    """The 100 at size 8 would pull the line to it; its floor reserves 105 whatever the line, the 100 and the shipped
+    margin, so the line stays the one the other points give. A floor of 104 covers the 100 without the margin a line
+    would ship, and leaves the point to the line."""
+    points = [(1, 10), (2, 15), (4, 20)]
+
+    assert upper_envelope([*points, _floored(8, 100, 104)]) == upper_envelope([*points, (8, 100)])
+    assert upper_envelope([*points, (8, 100)]) != upper_envelope(points)
+    assert upper_envelope([*points, _floored(8, 100, 105)]) == upper_envelope(points) == (5, 5)
+
+
+def test_a_point_its_floor_covers_rates_a_line_that_prices_it_above_the_floor() -> None:
+    """Without the point at 16 the edges (5, 5) and (2.5, 10) both over-reserve their worst point 1.25x, and the
+    steeper wins. Its floor covers the 50 at 16 with 53, but (5, 5) prices 85 there, 1.7x what it measured, where
+    (2.5, 10) prices it under the floor: what the estimate reserves rates."""
+    points = [(1, 10), (2, 15), (4, 20)]
+
+    assert upper_envelope([*points, _floored(16, 50, 53)]) == (Fraction(5, 2), 10)
+
+
+def test_a_point_its_floor_covers_rates_no_line_that_prices_it_below_the_floor() -> None:
+    """The floor reserves 90 for the 50 at 16 whichever edge wins: (5, 5) prices it at 90 and (2.5, 10) at 50, neither
+    above it. Rated on what the edges price, 1.8x against 1.0x, the point would hand the line to the flatter edge,
+    though it reserves the same under both; rated on nothing, the tie between them goes to the steeper as without it."""
+    points = [(1, 10), (2, 15), (4, 20)]
+
+    assert upper_envelope([*points, _floored(16, 50, 90)]) == upper_envelope(points) == (5, 5)
+
+
+def test_a_floor_no_line_reaches_does_not_decide_between_the_lines() -> None:
+    """The floor reserves 2.5x the 10 at size 1 whatever the line. Counted as each edge's worst ratio, it would tie
+    every edge and hand the line to the steepest, (10, 0), which over-reserves the 40 at 8 by 2x; left out, the edge
+    (5, 10) wins, the 1.25x it holds the others to."""
+    points = [(2, 20), (4, 30), (8, 40)]
+
+    assert upper_envelope([*points, _floored(1, 10, 25)]) == upper_envelope(points) == (5, 10)
+
+
+def test_a_line_is_held_against_the_floor_as_it_ships() -> None:
+    """The floor, the margin in it, reserves 87 for the 50 at 16. The edge (5, 5) prices that point at 85 before the
+    margin, under the floor, and at 89.25 as it ships, above it: it is the shipped line that would reserve more than
+    the floor, so the point rates it, 1.7x, and the flatter edge (2.5, 10) wins, as at a floor of 85."""
+    points = [(1, 10), (2, 15), (4, 20)]
+
+    assert upper_envelope([*points, _floored(16, 50, 87)]) == (Fraction(5, 2), 10)
+
+
+def test_a_point_its_floor_covers_rates_no_assembly_line_that_prices_it_below_the_floor() -> None:
+    """The assembly line through the readings at 6 and 8 Mi pixels prices the tile's decodes best (`FLAT_THEN_STEEP`).
+    At 16 Mi pixels it prices the 300 MiB measured there at 2.6x, under the 800 MiB its floor reserves anyway; the
+    tiled line alone would price it at 1.8x, but over-reserves the flat points 1.89x. The floor decides that point
+    whichever line ships, so the assembly line still wins."""
+    x, y, offset = 16 * MIB, 300 * MIB, Fraction(100 * MIB)
+    covered = (x, y, offset, offset, Fraction(800 * MIB))
+
+    assert two_phase_envelope([*FLAT_THEN_STEEP, covered]) == two_phase_envelope(FLAT_THEN_STEEP)
+
+
+def test_a_floor_no_candidate_reaches_does_not_decide_between_the_candidates() -> None:
+    """The floor reserves 3x the 60 MiB at 1 Mi pixels whichever lines ship. Counted as every candidate's worst ratio,
+    it would tie them all and leave the choice to the sum of ratios, which takes an assembly line, 7.5 bytes per pixel
+    from 80 MiB; left out, the tiled line alone, 5 bytes per pixel, wins on the worst of the other points, as it does
+    without the covered point."""
+    decodes = _decodes((4, 110, 100), (8, 140, 100), (12, 140, 100))
+    offset = Fraction(100 * MIB)
+    covered = (1 * MIB, 60 * MIB, offset, offset, Fraction(180 * MIB))
+
+    assert two_phase_envelope([*decodes, covered]) == two_phase_envelope(decodes) == ((5, 0), (0, 0))
+
+
+def test_no_assembly_line_passes_through_a_point_its_floor_covers() -> None:
+    """The floor covers the 150 MiB at 2 Mi pixels, with the margin. An assembly line through it and the 350 MiB at 8,
+    33.3 bytes per pixel from 83 MiB, would rate better than the tiled line alone; but that point needs no line, so no
+    candidate is drawn through it, and the tiled line alone, 31.25 bytes per pixel, wins."""
+    decodes = _decodes((3, 140, 100), (4, 180, 100), (8, 350, 100))
+    offset = Fraction(100 * MIB)
+    covered = (2 * MIB, 150 * MIB, offset, offset, Fraction(240 * MIB))
+
+    assert two_phase_envelope([*decodes, covered]) == ((Fraction(125, 4), 0), (0, 0))
 
 
 def test_the_shipped_margin_is_five_percent() -> None:
@@ -240,6 +329,93 @@ def test_a_tiled_line_covers_what_its_points_measured_above_their_estimators_unt
     assert tiled != shipped_pair([reading[:2] for reading in readings]), "on the raw demand"
 
 
+COUNTED_PER_PIXEL = 20
+"""What the floor of `_floored_terms` counts per image pixel, as a tiled VAE operation counts its buffers."""
+
+
+def _floored_terms(features, values):
+    """A tiled operation's two phases as the VAE estimators price them: the tile on the untiled line plus the tiled
+    line, or the floor, the counted buffers and the untiled line's base, whichever is larger. An untiled one is its
+    line."""
+    line = convolution_line(features)
+    assert line is not None
+    if line.sits_on is None:
+        return (
+            WorkingMemoryTerm.fitted("convolutions", f"k_{line.suffix}", line.size, values),
+            WorkingMemoryTerm.fitted("convolution_base", f"b_{line.suffix}", 1, values),
+        )
+    untiled, tile_area = line.sits_on
+    tile_phase = (
+        WorkingMemoryTerm.fitted("convolutions", f"k_{untiled}", tile_area, values),
+        WorkingMemoryTerm.fitted("convolution_base", f"b_{untiled}", 1, values),
+        WorkingMemoryTerm.fitted("tiled", f"k_{line.suffix}", line.size, values),
+        WorkingMemoryTerm.fitted("tiled_base", f"b_{line.suffix}", 1, values),
+    )
+    floor_phase = (
+        WorkingMemoryTerm("buffers", COUNTED_PER_PIXEL * line.size, True),
+        WorkingMemoryTerm.fitted("floor_base", f"b_{untiled}", 1, values),
+    )
+    floor_wins = sum(term.bytes for term in floor_phase) > sum(term.bytes for term in tile_phase)
+    return (
+        *(replace(term, included=not floor_wins) for term in tile_phase),
+        *(replace(term, included=floor_wins) for term in floor_phase),
+    )
+
+
+def test_a_tiled_point_the_untiled_lines_headroom_covers_is_not_left_to_the_floor() -> None:
+    """A tiled point's floor is what its estimate reserves whatever the lines price its tile and what tiling adds: the
+    counted buffers and the untiled line's base, without the slope that prices the tile. The untiled line runs from the
+    256 px point to the 1024 px one, above the 1000 MiB measured at the 512 px tile, so the tile phase alone covers a
+    4096 px encode at that tile of up to its price there less the margin, though the encode lies above that 1000 MiB.
+    Read with the slope beneath, its floor would be that tile phase and would leave the point to no line; read without,
+    it is the 320 MiB of buffers and the base, and the point stays in the tiled line's hull."""
+    spec = EstimatorSpec(
+        id="tiler",
+        version=1,
+        coefficients=frozenset(),
+        platform_keys=("conv_backend",),
+        terms=_floored_terms,
+        line=convolution_line,
+    )
+    values = {"k_encode_bf16": 0.0, "b_encode_bf16": 0.0, "k_tiled_encode_bf16": 0.0, "b_tiled_encode_bf16": 0.0}
+    key = ("tiler", 1, (("conv_backend", "cudnn"),))
+    untiled = [_point("tiler", "encode", px, mib) for px, mib in ((256, 400), (512, 1000), (1024, 4400))]
+
+    def data(mib: int) -> WorkingMemoryData:
+        """The untiled points, a 2048 px encode at a 1024 px tile, and a 4096 px one at a 512 px tile at `mib`."""
+        tiled = [_point("tiler", "encode", 2048, 4500, tile=1024), _point("tiler", "encode", 4096, mib, tile=512)]
+        return WorkingMemoryData(schema_version=1, coefficients=[_entry("tiler", values)], points=untiled + tiled)
+
+    def fitted(mib: int) -> dict[str, int]:
+        return dict(fitted_values([data(mib)], {"tiler": spec})[key])
+
+    shipped = fitted(1150)
+    k, b = shipped["k_encode_bf16"], shipped["b_encode_bf16"]
+
+    def at(tile: int) -> Fraction:
+        return Fraction(k * tile * tile + b)
+
+    groups = fit_points([data(1150)], {"tiler": spec})
+    readings = [
+        point_reading(point, base_values(data(1150).coefficients, groups))
+        for point in groups[(key, "tiled_encode_bf16")]
+    ]
+    assert [reading.floor for reading in readings] == [COUNTED_PER_PIXEL * px * px + b for px in (2048, 4096)]
+    for mib in (1150, 1200):
+        assert 1000 * MIB < mib * MIB and mib * MIB * (1 + SHIPPED_MARGIN) <= at(512), "within the headroom at the tile"
+        assert mib * MIB * (1 + SHIPPED_MARGIN) > COUNTED_PER_PIXEL * 4096 * 4096 + b, "above the floor"
+
+    tiled = (shipped["k_tiled_encode_bf16"], shipped["b_tiled_encode_bf16"])
+    assert tiled == shipped_pair(
+        [
+            (2048 * 2048, 4500 * MIB, Fraction(4400 * MIB), at(1024)),
+            (4096 * 4096, 1150 * MIB, Fraction(1000 * MIB), at(512)),
+        ]
+    )
+    raised = fitted(1200)
+    assert (raised["k_tiled_encode_bf16"], raised["b_tiled_encode_bf16"]) != tiled, "the 4096 px point moves the line"
+
+
 def test_a_tile_below_the_smallest_the_app_sets_is_covered_but_caps_nothing() -> None:
     """A 256 px tile is set by hand in the workflow editor only. Its point joins the tiled line's fit: above the line it
     raises it to cover itself, below it moves nothing, as a probe window would not; and its estimate is held from below
@@ -349,6 +525,16 @@ def test_an_assembly_line_takes_the_points_the_tile_cannot_price_without_rising_
     assert upper_envelope(FLAT_THEN_STEEP) == (25, 0), "the tiled line alone"
     assert all(max(o + line[0] * x + line[1], assembly[0] * x + assembly[1]) == y for x, y, o in FLAT_THEN_STEEP)
     assert max(_shipped_ratios(FLAT_THEN_STEEP)) == Fraction(213, 200)
+
+
+def test_a_point_its_floor_covers_needs_no_assembly_line() -> None:
+    """The tile's decodes measure 10 MiB above its price up to 4 Mi pixels, and 300 MiB at 8, which its floor reserves
+    anyway, with the shipped margin: no assembly line is needed for it, and none passes through it."""
+    flat = _decodes((1, 110, 100), (2, 110, 100), (4, 110, 100))
+    x, y, offset = 8 * MIB, 300 * MIB, Fraction(100 * MIB)
+
+    assert two_phase_envelope([*flat, (x, y, offset, offset, Fraction(0))])[1] != (0, 0)
+    assert two_phase_envelope([*flat, (x, y, offset, offset, Fraction(315 * MIB))]) == ((0, 10 * MIB), (0, 0))
 
 
 def test_a_linear_set_ships_no_assembly_line() -> None:

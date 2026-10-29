@@ -74,6 +74,12 @@ def _decode(px: int, **changes: object) -> dict[str, object]:
             "dtype": "bf16"} | changes  # fmt: skip
 
 
+def _sd_fp16_decode(px: int) -> dict[str, object]:
+    """An SD1/SDXL fp16 decode as the RTX 4090 records it: cuDNN's attention materializes no score matrix."""
+    return {"operation": "decode", "height": px, "width": px, "tile": None, "dtype": "fp16", "upcast_weight_bytes": 0,
+            "score_matrix_bytes": 0, "vae_class": "AutoencoderKL"}  # fmt: skip
+
+
 def _delta(value: int) -> CounterDelta:
     return CounterDelta(baseline=GIB, peak=GIB + value, offset=0, delta=value)
 
@@ -170,8 +176,10 @@ def _export(path: Path, device_class: DeviceClass, windows: list[dict], *, os_fa
 
 @pytest.fixture
 def exports(tmp_path: Path, machine) -> tuple[Path, Path]:
-    """A Linux RTX 4090 with two repetitions of a 1024px decode, an invalid and a partially resident window, and a
-    Windows RX 9060 XT on MIOpen's native allocator, saved as a family E2E run saves them, next to a status file."""
+    """A Linux RTX 4090 with two repetitions of a 1024px SD fp16 decode, an invalid and a partially resident window,
+    and a Windows RX 9060 XT on MIOpen's native allocator, saved as a family E2E run saves them, next to a status file.
+    The RTX 4090's decodes are SD's: the FLUX.2 decode lines on its platform have no headroom for a raise
+    (`bounds.UPPER_BOUND_EXCEPTIONS`)."""
     calibration = tmp_path / "calibration"
     calibration.mkdir()
     (calibration / "20261017-120000-box-1-status.json").write_text('{"available": true}', encoding="utf-8")
@@ -180,11 +188,15 @@ def exports(tmp_path: Path, machine) -> tuple[Path, Path]:
         calibration / f"20261017-120000-box-1-{RTX_4090.id}.json",
         RTX_4090,
         [
-            _window(1, _decode(1024), 4_600_000_000),
-            _window(2, _decode(512), 1_150_000_000),
-            _window(3, _decode(1024), 4_700_000_000),
-            _window(4, _decode(1024), 9 * GIB, valid=False, fit_eligible=False, reasons=["oom"]),
-            _window(5, _decode(1024), 9 * GIB, fit_eligible=False, reasons=["partial_residency"]),
+            _window(1, _sd_fp16_decode(1024), 4_600_000_000, estimator="vae.sd"),
+            _window(2, _sd_fp16_decode(512), 1_150_000_000, estimator="vae.sd"),
+            _window(3, _sd_fp16_decode(1024), 4_700_000_000, estimator="vae.sd"),
+            _window(
+                4, _sd_fp16_decode(1024), 9 * GIB, valid=False, fit_eligible=False, reasons=["oom"], estimator="vae.sd"
+            ),
+            _window(
+                5, _sd_fp16_decode(1024), 9 * GIB, fit_eligible=False, reasons=["partial_residency"], estimator="vae.sd"
+            ),
         ],
     )
     machine("7.14.0", "windows")
@@ -401,9 +413,9 @@ def test_written_data_holds_the_points_and_passes_the_shipped_data_checks(
     assert main([*map(str, exports), "--data-dir", str(data_dir)]) == 0
     assert _files(data_dir) == before, "nothing written without --write"
     preview = capsys.readouterr().out
-    # The 4.7 GB decode lies above the cuDNN line all FLUX.2 points share with vae.sd3: it is refitted.
-    shipped_k = _carried(DATA_DIR, "vae.sd3", CUDNN_NATIVE)["k_decode_bf16"]
-    assert f"vae.sd3 {CUDNN_NATIVE} k_decode_bf16 {shipped_k:.0f} ->" in preview
+    # The 4.7 GB decode lies above the cuDNN line all SD fp16 points share with vae.sd3: it is refitted.
+    shipped_k = _carried(DATA_DIR, "vae.sd3", CUDNN_NATIVE)["k_decode_fp16"]
+    assert f"vae.sd3 {CUDNN_NATIVE} k_decode_fp16 {shipped_k:.0f} ->" in preview
 
     # A run's calibration/ directory stands for its exports.
     assert main([str(exports[0].parent), "--data-dir", str(data_dir), "--write"]) == 0
@@ -411,7 +423,7 @@ def test_written_data_holds_the_points_and_passes_the_shipped_data_checks(
     built = load_data(data_dir)["vae.json"]
     probe_points = [p for p in built.points if p.method == "probe_demand"]
     assert sorted(p.measured_bytes for p in probe_points) == [1_150_000_000, 4_700_000_000, 10_900_000_000]
-    assert _carried(data_dir, "vae.sd3", CUDNN_NATIVE)["k_decode_bf16"] > shipped_k
+    assert _carried(data_dir, "vae.sd3", CUDNN_NATIVE)["k_decode_fp16"] > shipped_k
     shipped_checks(data_dir)
 
     # Built again from the same exports, the data does not change.
@@ -585,24 +597,25 @@ def test_probe_tiled_decodes_raise_a_tiled_stand_in_and_its_assembly_line_above_
 def test_probes_on_the_untiled_line_raise_it_and_may_shift_tile_cost_off_a_tiled_line_without_breaking_a_bound(
     specs,
 ) -> None:
-    """Warm RTX 4090 bf16 decodes at 512 and 1024 px under the native allocator raise the untiled line they measure,
-    and never lower it. The tiled FLUX decodes sit on that line at their tile, so the raised line prices more of each
-    tile, and the fit of the lines above takes less: the assembly line's base falls. That is the estimate reading the
-    tile's cost off the line beneath, not a lower reservation: every shipped point stays covered and within its bound,
-    which raising the lines above as well, charging the tile twice, would break."""
+    """Warm RTX 4090 SD fp16 decodes at 512 and 1024 px under the native allocator raise the untiled line they
+    measure, and never lower it. The tiled SD decodes sit on that line at their tile, so the raised line prices more of
+    each tile, and the fit of the lines above takes less: the tiled line's slope falls. That is the estimate reading
+    the tile's cost off the line beneath, not a lower reservation: every shipped point stays covered and within its
+    bound, which raising the lines above as well, charging the tile twice, would break. SD fp16, as FLUX's decode lines
+    on this platform have no headroom for a raise (`bounds.UPPER_BOUND_EXCEPTIONS`)."""
     native = {"conv_backend": "cudnn", "allocator": "native"}
     probes = [
         MeasuredPoint(
-            estimator="vae.flux2",
+            estimator="vae.sd",
             version=VAE_VERSION,
             platform=native,
-            features=_decode(px),
+            features=_sd_fp16_decode(px),
             measured_bytes=demand,
             method="probe_demand",
             device="NVIDIA GeForce RTX 4090",
             provenance="-",
         )
-        for px, demand in ((512, 1_150_000_000), (1024, 4_700_000_000))
+        for px, demand in ((512, 1_300_000_000), (1024, 4_900_000_000))
     ]
     before = coefficients.shipped_data()
     entries_before = [entry for file in before.values() for entry in file.coefficients]
@@ -610,10 +623,10 @@ def test_probes_on_the_untiled_line_raise_it_and_may_shift_tile_cost_off_a_tiled
     after = refit(merge_points(before, probes), specs)
 
     entries_after = [entry for file in after.values() for entry in file.coefficients]
-    untiled_before = carrier_of(entries_before, probes[0], "decode_bf16")
-    untiled_after = carrier_of(entries_after, probes[0], "decode_bf16")
+    untiled_before = carrier_of(entries_before, probes[0], "decode_fp16")
+    untiled_after = carrier_of(entries_after, probes[0], "decode_fp16")
     assert untiled_before.values is not None and untiled_after.values is not None
-    halves = ("k_decode_bf16", "b_decode_bf16")
+    halves = ("k_decode_fp16", "b_decode_fp16")
     assert all(untiled_after.values[name] >= untiled_before.values[name] for name in halves)
     assert any(untiled_after.values[name] > untiled_before.values[name] for name in halves), "the probes raise it"
 
@@ -624,17 +637,17 @@ def test_probes_on_the_untiled_line_raise_it_and_may_shift_tile_cost_off_a_tiled
         assert not point.in_fit or estimate.reservation_bytes >= point.measured_bytes, point_id(point, spec)
         assert bound_violation(point, spec, estimate) is None, point_id(point, spec)
 
-    def flux_decode(entries: list[CoefficientEntry]) -> dict[str, float]:
-        [entry] = [entry for entry in entries if entry.estimator == "vae.flux" and entry.platform == native]
+    def sd_decode(entries: list[CoefficientEntry]) -> dict[str, float]:
+        [entry] = [entry for entry in entries if entry.estimator == "vae.sd" and entry.platform == native]
         assert entry.values is not None
         return {
             name: value
             for name, value in entry.values.items()
-            if name.endswith(("tiled_decode_bf16", "assembled_decode_bf16"))
+            if name.endswith(("tiled_decode_fp16", "assembled_decode_fp16"))
         }
 
-    shifted = flux_decode(entries_after)
-    assert any(shifted[name] < value for name, value in flux_decode(entries_before).items()), "tile cost moved off"
+    shifted = sd_decode(entries_after)
+    assert any(shifted[name] < value for name, value in sd_decode(entries_before).items()), "tile cost moved off"
 
 
 def _fp32_1280(first_mib: int, largest_mib: int) -> list[dict]:
@@ -716,19 +729,19 @@ RTX_4060_TI_8GB = DeviceClass(
 def test_cards_of_one_name_are_separate_points_and_spreads(
     tmp_path: Path, machine, entries, specs, shipped_checks, capsys
 ) -> None:
-    """The 16 GB and the 8 GB RTX 4060 Ti report one name. A FLUX.2 decode at 1024px on each allocates 4.2 GB and
+    """The 16 GB and the 8 GB RTX 4060 Ti report one name. An SD fp16 decode at 1024px on each allocates 4.2 GB and
     reserves 4.2 GB on the one card, 4.7 GB on the other: two cards' readings, not a server's cache growing around the
     same tensors. The 4.7 GB raises the cuDNN line, and nothing flags it as fragmentation."""
     machine(None, "linux")
     sixteen = _export(
         tmp_path / f"20261017-120000-box-1-{RTX_4060_TI_16GB.id}.json",
         RTX_4060_TI_16GB,
-        [_window(1, _decode(1024), 4_200_000_000, allocated=4_200_000_000)],
+        [_window(1, _sd_fp16_decode(1024), 4_200_000_000, estimator="vae.sd", allocated=4_200_000_000)],
     )
     eight = _export(
         tmp_path / f"20261018-120000-box-1-{RTX_4060_TI_8GB.id}.json",
         RTX_4060_TI_8GB,
-        [_window(1, _decode(1024), 4_700_000_000, allocated=4_200_000_000)],
+        [_window(1, _sd_fp16_decode(1024), 4_700_000_000, estimator="vae.sd", allocated=4_200_000_000)],
     )
     data_dir, _ = _data_copy(tmp_path)
 

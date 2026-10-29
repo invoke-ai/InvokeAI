@@ -35,17 +35,25 @@ candidate whose estimates, both lines as they ship with `SHIPPED_MARGIN`, over-r
 the zero ``A`` on a tie (`shipped_two_phase`). Where no point needs the second phase, ``A`` is the zero line and the
 estimate the line alone.
 
+A tiled VAE operation's estimate also has a floor, a phase no line of its own prices: the buffers it holds at once, what
+its node keeps or adds beside them, and the base of the untiled line beneath (`vae_working_memory._tiled_convolutions`).
+The floor carries the shipped margin, as the lines do. A point the floor reserves with that margin is covered whatever
+the lines above, so it takes no part in their hull and no assembly line passes through it (`FitPoint.floor`,
+`point_reading`); the lines cover the others, with their own margin. It rates a candidate where the candidate prices it
+above its floor, so a line that would over-reserve it loses as it would at any point; below its floor it reserves the
+floor whichever candidate wins, and rates none. So a point the floor decides neither lifts a line nor escapes its upper
+bound, which `bounds.py` checks against the reservation.
+
 A measurement whose demand includes an analytic term of its estimate fits no line: a VAE an in-place cast grew
-(`upcast_weight_bytes`), a batch, and every denoise forward with an analytic term. The VAE mid-block score matrix is
-not such a term: an estimate reserves the larger of it and the convolutions, which peak apart, and on the builds that
+(`upcast_weight_bytes`), a batch, and every denoise forward with an analytic term. The VAE mid-block score matrix is not
+such a term: an estimate reserves the larger of it and the convolutions, which peak apart, and on the builds that
 materialize it the convolutions stay the larger over the measured sizes (`vae_working_memory._peak_of_two_phases`); the
-CUDA points that force a math kernel are out of fit. Nor are the buffers a tiled VAE operation holds at once, counted on
-its tile grid (`vae_working_memory._assembly_buffer_bytes`, `_encode_buffer_bytes`): the estimate reserves the larger
-of them and its fitted phases, and they decide no shipped point, so the envelopes rate those phases alone. A point that
-bounds its estimate from below only (a `probe_demand` window, `MeasuredPoint.holds_upper_bound`, or a tiled VAE
-operation on a tile the app never sets, `Line.caps`) is covered by the line and can raise it, but takes no part in
-choosing it: the other fresh-process points cap a line. A line is fitted only once its capping points alone span two
-sizes `MIN_AREA_RATIO` apart (`capping_spans`); until then it stays a stand-in, which the other points bound from below.
+CUDA points that force a math kernel are out of fit. Nor is a tiled VAE operation's floor, which the estimate reserves
+where it is the larger phase (above). A point that bounds its estimate from below only (a `probe_demand` window,
+`MeasuredPoint.holds_upper_bound`, or a tiled VAE operation on a tile the app never sets, `Line.caps`) is covered by the
+line and can raise it, but takes no part in choosing it: the other fresh-process points cap a line. A line is fitted
+only once its capping points alone span two sizes `MIN_AREA_RATIO` apart (`capping_spans`); until then it stays a
+stand-in, which the other points bound from below.
 A probe window on a line never lowers a half of it either: each coefficient ships at the larger of the fit on all points
 and the fit on the fresh-process points alone, both rated on the capping ones (`fitted_pair`), for a line with an
 assembly phase both lines of each two-phase fit (`fitted_two_phase`). A fresh point below `SMALLEST_APP_SIDE` shapes
@@ -67,6 +75,7 @@ demand is their own (`Line.own_demand`). A line that sits on another, and its as
 alone.
 """
 
+import functools
 import itertools
 import math
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -238,6 +247,12 @@ class FitPoint(NamedTuple):
     """Whether the point is a fresh-process measurement (`MeasuredPoint.holds_upper_bound`), not a warm `probe_demand`
     window. A fresh point below `SMALLEST_APP_SIDE` caps nothing but still shapes the fit a line is held to at least
     (`fitted_pair`)."""
+    floor: Optional[Callable[[Mapping[str, float]], float]] = None
+    """For a point of a line that sits on another: what its estimate reserves whatever the lines price its tile and
+    what tiling adds, given the values the line beneath ships (`point_reading`): the estimate with this line, its
+    assembly line and the slope of the line beneath at zero. The slope prices the tile, which is the tile phase's and
+    no floor; the base beneath stays, which a tiled VAE operation's floor holds beside the buffers it counts
+    (`vae_working_memory._tiled_convolutions`). A point its floor covers needs no line to cover it."""
 
 
 def spans(sizes: Iterable[int]) -> bool:
@@ -246,21 +261,68 @@ def spans(sizes: Iterable[int]) -> bool:
     return len(distinct) >= 2 and distinct[-1] >= MIN_AREA_RATIO * distinct[0]
 
 
-Reading = tuple[int, int] | tuple[int, int, Fraction] | tuple[int, int, Fraction, Fraction]
-"""A point as `upper_envelope` reads it: its size and measured bytes; for a line that sits on another, its offset, the
-demand above which the line covers it (0 without); and the bytes its estimate prices it at beneath the line, which its
-rating counts (the offset without)."""
+class Reading(NamedTuple):
+    """A point as the envelopes read it."""
+
+    size: int
+    bytes: int
+    """What it measured."""
+    offset: Fraction
+    """For a line that sits on another, the demand above which the line covers it; 0 without."""
+    priced: Fraction
+    """For a line that sits on another, what its estimate prices it at beneath the line, which its rating counts; the
+    offset without."""
+    floor: Fraction
+    """What its estimate reserves whatever the line (`FitPoint.floor`); 0 without."""
 
 
-def _with_offset(points: Sequence[Reading]) -> list[tuple[int, int, Fraction, Fraction]]:
+PointReading = (
+    Reading
+    | tuple[int, int]
+    | tuple[int, int, Fraction]
+    | tuple[int, int, Fraction, Fraction]
+    | tuple[int, int, Fraction, Fraction, Fraction]
+)
+"""What the envelopes take for a point: a `Reading`, or its leading fields as a plain tuple, the others at their
+defaults (a point that sits on nothing and has no floor reads ``(size, bytes)``)."""
+
+
+def _readings(points: Sequence[PointReading]) -> list[Reading]:
     readings = []
     for x, y, *rest in points:
         offset = Fraction(rest[0]) if rest else Fraction(0)
-        readings.append((x, y, offset, Fraction(rest[1]) if len(rest) > 1 else offset))
+        priced = Fraction(rest[1]) if len(rest) > 1 else offset
+        readings.append(Reading(x, y, offset, priced, Fraction(rest[2]) if len(rest) > 2 else Fraction(0)))
     return readings
 
 
-def upper_envelope(points: Sequence[Reading], capping: Optional[Sequence[Reading]] = None) -> tuple[Fraction, Fraction]:
+def _floor_covers(reading: Reading) -> bool:
+    """Whether a point's floor covers it with the shipped margin: the floor an estimate reserves carries the margin a
+    line ships with (`vae_working_memory._with_margin`), so the floor covers a point where it reserves the reading plus
+    that margin whatever the lines above, as a shipped line covers its points."""
+    return reading.bytes * (1 + SHIPPED_MARGIN) <= reading.floor
+
+
+def _ratio(shipped: Fraction, reading: int, floor: Fraction, rated: Optional[Fraction] = None) -> Optional[Fraction]:
+    """What a candidate over-reserves a point by, its estimate `rated` (by default what it `shipped`) over the
+    `reading`; or None where the point's floor covers it and the candidate, as it ships, prices it no higher: the
+    estimate is the floor then, whichever candidate wins."""
+    if reading <= floor and shipped <= floor:
+        return None
+    return (shipped if rated is None else rated) / reading
+
+
+def _rated(readings: Sequence[Reading]) -> dict[tuple[int, Fraction, Fraction, Fraction], int]:
+    """The highest reading of each size, offset, price beneath and floor: the readings that rate a line."""
+    rated: dict[tuple[int, Fraction, Fraction, Fraction], int] = {}
+    for x, y, o, r, f in readings:
+        rated[(x, o, r, f)] = max(y, rated.get((x, o, r, f), y))
+    return rated
+
+
+def upper_envelope(
+    points: Sequence[PointReading], capping: Optional[Sequence[PointReading]] = None
+) -> tuple[Fraction, Fraction]:
     """The line ``y = k * x + b`` with ``k, b >= 0`` on or above every point's demand above its offset, ``y - offset``,
     that over-reserves least.
 
@@ -273,14 +335,19 @@ def upper_envelope(points: Sequence[Reading], capping: Optional[Sequence[Reading
     tilt the line though no point lies above it. Points that share a size but not an offset are different operations, a
     tiled one at two tiles, and each rates the edges. With `capping`, a subset of the points, only its readings rate
     the edges: the others are covered but cap nothing. Without any, all points rate them. Where no point's demand lies
-    above its offset, the line is zero: the estimate beneath it covers every point. Raises unless the points span two
-    sizes at least `MIN_AREA_RATIO` apart.
-    """
-    readings = _with_offset(points)
-    _check_sizes(points, readings)
-    sizes = sorted({x for x, *_ in readings})
+    above its offset, the line is zero: the estimate beneath it covers every point.
 
-    highest = {x: max(y - o for px, y, o, _ in readings if px == x) for x in sizes}
+    A point its floor covers takes no part in the hull. A point rates an edge only where the edge, as it would ship with
+    `SHIPPED_MARGIN`, prices it above its floor, which carries that margin too: below, its estimate is the floor
+    whatever the edge, the same for every candidate, and rating it would let a ratio no line can change decide between
+    them (`_ratio`). Raises unless the points span two sizes at least `MIN_AREA_RATIO` apart.
+    """
+    readings = _readings(points)
+    _check_sizes(points, readings)
+    above_floor = [reading for reading in readings if not _floor_covers(reading)]
+    sizes = sorted({x for x, *_ in above_floor})
+
+    highest = {x: max(y - o for px, y, o, _, _ in above_floor if px == x) for x in sizes}
     hull: list[tuple[int, Fraction]] = [(0, Fraction(0))]
     for point in highest.items():
         # Drop the last vertex while it is not above the chord from the one before it to this point.
@@ -291,9 +358,7 @@ def upper_envelope(points: Sequence[Reading], capping: Optional[Sequence[Reading
             hull.pop()
         hull.append(point)
 
-    rated: dict[tuple[int, Fraction, Fraction], int] = {}
-    for x, y, o, r in _with_offset(capping) if capping else readings:
-        rated[(x, o, r)] = max(y, rated.get((x, o, r), y))
+    rated = _rated(_readings(capping) if capping else readings)
     edges = [((y1 - y0) / (x1 - x0), x0, y0) for (x0, y0), (x1, y1) in zip(hull, hull[1:], strict=False)]
     candidates = [(k, y0 - k * x0) for k, x0, y0 in edges if k >= 0]
     # Past the hull's highest vertex its edges fall; the flattest line `k >= 0` allows through that vertex stands in
@@ -302,7 +367,11 @@ def upper_envelope(points: Sequence[Reading], capping: Optional[Sequence[Reading
     candidates.append((Fraction(0), max(y for _, y in hull)))
     best: tuple[Fraction, Fraction, Fraction] | None = None
     for k, b in candidates:
-        worst = max((r + k * x + b) / y for (x, _, r), y in rated.items())
+        ratios = [
+            _ratio(r + (1 + SHIPPED_MARGIN) * (k * x + b), y, f, rated=r + k * x + b)
+            for (x, _, r, f), y in rated.items()
+        ]
+        worst = max((ratio for ratio in ratios if ratio is not None), default=Fraction(0))
         if best is None or (worst, -k) < (best[0], -best[1]):
             best = (worst, k, b)
     assert best is not None, "the flat line is always a candidate"
@@ -314,7 +383,7 @@ LinePair = tuple[Fraction, Fraction]
 
 
 def two_phase_envelope(
-    points: Sequence[Reading], capping: Optional[Sequence[Reading]] = None
+    points: Sequence[PointReading], capping: Optional[Sequence[PointReading]] = None
 ) -> tuple[LinePair, LinePair]:
     """A line that sits on another and its assembly line (`Line.assembly`), chosen together: ``T`` above each point's
     offset, ``A`` on its own, such that ``max(offset + T(x), A(x))`` lies on or above every point and, as the lines
@@ -342,15 +411,17 @@ def two_phase_envelope(
     With the zero ``A`` every point is left to ``T``: the line alone, as `upper_envelope` fits it. Returns the chosen
     lines before the margin, which `shipped_two_phase` adds. Raises unless the points span two sizes at least
     `MIN_AREA_RATIO` apart.
-    """
-    readings = _with_offset(points)
-    _check_sizes(points, readings)
-    rated: dict[tuple[int, Fraction, Fraction], int] = {}
-    for x, y, o, r in _with_offset(capping) if capping else readings:
-        rated[(x, o, r)] = max(y, rated.get((x, o, r), y))
-    capping_readings = _with_offset(capping) if capping else []
 
-    measured = sorted({(x, y) for x, y, _, _ in readings})
+    A point at or below its floor (`FitPoint.floor`) is covered whatever the lines: no candidate ``A`` passes through
+    it, ``T`` need not cover it (`upper_envelope`), and it rates a candidate, and ``T`` within it, only where the
+    candidate prices it above its floor, as `upper_envelope` rates.
+    """
+    readings = _readings(points)
+    _check_sizes(points, readings)
+    rated = _rated(_readings(capping) if capping else readings)
+    capping_readings = _readings(capping) if capping else []
+
+    measured = sorted({(reading.size, reading.bytes) for reading in readings if not _floor_covers(reading)})
     assemblies = {(Fraction(0), Fraction(0))}
     for (x0, y0), (x1, y1) in itertools.combinations(measured, 2):
         if x0 < x1 and y1 >= y0:
@@ -359,9 +430,9 @@ def two_phase_envelope(
 
     best: Optional[tuple[tuple[Fraction, Fraction, tuple[Fraction, ...]], LinePair, LinePair]] = None
     for k_a, b_a in assemblies:
-        left = [reading for reading in readings if reading[1] > k_a * reading[0] + b_a]
+        left = [reading for reading in readings if reading.bytes > k_a * reading.size + b_a]
         if left:
-            left_capping = [reading for reading in capping_readings if reading[1] > k_a * reading[0] + b_a]
+            left_capping = [reading for reading in capping_readings if reading.bytes > k_a * reading.size + b_a]
             try:
                 line = upper_envelope(left, left_capping)
             except ValueError:
@@ -369,16 +440,17 @@ def two_phase_envelope(
         else:
             line = (Fraction(0), Fraction(0))
         (k_t, b_t), (k_s, b_s) = _with_margin(*line, SHIPPED_MARGIN), _with_margin(k_a, b_a, SHIPPED_MARGIN)
-        ratios = [max(r + k_t * x + b_t, Fraction(k_s * x + b_s)) / y for (x, _, r), y in rated.items()]
+        priced = [(max(r + k_t * x + b_t, Fraction(k_s * x + b_s)), y, f) for (x, _, r, f), y in rated.items()]
+        ratios = [ratio for ratio in (_ratio(*point) for point in priced) if ratio is not None]
         tie_break = (Fraction(0),) if k_a == b_a == 0 else (Fraction(1), -k_a, -b_a)
-        rating = (max(ratios), sum(ratios, Fraction(0)), tie_break)
+        rating = (max(ratios, default=Fraction(0)), sum(ratios, Fraction(0)), tie_break)
         if best is None or rating < best[0]:
             best = (rating, line, (k_a, b_a))
     assert best is not None, "the zero assembly line leaves every point to the line, which fits them"
     return best[1], best[2]
 
 
-def _check_sizes(points: Sequence[Reading], readings: Sequence[tuple[int, int, Fraction, Fraction]]) -> None:
+def _check_sizes(points: Sequence[PointReading], readings: Sequence[Reading]) -> None:
     if not readings or any(x <= 0 or y <= 0 for x, y, *_ in readings):
         raise ValueError(f"an envelope needs points with positive sizes and bytes, got {list(points)}")
     sizes = sorted({x for x, *_ in readings})
@@ -396,14 +468,14 @@ def _with_margin(k: Fraction, b: Fraction, margin: Fraction) -> tuple[int, int]:
     return math.ceil(k * scale), math.ceil(b * scale / _MIB) * _MIB
 
 
-def shipped_pair(points: Sequence[Reading], capping: Optional[Sequence[Reading]] = None) -> tuple[int, int]:
+def shipped_pair(points: Sequence[PointReading], capping: Optional[Sequence[PointReading]] = None) -> tuple[int, int]:
     """The slope and intercept to ship for these points: the envelope plus `SHIPPED_MARGIN`, the slope rounded up to
     a whole byte per unit of size and the intercept to a whole MiB."""
     return _with_margin(*upper_envelope(points, capping), SHIPPED_MARGIN)
 
 
 def shipped_two_phase(
-    points: Sequence[Reading], capping: Optional[Sequence[Reading]] = None
+    points: Sequence[PointReading], capping: Optional[Sequence[PointReading]] = None
 ) -> tuple[tuple[int, int], tuple[int, int]]:
     """The slope and intercept to ship for a line with an assembly phase and for its assembly line: the pair
     `two_phase_envelope` chooses, each plus `SHIPPED_MARGIN` and rounded up as `shipped_pair` rounds."""
@@ -480,7 +552,12 @@ def fit_points(
             reference = references.get((point.estimator, point.version, platform, suffix, size))
         fresh = point.holds_upper_bound
         caps = fresh and line.caps
-        fit_point = FitPoint(line.size, point.measured_bytes, caps, base, line.assembly, reference, fresh)
+        floor = None
+        if line.sits_on is not None:
+            lines = frozenset(f"{part}_{name}" for name in (line.suffix, line.assembly) if name for part in "kb")
+            zeroed = lines | {f"k_{line.sits_on[0]}"}
+            floor = functools.partial(_floor, specs[point.estimator].terms, point.features, zeroed)
+        fit_point = FitPoint(line.size, point.measured_bytes, caps, base, line.assembly, reference, fresh, floor)
         groups.setdefault((entry_key(owner), line.suffix), []).append(fit_point)
         if line.assembly is not None:
             if line.assembly not in carried_lines(owner):
@@ -496,6 +573,21 @@ def fit_points(
     return groups
 
 
+def _floor(
+    terms: Callable[[Mapping[str, FeatureValue], Mapping[str, float]], Iterable[WorkingMemoryTerm]],
+    features: Mapping[str, FeatureValue],
+    zeroed: frozenset[str],
+    values: Mapping[str, float],
+) -> float:
+    """What an estimate reserves for `features` with the `zeroed` coefficients at zero and the others at `values`: the
+    included terms' bytes, summed in term order as `WorkingMemoryEstimate` sums them."""
+    total: float = 0
+    for term in terms(features, {**values, **dict.fromkeys(zeroed, 0.0)}):
+        if term.included:
+            total += term.bytes
+    return total
+
+
 def carrier_of(entries: Sequence[CoefficientEntry], point: MeasuredPoint, suffix: str) -> CoefficientEntry:
     """The entry that carries line `suffix` for `point`: its estimator's entry on its platform where that carries the
     line itself, the one that entry borrows from otherwise. A point names the OS only where it measured an OS-specific
@@ -509,14 +601,17 @@ def carrier_of(entries: Sequence[CoefficientEntry], point: MeasuredPoint, suffix
 
 def point_reading(point: FitPoint, bases: Mapping[EntryKey, Mapping[str, float]]) -> Reading:
     """A point as the envelopes read it: covered above the untiled demand its estimator measured at its tile, where it
-    did, and above the line beneath otherwise; rated on what that line prices it at, plus the line's own. Public for
+    did, and above the line beneath otherwise; rated on what that line prices it at, plus the line's own, and never
+    below its floor (`FitPoint.floor`), which the line beneath decides too. Public for
     `scripts/working_memory/build_shipped.py`, which raises a stand-in on its points as the fit reads them."""
     if point.base is None:
-        return (point.size, point.bytes)
+        return Reading(point.size, point.bytes, Fraction(0), Fraction(0), Fraction(0))
     key, suffix, size = point.base
     values = bases[key]
     priced = Fraction(values[f"k_{suffix}"]) * size + Fraction(values[f"b_{suffix}"])
-    return (point.size, point.bytes, priced if point.reference is None else Fraction(point.reference), priced)
+    offset = priced if point.reference is None else Fraction(point.reference)
+    floor = Fraction(point.floor(values)) if point.floor is not None else Fraction(0)
+    return Reading(point.size, point.bytes, offset, priced, floor)
 
 
 def entry_fit(
@@ -612,7 +707,7 @@ def capping_spans(line: Sequence[FitPoint]) -> bool:
     return spans(point.size for point in line if point.caps)
 
 
-def _check_capping(capping: Sequence[Reading]) -> None:
+def _check_capping(capping: Sequence[PointReading]) -> None:
     sizes = sorted({x for x, *_ in capping})
     if not spans(sizes):
         raise ValueError(
@@ -625,7 +720,9 @@ def _larger(first: tuple[int, int], second: tuple[int, int]) -> tuple[int, int]:
     return max(first[0], second[0]), max(first[1], second[1])
 
 
-def fitted_pair(readings: Sequence[Reading], fresh: Sequence[Reading], capping: Sequence[Reading]) -> tuple[int, int]:
+def fitted_pair(
+    readings: Sequence[PointReading], fresh: Sequence[PointReading], capping: Sequence[PointReading]
+) -> tuple[int, int]:
     """The pair to ship for a line's readings (`shipped_pair`), `fresh` those of its fresh-process points and
     `capping` those of its capping points: the coefficient-wise larger of its fit on all of them and its fit on the
     fresh ones alone, both rated on the capping ones. A probe window above the hull can drop a fresh vertex and so
@@ -638,7 +735,7 @@ def fitted_pair(readings: Sequence[Reading], fresh: Sequence[Reading], capping: 
 
 
 def fitted_two_phase(
-    readings: Sequence[Reading], fresh: Sequence[Reading], capping: Sequence[Reading]
+    readings: Sequence[PointReading], fresh: Sequence[PointReading], capping: Sequence[PointReading]
 ) -> tuple[tuple[int, int], tuple[int, int]]:
     """The pairs to ship for a line with an assembly phase and for its assembly line (`shipped_two_phase`): per line
     and coefficient, the larger of the two-phase fit on all the readings and the two-phase fit on the fresh ones

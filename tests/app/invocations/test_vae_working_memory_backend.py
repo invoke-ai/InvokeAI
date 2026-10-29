@@ -38,10 +38,12 @@ from invokeai.backend.util.vae_working_memory import (
     sd_vae_run_dtype,
 )
 from invokeai.backend.working_memory import platform as platform_module
-from invokeai.backend.working_memory.bounds import evaluate_point, point_id
+from invokeai.backend.working_memory.bounds import bound_violation, evaluate_point, fitted_decides, point_id
 from invokeai.backend.working_memory.coefficients import ResolvedCoefficients, shipped_coefficients, shipped_data
 from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate, WorkingMemoryTerm
+from invokeai.backend.working_memory.fit import base_values, carrier_of, entry_key, fit_points, point_reading
 from invokeai.backend.working_memory.platform import Platform, priced_as
+from invokeai.backend.working_memory.spec import import_estimator_modules
 
 PRE_DTYPE_BYTES_PER_PIXEL_PER_ELEMENT_BYTE = {
     "cudnn": {"decode": 2200, "encode": 1100},
@@ -409,13 +411,15 @@ def test_a_tiled_operation_is_its_tile_plus_the_tiled_line_and_a_decode_the_larg
 ) -> None:
     """No margin on the tile: what tiling adds over the tile's own demand is the tiled line's, in the image's pixels.
     A decode then assembles the image from its tiles, a phase of its own priced on the assembly line in the image's
-    pixels, and reserves the larger phase; an encode has no such phase. The buffers each holds take over only past the
-    measured sides, and each operation counts its own."""
+    pixels, and reserves the larger phase; an encode has no such phase. Neither reserves less than its floor, and each
+    operation counts its own."""
     vae = _vae(cls, torch.float16 if spec is VAE_SD_SPEC else torch.bfloat16, numel=1000)
     result = estimate(operation, _image(operation, side, side, channels), vae, 512, on(platform))
 
     assert result.features["tile"] == 512
-    assert result.reservation_bytes == int(_tiled(spec, platform, operation, dtype, 512 * 512, side * side) + growth)
+    fitted = _tiled(spec, platform, operation, dtype, 512 * 512, side * side)
+    floor = _floor(spec, platform, operation, side, side, 512, dtype)
+    assert result.reservation_bytes == int(max(fitted, floor) + growth)
     names = {term.name for term in result.terms}
     assert ("assembled" in names) == (operation == "decode")
     assert {name for name in names if name.endswith("_buffers")} == {BUFFER_TERMS[operation]}
@@ -693,6 +697,15 @@ def _encode_buffers(
 
 LATENT_CHANNELS = {VAE_SD_SPEC.id: 4, VAE_FLUX_SPEC.id: 16, VAE_FLUX2_SPEC.id: 32}
 
+POST_PROCESSED_IMAGES = {VAE_SD_SPEC.id: 1, VAE_FLUX_SPEC.id: 1, VAE_FLUX2_SPEC.id: 0}
+"""The images a decode node allocates inside its window beside the decoded one: `l2i` denormalizes it and
+`z_image_l2i` clamps it there; `flux2_vae_decode` post-processes after its window."""
+
+DISTRIBUTION_LATENTS = {VAE_SD_SPEC.id: 6, VAE_FLUX_SPEC.id: 6, VAE_FLUX2_SPEC.id: 3}
+"""The latent-wide tensors an encode node adds once the moments are assembled: the distribution's clamped logvar, std
+and var, and where the node samples (`i2l`, `flux_vae_encode`, `z_image_i2l`) the noise, the scaled noise and the
+sample."""
+
 
 def _buffers(spec, operation: str, height: int, width: int, tile: int, element_size: int, samples: int = 1) -> int:
     if operation == "decode":
@@ -700,12 +713,60 @@ def _buffers(spec, operation: str, height: int, width: int, tile: int, element_s
     return _encode_buffers(height, width, tile, LATENT_CHANNELS[spec.id], element_size, samples)
 
 
+def _latents(spec, height: int, width: int, element_size: int, samples: int = 1) -> int:
+    return LATENT_CHANNELS[spec.id] * (height // 8) * (width // 8) * element_size * samples
+
+
+def _counted_floor(spec, operation, height, width, tile, dtype, samples=1) -> int:
+    """What a tiled operation holds at once, counted here: the buffers, and the input latents and the post-processed
+    image of a decode or the distribution of an encode, all per sample."""
+    element_size = ELEMENT_SIZES[dtype]
+    buffers = _buffers(spec, operation, height, width, tile, element_size, samples)
+    if operation == "decode":
+        images = POST_PROCESSED_IMAGES[spec.id] * 3 * height * width * element_size * samples
+        return buffers + _latents(spec, height, width, element_size, samples) + images
+    return buffers + DISTRIBUTION_LATENTS[spec.id] * _latents(spec, height, width, element_size, samples)
+
+
+def _floor(spec, platform, operation, height, width, tile, dtype, samples=1) -> float:
+    """What a tiled operation reserves at least: what it holds at once and the untiled line's base per sample, and the
+    shipped lines' 5% margin on both."""
+    base = shipped_coefficients(spec, platform).values[f"b_{operation}_{dtype}"] * samples
+    floor = _counted_floor(spec, operation, height, width, tile, dtype, samples) + base
+    return floor + 0.05 * floor
+
+
 BUFFER_TERMS = {"decode": "assembly_buffers", "encode": "encode_buffers"}
 
 
 def _buffer_term(result: WorkingMemoryEstimate, operation: str) -> WorkingMemoryTerm:
-    [term] = [term for term in result.terms if term.name == BUFFER_TERMS[operation]]
+    return _term(result, BUFFER_TERMS[operation])
+
+
+def _term(result: WorkingMemoryEstimate, name: str) -> WorkingMemoryTerm:
+    [term] = [term for term in result.terms if term.name == name]
     return term
+
+
+FLOOR_ESTIMATES = [
+    pytest.param(
+        VAE_SD_SPEC,
+        lambda operation, image, vae, device: estimate_vae_working_memory_sd15_sdxl(
+            operation, image, vae, 512, False, device
+        ),
+        id="sd",
+    ),
+    pytest.param(
+        VAE_FLUX_SPEC,
+        lambda operation, image, vae, device: estimate_vae_working_memory_flux(operation, image, vae, 512, device),
+        id="flux",
+    ),
+    pytest.param(
+        VAE_FLUX2_SPEC,
+        lambda operation, image, vae, device: estimate_vae_working_memory_flux2(operation, image, vae, 512, device),
+        id="flux2",
+    ),
+]
 
 
 def _tiled_features(spec, operation: str, height: int, width: int, tile: int, dtype: str) -> dict:
@@ -726,59 +787,62 @@ def _tiled_features(spec, operation: str, height: int, width: int, tile: int, dt
 
 
 @pytest.mark.parametrize("operation", ["decode", "encode"])
-def test_a_tiled_operation_reserves_at_least_the_buffers_it_holds_up_to_32768_px(operation) -> None:
+def test_a_tiled_operation_reserves_at_least_its_floor_up_to_32768_px(operation) -> None:
     """No node field bounds an operation's size, an image made in the graph reaches the encode nodes without PIL's
-    decompression-bomb check, and the fitted lines are extrapolated past the 12288 px the tiled points measure: on
-    several platforms they fall below the buffers the operation cannot do without. Every platform and dtype each
-    estimator ships reserves at least them, at the tiles the app sets."""
+    decompression-bomb check, and the fitted lines are extrapolated past the largest side the tiled points measure: on
+    several platforms they fall below what the operation cannot do without. Every platform and dtype each estimator
+    ships reserves at least that, at the tiles the app sets."""
     sides, tiles = (12288, 16384, 24576, 32768), (512, 768, 1024)
     short = []
     for spec in (VAE_SD_SPEC, VAE_FLUX_SPEC, VAE_FLUX2_SPEC):
         prefix = f"k_{operation}_"
         dtypes = sorted({name.removeprefix(prefix) for name in spec.coefficients if name.startswith(prefix)})
-        buffers = {(side, tile): _buffers(spec, operation, side, side, tile, 1) for side in sides for tile in tiles}
         for platform in MEASURED:
             coefficients = shipped_coefficients(spec, platform)
             for dtype, side, tile in itertools.product(dtypes, sides, tiles):
                 features = _tiled_features(spec, operation, side, side, tile, dtype)
                 reserved = spec.evaluate(features, coefficients).reservation_bytes
-                if reserved < buffers[(side, tile)] * ELEMENT_SIZES[dtype]:
+                if reserved < int(_floor(spec, platform, operation, side, side, tile, dtype)):
                     short.append(f"{spec.id} {platform} {dtype} {side}px tile {tile}")
     assert not short
 
 
-def test_the_reviewed_flux_decode_reserves_its_assembly_buffers(on) -> None:
-    """A 24576 px FLUX.1 bf16 decode at a 512 px tile on Windows ROCm with expandable segments: its fitted phases
-    price 11.83 GiB, but the decoded tiles, the rows and the image alone take 12.70 GiB."""
-    device = on(Platform("miopen", "expandable", "windows"))
+def test_the_reviewed_flux_decode_reserves_its_floor(on) -> None:
+    """A 24576 px FLUX.1 bf16 decode at a 512 px tile on Windows ROCm with expandable segments: the decoded tiles, the
+    rows and the image alone take 12.70 GiB, more than the fitted phases priced before the floor; `z_image_l2i`'s
+    clamp, the latents and the process's base come on top. Measured there at 13.37 GiB: the floor reserves it with the
+    shipped margin."""
+    platform = Platform("miopen", "expandable", "windows")
     latents = torch.zeros(1, 16, 1, 1).expand(1, 16, 3072, 3072)
-    result = estimate_vae_working_memory_flux("decode", latents, _vae(dtype=torch.bfloat16), 512, device)
+    result = estimate_vae_working_memory_flux("decode", latents, _vae(dtype=torch.bfloat16), 512, on(platform))
 
-    assert result.reservation_bytes == _assembly_buffers(24576, 24576, 512, 2)
-    assert result.reservation_bytes >= 12.70 * 2**30
+    assert result.reservation_bytes == int(_floor(VAE_FLUX_SPEC, platform, "decode", 24576, 24576, 512, "bf16"))
+    assert _buffer_term(result, "decode").bytes >= 12.70 * 2**30
+    assert result.reservation_bytes >= 1.05 * 14360248320, "the measured 13.37 GiB and the margin"
 
 
-def test_a_large_flux_fp32_encode_reserves_its_input_and_moments(on) -> None:
+def test_a_large_flux_fp32_encode_reserves_its_floor(on) -> None:
     """A 24576 px FLUX.1 fp32 encode at a 512 px tile on Windows ROCm with expandable segments, the size a 16x upscale
-    of a 1536 px image hands the encode node: its fitted phase prices 0.95x of what the input image and the moments it
-    assembles take."""
-    device = on(Platform("miopen", "expandable", "windows"))
+    of a 1536 px image hands the encode node: its fitted phase prices less than the input image, the moments it
+    assembles and the distribution sampled from them."""
+    platform = Platform("miopen", "expandable", "windows")
     image = _image("encode", 24576, 24576, 3)
-    result = estimate_vae_working_memory_flux("encode", image, _vae(dtype=torch.float32), 512, device)
+    result = estimate_vae_working_memory_flux("encode", image, _vae(dtype=torch.float32), 512, on(platform))
 
-    assert result.reservation_bytes == _encode_buffers(24576, 24576, 512, 16, 4)
+    assert result.reservation_bytes == int(_floor(VAE_FLUX_SPEC, platform, "encode", 24576, 24576, 512, "fp32"))
 
 
 def test_a_non_square_decode_counts_the_clipped_edge_tiles_it_decodes(on) -> None:
     """At a 512 px tile the latents are stepped 48 at a time: 16392 px is 2049 latents, so the last row of tiles is
     33 latents tall, and 24584 px is 3073, so the last column is 49 wide. The buffers count those as they are decoded,
     neither as whole tiles nor as the image alone. FLUX.2 bf16 under `cudaMallocAsync`, where they decide."""
-    device = on(Platform("cudnn", "cudaMallocAsync", "linux"))
+    platform = Platform("cudnn", "cudaMallocAsync", "linux")
     latents = torch.zeros(1, 32, 1, 1).expand(1, 32, 16392 // 8, 24584 // 8)
     vae = _vae(AutoencoderKLFlux2, torch.bfloat16)
-    result = estimate_vae_working_memory_flux2("decode", latents, vae, 512, device)
+    result = estimate_vae_working_memory_flux2("decode", latents, vae, 512, on(platform))
 
-    assert result.reservation_bytes == _assembly_buffers(16392, 24584, 512, 2)
+    assert _buffer_term(result, "decode").bytes == _assembly_buffers(16392, 24584, 512, 2)
+    assert result.reservation_bytes == int(_floor(VAE_FLUX2_SPEC, platform, "decode", 16392, 24584, 512, "bf16"))
 
 
 @pytest.mark.parametrize("operation", ["decode", "encode"])
@@ -792,20 +856,52 @@ def test_a_tile_covering_one_axis_counts_the_tiles_it_slices_along_the_other(on,
     assert _buffer_term(result, operation).bytes == _buffers(VAE_FLUX2_SPEC, operation, 512, 32768, 1024, 2)
 
 
-def test_a_tiled_batch_reserves_the_assembly_buffers_of_every_sample(on) -> None:
-    """`tiled_decode` slices the whole batch at once, so every buffer holds every sample."""
-    result = _flux2_decode(Platform("cudnn", "cudaMallocAsync", "linux"), 16384, 3, on)
+def test_a_tiled_batch_reserves_the_floor_of_every_sample(on) -> None:
+    """`tiled_decode` slices the whole batch at once, so every buffer and the latents hold every sample, and the
+    process pays the base per sample as the untiled line prices it."""
+    platform = Platform("cudnn", "cudaMallocAsync", "linux")
+    result = _flux2_decode(platform, 16384, 3, on)
 
-    assert result.reservation_bytes == _assembly_buffers(16384, 16384, 512, 2, samples=3)
+    assert result.reservation_bytes == int(_floor(VAE_FLUX2_SPEC, platform, "decode", 16384, 16384, 512, "bf16", 3))
 
 
 def test_a_tiled_batch_encode_counts_the_buffers_of_every_sample(on) -> None:
-    """`_tiled_encode` slices the whole batch at once too, input image included."""
-    device = on(Platform("cudnn", "native", "linux"))
-    image = torch.zeros(1, 3, 1, 1).expand(2, 3, 4096, 4096)
-    result = estimate_vae_working_memory_flux2("encode", image, _vae(AutoencoderKLFlux2, torch.bfloat16), 512, device)
+    """`_tiled_encode` slices the whole batch at once too, input image included, the distribution holds it, and the
+    process pays the base per sample as the untiled line prices it. At 24576 px with expandable segments on Windows ROCm
+    the floor decides."""
+    platform = Platform("miopen", "expandable", "windows")
+    image = torch.zeros(1, 3, 1, 1).expand(2, 3, 24576, 24576)
+    vae = _vae(AutoencoderKLFlux2, torch.bfloat16)
+    result = estimate_vae_working_memory_flux2("encode", image, vae, 512, on(platform))
 
-    assert _buffer_term(result, "encode").bytes == _encode_buffers(4096, 4096, 512, 32, 2, samples=2)
+    assert _buffer_term(result, "encode").bytes == _encode_buffers(24576, 24576, 512, 32, 2, samples=2)
+    assert _term(result, "latent_distribution").bytes == 3 * _latents(VAE_FLUX2_SPEC, 24576, 24576, 2, samples=2)
+    assert (
+        _term(result, "floor_base").bytes == 2 * shipped_coefficients(VAE_FLUX2_SPEC, platform).values["b_encode_bf16"]
+    )
+    floor = _floor(VAE_FLUX2_SPEC, platform, "encode", 24576, 24576, 512, "bf16", samples=2)
+    assert result.reservation_bytes == int(floor)
+
+
+@pytest.mark.parametrize("spec, estimate", FLOOR_ESTIMATES)
+@pytest.mark.parametrize("operation", ["decode", "encode"])
+def test_the_floor_counts_the_input_the_node_keeps_and_what_it_adds_beside_the_buffers(on, spec, estimate, operation):
+    """A decode keeps its latents on the device and `l2i` and `z_image_l2i` allocate a post-processed image while the
+    assembled one is live; an encode's node splits the moments into a distribution, three latent-wide tensors, and
+    samples it with three more where it samples. A 2056x3080 image, not a multiple of the tile. The base is the untiled
+    line's, whatever the size."""
+    platform = Platform("cudnn", "native", "linux")
+    dtype = "fp16" if spec is VAE_SD_SPEC else "bf16"
+    vae = _vae(AutoencoderKLFlux2 if spec is VAE_FLUX2_SPEC else AutoencoderKL, torch.bfloat16)
+    result = estimate(operation, _image(operation, 2056, 3080, LATENT_CHANNELS[spec.id]), vae, on(platform))
+
+    latents = _latents(spec, 2056, 3080, 2)
+    if operation == "decode":
+        assert _term(result, "input_latents").bytes == latents
+        assert _term(result, "post_processing").bytes == POST_PROCESSED_IMAGES[spec.id] * 3 * 2056 * 3080 * 2
+    else:
+        assert _term(result, "latent_distribution").bytes == DISTRIBUTION_LATENTS[spec.id] * latents
+    assert _term(result, "floor_base").bytes == shipped_coefficients(spec, platform).values[f"b_{operation}_{dtype}"]
 
 
 @pytest.mark.parametrize("fp32, element_size", [(True, 4), (False, 2)])
@@ -871,21 +967,82 @@ def test_the_counted_buffers_are_the_input_and_the_moment_tiles_diffusers_encode
     assert _buffer_term(result, "encode").bytes == expected
 
 
-def test_no_shipped_tiled_operation_is_decided_by_its_buffers() -> None:
-    """The fit rates a tiled operation's points on its fitted phases alone (`fit.two_phase_envelope`,
-    `fit.upper_envelope`). A point the buffers decided would be rated on a phase the estimate does not reserve, so none
-    may be one: the buffers only take over past the measured sides."""
+def test_the_fit_reads_every_shipped_point_its_floor_decides_at_what_it_reserves() -> None:
+    """The fit leaves a point its floor covers to the floor and rates it at the larger of the floor and the lines
+    (`fit.FitPoint.floor`), so the floor the fit reads, from the values the line beneath ships, has to be what the
+    estimate reserves where the floor decides: else a covered point could be one the estimate leaves short, or a line
+    be rated on a phase the estimate does not reserve. The shipped points include such points, decodes and encodes."""
     specs = {spec.id: spec for spec in (VAE_SD_SPEC, VAE_FLUX_SPEC, VAE_FLUX2_SPEC)}
-    data = shipped_data().values()
-    points = [
-        point for file in data for point in file.points if point.estimator in specs and point.features.get("tile")
+    data = list(shipped_data().values())
+    entries = [entry for file in data for entry in file.coefficients]
+    groups = fit_points(data, import_estimator_modules())
+    bases = base_values(entries, groups)
+    decided = set()
+    for point in (point for file in data for point in file.points):
+        line = specs[point.estimator].line(point.features) if point.estimator in specs else None
+        if line is None or line.sits_on is None or not point.in_fit:
+            continue
+        estimate = evaluate_point(point, specs[point.estimator], data)
+        if not _term(estimate, BUFFER_TERMS[str(point.features["operation"])]).included:
+            continue
+        [read] = [
+            point_reading(fit_point, bases)
+            for fit_point in groups[(entry_key(carrier_of(entries, point, line.suffix)), line.suffix)]
+            if (fit_point.size, fit_point.bytes, fit_point.base[2])
+            == (line.size, point.measured_bytes, line.sits_on[1])
+        ]
+        assert int(read[4]) == estimate.reservation_bytes, point_id(point, specs[point.estimator])
+        decided.add(point.features["operation"])
+    assert decided == {"decode", "encode"}
+
+
+TILE_PHASE = {"convolutions", "convolution_base", "tiled", "tiled_base"}
+ASSEMBLY_PHASE = {"assembled", "assembled_base"}
+
+
+def test_a_shipped_point_its_floor_decides_keeps_the_shipped_margin() -> None:
+    """The floor carries the margin the fitted lines ship with, and the fit leaves a point to it only where the floor
+    without it covers the point: so a point the floor decides is reserved with that margin, unless the fitted lines
+    cover it on their own, as they cover every point they are left with."""
+    specs = {spec.id: spec for spec in (VAE_SD_SPEC, VAE_FLUX_SPEC, VAE_FLUX2_SPEC)}
+    data = list(shipped_data().values())
+    decided = 0
+    for point in (point for file in data for point in file.points):
+        if point.estimator not in specs or not point.features.get("tile") or not point.in_fit:
+            continue
+        estimate = evaluate_point(point, specs[point.estimator], data)
+        if not _term(estimate, BUFFER_TERMS[str(point.features["operation"])]).included:
+            continue
+        decided += 1
+        fitted = max(
+            sum(term.bytes for term in estimate.terms if term.name in TILE_PHASE),
+            sum(term.bytes for term in estimate.terms if term.name in ASSEMBLY_PHASE),
+        )
+        with_margin = estimate.reservation_bytes >= 1.05 * point.measured_bytes
+        assert with_margin or fitted >= point.measured_bytes, point_id(point, specs[point.estimator])
+        # The floor carries the untiled line's base, a fitted value, so `bounds.py` holds the point to its upper bound.
+        assert fitted_decides(estimate), point_id(point, specs[point.estimator])
+    assert decided
+
+
+def test_a_point_its_floor_over_reserves_breaks_its_upper_bound() -> None:
+    """A shipped point the floor decides, on a tile and an image the app sets, is held to the 1.3x upper bound as the
+    fitted lines' points are: read at 1.6x what its estimate reserves, it is one the floor over-reserves."""
+    spec, data = VAE_FLUX2_SPEC, list(shipped_data().values())
+    [point] = [
+        point
+        for file in data
+        for point in file.points
+        if point_id(point, spec)
+        == "vae.flux2-cudnn,cudaMallocAsync-decode-bf16-24576x24576-tile512-RTX4090-demand_peak"
     ]
-    operations = {point.features["operation"] for point in points}
-    assert operations == {"decode", "encode"}, f"shipped tiled points measure only {operations} -- the check is broken"
-    for point in points:
-        spec = specs[point.estimator]
-        buffers = _buffer_term(evaluate_point(point, spec, data), str(point.features["operation"]))
-        assert not buffers.included, point_id(point, spec)
+    estimate = evaluate_point(point, spec, data)
+    assert _term(estimate, "assembly_buffers").included and spec.line(point.features).caps
+    assert bound_violation(point, spec, estimate) is None
+
+    shrunk = point.model_copy(update={"measured_bytes": int(estimate.reservation_bytes / 1.6)})
+
+    assert bound_violation(shrunk, spec, evaluate_point(shrunk, spec, data)) is not None
 
 
 ESTIMATES = [

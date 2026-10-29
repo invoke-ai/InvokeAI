@@ -81,24 +81,24 @@
         "allocator": "native"
       },
       "values": {
-        "k_tiled_decode_fp16": 15,
-        "b_tiled_decode_fp16": 0,
-        "k_tiled_decode_bf16": 15,
-        "b_tiled_decode_bf16": 0,
-        "k_tiled_decode_fp32": 30,
-        "b_tiled_decode_fp32": 8388608,
+        "k_tiled_decode_fp16": 14,
+        "b_tiled_decode_fp16": 46137344,
+        "k_tiled_decode_bf16": 1,
+        "b_tiled_decode_bf16": 46137344,
+        "k_tiled_decode_fp32": 2,
+        "b_tiled_decode_fp32": 92274688,
         "k_tiled_encode_fp16": 11,
         "b_tiled_encode_fp16": 26214400,
         "k_tiled_encode_bf16": 11,
         "b_tiled_encode_bf16": 19922944,
         "k_tiled_encode_fp32": 22,
         "b_tiled_encode_fp32": 39845888,
-        "k_assembled_decode_fp16": 43,
-        "b_assembled_decode_fp16": 710934528,
-        "k_assembled_decode_bf16": 38,
-        "b_assembled_decode_bf16": 710934528,
+        "k_assembled_decode_fp16": 45,
+        "b_assembled_decode_fp16": 287309824,
+        "k_assembled_decode_bf16": 45,
+        "b_assembled_decode_bf16": 256901120,
         "k_assembled_decode_fp32": 92,
-        "b_assembled_decode_fp32": 1421869056
+        "b_assembled_decode_fp32": 946864128
       },
       "values_from": {
         "estimator": "vae.sd3",
@@ -119,11 +119,11 @@
         "b_assembled_decode_fp32"
       ],
       "unmeasured_floor": {
-        "k_tiled_decode_fp16": 25,
+        "k_tiled_decode_fp16": 22,
         "b_tiled_decode_fp16": 858783744,
-        "k_tiled_decode_bf16": 25,
+        "k_tiled_decode_bf16": 22,
         "b_tiled_decode_bf16": 475004928,
-        "k_tiled_decode_fp32": 50,
+        "k_tiled_decode_fp32": 44,
         "b_tiled_decode_fp32": 1062207488,
         "k_tiled_encode_fp16": 12,
         "b_tiled_encode_fp16": 532676608,
@@ -133,12 +133,12 @@
         "b_tiled_encode_fp32": 549453824,
         "k_assembled_decode_fp16": 60,
         "b_assembled_decode_fp16": 2457862144,
-        "k_assembled_decode_bf16": 38,
+        "k_assembled_decode_bf16": 45,
         "b_assembled_decode_bf16": 2457862144,
         "k_assembled_decode_fp32": 92,
         "b_assembled_decode_fp32": 4915724288
       },
-      "provenance": "Borrows the untiled lines of its dtypes from vae.sd3, so its untiled points bound them and join their fit: the FLUX.1 VAE runs the same diffusers AutoencoderKL convolution stack. Carries its own tiled lines, `tiled_<operation>_<dtype>`: what a tiled FLUX.1 operation needs above the untiled line at its tile, per image pixel and a base; and its decode's assembly lines, `assembled_decode_<dtype>`: what a tiled decode needs once it assembles the image from its tiles, per image pixel and a base that may be negative, reserved where that phase is the larger. Fitted lines are working_memory/fit.py's: bf16 on the RTX 4090 (torch 2.13+cu130, Windows) tiled points of scripts/calibrate_vae_tiling_working_memory.py (2026-10-19: image sides 1024 to 12288 px with 512 and 1024 px tiles, 2048 to 12288 px with a 1536 px tile, and 2048 to 8192 px with 256 and 768 px tiles, the 256 px ones as lower bounds only), the tiled lines fitted on what they measured above the untiled demand these runs measured at their tile, and rated with the shipped untiled line there, the decode's together with its assembly line (`fit.two_phase_envelope`), each plus 5%. Stand-ins, no tiled point measures them: fp16 and fp32 at, value by value, the larger of the SDXL VAE's tiled and assembly lines of the same operation and dtype on this platform and this family's own bf16 lines scaled by the element size (twice for fp32): the FLUX encoders emit 4 to 8 times the SDXL VAE's moment channels, and a FLUX decode's node and allocator show in its own lines. Where this entry prices a platform nothing is measured on (MPS, XPU, CPU, or another allocator on this backend), each tiled and assembly value is floored at its largest over the measured platforms."
+      "provenance": "Borrows the untiled lines of its dtypes from vae.sd3, so its untiled points bound them and join their fit: the FLUX.1 VAE runs the same diffusers AutoencoderKL convolution stack. Carries its own tiled lines, `tiled_<operation>_<dtype>`: what a tiled FLUX.1 operation needs above the untiled line at its tile, per image pixel and a base; and its decode's assembly lines, `assembled_decode_<dtype>`: what a tiled decode needs once it assembles the image from its tiles, per image pixel and a base that may be negative, reserved where that phase is the larger. Fitted lines are working_memory/fit.py's: bf16 on the RTX 4090 (torch 2.13+cu130, Windows) tiled points of scripts/calibrate_vae_tiling_working_memory.py (2026-10-19: image sides 1024 to 12288 px with 512 and 1024 px tiles, 2048 to 12288 px with a 1536 px tile, and 2048 to 8192 px with 256 and 768 px tiles, the 256 px ones as lower bounds only), the tiled lines fitted on what they measured above the untiled demand these runs measured at their tile, and rated with the shipped untiled line there, the decode's together with its assembly line (`fit.two_phase_envelope`), each plus 5%. Stand-ins, no tiled point measures them: fp16 and fp32 at, value by value, the larger of the SDXL VAE's tiled and assembly lines of the same operation and dtype on this platform and this family's own bf16 lines scaled by the element size (twice for fp32): the FLUX encoders emit 4 to 8 times the SDXL VAE's moment channels, and a FLUX decode's node and allocator show in its own lines. Where this entry prices a platform nothing is measured on (MPS, XPU, CPU, or another allocator on this backend), each tiled and assembly value is floored at its largest over the measured platforms. Refitted on its points by scripts/working_memory/build_shipped.py."
     },
     {
       "estimator": "vae.flux2",
@@ -148,18 +148,18 @@
         "allocator": "native"
       },
       "values": {
-        "k_tiled_decode_bf16": 9,
-        "b_tiled_decode_bf16": 5242880,
-        "k_tiled_decode_fp32": 18,
-        "b_tiled_decode_fp32": 10485760,
-        "k_tiled_encode_bf16": 16,
-        "b_tiled_encode_bf16": 32505856,
-        "k_tiled_encode_fp32": 32,
-        "b_tiled_encode_fp32": 65011712,
-        "k_assembled_decode_bf16": 21,
-        "b_assembled_decode_bf16": 987758592,
+        "k_tiled_decode_bf16": 16,
+        "b_tiled_decode_bf16": 0,
+        "k_tiled_decode_fp32": 32,
+        "b_tiled_decode_fp32": 8388608,
+        "k_tiled_encode_bf16": 17,
+        "b_tiled_encode_bf16": 15728640,
+        "k_tiled_encode_fp32": 34,
+        "b_tiled_encode_fp32": 31457280,
+        "k_assembled_decode_bf16": 25,
+        "b_assembled_decode_bf16": 745537536,
         "k_assembled_decode_fp32": 92,
-        "b_assembled_decode_fp32": 1975517184
+        "b_assembled_decode_fp32": 1491075072
       },
       "values_from": {
         "estimator": "vae.sd3",
@@ -175,19 +175,19 @@
       ],
       "unmeasured_floor": {
         "k_tiled_decode_bf16": 22,
-        "b_tiled_decode_bf16": 922746880,
+        "b_tiled_decode_bf16": 950009856,
         "k_tiled_decode_fp32": 44,
-        "b_tiled_decode_fp32": 1845493760,
-        "k_tiled_encode_bf16": 16,
+        "b_tiled_decode_fp32": 1900019712,
+        "k_tiled_encode_bf16": 17,
         "b_tiled_encode_bf16": 150994944,
-        "k_tiled_encode_fp32": 32,
+        "k_tiled_encode_fp32": 34,
         "b_tiled_encode_fp32": 529530880,
-        "k_assembled_decode_bf16": 21,
-        "b_assembled_decode_bf16": 2078277632,
+        "k_assembled_decode_bf16": 25,
+        "b_assembled_decode_bf16": 870318080,
         "k_assembled_decode_fp32": 92,
-        "b_assembled_decode_fp32": 4156555264
+        "b_assembled_decode_fp32": 1740636160
       },
-      "provenance": "Borrows the untiled lines of its dtypes from vae.sd3, so its untiled points bound them and join their fit: the FLUX.2 VAE runs the same diffusers AutoencoderKL convolution stack. Carries its own tiled lines, `tiled_<operation>_<dtype>`: what a tiled FLUX.2 operation needs above the untiled line at its tile, per image pixel and a base; and its decode's assembly lines, `assembled_decode_<dtype>`: what a tiled decode needs once it assembles the image from its tiles, per image pixel and a base that may be negative, reserved where that phase is the larger. Fitted lines are working_memory/fit.py's: bf16 on the RTX 4090 (torch 2.13+cu130, Windows) tiled points of scripts/calibrate_vae_tiling_working_memory.py (2026-10-19: image sides 1024 to 12288 px with 512 and 1024 px tiles, 2048 to 12288 px with a 1536 px tile, and 2048 to 8192 px with 256 and 768 px tiles, the 256 px ones as lower bounds only) and the #9519 reference-image encode at 2024 px, the tiled lines fitted on what they measured above the untiled demand these runs measured at their tile, and rated with the shipped untiled line there, the decode's together with its assembly line (`fit.two_phase_envelope`), each plus 5%. Stand-ins, no tiled point measures them: fp32 at, value by value, the larger of the SDXL VAE's tiled and assembly lines of the same operation and dtype on this platform and this family's own bf16 lines scaled by the element size (twice for fp32): the FLUX encoders emit 4 to 8 times the SDXL VAE's moment channels, and a FLUX decode's node and allocator show in its own lines. Where this entry prices a platform nothing is measured on (MPS, XPU, CPU, or another allocator on this backend), each tiled and assembly value is floored at its largest over the measured platforms."
+      "provenance": "Borrows the untiled lines of its dtypes from vae.sd3, so its untiled points bound them and join their fit: the FLUX.2 VAE runs the same diffusers AutoencoderKL convolution stack. Carries its own tiled lines, `tiled_<operation>_<dtype>`: what a tiled FLUX.2 operation needs above the untiled line at its tile, per image pixel and a base; and its decode's assembly lines, `assembled_decode_<dtype>`: what a tiled decode needs once it assembles the image from its tiles, per image pixel and a base that may be negative, reserved where that phase is the larger. Fitted lines are working_memory/fit.py's: bf16 on the RTX 4090 (torch 2.13+cu130, Windows) tiled points of scripts/calibrate_vae_tiling_working_memory.py (2026-10-19: image sides 1024 to 12288 px with 512 and 1024 px tiles, 2048 to 12288 px with a 1536 px tile, and 2048 to 8192 px with 256 and 768 px tiles, the 256 px ones as lower bounds only) and the #9519 reference-image encode at 2024 px, the tiled lines fitted on what they measured above the untiled demand these runs measured at their tile, and rated with the shipped untiled line there, the decode's together with its assembly line (`fit.two_phase_envelope`), each plus 5%. Stand-ins, no tiled point measures them: fp32 at, value by value, the larger of the SDXL VAE's tiled and assembly lines of the same operation and dtype on this platform and this family's own bf16 lines scaled by the element size (twice for fp32): the FLUX encoders emit 4 to 8 times the SDXL VAE's moment channels, and a FLUX decode's node and allocator show in its own lines. Where this entry prices a platform nothing is measured on (MPS, XPU, CPU, or another allocator on this backend), each tiled and assembly value is floored at its largest over the measured platforms. Refitted on its points by scripts/working_memory/build_shipped.py."
     },
     {
       "estimator": "vae.cogview4",
@@ -266,24 +266,24 @@
         "allocator": "cudaMallocAsync"
       },
       "values": {
-        "k_tiled_decode_fp16": 25,
+        "k_tiled_decode_fp16": 18,
         "b_tiled_decode_fp16": 427819008,
-        "k_tiled_decode_bf16": 25,
+        "k_tiled_decode_bf16": 18,
         "b_tiled_decode_bf16": 0,
-        "k_tiled_decode_fp32": 50,
+        "k_tiled_decode_fp32": 36,
         "b_tiled_decode_fp32": 0,
-        "k_tiled_encode_fp16": 9,
-        "b_tiled_encode_fp16": 35651584,
-        "k_tiled_encode_bf16": 9,
-        "b_tiled_encode_bf16": 35651584,
+        "k_tiled_encode_fp16": 10,
+        "b_tiled_encode_fp16": 7340032,
+        "k_tiled_encode_bf16": 10,
+        "b_tiled_encode_bf16": 0,
         "k_tiled_encode_fp32": 29,
         "b_tiled_encode_fp32": 130023424,
         "k_assembled_decode_fp16": 38,
-        "b_assembled_decode_fp16": 1181745152,
-        "k_assembled_decode_bf16": 15,
-        "b_assembled_decode_bf16": 1181745152,
+        "b_assembled_decode_fp16": 1179648000,
+        "k_assembled_decode_bf16": 16,
+        "b_assembled_decode_bf16": 1179648000,
         "k_assembled_decode_fp32": 72,
-        "b_assembled_decode_fp32": 2363490304
+        "b_assembled_decode_fp32": 2359296000
       },
       "values_from": {
         "estimator": "vae.sd3",
@@ -303,7 +303,7 @@
         "k_assembled_decode_fp32",
         "b_assembled_decode_fp32"
       ],
-      "provenance": "Borrows the untiled lines of its dtypes from vae.sd3, so its untiled points bound them and join their fit: the FLUX.1 VAE runs the same diffusers AutoencoderKL convolution stack. Carries its own tiled lines, `tiled_<operation>_<dtype>`: what a tiled FLUX.1 operation needs above the untiled line at its tile, per image pixel and a base; and its decode's assembly lines, `assembled_decode_<dtype>`: what a tiled decode needs once it assembles the image from its tiles, per image pixel and a base that may be negative, reserved where that phase is the larger. Fitted lines are working_memory/fit.py's: bf16 on the RTX 4090 (torch 2.13+cu130, Windows, backend:cudaMallocAsync) tiled points of scripts/calibrate_vae_tiling_working_memory.py (2026-10-19: image sides 1024 to 12288 px with 512 and 1024 px tiles, 2048 to 12288 px with a 1536 px tile, and 2048 to 8192 px with 256 and 768 px tiles, the 256 px ones as lower bounds only), the tiled lines fitted on what they measured above the untiled demand these runs measured at their tile, and rated with the shipped untiled line there, the decode's together with its assembly line (`fit.two_phase_envelope`), each plus 5%. Stand-ins, no tiled point measures them: fp16 and fp32 at, value by value, the larger of the SDXL VAE's tiled and assembly lines of the same operation and dtype on this platform and this family's own bf16 lines scaled by the element size (twice for fp32): the FLUX encoders emit 4 to 8 times the SDXL VAE's moment channels, and a FLUX decode's node and allocator show in its own lines."
+      "provenance": "Borrows the untiled lines of its dtypes from vae.sd3, so its untiled points bound them and join their fit: the FLUX.1 VAE runs the same diffusers AutoencoderKL convolution stack. Carries its own tiled lines, `tiled_<operation>_<dtype>`: what a tiled FLUX.1 operation needs above the untiled line at its tile, per image pixel and a base; and its decode's assembly lines, `assembled_decode_<dtype>`: what a tiled decode needs once it assembles the image from its tiles, per image pixel and a base that may be negative, reserved where that phase is the larger. Fitted lines are working_memory/fit.py's: bf16 on the RTX 4090 (torch 2.13+cu130, Windows, backend:cudaMallocAsync) tiled points of scripts/calibrate_vae_tiling_working_memory.py (2026-10-19: image sides 1024 to 12288 px with 512 and 1024 px tiles, 2048 to 12288 px with a 1536 px tile, and 2048 to 8192 px with 256 and 768 px tiles, the 256 px ones as lower bounds only), the tiled lines fitted on what they measured above the untiled demand these runs measured at their tile, and rated with the shipped untiled line there, the decode's together with its assembly line (`fit.two_phase_envelope`), each plus 5%. Stand-ins, no tiled point measures them: fp16 and fp32 at, value by value, the larger of the SDXL VAE's tiled and assembly lines of the same operation and dtype on this platform and this family's own bf16 lines scaled by the element size (twice for fp32): the FLUX encoders emit 4 to 8 times the SDXL VAE's moment channels, and a FLUX decode's node and allocator show in its own lines. Refitted on its points by scripts/working_memory/build_shipped.py."
     },
     {
       "estimator": "vae.flux2",
@@ -313,12 +313,12 @@
         "allocator": "cudaMallocAsync"
       },
       "values": {
-        "k_tiled_decode_bf16": 14,
-        "b_tiled_decode_bf16": 922746880,
+        "k_tiled_decode_bf16": 12,
+        "b_tiled_decode_bf16": 950009856,
         "k_tiled_decode_fp32": 30,
-        "b_tiled_decode_fp32": 1845493760,
-        "k_tiled_encode_bf16": 13,
-        "b_tiled_encode_bf16": 18874368,
+        "b_tiled_decode_fp32": 1900019712,
+        "k_tiled_encode_bf16": 11,
+        "b_tiled_encode_bf16": 26214400,
         "k_tiled_encode_fp32": 29,
         "b_tiled_encode_fp32": 130023424,
         "k_assembled_decode_bf16": 0,
@@ -338,7 +338,7 @@
         "k_assembled_decode_fp32",
         "b_assembled_decode_fp32"
       ],
-      "provenance": "Borrows the untiled lines of its dtypes from vae.sd3, so its untiled points bound them and join their fit: the FLUX.2 VAE runs the same diffusers AutoencoderKL convolution stack. Carries its own tiled lines, `tiled_<operation>_<dtype>`: what a tiled FLUX.2 operation needs above the untiled line at its tile, per image pixel and a base; and its decode's assembly lines, `assembled_decode_<dtype>`: what a tiled decode needs once it assembles the image from its tiles, per image pixel and a base that may be negative, reserved where that phase is the larger. Fitted lines are working_memory/fit.py's: bf16 on the RTX 4090 (torch 2.13+cu130, Windows, backend:cudaMallocAsync) tiled points of scripts/calibrate_vae_tiling_working_memory.py (2026-10-19: image sides 1024 to 12288 px with 512 and 1024 px tiles, 2048 to 12288 px with a 1536 px tile, and 2048 to 8192 px with 256 and 768 px tiles, the 256 px ones as lower bounds only), the tiled lines fitted on what they measured above the untiled demand these runs measured at their tile, and rated with the shipped untiled line there, the decode's together with its assembly line (`fit.two_phase_envelope`), each plus 5%. The bf16 assembly line is zero: the tile's own phase covers every point. Stand-ins, no tiled point measures them: fp32 at, value by value, the larger of the SDXL VAE's tiled and assembly lines of the same operation and dtype on this platform and this family's own bf16 lines scaled by the element size (twice for fp32): the FLUX encoders emit 4 to 8 times the SDXL VAE's moment channels, and a FLUX decode's node and allocator show in its own lines."
+      "provenance": "Borrows the untiled lines of its dtypes from vae.sd3, so its untiled points bound them and join their fit: the FLUX.2 VAE runs the same diffusers AutoencoderKL convolution stack. Carries its own tiled lines, `tiled_<operation>_<dtype>`: what a tiled FLUX.2 operation needs above the untiled line at its tile, per image pixel and a base; and its decode's assembly lines, `assembled_decode_<dtype>`: what a tiled decode needs once it assembles the image from its tiles, per image pixel and a base that may be negative, reserved where that phase is the larger. Fitted lines are working_memory/fit.py's: bf16 on the RTX 4090 (torch 2.13+cu130, Windows, backend:cudaMallocAsync) tiled points of scripts/calibrate_vae_tiling_working_memory.py (2026-10-19: image sides 1024 to 12288 px with 512 and 1024 px tiles, 2048 to 12288 px with a 1536 px tile, and 2048 to 8192 px with 256 and 768 px tiles, the 256 px ones as lower bounds only), the tiled lines fitted on what they measured above the untiled demand these runs measured at their tile, and rated with the shipped untiled line there, the decode's together with its assembly line (`fit.two_phase_envelope`), each plus 5%. The bf16 assembly line is zero: the tile's own phase covers every point. Stand-ins, no tiled point measures them: fp32 at, value by value, the larger of the SDXL VAE's tiled and assembly lines of the same operation and dtype on this platform and this family's own bf16 lines scaled by the element size (twice for fp32): the FLUX encoders emit 4 to 8 times the SDXL VAE's moment channels, and a FLUX decode's node and allocator show in its own lines. Refitted on its points by scripts/working_memory/build_shipped.py."
     },
     {
       "estimator": "vae.cogview4",
@@ -459,11 +459,11 @@
         "allocator": "native"
       },
       "values": {
-        "k_tiled_decode_fp16": 25,
+        "k_tiled_decode_fp16": 22,
         "b_tiled_decode_fp16": 858783744,
-        "k_tiled_decode_bf16": 25,
+        "k_tiled_decode_bf16": 22,
         "b_tiled_decode_bf16": 475004928,
-        "k_tiled_decode_fp32": 50,
+        "k_tiled_decode_fp32": 44,
         "b_tiled_decode_fp32": 1062207488,
         "k_tiled_encode_fp16": 12,
         "b_tiled_encode_fp16": 532676608,
@@ -473,7 +473,7 @@
         "b_tiled_encode_fp32": 549453824,
         "k_assembled_decode_fp16": 60,
         "b_assembled_decode_fp16": 2457862144,
-        "k_assembled_decode_bf16": 38,
+        "k_assembled_decode_bf16": 45,
         "b_assembled_decode_bf16": 2457862144,
         "k_assembled_decode_fp32": 92,
         "b_assembled_decode_fp32": 4915724288
@@ -503,11 +503,11 @@
         "b_assembled_decode_fp32"
       ],
       "unmeasured_floor": {
-        "k_tiled_decode_fp16": 25,
+        "k_tiled_decode_fp16": 22,
         "b_tiled_decode_fp16": 858783744,
-        "k_tiled_decode_bf16": 25,
+        "k_tiled_decode_bf16": 22,
         "b_tiled_decode_bf16": 475004928,
-        "k_tiled_decode_fp32": 50,
+        "k_tiled_decode_fp32": 44,
         "b_tiled_decode_fp32": 1062207488,
         "k_tiled_encode_fp16": 12,
         "b_tiled_encode_fp16": 532676608,
@@ -517,7 +517,7 @@
         "b_tiled_encode_fp32": 549453824,
         "k_assembled_decode_fp16": 60,
         "b_assembled_decode_fp16": 2457862144,
-        "k_assembled_decode_bf16": 38,
+        "k_assembled_decode_bf16": 45,
         "b_assembled_decode_bf16": 2457862144,
         "k_assembled_decode_fp32": 92,
         "b_assembled_decode_fp32": 4915724288
@@ -533,17 +533,17 @@
       },
       "values": {
         "k_tiled_decode_bf16": 22,
-        "b_tiled_decode_bf16": 922746880,
+        "b_tiled_decode_bf16": 950009856,
         "k_tiled_decode_fp32": 44,
-        "b_tiled_decode_fp32": 1845493760,
-        "k_tiled_encode_bf16": 16,
+        "b_tiled_decode_fp32": 1900019712,
+        "k_tiled_encode_bf16": 17,
         "b_tiled_encode_bf16": 150994944,
-        "k_tiled_encode_fp32": 32,
+        "k_tiled_encode_fp32": 34,
         "b_tiled_encode_fp32": 529530880,
-        "k_assembled_decode_bf16": 21,
-        "b_assembled_decode_bf16": 2078277632,
+        "k_assembled_decode_bf16": 25,
+        "b_assembled_decode_bf16": 870318080,
         "k_assembled_decode_fp32": 92,
-        "b_assembled_decode_fp32": 4156555264
+        "b_assembled_decode_fp32": 1740636160
       },
       "values_from": {
         "estimator": "vae.sd3",
@@ -565,17 +565,17 @@
       ],
       "unmeasured_floor": {
         "k_tiled_decode_bf16": 22,
-        "b_tiled_decode_bf16": 922746880,
+        "b_tiled_decode_bf16": 950009856,
         "k_tiled_decode_fp32": 44,
-        "b_tiled_decode_fp32": 1845493760,
-        "k_tiled_encode_bf16": 16,
+        "b_tiled_decode_fp32": 1900019712,
+        "k_tiled_encode_bf16": 17,
         "b_tiled_encode_bf16": 150994944,
-        "k_tiled_encode_fp32": 32,
+        "k_tiled_encode_fp32": 34,
         "b_tiled_encode_fp32": 529530880,
-        "k_assembled_decode_bf16": 21,
-        "b_assembled_decode_bf16": 2078277632,
+        "k_assembled_decode_bf16": 25,
+        "b_assembled_decode_bf16": 870318080,
         "k_assembled_decode_fp32": 92,
-        "b_assembled_decode_fp32": 4156555264
+        "b_assembled_decode_fp32": 1740636160
       },
       "provenance": "Borrows the untiled lines of its dtypes from vae.sd3, so its untiled points bound them and join their fit: the FLUX.2 VAE runs the same diffusers AutoencoderKL convolution stack. Carries its own tiled lines, `tiled_<operation>_<dtype>`: what a tiled FLUX.2 operation needs above the untiled line at its tile, per image pixel and a base; and its decode's assembly lines, `assembled_decode_<dtype>`: what a tiled decode needs once it assembles the image from its tiles, per image pixel and a base that may be negative, reserved where that phase is the larger. Every OS but Windows, which has its own entry. No tiled point measures this platform: every tiled and assembly line is a stand-in at its unmeasured floor, the largest of each value over the measured platforms (RTX 4090 native and cudaMallocAsync, RX 9060 XT native and expandable segments on Windows), as the untiled stand-ins here take the conservative figure. The same floors apply where this entry prices a platform nothing is measured on."
     },
@@ -725,11 +725,11 @@
         "b_assembled_decode_fp32"
       ],
       "unmeasured_floor": {
-        "k_tiled_decode_fp16": 25,
+        "k_tiled_decode_fp16": 22,
         "b_tiled_decode_fp16": 858783744,
-        "k_tiled_decode_bf16": 25,
+        "k_tiled_decode_bf16": 22,
         "b_tiled_decode_bf16": 475004928,
-        "k_tiled_decode_fp32": 50,
+        "k_tiled_decode_fp32": 44,
         "b_tiled_decode_fp32": 1062207488,
         "k_tiled_encode_fp16": 12,
         "b_tiled_encode_fp16": 532676608,
@@ -739,7 +739,7 @@
         "b_tiled_encode_fp32": 549453824,
         "k_assembled_decode_fp16": 60,
         "b_assembled_decode_fp16": 2457862144,
-        "k_assembled_decode_bf16": 38,
+        "k_assembled_decode_bf16": 45,
         "b_assembled_decode_bf16": 2457862144,
         "k_assembled_decode_fp32": 92,
         "b_assembled_decode_fp32": 4915724288
@@ -782,17 +782,17 @@
       ],
       "unmeasured_floor": {
         "k_tiled_decode_bf16": 22,
-        "b_tiled_decode_bf16": 922746880,
+        "b_tiled_decode_bf16": 950009856,
         "k_tiled_decode_fp32": 44,
-        "b_tiled_decode_fp32": 1845493760,
-        "k_tiled_encode_bf16": 16,
+        "b_tiled_decode_fp32": 1900019712,
+        "k_tiled_encode_bf16": 17,
         "b_tiled_encode_bf16": 150994944,
-        "k_tiled_encode_fp32": 32,
+        "k_tiled_encode_fp32": 34,
         "b_tiled_encode_fp32": 529530880,
-        "k_assembled_decode_bf16": 21,
-        "b_assembled_decode_bf16": 2078277632,
+        "k_assembled_decode_bf16": 25,
+        "b_assembled_decode_bf16": 870318080,
         "k_assembled_decode_fp32": 92,
-        "b_assembled_decode_fp32": 4156555264
+        "b_assembled_decode_fp32": 1740636160
       },
       "provenance": "Borrows the untiled lines of its dtypes from vae.sd3's Windows entry, so its untiled points bound them and join their fit: the FLUX.2 VAE runs the same diffusers AutoencoderKL convolution stack. Carries its own tiled lines, `tiled_<operation>_<dtype>`: what a tiled FLUX.2 operation needs above the untiled line at its tile, per image pixel and a base; and its decode's assembly lines, `assembled_decode_<dtype>`: what a tiled decode needs once it assembles the image from its tiles, per image pixel and a base that may be negative, reserved where that phase is the larger. Fitted lines are working_memory/fit.py's: bf16 on the RX 9060 XT (gfx1200, torch 2.13+rocm10, Windows, expandable segments off) tiled points of scripts/calibrate_vae_tiling_working_memory.py (2026-10-19: image sides 1024 to 12288 px with 512 and 1024 px tiles, and 2048 to 8192 px with 256 and 768 px tiles, the 256 px ones as lower bounds only), the tiled lines fitted on what they measured above the untiled demand these runs measured at their tile, and rated with the shipped untiled line there, the decode's together with its assembly line (`fit.two_phase_envelope`), each plus 5%. The bf16 assembly line is zero: the tile's own phase covers every point. Stand-ins, no tiled point measures them: fp32 at, value by value, the larger of the SDXL VAE's tiled and assembly lines of the same operation and dtype on this platform and this family's own bf16 lines scaled by the element size (twice for fp32): the FLUX encoders emit 4 to 8 times the SDXL VAE's moment channels, and a FLUX decode's node and allocator show in its own lines. Where this entry prices a platform nothing is measured on (MPS, XPU, CPU, or another allocator on this backend), each tiled and assembly value is floored at its largest over the measured platforms."
     },
@@ -833,8 +833,8 @@
         "b_tiled_encode_fp16": 115343360,
         "k_tiled_encode_fp32": 15,
         "b_tiled_encode_fp32": 100663296,
-        "k_assembled_decode_fp16": 30,
-        "b_assembled_decode_fp16": 497025024,
+        "k_assembled_decode_fp16": 0,
+        "b_assembled_decode_fp16": 0,
         "k_assembled_decode_fp32": 51,
         "b_assembled_decode_fp32": 1685061632
       },
@@ -842,7 +842,7 @@
         "estimator": "vae.sd3",
         "version": 2
       },
-      "provenance": "Borrows the untiled lines of its dtypes from vae.sd3's Windows entry, so its untiled points bound them and join their fit: the SD1/SDXL VAE runs the same diffusers AutoencoderKL convolution stack. Carries its own tiled lines, `tiled_<operation>_<dtype>`: what a tiled SD1/SDXL operation needs above the untiled line at its tile, per image pixel and a base; and its decode's assembly lines, `assembled_decode_<dtype>`: what a tiled decode needs once it assembles the image from its tiles, per image pixel and a base that may be negative, reserved where that phase is the larger. Fitted lines are working_memory/fit.py's: fp16 and fp32 on the RX 9060 XT (gfx1200, torch 2.13+rocm10, Windows, expandable segments) tiled points of scripts/calibrate_vae_tiling_working_memory.py (2026-10-19: image sides 1024 to 12288 px with 512 and 1024 px tiles, and 2048 to 8192 px with 256 and 768 px tiles, the 256 px ones as lower bounds only), the tiled lines fitted on what they measured above the untiled demand these runs measured at their tile, and rated with the shipped untiled line there, the decode's together with its assembly line (`fit.two_phase_envelope`), each plus 5%."
+      "provenance": "Borrows the untiled lines of its dtypes from vae.sd3's Windows entry, so its untiled points bound them and join their fit: the SD1/SDXL VAE runs the same diffusers AutoencoderKL convolution stack. Carries its own tiled lines, `tiled_<operation>_<dtype>`: what a tiled SD1/SDXL operation needs above the untiled line at its tile, per image pixel and a base; and its decode's assembly lines, `assembled_decode_<dtype>`: what a tiled decode needs once it assembles the image from its tiles, per image pixel and a base that may be negative, reserved where that phase is the larger. Fitted lines are working_memory/fit.py's: fp16 and fp32 on the RX 9060 XT (gfx1200, torch 2.13+rocm10, Windows, expandable segments) tiled points of scripts/calibrate_vae_tiling_working_memory.py (2026-10-19: image sides 1024 to 12288 px with 512 and 1024 px tiles, and 2048 to 8192 px with 256 and 768 px tiles, the 256 px ones as lower bounds only), the tiled lines fitted on what they measured above the untiled demand these runs measured at their tile, and rated with the shipped untiled line there, the decode's together with its assembly line (`fit.two_phase_envelope`), each plus 5%. Refitted on its points by scripts/working_memory/build_shipped.py."
     },
     {
       "estimator": "vae.sd3",
@@ -877,11 +877,11 @@
         "os": "windows"
       },
       "values": {
-        "k_tiled_decode_fp16": 11,
+        "k_tiled_decode_fp16": 12,
         "b_tiled_decode_fp16": 0,
-        "k_tiled_decode_bf16": 11,
+        "k_tiled_decode_bf16": 12,
         "b_tiled_decode_bf16": 0,
-        "k_tiled_decode_fp32": 22,
+        "k_tiled_decode_fp32": 24,
         "b_tiled_decode_fp32": 112197632,
         "k_tiled_encode_fp16": 8,
         "b_tiled_encode_fp16": 207618048,
@@ -889,12 +889,12 @@
         "b_tiled_encode_bf16": 207618048,
         "k_tiled_encode_fp32": 16,
         "b_tiled_encode_fp32": 415236096,
-        "k_assembled_decode_fp16": 30,
-        "b_assembled_decode_fp16": 1222639616,
-        "k_assembled_decode_bf16": 19,
-        "b_assembled_decode_bf16": 1222639616,
+        "k_assembled_decode_fp16": 13,
+        "b_assembled_decode_fp16": 2089811968,
+        "k_assembled_decode_bf16": 13,
+        "b_assembled_decode_bf16": 2089811968,
         "k_assembled_decode_fp32": 51,
-        "b_assembled_decode_fp32": 2445279232
+        "b_assembled_decode_fp32": 4179623936
       },
       "values_from": {
         "estimator": "vae.sd3",
@@ -914,7 +914,7 @@
         "k_assembled_decode_fp32",
         "b_assembled_decode_fp32"
       ],
-      "provenance": "Borrows the untiled lines of its dtypes from vae.sd3's Windows entry, so its untiled points bound them and join their fit: the FLUX.1 VAE runs the same diffusers AutoencoderKL convolution stack. Carries its own tiled lines, `tiled_<operation>_<dtype>`: what a tiled FLUX.1 operation needs above the untiled line at its tile, per image pixel and a base; and its decode's assembly lines, `assembled_decode_<dtype>`: what a tiled decode needs once it assembles the image from its tiles, per image pixel and a base that may be negative, reserved where that phase is the larger. Fitted lines are working_memory/fit.py's: bf16 on the RX 9060 XT (gfx1200, torch 2.13+rocm10, Windows, expandable segments) tiled points of scripts/calibrate_vae_tiling_working_memory.py (2026-10-19: image sides 1024 to 12288 px with 512 and 1024 px tiles, and 2048 to 8192 px with 256 and 768 px tiles, the 256 px ones as lower bounds only), the tiled lines fitted on what they measured above the untiled demand these runs measured at their tile, and rated with the shipped untiled line there, the decode's together with its assembly line (`fit.two_phase_envelope`), each plus 5%. Stand-ins, no tiled point measures them: fp16 and fp32 at, value by value, the larger of the SDXL VAE's tiled and assembly lines of the same operation and dtype on this platform and this family's own bf16 lines scaled by the element size (twice for fp32): the FLUX encoders emit 4 to 8 times the SDXL VAE's moment channels, and a FLUX decode's node and allocator show in its own lines."
+      "provenance": "Borrows the untiled lines of its dtypes from vae.sd3's Windows entry, so its untiled points bound them and join their fit: the FLUX.1 VAE runs the same diffusers AutoencoderKL convolution stack. Carries its own tiled lines, `tiled_<operation>_<dtype>`: what a tiled FLUX.1 operation needs above the untiled line at its tile, per image pixel and a base; and its decode's assembly lines, `assembled_decode_<dtype>`: what a tiled decode needs once it assembles the image from its tiles, per image pixel and a base that may be negative, reserved where that phase is the larger. Fitted lines are working_memory/fit.py's: bf16 on the RX 9060 XT (gfx1200, torch 2.13+rocm10, Windows, expandable segments) tiled points of scripts/calibrate_vae_tiling_working_memory.py (2026-10-19: image sides 1024 to 12288 px with 512 and 1024 px tiles, and 2048 to 8192 px with 256 and 768 px tiles, the 256 px ones as lower bounds only), the tiled lines fitted on what they measured above the untiled demand these runs measured at their tile, and rated with the shipped untiled line there, the decode's together with its assembly line (`fit.two_phase_envelope`), each plus 5%. Stand-ins, no tiled point measures them: fp16 and fp32 at, value by value, the larger of the SDXL VAE's tiled and assembly lines of the same operation and dtype on this platform and this family's own bf16 lines scaled by the element size (twice for fp32): the FLUX encoders emit 4 to 8 times the SDXL VAE's moment channels, and a FLUX decode's node and allocator show in its own lines. Refitted on its points by scripts/working_memory/build_shipped.py."
     },
     {
       "estimator": "vae.flux2",
@@ -933,18 +933,18 @@
         "b_encode_bf16": 483393536,
         "k_encode_fp32": 3898,
         "b_encode_fp32": 128974848,
-        "k_tiled_decode_bf16": 11,
+        "k_tiled_decode_bf16": 12,
         "b_tiled_decode_bf16": 0,
-        "k_tiled_decode_fp32": 22,
+        "k_tiled_decode_fp32": 24,
         "b_tiled_decode_fp32": 112197632,
-        "k_tiled_encode_bf16": 12,
-        "b_tiled_encode_bf16": 108003328,
-        "k_tiled_encode_fp32": 24,
-        "b_tiled_encode_fp32": 216006656,
-        "k_assembled_decode_bf16": 14,
-        "b_assembled_decode_bf16": 2078277632,
+        "k_tiled_encode_bf16": 10,
+        "b_tiled_encode_bf16": 114294784,
+        "k_tiled_encode_fp32": 20,
+        "b_tiled_encode_fp32": 228589568,
+        "k_assembled_decode_bf16": 13,
+        "b_assembled_decode_bf16": 870318080,
         "k_assembled_decode_fp32": 51,
-        "b_assembled_decode_fp32": 4156555264
+        "b_assembled_decode_fp32": 1740636160
       },
       "stand_ins": [
         "k_tiled_decode_fp32",
@@ -954,7 +954,7 @@
         "k_assembled_decode_fp32",
         "b_assembled_decode_fp32"
       ],
-      "provenance": "The FLUX.2 VAE's own convolution lines under MIOpen with expandable segments. Windows only, where expandable segments are Invoke's ROCm default: measured on gfx1200 alone. Elsewhere they are a user override nothing is measured for, priced as MIOpen with the native allocator on that OS. Fitted lines are working_memory/fit.py's: the upper envelope of the in-fit points of every estimator resolving to this entry, plus 5%. Untiled lines fitted on its RX 9060 XT (gfx1200, torch 2.13+rocm10) points. Not borrowed from vae.sd3: its fp32 decode needs ~140 MiB more at 512px than the SDXL and FLUX.1 VAEs, which would lift the family's fp32 decode line 9% above theirs, past the 5% margin. Its bf16 lines and fp32 encode equal the family's. Carries its own tiled lines, `tiled_<operation>_<dtype>`: what a tiled FLUX.2 operation needs above the untiled line at its tile, per image pixel and a base; and its decode's assembly lines, `assembled_decode_<dtype>`: what a tiled decode needs once it assembles the image from its tiles, per image pixel and a base that may be negative, reserved where that phase is the larger. Fitted lines are working_memory/fit.py's: bf16 on the RX 9060 XT (gfx1200, torch 2.13+rocm10, Windows, expandable segments) tiled points of scripts/calibrate_vae_tiling_working_memory.py (2026-10-19: image sides 1024 to 12288 px with 512 and 1024 px tiles, and 2048 to 8192 px with 256 and 768 px tiles, the 256 px ones as lower bounds only), the tiled lines fitted on what they measured above the untiled demand these runs measured at their tile, and rated with the shipped untiled line there, the decode's together with its assembly line (`fit.two_phase_envelope`), each plus 5%. Stand-ins, no tiled point measures them: fp32 at, value by value, the larger of the SDXL VAE's tiled and assembly lines of the same operation and dtype on this platform and this family's own bf16 lines scaled by the element size (twice for fp32): the FLUX encoders emit 4 to 8 times the SDXL VAE's moment channels, and a FLUX decode's node and allocator show in its own lines."
+      "provenance": "The FLUX.2 VAE's own convolution lines under MIOpen with expandable segments. Windows only, where expandable segments are Invoke's ROCm default: measured on gfx1200 alone. Elsewhere they are a user override nothing is measured for, priced as MIOpen with the native allocator on that OS. Fitted lines are working_memory/fit.py's: the upper envelope of the in-fit points of every estimator resolving to this entry, plus 5%. Untiled lines fitted on its RX 9060 XT (gfx1200, torch 2.13+rocm10) points. Not borrowed from vae.sd3: its fp32 decode needs ~140 MiB more at 512px than the SDXL and FLUX.1 VAEs, which would lift the family's fp32 decode line 9% above theirs, past the 5% margin. Its bf16 lines and fp32 encode equal the family's. Carries its own tiled lines, `tiled_<operation>_<dtype>`: what a tiled FLUX.2 operation needs above the untiled line at its tile, per image pixel and a base; and its decode's assembly lines, `assembled_decode_<dtype>`: what a tiled decode needs once it assembles the image from its tiles, per image pixel and a base that may be negative, reserved where that phase is the larger. Fitted lines are working_memory/fit.py's: bf16 on the RX 9060 XT (gfx1200, torch 2.13+rocm10, Windows, expandable segments) tiled points of scripts/calibrate_vae_tiling_working_memory.py (2026-10-19: image sides 1024 to 12288 px with 512 and 1024 px tiles, and 2048 to 8192 px with 256 and 768 px tiles, the 256 px ones as lower bounds only), the tiled lines fitted on what they measured above the untiled demand these runs measured at their tile, and rated with the shipped untiled line there, the decode's together with its assembly line (`fit.two_phase_envelope`), each plus 5%. Stand-ins, no tiled point measures them: fp32 at, value by value, the larger of the SDXL VAE's tiled and assembly lines of the same operation and dtype on this platform and this family's own bf16 lines scaled by the element size (twice for fp32): the FLUX encoders emit 4 to 8 times the SDXL VAE's moment channels, and a FLUX decode's node and allocator show in its own lines. Refitted on its points by scripts/working_memory/build_shipped.py."
     },
     {
       "estimator": "vae.cogview4",
@@ -23539,6 +23539,1173 @@
       "method": "demand_peak",
       "device": "RX 9060 XT (gfx1200)",
       "provenance": "scripts/calibrate_vae_tiling_working_memory.py, 2026-10-19: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed, so score_matrix_bytes is its chunked math term. Random-init SDXL AutoencoderKL from the released config, encode tile field 1024, a 1024px tile, run as `i2l` runs it inside its model_on_device window; memory does not depend on weight values. demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm run, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 26624,
+        "width": 26624,
+        "tile": 512,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 17081303040,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (torch reports the native allocator). Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), decode tile field 512, a 512px tile, run as `flux2_vae_decode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 28672,
+        "width": 28672,
+        "tile": 512,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 19734200320,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (torch reports the native allocator). Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), decode tile field 512, a 512px tile, run as `flux2_vae_decode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 26624,
+        "width": 26624,
+        "tile": 512,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 11907629056,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (torch reports the native allocator). Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), encode tile field 512, a 512px tile, run as `flux2_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 28672,
+        "width": 28672,
+        "tile": 512,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 13805551616,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (torch reports the native allocator). Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), encode tile field 512, a 512px tile, run as `flux2_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 16384,
+        "width": 16384,
+        "dtype": "bf16",
+        "tile": 512,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 7935623168,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (torch reports the cudaMallocAsync allocator). Random-init FLUX.1 AutoencoderKL with its loader's geometry, decode tile field 512, a 512px tile, run as `z_image_l2i` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 20480,
+        "width": 20480,
+        "dtype": "bf16",
+        "tile": 512,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 12331253760,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (torch reports the cudaMallocAsync allocator). Random-init FLUX.1 AutoencoderKL with its loader's geometry, decode tile field 512, a 512px tile, run as `z_image_l2i` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 24576,
+        "width": 24576,
+        "dtype": "bf16",
+        "tile": 512,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 17699962880,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (torch reports the cudaMallocAsync allocator). Random-init FLUX.1 AutoencoderKL with its loader's geometry, decode tile field 512, a 512px tile, run as `z_image_l2i` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 16384,
+        "width": 16384,
+        "dtype": "bf16",
+        "tile": 512,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 2835349504,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (torch reports the cudaMallocAsync allocator). Random-init FLUX.1 AutoencoderKL with its loader's geometry, encode tile field 512, a 512px tile, run as `flux_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 20480,
+        "width": 20480,
+        "dtype": "bf16",
+        "tile": 512,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 4378853376,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (torch reports the cudaMallocAsync allocator). Random-init FLUX.1 AutoencoderKL with its loader's geometry, encode tile field 512, a 512px tile, run as `flux_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 24576,
+        "width": 24576,
+        "dtype": "bf16",
+        "tile": 512,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 7415529472,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (torch reports the cudaMallocAsync allocator). Random-init FLUX.1 AutoencoderKL with its loader's geometry, encode tile field 512, a 512px tile, run as `flux_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 16384,
+        "width": 16384,
+        "tile": 512,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 6425673728,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (torch reports the cudaMallocAsync allocator). Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), decode tile field 512, a 512px tile, run as `flux2_vae_decode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 20480,
+        "width": 20480,
+        "tile": 512,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 10015997952,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (torch reports the cudaMallocAsync allocator). Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), decode tile field 512, a 512px tile, run as `flux2_vae_decode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 24576,
+        "width": 24576,
+        "tile": 512,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 14344519680,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (torch reports the cudaMallocAsync allocator). Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), decode tile field 512, a 512px tile, run as `flux2_vae_decode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 16384,
+        "width": 16384,
+        "tile": 512,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 3707764736,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (torch reports the cudaMallocAsync allocator). Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), encode tile field 512, a 512px tile, run as `flux2_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 20480,
+        "width": 20480,
+        "tile": 512,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 5754585088,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (torch reports the cudaMallocAsync allocator). Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), encode tile field 512, a 512px tile, run as `flux2_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 24576,
+        "width": 24576,
+        "tile": 512,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 8237613056,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (torch reports the cudaMallocAsync allocator). Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), encode tile field 512, a 512px tile, run as `flux2_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 16384,
+        "width": 16384,
+        "dtype": "bf16",
+        "tile": 512,
+        "score_matrix_bytes": 285212672
+      },
+      "measured_bytes": 6584008704,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.1 AutoencoderKL with its loader's geometry, decode tile field 512, a 512px tile, run as `z_image_l2i` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 20480,
+        "width": 20480,
+        "dtype": "bf16",
+        "tile": 512,
+        "score_matrix_bytes": 285212672
+      },
+      "measured_bytes": 10128195584,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.1 AutoencoderKL with its loader's geometry, decode tile field 512, a 512px tile, run as `z_image_l2i` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 24576,
+        "width": 24576,
+        "dtype": "bf16",
+        "tile": 512,
+        "score_matrix_bytes": 285212672
+      },
+      "measured_bytes": 14360248320,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.1 AutoencoderKL with its loader's geometry, decode tile field 512, a 512px tile, run as `z_image_l2i` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 16384,
+        "width": 16384,
+        "dtype": "bf16",
+        "tile": 512,
+        "score_matrix_bytes": 285212672
+      },
+      "measured_bytes": 3680567296,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.1 AutoencoderKL with its loader's geometry, encode tile field 512, a 512px tile, run as `flux_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 20480,
+        "width": 20480,
+        "dtype": "bf16",
+        "tile": 512,
+        "score_matrix_bytes": 285212672
+      },
+      "measured_bytes": 5542838272,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.1 AutoencoderKL with its loader's geometry, encode tile field 512, a 512px tile, run as `flux_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 24576,
+        "width": 24576,
+        "dtype": "bf16",
+        "tile": 512,
+        "score_matrix_bytes": 285212672
+      },
+      "measured_bytes": 7828733952,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.1 AutoencoderKL with its loader's geometry, encode tile field 512, a 512px tile, run as `flux_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 16384,
+        "width": 16384,
+        "tile": 512,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 285212672
+      },
+      "measured_bytes": 6730809344,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), decode tile field 512, a 512px tile, run as `flux2_vae_decode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 20480,
+        "width": 20480,
+        "tile": 512,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 285212672
+      },
+      "measured_bytes": 10337910784,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), decode tile field 512, a 512px tile, run as `flux2_vae_decode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 24576,
+        "width": 24576,
+        "tile": 512,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 285212672
+      },
+      "measured_bytes": 14674821120,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), decode tile field 512, a 512px tile, run as `flux2_vae_decode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 16384,
+        "width": 16384,
+        "tile": 512,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 285212672
+      },
+      "measured_bytes": 4569759744,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), encode tile field 512, a 512px tile, run as `flux2_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 20480,
+        "width": 20480,
+        "tile": 512,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 285212672
+      },
+      "measured_bytes": 6910181376,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), encode tile field 512, a 512px tile, run as `flux2_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 24576,
+        "width": 24576,
+        "tile": 512,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 285212672
+      },
+      "measured_bytes": 9196077056,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), encode tile field 512, a 512px tile, run as `flux2_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 16384,
+        "width": 16384,
+        "dtype": "bf16",
+        "tile": 1024,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 11700011008,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (torch reports the native allocator). Random-init FLUX.1 AutoencoderKL with its loader's geometry, decode tile field 1024, a 1024px tile, run as `z_image_l2i` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 20480,
+        "width": 20480,
+        "dtype": "bf16",
+        "tile": 1024,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 15535702016,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (torch reports the native allocator). Random-init FLUX.1 AutoencoderKL with its loader's geometry, decode tile field 1024, a 1024px tile, run as `z_image_l2i` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 16384,
+        "width": 16384,
+        "dtype": "bf16",
+        "tile": 1024,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 4418699264,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (torch reports the native allocator). Random-init FLUX.1 AutoencoderKL with its loader's geometry, encode tile field 1024, a 1024px tile, run as `flux_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 20480,
+        "width": 20480,
+        "dtype": "bf16",
+        "tile": 1024,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 5578424320,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (torch reports the native allocator). Random-init FLUX.1 AutoencoderKL with its loader's geometry, encode tile field 1024, a 1024px tile, run as `flux_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 16384,
+        "width": 16384,
+        "tile": 1024,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 8661237760,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (torch reports the native allocator). Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), decode tile field 1024, a 1024px tile, run as `flux2_vae_decode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 20480,
+        "width": 20480,
+        "tile": 1024,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 10787749888,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (torch reports the native allocator). Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), decode tile field 1024, a 1024px tile, run as `flux2_vae_decode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 16384,
+        "width": 16384,
+        "tile": 1024,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 4506779648,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (torch reports the native allocator). Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), encode tile field 1024, a 1024px tile, run as `flux2_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 20480,
+        "width": 20480,
+        "tile": 1024,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 6815744000,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (torch reports the native allocator). Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), encode tile field 1024, a 1024px tile, run as `flux2_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 16384,
+        "width": 16384,
+        "dtype": "bf16",
+        "tile": 1536,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 11844714496,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (torch reports the cudaMallocAsync allocator). Random-init FLUX.1 AutoencoderKL with its loader's geometry, decode tile field 1536, a 1536px tile, run as `z_image_l2i` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 16384,
+        "width": 16384,
+        "dtype": "bf16",
+        "tile": 1536,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 5955911680,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (torch reports the cudaMallocAsync allocator). Random-init FLUX.1 AutoencoderKL with its loader's geometry, encode tile field 1536, a 1536px tile, run as `flux_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.sd",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 14336,
+        "width": 14336,
+        "tile": 1536,
+        "dtype": "fp16",
+        "vae_class": "AutoencoderKL",
+        "upcast_weight_bytes": 0,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 10619977728,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (torch reports the cudaMallocAsync allocator). Random-init SDXL AutoencoderKL from the released config, decode tile field 1536, a 1536px tile, run as `l2i` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.sd",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 14336,
+        "width": 14336,
+        "tile": 1536,
+        "dtype": "fp16",
+        "vae_class": "AutoencoderKL",
+        "upcast_weight_bytes": 0,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 5588910080,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (torch reports the cudaMallocAsync allocator). Random-init SDXL AutoencoderKL from the released config, encode tile field 1536, a 1536px tile, run as `i2l` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.sd",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 14336,
+        "width": 14336,
+        "tile": 1536,
+        "dtype": "fp32",
+        "vae_class": "AutoencoderKL",
+        "upcast_weight_bytes": 0,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 17347641344,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (torch reports the cudaMallocAsync allocator). Random-init SDXL AutoencoderKL from the released config, decode tile field 1536, a 1536px tile, run as `l2i` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.sd",
+      "version": 3,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 14336,
+        "width": 14336,
+        "tile": 1536,
+        "dtype": "fp32",
+        "vae_class": "AutoencoderKL",
+        "upcast_weight_bytes": 0,
+        "score_matrix_bytes": 0
+      },
+      "measured_bytes": 9797894144,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): NVIDIA GeForce RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (torch reports the cudaMallocAsync allocator). Random-init SDXL AutoencoderKL from the released config, encode tile field 1536, a 1536px tile, run as `i2l` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.sd",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 12288,
+        "width": 12288,
+        "tile": 768,
+        "dtype": "fp16",
+        "vae_class": "AutoencoderKL",
+        "upcast_weight_bytes": 0,
+        "score_matrix_bytes": 1073741824
+      },
+      "measured_bytes": 7541227520,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init SDXL AutoencoderKL from the released config, decode tile field 768, a 768px tile, run as `l2i` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.sd",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 12288,
+        "width": 12288,
+        "tile": 768,
+        "dtype": "fp16",
+        "vae_class": "AutoencoderKL",
+        "upcast_weight_bytes": 0,
+        "score_matrix_bytes": 1073741824
+      },
+      "measured_bytes": 3386834944,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init SDXL AutoencoderKL from the released config, encode tile field 768, a 768px tile, run as `i2l` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.sd",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 12288,
+        "width": 12288,
+        "tile": 768,
+        "dtype": "fp32",
+        "vae_class": "AutoencoderKL",
+        "upcast_weight_bytes": 0,
+        "score_matrix_bytes": 1073741824
+      },
+      "measured_bytes": 10724835328,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init SDXL AutoencoderKL from the released config, decode tile field 768, a 768px tile, run as `l2i` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.sd",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 12288,
+        "width": 12288,
+        "tile": 768,
+        "dtype": "fp32",
+        "vae_class": "AutoencoderKL",
+        "upcast_weight_bytes": 0,
+        "score_matrix_bytes": 1073741824
+      },
+      "measured_bytes": 4609540096,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init SDXL AutoencoderKL from the released config, encode tile field 768, a 768px tile, run as `i2l` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.sd",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 16384,
+        "width": 16384,
+        "tile": 768,
+        "dtype": "fp32",
+        "vae_class": "AutoencoderKL",
+        "upcast_weight_bytes": 0,
+        "score_matrix_bytes": 1073741824
+      },
+      "measured_bytes": 6123683840,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init SDXL AutoencoderKL from the released config, encode tile field 768, a 768px tile, run as `i2l` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 16384,
+        "width": 16384,
+        "dtype": "bf16",
+        "tile": 1024,
+        "score_matrix_bytes": 1073741824
+      },
+      "measured_bytes": 9900654592,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.1 AutoencoderKL with its loader's geometry, decode tile field 1024, a 1024px tile, run as `z_image_l2i` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 20480,
+        "width": 20480,
+        "dtype": "bf16",
+        "tile": 1024,
+        "score_matrix_bytes": 1073741824
+      },
+      "measured_bytes": 11349786624,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.1 AutoencoderKL with its loader's geometry, decode tile field 1024, a 1024px tile, run as `z_image_l2i` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 16384,
+        "width": 16384,
+        "dtype": "bf16",
+        "tile": 1024,
+        "score_matrix_bytes": 1073741824
+      },
+      "measured_bytes": 5731516416,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.1 AutoencoderKL with its loader's geometry, encode tile field 1024, a 1024px tile, run as `flux_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 20480,
+        "width": 20480,
+        "dtype": "bf16",
+        "tile": 1024,
+        "score_matrix_bytes": 1073741824
+      },
+      "measured_bytes": 6912212992,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.1 AutoencoderKL with its loader's geometry, encode tile field 1024, a 1024px tile, run as `flux_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 16384,
+        "width": 16384,
+        "tile": 1024,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 1073741824
+      },
+      "measured_bytes": 9858711552,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), decode tile field 1024, a 1024px tile, run as `flux2_vae_decode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 20480,
+        "width": 20480,
+        "tile": 1024,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 1073741824
+      },
+      "measured_bytes": 11559501824,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), decode tile field 1024, a 1024px tile, run as `flux2_vae_decode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 16384,
+        "width": 16384,
+        "tile": 1024,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 1073741824
+      },
+      "measured_bytes": 6136266752,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), encode tile field 1024, a 1024px tile, run as `flux2_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "vae.flux2",
+      "version": 3,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 20480,
+        "width": 20480,
+        "tile": 1024,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "score_matrix_bytes": 1073741824
+      },
+      "measured_bytes": 7537164288,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_vae_tiling_working_memory.py (2026-10-29): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. Random-init FLUX.2 AutoencoderKLFlux2 with block widths (128, 256, 512, 512), encode tile field 1024, a 1024px tile, run as `flux2_vae_encode` runs it inside its model_on_device window; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm run; no failed allocation, allocator retry or spill."
     }
   ]
 }

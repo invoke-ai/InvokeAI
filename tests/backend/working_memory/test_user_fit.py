@@ -276,3 +276,34 @@ def test_the_z_image_denoise_is_moved_by_no_user_line(provide) -> None:
     features = _denoise_features(4096)
     shipped = Z_IMAGE_DENOISE_SPEC.evaluate(features, shipped_coefficients(Z_IMAGE_DENOISE_SPEC, PLATFORM))
     assert Z_IMAGE_DENOISE_SPEC.estimate(features, DEVICE) == shipped
+
+
+@pytest.mark.parametrize("delta", [512 * MIB, -64 * MIB], ids=["higher", "lower"])
+def test_a_tiled_decode_the_floor_decides_follows_a_higher_user_base_and_keeps_the_shipped_one_over_a_lower(
+    delta: int,
+) -> None:
+    """A 24576 px FLUX.1 bf16 decode at a 512 px tile on Windows ROCm with expandable segments: its floor decides, and
+    it carries the base of the untiled line. A tiled operation takes the larger of the user and the shipped estimate
+    (`user_fit.resolve`), so a user base above the shipped one raises the floor by it and its margin, and one below
+    leaves the shipped estimate standing."""
+    platform = Platform("miopen", "expandable", "windows")
+    features = {"operation": "decode", "height": 24576, "width": 24576, "dtype": "bf16", "tile": 512}
+    features["score_matrix_bytes"] = 0
+    shipped_values = shipped_coefficients(VAE_FLUX_SPEC, platform)
+    shipped = VAE_FLUX_SPEC.evaluate(features, shipped_values)
+    assert any(term.included and term.name == "assembly_buffers" for term in shipped.terms), "the floor decides"
+    carrier = user_fit.carrier_key(VAE_FLUX_SPEC.id, VAE_FLUX_SPEC.version, platform)
+    assert carrier is not None
+    k, b = shipped_values.values["k_decode_bf16"], shipped_values.values["b_decode_bf16"]
+    line = UserLine(k=int(k), b=int(b + delta), x_min=512**2, x_max=1024**2, points=3)
+    fit = UserFit(label="user:dc:env", platform=platform, lines={(carrier, "decode_bf16"): line})
+
+    resolved = user_fit.resolve(VAE_FLUX_SPEC, features, shipped_values, fit)
+
+    [base] = [term for term in resolved.terms if term.name == "floor_base"]
+    if delta > 0:
+        assert base.bytes == b + delta
+        assert resolved.reservation_bytes == pytest.approx(shipped.reservation_bytes + 1.05 * delta, abs=2)
+    else:
+        assert base.bytes == b
+        assert resolved.reservation_bytes == shipped.reservation_bytes
