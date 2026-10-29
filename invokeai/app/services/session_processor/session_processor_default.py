@@ -321,6 +321,7 @@ class DefaultSessionRunner(SessionRunnerBase):
     def run(self, queue_item: SessionQueueItem):
         # Exceptions raised outside `run_node` are handled by the processor. There is no need to catch them here.
 
+        self._refresh_user_fits()
         # getattr, like the workflow-call lifecycle's reads: runners also execute stand-in items without an origin.
         run_id = calibration_run_id(getattr(queue_item, "origin", None))
         if run_id is not None:
@@ -329,6 +330,18 @@ class DefaultSessionRunner(SessionRunnerBase):
         self._on_before_run_session(queue_item=queue_item)
         self._run_session_loop(queue_item)
         self._on_after_run_session(queue_item=queue_item)
+
+    def _refresh_user_fits(self) -> None:
+        """Let this item's estimates read the calibration store as it is now: once per item, never per estimate."""
+        # getattr: stand-in service containers that runners execute with need not carry the calibration service.
+        service = getattr(self._services, "working_memory_calibration", None)
+        if service is None:
+            return
+        try:
+            service.refresh_user_fits()
+        except Exception:
+            # The fits read so far stay in force; a store that cannot be read must not fail a generation.
+            self._services.logger.warning("Could not refresh the working-memory user fits", exc_info=True)
 
     def _run_calibration_item(self, queue_item: SessionQueueItem, run_id: str) -> None:
         """Run a working-memory calibration item, measuring each node (see `working_memory.probe`).
