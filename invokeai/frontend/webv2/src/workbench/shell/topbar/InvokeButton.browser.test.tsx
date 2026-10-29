@@ -14,6 +14,8 @@ import type * as UseTopbarShortcutModule from './useTopbarShortcut';
 // icon. Mock queue plumbing to isolate that gate.
 const harness = vi.hoisted(() => ({
   bindings: {} as Record<string, { aria: string; display: string; parts: string[] }>,
+  destinations: [] as string[],
+  lockToggles: 0,
   revealed: [] as string[],
   sources: [] as string[],
   progress: { activeItemIndex: 1, completedItemCount: 0, message: '', percentage: 0.42 as number | null },
@@ -25,7 +27,13 @@ vi.mock('@workbench/queue-integration/useActiveQueueProgress', () => ({
 }));
 vi.mock('@workbench/useNotify', () => ({ useNotify: () => ({ error: () => {} }) }));
 vi.mock('@workbench/WorkbenchContext', () => ({
-  useWorkbenchCommands: () => ({ generation: { setSource: (sourceId: string) => harness.sources.push(sourceId) } }),
+  useWorkbenchCommands: () => ({
+    generation: {
+      setDestination: (destination: string) => harness.destinations.push(destination),
+      setSource: (sourceId: string) => harness.sources.push(sourceId),
+      toggleRoutingLock: () => harness.lockToggles++,
+    },
+  }),
 }));
 vi.mock('./useTopbarShortcut', async (importOriginal) => ({
   ...(await importOriginal<typeof UseTopbarShortcutModule>()),
@@ -92,13 +100,8 @@ const makeInvocationState = (overrides: Partial<InvocationState> = {}): Invocati
   ...overrides,
 });
 
-const renderInvokeButton = async (overrides: Partial<InvocationState> = {}) => {
-  host = document.createElement('div');
-  document.body.append(host);
-  root = createRoot(host);
-  const state = makeInvocationState(overrides);
-
-  await act(() =>
+const renderState = (state: InvocationState) =>
+  act(() =>
     root?.render(
       <ChakraProvider value={system}>
         <InvokeButton state={state} />
@@ -106,7 +109,20 @@ const renderInvokeButton = async (overrides: Partial<InvocationState> = {}) => {
     )
   );
 
-  return { button: host.querySelector('button') as HTMLButtonElement, state };
+const renderInvokeButton = async (overrides: Partial<InvocationState> = {}) => {
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  const state = makeInvocationState(overrides);
+
+  await renderState(state);
+
+  return {
+    button: host.querySelector('button') as HTMLButtonElement,
+    /** Re-renders with the state the store would publish next. */
+    rerender: (next: Partial<InvocationState>) => renderState(makeInvocationState({ ...overrides, ...next })),
+    state,
+  };
 };
 
 const LAYER_ISSUES: InvocationIssue[] = [
@@ -119,6 +135,8 @@ const hasSpinner = (button: HTMLButtonElement): boolean => button.querySelector(
 
 beforeEach(() => {
   harness.bindings = {};
+  harness.destinations = [];
+  harness.lockToggles = 0;
   harness.revealed = [];
   harness.sources = [];
   harness.progress.percentage = 0.42;
@@ -240,6 +258,72 @@ describe('InvokeButton front of queue', () => {
     await act(() => userEvent.hover(button));
 
     await expect.element(page.getByText('topbar.invoke.invokeFrontHint: Ctrl+Shift+Enter')).toBeVisible();
+  });
+
+  describe('while Shift is held', () => {
+    const frontIcon = (button: HTMLButtonElement) => button.querySelector('[data-invoke-front-icon]');
+
+    beforeEach(async () => {
+      harness.bindings = {
+        'app.invoke': { aria: 'Control+Enter', display: 'Ctrl+Enter', parts: ['ctrl', 'enter'] },
+        'app.invokeFront': frontBinding,
+      };
+      // Wide enough for the keycap hint.
+      await page.viewport(1440, 900);
+    });
+
+    afterEach(() => userEvent.keyboard('{/Shift}'));
+
+    it('shows the front-of-queue icon over a ready button, at the same width, until released', async () => {
+      const { button } = await renderInvokeButton();
+
+      await act(() => userEvent.hover(button));
+      const width = button.getBoundingClientRect().width;
+      expect(frontIcon(button)).toBeNull();
+
+      await act(() => userEvent.keyboard('{Shift>}'));
+
+      expect(frontIcon(button)).not.toBeNull();
+      expect(button.getBoundingClientRect().width).toBe(width);
+      await expect.element(button).toHaveAccessibleName('topbar.invoke.invoke');
+
+      await act(() => userEvent.keyboard('{/Shift}'));
+
+      expect(frontIcon(button)).toBeNull();
+    });
+
+    it('forgets a Shift released away from the button', async () => {
+      const { button } = await renderInvokeButton();
+
+      await act(() => userEvent.hover(button));
+      await act(() => userEvent.keyboard('{Shift>}'));
+      expect(frontIcon(button)).not.toBeNull();
+      await act(() => userEvent.unhover(button));
+      await act(() => userEvent.keyboard('{/Shift}'));
+      await act(() => userEvent.hover(button));
+
+      expect(frontIcon(button)).toBeNull();
+    });
+
+    it('leaves the icon alone when Shift is held away from the button', async () => {
+      const { button } = await renderInvokeButton();
+
+      await act(() => userEvent.keyboard('{Shift>}'));
+
+      // Running and not hovered: the ring stays.
+      expect(hasProgressRing(button)).toBe(true);
+      expect(frontIcon(button)).toBeNull();
+    });
+
+    it('leaves a blocked button’s icon alone', async () => {
+      const { button } = await renderInvokeButton({ isValid: false, issues: LAYER_ISSUES });
+
+      await act(() => userEvent.hover(button));
+      await act(() => userEvent.keyboard('{Shift>}'));
+
+      expect(frontIcon(button)).toBeNull();
+      expect(button.querySelector('svg.lucide-circle-alert')).not.toBeNull();
+    });
   });
 
   it('names only Shift+click when the front-of-queue binding is cleared', async () => {
@@ -374,5 +458,204 @@ describe('InvokeButton issues', () => {
     await act(() => sourceGroup.getByText('widgets.labels.generate').click());
 
     expect(harness.sources).toEqual(['generate']);
+  });
+});
+
+describe('InvokeButton route card', () => {
+  const MULTI_SOURCE = {
+    placedTypeIds: new Set(['generate', 'canvas'] as const),
+    sources: [
+      { label: 'Generate', sourceId: 'generate' as const, typeId: 'generate' as const },
+      { label: 'Canvas', sourceId: 'canvas' as const, typeId: 'canvas' as const },
+    ],
+  };
+  const sourceGroup = () => page.getByRole('radiogroup', { name: 'topbar.routing.source' });
+  const destinationGroup = () => page.getByRole('radiogroup', { name: 'topbar.routing.destination' });
+
+  it('announces its card in every state, and expands only once pinned', async () => {
+    const { button } = await renderInvokeButton();
+
+    expect(button.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(button.getAttribute('aria-controls')).toBeNull();
+  });
+
+  it('opens pinned on ArrowDown while valid, focusing the selected source, and never invokes', async () => {
+    const invoke = vi.fn(() => Promise.resolve());
+    const { button } = await renderInvokeButton({ ...MULTI_SOURCE, invoke });
+
+    button.focus();
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+
+    await expect.poll(() => (document.activeElement as HTMLInputElement | null)?.value).toBe('generate');
+    expect(sourceGroup().element().contains(document.activeElement)).toBe(true);
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(button.getAttribute('aria-controls')).toBe(document.querySelector('[role="dialog"]')?.id);
+    expect(invoke).not.toHaveBeenCalled();
+
+    await act(() => userEvent.keyboard('{Escape}'));
+    await expect.element(button).toHaveFocus();
+    await expect.element(sourceGroup()).not.toBeInTheDocument();
+  });
+
+  it('opens pinned on ArrowDown with the first issue’s way out focused when blocked', async () => {
+    const { button } = await renderInvokeButton({ ...MULTI_SOURCE, isValid: false, issues: LAYER_ISSUES });
+
+    button.focus();
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+
+    await expect.element(page.getByRole('button', { name: 'Show layer' })).toHaveFocus();
+  });
+
+  it('opens pinned on right-click instead of the native menu, and never invokes', async () => {
+    const invoke = vi.fn(() => Promise.resolve());
+    const { button } = await renderInvokeButton({ invoke });
+    const contextMenu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+
+    await act(() => button.dispatchEvent(contextMenu));
+
+    expect(contextMenu.defaultPrevented).toBe(true);
+    await expect.element(destinationGroup()).toBeVisible();
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it('changes the destination in place, keeping the card open', async () => {
+    const { button } = await renderInvokeButton();
+
+    button.focus();
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+    await expect.element(destinationGroup()).toBeVisible();
+    await act(() => destinationGroup().getByText('Canvas').click());
+
+    expect(harness.destinations).toEqual(['canvas']);
+    await expect.element(destinationGroup()).toBeVisible();
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('pins a hover preview on a press inside it, so leaving no longer closes it', async () => {
+    const { button } = await renderInvokeButton();
+
+    await act(() => userEvent.hover(button));
+    await expect.element(destinationGroup()).toBeVisible();
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+
+    await act(() => destinationGroup().getByText('Canvas').click());
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    await act(() => userEvent.unhover(destinationGroup()));
+    await act(() => userEvent.hover(document.body));
+
+    await expect.element(destinationGroup()).toBeVisible();
+    expect(harness.destinations).toEqual(['canvas']);
+  });
+
+  it('locks the route from the card and marks a locked route on Invoke itself', async () => {
+    const { button, rerender } = await renderInvokeButton();
+
+    button.focus();
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+    const lock = page.getByRole('button', { name: 'topbar.routing.lockRouting' });
+    await expect.element(lock).toHaveAttribute('aria-pressed', 'false');
+    expect(button.querySelector('[data-routing-lock-indicator]')).toBeNull();
+
+    await act(() => lock.click());
+    expect(harness.lockToggles).toBe(1);
+    await rerender({ invocation: { ...invocation, destinationLocked: true, sourceLocked: true } });
+
+    // The name stays put; the pressed state carries the lock.
+    await expect.element(lock).toHaveAttribute('aria-pressed', 'true');
+    await expect.element(lock).toHaveFocus();
+    expect(button.querySelector('[data-routing-lock-indicator]')).not.toBeNull();
+    // The mark is decoration: Invoke keeps its name.
+    await expect.element(button).toHaveAccessibleName('topbar.invoke.invoke');
+  });
+
+  it('opens pinned on Alt+ArrowDown too, and keeps both keys from the window’s hotkeys', async () => {
+    const windowKeys: string[] = [];
+    const recordKey = (event: KeyboardEvent) => windowKeys.push(event.key);
+    window.addEventListener('keydown', recordKey);
+
+    try {
+      const { button } = await renderInvokeButton();
+
+      button.focus();
+      await act(() => userEvent.keyboard('{Alt>}{ArrowDown}{/Alt}'));
+      await expect.element(destinationGroup()).toBeVisible();
+      expect(button.getAttribute('aria-expanded')).toBe('true');
+      await act(() => userEvent.keyboard('{Escape}'));
+      await expect.element(button).toHaveFocus();
+      await act(() => userEvent.keyboard('{ArrowDown}'));
+      await expect.element(destinationGroup()).toBeVisible();
+
+      expect(windowKeys.filter((key) => key === 'ArrowDown')).toEqual([]);
+    } finally {
+      window.removeEventListener('keydown', recordKey);
+    }
+  });
+
+  it('pins an open preview on ArrowDown and moves focus into it', async () => {
+    const { button } = await renderInvokeButton();
+
+    await act(() => userEvent.hover(button));
+    await expect.element(destinationGroup()).toBeVisible();
+    button.focus();
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    await expect.poll(() => destinationGroup().element().contains(document.activeElement)).toBe(true);
+  });
+
+  it('closes to Invoke on Shift+Tab before the lock, its first control', async () => {
+    const { button } = await renderInvokeButton();
+
+    button.focus();
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+    // One source shows as text, so focus starts on the selected destination; the lock sits before it.
+    await expect.poll(() => (document.activeElement as HTMLInputElement | null)?.value).toBe('gallery');
+    await act(() => userEvent.keyboard('{Shift>}{Tab}{/Shift}'));
+    await expect.element(page.getByRole('button', { name: 'topbar.routing.lockRouting' })).toHaveFocus();
+    await act(() => userEvent.keyboard('{Shift>}{Tab}{/Shift}'));
+
+    await expect.element(button).toHaveFocus();
+    await expect.element(destinationGroup()).not.toBeInTheDocument();
+  });
+
+  // Focus landing on Invoke unasked would make the next Enter queue a generation.
+  it('leaves focus where it is when a card it never held closes', async () => {
+    const invoke = vi.fn(() => Promise.resolve());
+    const { button } = await renderInvokeButton({ invoke });
+    const prompt = document.createElement('textarea');
+    host?.append(prompt);
+    prompt.focus();
+
+    await act(() => userEvent.hover(button));
+    await expect.element(destinationGroup()).toBeVisible();
+    await act(() => userEvent.unhover(button));
+    await expect.element(destinationGroup()).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(prompt);
+
+    await act(() => button.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })));
+    await expect.element(destinationGroup()).toBeVisible();
+    // The card's dismiss layer arms a frame or so after it shows; repeat Escape until it does.
+    await expect
+      .poll(async () => {
+        await act(() => userEvent.keyboard('{Escape}'));
+        return destinationGroup().query();
+      })
+      .toBeNull();
+    expect(document.activeElement).toBe(prompt);
+
+    await act(() => userEvent.keyboard('{Enter}'));
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it('offers no destination choice for video, which only lands in the Gallery', async () => {
+    const { button } = await renderInvokeButton({ invocation: { ...invocation, sourceId: 'video' } });
+
+    await act(() => userEvent.hover(button));
+
+    await expect.element(page.getByText('topbar.routing.destination')).toBeVisible();
+    await expect.element(page.getByText('widgets.labels.gallery')).toBeVisible();
+    expect(destinationGroup().query()).toBeNull();
   });
 });

@@ -1,13 +1,15 @@
 import type { FocusEvent, KeyboardEvent, MouseEvent } from 'react';
 
-import { Box, Icon, Kbd, Popover, Portal, ProgressCircle, Spinner } from '@chakra-ui/react';
+import { Box, Icon, Kbd, Popover, Portal, ProgressCircle, Spinner, Status } from '@chakra-ui/react';
 import { getDeterminateProgressFraction } from '@features/queue/contracts';
+import { useModifierHeld } from '@platform/react/useModifierHeld';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button, useUnavailableControl } from '@platform/ui/Button';
 import { PopoverContent } from '@platform/ui/Popover';
+import { isRoutingLocked } from '@workbench/invocation';
 import { useActiveQueueProgress } from '@workbench/queue-integration/useActiveQueueProgress';
 import { useNotify } from '@workbench/useNotify';
-import { CircleAlertIcon, PlayIcon } from 'lucide-react';
+import { CircleAlertIcon, ListStartIcon, PlayIcon } from 'lucide-react';
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -37,8 +39,8 @@ const loadPopoverBody = (): Promise<InvokePopoverBodyComponent> =>
   ));
 
 /**
- * Invoke sits on top of its attached neighbours with full control corners; the iterations field and routing button
- * each run a tail of their frame under those corners so they read as a continuing border, not a notch.
+ * Invoke ends its attached group and sits on top of the iterations field with full control corners; the field runs a
+ * tail of its frame under Invoke's leading corners so it reads as a continuing border, not a notch.
  * Doubled specificity outranks the attached Group's `!important` corner reset.
  */
 const INVOKE_BUTTON_CSS = { '&&': { borderRadius: 'control !important' } } as const;
@@ -52,8 +54,9 @@ const PREVIEW_OPEN_DELAY_MS = 250;
 const PREVIEW_CLOSE_DELAY_MS = 200;
 
 /**
- * `preview` follows hover and keyboard focus and leaves focus where it is; `pinned` is the blocked button's click, and
- * takes focus into the list so its fixes are a Tab away.
+ * `preview` follows hover and keyboard focus and leaves focus where it is; `pinned` stays until dismissed. The blocked
+ * button's click, ArrowDown and a right-click pin it; any press inside a preview pins it too, so an edit there
+ * survives a short pointer excursion.
  */
 type IssuesPopoverMode = 'closed' | 'pinned' | 'preview';
 /** An open waiting on the card's chunk. Compared by identity: a later request, even of the same mode, replaces it. */
@@ -73,6 +76,8 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const shortcutBinding = useTopbarShortcutBinding('app.invoke');
   const frontBinding = useTopbarShortcutBinding('app.invokeFront');
   const shortcutParts = shortcutBinding?.parts ?? null;
+  // Shift+click queues at the front: holding it over a ready button says so before the click.
+  const isShiftHeld = useModifierHeld('Shift');
   const ariaKeyShortcuts =
     [shortcutBinding?.aria, frontBinding?.aria].filter((value) => value !== undefined).join(' ') || undefined;
   const contentId = useId();
@@ -86,8 +91,6 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   // the state marks the button busy.
   const pendingOpen = useRef<PendingOpen | null>(null);
   const [isOpenPending, setIsOpenPending] = useState(false);
-  // A jump to an issue's fix moves focus there; closing then must not pull it back to the button.
-  const [returnsFocus, setReturnsFocus] = useState(true);
 
   const { progress: runningProgress, summary } = useActiveQueueProgress();
   const hasOpenWork = summary.total > 0;
@@ -95,6 +98,7 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const canInvoke = isValid && !isPreparing;
+  const isLocked = isRoutingLocked(state.invocation);
   // Blocked by issues: the count replaces the shortcut, and activation opens the issue list.
   const showsIssues = !isValid && !isPreparing && issues.length > 0;
 
@@ -220,10 +224,13 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const focusFirstControl = useCallback(() => {
     let frames = 0;
     const attempt = () => {
-      // The first way out of the first issue, else the selected source: never a source the click did not choose.
+      // The first way out of the first issue, else the route's first selected segment (never one the user did not
+      // choose), else its lock.
+      const content = contentRef.current;
       const control =
-        contentRef.current?.querySelector<HTMLElement>('[data-issue-action]') ??
-        contentRef.current?.querySelector<HTMLElement>('input[type="radio"]:checked');
+        content?.querySelector<HTMLElement>('[data-issue-action]') ??
+        content?.querySelector<HTMLElement>('[data-invoke-route] input[type="radio"]:checked') ??
+        content?.querySelector<HTMLElement>('[data-routing-lock]');
 
       if (control) {
         control.focus();
@@ -237,7 +244,6 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const handleClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       clearTimers();
-      setReturnsFocus(true);
 
       if (canInvoke) {
         setMode('closed');
@@ -260,15 +266,50 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
     },
     [canInvoke, clearTimers, focusFirstControl, invoke, mode, openWhenLoaded, showsIssues]
   );
+  // Activation invokes while the route is valid, so the card has its own ways in: ArrowDown takes focus to its first
+  // control, the way a menu button opens.
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLButtonElement>) => {
+      if (event.key !== 'ArrowDown' || event.ctrlKey || event.metaKey || event.shiftKey) {
+        return;
+      }
+
+      // Handled here: the window's hotkeys (a layer nudge, gallery selection, prompt history) must not see it too.
+      event.preventDefault();
+      event.stopPropagation();
+      clearTimers();
+      openWhenLoaded('pinned', focusFirstControl);
+    },
+    [clearTimers, focusFirstControl, openWhenLoaded]
+  );
+  // The pointer's way in when a click would invoke; focus stays with the pointer.
+  const handleContextMenu = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      clearTimers();
+      openWhenLoaded('pinned');
+    },
+    [clearTimers, openWhenLoaded]
+  );
+  const pinPreview = useCallback(() => setMode((current) => (current === 'preview' ? 'pinned' : current)), []);
+  // Focus comes back to Invoke only from inside the card. A preview closing, or an Escape or press while focus is
+  // elsewhere, leaves it where it is: focus landing on Invoke unasked would make the next Enter queue.
+  const closeCard = useCallback(() => {
+    const returnsFocus = contentRef.current?.contains(document.activeElement) ?? false;
+
+    clearTimers();
+    setMode('closed');
+    if (returnsFocus) {
+      buttonRef.current?.focus();
+    }
+  }, [clearTimers]);
   const handleOpenChange = useCallback(
     ({ open }: { open: boolean }) => {
       if (!open) {
-        clearTimers();
-        setReturnsFocus(true);
-        setMode('closed');
+        closeCard();
       }
     },
-    [clearTimers]
+    [closeCard]
   );
   // The list sits in a portal: Tab past its last control (or Shift+Tab before its first) closes it and returns to
   // Invoke, rather than leaving focus on the page.
@@ -285,16 +326,14 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
 
       if (edge && document.activeElement === edge) {
         event.preventDefault();
-        clearTimers();
-        setReturnsFocus(true);
-        setMode('closed');
+        closeCard();
       }
     },
-    [clearTimers]
+    [closeCard]
   );
+  // A jump to an issue's fix moves focus there; closing must not pull it back to the button.
   const handleJump = useCallback(() => {
     clearTimers();
-    setReturnsFocus(false);
     setMode('closed');
   }, [clearTimers]);
   const getButton = useCallback(() => buttonRef.current, []);
@@ -309,6 +348,7 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
     ? ({ mode: 'progress', value: null } as const)
     : getInvokeIconMode({
         hasOpenWork,
+        isFrontHeld: isShiftHeld && canInvoke,
         isHovered: isHovered || isFocused,
         progress: getDeterminateProgressFraction(runningProgress?.percentage),
       });
@@ -316,13 +356,12 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   return (
     <Popover.Root
       autoFocus={false}
-      finalFocusEl={getButton}
       ids={popoverIds}
       lazyMount
       open={mode !== 'closed'}
       persistentElements={persistentElements}
       positioning={POPOVER_POSITIONING}
-      restoreFocus={returnsFocus}
+      restoreFocus={false}
       unmountOnExit
       onOpenChange={handleOpenChange}
     >
@@ -332,8 +371,8 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
           ref={buttonRef}
           aria-busy={isOpenPending || undefined}
           aria-controls={mode === 'closed' ? undefined : contentId}
-          aria-expanded={showsIssues ? mode === 'pinned' : undefined}
-          aria-haspopup={showsIssues ? 'dialog' : undefined}
+          aria-expanded={mode === 'pinned'}
+          aria-haspopup="dialog"
           aria-keyshortcuts={ariaKeyShortcuts}
           colorPalette={showsIssues ? 'gray' : 'brand'}
           css={INVOKE_BUTTON_CSS}
@@ -346,7 +385,9 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
           variant={showsIssues ? 'outline' : 'solid'}
           onBlur={handleBlur}
           onClick={handleClick}
+          onContextMenu={handleContextMenu}
           onFocus={handleFocus}
+          onKeyDown={handleKeyDown}
           onPointerEnter={handlePointerEnter}
           onPointerLeave={handlePointerLeave}
           zIndex="2"
@@ -360,6 +401,8 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
               <Icon as={CircleAlertIcon} boxSize="3.5" color="fg.error" />
             ) : iconMode.mode === 'play' ? (
               <Icon as={PlayIcon} boxSize="3.5" />
+            ) : iconMode.mode === 'front' ? (
+              <Icon as={ListStartIcon} boxSize="3.5" data-invoke-front-icon="" />
             ) : iconMode.value === null ? (
               // The app-wide spinner, not the ring's indeterminate sweep, for unknown progress.
               <Spinner borderWidth="1.5px" boxSize="3.5" color="bg" />
@@ -386,6 +429,20 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
               <TopbarShortcutKeys parts={shortcutParts} />
             </Kbd>
           ) : null}
+          {isLocked ? (
+            // Shows the route is locked while the card is closed; the card's lock control names it.
+            <Status.Root
+              aria-hidden
+              colorPalette="accent"
+              data-routing-lock-indicator=""
+              pointerEvents="none"
+              position="absolute"
+              right="-1px"
+              top="-1px"
+            >
+              <Status.Indicator />
+            </Status.Root>
+          ) : null}
         </Button>
       </Popover.Anchor>
       <Portal>
@@ -394,6 +451,7 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
             ref={contentRef}
             p="3"
             onKeyDown={handleContentKeyDown}
+            onPointerDown={pinPreview}
             onPointerEnter={clearTimers}
             onPointerLeave={mode === 'preview' ? schedulePreviewClose : undefined}
           >

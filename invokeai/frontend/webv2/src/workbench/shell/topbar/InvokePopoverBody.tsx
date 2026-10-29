@@ -1,18 +1,19 @@
-import type { InvocationSourceId } from '@workbench/invocationContracts';
+import type { InvocationSourceId, ResultDestination } from '@workbench/invocationContracts';
 
 import { HStack, Icon, Kbd, Popover, SegmentGroup, Separator, Stack, Text } from '@chakra-ui/react';
-import { Button } from '@platform/ui/Button';
+import { Button, IconButton } from '@platform/ui/Button';
 import { WidgetIcon } from '@workbench/iconResolver';
-import { ROUTE_LABEL_KEYS } from '@workbench/invocation';
+import { isRoutingLocked, ROUTE_LABEL_KEYS } from '@workbench/invocation';
 import { getWidgetById } from '@workbench/widgetRegistry';
 import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { ArrowRightIcon, CircleAlertIcon, WifiOffIcon } from 'lucide-react';
+import { CircleAlertIcon, LockKeyholeIcon, UnlockKeyholeIcon, WifiOffIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { InvocationIssue, InvocationState } from './useInvocationState';
 
 import { useInvokeIssueActions } from './invokeIssueActions';
+import { RoutingDestinationSegments } from './RoutingDestinationSegments';
 import { TopbarShortcutKeys } from './TopbarShortcutKeys';
 
 /** The Invoke card: what runs, where it goes, and each issue in the way with its fixes. Loads on first hover or focus. */
@@ -31,7 +32,6 @@ export const InvokePopoverBody = ({
   const { t } = useTranslation();
   const { batchCount, invocation, isPreparing, isValid, issues, promptExpansion, workflowBatchSize } = state;
   const source = t(ROUTE_LABEL_KEYS[invocation.sourceId]);
-  const destination = t(ROUTE_LABEL_KEYS[invocation.destination]);
   const promptCount = promptExpansion.count;
   const runs = t('topbar.invoke.summary.runs', { count: batchCount });
   const summary =
@@ -61,7 +61,7 @@ export const InvokePopoverBody = ({
   return (
     <Stack gap="2" maxW="22rem" minW="17rem">
       <HStack justify="space-between">
-        <Popover.Title fontSize="sm" fontWeight="700">
+        <Popover.Title fontSize="md" fontWeight="800" lineHeight="1rem">
           {isPreparing
             ? t('topbar.invoke.preparing')
             : isValid
@@ -74,7 +74,7 @@ export const InvokePopoverBody = ({
           </Kbd>
         ) : null}
       </HStack>
-      <InvokeRoute destination={destination} state={state} />
+      <InvokeRoute state={state} />
       <Text color="fg.muted" fontSize="xs">
         {summary}
       </Text>
@@ -85,12 +85,8 @@ export const InvokePopoverBody = ({
         </Text>
       ) : issues.length > 0 ? (
         <InvokeIssueList issues={issues} onJump={onJump} />
-      ) : (
-        <Text color="fg.muted" fontSize="sm">
-          {t('topbar.invoke.addingImagesTo', { destination })}
-        </Text>
-      )}
-      <Text color="fg.subtle" fontSize="xs">
+      ) : null}
+      <Text color="fg.muted" fontSize="xs">
         {frontShortcut === null
           ? t('topbar.invoke.invokeFrontHintNoShortcut')
           : t('topbar.invoke.invokeFrontHint', { shortcut: frontShortcut })}
@@ -99,18 +95,35 @@ export const InvokePopoverBody = ({
   );
 };
 
+const ROUTE_LABEL_PROPS = {
+  color: 'fg.muted',
+  fontSize: 'xs',
+  fontWeight: '700',
+  textTransform: 'uppercase',
+} as const;
+/** A one-option row reads as text at the segments' height, so a switch between the two never moves the card. */
+const ROUTE_VALUE_PROPS = {
+  alignItems: 'center',
+  display: 'flex',
+  fontSize: 'sm',
+  fontWeight: '600',
+  minH: '5',
+} as const;
+
 /**
- * Names what Invoke runs and where results go, and switches the source in place: among the sources this layout holds,
- * plus the current one when it is missing, so the choice is never between things the user cannot see.
+ * Where Invoke runs from and where its results go, each switchable in place, plus the lock that keeps the route
+ * through edits. Sources are those this layout holds, plus the current one when it is missing, so the choice is never
+ * between things the user cannot see. Video only lands in the Gallery, so it offers no destination to choose.
  */
-const InvokeRoute = ({ destination, state }: { destination: string; state: InvocationState }) => {
+const InvokeRoute = ({ state }: { state: InvocationState }) => {
   const { t } = useTranslation();
   const { generation } = useWorkbenchCommands();
   const { invocation, placedTypeIds, sources } = state;
   const options = sources.filter(
     (candidate) => placedTypeIds.has(candidate.typeId) || candidate.sourceId === invocation.sourceId
   );
-  const handleChange = useCallback(
+  const isLocked = isRoutingLocked(invocation);
+  const handleSourceChange = useCallback(
     ({ value }: { value: string | null }) => {
       if (value) {
         generation.setSource(value as InvocationSourceId);
@@ -118,19 +131,37 @@ const InvokeRoute = ({ destination, state }: { destination: string; state: Invoc
     },
     [generation]
   );
+  const handleToggleLock = useCallback(() => generation.toggleRoutingLock(), [generation]);
+  const handleDestinationChange = useCallback(
+    (destination: ResultDestination) => generation.setDestination(destination),
+    [generation]
+  );
 
   return (
-    <Stack gap="1">
-      <Text color="fg.subtle" fontSize="xs" fontWeight="700" textTransform="uppercase">
-        {t('topbar.invoke.runs')}
-      </Text>
-      <HStack gap="2" wrap="wrap">
+    <Stack data-invoke-route="" gap="2.5">
+      <Stack align="start" gap="1">
+        <HStack alignSelf="stretch" justify="space-between" minH="5">
+          <Text {...ROUTE_LABEL_PROPS}>{t('topbar.routing.source')}</Text>
+          <IconButton
+            // A fixed name with the state in aria-pressed, so it never reads as "Unlock routing, pressed".
+            aria-label={t('topbar.routing.lockRouting')}
+            aria-pressed={isLocked}
+            color={isLocked ? 'accent.fg' : 'fg.muted'}
+            data-routing-lock=""
+            size="xs"
+            tooltip={t('topbar.routing.lockRouting')}
+            variant="ghost"
+            onClick={handleToggleLock}
+          >
+            <Icon as={isLocked ? LockKeyholeIcon : UnlockKeyholeIcon} boxSize="3" />
+          </IconButton>
+        </HStack>
         {options.length > 1 ? (
           <SegmentGroup.Root
             aria-label={t('topbar.routing.source')}
             size="xs"
             value={invocation.sourceId}
-            onValueChange={handleChange}
+            onValueChange={handleSourceChange}
           >
             <SegmentGroup.Indicator />
             {options.map((option) => (
@@ -144,15 +175,24 @@ const InvokeRoute = ({ destination, state }: { destination: string; state: Invoc
             ))}
           </SegmentGroup.Root>
         ) : (
-          <Text fontSize="sm" fontWeight="600">
-            {t(ROUTE_LABEL_KEYS[invocation.sourceId])}
-          </Text>
+          <Text {...ROUTE_VALUE_PROPS}>{t(ROUTE_LABEL_KEYS[invocation.sourceId])}</Text>
         )}
-        <HStack color="fg.muted" gap="1">
-          <Icon aria-hidden as={ArrowRightIcon} boxSize="3" />
-          <Text fontSize="sm">{t('topbar.invoke.resultsTo', { destination })}</Text>
+      </Stack>
+      <Stack align="start" gap="1">
+        <HStack minH="5">
+          <Text {...ROUTE_LABEL_PROPS}>{t('topbar.routing.destination')}</Text>
         </HStack>
-      </HStack>
+        {invocation.sourceId === 'video' ? (
+          <Text {...ROUTE_VALUE_PROPS}>{t(ROUTE_LABEL_KEYS.gallery)}</Text>
+        ) : (
+          <RoutingDestinationSegments
+            ariaLabel={t('topbar.routing.destination')}
+            size="xs"
+            value={invocation.destination}
+            onChange={handleDestinationChange}
+          />
+        )}
+      </Stack>
     </Stack>
   );
 };

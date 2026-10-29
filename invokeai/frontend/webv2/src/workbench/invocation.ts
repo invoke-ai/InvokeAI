@@ -83,6 +83,9 @@ export const isInvocationSourceAvailable = (id: InvocationSourceId): boolean =>
 
 export const getDestinationLabel = (id: ResultDestination): string => destinationLabels.get(id) ?? 'Canvas';
 
+/** Locking routing pins both halves; either one locked reads as a locked route. */
+export const isRoutingLocked = (route: InvocationRoute): boolean => route.sourceLocked || route.destinationLocked;
+
 export const formatRoute = (route: InvocationRoute): string =>
   `${getSourceLabel(route.sourceId)} → ${getDestinationLabel(route.destination)}`;
 

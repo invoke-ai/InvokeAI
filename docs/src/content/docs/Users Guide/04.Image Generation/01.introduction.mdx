@@ -5,8 +5,6 @@ lastUpdated: 2026-09-30
 sidebar:
   order: 0
 ---
-import routingMenu from '../assets/routing-menu.webp';
-
 import { Steps } from '@astrojs/starlight/components';
 import { Image } from 'astro:assets';
 import generatePanel from '../assets/generate-panel-overview.png';
@@ -62,13 +60,11 @@ Every press of **Invoke** has a *route*: a **source**, the panel whose settings 
 
 Each layout preset starts with the route that suits its purpose. The **Compose** preset routes the Generate panel to the **Gallery**. The **Edit** preset routes to the **Canvas**, using the Canvas's layers and bounding box as the source, so results come back to the canvas for further editing. Switching presets switches to the new preset's route, unless the routing is locked.
 
-The routing control next to **Invoke** in the top bar shows the current source and destination as a pair of icons. Click it to change either one:
+The route lives in the **Invoke** card. Hover over **Invoke** to see it, or open it to make changes: right-click **Invoke**, or press <kbd>↓</kbd> while **Invoke** has keyboard focus. The card stays open while you change the route:
 
 * **Source** lists the panels in the current layout that can run a generation, such as Generate, Canvas, Upscale and Video.
-* **Destination** chooses **Gallery** or **Canvas**.
-* **Lock routing** keeps the route fixed. A small dot on the control shows that it is locked.
-
-<Image src={routingMenu} alt="The routing menu next to Invoke, with Source (Generate, Canvas, Upscale, Video, Workflow), Destination (Canvas or Gallery) and Lock routing." width={420} />
+* **Destination** chooses **Gallery** or **Canvas**. Video always goes to the Gallery, so with Video as the source there is nothing to choose.
+* The lock button beside **Source** keeps the route fixed. While the route is locked, a small dot shows on the corner of **Invoke**.
 
 The route also follows your work. When you change a setting in a different panel, that panel becomes the source, and the destination changes to match: the Canvas sends results to the Canvas, and the other panels send them to the Gallery. For example, editing the prompt in the Generate panel while you are in the Edit layout sends the next results to the Gallery. Lock the routing if you want results to keep going to one place while you work in several panels. To send a single run to the other destination without changing the route, press **Alt+Ctrl+Enter** (**Alt+Cmd+Enter** on macOS).
 

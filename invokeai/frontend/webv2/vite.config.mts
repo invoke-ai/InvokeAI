@@ -198,6 +198,9 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/shell/notifications/toastPolicy.ts',
   // The boot UI adapters and the lazy palette, image menu and canvas saves find gallery items through it.
   '/workbench/image-actions/useFindGalleryItem.ts',
+  // Invoke (editor boot), the lazy workflow editor and canvas header actions share the modifier-key hook; alone it
+  // costs a boot request.
+  '/platform/react/useModifierHeld.ts',
 ] as const;
 
 // The workflow core, its UI barrel and the project workflow collection are one chunk: the editor boots with all of

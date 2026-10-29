@@ -24,7 +24,7 @@ Hover over a numbered circle, or tap it on a touchscreen, for a short descriptio
 | 2 | **Project switcher** | Shows the active project and switches between projects. See [Working with Projects](/users-guide/projects/introduction/). |
 | 3 | **Layout preset tabs** | One tab per saved layout. A dot on a tab's icon means that layout has unsaved changes in this project; the active tab's arrow opens the preset menu. When there are more tabs than fit, the row fades at its edge and an arrow scrolls to the rest. |
 | 4 | **Save as new preset** | Saves the current arrangement as a new preset. |
-| 5 | **Invoke controls** | The number of iterations, the **Invoke** button, and routing, which chooses where the settings come from and where results go. See [When Invoke is blocked](#when-invoke-is-blocked). |
+| 5 | **Invoke controls** | The number of iterations and the **Invoke** button. Its card, shown on hover, sets the route: where the settings come from and where results go. See [When Invoke is blocked](#when-invoke-is-blocked). |
 | 6 | **Rails** | A strip of icons down each edge of the window, one icon per panel placed on that side. |
 | 7 | **Rail menu (…)** | Adds panels to a rail or removes them. **Widgets…** at its foot lists every panel. |
 | 8 | **Side panels** | Show the selected panel from the neighbouring rail. |
@@ -92,7 +92,7 @@ A floating Preview is handy on the **Edit** layout: keep the canvas in the cente
 
 When something stands in the way, **Invoke** turns grey and says how many issues there are, for example *Invoke · 2 issues*. Hover over it to see them; click it, or press <kbd>Enter</kbd> on it, to open the list and move into it. The list shows:
 
-- **Runs**: the panel Invoke takes its settings from (Generate, Canvas, Workflow, Upscale or Video) and where results go. If that panel isn't in the layout, or isn't the one you meant, choose another source right there among the panels the layout holds.
+- **Source** and **Destination**: the panel Invoke takes its settings from (Generate, Canvas, Workflow, Upscale or Video) and where results go. If that panel isn't in the layout, or isn't the one you meant, choose another source right there among the panels the layout holds.
 - Each issue, with a way to fix it: **Show** opens the panel and section that needs attention (a Generate setting, the prompt, a widget), **Show node** selects the workflow node and zooms to it, **Show layer** selects the canvas layer, **Open Model Manager** when no usable model is installed, **Add** for a missing source panel, and a one-click fix where Generate has one (for example a size that fits the model). A lost server connection is listed without a button; it clears when the connection returns.
 
 <kbd>Ctrl</kbd>+<kbd>Enter</kbd> still queues whenever nothing is in the way.
@@ -166,7 +166,7 @@ Invoke comes with four presets:
 | **Video**: generate video | Preview | Video, Upscale | Gallery, Queue |
 | **Workflow**: build and run workflows | Workflow editor (Preview also available) | Workflow | Queue, Preview, Gallery, Image Map |
 
-Each preset also sets where **Invoke** takes its settings from and where results go. For example, Compose generates from the Generate panel into the Gallery, while Edit works from and into the Canvas. A source or destination you have locked from the routing control next to **Invoke** is left alone.
+Each preset also sets where **Invoke** takes its settings from and where results go. For example, Compose generates from the Generate panel into the Gallery, while Edit works from and into the Canvas. A route you have locked from the **Invoke** card is left alone.
 
 New projects open with Compose unless you choose a different starting point when you create them.
 

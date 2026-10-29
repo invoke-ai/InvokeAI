@@ -42,6 +42,7 @@ import { InvokeButton } from './InvokeButton';
 
 // Only what the button itself reads: the card's content is the stand-in above.
 const BLOCKED_STATE = {
+  invocation: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
   invoke: () => Promise.resolve(),
   isPreparing: false,
   isValid: false,

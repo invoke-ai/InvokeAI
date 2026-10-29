@@ -431,20 +431,17 @@
         "showNode": "Show node"
       },
       "addToQueue": "Add to queue",
-      "addingImagesTo": "Adding images to {{destination}}",
       "expandingPrompts": "Expanding prompts…",
       "invoke": "Invoke",
       "invokeFront": "Invoke (front of queue)",
       "invokeFrontHint": "{{shortcut}} or Shift+click: add to the front of the queue",
       "invokeFrontHintNoShortcut": "Shift+click: add to the front of the queue",
       "preparing": "Preparing generation…",
-      "resultsTo": "Results go to {{destination}}",
       "routeIssues": {
         "emptyCanvasFrame": "The Canvas generation frame has no area.",
         "sourceNotMounted": "The {{source}} widget is not in this layout. Add it, or run another source.",
         "videoNeedsGallery": "Video results can only go to the Gallery."
       },
-      "runs": "Runs",
       "summary": {
         "batch": "{{source}} × {{runs}} × {{items}} → {{generations}}",
         "batchItems_one": "{{count}} batch item",
@@ -562,15 +559,9 @@
       "pausedDescription_other": "{{count}} items wait until you resume the processor."
     },
     "routing": {
-      "change": "Change routing",
       "destination": "Destination",
-      "lockDestination": "Lock output destination",
       "lockRouting": "Lock routing",
-      "lockSource": "Lock source",
-      "source": "Source",
-      "unlockDestination": "Unlock output destination",
-      "unlockRouting": "Unlock routing",
-      "unlockSource": "Unlock source"
+      "source": "Source"
     }
   },
   "projects": {
@@ -2719,7 +2710,7 @@
     "actionsLabel": "{{label}} actions",
     "sourceLock": {
       "label": "Locked invoke source",
-      "tooltip": "Invoke is locked to this widget. Unlock it from the routing menu."
+      "tooltip": "Invoke is locked to this widget. Unlock it with the lock in the Invoke card."
     },
     "centerRegion": "Center view",
     "centerViewClose": "Close {{label}}",

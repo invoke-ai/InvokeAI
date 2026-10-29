@@ -27,6 +27,7 @@ import { InvokeButton } from './InvokeButton';
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const BLOCKED_STATE = {
+  invocation: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
   invoke: () => Promise.resolve(),
   isPreparing: false,
   isValid: false,
