@@ -1,12 +1,22 @@
 """Stable Diffusion 3.5 starter models."""
 
-from invokeai.backend.model_manager.starter_models.common import gemma2_2b_encoder
+from invokeai.backend.model_manager.starter_models.common import TINY_AUTOENCODER_NOTE, gemma2_2b_encoder
 from invokeai.backend.model_manager.starter_models.types import StarterModel
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
     ModelType,
     PiDDecoderVariantType,
+)
+
+# Same network and file name as TAEF1; the base override the installer sends is what files it under SD3.
+taesd3 = StarterModel(
+    name="TAESD3 (SD3 preview decoder)",
+    base=BaseModelType.StableDiffusion3,
+    source="https://huggingface.co/madebyollin/taesd3/resolve/d58dcaccd2b36fcb7a6b9e93c1cc507acab5a778/diffusion_pytorch_model.safetensors",
+    description=f"Sharp live previews for SD3.5. {TINY_AUTOENCODER_NOTE} ~10MB",
+    type=ModelType.TinyAutoencoder,
+    format=ModelFormat.Checkpoint,
 )
 
 # SD3 uses a 16-channel latent, architecturally identical to FLUX.1. The config probe disambiguates via the
