@@ -12,10 +12,10 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     raise_if_not_dir,
     raise_if_not_file,
     state_dict_has_any_keys_ending_with,
-    state_dict_has_any_keys_starting_with,
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
+from invokeai.backend.model_manager.util.llamacpp_t5 import is_llamacpp_t5_encoder_state_dict
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.sdnq.detection import folder_has_sdnq_keys
 
@@ -193,11 +193,18 @@ class T5Encoder_SDNQ_Config(Config_Base):
         raise NotAMatchError("text_encoder_2 does not look like an SDNQ-quantized T5 encoder")
 
 
+# mT5's vocabulary, the smaller of the two multilingual ones (UMT5, Wan's encoder, has 256384). Both share
+# the llama.cpp layout and need tokenizers `T5EncoderGGUFModel` does not have; T5 v1.1 has 32128 tokens,
+# and its extended-vocabulary derivatives (e.g. ~69k-token T5XXL-Unchained) run on the bundled one.
+_MULTILINGUAL_VOCAB_SIZE = 250112
+
+
 class T5Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
     """Configuration for GGUF-quantized T5 text encoder models in a single .gguf file.
 
     These are conversions like city96/t5-v1_1-xxl-encoder-gguf, which use llama.cpp's T5 encoder
-    tensor naming (``enc.blk.N.*``, ``token_embd.weight``, ``enc.output_norm.weight``)."""
+    tensor naming (``enc.blk.N.*``, ``token_embd.weight``, ``enc.output_norm.weight``). UMT5 files in
+    the same naming belong to ``WanT5Encoder_GGUF_Config``."""
 
     base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
     type: Literal[ModelType.T5Encoder] = Field(default=ModelType.T5Encoder)
@@ -210,21 +217,22 @@ class T5Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
 
         raise_for_override_fields(cls, override_fields)
 
-        cls.raise_if_doesnt_look_like_t5_encoder(mod)
+        state_dict = mod.load_state_dict()
+        if not is_llamacpp_t5_encoder_state_dict(state_dict):
+            raise NotAMatchError("state dict does not look like a llama.cpp T5 encoder (no 'enc.blk.*' keys)")
+
+        embedding = state_dict.get("token_embd.weight")
+        if embedding is None:
+            raise NotAMatchError("state dict has no token embedding (token_embd.weight)")
+        vocab_size = int(embedding.shape[0])
+        if vocab_size >= _MULTILINGUAL_VOCAB_SIZE:
+            raise NotAMatchError(
+                f"vocabulary of {vocab_size} tokens is multilingual: a UMT5 (Wan) or mT5 encoder, not T5 v1.1"
+            )
 
         cls.raise_if_doesnt_look_like_gguf_quantized(mod)
 
         return cls(**override_fields)
-
-    @classmethod
-    def raise_if_doesnt_look_like_t5_encoder(cls, mod: ModelOnDisk) -> None:
-        # llama.cpp T5 encoders use the ``enc.`` prefix on their transformer blocks and final norm. This
-        # distinguishes them from decoder-only GGUF models (e.g. Qwen3, which uses bare ``blk.*``).
-        state_dict = mod.load_state_dict()
-        if not state_dict_has_any_keys_starting_with(
-            state_dict, "enc.blk."
-        ) and not state_dict_has_any_keys_ending_with(state_dict, "enc.output_norm.weight"):
-            raise NotAMatchError("state dict does not look like a T5 encoder (no 'enc.blk.*' keys)")
 
     @classmethod
     def raise_if_doesnt_look_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:

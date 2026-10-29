@@ -1,6 +1,6 @@
 ---
 title: Wan 2.2
-lastUpdated: 2026-09-29
+lastUpdated: 2026-10-21
 alsoListedIn:
   - users-guide/models/local-models
 sidebar:
@@ -57,6 +57,8 @@ Two **starter bundles**:
 * **Wan 2.2 Image-to-Video** (~32 GB) — UMT5-XXL, A14B VAE, I2V-A14B Q4_K_M (high + low), I2V Lightning (high + low).
 
 The bundles are independent; installing both totals ~56 GB (shared components are deduplicated). Higher-quality Q8_0 quantizations and full Diffusers builds are available a-la-carte in the starter models list.
+
+The UMT5-XXL encoder also comes as a GGUF file: **Wan T5 Encoder (UMT5-XXL, GGUF Q8_0)** in the starter models (~6 GB, about half the Diffusers encoder), or any other quantization from [city96's `umt5-xxl-encoder-gguf`](https://huggingface.co/city96/umt5-xxl-encoder-gguf). It carries its own tokenizer; select it in the **Wan T5 Encoder** slot. A UMT5 GGUF installed by an older InvokeAI is listed as a FLUX/SD 3 T5 encoder: use **Re-identify model** in the Model Manager to make it a Wan T5 encoder.
 
 :::tip
 **On a 12 GB VRAM card**: install just the Text-to-Video bundle and use TI2V-5B — it covers both text-to-video and image-to-video and fits comfortably. The A14B variants will technically run via aggressive offloading but are slow and prone to OOM.

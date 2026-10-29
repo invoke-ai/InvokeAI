@@ -125,7 +125,12 @@ class ModelOnDisk:
         extensions = {".safetensors", ".pt", ".pth", ".ckpt", ".bin", ".gguf"}
         return {f for f in self.path.rglob("*") if f.suffix in extensions and f.is_file()}
 
-    def metadata(self, path: Optional[Path] = None) -> dict[str, str]:
+    def metadata(self, path: Optional[Path] = None) -> dict[str, Any]:
+        """The file's metadata: a safetensors header's string map, or a GGUF's scalar fields.
+
+        GGUF values keep their type (string, number, boolean). Array fields are left out: identification
+        never needs their contents, and a tokenizer vocabulary runs to hundreds of thousands of entries.
+        """
         path = path or self.path
         if path in self._metadata_cache:
             return self._metadata_cache[path]
@@ -133,11 +138,9 @@ class ModelOnDisk:
             if path.suffix == ".gguf":
                 with WrappedGGUFReader(path) as reader:
                     metadata = {
-                        name: value
+                        name: field.contents()
                         for name, field in reader.fields.items()
-                        if field.types
-                        and field.types[0] == GGUFValueType.STRING
-                        and isinstance(value := field.contents(), str)
+                        if field.types and field.types[0] != GGUFValueType.ARRAY
                     }
             else:
                 with safe_open(path, framework="pt", device="cpu") as f:

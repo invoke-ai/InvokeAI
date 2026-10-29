@@ -425,6 +425,7 @@ def _write_gemma4_gguf(
     num_layers: int = 48,
     architecture: str = "ltxv",
     config_key: str | None = "config",
+    config_is_json: bool = True,
     assets: bool = True,
     asset_type: gguf.GGMLQuantizationType = gguf.GGMLQuantizationType.I8,
     layer_scalars: bool = True,
@@ -466,7 +467,9 @@ def _write_gemma4_gguf(
                 raw_dtype=gguf.GGMLQuantizationType.Q8_0,
             )
             writer.add_tensor(f"blk.{layer}.post_attention_norm.weight", np.ones(hidden_size, dtype=np.float32))
-    if config_key is not None:
+    if config_key is not None and not config_is_json:
+        writer.add_uint32(config_key, 1)
+    elif config_key is not None:
         text_config = {"model_type": "gemma4_text", "hidden_size": hidden_size, "num_hidden_layers": num_layers}
         writer.add_string(
             config_key,
@@ -527,8 +530,13 @@ def test_a_gemma3_12b_gguf_is_left_unclaimed(tmp_path: Path, naming: str) -> Non
 
 @pytest.mark.parametrize(
     ("missing", "named"),
-    [({"assets": False}, "carries no tokenizer"), ({"config_key": None}, "no model config")],
-    ids=["tokenizer", "config"],
+    [
+        ({"assets": False}, "carries no tokenizer"),
+        ({"config_key": None}, "no model config"),
+        # GGUF metadata keeps a field's type: a number under the config's key is no config either.
+        ({"config_is_json": False}, "no model config"),
+    ],
+    ids=["tokenizer", "config", "config_not_a_string"],
 )
 def test_an_ltx_gemma4_gguf_without_what_it_needs_besides_the_weights_is_refused(
     tmp_path: Path, missing: dict, named: str

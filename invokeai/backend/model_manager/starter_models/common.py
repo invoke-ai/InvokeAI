@@ -412,6 +412,16 @@ wan_22_t5_encoder = StarterModel(
     format=ModelFormat.WanT5Encoder,
 )
 
+wan_22_t5_encoder_gguf_q8_0 = StarterModel(
+    name="Wan T5 Encoder (UMT5-XXL, GGUF Q8_0)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/city96/umt5-xxl-encoder-gguf/resolve/main/umt5-xxl-encoder-Q8_0.gguf",
+    description="UMT5-XXL text encoder for all Wan 2.2 variants, GGUF Q8_0 quantized: about half the size of "
+    "the Diffusers encoder, with its tokenizer built in. (~6GB)",
+    type=ModelType.WanT5Encoder,
+    format=ModelFormat.GGUFQuantized,
+)
+
 # DALL-E 2 removed — deprecated by OpenAI, shutdown May 12, 2026.
 # region Anima
 anima_qwen3_encoder = StarterModel(

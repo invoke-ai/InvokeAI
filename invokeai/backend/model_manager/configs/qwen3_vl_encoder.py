@@ -318,7 +318,7 @@ class Qwen3VLEncoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
         if mod.path.suffix.lower() != ".gguf":
             raise NotAMatchError(f"expected a .gguf file, got {mod.path.suffix or '(no suffix)'}")
 
-        # `mod.metadata()` reads and caches every GGUF string field, and identification probes many
+        # `mod.metadata()` reads and caches every GGUF scalar field, and identification probes many
         # configs against the same ModelOnDisk -- so this costs one shared read rather than a second
         # mmap plus the full GC that closing a reader forces.
         architecture = mod.metadata().get("general.architecture")
