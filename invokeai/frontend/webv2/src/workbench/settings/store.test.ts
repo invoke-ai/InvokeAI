@@ -197,6 +197,14 @@ describe('loadWorkbenchSettings', () => {
 });
 
 describe('patchWorkbenchPreferences', () => {
+  it('saves the workflow form section gap with the account preferences', async () => {
+    await store.loadWorkbenchSettings();
+    await store.patchWorkbenchPreferences({ workflowFormSectionGapPx: 8 });
+
+    expect(store.getWorkbenchPreferences().workflowFormSectionGapPx).toBe(8);
+    expect(readBackendPreferences().workflowFormSectionGapPx).toBe(8);
+  });
+
   it('persists to the backend and localStorage', async () => {
     seedBackendPreferences({ themeId: 'osakaJade' });
     await store.loadWorkbenchSettings();
@@ -456,6 +464,13 @@ describe('installInPlace preference', () => {
 });
 
 describe('normalizeWorkbenchPreferences workflow editor', () => {
+  it('defaults and bounds the per-account workflow form spacing in pixels', () => {
+    expect(store.normalizeWorkbenchPreferences({}).workflowFormSectionGapPx).toBe(16);
+    expect(store.normalizeWorkbenchPreferences({ workflowFormSectionGapPx: 8 }).workflowFormSectionGapPx).toBe(8);
+    expect(store.normalizeWorkbenchPreferences({ workflowFormSectionGapPx: 36 }).workflowFormSectionGapPx).toBe(36);
+    expect(store.normalizeWorkbenchPreferences({ workflowFormSectionGapPx: 50 }).workflowFormSectionGapPx).toBe(16);
+    expect(store.normalizeWorkbenchPreferences({ workflowFormSectionGapPx: NaN }).workflowFormSectionGapPx).toBe(16);
+  });
   it('keeps connections above nodes unless the preference is explicitly on', () => {
     expect(store.normalizeWorkbenchPreferences({}).workflowEdgesBehindNodes).toBe(false);
     expect(

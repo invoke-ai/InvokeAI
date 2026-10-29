@@ -107,6 +107,8 @@ export interface WorkbenchPreferences {
   workflowEdgeStyle: 'curved' | 'square';
   /** Keep connections of a selected node beneath nodes instead of raising them over node controls. */
   workflowEdgesBehindNodes: boolean;
+  /** Personal spacing between collapsible sections of a workflow form, in pixels. */
+  workflowFormSectionGapPx: number;
   /** Order of the workflow library's own templates. */
   workflowLibrarySort: WorkflowLibrarySortId;
   /** How workflow library and project cards show their thumbnails. */
