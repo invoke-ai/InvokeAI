@@ -1,6 +1,7 @@
 import gc
 import json
 import math
+import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Callable, Literal
@@ -17,12 +18,48 @@ from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger()
 
+#: The names `GGUFReader` gives the file header's own values, in the same namespace as the metadata.
+_HEADER_FIELD_NAMES = frozenset({"GGUF.version", "GGUF.tensor_count", "GGUF.kv_count"})
+#: How `GGUFReader` refuses a metadata entry named like one of those, as the `KeyError`'s message.
+_REPEATED_HEADER_FIELD = re.compile(rf"^Duplicate ({'|'.join(map(re.escape, sorted(_HEADER_FIELD_NAMES)))}) ")
+
+
+class _HeaderTolerantGGUFReader(gguf.GGUFReader):
+    """`GGUFReader` for a file that repeats the header fields as metadata; see `_open_gguf_reader`.
+
+    Some converters copy a reader's fields back into the file they write, the three header fields among
+    them: every file of vanes430's Anima-2.9B GGUFs carries them. The header is read first and wins; the
+    copies are dropped, and they may be stale (that file's copied `GGUF.kv_count` is 3, its header's 6).
+    """
+
+    def _push_field(self, field: gguf.ReaderField, *args: Any, **kwargs: Any) -> int:
+        # The reader pushes the header before any metadata, so a second field of one of its names is a copy.
+        # Arguments are forwarded as given: `_push_field` is gguf-py's private method, and this override only
+        # runs for the files above.
+        if field.name in _HEADER_FIELD_NAMES and field.name in self.fields:
+            return 0
+        return super()._push_field(field, *args, **kwargs)
+
+
+def _open_gguf_reader(path: Path) -> gguf.GGUFReader:
+    """gguf-py's own reader; for a file that repeats the header as metadata, which it refuses, the tolerant one.
+
+    The retry is narrow on purpose: every other file never meets the subclass, so a gguf-py release that
+    changes the private method it overrides can break only the files gguf-py itself cannot read.
+    """
+    try:
+        return gguf.GGUFReader(path)
+    except KeyError as e:
+        if not (e.args and isinstance(e.args[0], str) and _REPEATED_HEADER_FIELD.match(e.args[0])):
+            raise
+    return _HeaderTolerantGGUFReader(path)
+
 
 class WrappedGGUFReader:
     """Wrapper around GGUFReader that adds a close() method."""
 
     def __init__(self, path: Path):
-        self.reader = gguf.GGUFReader(path)
+        self.reader = _open_gguf_reader(path)
 
     def __enter__(self):
         return self.reader
@@ -32,7 +69,12 @@ class WrappedGGUFReader:
         return False
 
     def close(self):
-        """Explicitly close the memory-mapped file."""
+        """Drop this wrapper's references to the reader and its memory map, then collect.
+
+        The map closes once nothing references it. A caller's `with WrappedGGUFReader(path) as reader:` keeps the
+        reader, and through its tensor views the map, until that name goes out of scope -- for the callers here,
+        when they return -- so the collection releases only what reference cycles would otherwise hold.
+        """
         if hasattr(self.reader, "data"):
             try:
                 self.reader.data.flush()
@@ -41,6 +83,17 @@ class WrappedGGUFReader:
                 logger.warning(f"Wasn't able to close GGUF memory map: {e}")
         del self.reader
         gc.collect()
+
+
+def gguf_tensor_bytes(path: Path) -> dict[str, int]:
+    """The stored size of each of a GGUF file's tensors, by name, from its header alone; no tensor data is read.
+
+    For a loader that decides from the names which tensors to read, and sizes what it will read. The reader is
+    referenced by this expression only, so the memory map is released as soon as the sizes are read, without the
+    full collection `WrappedGGUFReader.close` runs, which costs most of a second on a loaded process (measured on
+    Windows, where a file still mapped cannot be deleted: it deletes at once with the collector disabled).
+    """
+    return {tensor.name: int(tensor.n_bytes) for tensor in _open_gguf_reader(path).tensors}
 
 
 ORIG_SHAPE_KEY_PREFIX = "comfy.gguf.orig_shape."
@@ -97,7 +150,7 @@ def _read_comfy_orig_shapes(reader: gguf.GGUFReader) -> dict[str, torch.Size]:
 
 COMFY_QUANT_KEY_PREFIX = "comfy.gguf.quant."
 
-Q8CRMode = Literal["refuse", "decode", "ignore"]
+Q8CRMode = Literal["refuse", "decode"]
 
 
 def parse_q8_cr_markers(fields: Mapping[str, Any], source: str) -> dict[str, dict[str, Any]]:
@@ -144,6 +197,46 @@ def parse_q8_cr_markers(fields: Mapping[str, Any], source: str) -> dict[str, dic
     return layers
 
 
+def _logical_shape(tensor: gguf.ReaderTensor, orig_shapes: Mapping[str, torch.Size]) -> torch.Size:
+    """The shape a tensor has in the model: GGUF's reversed dims, or the native shape ComfyUI recorded."""
+    shape = torch.Size(tuple(int(v) for v in reversed(tensor.shape)))
+    orig_shape = orig_shapes.get(tensor.name)
+    if orig_shape is None:
+        return shape
+    if orig_shape.numel() != shape.numel():
+        raise ValueError(
+            f"GGUF tensor {tensor.name!r} declares original shape {tuple(orig_shape)}, which has a "
+            f"different element count than its stored shape {tuple(shape)}."
+        )
+    return orig_shape
+
+
+def gguf_header_state_dict(path: Path, compute_dtype: torch.dtype) -> dict[str, torch.Tensor]:
+    """A GGUF file's tensors as `gguf_sd_loader` returns them, but on the `meta` device: read from the header.
+
+    Model identification needs names, shapes and quantization types, never values, and the header holds them
+    all. `gguf_sd_loader` copies every tensor out of the file -- for a 23.6 GB transformer, 22 GiB of RAM per
+    probe -- to answer questions the first few MB answer. Each tensor comes back as the `GGMLTensor` the full
+    read gives, with the same packed and logical shapes; a ComfyUI-GGUF ``Q8_CR`` layer comes back as its raw
+    ``I8`` codes, without the markers a decoding read adds, since whether it is supported is decided from the
+    metadata. The reader maps the file but touches only the header.
+    """
+    with WrappedGGUFReader(path) as reader:
+        orig_shapes = _read_comfy_orig_shapes(reader)
+        sd: dict[str, torch.Tensor] = {}
+        for tensor in reader.tensors:
+            shape = _logical_shape(tensor, orig_shapes)
+            stored_dtype = torch.from_numpy(np.empty(0, dtype=tensor.data.dtype)).dtype
+            stored_shape = shape if tensor.tensor_type in TORCH_COMPATIBLE_QTYPES else tensor.data.shape
+            sd[tensor.name] = GGMLTensor(
+                torch.empty(stored_shape, dtype=stored_dtype, device="meta"),
+                ggml_quantization_type=tensor.tensor_type,
+                tensor_shape=shape,
+                compute_dtype=compute_dtype,
+            )
+        return sd
+
+
 def gguf_sd_loader(
     path: Path,
     compute_dtype: torch.dtype,
@@ -167,17 +260,14 @@ def gguf_sd_loader(
     - ``"refuse"``: any other loader. Raises before the tensors are read; without it the int8 codes reach
       a plain ``nn.Linear`` and the load fails on a dtype error that names neither the file nor the format.
       Identification refuses such files at install already, so this guards records made before it did.
-    - ``"ignore"``: model identification, which needs shapes and never builds a module. The file reads as
-      it always has; whether its quantization is supported is the installer's question, answered from
-      the metadata (see ``ModelConfigFactory``), so it is not raised here once per candidate config.
+
+    Model identification does not come here: it reads the header (`gguf_header_state_dict`).
     """
     with WrappedGGUFReader(path) as reader:
         sd: dict[str, torch.Tensor] = {}
         orig_shapes = _read_comfy_orig_shapes(reader)
-        int8_layers: dict[str, dict[str, Any]] = {}
-        if q8_cr != "ignore":
-            quant_fields = {k: f.contents() for k, f in reader.fields.items() if k.startswith(COMFY_QUANT_KEY_PREFIX)}
-            int8_layers = parse_q8_cr_markers(quant_fields, path.name)
+        quant_fields = {k: f.contents() for k, f in reader.fields.items() if k.startswith(COMFY_QUANT_KEY_PREFIX)}
+        int8_layers = parse_q8_cr_markers(quant_fields, path.name)
         if int8_layers and q8_cr == "refuse":
             raise ValueError(
                 f"{path.name} holds {len(int8_layers)} ComfyUI-GGUF Q8_CR (int8 convrot) layer(s), e.g. "
@@ -198,15 +288,7 @@ def gguf_sd_loader(
             # while tensors still hold references to the mapped memory.
             torch_tensor = torch.from_numpy(tensor.data.copy())
 
-            shape = torch.Size(tuple(int(v) for v in reversed(tensor.shape)))
-            orig_shape = orig_shapes.get(tensor.name)
-            if orig_shape is not None:
-                if orig_shape.numel() != shape.numel():
-                    raise ValueError(
-                        f"GGUF tensor {tensor.name!r} declares original shape {tuple(orig_shape)}, which has a "
-                        f"different element count than its stored shape {tuple(shape)}."
-                    )
-                shape = orig_shape
+            shape = _logical_shape(tensor, orig_shapes)
 
             if tensor.name in int8_layers or tensor.name in int8_scales:
                 expected = gguf.GGMLQuantizationType.I8 if tensor.name in int8_layers else gguf.GGMLQuantizationType.F32
