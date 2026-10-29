@@ -18,7 +18,6 @@ interface ResolveCanvasContextMenuOptions {
   /** Target the selected layer without hit-testing right-click pixels; the layers panel owns selection. */
   selectedLayerId?: string | null;
   isInlineEditor: boolean;
-  isInteractionLocked: boolean;
 }
 
 interface CanvasContextMenuResolution {
@@ -43,19 +42,15 @@ export const resolveCanvasContextMenu = ({
   clientX,
   clientY,
   isInlineEditor,
-  isInteractionLocked,
   selectedLayerId,
 }: ResolveCanvasContextMenuOptions): CanvasContextMenuResolution => {
   if (isInlineEditor) {
     return { preventDefault: false, target: null };
   }
 
-  // A locked surface offers only the global menu — there is nothing to act on.
-  const layerId = isInteractionLocked ? null : (selectedLayerId ?? null);
-
   return {
     preventDefault: true,
-    target: { layerId, x: clientX, y: clientY },
+    target: { layerId: selectedLayerId ?? null, x: clientX, y: clientY },
   };
 };
 

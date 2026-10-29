@@ -814,65 +814,6 @@ describe('createSelectObjectSession', () => {
     }
   );
 
-  it.each(['export', 'upload', 'queue', 'decode'] as const)(
-    'interrupts processing at the %s boundary while preserving inputs and the active operation',
-    async (boundary) => {
-      const wait = deferred<unknown>();
-      const harness = createHarness({
-        decodePreview:
-          boundary === 'decode'
-            ? vi.fn(() => wait.promise as Promise<string>)
-            : vi.fn(({ image }) => Promise.resolve(`decoded:${image.imageName}`)),
-        exportSource:
-          boundary === 'export'
-            ? vi.fn(() => wait.promise as ReturnType<SelectObjectSessionDeps<string>['exportSource']>)
-            : vi.fn(() => Promise.resolve({ blob, guard, rect, status: 'ok' as const })),
-        runGraph:
-          boundary === 'queue'
-            ? vi.fn(() => wait.promise as ReturnType<SelectObjectSessionDeps<string>['runGraph']>)
-            : vi.fn(() => Promise.resolve({ height: 12, imageName: 'result.png', origin: 'test', width: 16 })),
-        uploadIntermediate:
-          boundary === 'upload'
-            ? vi.fn(() => wait.promise as ReturnType<SelectObjectSessionDeps<string>['uploadIntermediate']>)
-            : vi.fn(() => Promise.resolve({ height: 12, imageName: 'input.png', width: 16 })),
-      });
-      harness.session.update({ input: { prompt: 'keep me', type: 'prompt' }, invert: true });
-      const pending = harness.session.process();
-      await vi.waitFor(() => {
-        const fn =
-          boundary === 'export'
-            ? harness.deps.exportSource
-            : boundary === 'upload'
-              ? harness.deps.uploadIntermediate
-              : boundary === 'queue'
-                ? harness.deps.runGraph
-                : harness.deps.decodePreview;
-        expect(fn).toHaveBeenCalledOnce();
-      });
-
-      harness.session.interruptProcessing();
-      if (boundary === 'export') {
-        wait.resolve({ blob, guard, rect, status: 'ok' });
-      } else if (boundary === 'upload') {
-        wait.resolve({ height: 12, imageName: 'input.png', width: 16 });
-      } else if (boundary === 'queue') {
-        wait.resolve({ height: 12, imageName: 'result.png', origin: 'test', width: 16 });
-      } else {
-        wait.resolve('decoded');
-      }
-
-      await expect(pending).resolves.toBe('stale');
-      expect(harness.deps.publishPreview).not.toHaveBeenCalled();
-      expect(harness.session.getSnapshot()).toMatchObject({
-        input: { prompt: 'keep me', type: 'prompt' },
-        invert: true,
-        preview: null,
-        status: 'ready',
-      });
-      expect(harness.controller.getSnapshot()).toMatchObject({ phase: 'ready', status: 'active' });
-    }
-  );
-
   it('suppresses a decoded preview when the source guard becomes stale', async () => {
     const decode = deferred<string>();
     const harness = createHarness({ decodePreview: vi.fn(() => decode.promise) });

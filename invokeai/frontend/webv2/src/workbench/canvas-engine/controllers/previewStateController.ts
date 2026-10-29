@@ -6,8 +6,37 @@ export interface StagedPreviewState {
   surface: RasterSurface;
   width: number;
   height: number;
-  placement?: Rect & { opacity: number };
+  /** Absolute document rect pinned at submission, never the live bbox. */
+  placement: Rect & { opacity: number };
 }
+
+/** Where one pending result lands, outlined by the overlay. */
+export interface StagedRegionState {
+  readonly rect: Rect;
+  readonly selected: boolean;
+}
+
+const normalizeRegions = (regions: readonly StagedRegionState[]): StagedRegionState[] => {
+  const unique = new Map<string, StagedRegionState>();
+  for (const { rect, selected } of regions) {
+    const key = `${rect.x}:${rect.y}:${rect.width}:${rect.height}`;
+    unique.set(key, { rect: { ...rect }, selected: selected || unique.get(key)?.selected === true });
+  }
+  return [...unique.values()].sort((left, right) => Number(left.selected) - Number(right.selected));
+};
+
+const sameRegions = (left: readonly StagedRegionState[], right: readonly StagedRegionState[]): boolean =>
+  left.length === right.length &&
+  left.every((region, index) => {
+    const other = right[index]!;
+    return (
+      region.selected === other.selected &&
+      region.rect.x === other.rect.x &&
+      region.rect.y === other.rect.y &&
+      region.rect.width === other.rect.width &&
+      region.rect.height === other.rect.height
+    );
+  });
 
 export interface FilterPreviewState {
   surface: RasterSurface;
@@ -28,6 +57,7 @@ export interface SamPreviewState {
 export class PreviewStateController {
   private staged: StagedPreviewState | null = null;
   private stagedToken = 0;
+  private stagedRegions: readonly StagedRegionState[] = [];
   private readonly filters = new Map<string, FilterPreviewState>();
   private readonly filterTokens = new Map<string, number>();
   private readonly guardedFilterTokens = new Map<string, number>();
@@ -54,6 +84,22 @@ export class PreviewStateController {
     const hadPreview = this.staged !== null;
     this.staged = null;
     return hadPreview;
+  }
+
+  getStagedRegions(): readonly StagedRegionState[] {
+    return this.stagedRegions;
+  }
+  /**
+   * Replaces the pending-result outlines, each rect once (results of one run share it; selected when any of them
+   * is) with the selected one last so an overlap never hides it. False when unchanged: nothing needs repainting.
+   */
+  setStagedRegions(regions: readonly StagedRegionState[]): boolean {
+    const next = normalizeRegions(regions);
+    if (sameRegions(this.stagedRegions, next)) {
+      return false;
+    }
+    this.stagedRegions = next;
+    return true;
   }
 
   hasFilter(layerId: string): boolean {
@@ -120,6 +166,7 @@ export class PreviewStateController {
 
   dispose(): void {
     this.clearStaged();
+    this.stagedRegions = [];
     this.clearFilters();
     this.sam = null;
   }

@@ -8576,6 +8576,37 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
     expect(document.bbox.y + document.bbox.height).toBeLessThanOrEqual(256);
   });
 
+  it('refuses an offset resize while results are pending, since their pinned rects would not move with the leaves', () => {
+    let state = submitGenerate(
+      primeGenerate(withInvocationDestination(withEmptyCanvas(createInitialWorkbenchState()), 'canvas'))
+    );
+    const offset = { height: 2048, offsetX: 64, offsetY: 32, type: 'resizeCanvasDocument', width: 2048 } as const;
+    const inFlight = getCanvas(state);
+
+    // A run still in flight for this canvas.
+    expect(getCanvas(workbenchReducer(state, offset))).toBe(inFlight);
+
+    const queueItem = getActiveProject(state).queue.items[0]!;
+    state = workbenchReducer(state, {
+      images: [createImage('staged.png', queueItem.id)],
+      projectId: getActiveProject(state).id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+    state = workbenchReducer(state, {
+      notify: false,
+      projectId: getActiveProject(state).id,
+      queueItemId: queueItem.id,
+      status: 'completed',
+      type: 'setQueueItemStatus',
+    });
+    const staged = getCanvas(state);
+    // A staged candidate waiting for review, its run finished.
+    expect(getCanvas(workbenchReducer(state, offset))).toBe(staged);
+    // Growing without an offset moves nothing, so it still applies.
+    expect(getCanvas(workbenchReducer(state, { ...offset, offsetX: 0, offsetY: 0 })).document.width).toBe(2048);
+  });
+
   it('replaces the whole document with a deep copy', () => {
     let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a')]);
     const replacement = {

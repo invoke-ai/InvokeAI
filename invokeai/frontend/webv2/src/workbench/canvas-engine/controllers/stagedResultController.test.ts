@@ -26,6 +26,8 @@ const selection = { candidate, selectedImageIndex: 0 } as const;
 interface HarnessOptions {
   readonly byteBudget?: number;
   readonly gestureActive?: boolean;
+  /** A floating selection or transform session stays open: its landing was refused. */
+  readonly sessionStuck?: boolean;
   readonly locked?: boolean;
   /** The reducer keeps the project unchanged, as when the candidate moved on. */
   readonly rejectDispatch?: boolean;
@@ -104,11 +106,13 @@ const createHarness = (options: HarnessOptions = {}) => {
       return () => listeners.delete(listener);
     },
   });
+  const settleEditSessions = vi.fn(() => !options.sessionStuck);
   const controller = new StagedResultController({
     createEventId: () => 'event-1',
     ctx,
     getCanvasState: () => project.canvas,
     now: () => '2026-07-16T01:00:00.000Z',
+    settleEditSessions,
   });
   return {
     breakMirror: (broken: boolean) => {
@@ -118,6 +122,7 @@ const createHarness = (options: HarnessOptions = {}) => {
     dispatched,
     history,
     project: () => project,
+    settleEditSessions,
   };
 };
 
@@ -183,12 +188,30 @@ describe('StagedResultController', () => {
   it.each([
     { name: 'editing is locked', options: { locked: true } },
     { name: 'a gesture is active', options: { gestureActive: true } },
+    { name: 'an edit session cannot land', options: { sessionStuck: true } },
   ])('returns busy without mutation when $name', ({ options }) => {
     const h = createHarness(options);
 
     expect(h.controller.commit(selection)).toEqual({ status: 'busy' });
     expect(h.dispatched).toEqual([]);
     expect(h.history.canUndo()).toBe(false);
+  });
+
+  it('lands open edit sessions before the accepted result goes on top', () => {
+    const h = createHarness();
+
+    expect(h.controller.commit(selection).status).toBe('committed');
+    expect(h.settleEditSessions).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { name: 'mid-gesture', options: { gestureActive: true } },
+    { name: 'while an operation holds the document', options: { locked: true } },
+  ])('never lands a session $name, so a refused accept loses nothing', ({ options }) => {
+    const h = createHarness(options);
+
+    expect(h.controller.commit(selection)).toEqual({ status: 'busy' });
+    expect(h.settleEditSessions).not.toHaveBeenCalled();
   });
 
   it('refuses before mutating when history could never retain the step', () => {

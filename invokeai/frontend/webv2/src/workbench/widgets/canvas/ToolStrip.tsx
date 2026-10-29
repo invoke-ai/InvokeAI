@@ -47,8 +47,6 @@ interface ToolStripButtonProps {
   hotkey?: string;
   icon: ElementType;
   label: string;
-  /** Why the tool cannot be chosen now; the button stays focusable and its tooltip says why. */
-  lockReason?: string;
   toolId: ToolId;
 }
 
@@ -73,20 +71,13 @@ const useToolTooltip = (label: string, hotkey: string | undefined, description?:
 };
 
 /** One sticky tool button: active state comes from core stores; click drives the tool capability. */
-const ToolStripButton = ({ description, engine, hotkey, icon, label, lockReason, toolId }: ToolStripButtonProps) => {
+const ToolStripButton = ({ description, engine, hotkey, icon, label, toolId }: ToolStripButtonProps) => {
   const activeTool = useCanvasActiveTool(engine);
   const onClick = useCallback(() => engine.tools.setTool(toolId), [engine, toolId]);
   const tooltip = useToolTooltip(label, hotkey, description);
 
   return (
-    <ToolbarButton
-      icon={icon}
-      isActive={activeTool === toolId}
-      label={label}
-      tooltip={tooltip}
-      unavailableReason={lockReason}
-      onClick={onClick}
-    />
+    <ToolbarButton icon={icon} isActive={activeTool === toolId} label={label} tooltip={tooltip} onClick={onClick} />
   );
 };
 
@@ -109,15 +100,7 @@ const SHAPE_KIND_LABEL_KEYS: Record<ShapeToolKind, string> = {
 };
 
 /** The Shape slot: one tool id, the flyout switching which kind the next drag draws. */
-const ShapeFamilyButton = ({
-  engine,
-  hotkey,
-  lockReason,
-}: {
-  engine: ToolStripEngine;
-  hotkey: string | undefined;
-  lockReason: string | undefined;
-}) => {
+const ShapeFamilyButton = ({ engine, hotkey }: { engine: ToolStripEngine; hotkey: string | undefined }) => {
   const { t } = useTranslation();
   const activeTool = useCanvasActiveTool(engine);
   const options = useShapeOptions(engine);
@@ -143,7 +126,6 @@ const ShapeFamilyButton = ({
   return (
     <ToolFamilyButton
       currentId={options.kind}
-      lockReason={lockReason}
       icon={SHAPE_KIND_ICONS[options.kind]}
       isActive={activeTool === 'shape'}
       items={items}
@@ -168,7 +150,7 @@ const toolHotkeys = (
 };
 
 /** The Select slot: marquee and lasso as one family; the slot stands for the last one used. */
-const SelectFamilyButton = ({ engine, lockReason }: { engine: ToolStripEngine; lockReason: string | undefined }) => {
+const SelectFamilyButton = ({ engine }: { engine: ToolStripEngine }) => {
   const { t } = useTranslation();
   const activeTool = useCanvasActiveTool(engine);
   const stored = useSelectFamilyTool();
@@ -211,7 +193,6 @@ const SelectFamilyButton = ({ engine, lockReason }: { engine: ToolStripEngine; l
   return (
     <ToolFamilyButton
       currentId={current}
-      lockReason={lockReason}
       icon={current === 'lasso' ? LassoIcon : SquareDashedMousePointerIcon}
       isActive={activeTool === 'marquee' || activeTool === 'lasso'}
       items={items}
@@ -230,15 +211,14 @@ const SelectFamilyButton = ({ engine, lockReason }: { engine: ToolStripEngine; l
 const TOOL_STRIP_TOP = 'var(--wb-center-chrome-inset, var(--chakra-spacing-2))';
 
 /**
- * Color picking stays a hold (Alt) or a key (I) rather than a strip button. While the canvas is locked (generating or
- * reviewing results) only View can be chosen; the other tools say why.
+ * Color picking stays a hold (Alt) or a key (I) rather than a strip button. Every tool stays available while a
+ * generation runs or its results wait for review.
  */
-const ToolStripRoot = ({ engine, lockReason }: { engine: ToolStripEngine; lockReason?: string | null }) => {
+const ToolStripRoot = ({ engine }: { engine: ToolStripEngine }) => {
   const { t } = useTranslation();
   const hotkeyDefinitions = useExtensionHotkeyDefinitions();
   const customHotkeys = useWorkbenchPreferenceSelector((preferences) => preferences.customHotkeys);
   const hotkeyFor = (hotkeyId: string) => toolHotkeys(hotkeyDefinitions, customHotkeys, hotkeyId)?.[0];
-  const locked = lockReason ?? undefined;
 
   return (
     <Box left="2" position="absolute" top={TOOL_STRIP_TOP} zIndex="2">
@@ -255,7 +235,6 @@ const ToolStripRoot = ({ engine, lockReason }: { engine: ToolStripEngine; lockRe
           hotkey={hotkeyFor('canvas.tool.move')}
           icon={MousePointer2Icon}
           label={t('widgets.canvas.tools.move')}
-          lockReason={locked}
           toolId="move"
         />
         <ToolStripButton
@@ -263,7 +242,6 @@ const ToolStripRoot = ({ engine, lockReason }: { engine: ToolStripEngine; lockRe
           hotkey={hotkeyFor('canvas.transformSelected')}
           icon={ScalingIcon}
           label={t('widgets.canvas.tools.transform')}
-          lockReason={locked}
           toolId="transform"
         />
         <ToolStripButton
@@ -273,7 +251,6 @@ const ToolStripRoot = ({ engine, lockReason }: { engine: ToolStripEngine; lockRe
           hotkey={hotkeyFor('canvas.tool.bbox') ?? 'c'}
           icon={ScanIcon}
           label={t('widgets.canvas.tools.bbox')}
-          lockReason={locked}
           toolId="bbox"
         />
         <ToolStripButton
@@ -281,7 +258,6 @@ const ToolStripRoot = ({ engine, lockReason }: { engine: ToolStripEngine; lockRe
           hotkey={hotkeyFor('canvas.tool.brush')}
           icon={BrushIcon}
           label={t('widgets.canvas.tools.brush')}
-          lockReason={locked}
           toolId="brush"
         />
         <ToolStripButton
@@ -289,16 +265,14 @@ const ToolStripRoot = ({ engine, lockReason }: { engine: ToolStripEngine; lockRe
           hotkey={hotkeyFor('canvas.tool.eraser')}
           icon={EraserIcon}
           label={t('widgets.canvas.tools.eraser')}
-          lockReason={locked}
           toolId="eraser"
         />
-        <ShapeFamilyButton engine={engine} hotkey={hotkeyFor('canvas.tool.shape')} lockReason={locked} />
+        <ShapeFamilyButton engine={engine} hotkey={hotkeyFor('canvas.tool.shape')} />
         <ToolStripButton
           engine={engine}
           hotkey={hotkeyFor('canvas.tool.gradient')}
           icon={GradientIcon}
           label={t('widgets.canvas.tools.gradient')}
-          lockReason={locked}
           toolId="gradient"
         />
         <ToolStripButton
@@ -306,10 +280,9 @@ const ToolStripRoot = ({ engine, lockReason }: { engine: ToolStripEngine; lockRe
           hotkey={hotkeyFor('canvas.tool.text')}
           icon={TypeIcon}
           label={t('widgets.canvas.tools.text')}
-          lockReason={locked}
           toolId="text"
         />
-        <SelectFamilyButton engine={engine} lockReason={locked} />
+        <SelectFamilyButton engine={engine} />
       </Toolbar>
     </Box>
   );

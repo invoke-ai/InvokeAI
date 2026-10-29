@@ -151,20 +151,22 @@ Then click **Run**. If the workflow has no image input and output it can connect
 
 When the Canvas is the destination, results appear in the staging area at the bottom of the canvas, not directly on it. The staging bar lets you:
 
-* Step through the results with the arrows, or with **←** and **→**, and show or hide the result thumbnails.
+* Step through the results with the arrows in the bar, with **Alt+[** and **Alt+]** on the canvas, or with **←** and **→** while the staging bar has focus (moving between thumbnails selects them), and show or hide the result thumbnails.
 * **Accept to layer** — add the current result as a new raster layer at the top of the raster layers and close the staging area.
   * A selected inpaint mask, regional guidance or control layer that you can still edit stays selected, so you can carry on painting it. Otherwise the new layer is selected.
   * The other staged results are set aside; the notice says how many and its **Review the other** button brings them back for review. Undoing the accepted layer on the canvas removes the layer but does not return the result to staging.
   * While the rest of the result's batch is still queued or generating, accepting also cancels those remaining images. The batch then shows as cancelled in the queue, and undoing the accepted layer does not restart it.
   * The arrow next to it offers **Keep as hidden layer**, which adds the result as a hidden layer (left out of generation) and keeps staging open and the batch running.
-* **Save to gallery** the current result, **Discard** it (**Delete**), or **Discard all**. Each discard has **Undo**. **Discard all** also stops what is still generating for this canvas (Undo brings back the results, not the stopped generation), and keeps a restore point in the History tab.
+* **Save to gallery** the current result, **Discard** it (**Delete** while the staging bar has focus), or **Discard all**. Each discard has **Undo**. **Discard all** also stops what is still generating for this canvas (Undo brings back the results, not the stopped generation), and keeps a restore point in the History tab.
 * Hide the preview of the current result to compare it with the canvas underneath.
 * **Auto-switch** — show each new result as it arrives (**Newest**), follow the one in progress (**In progress**), or stay on the current one (**Off**).
 * **Cancel** the running generation.
 
-Right-click a result's thumbnail to recall its settings into the Generate panel. While results are staged or a canvas generation is running, only the View tool works: a *Locked while generating* or *Locked while reviewing results* label at the top of the canvas says so, and the other tools' tooltips say why they are unavailable.
+Right-click a result's thumbnail to recall its settings into the Generate panel. The bar also says how many results are pending, counting the ones still generating.
 
-While a progress image or a staged result is shown, and while results stay staged with their preview hidden for comparison, inpaint masks, regional guidance and regenerate regions are hidden from view so they do not cover the result. They still take part in generation, and they reappear when you accept or discard the results.
+The canvas stays editable while results are staged or a canvas generation runs: every tool, layer action and shortcut works as usual. Each result keeps its place. It lands where the generation frame was when you pressed **Invoke**, and the canvas outlines that spot with a dashed amber frame for each pending result (thicker for the selected one). Moving or resizing the generation frame afterwards only affects the next **Invoke**; the results, and the live progress image, stay where they were. **Accept to layer** adds the result above all raster layers as they are at that moment, whatever you painted, added or deleted meanwhile, and first places any pixels you are still moving and applies a transform you have not applied yet.
+
+While a progress image or a staged result is shown, inpaint masks, regional guidance and regenerate regions are hidden from view so they do not cover the result. They still take part in generation. They reappear when you hide the preview or accept or discard the results, and while an inpaint mask or regional guidance layer is selected, so you can see what you paint: they then show over the result.
 
 ## The canvas menu
 
@@ -231,7 +233,7 @@ The tool keys, **Shift+T**, **[** and **]**, and **X** and **D** also work after
 | **Ctrl+J** / **Ctrl+E** | Duplicate layer / merge layer down |
 | **Ctrl+G** / **Ctrl+Shift+G** | Group / ungroup layers. With layers of one group selected, **Ctrl+Shift+G** moves them out of the group |
 | **Ctrl+]** / **Ctrl+[** (add **Shift** for front / back) | Move layer forward / backward |
-| **Alt+[** / **Alt+]** | Previous / next layer (wrapping, in the order of the Layers panel), or staged result while results are staged |
+| **Alt+[** / **Alt+]** | Previous / next layer (wrapping, in the order of the Layers panel), or previous / next result while more than one result is staged or generating |
 | **Q** | Switch to the layer bookmarked with **Bookmark for quick switch** in its menu, or back to the previously selected layer |
 | **Shift+H** | Hide control, guidance and mask layers |
 | **Shift+N** / **Shift+B** | Fit the generation frame to the layers / to the masks |

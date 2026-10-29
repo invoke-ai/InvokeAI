@@ -56,6 +56,7 @@ import {
   getCanvasStagingCandidateFingerprint,
   getCanvasStagingSlotCount,
   getCanvasStagingSlots,
+  hasPendingCanvasResults,
 } from './canvasStagingView';
 
 export type { CanvasLayerBasePatch, CanvasLayerConfigPatch, CanvasProjectMutation } from '@workbench/canvas-engine/api';
@@ -1043,6 +1044,11 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
       const height = Math.max(1, Math.round(mutation.height));
       const offsetX = mutation.offsetX ?? 0;
       const offsetY = mutation.offsetY ?? 0;
+      // An offset moves every leaf and the bbox but not the rects pending results were pinned to at submission, so
+      // it would land them off their content: refused while this session has any.
+      if ((offsetX !== 0 || offsetY !== 0) && hasPendingCanvasResults(project.canvas, project.queue.items)) {
+        return project;
+      }
       return updateCanvasDocument(project, (document) => ({
         ...document,
         bbox: clampBbox(

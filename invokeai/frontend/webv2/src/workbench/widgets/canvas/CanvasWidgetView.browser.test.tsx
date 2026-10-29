@@ -24,6 +24,7 @@ import {
   layerContract,
   stacksFrom,
 } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { getCanvasOperations, getControlSourceSnapshot } from '@workbench/canvas-operations/api';
 import { createControlDetectionStatusStore } from '@workbench/canvas-operations/controlDetectionStatusStore';
@@ -140,11 +141,14 @@ const renderView = async (
   status: QueueItem['status'],
   {
     beforeRender,
+    domRaster = false,
     nodes,
     selectedLayer,
     staged = true,
   }: {
     beforeRender?: (engine: CanvasEngine) => void;
+    /** Real Canvas2D pixels, for a test that attaches a surface and draws. */
+    domRaster?: boolean;
     nodes?: CanvasNodeContract[];
     selectedLayer?: CanvasLayerContract;
     staged?: boolean;
@@ -188,7 +192,7 @@ const renderView = async (
   }
   harness.store = store;
   harness.engine = createCanvasEngine({
-    backend: createTestStubRasterBackend(),
+    backend: domRaster ? createDomRasterBackend() : createTestStubRasterBackend(),
     ensureProjectOnServer: () => Promise.resolve(),
     imageResolver: () => Promise.resolve(new Blob()),
     mutationPort: createCanvasProjectMutationPort(store, projectId),
@@ -254,6 +258,85 @@ describe('CanvasWidgetView accept and stop', () => {
   });
 });
 
+describe('CanvasWidgetView editing while results are staged', () => {
+  const background = layerContract('background', 'raster');
+
+  it('leaves the tools to the user while the batch runs: nothing is parked on View', async () => {
+    await renderView('running', { selectedLayer: background });
+
+    await act(() => harness.engine!.tools.setTool('brush'));
+    expect(harness.engine!.interaction.get('activeTool')).toBe('brush');
+    await act(() => harness.engine!.tools.setTool('bbox'));
+    expect(harness.engine!.interaction.get('activeTool')).toBe('bbox');
+  });
+
+  it('lands a brush stroke on the selected layer while a result is staged and the batch runs', async () => {
+    const paint = layerContract('paint', 'raster');
+    await renderView('running', { domRaster: true, selectedLayer: paint });
+    const engine = harness.engine!;
+    const screen = document.createElement('canvas');
+    const overlay = document.createElement('canvas');
+    for (const canvas of [screen, overlay]) {
+      Object.assign(canvas.style, { height: '300px', left: '0', position: 'fixed', top: '0', width: '300px' });
+      host!.append(canvas);
+    }
+    await act(() => engine.surface.attach(screen, overlay));
+    await act(() => engine.tools.setTool('brush'));
+    const pointer = (type: string, x: number, buttons: number) =>
+      new PointerEvent(type, { bubbles: true, buttons, clientX: x, clientY: 150, pointerId: 1, pointerType: 'mouse' });
+
+    await act(() => {
+      overlay.dispatchEvent(pointer('pointerdown', 100, 1));
+      overlay.dispatchEvent(pointer('pointermove', 150, 1));
+      overlay.dispatchEvent(pointer('pointermove', 200, 1));
+      overlay.dispatchEvent(pointer('pointerup', 200, 0));
+    });
+
+    await expect.poll(() => engine.history.getEntries().past).toEqual(['Brush stroke']);
+    // Staging is untouched by the edit.
+    expect(activeProject().canvas.stagingArea.pendingImages.map((image) => image.imageName)).toEqual(['left-eye.png']);
+    engine.surface.detach();
+  });
+
+  it('outlines where each pending result lands, and keeps those rects when the frame moves', async () => {
+    let setRegions: ReturnType<typeof vi.spyOn> | null = null;
+    const { projectId, store } = await renderView('running', {
+      beforeRender: (engine) => {
+        setRegions = vi.spyOn(engine.previews, 'setStagedRegions');
+      },
+      selectedLayer: background,
+    });
+    const submitted = store.getState().projects[0]!.queue.items[0]!.snapshot.canvas.document.bbox;
+    const pinned = [
+      { rect: { height: 64, width: 64, x: 0, y: 0 }, selected: true },
+      { rect: submitted, selected: false },
+      { rect: submitted, selected: false },
+    ];
+    expect(setRegions!.mock.lastCall).toEqual([pinned]);
+
+    await act(() =>
+      store.commands.canvas.apply(projectId, {
+        bbox: { ...submitted, x: submitted.x + 128, y: submitted.y + 64 },
+        type: 'setCanvasBbox',
+      })
+    );
+    expect(store.getState().projects[0]!.canvas.document.bbox.x).toBe(submitted.x + 128);
+    // The feed rereads only on staging, revision or queue changes: a frame move publishes nothing.
+    const calls = setRegions!.mock.calls.length;
+    expect(setRegions!.mock.lastCall).toEqual([pinned]);
+    await act(() => store.commands.canvas.apply(projectId, { imageIndex: 1, type: 'setStagedImageIndex' }));
+    expect(setRegions!.mock.calls).toHaveLength(calls + 1);
+    expect(setRegions!.mock.lastCall).toEqual([pinned.map((region, index) => ({ ...region, selected: index === 1 }))]);
+    await act(() => store.commands.canvas.apply(projectId, { imageIndex: 0, type: 'setStagedImageIndex' }));
+
+    // The next Invoke uses the moved frame; this result still lands at its own rect, on top of the stack.
+    await page.getByRole('button', { exact: true, name: 'Accept to layer' }).click();
+    const [accepted, existing] = store.getState().projects[0]!.canvas.document.stacks.raster;
+    expect(existing).toMatchObject({ id: 'background' });
+    expect(accepted).toMatchObject({ source: { image: { imageName: 'left-eye.png' } }, transform: { x: 0, y: 0 } });
+  });
+});
+
 describe('CanvasWidgetView staged results can come back', () => {
   const second: CanvasStagingCandidateContract = {
     ...candidate,
@@ -269,18 +352,28 @@ describe('CanvasWidgetView staged results can come back', () => {
   const staged = (store: ReturnType<typeof createWorkbenchStore>) =>
     store.getState().projects[0]!.canvas.stagingArea.pendingImages.map((image) => image.imageName);
 
-  it('says the canvas is locked, and why, while its generation runs', async () => {
+  it('announces how many results are pending while the batch runs', async () => {
     await renderView('running');
-    await expect.element(page.getByRole('status').getByText('Locked while generating')).toBeVisible();
+    // One staged result and the two still generating.
+    await expect.element(page.getByRole('status').getByText('Generating, 3 results pending')).toBeVisible();
   });
 
-  it('says the canvas waits for review once the results are in, with help a keyboard can reach', async () => {
+  it('announces the results still waiting for review once the batch is done', async () => {
     await renderView('completed');
-    const chip = page.getByRole('status').filter({ hasText: 'Locked while reviewing results' });
-    await expect.element(chip).toBeVisible();
-    expect(chip.element().textContent).toContain('Accept or discard the staged results to edit again.');
-    await act(() => (chip.element() as HTMLElement).focus());
-    expect(document.activeElement).toBe(chip.element());
+    await expect.element(page.getByRole('status').getByText('1 result pending')).toBeVisible();
+  });
+
+  it('keeps keyboard focus in the staging bar after Delete discards the selected result', async () => {
+    const { store } = await renderView('running');
+    const selected = page.getByRole('button', { name: 'Select staged candidate 1' }).element() as HTMLElement;
+    await act(() => selected.focus());
+
+    await act(() => userEvent.keyboard('{Delete}'));
+
+    expect(staged(store)).toEqual([]);
+    // The result now selected (a placeholder still generating) takes focus, not the page.
+    await expect.poll(() => document.activeElement?.getAttribute('aria-current')).toBe('true');
+    expect(document.activeElement?.hasAttribute('data-staging-thumbnail')).toBe(true);
   });
 
   it('discards a result with an Undo that puts it back for review', async () => {
@@ -435,11 +528,11 @@ describe('CanvasWidgetView control layer overlay', () => {
     await expect.element(hint()).toBeVisible();
   });
 
-  it('shows no hint while staging locks the surface against drops', async () => {
+  it('keeps pointing at the image sources while a result is staged: the canvas stays editable', async () => {
     await renderView('completed', { selectedLayer: emptyControlLayer });
 
     await expect.element(page.getByRole('button', { exact: true, name: 'Accept to layer' })).toBeVisible();
-    await expect.element(hint()).not.toBeInTheDocument();
+    await expect.element(hint()).toBeVisible();
   });
 
   it('gives way to the drop zones while a gallery image is dragged', async () => {
@@ -614,11 +707,11 @@ describe('CanvasWidgetView control layer overlay', () => {
     expect(viewSwitch().elements()).toHaveLength(0);
   });
 
-  it('hides the view switch while staging locks the surface', async () => {
+  it('keeps the view switch while a result is staged', async () => {
     await renderView('completed', { selectedLayer: readyLayer });
 
     await expect.element(page.getByRole('button', { exact: true, name: 'Accept to layer' })).toBeVisible();
-    expect(viewSwitch().elements()).toHaveLength(0);
+    await expect.element(viewSwitch()).toBeVisible();
   });
 
   it('hides the view switch while an operation holds the document', async () => {

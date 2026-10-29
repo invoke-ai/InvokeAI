@@ -732,7 +732,6 @@ export interface CanvasEngineToolCapability extends CanvasToolCapability {
    * router, preserving newer registrations.
    */
   setColorSampleRouter(router: (hex: string, phase: ColorSamplePhase) => boolean): () => void;
-  setInteractionLocked(locked: boolean): void;
 }
 
 /** Why `beginTransform` opened no session; refusals leave the selection and the active tool unchanged. */
@@ -809,7 +808,7 @@ export interface CanvasEngineExportCapability extends CanvasExportCapability {
 export type ControlLayerViewMode = 'original' | 'map' | 'overlay';
 
 /**
- * `missing`: no control layer with a kept original; `locked`: an operation or a generation holds the canvas;
+ * `missing`: no control layer with a kept original; `locked`: an operation holds the document;
  * `stale`: a newer request or an edit of the layer superseded it; `over-budget`: the original's pixels do not fit the
  * raster budget; `failed`: the original could not be decoded.
  */
@@ -831,10 +830,15 @@ export interface CanvasEnginePreviewCapability extends CanvasPreviewCapability {
   ): Promise<'shown' | SubsetOf<CanvasCommandRefusal, 'missing'> | SubsetOf<CanvasTransactionOutcome, 'stale'>>;
   setStagedPreview(input: StagedPreviewInput | null): void;
   /**
+   * Overlay chrome only: outlines where each pending result (staged candidate or result still generating) will land,
+   * the selected one emphasized. Absolute document rects; an equal list repaints nothing.
+   */
+  setStagedRegions(regions: readonly StagedRegion[]): void;
+  /**
    * Display-only: shows a control layer as its kept original, the original under its map at half strength, or
-   * (`map`) as usual. One layer holds a view at a time; refused while the canvas is locked. Any edit or stroke on
-   * the layer, a selection change, a lock, a document replacement and the other resets in ARCHITECTURE.md return it
-   * to the map. Never recorded in history, persisted or exported.
+   * (`map`) as usual. One layer holds a view at a time; refused while an operation holds the document. Any edit or
+   * stroke on the layer, a selection change, an operation taking the document, a document replacement and the other
+   * resets in ARCHITECTURE.md return it to the map. Never recorded in history, persisted or exported.
    */
   setControlLayerView(layerId: string, view: ControlLayerViewMode): Promise<ControlLayerViewOutcome>;
 }
@@ -864,9 +868,18 @@ export type BooleanRasterOperation = 'intersect' | 'cutout' | 'cutaway' | 'exclu
 export interface StagedPreviewPlacement extends Rect {
   opacity: number;
 }
+/**
+ * A staged preview always lands at absolute document coordinates pinned at submission: a candidate at its placement,
+ * a progress frame (scaled to fill) at the rect its run was submitted with. Later bbox edits never move either.
+ */
 export type StagedPreviewInput =
-  | { imageName: string; placement?: StagedPreviewPlacement }
-  | { dataUrl: string; width: number; height: number };
+  | { imageName: string; placement: StagedPreviewPlacement }
+  | { dataUrl: string; placement: StagedPreviewPlacement };
+/** One pending result's landing rect in document space, for the staged-region overlay. */
+export interface StagedRegion {
+  readonly rect: Rect;
+  readonly selected: boolean;
+}
 export type {
   BboxToolOptions,
   BrushOptions,

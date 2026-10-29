@@ -38,7 +38,12 @@ import {
   Trash2Icon,
   XIcon,
 } from 'lucide-react';
-import { useCallback, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import {
+  useCallback,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CanvasFloatingBarDivider } from './CanvasFloatingBar';
@@ -78,6 +83,16 @@ const NARROW_HIDDEN_CSS = { [NARROW]: { display: 'none' } } as const;
 const NARROW_ONLY_CSS = { display: 'none', [NARROW]: { display: 'inline-flex' } } as const;
 /** Buttons whose text goes while narrow keep a square icon footprint. */
 const NARROW_ICON_BUTTON_CSS = { [NARROW]: { minW: '8', px: '0' } } as const;
+/** The status pill tightens once narrow. */
+const STATUS_PILL_CSS = { px: '2', [NARROW]: { px: '1' } } as const;
+const STATUS_PILL_IDLE_CSS = { px: '2', [COMPACT]: SR_ONLY } as const;
+/** Marks a thumbnail with its slot index, for roving focus and focus restore. */
+const THUMBNAIL_ATTR = 'data-staging-thumbnail';
+/** Marks the previous/next buttons, a focus target once no thumbnail shows. */
+const STEP_ATTR = 'data-staging-step';
+const OPEN_MENU_SELECTOR = '[role="menu"][data-state="open"]';
+/** Popups and fields own their own keys, even portaled inside the bar's React tree. */
+const OWNS_KEYS_SELECTOR = '[role="menu"], [role="listbox"], input, textarea, select, [contenteditable="true"]';
 
 interface StagingBarProps {
   antialiasProgressImages: boolean;
@@ -161,6 +176,72 @@ export const StagingBar = ({
     }
   };
 
+  /**
+   * After a keyboard discard, focus stays in the bar instead of falling to the page: on the result now selected
+   * when thumbnails show, else on a step button that still works, else on the bar itself.
+   */
+  const restoreFocusAfterDiscard = (root: HTMLElement) => {
+    requestAnimationFrame(() => {
+      if (!root.isConnected || root.contains(document.activeElement)) {
+        return;
+      }
+      const target =
+        (areThumbnailsVisible ? root.querySelector<HTMLElement>(`[${THUMBNAIL_ATTR}][aria-current="true"]`) : null) ??
+        root.querySelector<HTMLElement>(`[${STEP_ATTR}]:not(:disabled)`) ??
+        root;
+      target.focus();
+    });
+  };
+
+  // With focus in the bar, the arrows step through results and Delete discards the focused one, which is the
+  // selected one (focusing a thumbnail selects it); the canvas's own keys (nudge, delete the layer or selected
+  // pixels) never act on the document from here.
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      (event.target instanceof Element && event.target.closest(OWNS_KEYS_SELECTOR)) ||
+      // An open menu owns the keys even while focus has not moved into it (a thumbnail's menu opens at the pointer).
+      contextMenuTarget !== null ||
+      document.querySelector(OPEN_MENU_SELECTOR) !== null
+    ) {
+      return;
+    }
+    const thumbnail =
+      event.target instanceof HTMLElement ? event.target.closest<HTMLElement>(`[${THUMBNAIL_ATTR}]`) : null;
+    const isArrow = event.key.startsWith('Arrow');
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      if (selectedCandidate) {
+        onDiscardSelected();
+        restoreFocusAfterDiscard(event.currentTarget);
+      }
+    } else if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !event.shiftKey && hasMultipleSlots) {
+      const direction = event.key === 'ArrowLeft' ? -1 : 1;
+      const index = thumbnail ? Number(thumbnail.getAttribute(THUMBNAIL_ATTR)) : Number.NaN;
+      if (Number.isInteger(index)) {
+        // Roving focus: the next thumbnail takes focus, which selects it.
+        event.currentTarget
+          .querySelector<HTMLElement>(`[${THUMBNAIL_ATTR}="${(index + direction + slots.length) % slots.length}"]`)
+          ?.focus();
+      } else {
+        onCycle(direction);
+      }
+    } else if (!isArrow) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const pendingCount = slots.length;
+  const statusLabel =
+    pendingCount === 0
+      ? t('widgets.canvas.staging.generating')
+      : isGenerating
+        ? t('widgets.canvas.staging.generatingPending', { count: pendingCount })
+        : t('widgets.canvas.staging.pending', { count: pendingCount });
+
   return (
     <Stack
       align="center"
@@ -168,7 +249,10 @@ export const StagingBar = ({
       animationName="slide-from-bottom, fade-in"
       css={STAGING_ROOT_CSS}
       gap="2"
+      // Reachable by script only: the focus target of last resort after a keyboard discard.
+      tabIndex={-1}
       w="full"
+      onKeyDown={handleKeyDown}
     >
       {contextMenuTarget ? (
         <StagingItemContextMenu
@@ -237,16 +321,26 @@ export const StagingBar = ({
       ) : null}
 
       <CanvasOptionsBar>
-        {isGenerating ? (
-          <Tooltip content={t('widgets.canvas.staging.generating')}>
-            <HStack color="fg.muted" flexShrink="0" gap="1.5" position="relative" px="1" role="status">
-              <Spinner />
-              <Text css={COMPACT_SR_ONLY_CSS} fontSize="md" fontWeight="600" whiteSpace="nowrap">
-                {t('widgets.canvas.staging.generating')}
-              </Text>
-            </HStack>
-          </Tooltip>
-        ) : null}
+        {/* Results keep coming in and waiting here while the canvas stays editable; the status says how many. */}
+        <Tooltip content={statusLabel}>
+          <HStack
+            bg="bg.muted"
+            color="fg.muted"
+            // Once compact a running batch keeps its spinner; otherwise the pill goes, since the counter shows the
+            // count, and its status still reads the sentence.
+            css={isGenerating ? STATUS_PILL_CSS : STATUS_PILL_IDLE_CSS}
+            flexShrink="0"
+            gap="1.5"
+            h="6"
+            position="relative"
+            rounded="full"
+          >
+            {isGenerating ? <Spinner /> : null}
+            <Text css={COMPACT_SR_ONLY_CSS} fontSize="md" fontWeight="600" role="status" whiteSpace="nowrap">
+              {statusLabel}
+            </Text>
+          </HStack>
+        </Tooltip>
 
         {hasSlots && selectedSlot ? (
           <>
@@ -260,6 +354,7 @@ export const StagingBar = ({
               <Tooltip content={t('widgets.canvas.previousStagedCandidate')}>
                 <IconButton
                   aria-label={t('widgets.canvas.previousStagedCandidate')}
+                  data-staging-step=""
                   disabled={!hasMultipleSlots}
                   variant="ghost"
                   onClick={() => onCycle(-1)}
@@ -283,6 +378,7 @@ export const StagingBar = ({
               <Tooltip content={t('widgets.canvas.nextStagedCandidate')}>
                 <IconButton
                   aria-label={t('widgets.canvas.nextStagedCandidate')}
+                  data-staging-step=""
                   disabled={!hasMultipleSlots}
                   variant="ghost"
                   onClick={() => onCycle(1)}
@@ -474,6 +570,7 @@ const StagingThumbnail = ({
       aria-current={isSelected || undefined}
       aria-label={t('widgets.canvas.selectStagedCandidate', { number: index + 1 })}
       as="button"
+      data-staging-thumbnail={index}
       bg="bg.emphasized"
       borderWidth="2px"
       borderColor={isSelected ? 'accent.solid' : 'border.subtle'}
@@ -486,6 +583,8 @@ const StagingThumbnail = ({
       style={{ aspectRatio: '1 / 1' }}
       onClick={onSelect}
       onContextMenu={onContextMenu}
+      // Focus follows selection: the bar's keys act on the thumbnail the keyboard is on.
+      onFocus={isSelected ? undefined : onSelect}
     >
       {slot.kind === 'candidate' ? (
         <img

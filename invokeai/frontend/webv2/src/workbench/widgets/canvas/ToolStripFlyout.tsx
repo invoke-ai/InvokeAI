@@ -2,7 +2,7 @@ import type { KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as Reac
 
 import { Box, Icon, Menu, Portal, Stack, Text, useMenu } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { IconButton, useUnavailableControl } from '@platform/ui/Button';
+import { IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
@@ -48,7 +48,6 @@ const menuItemValueAt = (event: ReactPointerEvent): string | null =>
  */
 export const ToolFamilyButton = ({
   currentId,
-  lockReason,
   icon,
   isActive,
   items,
@@ -58,8 +57,6 @@ export const ToolFamilyButton = ({
 }: {
   /** The subtool the slot currently stands for (checked in the menu). */
   currentId: string;
-  /** Why the family cannot be chosen now: the slot reads as disabled, stays focusable, and its tooltip says why. */
-  lockReason?: string;
   icon: React.ElementType;
   isActive: boolean;
   items: readonly ToolFlyoutItem[];
@@ -71,8 +68,6 @@ export const ToolFamilyButton = ({
   // The menu anchors to, and returns focus to, the element carrying the trigger id: the slot, through its tooltip.
   // The slot is not a `Menu.Trigger`, whose click would open the menu instead of selecting the current subtool.
   const { t } = useTranslation();
-  const disabled = lockReason !== undefined;
-  const unavailable = useUnavailableControl(lockReason, undefined);
   const ids = useTooltipTriggerIds();
   const menuMachine = useMenu({ ids, positioning: MENU_POSITIONING });
   const menu = menuMachine.api;
@@ -87,7 +82,7 @@ export const ToolFamilyButton = ({
   }, []);
   useMountEffect(() => clearHoldTimer);
 
-  // Choosing an entry closes the menu itself; a locked slot's entries are disabled and never report a choice.
+  // Choosing an entry closes the menu itself.
   const onValueChange = useCallback((details: { value: string }) => onSelectSubtool(details.value), [onSelectSubtool]);
   const openFromKeyboard = useCallback(() => {
     menu.setOpen(true);
@@ -99,7 +94,7 @@ export const ToolFamilyButton = ({
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
-      if (disabled || event.button !== 0) {
+      if (event.button !== 0) {
         return;
       }
       openedByHold.current = false;
@@ -117,13 +112,10 @@ export const ToolFamilyButton = ({
         menu.setOpen(true);
       }, HOLD_OPEN_MS);
     },
-    [clearHoldTimer, disabled, menu]
+    [clearHoldTimer, menu]
   );
   const onPointerUp = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
-      if (disabled) {
-        return;
-      }
       if (holdTimer.current !== null) {
         clearHoldTimer();
         // Short press: an ordinary click on the slot — but only released over
@@ -150,7 +142,7 @@ export const ToolFamilyButton = ({
         }
       }
     },
-    [clearHoldTimer, disabled, menu, onActivate, onSelectSubtool]
+    [clearHoldTimer, menu, onActivate, onSelectSubtool]
   );
   const onPointerMove = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -183,20 +175,18 @@ export const ToolFamilyButton = ({
     (event: ReactMouseEvent<HTMLButtonElement>) => {
       // Pointer clicks are resolved on release above; a click with no pointer
       // detail is Enter or Space on the focused slot.
-      if (event.detail === 0 && !disabled) {
+      if (event.detail === 0) {
         onActivate();
       }
     },
-    [disabled, onActivate]
+    [onActivate]
   );
   const onContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLButtonElement>) => {
       event.preventDefault();
-      if (!disabled) {
-        menu.setOpen(true);
-      }
+      menu.setOpen(true);
     },
-    [disabled, menu]
+    [menu]
   );
   const onKeyDown = useCallback(
     (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -204,12 +194,10 @@ export const ToolFamilyButton = ({
         event.preventDefault();
         // Workbench hotkeys listen on window; the key that opens the menu must not also nudge the selected layer.
         event.stopPropagation();
-        if (!disabled) {
-          openFromKeyboard();
-        }
+        openFromKeyboard();
       }
     },
-    [disabled, openFromKeyboard]
+    [openFromKeyboard]
   );
   const onMenuKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
@@ -221,9 +209,6 @@ export const ToolFamilyButton = ({
       }
       // An open menu keeps unmodified keys from the workbench hotkeys, so the keycaps an entry shows are honoured
       // here: the entry's binding chooses it, as a click would, instead of moving the typeahead highlight.
-      if (disabled) {
-        return;
-      }
       const item = items.find((candidate) =>
         candidate.hotkeys?.some((hotkey) => isHotkeyPress(event.nativeEvent, hotkey))
       );
@@ -235,7 +220,7 @@ export const ToolFamilyButton = ({
         menu.setOpen(false);
       }
     },
-    [disabled, items, menu, onSelectSubtool]
+    [items, menu, onSelectSubtool]
   );
 
   // The title names the slot with the current subtool's first effective binding; its help line follows.
@@ -247,17 +232,17 @@ export const ToolFamilyButton = ({
     : label;
   const tooltip = useMemo(
     () =>
-      description || lockReason ? (
+      description ? (
         <Stack gap="0.5" maxW="16rem">
           <Text>{title}</Text>
           <Text color="fg.muted" fontSize="sm">
-            {lockReason ?? description}
+            {description}
           </Text>
         </Stack>
       ) : (
         title
       ),
-    [description, lockReason, title]
+    [description, title]
   );
 
   return (
@@ -280,10 +265,8 @@ export const ToolFamilyButton = ({
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
-          {...unavailable?.props}
         >
           <Icon as={icon} boxSize="3.5" />
-          {unavailable?.description}
           {/* The corner tick: this slot holds more tools. */}
           <Box
             borderBottomColor="fg.subtle"
@@ -304,7 +287,7 @@ export const ToolFamilyButton = ({
           <MenuContent aria-label={label} minW="10rem" onKeyDown={onMenuKeyDown}>
             <Menu.RadioItemGroup value={currentId} onValueChange={onValueChange}>
               {items.map((item) => (
-                <Menu.RadioItem key={item.id} disabled={disabled} value={item.id}>
+                <Menu.RadioItem key={item.id} value={item.id}>
                   <Menu.ItemIndicator />
                   <Icon as={item.icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
                   <Menu.ItemText fontSize="md">{item.label}</Menu.ItemText>

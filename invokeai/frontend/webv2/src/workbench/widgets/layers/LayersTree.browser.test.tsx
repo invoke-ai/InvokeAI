@@ -699,7 +699,6 @@ describe('LayersTree selection, surfaces and structure', () => {
       toggleLayerStackCollapsed(PROJECT_ID, 'l59', 'raster');
     });
     const ctx: CanvasHotkeyContext = {
-      discardSelectedStagedImage: () => undefined,
       document: harnessDocument,
       engine: engine as CanvasEngine,
       dispatch: (mutation) => {
@@ -707,9 +706,7 @@ describe('LayersTree selection, surfaces and structure', () => {
         return true;
       },
       selectedLayerIds: ['l59'],
-      hasStagingSlots: false,
-      hasSelectedStagedCandidate: false,
-      isInteractionLocked: false,
+      hasMultipleStagingSlots: false,
       copySelection: vi.fn(),
       cropAllLayers: vi.fn(),
       swapActiveColors: vi.fn(),

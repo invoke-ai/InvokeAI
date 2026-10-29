@@ -2,7 +2,6 @@ import type { AspectRatioId } from '@features/generation/contracts';
 import type { LayerTransform } from '@workbench/canvas-engine/api';
 import type {
   ToolFormProps,
-  ToolFooterProps,
   ToolPropertyForm,
   ToolPropertyGroup,
 } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
@@ -286,14 +285,12 @@ const FrameSizeSettings = ({ engine }: ToolFormProps) => {
  * pixels instead of opening a layer session; the numerics meanwhile edit the
  * settled selected layer, matching the Transform pane.
  */
-const TransformFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) => {
+const TransformFooter = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const session = useTransformSession(engine);
   const hasFloat = useCanvasHasFloatingSelection(engine);
   const isPending = usePendingTransformLayerId(engine) !== null;
-  // The root sticky footer sits OUTSIDE the inert tool section, so the
-  // surface lock must be honored here, not inherited.
-  const disabled = isExternalInteractionLocked || (!session && !hasFloat);
+  const disabled = !session && !hasFloat;
   const onApply = useCallback(() => engine.layers.applyTransform(), [engine]);
   const onCancel = useCallback(() => engine.layers.cancelTransform(), [engine]);
   const pendingText = t('widgets.canvas.transformPending');

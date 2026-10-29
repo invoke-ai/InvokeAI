@@ -78,7 +78,7 @@ const makeState = (
     isQuickSwitchBookmark: false,
     hasSupportedContent: true,
     hasWorkflowBindings: true,
-    interactionLocked: false,
+    operationLocked: false,
     canGroupSelection: true,
     canDeleteSelection: true,
     mergeMasksEligibility: 'eligible',
@@ -203,7 +203,7 @@ describe('layer context action registry', () => {
       'widgets.layers.actions.mergeMasksIneligible',
       'widgets.layers.actions.mergeMasksSettingsDiffer',
       'widgets.layers.actions.canvasNotReady',
-      'widgets.layers.actions.interactionLocked',
+      'widgets.layers.actions.operationLocked',
       'widgets.layers.actions.removeFromGroupLocked',
       'widgets.layers.actions.transformIneligible',
       'widgets.layers.rasterFilter.busy',
@@ -410,7 +410,7 @@ describe('getLayerContextActions', () => {
     ['no runnable binding', { canRunWorkflow: false }],
     ['missing engine', { hasEngine: false }],
     ['locked layer', { layer: { ...rasterLayer, isLocked: true } }],
-    ['locked interaction', { interactionLocked: true }],
+    ['locked interaction', { operationLocked: true }],
   ] as const)('disables Run Workflow for %s', (_label, overrides) => {
     const layer = 'layer' in overrides ? overrides.layer : rasterLayer;
     expect(byId(getLayerContextActions(makeState(layer, overrides)), 'run-workflow').isDisabled).toBe(true);
@@ -418,7 +418,7 @@ describe('getLayerContextActions', () => {
 
   it.each([
     ['missing engine', { hasEngine: false }],
-    ['locked interaction', { interactionLocked: true }],
+    ['locked interaction', { operationLocked: true }],
   ] as const)('disables Select Object for %s', (_label, overrides) => {
     expect(byId(getLayerContextActions(makeState(rasterLayer, overrides)), 'select-object').isDisabled).toBe(true);
   });
@@ -434,8 +434,8 @@ describe('getLayerContextActions', () => {
   });
 
   it('disables mutating pixel actions while interaction is locked', () => {
-    const rasterActions = getLayerContextActions(makeState(rasterLayer, { interactionLocked: true }));
-    const controlActions = getLayerContextActions(makeState(nonEmptyControlLayer, { interactionLocked: true }));
+    const rasterActions = getLayerContextActions(makeState(rasterLayer, { operationLocked: true }));
+    const controlActions = getLayerContextActions(makeState(nonEmptyControlLayer, { operationLocked: true }));
     expect(byId(rasterActions, 'crop-to-bbox').isDisabled).toBe(true);
     expect(byId(rasterActions, 'filter').isDisabled).toBe(true);
     expect(byId(rasterActions, 'transform').isDisabled).toBe(true);
@@ -463,19 +463,19 @@ describe('getLayerContextActions', () => {
     const inpaint = createInpaintMaskLayer('Interaction mask', 'interaction-mask');
     const regional = createRegionalGuidanceLayer('Interaction region', 0, 'interaction-region');
     const contexts = [
-      makeState(raster, { document: rasterDocument, interactionLocked: true }),
+      makeState(raster, { document: rasterDocument, operationLocked: true }),
       // A multi-selection context so the selection-only verbs are visible.
       makeState(raster, {
         document: rasterDocument,
-        interactionLocked: true,
+        operationLocked: true,
         selectedIds: [raster.id, 'interaction-raster-b'],
       }),
-      makeState(nonEmptyControlLayer, { interactionLocked: true }),
-      makeState(inpaint, { interactionLocked: true }),
-      makeState(inpaint, { interactionLocked: true, selectedIds: [inpaint.id, 'interaction-mask-b'] }),
-      makeState(regional, { interactionLocked: true }),
-      makeState(text, { interactionLocked: true }),
-      makeState(raster, { document: makeDocument([groupContract('G', [raster])]), interactionLocked: true }),
+      makeState(nonEmptyControlLayer, { operationLocked: true }),
+      makeState(inpaint, { operationLocked: true }),
+      makeState(inpaint, { operationLocked: true, selectedIds: [inpaint.id, 'interaction-mask-b'] }),
+      makeState(regional, { operationLocked: true }),
+      makeState(text, { operationLocked: true }),
+      makeState(raster, { document: makeDocument([groupContract('G', [raster])]), operationLocked: true }),
     ];
     const actions = contexts.flatMap((context) => getLayerContextActions(context));
     const actionsById = new Map(actions.map((action) => [action.id, action]));
@@ -900,7 +900,7 @@ describe('getLayerContextActions', () => {
     expect(byId(getLayerContextActions(makeState(unlocked)), 'filter').isDisabled).toBe(false);
     expect(byId(getLayerContextActions(makeState(unlocked, { hasEngine: false })), 'filter').isDisabled).toBe(true);
     expect(byId(getLayerContextActions(makeState({ ...unlocked, isLocked: true })), 'filter').isDisabled).toBe(true);
-    expect(byId(getLayerContextActions(makeState(unlocked, { interactionLocked: true })), 'filter').isDisabled).toBe(
+    expect(byId(getLayerContextActions(makeState(unlocked, { operationLocked: true })), 'filter').isDisabled).toBe(
       true
     );
   });
@@ -1024,7 +1024,7 @@ describe('remove-from-group', () => {
     // A lock on any group above the layer refuses the move just the same.
     const nested = [groupContract('Outer', [groupContract('G', [r1])], { isLocked: true })];
     expect(reason(r1, nested, refused)).toBe('widgets.layers.actions.removeFromGroupLocked');
-    expect(reason(r1, grouped, { interactionLocked: true })).toBe('widgets.layers.actions.interactionLocked');
+    expect(reason(r1, grouped, { operationLocked: true })).toBe('widgets.layers.actions.operationLocked');
   });
 });
 
@@ -1078,6 +1078,6 @@ describe('merge-masks', () => {
     expect(reason([m1, m2], { hasEngine: false, mergeMasksEligibility: 'ineligible' })).toBe(
       'widgets.layers.actions.canvasNotReady'
     );
-    expect(reason([m1, m2], { interactionLocked: true })).toBe('widgets.layers.actions.interactionLocked');
+    expect(reason([m1, m2], { operationLocked: true })).toBe('widgets.layers.actions.operationLocked');
   });
 });

@@ -83,8 +83,6 @@ const centre = (element: Element): { x: number; y: number } => {
   return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
 };
 
-const LOCKED = 'Locked while generating. You can still pan and zoom with View.';
-
 const wait = (ms: number) =>
   new Promise<void>((resolve) => {
     setTimeout(resolve, ms);
@@ -119,7 +117,7 @@ describe('tool strip family slots', () => {
     root = null;
   });
 
-  const renderStrip = async (props: Partial<ComponentProps<typeof ToolStrip>> = {}) => {
+  const renderStrip = async () => {
     const fake = createFakeEngine();
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -127,7 +125,7 @@ describe('tool strip family slots', () => {
     await act(() => {
       root?.render(
         <ChakraProvider value={system}>
-          <ToolStrip engine={fake.engine} {...props} />
+          <ToolStrip engine={fake.engine} />
         </ChakraProvider>
       );
     });
@@ -422,22 +420,6 @@ describe('tool strip family slots', () => {
     expect(fake.activeTool).toBe('lasso');
   });
 
-  it('disables the open menu entries when an interaction lock engages', async () => {
-    const fake = await renderStrip();
-    const shape = (await button('Shape').element()) as HTMLElement;
-    await openByContextMenu(shape);
-    await act(() => {
-      root?.render(
-        <ChakraProvider value={system}>
-          <ToolStrip engine={fake.engine} lockReason={LOCKED} />
-        </ChakraProvider>
-      );
-    });
-    await expect.element(entry('Star')).toHaveAttribute('aria-disabled', 'true');
-    await act(() => userEvent.click(entry('Star'), { force: true }));
-    expect(fake.shapeKind).toBe('rect');
-  });
-
   it('names the key that selects each tool in its tooltip, remaps included', async () => {
     accountLifecycle.activate('tool-strip-test');
     await patchWorkbenchPreferences({ customHotkeys: { 'canvas.tool.eraser': ['q'] } });
@@ -468,34 +450,5 @@ describe('tool strip family slots', () => {
     } finally {
       await patchWorkbenchPreferences({ customHotkeys: {} });
     }
-  });
-
-  it('keeps locked tools focusable and says why they cannot be chosen; View stays available', async () => {
-    const fake = await renderStrip({ lockReason: LOCKED });
-    const brush = (await button('Brush').element()) as HTMLButtonElement;
-    expect(brush.getAttribute('aria-disabled')).toBe('true');
-    await act(() => userEvent.click(brush, { force: true }));
-    expect(fake.activeTool).toBe('view');
-    await hoverSlot(brush);
-    await expect.poll(tooltipText).toBe(`Brush${LOCKED}`);
-    expect((await button('View').element()).getAttribute('aria-disabled')).toBeNull();
-  });
-
-  it('disables the family slots under an interaction lock, hold included', async () => {
-    await renderStrip({ lockReason: LOCKED });
-    const shape = (await button('Shape').element()) as HTMLElement;
-    expect(shape.getAttribute('aria-disabled')).toBe('true');
-    await hoverSlot(shape);
-    await expect.poll(tooltipText).toBe(`Shape${LOCKED}`);
-    const at = centre(shape);
-    await act(() => {
-      shape.dispatchEvent(pointerAt('pointerdown', at.x, at.y));
-    });
-    await act(() => wait(450));
-    expect(document.querySelector('[role="menu"]')).toBeNull();
-    await act(() => {
-      shape.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-    });
-    expect(document.querySelector('[role="menu"]')).toBeNull();
   });
 });

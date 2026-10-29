@@ -26,7 +26,6 @@ export const getCanvasShortcutHints = ({
   hasTransform,
   hasSelection,
   canUndo,
-  isLocked,
   operation,
   samVisual,
 }: {
@@ -36,12 +35,11 @@ export const getCanvasShortcutHints = ({
   hasTransform: boolean;
   hasSelection: boolean;
   canUndo: boolean;
-  isLocked: boolean;
   operation: 'filter' | 'select-object' | null;
   samVisual: boolean;
 }): ShortcutHintSnapshot => {
   const hints: ShortcutHint[] = [];
-  if (isLocked || operation === 'filter' || (operation === 'select-object' && !samVisual)) {
+  if (operation === 'filter' || (operation === 'select-object' && !samVisual)) {
     return { hints: [PAN, ZOOM], titleKey: 'widgets.canvas.tools.view' };
   }
   const tool = operation === 'select-object' ? 'sam' : activeTool;
@@ -136,8 +134,7 @@ const HINT_STATE_KEYS: readonly (keyof CanvasInteractionState)[] = [
 export const createCanvasShortcutHintSource = (
   engine: CanvasEngine,
   projectId: string,
-  instanceId: string,
-  lock: { getSnapshot(): boolean; subscribe(listener: () => void): () => void }
+  instanceId: string
 ): ShortcutHintSource => {
   const operations = getCanvasOperations(engine);
   let snapshot: ShortcutHintSnapshot | null = null;
@@ -154,7 +151,6 @@ export const createCanvasShortcutHintSource = (
         hasSelection: engine.interaction.get('hasSelection'),
         hasTransform:
           engine.interaction.get('transformSession') !== null || engine.interaction.get('hasFloatingSelection'),
-        isLocked: lock.getSnapshot(),
         lassoShape: engine.interaction.get('lassoOptions').shape,
         operation: operation.status === 'active' ? operation.identity.kind : null,
         samVisual: sam?.input.type === 'visual' && sam.status !== 'committing',
@@ -175,7 +171,6 @@ export const createCanvasShortcutHintSource = (
         ...HINT_STATE_KEYS.map((key) => engine.interaction.subscribe(key, listener)),
         operations.subscribeOperation(listener),
         operations.subscribeSamSession(listener),
-        lock.subscribe(listener),
       ];
       return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
     },

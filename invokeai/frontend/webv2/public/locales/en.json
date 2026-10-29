@@ -4122,6 +4122,10 @@
         "boardMissing": "Saved to Gallery, but its board no longer exists",
         "boardMissingDescription": "{{name}} is in Uncategorized.",
         "generating": "Generating…",
+        "generatingPending_one": "Generating, {{count}} result pending",
+        "generatingPending_other": "Generating, {{count}} results pending",
+        "pending_one": "{{count}} result pending",
+        "pending_other": "{{count}} results pending",
         "moreAcceptOptions": "More accept options",
         "recall": "Recall settings",
         "saveAsDisabledLayer": "Keep as hidden layer",
@@ -4301,14 +4305,6 @@
         "loading": "“{{name}}” is still loading",
         "loadingMessage": "Its pixels are on their way. Try again in a moment.",
         "paintOnNewLayer": "Paint on a new layer"
-      },
-      "lock": {
-        "generating": "Locked while generating",
-        "reviewing": "Locked while reviewing results",
-        "generatingHelp": "Editing resumes once the results are in and you accept or discard them. You can still pan and zoom.",
-        "reviewingHelp": "Accept or discard the staged results to edit again. You can still pan and zoom.",
-        "toolGenerating": "Locked while generating. You can still pan and zoom with View.",
-        "toolReviewing": "Locked while reviewing results. Accept or discard them to edit again."
       },
       "restorePoints": {
         "beforeClear": "Before clearing the canvas",
@@ -4631,7 +4627,7 @@
         "addRegenerateRegion": "Add regenerate region",
         "addRegenerateRegionDescription": "Regenerate where this layer has content, as a live inpaint mask.",
         "canvasNotReady": "The canvas is still starting. Try again in a moment.",
-        "interactionLocked": "Unavailable while the canvas is generating, has staged results, or is applying an edit.",
+        "operationLocked": "Unavailable while Filter or Select Object is running on the canvas.",
         "mergeMasks": "Merge masks",
         "mergeMasksIneligible": "Merge masks needs two or more enabled, unlocked inpaint masks with content.",
         "mergeMasksSettingsDiffer": "The masks have different noise or denoise settings. Match them to merge.",

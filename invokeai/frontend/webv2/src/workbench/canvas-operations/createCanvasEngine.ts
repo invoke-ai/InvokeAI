@@ -192,7 +192,6 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
       );
     },
     isGuardCurrent: host.isGuardCurrent,
-    isInteractionLocked: host.isInteractionLocked,
     isSamToolActive: host.isSamToolActive,
     prepareStart: host.prepareSelectObjectStart,
     projectId: options.projectId,
@@ -231,11 +230,8 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     encodeSurface: host.encodeSurface,
     getDocument: host.getDocument,
     getSessionDeps: (layerId) => ({
-      commit: ({ draft, guard, image, rect, signal, target }) => {
-        if (host.isInteractionLocked()) {
-          return Promise.resolve({ status: 'locked' });
-        }
-        return host.commitFilter({
+      commit: ({ draft, guard, image, rect, signal, target }) =>
+        host.commitFilter({
           ...(target === 'control' ? { controlCopy: { controlType: controlTypeForDetector(draft) } } : {}),
           filter: draft,
           guard,
@@ -245,14 +241,12 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
           requireExactImageDimensions: true,
           signal,
           target,
-        });
-      },
+        }),
       exportPixels: () => host.exportLayerPixels(layerId, { applyAdjustments: true, includeDisabled: true }),
       isGuardCurrent: host.isGuardCurrent,
       publishPreview: (imageName, rect, guard, filterType) =>
         host.publishFilterPreview(guard.layerId, imageName, rect, guard, filterType),
     }),
-    isInteractionLocked: host.isInteractionLocked,
     runFilterGraph,
     selectLayer: host.selectLayer,
     setViewTool: host.setViewTool,
@@ -264,7 +258,6 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     },
   });
 
-  const interactionLockListeners = new Set<() => void>();
   // Any of these may be what refused a detection commit; each release lets a waiting result retry.
   const lockStores = [
     core.stores.documentEditingLocked,
@@ -280,10 +273,8 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     projectId: options.projectId,
     runFilterGraph,
     subscribeLockChanges: (listener) => {
-      interactionLockListeners.add(listener);
       const unsubscribers = lockStores.map((store) => store.subscribe(listener));
       return () => {
-        interactionLockListeners.delete(listener);
         for (const unsubscribe of unsubscribers) {
           unsubscribe();
         }
@@ -383,24 +374,6 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     },
   };
 
-  const coreSetInteractionLocked = core.tools.setInteractionLocked;
-  const tools = {
-    ...core.tools,
-    setInteractionLocked: (locked: boolean) => {
-      if (locked) {
-        selectObjectCoordinator.interruptAndBlock();
-        filterCoordinator.interruptAndBlock();
-      }
-      coreSetInteractionLocked(locked);
-      if (!locked && selectObjectCoordinator.isActive()) {
-        host.setSamTool();
-      }
-      for (const listener of interactionLockListeners) {
-        listener();
-      }
-    },
-  };
-
   // Saves are dropped once the account changed: the engine outlives it only until the registry disposes it.
   const toolMemoryBinding = toolMemory
     ? bindCanvasToolMemory(core.stores, {
@@ -465,7 +438,7 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     },
   };
 
-  const engine: CanvasEngine = { ...core, diagnostics, lifecycle, tools };
+  const engine: CanvasEngine = { ...core, diagnostics, lifecycle };
   attachCanvasOperations(engine, operations);
   return engine;
 };

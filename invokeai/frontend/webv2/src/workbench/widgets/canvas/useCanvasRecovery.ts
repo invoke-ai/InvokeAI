@@ -10,13 +10,16 @@ import type { TFunction } from 'i18next';
 
 import { createItemId } from '@platform/browser/randomUuid';
 import { getCanvasEngine, isBlankCanvasDocument } from '@workbench/canvas-operations/api';
-import { getCanvasStagingCandidateFingerprint, getCanvasStagingSlots } from '@workbench/canvasStagingView';
+import {
+  getCanvasStagingCandidateFingerprint,
+  getCanvasStagingSlots,
+  hasPendingCanvasResults,
+} from '@workbench/canvasStagingView';
 import { useNotify } from '@workbench/useNotify';
 import { useActiveProjectId, useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { isCanvasInteractionLocked } from './canvasInteractionLock';
 import {
   clearCanvasWithRestorePoint,
   getInFlightCanvasItems,
@@ -52,7 +55,7 @@ const useRecoveryPorts = () => {
         if (getCanvasEngine(projectId)?.interaction.get('documentEditingLocked')) {
           return 'editing';
         }
-        return project && isCanvasInteractionLocked(project.canvas, project.queue.items) ? 'canvas' : null;
+        return project && hasPendingCanvasResults(project.canvas, project.queue.items) ? 'canvas' : null;
       },
       now: () => new Date().toISOString(),
     }),

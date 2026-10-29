@@ -6,8 +6,8 @@ import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { HISTORY_MAX_ENTRIES } from '@workbench/canvas-engine/api';
 import { useCanvasEngine, type CanvasEngineHandle } from '@workbench/canvas-operations/react';
+import { hasPendingCanvasResults } from '@workbench/canvasStagingView';
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
-import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
 import {
   useCanvasCanRedo,
   useCanvasCanUndo,
@@ -50,8 +50,9 @@ const ConnectedHistory = ({ engine }: { engine: CanvasEngineHandle }) => {
   const editingLocked = useCanvasDocumentEditingLocked(engine);
   const { dropped = 0, evicted, future, past } = engine.history.getEntries();
   const snapshots = useActiveProjectSelector((project) => project.canvas.snapshots ?? EMPTY_SNAPSHOTS);
-  const canvasLocked = useActiveProjectSelector((project) =>
-    isCanvasInteractionLocked(project.canvas, project.queue.items)
+  // A restore swaps the document, throwing away this session's staged and in-flight results, so it waits for them.
+  const hasPendingResults = useActiveProjectSelector((project) =>
+    hasPendingCanvasResults(project.canvas, project.queue.items)
   );
   const restorePoint = useRestorePoint();
   const [isClearOpen, setIsClearOpen] = useState(false);
@@ -154,7 +155,9 @@ const ConnectedHistory = ({ engine }: { engine: CanvasEngineHandle }) => {
         ) : null}
         {snapshots.length > 0 ? (
           <RestorePoints
-            canvasLockReason={lockReason ?? (canvasLocked ? t('widgets.layers.historyPane.restoreLocked') : undefined)}
+            canvasLockReason={
+              lockReason ?? (hasPendingResults ? t('widgets.layers.historyPane.restoreLocked') : undefined)
+            }
             points={snapshots}
             onRestore={restorePoint}
           />

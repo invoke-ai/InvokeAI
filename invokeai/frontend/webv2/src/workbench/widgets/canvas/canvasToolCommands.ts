@@ -64,7 +64,6 @@ export const reportTransformRefusal = (
 /** What the companion keys need; the Canvas and the Layers widget each build it from their own state. */
 export interface CanvasToolCommandContext {
   readonly engine: Pick<CanvasEngine, 'interaction' | 'layers' | 'tools'> | null;
-  readonly isInteractionLocked: boolean;
   /** The selected leaf that Transform opens on; null when nothing or a group is selected. */
   readonly selectedLayerId: string | null;
   /** Swaps the project foreground/background pair — a preference, never a document edit. */
@@ -74,10 +73,7 @@ export interface CanvasToolCommandContext {
   readonly reportTransformRefusal: (refusal: TransformRefusal) => void;
 }
 
-/**
- * Runs one companion key. The color pair is a preference, not a document edit, so X/D stay live while the surface
- * is interaction-locked; of the rest only the view tool works then.
- */
+/** Runs one companion key. The color pair is a preference, not a document edit: X/D need no engine. */
 export const executeCanvasToolCommand = (commandId: CanvasToolCommandId, ctx: CanvasToolCommandContext): void => {
   const { engine } = ctx;
   if (commandId === 'canvas.toggleFillColor') {
@@ -86,9 +82,6 @@ export const executeCanvasToolCommand = (commandId: CanvasToolCommandId, ctx: Ca
   }
   if (commandId === 'canvas.setFillColorsToDefault') {
     ctx.resetActiveColors();
-    return;
-  }
-  if (ctx.isInteractionLocked && commandId !== 'canvas.tool.view') {
     return;
   }
   if (!engine) {
