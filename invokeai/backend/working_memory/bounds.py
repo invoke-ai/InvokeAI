@@ -11,6 +11,7 @@ data to it, and by `scripts/working_memory/build_shipped.py`, which refuses to w
   weights evicted for nothing.
 """
 
+import json
 from collections.abc import Iterable, Mapping
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Final, Optional
@@ -46,23 +47,18 @@ spikes at small sizes and a second run reserving up to 1.6x the first at large o
 cannot stay within 1.3x of all of them. Windows ROCm defaults to expandable segments; this is the override's price."""
 
 
-def point_id(point: MeasuredPoint) -> str:
-    """A readable id of a point: estimator, platform, operation, dtype, size, tile, batch, prompt tokens, a
-    materialized score matrix, card and method. The platform, operation and dtype show where the point names them: an
-    estimator keyed by no platform trait records none, and one whose features name no operation or dtype (the
-    MOSS-Image denoise) none of those."""
-    features = point.features
+def point_id(point: MeasuredPoint, spec: "EstimatorSpec") -> str:
+    """A readable id of a point: estimator, platform, its features as its estimator's line labels them (`fit.Line`:
+    operation, dtype, size, tile, batch and a materialized score matrix of a VAE operation; size and prompt tokens of a
+    MOSS-Image denoise), card and method. Features that name no line show as they are. An estimator keyed by no
+    platform trait records none."""
+    found = spec.line(point.features)
+    label = found.label if found is not None else json.dumps(point.features, sort_keys=True, separators=(",", ":"))
     platform = ",".join(point.platform.values())
-    head = [point.estimator, *([platform] if platform else [])]
-    head += [str(features[name]) for name in ("operation", "dtype") if name in features]
-    shape = f"{features.get('height')}x{features.get('width')}"
-    tile = f"-tile{features['tile']}" if features.get("tile") is not None else ""
-    batch = f"-b{features['batch_size']}" if features.get("batch_size", 1) != 1 else ""
-    text = f"-text{features['text_tokens']}" if "text_tokens" in features else ""
-    scores = "-scores" if features.get("score_matrix_bytes") else ""
     out_of_fit = "-outfit" if not point.in_fit else ""
     card = point.device.split(" (")[0].replace(" ", "")
-    return f"{'-'.join(head)}-{shape}{tile}{batch}{text}{scores}{out_of_fit}-{card}-{point.method}"
+    head = f"{point.estimator}-{platform}" if platform else point.estimator
+    return f"{head}-{label}{out_of_fit}-{card}-{point.method}"
 
 
 _ANY_PLATFORM: Final = Platform("cudnn", "native", "linux")
@@ -89,15 +85,15 @@ def fitted_decides(estimate: WorkingMemoryEstimate) -> bool:
     return any(term.included and term.coefficient is not None for term in estimate.terms)
 
 
-def bound_violation(point: MeasuredPoint, estimate: WorkingMemoryEstimate) -> Optional[str]:
-    """Why `estimate` breaks a bound `point` sets for it, or None."""
+def bound_violation(point: MeasuredPoint, spec: "EstimatorSpec", estimate: WorkingMemoryEstimate) -> Optional[str]:
+    """Why `estimate`, the estimate `spec` gives `point`'s features, breaks a bound `point` sets for it, or None."""
     fitted = fitted_decides(estimate)
     reserved = estimate.reservation_bytes if fitted else max(estimate.reservation_bytes, WORKING_MEMORY_FLOOR)
     if reserved < point.measured_bytes:
         return f"reserves {reserved / 2**30:.3f} GiB for a measured {point.measured_bytes / 2**30:.3f} GiB"
     # An out-of-fit point checks another term, and a lower-bound-only point is no cold first run: neither caps.
     if point.holds_upper_bound and (point.max_ratio is not None or (fitted and point.in_fit)):
-        default = UPPER_BOUND_EXCEPTIONS.get(point_id(point), MAX_OVER_RESERVATION)
+        default = UPPER_BOUND_EXCEPTIONS.get(point_id(point, spec), MAX_OVER_RESERVATION)
         max_ratio = point.max_ratio if point.max_ratio is not None else default
         ratio = estimate.reservation_bytes / point.measured_bytes
         if ratio > max_ratio:
