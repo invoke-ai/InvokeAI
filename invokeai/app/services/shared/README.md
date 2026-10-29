@@ -818,11 +818,10 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
 - An `If` runs once per frame of the innermost iterator in its iterator ancestry, whichever branch is selected. When a
   condition, literal or computed in the root frame, selects a root value while the other branch carries an open
   `Iterate`, the `If` keeps that per-item cardinality and returns the root value in each item frame; the unselected
-  per-item computation stays inactive. A branch `For`'s final output carries no axis into that ancestry, so selecting
-  the root value over such a branch runs the `If` once in the root frame, while selecting it runs the `If` per item of
-  the iterator the `For` runs under.
-- The iterators whose frames are open at an `If`, including one reached through a `For` final output (which closes only
-  the `For`'s own axis), run regardless of the condition and are never gated by it.
+  per-item computation stays inactive.
+- Open iterator frames run regardless of the `If` condition. A selected `For` final output closes only its own axis
+  while keeping enclosing axes open; an unselected `For`-final-only axis adds no `If` frames unless the same axis also
+  reaches the `If` directly.
 - Before invocation, graph validation raises `UnsupportedIfIterationAxesError` for these frame sets:
   - Two unrelated iterators open at the `If` (neither stays open inside the other, judged by iterator ancestry, where a
     `Collect.item` input closes an axis), unless the input that decides the `If`'s frames carries both: the condition,
