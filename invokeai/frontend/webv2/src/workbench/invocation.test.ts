@@ -798,6 +798,29 @@ describe('submitResolvedInvocation', () => {
     expect(submitResolved.mock.calls[0]?.[0]).not.toHaveProperty('positivePrompts');
   });
 
+  it('dispatches the prompt as typed, with no round trip, while dynamic prompts are off', () => {
+    const project = getActiveProject(
+      createGenerateValues(animaModel, { dynamicPromptsEnabled: false, positivePrompt: 'wall painted #ff0000 {a|b}' })
+    );
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+    const route = routeFor(project, { ...project.invocation, destination: 'gallery', sourceId: 'generate' });
+
+    submitResolvedInvocation({
+      commands,
+      formatControlLayerError,
+      formatUpscaleMetadataFailure,
+      models: undefined,
+      owner: captureAccountScope(),
+      prepareCanvasInvocation: vi.fn(),
+      project,
+      route,
+    });
+
+    expect(submitResolved).toHaveBeenCalledTimes(1);
+    expect(submitResolved.mock.calls[0]?.[0]).not.toHaveProperty('positivePrompts');
+  });
+
   // Expansion failures must not submit literal dynamic syntax.
   describe('when a prompt cannot be expanded', () => {
     const submitDynamicPrompt = () => {

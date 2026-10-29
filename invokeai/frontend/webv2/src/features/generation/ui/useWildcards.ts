@@ -50,6 +50,11 @@ export interface WildcardCatalog {
   /** Names the backend can resolve, for the highlighter's known/unknown split. */
   knownNames: ReadonlySet<string>;
   isLoading: boolean;
+  /** The last read failed; any wildcards listed are from an earlier read. */
+  isError: boolean;
+  /** A retry after a failed read is on its way. */
+  isRetrying: boolean;
+  retry: () => void;
   create: (wildcard: { name: string; values: string[] }) => Promise<void>;
   update: (id: string, changes: { name?: string; values?: string[] }) => Promise<void>;
   remove: (id: string) => Promise<void>;
@@ -196,5 +201,17 @@ export const useWildcards = (): WildcardCatalog => {
     [queryClient]
   );
 
-  return { applyWrites, create, isLoading: query.isPending, knownNames, remove, removeMany, update, wildcards };
+  return {
+    applyWrites,
+    create,
+    isError: query.isError,
+    isLoading: query.isPending,
+    isRetrying: query.isError && query.isFetching,
+    knownNames,
+    remove,
+    removeMany,
+    retry: () => void query.refetch(),
+    update,
+    wildcards,
+  };
 };

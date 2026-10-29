@@ -4,7 +4,7 @@ import type { VaeModelConfig } from '@features/generation/core/types';
 
 import { Icon } from '@chakra-ui/react';
 import { isSupportedGenerateModel } from '@features/generation/core/baseGenerationPolicies';
-import { getGenerateValuesRevertPatch, normalizeGenerateSettings } from '@features/generation/core/settings';
+import { normalizeGenerateSettings } from '@features/generation/core/settings';
 import { IconButton, Tooltip } from '@platform/ui';
 import { RotateCcwIcon } from 'lucide-react';
 import { useMemo } from 'react';
@@ -12,8 +12,8 @@ import { useTranslation } from 'react-i18next';
 
 import { flushGenerateDrafts } from './generateDraftRegistry';
 import { GeneratePresetsPopover } from './GeneratePresetsPopover';
+import { offerGenerateUndo } from './generateUndo';
 import { useGenerateValues, useGenerationUi } from './GenerationUiContext';
-import { getGenerateSettingsUndoKey } from './modelSelectionNotice';
 import {
   getModelDefaultsPatch,
   getModelDefaultSettings,
@@ -61,13 +61,16 @@ export const GenerateHeaderActions = () => {
     }
 
     const patch = getModelDefaultsPatch(resolved.settings, resolved.selectedModel, vaeModels);
-    const revertPatch = getGenerateValuesRevertPatch(resolved.settings, { ...resolved.settings, ...patch });
 
     ui.settings.patchGenerateSettings(patch, projectId);
-    ui.notifications.undoable(t('widgets.generate.resetToModelDefaultsDone', { name: resolved.selectedModel.name }), {
-      onUndo: () => ui.settings.patchGenerateSettings(revertPatch, projectId),
+    offerGenerateUndo({
+      after: { ...resolved.settings, ...patch },
+      before: resolved.settings,
       projectId,
-      supersedes: getGenerateSettingsUndoKey(projectId),
+      slot: 'settings',
+      t,
+      title: t('widgets.generate.resetToModelDefaultsDone', { name: resolved.selectedModel.name }),
+      ui,
     });
   };
 

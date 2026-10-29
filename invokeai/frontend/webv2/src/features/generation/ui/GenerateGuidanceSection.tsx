@@ -19,7 +19,6 @@ import { GenerateConceptsContent, isCompatibleLora, isConceptInstalled } from '.
 import { useGenerationUi } from './GenerationUiContext';
 import { GenerateReferenceImagesContent } from './reference-images/GenerateReferenceImagesSection';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
-import { GenerateIssueNotes } from './shared/GenerateIssues';
 
 interface GenerateGuidanceSectionProps {
   draft: GenerateDraft;
@@ -93,7 +92,6 @@ export const GenerateGuidanceSection = ({
           onCommit={onReferenceCommit}
           onCommitImmediate={onCommitImmediate}
         />
-        <GenerateIssueNotes field="referenceImages" section="guidance" />
         {/* Not blocking: the run works, but without an edit LoRA it only copies the references. */}
         {getKrea2EditLoraState(selectedModel, settings) === 'noLora' ? (
           <Text color="fg.warning" fontSize="xs" role="status" textWrap="pretty">

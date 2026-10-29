@@ -25,6 +25,9 @@ export type GenerationIssueField =
   | 'concepts'
   | 'krea2RebalanceWeights'
   | 'mossImageUncondSkipLayers'
+  /** One reference image's card; the issue's `referenceImageId` names which. */
+  | 'referenceImage'
+  /** The reference images as a group: their count against the model's limit. */
   | 'referenceImages';
 
 /** Settings an issue can be fixed with in one step; `getGenerationIssueFixPatch` turns one into a settings patch. */
@@ -55,7 +58,7 @@ export interface GenerationIssue {
    * Where the problem is fixed. `field` names a control that shows the message itself (a component slot, the guidance
    * scrubber), or a group a section lists its issues under; without it the section lists the issue at its top.
    */
-  target: { field?: GenerationIssueField; section: GenerateSectionId };
+  target: { field?: GenerationIssueField; referenceImageId?: string; section: GenerateSectionId };
   fix?: GenerationIssueFix;
 }
 

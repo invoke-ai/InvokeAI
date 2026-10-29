@@ -46,7 +46,7 @@ describe('GenerateHeaderActions', () => {
       notifications: { error: vi.fn(), info: vi.fn(), reportError: vi.fn(), undoable },
       presets: { includePrompts: true, presets: [], remove: vi.fn(), rename: vi.fn(), save: vi.fn() },
       project: { activeProjectId: 'project-1' },
-      settings: { patchGenerateSettings },
+      settings: { patchGenerateSettings, readGenerateValues: () => values.getSnapshot() },
     } as unknown as GenerationUiAdapter;
     host = document.createElement('div');
     document.body.append(host);
@@ -72,12 +72,10 @@ describe('GenerateHeaderActions', () => {
       supersedes: 'generate-settings:project-1',
     });
 
+    // Steps were changed again since the reset; the Undo keeps that edit and restores the rest.
+    values.patchSnapshot({ steps: 50 });
     await act(() => undoable.mock.calls[0]![1].onUndo());
 
-    expect(patchGenerateSettings).toHaveBeenLastCalledWith(
-      expect.objectContaining({ cfgScale: 4, steps: 12 }),
-      'project-1'
-    );
-    expect(values.getSnapshot()).toMatchObject({ cfgScale: 4, steps: 12 });
+    expect(values.getSnapshot()).toMatchObject({ cfgScale: 4, steps: 50 });
   });
 });

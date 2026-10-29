@@ -92,6 +92,8 @@ export const ISSUE_FIELD_RENDERERS: Record<
   concepts: 'notes',
   krea2RebalanceWeights: 'own message',
   mossImageUncondSkipLayers: 'own message',
+  // On the card of the reference image it names.
+  referenceImage: 'notes',
   referenceImages: 'notes',
 };
 
@@ -128,12 +130,15 @@ export const GenerateIssueNotes = ({
   conceptKey,
   field,
   fixesOnly = false,
+  referenceImageId,
   section,
 }: {
   /** Only the issues about this concept, for notes under its row. */
   conceptKey?: string;
   field?: GenerationIssueField;
   fixesOnly?: boolean;
+  /** Only the issues about this reference image, for notes on its card. */
+  referenceImageId?: string;
   section: GenerateSectionId;
 }) => {
   const { t } = useTranslation();
@@ -143,7 +148,8 @@ export const GenerateIssueNotes = ({
       issue.target.section === section &&
       issue.target.field === field &&
       (!fixesOnly || issue.fix !== undefined) &&
-      (conceptKey === undefined || (issue.fix?.kind === 'removeConcept' && issue.fix.modelKey === conceptKey))
+      (conceptKey === undefined || (issue.fix?.kind === 'removeConcept' && issue.fix.modelKey === conceptKey)) &&
+      (referenceImageId === undefined || issue.target.referenceImageId === referenceImageId)
   );
 
   if (!context || issues.length === 0) {

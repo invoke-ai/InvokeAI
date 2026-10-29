@@ -273,6 +273,10 @@ const createCommands = (
         'removePromptFromHistory',
         (prompt: ActionPayload<'removePromptFromHistory'>['prompt'], projectId?: string) => ({ projectId, prompt })
       ),
+      restorePromptHistory: command(
+        'restorePromptHistory',
+        (items: ActionPayload<'restorePromptHistory'>['items'], projectId: string) => ({ items, projectId })
+      ),
       setBatchCount: command('setGenerateBatchCount', (batchCount: number, projectId?: string) => ({
         batchCount,
         projectId,

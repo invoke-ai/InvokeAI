@@ -38,13 +38,24 @@ export interface ResolvedGenerateWidgetValues {
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object';
 
+/**
+ * Fields newer than some saved projects whose absence already reads as their default, so loading such a project does
+ * not write them in: the project stays as saved until the user changes the setting.
+ */
+const DEFAULTS_READ_FROM_ABSENCE: Readonly<Partial<Record<keyof GenerateWidgetValues, unknown>>> = {
+  dynamicPromptsEnabled: true,
+};
+
 const hasSystemDifference = (storedValues: unknown, values: GenerateWidgetValues): boolean => {
   if (!isRecord(storedValues)) {
     return true;
   }
 
   return Object.entries(values).some(
-    ([key, value]) => key !== 'batchCount' && !areJsonValuesStructurallyEqual(storedValues[key], value)
+    ([key, value]) =>
+      key !== 'batchCount' &&
+      !(storedValues[key] === undefined && DEFAULTS_READ_FROM_ABSENCE[key as keyof GenerateWidgetValues] === value) &&
+      !areJsonValuesStructurallyEqual(storedValues[key], value)
   );
 };
 

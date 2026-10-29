@@ -8,6 +8,8 @@ export type DynamicPromptsSeedBehaviour = 'per-iteration' | 'per-image';
 
 export interface DynamicPromptsConfig {
   combinatorial: boolean;
+  /** Off keeps the prompt as typed: nothing is expanded and `{`, `#` and `__` are plain text. */
+  enabled: boolean;
   maxPrompts: number;
   /** Draws a new sample seed after each queued submission (random mode only). */
   resample: boolean;
@@ -273,6 +275,65 @@ export const getWildcardNameError = (
 export const hasDynamicPromptSyntax = (prompt: string): boolean =>
   /\{[\s\S]*\}/.test(prompt) || prompt.includes('#') || scanWildcardReferences(prompt).length > 0;
 
+/** Whether Invoke sends the prompt through the backend's expansion: dynamic prompts are on and it has their syntax. */
+export const expandsDynamicPrompts = (prompt: string, enabled: boolean): boolean =>
+  enabled && hasDynamicPromptSyntax(prompt);
+
+/** Text worded for `describeGenerationIssue`: English, with its locale key. */
+export interface DynamicPromptsFailureText {
+  message: string;
+  messageKey: string;
+  messageValues?: Readonly<Record<string, string>>;
+}
+
+/**
+ * Why the prompt's expansion cannot be used, or null: the request failed (a retry may work), or the backend could not
+ * expand the prompt and said why. Invoke waits on either; turning dynamic prompts off runs the prompt as typed.
+ */
+export const describeDynamicPromptsFailure = (expansion: {
+  error: string | null;
+  isError: boolean;
+}): DynamicPromptsFailureText | null => {
+  if (expansion.isError) {
+    return {
+      message: 'The prompt could not be expanded. Retry, or turn dynamic prompts off to use it as typed.',
+      messageKey: 'widgets.generate.dynamicPrompts.expansionFailed',
+    };
+  }
+
+  return expansion.error
+    ? {
+        message: `The prompt could not be expanded: ${expansion.error}`,
+        messageKey: 'widgets.generate.dynamicPrompts.expansionError',
+        messageValues: { error: expansion.error },
+      }
+    : null;
+};
+
+export type PromptCommentMarker = '#' | '//' | '/*';
+
+const BLOCK_COMMENT_RE = /\/\*[\s\S]*?\*\//;
+
+/**
+ * The first comment the backend's expansion would strip from `prompt`, or null: `#` or `//` and the rest of its line,
+ * or a closed block comment. The parser has no escape for any of them. `#` alone makes a prompt expand, so it always
+ * counts; the others only in a prompt expanded for other syntax.
+ */
+export const findDynamicPromptComment = (prompt: string): PromptCommentMarker | null => {
+  if (!hasDynamicPromptSyntax(prompt)) {
+    return null;
+  }
+
+  const candidates: [PromptCommentMarker, number][] = [
+    ['#', prompt.indexOf('#')],
+    ['//', prompt.indexOf('//')],
+    ['/*', prompt.search(BLOCK_COMMENT_RE)],
+  ];
+  const found = candidates.filter(([, index]) => index >= 0).sort(([, left], [, right]) => left - right);
+
+  return found[0]?.[0] ?? null;
+};
+
 export const isDynamicPromptsSeedBehaviour = (value: unknown): value is DynamicPromptsSeedBehaviour =>
   value === 'per-iteration' || value === 'per-image';
 
@@ -291,6 +352,7 @@ export const sanitizeDynamicPromptsConfig = (value: unknown): DynamicPromptsConf
 
   return {
     combinatorial: config.combinatorial !== false,
+    enabled: config.enabled !== false,
     maxPrompts: sanitizeMaxPrompts(config.maxPrompts),
     resample: config.resample !== false,
     sampleSeed: sanitizeSampleSeed(config.sampleSeed),

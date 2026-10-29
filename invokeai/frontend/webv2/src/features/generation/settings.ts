@@ -132,10 +132,11 @@ export {
 } from './core/sdxlRefiner';
 export {
   createDynamicPromptsSampleSeed,
+  describeDynamicPromptsFailure,
   DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
   DYNAMIC_PROMPTS_MAX_PROMPTS,
   DYNAMIC_PROMPTS_MIN_PROMPTS,
-  hasDynamicPromptSyntax,
+  expandsDynamicPrompts,
   isDynamicPromptsSeedBehaviour,
   sanitizeDynamicPromptsConfig,
   sanitizeMaxPrompts,
@@ -149,6 +150,7 @@ export {
   getPromptHistoryItemFromGenerateSettings,
   MAX_PROMPT_HISTORY,
   removePromptHistoryItem,
+  restorePromptHistoryItems,
 } from './core/promptHistory';
 export {
   applyProjectPromptDraft,

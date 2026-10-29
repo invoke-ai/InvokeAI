@@ -100,6 +100,7 @@ export const getDynamicPromptsConfig = (
   settings: Pick<
     GenerateSettings,
     | 'dynamicPromptsCombinatorial'
+    | 'dynamicPromptsEnabled'
     | 'dynamicPromptsMaxPrompts'
     | 'dynamicPromptsResample'
     | 'dynamicPromptsSampleSeed'
@@ -107,6 +108,7 @@ export const getDynamicPromptsConfig = (
   >
 ): DynamicPromptsConfig => ({
   combinatorial: settings.dynamicPromptsCombinatorial,
+  enabled: settings.dynamicPromptsEnabled,
   maxPrompts: settings.dynamicPromptsMaxPrompts,
   resample: settings.dynamicPromptsResample,
   sampleSeed: settings.dynamicPromptsSampleSeed,
@@ -867,6 +869,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     ),
     dynamicPromptsCombinatorial:
       typeof values.dynamicPromptsCombinatorial === 'boolean' ? values.dynamicPromptsCombinatorial : true,
+    dynamicPromptsEnabled: values.dynamicPromptsEnabled !== false,
     dynamicPromptsMaxPrompts: sanitizeMaxPrompts(values.dynamicPromptsMaxPrompts),
     dynamicPromptsSampleSeed: sanitizeSampleSeed(values.dynamicPromptsSampleSeed),
     dynamicPromptsResample: typeof values.dynamicPromptsResample === 'boolean' ? values.dynamicPromptsResample : true,

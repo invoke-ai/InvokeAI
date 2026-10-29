@@ -10,6 +10,7 @@ import { toPromptTemplateSnapshot } from '@features/generation/data/promptTempla
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
 import { PromptTemplateImage } from '@features/generation/ui/promptFields/PromptTemplateImage';
+import { GenerateLoadError } from '@features/generation/ui/shared/GenerateLoadError';
 import { downloadBlob } from '@platform/browser/downloadBlob';
 import {
   assertAccountScopeCurrent,
@@ -137,9 +138,26 @@ export const PromptTemplatesPanel = ({
       />
       <Separator />
 
+      {/* A failed refresh keeps the templates read before; only a failure with nothing to show fills the list. */}
+      {catalog.isError && catalog.templates.length > 0 ? (
+        <GenerateLoadError
+          isRetrying={catalog.isRetrying}
+          layout="inline"
+          message={t('widgets.generate.promptTemplates.couldNotRefresh')}
+          onRetry={catalog.retry}
+        />
+      ) : null}
+
       <Scrollable h="16rem" label={t('widgets.generate.promptTemplates.title')}>
         {catalog.isLoading ? (
           <PanelMessage>{t('widgets.generate.promptTemplates.loading')}</PanelMessage>
+        ) : catalog.isError && catalog.templates.length === 0 ? (
+          <GenerateLoadError
+            isRetrying={catalog.isRetrying}
+            layout="state"
+            message={t('widgets.generate.promptTemplates.couldNotLoad')}
+            onRetry={catalog.retry}
+          />
         ) : !hasResults ? (
           <PanelMessage>
             {searchTerm.trim()

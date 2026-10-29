@@ -118,16 +118,20 @@ describe('GeneratePresetsPopover', () => {
       if (slot === 'omitted') {
         delete olderPreset.refinerModel;
       }
-      const patchGenerateSettings = vi.fn();
       const undoable = vi.fn();
-      const currentValues = { ...olderPreset, model, refinerModel: refiner, steps: 30 };
+      const values = {
+        current: { ...olderPreset, model, refinerModel: refiner, steps: 30 } as Record<string, unknown>,
+      };
+      const patchGenerateSettings = vi.fn((patch: Record<string, unknown>) => {
+        values.current = { ...values.current, ...patch };
+      });
       const adapter = {
         ...ADAPTER,
-        generateValues: { getSnapshot: () => currentValues, subscribe: () => () => {} },
+        generateValues: { getSnapshot: () => values.current, subscribe: () => () => {} },
         models: { ...ADAPTER.models, catalog: [model, refiner] },
         presets: { ...ADAPTER.presets, presets: [{ id: 'older', label: 'Older preset', values: olderPreset }] },
         notifications: { ...ADAPTER.notifications, undoable },
-        settings: { ...ADAPTER.settings, patchGenerateSettings },
+        settings: { ...ADAPTER.settings, patchGenerateSettings, readGenerateValues: () => values.current },
       } as unknown as GenerationUiAdapter;
       await renderAdapter(adapter);
       await openPresets();
@@ -148,6 +152,44 @@ describe('GeneratePresetsPopover', () => {
       expect(patchGenerateSettings).toHaveBeenLastCalledWith({ refinerModel: refiner, steps: 30 }, 'project-1');
     }
   );
+
+  it('keeps settings newer than a preset, and an Undo leaves a template chosen after applying it', async () => {
+    const olderPreset: Record<string, unknown> = { ...getDefaultGenerateSettings(model), steps: 12 };
+    delete olderPreset.dynamicPromptsEnabled;
+    const template = { id: 'cinematic', name: 'Cinematic', negativePrompt: '', positivePrompt: '{prompt}, 35mm' };
+    const undoable = vi.fn();
+    const values = {
+      current: {
+        ...getDefaultGenerateSettings(model),
+        dynamicPromptsEnabled: false,
+        model,
+        promptTemplate: template,
+        steps: 30,
+      } as Record<string, unknown>,
+    };
+    const patchGenerateSettings = vi.fn((patch: Record<string, unknown>) => {
+      values.current = { ...values.current, ...patch };
+    });
+    const adapter = {
+      ...ADAPTER,
+      generateValues: { getSnapshot: () => values.current, subscribe: () => () => {} },
+      models: { ...ADAPTER.models, catalog: [model] },
+      presets: { ...ADAPTER.presets, presets: [{ id: 'older', label: 'Older preset', values: olderPreset }] },
+      notifications: { ...ADAPTER.notifications, undoable },
+      settings: { ...ADAPTER.settings, patchGenerateSettings, readGenerateValues: () => values.current },
+    } as unknown as GenerationUiAdapter;
+    await renderAdapter(adapter);
+    await openPresets();
+    await clickPreset('Older preset');
+
+    expect(values.current).toMatchObject({ dynamicPromptsEnabled: false, promptTemplate: null, steps: 12 });
+
+    const later = { ...template, id: 'noir', name: 'Noir' };
+    values.current = { ...values.current, promptTemplate: later };
+    undoable.mock.calls[0]![1].onUndo();
+
+    expect(values.current).toMatchObject({ dynamicPromptsEnabled: false, promptTemplate: later, steps: 30 });
+  });
 
   it('names the size a preset moved to when its stored size does not fit the model', async () => {
     // 1028 is off SDXL's 8 px grid, as a preset saved from a hosted model's size can be.

@@ -43,6 +43,7 @@ const translation = {
   common: {
     cancel: 'Cancel',
     delete: 'Delete',
+    retry: 'Retry',
     edit: 'Edit',
     negative: 'Negative',
     prompt: 'Prompt',
@@ -95,6 +96,8 @@ const translation = {
         viewMerged: 'Show the merged prompt',
         editAuthored: 'Back to editing your prompt',
         loading: 'Loading templates…',
+        couldNotLoad: 'Templates could not be loaded.',
+        couldNotRefresh: 'Templates could not be refreshed. The list may be out of date.',
       },
     },
   },
@@ -145,10 +148,13 @@ const createCatalog = (overrides: Partial<PromptTemplateCatalog> = {}): PromptTe
   defaultTemplates: [defaultTemplate],
   exportCsv: vi.fn(),
   importFile: vi.fn(),
+  isError: false,
   isLoaded: true,
   isLoading: false,
+  isRetrying: false,
   personalTemplates: [userTemplate],
   remove: vi.fn(),
+  retry: vi.fn(),
   sharedTemplates: [sharedTemplate],
   templates: [userTemplate, sharedTemplate, defaultTemplate],
   update: vi.fn(),
@@ -231,6 +237,54 @@ describe('the prompt templates panel', () => {
       negativePrompt: userTemplate.negativePrompt,
       positivePrompt: userTemplate.positivePrompt,
     });
+  });
+
+  it('says a failed read failed, with a retry, instead of showing an empty catalog', async () => {
+    const catalog = createCatalog({
+      defaultTemplates: [],
+      isError: true,
+      personalTemplates: [],
+      sharedTemplates: [],
+      templates: [],
+    });
+
+    await render(
+      <PromptTemplatesPanel
+        activeTemplate={null}
+        catalog={catalog}
+        isActiveTemplateMissing={false}
+        onApply={vi.fn()}
+        onCreate={vi.fn()}
+        onDetach={vi.fn()}
+        onEdit={vi.fn()}
+      />
+    );
+
+    expect(host!.textContent).toContain('Templates could not be loaded.');
+    expect(host!.textContent).not.toContain('No templates yet');
+
+    await act(async () => {
+      await userEvent.click(buttonWithText('Retry'));
+    });
+
+    expect(catalog.retry).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the templates it has when a refresh fails, and says the list may be stale', async () => {
+    await render(
+      <PromptTemplatesPanel
+        activeTemplate={null}
+        catalog={createCatalog({ isError: true })}
+        isActiveTemplateMissing={false}
+        onApply={vi.fn()}
+        onCreate={vi.fn()}
+        onDetach={vi.fn()}
+        onEdit={vi.fn()}
+      />
+    );
+
+    expect(host!.textContent).toContain('Templates could not be refreshed.');
+    expect(buttonWithText('Cinematic')).toBeTruthy();
   });
 
   it('keeps management controls outside the inactive template row button', async () => {

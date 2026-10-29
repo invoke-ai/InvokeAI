@@ -6,11 +6,7 @@ import {
   getGenerateModelSelectionResult,
   isSupportedGenerateModel,
 } from '@features/generation/core/baseGenerationPolicies';
-import {
-  GENERATE_TOOL_MODEL_PICK_KEYS,
-  getGenerateValuesRevertPatch,
-  normalizeGenerateSettings,
-} from '@features/generation/core/settings';
+import { GENERATE_TOOL_MODEL_PICK_KEYS, normalizeGenerateSettings } from '@features/generation/core/settings';
 import { resolveGenerateWidgetValues } from '@features/generation/settings';
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import {
@@ -31,8 +27,9 @@ import type { GeneratePresetRecord } from './GenerationUiContext';
 
 import { flushGenerateDrafts } from './generateDraftRegistry';
 import { getGenerateFormCommitPatch } from './generateFormViewModel';
+import { offerGenerateUndo } from './generateUndo';
 import { useGenerateValues, useGenerationUi } from './GenerationUiContext';
-import { describeModelSwitchChanges, getGenerateSettingsUndoKey } from './modelSelectionNotice';
+import { describeModelSwitchChanges } from './modelSelectionNotice';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from './promptFields/PromptPanelHeader';
 
 const POPOVER_POSITIONING = { placement: 'bottom-end' } as const;
@@ -56,18 +53,30 @@ const PRESET_PROMPT_KEYS = [
   'promptTemplateViewMode',
 ] as const satisfies readonly (keyof GenerateSettings)[];
 
-/** A preset's settings; one saved without prompts keeps the current prompts, everything else comes from the preset. */
+/** Settings newer than some saved presets: a preset without one keeps the current value instead of the default. */
+const PRESET_NEWER_KEYS = ['dynamicPromptsEnabled'] as const satisfies readonly (keyof GenerateSettings)[];
+
+/**
+ * A preset's settings; one saved without prompts keeps the current prompts, one saved before a newer setting keeps the
+ * current value of it, and everything else comes from the preset.
+ */
 const getPresetSettings = (current: object, preset: GeneratePresetRecord): GenerateSettings | null => {
   const currentValues = current as Record<string, unknown>;
 
   return normalizeGenerateSettings({
-    ...Object.fromEntries(PRESET_PROMPT_KEYS.map((key) => [key, currentValues[key]])),
+    ...Object.fromEntries([...PRESET_PROMPT_KEYS, ...PRESET_NEWER_KEYS].map((key) => [key, currentValues[key]])),
     ...preset.values,
   });
 };
 
-/** Ignore presentation and non-applied keys, including seed unless its mode is fixed, and prompts when asked. */
-const getPresetComparisonKey = (settings: GenerateSettings, withoutPrompts = false): string => {
+/** The keys a preset leaves as they are: the prompts when saved without them, and settings newer than it. */
+const getPresetKeptKeys = (preset: GeneratePresetRecord): readonly string[] => [
+  ...('positivePrompt' in preset.values ? [] : PRESET_PROMPT_KEYS),
+  ...PRESET_NEWER_KEYS.filter((key) => !(key in preset.values)),
+];
+
+/** Ignore presentation and non-applied keys, including seed unless its mode is fixed, and the keys a preset keeps. */
+const getPresetComparisonKey = (settings: GenerateSettings, keptKeys: readonly string[] = []): string => {
   const comparable: Record<string, unknown> = { ...settings };
 
   delete comparable.batchCount;
@@ -84,26 +93,25 @@ const getPresetComparisonKey = (settings: GenerateSettings, withoutPrompts = fal
     delete comparable.seed;
   }
 
-  if (withoutPrompts) {
-    for (const key of PRESET_PROMPT_KEYS) {
-      delete comparable[key];
-    }
+  for (const key of keptKeys) {
+    delete comparable[key];
   }
 
   return JSON.stringify(comparable);
 };
 
 /**
- * A preset's comparison key, read once per preset: one saved without prompts matches whatever prompts are current, so
- * its key leaves them out. Placeholder prompts let such a preset normalize on its own.
+ * A preset's comparison key, read once per preset: it leaves out the keys the preset keeps (prompts it was saved
+ * without, settings newer than it), which match whatever is current. Placeholder prompts let it normalize on its own.
  */
-const getStoredPresetKey = (preset: GeneratePresetRecord): { key: string; withoutPrompts: boolean } | null => {
+const getStoredPresetKey = (preset: GeneratePresetRecord): { key: string; keptKeys: readonly string[] } | null => {
   const withoutPrompts = !('positivePrompt' in preset.values);
+  const keptKeys = getPresetKeptKeys(preset);
   const settings = normalizeGenerateSettings(
     withoutPrompts ? { negativePrompt: '', positivePrompt: '', ...preset.values } : preset.values
   );
 
-  return settings ? { key: getPresetComparisonKey(settings, withoutPrompts), withoutPrompts } : null;
+  return settings ? { key: getPresetComparisonKey(settings, keptKeys), keptKeys } : null;
 };
 
 const PresetRow = ({
@@ -206,11 +214,22 @@ export const GeneratePresetsPopover = () => {
       return null;
     }
 
-    const currentKey = getPresetComparisonKey(settings);
-    const currentKeyWithoutPrompts = getPresetComparisonKey(settings, true);
-    const index = presetKeys.findIndex(
-      (stored) => stored !== null && stored.key === (stored.withoutPrompts ? currentKeyWithoutPrompts : currentKey)
-    );
+    // Presets keep only a few distinct sets of keys, so the current settings are keyed once per set.
+    const currentKeys = new Map<string, string>();
+    const getCurrentKey = (keptKeys: readonly string[]) => {
+      const signature = keptKeys.join();
+      const known = currentKeys.get(signature);
+
+      if (known !== undefined) {
+        return known;
+      }
+
+      const key = getPresetComparisonKey(settings, keptKeys);
+
+      currentKeys.set(signature, key);
+      return key;
+    };
+    const index = presetKeys.findIndex((stored) => stored !== null && stored.key === getCurrentKey(stored.keptKeys));
 
     return index >= 0 ? (presets[index] ?? null) : null;
   }, [presetKeys, presets, settings]);
@@ -255,20 +274,23 @@ export const GeneratePresetsPopover = () => {
       }
 
       const patch = getGenerateFormCommitPatch(resolved.values);
-      const revertPatch = getGenerateValuesRevertPatch(before, { ...before, ...patch });
       // What the preset holds that its model cannot use now, told as a switch to that model would tell it.
       const message = describeModelSwitchChanges(result, t, i18n.resolvedLanguage).join(' ');
 
       ui.settings.patchGenerateSettings(patch, projectId);
-      ui.notifications.undoable(t('widgets.generate.presetApplied', { name: record.label }), {
-        ...(message ? { message } : {}),
-        onUndo: () => ui.settings.patchGenerateSettings(revertPatch, projectId),
+      offerGenerateUndo({
+        after: { ...before, ...patch },
+        before,
+        message,
         projectId,
-        supersedes: getGenerateSettingsUndoKey(projectId),
+        slot: 'settings',
+        t,
+        title: t('widgets.generate.presetApplied', { name: record.label }),
+        ui,
       });
       setIsOpen(false);
     },
-    [i18n.resolvedLanguage, models, projectId, supportedModels, t, ui.generateValues, ui.notifications, ui.settings]
+    [i18n.resolvedLanguage, models, projectId, supportedModels, t, ui]
   );
 
   const [includePrompts, setIncludePrompts] = useState(ui.presets.includePrompts);

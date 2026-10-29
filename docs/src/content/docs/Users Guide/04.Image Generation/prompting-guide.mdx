@@ -1,7 +1,7 @@
 ---
 title: Prompting Guide
 description: Write prompts that work, then go further with prompt templates, dynamic prompts and wildcards.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-28
 sidebar:
   order: 2
 ---
@@ -233,13 +233,13 @@ gives `a red balloon`, `a red kite`, `a green balloon` and `a green kite`. Group
 
 ### Previewing and generating
 
-Click **Dynamic** in the prompt toolbar to open the Dynamic Prompts popover. When the prompt contains dynamic syntax, the button shows how many prompts it expands into.
+Click **Dynamic** in the prompt toolbar to open the Dynamic prompts popover. When the prompt contains dynamic syntax, the button shows how many prompts it expands into. **Use dynamic prompts** at the top of the popover switches expansion off for the project, so the prompt is used exactly as typed; **Dynamic** then reads **Off**.
 
 The **Preview** tab lists the expanded prompts, numbered and highlighted, and shows the total as *prompts × iterations → generations*. The Invoke button's tooltip shows the same count. Only the first 200 prompts are listed; the rest are summarized as *and N more*.
 
-Click a prompt in the list (**Use this prompt**) to replace your prompt with that one variation, for example to refine it on its own. If a template is applied, it is folded into the chosen prompt and the template itself is removed, since its words are now part of your prompt.
+Click a prompt in the list to replace your prompt with that one variation, for example to refine it on its own. If a template is applied, it is folded into the chosen prompt and the template itself is removed, since its words are now part of your prompt.
 
-If the prompt cannot be expanded, for example because a brace is not closed or a wildcard has no values, the Preview tab shows the error and Invoke is blocked until you fix it.
+If the prompt cannot be expanded, for example because a brace is not closed or a wildcard has no values, the Preview tab and a note under the prompt show the error, and Invoke is blocked until you fix it or turn dynamic prompts off. When the server could not be reached, the note offers **Retry**.
 
 <Steps>
 

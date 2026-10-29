@@ -36,6 +36,36 @@ const imeCompose: BrowserCommand<[steps: readonly { kind: 'commit' | 'compose'; 
   }
 };
 
+/**
+ * Drags with the real mouse through `points` (the test frame's viewport coordinates), so the browser hit-tests every
+ * move and the release the way a user's drag is, which synthetic events dispatched at an element skip.
+ */
+const mouseDragPath: BrowserCommand<[points: readonly { x: number; y: number }[], frameWidth: number]> = async (
+  { frame, page },
+  points,
+  frameWidth
+) => {
+  const box = await (await (await frame()).frameElement()).boundingBox();
+
+  if (!box || points.length === 0) {
+    throw new Error('mouseDragPath needs a visible test frame and at least one point');
+  }
+
+  const scale = box.width / frameWidth;
+  const [start, ...rest] = points.map((point) => ({ x: box.x + point.x * scale, y: box.y + point.y * scale }));
+
+  await page.mouse.move(start!.x, start!.y);
+  await page.mouse.down();
+  try {
+    for (const point of rest) {
+      await page.mouse.move(point.x, point.y, { steps: 6 });
+    }
+  } finally {
+    // Never leave the button pressed for the next test.
+    await page.mouse.up();
+  }
+};
+
 type ThumbnailRouteState = {
   /** Requests still to be answered with `failureStatus`. */
   failuresLeft: number;
@@ -144,6 +174,7 @@ export default mergeConfig(
           endThumbnailRouteFailures,
           getThumbnailRequests,
           imeCompose,
+          mouseDragPath,
           resetBrowserPointer,
           startThumbnailRoute,
           stopThumbnailRoute: stopThumbnailRouteCommand,

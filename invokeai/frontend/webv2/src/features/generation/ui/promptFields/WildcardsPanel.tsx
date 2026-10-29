@@ -16,6 +16,7 @@ import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
 import { PromptTextarea } from '@features/generation/ui/promptFields/PromptTextarea';
 import { WildcardTransferActions } from '@features/generation/ui/promptFields/WildcardTransferActions';
+import { GenerateLoadError } from '@features/generation/ui/shared/GenerateLoadError';
 import { WildcardDeleteError } from '@features/generation/ui/useWildcards';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton } from '@platform/ui/Button';
@@ -235,6 +236,9 @@ export const WildcardsPanel = ({
     }
   }, [catalog, notifications, pendingDelete, t]);
 
+  // Read failed with nothing to show: the list says so, and controls that act on it go.
+  const isUnreadable = catalog.isError && catalog.wildcards.length === 0;
+
   if (draft) {
     return (
       <Stack gap="2">
@@ -304,6 +308,16 @@ export const WildcardsPanel = ({
         </Button>
       </PromptPanelHeader>
 
+      {/* A failed refresh keeps the wildcards read before; only a failure with nothing to show fills the list. */}
+      {catalog.isError && catalog.wildcards.length > 0 ? (
+        <GenerateLoadError
+          isRetrying={catalog.isRetrying}
+          layout="inline"
+          message={t('widgets.generate.dynamicPrompts.couldNotRefreshWildcards')}
+          onRetry={catalog.retry}
+        />
+      ) : null}
+
       {catalog.wildcards.length > 0 ? (
         <>
           {/* Its own field: the panel opens from the prompt's label, whose Field would otherwise lend this input its id,
@@ -321,49 +335,63 @@ export const WildcardsPanel = ({
         </>
       ) : null}
 
-      <Box ref={selectionBarRef}>
-        <ListSelectionBar
-          // No visible matches means indeterminate, not all selected; clicking clears the hidden selection.
-          checked={hasSelection ? (hasUnselectedFiltered || filtered.length === 0 ? 'indeterminate' : true) : false}
-          isDisabled={filtered.length === 0 && !hasSelection}
-          label={t('widgets.generate.dynamicPrompts.selectAllWildcards')}
-          summary={
-            hasSelection
-              ? t('widgets.generate.dynamicPrompts.selectedWildcardCount', { count: selection.size })
-              : undefined
-          }
-          onCheckedChange={handleToggleSelectAll}
-        >
-          {hasSelection ? (
-            <>
-              <Button colorPalette="red" size="sm" variant="ghost" onClick={() => setIsBulkDeleteOpen(true)}>
-                <TrashIcon />
-                {t('common.delete')}
-              </Button>
-              <Tooltip content={t('widgets.generate.dynamicPrompts.clearWildcardSelection')}>
-                <IconButton
-                  aria-label={t('widgets.generate.dynamicPrompts.clearWildcardSelection')}
-                  size="sm"
-                  variant="ghost"
-                  onClick={clearSelection}
-                >
-                  <XIcon />
-                </IconButton>
-              </Tooltip>
-            </>
-          ) : null}
-        </ListSelectionBar>
-      </Box>
+      {/* Nothing to select while the list could not be read. */}
+      {isUnreadable ? null : (
+        <Box ref={selectionBarRef}>
+          <ListSelectionBar
+            // No visible matches means indeterminate, not all selected; clicking clears the hidden selection.
+            checked={hasSelection ? (hasUnselectedFiltered || filtered.length === 0 ? 'indeterminate' : true) : false}
+            isDisabled={filtered.length === 0 && !hasSelection}
+            label={t('widgets.generate.dynamicPrompts.selectAllWildcards')}
+            summary={
+              hasSelection
+                ? t('widgets.generate.dynamicPrompts.selectedWildcardCount', { count: selection.size })
+                : undefined
+            }
+            onCheckedChange={handleToggleSelectAll}
+          >
+            {hasSelection ? (
+              <>
+                <Button colorPalette="red" size="sm" variant="ghost" onClick={() => setIsBulkDeleteOpen(true)}>
+                  <TrashIcon />
+                  {t('common.delete')}
+                </Button>
+                <Tooltip content={t('widgets.generate.dynamicPrompts.clearWildcardSelection')}>
+                  <IconButton
+                    aria-label={t('widgets.generate.dynamicPrompts.clearWildcardSelection')}
+                    size="sm"
+                    variant="ghost"
+                    onClick={clearSelection}
+                  >
+                    <XIcon />
+                  </IconButton>
+                </Tooltip>
+              </>
+            ) : null}
+          </ListSelectionBar>
+        </Box>
+      )}
 
       <Box h="14rem">
         <List
           density="snug"
           emptyState={
-            <Text color="fg.subtle" fontSize="xs">
-              {catalog.wildcards.length === 0
-                ? t('widgets.generate.dynamicPrompts.noWildcardsYet')
-                : t('widgets.generate.dynamicPrompts.noMatchingWildcards')}
-            </Text>
+            catalog.isError && catalog.wildcards.length === 0 ? (
+              <GenerateLoadError
+                isRetrying={catalog.isRetrying}
+                layout="state"
+                message={t('widgets.generate.dynamicPrompts.couldNotLoadWildcards')}
+                onRetry={catalog.retry}
+              />
+            ) : (
+              <Text color="fg.subtle" fontSize="xs">
+                {catalog.isLoading
+                  ? t('widgets.generate.dynamicPrompts.loadingWildcards')
+                  : catalog.wildcards.length === 0
+                    ? t('widgets.generate.dynamicPrompts.noWildcardsYet')
+                    : t('widgets.generate.dynamicPrompts.noMatchingWildcards')}
+              </Text>
+            )
           }
           label={t('widgets.generate.dynamicPrompts.wildcards')}
           renderItem={(wildcard: WildcardRecord, rowProps: ListRowProps) => (
@@ -382,8 +410,12 @@ export const WildcardsPanel = ({
         />
       </Box>
 
-      <Separator />
-      <WildcardTransferActions catalog={catalog} />
+      {isUnreadable ? null : (
+        <>
+          <Separator />
+          <WildcardTransferActions catalog={catalog} />
+        </>
+      )}
 
       {/* Confirm irreversible deletion of handwritten values. */}
       <ConfirmDialog

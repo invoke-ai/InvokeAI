@@ -8,6 +8,8 @@ import { DndContext } from '@dnd-kit/core';
 import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import { ensureArchitectureCapabilitiesLoaded } from '@features/generation/data/architectureCapabilitiesStore';
+import { dynamicPromptsKeys } from '@features/generation/data/dynamicPromptsQueries';
+import { promptTemplatesQueryOptions } from '@features/generation/data/promptTemplates';
 import { wildcardsQueryOptions } from '@features/generation/data/wildcards';
 import { flushGenerateDrafts } from '@features/generation/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
@@ -193,15 +195,21 @@ const createStableGroups = () => ({
     ModelSelect: MainModelPicker,
     catalog: CATALOG,
     ensureLoaded: noop,
-    error: null,
+    error: null as string | null,
     getBaseColorPalette: () => 'gray',
     getBaseLabel: (base: string) => base,
     openManager: noop,
+    refresh: () => Promise.resolve(),
     status: 'loaded',
   },
   notifications: { error: noop, info: noop, reportError: noop, undoable: noop as (...args: unknown[]) => void },
   presets: { includePrompts: true, presets: [], remove: noop, rename: noop, save: noop, setIncludePrompts: noop },
-  promptHistory: { clear: noop, items: [], remove: noop },
+  promptHistory: {
+    clear: noop,
+    items: [] as { negativePrompt: string | null; positivePrompt: string }[],
+    remove: noop,
+    restore: noop,
+  },
   queueInsights: { getSnapshot: () => NO_QUEUE_INSIGHTS, subscribe: () => noop },
   rebalancePresets: { presets: [], remove: noop, rename: noop, save: noop },
   sectionPreferences: { sectionsOpen: ALL_SECTIONS_OPEN, setSectionOpen: noop },
@@ -934,5 +942,173 @@ describe('GenerateSettingsForm render isolation', () => {
       'widgets.generate.issueCount'
     );
     expect(document.activeElement).toBe(sizeSection().querySelector('[data-part="trigger"]'));
+  });
+});
+
+describe('GenerateSettingsForm model loading', () => {
+  it('reads the models again from Retry when they could not be loaded, and shows it working', async () => {
+    let finish!: () => void;
+    const refresh = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        })
+    );
+    stableGroups.models = { ...stableGroups.models, catalog: [], error: 'Server said no', refresh, status: 'loaded' };
+    await renderAdapter(buildAdapter());
+
+    expect(host!.textContent).toContain('widgets.generate.modelsCouldNotLoad');
+    expect(host!.textContent).toContain('Server said no');
+    const retry = [...host!.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === 'common.retry'
+    )!;
+
+    await settle(() => retry.click());
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(retry.dataset.loading).toBeDefined();
+
+    await settle(() => finish());
+    expect(retry.dataset.loading).toBeUndefined();
+  });
+});
+
+const CINEMATIC = { id: 'cinematic', name: 'Cinematic', negativePrompt: '', positivePrompt: '{prompt}, 35mm' };
+
+describe('GenerateSettingsForm prompt changes past the prompt text', () => {
+  const buttonNamed = (name: string) =>
+    [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.getAttribute('aria-label') === name
+    )!;
+
+  it('uses a history entry that replaces the negative prompt, with an Undo that keeps typing since', async () => {
+    const undoable = vi.fn();
+    stableGroups.notifications.undoable = undoable;
+    stableGroups.promptHistory.items = [{ negativePrompt: 'grainy', positivePrompt: 'a fox in snow' }];
+    storedValues().patchSnapshot({ negativePrompt: 'blurry' });
+    await renderAdapter(buildAdapter());
+
+    await settle(() => buttonNamed('widgets.generate.promptHistory').click());
+    await settle(() => buttonNamed('widgets.generate.usePrompt').click());
+
+    expect(storedValues().getSnapshot()).toMatchObject({ negativePrompt: 'grainy', positivePrompt: 'a fox in snow' });
+    expect(undoable).toHaveBeenCalledExactlyOnceWith('widgets.generate.promptHistoryUsed', {
+      onUndo: expect.any(Function),
+      projectId: 'project-1',
+      supersedes: 'generate-prompt:project-1',
+    });
+
+    // The positive prompt was edited since; the Undo leaves that edit alone.
+    await settle(() => storedValues().patchSnapshot({ positivePrompt: 'a fox in deep snow' }));
+    await settle(() => undoable.mock.calls[0]![1].onUndo());
+
+    expect(storedValues().getSnapshot()).toMatchObject({
+      negativePrompt: 'blurry',
+      positivePrompt: 'a fox in deep snow',
+    });
+  });
+
+  it('applies a template chosen in the panel, with an Undo that puts back the one before', async () => {
+    const undoable = vi.fn();
+    const previous = { id: 'noir', name: 'Noir', negativePrompt: '', positivePrompt: '{prompt}, noir' };
+    stableGroups.notifications.undoable = undoable;
+    storedValues().patchSnapshot({ promptTemplate: previous });
+    queryClient.setQueryData(promptTemplatesQueryOptions().queryKey, [
+      { ...CINEMATIC, hasImage: false, isDefault: true, isPublic: true, userId: 'system' },
+    ]);
+    await renderAdapter(buildAdapter());
+
+    await settle(() => buttonNamed('widgets.generate.promptTemplates.title').click(), 50);
+    await settle(
+      () =>
+        [...document.querySelectorAll<HTMLButtonElement>('[data-scope="popover"] button')]
+          .find((button) => button.textContent?.includes('Cinematic'))!
+          .click(),
+      50
+    );
+
+    expect(storedValues().getSnapshot().promptTemplate).toEqual(CINEMATIC);
+    expect(undoable).toHaveBeenCalledExactlyOnceWith('widgets.generate.promptTemplateApplied', {
+      onUndo: expect.any(Function),
+      projectId: 'project-1',
+      supersedes: 'generate-prompt:project-1',
+    });
+
+    await settle(() => undoable.mock.calls[0]![1].onUndo());
+
+    expect(storedValues().getSnapshot().promptTemplate).toEqual(previous);
+  });
+
+  it('merges a template into the prompt with an Undo that is all or nothing', async () => {
+    const undoable = vi.fn();
+    const info = vi.fn();
+    const template = { ...CINEMATIC, negativePrompt: '{prompt}, blurry' };
+    stableGroups.notifications = { ...stableGroups.notifications, info, undoable };
+    storedValues().patchSnapshot({
+      negativePrompt: 'grainy',
+      positivePrompt: 'a {red|blue} cat',
+      promptTemplate: template,
+    });
+    queryClient.setQueryData(
+      dynamicPromptsKeys.expansion({
+        combinatorial: true,
+        max_prompts: 100,
+        prompt: 'a {red|blue} cat, 35mm',
+        seed: null,
+      }),
+      { error: null, prompts: ['a red cat, 35mm', 'a blue cat, 35mm'] }
+    );
+    await renderAdapter(buildAdapter());
+
+    await settle(() => buttonNamed('widgets.generate.dynamicPrompts.showPrompts').click(), 700);
+    await settle(
+      () =>
+        [...document.querySelectorAll<HTMLButtonElement>('[data-scope="popover"] button')]
+          .find((button) => button.textContent?.includes('a red cat, 35mm'))!
+          .click(),
+      50
+    );
+
+    expect(storedValues().getSnapshot()).toMatchObject({
+      negativePrompt: 'grainy, blurry',
+      positivePrompt: 'a red cat, 35mm',
+      promptTemplate: null,
+    });
+    expect(undoable).toHaveBeenCalledWith('widgets.generate.promptTemplateMerged', expect.anything());
+    const undo = undoable.mock.calls.at(-1)![1].onUndo as () => void;
+
+    // Half a merge would be a prompt nobody wrote: with the positive prompt edited since, nothing is undone.
+    await settle(() => storedValues().patchSnapshot({ positivePrompt: 'a red cat, 50mm' }));
+    await settle(undo);
+    expect(storedValues().getSnapshot()).toMatchObject({ negativePrompt: 'grainy, blurry', promptTemplate: null });
+    expect(info).toHaveBeenCalledWith('widgets.generate.undoStale');
+
+    await settle(() => storedValues().patchSnapshot({ positivePrompt: 'a red cat, 35mm' }));
+    await settle(undo);
+    expect(storedValues().getSnapshot()).toMatchObject({
+      negativePrompt: 'grainy',
+      positivePrompt: 'a {red|blue} cat',
+      promptTemplate: template,
+    });
+  });
+
+  it('stops using a template from its tag, with an Undo that applies it again', async () => {
+    const undoable = vi.fn();
+    const template = { id: 'cinematic', name: 'Cinematic', negativePrompt: '', positivePrompt: '{prompt}, 35mm' };
+    stableGroups.notifications.undoable = undoable;
+    storedValues().patchSnapshot({ promptTemplate: template });
+    await renderAdapter(buildAdapter());
+
+    await settle(() => buttonNamed('widgets.generate.clearPromptTemplate').click());
+
+    expect(storedValues().getSnapshot().promptTemplate).toBeNull();
+    expect(undoable).toHaveBeenCalledExactlyOnceWith('widgets.generate.promptTemplateCleared', {
+      onUndo: expect.any(Function),
+      projectId: 'project-1',
+      supersedes: 'generate-prompt:project-1',
+    });
+
+    await settle(() => undoable.mock.calls[0]![1].onUndo());
+
+    expect(storedValues().getSnapshot().promptTemplate).toEqual(template);
   });
 });

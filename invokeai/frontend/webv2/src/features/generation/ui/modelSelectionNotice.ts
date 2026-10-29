@@ -9,6 +9,8 @@ import type { TFunction } from 'i18next';
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
+import { getGenerateSettingsUndoKey } from './generateUndo';
+
 /** The order a switch's changes are told in: what is lost first, then what is only set aside or moved. */
 const MODEL_SWITCH_CHANGE_KINDS: readonly GenerateModelSwitchChangeKind[] = [
   'removed',
@@ -16,12 +18,6 @@ const MODEL_SWITCH_CHANGE_KINDS: readonly GenerateModelSwitchChangeKind[] = [
   'turnedOff',
   'adjusted',
 ];
-
-/**
- * Every Generate Undo that restores settings a whole-form change replaced (a model switch, a preset, Reset all) shares
- * this key, so a newer one withdraws the older: undoing the older after the newer would leave a mix of both.
- */
-export const getGenerateSettingsUndoKey = (projectId: string): string => `generate-settings:${projectId}`;
 
 /**
  * One sentence per kind of change, then the size the change moved to; empty when nothing else changed. The toast says

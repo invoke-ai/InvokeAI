@@ -15,6 +15,7 @@ import { normalizeRebalancePresets } from '@features/generation/settings';
 import { useAuthSession, useCapabilities } from '@features/identity';
 import {
   ensureModelsLoaded,
+  refreshModels,
   getModelBaseColorPalette,
   getModelBaseLabel,
   getModelImageUrl,
@@ -29,8 +30,10 @@ import {
 } from '@features/queue/contracts';
 import { createUuid } from '@platform/browser/randomUuid';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { createProjectedExternalStore } from '@platform/state/projectedExternalStore';
 import { shallowEqual } from '@platform/state/selectors';
+import { createActionToast } from '@platform/ui/toaster';
 import { type QueryClient, QueryObserver, useQueryClient } from '@tanstack/react-query';
 import { resetGenerateDims } from '@workbench/canvasDimsSync';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
@@ -283,6 +286,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       ModelSelect,
       catalog: modelsCatalog,
       ensureLoaded: ensureModelsLoaded,
+      refresh: () => refreshModels(),
       error: modelsError,
       getBaseColorPalette: getModelBaseColorPalette,
       getBaseLabel: getModelBaseLabel,
@@ -314,6 +318,15 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     () => ({
       error: notify.error,
       info: notify.info,
+      offer: (title, { actions, message }) =>
+        void createActionToast({
+          actions,
+          description: message,
+          duration: Number.POSITIVE_INFINITY,
+          signal: captureAccountScope().signal,
+          title,
+          type: 'info',
+        }),
       reportError: notifications.reportError,
       undoable: notify.undoable,
     }),
@@ -321,9 +334,10 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
   );
   const promptHistoryGroup = useMemo<GenerationUiAdapter['promptHistory']>(
     () => ({
-      clear: () => generation.clearPromptHistory(),
+      clear: generation.clearPromptHistory,
       items: promptHistoryItems,
       remove: generation.removePromptFromHistory,
+      restore: generation.restorePromptHistory,
     }),
     [generation, promptHistoryItems]
   );

@@ -14,7 +14,7 @@ import { areArraysEqual, useExternalStoreSelector } from '@platform/state/select
 import { Button } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { Field } from '@platform/ui/Field';
-import { useCallback, useId } from 'react';
+import { useCallback, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { GenerateDraft } from './generateDebounce';
@@ -28,6 +28,7 @@ import {
   usePendingGenerateModelSwitch,
 } from './modelSelectionNotice';
 import { useGenerateSectionIssues } from './shared/GenerateIssues';
+import { GenerateLoadError } from './shared/GenerateLoadError';
 
 const MAIN_MODEL_TYPES = ['main', 'external_image_generator'];
 
@@ -64,6 +65,12 @@ export const GenerateModelCard = ({
   // On a Canvas source the width and height are the frame, which a switch keeps for a hosted provider.
   const isCanvasFrame = ui.project.invocationSourceId === 'canvas';
   const openManagerForMainModels = useCallback(() => openManager({ modelType: 'main' }), [openManager]);
+  const [isRetryingModels, setIsRetryingModels] = useState(false);
+  const { refresh: refreshModels } = ui.models;
+  const retryModels = useCallback(() => {
+    setIsRetryingModels(true);
+    void refreshModels().finally(() => setIsRetryingModels(false));
+  }, [refreshModels]);
   // Shared with the palette, which asks this card to confirm a lossy switch it cannot show itself.
   const pendingSwitchModel = usePendingGenerateModelSwitch(projectId);
   const modelIssues = useGenerateSectionIssues('model');
@@ -187,9 +194,13 @@ export const GenerateModelCard = ({
           {t('widgets.generate.loadingModels')}
         </Text>
       ) : loadError ? (
-        <Text color="fg.error" fontSize="xs">
-          {loadError}
-        </Text>
+        <GenerateLoadError
+          detail={loadError}
+          isRetrying={isRetryingModels}
+          layout="inline"
+          message={t('widgets.generate.modelsCouldNotLoad')}
+          onRetry={retryModels}
+        />
       ) : hasNoSupportedModels ? (
         <Stack gap="1.5">
           <Text color="fg.error" fontSize="xs">

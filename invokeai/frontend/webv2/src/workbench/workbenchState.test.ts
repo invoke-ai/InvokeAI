@@ -228,6 +228,7 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   hiDiffusionT2Ratio: 0,
   hiDiffusionWindowAttentionEnabled: true,
   dynamicPromptsCombinatorial: true,
+  dynamicPromptsEnabled: true,
   dynamicPromptsMaxPrompts: 100,
   dynamicPromptsSampleSeed: 0,
   dynamicPromptsResample: true,

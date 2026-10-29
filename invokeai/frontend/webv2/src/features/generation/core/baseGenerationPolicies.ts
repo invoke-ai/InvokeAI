@@ -473,6 +473,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     hiDiffusionT1Ratio: DEFAULT_HIDIFFUSION_T1_RATIO,
     hiDiffusionT2Ratio: DEFAULT_HIDIFFUSION_T2_RATIO,
     dynamicPromptsCombinatorial: true,
+    dynamicPromptsEnabled: true,
     dynamicPromptsMaxPrompts: DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
     dynamicPromptsSampleSeed: 0,
     dynamicPromptsResample: true,
@@ -2054,7 +2055,14 @@ const issue = (
 });
 
 const MODEL_TARGET: GenerationIssue['target'] = { section: 'model' };
+/** The reference images as a group (their count, or a rule over all of them); the section lists it above the cards. */
 const REFERENCE_IMAGES_TARGET: GenerationIssue['target'] = { field: 'referenceImages', section: 'guidance' };
+/** One reference image: its card shows the issue. */
+const referenceImageTarget = (referenceImageId: string): GenerationIssue['target'] => ({
+  field: 'referenceImage',
+  referenceImageId,
+  section: 'guidance',
+});
 
 /** Installed-model checks: the main model, its components, concepts and enabled references must all be installed. */
 export const getGenerationModelAvailabilityIssues = (
@@ -2143,7 +2151,7 @@ export const getGenerationModelAvailabilityIssues = (
           `referenceImages:modelNotInstalled:${referenceImage.id}`,
           'referenceModelNotInstalled',
           `Reference image ${index + 1} uses "${config.model.name}", which is not installed. Turn it off, or choose another model for it.`,
-          REFERENCE_IMAGES_TARGET,
+          referenceImageTarget(referenceImage.id),
           { index: index + 1, name: config.model.name },
           { kind: 'turnOffReferenceImages', referenceImageIds: [referenceImage.id] }
         )
@@ -2312,7 +2320,7 @@ const getReferenceImageValidationIssues = (
           `referenceImages:unsupported:${id}`,
           'referenceImageUnsupported',
           `${model.name} cannot use reference image ${index}. Turn it off, or remove it.`,
-          REFERENCE_IMAGES_TARGET,
+          referenceImageTarget(id),
           { index, name: model.name },
           turnOff
         )
@@ -2326,7 +2334,7 @@ const getReferenceImageValidationIssues = (
           `referenceImages:needsImage:${id}`,
           'referenceImageNeedsImage',
           `Reference image ${index} needs an image.`,
-          REFERENCE_IMAGES_TARGET,
+          referenceImageTarget(id),
           { index },
           turnOff
         )
@@ -2340,7 +2348,7 @@ const getReferenceImageValidationIssues = (
             `referenceImages:needsIpAdapter:${id}`,
             'referenceImageNeedsIpAdapter',
             `Reference image ${index} needs an IP Adapter model for ${model.name}.`,
-            REFERENCE_IMAGES_TARGET,
+            referenceImageTarget(id),
             { index, name: model.name },
             turnOff
           )
@@ -2355,7 +2363,7 @@ const getReferenceImageValidationIssues = (
             `referenceImages:strength:${id}`,
             'referenceImageStrength',
             `Reference image ${index} strength must be between 0 and 2.`,
-            REFERENCE_IMAGES_TARGET,
+            referenceImageTarget(id),
             { index },
             turnOff
           )
@@ -2372,7 +2380,7 @@ const getReferenceImageValidationIssues = (
           `referenceImages:needsRedux:${id}`,
           'referenceImageNeedsRedux',
           `Reference image ${index} needs a FLUX Redux model for ${model.name}.`,
-          REFERENCE_IMAGES_TARGET,
+          referenceImageTarget(id),
           { index, name: model.name },
           turnOff
         )
@@ -2388,7 +2396,7 @@ const getReferenceImageValidationIssues = (
           `referenceImages:needsKontext:${id}`,
           'referenceImageNeedsKontext',
           `Reference image ${index} needs the selected FLUX Kontext model.`,
-          REFERENCE_IMAGES_TARGET,
+          referenceImageTarget(id),
           { index },
           turnOff
         )

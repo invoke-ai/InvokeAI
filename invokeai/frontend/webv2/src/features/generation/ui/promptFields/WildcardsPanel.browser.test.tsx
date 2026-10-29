@@ -26,10 +26,13 @@ let root: Root | null = null;
 const catalog: WildcardCatalog = {
   applyWrites: vi.fn(),
   create: vi.fn(),
+  isError: false,
   isLoading: false,
+  isRetrying: false,
   knownNames: new Set(['colors']),
   remove: vi.fn(),
   removeMany: vi.fn(),
+  retry: vi.fn(),
   update: vi.fn(),
   wildcards: [{ id: 'w1', name: 'colors', values: ['red', 'green'] }],
 };
@@ -167,6 +170,42 @@ it('animates the conflict dialog out instead of unmounting it on cancel', async 
   }
 });
 
+describe('a failed wildcard read', () => {
+  it('says the read failed, with a retry, instead of offering to create the first wildcard', async () => {
+    const failed = { ...emptyCatalog, isError: true, retry: vi.fn() };
+
+    await renderPanel(true, failed);
+
+    expect(host!.textContent).toContain('widgets.generate.dynamicPrompts.couldNotLoadWildcards');
+    expect(host!.textContent).not.toContain('widgets.generate.dynamicPrompts.noWildcardsYet');
+    // Selecting and exporting act on a list there is none of.
+    expect(host!.innerHTML).not.toContain('widgets.generate.dynamicPrompts.selectAllWildcards');
+    expect(host!.textContent).not.toContain('widgets.generate.dynamicPrompts.export');
+
+    await act(async () => {
+      await userEvent.click(
+        [...host!.querySelectorAll('button')].find((button) => button.textContent === 'common.retry')!
+      );
+    });
+
+    expect(failed.retry).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the wildcards it has when a refresh fails', async () => {
+    await renderPanel(true, { ...catalog, isError: true });
+
+    expect(host!.textContent).toContain('widgets.generate.dynamicPrompts.couldNotRefreshWildcards');
+    expect(host!.textContent).toContain('__colors__');
+  });
+
+  it('says it is loading rather than empty before the first read', async () => {
+    await renderPanel(true, { ...emptyCatalog, isLoading: true });
+
+    expect(host!.textContent).toContain('widgets.generate.dynamicPrompts.loadingWildcards');
+    expect(host!.textContent).not.toContain('widgets.generate.dynamicPrompts.noWildcardsYet');
+  });
+});
+
 describe('wildcard values editor', () => {
   it('colours attention and nested dynamic syntax in the values', async () => {
     await openEditor(true);
@@ -210,10 +249,13 @@ describe('finding a wildcard', () => {
   const manyCatalog: WildcardCatalog = {
     applyWrites: vi.fn(),
     create: vi.fn(),
+    isError: false,
     isLoading: false,
+    isRetrying: false,
     knownNames: new Set(['colors']),
     remove: vi.fn(),
     removeMany: vi.fn(),
+    retry: vi.fn(),
     update: vi.fn(),
     wildcards: [
       { id: 'w1', name: 'colors', values: ['red', 'green'] },

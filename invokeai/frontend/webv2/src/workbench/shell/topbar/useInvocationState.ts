@@ -6,6 +6,8 @@ import type { WidgetTypeId } from '@workbench/widgetContracts';
 import { useDynamicPrompts } from '@features/generation/react';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import {
+  describeDynamicPromptsFailure,
+  describeGenerationIssue,
   getEffectivePrompts,
   normalizeGenerateSettings,
   sanitizeBatchCount,
@@ -82,6 +84,7 @@ const areTypeIdSetsEqual = (left: ReadonlySet<WidgetTypeId>, right: ReadonlySet<
 
 const readDynamicPromptsConfig = (values: Record<string, unknown>) => ({
   combinatorial: values.dynamicPromptsCombinatorial,
+  enabled: values.dynamicPromptsEnabled,
   maxPrompts: values.dynamicPromptsMaxPrompts,
   resample: values.dynamicPromptsResample,
   sampleSeed: values.dynamicPromptsSampleSeed,
@@ -174,10 +177,9 @@ export const useInvocationState = (): InvocationState => {
       : null
   );
   // Block unexpandable prompts rather than submitting literal dynamic syntax; hotkey submission enforces the same
-  // rule.
-  const expansionReason = promptExpansion.isError
-    ? 'The prompt could not be expanded.'
-    : (promptExpansion.error ?? null);
+  // rule. The prompt field offers the way out: retry, or turn dynamic prompts off and run the prompt as typed.
+  const expansionFailure = describeDynamicPromptsFailure(promptExpansion);
+  const expansionReason = expansionFailure ? describeGenerationIssue(t, expansionFailure) : null;
 
   const issues = useMemo(
     (): InvocationIssue[] => [

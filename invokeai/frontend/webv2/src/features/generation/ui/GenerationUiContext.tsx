@@ -119,11 +119,22 @@ export interface GenerationUiAdapter {
     openInModelManager?: (key: string) => void;
     /** Apply the optional model-type filter when opening Add Models. */
     openManager(options?: { modelType?: string }): void;
+    /** Reads the catalog again, even after a read that half failed; settles when the read does. */
+    refresh(): Promise<void>;
     status: 'error' | 'idle' | 'loaded' | 'loading';
   };
   notifications: {
     error(title: string, message?: string): void;
     info(title: string, message?: string): void;
+    /**
+     * Offers a choice about something that arrived on its own (a result held back), as buttons in a toast that stays
+     * until the user picks one or closes it, and closes with the account. Each `onClick` must check its target still
+     * exists.
+     */
+    offer(
+      title: string,
+      notice: { actions: readonly { label: string; onClick: () => void }[]; message?: string }
+    ): void;
     reportError(error: { area: string; message: string; namespace: 'generation'; projectId?: string }): void;
     /**
      * Reports a change that already happened, with Undo. `onUndo` must capture the ids it reverts (the toast outlives
@@ -142,9 +153,12 @@ export interface GenerationUiAdapter {
     showPromptSyntaxHighlighting: boolean;
   };
   promptHistory: {
+    /** The active project's history. */
     items: readonly PromptHistoryItem[];
-    clear(): void;
+    clear(projectId: string): void;
     remove(prompt: PromptHistoryItem): void;
+    /** Undoes a clear: puts `items` back into that project's history, behind entries added since. */
+    restore(items: readonly PromptHistoryItem[], projectId: string): void;
   };
   presets: {
     /** Whether a new preset keeps the prompts too; the save dialog's last choice, remembered per account. */

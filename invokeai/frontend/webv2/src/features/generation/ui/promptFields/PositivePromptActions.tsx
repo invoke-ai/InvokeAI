@@ -8,7 +8,10 @@ import type {
   ImageWithDims,
 } from '@features/generation/core/types';
 import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
+import type { PromptEditor } from '@features/generation/ui/promptFields/promptEditor';
+import type { PromptTemplateChange } from '@features/generation/ui/promptFields/PromptTemplatesButton';
 import type { DroppedPromptImage } from '@features/generation/ui/promptFields/usePromptImageDrop';
+import type { DynamicPromptsExpansion } from '@features/generation/ui/useDynamicPrompts';
 import type { ChangeEvent, MouseEvent } from 'react';
 
 import {
@@ -29,9 +32,11 @@ import { filterPromptHistory } from '@features/generation/core/promptHistory';
 import { resolveSelectedSystemPromptId } from '@features/generation/core/systemPrompts';
 import { llmTaskProgressStore } from '@features/generation/data/llmTaskProgress';
 import { expandPrompt, imageToPrompt } from '@features/generation/data/promptUtilities';
+import { getGeneratePromptUndoKey } from '@features/generation/ui/generateUndo';
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { DynamicPromptsButton } from '@features/generation/ui/promptFields/DynamicPromptsButton';
 import { LLMTaskProgressDisplay } from '@features/generation/ui/promptFields/LLMTaskProgressDisplay';
+import { useFocusAfterPromptWrite } from '@features/generation/ui/promptFields/promptEditor';
 import { PromptTemplatesButton } from '@features/generation/ui/promptFields/PromptTemplatesButton';
 import {
   filterPromptTriggerOptions,
@@ -46,9 +51,13 @@ import { useSystemPrompts } from '@features/generation/ui/promptFields/useSystem
 import { createUuid } from '@platform/browser/randomUuid';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { getApiErrorMessage } from '@platform/transport/http';
-import { Button, IconButton, PopoverContent, Scrollable, Tooltip } from '@platform/ui';
+import { Button, IconButton } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { PopoverContent } from '@platform/ui/Popover';
+import { Scrollable } from '@platform/ui/Scrollable';
+import { Tooltip } from '@platform/ui/Tooltip';
 import {
+  ArrowUpLeftIcon,
   EyeIcon,
   EyeOffIcon,
   HistoryIcon,
@@ -56,12 +65,13 @@ import {
   PencilSparklesIcon,
   PlusIcon,
   TrashIcon,
-  Undo2Icon,
 } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const POPOVER_POSITIONING_BOTTOM_END = { placement: 'bottom-end' } as const;
+/** Beside the trigger, so the prompt the request rewrites stays in view while it runs. */
+const POPOVER_POSITIONING_BESIDE = { placement: 'right-start' } as const;
 const TEXT_LLM_MODEL_TYPES = ['text_llm'];
 const LLAVA_MODEL_TYPES = ['llava_onevision'];
 /** Keep triggers available so missing-model states can explain recovery. */
@@ -138,7 +148,7 @@ export interface PromptTemplateState {
   /** Whether the box is showing the merged result rather than the authored text. */
   isViewMode: boolean;
   /** Absent on surfaces with no template concept (Upscale). */
-  onApply?: (template: PromptTemplateSnapshot | null) => void;
+  onApply?: (template: PromptTemplateSnapshot | null, change: PromptTemplateChange) => void;
   /** Absent wherever `onApply` is; view mode has nothing to show without it. */
   onViewModeChange?: (viewMode: boolean) => void;
   /** Writes already-merged text into the authored field and drops the template. */
@@ -151,10 +161,10 @@ interface PositivePromptActionsProps {
   droppedImage: DroppedPromptImage;
   /** Absent on surfaces whose prompt is not batch-expanded (Upscale). */
   dynamicPrompts: DynamicPromptsFieldConfig | null;
-  /** The authored prompt wrapped by the active template — what actually expands. */
-  effectivePositivePrompt: string;
   /** Absent on surfaces whose model family has no prompt enhancer of its own. */
   expandPromptSuggestion?: ExpandPromptSuggestion | null;
+  /** The expansion of the prompt inside its template (what generates), shared with the notice under the prompt. */
+  expansion: DynamicPromptsExpansion;
   loras: GenerateLora[];
   isPromptTriggerPickerOpen: boolean;
   onUsePrompt: (prompt: PromptHistoryItem) => void;
@@ -162,7 +172,8 @@ interface PositivePromptActionsProps {
   selectedModel: GenerateModelConfig | undefined;
   projectId: string;
   onOpenPromptTriggerPicker: (anchorElement: HTMLElement) => void;
-  onPositivePromptChangeImmediate: (prompt: string) => void;
+  /** Reads and rewrites the authored prompt, keeping rewrites undoable with Ctrl+Z. */
+  promptEditor: PromptEditor;
   savedPromptModels?: SavedPromptModels;
   template: PromptTemplateState;
   onInsertText: (text: string) => void;
@@ -176,15 +187,15 @@ export const PositivePromptActions = ({
   batchCount,
   droppedImage,
   dynamicPrompts,
-  effectivePositivePrompt,
   expandPromptSuggestion,
+  expansion,
   isPromptTriggerPickerOpen,
   onInsertText,
   onOpenPromptTriggerPicker,
-  onPositivePromptChangeImmediate,
   onUsePrompt,
   positivePrompt,
   projectId,
+  promptEditor,
   savedPromptModels,
   showSyntaxHighlighting,
   template,
@@ -196,12 +207,13 @@ export const PositivePromptActions = ({
         <DynamicPromptsButton
           batchCount={batchCount}
           config={dynamicPrompts}
+          expansion={expansion}
           highlightExpandedPrompts={showSyntaxHighlighting && attentionSyntax}
-          positivePrompt={effectivePositivePrompt}
+          promptEditor={promptEditor}
           showSyntaxHighlighting={showSyntaxHighlighting}
           onInsertText={onInsertText}
           // Applying merged expansion text must remove its template atomically.
-          onUsePrompt={template.active ? template.onFlatten : onPositivePromptChangeImmediate}
+          onUsePrompt={template.active ? template.onFlatten : promptEditor.write}
         />
       ) : null}
       {/* Disable authored-text rewrites while merged view hides the authored text. */}
@@ -213,18 +225,18 @@ export const PositivePromptActions = ({
         isDisabled={template.isViewMode}
         positivePrompt={positivePrompt}
         projectId={projectId}
+        promptEditor={promptEditor}
         savedPromptModels={savedPromptModels}
         suggestion={expandPromptSuggestion ?? null}
-        onPositivePromptChange={onPositivePromptChangeImmediate}
       />
       <ImageToPromptButton
         droppedImage={droppedImage}
         isDisabled={template.isViewMode}
         projectId={projectId}
+        promptEditor={promptEditor}
         savedPromptModels={savedPromptModels}
-        onPositivePromptChange={onPositivePromptChangeImmediate}
       />
-      <PositivePromptHistoryButton onUsePrompt={onUsePrompt} />
+      <PositivePromptHistoryButton projectId={projectId} promptEditor={promptEditor} onUsePrompt={onUsePrompt} />
     </HStack>
   );
 };
@@ -442,32 +454,226 @@ const PromptTriggerOptionButton = ({
   );
 };
 
+interface PromptRewrite {
+  /** Drops the request: its result never lands. */
+  abandon: () => void;
+  isRunning: boolean;
+  run: (request: (taskId: string) => Promise<string | null | undefined>, onError: (error: unknown) => void) => void;
+  taskId: string | null;
+}
+
+/** Long enough to recognise a held result in a toast without filling the screen with it. */
+const HELD_RESULT_PREVIEW_LENGTH = 280;
+
+/**
+ * One Expand or Image to Prompt request at a time; it keeps running when its popover closes. Its result replaces the
+ * prompt only while the prompt reads as it did when the request started: as an edit (Ctrl+Z) while the popover is
+ * still open, else without taking focus from wherever the user went; an Undo toast covers both. A prompt changed
+ * meanwhile is never overwritten: the result is offered in a toast instead. A field that unmounts or moves to another
+ * project drops the request, so a late result never lands in the wrong prompt.
+ */
+const usePromptRewrite = ({
+  editor,
+  isOpen,
+  onLandedOpen,
+  projectId,
+  title,
+}: {
+  editor: PromptEditor;
+  /** Whether the popover is open, read when the result lands. */
+  isOpen: () => boolean;
+  /** Closes the popover after a result landed while it was open. */
+  onLandedOpen: () => void;
+  projectId: string;
+  /** The Undo toast's title once a result replaced the prompt. */
+  title: string;
+}): PromptRewrite => {
+  const { t } = useTranslation();
+  const { notifications } = useGenerationUi();
+  const runIdRef = useRef(0);
+  const [taskId, setTaskId] = useState<string | null>(null);
+
+  useMountEffect(() => () => {
+    runIdRef.current += 1;
+  });
+
+  const abandon = useCallback(() => {
+    runIdRef.current += 1;
+    setTaskId(null);
+  }, []);
+
+  const apply = useCallback(
+    (result: string, previous: string, runProjectId: string, asEdit: boolean) => {
+      editor.write(result, { withoutFocus: !asEdit });
+      notifications.undoable(title, {
+        onUndo: () => {
+          if (editor.isShowing(runProjectId) && editor.read() === result) {
+            editor.write(previous, { withoutFocus: true });
+          } else {
+            notifications.info(t('widgets.generate.undoStale'));
+          }
+        },
+        projectId: runProjectId,
+        supersedes: getGeneratePromptUndoKey(runProjectId),
+      });
+    },
+    [editor, notifications, t, title]
+  );
+
+  const offer = useCallback(
+    (result: string, runProjectId: string) =>
+      notifications.offer(t('widgets.generate.promptChangedWhileRunning'), {
+        actions: [
+          {
+            label: t('widgets.generate.replacePrompt'),
+            onClick: () => {
+              if (editor.isShowing(runProjectId)) {
+                apply(result, editor.read(), runProjectId, false);
+              } else {
+                notifications.info(t('widgets.generate.promptResultStale'));
+              }
+            },
+          },
+          { label: t('common.discard'), onClick: () => undefined },
+        ],
+        message:
+          result.length > HELD_RESULT_PREVIEW_LENGTH ? `${result.slice(0, HELD_RESULT_PREVIEW_LENGTH)}…` : result,
+      }),
+    [apply, editor, notifications, t]
+  );
+
+  const run = useCallback(
+    (request: (taskId: string) => Promise<string | null | undefined>, onError: (error: unknown) => void) => {
+      runIdRef.current += 1;
+      const runId = runIdRef.current;
+      const runProjectId = projectId;
+      const nextTaskId = createUuid();
+      const startingPrompt = editor.read();
+      const isCurrent = () => runId === runIdRef.current;
+
+      setTaskId(nextTaskId);
+
+      void request(nextTaskId)
+        .then(
+          (result) => {
+            // Abandoned, or for a project this field no longer shows: dropped.
+            if (!isCurrent() || !editor.isShowing(runProjectId)) {
+              return;
+            }
+
+            const wasOpen = isOpen();
+
+            if (result && editor.read() === startingPrompt) {
+              apply(result, startingPrompt, runProjectId, wasOpen);
+            } else if (result) {
+              offer(result, runProjectId);
+            }
+
+            if (wasOpen) {
+              onLandedOpen();
+            }
+          },
+          (error: unknown) => {
+            if (isCurrent()) {
+              onError(error);
+            }
+          }
+        )
+        .finally(() => {
+          llmTaskProgressStore.delete(nextTaskId);
+
+          if (isCurrent()) {
+            setTaskId(null);
+          }
+        });
+    },
+    [apply, editor, isOpen, offer, onLandedOpen, projectId]
+  );
+
+  return { abandon, isRunning: taskId !== null, run, taskId };
+};
+
+/** While a request runs, the explicit way to drop it; closing the popover leaves it running. */
+const StopWaitingButton = ({ rewrite }: { rewrite: PromptRewrite }) => {
+  const { t } = useTranslation();
+
+  return rewrite.isRunning ? (
+    <Button alignSelf="start" px="1.5" variant="plain" onClick={rewrite.abandon}>
+      {t('widgets.generate.stopWaiting')}
+    </Button>
+  ) : null;
+};
+
+/**
+ * A popover that runs a prompt rewrite. It sits beside its trigger rather than over the prompt, and closes like any
+ * popover: the request keeps running (the trigger spins) and its result lands on its own.
+ */
+const usePromptRewritePopover = ({
+  editor,
+  onClose,
+  projectId,
+  title,
+}: {
+  editor: PromptEditor;
+  /** Extra cleanup on every close path. */
+  onClose?: () => void;
+  projectId: string;
+  title: string;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const isOpenRef = useRef(isOpen);
+  const { finalFocusEl, keepFocusAfterWrite } = useFocusAfterPromptWrite(editor);
+
+  // eslint-disable-next-line react/refs
+  isOpenRef.current = isOpen;
+
+  const close = useCallback(() => {
+    setIsOpen(false);
+    onClose?.();
+  }, [onClose]);
+  const closeAfterWrite = useCallback(() => {
+    keepFocusAfterWrite();
+    close();
+  }, [close, keepFocusAfterWrite]);
+  const readIsOpen = useCallback(() => isOpenRef.current, []);
+  const rewrite = usePromptRewrite({ editor, isOpen: readIsOpen, onLandedOpen: closeAfterWrite, projectId, title });
+  const handleOpenChange = useCallback((event: { open: boolean }) => (event.open ? setIsOpen(true) : close()), [close]);
+  const open = useCallback(() => setIsOpen(true), []);
+
+  return {
+    isOpen,
+    open,
+    rewrite,
+    rootProps: { finalFocusEl, onOpenChange: handleOpenChange, open: isOpen, positioning: POPOVER_POSITIONING_BESIDE },
+  };
+};
+
 const ExpandPromptButton = ({
   isDisabled,
-  onPositivePromptChange,
   positivePrompt,
   projectId,
+  promptEditor,
   savedPromptModels,
   suggestion,
 }: {
   isDisabled: boolean;
   positivePrompt: string;
   projectId: string;
+  promptEditor: PromptEditor;
   savedPromptModels: SavedPromptModels | undefined;
   suggestion: ExpandPromptSuggestion | null;
-  onPositivePromptChange: (prompt: string) => void;
 }) => {
   const { t } = useTranslation();
   const {
     models: { catalog: models, ensureLoaded: ensureModelsLoaded },
     notifications,
-    project: { activeProjectId },
   } = useGenerationUi();
-  const activeProjectIdRef = useRef(activeProjectId);
   const triggerId = useId();
-  const [isOpen, setIsOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [taskId, setTaskId] = useState<string | null>(null);
+  const { isOpen, rewrite, rootProps } = usePromptRewritePopover({
+    editor: promptEditor,
+    projectId,
+    title: t('widgets.generate.promptExpanded'),
+  });
   const [selectedSystemPromptId, setSelectedSystemPromptId] = useState<string | null>(null);
   // Keyed by image so unticking one frame does not carry over to the next one.
   const [excludedImageName, setExcludedImageName] = useState<string | null>(null);
@@ -500,60 +706,38 @@ const ExpandPromptButton = ({
   );
   const selectedSystemPrompt = systemPrompts.prompts.find((prompt) => prompt.id === effectiveSystemPromptId);
 
-  // eslint-disable-next-line react/refs
-  activeProjectIdRef.current = activeProjectId;
-
   useMountEffect(() => {
     void ensureModelsLoaded();
   });
 
-  const runExpandPrompt = useCallback(async () => {
+  const { run } = rewrite;
+  const handleRunExpandPrompt = useCallback(() => {
     if (!selectedModel || !positivePrompt.trim()) {
       return;
     }
 
-    const nextTaskId = createUuid();
-    setTaskId(nextTaskId);
-    setIsLoading(true);
-
-    try {
-      const result = await expandPrompt({
-        // Forward the selected prompt's optional token cap to expansion.
-        image_name: conditioningImage?.image_name,
-        max_tokens: selectedSystemPrompt?.maxTokens ?? undefined,
-        model_key: selectedModel.key,
-        prompt: positivePrompt,
-        system_prompt: selectedSystemPrompt?.content ?? null,
-        task_id: nextTaskId,
-      });
-
-      if (result.expanded_prompt && activeProjectIdRef.current === projectId) {
-        onPositivePromptChange(result.expanded_prompt);
-      }
-
-      setIsOpen(false);
-    } catch (error) {
-      notifications.reportError({
-        area: 'expand-prompt',
-        message: getApiErrorMessage(error, t('widgets.generate.couldNotExpandPrompt')),
-        namespace: 'generation',
-        projectId,
-      });
-    } finally {
-      llmTaskProgressStore.delete(nextTaskId);
-      setTaskId(null);
-      setIsLoading(false);
-    }
-  }, [
-    conditioningImage,
-    notifications,
-    onPositivePromptChange,
-    positivePrompt,
-    projectId,
-    selectedModel,
-    selectedSystemPrompt,
-    t,
-  ]);
+    run(
+      async (taskId) =>
+        (
+          await expandPrompt({
+            // Forward the selected prompt's optional token cap to expansion.
+            image_name: conditioningImage?.image_name,
+            max_tokens: selectedSystemPrompt?.maxTokens ?? undefined,
+            model_key: selectedModel.key,
+            prompt: positivePrompt,
+            system_prompt: selectedSystemPrompt?.content ?? null,
+            task_id: taskId,
+          })
+        ).expanded_prompt,
+      (error) =>
+        notifications.reportError({
+          area: 'expand-prompt',
+          message: getApiErrorMessage(error, t('widgets.generate.couldNotExpandPrompt')),
+          namespace: 'generation',
+          projectId,
+        })
+    );
+  }, [conditioningImage, notifications, positivePrompt, projectId, run, selectedModel, selectedSystemPrompt, t]);
 
   const popoverIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
   const suggestedImageName = suggestedImage?.image_name ?? null;
@@ -562,29 +746,20 @@ const ExpandPromptButton = ({
       setExcludedImageName(event.checked === true ? null : suggestedImageName),
     [suggestedImageName]
   );
-  const handleOpenChange = useCallback((event: { open: boolean }) => setIsOpen(event.open), []);
-  const handleRunExpandPrompt = useCallback(() => void runExpandPrompt(), [runExpandPrompt]);
 
   return (
-    <Popover.Root
-      ids={popoverIds}
-      lazyMount
-      open={isOpen}
-      positioning={POPOVER_POSITIONING_BOTTOM_END}
-      onOpenChange={handleOpenChange}
-    >
+    <Popover.Root ids={popoverIds} lazyMount {...rootProps}>
       {/* Always the feature name: the popover explains a missing model and offers the way out. */}
       <Tooltip content={t('widgets.generate.expandPrompt')} ids={popoverIds}>
         <Popover.Trigger asChild>
-          {/* Stays enabled mid-run so a dismissed popover can be reopened to follow progress. */}
           <IconButton
-            aria-busy={isLoading || undefined}
+            aria-busy={rewrite.isRunning || undefined}
             aria-label={t('widgets.generate.expandPrompt')}
             disabled={isDisabled}
             size="sm"
             variant="ghost"
           >
-            {isLoading ? <Spinner /> : <PencilSparklesIcon />}
+            {rewrite.isRunning ? <Spinner /> : <PencilSparklesIcon />}
           </IconButton>
         </Popover.Trigger>
       </Tooltip>
@@ -635,7 +810,7 @@ const ExpandPromptButton = ({
                         onIncludedChange={handleImageIncludedChange}
                       />
                     ) : null}
-                    <LLMTaskProgressDisplay taskId={taskId} />
+                    <LLMTaskProgressDisplay taskId={rewrite.taskId} />
                     {positivePrompt.trim() ? null : (
                       <Text color="fg.subtle" fontSize="md">
                         {t('widgets.generate.enterPromptToExpand')}
@@ -644,11 +819,12 @@ const ExpandPromptButton = ({
                     <Button
                       // The request carries the system prompt's text, so it waits for the list.
                       disabled={!selectedModel || !positivePrompt.trim() || systemPrompts.isLoading}
-                      loading={isLoading}
+                      loading={rewrite.isRunning}
                       onClick={handleRunExpandPrompt}
                     >
                       {t('widgets.generate.expand')}
                     </Button>
+                    <StopWaitingButton rewrite={rewrite} />
                   </>
                 )}
               </Stack>
@@ -703,28 +879,30 @@ const ExpandPromptImageOption = ({
 const ImageToPromptButton = ({
   droppedImage,
   isDisabled,
-  onPositivePromptChange,
   projectId,
+  promptEditor,
   savedPromptModels,
 }: {
   droppedImage: DroppedPromptImage;
   isDisabled: boolean;
   projectId: string;
+  promptEditor: PromptEditor;
   savedPromptModels: SavedPromptModels | undefined;
-  onPositivePromptChange: (prompt: string) => void;
 }) => {
   const { t } = useTranslation();
   const {
     gallery: { selectedImage },
     models: { catalog: models, ensureLoaded: ensureModelsLoaded },
     notifications,
-    project: { activeProjectId },
   } = useGenerationUi();
-  const activeProjectIdRef = useRef(activeProjectId);
   const triggerId = useId();
-  const [isOpen, setIsOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [taskId, setTaskId] = useState<string | null>(null);
+  // Dropped input clears on every close path; a controlled close bypasses onOpenChange.
+  const { open, rewrite, rootProps } = usePromptRewritePopover({
+    editor: promptEditor,
+    onClose: droppedImage.onClear,
+    projectId,
+    title: t('widgets.generate.promptFromImage'),
+  });
   const llavaModels = models.filter((model) => model.type === 'llava_onevision');
   const onSaveModelKey = savedPromptModels?.onChange;
   const saveModelKey = useMemo(
@@ -739,87 +917,54 @@ const ImageToPromptButton = ({
   // Dropped images take precedence over gallery selection.
   const image = droppedImage.image ?? selectedImage;
   const droppedImageName = droppedImage.image?.imageName ?? null;
-  const clearDroppedImage = droppedImage.onClear;
+  // Each drop opens the popover once, keyed by image name, so later renders cannot reopen it.
+  const [openedForDrop, setOpenedForDrop] = useState<string | null>(null);
 
-  // eslint-disable-next-line react/refs
-  activeProjectIdRef.current = activeProjectId;
+  if (droppedImageName !== openedForDrop) {
+    setOpenedForDrop(droppedImageName);
+
+    if (droppedImageName !== null) {
+      open();
+    }
+  }
 
   useMountEffect(() => {
     void ensureModelsLoaded();
   });
 
-  // Key gestures by image name and clear on close so repeated drops work without rerenders reopening the popup.
-  useEffect(() => {
-    if (droppedImageName !== null) {
-      // eslint-disable-next-line react/set-state-in-effect
-      setIsOpen(true);
-    }
-  }, [droppedImageName]);
-
-  // Clear dropped input on every close path; controlled close bypasses onOpenChange.
-  const close = useCallback(() => {
-    setIsOpen(false);
-    clearDroppedImage();
-  }, [clearDroppedImage]);
-
-  const runImageToPrompt = useCallback(async () => {
+  const { run } = rewrite;
+  const handleRunImageToPrompt = useCallback(() => {
     if (!image || !selectedModel) {
       return;
     }
 
-    const nextTaskId = createUuid();
-    setTaskId(nextTaskId);
-    setIsLoading(true);
-
-    try {
-      const result = await imageToPrompt({
-        image_name: image.imageName,
-        model_key: selectedModel.key,
-        task_id: nextTaskId,
-      });
-
-      if (result.prompt && activeProjectIdRef.current === projectId) {
-        onPositivePromptChange(result.prompt);
-      }
-
-      close();
-    } catch (error) {
-      notifications.reportError({
-        area: 'image-to-prompt',
-        message: getApiErrorMessage(error, t('widgets.generate.couldNotGeneratePromptFromImage')),
-        namespace: 'generation',
-        projectId,
-      });
-    } finally {
-      llmTaskProgressStore.delete(nextTaskId);
-      setTaskId(null);
-      setIsLoading(false);
-    }
-  }, [close, image, notifications, onPositivePromptChange, projectId, selectedModel, t]);
+    run(
+      async (taskId) =>
+        (await imageToPrompt({ image_name: image.imageName, model_key: selectedModel.key, task_id: taskId })).prompt,
+      (error) =>
+        notifications.reportError({
+          area: 'image-to-prompt',
+          message: getApiErrorMessage(error, t('widgets.generate.couldNotGeneratePromptFromImage')),
+          namespace: 'generation',
+          projectId,
+        })
+    );
+  }, [image, notifications, projectId, run, selectedModel, t]);
 
   const popoverIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
-  const handleOpenChange = useCallback((event: { open: boolean }) => (event.open ? setIsOpen(true) : close()), [close]);
-  const handleRunImageToPrompt = useCallback(() => void runImageToPrompt(), [runImageToPrompt]);
 
   return (
-    <Popover.Root
-      ids={popoverIds}
-      lazyMount
-      open={isOpen}
-      positioning={POPOVER_POSITIONING_BOTTOM_END}
-      onOpenChange={handleOpenChange}
-    >
+    <Popover.Root ids={popoverIds} lazyMount {...rootProps}>
       <Tooltip content={t('widgets.generate.imageToPrompt')} ids={popoverIds}>
         <Popover.Trigger asChild>
-          {/* Stays enabled mid-run so a dismissed popover can be reopened to follow progress. */}
           <IconButton
-            aria-busy={isLoading || undefined}
+            aria-busy={rewrite.isRunning || undefined}
             aria-label={t('widgets.generate.imageToPrompt')}
             disabled={isDisabled}
             size="sm"
             variant="ghost"
           >
-            {isLoading ? <Spinner /> : <ImageUpIcon />}
+            {rewrite.isRunning ? <Spinner /> : <ImageUpIcon />}
           </IconButton>
         </Popover.Trigger>
       </Tooltip>
@@ -864,10 +1009,15 @@ const ImageToPromptButton = ({
                         {t('widgets.generate.selectImageFirst')}
                       </Text>
                     )}
-                    <LLMTaskProgressDisplay taskId={taskId} />
-                    <Button disabled={!image || !selectedModel} loading={isLoading} onClick={handleRunImageToPrompt}>
+                    <LLMTaskProgressDisplay taskId={rewrite.taskId} />
+                    <Button
+                      disabled={!image || !selectedModel}
+                      loading={rewrite.isRunning}
+                      onClick={handleRunImageToPrompt}
+                    >
                       {t('widgets.generate.generatePrompt')}
                     </Button>
+                    <StopWaitingButton rewrite={rewrite} />
                   </>
                 )}
               </Stack>
@@ -879,15 +1029,21 @@ const ImageToPromptButton = ({
   );
 };
 
-const PositivePromptHistoryButton = ({ onUsePrompt }: Pick<PositivePromptActionsProps, 'onUsePrompt'>) => {
+const PositivePromptHistoryButton = ({
+  onUsePrompt,
+  projectId,
+  promptEditor,
+}: Pick<PositivePromptActionsProps, 'onUsePrompt' | 'projectId' | 'promptEditor'>) => {
   const { t } = useTranslation();
-  const { clear: clearPromptHistory, items: promptHistory } = useGenerationUi().promptHistory;
+  const { notifications, promptHistory: history } = useGenerationUi();
+  const promptHistory = history.items;
   const historyTriggerId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const filteredPrompts = filterPromptHistory(promptHistory, searchTerm);
   const popoverIds = useMemo(() => ({ trigger: historyTriggerId }), [historyTriggerId]);
   const handleOpenChange = useCallback((event: { open: boolean }) => setIsOpen(event.open), []);
+  const { finalFocusEl, keepFocusAfterWrite } = useFocusAfterPromptWrite(promptEditor);
 
   const onChangeSearchTerm = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.currentTarget.value);
@@ -896,13 +1052,31 @@ const PositivePromptHistoryButton = ({ onUsePrompt }: Pick<PositivePromptActions
   const usePrompt = useCallback(
     (prompt: PromptHistoryItem) => {
       onUsePrompt(prompt);
+      keepFocusAfterWrite();
       setIsOpen(false);
     },
-    [onUsePrompt]
+    [keepFocusAfterWrite, onUsePrompt]
+  );
+
+  // Clearing is undoable, so it does not ask first; the Undo puts every entry back.
+  const clearHistory = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      const cleared = promptHistory;
+
+      // The button disables itself; keep focus inside the popover rather than dropping it to the page.
+      event.currentTarget.closest<HTMLElement>('[data-scope="popover"][data-part="content"]')?.focus();
+      history.clear(projectId);
+      notifications.undoable(t('widgets.generate.promptHistoryCleared', { count: cleared.length }), {
+        onUndo: () => history.restore(cleared, projectId),
+        projectId,
+      });
+    },
+    [history, notifications, projectId, promptHistory, t]
   );
 
   return (
     <Popover.Root
+      finalFocusEl={finalFocusEl}
       ids={popoverIds}
       lazyMount
       open={isOpen}
@@ -929,7 +1103,7 @@ const PositivePromptHistoryButton = ({ onUsePrompt }: Pick<PositivePromptActions
                     value={searchTerm}
                     onChange={onChangeSearchTerm}
                   />
-                  <Button disabled={promptHistory.length === 0} variant="ghost" onClick={clearPromptHistory}>
+                  <Button disabled={promptHistory.length === 0} variant="ghost" onClick={clearHistory}>
                     <Icon as={TrashIcon} boxSize="3" />
                     {t('common.clear')}
                   </Button>
@@ -999,9 +1173,11 @@ const PromptHistoryItemRow = ({
 
   return (
     <HStack align="start" gap="1.5" pr="1">
-      <IconButton aria-label={t('widgets.generate.usePrompt')} size="sm" variant="ghost" onClick={handleUsePrompt}>
-        <Icon as={Undo2Icon} boxSize="3.5" />
-      </IconButton>
+      <Tooltip content={t('widgets.generate.usePrompt')}>
+        <IconButton aria-label={t('widgets.generate.usePrompt')} size="sm" variant="ghost" onClick={handleUsePrompt}>
+          <Icon as={ArrowUpLeftIcon} boxSize="3.5" />
+        </IconButton>
+      </Tooltip>
       <Stack flex="1" gap="0.5" minW="0">
         {prompt.positivePrompt ? (
           <Text color="fg" fontSize="xs" wordBreak="break-word">
@@ -1021,15 +1197,17 @@ const PromptHistoryItemRow = ({
         ) : null}
       </Stack>
 
-      <IconButton
-        aria-label={t('widgets.generate.deletePromptHistoryItem')}
-        colorPalette="red"
-        size="sm"
-        variant="ghost"
-        onClick={handleDelete}
-      >
-        <Icon as={TrashIcon} boxSize="3.5" />
-      </IconButton>
+      <Tooltip content={t('widgets.generate.deletePromptHistoryItem')}>
+        <IconButton
+          aria-label={t('widgets.generate.deletePromptHistoryItem')}
+          colorPalette="red"
+          size="sm"
+          variant="ghost"
+          onClick={handleDelete}
+        >
+          <Icon as={TrashIcon} boxSize="3.5" />
+        </IconButton>
+      </Tooltip>
     </HStack>
   );
 };

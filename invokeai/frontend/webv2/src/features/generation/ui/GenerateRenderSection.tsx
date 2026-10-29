@@ -94,6 +94,7 @@ const selectRenderSettings = pickGenerateSettings([
   'batchCount',
   'cfgScale',
   'dynamicPromptsCombinatorial',
+  'dynamicPromptsEnabled',
   'dynamicPromptsMaxPrompts',
   'dynamicPromptsResample',
   'dynamicPromptsSampleSeed',

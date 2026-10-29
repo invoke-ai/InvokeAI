@@ -18,10 +18,13 @@ import { useTranslation } from 'react-i18next';
 
 const POPOVER_POSITIONING_BOTTOM_END = { placement: 'bottom-end' } as const;
 
+/** `chosen`: the user applied or cleared a template here. `synced`: an edit or deletion in the catalog carried over. */
+export type PromptTemplateChange = 'chosen' | 'synced';
+
 interface PromptTemplatesButtonProps {
   activeTemplate: PromptTemplateSnapshot | null;
   showSyntaxHighlighting: boolean;
-  onApply: (template: PromptTemplateSnapshot | null) => void;
+  onApply: (template: PromptTemplateSnapshot | null, change: PromptTemplateChange) => void;
 }
 
 /** A null record creates a template; gallery input may prefill it. */
@@ -58,14 +61,14 @@ export const PromptTemplatesButton = ({
 
   const applyAndClose = useCallback(
     (template: PromptTemplateSnapshot | null) => {
-      onApply(template);
+      onApply(template, 'chosen');
       setIsOpen(false);
     },
     [onApply]
   );
 
   /** Deleting the applied template stops it applying, but the panel stays open. */
-  const detachTemplate = useCallback(() => onApply(null), [onApply]);
+  const detachTemplate = useCallback(() => onApply(null, 'synced'), [onApply]);
 
   const startCreate = useCallback(() => setEditorTarget({ record: null }), []);
   const startEdit = useCallback((record: PromptTemplateRecord) => setEditorTarget({ record }), []);
@@ -75,7 +78,7 @@ export const PromptTemplatesButton = ({
   const handleSaved = useCallback(
     (saved: PromptTemplateRecord) => {
       if (activeTemplate?.id === saved.id) {
-        onApply(toPromptTemplateSnapshot(saved));
+        onApply(toPromptTemplateSnapshot(saved), 'synced');
       }
 
       setEditorTarget(null);

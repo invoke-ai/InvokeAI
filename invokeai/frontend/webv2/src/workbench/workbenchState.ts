@@ -143,15 +143,16 @@ import {
   applyProjectPromptDraft,
   cloneGenerateWidgetValues,
   createDynamicPromptsSampleSeed,
+  expandsDynamicPrompts,
   getEffectivePrompts,
   getGenerationModelAvailabilityReasons,
   getPromptDraftFromValues,
   getPromptHistoryItemFromGenerateSettings,
-  hasDynamicPromptSyntax,
   migrateProjectPromptDraft,
   normalizeGenerateSettings,
   normalizeGenerateWidgetValues,
   removePromptHistoryItem,
+  restorePromptHistoryItems,
   sanitizeBatchCount,
   syncGenerateWidgetValuesWithModels,
 } from '@features/generation/settings';
@@ -361,6 +362,7 @@ type WorkbenchReducerAction =
   | { type: 'addPromptToHistory'; prompt: PromptHistoryItem; projectId?: string }
   | { type: 'removePromptFromHistory'; prompt: PromptHistoryItem; projectId?: string }
   | { type: 'clearPromptHistory'; projectId?: string }
+  | { type: 'restorePromptHistory'; items: readonly PromptHistoryItem[]; projectId: string }
   | {
       type: 'patchWidgetValues';
       widgetId: WidgetTypeId;
@@ -3777,7 +3779,10 @@ const enqueueCompiledSnapshot = (
     compiled.positivePrompts &&
     compiled.positivePrompts.length > 0 &&
     effectivePrompts &&
-    hasDynamicPromptSyntax(effectivePrompts.positivePrompt)
+    expandsDynamicPrompts(
+      effectivePrompts.positivePrompt,
+      (canvasGenerateSettings ?? generateSettings)?.dynamicPromptsEnabled === true
+    )
       ? compiled.positivePrompts
       : undefined;
   const expandedSeedBehaviour = expandedPositivePrompts
@@ -5025,6 +5030,12 @@ export const __workbenchReducerInternal = (
       return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => ({
         ...project,
         promptHistory: [],
+      }));
+    }
+    case 'restorePromptHistory': {
+      return updateProjectById(state, action.projectId, (project) => ({
+        ...project,
+        promptHistory: restorePromptHistoryItems(project.promptHistory, action.items),
       }));
     }
     case 'patchWidgetValues': {

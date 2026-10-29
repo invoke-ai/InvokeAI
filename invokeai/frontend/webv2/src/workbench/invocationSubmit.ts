@@ -19,8 +19,8 @@ import type { Project } from '@workbench/projectContracts';
 import { ensureGalleryBoardDestinations } from '@features/gallery/queries';
 import { resolveDynamicPrompts } from '@features/generation/prompts';
 import {
+  expandsDynamicPrompts,
   getEffectivePrompts,
-  hasDynamicPromptSyntax,
   normalizeGenerateSettings,
   sanitizeBatchCount,
 } from '@features/generation/settings';
@@ -43,7 +43,8 @@ import { getProjectWidgetValues } from './widgetState';
 /** Locale keys with their English, which notices keep for a language without them (`resolveNotificationText`). */
 const EXPANSION_FAILED_TITLE = { title: 'The prompt could not be expanded', titleKey: 'topbar.invoke.expansionFailed' };
 const EXPANSION_UNREACHABLE_MESSAGE = {
-  message: 'The server could not be reached to expand the prompt. Check the connection and try again.',
+  message:
+    'The server could not be reached to expand the prompt. Check the connection and try again, or turn dynamic prompts off to use the prompt as typed.',
   messageKey: 'topbar.invoke.expansionUnreachable',
 };
 const GENERATOR_FAILED_TITLE = {
@@ -108,8 +109,8 @@ export interface SubmitResolvedInvocationDeps {
 }
 
 /**
- * Return merged Generate prompts only for dynamic routes; templates may introduce syntax and must consume their
- * own placeholders before expansion.
+ * Return merged Generate prompts only for routes that expand them: dynamic prompts on and dynamic syntax present.
+ * Templates may introduce syntax and must consume their own placeholders before expansion.
  */
 const getExpandableSettings = (project: Project, route: ResolvedInvocationRoute): GenerateSettings | null => {
   if (route.sourceId === 'upscale' || route.sourceId === 'video' || route.sourceId === 'workflow') {
@@ -124,7 +125,9 @@ const getExpandableSettings = (project: Project, route: ResolvedInvocationRoute)
 
   const effectiveSettings = { ...settings, ...getEffectivePrompts(settings) };
 
-  return hasDynamicPromptSyntax(effectiveSettings.positivePrompt) ? effectiveSettings : null;
+  return expandsDynamicPrompts(effectiveSettings.positivePrompt, effectiveSettings.dynamicPromptsEnabled)
+    ? effectiveSettings
+    : null;
 };
 
 /**

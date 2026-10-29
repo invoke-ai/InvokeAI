@@ -89,6 +89,24 @@ describe('resolveGenerateWidgetValues', () => {
     expect(result?.systemPatch).not.toHaveProperty('batchCount');
   });
 
+  it('reads dynamic prompts as on for a project saved before the toggle, without writing the flag in', () => {
+    const model = createModel('current');
+    const { dynamicPromptsEnabled: _absent, ...storedValues } = createValues(model);
+    const result = resolveGenerateWidgetValues({ models: [model], storedValues });
+
+    expect(result?.values.dynamicPromptsEnabled).toBe(true);
+    expect(result?.systemPatch).toBeNull();
+  });
+
+  it('keeps dynamic prompts off once the user turned them off', () => {
+    const model = createModel('current');
+    const storedValues = createValues(model, { dynamicPromptsEnabled: false });
+    const result = resolveGenerateWidgetValues({ models: [model], storedValues });
+
+    expect(result?.values.dynamicPromptsEnabled).toBe(false);
+    expect(result?.systemPatch).toBeNull();
+  });
+
   it('keeps a chosen model that is no longer installed, so the card can name it and Invoke waits', () => {
     const removed = createModel('removed');
     const available = createModel('available');

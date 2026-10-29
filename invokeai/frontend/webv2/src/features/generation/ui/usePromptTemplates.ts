@@ -29,6 +29,11 @@ export interface PromptTemplateCatalog {
   templates: PromptTemplateRecord[];
   isLoading: boolean;
   isLoaded: boolean;
+  /** The last read failed; any templates listed are from an earlier read. */
+  isError: boolean;
+  /** A retry after a failed read is on its way. */
+  isRetrying: boolean;
+  retry: () => void;
   create: (draft: PromptTemplateCreateDraft) => Promise<PromptTemplateRecord>;
   update: (template: PromptTemplateRecord, draft: PromptTemplateUpdateDraft) => Promise<PromptTemplateRecord>;
   remove: (template: PromptTemplateRecord) => Promise<void>;
@@ -86,9 +91,12 @@ export const usePromptTemplates = ({ isEnabled = true }: { isEnabled?: boolean }
     defaultTemplates: classified.defaultTemplates,
     exportCsv: exportPromptTemplates,
     importFile,
+    isError: query.isError,
     isLoaded: query.isSuccess,
     isLoading: query.isPending,
+    isRetrying: query.isError && query.isFetching,
     remove,
+    retry: () => void query.refetch(),
     personalTemplates: classified.personalTemplates,
     sharedTemplates: classified.sharedTemplates,
     templates: classified.templates,
