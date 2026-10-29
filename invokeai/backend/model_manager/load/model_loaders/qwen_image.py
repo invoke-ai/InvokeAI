@@ -14,6 +14,7 @@ from invokeai.backend.model_manager.configs.main import (
 from invokeai.backend.model_manager.configs.qwen_vl_encoder import (
     QwenVLEncoder_Checkpoint_Config,
     QwenVLEncoder_Diffusers_Config,
+    QwenVLEncoder_GGUF_Config,
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -22,6 +23,7 @@ from invokeai.backend.model_manager.load.model_loaders.comfyui_state_dict_utils 
     _strip_quantization_metadata,
 )
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
+from invokeai.backend.model_manager.load.quantized_embedding import materialize_quantized_embedding
 from invokeai.backend.model_manager.qwen_image_controlnet_keys import is_qwen_image_instantx_controlnet
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
@@ -31,6 +33,8 @@ from invokeai.backend.model_manager.taxonomy import (
     QwenImageVariantType,
     SubModelType,
 )
+from invokeai.backend.model_manager.util.llamacpp_keys import convert_llamacpp_decoder_keys
+from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_visual_tower
 from invokeai.backend.quantization.fp8_scaled import (
     attach_fp8_scales,
     cast_state_dict,
@@ -45,7 +49,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     warn_on_unattached_scales,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
-from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
+from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
 from invokeai.backend.quantization.int8_convrot import reject_int8_layers_a_plain_fold_cannot_decode
 from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.quantization.nvfp4 import install_nvfp4_layers, pop_nvfp4_layers
@@ -551,5 +555,100 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
         if meta_params:
             raise RuntimeError(f"Failed to load all parameters from checkpoint. Meta tensors remain: {meta_params[:5]}")
 
+        model.eval()
+        return model
+
+
+# llama.cpp's name for the LM head. Conditioning reads hidden states and never runs it, so it is not read.
+_GGUF_LM_HEAD_KEY = "output.weight"
+_QWEN_VL_EMBED_KEY = "model.language_model.embed_tokens.weight"
+
+
+class _OmittedLMHead(torch.nn.Module):
+    """Stands in for the LM head of an encoder loaded without it.
+
+    The encoder's consumers take hidden states from the inner model, so nothing runs the head. A caller that runs
+    the full forward gets this error rather than logits from an uninitialized weight.
+    """
+
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        raise RuntimeError(
+            "This Qwen2.5-VL encoder was loaded from GGUF without its LM head; call `.model(...)` for hidden states."
+        )
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.QwenVLEncoder, format=ModelFormat.GGUFQuantized)
+class QwenVLEncoderGGUFLoader(ModelLoader):
+    """Loads a llama.cpp GGUF of the Qwen2.5-VL-7B language model as a text-only Qwen-Image encoder.
+
+    Built as the same `Qwen2_5_VLForConditionalGeneration` the checkpoint loader builds, from the vendored config,
+    so the prompt node runs one class for every format. The vision tower is dropped (llama.cpp keeps its weights in
+    a separate mmproj file) and the LM head is never read. Linear weights stay packed and dequantize per forward;
+    what a module reads outside a matmul, and what the file stores unquantized, is unpacked at load.
+    """
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        # The tokenizer is vendored, not read from the file; sized at the file, it would evict cached models for room
+        # it never uses.
+        if submodel_type is SubModelType.Tokenizer:
+            return 0
+        return super().get_size_fs(config, model_path, submodel_type)
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, QwenVLEncoder_GGUF_Config):
+            raise TypeError(f"Expected QwenVLEncoder_GGUF_Config, got {type(config).__name__}.")
+
+        match submodel_type:
+            case SubModelType.Tokenizer:
+                return load_bundled_qwen2_5_vl_tokenizer()
+            case SubModelType.TextEncoder:
+                return self._load_text_encoder(config)
+
+        raise ValueError(
+            f"Only Tokenizer and TextEncoder submodels are supported. "
+            f"Received: {submodel_type.value if submodel_type else 'None'}"
+        )
+
+    def _load_text_encoder(self, config: QwenVLEncoder_GGUF_Config) -> AnyModel:
+        from transformers import Qwen2_5_VLConfig, Qwen2_5_VLForConditionalGeneration
+
+        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        qwen_config = Qwen2_5_VLConfig.from_dict(load_bundled_qwen2_5_vl_config_dict())
+
+        sd = gguf_sd_loader(Path(config.path), compute_dtype=compute_dtype, keep=lambda name: name != _GGUF_LM_HEAD_KEY)
+        # llama.cpp names to the transformers 4 layout, then on to the one transformers 5 builds. llama.cpp does not
+        # permute Q/K for Qwen2-VL (it does for Llama), so the projections map as they are.
+        sd = _remap_qwen_vl_checkpoint_keys(convert_llamacpp_decoder_keys(sd))
+
+        with accelerate.init_empty_weights():
+            model = Qwen2_5_VLForConditionalGeneration(qwen_config)
+        drop_qwen3vl_visual_tower(model.model)
+        model.lm_head = _OmittedLMHead()
+
+        # Out of the unpacking below, which reserves for one unpacked tensor in flight: the embedding's dequantization
+        # kernels need several copies at once, and `materialize_quantized_embedding` reserves for those. That
+        # reservation leaves out the packed weights already held, so it falls short by about their size; fixing it
+        # belongs to the shared helper, not this loader.
+        embedding = sd.pop(_QWEN_VL_EMBED_KEY, None)
+        unpacked = unpack_ggml_at_load(sd, model, _model_declared_skip_patterns(model), self._ram_cache.make_room)
+        if embedding is not None:
+            sd[_QWEN_VL_EMBED_KEY] = embedding
+
+        # Strict: with the vision tower and the LM head gone, every remaining parameter comes from the file, so a
+        # missing one means an incomplete file and is named here rather than left on the meta device.
+        load_state_dict_ignoring_extras(model, sd, source="Qwen2.5-VL encoder GGUF", assign=True)
+        sd.clear()
+        materialize_quantized_embedding(model.model.language_model.embed_tokens, ram_cache=self._ram_cache)
+
+        self._logger.info(
+            f"Qwen2.5-VL encoder '{config.name}': loaded from GGUF, {unpacked} unquantized or non-Linear tensor(s) "
+            f"unpacked, Linear weights kept packed (compute={compute_dtype}); vision tower and LM head omitted."
+        )
         model.eval()
         return model

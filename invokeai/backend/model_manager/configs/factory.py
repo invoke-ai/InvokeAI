@@ -169,6 +169,7 @@ from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
 from invokeai.backend.model_manager.configs.qwen_vl_encoder import (
     QwenVLEncoder_Checkpoint_Config,
     QwenVLEncoder_Diffusers_Config,
+    QwenVLEncoder_GGUF_Config,
 )
 from invokeai.backend.model_manager.configs.siglip import SigLIP_Diffusers_Config
 from invokeai.backend.model_manager.configs.spandrel import Spandrel_Checkpoint_Config
@@ -595,6 +596,8 @@ AnyModelConfig = Annotated[
         # Qwen VL Encoder (Qwen2.5-VL multimodal encoder for Qwen Image)
         Annotated[QwenVLEncoder_Diffusers_Config, QwenVLEncoder_Diffusers_Config.get_tag()],
         Annotated[QwenVLEncoder_Checkpoint_Config, QwenVLEncoder_Checkpoint_Config.get_tag()],
+        # Text only: llama.cpp keeps the vision tower in a separate mmproj file, which this config refuses.
+        Annotated[QwenVLEncoder_GGUF_Config, QwenVLEncoder_GGUF_Config.get_tag()],
         # Wan T5 Encoder (UMT5-XXL for Wan 2.2)
         Annotated[WanT5Encoder_WanT5Encoder_Config, WanT5Encoder_WanT5Encoder_Config.get_tag()],
         # TI - file format

@@ -509,6 +509,63 @@ describe('component policies', () => {
     ).toEqual([]);
   });
 
+  describe('Qwen Image Edit with a GGUF Qwen VL Encoder', () => {
+    const model = createModel('qwen-image', { format: 'gguf_quantized', variant: 'edit' });
+    const ggufEncoder: ComponentModelConfig = {
+      ...qwenVlEncoder,
+      format: 'gguf_quantized',
+      key: 'qwen-vl-gguf',
+      name: 'Qwen VL Q4_K_M',
+    };
+    const reference = (id: string, isEnabled = true) => ({
+      config: { image: referenceImage, type: 'qwen_image_reference_image' as const },
+      id,
+      isEnabled,
+    });
+    const reasonsFor = (overrides: Partial<GenerateSettings>) =>
+      getGenerationValidationReasons(
+        model,
+        createSettings(model, { qwenVLEncoderModel: ggufEncoder, vae: qwenImageVae, ...overrides })
+      );
+
+    it('blocks Invoke once with the reason when reference images are on', () => {
+      expect(reasonsFor({ referenceImages: [reference('a'), reference('b')] })).toEqual([
+        'Qwen VL Encoder "Qwen VL Q4_K_M" is a GGUF build with no vision tower, so it cannot read reference images. ' +
+          'Select a safetensors or Diffusers Qwen VL Encoder, or turn the reference images off.',
+      ]);
+    });
+
+    it('leaves a text-to-image model to the reason that it takes no reference images', () => {
+      // The encoder is not what blocks this graph, so naming it would send the user after the wrong fix.
+      const generateModel = createModel('qwen-image', { format: 'gguf_quantized' });
+
+      expect(
+        getGenerationValidationReasons(
+          generateModel,
+          createSettings(generateModel, {
+            qwenVLEncoderModel: ggufEncoder,
+            referenceImages: [reference('a')],
+            vae: qwenImageVae,
+          })
+        )
+      ).toEqual(['Reference Image #1 is not supported by qwen-image model.']);
+    });
+
+    it('allows text-only prompts, which is what the GGUF encoder is for', () => {
+      expect(reasonsFor({ referenceImages: [] })).toEqual([]);
+      expect(reasonsFor({ referenceImages: [reference('a', false)] })).toEqual([]);
+    });
+
+    it('allows reference images with an encoder that carries the vision tower', () => {
+      expect(
+        reasonsFor({
+          qwenVLEncoderModel: { ...qwenVlEncoder, format: 'checkpoint' },
+          referenceImages: [reference('a')],
+        })
+      ).toEqual([]);
+    });
+  });
+
   describe('Z-Image Qwen3 encoder', () => {
     const model = createModel('z-image', { format: 'checkpoint' });
     const qwen3_4b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-4b', name: 'Qwen3 4B', variant: 'qwen3_4b' };

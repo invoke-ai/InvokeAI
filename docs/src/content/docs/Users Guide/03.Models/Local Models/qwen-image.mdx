@@ -1,7 +1,7 @@
 ---
 title: Qwen Image
 description: Generate and edit images with the Qwen Image 2512 text-to-image model and the Qwen Image Edit 2511 reference-image editing model, including GGUF installs, the Lightning LoRAs and the Fun and InstantX ControlNet Unions.
-lastUpdated: 2026-10-19
+lastUpdated: 2026-10-21
 sidebar:
   order: 8
 ---
@@ -67,9 +67,19 @@ Qwen Image needs three components:
 - **Single-file `.safetensors`** checkpoints (bf16/fp16, and ComfyUI-style fp8-scaled or nvfp4 builds)
   can be installed by path or URL; like GGUF, they need a standalone VAE and encoder.
 
-Three Qwen2.5-VL encoder builds are available as starter models: **fp8 scaled** (~7 GB, the one the
-bundle installs), **NVFP4** (~5.7 GB download, about 6.7 GB once loaded), and **Diffusers** (~16 GB,
-full precision). The single-file encoders ship with their tokenizer and config inside InvokeAI.
+Four Qwen2.5-VL encoder builds are available as starter models: **fp8 scaled** (~7 GB, the one the
+bundle installs), **NVFP4** (~5.7 GB download, about 6.7 GB once loaded), **GGUF Q4_K_M** (~4.7 GB, text
+only) and **Diffusers** (~16 GB, full precision). The single-file and GGUF encoders ship with their
+tokenizer and config inside InvokeAI.
+
+The **GGUF** encoders are llama.cpp builds of Qwen2.5-VL-7B-Instruct (e.g. from
+`unsloth/Qwen2.5-VL-7B-Instruct-GGUF`) and hold only the language model. They encode text prompts, but cannot
+read reference images: with one selected, an Edit model's reference images block **Invoke** with a message
+saying so, and the workflow node fails before it loads anything. The separate `mmproj` vision file in those
+repositories is refused at install, and so is a Qwen2-VL GGUF: the previous generation shares the llama.cpp
+architecture name and would condition Qwen Image with the wrong model. Measured on the CPU against the bf16
+encoder, the prompt embeddings of the Q8_0 build agree to a mean cosine similarity of 0.9999 and those of
+Q4_K_M to 0.996. The prompt node's **Quantization** option has no effect on a GGUF encoder.
 
 When a GGUF or single-file Qwen Image model is selected, pick the **Qwen VL Encoder** and **VAE** in the
 **Components** section next to the model. Alternatively, set **Component source** to an installed
@@ -124,7 +134,8 @@ then describe the change you want in the prompt. The text-to-image variant does 
 images.
 
 - All reference images are given to the Qwen2.5-VL encoder together with your prompt, so you can refer
-  to them in the instruction.
+  to them in the instruction. This needs the fp8 scaled, NVFP4 or Diffusers encoder: a GGUF encoder has no
+  vision tower.
 - The **first** reference image is also encoded by the VAE and supplied to the transformer as a
   pixel-level reference.
 

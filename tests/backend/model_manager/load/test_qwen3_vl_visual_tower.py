@@ -82,7 +82,7 @@ def test_a_model_without_a_tower_is_refused_rather_than_given_a_dead_attribute(t
     """`setattr` would happily invent `visual` on anything. On the `from_pretrained` paths nothing
     else would notice a renamed tower: it would load, a dead stub would sit beside it, and the
     encoder would keep every byte this is meant to save."""
-    with pytest.raises(RuntimeError, match="no Qwen3-VL visual tower"):
+    with pytest.raises(RuntimeError, match="no Qwen-VL visual tower"):
         drop_qwen3vl_visual_tower(torch.nn.Module())
 
 

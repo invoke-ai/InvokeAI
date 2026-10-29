@@ -175,6 +175,17 @@ qwen_vl_encoder_nvfp4 = StarterModel(
     format=ModelFormat.Checkpoint,
 )
 
+qwen_vl_encoder_gguf_q4_k_m = StarterModel(
+    name="Qwen2.5-VL Encoder (GGUF Q4_K_M)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/unsloth/Qwen2.5-VL-7B-Instruct-GGUF/resolve/main/Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf",
+    description="unsloth's Q4_K_M GGUF of the Qwen2.5-VL 7B language model. Text only: it cannot read reference "
+    "images, so Qwen-Image Edit with reference images needs a safetensors or Diffusers encoder. Its tokenizer and "
+    "config ship with InvokeAI. ~4.7GB",
+    type=ModelType.QwenVLEncoder,
+    format=ModelFormat.GGUFQuantized,
+)
+
 qwen_vl_encoder_diffusers = StarterModel(
     name="Qwen2.5-VL Encoder (Diffusers)",
     base=BaseModelType.Any,
