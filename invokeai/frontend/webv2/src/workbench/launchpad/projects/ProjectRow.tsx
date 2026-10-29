@@ -45,7 +45,18 @@ export const ProjectRow = ({
   const handleTogglePin = useCallback(() => onTogglePin(summary.id), [onTogglePin, summary.id]);
 
   return (
-    <Row className="group" gap="3" h="full" position="relative" px="2.5" rounded="md" onContextMenu={handleContextMenu}>
+    <Row
+      className="group"
+      // A project this build cannot open does not light up under the pointer as if it would open.
+      data-static={isCompatible ? undefined : ''}
+      gap="3"
+      h="full"
+      position="relative"
+      px="2.5"
+      rounded="md"
+      onContextMenu={handleContextMenu}
+    >
+      {/* A project this build cannot open has no link and no tab stop; its compatibility badge says why. */}
       {isCompatible ? (
         <Link
           aria-label={t('projects.openProjectLabel', { name: summary.name })}
@@ -53,16 +64,7 @@ export const ProjectRow = ({
           style={LINK_STYLE}
           to="/app"
         />
-      ) : (
-        <Box
-          aria-disabled="true"
-          aria-label={`${t('projects.openProjectLabel', { name: summary.name })}. ${t('projects.file.updateClient')}`}
-          role="link"
-          style={LINK_STYLE}
-          tabIndex={0}
-          title={t('projects.file.updateClient')}
-        />
-      )}
+      ) : null}
       <Box flexShrink={0} overflow="hidden" pointerEvents="none" rounded="sm" w={THUMBNAIL_WIDTH}>
         <ProjectCover coverUrl={summary.coverUrl} />
       </Box>

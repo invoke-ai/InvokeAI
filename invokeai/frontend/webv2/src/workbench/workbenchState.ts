@@ -88,6 +88,7 @@ import {
   generatedVideoToGalleryItem,
   settleGalleryValues,
 } from '@features/gallery/contracts';
+import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { planSeedSubmission } from '@platform/core/seed';
 import { describeError } from '@platform/logging/normalize';
 import { WIDGET_REGIONS } from '@workbench/layoutContracts';
@@ -4219,6 +4220,19 @@ const RECORDED_LAYOUT_ACTIONS: Partial<
   toggleRegionWidget: () => ({ label: 'Add widget' }),
 };
 
+/** Whether two versions of a project lay out the same: what a layout undo step would restore. */
+const isSamePlacement = (left: Project, right: Project): boolean =>
+  areJsonValuesStructurallyEqual(
+    [left.layout, left.widgetRegions, left.floatingWidgets ?? null, left.invocation, left.presetWorkingLayouts ?? null],
+    [
+      right.layout,
+      right.widgetRegions,
+      right.floatingWidgets ?? null,
+      right.invocation,
+      right.presetWorkingLayouts ?? null,
+    ]
+  );
+
 export const __workbenchReducerInternal = (
   state: WorkbenchState,
   action: WorkbenchReducerAction,
@@ -4240,8 +4254,13 @@ export const __workbenchReducerInternal = (
       const previous = previousById.get(project.id);
 
       // A case that recorded its own step (a removal with its notice) already moved the history. A project built
-      // straight from a document, outside hydration, has none to record into.
-      return !previous || previous === project || !previous.undoRedo || previous.undoRedo !== project.undoRedo
+      // straight from a document, outside hydration, has none to record into. A request that left the placement as
+      // it was (opening the widget already in front) is no step: it would only clear redo.
+      return !previous ||
+        previous === project ||
+        !previous.undoRedo ||
+        previous.undoRedo !== project.undoRedo ||
+        isSamePlacement(previous, project)
         ? project
         : { ...project, undoRedo: pushUndo(previous, step.label, { mergeKey: step.mergeKey }).undoRedo };
     }),

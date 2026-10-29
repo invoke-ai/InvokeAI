@@ -13,12 +13,16 @@ const selectWidgetTypeKey = (snapshot: WorkbenchSnapshot): string =>
     .sort()
     .join(' ');
 
-/** Settings editable where this renders: outside a workbench (the Launchpad) that leaves out project and widget settings. */
-export const useAvailableSettings = (): SettingsSection[] => {
+/**
+ * Settings editable where this renders: outside a workbench (the Launchpad) that leaves out project and widget
+ * settings, except that `forSearch` keeps project settings so a search can say they need an open project.
+ */
+export const useAvailableSettings = ({ forSearch = false }: { forSearch?: boolean } = {}): SettingsSection[] => {
   const { canManageAppConfig } = useCapabilities();
   const widgetTypeKey = useOptionalWorkbenchSelector<string | null>(selectWidgetTypeKey, null);
   return getAvailableSettings(settingsCatalog, {
     canManageAppConfig,
+    forSearch,
     widgetTypeIds: widgetTypeKey === null ? null : new Set(widgetTypeKey.split(' ')),
   });
 };

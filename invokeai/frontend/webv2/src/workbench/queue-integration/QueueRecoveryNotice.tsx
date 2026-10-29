@@ -61,7 +61,7 @@ export const QueueRecoveryNotice = ({
     query.data?.kind === 'available' ? query.data.projectIds.filter((projectId) => !openIds.has(projectId)) : [];
   const visibleIndex = Math.min(selectedIndex, Math.max(0, projectIds.length - 1));
   const projectId = projectIds[visibleIndex];
-  // The project is not open here, so its name comes from the library; while that has not loaded, the id stands in.
+  // The project is not open here, so its name comes from the library; without one it goes unnamed, never by id.
   const projectName = useProjectLibrarySelector(
     (snapshot) => snapshot.summaries.find((summary) => summary.id === projectId)?.name ?? null
   );
@@ -195,7 +195,7 @@ export const QueueRecoveryNotice = ({
               <Alert.Description overflowWrap="anywhere">
                 {projectName
                   ? t('shell.queueRecovery.description', { project: projectName })
-                  : t('shell.queueRecovery.descriptionUnnamed', { projectId })}
+                  : t('shell.queueRecovery.descriptionUnnamed')}
                 {projectIds.length > 1
                   ? ` ${t('shell.queueRecovery.position', {
                       count: projectIds.length,

@@ -23,6 +23,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { getErrorMessage, useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, IconButton } from '@platform/ui/Button';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { Group } from '@platform/ui/Group';
 import {
   ManagerQueueChip,
@@ -32,8 +33,8 @@ import {
 } from '@platform/ui/ManagerQueue';
 import { MenuActionItem, MenuContent } from '@platform/ui/Menu';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
-import { ChevronDownIcon, PauseIcon, PlayIcon, RefreshCcwIcon, XIcon } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { ChevronDownIcon, CircleStopIcon, PauseIcon, PlayIcon, RefreshCcwIcon } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
@@ -49,6 +50,7 @@ import {
   resolveInstallProgress,
   summarizeInstallQueue,
 } from './queueModel';
+import { useConfirmedInstallCancel } from './useConfirmedInstallCancel';
 import { useInstallJobActions } from './useInstallJobActions';
 
 const BULK_MENU_POSITIONING = { placement: 'bottom-start' } as const;
@@ -144,121 +146,140 @@ export const InstallQueueBar = () => {
     );
 
   const hasBulkTargets = pausableJobs.length + pausedJobs.length + cancellableJobs.length > 0;
+  // The jobs the confirmation named: a job that starts meanwhile is not cancelled by a count it was not part of.
+  const [cancelAllTargets, setCancelAllTargets] = useState<ModelInstallJob[] | null>(null);
+  const openCancelAllConfirm = () => setCancelAllTargets(cancellableJobs);
+  const closeCancelAllConfirm = () => setCancelAllTargets(null);
+  const cancelAll = (targets: ModelInstallJob[]) =>
+    runBulk(runCancelAll, cancelModelInstall, targets, (id, result) => {
+      if (result === null) {
+        dismissInstallJob(id);
+      } else {
+        replaceInstallJob(result);
+        if (!['completed', 'error', 'cancelled'].includes(result.status)) {
+          projectInstallCancelled(id);
+        }
+      }
+    });
 
   return (
-    <ManagerQueueFooter
-      collapsedActions={featured ? <FeaturedActions row={featured} /> : null}
-      collapsedChips={
-        <>
-          <ManagerQueueChip
-            count={summary.queued}
-            label={t('models.queueMoreQueued', { count: summary.queued })}
-            palette="gray"
-          />
-          <ManagerQueueChip
-            count={summary.attention}
-            icon="alert"
-            label={t('models.queueAttentionCount', { count: summary.attention })}
-            palette="red"
-          />
-        </>
-      }
-      collapsedSummary={
-        featured ? (
-          <FeaturedJob row={featured} />
-        ) : (
-          <ManagerQueueSummaryText>
-            {summary.paused > 0
-              ? t('models.queuePausedCount', { count: summary.paused })
-              : rows.length > 0
-                ? t('models.installJobSummary', { count: rows.length })
-                : t('models.noInstallsYet')}
-          </ManagerQueueSummaryText>
-        )
-      }
-      expanded={queueExpanded}
-      expandedActions={
-        <>
-          {hasBulkTargets ? (
-            <Group attached>
-              {pausedJobs.length > 0 ? (
-                <Button
-                  loading={isResumingAll}
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => void runBulk(runResumeAll, resumeModelInstall, pausedJobs)}
-                >
-                  <Icon as={PlayIcon} boxSize="3" />
-                  {t('models.resumeAll')}
-                </Button>
-              ) : (
-                <Button
-                  disabled={pausableJobs.length === 0}
-                  loading={isPausingAll}
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => void runBulk(runPauseAll, pauseModelInstall, pausableJobs)}
-                >
-                  <Icon as={PauseIcon} boxSize="3" />
-                  {t('models.pauseAll')}
-                </Button>
-              )}
-              <Menu.Root ids={bulkMenuIds} positioning={BULK_MENU_POSITIONING}>
-                <Tooltip content={t('models.moreQueueActions')} ids={bulkMenuIds}>
-                  <Menu.Trigger asChild>
-                    <IconButton aria-label={t('models.moreQueueActions')} size="sm" variant="ghost">
-                      <Icon as={ChevronDownIcon} boxSize="3" />
-                    </IconButton>
-                  </Menu.Trigger>
-                </Tooltip>
-                <Portal>
-                  <Menu.Positioner>
-                    <MenuContent minW="10rem">
-                      <MenuActionItem
-                        disabled={cancellableJobs.length === 0 || isCancellingAll}
-                        icon={XIcon}
-                        label={t('models.cancelAll')}
-                        tone="danger"
-                        value="cancel-all"
-                        onSelect={() =>
-                          void runBulk(runCancelAll, cancelModelInstall, cancellableJobs, (id, result) => {
-                            if (result === null) {
-                              dismissInstallJob(id);
-                            } else {
-                              replaceInstallJob(result);
-                              if (!['completed', 'error', 'cancelled'].includes(result.status)) {
-                                projectInstallCancelled(id);
-                              }
-                            }
-                          })
-                        }
-                      />
-                    </MenuContent>
-                  </Menu.Positioner>
-                </Portal>
-              </Menu.Root>
-            </Group>
-          ) : null}
-          {hasBulkTargets ? <Separator h="4" mx="1" orientation="vertical" /> : null}
-          <Button loading={isRefreshing} size="sm" variant="ghost" onClick={() => runRefresh(refreshInstalls)}>
-            <Icon as={RefreshCcwIcon} boxSize="3" />
-            {t('common.refresh')}
-          </Button>
-        </>
-      }
-      expandedSummary={<SummaryChips summary={summary} />}
-      finishedCount={finishedCount}
-      isClearingFinished={isPruning}
-      maximizeTooltip={t('models.maximizeQueueTooltip')}
-      maximized={queueMaximized}
-      restoreTooltip={t('models.restoreQueueTooltip')}
-      title={t('models.installQueue')}
-      onClearFinished={handlePrune}
-      onExpandedChange={setQueueExpanded}
-      onMaximizedChange={setQueueMaximized}
-    >
-      <InstallQueueTable error={error} rows={rows} status={status} />
-    </ManagerQueueFooter>
+    <>
+      <ManagerQueueFooter
+        collapsedActions={featured ? <FeaturedActions row={featured} /> : null}
+        collapsedChips={
+          <>
+            <ManagerQueueChip
+              count={summary.queued}
+              label={t('models.queueMoreQueued', { count: summary.queued })}
+              palette="gray"
+            />
+            <ManagerQueueChip
+              count={summary.attention}
+              icon="alert"
+              label={t('models.queueAttentionCount', { count: summary.attention })}
+              palette="red"
+            />
+          </>
+        }
+        collapsedSummary={
+          featured ? (
+            <FeaturedJob row={featured} />
+          ) : (
+            <ManagerQueueSummaryText>
+              {summary.paused > 0
+                ? t('models.queuePausedCount', { count: summary.paused })
+                : rows.length > 0
+                  ? t('models.installJobSummary', { count: rows.length })
+                  : t('models.noInstallsYet')}
+            </ManagerQueueSummaryText>
+          )
+        }
+        expanded={queueExpanded}
+        expandedActions={
+          <>
+            {hasBulkTargets ? (
+              <Group attached>
+                {pausedJobs.length > 0 ? (
+                  <Button
+                    loading={isResumingAll}
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void runBulk(runResumeAll, resumeModelInstall, pausedJobs)}
+                  >
+                    <Icon as={PlayIcon} boxSize="3" />
+                    {t('models.resumeAll')}
+                  </Button>
+                ) : (
+                  <Button
+                    disabled={pausableJobs.length === 0}
+                    loading={isPausingAll}
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void runBulk(runPauseAll, pauseModelInstall, pausableJobs)}
+                  >
+                    <Icon as={PauseIcon} boxSize="3" />
+                    {t('models.pauseAll')}
+                  </Button>
+                )}
+                <Menu.Root ids={bulkMenuIds} positioning={BULK_MENU_POSITIONING}>
+                  <Tooltip content={t('models.moreQueueActions')} ids={bulkMenuIds}>
+                    <Menu.Trigger asChild>
+                      <IconButton aria-label={t('models.moreQueueActions')} size="sm" variant="ghost">
+                        <Icon as={ChevronDownIcon} boxSize="3" />
+                      </IconButton>
+                    </Menu.Trigger>
+                  </Tooltip>
+                  <Portal>
+                    <Menu.Positioner>
+                      <MenuContent minW="10rem">
+                        <MenuActionItem
+                          disabled={cancellableJobs.length === 0 || isCancellingAll}
+                          icon={CircleStopIcon}
+                          label={t('models.cancelAllWithEllipsis')}
+                          tone="danger"
+                          value="cancel-all"
+                          onSelect={openCancelAllConfirm}
+                        />
+                      </MenuContent>
+                    </Menu.Positioner>
+                  </Portal>
+                </Menu.Root>
+              </Group>
+            ) : null}
+            {hasBulkTargets ? <Separator h="4" mx="1" orientation="vertical" /> : null}
+            <Button loading={isRefreshing} size="sm" variant="ghost" onClick={() => runRefresh(refreshInstalls)}>
+              <Icon as={RefreshCcwIcon} boxSize="3" />
+              {t('common.refresh')}
+            </Button>
+          </>
+        }
+        expandedSummary={<SummaryChips summary={summary} />}
+        finishedCount={finishedCount}
+        isClearingFinished={isPruning}
+        maximizeTooltip={t('models.maximizeQueueTooltip')}
+        maximized={queueMaximized}
+        restoreTooltip={t('models.restoreQueueTooltip')}
+        title={t('models.installQueue')}
+        onClearFinished={handlePrune}
+        onExpandedChange={setQueueExpanded}
+        onMaximizedChange={setQueueMaximized}
+      >
+        <InstallQueueTable error={error} rows={rows} status={status} />
+      </ManagerQueueFooter>
+      <ConfirmDialog
+        body={t('models.cancelAllBody', { count: cancelAllTargets?.length ?? 0 })}
+        cancelLabel={t('models.keepInstalling')}
+        confirmLabel={t('models.cancelAllConfirm', { count: cancelAllTargets?.length ?? 0 })}
+        isOpen={cancelAllTargets !== null}
+        title={t('models.cancelAllQuestion', { count: cancelAllTargets?.length ?? 0 })}
+        onClose={closeCancelAllConfirm}
+        onConfirm={async () => {
+          if (cancelAllTargets) {
+            await cancelAll(cancelAllTargets);
+          }
+        }}
+      />
+    </>
   );
 };
 
@@ -329,6 +350,8 @@ const FeaturedJob = ({ row }: { row: InstallQueueRow }) => {
 const FeaturedActions = ({ row }: { row: InstallQueueRow }) => {
   const { t } = useTranslation();
   const actions = useInstallJobActions(row.job);
+  const progress = resolveInstallProgress(row.job, useInstallProgress(row.job.id));
+  const cancel = useConfirmedInstallCancel(row.job, progress, actions.cancel);
 
   return (
     <>
@@ -352,11 +375,12 @@ const FeaturedActions = ({ row }: { row: InstallQueueRow }) => {
           disabled={actions.isBusy}
           size="sm"
           variant="ghost"
-          onClick={actions.cancel}
+          onClick={cancel.requestCancel}
         >
-          <Icon as={XIcon} boxSize="3.5" />
+          <Icon as={CircleStopIcon} boxSize="3.5" />
         </IconButton>
       </Tooltip>
+      {cancel.dialog}
     </>
   );
 };

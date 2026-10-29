@@ -338,7 +338,7 @@ describe('library mutations', () => {
   it('does not delete while another tab owns an active project run', async () => {
     projectLocks.acquireProjectMutationLock.mockResolvedValueOnce({ kind: 'contended' });
 
-    await expect(library.deleteLibraryProject('closed')).rejects.toThrow('active queue runs');
+    await expect(library.deleteLibraryProject('closed')).rejects.toMatchObject({ reason: 'active-runs' });
 
     expect(api.deleteProject).not.toHaveBeenCalled();
     expect(queueJournal.createAccountOwnedQueueRunJournal).not.toHaveBeenCalled();
@@ -359,7 +359,9 @@ describe('library mutations', () => {
     projectLocks.acquireProjectMutationLock.mockResolvedValueOnce({ kind: 'unavailable' });
 
     try {
-      await expect(library.deleteLibraryProject('closed')).rejects.toThrow('cross-tab coordination');
+      await expect(library.deleteLibraryProject('closed')).rejects.toMatchObject({
+        reason: 'coordination-unavailable',
+      });
     } finally {
       vi.unstubAllGlobals();
     }
@@ -375,7 +377,7 @@ describe('library mutations', () => {
       listForProject: vi.fn().mockResolvedValue({ entries: [{}], kind: 'available', removedCorrupt: 0 }),
     });
 
-    await expect(library.deleteLibraryProject('closed')).rejects.toThrow('active queue runs');
+    await expect(library.deleteLibraryProject('closed')).rejects.toMatchObject({ reason: 'active-runs' });
 
     expect(api.deleteProject).not.toHaveBeenCalled();
   });
@@ -389,7 +391,7 @@ describe('library mutations', () => {
       listForProject: vi.fn().mockResolvedValue({ kind: 'unavailable' }),
     });
 
-    await expect(library.deleteLibraryProject('closed')).rejects.toThrow('could not be verified');
+    await expect(library.deleteLibraryProject('closed')).rejects.toMatchObject({ reason: 'runs-unverified' });
 
     expect(api.deleteProject).not.toHaveBeenCalled();
     expect(release).toHaveBeenCalledOnce();

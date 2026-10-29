@@ -1,6 +1,6 @@
 import { Portal, Stack, Text } from '@chakra-ui/react';
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button, CloseButton } from './Button';
@@ -12,6 +12,7 @@ export const ConfirmDialog = ({
   cancelLabel,
   confirmLabel,
   finalFocusEl,
+  initialFocusEl,
   isDestructive = true,
   isConfirmDisabled = false,
   isOpen,
@@ -29,6 +30,11 @@ export const ConfirmDialog = ({
   confirmLabel: string;
   /** Where focus returns on close when the opener may no longer exist, e.g. a row the confirmed action deleted. */
   finalFocusEl?: () => HTMLElement | null;
+  /**
+   * Where focus starts instead of the dismiss button, such as a typed-confirmation field: safe only when the confirm
+   * stays disabled until the body is filled in.
+   */
+  initialFocusEl?: () => HTMLElement | null;
   isDestructive?: boolean;
   /** Keep confirmation unavailable until the caller has prepared a valid confirmation target. */
   isConfirmDisabled?: boolean;
@@ -92,6 +98,21 @@ export const ConfirmDialog = ({
   const handleConfirmClick = useCallback(() => {
     void handleConfirm();
   }, [handleConfirm]);
+  // Enter in a text field of the body confirms, as a form would, but only while confirming is allowed.
+  const handleBodyKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (
+        event.key === 'Enter' &&
+        !event.nativeEvent.isComposing &&
+        event.target instanceof HTMLInputElement &&
+        (event.target.type === 'text' || event.target.type === 'search')
+      ) {
+        event.preventDefault();
+        void handleConfirm();
+      }
+    },
+    [handleConfirm]
+  );
 
   // A destructive confirmation opens on its dismiss button rather than the dialog's default target (the close button
   // for an alertdialog), so a reflexive Enter or Space cancels and never commits or flips an option in the body.
@@ -102,7 +123,7 @@ export const ConfirmDialog = ({
       closeOnEscape={!isPending}
       closeOnInteractOutside={!isPending}
       finalFocusEl={finalFocusEl}
-      initialFocusEl={text.isDestructive ? getInitialFocus : undefined}
+      initialFocusEl={initialFocusEl ?? (text.isDestructive ? getInitialFocus : undefined)}
       open={isOpen}
       role="alertdialog"
       size="sm"
@@ -116,7 +137,7 @@ export const ConfirmDialog = ({
             <Dialog.Header>
               <Dialog.Title>{text.title}</Dialog.Title>
             </Dialog.Header>
-            <Dialog.Body>
+            <Dialog.Body onKeyDown={handleBodyKeyDown}>
               <Stack gap="2">
                 {typeof text.body === 'string' ? <Text fontSize="md">{text.body}</Text> : text.body}
               </Stack>

@@ -145,7 +145,6 @@ describe('database maintenance in Data & workspace settings', () => {
     mocks.canManageAppConfig = false;
     await renderSettings();
     expect(getVacuumButton()).toBeUndefined();
-    expect(host.textContent).toContain('Clear saved data');
   });
 
   it('keeps maintenance out of both top-bar menus', async () => {

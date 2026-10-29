@@ -299,7 +299,6 @@ describe('gallery maintenance in Data & workspace settings', () => {
     }
     expect(host.textContent).toContain('settings.databaseMaintenance.compactDatabase');
     expect(host.textContent).toContain('settings.catalog.manageIntermediates');
-    expect(host.textContent).toContain('Clear saved data');
     expect(mocks.apiFetchJson).not.toHaveBeenCalled();
 
     mocks.canManageAppConfig = false;
@@ -307,7 +306,6 @@ describe('gallery maintenance in Data & workspace settings', () => {
     for (const action of operations) {
       expect(getButton(action.button)).toBeUndefined();
     }
-    expect(host.textContent).toContain('Clear saved data');
   });
 
   it.each(operations)('$operation previews before confirmation and cancel sends no execute request', async (action) => {

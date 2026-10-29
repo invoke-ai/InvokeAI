@@ -34,6 +34,7 @@ export {
 export { AccountMenu } from './ui/AccountMenu';
 export { AccountMenuSection, useHasAccountSection } from './ui/AccountMenuSection';
 export { AuthUnavailableScreen } from './ui/AuthUnavailableScreen';
-export { LoginScreen } from './ui/LoginScreen';
+export { SessionExpiryNotice } from './ui/SessionExpiryNotice';
+export { LoginScreen, readLoginReturnPath } from './ui/LoginScreen';
 export { SetupScreen } from './ui/SetupScreen';
 export { UsersPage } from './ui/UsersPage';

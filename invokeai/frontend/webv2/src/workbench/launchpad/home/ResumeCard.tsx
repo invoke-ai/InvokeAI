@@ -54,9 +54,10 @@ export const ResumeCard = ({
       position="relative"
       rounded="lg"
       transition={CARD_TRANSITION}
-      _hover={CARD_HOVER}
+      _hover={isCompatible ? CARD_HOVER : undefined}
       onContextMenu={handleContextMenu}
     >
+      {/* A project this build cannot open has no link and no tab stop; its compatibility badge says why. */}
       {isCompatible ? (
         <Link
           aria-label={t('projects.openProjectLabel', { name: summary.name })}
@@ -64,16 +65,7 @@ export const ResumeCard = ({
           style={LINK_STYLE}
           to="/app"
         />
-      ) : (
-        <Box
-          aria-disabled="true"
-          aria-label={`${t('projects.openProjectLabel', { name: summary.name })}. ${t('projects.file.updateClient')}`}
-          role="link"
-          style={LINK_STYLE}
-          tabIndex={0}
-          title={t('projects.file.updateClient')}
-        />
-      )}
+      ) : null}
       <Flex align="center" flexShrink={0} p="1.5" pointerEvents="none" w={COVER_WIDTH}>
         <Box overflow="hidden" rounded="md" w="full">
           <ProjectCover coverUrl={summary.coverUrl} />
@@ -99,7 +91,7 @@ export const ResumeCard = ({
               </Link>
             </Button>
           ) : (
-            <Button disabled title={t('projects.file.updateClient')} variant="solid">
+            <Button unavailableReason={t('projects.file.updateClient')} variant="solid">
               {t('launchpad.home.resumeAction')}
               <ArrowRightIcon />
             </Button>

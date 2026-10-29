@@ -11,6 +11,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
+import type * as libraryModule from './library';
+
 import { serializeProjectDocumentV3Json } from './projectDocument';
 
 const harness = vi.hoisted(() => ({
@@ -27,10 +29,15 @@ const harness = vi.hoisted(() => ({
   reopenSession: vi.fn(),
 }));
 
-vi.mock('./library', () => ({
-  deleteLibraryProject: harness.deleteLibraryProject,
-  refreshProjectLibrary: vi.fn(),
-}));
+vi.mock('./library', async (importOriginal) => {
+  const { describeProjectDeletionFailure, ProjectDeletionRefusedError } = await importOriginal<typeof libraryModule>();
+  return {
+    describeProjectDeletionFailure,
+    ProjectDeletionRefusedError,
+    deleteLibraryProject: harness.deleteLibraryProject,
+    refreshProjectLibrary: vi.fn(),
+  };
+});
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useNavigate: () => harness.navigate,
@@ -114,14 +121,39 @@ afterEach(async () => {
 });
 
 describe('useProjectActions', () => {
-  it('blocks project deletion while a queue run is active', async () => {
+  it('blocks project deletion while a queue run is active and offers the queue', async () => {
     harness.project.queue.items = [{ status: 'running' } as Project['queue']['items'][number]];
     await act(() => root?.render(<Harness />));
 
     await act(() => userEvent.click(document.querySelectorAll('button')[1]!));
 
-    expect(harness.notifyError).toHaveBeenCalledWith('projects.deleteFailed', 'projects.activeRunsMustFinish');
+    expect(harness.notifyError).toHaveBeenCalledWith('projects.deleteFailed', 'projects.deleteRefused.active-runs', {
+      actions: [{ kind: 'open-widget', widgetId: 'queue' }],
+    });
     expect(harness.deleteLibraryProject).not.toHaveBeenCalled();
+  });
+
+  it('names why the server-side checks refused a delete, and offers the queue only for active runs', async () => {
+    const { ProjectDeletionRefusedError } = await import('./library');
+    await act(() => root?.render(<Harness />));
+
+    harness.deleteLibraryProject.mockRejectedValueOnce(new ProjectDeletionRefusedError('active-runs'));
+    await act(() => userEvent.click(document.querySelectorAll('button')[1]!));
+    expect(harness.notifyError).toHaveBeenLastCalledWith(
+      'projects.deleteFailed',
+      'projects.deleteRefused.active-runs',
+      {
+        actions: [{ kind: 'open-widget', widgetId: 'queue' }],
+      }
+    );
+
+    harness.deleteLibraryProject.mockRejectedValueOnce(new ProjectDeletionRefusedError('runs-unverified'));
+    await act(() => userEvent.click(document.querySelectorAll('button')[1]!));
+    expect(harness.notifyError).toHaveBeenLastCalledWith(
+      'projects.deleteFailed',
+      'projects.deleteRefused.runs-unverified',
+      { actions: undefined }
+    );
   });
 
   it('clears other open projects of the boards that went with a deleted project, and only once it is gone', async () => {

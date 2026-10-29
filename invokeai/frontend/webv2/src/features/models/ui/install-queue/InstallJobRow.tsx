@@ -15,6 +15,7 @@ import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Tooltip } from '@platform/ui/Tooltip';
 import {
   CheckIcon,
+  CircleStopIcon,
   ClockIcon,
   LockIcon,
   MinusIcon,
@@ -43,6 +44,7 @@ import {
   resolveInstallProgress,
   STATUS_PRESENTATION,
 } from './queueModel';
+import { useConfirmedInstallCancel } from './useConfirmedInstallCancel';
 import { useInstallJobActions } from './useInstallJobActions';
 
 const STATUS_GLYPHS: Record<InstallRowStatus, ManagerQueueGlyph> = {
@@ -69,6 +71,7 @@ export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
 
   const presentation = STATUS_PRESENTATION[status];
   const progress = resolveInstallProgress(job, liveProgress);
+  const cancel = useConfirmedInstallCancel(job, progress, actions.cancel);
   const displayName = getInstallJobDisplayName(job);
   const sourceLabel = getInstallJobSourceLabel(job);
   const problemParts = getProblemDownloadParts(job);
@@ -205,14 +208,16 @@ export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
               onClick={actions.dismiss}
             />
           ) : (
+            // Stop, not the X that removes a settled row from the list: this one throws work away.
             <ManagerQueueRowAction
               disabled={actions.isBusy}
-              icon={XIcon}
+              icon={CircleStopIcon}
               label={t('models.cancelInstall')}
               tone="danger"
-              onClick={actions.cancel}
+              onClick={cancel.requestCancel}
             />
           )}
+          {cancel.dialog}
         </>
       }
     />

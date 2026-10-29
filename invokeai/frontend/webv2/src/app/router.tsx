@@ -1,11 +1,16 @@
+import { Flex, Spinner, Text } from '@chakra-ui/react';
 import { FontsRuntimeProvider } from '@features/fonts/react';
 import {
   AuthSessionUnavailableError,
   AuthUnavailableScreen,
   ensureReadyAuthSession,
+  getAuthSession,
   getCapabilities,
   LoginScreen,
+  readLoginReturnPath,
+  SessionExpiryNotice,
   SetupScreen,
+  subscribeAuthSession,
   useAuthSession,
   useCapabilities,
   type Capabilities,
@@ -20,6 +25,7 @@ import {
 import { createLogger } from '@platform/logging/logger';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { createListenerChannel } from '@platform/state/externalStoreCore';
+import { toaster } from '@platform/ui/toaster';
 import {
   createHashHistory,
   createRootRoute,
@@ -31,10 +37,12 @@ import {
   Outlet,
   redirect,
   useRouter,
+  useRouterState,
 } from '@tanstack/react-router';
 import { WorkbenchSplashScreen } from '@workbench/components/WorkbenchSplashScreen';
 import { isLaunchpadIntentId } from '@workbench/launchpad/intents';
 import { Launchpad } from '@workbench/launchpad/Launchpad';
+import { StayOnLaunchpadButton } from '@workbench/launchpad/StayOnLaunchpadButton';
 import { listProjects } from '@workbench/projects/api';
 import { ProjectFileOptionsProvider } from '@workbench/projects/components/ProjectFileOptionsProvider';
 import { getProjectLibrary, seedProjectLibrary } from '@workbench/projects/library';
@@ -45,7 +53,9 @@ import {
   useWorkbenchPreferenceSelector,
 } from '@workbench/settings/store';
 import { loadAppVersion } from '@workbench/shell/whatsNewStore';
+import i18next from 'i18next';
 import { Fragment, useCallback, useMemo, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type * as SchedulerRules from './modelSchedulerPolicyReader';
 
@@ -143,9 +153,43 @@ export const AccountModelsUiProvider = ({ children }: { children: ReactNode }) =
   return <ModelsUiProvider adapter={adapter}>{children}</ModelsUiProvider>;
 };
 
+const NO_SEARCH = {};
+const returnToSearch = (returnTo: string) => ({ returnTo });
+const isLoginHref = (href: string): boolean => href === '/login' || href.startsWith('/login?');
+
+/** While the session resolves or follows another tab to a different account: say so, never a blank page. */
+const AccountPending = ({ messageKey }: { messageKey: string }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Flex align="center" bg="bg" color="fg.muted" gap="2" justify="center" minH="100dvh">
+      <Spinner />
+      <Text fontSize="md" role="status">
+        {t(messageKey)}
+      </Text>
+    </Flex>
+  );
+};
+
+/**
+ * Sends a signed-out session to the login screen; an expired one carries the way back (`returnTo`). Only this child
+ * follows the location, so navigation never re-renders the layout's runtime providers.
+ */
+const SignedOutRedirect = ({ sessionExpired }: { sessionExpired: boolean }) => {
+  const href = useRouterState({ select: (state) => state.location.href });
+  const loginReturnTo = useRouterState({
+    select: (state) =>
+      isLoginHref(state.location.href) ? (state.location.search as { returnTo?: string }).returnTo : undefined,
+  });
+  // It can render again on the way to the login screen; it keeps the way back it already chose.
+  const returnTo = isLoginHref(href) ? loginReturnTo : sessionExpired ? href : undefined;
+
+  return <Navigate replace search={returnTo === undefined ? NO_SEARCH : returnToSearch(returnTo)} to="/login" />;
+};
+
 /**
  * Keep socket and install progress alive across authenticated routes; mount heavier feature listeners only where
- * needed.
+ * needed. A sign-in by the expired account, here or followed from another tab, returns to `returnTo`.
  */
 const AuthenticatedLayout = () => {
   'use no memo';
@@ -153,25 +197,32 @@ const AuthenticatedLayout = () => {
   const session = useAuthSession();
 
   if (session.phase !== 'ready') {
-    return null;
+    return <AccountPending messageKey="splash.loadingApplication" />;
+  }
+
+  if (session.switchingAccount) {
+    return <AccountPending messageKey="auth.switchingAccount" />;
   }
 
   if (session.multiuserEnabled && session.user === null) {
-    return <Navigate replace to="/login" />;
+    return <SignedOutRedirect sessionExpired={session.sessionExpired} />;
   }
 
   return (
-    <Fragment key={session.accountEpoch}>
-      <SocketHubRuntime />
-      <ModelInstallRuntime />
-      <FontsRuntimeProvider>
-        <ProjectFileOptionsProvider>
-          <AccountModelsUiProvider>
-            <Outlet />
-          </AccountModelsUiProvider>
-        </ProjectFileOptionsProvider>
-      </FontsRuntimeProvider>
-    </Fragment>
+    <>
+      {session.multiuserEnabled ? <SessionExpiryNotice /> : null}
+      <Fragment key={session.accountEpoch}>
+        <SocketHubRuntime />
+        <ModelInstallRuntime />
+        <FontsRuntimeProvider>
+          <ProjectFileOptionsProvider>
+            <AccountModelsUiProvider>
+              <Outlet />
+            </AccountModelsUiProvider>
+          </ProjectFileOptionsProvider>
+        </FontsRuntimeProvider>
+      </Fragment>
+    </>
   );
 };
 
@@ -198,6 +249,12 @@ const startupRedirects = createStartupRedirects(
     },
     peekOpenProjectIds,
     preloadEditor: () => void import('./WorkbenchApp'),
+    reportSkippedLaunch: () =>
+      toaster.create({
+        description: i18next.t('splash.launchSkippedDescription'),
+        title: i18next.t('splash.launchSkippedTitle'),
+        type: 'info',
+      }),
   }
 );
 
@@ -211,7 +268,7 @@ const authenticatedRoute = createRoute({
       }
 
       if (session.user === null) {
-        throw redirect({ to: '/login' });
+        throw redirect({ search: session.sessionExpired ? { returnTo: location.href } : {}, to: '/login' });
       }
     }
 
@@ -233,11 +290,24 @@ const authenticatedRoute = createRoute({
   id: 'authenticated',
 });
 
-const requireLaunchpadCapability = async (capability: keyof Capabilities): Promise<void> => {
+/** A page the account may not use opens Projects instead, and says why; a hover preload says nothing. */
+const requireLaunchpadCapability = async (
+  capability: keyof Capabilities,
+  sectionKey: string,
+  preload: boolean
+): Promise<void> => {
   const session = await ensureReadyAuthSession();
 
   if (!getCapabilities(session)[capability]) {
-    throw redirect({ to: '/projects' });
+    if (!preload) {
+      toaster.create({
+        description: i18next.t('launchpad.redirects.noAccessDescription'),
+        id: `launchpad-no-access:${sectionKey}`,
+        title: i18next.t('launchpad.redirects.noAccess', { section: i18next.t(sectionKey) }),
+        type: 'info',
+      });
+    }
+    throw redirect({ replace: true, to: '/projects' });
   }
 };
 
@@ -257,7 +327,7 @@ const projectsHomeRoute = createRoute({
 });
 
 const modelsHomeRoute = createRoute({
-  beforeLoad: () => requireLaunchpadCapability('canManageModels'),
+  beforeLoad: ({ preload }) => requireLaunchpadCapability('canManageModels', 'launchpad.sections.models', preload),
   ...launchpadRouteOptions,
   path: 'models',
   validateSearch: (search: Record<string, unknown>): { project?: string } => ({
@@ -266,13 +336,13 @@ const modelsHomeRoute = createRoute({
 });
 
 const nodesHomeRoute = createRoute({
-  beforeLoad: () => requireLaunchpadCapability('canManageNodes'),
+  beforeLoad: ({ preload }) => requireLaunchpadCapability('canManageNodes', 'launchpad.sections.nodes', preload),
   ...launchpadRouteOptions,
   path: 'nodes',
 });
 
 const usersHomeRoute = createRoute({
-  beforeLoad: () => requireLaunchpadCapability('canManageUsers'),
+  beforeLoad: ({ preload }) => requireLaunchpadCapability('canManageUsers', 'launchpad.sections.users', preload),
   ...launchpadRouteOptions,
   path: 'users',
 });
@@ -296,6 +366,23 @@ const preferencesSectionRoute = createRoute({
   ...launchpadRouteOptions,
   path: 'preferences/$section',
   validateSearch: validatePreferencesSearch,
+});
+
+/** An address no page answers opens Home, and says so once; a hover preload says nothing. */
+const notFoundRoute = createRoute({
+  beforeLoad: ({ preload }) => {
+    if (!preload) {
+      toaster.create({
+        description: i18next.t('launchpad.redirects.notFoundDescription'),
+        id: 'launchpad-not-found',
+        title: i18next.t('launchpad.redirects.notFound'),
+        type: 'info',
+      });
+    }
+    throw redirect({ replace: true, to: '/' });
+  },
+  getParentRoute: () => authenticatedRoute,
+  path: '$',
 });
 
 const workbenchRoute = createRoute({
@@ -341,6 +428,9 @@ const loginRoute = createRoute({
   component: LoginScreen,
   getParentRoute: () => rootRoute,
   path: '/login',
+  validateSearch: (search: Record<string, unknown>): { returnTo?: string } => ({
+    returnTo: readLoginReturnPath(search.returnTo),
+  }),
 });
 
 const setupRoute = createRoute({
@@ -356,9 +446,11 @@ const setupRoute = createRoute({
   path: '/setup',
 });
 
-const RouterPending = () => <WorkbenchSplashScreen messageKey="splash.loadingApplication" />;
+const STAY_ON_LAUNCHPAD = <StayOnLaunchpadButton />;
+const RouterPending = () => <WorkbenchSplashScreen action={STAY_ON_LAUNCHPAD} messageKey="splash.loadingApplication" />;
 
 export const router = createRouter({
+  // Unknown addresses are the splat route's (with its notice); this answers only a `notFound()` a route throws.
   defaultNotFoundComponent: () => <Navigate to="/" />,
   defaultOnCatch: (error, errorInfo) =>
     routerLogger.error({
@@ -381,11 +473,35 @@ export const router = createRouter({
       preferencesHomeRoute,
       preferencesSectionRoute,
       workbenchRoute,
+      notFoundRoute,
     ]),
     loginRoute,
     setupRoute,
   ]),
 });
+
+/**
+ * Following another tab's sign-in to a different account lands on Home, as signing in here would: the page this tab
+ * showed belonged to the previous account (its project, or a manager the new account may not use).
+ */
+let wasSwitchingAccount = false;
+const unsubscribeAccountSwitchLanding = subscribeAuthSession(() => {
+  const { switchingAccount, user } = getAuthSession();
+
+  if (switchingAccount) {
+    wasSwitchingAccount = true;
+    return;
+  }
+
+  if (wasSwitchingAccount) {
+    wasSwitchingAccount = false;
+    if (user !== null) {
+      void router.navigate({ replace: true, to: '/' });
+    }
+  }
+});
+// A hot update of this module subscribes again; the replaced module's listener must go with it.
+import.meta.hot?.dispose(unsubscribeAccountSwitchLanding);
 
 declare module '@tanstack/react-router' {
   interface Register {

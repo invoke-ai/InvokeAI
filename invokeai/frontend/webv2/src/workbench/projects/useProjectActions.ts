@@ -1,5 +1,5 @@
 import type { GalleryBoardDeletionResult } from '@features/gallery';
-import type { Project } from '@workbench/projectContracts';
+import type { Project, WorkbenchNotificationAction } from '@workbench/projectContracts';
 
 import { getGalleryProjectBoardsFromCaches, invalidateGallery } from '@features/gallery/queries';
 import {
@@ -23,7 +23,12 @@ import { useTranslation } from 'react-i18next';
 
 import type { DeleteProjectBoards } from './api';
 
-import { deleteLibraryProject, refreshProjectLibrary } from './library';
+import {
+  deleteLibraryProject,
+  describeProjectDeletionFailure,
+  ProjectDeletionRefusedError,
+  refreshProjectLibrary,
+} from './library';
 import { serializeProjectDocumentV3Json } from './projectDocument';
 import { describeRefusedProject } from './projectLoadRefusal';
 
@@ -39,10 +44,14 @@ const NO_MEDIA_DELETED: Omit<GalleryBoardDeletionResult, 'boardId'> = {
   failedVideoNames: [],
 };
 
+/** Where a project's active runs are: they hold its deletion until they finish. */
+const OPEN_QUEUE_ACTIONS: readonly WorkbenchNotificationAction[] = [{ kind: 'open-widget', widgetId: 'queue' }];
+
 /**
  * Open reuses or hydrates a project. Close flushes while preserving the server record; closing the last tab
  * returns Home. Delete removes the server project.
  */
+
 export const useProjectActions = (): {
   closeProject: (project: Project) => void;
   deleteProject: (project: Project, boards?: DeleteProjectBoards) => Promise<void>;
@@ -217,8 +226,12 @@ export const useProjectActions = (): {
   };
 
   const deleteProject = async (project: Project, boards?: DeleteProjectBoards): Promise<void> => {
+    const reportDeleteFailure = (error: unknown) => {
+      const { message, offersQueue } = describeProjectDeletionFailure(error, t);
+      notify.error(t('projects.deleteFailed'), message, { actions: offersQueue ? OPEN_QUEUE_ACTIONS : undefined });
+    };
     if (hasActiveQueueRuns(project)) {
-      notify.error(t('projects.deleteFailed'), t('projects.activeRunsMustFinish'));
+      reportDeleteFailure(new ProjectDeletionRefusedError('active-runs'));
       return;
     }
 
@@ -232,7 +245,7 @@ export const useProjectActions = (): {
       // Open projects delete through the sync engine so in-flight saves finish first.
       await deleteLibraryProject(project.id, boards);
     } catch (error) {
-      notify.error(t('projects.deleteFailed'), error instanceof Error ? error.message : undefined);
+      reportDeleteFailure(error);
 
       return;
     }

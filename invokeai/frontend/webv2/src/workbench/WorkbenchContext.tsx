@@ -18,6 +18,7 @@ import type { ProjectPushOutcome } from './projects/projectFlush';
 import { WorkbenchSplashScreen } from './components/WorkbenchSplashScreen';
 import { WorkbenchUnavailableScreen } from './components/WorkbenchUnavailableScreen';
 import { createExtensionRegistry, type ExtensionRegistry } from './extensions/extensionRegistry';
+import { StayOnLaunchpadButton } from './launchpad/StayOnLaunchpadButton';
 import { clearLayerPanelStates } from './layerPanelState';
 import { browserPageLifecycle, createWorkbenchPersistenceRuntime, type PersistenceExit } from './persistenceRuntime';
 import { createOpenProjectBroker } from './projects/openProjectBroker';
@@ -35,6 +36,8 @@ import {
 import { consumeWorkspaceClearFailure } from './settings/clearWorkspaceData';
 import { getProjectWidgetValues } from './widgetState';
 import { createWorkbenchStore, type WorkbenchSnapshot, type WorkbenchInternalStore } from './workbenchStore';
+
+const STAY_ON_LAUNCHPAD = <StayOnLaunchpadButton />;
 
 interface WorkbenchContextValue {
   activeProject: Project;
@@ -226,7 +229,7 @@ export const WorkbenchProvider = ({
             ) : hasHydrated ? (
               children
             ) : (
-              <WorkbenchSplashScreen messageKey="splash.openingProject" />
+              <WorkbenchSplashScreen action={STAY_ON_LAUNCHPAD} messageKey="splash.openingProject" />
             )}
           </WorkbenchStoreContext>
         </WorkbenchExtensionsContext>

@@ -128,12 +128,17 @@ export interface SettingsAvailability {
   canManageAppConfig: boolean;
   /** Widget types in the open project, or `null` where no project is open (the Launchpad). */
   widgetTypeIds: ReadonlySet<string> | null;
+  /**
+   * Search also finds project settings where no project is open, so a search for one says where it lives instead of
+   * finding nothing; the entry renders as unavailable there.
+   */
+  forSearch?: boolean;
 }
 
 /** Only settings that can be edited here: project settings need a project, widget settings need that widget. */
 export const getAvailableSettings = (
   sections: readonly SettingsSection[],
-  { canManageAppConfig, widgetTypeIds }: SettingsAvailability
+  { canManageAppConfig, forSearch = false, widgetTypeIds }: SettingsAvailability
 ): SettingsSection[] =>
   sections.flatMap((section) => {
     if (section.id === 'server' && !canManageAppConfig) {
@@ -141,7 +146,7 @@ export const getAvailableSettings = (
     }
     const entries = section.entries.filter(({ field }) => {
       if (field.scope === 'project') {
-        return widgetTypeIds !== null;
+        return widgetTypeIds !== null || forSearch;
       }
       if (field.scope === 'instance') {
         return Boolean(section.widgetId && widgetTypeIds?.has(section.widgetId));
@@ -163,15 +168,19 @@ export interface SettingsBrowseState {
 
 export const isSettingsQuery = (query: string): boolean => query.trim().length > 0;
 
-/** What a settings surface shows for its section and search state; `sections` is never empty (Appearance is always available). */
+/**
+ * What a settings surface shows for its section and search state; `sections` is never empty (Appearance is always
+ * available). `searchable` is what a search looks through, `sections` by default.
+ */
 export const browseSettings = (
   sections: readonly SettingsSection[],
   { activeId, query, searchSection }: SettingsBrowseState,
-  t: TFunction
+  t: TFunction,
+  searchable: readonly SettingsSection[] = sections
 ) => {
   const searching = isSettingsQuery(query);
   const active = sections.find((section) => section.id === activeId) ?? sections[0];
-  const matches = searching ? searchSettings(sections, query, t) : [...sections];
+  const matches = searching ? searchSettings(searchable, query, t) : [...sections];
   const displayed = searching ? matches.filter((section) => !searchSection || section.id === searchSection) : [active];
   const count = matches.reduce((total, section) => total + section.entries.length, 0);
   return { active, count, displayed, matches, searching };

@@ -24,8 +24,9 @@ const ALL_RESULTS_KEY = 'all-results';
 type ListEntry = { kind: 'all' } | { kind: 'section'; section: SettingsSection };
 
 /**
- * Launchpad preferences: the settings that need no open project, in the managers' list/detail layout. The
- * section lives in the route; the query stays in the page, which the Launchpad keeps mounted between visits.
+ * Launchpad preferences: the settings that need no open project, in the managers' list/detail layout. Search also
+ * finds project settings, shown as needing an open project. The section lives in the route; the query stays in the
+ * page, which the Launchpad keeps mounted between visits.
  */
 export const PreferencesPage = () => {
   const { t } = useTranslation();
@@ -40,6 +41,7 @@ export const PreferencesPage = () => {
   // A search result opened from the list; sections open through the route.
   const [isSearchResultOpen, setIsSearchResultOpen] = useState(false);
   const sections = useAvailableSettings();
+  const searchableSections = useAvailableSettings({ forSearch: true });
   const isKnownRequest = requestedId !== null && sections.some((section) => section.id === requestedId);
 
   // Bare `/preferences` (the rail link) returns to the section last shown.
@@ -62,7 +64,8 @@ export const PreferencesPage = () => {
   const { active, count, displayed, matches, searching } = browseSettings(
     sections,
     { activeId: (isKnownRequest ? requestedId : lastSectionId) ?? '', query, searchSection },
-    t
+    t,
+    searchableSections
   );
 
   const showSearchSection = (sectionId: string | null) => {

@@ -168,7 +168,7 @@
     }
   },
   "common": {
-    "donateToInvokeAI": "Donate to InvokeAI",
+    "donateToInvokeAI": "Donate to Invoke",
     "actions": "Actions",
     "active": "Active",
     "add": "Add",
@@ -304,7 +304,7 @@
     "increaseValue": "Increase value"
   },
   "app": {
-    "name": "Invoke AI"
+    "name": "Invoke"
   },
   "errorScreen": {
     "copied": "Details copied.",
@@ -329,6 +329,7 @@
     "createAdminAccount": "Create administrator account",
     "currentPassword": "Current password",
     "displayNameHelp": "Optional — shown instead of your email.",
+    "forgotPasswordHint": "Forgot your password? Ask your administrator to reset it.",
     "hidePassword": "Hide password",
     "keepSignedIn": "Keep me signed in for a week",
     "leaveBlankKeepPassword": "Leave blank to keep your password.",
@@ -340,8 +341,10 @@
       "weak": "Weak"
     },
     "profileDisplayNameHelp": "Shown instead of your email across the workspace.",
-    "sessionExpired": "Your session expired. Sign in again to continue.",
-    "setupFooter": "You can add more users later from the user menu.",
+    "sessionExpired": "Your session expired. Sign in again to pick up where you left off.",
+    "sessionEndingTitle": "Your session ends soon",
+    "sessionEndingDescription": "You'll be signed out at {{time}} unless you make a change before then. Signing back in returns you here.",
+    "setupFooter": "You can add more users later from Users in the Launchpad.",
     "setupSubtitle": "Create the administrator account to get started.",
     "setupTitle": "Set up Invoke",
     "showPassword": "Show password",
@@ -349,16 +352,20 @@
     "signInFailed": "Sign-in failed. Check your email and password.",
     "signInSubtitle": "Sign in to your workspace to continue.",
     "signedInAs": "Signed in as {{email}}",
+    "switchingAccount": "Switching account…",
     "signOut": "Sign out",
     "welcomeTitle": "Welcome to Invoke",
     "yourPassword": "Your password"
   },
   "splash": {
     "artworkBy": "Artwork by {{artist}}",
-    "copyright": "© 2022-{{year}} InvokeAI Contributors | All rights reserved",
+    "copyright": "© 2022-{{year}} Invoke Contributors | All rights reserved",
     "loadingApplication": "Loading Application",
     "loadingWorkspace": "Loading workspace",
     "openingProject": "Opening project",
+    "stayOnLaunchpad": "Stay on the Launchpad",
+    "launchSkippedTitle": "Opened the Launchpad instead",
+    "launchSkippedDescription": "Your last work didn't finish opening the last time Invoke started, so it wasn't reopened. Open it from Home when you're ready.",
     "tagline": "Image Generation for Creatives"
   },
   "notifications": {
@@ -575,16 +582,21 @@
     "couldNotOpenDescription": "\"{{name}}\" could not be loaded from the server.",
     "createNewProject": "Create new project",
     "deleteFailed": "Delete failed",
+    "deleteRefused": {
+      "active-runs": "Its queue runs are still active. Let them finish or cancel them in the queue, then delete it.",
+      "runs-unverified": "Its queue runs could not be checked in this browser, so it was kept. Reload and try again.",
+      "coordination-unavailable": "Other tabs could not be checked for this project's queue runs, so it was kept. Close other Invoke tabs and try again."
+    },
     "deleteProject": "Delete project",
     "deleteProjectBoardsUnknown": "Its other boards could not be checked; they will be kept in the Library.",
     "deleteProjectCheckingBoards": "Checking its boards…",
-    "deleteProjectDeleteBoards": "Delete its other boards too",
-    "deleteProjectDeleteBoardsHint": "{{items}} return to Uncategorized.",
-    "deleteProjectInboxNote": "Its inbox goes with it; the images and videos it held return to Uncategorized.",
+    "deleteProjectDeleteBoards": "Also delete its other boards",
+    "deleteProjectDeleteBoardsHint": "Only the board folders are removed. Images are never deleted: {{items}} move to Uncategorized.",
+    "deleteProjectInboxNote": "Its inbox board goes with it; the images and videos on it move to Uncategorized. No image is deleted.",
     "deleteProjectItemCount_one": "{{count}} item",
     "deleteProjectItemCount_other": "{{count}} items",
     "deleteProjectKeepBoards": "Keep its other boards in the Library",
-    "deleteProjectKeepBoardsHint": "{{boards}} stay where you can find them, with everything on them.",
+    "deleteProjectKeepBoardsHint": "{{boards}} move to the Library, with everything on them.",
     "deleteProjectCardBody": "Delete \"{{name}}\"? The project is removed from the server permanently.",
     "deleteProjectQuestion": "Delete project?",
     "deleteProjectTabBody": "Delete \"{{name}}\"? The project and its saved copy on the server are removed permanently. To keep it in your library, close the tab instead.",
@@ -1368,8 +1380,8 @@
     "base": "Base",
     "baseArchitecture": "Base Architecture",
     "baseUrlFor": "{{title}} base URL",
-    "bulkDeleteBody_one": "Delete {{count}} selected model? Database records are removed, and files inside the InvokeAI models directory are deleted.",
-    "bulkDeleteBody_other": "Delete {{count}} selected models? Database records are removed, and files inside the InvokeAI models directory are deleted.",
+    "bulkDeleteBody_one": "Delete {{count}} selected model? Database records are removed, and files inside the Invoke models directory are deleted.",
+    "bulkDeleteBody_other": "Delete {{count}} selected models? Database records are removed, and files inside the Invoke models directory are deleted.",
     "bulkDeleteConfirm_one": "Delete {{count}} Model",
     "bulkDeleteConfirm_other": "Delete {{count}} Models",
     "bulkDeleteFailed": "Bulk delete failed",
@@ -1388,8 +1400,20 @@
     "bytesCopied": "{{bytes}} copied",
     "cacheEmptied": "Model cache emptied",
     "currentPath": "Current path",
-    "cancelAll": "Cancel all",
     "cancelFailed": "Cancel failed",
+    "cancelAllWithEllipsis": "Cancel all…",
+    "cancelAllQuestion_one": "Cancel {{count}} install?",
+    "cancelAllQuestion_other": "Cancel {{count}} installs?",
+    "cancelAllBody_one": "The install that is queued, downloading or paused stops, and anything it has downloaded is discarded. Installed models are not affected.",
+    "cancelAllBody_other": "All {{count}} installs that are queued, downloading or paused stop, and anything they have downloaded is discarded. Installed models are not affected.",
+    "cancelAllConfirm_one": "Cancel {{count}} install",
+    "cancelAllConfirm_other": "Cancel {{count}} installs",
+    "keepInstalling": "Keep installing",
+    "cancelDownload": "Cancel download",
+    "cancelDownloadQuestion": "Cancel this download?",
+    "cancelDownloadBody": "{{name}} has downloaded {{downloaded}} of {{total}}. Cancelling discards it; installing again starts over.",
+    "cancelDownloadBodyUnknownTotal": "{{name}} has downloaded {{downloaded}}. Cancelling discards it; installing again starts over.",
+    "keepDownloading": "Keep downloading",
     "cancelInstall": "Cancel install",
     "changedElsewhere": "This model changed elsewhere; your unsaved edits are kept.",
     "civitaiKey": "Civitai key",
@@ -1450,7 +1474,7 @@
     "defaultVae": "Default VAE",
     "defaultSettingsHelp": "Applied automatically when this model is selected. Off = use the app default.",
     "defaultSettingsSaved": "Default settings saved",
-    "deleteBody": "Delete \"{{name}}\"? The database record is removed, and the model files are deleted if they live inside the InvokeAI models directory.",
+    "deleteBody": "Delete \"{{name}}\"? The database record is removed, and the model files are deleted if they live inside the Invoke models directory.",
     "deleteFailed": "Delete failed",
     "deleteModel": "Delete model",
     "deleteSelectedTitle": "Delete selected models",
@@ -1501,7 +1525,7 @@
     "fullRows": "Full rows",
     "gatedRepoMessage": "This repo is gated. Add a Hugging Face token to continue.",
     "hash": "Hash",
-    "huggingFaceKeyDescription": "For gated repos like FLUX. Stored on the InvokeAI server and verified with HuggingFace.",
+    "huggingFaceKeyDescription": "For gated repos like FLUX. Stored on the Invoke server and verified with HuggingFace.",
     "huggingFaceRejectedToken": "HuggingFace rejected this token. Check that it has read access.",
     "huggingFaceToken": "HuggingFace token",
     "install": "Install",
@@ -1510,7 +1534,7 @@
     "installAllQueued": "Installs queued",
     "installAllQueuedDescription_one": "{{count}} install queued.",
     "installAllQueuedDescription_other": "{{count}} installs queued.",
-    "installBundle": "Install bundle",
+    "installNamedBundle": "Install {{name}}",
     "installFailed": "Install failed",
     "installFp8Storage": "FP8 storage",
     "installFp8StorageTooltip": "Store the weights in FP8 to roughly halve VRAM use. Applied only where the model's loader supports it — a checkpoint that already stores FP8 weights gets it automatically, and models it cannot help (GGUF, NF4 and SDNQ among them) are left alone.",
@@ -1539,9 +1563,25 @@
     "launchpad": {
       "installing_one": "{{count}} model installing…",
       "installing_other": "{{count}} models installing…",
-      "noModelsDescription": "Invoke needs at least one model before it can generate. Pick a starter bundle to see what's inside and install it from the model manager.",
-      "noModelsTitle": "No models installed",
-      "starterBundles": "Starter bundles"
+      "installsNeedAttention_one": "{{count}} install failed or needs attention.",
+      "installsNeedAttention_other": "{{count}} installs failed or need attention.",
+      "openQueue": "Open queue",
+      "reviewInstalls": "Review",
+      "noModelsDescription": "Invoke needs at least one model to generate. Install the recommended starter bundle here, or pick another in the Model Manager.",
+      "noModelsAskAdmin": "Ask an administrator to add some. Until then, nothing can be generated.",
+      "noModelsTitle": "No models installed yet",
+      "hardwareRequirements": "Hardware requirements",
+      "recommended": "Recommended",
+      "otherBundles": "Other starter bundles",
+      "starterBundles": "Starter bundles",
+      "startNeedsModel": "Generating needs a model. Install one above first.",
+      "startAfterInstall": "Generating can start once the models finish installing.",
+      "startNeedsModelAskAdmin": "Generating needs a model, which an administrator has to install.",
+      "bundleGoodFor": {
+        "sd-1": "Fast 512 px images and the largest add-on library; the lightest on hardware.",
+        "sdxl": "Detailed 1024 px images with a rich add-on library.",
+        "z-image": "Fast few-step 1024 px images from English or Chinese prompts."
+      }
     },
     "library": "Model library",
     "libraryMaintenance": "Model library maintenance",
@@ -1797,7 +1837,7 @@
     "couldNotLoadPacks": "Could not load custom node packs",
     "customNodesReloaded": "Custom nodes reloaded",
     "dependenciesRequired": "Dependencies required",
-    "dependenciesRequiredDescription": "{{name}} requires dependencies from {{dependencyFile}}. Install them, then restart InvokeAI.",
+    "dependenciesRequiredDescription": "{{name}} requires dependencies from {{dependencyFile}}. Install them, then restart Invoke.",
     "details": "Node Pack Details",
     "fieldInfo": "Field: {{name}} · Type: {{type}}",
     "fieldName": "Field: {{name}}",
@@ -1847,7 +1887,7 @@
     "connectorTitle": "Connector: {{input}} → {{output}}",
     "filterAndSort": "Filter and sort node packs",
     "gitUrl": "Git URL",
-    "gitUrlHelp": "Paste a public Git repository URL. InvokeAI clones it into your custom nodes directory.",
+    "gitUrlHelp": "Paste a public Git repository URL. Invoke clones it into your custom nodes directory.",
     "input": "Input",
     "install": "Install",
     "cloningRepository": "Cloning repository",
@@ -2020,12 +2060,12 @@
     "nodesInPack": "Nodes in this pack",
     "noExposedFields": "No exposed fields.",
     "noNodesRegistered": "No nodes registered",
-    "noNodesRegisteredHint": "This pack registered no nodes — reload nodes or restart InvokeAI, and check its dependencies.",
+    "noNodesRegisteredHint": "This pack registered no nodes — reload nodes or restart Invoke, and check its dependencies.",
     "noPacks": "No custom node packs",
     "noPacksDescription": "Install from a Git URL or place packs in your custom nodes directory, then reload.",
     "noPacksMatch": "No packs match",
     "noPreviews": "No node previews available",
-    "noPreviewsDescription": "The backend has no node definitions for this pack yet. Reload nodes or restart InvokeAI to load them.",
+    "noPreviewsDescription": "The backend has no node definitions for this pack yet. Reload nodes or restart Invoke to load them.",
     "noInstallsDescription": "Node pack installs and uninstalls appear here.",
     "noInstallsYet": "No installs yet",
     "notInstalled": "Not installed",
@@ -2050,7 +2090,7 @@
     "restoreQueueTooltip": "Dock the install queue to the bottom of the pane",
     "retryInstall": "Retry install",
     "retryWaitsForInstall": "Another node pack is installing. Retry when it finishes.",
-    "scanFolderDescription": "Add node packs directly to the custom nodes directory, then reload nodes. InvokeAI scans this folder on startup and reload.",
+    "scanFolderDescription": "Add node packs directly to the custom nodes directory, then reload nodes. Invoke scans this folder on startup and reload.",
     "searchPacks": "Search node packs",
     "searchPacksPlaceholder": "Search packs…",
     "selectPack": "Select a node pack",
@@ -2070,7 +2110,7 @@
     "uninstallFailed": "Uninstall failed",
     "uninstallPack": "Uninstall Node Pack",
     "uninstallTitle": "Uninstall {{name}}?",
-    "uninstalledDescription": "Restart InvokeAI for node removal to take full effect.",
+    "uninstalledDescription": "Restart Invoke for node removal to take full effect.",
     "uninstalledTitle": "Node pack uninstalled",
     "couldNotUninstall": "Could not uninstall the node pack.",
     "uninstalled": "Uninstalled",
@@ -2144,6 +2184,12 @@
     },
     "projectsGreeting": "Welcome to Invoke",
     "projectsGreetingWithName": "Welcome back, {{name}}",
+    "redirects": {
+      "notFound": "That page doesn't exist",
+      "notFoundDescription": "Invoke opened Home instead.",
+      "noAccess": "{{section}} needs permission you don't have",
+      "noAccessDescription": "Ask an administrator for access. Invoke opened Projects instead."
+    },
     "sections": {
       "home": "Home",
       "models": "Models",
@@ -2159,6 +2205,25 @@
     "informationalPopoversDisabled": "Informational popovers disabled",
     "informationalPopoversDisabledDesc": "Re-enable them under Settings, in the Behavior section.",
     "revertLayout": "Revert layout to saved preset",
+    "clearData": {
+      "action": "Clear saved data…",
+      "title": "Clear all saved data?",
+      "bodyUser": "This permanently deletes {{projects}} and all your settings on this server. It cannot be undone.",
+      "bodyInstall": "This permanently deletes {{projects}} and all settings for this install. It cannot be undone.",
+      "bodyUserNoProjects": "You have no saved projects on this server. This permanently deletes all your settings. It cannot be undone.",
+      "bodyInstallNoProjects": "This install has no saved projects. This permanently deletes all its settings. It cannot be undone.",
+      "projectCount_one": "your {{count}} project",
+      "projectCount_other": "all {{count}} of your projects",
+      "projectCountUnknown": "every saved project",
+      "mediaKept": "Images and videos are not deleted: project boards move to the Library, and inbox items return to Uncategorized.",
+      "exportFirst": "Want to keep a project? Export it from Projects first.",
+      "openProjects": "Open Projects",
+      "typeToConfirm": "Type {{word}} to confirm",
+      "confirmWord": "DELETE",
+      "confirm": "Delete everything",
+      "projectsFailed": "Saved projects could not all be deleted. Reloading to restore a consistent workspace.",
+      "settingsFailed": "Projects were deleted, but some local settings could not be. Reloading the workspace."
+    },
     "title": "Settings",
     "descriptionGlobal": "Global preferences for this single-user install. Project settings apply only to the active project.",
     "descriptionUser": "Preferences for the signed-in user. Project settings apply only to the active project.",
@@ -2207,13 +2272,13 @@
     },
     "maxQueueHistory": {
       "adminOnly": "Only an administrator can change how much queue history the server keeps.",
-      "description": "Finished, failed and canceled items kept when InvokeAI starts. Leave blank to keep everything, or enter 0 to clear finished history on every start.",
+      "description": "Finished, failed and canceled items kept when Invoke starts. Leave blank to keep everything, or enter 0 to clear finished history on every start.",
       "inputLabel": "Queue history limit",
       "invalid": "Enter a whole number of items, or leave the field blank.",
       "keepAll": "Keep all",
       "modified": "Queue history",
       "readFailed": "Could not read the server's queue history setting.",
-      "restartRequired": "Restart InvokeAI for changes to take effect.",
+      "restartRequired": "Restart Invoke for changes to take effect.",
       "saveFailed": "Could not save the queue history limit."
     },
     "databaseMaintenance": {
@@ -2256,7 +2321,7 @@
       },
       "startMove": "Start Move",
       "startConfirmTitle": "Move all images into the current layout?",
-      "startConfirmBody": "InvokeAI pauses image reads, uploads, deletions and generation for everyone on this server until the move finishes. It cannot start while queue work is active.",
+      "startConfirmBody": "Invoke pauses image reads, uploads, deletions and generation for everyone on this server until the move finishes. It cannot start while queue work is active.",
       "startFailed": "The image move could not be started.",
       "recover": "Recover",
       "recoverConfirmTitle": "Recover the image move journal?",
@@ -2283,7 +2348,7 @@
       "regenerateThumbnailsDescription": "Create missing thumbnails for images in the gallery. Original images are unchanged.",
       "regenerateThumbnailsTitle": "Regenerate missing thumbnails?",
       "regenerateThumbnailsConfirm": "Regenerate thumbnails",
-      "installationScope": "This maintenance scans images across all accounts in this InvokeAI installation and may take time.",
+      "installationScope": "This maintenance scans images across all accounts in this Invoke installation and may take time.",
       "previewLoading": "Scanning for affected images…",
       "previewFailed": "The gallery could not be scanned.",
       "retryPreview": "Retry scan",
@@ -2321,16 +2386,16 @@
         "description": "Highlight the region receiving keyboard shortcuts."
       },
       "autoSwitchInvocationRoute": {
-        "label": "Auto-switch Invoke route",
-        "description": "Match the Invoke source and destination to the surface you are editing. Locked routes are never changed."
+        "label": "Invoke follows what you edit",
+        "description": "When you edit in Generate, Canvas, Upscale, Video or a workflow, the Invoke button switches to run that. A route you locked never changes."
       },
       "enableInformationalPopovers": {
         "label": "Enable informational popovers",
         "description": "Show educational popovers on controls that have extra guidance."
       },
       "enableModelDescriptions": {
-        "label": "Show model descriptions",
-        "description": "Include model descriptions in model dropdowns where available."
+        "label": "Show descriptions in model pickers",
+        "description": "Show model descriptions in model dropdowns, where a model has one."
       },
       "notifyOnEnqueue": {
         "label": "Notify when queued",
@@ -2418,10 +2483,14 @@
       },
       "workspaceActions": {
         "label": "Data & workspace",
-        "description": "Reset the layout, manage intermediates, or permanently delete saved projects and settings. Administrators can also run database maintenance."
+        "description": "Revert the layout or manage intermediates. Administrators can also run database maintenance."
+      },
+      "clearSavedData": {
+        "label": "Clear saved data",
+        "description": "Permanently delete every saved project and your settings, then reload. Images and videos are kept."
       },
       "about": {
-        "label": "About InvokeAI",
+        "label": "About Invoke",
         "description": "Version, build, and server information."
       },
       "language": {
@@ -2554,7 +2623,8 @@
       "deletedTitle": "Project deleted on the server",
       "deleteDraft": "Delete draft",
       "deleteDraftConfirmBody": "Permanently delete this browser draft? This cannot be undone.",
-      "recoverableDraftDescription": "A browser draft for project {{projectId}} could not be opened automatically. Export it before deleting it or retrying recovery.",
+      "recoverableDraftDescription": "A browser draft of “{{project}}” could not be opened automatically. Export it before deleting it or retrying recovery.",
+      "recoverableDraftDescriptionUnnamed": "A browser draft of a project not in your library could not be opened automatically. Export it before deleting it or retrying recovery.",
       "recoverableDraftPosition": "Draft {{number}} of {{count}}.",
       "recoverableDraftTitle": "Recoverable project draft available",
       "nextDraft": "Next draft",
@@ -2570,7 +2640,7 @@
       "workspaceUseServerConfirmBody": "Replace this tab's layout, prompts and generation settings with the server version? Your edits to the project itself are kept.",
       "saveAsNew": "Save as new project",
       "saveAsNewConfirmBody": "Create a separate project from the local version? Editing is paused until the copy is safely created.",
-      "schemaDescription": "This project needs a newer version of InvokeAI. Export it before discarding the local draft.",
+      "schemaDescription": "This project needs a newer version of Invoke. Export it before discarding the local draft.",
       "schemaTitle": "Project schema is not supported",
       "serverVersionUnavailable": "The server version could not be loaded.",
       "useServer": "Use server version",
@@ -2594,7 +2664,7 @@
       "storageUnavailable": "Browser queue recovery storage may contain data, but it cannot be inspected in this browser session.",
       "storageUnavailableTitle": "Queue recovery storage is unavailable",
       "title": "Queue run recovery available",
-      "descriptionUnnamed": "Project {{projectId}} has locally saved queue run recovery data."
+      "descriptionUnnamed": "A project not in your library has locally saved queue run recovery data."
     },
     "deleteLayoutPreset": "Delete preset",
     "deleteLayoutPresetBody": "Delete \"{{name}}\"? This only removes the saved preset.",
@@ -6078,7 +6148,7 @@
     "previewGraph": "Preview graph",
     "private": "Private",
     "public": "Public",
-    "publicVisibilityHelp": "Visible to users of this InvokeAI instance.",
+    "publicVisibilityHelp": "Visible to users of this Invoke instance.",
     "publicVisibilityPartial": "The template was saved, but its public visibility could not be confirmed ({{message}}). Retry to make it public.",
     "publicWorkflow": "Public workflow",
     "projectWorkflowCount_one": "{{count}} workflow in this project",
@@ -6191,7 +6261,7 @@
     "allWidgetSettings": "All {{widget}} settings…",
     "loadFailed": "These settings could not be loaded. Try again.",
     "instanceUnavailable": "Open a project containing this widget to edit its settings.",
-    "projectUnavailable": "Open a project to edit these settings.",
+    "projectUnavailable": "Open a project to change this setting.",
     "groups": {
       "application": "Application",
       "project": "Project",

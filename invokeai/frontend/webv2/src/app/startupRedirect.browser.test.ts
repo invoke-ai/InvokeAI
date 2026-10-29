@@ -4,7 +4,8 @@ import {
   DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
   MAX_SUPPORTED_CANVAS_SCHEMA_VERSION,
 } from '@workbench/canvasSchemaVersion';
-import { describe, expect, it } from 'vitest';
+import { forgetStartupLaunchProject, settleStartupLaunch, stayOnLaunchpad } from '@workbench/launchpad/startupLaunch';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { createStartupRedirects, type InitialPageLoad } from './startupRedirect';
 
@@ -22,10 +23,18 @@ const readyLibrary = (...summaries: ProjectSummary[]): ProjectLibrarySnapshot =>
 const startup = (
   openProjectIds: string[] | null,
   library: ProjectLibrarySnapshot = readyLibrary(),
-  load: InitialPageLoad = { hash: '', navigationType: 'navigate' }
+  load: InitialPageLoad = { hash: '', navigationType: 'navigate' },
+  { previousEditorRendered = true }: { previousEditorRendered?: boolean } = {}
 ) => {
+  // Each call is a page load; unless a test says otherwise, the previous load's editor rendered.
+  if (previousEditorRendered) {
+    settleStartupLaunch();
+  }
   const calls = { editorPreloads: 0, libraryLoads: 0, sessionPeeks: 0 };
   const redirects = createStartupRedirects(load, {
+    reportSkippedLaunch: () => {
+      skippedReports += 1;
+    },
     loadProjectLibrary: () => {
       calls.libraryLoads += 1;
       return Promise.resolve(library);
@@ -41,6 +50,15 @@ const startup = (
 
   return { calls, redirects };
 };
+
+let skippedReports = 0;
+
+afterEach(() => {
+  // A test that left a launch opening would make the next one stay home; the editor rendering is what clears it.
+  settleStartupLaunch();
+  window.localStorage.clear();
+  skippedReports = 0;
+});
 
 const HOME = { pathname: '/', preload: false };
 const EDITOR = { pathname: '/app', preload: false };
@@ -140,5 +158,87 @@ describe('startup redirects', () => {
     const launchpadFirst = startup(['project-1']).redirects;
     await expect(launchpadFirst.take(HOME, 'launchpad')).resolves.toBeNull();
     await expect(launchpadFirst.take(HOME, 'recentProject')).resolves.toBeNull();
+  });
+
+  it('stays on the Launchpad, once and with a notice, when the previous launch never rendered the editor', async () => {
+    // The previous page load redirected into the editor and was gone before the editor rendered.
+    await startup(['project-1']).redirects.take(HOME, 'recentProject');
+
+    const next = startup(['project-1'], readyLibrary(), undefined, { previousEditorRendered: false });
+    await expect(next.redirects.take(HOME, 'recentProject')).resolves.toBeNull();
+    expect(next.calls.sessionPeeks).toBe(0);
+    expect(skippedReports).toBe(1);
+
+    // Only that one launch: the one after it tries again.
+    await expect(
+      startup(['project-1'], readyLibrary(), undefined, { previousEditorRendered: false }).redirects.take(
+        HOME,
+        'recentProject'
+      )
+    ).resolves.toEqual({ replace: true, search: {}, to: '/app' });
+    expect(skippedReports).toBe(1);
+  });
+
+  it('gives up its redirect when the viewer chooses the Launchpad from the splash while it decides', async () => {
+    let resolvePeek: (ids: string[]) => void = () => undefined;
+    const redirects = createStartupRedirects(
+      { hash: '', navigationType: 'navigate' },
+      {
+        loadProjectLibrary: () => Promise.resolve(readyLibrary(summary('project-1'))),
+        peekOpenProjectIds: () =>
+          new Promise((resolve) => {
+            resolvePeek = resolve;
+          }),
+        preloadEditor: () => undefined,
+        reportSkippedLaunch: () => undefined,
+      }
+    );
+
+    const decision = redirects.take(HOME, 'recentProject');
+    stayOnLaunchpad();
+    resolvePeek(['project-1']);
+
+    await expect(decision).resolves.toBeNull();
+    // Staying is not a failed open: the next launch reopens the work as usual.
+    await expect(
+      startup(['project-1'], readyLibrary(), undefined, { previousEditorRendered: false }).redirects.take(
+        HOME,
+        'recentProject'
+      )
+    ).resolves.not.toBeNull();
+  });
+
+  it('keeps the mark when another route loads before the editor renders, and drops it when that project is deleted', async () => {
+    const first = startup([], readyLibrary(summary('project-7')));
+    await expect(first.redirects.take(HOME, 'recentProject')).resolves.toEqual({
+      replace: true,
+      search: { project: 'project-7' },
+      to: '/app',
+    });
+    // The editor failed to load and the viewer went to the Launchpad: the next launch stays home.
+    await first.redirects.take({ pathname: '/projects', preload: false }, 'recentProject');
+    const skipped = startup([], readyLibrary(summary('project-7')), undefined, { previousEditorRendered: false });
+    await expect(skipped.redirects.take(HOME, 'recentProject')).resolves.toBeNull();
+    expect(skippedReports).toBe(1);
+
+    // A launch whose project was deleted since can no longer fail on it.
+    await startup([], readyLibrary(summary('project-7')), undefined, { previousEditorRendered: false }).redirects.take(
+      HOME,
+      'recentProject'
+    );
+    forgetStartupLaunchProject('project-7');
+    const afterDelete = startup([], readyLibrary(summary('project-3')), undefined, { previousEditorRendered: false });
+    await expect(afterDelete.redirects.take(HOME, 'recentProject')).resolves.not.toBeNull();
+    expect(skippedReports).toBe(1);
+  });
+
+  it('treats an editor that rendered after a reload as settling the launch the reloaded page left marked', async () => {
+    await startup(['project-1']).redirects.take(HOME, 'recentProject');
+    // A reload during "Opening project": this page never decided a launch, but its editor rendered.
+    settleStartupLaunch();
+
+    const next = startup(['project-1'], readyLibrary(), undefined, { previousEditorRendered: false });
+    await expect(next.redirects.take(HOME, 'recentProject')).resolves.not.toBeNull();
+    expect(skippedReports).toBe(0);
   });
 });

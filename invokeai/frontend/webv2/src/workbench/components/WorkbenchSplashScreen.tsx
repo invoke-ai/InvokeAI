@@ -1,18 +1,31 @@
 import splashImageUrl from '@assets/SplashImage.webp';
-import { Badge, Box, Flex, Heading, HStack, Spinner, Text, VStack } from '@chakra-ui/react';
+import { Badge, Box, Flex, Heading, Spinner, Stack, Text, VStack } from '@chakra-ui/react';
 import { APP_VERSION } from '@platform/runtime/appMetadata';
 import { InvokeMark } from '@platform/ui/InvokeMark';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const splashImageStyle = { backgroundPosition: 'center', backgroundSize: 'cover' } as const;
+// Side by side where the card fits (it needs about 680px), stacked below that with the artwork as a banner.
+const CARD_DIRECTION = { base: 'column', md: 'row' } as const;
+const ART_PADDING = { base: '6', md: '14' } as const;
+const ART_ASPECT = { base: 'auto', md: '1/1' } as const;
+const MARK_SIZE = 164;
+const TEXT_MIN_WIDTH = { base: '0', md: '80' } as const;
 
-export const WorkbenchSplashScreen = ({ messageKey = 'splash.loadingWorkspace' }: { messageKey?: string }) => {
+export const WorkbenchSplashScreen = ({
+  action,
+  messageKey = 'splash.loadingWorkspace',
+}: {
+  /** Shown under the status, such as a way out of a launch that is opening the last project. */
+  action?: ReactNode;
+  messageKey?: string;
+}) => {
   const { t } = useTranslation();
   const [year] = useState(() => new Date().getFullYear());
 
   return (
-    <Flex align="center" aria-busy="true" h="100vh" justify="center" layerStyle="dotGrid" role="status" w="100vw">
+    <Flex align="center" aria-busy="true" justify="center" layerStyle="dotGrid" minH="100dvh" p="4" w="full">
       <Box
         position="relative"
         bg="bg"
@@ -23,12 +36,22 @@ export const WorkbenchSplashScreen = ({ messageKey = 'splash.loadingWorkspace' }
         maxW="2xl"
         p="6"
         shadow="sm"
+        w="full"
       >
-        <HStack align="stretch" gap="8">
-          <Box aspectRatio="1/1" p="14" bgImage={`url(${splashImageUrl})`} rounded="xl" style={splashImageStyle}>
-            <InvokeMark size={164} />
-          </Box>
-          <VStack align="start" flex="1" minH="full" minW="80" textAlign="start" py="2">
+        <Stack align="stretch" direction={CARD_DIRECTION} gap="8">
+          <Flex
+            align="center"
+            aspectRatio={ART_ASPECT}
+            bgImage={`url(${splashImageUrl})`}
+            flexShrink={0}
+            justify="center"
+            p={ART_PADDING}
+            rounded="xl"
+            style={splashImageStyle}
+          >
+            <InvokeMark size={MARK_SIZE} />
+          </Flex>
+          <VStack align="start" flex="1" gap="3" minH="full" minW={TEXT_MIN_WIDTH} textAlign="start" py="2">
             <VStack align="start" gap="1.5">
               <Heading size="4xl">{t('app.name')}</Heading>
               <Badge fontFamily="mono" size="lg" variant="subtle">
@@ -39,15 +62,17 @@ export const WorkbenchSplashScreen = ({ messageKey = 'splash.loadingWorkspace' }
             <Text fontSize="md">{t('splash.artworkBy', { artist: 'Jonathan Pollack' })}</Text>
             <Flex alignItems="center" gap="2" mt="auto">
               <Spinner />
-              <Text fontSize="md" flex="1">
+              {/* Only the changing status is announced, not the tagline, credit or copyright. */}
+              <Text fontSize="md" flex="1" role="status">
                 {t(messageKey)}
               </Text>
             </Flex>
-            <Text fontSize="xs" mt="auto" fontFamily="mono">
+            {action}
+            <Text fontSize="xs" fontFamily="mono">
               {t('splash.copyright', { year })}
             </Text>
           </VStack>
-        </HStack>
+        </Stack>
       </Box>
     </Flex>
   );

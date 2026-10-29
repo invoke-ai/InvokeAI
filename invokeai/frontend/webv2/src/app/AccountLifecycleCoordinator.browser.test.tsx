@@ -1,7 +1,9 @@
 import type * as identityModule from '@features/identity';
 import type * as settingsStoreModule from '@workbench/settings/store';
 
+import { ChakraProvider } from '@chakra-ui/react';
 import { RouterProvider } from '@tanstack/react-router';
+import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -9,6 +11,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const identityErrors = vi.hoisted(() => ({
   AuthSessionUnavailableError: class AuthSessionUnavailableError extends Error {},
 }));
+
+const capabilities = vi.hoisted(() => ({ canManageModels: true, canManageNodes: true, canManageUsers: true }));
 
 const unavailableScreen = vi.hoisted(() => {
   let retry: (() => Promise<void> | void) | null = null;
@@ -26,6 +30,7 @@ const unavailableScreen = vi.hoisted(() => {
 
 type SessionSnapshot = {
   accountEpoch: number;
+  switchingAccount?: boolean;
   multiuserEnabled: boolean;
   phase: 'unavailable' | 'ready';
   sessionExpired: boolean;
@@ -37,6 +42,7 @@ type SessionSnapshot = {
 const sessionStore = vi.hoisted(() => {
   type Snapshot = {
     accountEpoch: number;
+    switchingAccount?: boolean;
     multiuserEnabled: boolean;
     phase: 'unavailable' | 'ready';
     sessionExpired: boolean;
@@ -94,12 +100,9 @@ vi.mock('@features/identity', async () => {
         ? Promise.resolve(snapshot)
         : Promise.reject(new identityErrors.AuthSessionUnavailableError());
     },
-    getCapabilities: () => ({
-      canManageModels: true,
-      canManageNodes: true,
-      canManageUsers: true,
-    }),
+    getCapabilities: () => ({ ...capabilities }),
     LoginScreen: () => React.createElement('div', { 'data-testid': 'login-screen' }, 'Login'),
+    SessionExpiryNotice: () => null,
     SetupScreen: () => React.createElement('div', null, 'Setup'),
     useAuthSession: () =>
       React.useSyncExternalStore(sessionStore.subscribe, sessionStore.getSnapshot, sessionStore.getSnapshot),
@@ -173,6 +176,8 @@ let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 afterEach(async () => {
+  capabilities.canManageModels = true;
+  vi.restoreAllMocks();
   await act(() => root?.unmount());
   host?.remove();
   host = null;
@@ -191,7 +196,11 @@ describe('authenticated route account lifecycle', () => {
     document.body.append(host);
     root = createRoot(host);
     await act(() => {
-      root?.render(<RouterProvider router={router} />);
+      root?.render(
+        <ChakraProvider value={system}>
+          <RouterProvider router={router} />
+        </ChakraProvider>
+      );
     });
 
     expect(host.querySelector('[data-testid="authenticated-runtime"]')).toBeNull();
@@ -219,7 +228,11 @@ describe('authenticated route account lifecycle', () => {
     document.body.append(host);
     root = createRoot(host);
     await act(() => {
-      root?.render(<RouterProvider router={router} />);
+      root?.render(
+        <ChakraProvider value={system}>
+          <RouterProvider router={router} />
+        </ChakraProvider>
+      );
     });
 
     await expect.poll(() => host?.querySelector('[data-testid="authenticated-runtime"]')).not.toBeNull();
@@ -254,6 +267,8 @@ describe('authenticated route account lifecycle', () => {
       });
 
       await expect.poll(() => router.state.location.pathname).toBe('/login');
+      // An expired session keeps the way back through sign-in.
+      expect(router.state.location.search).toEqual({ returnTo: path });
       expect(authenticatedRuntime?.isConnected).toBe(false);
       expect(host.querySelector('[data-testid="authenticated-runtime"]')).toBeNull();
       expect(host.querySelector('[data-testid="login-screen"]')).not.toBeNull();
@@ -278,5 +293,69 @@ describe('authenticated route account lifecycle', () => {
       expect(host.querySelector('[data-testid="authenticated-runtime"]')).toBe(authenticatedRuntime);
       expect(host.querySelector('[data-testid="login-screen"]')).toBeNull();
     }
+  });
+
+  it('shows the switch, not the sign-in screen, while following another account, and a sign-out keeps no way back', async () => {
+    sessionStore.setSnapshot(signedInSession(1));
+    const { router } = await import('./router');
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <RouterProvider router={router} />
+        </ChakraProvider>
+      );
+    });
+    await act(() => router.navigate({ replace: true, to: '/projects' }));
+    await expect.poll(() => host?.querySelector('[data-testid="authenticated-runtime"]')).not.toBeNull();
+
+    await act(() => {
+      sessionStore.setSnapshot({ ...signedOutSession(2), sessionExpired: false, switchingAccount: true });
+    });
+    expect(host.querySelector('[role="status"]')?.textContent).toBe('auth.switchingAccount');
+    expect(router.state.location.pathname).toBe('/projects');
+
+    await act(() => {
+      sessionStore.setSnapshot({ ...signedOutSession(3), sessionExpired: false });
+    });
+    await expect.poll(() => router.state.location.pathname).toBe('/login');
+    expect(router.state.location.search).toEqual({});
+  });
+
+  it('opens Home for an unknown address and Projects for a page the account may not use, saying so once', async () => {
+    const { toaster } = await import('@platform/ui/toaster');
+    const create = vi.spyOn(toaster, 'create');
+    sessionStore.setSnapshot(signedInSession(1));
+    const { router } = await import('./router');
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <RouterProvider router={router} />
+        </ChakraProvider>
+      );
+    });
+    await act(() => router.navigate({ replace: true, to: '/projects' }));
+
+    // A hover preload decides nothing and says nothing.
+    await act(() => router.preloadRoute({ to: '/no-such-page' as '/' }));
+    capabilities.canManageModels = false;
+    await act(() => router.preloadRoute({ to: '/models' }));
+    expect(create).not.toHaveBeenCalled();
+
+    await act(() => router.navigate({ to: '/no-such-page' as '/' }));
+    await expect.poll(() => router.state.location.pathname).toBe('/');
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ id: 'launchpad-not-found' }));
+
+    await act(() => router.navigate({ to: '/models' }));
+    await expect.poll(() => router.state.location.pathname).toBe('/projects');
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'launchpad-no-access:launchpad.sections.models' })
+    );
+    expect(create).toHaveBeenCalledTimes(2);
   });
 });

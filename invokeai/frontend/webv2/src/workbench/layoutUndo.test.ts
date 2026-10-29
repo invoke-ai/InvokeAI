@@ -93,6 +93,23 @@ describe('layout undo', () => {
     expect(getActiveProject(state).widgetInstances[upscale]?.state.values.scale).toBe(4);
   });
 
+  // Pressing 1 with Generate in front, or revealing Layers already open, asks to open what is showing.
+  it('records no step, and keeps redo, for an open that changes nothing', () => {
+    let state = run(createInitialWorkbenchState(), { presetId: 'compose', type: 'applyPreset' });
+    state = run(state, { type: 'toggleRoutingLock' }, { type: 'undoProjectChange' });
+    const history = getActiveProject(state).undoRedo;
+    const generate = (['left', 'right'] as const).find(
+      (region) =>
+        getActiveProject(state).widgetInstances[getActiveProject(state).widgetRegions[region].activeInstanceId]
+          ?.typeId === 'generate'
+    )!;
+
+    state = run(state, { region: generate, type: 'openRegionWidget', widgetId: 'generate' });
+
+    expect(getActiveProject(state).undoRedo).toBe(history);
+    expect(history.future).toHaveLength(1);
+  });
+
   it('folds a dragged divider into one step', () => {
     let state = run(createInitialWorkbenchState(), { presetId: 'compose', type: 'applyPreset' });
     const before = getActiveProject(state).undoRedo.past.length;

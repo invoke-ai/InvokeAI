@@ -1,6 +1,9 @@
 import type { GenerateWidgetValues, GenerationIssue, MainModelConfig } from '@features/generation/contracts';
 import type * as IdentityModule from '@features/identity';
+import type * as ModelsModule from '@features/models';
+import type { WidgetRegion } from '@workbench/layoutContracts';
 import type * as ProjectsApiModule from '@workbench/projects/api';
+import type { RegisteredWidget } from '@workbench/widgetContracts';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 
 import {
@@ -24,6 +27,7 @@ import type { InvocationIssue } from './invokeIssueTargets';
 
 const workbench = vi.hoisted(() => ({
   canManageModels: true,
+  managerRequests: [] as unknown[],
   store: null as ReturnType<typeof createWorkbenchStore> | null,
 }));
 
@@ -37,11 +41,15 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   useWorkbenchCommands: () => workbench.store!.commands,
   useWorkbenchQueries: () => workbench.store!.queries,
 }));
+// Navigation is the Model Manager's own (its tests cover the hash and filter); here, only what the action asks for.
+vi.mock('@features/models', async (importOriginal) => ({
+  ...(await importOriginal<typeof ModelsModule>()),
+  openModelManager: (request: unknown) => workbench.managerRequests.push(request),
+}));
 vi.mock('@features/identity', async (importOriginal) => ({
   ...(await importOriginal<typeof IdentityModule>()),
   useCapabilities: () => ({ canManageModels: workbench.canManageModels }),
 }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
 const { useInvokeIssueActions } = await import('./invokeIssueActions');
 
@@ -52,6 +60,21 @@ const sdxlModel: MainModelConfig = { base: 'sdxl', key: 'sdxl-model', name: 'SDX
 let host: HTMLDivElement;
 let root: Root;
 let getActions: ((issue: InvocationIssue) => InvokeIssueAction[]) | null = null;
+
+/**
+ * The real registry, minus chunk preloading: opening a widget here should change the layout, not pull the Canvas and
+ * workflow editor bundles into a run that renders neither.
+ */
+const withoutPreload = (widget: RegisteredWidget): RegisteredWidget => ({
+  ...widget,
+  implementation: { ...widget.implementation, preload: () => {} },
+});
+const getQuietWidgetsForRegion = (region: WidgetRegion) => getWidgetsForRegion(region).map(withoutPreload);
+const getQuietWidgetById = (typeId: string) => {
+  const widget = getWidgetById(typeId);
+
+  return widget ? withoutPreload(widget) : undefined;
+};
 
 /** Publishes the hook's latest result on every render, so a re-render with other capabilities is seen. */
 const Probe = ({ onActions }: { onActions: (actions: (issue: InvocationIssue) => InvokeIssueAction[]) => void }) => {
@@ -65,7 +88,10 @@ const publish = (actions: (issue: InvocationIssue) => InvokeIssueAction[]) => {
 const renderProbe = () =>
   act(() =>
     root.render(
-      <WorkbenchWidgetRegistryProvider getWidgetById={getWidgetById} getWidgetsForRegion={getWidgetsForRegion}>
+      <WorkbenchWidgetRegistryProvider
+        getWidgetById={getQuietWidgetById}
+        getWidgetsForRegion={getQuietWidgetsForRegion}
+      >
         <Probe onActions={publish} />
       </WorkbenchWidgetRegistryProvider>
     )
@@ -149,7 +175,7 @@ describe('useInvokeIssueActions', () => {
   });
 
   it('sends a missing model to the Model Manager, filtered to main models, for those who can install', async () => {
-    const originalHash = window.location.hash;
+    workbench.managerRequests = [];
     const issue: InvocationIssue = {
       message: 'SDXL is not installed.',
       target: {
@@ -165,8 +191,7 @@ describe('useInvokeIssueActions', () => {
     await renderProbe();
     await run(issue, 'models');
 
-    await expect.poll(() => window.location.hash).toBe(`#/models?project=${encodeURIComponent(project().id)}`);
-    window.location.hash = originalHash;
+    expect(workbench.managerRequests).toEqual([{ modelType: 'main', projectId: project().id }]);
   });
 
   it('opens the workflow editor in the center to show a node', async () => {

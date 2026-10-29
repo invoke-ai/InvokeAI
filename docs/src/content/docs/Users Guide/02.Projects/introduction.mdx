@@ -38,9 +38,9 @@ Undo history is not saved. It lasts only while the project is open in your brows
 
 ## Starting a project
 
-The **Home** page is the first thing you see when Invoke opens. It shows the project you edited most recently under **Pick up where you left off**, a row of **Recent projects**, and tiles for starting something new.
+The **Home** page is the first thing you see when Invoke opens. It shows the project you edited most recently under **Pick up where you left off**, a row of **Recent projects** with your pinned projects first, and tiles for starting something new. If your projects cannot be loaded, Home and **Projects** say so with a **Retry** button instead of showing an empty library.
 
-To skip Home, set **On startup, open** to **Most recent project** in Settings (**Behavior**). Invoke then reopens the projects you had open, or the project you edited last if you had none open. A link to a specific page still opens that page.
+To skip Home, set **On startup, open** to **Most recent project** in Settings (**Behavior**). Invoke then reopens the projects you had open, or the project you edited last if you had none open. A link to a specific page still opens that page. While it opens them, the loading screen offers **Stay on the Launchpad**. If that work did not finish opening the last time Invoke started, Invoke opens the Launchpad instead, once, and says why, so a project that fails to open never traps every launch.
 
 To create a project, click **New project**. The arrow beside it (**Choose how to start**) offers starting points that open the project with a layout suited to the task:
 
@@ -131,8 +131,8 @@ Right-click a project, or use its **Actions** button, for **Open**, **Pin**, **R
 
 - The project's canvas, workflows, layout and settings are deleted.
 - Its Inbox is deleted too, but **the images and videos on it are kept**: they move to **Uncategorized** in the gallery.
-- If the project has other boards, the dialog asks what to do with them: **keep them in the Library**, with everything on them, or **delete them too**, in which case their media also moves to Uncategorized. Deleting a project never empties your gallery.
-- A project that is still generating cannot be deleted until its runs finish.
+- If the project has other boards, the dialog asks what to do with them: **keep them in the Library**, with everything on them, or **also delete them**, which removes only the board folders: their images and videos move to Uncategorized. Deleting a project never deletes an image.
+- A project that is still generating cannot be deleted until its runs finish. The notice that says so offers the queue (or, on the Launchpad, the project) so you can wait for them or cancel them.
 
 If you only want to tidy the switcher, **Close** the project instead of deleting it.
 
@@ -174,4 +174,4 @@ In the Workflow Library dialog, **This project** lists the project's own workflo
 - **Invoke needs the server to open projects.** If it cannot reach the server, a **Projects are temporarily unavailable** screen offers to retry and to export any unsaved work your browser is holding.
 - **Newer projects need a newer Invoke.** A project saved by a newer version of Invoke shows **Requires a newer Invoke** and cannot be opened until you upgrade. Some features raise this requirement for good: once a project has had a Noise, Texture, Clarity or Dehaze adjustment on the canvas, versions of Invoke without those adjustments refuse to open it, even after you remove the adjustment.
 - **Size limits.** A project file can be up to 2 GB, with up to 20,000 files. Export reports a project that is too large to package.
-- **Clear saved data…** under **Data & workspace** in Settings deletes *all* of your projects and settings at once, and cannot be undone.
+- **Clear saved data…**, in its own warning area under **Data & workspace** in Settings, deletes *all* of your projects and settings at once, and cannot be undone. Its confirmation says how many projects go, links to **Projects** so you can export the ones you want first, and asks you to type **DELETE**. Images and videos are kept: project boards move to the Library and Inbox items to Uncategorized.
