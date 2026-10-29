@@ -128,6 +128,7 @@ from invokeai.backend.model_manager.starter_models.flux import (
     pid_1_5_decoder_flux_2kto4k_int8,
     pid_decoder_flux_2k,
     pid_decoder_flux_2kto4k,
+    taef1,
     union_cnet_flux,
 )
 from invokeai.backend.model_manager.starter_models.flux2 import (
@@ -156,6 +157,7 @@ from invokeai.backend.model_manager.starter_models.flux2 import (
     pid_1_5_decoder_flux2_2kto4k_int8,
     pid_decoder_flux2_2k,
     pid_decoder_flux2_2kto4k,
+    taef2,
 )
 from invokeai.backend.model_manager.starter_models.ideogram_4 import (
     ideogram_4_fp8,
@@ -192,6 +194,7 @@ from invokeai.backend.model_manager.starter_models.ltx_2 import (
     ltx2_5_text_encoder_bf16,
     ltx2_5_text_encoder_gguf_q4_k_m,
     ltx2_5_text_encoder_int8,
+    taeltx2_3,
 )
 from invokeai.backend.model_manager.starter_models.minimax_h3 import (
     minimax_h3_components,
@@ -230,6 +233,7 @@ from invokeai.backend.model_manager.starter_models.qwen_image_2_1 import (
     qwen_image_2_1_gguf_q4_k_m,
     qwen_image_2_1_turbo,
     qwen_image_2_1_vae,
+    taeqi2_1,
 )
 from invokeai.backend.model_manager.starter_models.sd_1 import (
     canny_sd1,
@@ -258,6 +262,7 @@ from invokeai.backend.model_manager.starter_models.sd_1 import (
     t2i_canny_sd1,
     t2i_depth_sd1,
     t2i_sketch_sd1,
+    taesd,
     tile_sd1,
 )
 from invokeai.backend.model_manager.starter_models.sd_3 import (
@@ -265,6 +270,7 @@ from invokeai.backend.model_manager.starter_models.sd_3 import (
     pid_decoder_sd3_2kto4k,
     sd35_large,
     sd35_medium,
+    taesd3,
 )
 from invokeai.backend.model_manager.starter_models.sdxl import (
     alien_lora_sdxl,
@@ -285,6 +291,7 @@ from invokeai.backend.model_manager.starter_models.sdxl import (
     t2i_canny_sdxl,
     t2i_lineart_sdxl,
     t2i_sketch_sdxl,
+    taesdxl,
     tile_sdxl,
     union_cnet_sdxl,
 )
@@ -295,6 +302,8 @@ from invokeai.backend.model_manager.starter_models.types import (
     StarterModelWithoutDependencies,
 )
 from invokeai.backend.model_manager.starter_models.wan import (
+    taew2_1,
+    taew2_2,
     wan_22_5b_vae,
     wan_22_a14b_vae,
     wan_22_i2v_a14b_diffusers,
@@ -338,6 +347,7 @@ STARTER_MODELS: list[StarterModel] = [
     flux_schnell_sdnq,
     sd35_medium,
     sd35_large,
+    taesd3,
     ideogram_4_nf4,
     ideogram_4_fp8,
     ideogram_4_single_file,
@@ -361,7 +371,10 @@ STARTER_MODELS: list[StarterModel] = [
     archvis_sdxl,
     sdxl_refiner,
     sdxl_fp16_vae_fix,
+    taesd,
+    taesdxl,
     flux_vae,
+    taef1,
     alien_lora_sdxl,
     noodle_lora_sdxl,
     easy_neg_sd1,
@@ -421,6 +434,7 @@ STARTER_MODELS: list[StarterModel] = [
     smollm2_1_7b_instruct,
     flux_fill,
     flux2_vae,
+    taef2,
     flux2_klein_4b,
     flux2_klein_4b_single,
     flux2_klein_4b_fp8,
@@ -504,12 +518,15 @@ STARTER_MODELS: list[StarterModel] = [
     qwen_image_2_1,
     qwen_image_2_1_gguf_q4_k_m,
     qwen_image_2_1_vae,
+    taeqi2_1,
     qwen3_vl_encoder_8b,
     moss_image_base,
     moss_image_sft,
     wan_22_t5_encoder,
     wan_22_a14b_vae,
     wan_22_5b_vae,
+    taew2_1,
+    taew2_2,
     wan_22_t2v_a14b_diffusers,
     wan_22_t2v_a14b_low_gguf_q4_k_m,
     wan_22_t2v_a14b_gguf_q4_k_m,
@@ -547,6 +564,7 @@ STARTER_MODELS: list[StarterModel] = [
     ltx2_5_components,
     ltx2_5_prompt_enhancer,
     ltx2_5_duration_head,
+    taeltx2_3,
     gemini_flash_image,
     gemini_pro_image_preview,
     gemini_3_1_flash_image_preview,

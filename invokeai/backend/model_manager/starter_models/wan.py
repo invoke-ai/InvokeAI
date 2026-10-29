@@ -1,6 +1,6 @@
 """Wan starter models."""
 
-from invokeai.backend.model_manager.starter_models.common import wan_22_t5_encoder
+from invokeai.backend.model_manager.starter_models.common import TINY_AUTOENCODER_NOTE, wan_22_t5_encoder
 from invokeai.backend.model_manager.starter_models.types import StarterModel
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -26,6 +26,27 @@ wan_22_5b_vae = StarterModel(
     description="Wan 2.2 TI2V-5B VAE (48-channel). Required for the TI2V-5B model family. "
     "Not interchangeable with the A14B VAE. (~400MB)",
     type=ModelType.VAE,
+    format=ModelFormat.Checkpoint,
+)
+
+# Filed under Wan, but a TAE serves every architecture denoising in its latent space: the Wan 2.1 VAE's
+# is also Qwen-Image's, Krea-2's and Anima's, so this one record previews all four.
+taew2_1 = StarterModel(
+    name="TAEW2.1 (Wan 2.1 VAE preview decoder)",
+    base=BaseModelType.Wan,
+    source="https://github.com/madebyollin/taehv/raw/62f7591f59dfbb4c3c02b7a621d180a9eeaba26c/safetensors/taew2_1.safetensors",
+    description="Sharp live previews for Wan 2.2 A14B, Qwen-Image, Krea-2 and Anima, which share the Wan 2.1 "
+    f"VAE's latents. {TINY_AUTOENCODER_NOTE} ~23MB",
+    type=ModelType.TinyAutoencoder,
+    format=ModelFormat.Checkpoint,
+)
+
+taew2_2 = StarterModel(
+    name="TAEW2.2 (Wan 2.2 TI2V-5B preview decoder)",
+    base=BaseModelType.Wan,
+    source="https://github.com/madebyollin/taehv/raw/62f7591f59dfbb4c3c02b7a621d180a9eeaba26c/safetensors/taew2_2.safetensors",
+    description=f"Sharp live previews for Wan 2.2 TI2V-5B. {TINY_AUTOENCODER_NOTE} ~23MB",
+    type=ModelType.TinyAutoencoder,
     format=ModelFormat.Checkpoint,
 )
 

@@ -386,6 +386,37 @@ def test_the_branch_is_locked_with_the_same_reservation_and_hooked_inside_the_ex
     assert _hook_count(transformer) == 0
 
 
+def test_the_first_preview_is_sent_once_the_transformer_and_the_branch_are_locked(tmp_path) -> None:
+    """A Tiny AutoEncoder preview places its TAE next to the locked models; before the locks there are none to fit."""
+    transformer, branch, vae = _tiny_transformer(), _tiny_branch(), _tiny_vae()
+    events: list[str] = []
+
+    def locking(name: str, model):
+        def lock(working_mem_bytes=None):
+            events.append(f"lock {name}")
+            return nullcontext((None, model))
+
+        return lock
+
+    context = _context(
+        tmp_path,
+        _loaded(transformer, locking("transformer", transformer)),
+        _loaded(branch, locking("branch", branch)),
+        _loaded(vae, _yielding(vae)),
+    )
+
+    def preview(*_args) -> None:
+        events.append("preview")
+        raise _Stop
+
+    context.util.sd_step_callback.side_effect = preview
+
+    with pytest.raises(_Stop):
+        _denoise()._run_diffusion(context)
+
+    assert events == ["lock transformer", "lock branch", "preview"]
+
+
 class _GateRecordingTransformer(QwenImageTransformer2DModel):
     """The real class, so the node's isinstance checks hold and the real hooks land on its blocks, with the forward
     replaced: no bfloat16 matmul on the CPU, and a record of the control gate at every call."""

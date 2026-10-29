@@ -1,6 +1,7 @@
 """FLUX.2 starter models."""
 
 from invokeai.backend.model_manager.starter_models.common import (
+    TINY_AUTOENCODER_NOTE,
     flux2_dev_cow_mistral_q4,
     flux2_dev_cow_mistral_q8,
     flux2_klein_qwen3_4b_encoder,
@@ -71,6 +72,15 @@ flux2_vae = StarterModel(
     source="black-forest-labs/FLUX.2-klein-4B::vae",
     description="FLUX.2 VAE (16-channel, same architecture as FLUX.1 VAE). ~168MB",
     type=ModelType.VAE,
+)
+
+taef2 = StarterModel(
+    name="TAEF2 (FLUX.2 preview decoder)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/madebyollin/taef2/resolve/bd244ebfe4398c84fbf312a2f1c868c676b500e3/taef2.safetensors",
+    description=f"Sharp live previews for FLUX.2 and ERNIE-Image. {TINY_AUTOENCODER_NOTE} ~11MB",
+    type=ModelType.TinyAutoencoder,
+    format=ModelFormat.Checkpoint,
 )
 
 flux2_klein_4b = StarterModel(

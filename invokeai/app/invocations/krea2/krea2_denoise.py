@@ -664,15 +664,6 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 style_ref_position_ids = position_ids
 
         step_callback = self._build_step_callback(context)
-        step_callback(
-            PipelineIntermediateState(
-                step=0,
-                order=1,
-                total_steps=total_steps,
-                timestep=int(timesteps_sched[0].item()) if total_steps > 0 else 0,
-                latents=unpack_latents(latents, latent_height, latent_width),
-            ),
-        )
 
         transformer_config = context.models.get_config(self.transformer.transformer)
         num_train_timesteps = scheduler.config.num_train_timesteps
@@ -741,6 +732,16 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         with ExitStack() as exit_stack:
             (cached_weights, transformer) = exit_stack.enter_context(
                 transformer_info.model_on_device(working_mem_bytes=estimated_working_memory)
+            )
+            # Inside the lock: a Tiny AutoEncoder preview loads its TAE only if it fits next to the locked model.
+            step_callback(
+                PipelineIntermediateState(
+                    step=0,
+                    order=1,
+                    total_steps=total_steps,
+                    timestep=int(timesteps_sched[0].item()) if total_steps > 0 else 0,
+                    latents=unpack_latents(latents, latent_height, latent_width),
+                ),
             )
 
             # Whether LoRA has to go on as a sidecar. Asked of the loaded module tree rather than the

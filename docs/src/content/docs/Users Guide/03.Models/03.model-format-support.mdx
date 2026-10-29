@@ -1,7 +1,7 @@
 ---
 title: Model Format Support
 description: Which file formats and quantizations InvokeAI loads for every model family, text encoder, VAE and adapter.
-lastUpdated: 2026-10-21
+lastUpdated: 2026-10-26
 sidebar:
   order: 3
 ---
@@ -104,6 +104,46 @@ models. Install the whole MOSS-Image Diffusers folder or a merged single file in
 Quantized VAE files (fp8, int8, nvfp4) are not supported; use the unquantized VAE. The SD 3, FLUX.2, Qwen-Image,
 Qwen-Image-2.1, Wan, Anima and Ideogram 4 VAEs fail with a message when they load. The FLUX.1 and SD 1.x / SDXL single-file VAEs do
 not check, so a quantized file there fails with an unclear error or decodes incorrectly.
+
+## Preview decoders (Tiny AutoEncoders)
+
+Tiny AutoEncoders render [live denoising previews](/users-guide/image-generation/advanced-topics/tiny-autoencoder-previews/)
+and nothing else. Each one is a single file, a `.safetensors`, `.pth` or `.pt`.
+
+| Tiny AutoEncoder | File | Installs under | Previews for |
+|---|---|---|---|
+| TAESD | `taesd_decoder.safetensors` | SD 1.x | SD 1.x, SD 2.x |
+| TAESDXL | `taesdxl_decoder.safetensors` | SDXL | SDXL, SDXL Refiner |
+| TAESD3 | `diffusion_pytorch_model.safetensors` from `madebyollin/taesd3` | SD 3 | SD 3 |
+| TAEF1 | `diffusion_pytorch_model.safetensors` from `madebyollin/taef1` | FLUX.1 | FLUX.1, Z-Image |
+| TAEF2 | `taef2.safetensors` | FLUX.2 | FLUX.2, ERNIE-Image |
+| TAEQI2.1 | `taeqi2_1.safetensors` | Qwen-Image-2.1 | Qwen-Image-2.1 |
+| TAEW2.1 | `taew2_1.safetensors` | Wan 2.2 | Wan 2.2 A14B, Qwen-Image, Krea-2, Anima |
+| TAEW2.2 | `taew2_2.safetensors` | Wan 2.2 | Wan 2.2 TI2V-5B |
+| TAELTX2.3 | `taeltx2_3.safetensors` | LTX-2 | LTX-2.5 |
+
+The image TAEs (TAESD) load in both published layouts: the decoder-only files (the `*_decoder.safetensors` files
+above, and the `*_decoder.pth` files ComfyUI keeps in `models/vae_approx/`) and the files that hold encoder and
+decoder together (`diffusion_pytorch_model.safetensors`, `taef2.safetensors`, `taeqi2_1.safetensors`). The video
+TAEs (TAEHV: TAEW2.1, TAEW2.2, TAELTX2.3) load as published in madebyollin's `taehv` repository, one file with
+encoder and decoder.
+
+Some networks are not specific to one model. TAESD and TAESDXL read the same 4-channel latents with the same
+network, and so do TAESD3 and TAEF1 with 16 channels. TAEW2.1's network is also published as `taehv`
+(HunyuanVideo) and `taecvx` (CogVideoX), and TAELTX2.3's as `taeltx_2` (LTX-2). For these six the file name, its
+folder name or the download source has to name the TAE (`taesd`, `taesdxl`, `taesd3`, `taef1`, `taew2_1` or
+`taeltx2_3`); a file that names none of them is refused (**R**). An install that sets the base explicitly, as the
+starter models do, needs no name. TAEF2, TAEQI2.1 and TAEW2.2 are recognized by their network alone.
+
+- **R:** the "tinier" TAEQI2.1 (`taeqi2_1_tinier`); the message asks for `taeqi2_1.safetensors` instead.
+- **R:** a file named `taeltx_2`, the TAE for LTX-2's VAE, even with an explicit base. It previews LTX-2.5 worse than
+  the linear preview; the message asks for TAELTX2.3.
+- **R:** a file named `taehv` or `taecvx`, even with an explicit base. They decode HunyuanVideo and CogVideoX
+  latents, which InvokeAI does not run.
+- **Not recognized:** other Tiny AutoEncoders, such as the 32× Sana decoder, `taeh3` (MiniMax H3 uses its own
+  built-in preview decoder), `taehv1_5` and the "super" TAEHV decoders. They install as unknown models.
+- A Diffusers `AutoencoderTiny` folder (for example the `madebyollin/taesdxl` repository as a whole) installs as a
+  VAE and is not used for previews. Install the single file instead.
 
 ## LoRAs and adapters
 
