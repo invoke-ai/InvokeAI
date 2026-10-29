@@ -5,7 +5,10 @@ rule that turns them into lines and the rule by which an estimate uses them. Lin
 joins the line its estimator resolves to on the platform it ran on -- the lender's, where the estimator borrows its
 values -- so a calibration of one model's decode moves every estimator that prices with the same line. Only the
 estimators that opt in (`EstimatorSpec.user_calibrated`) take part: the others' windows fit no user line, and no user
-line moves their estimates.
+line moves their estimates. Only the lines whose demand is their own take part (`fit.Line.own_demand`): a line that
+sits on another, a tiled VAE operation's, is fitted on what its points measured above their untiled demand at the
+tile, a tiled decode's together with its assembly line: its windows fit no user line. Its estimate prices its tile on
+the larger of the user and the shipped untiled line (`resolve`), and what tiling adds stays shipped.
 
 An estimate reads a user line through the provider seam: the app registers one (`set_user_fit_provider`) that answers
 from memory, and `EstimatorSpec.estimate` asks it per estimate. Without a provider, or when it has no fit for the
@@ -86,8 +89,9 @@ class UserFit:
 
 @functools.cache
 def carrier_key(estimator: str, version: int, platform: Platform) -> Optional[EntryKey]:
-    """The shipped entry whose values `estimator` `version` prices with on `platform`: its own, or the one it borrows
-    from. None where the shipped data has no entry for it."""
+    """The shipped entry that carries the lines a user calibration of `estimator` `version` fits on `platform`: its own,
+    or the one it borrows from. An entry's own values beside borrowed ones are lines that sit on another and their
+    assembly lines, which no user calibration fits. None where the shipped data has no entry for it."""
     full = {key: str(value) for key, value in asdict(priced_as(platform)).items()}
     entries = [entry for file in shipped_data().values() for entry in file.coefficients]
     where = f"{estimator} on {full}"
@@ -114,9 +118,9 @@ def fit_user_lines(
     """The user lines `points`, measured on `platform`, fit; and, per line they measure but cannot fit, why.
 
     A point joins a line where its estimator, as `specs` registers it, is `user_calibrated` and its `line` admits the
-    point's features, its estimator version has shipped values on the platform, the entry carrying them has the line,
-    and it demanded more than nothing. Each line is `fit.user_pair` of its points: two sizes at least
-    `fit.MIN_AREA_RATIO` apart, or no line.
+    point's features as its own demand (`fit.Line.own_demand`), its estimator version has shipped values on the
+    platform, the entry carrying them has the line, and it demanded more than nothing. Each line is `fit.user_pair` of
+    its points: two sizes at least `fit.MIN_AREA_RATIO` apart, or no line.
     """
     groups: dict[LineKey, list[tuple[int, int]]] = {}
     for point in points:
@@ -124,7 +128,7 @@ def fit_user_lines(
         if spec is None or not spec.user_calibrated or point.demand_bytes <= 0:
             continue
         found = spec.line(point.features)
-        if found is None or not found.fits:
+        if found is None or not found.own_demand:
             continue
         carrier = carrier_key(point.estimator, point.version, platform)
         if carrier is None or found.suffix not in _carried_lines(carrier):
@@ -154,18 +158,29 @@ def resolve(
     is `user_calibrated`.
 
     The line and its size are read as `fit.py` reads a point's (`EstimatorSpec.line`): for the convolution lines the
-    output's pixels, also for a tiled operation, whose image is at least its tile, so a tiled operation past the
-    measured sizes takes the larger estimate. At or below `UserLine.x_max` the user line decides; above, the larger
-    estimate wins, the shipped one on a tie. `source` names the user fit and the line wherever the user line decides.
+    output's pixels. At or below `UserLine.x_max` the user line decides; above, the larger estimate wins, the shipped
+    one on a tie.
+
+    A tiled operation prices its tile on the untiled line beneath its tiled line (`fit.Line.sits_on`), and takes the
+    larger estimate at every size, the rule above `x_max`: its tiled and assembly lines, which no user line measures
+    (`fit_user_lines`), are fitted over the untiled demand measured where the shipped line was, which a lower user line
+    beneath them could undercut, while a card whose untiled decode needs more than the shipped line needs it for each
+    tile too. `source` names the user fit and the line wherever the user line decides.
     """
     found = spec.line(features) if spec.user_calibrated else None
-    line = fit.lines_for(spec).get(found.suffix) if found is not None else None
-    if found is None or line is None:
+    if found is None:
         return spec.evaluate(features, shipped)
-    suffix = found.suffix
+    tiled = found.sits_on is not None
+    suffix, size = found.sits_on if found.sits_on is not None else (found.suffix, found.size)
+    line = fit.lines_for(spec).get(suffix)
+    if line is None:
+        return spec.evaluate(features, shipped)
     values = MappingProxyType({**shipped.values, f"k_{suffix}": line.k, f"b_{suffix}": line.b})
-    within = found.size <= line.x_max
-    where = "within its measured sizes" if within else "above its measured sizes, over shipped"
+    within = not tiled and size <= line.x_max
+    if tiled:
+        where = "at the tile, over shipped"
+    else:
+        where = "within its measured sizes" if within else "above its measured sizes, over shipped"
     user = spec.evaluate(
         features, ResolvedCoefficients(values=values, source=f"{fit.label} ({suffix} {where}) + {shipped.source}")
     )
@@ -174,7 +189,8 @@ def resolve(
     shipped_estimate = spec.evaluate(features, shipped)
     if user.reservation_bytes > shipped_estimate.reservation_bytes:
         return user
-    return replace(shipped_estimate, source=f"{shipped.source} (over {fit.label} {suffix}, above its measured sizes)")
+    over = " at the tile" if tiled else ", above its measured sizes"
+    return replace(shipped_estimate, source=f"{shipped.source} (over {fit.label} {suffix}{over})")
 
 
 UserFitProvider = Callable[["EstimatorSpec", Platform, torch.device], Optional[UserFit]]

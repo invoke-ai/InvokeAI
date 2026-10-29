@@ -6,6 +6,7 @@ import json
 import platform as stdlib_platform
 import shutil
 from collections.abc import Callable, Iterator
+from fractions import Fraction
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
@@ -20,14 +21,23 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     CalibrationStoreFile,
 )
 from invokeai.backend.util import nvml
+from invokeai.backend.util.vae_working_memory import VAE_FLUX2_SPEC, VAE_SD_SPEC
 from invokeai.backend.working_memory import coefficients, fragmentation
 from invokeai.backend.working_memory import platform as working_memory_platform
-from invokeai.backend.working_memory.coefficients import CoefficientEntry, MeasuredPoint, load_data
+from invokeai.backend.working_memory.bounds import bound_violation, evaluate_point, point_id
+from invokeai.backend.working_memory.coefficients import CoefficientEntry, MeasuredPoint, WorkingMemoryData, load_data
 from invokeai.backend.working_memory.fingerprint import DeviceClass, Environment, environment_for
+from invokeai.backend.working_memory.fit import (
+    base_values,
+    carrier_of,
+    convolution_line,
+    fit_points,
+    shipped_two_phase,
+)
 from invokeai.backend.working_memory.fragmentation import Measurement
 from invokeai.backend.working_memory.platform import platform_for
 from invokeai.backend.working_memory.probe import CounterDelta
-from invokeai.backend.working_memory.spec import import_estimator_modules
+from invokeai.backend.working_memory.spec import EstimatorSpec, import_estimator_modules
 from invokeai.backend.z_image.denoise_working_memory import Z_IMAGE_DENOISE_SPEC
 from scripts.working_memory.build_shipped import (
     DATA_DIR,
@@ -36,6 +46,7 @@ from scripts.working_memory.build_shipped import (
     bound_violations,
     build_points,
     export_paths,
+    legacy_fit,
     main,
     merge_points,
     point_identity,
@@ -53,11 +64,20 @@ RTX_4090 = DeviceClass(vendor="nvidia", name="NVIDIA GeForce RTX 4090", total_mi
 RX_9060_XT = DeviceClass(vendor="amd", name="AMD Radeon RX 9060 XT", total_mib=16304, backend="hip", arch="gfx1200")
 SETTINGS = {"pytorch_cuda_alloc_conf": None, "attention_type": "sdpa"}
 GIB = 2**30
+VAE_VERSION = VAE_FLUX2_SPEC.version
+"""The version the VAE windows here are recorded at: the FLUX.2 and SD1/SDXL estimators', which move together."""
+assert VAE_SD_SPEC.version == VAE_VERSION
 
 
 def _decode(px: int, **changes: object) -> dict[str, object]:
     return {"operation": "decode", "height": px, "width": px, "tile": None, "batch_size": 1, "score_matrix_bytes": 0,
             "dtype": "bf16"} | changes  # fmt: skip
+
+
+def _sd_fp16_decode(px: int) -> dict[str, object]:
+    """An SD1/SDXL fp16 decode as the RTX 4090 records it: cuDNN's attention materializes no score matrix."""
+    return {"operation": "decode", "height": px, "width": px, "tile": None, "dtype": "fp16", "upcast_weight_bytes": 0,
+            "score_matrix_bytes": 0, "vae_class": "AutoencoderKL"}  # fmt: skip
 
 
 def _delta(value: int) -> CounterDelta:
@@ -72,7 +92,7 @@ def _window(
     valid=True,
     fit_eligible=True,
     reasons=(),
-    version=2,
+    version=VAE_VERSION,
     estimator="vae.flux2",
     allocated: int | None = None,
 ):
@@ -156,8 +176,10 @@ def _export(path: Path, device_class: DeviceClass, windows: list[dict], *, os_fa
 
 @pytest.fixture
 def exports(tmp_path: Path, machine) -> tuple[Path, Path]:
-    """A Linux RTX 4090 with two repetitions of a 1024px decode, an invalid and a partially resident window, and a
-    Windows RX 9060 XT on MIOpen's native allocator, saved as a family E2E run saves them, next to a status file."""
+    """A Linux RTX 4090 with two repetitions of a 1024px SD fp16 decode, an invalid and a partially resident window,
+    and a Windows RX 9060 XT on MIOpen's native allocator, saved as a family E2E run saves them, next to a status file.
+    The RTX 4090's decodes are SD's: the FLUX.2 decode lines on its platform have no headroom for a raise
+    (`bounds.UPPER_BOUND_EXCEPTIONS`)."""
     calibration = tmp_path / "calibration"
     calibration.mkdir()
     (calibration / "20261017-120000-box-1-status.json").write_text('{"available": true}', encoding="utf-8")
@@ -166,11 +188,15 @@ def exports(tmp_path: Path, machine) -> tuple[Path, Path]:
         calibration / f"20261017-120000-box-1-{RTX_4090.id}.json",
         RTX_4090,
         [
-            _window(1, _decode(1024), 4_600_000_000),
-            _window(2, _decode(512), 1_150_000_000),
-            _window(3, _decode(1024), 4_700_000_000),
-            _window(4, _decode(1024), 9 * GIB, valid=False, fit_eligible=False, reasons=["oom"]),
-            _window(5, _decode(1024), 9 * GIB, fit_eligible=False, reasons=["partial_residency"]),
+            _window(1, _sd_fp16_decode(1024), 4_600_000_000, estimator="vae.sd"),
+            _window(2, _sd_fp16_decode(512), 1_150_000_000, estimator="vae.sd"),
+            _window(3, _sd_fp16_decode(1024), 4_700_000_000, estimator="vae.sd"),
+            _window(
+                4, _sd_fp16_decode(1024), 9 * GIB, valid=False, fit_eligible=False, reasons=["oom"], estimator="vae.sd"
+            ),
+            _window(
+                5, _sd_fp16_decode(1024), 9 * GIB, fit_eligible=False, reasons=["partial_residency"], estimator="vae.sd"
+            ),
         ],
     )
     machine("7.14.0", "windows")
@@ -268,8 +294,8 @@ def test_a_window_whose_environment_lacks_a_platform_fact_is_left_out(machine, t
 @pytest.mark.parametrize(
     "window, message",
     [
-        pytest.param(_window(1, _decode(1024), 4 * GIB, version=1), "version 1, the registered estimator is version 2",
-                     id="stale-version"),
+        pytest.param(_window(1, _decode(1024), 4 * GIB, version=VAE_VERSION - 1),
+                     f"version {VAE_VERSION - 1}, the registered estimator is version {VAE_VERSION}", id="stale-version"),
         pytest.param(_window(1, {"operation": "decode", "height": 1024}, 4 * GIB), "cannot evaluate its features",
                      id="features-the-terms-cannot-read"),
     ],
@@ -294,7 +320,7 @@ def test_a_directory_stands_for_its_exports_in_lifetime_order(tmp_path: Path) ->
 def _probe_point(measured_bytes: int) -> MeasuredPoint:
     return MeasuredPoint(
         estimator="vae.flux2",
-        version=2,
+        version=VAE_VERSION,
         platform=CUDNN_NATIVE,
         features=_decode(1024),
         measured_bytes=measured_bytes,
@@ -387,9 +413,9 @@ def test_written_data_holds_the_points_and_passes_the_shipped_data_checks(
     assert main([*map(str, exports), "--data-dir", str(data_dir)]) == 0
     assert _files(data_dir) == before, "nothing written without --write"
     preview = capsys.readouterr().out
-    # The 4.7 GB decode lies above the cuDNN line all FLUX.2 points share with vae.sd3: it is refitted.
-    shipped_k = _carried(DATA_DIR, "vae.sd3", CUDNN_NATIVE)["k_decode_bf16"]
-    assert f"vae.sd3 {CUDNN_NATIVE} k_decode_bf16 {shipped_k:.0f} ->" in preview
+    # The 4.7 GB decode lies above the cuDNN line all SD fp16 points share with vae.sd3: it is refitted.
+    shipped_k = _carried(DATA_DIR, "vae.sd3", CUDNN_NATIVE)["k_decode_fp16"]
+    assert f"vae.sd3 {CUDNN_NATIVE} k_decode_fp16 {shipped_k:.0f} ->" in preview
 
     # A run's calibration/ directory stands for its exports.
     assert main([str(exports[0].parent), "--data-dir", str(data_dir), "--write"]) == 0
@@ -397,7 +423,7 @@ def test_written_data_holds_the_points_and_passes_the_shipped_data_checks(
     built = load_data(data_dir)["vae.json"]
     probe_points = [p for p in built.points if p.method == "probe_demand"]
     assert sorted(p.measured_bytes for p in probe_points) == [1_150_000_000, 4_700_000_000, 10_900_000_000]
-    assert _carried(data_dir, "vae.sd3", CUDNN_NATIVE)["k_decode_bf16"] > shipped_k
+    assert _carried(data_dir, "vae.sd3", CUDNN_NATIVE)["k_decode_fp16"] > shipped_k
     shipped_checks(data_dir)
 
     # Built again from the same exports, the data does not change.
@@ -482,7 +508,7 @@ def _miopen_native_point(
 ) -> MeasuredPoint:
     return MeasuredPoint(
         estimator=estimator,
-        version=2,
+        version=import_estimator_modules()[estimator].version,
         platform=MIOPEN_NATIVE,
         features=features,
         measured_bytes=measured_bytes,
@@ -536,6 +562,94 @@ def test_a_raised_stand_in_takes_the_larger_base_too(specs) -> None:
     assert RAISE_NOTE in entry.provenance
 
 
+def test_probe_tiled_decodes_raise_a_tiled_stand_in_and_its_assembly_line_above_the_tile(specs) -> None:
+    """The SD estimator's fp16 tiled decode off Windows is a stand-in, tiled line and assembly line alike, over the
+    borrowed untiled stand-in of 7200 bytes per pixel. No untiled SD point measures the 512px tile there, so probe
+    decodes at that tile are read above what the untiled line prices it at. Four of them, 1024 to 8192px, the largest
+    needing the assembly phase, raise the tiled slope and the assembly base, fitted together; the halves they lie
+    under stay. Read on their raw bytes, the raise would price the tile twice."""
+    tile_price = 7200 * 512 * 512
+    above_the_tile = {1024: 1600 * MIB, 2048: 1700 * MIB, 4096: 2200 * MIB, 8192: 9000 * MIB}
+    probes = [
+        _miopen_native_point("vae.sd", _sd_decode(px, "fp16") | {"tile": 512}, tile_price + mib, "probe_demand")
+        for px, mib in above_the_tile.items()
+    ]
+    names = [f"{part}_{line}_fp16" for line in ("tiled_decode", "assembled_decode") for part in ("k", "b")]
+    shipped = _carried(DATA_DIR, "vae.sd", MIOPEN_NATIVE)
+
+    entry = _refit_shipped(probes, specs, "vae.sd")
+
+    readings = [
+        (px * px, tile_price + mib, Fraction(tile_price), Fraction(tile_price)) for px, mib in above_the_tile.items()
+    ]
+    tiled, assembled = shipped_two_phase(readings)
+    assert entry.values is not None
+    raised = [entry.values[name] for name in names]
+    assert raised == [max(shipped[name], fit) for name, fit in zip(names, (*tiled, *assembled), strict=True)]
+    assert raised[0] > shipped[names[0]] and raised[3] > shipped[names[3]], "the tiled slope and the assembly base"
+    assert raised[1] == shipped[names[1]] and raised[2] == shipped[names[2]]
+    raw_tiled, raw_assembled = shipped_two_phase([reading[:2] for reading in readings])
+    assert (*raw_tiled, *raw_assembled) != (*tiled, *assembled)
+    assert set(names) <= set(entry.stand_ins)
+    assert RAISE_NOTE in entry.provenance
+
+
+def test_probes_on_the_untiled_line_raise_it_and_may_shift_tile_cost_off_a_tiled_line_without_breaking_a_bound(
+    specs,
+) -> None:
+    """Warm RTX 4090 SD fp16 decodes at 512 and 1024 px under the native allocator raise the untiled line they
+    measure, and never lower it. The tiled SD decodes sit on that line at their tile, so the raised line prices more of
+    each tile, and the fit of the lines above takes less: the tiled line's slope falls. That is the estimate reading
+    the tile's cost off the line beneath, not a lower reservation: every shipped point stays covered and within its
+    bound, which raising the lines above as well, charging the tile twice, would break. SD fp16, as FLUX's decode lines
+    on this platform have no headroom for a raise (`bounds.UPPER_BOUND_EXCEPTIONS`)."""
+    native = {"conv_backend": "cudnn", "allocator": "native"}
+    probes = [
+        MeasuredPoint(
+            estimator="vae.sd",
+            version=VAE_VERSION,
+            platform=native,
+            features=_sd_fp16_decode(px),
+            measured_bytes=demand,
+            method="probe_demand",
+            device="NVIDIA GeForce RTX 4090",
+            provenance="-",
+        )
+        for px, demand in ((512, 1_300_000_000), (1024, 4_900_000_000))
+    ]
+    before = coefficients.shipped_data()
+    entries_before = [entry for file in before.values() for entry in file.coefficients]
+
+    after = refit(merge_points(before, probes), specs)
+
+    entries_after = [entry for file in after.values() for entry in file.coefficients]
+    untiled_before = carrier_of(entries_before, probes[0], "decode_fp16")
+    untiled_after = carrier_of(entries_after, probes[0], "decode_fp16")
+    assert untiled_before.values is not None and untiled_after.values is not None
+    halves = ("k_decode_fp16", "b_decode_fp16")
+    assert all(untiled_after.values[name] >= untiled_before.values[name] for name in halves)
+    assert any(untiled_after.values[name] > untiled_before.values[name] for name in halves), "the probes raise it"
+
+    for point in (point for file in after.values() for point in file.points):
+        spec = specs[point.estimator]
+        estimate = evaluate_point(point, spec, after.values())
+        # Covered: an in-fit point by its fitted lines alone; an out-of-fit check, by the floor too (`bounds.py`).
+        assert not point.in_fit or estimate.reservation_bytes >= point.measured_bytes, point_id(point, spec)
+        assert bound_violation(point, spec, estimate) is None, point_id(point, spec)
+
+    def sd_decode(entries: list[CoefficientEntry]) -> dict[str, float]:
+        [entry] = [entry for entry in entries if entry.estimator == "vae.sd" and entry.platform == native]
+        assert entry.values is not None
+        return {
+            name: value
+            for name, value in entry.values.items()
+            if name.endswith(("tiled_decode_fp16", "assembled_decode_fp16"))
+        }
+
+    shifted = sd_decode(entries_after)
+    assert any(shifted[name] < value for name, value in sd_decode(entries_before).items()), "tile cost moved off"
+
+
 def _fp32_1280(first_mib: int, largest_mib: int) -> list[dict]:
     """Two fp32 SDXL decodes at 1280px in one long-running server, allocated flat at the first one's bytes."""
     return [
@@ -551,13 +665,14 @@ def test_a_raise_that_pushes_fresh_process_points_over_their_bound_is_refused_ev
     line that covers it over-reserves the fresh-process points of the same line beyond 1.3x."""
     export = _amd_export(tmp_path, machine, _fp32_1280(8020, 13000))
     data_dir, before = _data_copy(tmp_path)
+    shipped_k = _carried(DATA_DIR, "vae.sd3", MIOPEN_EXPANDABLE_WINDOWS)["k_decode_fp32"]
 
     for consent in ([], ["--accept-fragmentation"]):
         assert main([str(export), "--data-dir", str(data_dir), "--write", *consent]) == 1
         captured = capsys.readouterr()
         assert "[2 windows, MiB 8020, 13000; max/first 1.62]" in captured.out
         assert "reserved MiB 8020, 13000 while allocated MiB 8020, 8020" in captured.out
-        assert "decode_fp32: k 5988 -> " in captured.out and "1 flagged as fragmentation" in captured.out
+        assert f" decode_fp32: k {shipped_k:.0f} -> " in captured.out and "1 flagged as fragmentation" in captured.out
         assert "the bounds of these points reject the result" in captured.err
         violation = "vae.sd-miopen,expandable,windows-decode-fp32-1280x1280-scores-RX9060XT-demand_peak: reserves"
         assert violation in captured.err
@@ -614,19 +729,19 @@ RTX_4060_TI_8GB = DeviceClass(
 def test_cards_of_one_name_are_separate_points_and_spreads(
     tmp_path: Path, machine, entries, specs, shipped_checks, capsys
 ) -> None:
-    """The 16 GB and the 8 GB RTX 4060 Ti report one name. A FLUX.2 decode at 1024px on each allocates 4.2 GB and
+    """The 16 GB and the 8 GB RTX 4060 Ti report one name. An SD fp16 decode at 1024px on each allocates 4.2 GB and
     reserves 4.2 GB on the one card, 4.7 GB on the other: two cards' readings, not a server's cache growing around the
     same tensors. The 4.7 GB raises the cuDNN line, and nothing flags it as fragmentation."""
     machine(None, "linux")
     sixteen = _export(
         tmp_path / f"20261017-120000-box-1-{RTX_4060_TI_16GB.id}.json",
         RTX_4060_TI_16GB,
-        [_window(1, _decode(1024), 4_200_000_000, allocated=4_200_000_000)],
+        [_window(1, _sd_fp16_decode(1024), 4_200_000_000, estimator="vae.sd", allocated=4_200_000_000)],
     )
     eight = _export(
         tmp_path / f"20261018-120000-box-1-{RTX_4060_TI_8GB.id}.json",
         RTX_4060_TI_8GB,
-        [_window(1, _decode(1024), 4_700_000_000, allocated=4_200_000_000)],
+        [_window(1, _sd_fp16_decode(1024), 4_700_000_000, estimator="vae.sd", allocated=4_200_000_000)],
     )
     data_dir, _ = _data_copy(tmp_path)
 
@@ -730,7 +845,12 @@ def _point_file(path: Path, records: list[dict]) -> Path:
 
 
 def _denoise_entries(data_dir: Path) -> dict[str, coefficients.CoefficientEntry]:
-    return {",".join(entry.platform.values()): entry for entry in load_data(data_dir)["denoise.json"].coefficients}
+    """The Z-Image denoise entries by platform; the file declares the FLUX.2 denoise's too."""
+    return {
+        ",".join(entry.platform.values()): entry
+        for entry in load_data(data_dir)["denoise.json"].coefficients
+        if entry.estimator == Z_IMAGE_DENOISE_SPEC.id
+    }
 
 
 LEGACY_DENOISE = {f"{part}_denoise_{dtype}": value for dtype in FITTED for part, value in (("k", 262144), ("b", GIB))}
@@ -738,16 +858,20 @@ LEGACY_DENOISE = {f"{part}_denoise_{dtype}": value for dtype in FITTED for part,
 
 
 def _legacy_data_copy(tmp_path: Path) -> tuple[Path, dict[str, bytes]]:
-    """The shipped data as it was before the RTX 4090's native-allocator denoise points shipped: that entry hand-set
-    and `legacy` again, without its points."""
+    """The shipped data as it was before the RTX 4090's native-allocator Z-Image denoise points shipped: that entry
+    hand-set and `legacy` again, without its points."""
     data_dir, _ = _data_copy(tmp_path)
     data = load_data(data_dir)["denoise.json"]
-    coefficients = [
-        entry.model_copy(update={"values": LEGACY_DENOISE, "legacy": True}) if entry.platform == CUDNN_NATIVE else entry
+
+    def reverted(entry: coefficients.CoefficientEntry | MeasuredPoint) -> bool:
+        return entry.estimator == Z_IMAGE_DENOISE_SPEC.id and entry.platform == CUDNN_NATIVE
+
+    entries = [
+        entry.model_copy(update={"values": LEGACY_DENOISE, "legacy": True}) if reverted(entry) else entry
         for entry in data.coefficients
     ]
-    points = [point for point in data.points if point.platform != CUDNN_NATIVE]
-    write_data(data_dir / "denoise.json", data.model_copy(update={"coefficients": coefficients, "points": points}))
+    points = [point for point in data.points if not reverted(point)]
+    write_data(data_dir / "denoise.json", data.model_copy(update={"coefficients": entries, "points": points}))
     return data_dir, _files(data_dir)
 
 
@@ -913,3 +1037,35 @@ def test_a_remeasurement_below_the_shipped_point_keeps_it_and_says_so(tmp_path: 
     out = capsys.readouterr().out
     assert f"kept shipped {shipped.measured_bytes} over remeasured {shipped.measured_bytes - 64 * MIB}" in out
     assert _files(data_dir) == before
+
+
+def _toy_terms(features, values):
+    return ()
+
+
+def test_a_legacy_entrys_tiled_line_is_fitted_on_the_fit_of_the_line_beneath(tmp_path: Path) -> None:
+    """`legacy_fit` rates a line that sits on another with that line's fit, as `fitted_values` does, rather than
+    leaving it out of the fit that would replace the hand-set values."""
+    spec = EstimatorSpec(
+        id="toy", version=1, coefficients=frozenset(), platform_keys=("conv_backend",), terms=_toy_terms,
+        line=convolution_line,
+    )  # fmt: skip
+    platform = {"conv_backend": "cudnn"}
+
+    def point(px: int, mib: int, tile: int | None = None) -> MeasuredPoint:
+        features = {"operation": "encode", "dtype": "bf16", "height": px, "width": px, "tile": tile}
+        return MeasuredPoint(estimator="toy", version=1, platform=platform, features=features,
+                             measured_bytes=mib * 2**20, method="demand_peak", device="-", provenance="-")  # fmt: skip
+
+    lines = {f"{part}_{line}_bf16": 0.0 for line in ("encode", "tiled_encode") for part in ("k", "b")}
+    entry = CoefficientEntry(estimator="toy", version=1, platform=platform, values=lines, legacy=True, provenance="-")
+    data = WorkingMemoryData(
+        schema_version=1,
+        coefficients=[entry],
+        points=[point(512, 1100), point(1024, 4400), point(2048, 1250, 512), point(4096, 1500, 512)],
+    )
+    groups = fit_points([data], {"toy": spec})
+
+    values, problems = legacy_fit(entry, groups, base_values([entry], groups))
+
+    assert not problems and set(values) == set(lines)

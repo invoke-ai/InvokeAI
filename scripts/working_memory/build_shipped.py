@@ -59,12 +59,15 @@ from invokeai.backend.working_memory.estimate import FeatureValue
 from invokeai.backend.working_memory.fit import (
     EntryKey,
     FitPoint,
+    base_values,
     capping_spans,
     entry_fit,
     entry_key,
     fit_points,
     fitted_values,
+    point_reading,
     shipped_pair,
+    shipped_two_phase,
 )
 from invokeai.backend.working_memory.fragmentation import Measurement, fragmented
 from invokeai.backend.working_memory.platform import (
@@ -438,13 +441,16 @@ carries."""
 
 
 def legacy_fit(
-    entry: CoefficientEntry, groups: Mapping[tuple[EntryKey, str], Sequence[FitPoint]]
+    entry: CoefficientEntry,
+    groups: Mapping[tuple[EntryKey, str], Sequence[FitPoint]],
+    bases: Mapping[EntryKey, Mapping[str, float]],
 ) -> tuple[dict[str, int], dict[str, str]]:
-    """The fit that would replace a `legacy` entry's hand-set values (`fit.entry_fit` on `groups`), and per line why
-    its points cannot: they do not fit it, as its fresh-process points do not span (`fit.capping_spans`), or none of
-    them holds the upper bound (`MeasuredPoint.holds_upper_bound`). A probe window raises a line but never caps one,
-    so probe windows alone never replace hand-set values."""
-    values, problems = entry_fit(entry, groups)
+    """The fit that would replace a `legacy` entry's hand-set values (`fit.entry_fit` on `groups`, a line that sits on
+    another priced with `bases`, `fit.base_values`), and per line why its points cannot: they do not fit it, as its
+    capping points do not span (`fit.capping_spans`), or none of them holds the upper bound
+    (`MeasuredPoint.holds_upper_bound`). A probe window raises a line but never caps one, so probe windows alone never
+    replace hand-set values."""
+    values, problems = entry_fit(entry, groups, bases)
     for suffix in problems:
         line = groups.get((entry_key(entry), suffix), [])
         if line and not any(point.caps for point in line):
@@ -460,22 +466,35 @@ def refit(data: Mapping[str, WorkingMemoryData], specs: Mapping[str, EstimatorSp
     with a point that holds the upper bound (`legacy_fit`), is fitted from then on too; one they do not keeps its
     hand-set values."""
     groups = fit_points(data.values(), specs)
+    bases = base_values([entry for file in data.values() for entry in file.coefficients], groups)
     replaced: set[EntryKey] = set()
 
-    def raised_stand_ins(entry: CoefficientEntry) -> dict[str, float]:
+    def raised_stand_ins(entry: CoefficientEntry, bases: Mapping[EntryKey, Mapping[str, float]]) -> dict[str, float]:
         values = entry.values or {}
-        raised = {}
+        raised: dict[str, float] = {}
+
+        def raise_to(suffix: str, pair: tuple[int, int]) -> None:
+            raised[f"k_{suffix}"] = max(values[f"k_{suffix}"], pair[0])
+            raised[f"b_{suffix}"] = max(values[f"b_{suffix}"], pair[1])
+
         for suffix in sorted({name[2:] for name in entry.stand_ins}):
             line = groups.get((entry_key(entry), suffix))
-            if not line:
+            # An assembly line is raised with the line whose second phase it prices.
+            if not line or any(point.assembly == suffix for point in line):
                 continue
+            # Read as the fit reads them: a line that sits on another covers its points above their offsets.
+            readings = [point_reading(point, bases) for point in line]
+            assembly = line[0].assembly
             try:
-                k, b = shipped_pair([(point.size, point.bytes) for point in line])
+                if assembly is None:
+                    raise_to(suffix, shipped_pair(readings))
+                else:
+                    pair, assembled = shipped_two_phase(readings)
+                    raise_to(suffix, pair)
+                    raise_to(assembly, assembled)
             except ValueError:
                 # Too few sizes for a line; `bound_violations` refuses a stand-in below one of them.
                 continue
-            raised[f"k_{suffix}"] = max(values[f"k_{suffix}"], k)
-            raised[f"b_{suffix}"] = max(values[f"b_{suffix}"], b)
         return raised
 
     def staged(entry: CoefficientEntry) -> CoefficientEntry:
@@ -485,7 +504,7 @@ def refit(data: Mapping[str, WorkingMemoryData], specs: Mapping[str, EstimatorSp
         entry = entry.model_copy(update={"stand_ins": stand_ins})
         if not entry.legacy:
             return entry
-        values, problems = legacy_fit(entry, groups)
+        values, problems = legacy_fit(entry, groups, bases)
         if not values or problems:
             return entry
         replaced.add(entry_key(entry))
@@ -499,12 +518,14 @@ def refit(data: Mapping[str, WorkingMemoryData], specs: Mapping[str, EstimatorSp
         fitted = fitted_values(staged_data.values(), specs)
     except ValueError as e:
         raise BuildError(f"the points cannot fit a line: {e}") from e
+    # What the lines beneath price a raised stand-in's points at: the staged entries', as the fit prices them.
+    staged_bases = base_values([entry for file in staged_data.values() for entry in file.coefficients], groups)
 
     def refitted(entry: CoefficientEntry) -> CoefficientEntry:
         if entry.values is None:
             return entry
         line = fitted.get(entry_key(entry), {})
-        raised = raised_stand_ins(entry)
+        raised = raised_stand_ins(entry, staged_bases)
         values = {
             name: float(raised.get(name, value)) if name in entry.stand_ins else float(line.get(name, value))
             for name, value in entry.values.items()
@@ -533,6 +554,7 @@ def legacy_notes(
     measures its platform, or the lines its points cannot replace (`legacy_fit`)."""
     measured = {point.estimator for point in new_points}
     groups = fit_points(data.values(), specs)
+    bases = base_values([entry for file in data.values() for entry in file.coefficients], groups)
     notes = []
     for entry in (entry for file in data.values() for entry in file.coefficients):
         if not entry.legacy or entry.estimator not in measured:
@@ -540,7 +562,7 @@ def legacy_notes(
         if not any(key == entry_key(entry) for key, _ in groups):
             reasons = "no in-fit point measures this platform"
         else:
-            _, problems = legacy_fit(entry, groups)
+            _, problems = legacy_fit(entry, groups, bases)
             reasons = "; ".join(f"{suffix}: {problem}" for suffix, problem in problems.items())
         notes.append(f"note: {entry.estimator} {entry.platform} stays legacy: {reasons}")
     return notes

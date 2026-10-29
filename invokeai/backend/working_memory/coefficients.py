@@ -1,8 +1,9 @@
 """The coefficients estimators are evaluated with, and the measured points that bound them.
 
 Both ship as JSON under `data/`, read through `importlib.resources` so a wheel install finds them. A coefficient entry
-belongs to one estimator version on one measured platform, and either carries its values or borrows another entry's
-(`values_from`); a point records the features of an operation that was measured and its measured peak. A carried value
+belongs to one estimator version on one measured platform, and carries its values, borrows another entry's
+(`values_from`), or carries some and borrows the rest; a point records the features of an operation that was measured
+and its measured peak. A carried value
 is the fit of the points it is resolved for (`fit.py`), a declared stand-in (`stand_ins`), or a hand-set constant of an
 entry marked `legacy`. `tests/backend/working_memory/test_shipped_coefficients.py` resolves every entry against its
 `EstimatorSpec`, holds every point to the estimate the shipped coefficients give it, and every fitted value to the fit
@@ -32,23 +33,26 @@ class _DataModel(BaseModel):
 
 class ValuesFrom(_DataModel):
     """The entry whose values another entry takes: same platform, this estimator id and version. It may carry more
-    values than the borrower reads -- a family member that runs fewer dtypes reads fewer of them -- never fewer."""
+    values than the borrower reads -- a family member that runs fewer dtypes reads fewer of them -- never fewer than the
+    borrower reads and does not carry itself."""
 
     estimator: str
     version: int
 
 
 class CoefficientEntry(_DataModel):
-    """The coefficient values of one estimator version on one platform: its own, or another entry's."""
+    """The coefficient values of one estimator version on one platform: its own, another entry's, or both."""
 
     estimator: str
     version: int
     platform: dict[str, str]
     values: dict[str, float] | None = None
     values_from: ValuesFrom | None = None
-    """Borrow the values of another estimator's entry on the same platform, so that its measured points bound this
-    estimator too, and this estimator's points join the fit of those values. One hop: the entry borrowed from carries
-    its own values."""
+    """Borrow the values this entry does not carry from another estimator's entry on the same platform, so that its
+    measured points bound this estimator too, and this estimator's points join the fit of those values. One hop: the
+    entry borrowed from carries its own values. An entry may carry lines of its own beside the borrowed ones, never a
+    value it also borrows: the family's VAE estimators borrow the untiled convolution lines and carry their own tiled
+    lines, which differ per family."""
     stand_ins: list[str] = []
     """Carried values that are declared conservative stand-ins rather than fits: what this platform prices a line no
     in-fit point measures at. `provenance` says what they stand for; every other carried value is a fit, unless the
@@ -56,7 +60,9 @@ class CoefficientEntry(_DataModel):
     unmeasured_floor: dict[str, float] = {}
     """Declared lower bounds, not fits: what carried values are raised to where this entry prices a platform nothing
     is measured on (see `priced_as`). A fit describes the platform its points were measured on, not the one it stands
-    in for. `provenance` says where the floors come from."""
+    in for. `provenance` says where the floors come from. Each value is raised on its own, so a line whose slope and
+    intercept are floored at the largest each takes over several platforms lies on or above every one of their lines
+    at every size, whatever their signs: a negative intercept, as an assembly line may have, included."""
     legacy: bool = False
     """True for an entry whose carried values are hand-set constants, not a fit of measured points: no point decides
     them and `fit.py` does not reproduce them, though the points of its estimator still bound its estimates. The data
@@ -67,8 +73,8 @@ class CoefficientEntry(_DataModel):
 
     @model_validator(mode="after")
     def _values_or_values_from(self) -> Self:
-        if (self.values is None) == (self.values_from is None):
-            raise ValueError("a coefficient entry carries exactly one of `values` and `values_from`")
+        if self.values is None and self.values_from is None:
+            raise ValueError("a coefficient entry carries `values`, `values_from` or both")
         for field, names in (("stand-ins", self.stand_ins), ("unmeasured floors", self.unmeasured_floor)):
             unknown = sorted(set(names) - set(self.values or {}))
             if unknown:
@@ -214,8 +220,8 @@ def resolve_coefficients(
     """The values `spec` takes on `platform`, and a `source` that says how they were found.
 
     A platform nothing is measured on is priced as the measured platform `priced_as` names. The entry for the spec's
-    id and version that applies there (`find_entry`) either carries the values or borrows them, one hop, from the
-    entry of another estimator that applies on the same platform. No other fallback: an estimate priced with
+    id and version that applies there (`find_entry`) carries the values, or borrows those it does not carry, one hop,
+    from the entry of another estimator that applies on the same platform. No other fallback: an estimate priced with
     coefficients fitted for something else is the shortfall this data exists to prevent, so a missing, ambiguous,
     chained or mismatched entry raises, naming what is wrong. `origin` prefixes the `source`.
 
@@ -239,14 +245,21 @@ def resolve_coefficients(
                 f"Working-memory coefficients for estimator '{spec.id}' on {where} borrow from '{lender}', whose "
                 "entry borrows in turn; borrow from the entry that carries the values."
             )
-    values = carrier.values
-    assert values is not None, "a validated entry carries values or values_from"
+    own, lent = entry.values or {}, carrier.values if lender else {}
+    assert lent is not None, "a lender's entry carries values, checked above"
+    shadowed = sorted(set(own) & set(lent))
+    if shadowed:
+        raise LookupError(
+            f"Working-memory coefficients for estimator '{spec.id}' on {where} carry {shadowed}, which they also "
+            f"borrow from '{lender}'; carry or borrow each value."
+        )
+    values = {**lent, **own}
     # An entry's own values are exactly what its spec reads; a lender's may be more (see `ValuesFrom`).
-    matches = set(values) == spec.coefficients if lender is None else spec.coefficients <= set(values)
+    matches = set(values) == spec.coefficients if lender is None else set(own) <= spec.coefficients <= set(values)
     if not matches:
         raise LookupError(
             f"Working-memory coefficients for estimator '{spec.id}' on {where} provide {sorted(values)}"
-            f"{f' (from {lender})' if lender else ''}; the estimator reads {sorted(spec.coefficients)}."
+            f"{f' (with {lender})' if lender else ''}; the estimator reads {sorted(spec.coefficients)}."
         )
 
     # The source names the spec's keys, and a refining key (the OS) where an entry it read names one.
@@ -255,7 +268,8 @@ def resolve_coefficients(
     read = {name: values[name] for name in sorted(spec.coefficients)}
     notes = [f"values of {lender}"] if lender else []
     if spec.platform_keys and measured != platform:
-        floors = {name: floor for name, floor in carrier.unmeasured_floor.items() if name in read}
+        declared = {**(carrier.unmeasured_floor if lender else {}), **entry.unmeasured_floor}
+        floors = {name: floor for name, floor in declared.items() if name in read}
         read |= {name: max(read[name], floor) for name, floor in floors.items()}
         notes.insert(0, f"priced as {_where({key: full[key] for key in shown})}{', floored' if floors else ''}")
     note = f" ({', '.join(notes)})" if notes else ""
