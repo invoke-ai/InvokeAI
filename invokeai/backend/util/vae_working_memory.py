@@ -139,8 +139,13 @@ def _vae_mid_block_score_matrix_bytes(
 #
 # A tiled operation of the SD1/SDXL, FLUX.1 or FLUX.2 VAE pays the untiled line at its largest tile and, on top of it,
 # the estimator's tiled line in the image's pixels; a tiled decode reserves the larger of that and its assembly line,
-# also in the image's pixels (`_tiled_convolutions`). The tiled and assembly lines are per estimator: what tiling adds
-# differs per family, so each family's entry carries its own beside the untiled lines it borrows.
+# also in the image's pixels. Neither operation reserves less than the buffers it holds at once, counted from its tile
+# grid (`_tiled_convolutions`, `_assembly_buffer_bytes`, `_encode_buffer_bytes`). The tiled and assembly lines are per
+# estimator: what tiling adds differs per family, so each family's entry carries its own beside the untiled lines it
+# borrows. The buffers are not fitted: past the measured sides the fitted lines are extrapolated, and on several
+# platforms they fall below the buffers, for example at a 512 px tile a FLUX.2 bf16 decode under `cudaMallocAsync` from
+# about 15,300 px a side, a FLUX.1 bf16 decode on MIOpen with expandable segments from about 18,500 px, and an fp32
+# encode there from about 21,100 px. At every shipped point the fitted phases stay larger.
 #
 # Caveat for AMD users: `MIOPEN_FIND_MODE=2` (FAST) selects convolution algorithms heuristically instead of by
 # benchmark, and measured a uniform 1.28x more memory at every resolution when the MIOpen values were first fitted.
@@ -148,6 +153,27 @@ def _vae_mid_block_score_matrix_bytes(
 # exceed their reservation on another card, raise `device_working_mem_gb`.
 _PLATFORM_KEYS = ("conv_backend", "allocator")
 _DTYPE_NAMES: dict[torch.dtype, str] = {torch.float16: "fp16", torch.bfloat16: "bf16", torch.float32: "fp32"}
+_ELEMENT_SIZES: dict[str, int] = {name: dtype.itemsize for dtype, name in _DTYPE_NAMES.items()}
+
+TILE_OVERLAP_FACTOR = 0.25
+"""The overlap every tiled AutoencoderKL operation priced here runs at: the one `AutoencoderKL` and
+`AutoencoderKLFlux2` set when built, the one the SD nodes patch (`SD_VAE_TILE_OVERLAP_FACTOR`), and the one every
+tiled point was measured at. A tiled operation's buffers are counted on the tile grid at this overlap from the recorded
+features alone, so the estimators refuse a VAE that would tile at another (`_check_tile_overlap`) rather than price its
+grid wrong."""
+
+# What every tiled decode keeps live while it assembles the image, and an encode takes as input: RGB.
+_IMAGE_CHANNELS = 3
+
+# What a tiled encode assembles per latent channel: the moments, mean and logvar, before `DiagonalGaussianDistribution`
+# splits them.
+_VAE_MOMENT_CHANNELS_PER_LATENT = 2
+
+# The latent channels of the VAEs the tiled estimators price, whose moments a tiled encode assembles: the SD1/SDXL VAE
+# (and the tiny autoencoder), the FLUX.1 VAE that Z-Image shares, and the FLUX.2 VAE.
+_SD_VAE_LATENT_CHANNELS = 4
+_FLUX_VAE_LATENT_CHANNELS = 16
+_FLUX2_VAE_LATENT_CHANNELS = 32
 
 
 def _convolution_coefficients(*dtypes: str, tiled: bool = False) -> frozenset[str]:
@@ -219,7 +245,7 @@ def _convolutions(
 
 
 def _tiled_convolutions(
-    features: Mapping[str, FeatureValue], values: Mapping[str, float], samples: int = 1
+    features: Mapping[str, FeatureValue], values: Mapping[str, float], latent_channels: int, samples: int = 1
 ) -> tuple[WorkingMemoryTerm, ...]:
     """A tiled operation's convolutions, for `samples` samples: the untiled line at its largest tile, and the tiled
     line `tiled_<operation>_<dtype>` over the image's pixels for what tiling adds on top. A decode reserves the larger
@@ -248,6 +274,12 @@ def _tiled_convolutions(
     The tiled line and the assembly line are fitted together on what the points measured, the tiled line above the
     untiled demand measured at their tile (`fit.two_phase_envelope`, `fit.FitPoint.reference`): what tiling adds to that
     demand, which carries to a tile no point measured whose growth is no larger than the measured tiles'.
+
+    Past the measured sides both lines are extrapolated, and the operation holds buffers no line has to reach: a
+    decode reserves at least those of its assembly (`_assembly_buffer_bytes`), a third phase beside the two, and an
+    encode its input image and the moments it assembles (`_encode_buffer_bytes`, of a VAE with `latent_channels`), a
+    second phase beside its tile. They win at no shipped point, so the fit, which rates the fitted phases alone, is
+    unaffected; the VAE estimator tests hold them to that (`tests/app/invocations/test_vae_working_memory_backend.py`).
     """
     line = convolution_line(features)
     assert line is not None and line.sits_on is not None, "a tiled operation's features place it on its tiled line"
@@ -258,13 +290,84 @@ def _tiled_convolutions(
         WorkingMemoryTerm.fitted("tiled_base", f"b_{line.suffix}", samples, values),
     )
     if line.assembly is None:
-        return tile_phase
+        buffers = _encode_buffer_bytes(features, latent_channels, samples)
+        return _larger_phase(tile_phase, (WorkingMemoryTerm("encode_buffers", buffers, True),))
     base_samples = samples if values[f"b_{line.assembly}"] >= 0 else 1
     assembly_phase = (
         WorkingMemoryTerm.fitted("assembled", f"k_{line.assembly}", line.size, values),
         WorkingMemoryTerm.fitted("assembled_base", f"b_{line.assembly}", base_samples, values),
     )
-    return _larger_phase(tile_phase, assembly_phase)
+    buffers = (WorkingMemoryTerm("assembly_buffers", _assembly_buffer_bytes(features, samples), True),)
+    return _larger_phase(_larger_phase(tile_phase, assembly_phase), buffers)
+
+
+def _assembly_buffer_bytes(features: Mapping[str, FeatureValue], samples: int) -> int:
+    """What a tiled decode holds at once while it assembles the image, for `samples` samples: every decoded tile, the
+    rows blended from them, and the image concatenated from those.
+
+    `AutoencoderKL` and `AutoencoderKLFlux2` run the same `tiled_decode`: it steps the latents by
+    ``int(latent_tile * (1 - overlap))``, decodes each slice -- clipped at the far edges, so an edge tile is smaller --
+    and keeps every decoded tile in `rows` until the end. The blends write into those tiles and the crops are views, so
+    the rows concatenated from them come to one image, and the final `torch.cat` adds another. Counted on that grid at
+    `TILE_OVERLAP_FACTOR`, in the dtype the decode runs in: 3 channels of the element size per pixel of every tile and
+    twice the image's. Neither the input latents nor the node's post-processing are counted, so it is a floor.
+
+    The tiny autoencoder, which the SD estimator prices on the same lines, assembles into one fp32 output buffer
+    instead, 12 bytes per image pixel beside the tile in flight; this counts at least 18 for it.
+    """
+    height, width, tile = (cast(int, features[name]) for name in ("height", "width", "tile"))
+    latent_tile = tile // LATENT_SCALE_FACTOR
+    stride = int(latent_tile * (1 - TILE_OVERLAP_FACTOR))
+
+    def decoded_pixels(side: int) -> int:
+        latents = side // LATENT_SCALE_FACTOR
+        return LATENT_SCALE_FACTOR * sum(min(latent_tile, latents - start) for start in range(0, latents, stride))
+
+    tiles = decoded_pixels(height) * decoded_pixels(width)
+    element_size = _ELEMENT_SIZES[cast(str, features["dtype"])]
+    return _IMAGE_CHANNELS * element_size * samples * (tiles + 2 * height * width)
+
+
+def _encode_buffer_bytes(features: Mapping[str, FeatureValue], latent_channels: int, samples: int) -> int:
+    """What a tiled encode holds at once while it assembles the moments, for `samples` samples: the input image, every
+    encoded tile, the rows blended from them, and the moments concatenated from those.
+
+    `AutoencoderKL` and `AutoencoderKLFlux2` run the same `_tiled_encode`: it steps the image by
+    ``int(tile * (1 - overlap))`` pixels, encodes each slice -- clipped at the far edges; a slice of ``s`` pixels
+    encodes to ``s // 8`` latents -- and keeps every encoded tile, twice `latent_channels` wide, in `rows` until the
+    end. The blends write into those tiles and the crops to ``latent_tile - int(latent_tile * overlap)`` latents are
+    views, so the rows concatenated from them take what the crops keep, and the final `torch.cat` as much again. The
+    input image, which the node moved to the device in the dtype the VAE runs in, stays live throughout. Splitting the
+    moments into a distribution afterwards adds three latent-wide tensors once the tiles are gone, less than this.
+    Counted on that grid at `TILE_OVERLAP_FACTOR`, in the element size of that dtype; the node's own copies are not
+    counted, so it is a floor.
+
+    The tiny autoencoder, which the SD estimator prices on the same lines, keeps no tiles: it holds its input and one
+    fp32 latent of 4 channels, below what this counts for it.
+    """
+    height, width, tile = (cast(int, features[name]) for name in ("height", "width", "tile"))
+    stride = int(tile * (1 - TILE_OVERLAP_FACTOR))
+    latent_tile = tile // LATENT_SCALE_FACTOR
+    kept = latent_tile - int(latent_tile * TILE_OVERLAP_FACTOR)
+
+    def encoded_latents(side: int) -> tuple[int, int]:
+        """Along one axis: the latents of every encoded tile, and of the crops the rows keep."""
+        encoded = [min(tile, side - start) // LATENT_SCALE_FACTOR for start in range(0, side, stride)]
+        return sum(encoded), sum(min(kept, latents) for latents in encoded)
+
+    (tiles_h, kept_h), (tiles_w, kept_w) = encoded_latents(height), encoded_latents(width)
+    moments = _VAE_MOMENT_CHANNELS_PER_LATENT * latent_channels * (tiles_h * tiles_w + 2 * kept_h * kept_w)
+    element_size = _ELEMENT_SIZES[cast(str, features["dtype"])]
+    return element_size * samples * (_IMAGE_CHANNELS * height * width + moments)
+
+
+def _check_tile_overlap(vae: torch.nn.Module, overlap_factor: float) -> None:
+    """Refuse to price a tiled operation at an overlap its tile grid is not counted at (`TILE_OVERLAP_FACTOR`)."""
+    if overlap_factor != TILE_OVERLAP_FACTOR:
+        raise ValueError(
+            f"{type(vae).__name__} tiles at an overlap of {overlap_factor}: a tiled operation's working memory is "
+            f"measured and priced at {TILE_OVERLAP_FACTOR} only."
+        )
 
 
 def _larger_phase(
@@ -307,16 +410,16 @@ def _peak_of_two_phases(
     the MIOpen coefficient keeps the linear term above the score term across the measured range, so the crossover does
     not arise there at all.
 
-    On a tie the convolutions are the ones reserved. A tiled decode's convolution phase is itself the larger of its
-    tile and its assembly (`_tiled_convolutions`); the score matrix is the tile's, so the reservation is the largest of
-    the three.
+    On a tie the convolutions are the ones reserved. A tiled decode's convolution phase is itself the largest of its
+    tile, its assembly and its assembly's buffers (`_tiled_convolutions`); the score matrix is the tile's, so the
+    reservation is the largest of the four.
     """
     return _larger_phase(convolution_phase, (WorkingMemoryTerm("mid_block_scores", score_matrix_bytes, True),))
 
 
 def _sd_terms(features: Mapping[str, FeatureValue], values: Mapping[str, float]) -> tuple[WorkingMemoryTerm, ...]:
     if features["tile"] is not None:
-        terms = _tiled_convolutions(features, values)
+        terms = _tiled_convolutions(features, values, _SD_VAE_LATENT_CHANNELS)
     else:
         terms = _convolutions(features, values, cast(int, features["height"]) * cast(int, features["width"]))
 
@@ -393,9 +496,11 @@ def estimate_vae_working_memory_sd15_sdxl(
     which the node leaves in place then. A field above 0 is priced at the tile `patch_vae_tiling_params` gives the VAE
     for it at `SD_VAE_TILE_OVERLAP_FACTOR` (`diffusers_tile`), not at the field: a 24 px field runs a 32 px tile, a
     200 px one 192 px. A tiled operation is priced on its largest tile, clamped to the image per axis as the VAE slices
-    it, plus the tiled line, and a tiled decode on the larger of that and its assembly line (`_tiled_convolutions`); a
-    tile covering the image on both axes is priced as the single pass the VAE runs then (`AutoencoderKL` tiles only when
-    a side is strictly larger than the tile; for the tiny autoencoder, which tiles anyway, see below).
+    it, plus the tiled line, and a tiled decode on the larger of that and its assembly line, neither below the buffers
+    the operation holds at once (`_tiled_convolutions`); a tile covering the image on both axes is priced as the single
+    pass the VAE runs then (`AutoencoderKL` tiles only when a side is strictly larger than the tile; for the tiny
+    autoencoder, which tiles anyway, see below). A tiled `AutoencoderKL` operation at an overlap other than
+    `TILE_OVERLAP_FACTOR` is refused.
     """
     device = device if device is not None else TorchDevice.choose_torch_device()
     run_dtype = sd_vae_run_dtype(operation, fp32, device)
@@ -403,9 +508,11 @@ def estimate_vae_working_memory_sd15_sdxl(
     height = latent_scale_factor_for_operation * image_tensor.shape[-2]
     width = latent_scale_factor_for_operation * image_tensor.shape[-1]
 
-    # The nodes patch the VAE's tile for a field above 0 only, and leave its own in place otherwise.
+    # The nodes patch the VAE's tile and overlap for a field above 0 only, and leave its own in place otherwise.
+    overlap_factor = SD_VAE_TILE_OVERLAP_FACTOR
     if tile_size is not None and tile_size <= 0:
         tile_size = vae.tile_sample_min_size
+        overlap_factor = vae.tile_overlap_factor
         assert isinstance(tile_size, int)
     elif tile_size is not None:
         tile_size, _ = diffusers_tile(vae, tile_size, SD_VAE_TILE_OVERLAP_FACTOR)
@@ -414,6 +521,9 @@ def estimate_vae_working_memory_sd15_sdxl(
     # which cost many times what its convolutions do (64 channels wide against 512), so it stays an upper bound.
     if tile_size is not None and tile_size >= height and tile_size >= width:
         tile_size = None
+    # The tiny autoencoder's own overlap (0.125) does not matter: the buffers counted for it are an upper bound at any.
+    if tile_size is not None and isinstance(vae, AutoencoderKL):
+        _check_tile_overlap(vae, overlap_factor)
 
     features: dict[str, FeatureValue] = {
         "operation": operation,
@@ -497,15 +607,10 @@ def estimate_vae_working_memory_cogview4(
     return _estimate(VAE_COGVIEW4_SPEC, features, device)
 
 
-# What the Anima estimator adds for a tiled encode: the full-resolution RGB image, and the moments -- mean and
-# logvar, twice the latent width, before `DiagonalGaussianDistribution` splits them.
-_IMAGE_CHANNELS = 3
-_VAE_MOMENT_CHANNELS_PER_LATENT = 2
-
-
 def _flux_terms(features: Mapping[str, FeatureValue], values: Mapping[str, float]) -> tuple[WorkingMemoryTerm, ...]:
     if features["tile"] is not None:
-        return _peak_of_two_phases(_tiled_convolutions(features, values), cast(int, features["score_matrix_bytes"]))
+        convolutions = _tiled_convolutions(features, values, _FLUX_VAE_LATENT_CHANNELS)
+        return _peak_of_two_phases(convolutions, cast(int, features["score_matrix_bytes"]))
     return _single_pass_terms(features, values)
 
 
@@ -537,11 +642,12 @@ def estimate_vae_working_memory_flux(
     sites that pass no tile depend on that signature. When set, the operation is priced on its
     largest tile, clamped to the image per axis, plus the tiled line for what tiling adds: the
     allocator's jump, and the encode's input image and moments. A decode reserves the larger of
-    that and its assembly line, for the assembled output and the node's post-processing
-    (`_tiled_convolutions`). `tile_size <= 0` is the nodes' "use the default" sentinel; see
-    `resolve_tile_size`. The tile priced is the one `scoped_vae_tiling` runs for the field
-    (`scoped_vae_tile`), which can be smaller than the field. Both operations tile, each with its
-    own tiled line.
+    that and its assembly line, for the assembled output and the node's post-processing. Neither
+    reserves less than the buffers it holds at once, counted on its tile grid
+    (`_tiled_convolutions`); one at an overlap other than `TILE_OVERLAP_FACTOR` is refused.
+    `tile_size <= 0` is the nodes' "use the default" sentinel; see `resolve_tile_size`. The tile
+    priced is the one `scoped_vae_tiling` runs for the field (`scoped_vae_tile`), which can be
+    smaller than the field. Both operations tile, each with its own tiled line.
 
     `device` is where the VAE will run (a `cpu_only` VAE runs on the CPU); it picks the convolution
     backend's coefficients. Defaults to the session device.
@@ -564,6 +670,7 @@ def estimate_vae_working_memory_flux(
     # for a decode that needs ~4.6GB, evicting the transformer from the cache for nothing.
     if tile is not None and (tile < out_h or tile < out_w):
         score_h, score_w = min(tile, out_h), min(tile, out_w)
+        _check_tile_overlap(vae, vae.tile_overlap_factor)
     else:
         tile = None
         score_h, score_w = out_h, out_w
@@ -593,7 +700,7 @@ def _flux2_terms(features: Mapping[str, FeatureValue], values: Mapping[str, floa
     batch_size = cast(int, features["batch_size"])
     if features["tile"] is not None:
         # The largest slice `AutoencoderKLFlux2` takes is the tile, clamped to the image per axis.
-        convolutions = _tiled_convolutions(features, values, samples=batch_size)
+        convolutions = _tiled_convolutions(features, values, _FLUX2_VAE_LATENT_CHANNELS, samples=batch_size)
     else:
         height, width = cast(int, features["height"]), cast(int, features["width"])
         convolutions = _convolutions(features, values, height * width, samples=batch_size)
@@ -654,11 +761,12 @@ def estimate_vae_working_memory_flux2(
     "use the default" sentinel (see `resolve_tile_size`). The tile priced is the one
     `scoped_vae_tiling` runs for the field (`scoped_vae_tile`), which can be smaller than the field.
     A tiled operation is priced on the largest tile instead of the full image, plus the tiled line
-    for what tiling adds on top, a decode at the larger of that and its assembly line
-    (`_tiled_convolutions`), and the score matrix is priced on the tile too, if one is materialized
-    at all. That tile is clamped to the image per axis, as the slices `AutoencoderKLFlux2` takes
-    are, and a tile covering the image on both axes is priced as the single pass it runs: the VAE
-    tiles only when a side is strictly larger than the tile.
+    for what tiling adds on top, a decode at the larger of that and its assembly line, neither below
+    the buffers the operation holds for the whole batch (`_tiled_convolutions`; one at an overlap
+    other than `TILE_OVERLAP_FACTOR` is refused), and the score matrix is priced on the tile too,
+    if one is materialized at all. That tile is clamped to the image per axis, as the slices
+    `AutoencoderKLFlux2` takes are, and a tile covering the image on both axes is priced as the
+    single pass it runs: the VAE tiles only when a side is strictly larger than the tile.
 
     Both terms are per sample. `vae.decode` takes whatever batch the latents carry, and a
     ``LatentsField`` is not pinned to one, so the batch has to multiply through: measured at 1024px
@@ -680,6 +788,7 @@ def estimate_vae_working_memory_flux2(
     tile = scoped_vae_tile(vae, tile_size)[0] if tile_size is not None else None
     if tile is not None and (tile < out_h or tile < out_w):
         tile_h, tile_w = min(tile, out_h), min(tile, out_w)
+        _check_tile_overlap(vae, vae.tile_overlap_factor)
     else:
         tile = None
         tile_h, tile_w = out_h, out_w

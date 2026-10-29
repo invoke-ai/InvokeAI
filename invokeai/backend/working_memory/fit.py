@@ -39,12 +39,14 @@ A measurement whose demand includes an analytic term of its estimate fits no lin
 (`upcast_weight_bytes`), a batch, and every denoise forward with an analytic term. The VAE mid-block score matrix is
 not such a term: an estimate reserves the larger of it and the convolutions, which peak apart, and on the builds that
 materialize it the convolutions stay the larger over the measured sizes (`vae_working_memory._peak_of_two_phases`); the
-CUDA points that force a math kernel are out of fit. A point that bounds its estimate from below only (a
-`probe_demand` window, `MeasuredPoint.holds_upper_bound`, or a tiled VAE operation on a tile the app never sets,
-`Line.caps`) is covered by the line and can raise it, but takes no part in choosing it: the other fresh-process points
-cap a line. A line is fitted only once its capping points alone span two sizes `MIN_AREA_RATIO` apart
-(`capping_spans`); until then it stays a stand-in, which the other points bound from below. A probe window on a line
-never lowers a half of it either: each coefficient ships at the larger of the fit on all points
+CUDA points that force a math kernel are out of fit. Nor are the buffers a tiled VAE operation holds at once, counted on
+its tile grid (`vae_working_memory._assembly_buffer_bytes`, `_encode_buffer_bytes`): the estimate reserves the larger
+of them and its fitted phases, and they decide no shipped point, so the envelopes rate those phases alone. A point that
+bounds its estimate from below only (a `probe_demand` window, `MeasuredPoint.holds_upper_bound`, or a tiled VAE
+operation on a tile the app never sets, `Line.caps`) is covered by the line and can raise it, but takes no part in
+choosing it: the other fresh-process points cap a line. A line is fitted only once its capping points alone span two
+sizes `MIN_AREA_RATIO` apart (`capping_spans`); until then it stays a stand-in, which the other points bound from below.
+A probe window on a line never lowers a half of it either: each coefficient ships at the larger of the fit on all points
 and the fit on the fresh-process points alone, both rated on the capping ones (`fitted_pair`), for a line with an
 assembly phase both lines of each two-phase fit (`fitted_two_phase`). A fresh point below `SMALLEST_APP_SIDE` shapes
 both fits; it only rates neither. A line that sits on another reads its points above their offsets in both fits
