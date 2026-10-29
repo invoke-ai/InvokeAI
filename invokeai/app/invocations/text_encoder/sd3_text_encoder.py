@@ -17,7 +17,7 @@ from invokeai.app.invocations.primitives import SD3ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
-from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX
+from invokeai.backend.patches.lora_conversions.sd3_lora_constants import SD3_LORA_CLIP_G_PREFIX, SD3_LORA_CLIP_L_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, SD3ConditioningInfo
@@ -63,8 +63,8 @@ class Sd3TextEncoderInvocation(BaseInvocation):
         # Note: The text encoding model are run in separate functions to ensure that all model references are locally
         # scoped. This ensures that earlier models can be freed and gc'd before loading later models (if necessary).
 
-        clip_l_embeddings, clip_l_pooled_embeddings = self._clip_encode(context, self.clip_l)
-        clip_g_embeddings, clip_g_pooled_embeddings = self._clip_encode(context, self.clip_g)
+        clip_l_embeddings, clip_l_pooled_embeddings = self._clip_encode(context, self.clip_l, SD3_LORA_CLIP_L_PREFIX)
+        clip_g_embeddings, clip_g_pooled_embeddings = self._clip_encode(context, self.clip_g, SD3_LORA_CLIP_G_PREFIX)
 
         t5_embeddings: torch.Tensor | None = None
         if self.t5_encoder is not None:
@@ -142,8 +142,10 @@ class Sd3TextEncoderInvocation(BaseInvocation):
         return prompt_embeds
 
     def _clip_encode(
-        self, context: InvocationContext, clip_model: CLIPField, tokenizer_max_length: int = 77
+        self, context: InvocationContext, clip_model: CLIPField, lora_prefix: str, tokenizer_max_length: int = 77
     ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Encode with one CLIP encoder. `lora_prefix` picks that encoder's layers out of an SD 3 LoRA, which keeps
+        CLIP-L and CLIP-G apart: both name their modules `text_model.encoder.layers.N...`."""
         prompt = [self.prompt]
 
         clip_text_encoder_info = context.models.load(clip_model.text_encoder)
@@ -170,7 +172,7 @@ class Sd3TextEncoderInvocation(BaseInvocation):
                     LayerPatcher.apply_smart_model_patches(
                         model=clip_text_encoder,
                         patches=self._clip_lora_iterator(context, clip_model),
-                        prefix=FLUX_LORA_CLIP_PREFIX,
+                        prefix=lora_prefix,
                         dtype=clip_text_encoder.dtype,
                         cached_weights=cached_weights,
                     )

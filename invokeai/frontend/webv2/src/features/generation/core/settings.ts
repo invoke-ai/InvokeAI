@@ -747,6 +747,12 @@ export const isLoraCompatibleWithModel = (
     return isWanLoraTargetingMain(loraModel.variant, mainModel.variant);
   }
 
+  if (mainModel.base === 'sd-3') {
+    // Medium and Large LoRAs do not fit each other's widths; records installed before the variant existed carry none
+    // and stay permissive, the denoise node checks those at run time.
+    return !mainModel.variant || !loraModel.variant || loraModel.variant === mainModel.variant;
+  }
+
   return true;
 };
 

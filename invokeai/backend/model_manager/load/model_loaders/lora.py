@@ -67,6 +67,7 @@ from invokeai.backend.patches.lora_conversions.peft_adapter_utils import normali
 from invokeai.backend.patches.lora_conversions.qwen_image_lora_conversion_utils import (
     lora_model_from_qwen_image_state_dict,
 )
+from invokeai.backend.patches.lora_conversions.sd3_lora_conversion_utils import lora_model_from_sd3_state_dict
 from invokeai.backend.patches.lora_conversions.sd_lora_conversion_utils import lora_model_from_sd_state_dict
 from invokeai.backend.patches.lora_conversions.sdxl_lora_conversion_utils import convert_sdxl_keys_to_diffusers_format
 from invokeai.backend.patches.lora_conversions.wan_lora_conversion_utils import lora_model_from_wan_state_dict
@@ -202,6 +203,10 @@ class LoRALoader(ModelLoader):
             # with the same map the base checkpoint goes through. alpha=None -> alpha=rank, which
             # is what the published distilled accelerator (no .alpha tensors) expects.
             model = lora_model_from_ltx2_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.StableDiffusion3:
+            # diffusers, PEFT, SimpleTuner LyCORIS and kohya MMDiT names, all onto diffusers' SD3Transformer2DModel
+            # and the two CLIP encoders; T5 layers are dropped with a warning.
+            model = lora_model_from_sd3_state_dict(state_dict=state_dict)
         else:
             raise ValueError(f"Unsupported LoRA base model: {self._model_base}")
 

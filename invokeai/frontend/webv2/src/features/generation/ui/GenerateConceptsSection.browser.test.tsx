@@ -29,7 +29,7 @@ seedArchitectureCapabilities();
 const LORA_MODEL: LoraModelConfig = { base: 'sdxl', key: 'lora-1', name: 'Ink Wash', type: 'lora' };
 const ADDED_LORA_MODEL: LoraModelConfig = { base: 'sdxl', key: 'lora-2', name: 'Chalk', type: 'lora' };
 const MAIN_MODEL: GenerateModelConfig = { base: 'sdxl', key: 'main-1', name: 'Base', type: 'main' };
-const SD3_MODEL: GenerateModelConfig = { base: 'sd-3', key: 'sd3', name: 'SD3', type: 'main' };
+const COGVIEW4_MODEL: GenerateModelConfig = { base: 'cogview4', key: 'cogview4', name: 'CogView4', type: 'main' };
 const LORA_MODELS = [LORA_MODEL];
 const LORA: GenerateLora = { isEnabled: true, model: LORA_MODEL, weight: 0.75 };
 const SETTINGS: GenerateSettings = { ...getDefaultGenerateSettings(), loras: [LORA] };
@@ -185,7 +185,7 @@ describe('GenerateConceptsContent', () => {
   });
 
   it('explains instead of offering an always-empty picker when the model cannot use concepts', async () => {
-    const { row } = await render(SD3_MODEL, { ...SETTINGS, loras: [] });
+    const { row } = await render(COGVIEW4_MODEL, { ...SETTINGS, loras: [] });
 
     expect(row.querySelector('[data-testid="concept-picker"]')).toBeNull();
     expect(row.textContent).toContain('widgets.generate.conceptsUnsupported');
@@ -193,7 +193,7 @@ describe('GenerateConceptsContent', () => {
   });
 
   it('keeps concepts from another model removable when the model cannot use concepts', async () => {
-    const { row, onCommit } = await render(SD3_MODEL);
+    const { row, onCommit } = await render(COGVIEW4_MODEL);
 
     expect(row.textContent).toContain('Ink Wash');
     expect(row.textContent).toContain('widgets.generate.incompatible');
@@ -210,10 +210,10 @@ describe('GenerateConceptsContent', () => {
   });
 
   it('marks a same-family concept incompatible when the model cannot use concepts', async () => {
-    const sd3Lora: LoraModelConfig = { base: 'sd-3', key: 'sd3-lora', name: 'Glow', type: 'lora' };
-    const { row } = await render(SD3_MODEL, {
+    const cogView4Lora: LoraModelConfig = { base: 'cogview4', key: 'cogview4-lora', name: 'Glow', type: 'lora' };
+    const { row } = await render(COGVIEW4_MODEL, {
       ...SETTINGS,
-      loras: [{ isEnabled: true, model: sd3Lora, weight: 0.8 }],
+      loras: [{ isEnabled: true, model: cogView4Lora, weight: 0.8 }],
     });
 
     expect(row.textContent).toContain('widgets.generate.incompatible');
