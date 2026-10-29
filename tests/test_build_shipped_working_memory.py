@@ -1,5 +1,6 @@
 """scripts/working_memory/build_shipped.py: calibration store exports into shipped working-memory points and fits."""
 
+import json
 import platform as stdlib_platform
 import shutil
 from collections.abc import Callable, Iterator
@@ -17,10 +18,11 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     CalibrationStoreFile,
 )
 from invokeai.backend.util import nvml
-from invokeai.backend.working_memory import coefficients
+from invokeai.backend.working_memory import coefficients, fragmentation
 from invokeai.backend.working_memory import platform as working_memory_platform
 from invokeai.backend.working_memory.coefficients import CoefficientEntry, MeasuredPoint, load_data
 from invokeai.backend.working_memory.fingerprint import DeviceClass, Environment, environment_for
+from invokeai.backend.working_memory.fragmentation import Measurement
 from invokeai.backend.working_memory.platform import platform_for
 from invokeai.backend.working_memory.probe import CounterDelta
 from invokeai.backend.working_memory.spec import import_estimator_modules
@@ -28,12 +30,12 @@ from scripts.working_memory.build_shipped import (
     DATA_DIR,
     RAISE_NOTE,
     BuildError,
-    Spread,
     bound_violations,
     build_points,
     export_paths,
     main,
     merge_points,
+    point_identity,
     point_platform,
     refit,
 )
@@ -556,6 +558,26 @@ def test_a_raise_that_pushes_fresh_process_points_over_their_bound_is_refused_ev
         assert _files(data_dir) == before
 
 
+def test_two_owners_attempts_with_one_id_are_measured_apart(tmp_path: Path, machine, entries, specs) -> None:
+    """The two fp32 1280px decodes of `_fp32_1280`, each another owner's attempt "1": reserved grew from one to the
+    other around flat allocations, which within one attempt is fragmentation. Across two it is not."""
+    windows = [
+        {**window, "run_id": run_id} for window, run_id in zip(_fp32_1280(8020, 9300), ("run-a", "run-b"), strict=True)
+    ]
+    export = _amd_export(tmp_path, machine, windows)
+    store = json.loads(export.read_text(encoding="utf-8"))
+    [run] = store["runs"]
+    store["runs"] = [
+        {**run, "run_id": run_id, "user_id": owner, "attempt_id": "1", "attempt_steps": 1}
+        for run_id, owner in (("run-a", "admin-a"), ("run-b", "admin-b"))
+    ]
+    export.write_text(json.dumps(store), encoding="utf-8")
+
+    build = build_points([export], specs, entries)
+
+    assert [spread.fragmented for spread in build.spreads.values()] == [False]
+
+
 def test_a_raise_on_a_fragmentation_flagged_point_needs_consent(
     tmp_path: Path, machine, shipped_checks, capsys
 ) -> None:
@@ -629,8 +651,39 @@ def test_cards_of_one_name_are_separate_points_and_spreads(
         pytest.param((2887, 3160, 3160), (2887, 2887, 2887), False, id="growth-below-ten-percent"),
     ],
 )
-def test_a_spread_is_flagged_as_fragmentation_only_when_reserved_grows_around_flat_allocations(
+def test_a_measurement_is_flagged_as_fragmentation_only_when_reserved_grows_around_flat_allocations(
     reserved, allocated, fragmented
 ) -> None:
-    spread = Spread(demand=reserved, reserved=reserved, allocated=allocated)
-    assert spread.fragmented is fragmented
+    measurement = Measurement(
+        line="decode_fp32", pixels=1280**2, demand=reserved, reserved=reserved, allocated=allocated
+    )
+    assert fragmentation.fragmented([measurement]) == [fragmented]
+
+
+def test_a_size_whose_one_window_stands_out_from_the_smaller_sizes_is_flagged_without_any_growth(
+    tmp_path: Path, machine, entries, specs, capsys
+) -> None:
+    """The RX 9060 XT's fp32 SDXL decodes of one attempt (real reserved and allocated bytes): 576px and 832px reserve
+    1.11 and 1.10 times what they allocate, the one fully resident 1216px window 1.47 times, 1.33 times their median.
+    It has no repetition to grow over, so only the ratio rule can flag it -- as the user fit does."""
+    windows = [
+        _window(item, _sd_decode(px, "fp32"), reserved, estimator="vae.sd", allocated=allocated)
+        for item, (px, reserved, allocated) in enumerate(
+            [
+                (576, 1887436800, 1702840320),
+                (576, 1887436800, 1702840320),
+                (832, 3900702720, 3552839680),
+                (832, 3900702720, 3552839680),
+                (1216, 11135877120, 7589201920),
+            ],
+            start=1,
+        )
+    ]
+    export = _amd_export(tmp_path, machine, windows)
+
+    build = build_points([export], specs, entries)
+
+    flagged = {point.features["width"] for point in build.points if build.spreads[point_identity(point)].fragmented}
+    assert flagged == {1216}
+    main([str(export), "--data-dir", str(DATA_DIR)])
+    assert "warning: fragmentation? vae.sd" in capsys.readouterr().out

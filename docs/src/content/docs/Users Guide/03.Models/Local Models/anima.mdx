@@ -1,7 +1,7 @@
 ---
 title: Anima
 description: Generate anime-style images with Anima, a 2B Cosmos Predict2 diffusion transformer with an LLM adapter, including its schedulers, regional prompting, character-reference IP-Adapter and ControlNet-LLLite adapters.
-lastUpdated: 2026-10-18
+lastUpdated: 2026-10-21
 sidebar:
   order: 1
 ---
@@ -23,8 +23,8 @@ This is a summary, not legal advice. Read the full license on the model's Huggin
 
 ## Hardware
 
-Anima is small by current standards: the transformer is a ~4.5 GB download, the Qwen3 encoder ~1.2 GB
-and the VAE ~200 MB. On low-VRAM GPUs,
+Anima is small by current standards: the transformer is a ~4.5 GB download (1.0–2.2 GB as a
+[GGUF](#gguf-builds)), the Qwen3 encoder ~1.2 GB and the VAE ~200 MB. On low-VRAM GPUs,
 [Low-VRAM mode](/configuration/optimization/low-vram-mode/) and
 [FP8 Storage](/configuration/optimization/fp8-storage/) both apply to Anima.
 
@@ -39,11 +39,11 @@ Install the **Anima** bundle from the Model Manager's Starter Models. It contain
   [below](#controlnet-lllite-adapters))
 
 Installing *Anima Base 1.0* on its own also installs the encoder and VAE as dependencies. Anima is
-distributed as a single file only, so the three components are always separate models:
+distributed as single files only, a checkpoint or a GGUF, so the three components are always separate models:
 
 | Component    | Model                                                          |
 | ------------ | -------------------------------------------------------------- |
-| Transformer  | the Anima checkpoint (Cosmos Predict2 DiT + LLM adapter)       |
+| Transformer  | the Anima checkpoint or GGUF (Cosmos Predict2 DiT + LLM adapter) |
 | Text encoder | a **Qwen3 0.6B** encoder                                       |
 | VAE          | the 16-channel Wan 2.1 / Qwen Image VAE                        |
 
@@ -87,6 +87,35 @@ Anima-2.9B keeps Anima's blocks unchanged, so Anima adapters work there as on An
 Anima-3.8B changed them slightly and adds the semantic connector, so results there can differ more.
 :::
 
+## GGUF builds
+
+Community GGUF conversions of the transformer install and generate like the checkpoint, with the same Qwen3
+encoder and VAE as separate components, and LoRAs apply to them. FP8 Storage does not: the weights are already
+quantized. The **Anima Turbo 1.1 (GGUF, Q8_0)** starter model is one: Anima Turbo, the distilled version of
+Anima for fast generations, at about half the memory of the bf16 checkpoint (~2.2 GB). Like any Anima model
+whose name contains "turbo", it is set to 10 steps at CFG 1 when selected; its model card recommends CFG 1 and
+8–12 steps.
+
+These builds are known to install and load:
+
+| Repository | Model | Notes |
+| ---------- | ----- | ----- |
+| `vanes430/Anima-Turbo-V1.1-GGUF` | Anima Turbo v1.1 | ComfyUI-GGUF conversion; Q8_0 and Q4_K_M checked |
+| `Bedovyy/Anima-GGUF` | Anima Preview | `anima-preview-Q8_0.gguf` checked; the repository also holds Preview 2 and Preview 3 builds |
+| `JusteLeo/Anima2-GGUF` | Anima Preview 2 | stable-diffusion.cpp conversion; Q8_0 checked |
+| `n-Arno/Anima-P3-Turbo-AIO-Q4_K` | UnNamedA V1, a community Anima model | stable-diffusion.cpp all-in-one file, which also holds a Qwen3 encoder and the VAE. Only the transformer is read: the bundled encoder, a modified one, is not used, and the encoder and VAE you select replace it. `UNNAMED-ANIMA-V1-Turbo-AIO-SdCpp-Q4_K.gguf` checked; the repository's other all-in-one files are not |
+
+`Abiray/Anima-base-v1.0-GGUF`, a ComfyUI-GGUF conversion of Anima Base 1.0, is recognized from its Q3_K_M and
+Q8_0 headers but has not been loaded.
+
+The GGUFs in `vanes430/Anima-2.9B-GGUF` are broken conversions: every quantized tensor holds the bf16 weights'
+raw bytes and is twice as wide as the model's, so the weights cannot be recovered. They are refused at install;
+use the **Anima-2.9B (Preview v1)** starter model instead, or its int8 build for about half the memory.
+
+No GGUF of Anima-3.8B has been verified, so one is refused at install as well; use its safetensors starter
+model. A 52-block GGUF without Anima-3.8B's semantic connector is refused too, because it cannot be told apart
+from the unsupported v1.0 transformer.
+
 ## Generation settings
 
 Selecting an Anima model applies these defaults:
@@ -95,6 +124,9 @@ Selecting an Anima model applies these defaults:
 - **CFG Scale:** 4.5 (the minimum is 1, which turns CFG off)
 - **Scheduler:** Euler
 - **Size:** 1024×1024; width and height snap to multiples of 8.
+
+A model whose name contains "turbo", such as Anima Turbo, gets **10 steps** at **CFG 1** instead. Anima-3.8B's
+defaults are given [above](#community-finetunes).
 
 The **Scheduler** menu offers Anima's own set: **Euler**, **Heun (2nd order)**, **DPM++ 2M**,
 **DPM++ 2M SDE**, **ER-SDE** and **LCM**.
