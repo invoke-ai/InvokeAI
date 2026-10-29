@@ -350,6 +350,64 @@ describe('Anima source-preserving edits', () => {
     expect(weightAt(edited, 'dog')).toBeCloseTo(2.1, 10);
   });
 
+  it.each(['(cat (dog)2)0.1', '(cat (dog)65504)0.5', '(cat (dog (bird)2)1)0.1'])(
+    'cancels the entire group edit when a descendant cannot be represented: %s',
+    (prompt) => {
+      for (const [start, end] of [
+        [0, 0],
+        [prompt.length - 1, prompt.length - 1],
+        [0, prompt.length],
+      ] as const) {
+        expect(adjustPromptAttention(prompt, start, end, 'decrement', false, 'anima')).toEqual({
+          prompt,
+          selectionStart: start,
+          selectionEnd: end,
+        });
+      }
+    }
+  );
+
+  it.each([
+    ['(cat (dog)0)0.5', 'decrement'],
+    ['(cat (dog)32752)2', 'increment'],
+  ] as const)('cancels ancestor edits when a descendant reaches an effective weight bound: %s', (prompt, direction) => {
+    expect(adjustPromptAttention(prompt, 0, 0, direction, false, 'anima')).toEqual({
+      prompt,
+      selectionStart: 0,
+      selectionEnd: 0,
+    });
+  });
+
+  it('does not partially adjust a selection containing an unrepresentable target', () => {
+    const prompt = 'cat (dog)65504';
+    expect(adjustPromptAttention(prompt, 0, prompt.length, 'increment', false, 'anima')).toEqual({
+      prompt,
+      selectionStart: 0,
+      selectionEnd: prompt.length,
+    });
+  });
+
+  it('still decrements representable nested weights while preserving unselected neighbours', () => {
+    const prompt = 'before (cat (dog)2)0.2 after';
+    const edited = change(prompt, prompt.indexOf('('), 'decrement');
+    expect(edited).not.toBe(prompt);
+    expect(weightAt(edited, 'cat')).toBeCloseTo(0.1, 10);
+    expect(weightAt(edited, 'dog')).toBeCloseTo(0.3, 10);
+    expect(weightAt(edited, 'before')).toBe(1);
+    expect(weightAt(edited, 'after')).toBe(1);
+  });
+
+  it.each([
+    ['(cat dog)0.1', '(cat dog)0'],
+    ['(cat (dog)1)0.1', '(cat (dog)1)0'],
+    ['(cat ((dog)1)1)0.1', '(cat ((dog)1)1)0'],
+  ])('allows every descendant to reach zero in %s', (prompt, expected) => {
+    const edited = change(prompt, 0, 'decrement');
+    expect(edited).toBe(expected);
+    expect(weightAt(edited, 'cat')).toBe(0);
+    expect(weightAt(edited, 'dog')).toBe(0);
+  });
+
   it('multiplies opposite symbolic signs rather than cancelling them', () => {
     const edited = change('(red- blue)+', 'red');
     expect(weightAt(edited, 'red')).toBeCloseTo(1.09, 10);

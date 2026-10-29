@@ -191,3 +191,44 @@ it.each([
     expect(host.querySelector('pre')?.textContent).toContain(input.value);
   }
 );
+
+it.each(['(cat (dog)2)0.1', '(cat (dog)65504)0.5'])(
+  'keeps the input and caret unchanged when an Anima group hotkey cannot adjust every descendant: %s',
+  async (prompt) => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await renderPromptModel({ base: 'anima', key: 'anima', name: 'Anima', type: 'main' }, prompt);
+    const input = host.querySelector('textarea')!;
+    const onInput = vi.fn();
+    input.addEventListener('input', onInput);
+    input.focus();
+    input.setSelectionRange(0, 0);
+
+    await act(() => {
+      expect(adjustFocusedPromptAttention('decrement', false)).toBe(false);
+    });
+
+    expect(input.value).toBe(prompt);
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe(0);
+    expect(document.activeElement).toBe(input);
+    expect(onInput).not.toHaveBeenCalled();
+  }
+);
+
+it('allows the Anima group hotkey when all descendants can reach zero', async () => {
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  await renderPromptModel({ base: 'anima', key: 'anima', name: 'Anima', type: 'main' }, '(cat (dog)1)0.1');
+  const input = host.querySelector('textarea')!;
+  input.focus();
+  input.setSelectionRange(0, 0);
+
+  await act(() => {
+    expect(adjustFocusedPromptAttention('decrement', false)).toBe(true);
+  });
+
+  await expect.poll(() => input.value).toBe('(cat (dog)1)0');
+});

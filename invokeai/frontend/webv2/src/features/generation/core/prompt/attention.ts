@@ -445,11 +445,19 @@ const adjustAnimaAttention = (
     const { part, effective } = target;
     const inherited =
       delimiter && target.parent ? (adjustedGroups.get(target.parent) ?? target.inherited) : target.inherited;
-    if (inherited.value === 0) {
-      continue;
-    }
+    // All selected targets must succeed; skipping one can leave already-edited ancestors changing its weight.
     const stepped = stepWeight(effective, direction, preferNumeric);
     if (stepped.value < 0 || stepped.value > ANIMA_MAX_WEIGHT || !Number.isFinite(stepped.value)) {
+      return unchanged;
+    }
+    if (delimiter && part.delimiter) {
+      adjustedGroups.set(target, stepped);
+    }
+    if (inherited.value === 0) {
+      // A zero ancestor satisfies a requested zero, but cannot represent any nonzero descendant.
+      if (stepped.value !== 0) {
+        return unchanged;
+      }
       continue;
     }
     const relativeSteps = stepped.steps !== null && inherited.steps !== null ? stepped.steps - inherited.steps : null;
@@ -458,10 +466,7 @@ const adjustAnimaAttention = (
       (relativeSteps === 0 || inherited.steps === 0 || Math.sign(relativeSteps) === Math.sign(inherited.steps!));
     const local = symbolic ? symbolicValue(relativeSteps!) : roundWeight(stepped.value / inherited.value);
     if (!Number.isFinite(local) || local < 0 || local > ANIMA_MAX_WEIGHT) {
-      continue;
-    }
-    if (delimiter && part.delimiter) {
-      adjustedGroups.set(target, stepped);
+      return unchanged;
     }
     if (local === part.weight) {
       continue;
