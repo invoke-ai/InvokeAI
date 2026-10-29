@@ -1275,7 +1275,10 @@ export const getComponentSectionPolicy = (
   return { ...policy, slots };
 };
 
-const getComponentPolicyContext = (model: GenerateModelConfig, settings: GenerateSettings): ComponentPolicyContext => ({
+export const getComponentPolicyContext = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings
+): ComponentPolicyContext => ({
   model,
   settings,
   selectedComponents: {
@@ -1320,6 +1323,9 @@ const COMPONENT_SETTING_LABELS: Record<GenerateComponentValueKey, string> = {
   componentSourceModel: 'Component source',
 };
 
+/** Every settings key that holds a component model. */
+export const GENERATE_COMPONENT_VALUE_KEYS = Object.keys(COMPONENT_SETTING_LABELS) as GenerateComponentValueKey[];
+
 /** The subjects a switch can report that are not component slots; a Record so a new subject cannot be left out. */
 const SWITCH_SETTING_SUBJECTS: Record<Exclude<GenerateModelSwitchSubject, GenerateComponentValueKey>, true> = {
   cfgRescale: true,
@@ -1335,7 +1341,7 @@ const SWITCH_SETTING_SUBJECTS: Record<Exclude<GenerateModelSwitchSubject, Genera
 
 /** Every subject a switch can report; the locale names each under `widgets.generate.switchSubjects`. */
 export const GENERATE_MODEL_SWITCH_SUBJECTS = [
-  ...Object.keys(COMPONENT_SETTING_LABELS),
+  ...GENERATE_COMPONENT_VALUE_KEYS,
   ...Object.keys(SWITCH_SETTING_SUBJECTS),
 ] as readonly GenerateModelSwitchSubject[];
 
@@ -1925,7 +1931,7 @@ const getSettingsWithCompatibleModelSelections = (
   const slotsByKey = new Map(policy.slots.map((slotPolicy) => [slotPolicy.key, slotPolicy]));
   const uiPolicy = getGenerationUiPolicy(model);
 
-  for (const key of Object.keys(COMPONENT_SETTING_LABELS) as GenerateComponentValueKey[]) {
+  for (const key of GENERATE_COMPONENT_VALUE_KEYS) {
     if (!nextSettings[key]) {
       continue;
     }
@@ -2084,7 +2090,7 @@ export const getGenerationModelAvailabilityIssues = (
     );
   }
 
-  for (const key of Object.keys(COMPONENT_SETTING_LABELS) as GenerateComponentValueKey[]) {
+  for (const key of GENERATE_COMPONENT_VALUE_KEYS) {
     const value = settings[key];
 
     if (value && !hasModelKey(models, value.key, value.type)) {

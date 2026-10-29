@@ -1917,6 +1917,24 @@ const LTX2_ENCODER = {
 };
 
 describe('LTX-2 policy', () => {
+  it('runs a GGUF build exactly like the single-file checkpoint, components from the folder', () => {
+    const checkpoint = ltx2('ltx2_distilled');
+    const gguf = ltx2('ltx2_distilled', { format: 'gguf_quantized', key: 'ltx2-distilled-gguf' });
+    const missingComponents = { ltx2TextEncoderModel: LTX2_ENCODER };
+    const complete = { componentSourceModel: LTX2_COMPONENTS, ltx2TextEncoderModel: LTX2_ENCODER };
+
+    expect(isSupportedVideoModel(gguf)).toBe(true);
+    expect(isVideoModelSelectable(gguf)).toBe(true);
+    expect(getDefaultVideoSettings(gguf, [LTX2_COMPONENTS, LTX2_ENCODER]).componentSourceModel?.key).toBe(
+      LTX2_COMPONENTS.key
+    );
+    expect(getVideoValidationReasons(gguf, settingsFor(gguf, missingComponents))).toEqual(
+      getVideoValidationReasons(checkpoint, settingsFor(checkpoint, missingComponents))
+    );
+    expect(getVideoValidationReasons(gguf, settingsFor(gguf, missingComponents))).not.toEqual([]);
+    expect(getVideoValidationReasons(gguf, settingsFor(gguf, complete))).toEqual([]);
+  });
+
   it('offers every conditioning shape on both checkpoints', () => {
     const modes = ['txt2vid', 'first-frame', 'last-frame', 'first-last', 'extend', 'audio-to-video', 'video-to-audio'];
 

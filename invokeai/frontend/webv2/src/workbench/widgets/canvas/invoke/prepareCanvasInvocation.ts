@@ -177,6 +177,7 @@ const createControlLayerCollector = (
           ...(typeof resolved.hash === 'string' ? { hash: resolved.hash } : {}),
         },
         modelCondInChannels: resolved.cond_in_channels,
+        modelControlArchitecture: resolved.control_architecture,
         weight: adapter.weight,
       });
       return true;
@@ -253,16 +254,19 @@ export const resolveRegionalReferenceImages = (
 };
 
 /**
- * Reject hosted-provider regions; resolve local references and skip unsupported/noncontributing local regions.
- * Join uploaded masks with captured prompt/reference metadata for graph inputs.
+ * Reject hosted-provider regions; resolve local references and skip unsupported/noncontributing local regions (on
+ * layout bases the region's settings name the reason). Join uploaded masks and their bounds with captured
+ * prompt/reference/layout metadata for graph inputs.
  */
 const createRegionalGuidanceCollector = (
   model: GenerateModelConfig
 ): {
   shouldComposite(layer: CanvasRegionalGuidanceLayerContract): boolean;
-  toGraphInputs(images: readonly { layerId: string; imageName: string }[]): RegionalGuidanceInput[];
+  toGraphInputs(
+    images: readonly { layerId: string; imageName: string; bounds: RegionalGuidanceInput['maskBounds'] }[]
+  ): RegionalGuidanceInput[];
 } => {
-  const metadata = new Map<string, Omit<RegionalGuidanceInput, 'maskImageName'>>();
+  const metadata = new Map<string, Omit<RegionalGuidanceInput, 'maskImageName' | 'maskBounds'>>();
 
   return {
     shouldComposite: (layer) => {
@@ -273,6 +277,7 @@ const createRegionalGuidanceCollector = (
       const rejection = getRegionalGuidanceRejectionReason({
         hasContent: true,
         layerName: layer.name,
+        layout: layer.layout,
         mainBase: model.base,
         negativePrompt: layer.negativePrompt,
         positivePrompt: layer.positivePrompt,
@@ -284,6 +289,8 @@ const createRegionalGuidanceCollector = (
       metadata.set(layer.id, {
         autoNegative: layer.autoNegative,
         id: layer.id,
+        // Typed against Generation's layout roles: a persisted role the graph cannot send fails to compile here.
+        ...(layer.layout ? { layout: layer.layout } : {}),
         negativePrompt: layer.negativePrompt,
         positivePrompt: layer.positivePrompt,
         referenceImages,
@@ -291,9 +298,9 @@ const createRegionalGuidanceCollector = (
       return true;
     },
     toGraphInputs: (images) =>
-      images.flatMap(({ imageName, layerId }) => {
+      images.flatMap(({ bounds, imageName, layerId }) => {
         const meta = metadata.get(layerId);
-        return meta ? [{ ...meta, maskImageName: imageName }] : [];
+        return meta ? [{ ...meta, maskBounds: bounds, maskImageName: imageName }] : [];
       }),
   };
 };

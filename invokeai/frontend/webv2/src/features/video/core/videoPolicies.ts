@@ -445,16 +445,17 @@ export const VIDEO_GENERATION: Record<
 export const SUPPORTED_VIDEO_BASES = Object.keys(VIDEO_GENERATION) as SupportedVideoBase[];
 
 /**
- * Supports Wan mains and H3 folder/checkpoint mains. H3 checkpoint variant owns task identity; a Diffusers source
- * supplies its remaining components.
+ * Supports Wan mains, H3 folder/checkpoint mains and LTX-2 folder/checkpoint/GGUF mains. A single-file main owns the
+ * task identity; a Diffusers source supplies its remaining components.
  */
 export const isSupportedVideoModel = <T extends { base: string; type: string; format?: string }>(
   model: T
 ): model is T & MainModelConfig =>
   model.type === 'main' &&
   (model.base === 'wan' ||
-    ((model.base === 'minimax-h3' || model.base === 'ltx-2') &&
-      (model.format === 'diffusers' || model.format === 'checkpoint')));
+    (model.base === 'minimax-h3' && (model.format === 'diffusers' || model.format === 'checkpoint')) ||
+    (model.base === 'ltx-2' &&
+      (model.format === 'diffusers' || model.format === 'checkpoint' || model.format === 'gguf_quantized')));
 
 /**
  * Select runnable identity-bearing models. Components-only and Ref2VA Diffusers folders remain supported for

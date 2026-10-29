@@ -863,7 +863,12 @@ export interface CanvasEngine {
 }
 
 export type * from './contracts';
-export { CANVAS_COLOR_LABELS, CANVAS_MAX_NODE_COUNT, CANVAS_MAX_NODE_DEPTH } from './contracts';
+export {
+  CANVAS_COLOR_LABELS,
+  CANVAS_MAX_NODE_COUNT,
+  CANVAS_MAX_NODE_DEPTH,
+  CANVAS_REGIONAL_LAYOUT_KINDS,
+} from './contracts';
 export type BooleanRasterOperation = 'intersect' | 'cutout' | 'cutaway' | 'exclude';
 export interface StagedPreviewPlacement extends Rect {
   opacity: number;

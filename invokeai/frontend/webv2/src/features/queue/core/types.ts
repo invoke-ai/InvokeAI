@@ -1,4 +1,5 @@
 import type {
+  GeneratePromptSubmission,
   QueuePromptSeedBehaviour,
   QueueSeedStep,
   QueueWorkflowBatchDatum,
@@ -58,23 +59,7 @@ export interface QueueEnqueueWorkflowRequest extends QueueEnqueueRequestBase {
   batchData?: QueueWorkflowBatchDatum[][];
 }
 
-export interface QueueEnqueueGenerateRequest extends QueueEnqueueRequestBase {
-  negativePrompt: string;
-  negativePromptNodeId: string;
-  positivePrompt: string;
-  positivePromptNodeId: string;
-  /**
-   * Prompts to submit as a batch dimension, already expanded by the caller.
-   * Absent or empty submits `positivePrompt` verbatim.
-   */
-  positivePrompts?: string[];
-  seed: number;
-  seedBehaviour?: QueuePromptSeedBehaviour;
-  seedNodeId: string;
-  seedStep: QueueSeedStep;
-  /** Legacy recovery maps the old random toggle to seedStep and preserves its expansion rules. */
-  legacySeedPlan?: true;
-}
+export interface QueueEnqueueGenerateRequest extends QueueEnqueueRequestBase, GeneratePromptSubmission {}
 
 export interface QueueEnqueueResult {
   batchId?: string;

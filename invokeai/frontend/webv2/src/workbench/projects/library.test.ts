@@ -345,10 +345,16 @@ describe('library mutations', () => {
   });
 
   it('deletes in this tab alone when Web Locks are unavailable, as on a plain-HTTP origin', async () => {
+    // A plain-HTTP origin has no navigator.locks; Node 24 defines one, so remove it explicitly.
+    vi.stubGlobal('navigator', {});
     projectLocks.acquireProjectMutationLock.mockResolvedValueOnce({ kind: 'unavailable' });
     api.deleteProject.mockResolvedValue(undefined);
 
-    await library.deleteLibraryProject('closed');
+    try {
+      await library.deleteLibraryProject('closed');
+    } finally {
+      vi.unstubAllGlobals();
+    }
 
     expect(api.deleteProject).toHaveBeenCalledWith('closed', expect.any(AbortSignal), 'release');
   });
@@ -370,6 +376,7 @@ describe('library mutations', () => {
   });
 
   it('still refuses without Web Locks while the project has journaled queue runs', async () => {
+    vi.stubGlobal('navigator', {});
     projectLocks.acquireProjectMutationLock.mockResolvedValueOnce({ kind: 'unavailable' });
     queueJournal.createAccountOwnedQueueRunJournal.mockResolvedValueOnce({
       close: vi.fn(),
@@ -377,7 +384,11 @@ describe('library mutations', () => {
       listForProject: vi.fn().mockResolvedValue({ entries: [{}], kind: 'available', removedCorrupt: 0 }),
     });
 
-    await expect(library.deleteLibraryProject('closed')).rejects.toMatchObject({ reason: 'active-runs' });
+    try {
+      await expect(library.deleteLibraryProject('closed')).rejects.toMatchObject({ reason: 'active-runs' });
+    } finally {
+      vi.unstubAllGlobals();
+    }
 
     expect(api.deleteProject).not.toHaveBeenCalled();
   });

@@ -60,6 +60,19 @@ anima_2_9b_int8 = StarterModel(
     dependencies=[anima_qwen3_encoder, anima_vae],
 )
 
+anima_turbo_gguf_q8_0 = StarterModel(
+    name="Anima Turbo 1.1 (GGUF, Q8_0)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/vanes430/Anima-Turbo-V1.1-GGUF/resolve/main/anima-turbo-v1.1-Q8_0.gguf",
+    description="Anima Turbo v1.1, the distilled version of Anima for fast generations, in a community Q8_0 "
+    "GGUF: about half the memory of the bf16 checkpoint. Recommended: 8-12 steps, CFG 1. "
+    f"{_DERIVATIVE_LICENSE} ~2.2GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=AnimaVariantType.Qwen3,
+    dependencies=[anima_qwen3_encoder, anima_vae],
+)
+
 anima_qwen3_5_encoder = StarterModel(
     name="Anima-3.8B Qwen3.5 4B Encoder",
     base=BaseModelType.Any,

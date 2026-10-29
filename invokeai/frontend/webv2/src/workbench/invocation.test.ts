@@ -608,6 +608,53 @@ describe('resolveInvocationRoute — canvas source', () => {
     expect(modelsLoadingRoute.validationReasons).toEqual([]);
   });
 
+  it('blocks MOSS-Image layout regions around a blank prompt before anything uploads', () => {
+    const mossModel: MainModelConfig = {
+      base: 'moss-image',
+      format: 'diffusers',
+      key: 'moss-model',
+      name: 'MOSS-Image',
+      type: 'main',
+    };
+    const region = (overrides: Partial<CanvasLayerContract> = {}): CanvasLayerContract =>
+      ({
+        autoNegative: false,
+        blendMode: 'normal',
+        id: 'region-1',
+        isEnabled: true,
+        isLocked: false,
+        mask: { bitmap: { height: 64, imageName: 'mask.png', width: 64 }, fill: { color: '#00ff00', style: 'solid' } },
+        name: 'Region 1',
+        negativePrompt: null,
+        opacity: 1,
+        positivePrompt: 'a shop sign',
+        referenceImages: [],
+        transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+        type: 'regional_guidance',
+        ...overrides,
+      }) as CanvasLayerContract;
+    const reasonsFor = (overrides: Partial<GenerateWidgetValues>, layers: CanvasLayerContract[]) =>
+      resolveInvocationRouteInput(
+        canvasInputFor({ generateValues: createGenerateValues(mossModel, overrides), layers }),
+        'global',
+        canvasRoute
+      ).validationReasons;
+
+    expect(reasonsFor({ positivePrompt: ' ' }, [region()])).toEqual([
+      'MOSS-Image needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.',
+    ]);
+    // A prompt template supplies the prompt the layout is built around.
+    const template = { id: 'poster', name: 'Poster', negativePrompt: '', positivePrompt: 'a vintage poster' };
+    expect(reasonsFor({ positivePrompt: '', promptTemplate: template }, [region()])).toEqual([]);
+    // Regions that never reach the layout leave a blank prompt alone.
+    const unplaced = [
+      region({ id: 'empty', mask: { bitmap: null, fill: { color: '#00ff00', style: 'solid' } } }),
+      region({ id: 'uncaptioned', positivePrompt: null }),
+      region({ id: 'disabled', isEnabled: false }),
+    ];
+    expect(reasonsFor({ positivePrompt: '' }, unplaced)).toEqual([]);
+  });
+
   it('treats the layer stack identity as part of the route input', () => {
     const input = canvasInputFor();
 

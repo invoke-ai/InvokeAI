@@ -1,4 +1,4 @@
-import { Portal, Stack, Text } from '@chakra-ui/react';
+import { Portal, Stack } from '@chakra-ui/react';
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import { useCallback, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -139,7 +139,16 @@ export const ConfirmDialog = ({
             </Dialog.Header>
             <Dialog.Body onKeyDown={handleBodyKeyDown}>
               <Stack gap="2">
-                {typeof text.body === 'string' ? <Text fontSize="md">{text.body}</Text> : text.body}
+                {/* A text body describes the dialog (`aria-describedby`), so the consequence is read when it opens. It
+                    keeps the body's look, not the description recipe's muted color and tighter `md` line height. A
+                    composed body names its own description. */}
+                {typeof text.body === 'string' ? (
+                  <Dialog.Description color="fg" fontSize="md" lineHeight="inherit">
+                    {text.body}
+                  </Dialog.Description>
+                ) : (
+                  text.body
+                )}
               </Stack>
             </Dialog.Body>
             <Dialog.Footer>

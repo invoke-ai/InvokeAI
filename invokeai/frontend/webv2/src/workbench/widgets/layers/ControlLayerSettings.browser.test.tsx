@@ -628,6 +628,38 @@ describe('ControlLayerSettings model', () => {
     expect(harness.memory).toEqual([]);
   });
 
+  it('offers both Qwen Image ControlNet designs on a Qwen Image model, and no other base', async () => {
+    harness.mainModel = { base: 'qwen-image', key: 'qwen-main', name: 'Qwen Image 2512', type: 'main' };
+    harness.models = [
+      model('Qwen Image ControlNet Union', 'controlnet', 'qwen-image'),
+      {
+        ...model('Qwen Image InstantX ControlNet Union', 'controlnet', 'qwen-image'),
+        control_architecture: 'instantx_union',
+      },
+      model('Z-Image ControlNet Union', 'controlnet', 'z-image'),
+    ];
+    await render({
+      ...createControlLayer({ base: 'qwen-image', id: 'control-1', name: 'Control Layer 1' }),
+      source: PHOTO,
+    });
+
+    await act(() => combobox('Model').click());
+    const group = page.getByRole('group', { name: 'Installed models' });
+    expect(
+      group
+        .getByRole('option')
+        .elements()
+        .map((option) => option.textContent)
+    ).toEqual([
+      expect.stringContaining('Qwen Image ControlNet Union'),
+      expect.stringContaining('Qwen Image InstantX ControlNet Union'),
+    ]);
+    await act(() => page.getByRole('option', { name: /^Qwen Image InstantX ControlNet Union/ }).click());
+    await settle();
+
+    expect(adapterOf(0)).toEqual({ kind: 'qwen_image_control', model: 'Qwen Image InstantX ControlNet Union' });
+  });
+
   it('says there is nothing to pick for a layer without a type when no model is installed', async () => {
     harness.models = [];
     await render(controlLayer({ source: PHOTO }));

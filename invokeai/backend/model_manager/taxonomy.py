@@ -114,6 +114,7 @@ class ModelType(str, Enum):
     ExternalImageGenerator = "external_image_generator"
     PiDDecoder = "pid_decoder"
     LTX2DurationHead = "ltx2_duration_head"
+    TinyAutoencoder = "tiny_autoencoder"
     Unknown = "unknown"
 
 

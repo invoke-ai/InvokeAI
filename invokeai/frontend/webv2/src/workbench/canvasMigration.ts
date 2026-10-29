@@ -17,6 +17,7 @@ import { createItemId } from '@platform/browser/randomUuid';
 import {
   CANVAS_MAX_NODE_COUNT,
   CANVAS_MAX_NODE_DEPTH,
+  CANVAS_REGIONAL_LAYOUT_KINDS,
   CONTROL_TYPES,
   LAYER_STACK_ORDER,
 } from '@workbench/canvas-engine/api';
@@ -277,6 +278,13 @@ const zCanvasLayer = z.discriminatedUnion('type', [
   zLayerBase.extend({
     autoNegative: z.boolean(),
     isHidden: z.boolean().optional(),
+    // A structurally broken layout role drops (the region reads as an object). A role this build does not know
+    // refuses the canvas instead: rewriting it as an object would replace the user's choice on the next autosave.
+    layout: z
+      .object({ kind: z.string(), text: z.string().optional() })
+      .optional()
+      .catch(undefined)
+      .pipe(z.object({ kind: z.enum(CANVAS_REGIONAL_LAYOUT_KINDS), text: z.string().optional() }).optional()),
     mask: zMask,
     negativePrompt: z.string().nullable(),
     positivePrompt: z.string().nullable(),

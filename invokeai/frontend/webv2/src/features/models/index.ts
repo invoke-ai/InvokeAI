@@ -33,7 +33,9 @@ export { getStarterModelInstallSources, type StarterInstallSource } from './ui/a
 export { ModelInstallRuntime } from './ui/ModelInstallRuntime';
 export { ModelsPage } from './ui/ModelsPage';
 export { openModelManager } from './ui/openModelManager';
+export type { CalibrationGraph, CalibrationGraphCompiler, WorkingMemoryCase } from './core/workingMemory';
 export {
+  CalibrationGraphCompilerProvider,
   ModelsUiProvider,
   useModelsUi,
   useOpenAddModelsSearch,

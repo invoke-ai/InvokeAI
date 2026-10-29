@@ -139,6 +139,7 @@ export {
   DYNAMIC_PROMPTS_MIN_PROMPTS,
   expandsDynamicPrompts,
   isDynamicPromptsSeedBehaviour,
+  planGenerateSubmission,
   sanitizeDynamicPromptsConfig,
   sanitizeMaxPrompts,
   sanitizeSampleSeed,
