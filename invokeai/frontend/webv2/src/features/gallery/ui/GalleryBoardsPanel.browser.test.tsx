@@ -187,7 +187,6 @@ const getRowsBySection = (): Record<string, string[]> => {
     ).map((row) =>
       (row.textContent ?? '')
         .replace(/\d+ \| \d+$/, '')
-        .replace('widgets.gallery.autoAddBadge', '')
         .replace('Alice Example', '')
         .trim()
     );
@@ -195,6 +194,14 @@ const getRowsBySection = (): Record<string, string[]> => {
 
   return result;
 };
+
+const AUTO_ADD_TARGET = '[role="img"][aria-label="widgets.gallery.autoAddTarget"]';
+
+/** Labels of the rows marked as where new results go. */
+const getAutoAddRows = (): string[] =>
+  getBoardRows()
+    .filter((row) => row.querySelector(AUTO_ADD_TARGET) !== null)
+    .map((row) => (row.textContent ?? '').replace(/\d+ \| \d+$/, '').trim());
 
 const getSearchInput = (): HTMLInputElement => {
   const input = host?.querySelector<HTMLInputElement>('input');
@@ -286,11 +293,7 @@ describe('GalleryBoardsPanel', () => {
     expect(sections.Library).toEqual(['Uncategorized', 'dogs', 'Cats']);
     expect(sections.Archived).toEqual(['GORL']);
     // Nothing chosen: new results go to the project's inbox, and only its row says so.
-    expect(
-      getBoardRows()
-        .filter((row) => row.textContent?.includes('widgets.gallery.autoAddBadge'))
-        .map((row) => row.textContent?.replace(/widgets\.gallery\.autoAddBadge.*$/, ''))
-    ).toEqual(['Inbox']);
+    expect(getAutoAddRows()).toEqual(['Inbox']);
   });
 
   it('lists other projects under their names only when they are shown', async () => {
@@ -685,7 +688,7 @@ describe('GalleryBoardsPanel', () => {
     expect(actions.updateSettings).toHaveBeenCalledWith({ expandedBoardSections: ['other-users'] });
   });
 
-  it('marks the inbox Auto when the followed selected board is one the caller may only view', async () => {
+  it('marks the inbox as the destination when the followed selected board is one the caller may only view', async () => {
     const shared = createBoard({
       access: { actions: ['read'], adminOverride: false, generalAccess: 'viewer', role: 'viewer' },
       id: 'refs',
@@ -698,24 +701,17 @@ describe('GalleryBoardsPanel', () => {
       selectedBoardId: 'refs',
     });
 
-    const inboxRow = getBoardRows().find((row) => row.textContent?.startsWith('Inbox'));
-    const sharedRow = getBoardRows().find((row) => row.textContent?.startsWith('Client references'));
-    expect(inboxRow?.textContent).toContain('widgets.gallery.autoAddBadge');
-    expect(sharedRow?.textContent).not.toContain('widgets.gallery.autoAddBadge');
+    // Only the inbox is marked, not the followed board that refuses results.
+    expect(getAutoAddRows()).toEqual(['Inbox']);
   });
 
   it('marks the board results go to as submissions decide it: a chosen board, else the inbox', async () => {
-    const autoRows = () =>
-      getBoardRows()
-        .filter((row) => row.textContent?.includes('widgets.gallery.autoAddBadge'))
-        .map((row) => row.textContent?.replace(/widgets\.gallery\.autoAddBadge.*$/, ''));
-
     await renderPanel(createGallery({ autoAddBoardId: 'dogs' }));
-    expect(autoRows()).toEqual(['dogs']);
+    expect(getAutoAddRows()).toEqual(['dogs']);
 
     // A chosen board no listing holds any more (deleted elsewhere) sends results to the inbox.
     await renderPanel(createGallery({ autoAddBoardId: 'gone' }));
-    expect(autoRows()).toEqual(['Inbox']);
+    expect(getAutoAddRows()).toEqual(['Inbox']);
   });
 
   it('persists a collapsed section', async () => {

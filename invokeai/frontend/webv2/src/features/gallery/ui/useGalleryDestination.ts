@@ -17,10 +17,10 @@ export interface GalleryDestination {
 
 /**
  * Where new results go, decided as submissions decide it (`getGalleryAutoAddBoardId` against the cached board
- * listings), for the surfaces that name it: the header's Saving to and the panel's Auto badge. A chosen board the
- * panel's listing lacks may be archived, so only then is the listing of archived boards read too; it is the one
- * submissions ensure, so the read is shared. Until it lands, or while the panel's own listing loads, the chosen board
- * is shown as chosen rather than refused.
+ * listings), for the surfaces that name it: the header's Saving to and the board list's destination marker. A chosen
+ * board the panel's listing lacks may be archived, so only then is the listing of archived boards read too; it is the
+ * one submissions ensure, so the read is shared. Until it lands, or while the panel's own listing loads, the chosen
+ * board is shown as chosen rather than refused.
  */
 export const useGalleryDestination = (
   view: Pick<GalleryStateView, 'boards' | 'projectBoardId' | 'selectedBoardId' | 'settings'>
