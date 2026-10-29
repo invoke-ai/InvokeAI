@@ -65,6 +65,16 @@ class TestIsQwen3VLEncoderStateDict:
         sd = {"model.visual.blocks.0.attn.qkv.weight": object()}
         assert _is_qwen3_vl_encoder_state_dict(sd) is False
 
+    def test_a_multimodal_qwen3_5_export_does_not_match(self) -> None:
+        # MOSS-Image's encoder (transformers `Qwen3_5Model`): a decoder and a visual tower, like Qwen3-VL,
+        # but with Gated DeltaNet layers, which no Qwen3-VL has -- whatever its depth.
+        sd = {
+            "language_model.layers.0.linear_attn.in_proj_qkv.weight": object(),
+            "language_model.layers.35.self_attn.q_proj.weight": object(),
+            "visual.blocks.0.attn.qkv.weight": object(),
+        }
+        assert _is_qwen3_vl_encoder_state_dict(sd) is False
+
     def test_ignores_non_string_keys(self) -> None:
         sd: dict = {0: object(), 1: object()}
         assert _is_qwen3_vl_encoder_state_dict(sd) is False

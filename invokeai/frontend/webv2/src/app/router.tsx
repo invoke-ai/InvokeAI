@@ -11,8 +11,10 @@ import {
   type Capabilities,
 } from '@features/identity';
 import {
+  CalibrationGraphCompilerProvider,
   ModelInstallRuntime,
   ModelsUiProvider,
+  type CalibrationGraphCompiler,
   type ModelsUiAdapter,
   type SchedulerPolicySource,
   type SchedulerPolicyState,
@@ -200,8 +202,18 @@ const requireLaunchpadCapability = async (capability: keyof Capabilities): Promi
   }
 };
 
+/** Loads Generate's compiler only once the Model Manager prepares a working-memory calibration. */
+const compileCalibrationGraphs: CalibrationGraphCompiler = (cases, models, signal) =>
+  import('./calibrationGraphs').then((module) => module.compileCalibrationGraphs(cases, models, signal));
+
+const LaunchpadRoute = () => (
+  <CalibrationGraphCompilerProvider compile={compileCalibrationGraphs}>
+    <Launchpad />
+  </CalibrationGraphCompilerProvider>
+);
+
 const launchpadRouteOptions = {
-  component: Launchpad,
+  component: LaunchpadRoute,
   getParentRoute: () => authenticatedRoute,
 };
 

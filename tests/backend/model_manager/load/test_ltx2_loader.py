@@ -31,69 +31,15 @@ from invokeai.backend.model_manager.load.model_loaders.ltx2 import (
 from invokeai.backend.model_manager.taxonomy import LTX2VariantType, SubModelType
 from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.quantization.nvfp4 import NVFP4Linear
+from tests.backend.model_manager.load.ltx2_transformer_fixture import (
+    TINY_TRANSFORMER,
+    official_name,
+    tiny_transformer_checkpoint,
+)
 from tests.fixtures.loader_seams import Seam, prepare
 from tests.fixtures.quantized_payloads import comfy_quant_marker, nvfp4_signed_tensors
 
 COMPUTE_DTYPE = torch.bfloat16
-
-# A one-block transformer with a 128-wide video stream (so an nvfp4 layer's 128-row tiles fit) and
-# a 32-wide audio stream.
-TINY_TRANSFORMER = {
-    **cc.LTX2_5_TRANSFORMER_CONFIG,
-    "in_channels": 4,
-    "out_channels": 4,
-    "num_attention_heads": 2,
-    "attention_head_dim": 64,
-    "cross_attention_dim": 32,
-    "audio_in_channels": 4,
-    "audio_out_channels": 4,
-    "audio_num_attention_heads": 2,
-    "audio_attention_head_dim": 16,
-    "audio_cross_attention_dim": 16,
-    "num_layers": 1,
-    "caption_channels": 8,
-}
-
-# diffusers attribute path -> official checkpoint spelling; ordered so a longer name is rewritten
-# before the shorter name it contains. Written independently of the loader's tables: the test is
-# that the loader's forward conversion lands every one of these back on the model.
-_TO_OFFICIAL = (
-    ("audio_time_embed.", "audio_adaln_single."),
-    ("time_embed.", "adaln_single."),
-    ("av_cross_attn_video_scale_shift", "av_ca_video_scale_shift_adaln_single"),
-    ("av_cross_attn_video_a2v_gate", "av_ca_a2v_gate_adaln_single"),
-    ("av_cross_attn_audio_scale_shift", "av_ca_audio_scale_shift_adaln_single"),
-    ("av_cross_attn_audio_v2a_gate", "av_ca_v2a_gate_adaln_single"),
-    ("video_a2v_cross_attn_scale_shift_table", "scale_shift_table_a2v_ca_video"),
-    ("audio_a2v_cross_attn_scale_shift_table", "scale_shift_table_a2v_ca_audio"),
-    ("audio_proj_in", "audio_patchify_proj"),
-    ("proj_in", "patchify_proj"),
-    ("norm_q", "q_norm"),
-    ("norm_k", "k_norm"),
-    ("audio_prompt_adaln.", "audio_prompt_adaln_single."),
-    ("prompt_adaln.", "prompt_adaln_single."),
-)
-_EXCLUSIVE = {"audio_time_embed.", "audio_proj_in", "audio_prompt_adaln."}
-
-
-def _official_name(diffusers_name: str, prefix: str = "model.diffusion_model.") -> str:
-    name = diffusers_name
-    for new, old in _TO_OFFICIAL:
-        if new in name:
-            name = name.replace(new, old, 1)
-            if new in _EXCLUSIVE:
-                break
-    return prefix + name
-
-
-def _tiny_transformer_checkpoint(
-    *, keyframe_embedding: bool = True, prefix: str = "model.diffusion_model."
-) -> dict[str, torch.Tensor]:
-    from diffusers import LTX2VideoTransformer3DModel
-
-    torch.manual_seed(0)
-    model = LTX2VideoTransformer3DModel(**{**TINY_TRANSFORMER, "use_keyframes_abs_pos_embedding": keyframe_embedding})
-    return {_official_name(k, prefix): v.detach().clone() for k, v in model.state_dict().items()}
 
 
 def _tiny_geometry(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -133,15 +79,13 @@ NVFP4_LAYER = "time_embed.emb.timestep_embedder.linear_1"  # official: adaln_sin
 
 
 def _int8_checkpoint() -> tuple[dict[str, torch.Tensor], torch.Tensor]:
-    sd = _tiny_transformer_checkpoint()
-    key = _official_name(f"{INT8_LAYER}.weight")
+    sd = tiny_transformer_checkpoint()
+    key = official_name(f"{INT8_LAYER}.weight")
     dense = sd[key]
     scale = dense.abs().amax(dim=1, keepdim=True) / 127.0
     sd[key] = torch.round(dense / scale).clamp(-127, 127).to(torch.int8)
-    sd[_official_name(f"{INT8_LAYER}.weight_scale")] = scale.float()
-    sd[_official_name(f"{INT8_LAYER}.comfy_quant")] = comfy_quant_marker(
-        {"format": "int8_tensorwise", "convrot": False}
-    )
+    sd[official_name(f"{INT8_LAYER}.weight_scale")] = scale.float()
+    sd[official_name(f"{INT8_LAYER}.comfy_quant")] = comfy_quant_marker({"format": "int8_tensorwise", "convrot": False})
     return sd, dense
 
 
@@ -150,7 +94,7 @@ def _room_was_made_before(run, step: str) -> bool:
 
 
 def test_a_dense_bf16_file_loads_every_tensor_reserving_before_the_cast(monkeypatch, tmp_path) -> None:
-    sd = _tiny_transformer_checkpoint()
+    sd = tiny_transformer_checkpoint()
     run = prepare(
         _transformer_seam(), monkeypatch, state_dict=sd, metadata={}, geometry=_tiny_geometry, observe=OBSERVED
     )
@@ -186,8 +130,8 @@ def test_an_int8_convrot_layer_stays_packed_under_its_renamed_path(monkeypatch, 
 
 
 def test_a_header_named_nvfp4_layer_stays_packed_under_its_renamed_path(monkeypatch, tmp_path) -> None:
-    sd = _tiny_transformer_checkpoint()
-    official = _official_name(f"{NVFP4_LAYER}.weight")
+    sd = tiny_transformer_checkpoint()
+    official = official_name(f"{NVFP4_LAYER}.weight")
     shape = tuple(sd.pop(official).shape)
     assert shape[0] % 128 == 0 and shape[1] % 64 == 0, "the toy layer must fit nvfp4's tiles"
     module_path = official[len("model.diffusion_model.") : -len(".weight")]
@@ -209,7 +153,7 @@ def test_a_header_named_nvfp4_layer_stays_packed_under_its_renamed_path(monkeypa
 
 
 def test_a_file_without_the_keyframe_embedding_builds_the_model_without_it(monkeypatch, tmp_path) -> None:
-    sd = _tiny_transformer_checkpoint(keyframe_embedding=False)
+    sd = tiny_transformer_checkpoint(keyframe_embedding=False)
     run = prepare(_transformer_seam(), monkeypatch, state_dict=sd, metadata={}, geometry=_tiny_geometry)
     model = run.load(_checkpoint_config(tmp_path, sd))
     assert model.config.use_keyframes_abs_pos_embedding is False
@@ -218,14 +162,14 @@ def test_a_file_without_the_keyframe_embedding_builds_the_model_without_it(monke
 
 def test_a_bare_key_file_loads_the_same_as_a_prefixed_one(monkeypatch, tmp_path) -> None:
     """Identification accepts both spellings, so the loader has to as well."""
-    sd = _tiny_transformer_checkpoint(prefix="")
+    sd = tiny_transformer_checkpoint(prefix="")
     run = prepare(_transformer_seam(), monkeypatch, state_dict=sd, metadata={}, geometry=_tiny_geometry)
     model = run.load(_checkpoint_config(tmp_path, sd))
     assert not any(p.is_meta for p in model.parameters())
 
 
 def test_bundled_component_tensors_are_ignored_not_refused(monkeypatch, tmp_path) -> None:
-    sd = _tiny_transformer_checkpoint()
+    sd = tiny_transformer_checkpoint()
     sd["vae.encoder.conv_in.conv.weight"] = torch.zeros(4, 4)
     sd["model.diffusion_model.video_embeddings_connector.learnable_registers"] = torch.zeros(4, 4)
     run = prepare(_transformer_seam(), monkeypatch, state_dict=sd, metadata={}, geometry=_tiny_geometry)
@@ -235,7 +179,7 @@ def test_bundled_component_tensors_are_ignored_not_refused(monkeypatch, tmp_path
 
 
 def test_a_header_declared_unsupported_format_is_refused_before_the_tensor_read(monkeypatch, tmp_path) -> None:
-    sd = _tiny_transformer_checkpoint()
+    sd = tiny_transformer_checkpoint()
     header = {"_quantization_metadata": json.dumps({"layers": {"x": {"format": "fp8_scaled"}}})}
     config = _checkpoint_config(tmp_path, sd, metadata=header)
     run = prepare(_transformer_seam(), monkeypatch, state_dict=sd, metadata=header, geometry=_tiny_geometry)
@@ -246,8 +190,8 @@ def test_a_header_declared_unsupported_format_is_refused_before_the_tensor_read(
 
 
 def test_undeclared_float8_weights_are_refused_by_name(monkeypatch, tmp_path) -> None:
-    sd = _tiny_transformer_checkpoint()
-    key = _official_name("transformer_blocks.0.attn1.to_v.weight")
+    sd = tiny_transformer_checkpoint()
+    key = official_name("transformer_blocks.0.attn1.to_v.weight")
     sd[key] = sd[key].to(torch.float8_e4m3fn)
     run = prepare(_transformer_seam(), monkeypatch, state_dict=sd, metadata={}, geometry=_tiny_geometry)
     with pytest.raises(ValueError, match="float8"):
@@ -587,8 +531,8 @@ def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_
     reaches the detector before it asks the cache for room. Here a key conversion stands between the
     pop and the reservation, and nothing but their order keeps them that way round.
     """
-    sd = _tiny_transformer_checkpoint()
-    target = _official_name(f"{NVFP4_LAYER}.weight")[: -len(".weight")]
+    sd = tiny_transformer_checkpoint()
+    target = official_name(f"{NVFP4_LAYER}.weight")[: -len(".weight")]
     rows, packed = sd[f"{target}.weight"].shape[0], sd[f"{target}.weight"].shape[1] // 2
     sd[f"{target}.weight"] = torch.zeros(rows, packed, dtype=torch.uint8)
     sd[f"{target}.weight_scale"] = torch.zeros(rows, packed // 8).to(torch.float8_e4m3fn)

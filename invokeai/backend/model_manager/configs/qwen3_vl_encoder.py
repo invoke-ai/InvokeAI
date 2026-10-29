@@ -13,6 +13,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     raise_if_not_dir,
     raise_if_not_file,
 )
+from invokeai.backend.model_manager.configs.qwen3_5_encoder import has_qwen3_5_linear_attention
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, Qwen3VLVariantType
 from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_unloaded_keys
@@ -194,8 +195,12 @@ def _is_qwen3_vl_encoder_state_dict(state_dict: dict[str | int, Any]) -> bool:
     """True for a single-file Qwen3-VL encoder: a Qwen3 text decoder PLUS a visual tower.
 
     The visual tower (``visual.*`` / ``model.visual.*``) distinguishes Qwen3-VL from the text-only
-    ``Qwen3Encoder`` (Z-Image / FLUX.2 Klein), which has ``model.layers.*`` but no visual tower.
+    ``Qwen3Encoder`` (Z-Image / FLUX.2 Klein), which has ``model.layers.*`` but no visual tower. Gated
+    DeltaNet (``linear_attn``) layers distinguish it from a multimodal Qwen3.5 export (MOSS-Image's
+    encoder), which has a ``language_model.layers.*`` decoder and a visual tower as well.
     """
+    if has_qwen3_5_linear_attention(state_dict):
+        return False
     str_keys = [k for k in state_dict if isinstance(k, str)]
     has_text_decoder = any(".layers." in k and ("model." in k or k.startswith("layers.")) for k in str_keys)
     has_visual_tower = any(k.startswith(("visual.", "model.visual.")) or ".visual." in k for k in str_keys)

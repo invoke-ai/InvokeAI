@@ -130,7 +130,7 @@ For example, for a SD1.5 main (pipeline) inpainting model in diffusers format, y
 
 #### `"expected_refusal"`
 
-For a model that identification recognizes and refuses, so the install fails with a reason (an `InvalidMatchError`), set this to a substring of that reason instead of giving `"expected_config_attrs"` (setting both fails the test). The test then expects no config and exactly one refusal, containing the substring.
+For a model that identification recognizes and refuses, so the install fails with a reason (an `InvalidMatchError`), set this to a substring of that reason instead of giving `"expected_config_attrs"` (setting both fails the test). The test then expects no config and exactly one refusal, containing the substring. This is for files that are recognised but unsupported, such as an LTX-2.3 transformer, which must not install as an unknown model.
 
 ```json
 {

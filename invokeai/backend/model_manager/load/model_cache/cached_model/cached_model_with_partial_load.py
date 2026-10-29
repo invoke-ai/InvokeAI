@@ -4,6 +4,7 @@ from typing import Iterator
 
 import torch
 
+from invokeai.backend.model_manager.load.model_cache.counted_dtypes import return_to_counted_dtypes
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
 from invokeai.backend.model_manager.load.model_cache.tensor_aliases import (
     StorageKey,
@@ -65,6 +66,10 @@ class CachedModelWithPartialLoad:
         self._aliases = aliases.groups
         self._state_dict_bytes = aliases.bytes_by_key
         self._total_bytes = sum(self._state_dict_bytes.values())
+        # The dtype each of those byte counts is in. A holder may cast weights in place (the SD VAE nodes upcast the
+        # VAE to fp32); the last unlock returns them to these dtypes (see `restore_counted_dtypes`), so between locks
+        # the bytes on each device are what `cur_vram_bytes()` and `total_bytes()` report.
+        self._state_dict_dtypes = {key: tensor.dtype for key, tensor in model_state_dict.items()}
         self._cur_vram_bytes: int | None = None
         self._modules_that_support_autocast = self._find_modules_that_support_autocast()
         self._keys_in_modules_that_do_not_support_autocast = self._find_keys_in_modules_that_do_not_support_autocast(
@@ -290,6 +295,15 @@ class CachedModelWithPartialLoad:
             if keys_to_repair:
                 self._cur_vram_bytes = None
         return repaired_required_tensors
+
+    def restore_counted_dtypes(self) -> None:
+        """Return every weight a holder cast in place to the dtype `cur_vram_bytes()` and `total_bytes()` count it in.
+
+        The cache calls this when the last lock ends (see `ModelCache._unpin`) and `return_to_counted_dtypes` does the
+        work. Weights keep their devices, so a VRAM count already taken stays true, unless a tied weight's names were
+        split across devices: they all get the tensor of the first name visited, on its device.
+        """
+        return_to_counted_dtypes(self._model, self._state_dict_dtypes, self._aliases, self._cpu_state_dict)
 
     def _load_state_dict_with_device_conversion(
         self, state_dict: dict[str, torch.Tensor], keys_to_convert: set[str], target_device: torch.device
