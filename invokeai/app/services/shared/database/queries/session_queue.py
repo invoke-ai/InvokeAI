@@ -497,6 +497,11 @@ _BATCH_ITEM_IDS = select(_Q.item_id).where(_IN_BATCH).order_by(_Q.item_id)
 _ACTIVE_WORK = (
     select(literal(1)).where(_Q.status.in_([literal("pending"), literal("in_progress")])).limit(fixed_limit(1))
 )
+# The unfinished items found by their status, the origin then tested on their rows: the read costs the queue's live
+# items, where the listing index would walk its whole history.
+_UNFINISHED_ORIGINS = select(_Q.origin).where(
+    _IN_QUEUE_UNINDEXED, _Q.status.in_([literal(status) for status in ACTIVE_QUEUE_STATUSES]), _origin_matches()
+)
 
 _THE_RECEIPT = and_(
     _R.queue_id == bindparam("queue_id"),
@@ -854,6 +859,12 @@ class SessionQueueQueries(QueryModule):
     def lineage(self, conn: Connection, queue_id: str, origin_prefix: str) -> Sequence[Row[Any]]:
         """Id, status, origin and retry source of the queue's items with the origin, in no order."""
         return conn.execute(_LINEAGE, {"queue_id": queue_id, "origin_pattern": like_prefix(origin_prefix)}).all()
+
+    @read
+    def unfinished_origins(self, conn: Connection, queue_id: str, origin_prefix: str) -> list[str]:
+        """The origin of each of the queue's items pending, in progress or waiting with the origin, in no order."""
+        parameters = {"queue_id": queue_id, "origin_pattern": like_prefix(origin_prefix)}
+        return list(conn.execute(_UNFINISHED_ORIGINS, parameters).scalars().all())
 
     @mapped(_summaries)
     @read

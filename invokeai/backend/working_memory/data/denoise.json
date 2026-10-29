@@ -1,0 +1,2253 @@
+{
+  "schema_version": 1,
+  "coefficients": [
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "values": {
+        "k_denoise_bf16": 266684,
+        "b_denoise_bf16": 0,
+        "k_denoise_fp16": 266684,
+        "b_denoise_fp16": 0,
+        "k_denoise_fp32": 459628,
+        "b_denoise_fp32": 0
+      },
+      "unmeasured_floor": {
+        "k_denoise_bf16": 262144,
+        "b_denoise_bf16": 1073741824,
+        "k_denoise_fp16": 262144,
+        "b_denoise_fp16": 1073741824,
+        "k_denoise_fp32": 262144,
+        "b_denoise_fp32": 1073741824
+      },
+      "provenance": "The Z-Image transformer forward's lines, bytes per attended token plus a base, per dtype. RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA. Measured by scripts/calibrate_z_image_working_memory.py on 2026-10-18: bf16, fp16 and fp32 at 512, 768, 1024, 1440 and 2048px with a 512-token caption, and at 1024 and 1440px with a 77-token one, 21 plain forwards on a random-init transformer of the real geometry (memory does not depend on weight values) with 2 main blocks and one refiner block each, one fresh process per point with the server's runtime, demand_peak (the largest of the driver, reserved and allocated peak) of the larger of a cold and a warm forward. Fitted by scripts/working_memory/build_shipped.py: working_memory/fit.py's upper envelope of the points below, plus 5%. 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB, cudaMallocAsync). bf16 and fp16 measured identical; fp32 needs about 1.7 times as much per token. Every line runs through the origin: no point needs a base. Where this entry prices a platform nothing is measured on (MPS, XPU, the CPU, or cuDNN with expandable segments), each value is floored at the legacy constants the node reserved by hand, 0.25 MiB per attended token and a 1 GiB base for every dtype: the fit describes the card its points were measured on, not the platforms it stands in for."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "values": {
+        "k_denoise_bf16": 189236,
+        "b_denoise_bf16": 9437184,
+        "k_denoise_fp16": 189236,
+        "b_denoise_fp16": 9437184,
+        "k_denoise_fp32": 341719,
+        "b_denoise_fp32": 0
+      },
+      "provenance": "The Z-Image transformer forward's lines, bytes per attended token plus a base, per dtype. RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync, fused SDPA. Measured by scripts/calibrate_z_image_working_memory.py on 2026-10-18: bf16, fp16 and fp32 at 512, 768, 1024, 1440 and 2048px with a 512-token caption, and at 1024 and 1440px with a 77-token one, 21 plain forwards on a random-init transformer of the real geometry (memory does not depend on weight values) with 2 main blocks and one refiner block each, one fresh process per point with the server's runtime, demand_peak (the largest of the driver, reserved and allocated peak) of the larger of a cold and a warm forward. Fitted by scripts/working_memory/build_shipped.py: working_memory/fit.py's upper envelope of the points below, plus 5%. 4 main blocks measured no more at 1024px bf16 (768 MiB against 800 MiB). The real 30-block Z-Image Turbo in a running server measured below this line: 2176 MiB of demand at 15424 tokens in bf16, which it prices at 2793 MiB (calibration probe windows, kept as evidence and not shipped)."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "values": {
+        "k_denoise_bf16": 262144,
+        "b_denoise_bf16": 1073741824,
+        "k_denoise_fp16": 262144,
+        "b_denoise_fp16": 1073741824,
+        "k_denoise_fp32": 262144,
+        "b_denoise_fp32": 1073741824
+      },
+      "legacy": true,
+      "provenance": "Legacy, not a fit, for every OS but Windows, which has its own entry: Linux ROCm with the native allocator is not measured. The constants the Z-Image denoise node reserved by hand, 0.25 MiB per attended token and a 1 GiB base, the same for every dtype, derived from peak reserved memory in bf16 on an RTX 4090 with a 512-token caption (scripts/calibrate_z_image_working_memory.py): 0.99 GiB at 1024px, 1.96 GiB at 1440px and 3.85 GiB at 2048px, 0.22 to 0.23 MB per token. They cover bf16 and fp16 on every platform measured since, but not fp32 from 1440px up: every measured fp32 line is steeper (the RX 9060 XT with the native allocator on Windows measured 6.9 GiB at 2048px, which these constants price at 5.1 GiB)."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "values": {
+        "k_denoise_bf16": 267790,
+        "b_denoise_bf16": 233832448,
+        "k_denoise_fp16": 267790,
+        "b_denoise_fp16": 271581184,
+        "k_denoise_fp32": 495266,
+        "b_denoise_fp32": 42991616
+      },
+      "unmeasured_floor": {
+        "k_denoise_bf16": 262144,
+        "b_denoise_bf16": 1073741824,
+        "k_denoise_fp16": 262144,
+        "b_denoise_fp16": 1073741824,
+        "k_denoise_fp32": 262144,
+        "b_denoise_fp32": 1073741824
+      },
+      "provenance": "Windows only; every other OS keeps its own entry. The Z-Image transformer forward's lines, bytes per attended token plus a base, per dtype. RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Measured by scripts/calibrate_z_image_working_memory.py on 2026-10-18: bf16, fp16 and fp32 at 512, 768, 1024, 1440 and 2048px with a 512-token caption, and at 1024 and 1440px with a 77-token one, 21 plain forwards on a random-init transformer of the real geometry (memory does not depend on weight values) with 2 main blocks and one refiner block each, one fresh process per point with the server's runtime, demand_peak (the largest of the driver, reserved and allocated peak) of the larger of a cold and a warm forward. Fitted by scripts/working_memory/build_shipped.py: working_memory/fit.py's upper envelope of the points below, plus 5%. 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, expandable segments). The base carries the ~250 MiB a process's first forward maps beyond its second (585 against 334 MiB at 512px bf16). Where this entry prices a platform nothing is measured on (MIOpen under hipMallocAsync on Windows), each value is floored at the legacy constants the node reserved by hand, 0.25 MiB per attended token and a 1 GiB base for every dtype: the fit describes the card its points were measured on, not the platform it stands in for."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "values": {
+        "k_denoise_bf16": 167383,
+        "b_denoise_bf16": 269484032,
+        "k_denoise_fp16": 167383,
+        "b_denoise_fp16": 306184192,
+        "k_denoise_fp32": 318260,
+        "b_denoise_fp32": 134217728
+      },
+      "provenance": "Windows only, where expandable segments are Invoke's ROCm default. The Z-Image transformer forward's lines, bytes per attended token plus a base, per dtype. RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True, MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Measured by scripts/calibrate_z_image_working_memory.py on 2026-10-18: bf16, fp16 and fp32 at 512, 768, 1024, 1440 and 2048px with a 512-token caption, and at 1024 and 1440px with a 77-token one, 21 plain forwards on a random-init transformer of the real geometry (memory does not depend on weight values) with 2 main blocks and one refiner block each, one fresh process per point with the server's runtime, demand_peak (the largest of the driver, reserved and allocated peak) of the larger of a cold and a warm forward. Fitted by scripts/working_memory/build_shipped.py: working_memory/fit.py's upper envelope of the points below, plus 5%. 4 main blocks measured the same at 1024px bf16 (937 MiB). The base carries the ~255 MiB a process's first forward maps beyond its second (477 against 222 MiB at 512px bf16). The real 30-block Z-Image Turbo in a running server measured below this line: 686 MiB of demand at 4128 tokens in bf16, which it prices at 1066 MiB (calibration probe windows, kept as evidence and not shipped)."
+    }
+  ],
+  "points": [
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 1024,
+        "text_tokens": 512,
+        "tokens": 1536,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 367001600,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 2304,
+        "text_tokens": 512,
+        "tokens": 2816,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 645922816,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 512,
+        "tokens": 4608,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1077936128,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 512,
+        "tokens": 8640,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2118123520,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 16384,
+        "text_tokens": 512,
+        "tokens": 16896,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 4148166656,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 96,
+        "tokens": 4192,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1050673152,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 96,
+        "tokens": 8224,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2088763392,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 1024,
+        "text_tokens": 512,
+        "tokens": 1536,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 367001600,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 2304,
+        "text_tokens": 512,
+        "tokens": 2816,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 645922816,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 512,
+        "tokens": 4608,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1077936128,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 512,
+        "tokens": 8640,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2118123520,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 16384,
+        "text_tokens": 512,
+        "tokens": 16896,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 4148166656,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 96,
+        "tokens": 4192,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1050673152,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 96,
+        "tokens": 8224,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2088763392,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 1024,
+        "text_tokens": 512,
+        "tokens": 1536,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 624951296,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 2304,
+        "text_tokens": 512,
+        "tokens": 2816,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1101004800,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 512,
+        "tokens": 4608,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1881145344,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 512,
+        "tokens": 8640,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 3667918848,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 16384,
+        "text_tokens": 512,
+        "tokens": 16896,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 7266631680,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 96,
+        "tokens": 4192,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1835008000,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 96,
+        "tokens": 8224,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 3579838464,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, no allocator configuration (the native allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 1024,
+        "text_tokens": 512,
+        "tokens": 1536,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 285212672,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 2304,
+        "text_tokens": 512,
+        "tokens": 2816,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 452984832,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 512,
+        "tokens": 4608,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 838860800,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 512,
+        "tokens": 8640,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1426063360,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 16384,
+        "text_tokens": 512,
+        "tokens": 16896,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2969567232,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 96,
+        "tokens": 4192,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 754974720,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 96,
+        "tokens": 8224,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1409286144,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 1024,
+        "text_tokens": 512,
+        "tokens": 1536,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 285212672,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 2304,
+        "text_tokens": 512,
+        "tokens": 2816,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 452984832,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 512,
+        "tokens": 4608,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 838860800,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 512,
+        "tokens": 8640,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1426063360,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 16384,
+        "text_tokens": 512,
+        "tokens": 16896,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2785017856,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 96,
+        "tokens": 4192,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 754974720,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 96,
+        "tokens": 8224,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1459617792,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 1024,
+        "text_tokens": 512,
+        "tokens": 1536,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 446693376,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 2304,
+        "text_tokens": 512,
+        "tokens": 2816,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 916455424,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 512,
+        "tokens": 4608,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1352663040,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 512,
+        "tokens": 8640,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2627731456,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 16384,
+        "text_tokens": 512,
+        "tokens": 16896,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 5077204992,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 96,
+        "tokens": 4192,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1319108608,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 96,
+        "tokens": 8224,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2550136832,
+      "method": "demand_peak",
+      "device": "RTX 4090",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RTX 4090, torch 2.13.0+cu130, Windows, PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync (the cudaMallocAsync allocator), fused SDPA; MIOPEN_FIND_MODE, AOTriton and the ROCm SDPA guard are ROCm's and do not apply. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured no more at 1024px bf16 on this card (768 MiB against 800 MiB with 2, under cudaMallocAsync). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 1024,
+        "text_tokens": 512,
+        "tokens": 1536,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 500629504,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 2304,
+        "text_tokens": 512,
+        "tokens": 2816,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 689373184,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 512,
+        "tokens": 4608,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 982974464,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 512,
+        "tokens": 8640,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1633091584,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 16384,
+        "text_tokens": 512,
+        "tokens": 16896,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2618753024,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 96,
+        "tokens": 4192,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 857145344,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 96,
+        "tokens": 8224,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1507262464,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 1024,
+        "text_tokens": 512,
+        "tokens": 1536,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 536346624,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 2304,
+        "text_tokens": 512,
+        "tokens": 2816,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 725090304,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 512,
+        "tokens": 4608,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1018691584,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 512,
+        "tokens": 8640,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1668808704,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 16384,
+        "text_tokens": 512,
+        "tokens": 16896,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2654470144,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 96,
+        "tokens": 4192,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 892862464,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 96,
+        "tokens": 8224,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1542979584,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 1024,
+        "text_tokens": 512,
+        "tokens": 1536,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 593362944,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 2304,
+        "text_tokens": 512,
+        "tokens": 2816,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 949878784,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 512,
+        "tokens": 4608,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1432223744,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 512,
+        "tokens": 8640,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2627600384,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 16384,
+        "text_tokens": 512,
+        "tokens": 16896,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 5249040384,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 96,
+        "tokens": 4192,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1355415552,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 96,
+        "tokens": 8224,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2257190912,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (expandable segments), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 1024,
+        "text_tokens": 512,
+        "tokens": 1536,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 613875712,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 2304,
+        "text_tokens": 512,
+        "tokens": 2816,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 892796928,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 512,
+        "tokens": 4608,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1324810240,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 512,
+        "tokens": 8640,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2341928960,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 16384,
+        "text_tokens": 512,
+        "tokens": 16896,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 4501995520,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 96,
+        "tokens": 4192,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1291255808,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 96,
+        "tokens": 8224,
+        "dtype": "bf16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2308374528,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 1024,
+        "text_tokens": 512,
+        "tokens": 1536,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 649592832,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 2304,
+        "text_tokens": 512,
+        "tokens": 2816,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 928514048,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 512,
+        "tokens": 4608,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1360527360,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 512,
+        "tokens": 8640,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2377646080,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 16384,
+        "text_tokens": 512,
+        "tokens": 16896,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 4537712640,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 96,
+        "tokens": 4192,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1326972928,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 96,
+        "tokens": 8224,
+        "dtype": "fp16",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2344091648,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 1024,
+        "text_tokens": 512,
+        "tokens": 1536,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 765329408,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 2304,
+        "text_tokens": 512,
+        "tokens": 2816,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1258160128,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 512,
+        "tokens": 4608,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2036203520,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 512,
+        "tokens": 8640,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 3802005504,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 16384,
+        "text_tokens": 512,
+        "tokens": 16896,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 7383941120,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 4096,
+        "text_tokens": 96,
+        "tokens": 4192,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2018115584,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.z_image",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "image_tokens": 8128,
+        "text_tokens": 96,
+        "tokens": 8224,
+        "dtype": "fp32",
+        "control_blocks": 0,
+        "has_attention_mask": false,
+        "regional_bias_bytes": 0,
+        "score_matrix_bytes": 0,
+        "lora_count": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 3721003008,
+      "method": "demand_peak",
+      "device": "RX 9060 XT (gfx1200)",
+      "provenance": "scripts/calibrate_z_image_working_memory.py, 2026-10-18: RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Random-init Z-Image transformer with the real geometry (memory does not depend on weight values), 2 main blocks and one refiner block each; 4 main blocks measured the same at 1024px bf16 on this card (937 MiB, under expandable segments). demand_peak: the largest of the driver, reserved and allocated peak over the baseline, the larger of a cold and a warm forward, one fresh process per point with the server's runtime; no failed allocation, allocator retry or spill."
+    }
+  ]
+}

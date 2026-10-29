@@ -6,7 +6,7 @@ the image's (one per 16x16 pixels) and the prompt's. The coefficient and the poi
 """
 
 from collections.abc import Mapping
-from typing import cast
+from typing import Optional, cast
 
 import torch
 
@@ -14,17 +14,36 @@ from invokeai.backend.moss_image.pipeline_moss_image import MOSSImageTransformer
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.working_memory.estimate import FeatureValue, WorkingMemoryEstimate, WorkingMemoryTerm
+from invokeai.backend.working_memory.fit import Line
 from invokeai.backend.working_memory.spec import EstimatorSpec, register
 
 # One transformer token per 2x2 patch of the FLUX.2 VAE's 8x latent.
 MOSS_IMAGE_TOKEN_SCALE = 16
 
 
-def _denoise_terms(features: Mapping[str, FeatureValue], values: Mapping[str, float]) -> tuple[WorkingMemoryTerm, ...]:
+def _tokens(features: Mapping[str, FeatureValue]) -> int:
     image_tokens = (cast(int, features["height"]) // MOSS_IMAGE_TOKEN_SCALE) * (
         cast(int, features["width"]) // MOSS_IMAGE_TOKEN_SCALE
     )
-    tokens = image_tokens + cast(int, features["text_tokens"])
+    return image_tokens + cast(int, features["text_tokens"])
+
+
+def _line(features: Mapping[str, FeatureValue]) -> Optional[Line]:
+    """The forward's line, `token` over the attended tokens. Only the plain forward fits it: a fused SDPA kernel and a
+    dense build, every analytic term zero. The label names the size, the prompt's tokens and each analytic term that
+    is not zero, in bytes.
+
+    The shipped entry carries the slope alone (`k_token`), no base, so the line is not one it carries and the shipped
+    fit leaves it out (`fit.hand_set_values`): the slope is hand-set until a fitted base ships with it."""
+    if not all(isinstance(features.get(name), int) for name in ("height", "width", "text_tokens")):
+        return None
+    on_top = [f"{name}={features[name]}" for name in ("score_matrix_bytes", "dequant_bytes") if features.get(name)]
+    shape = f"{features['height']}x{features['width']}-text{features['text_tokens']}"
+    return Line("token", _tokens(features), not on_top, "-".join((shape, *on_top)))
+
+
+def _denoise_terms(features: Mapping[str, FeatureValue], values: Mapping[str, float]) -> tuple[WorkingMemoryTerm, ...]:
+    tokens = _tokens(features)
     return (
         WorkingMemoryTerm.fitted("activations", "k_token", tokens, values),
         # Analytic: zero on a fused SDPA kernel, the materialized score matrices where the build has none.
@@ -44,6 +63,7 @@ MOSS_IMAGE_DENOISE_SPEC = register(
         # shapes is what does, and the analytic score-matrix term prices that.
         platform_keys=(),
         terms=_denoise_terms,
+        line=_line,
     )
 )
 

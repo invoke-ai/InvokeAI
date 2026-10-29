@@ -19,7 +19,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
 from invokeai.backend.model_manager.load.model_loaders import ideogram4
 from invokeai.backend.model_manager.load.model_loaders.ideogram4 import Ideogram4GGUFModel
 from invokeai.backend.model_manager.taxonomy import SubModelType
-from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.gguf.ggml_tensor import HOST_DEQUANT_PEAK_COPIES, GGMLTensor
 from tests.backend.model_manager.load.ideogram4_gguf_fixture import (
     TINY_CONFIG,
     Packs,
@@ -137,17 +137,23 @@ def test_the_load_reserves_the_model_as_it_will_be_held(monkeypatch, tmp_path, p
     """One absolute reservation: `make_room` makes that much room rather than adding to the file-size
     reservation the framework made before the loader ran, so reserving only what dequantizing adds
     would evict nothing. It covers every weight as the model ends up holding it -- packed or
-    unpacked -- plus the largest unpacked tensor, which is briefly held twice while it is replaced.
+    unpacked -- plus what replacing one tensor holds beside its result: its packed original, which lives until
+    the result lands, and for a quantized one the kernels' temporaries while its rows decode a slice at a time
+    (the fixture's tensors are each smaller than one slice).
     """
     model, _, run = _load(monkeypatch, tmp_path, packs)
+    stored = {tensor.name: tensor for tensor in gguf.GGUFReader(tmp_path / "ideogram4-transformer-q8_0.gguf").tensors}
     held = {
         name: param.data.quantized_data.nbytes
         if isinstance(param.data, GGMLTensor)
         else param.numel() * param.element_size()
         for name, param in model.named_parameters()
     }
-    largest_unpacked = max(
-        size for name, size in held.items() if not isinstance(model.get_parameter(name).data, GGMLTensor)
+    unquantized = {gguf.GGMLQuantizationType.F32, gguf.GGMLQuantizationType.F16, gguf.GGMLQuantizationType.BF16}
+    in_flight = max(
+        int(stored[name].n_bytes) + (0 if stored[name].tensor_type in unquantized else HOST_DEQUANT_PEAK_COPIES * size)
+        for name, size in held.items()
+        if not isinstance(model.get_parameter(name).data, GGMLTensor)
     )
 
-    assert run.reserved == [sum(held.values()) + largest_unpacked]
+    assert run.reserved == [sum(held.values()) + in_flight]

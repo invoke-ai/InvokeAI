@@ -313,6 +313,10 @@
           "qwen3EncoderModel",
           "vae"
         ],
+        "qwen3-gguf": [
+          "qwen3EncoderModel",
+          "vae"
+        ],
         "qwen35": [
           "qwen35EncoderModel",
           "qwen3EncoderModel",
