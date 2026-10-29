@@ -190,6 +190,7 @@ from invokeai.backend.model_manager.starter_models.ltx_2 import (
     ltx2_5_duration_head,
     ltx2_5_prompt_enhancer,
     ltx2_5_text_encoder_bf16,
+    ltx2_5_text_encoder_gguf_q4_k_m,
     ltx2_5_text_encoder_int8,
 )
 from invokeai.backend.model_manager.starter_models.minimax_h3 import (
@@ -540,6 +541,7 @@ STARTER_MODELS: list[StarterModel] = [
     ltx2_5_dev_transformer_bf16,
     ltx2_5_text_encoder_int8,
     ltx2_5_text_encoder_bf16,
+    ltx2_5_text_encoder_gguf_q4_k_m,
     ltx2_5_components,
     ltx2_5_prompt_enhancer,
     ltx2_5_duration_head,

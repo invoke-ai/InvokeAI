@@ -116,7 +116,11 @@ def test_minimax_h3_bundle_models_are_registered_in_starter_models() -> None:
 def test_the_ltx2_gguf_transformers_pull_the_components_and_the_encoder() -> None:
     """A GGUF build holds only the transformer, as the int8 single files do: installing one has to pull the component
     folder and the Gemma-4 encoder it cannot run without, both installable starters themselves."""
-    gguf = [m for m in STARTER_MODELS if m.base is BaseModelType.LTX2 and m.format is ModelFormat.GGUFQuantized]
+    gguf = [
+        m
+        for m in STARTER_MODELS
+        if m.base is BaseModelType.LTX2 and m.type is ModelType.Main and m.format is ModelFormat.GGUFQuantized
+    ]
     starter_sources = {m.source for m in STARTER_MODELS}
 
     assert {m.variant for m in gguf} == {LTX2VariantType.Dev, LTX2VariantType.Distilled}
