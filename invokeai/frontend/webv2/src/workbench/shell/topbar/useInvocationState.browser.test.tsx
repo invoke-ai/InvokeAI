@@ -144,7 +144,9 @@ const Probe = (): ReactNode => {
       <span data-batch-count={state.batchCount} data-testid="reasons">
         {state.issues.map((issue) => issue.message).join(' | ')}
       </span>
-      <span data-testid="issue-layers">{state.issues.map((issue) => issue.layerId ?? '-').join(' | ')}</span>
+      <span data-testid="issue-layers">
+        {state.issues.map(({ target }) => (target.kind === 'layer' ? target.layerId : '-')).join(' | ')}
+      </span>
       <button data-testid="invoke-front" type="button" onClick={() => void state.invoke({ prepend: true })}>
         Invoke front
       </button>
@@ -203,13 +205,13 @@ describe('useInvocationState and the workflow node templates', () => {
       )
     );
 
-    expect(blockingReasons()).toContain('Node definitions are still loading.');
+    expect(blockingReasons()).toContain('nodes.readiness.templatesLoading');
 
     await act(() => {
       templates.set({ error: null, status: 'loaded', templates: {} });
     });
 
-    expect(blockingReasons()).not.toContain('Node definitions are still loading.');
+    expect(blockingReasons()).not.toContain('nodes.readiness.templatesLoading');
   });
 
   it("reports the workflow widget's own iteration count for a workflow route", async () => {

@@ -2,7 +2,7 @@ import type { ListRowProps } from '@platform/ui/list/List';
 import type { ListSection } from '@platform/ui/list/listRows';
 import type { HotkeyCategory, HotkeyDefinition } from '@workbench/hotkeys';
 
-import { Badge, HStack, Icon, Input, InputGroup, Kbd, Stack, Text } from '@chakra-ui/react';
+import { HStack, Icon, Input, InputGroup, Kbd, Stack, Text } from '@chakra-ui/react';
 import { Button, IconButton } from '@platform/ui';
 import { EmptyState } from '@platform/ui/EmptyState';
 import { List } from '@platform/ui/list/List';
@@ -11,6 +11,7 @@ import { ModifiedSettingIndicator } from '@platform/ui/settings/ModifiedSettingI
 import {
   firstPartyHotkeyCatalog,
   formatHotkeyForPlatform,
+  mergeHotkeyCatalog,
   normalizeHotkeyString,
   eventToHotkeyString,
   useExtensionHotkeyDefinitions,
@@ -22,6 +23,15 @@ import { Fragment, useCallback, useDeferredValue, useEffect, useMemo, useState }
 import { useTranslation } from 'react-i18next';
 
 type HotkeyConflict = { hotkey: HotkeyDefinition; title: string };
+
+/** The scope a binding answers in, named for the shadowing note: a widget's label, or the focused panel. */
+const SCOPE_LABEL_KEYS: Record<HotkeyCategory, string> = {
+  app: 'hotkeys.scopes.focusedPanel',
+  canvas: 'hotkeys.categories.canvas',
+  gallery: 'hotkeys.categories.gallery',
+  viewer: 'hotkeys.categories.viewer',
+  workflows: 'hotkeys.categories.workflows',
+};
 
 interface HotkeyEntry {
   hotkey: HotkeyDefinition;
@@ -74,6 +84,14 @@ const getScopeRank = (hotkey: HotkeyDefinition): number => {
   return 100;
 };
 
+/**
+ * Same key, narrower scope: while its widget (or panel) has focus, `narrow` takes the key from `broad`. Not a conflict
+ * either way, since each still works elsewhere, but worth saying on both rows.
+ */
+const shadows = (narrow: HotkeyDefinition, broad: HotkeyDefinition): boolean =>
+  getScopeRank(narrow) > getScopeRank(broad) &&
+  (broad.scope.kind === 'global' || broad.scope.kind === 'focused-region');
+
 const canScopesOverlap = (left: HotkeyDefinition, right: HotkeyDefinition): boolean => {
   if (getScopeRank(left) !== getScopeRank(right)) {
     return false;
@@ -115,10 +133,6 @@ const buildConflictMap = (
   const conflicts = new Map<string, HotkeyConflict[]>();
 
   for (const hotkey of catalog) {
-    if (hotkey.implemented === false) {
-      continue;
-    }
-
     const effectiveKeys = normalizeKeys(customHotkeys[hotkey.id] ?? hotkey.defaultKeys);
 
     for (const key of effectiveKeys) {
@@ -185,7 +199,7 @@ export const HotkeysSettingsSection = () => {
   const extensionHotkeys = useExtensionHotkeyDefinitions();
   const [searchTerm, setSearchTerm] = useState('');
   const deferredSearchTerm = useDeferredValue(searchTerm);
-  const catalog = useMemo(() => [...firstPartyHotkeyCatalog, ...extensionHotkeys], [extensionHotkeys]);
+  const catalog = useMemo(() => mergeHotkeyCatalog(firstPartyHotkeyCatalog, extensionHotkeys), [extensionHotkeys]);
   const rows = useMemo(
     () =>
       listRowsFromSections(buildSections({ catalog, customHotkeys, searchTerm: deferredSearchTerm, t }), getEntryKey),
@@ -303,12 +317,12 @@ const HotkeyListRow = ({
   const isEditing = editingIndex !== null;
   const isDirty = draftKeys.join('\n') !== effectiveKeys.join('\n');
   const hasDuplicate = new Set(draftKeys).size !== draftKeys.length;
-  const conflict =
-    hotkey.implemented === false
-      ? undefined
-      : draftKeys
-          .flatMap((key) => conflictMap.get(key) ?? [])
-          .find((entry) => entry.hotkey.id !== hotkey.id && canScopesOverlap(hotkey, entry.hotkey));
+  const sameKey = draftKeys
+    .flatMap((key) => conflictMap.get(key) ?? [])
+    .filter((entry) => entry.hotkey.id !== hotkey.id);
+  const conflict = sameKey.find((entry) => canScopesOverlap(hotkey, entry.hotkey));
+  const shadowed = sameKey.find((entry) => shadows(hotkey, entry.hotkey));
+  const shadowedBy = sameKey.find((entry) => shadows(entry.hotkey, hotkey));
   const canSave = !hasDuplicate && !conflict && (isDirty || isEditing);
   const defaultKeys = normalizeKeys(hotkey.defaultKeys);
   const isModified =
@@ -366,11 +380,6 @@ const HotkeyListRow = ({
           <Text color="fg" fontSize="lg" fontWeight="600" truncate>
             {getHotkeyTitle(hotkey)}
           </Text>
-          {hotkey.implemented === false ? (
-            <Badge colorPalette="gray" variant="surface">
-              {t('hotkeys.pending')}
-            </Badge>
-          ) : null}
           {isModified ? <ModifiedSettingIndicator label={getHotkeyTitle(hotkey)} /> : null}
         </HStack>
         <Text color="fg.muted" fontSize="xs" truncate>
@@ -383,6 +392,17 @@ const HotkeyListRow = ({
         ) : hasDuplicate ? (
           <Text color="fg.error" fontSize="xs">
             {t('hotkeys.duplicateBinding')}
+          </Text>
+        ) : shadowed ? (
+          <Text color="fg.warning" fontSize="xs">
+            {t('hotkeys.shadows', { scope: t(SCOPE_LABEL_KEYS[hotkey.category]), title: shadowed.title })}
+          </Text>
+        ) : shadowedBy ? (
+          <Text color="fg.warning" fontSize="xs">
+            {t('hotkeys.shadowedBy', {
+              scope: t(SCOPE_LABEL_KEYS[shadowedBy.hotkey.category]),
+              title: shadowedBy.title,
+            })}
           </Text>
         ) : null}
       </Stack>

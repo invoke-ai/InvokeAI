@@ -305,6 +305,50 @@ describe('WorkbenchHotkeyRuntime and selected-image shortcuts', () => {
   });
 });
 
+describe('WorkbenchHotkeyRuntime and catalog rows a widget also contributes', () => {
+  // The catalog lists Canvas's keys for settings; the mounted Canvas registers the same ids. Its own registration
+  // decides how the key behaves, so a widget flag the catalog row lacks is not overridden by the row.
+  it('lets the widget registration of a catalog id answer, with its own flags', async () => {
+    const canvas = document.createElement('div');
+    canvas.dataset.hotkeyWidgetInstanceId = 'canvas';
+    canvas.dataset.hotkeyWidgetRegion = 'center';
+    canvas.dataset.hotkeyWidgetTypeId = 'canvas';
+    host!.append(canvas);
+    const source: WidgetContributionSource = {
+      instanceId: 'canvas',
+      projectId: projectId(),
+      region: 'center',
+      typeId: 'canvas',
+    };
+
+    await act(() => {
+      runtimeMocks.extensions.commands.register({
+        handler: () => ran.push('canvas.tool.brush'),
+        id: 'canvas.tool.brush',
+        source,
+        title: 'Brush',
+      });
+      runtimeMocks.extensions.hotkeys.register({
+        commandId: 'canvas.tool.brush',
+        defaultKeys: ['b'],
+        id: 'canvas.tool.brush',
+        preventDefault: false,
+        source,
+        title: 'Brush',
+      });
+    });
+    const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, code: 'KeyB', key: 'b' });
+
+    await act(async () => {
+      canvas.dispatchEvent(event);
+      await Promise.resolve();
+    });
+
+    expect(ran).toEqual(['canvas.tool.brush']);
+    expect(event.defaultPrevented).toBe(false);
+  });
+});
+
 describe('WorkbenchHotkeyRuntime and open menus', () => {
   let menuRoot: Root | null = null;
 

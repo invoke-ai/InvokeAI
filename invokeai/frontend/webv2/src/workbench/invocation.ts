@@ -6,6 +6,7 @@ import type {
   InvocationRoute,
   InvocationValidationReason,
   InvocationSourceId,
+  RouteIssue,
   ResolvedInvocationRoute,
   ResultDestination,
 } from '@workbench/invocationContracts';
@@ -27,7 +28,7 @@ import { getUpscaleValidationReasons, normalizeUpscaleWidgetValues } from '@feat
 import { getVideoWidgetValidationReasons, normalizeVideoWidgetValues } from '@features/video';
 import { getProjectGraphReadiness } from '@features/workflow/graph';
 import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
-import { localizeForLoopValidationReason } from '@features/workflow/utility';
+import { localizeWorkflowReadinessReason } from '@features/workflow/utility';
 import { areArraysEqual, createStableSelector } from '@platform/state/selectors';
 import {
   compileContributingLayers,
@@ -290,7 +291,7 @@ export const resolveInvocationRouteInput = (
   if (!isInvocationSourceAvailable(sourceId)) {
     validationReasons.push(`${getSourceLabel(sourceId)} is not an available invocation source.`);
   } else if (sourceWidgetId && !isWidgetMounted(input, sourceWidgetId)) {
-    validationReasons.push(`The ${getSourceLabel(sourceId)} widget is not mounted in this project.`);
+    validationReasons.push({ routeIssue: { kind: 'sourceNotMounted', sourceId } });
   }
 
   if (sourceId === 'generate') {
@@ -318,7 +319,7 @@ export const resolveInvocationRouteInput = (
     validationReasons.push(...getGenerateSnapshotValidationReasons(input.generateValues, models, input.canvasBbox));
 
     if (input.canvasBbox.width <= 0 || input.canvasBbox.height <= 0) {
-      validationReasons.push('Canvas generation frame must have a positive area.');
+      validationReasons.push({ routeIssue: { kind: 'emptyCanvasFrame' } });
     }
 
     const values = normalizeGenerateWidgetValues(input.generateValues);
@@ -367,7 +368,7 @@ export const resolveInvocationRouteInput = (
   if (!destinationAvailable) {
     validationReasons.push(`${getDestinationLabel(destination)} is not an available result destination.`);
   } else if (!destinationCompatible) {
-    validationReasons.push('Video results can only be sent to the Gallery. Switch the destination to Gallery.');
+    validationReasons.push({ routeIssue: { kind: 'videoNeedsGallery' } });
   }
 
   return {
@@ -386,7 +387,23 @@ export const resolveInvocationRouteInput = (
 export const isInvocationRouteValid = (route: ResolvedInvocationRoute): boolean =>
   route.sourceValid && route.destinationValid;
 
-/** Words any route validation reason for display; control-layer and Generate issues come from the locale. */
+/** What each source and destination is called in the UI: the widget that runs or receives the work. */
+export const ROUTE_LABEL_KEYS: Record<InvocationSourceId | ResultDestination, string> = {
+  canvas: 'widgets.labels.canvas',
+  gallery: 'widgets.labels.gallery',
+  generate: 'widgets.labels.generate',
+  upscale: 'widgets.labels.upscale',
+  video: 'widgets.labels.video',
+  workflow: 'widgets.labels.workflow',
+};
+
+const describeRouteIssue = (issue: RouteIssue, t: (key: string, options?: Record<string, unknown>) => string): string =>
+  t(
+    `topbar.invoke.routeIssues.${issue.kind}`,
+    issue.kind === 'sourceNotMounted' ? { source: t(ROUTE_LABEL_KEYS[issue.sourceId]) } : undefined
+  );
+
+/** Words any route validation reason for display; every structured reason comes from the locale. */
 export const localizeInvocationValidationReason = (
   reason: InvocationValidationReason,
   t: (key: string, options?: Record<string, unknown>) => string
@@ -395,4 +412,6 @@ export const localizeInvocationValidationReason = (
     ? describeControlLayerIssue(t, reason.controlLayerIssue)
     : typeof reason === 'object' && 'generationIssue' in reason
       ? describeGenerationIssue(t, reason.generationIssue)
-      : localizeForLoopValidationReason(reason, t);
+      : typeof reason === 'object' && 'routeIssue' in reason
+        ? describeRouteIssue(reason.routeIssue, t)
+        : localizeWorkflowReadinessReason(reason, t);

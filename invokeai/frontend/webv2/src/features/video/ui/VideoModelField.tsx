@@ -10,7 +10,7 @@ import type {
 
 import { Box, Text } from '@chakra-ui/react';
 import { isMainModelConfig } from '@features/generation/settings';
-import { ModelSelect } from '@features/models/react';
+import { ModelSelect, useHasModelPickerCandidates } from '@features/models/react';
 import { getVideoModelSelectionResult, isVideoModelSelectable } from '@features/video/core/videoPolicies';
 import { syncVideoWidgetValuesWithModels } from '@features/video/core/widgetValues';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
@@ -78,6 +78,7 @@ export const VideoModelField = ({
 }) => {
   const { i18n, t } = useTranslation();
   const { patchValues } = useVideoUiActions();
+  const hasVideoModels = useHasModelPickerCandidates({ filter: isVideoModelSelectable, modelTypes: MAIN_MODEL_TYPES });
   // The picker keeps its default id, which keys its remembered view and base filter; focus returns through this.
   const pickerRef = useRef<HTMLDivElement>(null);
   // Retain only the target and its project; the dialog previews, and confirmation applies, against live settings.
@@ -152,13 +153,20 @@ export const VideoModelField = ({
   return (
     <>
       <Field
-        error={values.model ? undefined : t('widgets.video.modelRequired')}
+        error={
+          values.model
+            ? undefined
+            : hasVideoModels === false
+              ? t('widgets.video.modelNotInstalled')
+              : t('widgets.video.modelRequired')
+        }
         hint="model"
         label={t('widgets.video.mainModel')}
       >
         <Box ref={pickerRef} minW="0" w="full">
           <ModelSelect
             filter={isVideoModelSelectable}
+            installAction
             invalid={!values.model}
             modelTypes={MAIN_MODEL_TYPES}
             placeholder={t('widgets.video.selectModel')}

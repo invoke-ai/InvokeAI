@@ -19,6 +19,7 @@ import {
   getModelBaseColorPalette,
   getModelBaseLabel,
   getModelImageUrl,
+  openModelManager,
   useModelsSelector,
   useOpenModelInManager,
 } from '@features/models';
@@ -292,24 +293,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       getBaseLabel: getModelBaseLabel,
       getImageUrl: getModelImageUrl,
       openInModelManager: openInModelManager ?? undefined,
-      // Use hash navigation and lazy filter seeding to keep router/manager code out of initial bundles; set the
-      // filter before navigation.
-      openManager: (options) => {
-        const navigateToManager = () => {
-          window.location.hash = `#/models?project=${encodeURIComponent(project.activeProjectId)}`;
-        };
-        const modelType = options?.modelType;
-
-        if (modelType === undefined) {
-          navigateToManager();
-          return;
-        }
-
-        void import('@features/models/launchpad').then(({ requestAddModelsTypeFilter }) => {
-          requestAddModelsTypeFilter(modelType);
-          navigateToManager();
-        });
-      },
+      openManager: (options) => openModelManager({ modelType: options?.modelType, projectId: project.activeProjectId }),
       status: modelsStatus,
     }),
     [modelsCatalog, modelsError, modelsStatus, openInModelManager, project.activeProjectId]

@@ -76,6 +76,7 @@ export {
 } from './core/baseGenerationPolicies';
 export {
   describeGenerationIssue,
+  describeGenerationIssueFix,
   getGenerationIssueFixPatch,
   type GenerateSectionId,
   type GenerationIssue,

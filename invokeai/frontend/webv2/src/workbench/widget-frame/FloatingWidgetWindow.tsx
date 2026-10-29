@@ -13,14 +13,27 @@ import {
   FLOATING_VIEWPORT_MARGIN_PX,
   resizeFloatingGeometry,
   type FloatingGeometry,
+  isAwaitedCenterView,
   type FloatingResizeEdge,
 } from '@workbench/floatingWindows';
 import { useFloatingWindowFocus, useWorkbenchFocus } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
 import { DOCK_DESTINATION_ICONS, resolveDockLabel, resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
-import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import {
+  useActiveProjectId,
+  useActiveProjectSelector,
+  useWorkbenchCommands,
+  useWorkbenchQueries,
+} from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
-import { ChevronsDownUpIcon, ChevronsUpDownIcon, Maximize2Icon, Minimize2Icon, TriangleAlertIcon } from 'lucide-react';
+import {
+  ChevronsDownUpIcon,
+  ChevronsUpDownIcon,
+  Maximize2Icon,
+  Minimize2Icon,
+  TriangleAlertIcon,
+  XIcon,
+} from 'lucide-react';
 import {
   Activity,
   Component,
@@ -353,6 +366,7 @@ export const FloatingWidgetWindow = ({
 }) => {
   const { t } = useTranslation();
   const { widgets } = useWorkbenchCommands();
+  const queries = useWorkbenchQueries();
   const { getWidgetById } = useWorkbenchWidgetRegistry();
   const instance = useActiveProjectSelector(
     (project) => project.widgetInstances[instanceId],
@@ -640,6 +654,20 @@ export const FloatingWidgetWindow = ({
       focusRegion(state.returnRegion, typeId);
     }
   }, [focusRegion, instanceId, state.returnRegion, typeId, widgets]);
+  // Close takes the window out of the layout (an Undo toast brings it back). Focus goes where the window's marker menu
+  // sends it: the center when it gets its view back, else the panel the window's rail shows, else the center.
+  const handleClose = useCallback(() => {
+    const { layout, widgetRegions } = queries.getSnapshot().activeProject;
+    const restoresCenter = isAwaitedCenterView(widgetRegions.center, instanceId);
+    const region = state.returnRegion;
+    const isRailPanelShown =
+      (region === 'left' ? layout.panels.isLeftOpen : region === 'right' && layout.panels.isRightOpen) &&
+      !widgetRegions[region].isCollapsed;
+
+    flushWorkbenchDrafts();
+    widgets.closeFloating(instanceId);
+    focusRegion(restoresCenter || !isRailPanelShown ? 'center' : region, restoresCenter ? typeId : undefined);
+  }, [focusRegion, instanceId, queries, state.returnRegion, typeId, widgets]);
   const handleToggleShade = useCallback(() => {
     // Shading hides the body: its editors keep their state but stop running, so their drafts are saved first.
     if (mode !== 'shaded') {
@@ -819,6 +847,17 @@ export const FloatingWidgetWindow = ({
             <Tooltip content={dockLabel}>
               <IconButton aria-label={dockLabel} color="fg.muted" size="sm" variant="ghost" onClick={handleDock}>
                 <Icon as={DOCK_DESTINATION_ICONS[state.returnRegion]} boxSize="3.5" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip content={t('widgets.floating.close')}>
+              <IconButton
+                aria-label={t('widgets.floating.closeNamed', { label })}
+                color="fg.muted"
+                size="sm"
+                variant="ghost"
+                onClick={handleClose}
+              >
+                <Icon as={XIcon} boxSize="3.5" />
               </IconButton>
             </Tooltip>
           </HStack>

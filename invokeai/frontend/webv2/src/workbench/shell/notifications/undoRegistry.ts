@@ -29,18 +29,26 @@ export const registerNotificationUndo = (onUndo: () => void, supersedes?: string
   const undoId = `undo-${++nextUndoId}`;
 
   if (supersedes !== undefined) {
-    for (const [olderId, entry] of pendingUndos) {
-      if (entry.supersedes === supersedes) {
-        pendingUndos.delete(olderId);
-        entry.withdrawal.abort();
-      }
-    }
+    withdrawNotificationUndos(supersedes);
   }
 
   pendingUndos.set(undoId, { isHeld: false, onUndo, supersedes, withdrawal: new AbortController() });
   dropOldestIdleUndo();
 
   return undoId;
+};
+
+/**
+ * Withdraws every undo registered under `supersedes` (their toasts close, their buttons go), for an owner that knows
+ * the change they revert is no longer the latest: undone another way, or built on since.
+ */
+export const withdrawNotificationUndos = (supersedes: string): void => {
+  for (const [undoId, entry] of pendingUndos) {
+    if (entry.supersedes === supersedes) {
+      pendingUndos.delete(undoId);
+      entry.withdrawal.abort();
+    }
+  }
 };
 
 export const hasNotificationUndo = (undoId: string): boolean => pendingUndos.has(undoId);

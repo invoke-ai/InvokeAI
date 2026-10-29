@@ -15,6 +15,7 @@ import { OPEN_COMMAND_PALETTE_HOTKEY } from '@workbench/hotkeys/catalog';
 import { openCommandPalette } from '@workbench/palette/paletteStore';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { openWhatsNew } from '@workbench/shell/whatsNewStore';
+import { openWidgetsDialogFrom } from '@workbench/shell/widgetsDialogStore';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import {
@@ -23,12 +24,13 @@ import {
   BoxIcon,
   FolderIcon,
   HouseIcon,
+  LayoutGridIcon,
   ListOrderedIcon,
   SearchIcon,
   SettingsIcon,
   TypeIcon,
 } from 'lucide-react';
-import { useCallback, useState, type ComponentType, type ElementType } from 'react';
+import { useCallback, useRef, useState, type ComponentType, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { TopbarMenuChevron } from './TopbarMenuChevron';
@@ -65,6 +67,9 @@ export const AppMenu = () => {
   }, [navigate]);
   const openQueue = useCallback(() => openWorkbenchWidget('queue'), [openWorkbenchWidget]);
   const openSettings = useCallback(() => openWorkbenchSettings(), []);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  // The menu item is gone once the dialog closes; focus returns to the menu's own button.
+  const openWidgets = useCallback(() => openWidgetsDialogFrom(() => triggerRef.current), []);
   const queryClient = useQueryClient();
   // Rendered only once loaded: a lazy() boundary would suspend on open and React delays its reveal, shifting rows.
   // A chunk that fails to load (e.g. after an upgrade) leaves the optional link absent.
@@ -92,6 +97,7 @@ export const AppMenu = () => {
     <Menu.Root lazyMount positioning={MENU_POSITIONING} onOpenChange={handleOpenChange}>
       <Menu.Trigger asChild>
         <IconButton
+          ref={triggerRef}
           aria-label={t('topbar.appMenu.open')}
           className="group"
           pe="1.5"
@@ -143,6 +149,10 @@ export const AppMenu = () => {
                     {queuedCount}
                   </Badge>
                 ) : null}
+              </Menu.Item>
+              <Menu.Item value="widgets" onClick={openWidgets}>
+                <Icon as={LayoutGridIcon} boxSize="3.5" />
+                <Menu.ItemText>{t('shell.widgets.menuItem')}</Menu.ItemText>
               </Menu.Item>
             </Menu.ItemGroup>
             {DonationMenuItem ? <DonationMenuItem separated /> : null}

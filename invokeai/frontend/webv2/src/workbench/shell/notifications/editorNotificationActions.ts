@@ -16,9 +16,8 @@ import {
   registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
-import { openWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { revealOrOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
-import { revealPlacedWidget } from '@workbench/widgetPlacementCommands';
 
 import type { NotificationActionContext } from './notificationActions';
 
@@ -53,22 +52,8 @@ export const createEditorNotificationActionContext = ({
   t,
   widgets,
 }: EditorNotificationActionSources): NotificationActionContext => {
-  const openWidget = (widgetId: WidgetTypeId): void => {
-    // Where the layout already has the widget, bring that one forward rather than open another.
-    const revealed = revealPlacedWidget({ project: queries.getSnapshot().activeProject, typeId: widgetId, widgets });
-
-    if (revealed?.kind === 'floating') {
-      focus.focusFloating(revealed.instanceId);
-    } else if (revealed) {
-      focus.focusRegion(revealed.region, widgetId);
-    } else {
-      const opened = openWorkbenchWidget(widgets, getWidgetsForRegion, widgetId);
-
-      if (opened.ok) {
-        focus.focusRegion(opened.region, widgetId);
-      }
-    }
-  };
+  const openWidget = (widgetId: WidgetTypeId): void =>
+    revealOrOpenWorkbenchWidget({ focus, getWidgetsForRegion, queries, widgets }, widgetId);
 
   return {
     getWidgetLabel: (widgetId) => {

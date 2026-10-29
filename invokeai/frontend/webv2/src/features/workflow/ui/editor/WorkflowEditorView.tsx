@@ -90,6 +90,7 @@ import {
 } from './flowAdapters';
 import {
   registerWorkflowFlowInstance,
+  registerWorkflowViewElement,
   releaseWorkflowFlowInstance,
   WORKFLOW_FIT_PADDING,
   WORKFLOW_TOOLBAR_CLEARANCE_PX,
@@ -443,6 +444,16 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     templateStatus: InvocationTemplateStatus;
   } | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
+  // The frame also tells actions outside the flow (the header's Add node) where the visible graph is.
+  const attachEditorElement = useCallback((element: HTMLDivElement | null) => {
+    editorRef.current = element;
+    const release = registerWorkflowViewElement(element);
+
+    return () => {
+      editorRef.current = null;
+      release?.();
+    };
+  }, []);
   /** The last pointer position over this editor, kept outside state so pointer moves never re-render it. */
   const pointerRef = useRef<{ client: XYPosition | null; isOverEditor: boolean }>({
     client: null,
@@ -1335,7 +1346,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
 
   return (
     <Box
-      ref={editorRef}
+      ref={attachEditorElement}
       bg="bg.inset"
       css={editorCss}
       h="full"

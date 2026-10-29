@@ -9,14 +9,15 @@ import { createWorkbenchStore, type WorkbenchInternalStore, type WorkbenchSnapsh
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 let store: WorkbenchInternalStore;
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) =>
+    t: (key: string, options?: { count?: number }) =>
       ({
+        'topbar.presets.moreAvailable': `More layout presets, ${options?.count} available`,
         // A translated default, as another language shows the Workflow preset.
         'topbar.presets.builtInLabels.automate': 'Arbeitsablauf',
         'topbar.presets.layoutPreset': 'Layout preset',
@@ -404,6 +405,64 @@ describe('LayoutPresetStrip', () => {
 
     expect(scrollLeftAfterDrop).toBe(0);
     expect(scrollContainer!.scrollLeft).toBe(0);
+  });
+
+  // The cue says how many presets lie past the end, on screen and in its name, and reveals them.
+  it('counts the presets past the strip end on its end cue and scrolls to them', async () => {
+    for (let index = 2; index <= 8; index += 1) {
+      store.commands.layout.createPreset(`custom-${index}`, `Custom ${index}`, 'star');
+    }
+    store.commands.layout.applyPreset('compose');
+    await renderStrip();
+    const scroller = document.querySelector<HTMLElement>('[data-layout-preset-scroll]')!;
+    const hiddenPastEnd = () =>
+      Array.from(scroller.querySelectorAll('[role="tab"]')).filter(
+        (tab) => tab.getBoundingClientRect().right > scroller.getBoundingClientRect().right + 1
+      ).length;
+    const endCue = () => document.querySelector<HTMLElement>('[data-overflow-cue="end"] button');
+
+    await expect.poll(endCue, POLL).not.toBeNull();
+    const count = hiddenPastEnd();
+
+    expect(count).toBeGreaterThan(0);
+    expect(endCue()).toHaveAccessibleName(`More layout presets, ${count} available`);
+    expect(endCue()!.textContent).toBe(`+${count}`);
+
+    await act(() => endCue()!.click());
+
+    await expect.poll(endCue, POLL).toBeNull();
+    expect(document.querySelector('[data-overflow-cue="start"]')).not.toBeNull();
+  });
+
+  it('brings the active preset back into view when the strip narrows and when the preset changes', async () => {
+    for (let index = 2; index <= 8; index += 1) {
+      store.commands.layout.createPreset(`custom-${index}`, `Custom ${index}`, 'star');
+    }
+    store.commands.layout.applyPreset('compose');
+    await renderStrip();
+    const scroller = document.querySelector<HTMLElement>('[data-layout-preset-scroll]')!;
+    const isInView = (id: string) => {
+      const tab = presetTab(id)!.getBoundingClientRect();
+      const bounds = scroller.getBoundingClientRect();
+
+      return tab.left >= bounds.left - 1 && tab.right <= bounds.right + 1;
+    };
+
+    // Switching to the last preset brings its tab in from past the end.
+    await act(() => store.commands.layout.applyPreset('automate'));
+    await expect.poll(() => isInView('automate'), POLL).toBe(true);
+
+    // Scrolled away by hand, the strip stays put; narrowed, it scrolls back to the active preset. (This strip is too
+    // narrow for the tab to clear both cues, so the test asks only that it moved to it.)
+    scroller.scrollLeft = 0;
+    await expect.poll(() => isInView('automate'), POLL).toBe(false);
+    const viewport = { height: window.innerHeight, width: window.innerWidth };
+    await page.viewport(viewport.width - 60, viewport.height);
+    await expect
+      .poll(() => presetTab('automate')!.getBoundingClientRect().left < scroller.getBoundingClientRect().right, POLL)
+      .toBe(true);
+    expect(scroller.scrollLeft).toBeGreaterThan(0);
+    await page.viewport(viewport.width, viewport.height);
   });
 
   it('preserves horizontal touch panning and reorders after a long press', async () => {

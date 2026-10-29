@@ -5,11 +5,10 @@ import type {
   GenerationIssueField,
   GenerationIssueFix,
 } from '@features/generation/core/generationIssues';
-import type { TFunction } from 'i18next';
 import type { ReactNode } from 'react';
 
 import { Badge, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { describeGenerationIssue } from '@features/generation/core/generationIssues';
+import { describeGenerationIssue, describeGenerationIssueFix } from '@features/generation/core/generationIssues';
 import { Button } from '@platform/ui/Button';
 import { CircleAlertIcon } from 'lucide-react';
 import { createContext, use, useMemo } from 'react';
@@ -47,23 +46,6 @@ export const areGenerationIssuesEqual = (
       issue.message === right[index]?.message &&
       JSON.stringify(issue.fix) === JSON.stringify(right[index]?.fix)
   );
-
-const getFixLabel = (t: TFunction, fix: GenerationIssueFix): string => {
-  switch (fix.kind) {
-    case 'clampGuidance':
-      return t('widgets.generate.issueFixes.setValue', { value: fix.value });
-    case 'clearModel':
-      return t('widgets.generate.issueFixes.clear');
-    case 'removeConcept':
-      return t('widgets.generate.issueFixes.remove');
-    case 'setDimensions':
-      return t('widgets.generate.issueFixes.setSize', { height: fix.height, width: fix.width });
-    case 'turnOffPid':
-      return t('widgets.generate.issueFixes.turnOffPid');
-    case 'turnOffReferenceImages':
-      return t('widgets.generate.issueFixes.turnOff', { count: fix.referenceImageIds.length });
-  }
-};
 
 /** A collapsed section names how many problems it holds, so a closed section never hides why Invoke is blocked. */
 export const GenerateSectionIssueBadge = ({ section }: { section: string }) => {
@@ -162,7 +144,13 @@ export const GenerateIssueNotes = ({
         const message = describeGenerationIssue(t, issue);
 
         return (
-          <HStack key={issue.id} alignItems="flex-start" gap="1.5" justifyContent={fixesOnly ? 'flex-end' : undefined}>
+          <HStack
+            key={issue.id}
+            alignItems="flex-start"
+            data-issue-id={issue.id}
+            gap="1.5"
+            justifyContent={fixesOnly ? 'flex-end' : undefined}
+          >
             {fixesOnly ? null : (
               <>
                 <Icon as={CircleAlertIcon} boxSize="3" color="fg.error" flexShrink={0} mt="px" />
@@ -174,8 +162,11 @@ export const GenerateIssueNotes = ({
             {issue.fix ? (
               <IssueFixButton
                 fix={issue.fix}
-                label={getFixLabel(t, issue.fix)}
-                name={t('widgets.generate.issueFixNamed', { fix: getFixLabel(t, issue.fix), issue: message })}
+                label={describeGenerationIssueFix(t, issue.fix)}
+                name={t('widgets.generate.issueFixNamed', {
+                  fix: describeGenerationIssueFix(t, issue.fix),
+                  issue: message,
+                })}
                 onFix={context.applyFix}
               />
             ) : null}

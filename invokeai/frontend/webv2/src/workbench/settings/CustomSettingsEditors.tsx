@@ -210,7 +210,7 @@ export const WorkspaceSettings = ({ onReveal }: Pick<SettingFieldProps, 'onRevea
         {commands ? (
           <Button size="lg" variant="outline" onClick={resetLayout}>
             <RotateCcwIcon />
-            Reset layout
+            {t('settings.revertLayout')}
           </Button>
         ) : null}
         {onReveal ? (

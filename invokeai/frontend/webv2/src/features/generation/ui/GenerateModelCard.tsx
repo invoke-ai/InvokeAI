@@ -152,7 +152,7 @@ export const GenerateModelCard = ({
   const hasNoSupportedModels = !isLoadingModels && !loadError && supportedModels.length === 0;
 
   return (
-    <Stack gap="1" py="1">
+    <Stack data-generate-section="model" gap="1" py="1">
       {/* The Field describes the picker with the model's issues, which have no one-step fix: the picker is it. */}
       <Field
         error={modelIssues.length > 0 ? modelIssues.map((issue) => describeGenerationIssue(t, issue)).join(' ') : null}

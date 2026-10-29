@@ -38,6 +38,10 @@ import {
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { getInvocationIssueTarget, type InvocationIssue } from './invokeIssueTargets';
+
+export type { InvocationIssue, InvocationIssueTarget } from './invokeIssueTargets';
+
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
 
 /**
@@ -102,12 +106,6 @@ export const isBatchCountFixed = (sourceId: InvocationRoute['sourceId'], values:
 
 export const getBatchCount = (sourceId: InvocationRoute['sourceId'], values: Record<string, unknown>): number =>
   isBatchCountFixed(sourceId, values) ? 1 : sanitizeBatchCount(values.batchCount);
-
-/** Why Invoke cannot run, worded for the user; `layerId` names the canvas layer to show for it. */
-export interface InvocationIssue {
-  message: string;
-  layerId: string | null;
-}
 
 export interface InvocationState {
   batchCount: number;
@@ -183,14 +181,16 @@ export const useInvocationState = (): InvocationState => {
 
   const issues = useMemo(
     (): InvocationIssue[] => [
-      ...(isConnected ? [] : [{ layerId: null, message: t('topbar.invoke.serverDisconnected') }]),
-      ...(expansionReason === null ? [] : [{ layerId: null, message: expansionReason }]),
+      ...(isConnected
+        ? []
+        : [{ message: t('topbar.invoke.serverDisconnected'), target: { kind: 'connection' } } as const]),
+      ...(expansionReason === null ? [] : [{ message: expansionReason, target: { kind: 'prompt' } } as const]),
       ...resolvedRoute.validationReasons.map((reason) => ({
-        layerId: typeof reason === 'object' && 'controlLayerIssue' in reason ? reason.controlLayerIssue.layerId : null,
         message: localizeInvocationValidationReason(reason, t),
+        target: getInvocationIssueTarget(reason, invocation.sourceId),
       })),
     ],
-    [expansionReason, isConnected, resolvedRoute.validationReasons, t]
+    [expansionReason, invocation.sourceId, isConnected, resolvedRoute.validationReasons, t]
   );
   const isValid = isInvocationRouteValid(resolvedRoute) && isConnected && expansionReason === null;
 

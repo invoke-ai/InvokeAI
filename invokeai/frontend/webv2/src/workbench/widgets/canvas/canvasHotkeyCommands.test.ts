@@ -14,6 +14,7 @@ import type { TFunction } from 'i18next';
 import { createControlLayer, createDocumentModel } from '@workbench/canvas-engine/api';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
+import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import { CANVAS_HEADER_HOTKEYS } from './canvasHeaderCommands';
@@ -828,6 +829,39 @@ describe('registration tables', () => {
   // Everything the mounted Canvas registers: its own keys, the companion keys and the header's commands. The
   // companion widget registers a subset (history plus companion keys), so it is covered too.
   const allEntries = [...CANVAS_COMPANION_HOTKEYS, ...CANVAS_ONLY_HOTKEYS, ...CANVAS_HEADER_HOTKEYS];
+
+  // Hotkey settings list the catalog, so a Canvas binding shows (and can be rebound) before any Canvas mounts.
+  it('mirrors every registered key in the hotkey catalog with the same defaults, under Canvas', () => {
+    const catalogDefaults = Object.fromEntries(
+      firstPartyHotkeyCatalog
+        .filter((hotkey) => hotkey.category === 'canvas')
+        .map((hotkey) => [hotkey.id, hotkey.defaultKeys])
+    );
+    const registeredDefaults = Object.fromEntries(allEntries.map(([id, , keys]) => [id, [...keys]]));
+
+    expect(registeredDefaults).toEqual(catalogDefaults);
+  });
+
+  // The Canvas (and Layers) register every row with `allowInEditable: false` and no other flag, so a row that reads
+  // otherwise in Hotkeys settings or answers before the Canvas mounts would describe a different key.
+  it('mirrors the flags the Canvas registers its keys with', () => {
+    const catalogFlags = Object.fromEntries(
+      firstPartyHotkeyCatalog
+        .filter((hotkey) => hotkey.category === 'canvas')
+        .map(({ allowInEditable, allowInModal, id, preventDefault, targetSelector }) => [
+          id,
+          {
+            allowInEditable: allowInEditable === true,
+            allowInModal: allowInModal === true,
+            preventDefault: preventDefault !== false,
+            targetSelector: targetSelector ?? null,
+          },
+        ])
+    );
+    const registeredFlags = { allowInEditable: false, allowInModal: false, preventDefault: true, targetSelector: null };
+
+    expect(catalogFlags).toEqual(Object.fromEntries(allEntries.map(([id]) => [id, registeredFlags])));
+  });
 
   it('gives Transform Shift+T as its only default', () => {
     expect(CANVAS_COMPANION_HOTKEYS.find(([id]) => id === 'canvas.transformSelected')?.[2]).toEqual(['shift+t']);

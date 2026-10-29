@@ -154,14 +154,28 @@ export interface PromptHistoryItem {
   negativePrompt: string | null;
 }
 
+/**
+ * A layout change worth reporting with an Undo toast; the step that made it carries this (see
+ * `shell/LayoutUndoNotices.tsx`). Steps without one, such as a resize or a route change, are undone only by the
+ * layout undo command.
+ */
+export type LayoutUndoNotice =
+  /** The active preset's saved arrangement was laid out again over unsaved changes. */
+  | { kind: 'revert'; presetId: LayoutPresetId }
+  /** Another preset's unsaved arrangement in this project was dropped. */
+  | { kind: 'discardCopy'; presetId: LayoutPresetId }
+  | { kind: 'switchPreset'; presetId: LayoutPresetId }
+  | { kind: 'removeWidget'; instanceId: WidgetInstanceId };
+
 export interface UndoRedoEntry {
   id: string;
   createdAt: string;
   label: string;
   project: ProjectUndoSnapshot;
-  /** Edits that arrive as a stream (typing, dragging) share a key so they fold into one step. */
+  notice?: LayoutUndoNotice;
+  /** Edits that arrive as a stream (a dragged divider, a moved window) share a key so they fold into one step. */
   mergeKey?: string;
-  /** When the entry last absorbed a same-key edit; the merge window runs from here. */
+  /** When the step last absorbed a same-key edit; the merge window runs from here. */
   mergedAt?: string;
 }
 

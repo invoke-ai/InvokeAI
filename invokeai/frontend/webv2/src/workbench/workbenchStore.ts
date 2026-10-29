@@ -357,6 +357,12 @@ const createCommands = (
         })
       ),
       reset: command('resetActiveLayout'),
+      /** Steps the project's layout back (the active project by default), or back to before one step's change. */
+      undo: command('undoProjectChange', (projectId?: string, throughEntryId?: string) => ({
+        ...(projectId === undefined ? {} : { projectId }),
+        ...(throughEntryId === undefined ? {} : { throughEntryId }),
+      })),
+      redo: command('redoProjectChange', (projectId?: string) => (projectId === undefined ? {} : { projectId })),
       /** Discards the named preset's unsaved arrangement in the active project. */
       revertPreset: command('revertLayoutPreset', (presetId: ActionPayload<'revertLayoutPreset'>['presetId']) => ({
         presetId,

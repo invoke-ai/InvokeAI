@@ -421,6 +421,22 @@ export const parseWorkflowJson = (raw: unknown): ParsedWorkflow => {
   return { document, warnings };
 };
 
+/**
+ * A load's warnings as the one notice it shows: each distinct warning once, in the order first seen, with a count when
+ * it repeats (a file with many unrecognized nodes says so once). Null when there is nothing to say.
+ */
+export const summarizeWorkflowLoadWarnings = (warnings: readonly string[]): string | null => {
+  const counts = new Map<string, number>();
+
+  for (const warning of warnings) {
+    counts.set(warning, (counts.get(warning) ?? 0) + 1);
+  }
+
+  return counts.size === 0
+    ? null
+    : [...counts].map(([warning, count]) => (count > 1 ? `${warning} (×${count})` : warning)).join(' ');
+};
+
 const serializeInvocationNode = (node: Extract<WorkflowNode, { type: 'invocation' }>) => {
   // Editor reconciliation state stays with the project; a portable document starts from its current selection.
   const {

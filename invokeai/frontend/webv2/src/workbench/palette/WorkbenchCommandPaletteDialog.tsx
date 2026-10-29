@@ -15,12 +15,16 @@ import { getModelsSnapshot } from '@features/models';
 import { getQueueQueryScope, getQueueReadModelOptions } from '@features/queue/queries';
 import { queryClient } from '@platform/query/client';
 import { useQuery } from '@tanstack/react-query';
+import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { recallProjectPromptHistoryItem, selectProjectGenerateModel } from '@workbench/generationSettingsOrchestration';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { getLayoutPresetCommandTitleOverrides } from '@workbench/layoutPresetSnapshots';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { useAvailableSettings } from '@workbench/settings/useAvailableSettings';
 import { useNotify } from '@workbench/useNotify';
+import { revealOrOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { resolveWidgetLabel } from '@workbench/widgetLabels';
+import { getOpenableWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
   useActiveProjectSelector,
@@ -35,7 +39,13 @@ import { useTranslation } from 'react-i18next';
 import type { PaletteEntry, PaletteSearchProvider, SettingsEntryDeps } from './entries';
 
 import { CommandPaletteDialog } from './CommandPaletteDialog';
-import { buildCatalogCommandEntries, buildOpenSettingsEntry, buildSettingsEntries, getEntryKeys } from './entries';
+import {
+  buildCatalogCommandEntries,
+  buildOpenSettingsEntry,
+  buildSettingsEntries,
+  buildWidgetEntries,
+  getEntryKeys,
+} from './entries';
 import { buildExtensionPaletteEntry, createExtensionSearchProvider } from './extensionPaletteAdapters';
 import {
   createBoardsProvider,
@@ -104,6 +114,57 @@ const WorkbenchCommandPaletteDialog = ({
     [account, t]
   );
 
+  const focus = useWorkbenchFocus();
+  const { widgets: widgetCommands } = useWorkbenchCommands();
+  const widgetEntries = useMemo(() => {
+    const seen = new Set<string>();
+    const openable = (['center', 'left', 'right', 'bottom'] as const)
+      .flatMap((region) => getWidgetsForRegion(region))
+      .filter((widget) => {
+        const typeId = widget.manifest.id;
+
+        if (seen.has(typeId) || widget.status !== 'enabled') {
+          return false;
+        }
+
+        seen.add(typeId);
+        // The Workflow editor has its own command (it opens the editor in the center), so it is offered once, there.
+        return typeId !== 'workflow' && getOpenableWidgetPlacement({ getWidgetsForRegion, typeId }) !== null;
+      });
+
+    return buildWidgetEntries({
+      catalog,
+      customHotkeys: preferences.customHotkeys,
+      formatHotkey,
+      show: (typeId) =>
+        revealOrOpenWorkbenchWidget(
+          { focus, getWidgetsForRegion, queries: workbenchQueries, widgets: widgetCommands },
+          typeId
+        ),
+      t,
+      widgets: openable.map((widget) => ({
+        label: resolveWidgetLabel(widget.manifest, t),
+        typeId: widget.manifest.id,
+      })),
+    });
+  }, [
+    catalog,
+    focus,
+    formatHotkey,
+    getWidgetsForRegion,
+    preferences.customHotkeys,
+    t,
+    widgetCommands,
+    workbenchQueries,
+  ]);
+  const commandStore = extensions.stores.commands;
+  const commandContributions = useSyncExternalStore(commandStore.subscribe, commandStore.list, commandStore.list);
+  const isHandled = useMemo(() => {
+    const handled = new Set(commandContributions.map(({ id }) => id));
+
+    return (commandId: string) => handled.has(commandId);
+  }, [commandContributions]);
+
   const executeCommand = useCallback(
     (commandId: string) => {
       const contribution = extensions.stores.commands.findLatest(
@@ -122,6 +183,7 @@ const WorkbenchCommandPaletteDialog = ({
         execute: executeCommand,
         catalog,
         formatHotkey,
+        isHandled,
         presentWidgetTypeIds: new Set(presentWidgetTypeIds),
         t,
         titleOverrides: commandTitleOverrides,
@@ -129,6 +191,7 @@ const WorkbenchCommandPaletteDialog = ({
       ...paletteContributions.map((contribution) =>
         buildExtensionPaletteEntry(contribution, extensions.commands.executeForSource)
       ),
+      ...widgetEntries,
       ...buildStaticAppEntries(
         t,
         getEntryKeys(
@@ -145,12 +208,14 @@ const WorkbenchCommandPaletteDialog = ({
       executeCommand,
       extensions,
       formatHotkey,
+      isHandled,
       paletteContributions,
       preferences,
       presentWidgetTypeIds,
       settingsEntryDeps,
       settingsSections,
       t,
+      widgetEntries,
     ]
   );
 

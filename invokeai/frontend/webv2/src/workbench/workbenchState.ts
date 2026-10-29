@@ -39,6 +39,7 @@ import type {
 import type {
   AccountState,
   Project,
+  LayoutUndoNotice,
   ProjectUndoSnapshot,
   PromptHistoryItem,
   WorkbenchNotification,
@@ -581,8 +582,14 @@ type WorkbenchReducerAction =
   /** Cancels this tab's runs the backend has not accepted, in one project or every open one. */
   | { type: 'cancelUnsubmittedQueueItems'; projectId?: string }
   | { type: 'clearCompletedQueueItems' }
-  | { type: 'undoProjectChange' }
-  | { type: 'redoProjectChange' }
+  | {
+      type: 'undoProjectChange';
+      /** Defaults to the active project. */
+      projectId?: string;
+      /** Undo back to before this step; nothing happens once it is no longer in the history. */
+      throughEntryId?: string;
+    }
+  | { type: 'redoProjectChange'; projectId?: string }
   | { type: 'hydrateWorkbench'; state: WorkbenchState }
   | { type: 'replaceProjectFromServer'; projectId: string; project: Project }
   | {
@@ -635,7 +642,7 @@ type WorkbenchReducerAction =
     };
 
 const HISTORY_LIMIT = 40;
-/** A pause this long between same-key edits (typing, dragging) starts a new undo step. */
+/** A pause this long between same-key layout edits (a dragged divider, a moved window) starts a new undo step. */
 const UNDO_MERGE_WINDOW_MS = 1500;
 const NOTIFICATION_LIMIT = 100;
 // Side-panel bounds keep widget controls usable while reserving work-surface space. The bottom status strip has
@@ -1508,33 +1515,57 @@ const createUndoSnapshot = (project: Project): ProjectUndoSnapshot => ({
   widgetRegions: cloneWidgetRegions(project.widgetRegions),
 });
 
-const restoreUndoSnapshot = (project: Project, snapshot: ProjectUndoSnapshot): Project => ({
-  ...project,
-  // Restore floating windows with widgetRegions to avoid duplicate or orphaned placements.
-  floatingWidgets: snapshot.floatingWidgets ? { ...snapshot.floatingWidgets } : undefined,
-  // The memory is not part of the snapshot, but a window the undo closes is still remembered.
-  lastFloatingGeometry: rememberClosedWindows(
-    project.lastFloatingGeometry,
-    project.floatingWidgets,
-    snapshot.floatingWidgets,
-    // The snapshot's instances replace the project's, so an instance created since is gone.
-    (instanceId) => Object.hasOwn(snapshot.widgetInstances, instanceId)
-  ),
-  invocation: { ...snapshot.invocation },
-  layout: { ...snapshot.layout, panels: { ...snapshot.layout.panels } },
-  presetWorkingLayouts: snapshot.presetWorkingLayouts,
-  widgetGraphs: cloneWidgetGraphs(snapshot.widgetGraphs),
-  widgetInstances: cloneWidgetInstances(snapshot.widgetInstances),
-  widgetRegions: cloneWidgetRegions(snapshot.widgetRegions),
-});
+/**
+ * Project undo is layout undo: placements, panels, route and preset copies go back to the step's snapshot, while every
+ * widget keeps its current values (a Generate prompt typed since stays). Instances are never lost: one the step dropped
+ * returns with the values it had then, and one created since stays, unplaced, with its own, so adding it again brings
+ * them back. Graphs fill in only where the project has none now.
+ */
+const restoreUndoSnapshot = (project: Project, snapshot: ProjectUndoSnapshot): Project => {
+  const widgetInstances = {
+    ...cloneWidgetInstances(project.widgetInstances),
+    ...Object.fromEntries(
+      Object.entries(cloneWidgetInstances(snapshot.widgetInstances)).map(([instanceId, instance]) => {
+        const current = project.widgetInstances[instanceId];
 
-/** Capture pre-edit state; edits sharing a mergeKey within the window undo as one burst. */
-const pushUndo = (project: Project, label: string, mergeKey?: string): Project => {
+        return [instanceId, current ? { ...instance, state: current.state } : instance];
+      })
+    ),
+  };
+
+  return {
+    ...project,
+    // Restore floating windows with widgetRegions to avoid duplicate or orphaned placements.
+    floatingWidgets: snapshot.floatingWidgets ? { ...snapshot.floatingWidgets } : undefined,
+    // The memory is not part of the snapshot, but a window the undo closes is still remembered.
+    lastFloatingGeometry: rememberClosedWindows(
+      project.lastFloatingGeometry,
+      project.floatingWidgets,
+      snapshot.floatingWidgets,
+      (instanceId) => Object.hasOwn(widgetInstances, instanceId)
+    ),
+    invocation: { ...snapshot.invocation },
+    layout: { ...snapshot.layout, panels: { ...snapshot.layout.panels } },
+    presetWorkingLayouts: snapshot.presetWorkingLayouts,
+    widgetGraphs: { ...cloneWidgetGraphs(snapshot.widgetGraphs), ...project.widgetGraphs },
+    widgetInstances,
+    widgetRegions: cloneWidgetRegions(snapshot.widgetRegions),
+  };
+};
+
+/**
+ * Capture the pre-edit state as one undo step; `notice` makes the step report itself with an Undo toast. Edits sharing a
+ * `mergeKey` within the merge window fold into the step before them, which keeps its snapshot from before the burst.
+ */
+const pushUndo = (
+  project: Project,
+  label: string,
+  { mergeKey, notice }: { mergeKey?: string; notice?: LayoutUndoNotice } = {}
+): Project => {
   const previous = project.undoRedo.past.at(-1);
   const timestamp = now();
 
-  // An undo in between (`future` non-empty) ends the burst: the state the user
-  // just stood on must stay reachable as its own step.
+  // An undo in between (`future` non-empty) ends the burst: the state the user stood on stays its own step.
   if (
     mergeKey &&
     previous?.mergeKey === mergeKey &&
@@ -1543,10 +1574,7 @@ const pushUndo = (project: Project, label: string, mergeKey?: string): Project =
   ) {
     return {
       ...project,
-      undoRedo: {
-        future: [],
-        past: [...project.undoRedo.past.slice(0, -1), { ...previous, mergedAt: timestamp }],
-      },
+      undoRedo: { future: [], past: [...project.undoRedo.past.slice(0, -1), { ...previous, mergedAt: timestamp }] },
     };
   }
 
@@ -1561,9 +1589,30 @@ const pushUndo = (project: Project, label: string, mergeKey?: string): Project =
           id: createId('undo'),
           label,
           ...(mergeKey ? { mergeKey } : {}),
+          ...(notice ? { notice } : {}),
           project: createUndoSnapshot(project),
         },
       ].slice(-HISTORY_LIMIT),
+    },
+  };
+};
+
+/** Steps back once: the step's snapshot is laid out and the current state becomes the first redo. */
+const undoProjectStep = (project: Project): Project => {
+  const undoEntry = project.undoRedo.past.at(-1);
+
+  if (!undoEntry) {
+    return project;
+  }
+
+  return {
+    ...restoreUndoSnapshot(project, undoEntry.project),
+    undoRedo: {
+      future: [
+        { createdAt: now(), id: createId('redo'), label: undoEntry.label, project: createUndoSnapshot(project) },
+        ...project.undoRedo.future,
+      ].slice(0, HISTORY_LIMIT),
+      past: project.undoRedo.past.slice(0, -1),
     },
   };
 };
@@ -2781,7 +2830,7 @@ const updateActiveProjectLayoutPreset = (
   { applyDefaultRoute }: { applyDefaultRoute: boolean }
 ): WorkbenchState =>
   updateActiveProject(state, (project) => {
-    const nextProject = pushUndo(project, 'Update layout');
+    const nextProject = pushUndo(project, 'Update layout', { notice: { kind: 'revert', presetId: preset.id } });
     const nextLayoutProject = applyLayoutPresetToProject(nextProject, preset);
 
     return {
@@ -2801,7 +2850,7 @@ const updateActiveProjectLayoutPreset = (
 /** Leave the active preset for another, keeping each preset's working arrangement in this project. */
 const switchActiveProjectLayoutPreset = (state: WorkbenchState, preset: LayoutPreset): WorkbenchState =>
   updateActiveProject(state, (project) => {
-    const nextProject = pushUndo(project, 'Update layout');
+    const nextProject = pushUndo(project, 'Update layout', { notice: { kind: 'switchPreset', presetId: preset.id } });
     const workingArrangement = findLayoutPresetWorkingCopy(project.presetWorkingLayouts, preset.id);
     // The working copy takes the saved preset's place for the arrangement only; identity and route stay the preset's.
     const nextLayoutProject = applyLayoutPresetToProject(
@@ -4142,7 +4191,64 @@ const getCurrentGallerySelectionQuery = (values: Record<string, unknown>, page: 
   };
 };
 
+/**
+ * Placement changes the user makes directly, each one layout undo step. A step's snapshot is the project before it, so
+ * undo puts back exactly what the step moved; bursts (a dragged divider, a moved window) fold into one step per key.
+ * Changes that are steps by themselves (a removal, a preset switch, a route change) record their own.
+ */
+const RECORDED_LAYOUT_ACTIONS: Partial<
+  Record<WorkbenchReducerAction['type'], (action: WorkbenchReducerAction) => { label: string; mergeKey?: string }>
+> = {
+  dockFloatingWidget: () => ({ label: 'Dock window' }),
+  floatWidget: () => ({ label: 'Float widget' }),
+  moveWidgetInstance: () => ({ label: 'Move widget' }),
+  openRegionWidget: () => ({ label: 'Open widget' }),
+  reorderWidgetInstances: () => ({ label: 'Reorder widgets' }),
+  setCenterView: () => ({ label: 'Change center view' }),
+  setFloatingWidgetGeometry: (action) => ({
+    label: 'Move window',
+    mergeKey: `geometry:${(action as { instanceId: string }).instanceId}`,
+  }),
+  setFloatingWidgetMode: () => ({ label: 'Change window' }),
+  setRegionWidgetCollapsed: () => ({ label: 'Collapse panel' }),
+  setRegionWidgetSize: (action) => ({
+    label: 'Resize panel',
+    mergeKey: `size:${(action as { region: string }).region}`,
+  }),
+  setWidgetInstanceAlignment: () => ({ label: 'Move widget' }),
+  toggleRegionWidget: () => ({ label: 'Add widget' }),
+};
+
 export const __workbenchReducerInternal = (
+  state: WorkbenchState,
+  action: WorkbenchReducerAction,
+  context: WorkbenchReducerContext
+): WorkbenchState => {
+  const next = reduceWorkbenchAction(state, action, context);
+  const describeStep = RECORDED_LAYOUT_ACTIONS[action.type];
+
+  if (!describeStep || next === state || next.projects === state.projects) {
+    return next;
+  }
+
+  const step = describeStep(action);
+  const previousById = new Map(state.projects.map((project) => [project.id, project]));
+
+  return {
+    ...next,
+    projects: next.projects.map((project) => {
+      const previous = previousById.get(project.id);
+
+      // A case that recorded its own step (a removal with its notice) already moved the history. A project built
+      // straight from a document, outside hydration, has none to record into.
+      return !previous || previous === project || !previous.undoRedo || previous.undoRedo !== project.undoRedo
+        ? project
+        : { ...project, undoRedo: pushUndo(previous, step.label, { mergeKey: step.mergeKey }).undoRedo };
+    }),
+  };
+};
+
+const reduceWorkbenchAction = (
   state: WorkbenchState,
   action: WorkbenchReducerAction,
   context: WorkbenchReducerContext
@@ -4510,7 +4616,7 @@ export const __workbenchReducerInternal = (
       }
 
       return updateActiveProject(state, (project) => ({
-        ...pushUndo(project, 'Update layout'),
+        ...pushUndo(project, 'Update layout', { notice: { kind: 'discardCopy', presetId: action.presetId } }),
         presetWorkingLayouts: withoutPresetWorkingLayouts(project, (presetId) => presetId === action.presetId),
       }));
     }
@@ -4656,8 +4762,12 @@ export const __workbenchReducerInternal = (
           return project;
         }
 
+        // Removing is a layout step the user can take back; adding opens what they asked for.
+        const before = isEnabled
+          ? pushUndo(project, 'Remove widget', { notice: { instanceId: action.widgetId, kind: 'removeWidget' } })
+          : project;
         const nextProject = updateProjectWidgetRegion(
-          updateRegionOrder(project, action.region, (slots) =>
+          updateRegionOrder(before, action.region, (slots) =>
             isEnabled
               ? slots.filter((slot) => slot.instanceId !== action.widgetId)
               : [...slots, { instanceId: action.widgetId, isFloating: false }]
@@ -4768,8 +4878,10 @@ export const __workbenchReducerInternal = (
 
         // Removing closes the window and frees its rail slot. It opens no panel, but a center left empty by this
         // instance gets its view back rather than staying blank.
-        const closed = updateRegionOrder(project, floating.returnRegion, (slots) =>
-          slots.filter((slot) => slot.instanceId !== action.instanceId)
+        const closed = updateRegionOrder(
+          pushUndo(project, 'Remove widget', { notice: { instanceId: action.instanceId, kind: 'removeWidget' } }),
+          floating.returnRegion,
+          (slots) => slots.filter((slot) => slot.instanceId !== action.instanceId)
         );
 
         return isAwaitedCenterView(project.widgetRegions.center, action.instanceId)
@@ -5933,50 +6045,37 @@ export const __workbenchReducerInternal = (
       };
     }
     case 'undoProjectChange': {
-      return updateActiveProject(state, (project) => {
-        const undoEntry = project.undoRedo.past.at(-1);
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => {
+        // A toast's Undo names its own step; steps taken on top of it go back with it, as repeated undos would.
+        if (action.throughEntryId !== undefined) {
+          const index = project.undoRedo.past.findIndex((entry) => entry.id === action.throughEntryId);
 
-        if (!undoEntry) {
-          return project;
+          if (index === -1) {
+            return project;
+          }
+
+          let restored = project;
+
+          for (let step = project.undoRedo.past.length; step > index; step--) {
+            restored = undoProjectStep(restored);
+          }
+
+          return restored;
         }
 
-        const restoredProject = restoreUndoSnapshot(project, undoEntry.project);
-
-        return {
-          ...restoredProject,
-          events: project.events,
-          promptHistory: project.promptHistory,
-          queue: project.queue,
-          undoRedo: {
-            future: [
-              {
-                createdAt: now(),
-                id: createId('redo'),
-                label: undoEntry.label,
-                project: createUndoSnapshot(project),
-              },
-              ...project.undoRedo.future,
-            ].slice(0, HISTORY_LIMIT),
-            past: project.undoRedo.past.slice(0, -1),
-          },
-        };
+        return undoProjectStep(project);
       });
     }
     case 'redoProjectChange': {
-      return updateActiveProject(state, (project) => {
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => {
         const redoEntry = project.undoRedo.future[0];
 
         if (!redoEntry) {
           return project;
         }
 
-        const restoredProject = restoreUndoSnapshot(project, redoEntry.project);
-
         return {
-          ...restoredProject,
-          events: project.events,
-          promptHistory: project.promptHistory,
-          queue: project.queue,
+          ...restoreUndoSnapshot(project, redoEntry.project),
           undoRedo: {
             future: project.undoRedo.future.slice(1),
             past: [

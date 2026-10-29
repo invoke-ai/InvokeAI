@@ -6,6 +6,7 @@ import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
 import { ChakraProvider } from '@chakra-ui/react';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { GenerationUiProvider, type GenerationUiAdapter } from '@features/generation/ui/GenerationUiContext';
+import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { getDefaultVideoSettings } from '@features/video';
 import { VideoWidgetView } from '@features/video/ui/VideoWidgetView';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -140,7 +141,10 @@ vi.mock('@features/generation/components', async (importOriginal) => ({
   NegativePromptField: () => null,
   PositivePromptField: () => null,
 }));
-vi.mock('@platform/ui/toaster', () => ({ toaster: { create: notify } }));
+vi.mock('@platform/ui/toaster', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  toaster: { create: notify },
+}));
 vi.mock('@workbench/settings/store', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useWorkbenchPreferenceSelector: () => false,
@@ -150,6 +154,7 @@ vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: ()
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) =>
     selector(useSyncExternalStore(store.subscribe, store.getSnapshot).activeProject),
+  useOptionalWorkbenchCommands: () => store.commands,
   useWorkbenchCommands: () => store.commands,
   useWorkbenchQueries: () => store.queries,
 }));
@@ -460,5 +465,40 @@ describe('video model switch confirmation', () => {
 
     expect(stored().modelKey).toBe(wanT2v.key);
     await vi.waitFor(() => expect(document.activeElement).toBe(modelSelect()));
+  });
+});
+
+describe('video model field without a model', () => {
+  // The picker's install action reads the library itself; the field's message has to agree with it.
+  const renderEmpty = () =>
+    act(() =>
+      root.render(
+        <I18nextProvider i18n={i18n}>
+          <QueryClientProvider client={new QueryClient()}>
+            <ChakraProvider value={system}>
+              <GenerationUiProvider adapter={generationAdapter}>
+                <VideoUiAdapterProvider>
+                  <VideoWidgetView />
+                </VideoUiAdapterProvider>
+              </GenerationUiProvider>
+            </ChakraProvider>
+          </QueryClientProvider>
+        </I18nextProvider>
+      )
+    );
+
+  afterEach(() => setModelsSnapshotForTests({ error: null, models: [], status: 'idle' }));
+
+  it('says none is installed rather than asking for a choice the picker cannot offer', async () => {
+    modelStore.set([]);
+    setModelsSnapshotForTests({ error: null, models: [], status: 'loaded' });
+    await renderEmpty();
+
+    expect(host.textContent).toContain('No Wan 2.2, LTX-2 or MiniMax H3 model is installed.');
+
+    setModelsSnapshotForTests({ error: null, models: catalog as never, status: 'loaded' });
+    await renderEmpty();
+
+    expect(host.textContent).toContain('Select a Wan 2.2, LTX-2 or MiniMax H3 model.');
   });
 });

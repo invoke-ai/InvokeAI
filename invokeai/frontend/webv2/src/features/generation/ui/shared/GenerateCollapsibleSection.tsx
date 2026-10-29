@@ -53,6 +53,7 @@ export const GenerateCollapsibleSection = ({ badges, children, defaultOpen, isOp
     <Collapsible.Root
       className="generate-section"
       css={SECTION_STYLES}
+      data-generate-section={sectionId}
       _open={SECTION_OPEN_STYLES}
       defaultOpen={sectionId === undefined ? defaultOpen : undefined}
       open={resolvedOpen}

@@ -244,7 +244,10 @@ describe('WorkbenchHotkeyRuntime under a modal dialog', () => {
     await userEvent.keyboard('{Enter}');
     expect(confirmed).toBe(1);
     expect(ran).toEqual(['map.escape']);
-    dispatchKey({ key: 'Enter' });
+    // From outside any control: Enter on a focused button (focus may return to one) is the button's own press.
+    document.body.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, code: 'Enter', key: 'Enter' })
+    );
     expect(ran).toEqual(['map.escape', 'map.enter']);
   });
 

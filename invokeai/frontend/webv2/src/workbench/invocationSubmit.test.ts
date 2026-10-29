@@ -377,6 +377,8 @@ describe('submitResolvedInvocation with a workflow generator', () => {
     expect(notify).toHaveBeenCalledWith({
       kind: 'error',
       message: 'Batch node "string_batch" has an empty collection.',
+      messageKey: 'nodes.readiness.batchEmpty',
+      messageValues: { node: 'string_batch' },
       title: 'The batch is not ready',
       titleKey: 'topbar.invoke.batchNotReady',
     });

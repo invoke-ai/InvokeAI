@@ -7,7 +7,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
-import type { InvocationState } from './useInvocationState';
+import type { InvocationIssue, InvocationState } from './useInvocationState';
 import type * as UseTopbarShortcutModule from './useTopbarShortcut';
 
 // Verify progress returns after hover ends unless focus-visible remains; mouse click-focus must not pin the play
@@ -15,6 +15,7 @@ import type * as UseTopbarShortcutModule from './useTopbarShortcut';
 const harness = vi.hoisted(() => ({
   bindings: {} as Record<string, { aria: string; display: string; parts: string[] }>,
   revealed: [] as string[],
+  sources: [] as string[],
   progress: { activeItemIndex: 1, completedItemCount: 0, message: '', percentage: 0.42 as number | null },
   summary: { current: 1, remaining: 1, runningQueueItemId: 'item-1', total: 1 },
 }));
@@ -22,13 +23,25 @@ const harness = vi.hoisted(() => ({
 vi.mock('@workbench/queue-integration/useActiveQueueProgress', () => ({
   useActiveQueueProgress: () => ({ progress: harness.progress, queueItems: [], summary: harness.summary }),
 }));
-vi.mock('@workbench/invocation', () => ({ getDestinationLabel: () => 'Gallery' }));
+vi.mock('@workbench/WorkbenchContext', () => ({
+  useWorkbenchCommands: () => ({ generation: { setSource: (sourceId: string) => harness.sources.push(sourceId) } }),
+}));
 vi.mock('./useTopbarShortcut', async (importOriginal) => ({
   ...(await importOriginal<typeof UseTopbarShortcutModule>()),
   useTopbarShortcutBinding: (commandId: string) => harness.bindings[commandId] ?? null,
 }));
-vi.mock('@workbench/widgets/layers/revealLayerProperties', () => ({
-  useRevealLayerProperties: () => (layerId: string) => harness.revealed.push(layerId),
+// The list's ways out are their own module's concern; here each layer issue offers one that records its layer.
+vi.mock('./invokeIssueActions', () => ({
+  useInvokeIssueActions: () => (issue: InvocationIssue) =>
+    issue.target.kind === 'layer'
+      ? [
+          {
+            id: 'show',
+            label: 'Show layer',
+            run: () => harness.revealed.push((issue.target as { layerId: string }).layerId),
+          },
+        ]
+      : [],
 }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -95,12 +108,18 @@ const renderInvokeButton = async (overrides: Partial<InvocationState> = {}) => {
   return { button: host.querySelector('button') as HTMLButtonElement, state };
 };
 
+const LAYER_ISSUES: InvocationIssue[] = [
+  { message: 'Control layer "Depth 1": Choose a model.', target: { kind: 'layer', layerId: 'control-2' } },
+  { message: 'The server is disconnected.', target: { kind: 'connection' } },
+];
+
 const hasProgressRing = (button: HTMLButtonElement): boolean => button.querySelector('[role="progressbar"]') !== null;
 const hasSpinner = (button: HTMLButtonElement): boolean => button.querySelector('.chakra-spinner') !== null;
 
 beforeEach(() => {
   harness.bindings = {};
   harness.revealed = [];
+  harness.sources = [];
   harness.progress.percentage = 0.42;
   harness.summary.total = 1;
   harness.summary.runningQueueItemId = 'item-1';
@@ -160,7 +179,9 @@ describe('InvokeButton icon slot', () => {
       invoke,
       isPreparing: true,
       isValid: false,
-      issues: [{ layerId: 'control-2', message: 'Control layer "Depth 1": Choose a model.' }],
+      issues: [
+        { message: 'Control layer "Depth 1": Choose a model.', target: { kind: 'layer', layerId: 'control-2' } },
+      ],
     });
 
     expect(button.getAttribute('aria-disabled')).toBe('true');
@@ -191,29 +212,16 @@ describe('InvokeButton front of queue', () => {
     expect(invoke).toHaveBeenNthCalledWith(2, { prepend: true });
   });
 
-  it('ignores both clicks while Invoke is blocked by issues no layer can show', async () => {
+  it('never queues while blocked, however it is clicked', async () => {
     const invoke = vi.fn(() => Promise.resolve());
-    const { button } = await renderInvokeButton({
-      invoke,
-      isValid: false,
-      issues: [
-        { layerId: null, message: 'The backend is disconnected.' },
-        { layerId: 'control-2', message: 'Control layer "Depth 1": Choose a model.' },
-      ],
-    });
+    const { button } = await renderInvokeButton({ invoke, isValid: false, issues: LAYER_ISSUES });
 
-    // The visible label names it (WCAG 2.5.3); the blocking reason describes it.
-    expect(button.getAttribute('aria-disabled')).toBe('true');
-    await expect.element(button).toHaveAccessibleName('topbar.invoke.issueCount(2)');
-    await expect.element(button).toHaveAccessibleDescription('topbar.invoke.unavailable');
-
-    expect(getComputedStyle(button).opacity).toBe('0.55');
-    // Dispatched: a blocked Invoke is not actionable for a pointer driver.
-    await act(() => button.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-    await act(() => button.dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true })));
+    await act(() => userEvent.click(button));
+    await userEvent.keyboard('{Shift>}');
+    await act(() => userEvent.click(button));
+    await userEvent.keyboard('{/Shift}');
 
     expect(invoke).not.toHaveBeenCalled();
-    expect(harness.revealed).toEqual([]);
   });
 
   it('names the live front-of-queue binding and Shift+click, and lists both bindings as shortcuts', async () => {
@@ -243,43 +251,127 @@ describe('InvokeButton front of queue', () => {
 });
 
 describe('InvokeButton issues', () => {
-  const LAYER_ISSUES = [
-    { layerId: 'control-2', message: 'Control layer "Depth 1": Choose a model.' },
-    { layerId: null, message: 'The backend is disconnected.' },
-  ];
-
-  it('counts the issues in place of the shortcut and keeps listing them in the tooltip', async () => {
+  it('counts the issues in place of the shortcut and steps back from the primary color', async () => {
     harness.bindings = { 'app.invoke': { aria: 'Control+Enter', display: 'Ctrl+Enter', parts: ['ctrl', 'enter'] } };
     const { button } = await renderInvokeButton({ isValid: false, issues: LAYER_ISSUES });
 
-    expect(button.textContent).toContain('topbar.invoke.issueCount(2)');
+    await expect.element(button).toHaveAccessibleName('topbar.invoke.issueCount(2)');
     expect(button.querySelector('kbd')).toBeNull();
+    // Blocked is not disabled: activating it opens the list.
+    expect(button.getAttribute('aria-disabled')).not.toBe('true');
+    expect(button.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(button.dataset.blocked).toBe('');
+  });
+
+  it('previews the issues on hover without taking focus', async () => {
+    const { button } = await renderInvokeButton({ isValid: false, issues: LAYER_ISSUES });
+
     await act(() => userEvent.hover(button));
 
     await expect.element(page.getByText('Control layer "Depth 1": Choose a model.')).toBeVisible();
-    await expect.element(page.getByText('backend is disconnected.')).toBeVisible();
+    await expect.element(page.getByText('The server is disconnected.')).toBeVisible();
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).not.toBe(page.getByRole('button', { name: 'Show layer' }).element());
   });
 
-  it('shows the first issue’s layer on click or Enter, and never invokes', async () => {
+  it('opens the list on click or Enter, with each issue’s way out, and never invokes', async () => {
     const invoke = vi.fn(() => Promise.resolve());
     const { button } = await renderInvokeButton({ invoke, isValid: false, issues: LAYER_ISSUES });
 
-    expect(button.getAttribute('aria-disabled')).not.toBe('true');
-    // Actionable, so not dimmed like a blocked Invoke.
-    expect(getComputedStyle(button).opacity).toBe('1');
-    expect(button.getAttribute('aria-label')).toBe(
-      'topbar.invoke.showIssue(2, Control layer "Depth 1": Choose a model.)'
-    );
-    await expect
-      .element(button)
-      .toHaveAccessibleName('topbar.invoke.showIssue(2, Control layer "Depth 1": Choose a model.)');
-    expect(button.hasAttribute('aria-describedby')).toBe(false);
-
-    await act(() => userEvent.click(button));
     button.focus();
     await act(() => userEvent.keyboard('{Enter}'));
 
-    expect(harness.revealed).toEqual(['control-2', 'control-2']);
+    const show = page.getByRole('button', { name: 'Show layer' });
+    await expect.element(show).toHaveFocus();
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    // The lost connection is listed with nothing to press.
+    await expect.element(page.getByText('The server is disconnected.')).toBeVisible();
+
+    await act(() => show.click());
+
+    expect(harness.revealed).toEqual(['control-2']);
     expect(invoke).not.toHaveBeenCalled();
+    // A jump closes the list and leaves focus where the jump put it.
+    await expect.element(page.getByText('Control layer "Depth 1": Choose a model.')).not.toBeInTheDocument();
+  });
+
+  const WORKFLOW_ROUTE = {
+    invocation: { ...invocation, sourceId: 'workflow' as const },
+    isValid: false,
+    placedTypeIds: new Set(['generate', 'workflow'] as const),
+    sources: [
+      { label: 'Generate', sourceId: 'generate' as const, typeId: 'generate' as const },
+      { label: 'Workflow', sourceId: 'workflow' as const, typeId: 'workflow' as const },
+    ],
+  };
+
+  // With no way out to press, a click lands on the source the route runs, never on one the user did not choose.
+  it('pins focus on the selected source when no issue offers an action', async () => {
+    const { button } = await renderInvokeButton({
+      ...WORKFLOW_ROUTE,
+      issues: [{ message: 'The server is disconnected.', target: { kind: 'connection' } }],
+    });
+
+    await act(() => userEvent.click(button));
+
+    await expect.poll(() => (document.activeElement as HTMLInputElement | null)?.value).toBe('workflow');
+    expect((document.activeElement as HTMLInputElement).checked).toBe(true);
+  });
+
+  it('gives focus back to Invoke on Escape, and on Tab past its last control', async () => {
+    const { button } = await renderInvokeButton({ isValid: false, issues: LAYER_ISSUES });
+
+    await act(() => userEvent.click(button));
+    await expect.element(page.getByRole('button', { name: 'Show layer' })).toHaveFocus();
+    await act(() => userEvent.keyboard('{Escape}'));
+    await expect.element(button).toHaveFocus();
+    await expect.element(page.getByText('Control layer "Depth 1": Choose a model.')).not.toBeInTheDocument();
+
+    await act(() => userEvent.click(button));
+    await expect.element(page.getByRole('button', { name: 'Show layer' })).toHaveFocus();
+    await act(() => userEvent.tab());
+
+    await expect.element(button).toHaveFocus();
+    await expect.element(page.getByText('Control layer "Depth 1": Choose a model.')).not.toBeInTheDocument();
+  });
+
+  it('closes a hover preview once the pointer leaves', async () => {
+    const { button } = await renderInvokeButton({ isValid: false, issues: LAYER_ISSUES });
+
+    await act(() => userEvent.hover(button));
+    await expect.element(page.getByText('Control layer "Depth 1": Choose a model.')).toBeVisible();
+    await act(() => userEvent.unhover(button));
+
+    await expect.element(page.getByText('Control layer "Depth 1": Choose a model.')).not.toBeInTheDocument();
+  });
+
+  it('switches the source among those the layout holds, from the list itself', async () => {
+    const { button } = await renderInvokeButton({
+      invocation: { ...invocation, sourceId: 'workflow' },
+      isValid: false,
+      issues: [
+        {
+          message: 'The Workflow widget is not in this layout. Add it, or run another source.',
+          target: { kind: 'mountSource', sourceId: 'workflow' },
+        },
+      ],
+      placedTypeIds: new Set(['generate', 'canvas']),
+      sources: [
+        { label: 'Generate', sourceId: 'generate', typeId: 'generate' },
+        { label: 'Canvas', sourceId: 'canvas', typeId: 'canvas' },
+        { label: 'Upscale', sourceId: 'upscale', typeId: 'upscale' },
+        { label: 'Workflow', sourceId: 'workflow', typeId: 'workflow' },
+      ],
+    });
+
+    await act(() => userEvent.click(button));
+    const sourceGroup = page.getByRole('radiogroup', { name: 'topbar.routing.source' });
+
+    await expect.element(sourceGroup).toBeVisible();
+    // Upscale is in no region or window, so it is not offered; the missing Workflow stays, as the current choice.
+    expect(sourceGroup.getByText('widgets.labels.upscale').query()).toBeNull();
+    await act(() => sourceGroup.getByText('widgets.labels.generate').click());
+
+    expect(harness.sources).toEqual(['generate']);
   });
 });

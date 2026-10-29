@@ -250,7 +250,7 @@ describe('resolveInvocationRoute — upscale source', () => {
 
     expect(
       resolveInvocationRouteInput(withoutWidget, 'global', route, upscaleModels).validationReasons.map(reasonText)
-    ).toContain('The Upscale widget is not mounted in this project.');
+    ).toContainEqual({ routeIssue: { kind: 'sourceNotMounted', sourceId: 'upscale' } });
     expect(
       resolveInvocationRouteInput(input, 'global', route, missingTile).validationReasons.map(reasonText)
     ).toContain('SDXL Tile ControlNet is no longer installed.');
@@ -517,7 +517,7 @@ describe('resolveInvocationRoute — canvas source', () => {
     );
 
     expect(route.sourceValid).toBe(false);
-    expect(route.validationReasons.map(reasonText)).toContain('Canvas generation frame must have a positive area.');
+    expect(route.validationReasons).toContainEqual({ routeIssue: { kind: 'emptyCanvasFrame' } });
   });
 
   it('reuses the generate model validation reasons', () => {
@@ -539,7 +539,7 @@ describe('resolveInvocationRoute — canvas source', () => {
     );
 
     expect(route.sourceValid).toBe(false);
-    expect(route.validationReasons.map(reasonText)).toContain('The Canvas widget is not mounted in this project.');
+    expect(route.validationReasons).toContainEqual({ routeIssue: { kind: 'sourceNotMounted', sourceId: 'canvas' } });
   });
 
   it('blocks a typed content-bearing control layer no model resolves once models are loaded', () => {
@@ -916,9 +916,7 @@ describe('resolveInvocationRoute — video destination compatibility', () => {
     const blocked = resolveInvocationRouteInput(input, 'global', canvasRoute);
 
     expect(blocked.destinationValid).toBe(false);
-    expect(blocked.validationReasons.map(reasonText)).toContain(
-      'Video results can only be sent to the Gallery. Switch the destination to Gallery.'
-    );
+    expect(blocked.validationReasons).toContainEqual({ routeIssue: { kind: 'videoNeedsGallery' } });
 
     expect(
       resolveInvocationRouteInput(input, 'global', { ...canvasRoute, destination: 'gallery' }).destinationValid

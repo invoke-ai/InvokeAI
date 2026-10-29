@@ -68,6 +68,27 @@ export const describeGenerationIssue = (
   issue: Pick<GenerationIssue, 'message' | 'messageKey' | 'messageValues'>
 ): string => (issue.messageKey ? t(issue.messageKey, { ...issue.messageValues }) : issue.message);
 
+/** What applying `fix` does, in the active language: the label of a one-step fix button. */
+export const describeGenerationIssueFix = (
+  t: (key: string, values?: Record<string, unknown>) => string,
+  fix: GenerationIssueFix
+): string => {
+  switch (fix.kind) {
+    case 'clampGuidance':
+      return t('widgets.generate.issueFixes.setValue', { value: fix.value });
+    case 'clearModel':
+      return t('widgets.generate.issueFixes.clear');
+    case 'removeConcept':
+      return t('widgets.generate.issueFixes.remove');
+    case 'setDimensions':
+      return t('widgets.generate.issueFixes.setSize', { height: fix.height, width: fix.width });
+    case 'turnOffPid':
+      return t('widgets.generate.issueFixes.turnOffPid');
+    case 'turnOffReferenceImages':
+      return t('widgets.generate.issueFixes.turnOff', { count: fix.referenceImageIds.length });
+  }
+};
+
 /** The patch that applies `fix` to `settings`, read when the fix runs so it acts on the latest values. */
 export const getGenerationIssueFixPatch = (
   settings: Pick<GenerateSettings, 'loras' | 'referenceImages'>,

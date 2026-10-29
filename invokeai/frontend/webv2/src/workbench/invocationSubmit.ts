@@ -213,7 +213,15 @@ const resolveWorkflowGeneratorsForRoute = async (
   const reason = resolvedPlan.reasons[0] ?? capReason;
 
   if (reason) {
-    commands.notifications.add({ ...BATCH_NOT_READY_TITLE, kind: 'error', message: reason });
+    const { message, messageKey, messageValues } = reason.workflowIssue;
+
+    commands.notifications.add({
+      ...BATCH_NOT_READY_TITLE,
+      kind: 'error',
+      message,
+      messageKey,
+      ...(messageValues ? { messageValues } : {}),
+    });
     return null;
   }
 

@@ -25,7 +25,6 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
-  ErrorComponent,
   type ErrorComponentProps,
   lazyRouteComponent,
   Navigate,
@@ -46,10 +45,11 @@ import {
   useWorkbenchPreferenceSelector,
 } from '@workbench/settings/store';
 import { loadAppVersion } from '@workbench/shell/whatsNewStore';
-import { Fragment, useMemo, type ReactNode } from 'react';
+import { Fragment, useCallback, useMemo, type ReactNode } from 'react';
 
 import type * as SchedulerRules from './modelSchedulerPolicyReader';
 
+import { RouterErrorScreen } from './RouterErrorScreen';
 import { SocketHubRuntime } from './SocketHubRuntime';
 import { createStartupRedirects } from './startupRedirect';
 
@@ -61,15 +61,17 @@ import { createStartupRedirects } from './startupRedirect';
 /** Route render and loader failures reach the router's catch boundary; record them once there. */
 const routerLogger = createLogger({ area: 'router', namespace: 'app' });
 
-const RouterError = ({ error }: ErrorComponentProps) => {
+const RouterError = ({ error, reset }: ErrorComponentProps) => {
   'use no memo';
   // Skip compiler memoization on this cold path; retry tests and build budgets guard it.
   const router = useRouter();
+  // Home has its own loaders, so leaving the failed route and clearing the boundary is a real way back.
+  const goHome = useCallback(() => void router.navigate({ to: '/' }).then(reset), [reset, router]);
 
   return error instanceof AuthSessionUnavailableError ? (
     <AuthUnavailableScreen onRetry={router.invalidate} />
   ) : (
-    <ErrorComponent error={error} />
+    <RouterErrorScreen error={error} onGoHome={goHome} />
   );
 };
 

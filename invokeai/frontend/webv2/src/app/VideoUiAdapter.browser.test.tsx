@@ -62,6 +62,7 @@ vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: ()
 let widgetInstances: Record<string, unknown> = {};
 
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useOptionalWorkbenchCommands: () => null,
   useActiveProjectSelector: (selector: (project: unknown) => unknown) =>
     selector({ id: activeProjectId, widgetInstances }),
   useWorkbenchCommands: () => ({
