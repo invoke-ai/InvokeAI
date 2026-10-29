@@ -2,7 +2,7 @@
 it casts to, and the quantized files it refuses rather than loads unscaled.
 
 Like the Z-Image ControlNet loader it builds under `init_empty_weights` and assigns the file's tensors, so an fp8
-weight with its scale dropped would become the parameter as it is (`test_z_image_control_adapter_loader.py`). No
+weight with its scale dropped would become the parameter as it is (`test_z_image_fun_controlnet_loader.py`). No
 quantized build of this adapter is published (alibaba-pai ships dense bf16 files), so refusing costs nothing. The
 Qwen-Image loader is covered in `test_qwen_image_controlnet_loader.py`.
 """
