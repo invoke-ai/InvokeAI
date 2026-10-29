@@ -18,11 +18,9 @@ import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import {
   BugIcon,
-  CheckIcon,
   ChevronDownIcon,
   DatabaseIcon,
   FullscreenIcon,
-  MaximizeIcon,
   Redo2Icon,
   SaveIcon,
   Trash2Icon,
@@ -60,6 +58,7 @@ type CanvasHeaderEngine = Pick<
 
 const ZOOM_OPTIONS = zoomMenuOptions();
 const MENU_POSITIONING = { placement: 'bottom-end' } as const;
+const ZOOM_MENU_POSITIONING = { placement: 'bottom-start' } as const;
 
 /** Reads the persisted, default-applied canvas settings for the active project. */
 const selectCanvasSettings = (project: Project): ResolvedCanvasSettings =>
@@ -101,6 +100,7 @@ const CanvasHeaderActionsInner = ({
   const editingLocked = useCanvasDocumentEditingLocked(engine);
   const { isSaving, save: saveToGallery } = useCanvasGallerySave(engine);
   const saveMenuIds = useTooltipTriggerIds();
+  const zoomMenuIds = useTooltipTriggerIds();
   const saveLabel = isSaving
     ? t('widgets.canvas.controls.savingToGallery')
     : t('widgets.canvas.contextMenu.saveToGallery');
@@ -209,48 +209,46 @@ const CanvasHeaderActionsInner = ({
 
   return (
     <HStack gap="0.5">
-      <Menu.Root positioning={MENU_POSITIONING}>
-        <Menu.Trigger asChild>
-          <Button
-            aria-label={t('widgets.canvas.controls.zoomLevel', { zoom: zoomLabel })}
-            color="fg.muted"
-            fontVariantNumeric="tabular-nums"
-            size="sm"
-            variant="ghost"
-          >
-            <ZoomInIcon aria-hidden />
-            {/* Wide enough for "2000%" in tabular digits, so the trigger keeps its width as the zoom changes. */}
-            <Text minW="6ch" textAlign="center">
-              {zoomLabel}
-            </Text>
-            <ChevronDownIcon size={12} />
-          </Button>
-        </Menu.Trigger>
+      <Menu.Root ids={zoomMenuIds} positioning={ZOOM_MENU_POSITIONING}>
+        <Tooltip content={t('widgets.canvas.controls.zoom')} ids={zoomMenuIds}>
+          <Menu.Trigger asChild>
+            <Button
+              aria-label={t('widgets.canvas.controls.zoomLevel', { zoom: zoomLabel })}
+              color="fg.muted"
+              fontVariantNumeric="tabular-nums"
+              size="sm"
+              variant="ghost"
+            >
+              <ZoomInIcon aria-hidden />
+              {/* Wide enough for "500%" in tabular digits, so the trigger keeps its width as the zoom changes. */}
+              <Text fontSize="md" minW="6ch" textAlign="center">
+                {zoomLabel}
+              </Text>
+              <ChevronDownIcon size={12} />
+            </Button>
+          </Menu.Trigger>
+        </Tooltip>
         <Portal>
           <Menu.Positioner>
-            <MenuContent minW="7rem" py="1">
+            <MenuContent minW="9rem">
+              <MenuActionItem
+                label={t('widgets.canvas.controls.fitToView')}
+                value="fit"
+                onSelect={() => engine.viewport.fitToView()}
+              />
               {ZOOM_OPTIONS.map((option) => (
-                <Menu.Item key={option.value} value={option.label} onClick={() => setZoom(option.value)}>
-                  <CheckIcon size={12} opacity={zoomLabel === option.label ? 1 : 0} />
-                  <Menu.ItemText>{option.label}</Menu.ItemText>
-                </Menu.Item>
+                <MenuActionItem
+                  key={option.value}
+                  disabled={zoomLabel === option.label}
+                  label={option.label}
+                  value={`zoom-${option.label}`}
+                  onSelect={() => setZoom(option.value)}
+                />
               ))}
             </MenuContent>
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
-
-      <Tooltip content={t('widgets.canvas.controls.fitToView')}>
-        <IconButton
-          aria-label={t('widgets.canvas.controls.fitToView')}
-          color="fg.muted"
-          size="sm"
-          variant="ghost"
-          onClick={() => engine.viewport.fitToView()}
-        >
-          <MaximizeIcon />
-        </IconButton>
-      </Tooltip>
 
       <Tooltip content={t('widgets.canvas.controls.fitBboxToLayers')}>
         <IconButton

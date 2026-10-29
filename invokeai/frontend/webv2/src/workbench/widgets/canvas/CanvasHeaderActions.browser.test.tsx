@@ -293,6 +293,42 @@ describe('CanvasHeaderActions clear canvas', () => {
   });
 });
 
+describe('CanvasHeaderActions zoom menu', () => {
+  const item = (name: string) => page.getByRole('menuitem', { exact: true, name });
+
+  it('names the current zoom, leads with Fit to view, and offers every preset but the current one', async () => {
+    await renderActions();
+    const fitToView = vi.spyOn(harness.engine!.viewport, 'fitToView');
+
+    await page.getByRole('button', { exact: true, name: 'Zoom 100%' }).click();
+    const labels = [...document.querySelectorAll('[role="menuitem"]')].map((node) => node.textContent?.trim());
+    expect(labels).toEqual([
+      'Fit to view',
+      '25%',
+      '33%',
+      '50%',
+      '67%',
+      '75%',
+      '100%',
+      '125%',
+      '150%',
+      '200%',
+      '300%',
+      '400%',
+      '500%',
+    ]);
+    await expect.element(item('100%')).toHaveAttribute('aria-disabled', 'true');
+    await item('200%').click();
+
+    const trigger = page.getByRole('button', { exact: true, name: 'Zoom 200%' });
+    await expect.element(trigger).toHaveTextContent('200%');
+    await trigger.click();
+    await expect.element(item('200%')).toHaveAttribute('aria-disabled', 'true');
+    await item('Fit to view').click();
+    expect(fitToView).toHaveBeenCalledOnce();
+  });
+});
+
 describe('CanvasHeaderActions fit frame to masks', () => {
   it("pads the masks by the project's mask blur plus 8 before snapping outward to the grid", async () => {
     const mask: CanvasLayerContract = {

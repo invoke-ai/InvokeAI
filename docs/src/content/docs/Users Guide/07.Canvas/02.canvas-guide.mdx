@@ -14,7 +14,7 @@ This page describes the Canvas itself: its tools, controls and menus. For an int
 
 Each project has one canvas. It opens in the center of the **Edit** layout (**Alt+2**), or press **2** to bring it to the front.
 
-<Image src={toolbar} alt="The Canvas with its tool strip on the left and the header buttons along the top: zoom, fit buttons, undo and redo, save, clear canvas, settings and more." width={560} />
+<Image src={toolbar} alt="The Canvas with its tool strip on the left and the header buttons along the top: the zoom menu, fit frame buttons, undo and redo, save, clear canvas, settings and more." width={560} />
 
 ## Tools
 
@@ -74,13 +74,13 @@ In InvokeAI 6, the Lasso drew directly into an inpaint mask, and created one if 
 
 * **Zoom** with the mouse wheel, which zooms around the pointer, or choose a level from the zoom menu in the header (25% to 500%). **Ctrl+1**, **Ctrl+2**, **Ctrl+3** and **Ctrl+4** zoom to 100%, 200%, 400% and 800% around the center of the view. Many browsers use these keys to switch tabs and do not pass them to the page; there, choose **Zoom to 100%**, **Zoom to 200%**, **Zoom to 400%** or **Zoom to 800%** from the command palette (**Ctrl+K**), or assign other keys in **Settings → Hotkeys**.
 * **Pan** with the View tool, by holding **Space**, or by dragging with the middle mouse button.
-* **Fit to view** (header) fits the generation frame and all layers into the window.
+* **Fit to view**, at the top of the header's zoom menu, fits the generation frame and all layers into the window.
 
 ## The header
 
 The buttons along the top of the canvas, from left to right:
 
-* **Zoom level** and **Fit to view**.
+* **Zoom** — shows the current zoom level. Its menu offers **Fit to view**, then the zoom levels from 25% to 500%.
 * **Fit frame to layers** (**Shift+N**) — resizes the generation frame to the area all layers cover. With **Snap to grid** on, the frame then shrinks inward to the model's grid, so it can trim up to one grid step less one pixel from each edge of the layers.
 * **Fit frame to masks** (**Shift+B**) — resizes the generation frame to enclose the inpaint masks, with a margin of the **Mask blur** (in the Generate panel's **Compositing** section) plus 8 pixels, so the blurred edge of the mask stays inside the frame. With the default blur of 16, the margin is 24 pixels. With **Snap to grid** on, the frame then grows outward to the model's grid, so the margin can be wider but never narrower.
 * **Undo canvas edit** (**Ctrl+Z**) and **Redo canvas edit** (**Ctrl+Shift+Z** or **Ctrl+Y**).

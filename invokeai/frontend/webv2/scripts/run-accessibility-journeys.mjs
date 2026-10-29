@@ -1050,7 +1050,7 @@ const runKeepAliveStateJourney = async (browser) => {
 
     await selectLayoutPreset(page, 'Edit', 'Canvas');
 
-    const zoomTrigger = page.getByRole('button', { name: /^Zoom level\b/ });
+    const zoomTrigger = page.getByRole('button', { name: /^Zoom \d+%$/ });
     await zoomTrigger.click();
     await page.getByRole('menuitem', { exact: true, name: '200%' }).click();
     await waitForSettledDocument(page);
