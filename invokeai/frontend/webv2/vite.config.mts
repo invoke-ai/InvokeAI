@@ -183,6 +183,9 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/widgets/canvas/bboxGrid.ts',
   // The Preview (open at boot) and the Canvas staging bar share the Auto-switch menu; alone it costs a boot request.
   '/workbench/widgets/shared/AutoSwitchMenu.tsx',
+  // The Gallery, the Preview filmstrip and the Canvas staging bar share the progress badge; alone it costs a boot
+  // request.
+  '/platform/ui/ProgressBadge.tsx',
   // Invoke, the image menu (editor boot) and the lazy layer menu reveal a layer's Properties through these.
   '/workbench/widgets/layers/layerPropertiesRequestStore.ts',
   '/workbench/widgets/layers/revealLayerProperties.ts',
