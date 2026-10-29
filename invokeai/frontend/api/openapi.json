@@ -1515,6 +1515,9 @@
                       "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
                     },
                     {
@@ -2030,6 +2033,9 @@
                       "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
                     },
                     {
@@ -2543,6 +2549,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
@@ -3103,6 +3112,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
@@ -3690,6 +3702,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
@@ -5152,6 +5167,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
@@ -20871,6 +20889,9 @@
           },
           {
             "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
           },
           {
             "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
@@ -75223,7 +75244,7 @@
           "generation"
         ],
         "title": "Main_Checkpoint_LTX2_Config",
-        "description": "An LTX-2 single-file transformer (safetensors) in the official key layout.\n\nCovers the bf16, Comfy ``int8_tensorwise``(+convrot) and ``nvfp4`` releases; the quantization\nscheme is read from the file's own markers by the loader, not recorded here. The file may hold\nonly the transformer (the 2.5 releases) or bundle other components beside it (earlier\ngenerations) -- either way everything else comes from an installed LTX-2 component folder.\n\nDev and Distilled transformers are key-for-key identical, so the FILENAME is the variant\nclassifier and ``variant`` is the user-correctable override for renamed files. A misclassified\nvariant runs but samples with the wrong recipe (guided schedule vs fixed distilled sigmas)."
+        "description": "An LTX-2 single-file transformer (safetensors) in the official key layout.\n\nCovers the bf16, Comfy ``int8_tensorwise``(+convrot) and ``nvfp4`` releases; the quantization\nscheme is read from the file's own markers by the loader, not recorded here. The file may hold\nonly the transformer (the 2.5 releases) or bundle other components beside it (earlier\ngenerations) -- either way everything else comes from an installed LTX-2 component folder. Dev and\nDistilled are told apart by the filename."
       },
       "Main_Checkpoint_MiniMaxH3_Config": {
         "properties": {
@@ -80920,6 +80941,181 @@
         ],
         "title": "Main_GGUF_Krea2_Config",
         "description": "Model config for GGUF-quantized Krea-2 transformer models (single-file)."
+      },
+      "Main_GGUF_LTX2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "ltx-2",
+            "title": "Base",
+            "default": "ltx-2"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/LTX2VariantType"
+          },
+          "generation": {
+            "type": "string",
+            "title": "Generation",
+            "description": "The LTX-2 generation the transformer belongs to, e.g. '2.5'."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant",
+          "generation"
+        ],
+        "title": "Main_GGUF_LTX2_Config",
+        "description": "An LTX-2 single-file transformer in GGUF, in the official key layout.\n\nThe community builds are conversions of the official single files: the transformer's keys, bare or\nunder ``model.diffusion_model.``, with the two text connectors bundled beside them -- which, as for\nthe official files, the component folder supplies instead. Their ``general.architecture`` is ``ltxv``\nfor every generation, and some carry another model's metadata outright, so the keys identify them,\nexactly as they do the safetensors files. Some keep the official ``model_version`` string and some\ndrop it; the structure dates those. Dev and Distilled are told apart by the filename."
       },
       "Main_GGUF_QwenImage21_Config": {
         "properties": {
@@ -89374,6 +89570,9 @@
                 "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
               },
               {
@@ -90135,6 +90334,9 @@
                     "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
                   },
                   {
@@ -90826,6 +91028,9 @@
                 "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
               },
               {
@@ -91326,6 +91531,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
@@ -92321,6 +92529,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_GGUF_ErnieImage_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
