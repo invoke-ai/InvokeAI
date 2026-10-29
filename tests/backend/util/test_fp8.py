@@ -1,4 +1,4 @@
-"""Tests for `get_model_compute_dtype`.
+"""Tests for the FP8 storage helpers: `get_model_compute_dtype`, and `peak_fp8_cast_transient_bytes` at the end.
 
 Regression coverage for the SDXL + fp8_storage crash:
 
@@ -23,6 +23,7 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, 
 from invokeai.backend.util.fp8 import (
     FP8_COMPUTE_DTYPE_ATTR,
     get_model_compute_dtype,
+    peak_fp8_cast_transient_bytes,
     set_fp8_compute_dtype,
 )
 
@@ -161,3 +162,72 @@ def test_double_cast_is_a_noop():
     # the hooks would have been registered twice.
     assert model.norm1.weight.dtype == torch.bfloat16
     assert len(model.linear._forward_pre_hooks) == 1
+
+
+class _TwoLayers(torch.nn.Module):
+    """Two castable layers of different sizes, run one after the other, and a norm FP8 Storage leaves alone."""
+
+    def __init__(self):
+        super().__init__()
+        self.large = torch.nn.Linear(64, 64)
+        self.small = torch.nn.Linear(64, 8)
+        self.norm = torch.nn.LayerNorm(8)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.norm(self.small(self.large(x)))
+
+
+@pytest.mark.skipif(not _fp8_supported(), reason="torch.float8_e4m3fn not available")
+def test_the_fp8_cast_transient_is_the_largest_layer_fp8_storage_widens_in_a_forward():
+    """Measured on the loader's real cast: each layer's params are widened while its own forward runs, and put back
+    before the next layer widens, so what is widened at once peaks at the largest layer's, weight and bias. In fp32,
+    which CPU tests run in."""
+    model = _TwoLayers()
+    ModelLoader._apply_fp8_to_nn_module(model, storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.float32)
+    widened_at_once = []
+
+    def record(module: torch.nn.Module, args: object) -> None:
+        widened_at_once.append(
+            sum(
+                p.nbytes for layer in (model.large, model.small) for p in layer.parameters() if p.dtype == torch.float32
+            )
+        )
+
+    # Registered after the cast's hooks, so they see each layer's params as its forward runs on them.
+    for layer in (model.large, model.small):
+        layer.register_forward_pre_hook(record)
+    model(torch.randn(1, 64))
+
+    assert widened_at_once == [(64 * 64 + 64) * 4, (64 * 8 + 8) * 4]
+    assert peak_fp8_cast_transient_bytes(model, torch.float32) == max(widened_at_once)
+
+
+@pytest.mark.skipif(not _fp8_supported(), reason="torch.float8_e4m3fn not available")
+@pytest.mark.parametrize("scaled, copies", [(False, 1), (True, 2)], ids=["raw", "scaled"])
+def test_a_kept_fp8_checkpoint_weight_is_widened_per_forward_and_a_scaled_one_twice(scaled: bool, copies: int):
+    """`CustomLinear` dequantizes a kept fp8 weight per forward; `dequantize_weight` holds the widened weight and its
+    product with the `weight_scale` at once. Only the weight is kept in fp8, so the bias costs nothing."""
+    layer = torch.nn.Linear(64, 32, device="meta")
+    layer.weight = torch.nn.Parameter(
+        torch.empty(32, 64, dtype=torch.float8_e4m3fn, device="meta"), requires_grad=False
+    )
+    if scaled:
+        layer.register_buffer("weight_scale", torch.ones((), device="meta"), persistent=False)
+
+    assert peak_fp8_cast_transient_bytes(torch.nn.Sequential(layer), torch.bfloat16) == copies * 32 * 64 * 2
+
+
+class _PackedTensor(torch.Tensor):
+    """A quantized payload kept in a tensor subclass, as SDNQ and GGUF keep theirs."""
+
+
+@pytest.mark.skipif(not _fp8_supported(), reason="torch.float8_e4m3fn not available")
+def test_a_model_without_plain_fp8_weights_has_no_fp8_cast_transient():
+    """Dense weights are what the forward runs on, and a packed payload is its own scheme's to dequantize."""
+    dense = torch.nn.Linear(64, 64, device="meta", dtype=torch.bfloat16)
+    packed = torch.nn.Linear(64, 64, device="meta")
+    packed.weight = torch.nn.Parameter(
+        torch.empty(64, 64, dtype=torch.float8_e4m3fn, device="meta").as_subclass(_PackedTensor), requires_grad=False
+    )
+
+    assert peak_fp8_cast_transient_bytes(torch.nn.Sequential(dense, packed), torch.bfloat16) == 0
