@@ -1,6 +1,7 @@
 """FLUX.1 starter models."""
 
 from invokeai.backend.model_manager.starter_models.common import (
+    TINY_AUTOENCODER_NOTE,
     clip_l_encoder,
     clip_vit_l_image_encoder,
     gemma2_2b_encoder,
@@ -22,6 +23,15 @@ flux_vae = StarterModel(
     source="black-forest-labs/FLUX.1-schnell::ae.safetensors",
     description="FLUX VAE compatible with both schnell and dev variants.",
     type=ModelType.VAE,
+)
+
+taef1 = StarterModel(
+    name="TAEF1 (FLUX.1 preview decoder)",
+    base=BaseModelType.Flux,
+    source="https://huggingface.co/madebyollin/taef1/resolve/b1b2d00e9e440cfbf3dedb34266864da86016ceb/diffusion_pytorch_model.safetensors",
+    description=f"Sharp live previews for FLUX.1 and Z-Image. {TINY_AUTOENCODER_NOTE} ~10MB",
+    type=ModelType.TinyAutoencoder,
+    format=ModelFormat.Checkpoint,
 )
 
 # NVIDIA PiD decoders (https://huggingface.co/nvidia/PiD). Code is Apache-2.0; weights are NSCLv1 (non-commercial /
