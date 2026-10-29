@@ -1,11 +1,13 @@
 """Loader registrations for LTX-2 (Lightricks) audio-video generation models.
 
-Three records make a generation (see ``configs/main.py`` for the split):
+Three records make a generation (see ``configs/main.py`` for the split), the transformer either of the first two:
 
 - ``Main`` / ``Checkpoint`` -- the 22B transformer as one official-layout single file: bf16, or Comfy
   ``int8_tensorwise``(+convrot) / ``nvfp4`` with the layers named by a marker or in the header.
   Quantized linears stay packed and dequantize per forward (``Int8ConvrotLinear`` / ``NVFP4Linear``);
   bf16 files take the FP8-storage path when the device policy asks for it.
+- ``Main`` / ``GGUFQuantized`` -- the same transformer from a community GGUF build. Its Linears stay
+  packed as ``GGMLTensor``; the text connectors every build bundles beside it are never read.
 - ``Main`` / ``Diffusers`` -- the component folder: video VAE, audio VAE, vocoder, text projection
   and connectors, latent upsamplers, each an official-layout single file mapped onto its diffusers
   class here. A folder that also holds a transformer file serves that too.
@@ -22,7 +24,7 @@ reserves what a cast will produce *before* widening a tensor.
 """
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Any, Optional
 
@@ -34,7 +36,11 @@ from invokeai.backend.ltx2 import component_configs as cc
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.gemma4_encoder import Gemma4Encoder_Gemma4Encoder_LTX2_Config
 from invokeai.backend.model_manager.configs.ltx2_duration_head import LTX2DurationHead_Checkpoint_Config
-from invokeai.backend.model_manager.configs.main import Main_Checkpoint_LTX2_Config, Main_Diffusers_LTX2_Config
+from invokeai.backend.model_manager.configs.main import (
+    Main_Checkpoint_LTX2_Config,
+    Main_Diffusers_LTX2_Config,
+    Main_GGUF_LTX2_Config,
+)
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders._single_file_guards import (
@@ -55,6 +61,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     read_safetensors_metadata,
     strip_layer_path_prefix,
 )
+from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
 from invokeai.backend.quantization.int8_convrot import (
     INT8_TENSORWISE_FORMAT,
     drop_unconsumed_quantization_sidecars,
@@ -160,6 +167,45 @@ def _assign_state_dict(model: torch.nn.Module, sd: dict[str, torch.Tensor], what
     return model
 
 
+def _is_bundled_component(key: str) -> bool:
+    """Whether ``key`` belongs to a component a release stores beside the transformer (connectors, VAEs)."""
+    return layout.strip_transformer_prefix(key).startswith(cc.TRANSFORMER_FOREIGN_PREFIXES)
+
+
+def _diffusers_transformer_key_map(official_keys: Iterable[str]) -> dict[str, str]:
+    """Official -> diffusers name for every bare transformer key, quantization side channels included.
+
+    The converter re-inserts renamed keys at the end of the dict, so positions cannot be paired; sentinels can.
+    """
+    from diffusers.loaders.single_file_utils import convert_ltx2_transformer_to_diffusers
+
+    renamed = convert_ltx2_transformer_to_diffusers({key: key for key in official_keys})
+    renamed, _ = cc.finish_transformer_keys(renamed)
+    return {old: new for new, old in renamed.items()}
+
+
+def _build_transformer(sd: Mapping[str, Any]) -> torch.nn.Module:
+    """The diffusers transformer on the meta device, shaped for the file ``sd`` was read from.
+
+    The keyframe absolute position embedding is a 2.5.1 addition that the nvfp4 release omits; its presence
+    is a fact about the file, not the generation.
+    """
+    from diffusers import LTX2VideoTransformer3DModel
+
+    config = {**cc.LTX2_5_TRANSFORMER_CONFIG, "use_keyframes_abs_pos_embedding": "keyframes_abs_pos_embedding" in sd}
+    with accelerate.init_empty_weights():
+        return LTX2VideoTransformer3DModel(**config)
+
+
+def _require_transformer_submodel(submodel_type: Optional[SubModelType]) -> None:
+    if submodel_type is not SubModelType.Transformer:
+        raise ValueError(
+            "LTX-2 single-file checkpoints serve only the transformer. The VAEs, vocoder and connectors "
+            "come from an installed LTX-2 component folder and the text encoder from the Gemma-4 encoder "
+            f"record. Received: {submodel_type.value if submodel_type else 'None'}"
+        )
+
+
 class _LTX2ComponentLoading:
     """The per-component loaders, shared by the folder loader and (for the transformer) the
     single-file loader. Mixed into ``ModelLoader`` subclasses, so ``self._ram_cache`` / ``_logger`` exist."""
@@ -244,8 +290,6 @@ class _LTX2ComponentLoading:
         reservation is made while the state dict still holds its packed dtypes; nvfp4 layers are
         taken out before either side-channel reader can pair their scales with the wrong weight.
         """
-        from diffusers import LTX2VideoTransformer3DModel
-        from diffusers.loaders.single_file_utils import convert_ltx2_transformer_to_diffusers
         from safetensors.torch import load_file
 
         assert isinstance(self, ModelLoader)
@@ -264,7 +308,7 @@ class _LTX2ComponentLoading:
         foreign: list[str] = []
         for key in list(sd):
             bare = layout.strip_transformer_prefix(key)
-            if bare.startswith(cc.TRANSFORMER_FOREIGN_PREFIXES):
+            if _is_bundled_component(key):
                 foreign.append(key)
                 del sd[key]
             elif bare != key:
@@ -273,11 +317,8 @@ class _LTX2ComponentLoading:
             self._logger.info(f"{what}: ignoring {len(foreign)} tensor(s) of bundled components (e.g. {foreign[0]}).")
 
         # Official -> diffusers names, recorded for every key (weights, scales and the nvfp4 payloads
-        # about to be popped) so the quantization side channel follows its weights. The converter
-        # re-inserts renamed keys at the end of the dict, so positions cannot be paired; sentinels can.
-        renamed = convert_ltx2_transformer_to_diffusers({key: key for key in sd})
-        renamed, _ = cc.finish_transformer_keys(renamed)
-        key_map = {old: new for new, old in renamed.items()}
+        # about to be popped) so the quantization side channel follows its weights.
+        key_map = _diffusers_transformer_key_map(sd)
 
         def diffusers_module_path(official_path: str) -> str:
             return key_map.get(f"{official_path}.weight", f"{official_path}.weight")[: -len(".weight")]
@@ -303,14 +344,7 @@ class _LTX2ComponentLoading:
         for key in list(sd):
             sd[key_map[key]] = sd.pop(key)
 
-        # The keyframe absolute position embedding is a 2.5.1 addition that the nvfp4 release omits;
-        # its presence is a fact about the file, not the generation.
-        transformer_config = {
-            **cc.LTX2_5_TRANSFORMER_CONFIG,
-            "use_keyframes_abs_pos_embedding": "keyframes_abs_pos_embedding" in sd,
-        }
-        with accelerate.init_empty_weights():
-            model = LTX2VideoTransformer3DModel(**transformer_config)
+        model = _build_transformer(sd)
         skip_patterns = _model_declared_skip_patterns(model)
         nvfp4_bytes = predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns)
 
@@ -385,7 +419,7 @@ class LTX2FolderModel(_LTX2ComponentLoading, ModelLoader):
                 if layout.ROLE_TRANSFORMER not in config.components:
                     raise ValueError(
                         "This LTX-2 folder holds only the shared components - it is a components-only install. "
-                        "In the LTX-2 Model Loader, select a single-file LTX-2 transformer (bf16 or int8-convrot) "
+                        "In the LTX-2 Model Loader, select a single-file LTX-2 transformer (safetensors or GGUF) "
                         "to use with it."
                     )
                 return self._load_transformer_from_file(_component_path(config, layout.ROLE_TRANSFORMER), config)
@@ -421,16 +455,64 @@ class LTX2CheckpointModel(_LTX2ComponentLoading, ModelLoader):
     ) -> AnyModel:
         if not isinstance(config, Main_Checkpoint_LTX2_Config):
             raise ValueError(f"Unexpected config type {type(config).__name__} for an LTX-2 checkpoint loader.")
-        if submodel_type is not SubModelType.Transformer:
-            raise ValueError(
-                "LTX-2 single-file checkpoints serve only the transformer. The VAEs, vocoder and connectors "
-                "come from an installed LTX-2 component folder and the text encoder from the Gemma-4 encoder "
-                f"record. Received: {submodel_type.value if submodel_type else 'None'}"
-            )
+        _require_transformer_submodel(submodel_type)
         return self._load_from_singlefile(config)
 
     def _load_from_singlefile(self, config: Main_Checkpoint_LTX2_Config) -> AnyModel:
         return self._load_transformer_from_file(Path(config.path), config)
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.LTX2, type=ModelType.Main, format=ModelFormat.GGUFQuantized)
+class LTX2GGUFModel(ModelLoader):
+    """Loader for LTX-2 single-file transformers in GGUF (the community Q2_K to Q8_0 builds).
+
+    The Linear weights stay packed as ``GGMLTensor`` and dequantize per forward through the model cache's
+    autocast layers; what the model reads outside a matmul, and what is not quantized at all, is unpacked
+    here (see `unpack_ggml_at_load`). The text connectors every build bundles beside the transformer are
+    skipped before their data is read: as for the official files, the component folder supplies them.
+
+    No `fp8_storage` declaration: FP8 Storage is refused for every quantized format by rule.
+    """
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, Main_GGUF_LTX2_Config):
+            raise ValueError(f"Unexpected config type {type(config).__name__} for an LTX-2 GGUF loader.")
+        _require_transformer_submodel(submodel_type)
+
+        what = "LTX-2 transformer GGUF"
+        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        foreign: list[str] = []
+
+        def keep(key: str) -> bool:
+            if _is_bundled_component(key):
+                foreign.append(key)
+                return False
+            return True
+
+        read = gguf_sd_loader(Path(config.path), compute_dtype, keep=keep)
+        if foreign:
+            self._logger.info(f"{what}: ignoring {len(foreign)} tensor(s) of bundled components (e.g. {foreign[0]}).")
+        bare = {layout.strip_transformer_prefix(key): value for key, value in read.items()}
+        read.clear()
+        key_map = _diffusers_transformer_key_map(bare)
+        sd = {key_map[key]: value for key, value in bare.items()}
+        bare.clear()
+
+        model = _build_transformer(sd)
+        unpacked = unpack_ggml_at_load(sd, model, _model_declared_skip_patterns(model), self._ram_cache.make_room)
+        load_state_dict_ignoring_extras(model, sd, source=what, assign=True, allow_missing=True)
+        reject_incomplete_load(model, what=what)
+        sd.clear()
+
+        self._logger.info(
+            f"{what}: {unpacked} unquantized or non-Linear tensor(s) unpacked at load, the remaining Linear "
+            "weights kept packed"
+        )
+        return model
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.LTX2, type=ModelType.Gemma4Encoder, format=ModelFormat.Gemma4Encoder)
