@@ -24,7 +24,6 @@ import { useAvailableSettings } from '@workbench/settings/useAvailableSettings';
 import { useNotify } from '@workbench/useNotify';
 import { revealOrOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
-import { getOpenableWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
   useActiveProjectSelector,
@@ -56,6 +55,7 @@ import {
   createSemanticImagesProvider,
   createWorkflowsProvider,
 } from './paletteProviders';
+import { listPaletteWidgets } from './paletteWidgets';
 
 const buildStaticAppEntries = (t: TFunction, settingsKeys: string[] | undefined): PaletteEntry[] => [
   buildOpenSettingsEntry(t, () => openWorkbenchSettings(), settingsKeys),
@@ -117,20 +117,7 @@ const WorkbenchCommandPaletteDialog = ({
   const focus = useWorkbenchFocus();
   const { widgets: widgetCommands } = useWorkbenchCommands();
   const widgetEntries = useMemo(() => {
-    const seen = new Set<string>();
-    const openable = (['center', 'left', 'right', 'bottom'] as const)
-      .flatMap((region) => getWidgetsForRegion(region))
-      .filter((widget) => {
-        const typeId = widget.manifest.id;
-
-        if (seen.has(typeId) || widget.status !== 'enabled') {
-          return false;
-        }
-
-        seen.add(typeId);
-        // The Workflow editor has its own command (it opens the editor in the center), so it is offered once, there.
-        return typeId !== 'workflow' && getOpenableWidgetPlacement({ getWidgetsForRegion, typeId }) !== null;
-      });
+    const openable = listPaletteWidgets(getWidgetsForRegion);
 
     return buildWidgetEntries({
       catalog,

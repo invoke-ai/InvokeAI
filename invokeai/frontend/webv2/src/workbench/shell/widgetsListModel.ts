@@ -4,8 +4,8 @@ import type { WidgetPlacementProject } from '@workbench/widgetPlacementCommands'
 import type { WorkbenchWidgetCommands } from '@workbench/workbenchStore';
 
 import {
+  canRenderWidgetInRegion,
   getEnabledCenterViewCount,
-  getOpenableWidgetPlacement,
   openWidgetPlacement,
 } from '@workbench/widgetPlacementCommands';
 
@@ -39,13 +39,29 @@ const isStatusChip = (widget: RegisteredWidget): boolean =>
   widget.manifest.allowedRegions.includes('bottom') &&
   (widget.manifest.bottomPanel === 'tooltip' || widget.manifest.bottomPanel === 'popover');
 
-/** Whether the list can put this widget back in the layout: as a panel or view, or as a status chip. */
-export const canAddWidget = (
+/** The regions an Add tries, in the order a placement open tries them. */
+const ADD_REGIONS: readonly WidgetRegion[] = ['center', 'right', 'left', 'bottom'];
+
+/**
+ * Whether a placement open can show this widget as a panel or view somewhere. A pure check: lists ask it on every
+ * render, so unlike the open itself it starts no chunk load.
+ */
+export const canOpenWidget = (
   widget: RegisteredWidget,
   getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[]
 ): boolean =>
   widget.status === 'enabled' &&
-  (getOpenableWidgetPlacement({ getWidgetsForRegion, typeId: widget.manifest.id }) !== null || isStatusChip(widget));
+  ADD_REGIONS.some(
+    (region) =>
+      getWidgetsForRegion(region).some((candidate) => candidate.manifest.id === widget.manifest.id) &&
+      canRenderWidgetInRegion(widget, region)
+  );
+
+/** Whether the list can put this widget back in the layout: as a panel or view, or as a status chip. Loads nothing. */
+export const canAddWidget = (
+  widget: RegisteredWidget,
+  getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[]
+): boolean => widget.status === 'enabled' && (isStatusChip(widget) || canOpenWidget(widget, getWidgetsForRegion));
 
 /** Puts a widget in the layout where it opens by default; a status chip goes back to the status bar. */
 export const addWidgetToLayout = ({
