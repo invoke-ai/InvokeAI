@@ -4,7 +4,7 @@ import type { VaeModelConfig } from '@features/generation/core/types';
 
 import { Icon } from '@chakra-ui/react';
 import { isSupportedGenerateModel } from '@features/generation/core/baseGenerationPolicies';
-import { normalizeGenerateSettings } from '@features/generation/core/settings';
+import { getGenerateValuesRevertPatch, normalizeGenerateSettings } from '@features/generation/core/settings';
 import { IconButton, Tooltip } from '@platform/ui';
 import { RotateCcwIcon } from 'lucide-react';
 import { useMemo } from 'react';
@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { flushGenerateDrafts } from './generateDraftRegistry';
 import { GeneratePresetsPopover } from './GeneratePresetsPopover';
 import { useGenerateValues, useGenerationUi } from './GenerationUiContext';
+import { getGenerateSettingsUndoKey } from './modelSelectionNotice';
 import {
   getModelDefaultsPatch,
   getModelDefaultSettings,
@@ -55,12 +56,19 @@ export const GenerateHeaderActions = () => {
     flushGenerateDrafts();
     const resolved = resolveDefaults(ui.generateValues.getSnapshot());
 
-    if (resolved) {
-      ui.settings.patchGenerateSettings(
-        getModelDefaultsPatch(resolved.settings, resolved.selectedModel, vaeModels),
-        projectId
-      );
+    if (!resolved) {
+      return;
     }
+
+    const patch = getModelDefaultsPatch(resolved.settings, resolved.selectedModel, vaeModels);
+    const revertPatch = getGenerateValuesRevertPatch(resolved.settings, { ...resolved.settings, ...patch });
+
+    ui.settings.patchGenerateSettings(patch, projectId);
+    ui.notifications.undoable(t('widgets.generate.resetToModelDefaultsDone', { name: resolved.selectedModel.name }), {
+      onUndo: () => ui.settings.patchGenerateSettings(revertPatch, projectId),
+      projectId,
+      supersedes: getGenerateSettingsUndoKey(projectId),
+    });
   };
 
   const resetLabel = t('widgets.generate.resetAllToModelDefaults');

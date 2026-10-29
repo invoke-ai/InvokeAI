@@ -2,6 +2,7 @@ import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  getNotificationUndoWithdrawal,
   hasNotificationUndo,
   holdNotificationUndo,
   registerNotificationUndo,
@@ -57,5 +58,22 @@ describe('notification undo registry', () => {
 
     expect(hasNotificationUndo(undoId)).toBe(false);
     expect(onUndo).not.toHaveBeenCalled();
+  });
+
+  it('withdraws an older undo of the same thing when a newer one arrives, closing its toast', () => {
+    const older = vi.fn();
+    const olderId = registerNotificationUndo(older, 'generate-settings:project-1');
+    holdNotificationUndo(olderId);
+    const withdrawal = getNotificationUndoWithdrawal(olderId)!;
+    const otherProject = registerNotificationUndo(vi.fn(), 'generate-settings:project-2');
+
+    const newerId = registerNotificationUndo(vi.fn(), 'generate-settings:project-1');
+
+    expect(withdrawal.aborted).toBe(true);
+    expect(hasNotificationUndo(olderId)).toBe(false);
+    runNotificationUndo(olderId);
+    expect(older).not.toHaveBeenCalled();
+    expect(hasNotificationUndo(newerId)).toBe(true);
+    expect(hasNotificationUndo(otherProject)).toBe(true);
   });
 });

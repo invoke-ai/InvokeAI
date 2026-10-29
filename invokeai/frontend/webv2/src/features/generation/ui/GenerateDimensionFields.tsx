@@ -31,6 +31,7 @@ import { AspectRatioLockButton, AspectRatioSelect } from './shared/AspectRatioSe
 import { ExternalSizeSelect } from './shared/ExternalSizeSelect';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
+import { GenerateIssueNotes } from './shared/GenerateIssues';
 
 interface GenerateDimensionFieldsProps {
   draft: GenerateDraft;
@@ -52,6 +53,20 @@ const getActiveRatio = (settings: Pick<GenerateSettings, 'aspectRatioValue' | 'h
       : 1;
 
 const PREVIEW_STAGE_PX = 108;
+/** An 8px grip drawn inside a 16px target, so the corner is easy to catch without looking heavier. */
+const SIZE_HANDLE_CSS = {
+  '&::after': {
+    bg: 'fg.muted',
+    content: '""',
+    inset: '4px',
+    position: 'absolute',
+    rounded: '1px',
+    transitionDuration: 'var(--wb-motion-duration-fast)',
+    transitionProperty: 'background-color',
+  },
+  '&:hover::after': { bg: 'fg' },
+  '&:focus-visible': { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '-2px' },
+} as const;
 /** The scrub range covers everyday sizes; typing still reaches `MAX_DIMENSION`. */
 const DIMENSION_SLIDER_MAX = 2048;
 /** Vertical gap between the width and height rows; the lock bracket's geometry assumes it. */
@@ -171,6 +186,7 @@ const SizePreview = ({
   grid,
   handleLabel,
   isRatioConstrained,
+  onCancelDrag,
   onDraft,
   onCommitDims,
   ratio,
@@ -181,6 +197,8 @@ const SizePreview = ({
   grid: number;
   handleLabel: string;
   isRatioConstrained: boolean;
+  /** A drag the browser or the user called off (touch scroll, Escape, lost capture) leaves the size as it was. */
+  onCancelDrag: () => void;
   onDraft: (dims: Dimensions) => void;
   onCommitDims: (dims: Dimensions) => void;
   ratio: number;
@@ -220,6 +238,13 @@ const SizePreview = ({
         : clampToRange(drag.startHeight + ((event.clientY - drag.startY) * 2) / drag.scale);
 
     return { height: Math.round(height), width: Math.round(width) };
+  };
+
+  const cancelDrag = () => {
+    if (dragRef.current) {
+      dragRef.current = null;
+      onCancelDrag();
+    }
   };
 
   const nudge = (dw: number, dh: number) => {
@@ -265,16 +290,15 @@ const SizePreview = ({
         <Box
           aria-label={handleLabel}
           as="button"
-          bg="fg.muted"
-          bottom="-4px"
+          bottom="-8px"
+          css={SIZE_HANDLE_CSS}
           cursor="nwse-resize"
-          h="8px"
+          h="16px"
           position="absolute"
-          right="-4px"
-          rounded="1px"
-          w="8px"
-          _focusVisible={{ outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '1px' }}
-          _hover={{ bg: 'fg' }}
+          right="-8px"
+          rounded="2px"
+          touchAction="none"
+          w="16px"
           onKeyDown={(event) => {
             const nudges: Record<string, [number, number]> = {
               ArrowDown: [0, 1],
@@ -291,7 +315,13 @@ const SizePreview = ({
           }}
           onPointerDown={(event) => {
             event.preventDefault();
-            event.currentTarget.setPointerCapture(event.pointerId);
+
+            try {
+              event.currentTarget.setPointerCapture(event.pointerId);
+            } catch {
+              // An inactive pointer (a synthetic event) cannot be captured; the handle still sees its own events.
+            }
+
             dragRef.current = {
               scale,
               startHeight: current.height,
@@ -316,6 +346,9 @@ const SizePreview = ({
               onCommitDims(snap(dims));
             }
           }}
+          // A released drag has already cleared `dragRef`; these only end one that never reached pointerup.
+          onLostPointerCapture={cancelDrag}
+          onPointerCancel={cancelDrag}
         />
       </Box>
     </Box>
@@ -566,7 +599,7 @@ export const GenerateDimensionFields = ({
     dimensions.optimal * dimensions.optimal,
     dimensionGrid
   );
-  const frameLabel = `${displayDimensions.width}x${displayDimensions.height}`;
+  const frameLabel = `${displayDimensions.width}×${displayDimensions.height}`;
 
   // The optimal-side stop is scalar; recommended dimensions preserve the live ratio.
   const dimensionField = (key: 'height' | 'width') => (
@@ -612,7 +645,7 @@ export const GenerateDimensionFields = ({
         label={t('widgets.generate.size')}
         badges={
           <>
-            <Badge>{isResized ? `${frameLabel} → ${renderSize.width}x${renderSize.height}` : frameLabel}</Badge>
+            <Badge>{isResized ? `${frameLabel} → ${renderSize.width}×${renderSize.height}` : frameLabel}</Badge>
             {isRatioConstrained && (
               <Badge>
                 <Icon as={LockIcon} boxSize="3" />
@@ -628,7 +661,8 @@ export const GenerateDimensionFields = ({
             <Stack flex="1" gap="2" minW="0">
               {/* The lock binds width to height, so it sits between the two values it couples. */}
               <GenerateFieldContextMenu
-                copyValue={() => frameLabel}
+                fieldLabel={t('widgets.generate.size')}
+                copyValue={() => `${displayDimensions.width}x${displayDimensions.height}`}
                 isAtDefault={
                   modelDefaults !== null &&
                   displayDimensions.width === modelDefaults.width &&
@@ -649,6 +683,7 @@ export const GenerateDimensionFields = ({
                   </Box>
                 </HStack>
               </GenerateFieldContextMenu>
+              <GenerateIssueNotes section="dimensions" />
 
               {selectedModel?.type === 'external_image_generator' ? (
                 <ExternalSizeSelect
@@ -695,6 +730,7 @@ export const GenerateDimensionFields = ({
                   ? getActiveRatio({ aspectRatioValue: settings.aspectRatioValue, ...displayDimensions })
                   : dimensionRatio
               }
+              onCancelDrag={() => setDraftDimensions(null)}
               onCommitDims={(dims) => {
                 setDraftDimensions(dims);
                 commitDimensions(dims);

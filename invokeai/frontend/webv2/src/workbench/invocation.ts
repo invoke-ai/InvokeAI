@@ -14,13 +14,13 @@ import type { WidgetId } from '@workbench/widgetContracts';
 
 import {
   describeExternalCanvasRefusal,
-  getGenerationModelAvailabilityReasons,
-  getGenerationValidationReasons,
+  describeGenerationIssue,
+  getGenerateInvocationIssues,
   isExternalTextOnlyCanvasModel,
   isGenerateModelConfig,
   isSupportedGenerateModel,
+  NO_GENERATE_MODEL_ISSUE,
   normalizeGenerateWidgetValues,
-  resolveExternalCanvasRequestSize,
   sanitizeBatchCount,
 } from '@features/generation/settings';
 import { getUpscaleValidationReasons, normalizeUpscaleWidgetValues } from '@features/upscale';
@@ -235,32 +235,18 @@ const getGenerateSnapshotValidationReasons = (
   generateValues: Record<string, unknown>,
   models?: readonly ModelConfig[],
   canvasBbox?: InvocationRouteInput['canvasBbox']
-): string[] => {
+): InvocationValidationReason[] => {
   const values = normalizeGenerateWidgetValues(generateValues);
 
   if (!values || !isSupportedGenerateModel(values.model)) {
-    return ['Generate needs a supported model before it can be invoked.'];
+    return [{ generationIssue: NO_GENERATE_MODEL_ISSUE }];
   }
 
-  // Canvas discovers the mode from pixel coverage during preparation and asks a provider for its size nearest the
-  // bbox, so readiness validates that size and permits an advertised whole-image mode; the compiler validates the
-  // captured one. Generate itself remains strictly text-to-image.
-  const providerModes =
-    canvasBbox !== undefined && values.model.type === 'external_image_generator'
-      ? (values.model.capabilities?.modes ?? ['txt2img'])
-      : null;
-  const mode = providerModes !== null && !providerModes.includes('txt2img') ? 'img2img' : 'txt2img';
-
-  return [
-    ...getGenerationValidationReasons(
-      values.model,
-      providerModes !== null && canvasBbox
-        ? { ...values, ...resolveExternalCanvasRequestSize(values.model, canvasBbox) }
-        : values,
-      mode
-    ),
-    ...(models ? getGenerationModelAvailabilityReasons(values.model, values, models) : []),
-  ];
+  // Generate itself stays text to image; the Canvas source checks the provider at the size its frame asks for.
+  return getGenerateInvocationIssues(values, {
+    ...(canvasBbox ? { canvasFrame: canvasBbox } : {}),
+    ...(models ? { models } : {}),
+  }).map((generationIssue) => ({ generationIssue }));
 };
 
 export const isResultDestinationAvailable = (destination: ResultDestination): boolean =>
@@ -400,11 +386,13 @@ export const resolveInvocationRouteInput = (
 export const isInvocationRouteValid = (route: ResolvedInvocationRoute): boolean =>
   route.sourceValid && route.destinationValid;
 
-/** Words any route validation reason for display; control-layer issues come from the locale. */
+/** Words any route validation reason for display; control-layer and Generate issues come from the locale. */
 export const localizeInvocationValidationReason = (
   reason: InvocationValidationReason,
   t: (key: string, options?: Record<string, unknown>) => string
 ): string =>
   typeof reason === 'object' && 'controlLayerIssue' in reason
     ? describeControlLayerIssue(t, reason.controlLayerIssue)
-    : localizeForLoopValidationReason(reason, t);
+    : typeof reason === 'object' && 'generationIssue' in reason
+      ? describeGenerationIssue(t, reason.generationIssue)
+      : localizeForLoopValidationReason(reason, t);

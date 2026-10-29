@@ -259,8 +259,8 @@ describe('video model switch confirmation', () => {
 
     await choose(wanT2v.key);
 
-    const confirmedList =
-      'Switching to Wan 2.2 T2V removes: the initial video (with its trim), the last frame, and 1 LoRA.';
+    // The LTX-2 LoRA is not lost: it stays listed, badged and off, for the next LTX-2 model.
+    const confirmedList = 'Switching to Wan 2.2 T2V removes: the initial video (with its trim) and the last frame.';
     expect(dialog()?.textContent).toContain(confirmedList);
     expect(dialog()?.textContent).toContain(
       'It also adjusts Target Resolution and Advanced guidance to fit this model.'
@@ -300,7 +300,7 @@ describe('video model switch confirmation', () => {
     }
     expect(stored()).toMatchObject({
       lastFrameImage: null,
-      loras: [],
+      loras: [{ model: { key: inkWash.key }, weight: 0.75 }],
       model: { key: wanT2v.key },
       modelKey: wanT2v.key,
       positivePrompt: 'a harbor at dusk',
@@ -348,9 +348,7 @@ describe('video model switch confirmation', () => {
       })
     );
 
-    expect(dialog()?.textContent).toContain(
-      'Switching to Wan 2.2 T2V removes: the initial video (with its trim) and 2 LoRAs.'
-    );
+    expect(dialog()?.textContent).toContain('Switching to Wan 2.2 T2V removes: the initial video (with its trim).');
 
     await act(async () => {
       await userEvent.click(dialogButton('Switch model'));
@@ -358,7 +356,7 @@ describe('video model switch confirmation', () => {
 
     expect(stored()).toMatchObject({
       lastFrameImage: null,
-      loras: [],
+      loras: [{ model: { key: inkWash.key } }, { model: { key: filmGrain.key } }],
       modelKey: wanT2v.key,
       positivePrompt: 'a harbor at night',
       sourceVideo: null,
@@ -409,7 +407,7 @@ describe('video model switch confirmation', () => {
     expect(new Set(pickerIds).size).toBe(1);
   });
 
-  it('commits a pending LoRA weight to the current model before judging the switch', async () => {
+  it('commits a pending LoRA weight to the current model before switching', async () => {
     await render();
     await nudgeLoraWeight();
 
@@ -417,8 +415,8 @@ describe('video model switch confirmation', () => {
 
     await choose(wanT2v.key);
 
-    // Committed on LTX-2 Dev, before the dialog asked about dropping it.
-    expect(dialog()?.textContent).toContain('1 LoRA');
+    // Committed on LTX-2 Dev, before the dialog asked about the switch.
+    expect(dialog()?.textContent).toContain('Switching to Wan 2.2 T2V removes');
     expect(stored()).toMatchObject({ loras: [{ weight: 0.8 }], modelKey: ltxDev.key });
 
     await act(async () => {

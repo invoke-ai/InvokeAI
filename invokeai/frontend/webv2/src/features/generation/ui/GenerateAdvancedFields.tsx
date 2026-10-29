@@ -34,6 +34,7 @@ import { type GenerateDraft, pickGenerateSettings } from './generateDebounce';
 import { GenerationModelSelect as ModelSelect } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
+import { GenerateIssueNotes } from './shared/GenerateIssues';
 import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
 
 interface GenerateAdvancedFieldsProps {
@@ -185,6 +186,9 @@ export const GenerateAdvancedFields = ({
       badges={badges}
       sectionId="advanced"
     >
+      <Stack _empty={{ display: 'none' }} p="2" pb="0">
+        <GenerateIssueNotes section="advanced" />
+      </Stack>
       {policy.sdVaeVisible || policy.vaePrecisionVisible ? (
         <HStack alignItems="flex-start" gap="2" p="2">
           {policy.sdVaeVisible ? (
@@ -243,6 +247,7 @@ export const GenerateAdvancedFields = ({
         <Stack gap="2" p="2">
           {policy.clipSkipMax ? (
             <GenerateFieldContextMenu
+              fieldLabel={t('widgets.generate.clipSkip')}
               copyValue={() => String(settings.clipSkip)}
               isAtDefault={modelDefaults !== null && settings.clipSkip === modelDefaults.clipSkip}
               onReset={modelDefaults ? () => onCommit({ clipSkip: modelDefaults.clipSkip }) : undefined}
@@ -261,6 +266,7 @@ export const GenerateAdvancedFields = ({
           ) : null}
           {policy.cfgRescaleVisible ? (
             <GenerateFieldContextMenu
+              fieldLabel={t('widgets.generate.cfgRescale')}
               copyValue={() => String(settings.cfgRescaleMultiplier)}
               isAtDefault={
                 modelDefaults !== null && settings.cfgRescaleMultiplier === modelDefaults.cfgRescaleMultiplier
@@ -307,6 +313,7 @@ export const GenerateAdvancedFields = ({
             onCheckedChange={(checked) => onCommit({ hiDiffusionWindowAttentionEnabled: checked })}
           />
           <GenerateFieldContextMenu
+            fieldLabel={t('widgets.generate.hiDiffusionT1Ratio')}
             copyValue={() => String(settings.hiDiffusionT1Ratio)}
             isAtDefault={settings.hiDiffusionT1Ratio === DEFAULT_HIDIFFUSION_T1_RATIO}
             onReset={() => onCommit({ hiDiffusionT1Ratio: DEFAULT_HIDIFFUSION_T1_RATIO })}
@@ -324,6 +331,7 @@ export const GenerateAdvancedFields = ({
             />
           </GenerateFieldContextMenu>
           <GenerateFieldContextMenu
+            fieldLabel={t('widgets.generate.hiDiffusionT2Ratio')}
             copyValue={() => String(settings.hiDiffusionT2Ratio)}
             isAtDefault={settings.hiDiffusionT2Ratio === DEFAULT_HIDIFFUSION_T2_RATIO}
             onReset={() => onCommit({ hiDiffusionT2Ratio: DEFAULT_HIDIFFUSION_T2_RATIO })}

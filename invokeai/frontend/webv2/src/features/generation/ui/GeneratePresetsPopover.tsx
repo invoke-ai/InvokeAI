@@ -1,12 +1,16 @@
 import type { GenerateSettings } from '@features/generation/core/types';
 import type { ChangeEvent } from 'react';
 
-import { HStack, Icon, Input, InputGroup, Popover, Portal, Separator, Stack, Text } from '@chakra-ui/react';
+import { Checkbox, HStack, Icon, Input, InputGroup, Popover, Portal, Separator, Stack, Text } from '@chakra-ui/react';
 import {
   getGenerateModelSelectionResult,
   isSupportedGenerateModel,
 } from '@features/generation/core/baseGenerationPolicies';
-import { GENERATE_TOOL_MODEL_PICK_KEYS, normalizeGenerateSettings } from '@features/generation/core/settings';
+import {
+  GENERATE_TOOL_MODEL_PICK_KEYS,
+  getGenerateValuesRevertPatch,
+  normalizeGenerateSettings,
+} from '@features/generation/core/settings';
 import { resolveGenerateWidgetValues } from '@features/generation/settings';
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import {
@@ -28,7 +32,7 @@ import type { GeneratePresetRecord } from './GenerationUiContext';
 import { flushGenerateDrafts } from './generateDraftRegistry';
 import { getGenerateFormCommitPatch } from './generateFormViewModel';
 import { useGenerateValues, useGenerationUi } from './GenerationUiContext';
-import { notifyGenerateDimensionsAdjusted, notifyGenerateModelSelectionCleared } from './modelSelectionNotice';
+import { describeModelSwitchChanges, getGenerateSettingsUndoKey } from './modelSelectionNotice';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from './promptFields/PromptPanelHeader';
 
 const POPOVER_POSITIONING = { placement: 'bottom-end' } as const;
@@ -41,8 +45,29 @@ const SEARCH_VISIBLE_MIN_PRESETS = 6;
 
 type PresetDialogSubject = { mode: 'save' } | { mode: 'rename'; preset: GeneratePresetRecord };
 
-/** Ignore presentation and non-applied keys, including seed unless its mode is fixed. */
-const getPresetComparisonKey = (settings: GenerateSettings): string => {
+/** What "include prompts" covers: the prompt text and the template applied to it, with their panel arrangement. */
+const PRESET_PROMPT_KEYS = [
+  'negativePrompt',
+  'negativePromptEnabled',
+  'negativePromptHeightPx',
+  'positivePrompt',
+  'positivePromptHeightPx',
+  'promptTemplate',
+  'promptTemplateViewMode',
+] as const satisfies readonly (keyof GenerateSettings)[];
+
+/** A preset's settings; one saved without prompts keeps the current prompts, everything else comes from the preset. */
+const getPresetSettings = (current: object, preset: GeneratePresetRecord): GenerateSettings | null => {
+  const currentValues = current as Record<string, unknown>;
+
+  return normalizeGenerateSettings({
+    ...Object.fromEntries(PRESET_PROMPT_KEYS.map((key) => [key, currentValues[key]])),
+    ...preset.values,
+  });
+};
+
+/** Ignore presentation and non-applied keys, including seed unless its mode is fixed, and prompts when asked. */
+const getPresetComparisonKey = (settings: GenerateSettings, withoutPrompts = false): string => {
   const comparable: Record<string, unknown> = { ...settings };
 
   delete comparable.batchCount;
@@ -59,7 +84,26 @@ const getPresetComparisonKey = (settings: GenerateSettings): string => {
     delete comparable.seed;
   }
 
+  if (withoutPrompts) {
+    for (const key of PRESET_PROMPT_KEYS) {
+      delete comparable[key];
+    }
+  }
+
   return JSON.stringify(comparable);
+};
+
+/**
+ * A preset's comparison key, read once per preset: one saved without prompts matches whatever prompts are current, so
+ * its key leaves them out. Placeholder prompts let such a preset normalize on its own.
+ */
+const getStoredPresetKey = (preset: GeneratePresetRecord): { key: string; withoutPrompts: boolean } | null => {
+  const withoutPrompts = !('positivePrompt' in preset.values);
+  const settings = normalizeGenerateSettings(
+    withoutPrompts ? { negativePrompt: '', positivePrompt: '', ...preset.values } : preset.values
+  );
+
+  return settings ? { key: getPresetComparisonKey(settings, withoutPrompts), withoutPrompts } : null;
 };
 
 const PresetRow = ({
@@ -138,6 +182,8 @@ export const GeneratePresetsPopover = () => {
   // Tooltip and Popover must share the trigger ID to preserve anchoring.
   const triggerId = useId();
   const triggerIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
+  // The popover that opened a dialog may have closed; focus returns to its trigger, not the page.
+  const getTriggerElement = useCallback(() => document.getElementById(triggerId), [triggerId]);
 
   const models = ui.models.catalog;
   const projectId = ui.project.activeProjectId;
@@ -153,23 +199,18 @@ export const GeneratePresetsPopover = () => {
     return term ? presets.filter((preset) => preset.label.toLowerCase().includes(term)) : presets;
   }, [presets, searchTerm]);
 
-  // Serialized equality requires canonical key order.
-  const presetKeys = useMemo(
-    () =>
-      presets.map((preset) => {
-        const normalized = normalizeGenerateSettings(preset.values);
-
-        return normalized ? getPresetComparisonKey(normalized) : null;
-      }),
-    [presets]
-  );
+  // Serialized equality requires canonical key order. Presets normalize once per catalog change, not per edit.
+  const presetKeys = useMemo(() => presets.map(getStoredPresetKey), [presets]);
   const activePreset = useMemo(() => {
     if (!settings) {
       return null;
     }
 
     const currentKey = getPresetComparisonKey(settings);
-    const index = presetKeys.findIndex((key) => key !== null && key === currentKey);
+    const currentKeyWithoutPrompts = getPresetComparisonKey(settings, true);
+    const index = presetKeys.findIndex(
+      (stored) => stored !== null && stored.key === (stored.withoutPrompts ? currentKeyWithoutPrompts : currentKey)
+    );
 
     return index >= 0 ? (presets[index] ?? null) : null;
   }, [presetKeys, presets, settings]);
@@ -188,7 +229,10 @@ export const GeneratePresetsPopover = () => {
 
   const applyPreset = useCallback(
     (record: GeneratePresetRecord) => {
-      const normalized = normalizeGenerateSettings(record.values);
+      // Flush so Undo restores what the user saw, not a debounce behind it.
+      flushGenerateDrafts();
+      const before = ui.generateValues.getSnapshot();
+      const normalized = getPresetSettings(before, record);
 
       if (!normalized) {
         ui.notifications.error(t('widgets.generate.presetUnreadable'), record.label);
@@ -210,26 +254,32 @@ export const GeneratePresetsPopover = () => {
         return;
       }
 
-      ui.settings.patchGenerateSettings(getGenerateFormCommitPatch(resolved.values), projectId);
-      const clearedLabels =
-        settings?.refinerModel && !resolved.values.refinerModel && !result.clearedLabels.includes('Refiner')
-          ? [...result.clearedLabels, 'Refiner']
-          : result.clearedLabels;
-      notifyGenerateModelSelectionCleared({
-        clearedLabels,
-        locale: i18n.resolvedLanguage,
-        modelName: model.name,
-        notifications: ui.notifications,
-        reason: 'preset',
-        t,
+      const patch = getGenerateFormCommitPatch(resolved.values);
+      const revertPatch = getGenerateValuesRevertPatch(before, { ...before, ...patch });
+      // What the preset holds that its model cannot use now, told as a switch to that model would tell it.
+      const message = describeModelSwitchChanges(result, t, i18n.resolvedLanguage).join(' ');
+
+      ui.settings.patchGenerateSettings(patch, projectId);
+      ui.notifications.undoable(t('widgets.generate.presetApplied', { name: record.label }), {
+        ...(message ? { message } : {}),
+        onUndo: () => ui.settings.patchGenerateSettings(revertPatch, projectId),
+        projectId,
+        supersedes: getGenerateSettingsUndoKey(projectId),
       });
-      notifyGenerateDimensionsAdjusted({ modelName: model.name, notifications: ui.notifications, result, t });
       setIsOpen(false);
     },
-    [i18n.resolvedLanguage, models, projectId, settings, supportedModels, t, ui.notifications, ui.settings]
+    [i18n.resolvedLanguage, models, projectId, supportedModels, t, ui.generateValues, ui.notifications, ui.settings]
   );
 
-  const openSaveDialog = useCallback(() => setDialogSubject({ mode: 'save' }), []);
+  const [includePrompts, setIncludePrompts] = useState(ui.presets.includePrompts);
+  const openSaveDialog = useCallback(() => {
+    setIncludePrompts(ui.presets.includePrompts);
+    setDialogSubject({ mode: 'save' });
+  }, [ui.presets.includePrompts]);
+  const handleIncludePromptsChange = useCallback(
+    (event: { checked: boolean | 'indeterminate' }) => setIncludePrompts(event.checked === true),
+    []
+  );
   const openRenameDialog = useCallback(
     (preset: GeneratePresetRecord) => setDialogSubject({ mode: 'rename', preset }),
     []
@@ -246,11 +296,25 @@ export const GeneratePresetsPopover = () => {
       flushGenerateDrafts();
       const snapshot = normalizeGenerateSettings(ui.generateValues.getSnapshot());
 
-      if (snapshot) {
-        ui.presets.save(label, { ...snapshot });
+      if (!snapshot) {
+        return;
+      }
+
+      const values: Record<string, unknown> = { ...snapshot };
+
+      if (!includePrompts) {
+        for (const key of PRESET_PROMPT_KEYS) {
+          delete values[key];
+        }
+      }
+
+      ui.presets.save(label, values);
+
+      if (includePrompts !== ui.presets.includePrompts) {
+        ui.presets.setIncludePrompts(includePrompts);
       }
     },
-    [dialogSubject, ui.generateValues, ui.presets]
+    [dialogSubject, includePrompts, ui.generateValues, ui.presets]
   );
 
   const cancelDelete = useCallback(() => setPendingDelete(null), []);
@@ -355,6 +419,7 @@ export const GeneratePresetsPopover = () => {
       {dialog.value ? (
         <RenameDialog
           key={dialog.generation}
+          finalFocusEl={getTriggerElement}
           initialName={dialog.value.mode === 'rename' ? dialog.value.preset.label : ''}
           isOpen={dialog.isOpen}
           label={t('widgets.generate.presetName')}
@@ -367,7 +432,17 @@ export const GeneratePresetsPopover = () => {
           onClose={closeDialog}
           onExitComplete={dialog.release}
           onSubmit={handleDialogSubmit}
-        />
+        >
+          {dialog.value.mode === 'save' ? (
+            <Checkbox.Root checked={includePrompts} size="sm" onCheckedChange={handleIncludePromptsChange}>
+              <Checkbox.HiddenInput />
+              <Checkbox.Control>
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              <Checkbox.Label>{t('widgets.generate.presetIncludePrompts')}</Checkbox.Label>
+            </Checkbox.Root>
+          ) : null}
+        </RenameDialog>
       ) : null}
       <ConfirmDialog
         body={t('widgets.generate.presetDeleteBody', { name: pendingDelete?.label ?? '' })}

@@ -1,3 +1,4 @@
+import type { GenerationIssue } from '@features/generation/contracts';
 import type { ForLoopValidationReason } from '@features/workflow/utility';
 import type { ControlLayerIssue } from '@workbench/controlLayerChecks';
 
@@ -33,7 +34,19 @@ export interface ControlLayerValidationReason {
   controlLayerIssue: ControlLayerIssue;
 }
 
-export type InvocationValidationReason = string | ForLoopValidationReason | ControlLayerValidationReason;
+/**
+ * A Generate settings issue, kept structured: the shell words it from the locale today, and its `target` (section and
+ * field) and `fix` are there for a surface that jumps to the field or applies the fix.
+ */
+export interface GenerationValidationReason {
+  generationIssue: GenerationIssue;
+}
+
+export type InvocationValidationReason =
+  | string
+  | ForLoopValidationReason
+  | ControlLayerValidationReason
+  | GenerationValidationReason;
 
 export interface ResolvedInvocationRoute extends InvocationRoute {
   mode: InvocationMode;

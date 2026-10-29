@@ -11,6 +11,7 @@ export {
   deriveAspectRatioId,
   GENERATE_UI_STATE_KEYS,
   getDefaultLoraWeight,
+  getGenerateValuesRevertPatch,
   getModelDefaultVae,
   hasModelDefaultVae,
   isAspectRatioLocked,
@@ -53,9 +54,9 @@ export {
   isComponentCompatibleWithModel,
   getDimensionGrid,
   getGenerationDimensions,
+  getGenerateInvocationIssues,
   getGenerationModelAvailabilityReasons,
   getGenerationUiPolicy,
-  getGenerationValidationReasons,
   getMaxReferenceImages,
   getPromptHistoryRecallPatch,
   getSchedulerOptions,
@@ -63,11 +64,23 @@ export {
   isArchitectureDescribed,
   isGenerateModelSelectable,
   isKnownScheduler,
+  isLossyModelSwitch,
   isReferenceImageSupported,
   isSupportedGenerateModel,
+  NO_GENERATE_MODEL_ISSUE,
   SCHEDULER_OPTIONS,
   type GenerateModelSelectionResult,
+  type GenerateModelSwitchChange,
+  type GenerateModelSwitchChangeKind,
+  type GenerateModelSwitchSubject,
 } from './core/baseGenerationPolicies';
+export {
+  describeGenerationIssue,
+  getGenerationIssueFixPatch,
+  type GenerateSectionId,
+  type GenerationIssue,
+  type GenerationIssueFix,
+} from './core/generationIssues';
 export { hasArchitectureCapabilities } from './core/architectureCapabilities';
 export {
   describeExternalCanvasRefusal,

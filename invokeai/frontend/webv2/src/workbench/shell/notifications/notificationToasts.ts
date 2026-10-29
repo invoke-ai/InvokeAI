@@ -5,6 +5,7 @@ import type { TFunction } from 'i18next';
 import { ACTION_TOAST_DURATION_MS, createActionToast } from '@platform/ui/toaster';
 
 import {
+  getNotificationActionWithdrawals,
   holdNotificationActions,
   releaseNotificationActions,
   resolveNotificationActions,
@@ -73,7 +74,9 @@ export const startNotificationToasts = ({
             },
           }
         : {}),
-      ...(actions.length > 0 || notification.persistent ? { signal: lifetime.signal } : {}),
+      ...(actions.length > 0 || notification.persistent
+        ? { signal: AbortSignal.any([lifetime.signal, ...getNotificationActionWithdrawals(descriptors)]) }
+        : {}),
       title: text.title,
       type: notificationToastType[notification.kind],
     });

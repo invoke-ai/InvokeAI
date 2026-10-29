@@ -11,7 +11,6 @@ import type {
 import {
   getCompatibleDiffusersComponentSource,
   isDiffusersMainForBase,
-  isLoraCompatibleWithModel,
   isLoraModelConfig,
   isWanLoraTargetingMain,
 } from '@features/generation/settings';
@@ -1901,7 +1900,7 @@ export const getVideoSettingsWithModelDefaults = (
         (lora) => !previousKeys.has(lora.model.key) && !modelDefaults.loras.some((d) => d.model.key === lora.model.key)
       ),
       ...modelDefaults.loras,
-    ].map((lora) => (isLoraCompatibleWithModel(lora.model, model) ? lora : { ...lora, isEnabled: false })),
+    ],
     ltx2TextEncoderModel: modelDefaults.ltx2TextEncoderModel,
     modalityScale: modelDefaults.modalityScale,
     modelKey: model.key,
@@ -1928,12 +1927,11 @@ export type VideoModelSwitchLossKey =
   | 'conditioningClip'
   | 'firstFrame'
   | 'lastFrame'
-  | 'loras'
   | VideoComponentValueKey;
 
 export interface VideoModelSwitchLoss {
   key: VideoModelSwitchLossKey;
-  /** How many items go: references or LoRAs; 1 for a single slot. */
+  /** How many items go: references; 1 for a single slot. */
   count: number;
 }
 
@@ -2179,13 +2177,8 @@ export const getVideoModelSelectionResult = ({
     }
   }
 
-  const compatibleLoras = next.loras.filter((lora) => isLoraCompatibleWithModel(lora.model, model));
-
-  if (compatibleLoras.length !== next.loras.length) {
-    // Accelerator LoRAs left with the acceleration reconciliation above; what remains is the user's own.
-    losses.push({ count: next.loras.length - compatibleLoras.length, key: 'loras' });
-    next.loras = compatibleLoras;
-  }
+  // The user's concepts stay as they are, as in Generate: the graph loads only the ones the model can
+  // (`getActiveCompatibleLoras`), the row badges the rest, and a compatible model runs them again.
 
   const policy = getVideoComponentSectionPolicy(model, next);
   const slotsByKey = new Map(policy.slots.map((slotPolicy) => [slotPolicy.key, slotPolicy]));
@@ -2548,16 +2541,6 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
         ? 'MiniMax H3 supports aspect ratios from 1:4 to 4:1. The conditioning media is outside that range.'
         : 'The conditioning media is too small or degenerate to derive video dimensions from.'
     );
-  }
-
-  if (model.base === 'wan') {
-    // Report incompatible Wan expert-family LoRAs rather than silently dropping weights that would mismatch tensor
-    // shapes.
-    for (const lora of settings.loras) {
-      if (lora.isEnabled && !isWanLoraTargetingMain(lora.model.variant, model.variant)) {
-        reasons.push(`${lora.model.name} targets a different Wan model family than ${model.name}.`);
-      }
-    }
   }
 
   const componentPolicy = getVideoComponentSectionPolicy(model, settings);

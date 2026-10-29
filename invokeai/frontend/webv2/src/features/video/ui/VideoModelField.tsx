@@ -34,7 +34,6 @@ const LOSS_LABELS: Record<VideoModelSwitchLossKey, { labelKey: string }> = {
   h3TransformerModel: { labelKey: 'widgets.video.switchModelLosses.h3TransformerModel' },
   initialVideo: { labelKey: 'widgets.video.switchModelLosses.initialVideo' },
   lastFrame: { labelKey: 'widgets.video.switchModelLosses.lastFrame' },
-  loras: { labelKey: 'widgets.video.switchModelLosses.loras' },
   ltx2DurationHeadModel: { labelKey: 'widgets.video.switchModelLosses.ltx2DurationHeadModel' },
   ltx2TextEncoderModel: { labelKey: 'widgets.video.switchModelLosses.ltx2TextEncoderModel' },
   references: { labelKey: 'widgets.video.switchModelLosses.references' },

@@ -35,6 +35,13 @@ export interface ConceptModelPort {
 export interface ConceptRowProps {
   /** False dims the row, badges it, and locks it off; the caller decides compatibility against its main model. */
   isCompatible?: boolean;
+  /**
+   * False badges the row as not installed, an error that blocks Invoke while the concept is on: its switch keeps the
+   * saved state but is locked, and `issue` says what blocks and how to fix it.
+   */
+  isInstalled?: boolean;
+  /** Shown under the row: the issue that blocks Invoke because of this concept, with its fix. */
+  issue?: ReactNode;
   /** The committed concept. Weight edits stay in a local draft until idle or a workbench flush. */
   lora: GenerateLora;
   models: ConceptModelPort;
@@ -161,7 +168,9 @@ export const ConceptRow = memo(function ConceptRow(props: ConceptRowProps) {
 });
 
 const ConceptRowContent = ({
-  isCompatible = true,
+  isCompatible: isCompatibleModel = true,
+  isInstalled = true,
+  issue,
   lora,
   models,
   onRemove,
@@ -170,6 +179,8 @@ const ConceptRowContent = ({
 }: ConceptRowProps & { weight: number }) => {
   const { t } = useTranslation();
   const { key, name, trigger_phrases: triggerPhrases } = lora.model;
+  // A concept that is not installed cannot run either; the row says which of the two it is.
+  const isCompatible = isCompatibleModel && isInstalled;
   const isActive = lora.isEnabled && isCompatible;
   const defaultWeight = getDefaultLoraWeight(lora.model);
   const menu = useContextMenu();
@@ -198,12 +209,13 @@ const ConceptRowContent = ({
   return (
     <Box role="listitem">
       {/* Naming the group gives the row's "Weight" slider and controls their concept's context. */}
-      <Box aria-label={name} opacity={isCompatible ? 1 : 0.68} role="group">
+      {/* Only a concept the model skips is dimmed; one that is missing but on blocks Invoke and stays at full strength. */}
+      <Box aria-label={name} opacity={isCompatibleModel ? 1 : 0.68} role="group">
         <ListItem
           actions={
             <Flex gap={1}>
               <GenerateRowSwitch
-                checked={isActive}
+                checked={isInstalled ? isActive : lora.isEnabled}
                 disabled={!isCompatible}
                 label={
                   isActive
@@ -230,7 +242,12 @@ const ConceptRowContent = ({
               <Badge colorPalette={models.getBaseColorPalette(lora.model.base)} variant="surface">
                 {models.getBaseLabel(lora.model.base)}
               </Badge>
-              {isCompatible ? null : (
+              {isInstalled ? null : (
+                <Badge colorPalette="red" variant="solid">
+                  {t('widgets.generate.notInstalled')}
+                </Badge>
+              )}
+              {isCompatibleModel ? null : (
                 <Badge colorPalette="orange" variant="surface">
                   {t('widgets.generate.incompatible')}
                 </Badge>
@@ -242,6 +259,7 @@ const ConceptRowContent = ({
             // Backed with the settings section's surface so the row's hover tint never washes out the track and fill.
             <Box bg="bg.muted" rounded="control">
               <GenerateFieldContextMenu
+                fieldLabel={t('widgets.generate.conceptWeightNamed', { name })}
                 copyValue={copyWeight}
                 isAtDefault={weight === defaultWeight}
                 resetLabel={t('widgets.generate.resetToConceptDefault')}
@@ -288,6 +306,11 @@ const ConceptRowContent = ({
           onContextMenu={menu.open}
         />
       </Box>
+      {issue ? (
+        <Box pb="1.5" px="2">
+          {issue}
+        </Box>
+      ) : null}
       <Menu.Root
         lazyMount
         open={menu.anchor !== null}

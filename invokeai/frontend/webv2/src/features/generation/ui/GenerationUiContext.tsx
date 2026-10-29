@@ -125,6 +125,14 @@ export interface GenerationUiAdapter {
     error(title: string, message?: string): void;
     info(title: string, message?: string): void;
     reportError(error: { area: string; message: string; namespace: 'generation'; projectId?: string }): void;
+    /**
+     * Reports a change that already happened, with Undo. `onUndo` must capture the ids it reverts (the toast outlives
+     * tab switches); with `projectId`, Undo is withdrawn once that project closes.
+     */
+    undoable(
+      title: string,
+      notice: { message?: string; onUndo: () => void; projectId?: string; supersedes?: string }
+    ): void;
   };
   /** The active project's stored Generate values; a store so edits do not re-render every adapter consumer. */
   generateValues: ReadableExternalStore<Record<string, unknown>>;
@@ -139,6 +147,9 @@ export interface GenerationUiAdapter {
     remove(prompt: PromptHistoryItem): void;
   };
   presets: {
+    /** Whether a new preset keeps the prompts too; the save dialog's last choice, remembered per account. */
+    includePrompts: boolean;
+    setIncludePrompts(includePrompts: boolean): void;
     /** User-saved Generate settings snapshots ("recipes"), in save order. */
     presets: readonly GeneratePresetRecord[];
     /** Adds a snapshot under a new id and returns it. */
@@ -166,6 +177,8 @@ export interface GenerationUiAdapter {
   };
   settings: {
     patchGenerateSettings(values: Partial<GenerateSettings>, projectId?: string, origin?: 'user' | 'system'): void;
+    /** A project's stored Generate values, read when an Undo runs; null once the project is closed. */
+    readGenerateValues(projectId: string): Record<string, unknown> | null;
     /**
      * Applies a Reset size choice: the same patch, marked as a reset so a surface that frames the size (the canvas)
      * can keep its centre rather than its top-left. Generation does not know which surface that is.

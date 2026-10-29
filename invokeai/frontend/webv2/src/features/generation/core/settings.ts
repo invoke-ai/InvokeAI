@@ -776,6 +776,25 @@ export const GENERATE_TOOL_MODEL_PICK_KEYS = [
   'imageToPromptModelKey',
 ] as const satisfies readonly (keyof GenerateSettings)[];
 
+/**
+ * What reverts `after` back to `before`: the earlier value of every key the change touched, the model included. Keys
+ * the change left alone stay out, so an Undo keeps edits made since (a prompt typed after a model switch). Batch count
+ * belongs to the top bar and is never reverted.
+ */
+export const getGenerateValuesRevertPatch = (before: object, after: object): Record<string, unknown> => {
+  const patch: Record<string, unknown> = {};
+  const beforeValues = before as Readonly<Record<string, unknown>>;
+  const afterValues = after as Readonly<Record<string, unknown>>;
+
+  for (const key of new Set([...Object.keys(beforeValues), ...Object.keys(afterValues)])) {
+    if (key !== 'batchCount' && !areJsonValuesStructurallyEqual(beforeValues[key], afterValues[key])) {
+      patch[key] = beforeValues[key];
+    }
+  }
+
+  return patch;
+};
+
 /** Exclude arrangement keys from generation-intent routing, including template view but not template application. */
 export const GENERATE_UI_STATE_KEYS = {
   aspectRatioIsLocked: true,

@@ -1,6 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { GenerationModelCatalogItem } from '@features/generation/contracts';
-import type { GenerateLora, LoraModelConfig } from '@features/generation/core/types';
+import type { GenerateLora, GenerateModelConfig, LoraModelConfig } from '@features/generation/core/types';
 import type { ComponentType } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -22,6 +22,7 @@ import { userEvent } from 'vitest/browser';
 
 import { GenerateWidgetView } from './GenerateWidgetView';
 import { GenerationUiProvider, type GenerationModelSelectProps, type GenerationUiAdapter } from './GenerationUiContext';
+import { requestGenerateModelSwitchConfirmation } from './modelSelectionNotice';
 
 vi.mock('react-i18next', () => {
   // Shows the cleared-settings list a model-switch confirmation formats into its body.
@@ -84,11 +85,15 @@ const MODEL = {
   name: 'SDXL',
   type: 'main',
 } as GenerationModelCatalogItem;
-const CATALOG: readonly GenerationModelCatalogItem[] = [MODEL];
+const ink: LoraModelConfig = { base: 'sdxl', key: 'ink', name: 'Ink', type: 'lora' };
+const chalk: LoraModelConfig = { base: 'sdxl', key: 'chalk', name: 'Chalk', type: 'lora' };
+// The concepts the tests apply are installed, so their rows run.
+const CATALOG: readonly GenerationModelCatalogItem[] = [MODEL, ink, chalk] as unknown as GenerationModelCatalogItem[];
 const OTHER_SDXL = { ...MODEL, key: 'sdxl-2', name: 'SDXL 2' } as GenerationModelCatalogItem;
 // A coarser size grid than SDXL's, and no SDXL LoRAs.
 const FLUX = { ...MODEL, base: 'flux', key: 'flux', name: 'FLUX' } as GenerationModelCatalogItem;
 const ANIMA = { ...MODEL, base: 'anima', key: 'anima', name: 'Anima' } as GenerationModelCatalogItem;
+const SDXL_VAE = { base: 'sdxl', key: 'sdxl-vae', name: 'SDXL VAE', type: 'vae' } as GenerationModelCatalogItem;
 const ANIMA_INPAINT_ADAPTER = {
   base: 'anima',
   cond_in_channels: 4,
@@ -107,13 +112,27 @@ const ANIMA_SKETCH_ADAPTER = {
  * The picker, reduced to buttons that hand a model to its real selection handler: the model card's main picks, and
  * for a component slot the catalog models of its types that pass its filter.
  */
-const MainModelPicker = ({ filter, invalid, modelTypes, onChange, placeholder, value }: GenerationModelSelectProps) =>
+const MainModelPicker = ({
+  filter,
+  id,
+  invalid,
+  modelTypes,
+  onChange,
+  placeholder,
+  value,
+}: GenerationModelSelectProps) =>
   modelTypes.includes('external_image_generator') ? (
-    [OTHER_SDXL, FLUX].map((model) => (
-      <button key={model.key} data-model-pick={model.key} type="button" onClick={() => onChange(model)}>
-        {model.name}
+    <>
+      {/* The trigger the card's "Choose another model" opens. */}
+      <button id={id} data-main-picker-trigger="" type="button" onClick={mainPickerOpened}>
+        {placeholder}
       </button>
-    ))
+      {[OTHER_SDXL, FLUX].map((model) => (
+        <button key={model.key} data-model-pick={model.key} type="button" onClick={() => onChange(model)}>
+          {model.name}
+        </button>
+      ))}
+    </>
   ) : (
     <div
       aria-invalid={invalid}
@@ -139,6 +158,7 @@ const INITIAL_VALUES: Record<string, unknown> = {
 const UNRELATED_SECTIONS = ['model', 'prompts', 'dimensions', 'guidance', 'components', 'advanced'];
 
 const noop = () => undefined;
+const mainPickerOpened = vi.fn();
 const ALL_SECTIONS_OPEN = new Proxy({}, { get: () => true }) as Record<string, boolean>;
 
 let host: HTMLDivElement | null = null;
@@ -179,13 +199,14 @@ const createStableGroups = () => ({
     openManager: noop,
     status: 'loaded',
   },
-  notifications: { error: noop, info: noop, reportError: noop },
-  presets: { presets: [], remove: noop, rename: noop, save: noop },
+  notifications: { error: noop, info: noop, reportError: noop, undoable: noop as (...args: unknown[]) => void },
+  presets: { includePrompts: true, presets: [], remove: noop, rename: noop, save: noop, setIncludePrompts: noop },
   promptHistory: { clear: noop, items: [], remove: noop },
   queueInsights: { getSnapshot: () => NO_QUEUE_INSIGHTS, subscribe: () => noop },
   rebalancePresets: { presets: [], remove: noop, rename: noop, save: noop },
   sectionPreferences: { sectionsOpen: ALL_SECTIONS_OPEN, setSectionOpen: noop },
   settings: {
+    readGenerateValues: (projectId: string) => projectValues.get(projectId)?.getSnapshot() ?? null,
     patchGenerateSettings: (patch: Record<string, unknown>, projectId?: string) => {
       patches.push({ patch, projectId });
       storedValues(projectId).patchSnapshot(patch);
@@ -244,9 +265,6 @@ const sliderNamed = (label: string): HTMLElement => {
 
 const pressRight = (element: Element | null | undefined) =>
   settle(() => element?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' })));
-
-const ink: LoraModelConfig = { base: 'sdxl', key: 'ink', name: 'Ink', type: 'lora' };
-const chalk: LoraModelConfig = { base: 'sdxl', key: 'chalk', name: 'Chalk', type: 'lora' };
 
 const showConcepts = () =>
   settle(() =>
@@ -772,28 +790,38 @@ describe('GenerateSettingsForm render isolation', () => {
     expect(stepsValue()).toBe(31);
   });
 
-  it('switches at once when only the size moves, reporting the new size', async () => {
-    const info = vi.fn();
-    stableGroups.notifications.info = info;
-    stableGroups.models.catalog = [MODEL, FLUX];
+  it('switches at once when nothing is lost, with an Undo that restores the earlier model and size', async () => {
+    const undoable = vi.fn();
+    stableGroups.notifications.undoable = undoable;
+    stableGroups.models.catalog = [MODEL, FLUX, ink];
+    storedValues().patchSnapshot({ loras: [{ isEnabled: true, model: ink, weight: 0.75 }] });
     await renderAdapter(buildAdapter());
     // 1032 sits on SDXL's 8 px grid but not FLUX's 16 px one.
     await pressRight(sliderNamed('widgets.generate.width'));
 
     await settle(() => host!.querySelector<HTMLElement>('[data-model-pick="flux"]')?.click());
 
+    // The SDXL concept is set aside, not lost, so the switch needs no confirmation.
     expect(document.querySelector('[role="alertdialog"]')).toBeNull();
     expect(patches.at(-1)?.patch).toMatchObject({ modelKey: 'flux' });
     expect((patches.at(-1)?.patch.width as number) % 16).toBe(0);
-    expect(info).toHaveBeenCalledWith(
-      'widgets.generate.dimensionsAdjusted',
-      'widgets.generate.dimensionsAdjustedDescription'
-    );
+    expect(storedValues().getSnapshot().loras).toEqual([{ isEnabled: true, model: ink, weight: 0.75 }]);
+    expect(undoable).toHaveBeenCalledExactlyOnceWith('widgets.generate.switchedModel', {
+      message:
+        'widgets.generate.switchChanges.turnedOff: widgets.generate.switchSubjects.concepts widgets.generate.switchChanges.size',
+      onUndo: expect.any(Function),
+      projectId: 'project-1',
+      supersedes: 'generate-settings:project-1',
+    });
+
+    await settle(() => undoable.mock.calls[0]![1].onUndo());
+
+    expect(storedValues().getSnapshot()).toMatchObject({ modelKey: 'sdxl', width: 1032 });
   });
 
-  it('confirms a lossy switch against the draft, pending edits included', async () => {
-    stableGroups.models.catalog = [MODEL, FLUX, ink];
-    storedValues().patchSnapshot({ loras: [{ isEnabled: true, model: ink, weight: 0.75 }] });
+  it('confirms a switch that removes something, naming what goes and what is only turned off', async () => {
+    stableGroups.models.catalog = [MODEL, FLUX, ink, SDXL_VAE];
+    storedValues().patchSnapshot({ loras: [{ isEnabled: true, model: ink, weight: 0.75 }], vae: SDXL_VAE });
     await renderAdapter(buildAdapter());
     await stepSteps();
     // 1032 sits on SDXL's 8 px grid but not FLUX's 16 px one; only the draft holds it.
@@ -802,9 +830,13 @@ describe('GenerateSettingsForm render isolation', () => {
     await settle(() => host!.querySelector<HTMLElement>('[data-model-pick="flux"]')?.click());
 
     const dialog = document.querySelector<HTMLElement>('[role="alertdialog"]');
+    const removed = 'widgets.generate.switchModelLines.removed: widgets.generate.switchSubjects.vae';
+    expect(dialog?.textContent).toContain(removed);
+    expect(dialog?.textContent).toContain(
+      'widgets.generate.switchModelLines.turnedOff: widgets.generate.switchSubjects.concepts'
+    );
     // The size moves to the FLUX grid, which the dialog reports beside the loss rather than as one.
-    expect(dialog?.textContent).toContain('widgets.generate.switchModelBody: LoRAs');
-    expect(dialog?.textContent).toContain('widgets.generate.switchModelAdjustsDimensions');
+    expect(dialog?.textContent).toContain('widgets.generate.switchChanges.size');
     expect(patches).toEqual([]);
 
     const confirm = [...dialog!.querySelectorAll<HTMLButtonElement>('button')].find(
@@ -815,14 +847,92 @@ describe('GenerateSettingsForm render isolation', () => {
     // The switch lands as the dialog closes, and the dialog animates out still listing what was confirmed.
     expect(frames).not.toHaveLength(0);
     for (const frame of frames) {
-      expect(frame.text).toContain('widgets.generate.switchModelBody: LoRAs');
+      expect(frame.text).toContain(removed);
     }
 
     await settle(noop, 400);
 
     expect(patches).toHaveLength(1);
-    expect(patches[0]?.patch).toMatchObject({ loras: [], modelKey: 'flux', steps: 31 });
+    expect(patches[0]?.patch).toMatchObject({ modelKey: 'flux', steps: 31, vae: null });
     expect((patches[0]?.patch.width as number) % 16).toBe(0);
-    expect(storedValues().getSnapshot()).toMatchObject({ loras: [], modelKey: 'flux', steps: 31 });
+    expect(storedValues().getSnapshot()).toMatchObject({ modelKey: 'flux', steps: 31, vae: null });
+  });
+
+  it('confirms a switch another surface asked for, the way its own picker does', async () => {
+    stableGroups.models.catalog = [MODEL, FLUX, SDXL_VAE];
+    storedValues().patchSnapshot({ vae: SDXL_VAE });
+    await renderAdapter(buildAdapter());
+
+    await settle(() =>
+      requestGenerateModelSwitchConfirmation({ model: FLUX as GenerateModelConfig, projectId: 'project-2' })
+    );
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+
+    await settle(() =>
+      requestGenerateModelSwitchConfirmation({ model: FLUX as GenerateModelConfig, projectId: 'project-1' })
+    );
+    const dialog = document.querySelector<HTMLElement>('[role="alertdialog"]');
+    expect(dialog?.textContent).toContain('widgets.generate.switchSubjects.vae');
+
+    await settle(() =>
+      [...dialog!.querySelectorAll<HTMLButtonElement>('button')]
+        .find((button) => button.textContent === 'widgets.generate.switchModelConfirm')
+        ?.click()
+    );
+    await settle(noop, 400);
+
+    expect(storedValues().getSnapshot()).toMatchObject({ modelKey: 'flux', vae: null });
+  });
+
+  it('keeps a model that is no longer installed, names it, and offers another pick or the Model Manager', async () => {
+    const gone = { ...MODEL, key: 'gone', name: 'Gone XL' };
+    const openManager = vi.fn();
+    stableGroups.models.openManager = openManager;
+    mainPickerOpened.mockClear();
+    projectValues.set(
+      'project-1',
+      createExternalStoreCore<Record<string, unknown>>({ ...INITIAL_VALUES, model: gone, modelKey: gone.key })
+    );
+    await renderAdapter(buildAdapter());
+
+    expect(storedValues().getSnapshot().modelKey).toBe('gone');
+    expect(host?.textContent).toContain('widgets.generate.issues.modelNotInstalled');
+    expect(patches).toEqual([]);
+
+    const button = (name: string) =>
+      [...host!.querySelectorAll<HTMLButtonElement>('button')].find((candidate) => candidate.textContent === name);
+
+    await settle(() => button('widgets.generate.chooseAnotherModel')?.click());
+    expect(mainPickerOpened).toHaveBeenCalledOnce();
+
+    await settle(() => button('widgets.generate.openModelManager')?.click());
+    expect(openManager).toHaveBeenCalledExactlyOnceWith({ modelType: 'main' });
+  });
+
+  it('badges a section holding an issue, and its one-step fix patches the setting and moves focus on', async () => {
+    projectValues.set(
+      'project-1',
+      createExternalStoreCore<Record<string, unknown>>({ ...INITIAL_VALUES, aspectRatioId: 'Free', width: 1001 })
+    );
+    await renderAdapter(buildAdapter());
+    const sizeSection = () =>
+      [...host!.querySelectorAll<HTMLElement>('.generate-section')].find((section) =>
+        section.textContent?.includes('widgets.generate.size')
+      )!;
+
+    expect(sizeSection().querySelector('[data-part="trigger"]')?.textContent).toContain('widgets.generate.issueCount');
+
+    const fix = sizeSection().querySelector<HTMLButtonElement>('[data-issue-fix]')!;
+    expect(fix.textContent).toBe('widgets.generate.issueFixes.setSize');
+    await settle(() => fix.click(), 50);
+
+    expect(patches.at(-1)).toMatchObject({
+      patch: { aspectRatioValue: 1000 / 1024, width: 1000 },
+      projectId: 'project-1',
+    });
+    expect(sizeSection().querySelector('[data-part="trigger"]')?.textContent).not.toContain(
+      'widgets.generate.issueCount'
+    );
+    expect(document.activeElement).toBe(sizeSection().querySelector('[data-part="trigger"]'));
   });
 });

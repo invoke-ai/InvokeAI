@@ -273,8 +273,9 @@ describe('buildRecallParametersSettings', () => {
       { key: 'refiner_cfg_scale', reason: 'incompatible', detail: flux.name },
     ]);
 
+    // Leaving SDXL keeps the refiner selected but idle (it runs only after an SDXL base); the recalled one is skipped.
     const away = build(current, { model: flux.key, refiner_model: refiner.key, refiner_steps: 15 });
-    expect(away.values.refinerModel).toBeNull();
+    expect(away.values.refinerModel).toEqual(refiner);
     expect(away.values.refinerSteps).toBe(35);
     expect(away.skipped.map(({ key }) => key)).toEqual(['refiner_model', 'refiner_steps']);
   });

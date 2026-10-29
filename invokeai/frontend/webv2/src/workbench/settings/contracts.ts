@@ -136,6 +136,8 @@ export interface WorkbenchPreferences {
   krea2RebalancePresets: StoredRebalancePreset[];
   /** User-saved Generate settings snapshots ("recipes"), in the order they were saved. */
   generatePresets: StoredGeneratePreset[];
+  /** Whether a new Generate preset keeps the prompts too: the save dialog's last choice. Not shown in Settings. */
+  generatePresetsIncludePrompts: boolean;
   /**
    * The last control model picked per main-model base and control type (`${base}:${controlType}` → model key);
    * control layers left on automatic use it. Not shown in Settings.

@@ -62,6 +62,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   exportIncludesWorkspace: true,
   galleryDestinationNoticeShown: false,
   generatePresets: [],
+  generatePresetsIncludePrompts: true,
   generateSectionsOpen: {},
   highContrast: false,
   installInPlace: true,
@@ -377,6 +378,7 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
       ? preferences.exportIncludesWorkspace
       : DEFAULT_PREFERENCES.exportIncludesWorkspace,
   generatePresets: normalizeGeneratePresets(preferences?.generatePresets),
+  generatePresetsIncludePrompts: preferences?.generatePresetsIncludePrompts !== false,
   generateSectionsOpen: normalizeGenerateSectionsOpen(preferences?.generateSectionsOpen),
   installInPlace:
     typeof preferences?.installInPlace === 'boolean' ? preferences.installInPlace : DEFAULT_PREFERENCES.installInPlace,

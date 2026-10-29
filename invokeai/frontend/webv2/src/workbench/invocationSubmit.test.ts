@@ -358,6 +358,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
       kind: 'error',
       message: 'string_generator: Unbalanced braces',
       title: 'The batch generator could not be resolved',
+      titleKey: 'topbar.invoke.generatorFailed',
     });
   });
 
@@ -377,6 +378,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
       kind: 'error',
       message: 'Batch node "string_batch" has an empty collection.',
       title: 'The batch is not ready',
+      titleKey: 'topbar.invoke.batchNotReady',
     });
   });
 });

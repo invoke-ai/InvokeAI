@@ -5,7 +5,13 @@ import { ACTION_TOAST_DURATION_MS, createActionToast, toaster } from '@platform/
 import i18next from 'i18next';
 import { useMemo } from 'react';
 
-import { registerNotificationUndo } from './shell/notifications/undoRegistry';
+import {
+  getNotificationUndoWithdrawal,
+  holdNotificationUndo,
+  registerNotificationUndo,
+  releaseNotificationUndo,
+  runNotificationUndo,
+} from './shell/notifications/undoRegistry';
 import { useOptionalWorkbenchCommands } from './WorkbenchContext';
 
 export interface NotifyOptions {
@@ -25,6 +31,11 @@ export interface UndoableNotice {
   onUndo: () => void;
   /** The project the action changed: Undo is withdrawn once that project is no longer open. */
   projectId?: string;
+  /**
+   * What the undo reverts, such as one project's Generate settings. A newer undo with the same key closes this one's
+   * toast: undoing an older step after a newer one would leave a mix of both.
+   */
+  supersedes?: string;
   /**
    * Toast only, never recorded in the notification center: for undoing a change to the center itself, which a record
    * of it would undo in turn (clearing the list would leave the clear's own notice in it).
@@ -73,11 +84,13 @@ export const useNotify = (): Notify => {
         }
       };
 
-    const undoable = (title: string, { message, onUndo, projectId, transient }: UndoableNotice): void => {
+    const undoable = (title: string, { message, onUndo, projectId, supersedes, transient }: UndoableNotice): void => {
+      const undoId = registerNotificationUndo(onUndo, supersedes);
+
       if (commands && !transient) {
         // The center keeps the notice as data; the closure waits in the registry until its toast closes.
         commands.notifications.add({
-          actions: [{ kind: 'undo', undoId: registerNotificationUndo(onUndo), ...(projectId ? { projectId } : {}) }],
+          actions: [{ kind: 'undo', undoId, ...(projectId ? { projectId } : {}) }],
           kind: 'success',
           message,
           title,
@@ -85,15 +98,23 @@ export const useNotify = (): Notify => {
         return;
       }
 
+      const withdrawal = getNotificationUndoWithdrawal(undoId);
+
       createActionToast({
         // Read at call time: only this path needs a translation, and the hook must not suspend or change identity.
-        actions: [{ label: i18next.t('common.undo'), onClick: onUndo }],
+        actions: [{ label: i18next.t('common.undo'), onClick: () => runNotificationUndo(undoId) }],
         description: message,
         duration: ACTION_TOAST_DURATION_MS,
-        signal: captureAccountScope().signal,
+        onStatusChange: ({ status }) => {
+          if (status === 'unmounted') {
+            releaseNotificationUndo(undoId);
+          }
+        },
+        signal: withdrawal ? AbortSignal.any([captureAccountScope().signal, withdrawal]) : captureAccountScope().signal,
         title,
         type: 'success',
       });
+      holdNotificationUndo(undoId);
     };
 
     return { error: record('error'), info: record('info'), success: record('success'), undoable };

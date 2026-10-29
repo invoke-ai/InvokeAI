@@ -89,7 +89,38 @@ describe('resolveGenerateWidgetValues', () => {
     expect(result?.systemPatch).not.toHaveProperty('batchCount');
   });
 
-  it('keeps authored settings while replacing an unavailable selection with the default model', () => {
+  it('keeps a chosen model that is no longer installed, so the card can name it and Invoke waits', () => {
+    const removed = createModel('removed');
+    const available = createModel('available');
+    const storedValues = createValues(removed, { positivePrompt: 'keep this prompt' });
+    const result = resolveGenerateWidgetValues({ models: [available], storedValues });
+
+    expect(result?.values).toBe(storedValues);
+    expect(result?.values.model).toBe(removed);
+    expect(result?.systemPatch).toBeNull();
+  });
+
+  it('finds a reinstalled model again by its file hash, though it came back under a new key', () => {
+    const removed = createModel('removed', { hash: 'blake3:abc' });
+    const reinstalled = createModel('reinstalled', { hash: 'blake3:abc', name: 'Same file' });
+    const storedValues = createValues(removed, { positivePrompt: 'keep this prompt' });
+    const result = resolveGenerateWidgetValues({ models: [createModel('other'), reinstalled], storedValues });
+
+    expect(result?.values.model).toBe(reinstalled);
+    expect(result?.values.positivePrompt).toBe('keep this prompt');
+    expect(result?.systemPatch).toMatchObject({ model: reinstalled, modelKey: reinstalled.key });
+  });
+
+  it('defaults a choice that never named a model', () => {
+    const available = createModel('available');
+    const { model: _, ...withoutModel } = createValues(createModel('unknown'), { modelKey: '' });
+    const result = resolveGenerateWidgetValues({ models: [available], storedValues: withoutModel });
+
+    expect(result?.values.model).toBe(available);
+    expect(result?.systemPatch).toMatchObject({ model: available, modelKey: available.key });
+  });
+
+  it('keeps authored settings while replacing a selection of an unsupported family with the default model', () => {
     const unavailable = createModel('unavailable', { base: 'not-supported' });
     const available = createModel('available');
     const storedValues = createValues(unavailable, { positivePrompt: 'keep this prompt' });

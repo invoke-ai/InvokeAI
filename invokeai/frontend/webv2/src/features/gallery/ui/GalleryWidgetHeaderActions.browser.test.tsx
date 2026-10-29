@@ -118,17 +118,7 @@ describe('GalleryWidgetHeaderActions', () => {
     await render({});
 
     expect(trigger().dataset.galleryDestination).toBe('inbox');
-    expect(trigger().getAttribute('aria-label')).toBe(
-      'widgets.gallery.savingTo widgets.gallery.inbox. widgets.gallery.destinationTriggerHint'
-    );
-    // The accessible name carries the visible text, label then board, in reading order.
-    const accessibleName = trigger().getAttribute('aria-label') ?? '';
-    expect(trigger().textContent).toBe('widgets.gallery.savingTo widgets.gallery.inbox');
-    expect(accessibleName.startsWith(trigger().textContent ?? '')).toBe(true);
-    expect(accessibleName.indexOf('widgets.gallery.savingTo')).toBeGreaterThanOrEqual(0);
-    expect(accessibleName.indexOf('widgets.gallery.savingTo')).toBeLessThan(
-      accessibleName.indexOf('widgets.gallery.inbox')
-    );
+    expect(trigger().getAttribute('aria-label')).toBe('widgets.gallery.destinationTrigger(name=widgets.gallery.inbox)');
     // Closed, the menu renders nothing.
     expect(document.querySelector('[role="menuitemradio"]')).toBeNull();
   });

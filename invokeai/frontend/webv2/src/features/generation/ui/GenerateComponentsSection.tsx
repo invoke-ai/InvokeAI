@@ -25,6 +25,7 @@ import { useTranslation } from 'react-i18next';
 import { type GenerateDraft, pickGenerateSettings } from './generateDebounce';
 import { GenerationModelSelect as ModelSelect } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
+import { GenerateIssueNotes } from './shared/GenerateIssues';
 import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
 
 interface GenerateComponentsSectionProps {
@@ -176,6 +177,7 @@ export const GenerateComponentsSection = ({ draft, onCommit, selectedModel }: Ge
             onCommit={onCommit}
           />
         ) : null}
+        <GenerateIssueNotes section="components" />
       </Stack>
     </GenerateCollapsibleSection>
   );

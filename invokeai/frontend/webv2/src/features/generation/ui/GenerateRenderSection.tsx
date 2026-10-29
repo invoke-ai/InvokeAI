@@ -45,7 +45,6 @@ import { useRegisterDraftFlusher } from '@platform/react/draftRegistry';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Combobox } from '@platform/ui/Combobox';
 import { Field } from '@platform/ui/Field';
-import { ModelDefaultButton } from '@platform/ui/ModelDefaultButton';
 import { ScrubberField } from '@platform/ui/ScrubberField';
 import { Select } from '@platform/ui/Select';
 import { SliderNumberField } from '@platform/ui/SliderNumberField';
@@ -63,6 +62,7 @@ import {
 } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
+import { GenerateIssueNotes } from './shared/GenerateIssues';
 import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
 import { SeedField as SharedSeedField } from './shared/SeedField';
 import { useDynamicPrompts } from './useDynamicPrompts';
@@ -282,6 +282,7 @@ const MossImageSkipLayersField = ({
   return (
     <GenerateFieldContextMenu
       copyValue={() => formatSkipLayers(stored)}
+      fieldLabel={label}
       isAtDefault={isSameSkipLayers(stored, DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS)}
       onReset={() => {
         setDraft(null);
@@ -635,6 +636,7 @@ export const GenerateRenderSection = ({
   const renderFields = (strengthField: ReactNode) => (
     <>
       <GenerateFieldContextMenu
+        fieldLabel={t('widgets.generate.steps')}
         copyValue={() => String(settings.steps)}
         isAtDefault={modelDefaults !== null && settings.steps === modelDefaults.steps}
         onReset={modelDefaults ? () => onCommit({ steps: modelDefaults.steps }) : undefined}
@@ -653,6 +655,7 @@ export const GenerateRenderSection = ({
         />
       </GenerateFieldContextMenu>
       <GenerateFieldContextMenu
+        fieldLabel={uiPolicy.guidanceLabel}
         copyValue={() => String(settings.cfgScale)}
         isAtDefault={modelDefaults !== null && settings.cfgScale === modelDefaults.cfgScale}
         onReset={modelDefaults ? () => onCommit({ cfgScale: modelDefaults.cfgScale }) : undefined}
@@ -671,6 +674,8 @@ export const GenerateRenderSection = ({
           onChange={(cfgScale) => commitNumber('cfgScale', cfgScale)}
         />
       </GenerateFieldContextMenu>
+      {/* The scrubber shows the message; this adds its one-step fix. */}
+      <GenerateIssueNotes field="cfgScale" fixesOnly section="render" />
       {strengthField}
       {familyBase === 'moss-image' ? (
         <MossImageSkipLayersField settings={settings} onCommitImmediate={onCommitImmediate} />
@@ -703,26 +708,18 @@ export const GenerateRenderSection = ({
       {familyBase === 'flux' ? <FluxDypeFields settings={settings} onCommit={onCommit} /> : null}
       {uiPolicy.schedulerVisible ? (
         <GenerateFieldContextMenu
+          fieldLabel={t('widgets.generate.scheduler')}
           copyValue={() => settings.scheduler}
           isAtDefault={modelDefaults !== null && settings.scheduler === modelDefaults.scheduler}
           onReset={modelDefaults ? () => onCommit({ scheduler: modelDefaults.scheduler }) : undefined}
         >
           <Field hint="scheduler" label={t('widgets.generate.scheduler')}>
-            <HStack gap="1">
-              <Combobox
-                aria-label={t('widgets.generate.scheduler')}
-                flex="1"
-                options={getSchedulerOptions(selectedModel, settings.scheduler)}
-                value={settings.scheduler}
-                onValueChange={(scheduler) => onCommit({ scheduler })}
-              />
-              {modelDefaults && settings.scheduler !== modelDefaults.scheduler ? (
-                <ModelDefaultButton
-                  label={t('widgets.generate.useModelDefaultScheduler')}
-                  onClick={() => onCommit({ scheduler: modelDefaults.scheduler })}
-                />
-              ) : null}
-            </HStack>
+            <Combobox
+              aria-label={t('widgets.generate.scheduler')}
+              options={getSchedulerOptions(selectedModel, settings.scheduler)}
+              value={settings.scheduler}
+              onValueChange={(scheduler) => onCommit({ scheduler })}
+            />
           </Field>
         </GenerateFieldContextMenu>
       ) : null}
@@ -760,6 +757,7 @@ export const GenerateRenderSection = ({
       sectionId="render"
     >
       <Stack gap="2" p="2">
+        <GenerateIssueNotes section="render" />
         {renderFields(canvas?.field ?? null)}
       </Stack>
     </GenerateCollapsibleSection>

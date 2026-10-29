@@ -283,6 +283,7 @@ export const GenerateConditioningRebalanceField = ({
             </Stack>
 
             <GenerateFieldContextMenu
+              fieldLabel={t('widgets.generate.krea2RebalanceGain')}
               copyValue={() => String(settings.krea2RebalanceMultiplier)}
               isAtDefault={settings.krea2RebalanceMultiplier === DEFAULT_KREA2_REBALANCE_MULTIPLIER}
               onReset={() => onCommit({ krea2RebalanceMultiplier: DEFAULT_KREA2_REBALANCE_MULTIPLIER })}

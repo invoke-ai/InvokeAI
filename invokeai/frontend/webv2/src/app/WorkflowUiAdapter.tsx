@@ -26,6 +26,7 @@ import {
   createInvocationRouteInputSelector,
   formatRoute,
   isInvocationRouteValid,
+  localizeInvocationValidationReason,
   resolveInvocationRouteInput,
 } from '@workbench/invocation';
 import { useIsInvocationPreparing } from '@workbench/invocationPreparation';
@@ -154,14 +155,17 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
           availabilityModels
         );
 
+        const message = route.validationMessage;
+
         return {
           canInvoke: isInvocationRouteValid(route) && !isPreparing,
           label: formatRoute(route),
+          // For-loop reasons stay structured: the workflow words them itself.
           validationMessage: isPreparing
             ? t('topbar.invoke.preparing')
-            : typeof route.validationMessage === 'object' && 'controlLayerIssue' in route.validationMessage
-              ? describeControlLayerIssue(t, route.validationMessage.controlLayerIssue)
-              : route.validationMessage,
+            : typeof message === 'object' && ('controlLayerIssue' in message || 'generationIssue' in message)
+              ? localizeInvocationValidationReason(message, t)
+              : message,
         };
       },
       invoke: async (sourceId) => {

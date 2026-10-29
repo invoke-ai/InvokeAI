@@ -155,9 +155,7 @@ export const GalleryWidgetHeaderActions = () => {
       <Tooltip content={tooltip} disabled={isMenuOpen} ids={triggerIds}>
         <Menu.Trigger asChild>
           <Button
-            // Built from the visible text, so in every language the name starts with what the button shows and a
-            // speech user can say it; the hint follows.
-            aria-label={`${t('widgets.gallery.savingTo')} ${destinationName}. ${t('widgets.gallery.destinationTriggerHint')}`}
+            aria-label={t('widgets.gallery.destinationTrigger', { name: destinationName })}
             data-gallery-destination={destination.boardId}
             maxW="18rem"
             minW="0"
@@ -165,14 +163,10 @@ export const GalleryWidgetHeaderActions = () => {
             variant="ghost"
           >
             <Icon as={SquareArrowDownIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-            {/* One run of text, label and board joined by a space, so the visible text reads as the start of the
-                accessible name ("Saving to Inbox"); separate flex items would read as "Saving toInbox". */}
-            <HStack as="span" gap="0" minW="0">
-              <Text as="span" color="fg.muted" flexShrink={0} whiteSpace="pre">
-                {`${t('widgets.gallery.savingTo')} `}
-              </Text>
-              <MiddleTruncate as="span" fontWeight="600" minW="0" text={destinationName} />
-            </HStack>
+            <Text color="fg.subtle" flexShrink={0}>
+              {t('widgets.gallery.savingTo')}
+            </Text>
+            <MiddleTruncate fontWeight="600" minW="0" text={destinationName} />
             <Icon as={ChevronDownIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
           </Button>
         </Menu.Trigger>

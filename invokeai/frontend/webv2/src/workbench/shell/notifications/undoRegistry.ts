@@ -7,7 +7,10 @@ import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
  * recorded while the editor shell was not mounted) count against the bound, oldest dropped first.
  */
 const MAX_IDLE_UNDOS = 20;
-const pendingUndos = new Map<string, { isHeld: boolean; onUndo: () => void }>();
+const pendingUndos = new Map<
+  string,
+  { isHeld: boolean; onUndo: () => void; supersedes: string | undefined; withdrawal: AbortController }
+>();
 let nextUndoId = 0;
 
 const dropOldestIdleUndo = (): void => {
@@ -18,16 +21,33 @@ const dropOldestIdleUndo = (): void => {
   }
 };
 
-export const registerNotificationUndo = (onUndo: () => void): string => {
+/**
+ * `supersedes` names what the undo reverts, such as one project's Generate settings. A newer undo with the same key
+ * withdraws the older ones (their toasts close): undoing an older step after a newer one would leave a mix of both.
+ */
+export const registerNotificationUndo = (onUndo: () => void, supersedes?: string): string => {
   const undoId = `undo-${++nextUndoId}`;
 
-  pendingUndos.set(undoId, { isHeld: false, onUndo });
+  if (supersedes !== undefined) {
+    for (const [olderId, entry] of pendingUndos) {
+      if (entry.supersedes === supersedes) {
+        pendingUndos.delete(olderId);
+        entry.withdrawal.abort();
+      }
+    }
+  }
+
+  pendingUndos.set(undoId, { isHeld: false, onUndo, supersedes, withdrawal: new AbortController() });
   dropOldestIdleUndo();
 
   return undoId;
 };
 
 export const hasNotificationUndo = (undoId: string): boolean => pendingUndos.has(undoId);
+
+/** Aborts when a newer undo supersedes this one; a toast offering it closes then. */
+export const getNotificationUndoWithdrawal = (undoId: string): AbortSignal | undefined =>
+  pendingUndos.get(undoId)?.withdrawal.signal;
 
 /** Keeps the entry while a toast shows its Undo; `releaseNotificationUndo` ends that. */
 export const holdNotificationUndo = (undoId: string): void => {

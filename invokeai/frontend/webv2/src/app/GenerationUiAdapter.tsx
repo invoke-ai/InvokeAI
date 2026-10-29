@@ -10,7 +10,7 @@ import {
   invalidateGallery,
 } from '@features/gallery/queries';
 import { galleryImageUrls } from '@features/gallery/utility';
-import { GenerationUiProvider } from '@features/generation/react';
+import { clearGenerateModelSwitchConfirmation, GenerationUiProvider } from '@features/generation/react';
 import { normalizeRebalancePresets } from '@features/generation/settings';
 import { useAuthSession, useCapabilities } from '@features/identity';
 import {
@@ -190,6 +190,20 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     void import('@features/models/react');
   });
   const store = useWorkbenchInternalStore();
+  // A model switch waiting for confirmation belongs to the project it was asked in; leaving that project drops it, so
+  // the dialog never pops up later in another context.
+  useMountEffect(() => {
+    let activeProjectId = store.getSnapshot().activeProject.id;
+
+    return store.subscribe(() => {
+      const next = store.getSnapshot().activeProject.id;
+
+      if (next !== activeProjectId) {
+        activeProjectId = next;
+        clearGenerateModelSwitchConfirmation();
+      }
+    });
+  });
   const generateValues = useMemo(
     () =>
       createProjectedExternalStore({
@@ -297,8 +311,13 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     [modelsCatalog, modelsError, modelsStatus, openInModelManager, project.activeProjectId]
   );
   const notificationsGroup = useMemo<GenerationUiAdapter['notifications']>(
-    () => ({ error: notify.error, info: notify.info, reportError: notifications.reportError }),
-    [notifications.reportError, notify.error, notify.info]
+    () => ({
+      error: notify.error,
+      info: notify.info,
+      reportError: notifications.reportError,
+      undoable: notify.undoable,
+    }),
+    [notifications.reportError, notify.error, notify.info, notify.undoable]
   );
   const promptHistoryGroup = useMemo<GenerationUiAdapter['promptHistory']>(
     () => ({
@@ -311,6 +330,11 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
   const settingsGroup = useMemo<GenerationUiAdapter['settings']>(
     () => ({
       patchGenerateSettings: generation.patchSettings,
+      readGenerateValues: (projectId) => {
+        const project = store.getSnapshot().projects.find((candidate) => candidate.id === projectId);
+
+        return project ? getProjectWidgetValues(project, 'generate') : null;
+      },
       resetDimensions: (values, projectId) => resetGenerateDims(store, values, projectId),
     }),
     [generation, store]
@@ -359,8 +383,12 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     [krea2RebalancePresets]
   );
   const generatePresets = useWorkbenchPreferenceSelector((preferences) => preferences.generatePresets);
+  const generatePresetsIncludePrompts = useWorkbenchPreferenceSelector(
+    (preferences) => preferences.generatePresetsIncludePrompts
+  );
   const presetsGroup = useMemo<GenerationUiAdapter['presets']>(
     () => ({
+      includePrompts: generatePresetsIncludePrompts,
       // Presets are shape-checked in storage and normalized against current models on application.
       presets: generatePresets,
       remove: (presetId) => {
@@ -384,8 +412,11 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
 
         return preset;
       },
+      setIncludePrompts: (includePrompts) => {
+        void patchWorkbenchPreferences({ generatePresetsIncludePrompts: includePrompts });
+      },
     }),
-    [generatePresets]
+    [generatePresets, generatePresetsIncludePrompts]
   );
   const generateSectionsOpen = useWorkbenchPreferenceSelector((preferences) => preferences.generateSectionsOpen);
   const sectionPreferencesGroup = useMemo<GenerationUiAdapter['sectionPreferences']>(

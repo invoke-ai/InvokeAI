@@ -40,10 +40,17 @@ import { readCanvasCompositingSettings } from './widgets/canvas/invoke/canvasCom
 import { readCanvasDenoisingStrength } from './widgets/canvas/invoke/canvasStrength';
 import { getProjectWidgetValues } from './widgetState';
 
-/** Plain English, like the shell's other notices — this module has no i18n context. */
-const EXPANSION_FAILED_TITLE = 'The prompt could not be expanded';
-const GENERATOR_FAILED_TITLE = 'The batch generator could not be resolved';
-const BATCH_NOT_READY_TITLE = 'The batch is not ready';
+/** Locale keys with their English, which notices keep for a language without them (`resolveNotificationText`). */
+const EXPANSION_FAILED_TITLE = { title: 'The prompt could not be expanded', titleKey: 'topbar.invoke.expansionFailed' };
+const EXPANSION_UNREACHABLE_MESSAGE = {
+  message: 'The server could not be reached to expand the prompt. Check the connection and try again.',
+  messageKey: 'topbar.invoke.expansionUnreachable',
+};
+const GENERATOR_FAILED_TITLE = {
+  title: 'The batch generator could not be resolved',
+  titleKey: 'topbar.invoke.generatorFailed',
+};
+const BATCH_NOT_READY_TITLE = { title: 'The batch is not ready', titleKey: 'topbar.invoke.batchNotReady' };
 
 /** Settled, never rejected: it may fail while the board listing is still awaited, before anything awaits it. */
 type UpscaleSourceMetadataRead = UpscaleSourceMetadata | { error: unknown; imageName: string };
@@ -185,7 +192,7 @@ const resolveWorkflowGeneratorsForRoute = async (
   }
 
   if (errors.length > 0) {
-    commands.notifications.add({ kind: 'error', message: errors[0], title: GENERATOR_FAILED_TITLE });
+    commands.notifications.add({ ...GENERATOR_FAILED_TITLE, kind: 'error', message: errors[0] });
     return null;
   }
 
@@ -203,7 +210,7 @@ const resolveWorkflowGeneratorsForRoute = async (
   const reason = resolvedPlan.reasons[0] ?? capReason;
 
   if (reason) {
-    commands.notifications.add({ kind: 'error', message: reason, title: BATCH_NOT_READY_TITLE });
+    commands.notifications.add({ ...BATCH_NOT_READY_TITLE, kind: 'error', message: reason });
     return null;
   }
 
@@ -280,10 +287,11 @@ export const submitResolvedInvocation = async ({
     // Reject failed expansions for hotkey and preview callers too, so literal dynamic syntax never reaches
     // generation.
     if (expansion === null || expansion.error) {
+      // A request that never answered has no server reason, so the notice says what failed instead.
       commands.notifications.add({
+        ...EXPANSION_FAILED_TITLE,
+        ...(expansion === null ? EXPANSION_UNREACHABLE_MESSAGE : { message: expansion.error ?? undefined }),
         kind: 'error',
-        message: expansion?.error ?? undefined,
-        title: EXPANSION_FAILED_TITLE,
       });
       return;
     }

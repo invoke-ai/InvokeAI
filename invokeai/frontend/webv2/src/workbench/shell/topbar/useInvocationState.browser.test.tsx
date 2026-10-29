@@ -181,9 +181,8 @@ describe('useInvocationState and the architecture capability table', () => {
   it('stops blocking Invoke as soon as a retried load succeeds', async () => {
     await renderProbe(buildGenerateProject());
 
-    expect(blockingReasons()).toBe(
-      'Model capabilities are not available. Generation is blocked until they load; if this persists, retry from the Generate panel.'
-    );
+    // Worded from the locale, which this probe leaves untranslated.
+    expect(blockingReasons()).toBe('widgets.generate.issues.capabilitiesUnavailable');
 
     // Capability arrival alone must recompute the route after retry succeeds.
     await act(() => {

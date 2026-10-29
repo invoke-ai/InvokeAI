@@ -1,109 +1,98 @@
 import type { GenerateSettings } from '@features/generation/core/types';
 import type { TFunction } from 'i18next';
 
-import { describe, expect, it, vi } from 'vitest';
+import i18n from 'i18next';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { notifyGenerateDimensionsAdjusted, notifyGenerateModelSelectionCleared } from './modelSelectionNotice';
+import { describeModelSwitchChanges, notifyGenerateModelSwitched } from './modelSelectionNotice';
 
-const createTranslation = () =>
-  vi.fn((key: string, options?: Record<string, unknown>) => {
-    if (key === 'widgets.generate.incompatibleSettingsCleared') {
-      return 'Incompatible settings cleared';
-    }
+const englishCatalog = Object.values(
+  import.meta.glob('../../../../public/locales/en.json', { eager: true, import: 'default' })
+)[0] as Record<string, unknown>;
+const instance = i18n.createInstance();
+const t = ((key: string, values?: Record<string, unknown>) => instance.t(key, values)) as TFunction;
+const settings = { height: 1600, width: 2848 } as GenerateSettings;
 
-    return `${String(options?.labels)} ${Number(options?.count) === 1 ? 'was' : 'were'} not compatible with ${String(options?.name)}.`;
-  }) as unknown as TFunction;
-
-describe('notifyGenerateModelSelectionCleared', () => {
-  it('does not notify when no settings were cleared', () => {
-    const info = vi.fn();
-
-    notifyGenerateModelSelectionCleared({
-      clearedLabels: [],
-      locale: 'en',
-      modelName: 'FLUX',
-      notifications: { info },
-      t: createTranslation(),
-    });
-
-    expect(info).not.toHaveBeenCalled();
-  });
-
-  it('passes singular interpolation values to the translated notice', () => {
-    const info = vi.fn();
-    const t = createTranslation();
-
-    notifyGenerateModelSelectionCleared({
-      clearedLabels: ['LoRAs'],
-      locale: 'en',
-      modelName: 'FLUX',
-      notifications: { info },
-      t,
-    });
-
-    expect(t).toHaveBeenLastCalledWith('widgets.generate.incompatibleSettingsClearedDescription', {
-      count: 1,
-      labels: 'LoRAs',
-      name: 'FLUX',
-    });
-    expect(info).toHaveBeenCalledWith('Incompatible settings cleared', 'LoRAs was not compatible with FLUX.');
-  });
-
-  it('formats multiple labels with the resolved locale and plural interpolation', () => {
-    const info = vi.fn();
-    const t = createTranslation();
-
-    notifyGenerateModelSelectionCleared({
-      clearedLabels: ['Dimensions', 'LoRAs', 'VAE'],
-      locale: 'en',
-      modelName: 'FLUX',
-      notifications: { info },
-      t,
-    });
-
-    expect(t).toHaveBeenLastCalledWith('widgets.generate.incompatibleSettingsClearedDescription', {
-      count: 3,
-      labels: 'Dimensions, LoRAs, and VAE',
-      name: 'FLUX',
-    });
-    expect(info).toHaveBeenCalledWith(
-      'Incompatible settings cleared',
-      'Dimensions, LoRAs, and VAE were not compatible with FLUX.'
-    );
+beforeAll(async () => {
+  await instance.init({
+    initAsync: false,
+    interpolation: { escapeValue: false },
+    lng: 'en',
+    resources: { en: { translation: englishCatalog } },
   });
 });
 
-describe('notifyGenerateDimensionsAdjusted', () => {
-  const t = vi.fn((key: string, options?: Record<string, unknown>) =>
-    options ? `${key} ${JSON.stringify(options)}` : key
-  ) as unknown as TFunction;
-
-  it('names the size the switch moved to', () => {
-    const info = vi.fn();
-
-    notifyGenerateDimensionsAdjusted({
-      modelName: 'Seedream 4.5',
-      notifications: { info },
-      result: { dimensionsAdjusted: true, settings: { height: 1600, width: 2848 } as GenerateSettings },
-      t,
-    });
-
-    expect(info).toHaveBeenCalledWith(
-      'widgets.generate.dimensionsAdjusted',
-      'widgets.generate.dimensionsAdjustedDescription {"height":1600,"name":"Seedream 4.5","width":2848}'
-    );
+describe('describeModelSwitchChanges', () => {
+  it('tells what is lost before what is only set aside, with counts and the new size', () => {
+    expect(
+      describeModelSwitchChanges(
+        {
+          changes: [
+            { count: 2, kind: 'turnedOff', subject: 'concepts' },
+            { kind: 'removed', subject: 'vae' },
+            { kind: 'reset', subject: 'clipSkip' },
+            { kind: 'removed', subject: 't5EncoderModel' },
+            { count: 1, kind: 'turnedOff', subject: 'referenceImages' },
+          ],
+          dimensionsAdjusted: true,
+          settings,
+        },
+        t,
+        'en'
+      )
+    ).toEqual([
+      'Removed: VAE and T5 encoder.',
+      'Reset to default: CLIP skip.',
+      'Turned off, kept for later: 2 concepts and 1 reference image.',
+      'Size set to 2848×1600.',
+    ]);
   });
 
-  it('stays quiet when the size already fit', () => {
-    const info = vi.fn();
+  it('says nothing for a switch that changed nothing else', () => {
+    expect(describeModelSwitchChanges({ changes: [], dimensionsAdjusted: false, settings }, t, 'en')).toEqual([]);
+  });
+});
 
-    notifyGenerateDimensionsAdjusted({
-      modelName: 'SDXL',
-      notifications: { info },
-      result: { dimensionsAdjusted: false, settings: { height: 1024, width: 1024 } as GenerateSettings },
+describe('notifyGenerateModelSwitched', () => {
+  const notify = (getCurrentModelKey: () => string | undefined) => {
+    const notifications = { info: vi.fn(), undoable: vi.fn() };
+    const revert = vi.fn();
+
+    notifyGenerateModelSwitched({
+      getCurrentModelKey,
+      locale: 'en',
+      model: { key: 'flux-dev', name: 'FLUX dev' },
+      notifications,
+      projectId: 'project-1',
+      result: { changes: [{ count: 1, kind: 'turnedOff', subject: 'concepts' }], dimensionsAdjusted: false, settings },
+      revert,
       t,
     });
 
-    expect(info).not.toHaveBeenCalled();
+    return { notifications, revert, undo: () => notifications.undoable.mock.calls[0]![1].onUndo() };
+  };
+
+  it('reports the switch with an Undo for its project that a newer whole-form change supersedes', () => {
+    const { notifications, revert, undo } = notify(() => 'flux-dev');
+
+    expect(notifications.undoable).toHaveBeenCalledExactlyOnceWith('Switched to FLUX dev', {
+      message: 'Turned off, kept for later: 1 concept.',
+      onUndo: expect.any(Function),
+      projectId: 'project-1',
+      supersedes: 'generate-settings:project-1',
+    });
+    undo();
+    expect(revert).toHaveBeenCalledOnce();
+  });
+
+  it('undoes nothing, and says so, once the project uses another model', () => {
+    const { notifications, revert, undo } = notify(() => 'sdxl');
+
+    undo();
+
+    expect(revert).not.toHaveBeenCalled();
+    expect(notifications.info).toHaveBeenCalledExactlyOnceWith(
+      'The model changed after switching to FLUX dev, so nothing was undone.'
+    );
   });
 });

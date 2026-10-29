@@ -29,7 +29,7 @@ Models produce their best results near their optimal size. Much larger images ca
 
 ## Render settings
 
-The **Render** section controls how the image is generated. Each slider has a mark at the model's recommended value. To reset a single field, double-click it or right-click it and choose **Reset to model default**.
+The **Render** section controls how the image is generated. Each slider has a mark at the model's recommended value. A field you have changed shows a small dot to its left; click the dot to reset the field to the model default. You can also double-click the field, or open its menu by right-clicking it (or with the menu key or Shift+F10 while it has focus) and choose **Reset to model default**.
 
 ### Steps
 
@@ -41,7 +41,7 @@ The **Render** section controls how the image is generated. Each slider has a ma
 
 ### Scheduler
 
-The **Scheduler** is the algorithm that decides how much noise to remove at each step. Schedulers differ in speed, in how many steps they need, and in the character of the result. Euler, the DPM++ family and UniPC are good general-purpose choices; LCM is only for LCM and similar distilled models. The list of schedulers depends on the model, and some models use a fixed schedule and do not show this field. **Use model default scheduler** switches back to the model's own choice.
+The **Scheduler** is the algorithm that decides how much noise to remove at each step. Schedulers differ in speed, in how many steps they need, and in the character of the result. Euler, the DPM++ family and UniPC are good general-purpose choices; LCM is only for LCM and similar distilled models. The list of schedulers depends on the model, and some models use a fixed schedule and do not show this field. When you have picked another scheduler, the dot to the left of the field switches back to the model's own choice.
 
 ### Seed
 
@@ -89,11 +89,11 @@ Two output filters live in **Settings** under **Project** rather than in the pan
 
 ### Resetting to defaults
 
-Each model has recommended settings, which you can change in the Model Manager. **Reset all to model defaults**, the ↺ button in the Generate panel's title bar, applies them: size, steps, CFG or guidance, scheduler and VAE settings. Your prompts are left alone. The button is disabled when your settings already match the defaults.
+Each model has recommended settings, which you can change in the Model Manager. **Reset all to model defaults**, the ↺ button in the Generate panel's title bar, applies them: size, steps, CFG or guidance, scheduler and VAE settings. Your prompts and concepts are left alone, and a notification offers **Undo** to bring your earlier values back. The button is disabled when your settings already match the defaults.
 
 To return to the settings of an earlier image instead, right-click it in the Gallery or Preview and open **Recall Metadata**. **Recall All** restores its model, concepts, prompts, seed, size, render and refiner settings; **Remix Image** does the same but keeps a new seed; and **Use Prompt**, **Use Seed** and **Use Size** recall one thing at a time. Recalled concepts replace the ones in the panel at the weights the image used; any that are not installed or do not fit the model are listed in a notice. If the image's model is not installed, or the image was saved from the canvas, your current concepts are kept.
 
-To keep a combination of settings for later, use **Presets** in the panel's title bar to save the current settings under a name and apply them again.
+To keep a combination of settings for later, use **Presets** in the panel's title bar to save the current settings under a name and apply them again. When you save, **Include prompts** decides whether the preset keeps your prompts too; the panel remembers your choice. Applying a preset saved without prompts keeps the prompts you have. Applying a preset shows a notification with **Undo**, which restores the settings you had before.
 
 ## Adding concepts
 
@@ -109,7 +109,7 @@ Concepts, also called LoRAs, are small add-on models that teach the main model a
 
 </Steps>
 
-You can add as many concepts as you like and combine them. Use the switch on each row to turn a concept off without removing it, and the trash button to remove it. If you change to a model from a different family, its concepts are marked **Incompatible** or removed. SD3, CogView4, ERNIE Image, Ideogram 4, Qwen-Image-2.1, MOSS-Image and external API models don't support concepts, so with one of them selected the section says so instead of offering LoRAs.
+You can add as many concepts as you like and combine them. Use the switch on each row to turn a concept off without removing it, and the trash button to remove it. If you change to a model from a different family, the concepts it cannot use stay in the list, marked **Incompatible** and switched off; they run again when you switch back to a model they fit. A concept that is no longer installed is marked **Not installed**. SD3, CogView4, ERNIE Image, Ideogram 4, Qwen-Image-2.1, MOSS-Image and external API models don't support concepts, so with one of them selected the section says so instead of offering LoRAs.
 
 ## Adding reference images
 

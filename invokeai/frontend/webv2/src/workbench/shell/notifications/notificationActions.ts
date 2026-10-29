@@ -4,6 +4,7 @@ import type { WidgetTypeId } from '@workbench/widgetContracts';
 import type { TFunction } from 'i18next';
 
 import {
+  getNotificationUndoWithdrawal,
   hasNotificationUndo,
   holdNotificationUndo,
   releaseNotificationUndo,
@@ -37,6 +38,8 @@ interface NotificationActionHandler<Action extends WorkbenchNotificationAction> 
   hold?: (action: Action) => void;
   /** Frees what only a visible toast may still run, once that toast has closed. */
   release?: (action: Action) => void;
+  /** Aborts when the action is withdrawn for good; a toast offering it closes then. */
+  withdrawal?: (action: Action) => AbortSignal | undefined;
 }
 
 /** One handler per descriptor kind; the mapped type makes a new kind a compile error until it has one. */
@@ -65,6 +68,7 @@ const handlers: {
     label: ({ projectId, undoId }, { isProjectOpen, t }) =>
       hasNotificationUndo(undoId) && (projectId === undefined || isProjectOpen(projectId)) ? t('common.undo') : null,
     release: ({ undoId }) => releaseNotificationUndo(undoId),
+    withdrawal: ({ undoId }) => getNotificationUndoWithdrawal(undoId),
     run: ({ projectId, undoId }, { isProjectOpen }) => {
       // The toast can outlive its project's tab; undoing then would act on a project the user no longer sees.
       if (projectId !== undefined && !isProjectOpen(projectId)) {
@@ -102,3 +106,9 @@ export const releaseNotificationActions = (actions: readonly WorkbenchNotificati
     (handlers[action.kind] as NotificationActionHandler<typeof action>).release?.(action);
   }
 };
+
+/** Signals that close a toast offering `actions` once one of them is withdrawn (a superseded undo). */
+export const getNotificationActionWithdrawals = (actions: readonly WorkbenchNotificationAction[]): AbortSignal[] =>
+  actions.flatMap(
+    (action) => (handlers[action.kind] as NotificationActionHandler<typeof action>).withdrawal?.(action) ?? []
+  );

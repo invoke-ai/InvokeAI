@@ -1,5 +1,4 @@
 import type { GenerateModelConfig } from '@features/generation/contracts';
-import type { GenerateModelSelectionResult } from '@features/generation/settings';
 import type { ModelConfig } from '@features/models';
 import type { QueueReadModel } from '@features/queue/contracts';
 import type { PromptHistoryItem } from '@workbench/projectContracts';
@@ -8,11 +7,7 @@ import type { TFunction } from 'i18next';
 import { getGalleryBoardLabel, type GalleryBoard, type GalleryImage } from '@features/gallery/contracts';
 import { ALL_READABLE_BOARDS_ID, listPaletteImages, listPaletteSemanticImages } from '@features/gallery/paletteSearch';
 import { galleryBoardsOptions, imageIndexAvailabilityOptions } from '@features/gallery/queries';
-import {
-  focusPositivePrompt,
-  notifyGenerateDimensionsAdjusted,
-  notifyGenerateModelSelectionCleared,
-} from '@features/generation/react';
+import { focusPositivePrompt } from '@features/generation/react';
 import { isGenerateModelSelectable } from '@features/generation/settings';
 import { ensureModelsLoaded, getModelBaseLabel, getModelsSnapshot } from '@features/models';
 import { extractGenerationMeta, getResultImageName } from '@features/queue/contracts';
@@ -179,20 +174,16 @@ export const createPromptHistoryProvider = ({
   },
 });
 
-/** Picking a model switches Generate to it, reports what the switch cleared or resized, then opens the widget. */
+/** Picking a model switches Generate to it the way the model picker does, then opens the widget. */
 export const createModelsProvider = ({
-  locale,
-  notifications,
   openGenerateWidget,
   openModelManager,
   selectModel,
   t,
 }: {
-  locale: string | undefined;
-  notifications: { info(title: string, message?: string): void };
   openGenerateWidget: () => void;
   openModelManager: () => void;
-  selectModel: (model: GenerateModelConfig, models: readonly ModelConfig[]) => GenerateModelSelectionResult;
+  selectModel: (model: GenerateModelConfig, models: readonly ModelConfig[]) => void;
   t: TFunction;
 }): PaletteSearchProvider => ({
   contextKey: 'global',
@@ -216,16 +207,7 @@ export const createModelsProvider = ({
         isPersistentRecent: false,
         keywords: model.base,
         run: () => {
-          const result = selectModel(model, models);
-
-          notifyGenerateModelSelectionCleared({
-            clearedLabels: result.clearedLabels,
-            locale,
-            modelName: model.name,
-            notifications,
-            t,
-          });
-          notifyGenerateDimensionsAdjusted({ modelName: model.name, notifications, result, t });
+          selectModel(model, models);
           openGenerateWidget();
         },
         secondary: { label: t('commandPalette.actions.openModelManager'), run: openModelManager },

@@ -74,9 +74,22 @@ export const resolveGenerateWidgetValues = ({
   }
 
   const normalizedSettings = normalizeGenerateSettings(storedValues);
-  const selectedModel =
-    supportedModels.find((model) => model.key === normalizedSettings?.modelKey) ?? supportedModels[0]!;
   const normalizedWidgetValues = normalizeGenerateWidgetValues(storedValues);
+  const storedModel = normalizedWidgetValues?.model;
+  // A chosen model that is no longer installed stays chosen: the model card names it and Invoke waits until the user
+  // picks another or it returns. Reinstalling gives it a new key but the same file hash, so it is found again by hash.
+  // Only values with no runnable choice (first run, an unknown family) take the default.
+  const selectedModel =
+    supportedModels.find((model) => model.key === normalizedSettings?.modelKey) ??
+    (storedModel?.hash
+      ? supportedModels.find((model) => model.hash === storedModel.hash && model.type === storedModel.type)
+      : undefined) ??
+    (storedModel &&
+    storedModel.key === normalizedSettings?.modelKey &&
+    isGenerateModelSelectable(storedModel) &&
+    isArchitectureDescribed(storedModel)
+      ? storedModel
+      : supportedModels[0]!);
   const canReuseStoredValues =
     isGenerateWidgetValues(storedValues) && normalizedWidgetValues?.batchCount === storedValues.batchCount;
   const baseValues: GenerateWidgetValues = canReuseStoredValues

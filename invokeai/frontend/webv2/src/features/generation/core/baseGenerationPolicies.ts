@@ -15,10 +15,12 @@ import {
   SUPPORTED_GENERATE_BASES,
   type SupportedGenerateBase,
 } from '@features/generation/core/supportedBases';
+import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { SEED_MAX } from '@platform/core/seed';
 
 import type {
   ExternalGenerationMode,
+  GenerateLora,
   GenerateModelConfig,
   GenerateReferenceImage,
   GenerateReferenceImageAsset,
@@ -57,9 +59,11 @@ import {
   getExternalReferenceImages,
   getExternalResolutionPresets,
   isSeedreamBatchModel,
+  resolveExternalCanvasRequestSize,
   resolveExternalImageSize,
   SEEDREAM_BATCH_MAX_TOTAL_IMAGES,
 } from './externalProvider';
+import { createUntranslatedGenerationIssue, type GenerationIssue, type GenerationIssueFix } from './generationIssues';
 import {
   DEFAULT_PID_STEPS,
   getIsPidActive,
@@ -102,11 +106,12 @@ import {
   IDEOGRAM4_MU_MIN,
   IDEOGRAM4_STEPS_MAX,
   IDEOGRAM4_STEPS_MIN,
+  isAspectRatioLocked,
+  isGenerateModelConfig,
   isGenerateSettings,
   isLoraCompatibleWithModel,
   isValidKrea2RebalanceWeights,
   isValidMossImageSkipLayers,
-  isWanLoraTargetingMain,
   KREA2_REBALANCE_WEIGHT_COUNT,
   MAX_MOSS_IMAGE_SKIP_LAYER,
   normalizeGenerateSettings,
@@ -570,9 +575,7 @@ export const getSettingsWithModelDefaults = (
     cfgScale: modelDefaults.cfgScale,
     colorCompensation: modelDefaults.colorCompensation,
     height: modelDefaults.height,
-    loras: settings.loras.map((lora) =>
-      isLoraCompatibleWithModel(lora.model, model) ? lora : { ...lora, isEnabled: false }
-    ),
+    // Concepts stay as they are: the model skips the ones it cannot load, and a compatible model runs them again.
     modelKey: model.key,
     scheduler: modelDefaults.scheduler,
     steps: modelDefaults.steps,
@@ -630,16 +633,47 @@ export interface ComponentSlotPolicy {
 export interface ComponentSectionPolicy {
   defaultOpen: boolean;
   slots: readonly ComponentSlotPolicy[];
-  validate: (ctx: ComponentPolicyContext) => string[];
+  /** Family rules beyond the slots; each slot reports its own through `getComponentSlotIssue`. */
+  rules?: (ctx: ComponentPolicyContext) => string[];
+}
+
+/**
+ * What a model switch does to one choice the user made. `turnedOff` keeps it and the new model just does not run it,
+ * so switching back runs it again; `adjusted` moves a value into the new model's range; `removed` clears a selection
+ * and `reset` returns a value to its default, both lost for good once the switch is kept.
+ */
+export type GenerateModelSwitchChangeKind = 'adjusted' | 'removed' | 'reset' | 'turnedOff';
+
+export type GenerateModelSwitchSubject =
+  | GenerateComponentValueKey
+  | 'cfgRescale'
+  | 'clipSkip'
+  | 'colorCompensation'
+  | 'concepts'
+  | 'guidance'
+  | 'hiDiffusion'
+  | 'referenceImages'
+  | 'seamless'
+  | 'vaePrecision';
+
+export interface GenerateModelSwitchChange {
+  kind: GenerateModelSwitchChangeKind;
+  subject: GenerateModelSwitchSubject;
+  /** How many items of a list (concepts, reference images) it affects. */
+  count?: number;
 }
 
 export interface GenerateModelSelectionResult {
   settings: GenerateSettings;
-  /** Settings the switch turns off or removes, which callers confirm or report. */
-  clearedLabels: readonly string[];
+  /** Choices the switch changes, which callers confirm or report. */
+  changes: readonly GenerateModelSwitchChange[];
   /** The size moved to the model's grid or provider sizes. Nothing is lost and it stays on screen, so it is reported. */
   dimensionsAdjusted: boolean;
 }
+
+/** A switch that removes or resets something cannot be taken back by switching back, so it is confirmed first. */
+export const isLossyModelSwitch = (result: Pick<GenerateModelSelectionResult, 'changes'>): boolean =>
+  result.changes.some((change) => change.kind === 'removed' || change.kind === 'reset');
 
 const TYPE_CLIP_EMBED: ModelTaxonomyType[] = ['clip_embed'];
 const TYPE_MAIN: ModelTaxonomyType[] = ['main'];
@@ -934,13 +968,9 @@ export const getComponentSlotIssue = (slotPolicy: ComponentSlotPolicy, ctx: Comp
   return isValid ? null : (slotPolicy.missingMessage ?? `Generate needs a ${slotPolicy.label} for this model.`);
 };
 
-const validateSlots = (policy: Pick<ComponentSectionPolicy, 'slots'>, ctx: ComponentPolicyContext): string[] =>
-  policy.slots.flatMap((slotPolicy) => getComponentSlotIssue(slotPolicy, ctx) ?? []);
-
 const createPolicy = (defaultOpen: boolean, slots: readonly ComponentSlotPolicy[]): ComponentSectionPolicy => ({
   defaultOpen,
   slots,
-  validate: (ctx) => validateSlots({ slots }, ctx),
 });
 
 const EMPTY_COMPONENT_POLICY: ComponentSectionPolicy = createPolicy(false, []);
@@ -976,12 +1006,10 @@ const getBaseComponentSectionPolicy = (
             missingMessage: 'Generate needs a VAE for FLUX models.',
           },
         ]),
-        validate: (ctx) => [
-          ...(ctx.model.type !== 'external_image_generator' && ctx.model.variant === 'dev_fill'
+        rules: (ctx) =>
+          ctx.model.type !== 'external_image_generator' && ctx.model.variant === 'dev_fill'
             ? ['FLUX Fill models do not support text-to-image generation.']
-            : []),
-          ...validateSlots(getBaseComponentSectionPolicy(ctx.model, ctx.settings), ctx),
-        ],
+            : [],
       };
     case 'flux2': {
       const encoderSlot: ComponentSlotPolicy =
@@ -1230,7 +1258,7 @@ const getBaseComponentSectionPolicy = (
   }
 };
 
-/** Add and validate PiD slots; each base policy retains ownership of its other component validation. */
+/** Add the PiD slots; each base policy keeps its other slots and rules. */
 export const getComponentSectionPolicy = (
   model: GenerateModelConfig | undefined,
   settings: ComponentPolicySettings
@@ -1243,11 +1271,7 @@ export const getComponentSectionPolicy = (
 
   const slots = [...policy.slots, ...pidSlots()];
 
-  return {
-    defaultOpen: policy.defaultOpen,
-    slots,
-    validate: (ctx) => [...policy.validate(ctx), ...validateSlots({ slots: pidSlots() }, ctx)],
-  };
+  return { ...policy, slots };
 };
 
 const getComponentPolicyContext = (model: GenerateModelConfig, settings: GenerateSettings): ComponentPolicyContext => ({
@@ -1274,31 +1298,45 @@ const getComponentPolicyContext = (model: GenerateModelConfig, settings: Generat
   },
 });
 
+/** English names, as `widgets.generate.switchSubjects` words them, for the issue text the locale nests them into. */
 const COMPONENT_SETTING_LABELS: Record<GenerateComponentValueKey, string> = {
   clipEmbedModel: 'CLIP Embed',
   clipGEmbedModel: 'CLIP G',
   clipLEmbedModel: 'CLIP L',
-  mistralEncoderModel: 'Mistral Encoder',
-  qwen3EncoderModel: 'Qwen3 Encoder',
-  qwenVLEncoderModel: 'Qwen VL Encoder',
-  qwen3VLEncoderModel: 'Qwen3-VL Encoder',
-  qwen35EncoderModel: 'Qwen3.5 Encoder',
-  animaInpaintAdapterModel: 'Inpaint Adapter',
-  wanT5EncoderModel: 'Wan T5 Encoder',
+  mistralEncoderModel: 'Mistral encoder',
+  qwen3EncoderModel: 'Qwen3 encoder',
+  qwenVLEncoderModel: 'Qwen VL encoder',
+  qwen3VLEncoderModel: 'Qwen3-VL encoder',
+  qwen35EncoderModel: 'Qwen3.5 encoder',
+  animaInpaintAdapterModel: 'Inpaint adapter',
+  wanT5EncoderModel: 'Wan T5 encoder',
   wanLowNoiseModel: 'Low-noise expert',
-  ideogram4UnconditionalModel: 'Transformer (Unconditional)',
-  t5EncoderModel: 'T5 Encoder',
-  pidDecoderModel: 'PiD Decoder',
-  gemma2EncoderModel: 'Gemma-2 Encoder',
+  ideogram4UnconditionalModel: 'Unconditional transformer',
+  t5EncoderModel: 'T5 encoder',
+  pidDecoderModel: 'PiD decoder',
+  gemma2EncoderModel: 'Gemma-2 encoder',
   vae: 'VAE',
   componentSourceModel: 'Component source',
 };
 
-const addClearedLabel = (labels: string[], label: string) => {
-  if (!labels.includes(label)) {
-    labels.push(label);
-  }
+/** The subjects a switch can report that are not component slots; a Record so a new subject cannot be left out. */
+const SWITCH_SETTING_SUBJECTS: Record<Exclude<GenerateModelSwitchSubject, GenerateComponentValueKey>, true> = {
+  cfgRescale: true,
+  clipSkip: true,
+  colorCompensation: true,
+  concepts: true,
+  guidance: true,
+  hiDiffusion: true,
+  referenceImages: true,
+  seamless: true,
+  vaePrecision: true,
 };
+
+/** Every subject a switch can report; the locale names each under `widgets.generate.switchSubjects`. */
+export const GENERATE_MODEL_SWITCH_SUBJECTS = [
+  ...Object.keys(COMPONENT_SETTING_LABELS),
+  ...Object.keys(SWITCH_SETTING_SUBJECTS),
+] as readonly GenerateModelSwitchSubject[];
 
 const isSelectedComponentCompatible = (
   slotPolicy: ComponentSlotPolicy | undefined,
@@ -1755,8 +1793,9 @@ const getSettingsWithCompatibleModelSelections = (
   isCanvasFrame: boolean
 ): GenerateModelSelectionResult => {
   const nextSettings: GenerateSettings = { ...settings, modelKey: model.key };
-  const clearedLabels: string[] = [];
-  const compatibleLoras = settings.loras.filter((lora) => isLoraCompatibleWithModel(lora.model, model));
+  const changes: GenerateModelSwitchChange[] = [];
+  const change = (subject: GenerateModelSwitchSubject, kind: GenerateModelSwitchChangeKind, count?: number) =>
+    changes.push(count === undefined ? { kind, subject } : { count, kind, subject });
   const dimensions = getGenerationDimensions(model);
   const width = clampDimension(nextSettings.width, dimensions.grid);
   const height = clampDimension(nextSettings.height, dimensions.grid);
@@ -1802,14 +1841,29 @@ const getSettingsWithCompatibleModelSelections = (
     nextSettings.externalImageSize = resolveExternalImageSize(nextSettings, model);
   }
 
-  if (compatibleLoras.length !== settings.loras.length) {
-    nextSettings.loras = compatibleLoras;
-    addClearedLabel(clearedLabels, 'LoRAs');
+  // Concepts stay listed as they are: the graph loads only those the model can, the panel badges the rest, and a
+  // compatible model runs them again. Only the ones that ran before and stop now are reported.
+  const previousModel = models.find((candidate) => candidate.key === settings.modelKey);
+  const runsConcept = (candidate: GenerateModelConfig | undefined, lora: GenerateLora) =>
+    Boolean(candidate && isLoraSupported(candidate) && isLoraCompatibleWithModel(lora.model, candidate));
+  const stoppedConcepts = settings.loras.filter(
+    (lora) =>
+      lora.isEnabled &&
+      !runsConcept(model, lora) &&
+      (!previousModel || !isGenerateModelConfig(previousModel) || runsConcept(previousModel, lora))
+  ).length;
+
+  if (stoppedConcepts > 0) {
+    change('concepts', 'turnedOff', stoppedConcepts);
   }
 
   // Enabled references the new family cannot run together are switched off rather than deleted: Invoke is not left
-  // blocked, the first enabled ones keep running, and switching back can turn the rest on again.
-  const retargetedReferenceImages = getCompatibleReferenceImages(settings.referenceImages, model, models);
+  // blocked, the first enabled ones keep running, and switching back can turn the rest on again. A model without
+  // references keeps them as they are, all switched off, for the next model that takes them.
+  const referencesSupported = isReferenceImageSupported(model);
+  const retargetedReferenceImages = referencesSupported
+    ? getCompatibleReferenceImages(settings.referenceImages, model, models)
+    : settings.referenceImages;
   const enabledKept: GenerateReferenceImage[] = [];
   let didSwitchOff = false;
   const keptOrSwitchedOff = retargetedReferenceImages.map((referenceImage) => {
@@ -1817,7 +1871,7 @@ const getSettingsWithCompatibleModelSelections = (
       return referenceImage;
     }
 
-    if (canRunWithEnabledReferenceImages(model, enabledKept, referenceImage)) {
+    if (referencesSupported && canRunWithEnabledReferenceImages(model, enabledKept, referenceImage)) {
       enabledKept.push(referenceImage);
       return referenceImage;
     }
@@ -1829,7 +1883,41 @@ const getSettingsWithCompatibleModelSelections = (
 
   if (compatibleReferenceImages !== settings.referenceImages) {
     nextSettings.referenceImages = compatibleReferenceImages;
-    addClearedLabel(clearedLabels, 'Reference Images');
+    // A retargeted reference keeps its image; its adapter and weights take the new family's defaults. Only tuning
+    // the user chose is lost: a reference still at the previous family's defaults loses nothing.
+    const isPreviousDefault = (referenceImage: GenerateReferenceImage) => {
+      if (!previousModel || !isGenerateModelConfig(previousModel)) {
+        return false;
+      }
+
+      const [config] = getDefaultReferenceImageConfigs(
+        previousModel,
+        models,
+        [{ image: referenceImage.config.image, isEnabled: referenceImage.isEnabled }],
+        []
+      );
+
+      return config !== undefined && areJsonValuesStructurallyEqual(config, referenceImage.config);
+    };
+    const retargeted = settings.referenceImages.filter(
+      (referenceImage, index) => retargetedReferenceImages[index] !== referenceImage
+    );
+    const tunedRetargets = retargeted.filter((referenceImage) => !isPreviousDefault(referenceImage)).length;
+    const switchedOff = keptOrSwitchedOff.filter(
+      (referenceImage, index) => referenceImage.isEnabled !== retargetedReferenceImages[index]?.isEnabled
+    ).length;
+
+    if (tunedRetargets > 0) {
+      change('referenceImages', 'reset', tunedRetargets);
+    }
+
+    if (retargeted.length > tunedRetargets) {
+      change('referenceImages', 'adjusted', retargeted.length - tunedRetargets);
+    }
+
+    if (switchedOff > 0) {
+      change('referenceImages', 'turnedOff', switchedOff);
+    }
   }
 
   const policy = getComponentSectionPolicy(model, nextSettings);
@@ -1847,7 +1935,7 @@ const getSettingsWithCompatibleModelSelections = (
 
     if (!isSelectedComponentCompatible(slotsByKey.get(key), model, nextSettings, key)) {
       nextSettings[key] = null;
-      addClearedLabel(clearedLabels, COMPONENT_SETTING_LABELS[key]);
+      change(key, 'removed');
     }
   }
 
@@ -1856,55 +1944,59 @@ const getSettingsWithCompatibleModelSelections = (
 
   if (clampedGuidance !== nextSettings.cfgScale) {
     nextSettings.cfgScale = clampedGuidance;
-    addClearedLabel(clearedLabels, uiPolicy.guidanceLabel);
+    change('guidance', 'adjusted');
   }
 
   if (!uiPolicy.clipSkipMax && nextSettings.clipSkip !== 0) {
     nextSettings.clipSkip = 0;
-    addClearedLabel(clearedLabels, 'CLIP skip');
+    change('clipSkip', 'reset');
   } else if (uiPolicy.clipSkipMax && nextSettings.clipSkip > uiPolicy.clipSkipMax) {
     nextSettings.clipSkip = uiPolicy.clipSkipMax;
-    addClearedLabel(clearedLabels, 'CLIP skip');
+    change('clipSkip', 'adjusted');
   }
 
   if (!uiPolicy.cfgRescaleVisible && nextSettings.cfgRescaleMultiplier !== 0) {
     nextSettings.cfgRescaleMultiplier = 0;
-    addClearedLabel(clearedLabels, 'CFG rescale');
+    change('cfgRescale', 'reset');
   }
 
   if (!uiPolicy.colorCompensationVisible && nextSettings.colorCompensation) {
     nextSettings.colorCompensation = false;
-    addClearedLabel(clearedLabels, 'Color compensation');
+    change('colorCompensation', 'reset');
   }
 
   if (!uiPolicy.hiDiffusionVisible && nextSettings.hiDiffusionEnabled) {
     nextSettings.hiDiffusionEnabled = false;
-    addClearedLabel(clearedLabels, 'HiDiffusion');
+    change('hiDiffusion', 'reset');
   }
 
-  // The refiner only ever follows an SDXL base; its tuning values stay for the next SDXL pick.
-  if (!uiPolicy.refinerVisible && nextSettings.refinerModel) {
-    nextSettings.refinerModel = null;
-    addClearedLabel(clearedLabels, 'Refiner');
-  }
-
+  // The refiner stays selected: it only runs after an SDXL base (`getActiveRefiner`), and the next SDXL pick uses it.
   if (!uiPolicy.seamlessVisible && (nextSettings.seamlessXAxis || nextSettings.seamlessYAxis)) {
     nextSettings.seamlessXAxis = false;
     nextSettings.seamlessYAxis = false;
-    addClearedLabel(clearedLabels, 'Seamless tiling');
+    change('seamless', 'reset');
   }
 
   if (!uiPolicy.vaePrecisionVisible) {
     const defaultVaePrecision = getGenerationDefaults(model).vaePrecision;
 
     if (nextSettings.vaePrecision !== defaultVaePrecision) {
+      // Only a precision the user picked is lost; moving from one family's default to the next is no choice undone.
+      const previousDefault =
+        previousModel && isGenerateModelConfig(previousModel)
+          ? getGenerationDefaults(previousModel).vaePrecision
+          : undefined;
+
+      if (nextSettings.vaePrecision !== previousDefault) {
+        change('vaePrecision', 'reset');
+      }
+
       nextSettings.vaePrecision = defaultVaePrecision;
-      addClearedLabel(clearedLabels, 'VAE precision');
     }
   }
 
   return {
-    clearedLabels,
+    changes,
     dimensionsAdjusted: nextSettings.width !== settings.width || nextSettings.height !== settings.height,
     settings: nextSettings,
   };
@@ -1942,93 +2034,236 @@ export const getGenerateModelSelectionResult = ({
 const hasModelKey = (models: readonly ModelConfig[], key: string, type?: string): boolean =>
   models.some((model) => model.key === key && (!type || model.type === type));
 
-export const getGenerationModelAvailabilityReasons = (
+const ISSUE_KEY = 'widgets.generate.issues';
+
+/** A translated issue; `message` must read exactly like the locale entry, which the issue tests check. */
+const issue = (
+  id: string,
+  key: string,
+  message: string,
+  target: GenerationIssue['target'],
+  values?: Record<string, number | string>,
+  fix?: GenerationIssueFix
+): GenerationIssue => ({
+  id,
+  message,
+  messageKey: `${ISSUE_KEY}.${key}`,
+  ...(values ? { messageValues: values } : {}),
+  target,
+  ...(fix ? { fix } : {}),
+});
+
+const MODEL_TARGET: GenerationIssue['target'] = { section: 'model' };
+const REFERENCE_IMAGES_TARGET: GenerationIssue['target'] = { field: 'referenceImages', section: 'guidance' };
+
+/** Installed-model checks: the main model, its components, concepts and enabled references must all be installed. */
+export const getGenerationModelAvailabilityIssues = (
   model: GenerateModelConfig,
   settings: GenerateSettings,
   models: readonly ModelConfig[]
-): string[] => {
-  const reasons: string[] = [];
+): GenerationIssue[] => {
+  const issues: GenerationIssue[] = [];
 
   if (!hasModelKey(models, model.key, model.type)) {
-    reasons.push(`Selected model "${model.name}" is no longer installed.`);
+    issues.push(
+      issue(
+        `model:notInstalled:${model.key}`,
+        'modelNotInstalled',
+        `${model.name} is not installed. Choose another model, or reinstall it.`,
+        MODEL_TARGET,
+        { name: model.name }
+      )
+    );
   }
 
   for (const key of Object.keys(COMPONENT_SETTING_LABELS) as GenerateComponentValueKey[]) {
     const value = settings[key];
 
     if (value && !hasModelKey(models, value.key, value.type)) {
-      reasons.push(`${COMPONENT_SETTING_LABELS[key]} "${value.name}" is no longer installed.`);
+      issues.push(
+        issue(
+          `components:notInstalled:${key}`,
+          'componentNotInstalled',
+          `${COMPONENT_SETTING_LABELS[key]} "${value.name}" is not installed. Choose another, or clear it.`,
+          { section: 'components' },
+          // The locale nests its own name for the slot, keyed by `component`.
+          { component: key, name: value.name },
+          { key, kind: 'clearModel' }
+        )
+      );
     }
   }
 
   const refiner = getActiveRefiner(settings, model);
   if (refiner && !hasModelKey(models, refiner.key, 'main')) {
-    reasons.push(`Refiner "${refiner.name}" is no longer installed.`);
+    issues.push(
+      issue(
+        'refiner:notInstalled',
+        'refinerNotInstalled',
+        `Refiner "${refiner.name}" is not installed. Choose another, or clear it.`,
+        { section: 'refiner' },
+        { name: refiner.name },
+        { key: 'refinerModel', kind: 'clearModel' }
+      )
+    );
   }
 
+  // Only concepts the model would load need to be installed; the rest are set aside and skipped by the graph.
   for (const lora of settings.loras) {
-    if (!hasModelKey(models, lora.model.key, 'lora')) {
-      reasons.push(`LoRA "${lora.model.name}" is no longer installed.`);
+    if (
+      lora.isEnabled &&
+      isLoraSupported(model) &&
+      isLoraCompatibleWithModel(lora.model, model) &&
+      !hasModelKey(models, lora.model.key, 'lora')
+    ) {
+      issues.push(
+        issue(
+          `concepts:notInstalled:${lora.model.key}`,
+          'conceptNotInstalled',
+          `Concept "${lora.model.name}" is not installed. Remove it, or reinstall it.`,
+          { field: 'concepts', section: 'guidance' },
+          { name: lora.model.name },
+          { kind: 'removeConcept', modelKey: lora.model.key }
+        )
+      );
     }
   }
 
-  for (const referenceImage of settings.referenceImages) {
-    if (!referenceImage.isEnabled) {
-      continue;
-    }
-
+  settings.referenceImages.forEach((referenceImage, index) => {
     const config = referenceImage.config;
 
-    if ('model' in config && config.model && !hasModelKey(models, config.model.key, config.model.type)) {
-      reasons.push(`Reference Image model "${config.model.name}" is no longer installed.`);
+    if (
+      referenceImage.isEnabled &&
+      'model' in config &&
+      config.model &&
+      !hasModelKey(models, config.model.key, config.model.type)
+    ) {
+      issues.push(
+        issue(
+          `referenceImages:modelNotInstalled:${referenceImage.id}`,
+          'referenceModelNotInstalled',
+          `Reference image ${index + 1} uses "${config.model.name}", which is not installed. Turn it off, or choose another model for it.`,
+          REFERENCE_IMAGES_TARGET,
+          { index: index + 1, name: config.model.name },
+          { kind: 'turnOffReferenceImages', referenceImageIds: [referenceImage.id] }
+        )
+      );
     }
-  }
+  });
 
-  return reasons;
+  return issues;
 };
 
-const getDimensionValidationReasons = (model: GenerateModelConfig, settings: GenerateSettings): string[] => {
-  const reasons: string[] = [];
+export const getGenerationModelAvailabilityReasons = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  models: readonly ModelConfig[]
+): string[] => getGenerationModelAvailabilityIssues(model, settings, models).map(({ message }) => message);
+
+const getDimensionValidationIssues = (model: GenerateModelConfig, settings: GenerateSettings): GenerationIssue[] => {
+  const issues: GenerationIssue[] = [];
   // Native target dimensions must be divisible by model grid × 4.
   const dimensions = getGenerationDimensions(model, settings.pidMode);
+  const toGrid = (value: number, round: (value: number) => number = Math.round) =>
+    Math.min(
+      dimensions.max,
+      Math.max(dimensions.min, round((Number.isFinite(value) ? value : 0) / dimensions.grid) * dimensions.grid)
+    );
+  // A size fix keeps a locked or preset ratio, deriving the height from the width; a free size records its new ratio.
+  const isRatioConstrained = isAspectRatioLocked(settings);
+  const ratio =
+    settings.aspectRatioValue > 0
+      ? settings.aspectRatioValue
+      : settings.height > 0
+        ? settings.width / settings.height
+        : 1;
+  const sizeFix = (width: number, height: number, round?: (value: number) => number): GenerationIssueFix => {
+    const fittedWidth = toGrid(width, round);
+    const fittedHeight = isRatioConstrained ? toGrid(fittedWidth / ratio, round) : toGrid(height, round);
 
-  if (!Number.isFinite(settings.width) || settings.width < dimensions.min || settings.width > dimensions.max) {
-    reasons.push(`Generate width must be between ${dimensions.min} and ${dimensions.max}.`);
-  } else if (settings.width % dimensions.grid !== 0) {
-    reasons.push(`Generate width must be a multiple of ${dimensions.grid}.`);
-  }
+    return {
+      height: fittedHeight,
+      kind: 'setDimensions',
+      width: fittedWidth,
+      ...(isRatioConstrained ? {} : { aspectRatioValue: fittedWidth / fittedHeight }),
+    };
+  };
+  const fittedSize = sizeFix(settings.width, settings.height);
+  const target: GenerationIssue['target'] = { section: 'dimensions' };
 
-  if (!Number.isFinite(settings.height) || settings.height < dimensions.min || settings.height > dimensions.max) {
-    reasons.push(`Generate height must be between ${dimensions.min} and ${dimensions.max}.`);
-  } else if (settings.height % dimensions.grid !== 0) {
-    reasons.push(`Generate height must be a multiple of ${dimensions.grid}.`);
+  for (const side of ['width', 'height'] as const) {
+    const value = settings[side];
+    const label = side === 'width' ? 'Width' : 'Height';
+
+    if (!Number.isFinite(value) || value < dimensions.min || value > dimensions.max) {
+      issues.push(
+        issue(
+          `dimensions:${side}Range`,
+          `${side}Range`,
+          `${label} must be between ${dimensions.min} and ${dimensions.max}.`,
+          target,
+          { max: dimensions.max, min: dimensions.min },
+          fittedSize
+        )
+      );
+    } else if (value % dimensions.grid !== 0) {
+      issues.push(
+        issue(
+          `dimensions:${side}Grid`,
+          `${side}Grid`,
+          `${label} must be a multiple of ${dimensions.grid}.`,
+          target,
+          { grid: dimensions.grid },
+          fittedSize
+        )
+      );
+    }
   }
 
   const maxSize = model.type === 'external_image_generator' ? model.capabilities?.max_image_size : null;
   if (maxSize && (settings.width > maxSize.width || settings.height > maxSize.height)) {
-    reasons.push(`${model.name} supports a maximum size of ${maxSize.width}×${maxSize.height}.`);
+    issues.push(
+      issue(
+        'dimensions:providerMax',
+        'providerMaxSize',
+        `${model.name} supports at most ${maxSize.width}×${maxSize.height}.`,
+        target,
+        { height: maxSize.height, name: model.name, width: maxSize.width },
+        // Scaled down to fit both bounds, then rounded down so the grid never pushes it back over.
+        (() => {
+          const scale = Math.min(maxSize.width / settings.width, maxSize.height / settings.height, 1);
+
+          return sizeFix(settings.width * scale, settings.height * scale, Math.floor);
+        })()
+      )
+    );
   }
 
-  return reasons;
+  return issues;
 };
 
 /** Reject unsupported PiD instead of silently using ordinary decode. */
-const getPidValidationReasons = (model: GenerateModelConfig, settings: GenerateSettings): string[] => {
+const getPidValidationIssues = (model: GenerateModelConfig, settings: GenerateSettings): GenerationIssue[] => {
   if (settings.pidMode === 'off') {
     return [];
   }
 
+  const target: GenerationIssue['target'] = { section: 'advanced' };
+
   if (!getIsPidSupportedBase(model.base)) {
-    return [`PiD is not supported for ${model.name}. Turn PiD off to generate with this model.`];
+    return [
+      issue(
+        'advanced:pidUnsupported',
+        'pidUnsupported',
+        `${model.name} does not support PiD. Turn PiD off to generate with it.`,
+        target,
+        { name: model.name },
+        { kind: 'turnOffPid' }
+      ),
+    ];
   }
 
-  const reasons: string[] = [];
-
-  if (settings.pidSteps < 1) {
-    reasons.push('PiD steps must be at least 1.');
-  }
-
-  return reasons;
+  return settings.pidSteps < 1 ? [issue('advanced:pidSteps', 'pidSteps', 'PiD steps must be at least 1.', target)] : [];
 };
 
 /** Only the encoder of a Qwen-Image-2.1 Diffusers model keeps the vision tower that reads references. */
@@ -2036,56 +2271,128 @@ export const QWEN_IMAGE_21_STANDALONE_ENCODER_REASON =
   "Reference images need the Qwen-Image-2.1 model's own encoder, the only one with a vision tower. " +
   'Clear the Qwen3-VL Encoder component.';
 
-const getReferenceImageValidationReasons = (model: GenerateModelConfig, settings: GenerateSettings): string[] => {
-  const reasons: string[] = [];
-  const enabled = settings.referenceImages.filter((referenceImage) => referenceImage.isEnabled);
+const getReferenceImageValidationIssues = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings
+): GenerationIssue[] => {
+  const issues: GenerationIssue[] = [];
   // Use the shared reference limit, but report unsupported images individually rather than a misleading maximum of
   // zero.
   const maxReferenceImages = getMaxReferenceImages(model);
+  const active = settings.referenceImages.filter(isReferenceImageActive);
 
-  if (
-    isReferenceImageSupported(model) &&
-    settings.referenceImages.filter(isReferenceImageActive).length > maxReferenceImages
-  ) {
-    reasons.push(
-      `Generate supports at most ${maxReferenceImages} reference image${maxReferenceImages === 1 ? '' : 's'} for ${model.name}.`
+  if (isReferenceImageSupported(model) && active.length > maxReferenceImages) {
+    issues.push(
+      issue(
+        'referenceImages:limit',
+        'referenceImageLimit',
+        `${model.name} supports at most ${maxReferenceImages} reference image${maxReferenceImages === 1 ? '' : 's'}. Turn off or remove the extra ones.`,
+        REFERENCE_IMAGES_TARGET,
+        { count: maxReferenceImages, name: model.name },
+        {
+          kind: 'turnOffReferenceImages',
+          referenceImageIds: active.slice(maxReferenceImages).map((referenceImage) => referenceImage.id),
+        }
+      )
     );
   }
 
-  enabled.forEach((referenceImage, index) => {
-    const prefix = `Reference Image #${index + 1}`;
+  settings.referenceImages.forEach((referenceImage, position) => {
+    if (!referenceImage.isEnabled) {
+      return;
+    }
+
+    const index = position + 1;
+    const id = referenceImage.id;
+    const turnOff: GenerationIssueFix = { kind: 'turnOffReferenceImages', referenceImageIds: [id] };
 
     if (!getReferenceImageConfigSupported(model, referenceImage)) {
-      reasons.push(`${prefix} is not supported by ${model.base} model.`);
+      issues.push(
+        issue(
+          `referenceImages:unsupported:${id}`,
+          'referenceImageUnsupported',
+          `${model.name} cannot use reference image ${index}. Turn it off, or remove it.`,
+          REFERENCE_IMAGES_TARGET,
+          { index, name: model.name },
+          turnOff
+        )
+      );
       return;
     }
 
     if (!referenceImage.config.image) {
-      reasons.push(`${prefix} needs an image.`);
+      issues.push(
+        issue(
+          `referenceImages:needsImage:${id}`,
+          'referenceImageNeedsImage',
+          `Reference image ${index} needs an image.`,
+          REFERENCE_IMAGES_TARGET,
+          { index },
+          turnOff
+        )
+      );
     }
 
     if (referenceImage.config.type === 'ip_adapter') {
       if (!referenceImage.config.model || referenceImage.config.model.base !== model.base) {
-        reasons.push(`${prefix} needs a compatible IP Adapter model.`);
+        issues.push(
+          issue(
+            `referenceImages:needsIpAdapter:${id}`,
+            'referenceImageNeedsIpAdapter',
+            `Reference image ${index} needs an IP Adapter model for ${model.name}.`,
+            REFERENCE_IMAGES_TARGET,
+            { index, name: model.name },
+            turnOff
+          )
+        );
       }
 
       // A weight recalled from an SD reference can be negative; `anima_ip_adapter.strength` rejects it at enqueue.
       const { weight } = referenceImage.config;
       if (isStrengthOnlyIPAdapterBase(model.base) && !(weight >= 0 && weight <= 2)) {
-        reasons.push(`${prefix} strength must be between 0 and 2.`);
+        issues.push(
+          issue(
+            `referenceImages:strength:${id}`,
+            'referenceImageStrength',
+            `Reference image ${index} strength must be between 0 and 2.`,
+            REFERENCE_IMAGES_TARGET,
+            { index },
+            turnOff
+          )
+        );
       }
     }
 
-    if (referenceImage.config.type === 'flux_redux') {
-      if (!referenceImage.config.model || referenceImage.config.model.base !== model.base) {
-        reasons.push(`${prefix} needs a compatible FLUX Redux model.`);
-      }
+    if (
+      referenceImage.config.type === 'flux_redux' &&
+      (!referenceImage.config.model || referenceImage.config.model.base !== model.base)
+    ) {
+      issues.push(
+        issue(
+          `referenceImages:needsRedux:${id}`,
+          'referenceImageNeedsRedux',
+          `Reference image ${index} needs a FLUX Redux model for ${model.name}.`,
+          REFERENCE_IMAGES_TARGET,
+          { index, name: model.name },
+          turnOff
+        )
+      );
     }
 
-    if (referenceImage.config.type === 'flux_kontext_reference_image') {
-      if (!referenceImage.config.model || referenceImage.config.model.key !== model.key) {
-        reasons.push(`${prefix} needs the selected FLUX Kontext model.`);
-      }
+    if (
+      referenceImage.config.type === 'flux_kontext_reference_image' &&
+      (!referenceImage.config.model || referenceImage.config.model.key !== model.key)
+    ) {
+      issues.push(
+        issue(
+          `referenceImages:needsKontext:${id}`,
+          'referenceImageNeedsKontext',
+          `Reference image ${index} needs the selected FLUX Kontext model.`,
+          REFERENCE_IMAGES_TARGET,
+          { index },
+          turnOff
+        )
+      );
     }
   });
 
@@ -2095,12 +2402,19 @@ const getReferenceImageValidationReasons = (model: GenerateModelConfig, settings
     model.base === 'qwen-image-2-1' &&
     settings.qwen3VLEncoderModel &&
     isQwen3Vl8bEncoder(settings.qwen3VLEncoderModel) &&
-    enabled.some((referenceImage) => referenceImage.config.type === 'qwen_image_2_1_reference_image')
+    settings.referenceImages.some(
+      (referenceImage) => referenceImage.isEnabled && referenceImage.config.type === 'qwen_image_2_1_reference_image'
+    )
   ) {
-    reasons.push(QWEN_IMAGE_21_STANDALONE_ENCODER_REASON);
+    issues.push(
+      createUntranslatedGenerationIssue(QWEN_IMAGE_21_STANDALONE_ENCODER_REASON, REFERENCE_IMAGES_TARGET, {
+        key: 'qwen3VLEncoderModel',
+        kind: 'clearModel',
+      })
+    );
   }
 
-  return reasons;
+  return issues;
 };
 
 /** Validate guidance for writes bypassing model selection; return null or one error message. */
@@ -2155,12 +2469,16 @@ const getKrea2ReferenceValidationReasons = (settings: GenerateSettings): string[
   return reasons;
 };
 
-/** Scalar/LoRA family rules are separate from component-slot validation. */
-const getModelFamilyValidationReasons = (model: MainModelConfig, settings: GenerateSettings): string[] => {
-  const reasons: string[] = [];
+/** Scalar family rules are separate from component-slot validation; their fields show the English inline. */
+const getModelFamilyValidationIssues = (model: MainModelConfig, settings: GenerateSettings): GenerationIssue[] => {
+  const issues: GenerationIssue[] = [];
 
   if (model.base === 'krea-2') {
-    reasons.push(...getKrea2ReferenceValidationReasons(settings));
+    issues.push(
+      ...getKrea2ReferenceValidationReasons(settings).map((reason) =>
+        createUntranslatedGenerationIssue(reason, REFERENCE_IMAGES_TARGET)
+      )
+    );
   }
 
   // Parse raw rebalance strings before forwarding them to the backend.
@@ -2169,7 +2487,12 @@ const getModelFamilyValidationReasons = (model: MainModelConfig, settings: Gener
     settings.krea2RebalanceEnabled &&
     !isValidKrea2RebalanceWeights(settings.krea2RebalanceWeights)
   ) {
-    reasons.push(`Krea-2 rebalance weights must be ${KREA2_REBALANCE_WEIGHT_COUNT} comma-separated numbers.`);
+    issues.push(
+      createUntranslatedGenerationIssue(
+        `Krea-2 rebalance weights must be ${KREA2_REBALANCE_WEIGHT_COUNT} comma-separated numbers.`,
+        { field: 'krea2RebalanceWeights', section: 'render' }
+      )
+    );
   }
 
   // The field commits only lists in range, but a persisted one can still name a block MOSS-Image lacks, which would fail
@@ -2180,7 +2503,12 @@ const getModelFamilyValidationReasons = (model: MainModelConfig, settings: Gener
     settings.cfgScale > 1 &&
     !isValidMossImageSkipLayers(settings.mossImageUncondSkipLayers)
   ) {
-    reasons.push(`MOSS-Image skip layers must be whole numbers from 0 to ${MAX_MOSS_IMAGE_SKIP_LAYER}.`);
+    issues.push(
+      createUntranslatedGenerationIssue(
+        `MOSS-Image skip layers must be whole numbers from 0 to ${MAX_MOSS_IMAGE_SKIP_LAYER}.`,
+        { field: 'mossImageUncondSkipLayers', section: 'render' }
+      )
+    );
   }
 
   // Finite persisted Ideogram overrides still need range validation.
@@ -2192,21 +2520,16 @@ const getModelFamilyValidationReasons = (model: MainModelConfig, settings: Gener
     ] as const) {
       // Null is "let the preset decide" and is omitted from the graph entirely.
       if (value !== null && (value < min || value > max)) {
-        reasons.push(`Ideogram 4 ${label} must be between ${min} and ${max}.`);
+        issues.push(
+          createUntranslatedGenerationIssue(`Ideogram 4 ${label} must be between ${min} and ${max}.`, {
+            section: 'render',
+          })
+        );
       }
     }
   }
 
-  // Report Wan LoRA family mismatches rather than silently drop selected LoRAs.
-  if (model.base === 'wan') {
-    for (const lora of settings.loras) {
-      if (lora.isEnabled && !isWanLoraTargetingMain(lora.model.variant, model.variant)) {
-        reasons.push(`${lora.model.name} targets a different Wan model family than ${model.name}.`);
-      }
-    }
-  }
-
-  return reasons;
+  return issues;
 };
 
 const EXTERNAL_MODE_LABELS: Record<ExternalGenerationMode, string> = {
@@ -2221,44 +2544,89 @@ export const getExternalModeReason = (model: GenerateModelConfig, mode: External
     ? `${model.name} does not support ${EXTERNAL_MODE_LABELS[mode]}.`
     : null;
 
+/** Reported when Generate has no model it can run with; also used by surfaces that cannot read the values at all. */
+export const NO_GENERATE_MODEL_ISSUE: GenerationIssue = issue(
+  'model:unsupported',
+  'noSupportedModel',
+  'Generate needs a supported model before it can be invoked.',
+  MODEL_TARGET
+);
+
+/** The Components section's issues: one per slot, which the slot shows itself, then the family's other rules. */
+const getComponentValidationIssues = (model: GenerateModelConfig, settings: GenerateSettings): GenerationIssue[] => {
+  const policy = getComponentSectionPolicy(model, settings);
+  const ctx = getComponentPolicyContext(model, settings);
+
+  return [
+    ...(policy.rules?.(ctx) ?? []).map((message) =>
+      createUntranslatedGenerationIssue(message, { section: 'components' })
+    ),
+    ...policy.slots.flatMap((slotPolicy) => {
+      const message = getComponentSlotIssue(slotPolicy, ctx);
+
+      return message
+        ? [createUntranslatedGenerationIssue(message, { field: slotPolicy.key, section: 'components' })]
+        : [];
+    }),
+  ];
+};
+
 /** `mode` is the external generation mode being compiled; local models are validated the same way for every mode. */
-export const getGenerationValidationReasons = (
+export const getGenerationValidationIssues = (
   model: GenerateModelConfig,
   settings: GenerateSettings,
   mode: ExternalGenerationMode = 'txt2img'
-): string[] => {
+): GenerationIssue[] => {
   // All compilers share this validator; check capabilities before model-specific policy.
   if (!hasArchitectureCapabilities()) {
     // Keep core independent of the load-state store; failures direct callers to retry.
     return [
-      'Model capabilities are not available. Generation is blocked until they load; if this persists, retry from the Generate panel.',
+      issue(
+        'model:capabilitiesUnavailable',
+        'capabilitiesUnavailable',
+        'Model capabilities are not available. Generation is blocked until they load; if this persists, retry from the Generate panel.',
+        MODEL_TARGET
+      ),
     ];
   }
 
   if (!isSupportedGenerateModel(model)) {
-    return ['Generate needs a supported model before it can be invoked.'];
+    return [NO_GENERATE_MODEL_ISSUE];
   }
 
   // Reject supported bases missing from the loaded table rather than compile fallback policy.
   if (!isArchitectureDescribed(model)) {
-    return [`The backend does not describe the ${model.base} architecture, so it cannot be generated with.`];
+    return [
+      issue(
+        'model:architectureNotDescribed',
+        'architectureNotDescribed',
+        `The backend does not describe the ${model.base} architecture, so it cannot be generated with.`,
+        MODEL_TARGET,
+        { base: model.base }
+      ),
+    ];
   }
 
-  const reasons = [
-    ...getDimensionValidationReasons(model, settings),
-    ...getReferenceImageValidationReasons(model, settings),
-    ...getPidValidationReasons(model, settings),
+  const issues = [
+    ...getDimensionValidationIssues(model, settings),
+    ...getReferenceImageValidationIssues(model, settings),
+    ...getPidValidationIssues(model, settings),
   ];
 
   if (model.type === 'external_image_generator') {
     const modeReason = getExternalModeReason(model, mode);
 
     if (modeReason) {
-      reasons.push(modeReason);
+      issues.push(createUntranslatedGenerationIssue(modeReason, MODEL_TARGET));
     }
 
     if (!getExternalProviderNodeType(model.provider_id)) {
-      reasons.push(`No invocation node registered for external provider '${model.provider_id ?? ''}'.`);
+      issues.push(
+        createUntranslatedGenerationIssue(
+          `No invocation node registered for external provider '${model.provider_id ?? ''}'.`,
+          MODEL_TARGET
+        )
+      );
     }
 
     // Every request emits one output, and the Canvas edit modes add the composite as one init image.
@@ -2266,25 +2634,72 @@ export const getGenerationValidationReasons = (
       const totalImages = getExternalReferenceImages(settings, model).length + (mode === 'txt2img' ? 0 : 1) + 1;
 
       if (totalImages > SEEDREAM_BATCH_MAX_TOTAL_IMAGES) {
-        reasons.push(
-          `${model.name} supports at most ${SEEDREAM_BATCH_MAX_TOTAL_IMAGES} images total (reference + init + output), got ${totalImages}.`
+        issues.push(
+          createUntranslatedGenerationIssue(
+            `${model.name} supports at most ${SEEDREAM_BATCH_MAX_TOTAL_IMAGES} images total (reference + init + output), got ${totalImages}.`,
+            REFERENCE_IMAGES_TARGET
+          )
         );
       }
     }
 
-    return reasons;
+    return issues;
   }
 
-  const componentPolicy = getComponentSectionPolicy(model, settings);
-  reasons.push(...componentPolicy.validate(getComponentPolicyContext(model, settings)));
+  issues.push(...getComponentValidationIssues(model, settings));
   const guidanceReason = getGuidanceBoundReason(model, settings.cfgScale);
 
   if (guidanceReason) {
-    reasons.push(guidanceReason);
+    issues.push(
+      createUntranslatedGenerationIssue(
+        guidanceReason,
+        { field: 'cfgScale', section: 'render' },
+        { kind: 'clampGuidance', value: clampGuidance(settings.cfgScale, getBaseGenerationConfig(model).guidance) }
+      )
+    );
   }
 
-  reasons.push(...getModelFamilyValidationReasons(model, settings));
-  reasons.push(...getRefinerValidationReasons(model, settings));
+  issues.push(...getModelFamilyValidationIssues(model, settings));
+  issues.push(
+    ...getRefinerValidationReasons(model, settings).map((reason) =>
+      createUntranslatedGenerationIssue(reason, { section: 'refiner' })
+    )
+  );
 
-  return reasons;
+  return issues;
+};
+
+/** English reasons for compilers and logs, which throw or list them without a translator. */
+export const getGenerationValidationReasons = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  mode: ExternalGenerationMode = 'txt2img'
+): string[] => getGenerationValidationIssues(model, settings, mode).map(({ message }) => message);
+
+/**
+ * What blocks Invoke for Generate's values, shared by the Invoke route and the Generate form so the two always agree.
+ * With a Canvas frame, a hosted provider is checked at the size it will be asked for (its own size nearest the frame),
+ * and one without text to image as the edit the Canvas will ask for. `models` adds the installed-model checks; leave it
+ * out while the catalog is unread, which would otherwise name every model as missing.
+ */
+export const getGenerateInvocationIssues = (
+  values: GenerateSettings & { model: GenerateModelConfig },
+  { canvasFrame, models }: { canvasFrame?: { height: number; width: number }; models?: readonly ModelConfig[] } = {}
+): GenerationIssue[] => {
+  const { model } = values;
+  const providerModes =
+    canvasFrame !== undefined && model.type === 'external_image_generator'
+      ? (model.capabilities?.modes ?? ['txt2img'])
+      : null;
+
+  return [
+    ...getGenerationValidationIssues(
+      model,
+      providerModes !== null && canvasFrame
+        ? { ...values, ...resolveExternalCanvasRequestSize(model, canvasFrame) }
+        : values,
+      providerModes !== null && !providerModes.includes('txt2img') ? 'img2img' : 'txt2img'
+    ),
+    ...(models ? getGenerationModelAvailabilityIssues(model, values, models) : []),
+  ];
 };

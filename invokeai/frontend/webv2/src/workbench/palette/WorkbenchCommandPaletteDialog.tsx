@@ -6,7 +6,11 @@ import type { getWidgetsForRegion as GetWidgetsForRegion } from '@workbench/widg
 import type { TFunction } from 'i18next';
 
 import { imageIndexAvailabilityOptions } from '@features/gallery/queries';
-import { flushGenerateDrafts } from '@features/generation/react';
+import {
+  flushGenerateDrafts,
+  notifyGenerateModelSwitched,
+  requestGenerateModelSwitchConfirmation,
+} from '@features/generation/react';
 import { getModelsSnapshot } from '@features/models';
 import { getQueueQueryScope, getQueueReadModelOptions } from '@features/queue/queries';
 import { queryClient } from '@platform/query/client';
@@ -202,18 +206,43 @@ const WorkbenchCommandPaletteDialog = ({
         t,
       }),
       createModelsProvider({
-        locale: i18n.resolvedLanguage,
-        notifications: notify,
         selectModel: (model, catalogModels) => {
           const { currentValues, isCanvasFrame, projectId } = readCurrentGenerateContext();
-
-          return selectProjectGenerateModel({
+          const selection = selectProjectGenerateModel({
             currentValues,
             generation,
             isCanvasFrame,
             model,
             models: catalogModels,
             projectId,
+          });
+
+          if (selection.status === 'needsConfirmation') {
+            // The project's model card asks, as it does for its own picker, once the widget below opens.
+            requestGenerateModelSwitchConfirmation({ model, projectId });
+            return;
+          }
+
+          if (selection.status === 'unchanged' || !selection.revertPatch) {
+            return;
+          }
+
+          const { revertPatch } = selection;
+
+          notifyGenerateModelSwitched({
+            getCurrentModelKey: () => {
+              const project = workbenchQueries.getProject(projectId);
+              const modelKey = project ? getProjectWidgetValues(project, 'generate').modelKey : undefined;
+
+              return typeof modelKey === 'string' ? modelKey : undefined;
+            },
+            locale: i18n.resolvedLanguage,
+            model,
+            notifications: notify,
+            projectId,
+            result: selection.result,
+            revert: () => generation.patchSettings(revertPatch, projectId),
+            t,
           });
         },
         openGenerateWidget: () => openWidget('generate'),
@@ -269,6 +298,7 @@ const WorkbenchCommandPaletteDialog = ({
     requestQueueItemReveal,
     t,
     workbenchCommands,
+    workbenchQueries,
   ]);
 
   return (

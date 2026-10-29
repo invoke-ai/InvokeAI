@@ -31,6 +31,7 @@ let root: Root;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 vi.mock('@features/generation/react', () => ({
+  clearGenerateModelSwitchConfirmation: () => undefined,
   GenerationUiProvider: ({ adapter: next, children }: { adapter: GenerationUiAdapter; children: ReactNode }) => {
     adapter = next;
     return children;
