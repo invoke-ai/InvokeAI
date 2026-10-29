@@ -1,4 +1,5 @@
 // @ts-check
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
@@ -7,6 +8,7 @@ import starlightLinksValidator from 'starlight-links-validator';
 import starlightLlmsText from 'starlight-llms-txt';
 import starlightChangelogs from 'starlight-changelogs';
 import { rehypePrefixBaseToRootLinks } from './plugins/rehype-prefix-base-to-root-links.mjs';
+import { remarkSortPrefixSlug } from './plugins/remark-sort-prefix-slug.mjs';
 import starlightContextualMenu from 'starlight-contextual-menu';
 
 // Configs
@@ -17,14 +19,14 @@ import {
   socialConfig,
 } from './src/config';
 
-// Deployment target: 'custom' (default, custom domain at invoke.ai) or 'ghpages'
+// Deployment target: 'custom' (default, custom domain at v7.invoke.ai) or 'ghpages'
 // (GitHub Pages project URL at invoke-ai.github.io/InvokeAI). Drive site/base from this
 // so the same source can be deployed to either target.
 const deployTarget = process.env.DEPLOY_TARGET ?? 'custom';
 const isGhPages = deployTarget === 'ghpages';
 const enableAnalytics = process.env.ENABLE_ANALYTICS === 'true';
 const base = isGhPages ? '/InvokeAI' : '';
-const site = isGhPages ? 'https://invoke-ai.github.io' : 'https://invoke.ai';
+const site = isGhPages ? 'https://invoke-ai.github.io' : 'https://v7.invoke.ai';
 
 const redirects = createRedirects(base);
 const head = createHeadConfig({ base, enableAnalytics, isGhPages, site });
@@ -34,6 +36,7 @@ export default defineConfig({
   site,
   base: base || undefined,
   markdown: {
+    remarkPlugins: [[remarkSortPrefixSlug, { docsDir: fileURLToPath(new URL('./src/content/docs', import.meta.url)) }]],
     rehypePlugins: [[rehypePrefixBaseToRootLinks, { base }]],
   },
   integrations: [
@@ -69,6 +72,7 @@ export default defineConfig({
         './src/styles/custom.css',
       ],
       sidebar: sidebarConfig,
+      routeMiddleware: './src/route-data.ts',
       components: {
         ThemeProvider: './src/lib/components/ForceDarkTheme.astro',
         ThemeSelect: './src/lib/components/EmptyComponent.astro',

@@ -1,0 +1,458 @@
+import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { RasterizationJob } from '@workbench/canvas-engine/controllers/rasterController';
+import type { LayerCacheEntry } from '@workbench/canvas-engine/render/layerCache';
+import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
+
+import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { ImageUnavailableError } from '@workbench/canvas-engine/render/rasterizers/imageRasterizer';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { createLayerRasterizer, type CreateLayerRasterizerDeps, RASTERIZATION_RETRY_BASE_MS } from './layerRasterizer';
+
+const surface = (width = 4, height = 4): RasterSurface =>
+  ({
+    canvas: {},
+    ctx: { clearRect: vi.fn(), drawImage: vi.fn(), setTransform: vi.fn() },
+    height,
+    resize: vi.fn(),
+    width,
+  }) as unknown as RasterSurface;
+
+const rasterLayer = (overrides: Record<string, unknown> = {}): CanvasLayerContract =>
+  ({
+    id: 'layer-1',
+    isEnabled: true,
+    isLocked: false,
+    name: 'Layer 1',
+    source: { image: { height: 4, imageName: 'a.png', width: 4 }, type: 'image' },
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type: 'raster',
+    ...overrides,
+  }) as unknown as CanvasLayerContract;
+
+const textLayer = (): CanvasLayerContract =>
+  rasterLayer({
+    source: {
+      color: '#fff',
+      content: 'hello',
+      fontFamily: 'Inter',
+      fontSize: 12,
+      fontStyle: 'normal',
+      fontWeight: 400,
+      lineHeight: 1.2,
+      type: 'text',
+    },
+  });
+
+const documentOf = (layers: CanvasLayerContract[]): CanvasDocumentContractV3 =>
+  ({ height: 64, stacks: stacksFrom(layers), width: 64 }) as unknown as CanvasDocumentContractV3;
+
+interface Harness {
+  deps: CreateLayerRasterizerDeps;
+  entry: LayerCacheEntry;
+  installed: Map<string, RasterizationJob>;
+  documentGeneration: { value: number };
+  document: { value: CanvasDocumentContractV3 };
+  state: { disposed: boolean; hasCanvas: boolean };
+  rasterize: ReturnType<typeof vi.fn>;
+  fontReady: (() => void) | null;
+  spies: {
+    cancel: ReturnType<typeof vi.fn>;
+    invalidateLayerCache: ReturnType<typeof vi.fn>;
+    invalidateLayerRender: ReturnType<typeof vi.fn>;
+    reportError: ReturnType<typeof vi.fn>;
+    setStatus: ReturnType<typeof vi.fn>;
+    setVersion: ReturnType<typeof vi.fn>;
+  };
+}
+
+let harness: Harness;
+
+const makeHarness = (overrides: Partial<CreateLayerRasterizerDeps> = {}): Harness => {
+  const entry = {
+    layerId: 'layer-1',
+    rect: { height: 4, width: 4, x: 0, y: 0 },
+    surface: surface(),
+    version: 3,
+  } as unknown as LayerCacheEntry;
+  const installed = new Map<string, RasterizationJob>();
+  const documentGeneration = { value: 7 };
+  const document = { value: documentOf([rasterLayer()]) };
+  const state = { disposed: false, hasCanvas: true };
+  const rasterize = vi.fn(() => Promise.resolve({ rect: { height: 4, width: 4, x: 0, y: 0 }, surface: surface() }));
+  const spies = {
+    cancel: vi.fn(),
+    invalidateLayerCache: vi.fn(),
+    invalidateLayerRender: vi.fn(),
+    reportError: vi.fn(),
+    setStatus: vi.fn(),
+    setVersion: vi.fn(),
+  };
+  const result: Harness = {
+    document,
+    documentGeneration,
+    entry,
+    fontReady: null,
+    installed,
+    rasterize,
+    spies,
+    state,
+    deps: {
+      createSurface: (width, height) => surface(width, height),
+      fontLoader: {
+        ensure: (_font, onReady) => {
+          result.fontReady = onReady;
+        },
+        resolveFamily: (source) => source.fontFamily,
+      },
+      getDocument: () => document.value,
+      hasCanvasState: () => state.hasCanvas,
+      invalidateLayerCache: spies.invalidateLayerCache,
+      invalidateLayerRender: spies.invalidateLayerRender,
+      isDisposed: () => state.disposed,
+      jobs: {
+        cancel: spies.cancel,
+        finish: (layerId, job) => {
+          if (installed.get(layerId) === job) {
+            installed.delete(layerId);
+          }
+        },
+        get: (layerId) => installed.get(layerId),
+        getDocumentGeneration: () => documentGeneration.value,
+        install: (layerId, job) => installed.set(layerId, job),
+      },
+      layerCache: {
+        get: vi.fn(() => entry),
+        getOrCreateRect: vi.fn(() => entry),
+        peek: vi.fn(() => entry),
+        publishRasterized: vi.fn((_layerId: string, _rect: unknown, _pixels: unknown, family?: string) => {
+          entry.renderedFontFamily = family;
+          return { ...entry, version: entry.version + 1 };
+        }),
+        version: vi.fn(() => entry.version),
+      } as unknown as CreateLayerRasterizerDeps['layerCache'],
+      rasterize: rasterize as unknown as CreateLayerRasterizerDeps['rasterize'],
+      reportError: spies.reportError,
+      thumbnails: { setStatus: spies.setStatus, setVersion: spies.setVersion },
+      ...overrides,
+    },
+  };
+  return result;
+};
+
+beforeEach(() => {
+  harness = makeHarness();
+});
+
+const start = (layer = rasterLayer(), signal?: AbortSignal) =>
+  createLayerRasterizer(harness.deps).getOrStartLayerRasterization(layer, harness.document.value, signal);
+
+describe('refusals before any work', () => {
+  it('reports aborted for an already-aborted signal', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await expect(start(rasterLayer(), controller.signal)).resolves.toBe('aborted');
+    expect(harness.rasterize).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['the engine is disposed', (h: Harness) => (h.state.disposed = true)],
+    ['there is no canvas state', (h: Harness) => (h.state.hasCanvas = false)],
+  ])('reports stale when %s', async (_label, mutate) => {
+    mutate(harness);
+    await expect(start()).resolves.toBe('stale');
+    expect(harness.rasterize).not.toHaveBeenCalled();
+  });
+
+  it('reports stale for a source it cannot rasterize', async () => {
+    await expect(start(rasterLayer({ source: { kind: 'polygon', points: [], type: 'shape' } }))).resolves.toBe('stale');
+  });
+});
+
+describe('job reuse', () => {
+  it('joins an in-flight job describing the same source, version and generation', async () => {
+    const rasterizer = createLayerRasterizer(harness.deps);
+    const first = rasterizer.getOrStartLayerRasterization(rasterLayer(), harness.document.value);
+    const second = rasterizer.getOrStartLayerRasterization(rasterLayer(), harness.document.value);
+    expect(second).toBe(first);
+    expect(harness.rasterize).toHaveBeenCalledTimes(1);
+    await first;
+  });
+
+  it.each([
+    ['the cache version moved', (h: Harness) => ((h.entry as { version: number }).version = 99)],
+    ['the document generation moved', (h: Harness) => (h.documentGeneration.value += 1)],
+  ])('restarts rather than joining once %s', async (_label, mutate) => {
+    const rasterizer = createLayerRasterizer(harness.deps);
+    const first = rasterizer.getOrStartLayerRasterization(rasterLayer(), harness.document.value);
+    mutate(harness);
+    const second = rasterizer.getOrStartLayerRasterization(rasterLayer(), harness.document.value);
+    expect(second).not.toBe(first);
+    expect(harness.spies.cancel).toHaveBeenCalledWith('layer-1');
+    await Promise.all([first, second]);
+  });
+
+  it('restarts when the source changed by value even though nothing else did', async () => {
+    const rasterizer = createLayerRasterizer(harness.deps);
+    const first = rasterizer.getOrStartLayerRasterization(rasterLayer(), harness.document.value);
+    const edited = rasterLayer({ source: { image: { height: 4, imageName: 'b.png', width: 4 }, type: 'image' } });
+    const second = rasterizer.getOrStartLayerRasterization(edited, harness.document.value);
+    expect(second).not.toBe(first);
+    await Promise.all([first, second]);
+  });
+
+  it('cancels the shared job when a joining caller aborts, and unhooks its listener', async () => {
+    const rasterizer = createLayerRasterizer(harness.deps);
+    const first = rasterizer.getOrStartLayerRasterization(rasterLayer(), harness.document.value);
+    const controller = new AbortController();
+    const removeSpy = vi.spyOn(controller.signal, 'removeEventListener');
+    const joined = rasterizer.getOrStartLayerRasterization(rasterLayer(), harness.document.value, controller.signal);
+    const job = harness.installed.get('layer-1')!;
+    controller.abort();
+    expect(job.abortedByCaller).toBe(true);
+    await Promise.all([first, joined]);
+    expect(removeSpy).toHaveBeenCalled();
+  });
+});
+
+describe('publishing', () => {
+  it('publishes the rasterized pixels through the cache and reports the layer ready', async () => {
+    const rect = { height: 8, width: 8, x: 1, y: 2 };
+    const pixels = surface(8, 8);
+    harness.rasterize.mockResolvedValue({ rect, surface: pixels });
+    await expect(start()).resolves.toBe('published');
+    expect(harness.deps.layerCache.publishRasterized).toHaveBeenCalledWith('layer-1', rect, pixels, undefined);
+    expect(harness.spies.setVersion).toHaveBeenCalledWith('layer-1', 4);
+    expect(harness.spies.setStatus).toHaveBeenCalledWith('layer-1', 'ready');
+    expect(harness.spies.invalidateLayerRender).toHaveBeenCalledWith('layer-1');
+  });
+});
+
+describe('a result that no longer describes the live layer', () => {
+  it.each([
+    ['the engine was disposed', (h: Harness) => (h.state.disposed = true)],
+    ['the canvas state went away', (h: Harness) => (h.state.hasCanvas = false)],
+    ['the document generation moved', (h: Harness) => (h.documentGeneration.value += 1)],
+    ['the layer was deleted', (h: Harness) => (h.document.value = documentOf([]))],
+    [
+      'the layer source was edited',
+      (h: Harness) =>
+        (h.document.value = documentOf([
+          rasterLayer({ source: { image: { height: 4, imageName: 'b.png', width: 4 }, type: 'image' } }),
+        ])),
+    ],
+    [
+      'the cache entry was dropped',
+      (h: Harness) => (h.deps.layerCache.get as ReturnType<typeof vi.fn>).mockReturnValue(undefined),
+    ],
+    [
+      'the cache version moved under it',
+      (h: Harness) => (h.deps.layerCache.get as ReturnType<typeof vi.fn>).mockReturnValue({ ...h.entry, version: 99 }),
+    ],
+  ])('is dropped as stale once %s', async (_label, mutate) => {
+    harness.rasterize.mockImplementation(() => {
+      mutate(harness);
+      return Promise.resolve({ rect: { height: 4, width: 4, x: 0, y: 0 }, surface: surface() });
+    });
+    await expect(start()).resolves.toBe('stale');
+    expect(harness.spies.setVersion).not.toHaveBeenCalled();
+  });
+
+  it('is dropped as stale when a newer job replaced it', async () => {
+    harness.rasterize.mockImplementation(() => {
+      harness.installed.set('layer-1', { version: 999 } as unknown as RasterizationJob);
+      return Promise.resolve({ rect: { height: 4, width: 4, x: 0, y: 0 }, surface: surface() });
+    });
+    await expect(start()).resolves.toBe('stale');
+  });
+});
+
+describe('failure', () => {
+  it('marks the layer errored and reports it', async () => {
+    harness.rasterize.mockRejectedValue(new Error('decode failed'));
+    await expect(start()).resolves.toBe('error');
+    expect(harness.spies.setStatus).toHaveBeenCalledWith('layer-1', 'error');
+    expect(harness.spies.reportError).toHaveBeenCalledWith(
+      'Layer thumbnail rasterization failed',
+      'layer-1',
+      expect.any(Error)
+    );
+  });
+
+  it('reports a source that keeps failing once, and remembers the failure until the layer changes', async () => {
+    const rasterizer = createLayerRasterizer(harness.deps);
+    (harness.entry as { stale: boolean }).stale = true;
+    harness.rasterize.mockRejectedValue(new Error('decode failed'));
+    const layer = rasterLayer();
+
+    await expect(rasterizer.getOrStartLayerRasterization(layer, harness.document.value)).resolves.toBe('error');
+    await expect(rasterizer.getOrStartLayerRasterization(layer, harness.document.value)).resolves.toBe('error');
+    expect(harness.rasterize).toHaveBeenCalledTimes(2);
+    expect(harness.spies.reportError).toHaveBeenCalledOnce();
+    expect(rasterizer.getFailure(layer)).toBe('unreadable');
+
+    // Another image is another failure, worth its own notice.
+    const replaced = rasterLayer({ source: { image: { height: 4, imageName: 'b.png', width: 4 }, type: 'image' } });
+    harness.document.value = documentOf([replaced]);
+    expect(rasterizer.getFailure(replaced)).toBeNull();
+    await expect(rasterizer.getOrStartLayerRasterization(replaced, harness.document.value)).resolves.toBe('error');
+    expect(harness.spies.reportError).toHaveBeenCalledTimes(2);
+  });
+
+  it('lets a failed source retry after a backoff that doubles per failure, reporting it once', async () => {
+    const timers: { callback: () => void; delayMs: number }[] = [];
+    const rasterizer = createLayerRasterizer({
+      ...harness.deps,
+      setTimer: (callback, delayMs) => {
+        timers.push({ callback, delayMs });
+        return () => undefined;
+      },
+    });
+    (harness.entry as { stale: boolean }).stale = true;
+    harness.rasterize.mockRejectedValue(new Error('backend restarting'));
+    const layer = rasterLayer();
+
+    await rasterizer.getOrStartLayerRasterization(layer, harness.document.value);
+    expect(rasterizer.isBackingOff(layer)).toBe(true);
+    timers.at(-1)!.callback();
+    // The backoff's end lets the display try again, and says so; the failure itself is still on record.
+    expect(rasterizer.isBackingOff(layer)).toBe(false);
+    expect(rasterizer.getFailure(layer)).toBe('unreadable');
+    expect(harness.spies.invalidateLayerRender).toHaveBeenCalledWith('layer-1');
+
+    await rasterizer.getOrStartLayerRasterization(layer, harness.document.value);
+    expect(timers.map(({ delayMs }) => delayMs)).toEqual([
+      RASTERIZATION_RETRY_BASE_MS,
+      RASTERIZATION_RETRY_BASE_MS * 2,
+    ]);
+    expect(harness.spies.reportError).toHaveBeenCalledOnce();
+  });
+
+  it('records an image that could not be fetched as unavailable: backed off, reported once per kind', async () => {
+    const timers: { callback: () => void; delayMs: number }[] = [];
+    const rasterizer = createLayerRasterizer({
+      ...harness.deps,
+      setTimer: (callback, delayMs) => {
+        timers.push({ callback, delayMs });
+        return () => undefined;
+      },
+    });
+    (harness.entry as { stale: boolean }).stale = true;
+    const outage = new ImageUnavailableError('a.png', { cause: new Error('503') });
+    harness.rasterize.mockRejectedValue(outage);
+    const layer = rasterLayer();
+
+    await expect(rasterizer.getOrStartLayerRasterization(layer, harness.document.value)).resolves.toBe('unavailable');
+    expect(harness.spies.setStatus).toHaveBeenCalledWith('layer-1', 'error');
+    expect(rasterizer.getFailure(layer)).toBe('unavailable');
+    expect(rasterizer.isBackingOff(layer)).toBe(true);
+
+    timers.at(-1)!.callback();
+    await expect(rasterizer.getOrStartLayerRasterization(layer, harness.document.value)).resolves.toBe('unavailable');
+    expect(timers.map(({ delayMs }) => delayMs)).toEqual([
+      RASTERIZATION_RETRY_BASE_MS,
+      RASTERIZATION_RETRY_BASE_MS * 2,
+    ]);
+    // The notice carries the wrapper, which names the image, with the resolver's error as its cause.
+    expect(harness.spies.reportError.mock.calls).toEqual([['Layer thumbnail rasterization failed', 'layer-1', outage]]);
+
+    // Once the image is gone for good, the same key reads as unreadable, and that new kind is reported.
+    const gone = new Error('decode failed');
+    harness.rasterize.mockRejectedValue(gone);
+    await expect(rasterizer.getOrStartLayerRasterization(layer, harness.document.value)).resolves.toBe('error');
+    expect(rasterizer.getFailure(layer)).toBe('unreadable');
+    expect(harness.spies.reportError.mock.calls.at(-1)).toEqual([
+      'Layer thumbnail rasterization failed',
+      'layer-1',
+      gone,
+    ]);
+    await expect(rasterizer.getOrStartLayerRasterization(layer, harness.document.value)).resolves.toBe('error');
+    expect(harness.spies.reportError).toHaveBeenCalledTimes(2);
+  });
+
+  it('forgets a failure once a retry publishes', async () => {
+    const rasterizer = createLayerRasterizer(harness.deps);
+    (harness.entry as { stale: boolean }).stale = true;
+    harness.rasterize.mockRejectedValueOnce(new Error('network blip'));
+    const layer = rasterLayer();
+
+    await expect(rasterizer.getOrStartLayerRasterization(layer, harness.document.value)).resolves.toBe('error');
+    await expect(rasterizer.getOrStartLayerRasterization(layer, harness.document.value)).resolves.toBe('published');
+    expect(rasterizer.getFailure(layer)).toBeNull();
+  });
+
+  it('still reports error when diagnostics itself throws', async () => {
+    harness.rasterize.mockRejectedValue(new Error('decode failed'));
+    harness.spies.reportError.mockImplementation(() => {
+      throw new Error('diagnostics is down');
+    });
+    await expect(start()).resolves.toBe('error');
+  });
+
+  it('stays quiet about a failure whose layer has already moved on', async () => {
+    harness.rasterize.mockImplementation(() => {
+      harness.document.value = documentOf([]);
+      return Promise.reject(new Error('decode failed'));
+    });
+    await expect(start()).resolves.toBe('stale');
+    expect(harness.spies.reportError).not.toHaveBeenCalled();
+    expect(harness.spies.setStatus).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      'the cache version moved on',
+      (h: Harness) => (h.deps.layerCache.version as ReturnType<typeof vi.fn>).mockReturnValue(99),
+    ],
+    [
+      'the layer source was edited',
+      (h: Harness) =>
+        (h.document.value = documentOf([
+          rasterLayer({ source: { image: { height: 4, imageName: 'b.png', width: 4 }, type: 'image' } }),
+        ])),
+    ],
+  ])('stays quiet about a failure once %s', async (_label, mutate) => {
+    harness.rasterize.mockImplementation(() => {
+      mutate(harness);
+      return Promise.reject(new Error('decode failed'));
+    });
+    await expect(start()).resolves.toBe('stale');
+    expect(harness.spies.reportError).not.toHaveBeenCalled();
+    expect(harness.spies.setStatus).not.toHaveBeenCalled();
+  });
+
+  it('reports aborted, not error, when the caller cancelled', async () => {
+    const controller = new AbortController();
+    harness.rasterize.mockImplementation(() => {
+      controller.abort();
+      return Promise.reject(new Error('aborted'));
+    });
+    await expect(start(rasterLayer(), controller.signal)).resolves.toBe('aborted');
+    expect(harness.spies.reportError).not.toHaveBeenCalled();
+  });
+});
+
+describe('text sources', () => {
+  it('re-invalidates once the real font arrives', async () => {
+    harness.document.value = documentOf([textLayer()]);
+    await start(textLayer());
+    expect(harness.entry.renderedFontFamily).toBe('Inter');
+    expect(harness.fontReady).toBeTypeOf('function');
+    harness.fontReady?.();
+    expect(harness.spies.invalidateLayerCache).toHaveBeenCalledWith('layer-1');
+    expect(harness.spies.invalidateLayerRender).toHaveBeenCalledWith('layer-1');
+  });
+
+  it('does not re-invalidate when the font arrives after the layer moved on', async () => {
+    harness.document.value = documentOf([textLayer()]);
+    await start(textLayer());
+    harness.document.value = documentOf([]);
+    harness.fontReady?.();
+    expect(harness.spies.invalidateLayerCache).not.toHaveBeenCalled();
+  });
+
+  it('does not wait on fonts for a non-text source', async () => {
+    await start();
+    expect(harness.fontReady).toBeNull();
+  });
+});

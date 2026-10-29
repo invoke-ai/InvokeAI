@@ -81,12 +81,14 @@ Starter overrides are matched by `source` (`external://provider/model-id`). Keep
 
 - runtime capability/default overrides depend on it
 - installation detection in starter-model APIs depends on it
+- the model manager's External Provider section treats a record whose `source` matches a starter as catalog-managed and shows its routing, capabilities and defaults read-only, because a changed route would keep the matched entry's capabilities
 
 `STARTER_MODELS` enforces unique `source` values with an assertion.
 
 ### Install behavior notes
 
 - External starter models are managed in **External Providers** setup (not the regular Starter Models tab).
+- Canvas compiles `txt2img` and `img2img` for external models; `inpaint` is refused on Canvas because its keep-mask does not match any provider's edit-mask contract (the workflow editor nodes still accept `mask_image`). For a model with `resolution_presets`, `aspect_ratio_sizes` or `allowed_aspect_ratios`, the Canvas requests one of the model's own sizes (the closest aspect ratio, then the smallest size covering the bounding box). `_bucket_request` passes a fixed size or an exact multiple of an allowed ratio through unchanged; a resolution preset whose rounded size is off its exact ratio may be nudged by a pixel, which is harmless because the provider sizes its output from the ratio and the preset's name. A `txt2img` result is scaled to cover the bounding box and center-cropped; an `img2img` init image is resized to the request size and the result resized back. Keep these capabilities accurate: the crop is planned from them.
 - External starter models auto-install when a provider is configured.
 - Removing a provider API key removes installed external models for that provider.
 
@@ -118,7 +120,7 @@ If your model uses a provider that is not already integrated:
    `ExternalGenerationService`.
 5. Add starter model entries using `source="external://<provider>/<model-id>"`.
 6. Optional UI ordering tweak:
-   `invokeai/frontend/web/src/features/modelManagerV2/subpanels/AddModelPanel/ExternalProviders/ExternalProvidersForm.tsx`
+   `invokeai/frontend/webv1/src/features/modelManagerV2/subpanels/AddModelPanel/ExternalProviders/ExternalProvidersForm.tsx`
    (`PROVIDER_SORT_ORDER`).
 
 ## 4) Optional Manual Installation

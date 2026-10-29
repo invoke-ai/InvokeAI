@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Team
-
 from abc import ABC, abstractmethod
 
 import torch
@@ -11,7 +9,8 @@ from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_install.model_install_base import ModelInstallServiceBase
 from invokeai.app.services.model_load.model_load_base import ModelLoadServiceBase
-from invokeai.app.services.model_records.model_records_base import ModelRecordServiceBase
+from invokeai.app.services.model_records.model_records_base import ModelRecordChanges, ModelRecordServiceBase
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 
 
 class ModelManagerServiceBase(ABC):
@@ -57,6 +56,23 @@ class ModelManagerServiceBase(ABC):
     def install(self) -> ModelInstallServiceBase:
         """Return the ModelInstallServiceBase used to download and manipulate model files."""
         pass
+
+    @abstractmethod
+    def update_model_record(self, key: str, changes: ModelRecordChanges) -> AnyModelConfig:
+        """Apply `changes` to `key`'s record, which may change its config class, and return the stored result.
+        Cached instances the change made stale are dropped (see `ModelLoadServiceBase.apply_record_change`).
+
+        Raises `UnknownModelException` for an unknown key, and `ValueError` when the changed record is invalid or
+        conflicts with another record."""
+
+    @abstractmethod
+    def reidentify_model(self, key: str) -> AnyModelConfig:
+        """Identify `key`'s files again and replace its record with the result, keeping what the user set: the
+        name, description, cover image, trigger phrases, install source and CPU/FP8 preferences. Cached instances
+        the new record makes stale are dropped (see `ModelLoadServiceBase.apply_record_change`).
+
+        Raises `UnknownModelException` for an unknown key, and `InvalidModelException` when the files are not
+        identified as any model."""
 
     @abstractmethod
     def start(self, invoker: Invoker) -> None:

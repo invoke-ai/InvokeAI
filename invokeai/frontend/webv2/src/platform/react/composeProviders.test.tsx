@@ -1,0 +1,48 @@
+import type { ReactNode } from 'react';
+
+import { createContext, use } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { describe, expect, it } from 'vitest';
+
+import { composeProviders } from './composeProviders';
+
+// Chain context values so the probe detects provider order.
+const FirstContext = createContext('missing-first');
+const SecondContext = createContext('missing-second');
+const ThirdContext = createContext('missing-third');
+
+const FirstProvider = ({ children }: { children: ReactNode }) => (
+  <FirstContext.Provider value="first">{children}</FirstContext.Provider>
+);
+
+const SecondProvider = ({ children }: { children: ReactNode }) => (
+  <SecondContext.Provider value={`${use(FirstContext)}/second`}>{children}</SecondContext.Provider>
+);
+
+const ThirdProvider = ({ children }: { children: ReactNode }) => (
+  <ThirdContext.Provider value={`${use(SecondContext)}/third`}>{children}</ThirdContext.Provider>
+);
+
+const Probe = () => <output>{use(ThirdContext)}</output>;
+
+describe('composeProviders', () => {
+  it('nests providers in array order, outermost first', () => {
+    const Composed = composeProviders([FirstProvider, SecondProvider, ThirdProvider]);
+
+    const markup = renderToStaticMarkup(
+      <Composed>
+        <Probe />
+      </Composed>
+    );
+
+    expect(markup).toContain('first/second/third');
+  });
+
+  it('renders children unchanged for an empty provider list', () => {
+    const Composed = composeProviders([]);
+
+    const markup = renderToStaticMarkup(<Composed>plain children</Composed>);
+
+    expect(markup).toBe('plain children');
+  });
+});

@@ -4,7 +4,7 @@ import pytest
 import torch
 from PIL import Image as PILImage
 
-from invokeai.app.invocations.krea2_style_reference import (
+from invokeai.app.invocations.krea2.krea2_style_reference import (
     Krea2StyleReferenceInvocation,
     fit_image_to_box,
 )
@@ -104,10 +104,10 @@ def _patch_vae_encode(monkeypatch) -> dict:
         return torch.zeros(1, 16, 1, 8, 8)
 
     monkeypatch.setattr(
-        "invokeai.app.invocations.krea2_style_reference.QwenImageImageToLatentsInvocation.vae_encode",
+        "invokeai.app.invocations.krea2.krea2_style_reference.QwenImageImageToLatentsInvocation.vae_encode",
         staticmethod(fake_vae_encode),
     )
-    monkeypatch.setattr("invokeai.app.invocations.krea2_style_reference.TorchDevice.empty_cache", lambda: None)
+    monkeypatch.setattr("invokeai.app.invocations.krea2.krea2_style_reference.TorchDevice.empty_cache", lambda: None)
     return encoded
 
 

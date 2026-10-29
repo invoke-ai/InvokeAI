@@ -9,6 +9,8 @@ from pydantic import BaseModel
 from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
+from invokeai.app.invocations.fields import ImageField, VideoField
+from invokeai.app.services.progress_previews.progress_previews_common import ProgressPreviewDTO
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
@@ -16,12 +18,19 @@ from invokeai.app.services.session_queue.session_queue_common import (
     CancelAllExceptCurrentResult,
     CancelByBatchIDsResult,
     CancelByDestinationResult,
+    CancelByQueueIDResult,
     ClearResult,
     DeleteAllExceptCurrentResult,
     DeleteByDestinationResult,
+    EnqueueBatchReceipt,
     EnqueueBatchResult,
+    EnqueueIdempotencyConflictError,
+    EnqueueProjectNotFoundError,
+    EnqueueReceiptLimitError,
     ItemIdsResult,
     PruneResult,
+    QueueItemDeliveryRequest,
+    QueueItemDeliveryResult,
     RetryItemsResult,
     SessionQueueCountsByDestination,
     SessionQueueItem,
@@ -30,14 +39,21 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueStatus,
 )
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import SQLiteDirection
+from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
+from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
+    CALIBRATION_ORIGIN_PREFIX,
+    CalibrationStoreError,
+    is_reserved_origin,
+)
 
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
 
 # Upper bound on the number of item ids a client may ask about in one request. Without it a
-# caller can post tens of thousands of ids, which the SQLite layer would either expand past the
-# per-statement bind limit or grind through in a long-running query. The list is meant to cover
-# the rows a client actually has on screen, so this is far above any legitimate use.
+# caller can post tens of thousands of ids and make the database grind through a long-running
+# query. The list is meant to cover the rows a client actually has on screen, so this is far
+# above any legitimate use. A limited id listing is capped at the same size, since its ids are
+# fetched to be hydrated that way.
 MAX_QUEUE_ITEM_IDS_PER_REQUEST = 1000
 
 
@@ -48,10 +64,109 @@ class SessionQueueAndProcessorStatus(BaseModel):
     processor: SessionProcessorStatus
 
 
+def _image_record_exists(image_name: str) -> bool:
+    return ApiDependencies.invoker.services.image_records.exists(image_name)
+
+
+def _video_record_exists(video_name: str) -> bool:
+    # video_records has no exists() the way image_records does, and widening that ABC would add
+    # divergence from upstream for no gain here — get() already answers the question.
+    try:
+        ApiDependencies.invoker.services.video_records.get(video_name)
+    except VideoRecordNotFoundException:
+        return False
+    return True
+
+
+def strip_missing_image_results(
+    queue_item: SessionQueueItem,
+    image_exists: Callable[[str], bool] | None = None,
+    video_exists: Callable[[str], bool] | None = None,
+) -> SessionQueueItem:
+    """Remove result outputs whose image or video records have been deleted.
+
+    Completed queue history can outlive its output media. API clients hydrate
+    images and videos listed in `session.results`; returning stale names makes them
+    loop on 404s. Keep the queue item/history, but do not advertise impossible outputs.
+    """
+    if not queue_item.session.results:
+        return queue_item
+
+    image_exists = image_exists or _image_record_exists
+    video_exists = video_exists or _video_record_exists
+    filtered_results = {}
+    did_filter = False
+    image_cache: dict[str, bool] = {}
+    video_cache: dict[str, bool] = {}
+
+    def media_field(item: object) -> ImageField | VideoField | None:
+        if isinstance(item, (ImageField, VideoField)):
+            return item
+        if isinstance(item, dict):
+            if isinstance(item.get("image_name"), str):
+                return ImageField.model_validate(item)
+            if isinstance(item.get("video_name"), str):
+                return VideoField.model_validate(item)
+        return None
+
+    def cached_exists(field: ImageField | VideoField) -> bool:
+        if isinstance(field, VideoField):
+            if field.video_name not in video_cache:
+                video_cache[field.video_name] = video_exists(field.video_name)
+            return video_cache[field.video_name]
+        if field.image_name not in image_cache:
+            image_cache[field.image_name] = image_exists(field.image_name)
+        return image_cache[field.image_name]
+
+    for node_id, output in queue_item.session.results.items():
+        image = output.get("image") if isinstance(output, dict) else getattr(output, "image", None)
+        image_field = media_field(image)
+        if isinstance(image_field, ImageField) and not cached_exists(image_field):
+            did_filter = True
+            continue
+
+        video = output.get("video") if isinstance(output, dict) else getattr(output, "video", None)
+        video_field = media_field(video)
+        if isinstance(video_field, VideoField) and not cached_exists(video_field):
+            did_filter = True
+            continue
+
+        collection = output.get("collection") if isinstance(output, dict) else getattr(output, "collection", None)
+        if isinstance(collection, list) and any(media_field(item) is not None for item in collection):
+            filtered_collection = [
+                item for item in collection if (field := media_field(item)) is None or cached_exists(field)
+            ]
+            if len(filtered_collection) != len(collection):
+                did_filter = True
+                if len(filtered_collection) == 0:
+                    continue
+                if isinstance(output, dict):
+                    output = {**output, "collection": filtered_collection}
+                else:
+                    output = output.model_copy(update={"collection": filtered_collection})
+
+        filtered_results[node_id] = output
+
+    if not did_filter:
+        return queue_item
+
+    sanitized_item = queue_item.model_copy(deep=True)
+    sanitized_item.session.results = filtered_results
+    return sanitized_item
+
+
 def _get_workflow_call_root_queue_item(queue_item: SessionQueueItem) -> SessionQueueItem:
     if queue_item.root_item_id is None:
         return queue_item
-    return ApiDependencies.invoker.services.session_queue.get_queue_item(queue_item.root_item_id)
+    return _get_queue_item_for_retry(queue_item.root_item_id)
+
+
+def _get_queue_item_for_retry(item_id: int) -> SessionQueueItem:
+    session_queue = ApiDependencies.invoker.services.session_queue
+    read_for_retry = getattr(session_queue, "_get_queue_item_for_retry", None)
+    if read_for_retry is not None:
+        return read_for_retry(item_id)
+    return session_queue.get_queue_item(item_id)
 
 
 # What a non-admin must not see on another user's queue item, and what each field is replaced
@@ -69,6 +184,7 @@ _REDACTIONS: dict[str, Callable[[], Any]] = {
     "user_id": lambda: "redacted",
     "user_display_name": lambda: None,
     "user_email": lambda: None,
+    "project_id": lambda: None,
     "batch_id": lambda: "redacted",
     "session_id": lambda: "redacted",
     "origin": lambda: None,
@@ -91,6 +207,15 @@ _REDACTIONS: dict[str, Callable[[], Any]] = {
 AnyQueueItem = TypeVar("AnyQueueItem", SessionQueueItem, SessionQueueItemSummary)
 
 
+def origin_owner(current_user: CurrentUserOrDefault, origin_prefix: Optional[str]) -> Optional[str]:
+    """The account an origin-scoped read is limited to: the caller's own, unless they are an admin.
+
+    A project's origin names one account's project, so another account's items under it are not part of it. Matching
+    the prefix against everyone's items would also let any caller probe, prefix by prefix, for other accounts' project
+    ids."""
+    return None if origin_prefix is None or current_user.is_admin else current_user.user_id
+
+
 def sanitize_queue_item_for_user(queue_item: AnyQueueItem, current_user_id: str, is_admin: bool) -> AnyQueueItem:
     """Sanitize a queue item, or a queue item summary, for a non-admin viewing another user's item.
 
@@ -107,6 +232,8 @@ def sanitize_queue_item_for_user(queue_item: AnyQueueItem, current_user_id: str,
     """
     # Admins and item owners can see everything
     if is_admin or queue_item.user_id == current_user_id:
+        if isinstance(queue_item, SessionQueueItem):
+            return strip_missing_image_results(queue_item)
         return queue_item
 
     updates = {
@@ -117,28 +244,97 @@ def sanitize_queue_item_for_user(queue_item: AnyQueueItem, current_user_id: str,
     return queue_item.model_copy(update=updates)
 
 
+def get_queue_item_for_mutation(queue_id: str, item_id: int, current_user: CurrentUserOrDefault) -> SessionQueueItem:
+    queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
+
+    if queue_item.queue_id != queue_id:
+        raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
+
+    if queue_item.user_id != current_user.user_id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail=f"You do not have permission to mutate queue item {item_id}")
+
+    return queue_item
+
+
 @session_queue_router.post(
     "/{queue_id}/enqueue_batch",
     operation_id="enqueue_batch",
     responses={
         201: {"model": EnqueueBatchResult},
+        400: {
+            "description": f"The batch's origin starts with '{CALIBRATION_ORIGIN_PREFIX}' (in any case), which is "
+            "reserved for working-memory calibration runs"
+        },
     },
 )
 async def enqueue_batch(
     current_user: CurrentUserOrDefault,
-    queue_id: str = Path(description="The queue id to perform this operation on"),
+    queue_id: str = Path(description="The queue id to perform this operation on", max_length=255),
     batch: Batch = Body(description="Batch to process"),
     prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
 ) -> EnqueueBatchResult:
     """Processes a batch and enqueues the output graphs for execution for the current user."""
+    # Calibration items are measured and admitted as such by the session runner; only the calibration route may
+    # create them, for administrators.
+    if is_reserved_origin(batch.origin):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Origins starting with '{CALIBRATION_ORIGIN_PREFIX}' are reserved for working-memory calibration "
+            "runs, which start through POST /api/v2/models/i/{key}/working_memory/calibrate.",
+        )
     await asyncio.to_thread(assert_image_move_maintenance_inactive)
 
     try:
         return await ApiDependencies.invoker.services.session_queue.enqueue_batch(
             queue_id=queue_id, batch=batch, prepend=prepend, user_id=current_user.user_id
         )
+    except EnqueueIdempotencyConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except EnqueueProjectNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except EnqueueReceiptLimitError as e:
+        raise HTTPException(status_code=429, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while enqueuing batch: {e}")
+
+
+@session_queue_router.post(
+    "/{queue_id}/enqueue_batch/acknowledge",
+    operation_id="acknowledge_enqueue_batch",
+    status_code=204,
+)
+def acknowledge_enqueue_batch(
+    current_user: CurrentUserOrDefault,
+    queue_id: str = Path(description="The queue id that accepted the batch"),
+    idempotency_key: str = Body(
+        description="The acknowledged enqueue retry key", embed=True, min_length=1, max_length=255
+    ),
+) -> None:
+    ApiDependencies.invoker.services.session_queue.acknowledge_enqueue(
+        queue_id=queue_id,
+        idempotency_key=idempotency_key,
+        user_id=current_user.user_id,
+    )
+
+
+@session_queue_router.get(
+    "/{queue_id}/enqueue_batch/receipt",
+    operation_id="get_enqueue_batch_receipt",
+    response_model=EnqueueBatchReceipt,
+)
+def get_enqueue_batch_receipt(
+    current_user: CurrentUserOrDefault,
+    queue_id: str = Path(description="The queue id that accepted the batch"),
+    idempotency_key: str = Query(description="The enqueue retry key", min_length=1, max_length=255),
+) -> EnqueueBatchReceipt:
+    receipt = ApiDependencies.invoker.services.session_queue.get_enqueue_receipt(
+        queue_id=queue_id,
+        idempotency_key=idempotency_key,
+        user_id=current_user.user_id,
+    )
+    if receipt is None:
+        raise HTTPException(status_code=404, detail="Enqueue receipt not found")
+    return receipt
 
 
 @session_queue_router.get(
@@ -155,7 +351,7 @@ def list_all_queue_items(
 ) -> list[SessionQueueItem]:
     """Gets all queue items"""
     try:
-        items = ApiDependencies.invoker.services.session_queue.list_all_queue_items(
+        items = ApiDependencies.invoker.services.session_queue.list_all_queue_items_for_api(
             queue_id=queue_id,
             destination=destination,
         )
@@ -176,10 +372,29 @@ def get_queue_item_ids(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
+    origin_prefix: Optional[str] = Query(
+        default=None,
+        description=(
+            "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own"
+            " items match"
+        ),
+    ),
+    limit: Optional[int] = Query(
+        default=None,
+        ge=1,
+        le=MAX_QUEUE_ITEM_IDS_PER_REQUEST,
+        description="Return at most this many ids, from the start of the requested order. Omit to return every matching id",
+    ),
 ) -> ItemIdsResult:
-    """Gets all queue item ids that match the given parameters.
+    """Gets the queue item ids that match the given parameters, ordered by creation time.
 
-    IDs for every user's items are returned (item ids carry no sensitive data on their own).
+    `total_count` is the number of ids in `item_ids`. Without `limit`, every matching id is returned, so it
+    equals the number of matching items. With `limit`, only the first `limit` ids of the same order are
+    returned, and it is not a total (counting every match would read the whole queue history); use the queue
+    status for totals.
+
+    Without `origin_prefix`, IDs for every user's items are returned (item ids carry no sensitive data on their
+    own); with it, a non-admin gets only their own.
     When the corresponding items are hydrated via get_queue_items_by_item_ids, those belonging
     to other users are redacted by sanitize_queue_item_for_user. This lets a non-admin see
     partially-redacted entries for other users' jobs in the queue list, while still revealing
@@ -188,7 +403,13 @@ def get_queue_item_ids(
     current_user is required so the endpoint stays behind authentication in multiuser mode.
     """
     try:
-        return ApiDependencies.invoker.services.session_queue.get_queue_item_ids(queue_id=queue_id, order_dir=order_dir)
+        return ApiDependencies.invoker.services.session_queue.get_queue_item_ids(
+            queue_id=queue_id,
+            order_dir=order_dir,
+            owner_id=origin_owner(current_user, origin_prefix),
+            origin_prefix=origin_prefix,
+            limit=limit,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while listing all queue item ids: {e}")
 
@@ -220,7 +441,7 @@ def get_queue_items_by_item_ids(
         queue_items: list[SessionQueueItem] = []
         for item_id in item_ids:
             try:
-                queue_item = session_queue_service.get_queue_item(item_id=item_id)
+                queue_item = session_queue_service.get_queue_item_for_api(item_id=item_id)
                 if queue_item.queue_id != queue_id:  # Auth protection for items from other queues
                     continue
                 # Sanitize item for non-admin users
@@ -299,16 +520,42 @@ def pause(
 def cancel_all_except_current(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
+    origin_prefix: Optional[str] = Query(
+        default=None, description="Only cancel queue items whose origin starts with this prefix"
+    ),
 ) -> CancelAllExceptCurrentResult:
     """Immediately cancels all queue items except in-processing items. Non-admin users can only cancel their own items."""
     try:
         # Admin users can cancel all items, non-admin users can only cancel their own
         user_id = None if current_user.is_admin else current_user.user_id
         return ApiDependencies.invoker.services.session_queue.cancel_all_except_current(
-            queue_id=queue_id, user_id=user_id
+            queue_id=queue_id, user_id=user_id, origin_prefix=origin_prefix
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while canceling all except current: {e}")
+
+
+@session_queue_router.put(
+    "/{queue_id}/cancel_all",
+    operation_id="cancel_all",
+    responses={200: {"model": CancelByQueueIDResult}},
+)
+def cancel_all(
+    current_user: CurrentUserOrDefault,
+    queue_id: str = Path(description="The queue id to perform this operation on"),
+    origin_prefix: Optional[str] = Query(
+        default=None, description="Only cancel queue items whose origin starts with this prefix"
+    ),
+) -> CancelByQueueIDResult:
+    """Immediately cancels all queue items, in-progress items included. Non-admin users can only cancel their own items."""
+    try:
+        # Admin users can cancel all items, non-admin users can only cancel their own
+        user_id = None if current_user.is_admin else current_user.user_id
+        return ApiDependencies.invoker.services.session_queue.cancel_by_queue_id(
+            queue_id=queue_id, user_id=user_id, origin_prefix=origin_prefix
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error while canceling all: {e}")
 
 
 @session_queue_router.put(
@@ -376,14 +623,23 @@ def cancel_by_destination(
 @session_queue_router.put(
     "/{queue_id}/retry_items_by_id",
     operation_id="retry_items_by_id",
-    responses={200: {"model": RetryItemsResult}},
+    responses={
+        200: {"model": RetryItemsResult},
+        503: {
+            "description": "The items include a working-memory calibration's, and its store cannot be written now "
+            "(unwritable root, lock timeout): no item is retried, the request's other items included"
+        },
+    },
 )
 def retry_items_by_id(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_ids: list[int] = Body(description="The queue item ids to retry"),
 ) -> RetryItemsResult:
-    """Retries the given queue items. Users can only retry their own items unless they are an admin."""
+    """Retries the given queue items. Users can only retry their own items unless they are an admin.
+
+    A calibration item's retry is recorded in the calibration store as it commits. When that store cannot be written,
+    the request retries nothing, also its items that are no calibration's (503); retry again once it can."""
     try:
         # Check queue membership for all items and ownership for non-admins.
         valid_item_ids: list[int] = []
@@ -413,6 +669,12 @@ def retry_items_by_id(
         )
     except HTTPException:
         raise
+    except CalibrationStoreError:
+        # The error names the store's path on the server.
+        raise HTTPException(
+            status_code=503,
+            detail="The working-memory calibration store cannot be written now, so no item was retried. Try again.",
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while retrying queue items: {e}")
 
@@ -474,15 +736,46 @@ def prune(
 def get_current_queue_item(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
+    origin_prefix: Optional[str] = Query(
+        default=None,
+        description=(
+            "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own"
+            " items match"
+        ),
+    ),
 ) -> Optional[SessionQueueItem]:
     """Gets the currently execution queue item"""
     try:
-        item = ApiDependencies.invoker.services.session_queue.get_current(queue_id)
+        item = ApiDependencies.invoker.services.session_queue.get_current_for_api(
+            queue_id, origin_prefix=origin_prefix, owner_id=origin_owner(current_user, origin_prefix)
+        )
         if item is not None:
             item = sanitize_queue_item_for_user(item, current_user.user_id, current_user.is_admin)
         return item
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while getting current queue item: {e}")
+
+
+@session_queue_router.get(
+    "/{queue_id}/previews",
+    operation_id="get_progress_previews",
+    responses={
+        200: {"model": list[ProgressPreviewDTO]},
+    },
+)
+def get_progress_previews(
+    current_user: CurrentUserOrDefault,
+    queue_id: str = Path(description="The queue id to perform this operation on"),
+) -> list[ProgressPreviewDTO]:
+    """The latest denoising preview frame of each of the caller's running queue items: the same
+    payloads as the `invocation_progress` socket events, with their revisions. A client whose socket
+    was dropped, or whose tab was hidden, reconciles from this instead of waiting for the next step.
+    Owner-scoped: progress is personal UI, so even admins see only their own."""
+    try:
+        previews = ApiDependencies.invoker.services.progress_previews.list_for_user(current_user.user_id, queue_id)
+        return [ProgressPreviewDTO.from_event(event) for event in previews]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error while getting progress previews: {e}")
 
 
 @session_queue_router.get(
@@ -495,10 +788,19 @@ def get_current_queue_item(
 def get_next_queue_item(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
+    origin_prefix: Optional[str] = Query(
+        default=None,
+        description=(
+            "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own"
+            " items match"
+        ),
+    ),
 ) -> Optional[SessionQueueItem]:
     """Gets the next queue item, without executing it"""
     try:
-        item = ApiDependencies.invoker.services.session_queue.get_next(queue_id)
+        item = ApiDependencies.invoker.services.session_queue.get_next_for_api(
+            queue_id, origin_prefix=origin_prefix, owner_id=origin_owner(current_user, origin_prefix)
+        )
         if item is not None:
             item = sanitize_queue_item_for_user(item, current_user.user_id, current_user.is_admin)
         return item
@@ -516,14 +818,26 @@ def get_next_queue_item(
 def get_queue_status(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
+    origin_prefix: Optional[str] = Query(
+        default=None,
+        description=(
+            "Only include queue items whose origin starts with this prefix. For a non-admin caller, only their own"
+            " items match"
+        ),
+    ),
 ) -> SessionQueueAndProcessorStatus:
-    """Gets the status of the session queue. Returns global counts; every user additionally gets
-    their own pending/in_progress counts (so the UI can show an X/Y badge and scope personal UI
-    like the progress bar to the user's own activity). Non-admin users cannot see the current
-    item's identifiers unless they own it."""
+    """Gets the status of the session queue. Returns global counts (a non-admin's counts are their own when
+    `origin_prefix` is given); every user additionally gets their own pending/in_progress counts (so the UI
+    can show an X/Y badge and scope personal UI like the progress bar to the user's own activity). Non-admin
+    users cannot see the current item's identifiers unless they own it."""
     try:
         queue = ApiDependencies.invoker.services.session_queue.get_queue_status(
-            queue_id, user_id=current_user.user_id, is_admin=current_user.is_admin
+            queue_id,
+            user_id=current_user.user_id,
+            acting_user_id=current_user.user_id,
+            origin_prefix=origin_prefix,
+            is_admin=current_user.is_admin,
+            owner_id=origin_owner(current_user, origin_prefix),
         )
         processor = ApiDependencies.invoker.services.session_processor.get_status()
         return SessionQueueAndProcessorStatus(queue=queue, processor=processor)
@@ -568,7 +882,7 @@ def get_queue_item(
 ) -> SessionQueueItem:
     """Gets a queue item"""
     try:
-        queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id=item_id)
+        queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item_for_api(item_id=item_id)
         if queue_item.queue_id != queue_id:
             raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
         # Sanitize item for non-admin users
@@ -626,14 +940,7 @@ def cancel_queue_item(
 ) -> SessionQueueItem:
     """Cancels a queue item. Users can only cancel their own items unless they are an admin."""
     try:
-        # Get the queue item to check ownership
-        queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
-        if queue_item.queue_id != queue_id:
-            raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
-
-        # Check authorization: user must own the item or be an admin
-        if queue_item.user_id != current_user.user_id and not current_user.is_admin:
-            raise HTTPException(status_code=403, detail="You do not have permission to cancel this queue item")
+        get_queue_item_for_mutation(queue_id, item_id, current_user)
 
         return ApiDependencies.invoker.services.session_queue.cancel_queue_item(item_id)
     except SessionQueueItemNotFoundError:
@@ -642,6 +949,40 @@ def cancel_queue_item(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while canceling queue item: {e}")
+
+
+@session_queue_router.post(
+    "/{queue_id}/i/{item_id}/delivery",
+    operation_id="claim_queue_item_delivery",
+    response_model=QueueItemDeliveryResult,
+)
+def claim_queue_item_delivery(
+    current_user: CurrentUserOrDefault,
+    queue_id: str = Path(description="The queue id to perform this operation on"),
+    item_id: int = Path(description="The queue item whose results are delivered"),
+    request: QueueItemDeliveryRequest = Body(description="The delivery change"),
+) -> QueueItemDeliveryResult:
+    """Claims, confirms or releases staging a queue item's results, so that only one of its owner's browsers stages
+    them. A claim is held for a while unless confirmed, released or renewed."""
+    session_queue = ApiDependencies.invoker.services.session_queue
+    try:
+        # Waiting browsers ask often: authorize by the item's owner alone, without reading its session.
+        owner = session_queue.get_queue_item_owner(item_id)
+        if owner.queue_id != queue_id:
+            raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
+        if owner.user_id != current_user.user_id and not current_user.is_admin:
+            raise HTTPException(status_code=403, detail=f"You do not have permission to mutate queue item {item_id}")
+        if request.action == "claim":
+            return session_queue.claim_queue_item_delivery(item_id, request.claimant)
+        if request.action == "confirm":
+            return session_queue.confirm_queue_item_delivery(item_id)
+        return session_queue.release_queue_item_delivery(item_id, request.claimant)
+    except SessionQueueItemNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error while changing queue item delivery: {e}")
 
 
 @session_queue_router.get(

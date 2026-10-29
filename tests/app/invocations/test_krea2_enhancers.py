@@ -12,15 +12,19 @@ import pytest
 import torch
 
 from invokeai.app.invocations.fields import Krea2ConditioningField, TensorField
-from invokeai.app.invocations.krea2_conditioning_rebalance import Krea2ConditioningRebalanceInvocation
-from invokeai.app.invocations.krea2_seed_variance import Krea2SeedVarianceInvocation
+from invokeai.app.invocations.krea2.krea2_conditioning_rebalance import Krea2ConditioningRebalanceInvocation
+from invokeai.app.invocations.krea2.krea2_seed_variance import Krea2SeedVarianceInvocation
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, Krea2ConditioningInfo
 
 
-def _make_context(embeds: torch.Tensor, saved: dict) -> SimpleNamespace:
+def _make_context(embeds: torch.Tensor, saved: dict, num_reference_images: int = 0) -> SimpleNamespace:
     def load(_name: str) -> ConditioningFieldData:
         return ConditioningFieldData(
-            conditionings=[Krea2ConditioningInfo(prompt_embeds=embeds, prompt_embeds_mask=None)]
+            conditionings=[
+                Krea2ConditioningInfo(
+                    prompt_embeds=embeds, prompt_embeds_mask=None, num_reference_images=num_reference_images
+                )
+            ]
         )
 
     def save(data: ConditioningFieldData) -> str:
@@ -252,3 +256,29 @@ def test_seed_variance_preserves_the_regional_mask_when_enabled() -> None:
     output = invocation.invoke(_make_context(_ramp_embeds(), {}))
 
     assert output.conditioning.mask == regional_mask
+
+
+@pytest.mark.parametrize(
+    "invocation",
+    [
+        Krea2ConditioningRebalanceInvocation.model_construct(
+            conditioning=Krea2ConditioningField(conditioning_name="c"),
+            per_layer_weights=",".join(["1.0"] * 12),
+            multiplier=2.0,
+        ),
+        Krea2SeedVarianceInvocation.model_construct(
+            conditioning=Krea2ConditioningField(conditioning_name="c"),
+            strength=0.5,
+            randomize_percent=50.0,
+            variance_seed=3,
+        ),
+    ],
+    ids=["rebalance", "seed_variance"],
+)
+def test_the_enhancers_keep_the_reference_image_count(invocation) -> None:
+    """The denoise checks the count against its reference latents; an enhancer in between must not reset it."""
+    saved: dict = {}
+
+    invocation.invoke(_make_context(_ramp_embeds(), saved, num_reference_images=2))
+
+    assert saved["data"].conditionings[0].num_reference_images == 2

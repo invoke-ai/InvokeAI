@@ -1,0 +1,61 @@
+---
+title: Google Gemini
+---
+
+import { Steps } from '@astrojs/starlight/components'
+
+Invoke supports Google's Gemini image generation models through the Gemini API. This provider is a good fit if you want high-quality text-to-image and reference-based image edits without running a local model.
+
+## Getting an API Key
+
+<Steps>
+1. Open [Google AI Studio](https://aistudio.google.com/) and sign in with your Google account.
+2. Generate a new API key.
+3. Note the key — it will only be shown once.
+</Steps>
+
+## Configuration
+
+Add your key to `api_keys.yaml` in your Invoke root directory:
+
+```yaml
+external_gemini_api_key: "your-gemini-api-key"
+
+# Optional — only set this if you need to route requests through a different endpoint
+external_gemini_base_url: "https://generativelanguage.googleapis.com"
+```
+
+Restart Invoke for the change to take effect.
+
+## Available Models
+
+| Model | Modes | Reference Images | Notes |
+| --- | --- | --- | --- |
+| **Gemini 2.5 Flash Image** | txt2img | Yes | 10 aspect ratios, fixed per-ratio resolutions. |
+| **Gemini 3 Pro Image Preview** | txt2img | Up to 14 (6 object + 5 character) | 1K / 2K / 4K resolution presets. |
+| **Gemini 3.1 Flash Image Preview** | txt2img | Up to 14 (10 object + 4 character) | 512 / 1K / 2K / 4K resolution presets. |
+
+Reference-image input is used to condition generation but counts as txt2img — neither img2img (denoising strength) nor inpaint (mask) is supported for Gemini.
+
+All Gemini models are single-image-per-request — batch size is fixed at 1. To generate multiple variations, queue multiple invocations.
+
+## Provider-Specific Options
+
+Selecting a Gemini model adds a **Provider options** section to the Generate panel:
+
+- **Temperature** — Override the sampling temperature (0–2; the provider default is 1).
+- **Thinking level** — `minimal` or `high`, or the provider default.
+
+Gemini 3 models list their resolution presets under **Provider size** in the Size section. Picking one sets the width and height to the preset and sends its named size (`1K`, `2K`, `4K`) to the API. The named size and the sampling options are recorded in the image metadata and restored by **Recall All** and **Remix**.
+
+## Canvas
+
+Gemini models generate only from text, so on the Canvas the bounding box must be free of raster content: hide raster layers or move their content out of the box to generate. Invoke asks for the size whose aspect ratio is closest to the bounding box's; for Gemini 3 that is the smallest named size covering the box at that ratio, such as `2K` for a 2000×2000 box. The result is scaled to cover the bounding box and cropped to it from the center, so it is never stretched.
+
+## Tips
+
+<Steps>
+1. Reference images are sent directly to the API as inlined PNG data. Large references increase request latency and cost — crop tightly where possible.
+2. Aspect ratios are mapped to the closest Gemini-supported ratio. For Gemini 3 models, use the resolution presets to stay at the provider's native output sizes and avoid unnecessary rescaling.
+3. Pricing varies by model and region. Check Google's documentation before running large batches.
+</Steps>

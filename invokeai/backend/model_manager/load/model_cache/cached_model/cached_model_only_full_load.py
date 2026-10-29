@@ -3,7 +3,9 @@ from typing import Any
 
 import torch
 
+from invokeai.backend.model_manager.load.model_cache.counted_dtypes import return_to_counted_dtypes
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
+from invokeai.backend.model_manager.load.model_cache.tensor_aliases import StorageKey, analyze_state_dict, storage_key
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 
 
@@ -43,6 +45,19 @@ class CachedModelOnlyFullLoad:
         self._shared_store: SharedCpuWeightsStore | None = None
         self._shared_key: str | None = None
         self._shared_release_finalizer: weakref.finalize | None = None
+
+        # The keys of every tied weight, so a device change can re-point them at one tensor (see
+        # `_retie_shared_weights`). Empty for models that are not `nn.Module`s and for the usual untied ones.
+        self._alias_groups: dict[str, tuple[str, ...]] = (
+            analyze_state_dict(model.state_dict()).groups if isinstance(model, torch.nn.Module) else {}
+        )
+        # The dtype the cache counted each weight in, which the last unlock returns weights a holder cast in place to
+        # (see `restore_counted_dtypes`). None for models that are not `nn.Module`s.
+        self._counted_dtypes: dict[str, torch.dtype] | None = (
+            {key: tensor.dtype for key, tensor in model.state_dict().items()}
+            if isinstance(model, torch.nn.Module)
+            else None
+        )
 
         # A CPU read-only copy of the model's state dict.
         self._cpu_state_dict: dict[str, torch.Tensor] | None = None
@@ -153,9 +168,15 @@ class CachedModelOnlyFullLoad:
             return 0
 
         if self._cpu_state_dict is not None:
+            # Tied weights appear under several keys; copying each name on its own would put two copies on the device
+            # and untie them (see `tensor_aliases`).
+            copied: dict[StorageKey, torch.Tensor] = {}
             new_state_dict: dict[str, torch.Tensor] = {}
             for k, v in self._cpu_state_dict.items():
-                new_state_dict[k] = v.to(self._compute_device, copy=True)
+                key = storage_key(v)
+                if key not in copied:
+                    copied[key] = v.to(self._compute_device, copy=True)
+                new_state_dict[k] = copied[key]
             self._model.load_state_dict(new_state_dict, assign=True)
 
         check_for_gguf = hasattr(self._model, "state_dict") and self._model.state_dict().get("img_in.weight")
@@ -167,6 +188,7 @@ class CachedModelOnlyFullLoad:
         else:
             self._model.to(self._compute_device)
 
+        self._retie_shared_weights()
         self._is_in_vram = True
         return self._total_bytes
 
@@ -180,6 +202,7 @@ class CachedModelOnlyFullLoad:
             return 0
 
         if self._cpu_state_dict is not None:
+            # The RAM copy still has its tied names pointing at one tensor, so this restores the tie as well.
             self._model.load_state_dict(self._cpu_state_dict, assign=True)
 
         check_for_gguf = hasattr(self._model, "state_dict") and self._model.state_dict().get("img_in.weight")
@@ -191,5 +214,32 @@ class CachedModelOnlyFullLoad:
         else:
             self._model.to(self._offload_device)
 
+        self._retie_shared_weights()
         self._is_in_vram = False
         return self._total_bytes
+
+    def restore_counted_dtypes(self) -> None:
+        """Return every weight a holder cast in place to the dtype the cache counts it in.
+
+        The cache calls this when the last lock ends (see `ModelCache._unpin`); see `return_to_counted_dtypes`. The
+        cache charges the model `total_bytes` in RAM and as the room it makes in VRAM, and a `cpu_only` model is never
+        moved, so nothing else would put it back.
+        """
+        if self._counted_dtypes is not None:
+            return_to_counted_dtypes(self._model, self._counted_dtypes, self._alias_groups, self._cpu_state_dict)
+
+    def _retie_shared_weights(self) -> None:
+        """Re-point the names of a tied weight at one tensor after a device change.
+
+        `nn.Module.to()` copies each module's parameters with no memo across the modules that share one, so a tied
+        weight arrives as two tensors -- twice the memory, and writes through one name no longer visible through the
+        other. Only the `keep_ram_copy=False` path goes through `.to()` for the weights; with a RAM copy the state
+        dict is moved above, one copy per distinct tensor, and never splits. Dropping the duplicate here keeps its
+        cost to the move itself rather than for as long as the model is resident.
+        """
+        if not self._alias_groups:
+            return
+        state_dict = self._model.state_dict()
+        self._model.load_state_dict(
+            {key: state_dict[group[0]] for key, group in self._alias_groups.items()}, strict=False, assign=True
+        )

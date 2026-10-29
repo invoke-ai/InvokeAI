@@ -5,7 +5,7 @@ import torch
 from PIL.Image import Image
 
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
-from invokeai.app.invocations.flux_vae_encode import FluxVaeEncodeInvocation
+from invokeai.app.invocations.vae.flux_vae_encode import FluxVaeEncodeInvocation
 from invokeai.app.util.controlnet_utils import CONTROLNET_RESIZE_VALUES, prepare_control_image
 from invokeai.backend.flux.controlnet.controlnet_flux_output import ControlNetFluxOutput
 from invokeai.backend.flux.controlnet.instantx_controlnet_flux import (

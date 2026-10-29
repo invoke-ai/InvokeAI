@@ -1,16 +1,18 @@
+import copy
 import gc
 import time
 import traceback
-from contextlib import contextmanager, suppress
+from contextlib import contextmanager, nullcontext, suppress
 from threading import BoundedSemaphore, Thread
 from threading import Event as ThreadEvent
-from typing import Iterator, Optional
+from typing import Callable, Iterator, Literal, Optional
 
 import torch
 from starlette.concurrency import run_in_threadpool
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
+from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.events.events_common import (
     BatchEnqueuedEvent,
     FastAPIEvent,
@@ -21,6 +23,7 @@ from invokeai.app.services.events.events_common import (
 )
 from invokeai.app.services.invocation_stats.invocation_stats_common import GESStatsNotFoundError
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.session_processor.architecture_switch import ArchitectureSwitchOffload
 from invokeai.app.services.session_processor.session_processor_base import (
     InvocationServices,
     OnAfterRunNode,
@@ -37,12 +40,26 @@ from invokeai.app.services.session_processor.workflow_call_runtime import (
     WorkflowCallCoordinator,
     WorkflowCallQueueLifecycle,
 )
-from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem, SessionQueueItemNotFoundError
+from invokeai.app.services.session_queue.session_queue_common import (
+    SessionQueueItem,
+    SessionQueueItemChangedError,
+    SessionQueueItemNotFoundError,
+)
 from invokeai.app.services.shared.graph import CollectInvocation, IterateInvocation, NodeInputError
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
+from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import calibration_run_id
 from invokeai.app.util.profiler import Profiler
-from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
-from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.device_pool import (
+    GENERATION_DEVICE_POOL,
+    idle_device_borrowed,
+)
+from invokeai.backend.util.devices import TorchDevice, disable_conv_benchmark_empty_cache
+from invokeai.backend.util.wddm import paged_bytes
+from invokeai.backend.working_memory import probe
+
+# Paged-out VRAM worth a warning. Weight uploads page a few hundred MB for an instant (0.25-0.36 GiB measured on an
+# RX 9060 XT), so the threshold sits above that; a session that ends with more than this paged has lost real VRAM.
+_VRAM_PAGING_WARNING_BYTES = 512 * 2**20
 
 # A failed owner lookup is retried before the item is refused, so that a transient error
 # — a busy-timeout on the shared SQLite connection under multi-GPU write contention, say —
@@ -50,6 +67,27 @@ from invokeai.backend.util.devices import TorchDevice
 # wait between attempts blocks nothing else.
 OWNER_LOOKUP_ATTEMPTS = 3
 OWNER_LOOKUP_RETRY_SECONDS = 0.25
+
+# How long `DefaultSessionProcessor.stop` waits, in all, for its workers to leave their sessions. A node that checks for
+# cancellation stops within one step; the bound also covers most nodes without such a check (a large VAE decode), and
+# keeps a node that never returns from holding up shutdown for good.
+WORKER_STOP_TIMEOUT_SECONDS = 30.0
+# After this long, `stop` says which worker it is waiting for: the wait runs on the event-loop thread at shutdown.
+WORKER_STOP_NOTICE_SECONDS = 1.0
+
+# Workers a stop gave up on. Process-wide, like the device pool whose locks they may still hold: no processor of this
+# process starts, and none replaces the pool, while one of them runs.
+_abandoned_workers: list[Thread] = []
+
+
+def refuse_while_an_abandoned_worker_runs() -> None:
+    """Raise RuntimeError while a worker an earlier `DefaultSessionProcessor.stop` gave up on still runs."""
+    _abandoned_workers[:] = [thread for thread in _abandoned_workers if thread.is_alive()]
+    if _abandoned_workers:
+        raise RuntimeError(
+            f"Session worker {', '.join(thread.name for thread in _abandoned_workers)} of the previous session "
+            "processor is still running a node; it would share its GPU with the new workers. Restart the process."
+        )
 
 
 def queue_owner_is_active(
@@ -123,25 +161,6 @@ def queue_owner_is_active(
     return False
 
 
-def _set_torch_current_device(device: torch.device) -> None:
-    """Mirror a session-device pin onto torch's per-thread current device.
-
-    CUDA and XPU both track a current device per thread, and index-less allocations
-    (e.g. ``torch.zeros(2, device="xpu")``) resolve through it. Setting only the
-    session device would leave such allocations on whichever GPU the thread was last
-    pinned to -- for a borrowed idle GPU, that is the busy denoise device the offload
-    exists to protect.
-
-    Availability is checked first, mirroring TorchDevice.normalize: generation devices
-    can be configured (or, in tests, faked) for a backend this process cannot actually
-    initialise, and set_device would then fail or block on backend init.
-    """
-    if device.type == "cuda" and torch.cuda.is_available():
-        torch.cuda.set_device(device)
-    elif device.type == "xpu" and hasattr(torch, "xpu") and torch.xpu.is_available():
-        torch.xpu.set_device(device)
-
-
 class DefaultSessionRunner(SessionRunnerBase):
     """Processes a single session's invocations."""
 
@@ -169,6 +188,16 @@ class DefaultSessionRunner(SessionRunnerBase):
         self._on_after_run_session_callbacks = on_after_run_session_callbacks or []
         self.workflow_call_coordinator = WorkflowCallCoordinator(self)
         self.workflow_call_queue_lifecycle = WorkflowCallQueueLifecycle(self)
+        # Per runner, hence per worker and device: each worker remembers the architecture it last ran.
+        self._architecture_switch = ArchitectureSwitchOffload()
+        # The calibration run of the item this runner is executing, None for every other item.
+        self._calibration_run_id: Optional[str] = None
+        # What the outcome hooks last reported: `run_node` swallows a node's failure or cancellation, and a calibration
+        # node must not keep valid measurements then.
+        self._node_outcome: Optional[Literal["completed", "failed"]] = None
+        # The item as the queue left it in the last `_on_after_run_session`, taken before its statistics and callbacks
+        # run (None when the queue no longer had it): a calibration item's outcome, also when one of those raised.
+        self._settled_item: Optional[SessionQueueItem] = None
 
     def start(self, services: InvocationServices, cancel_event: ThreadEvent, profiler: Optional[Profiler] = None):
         self._services = services
@@ -207,18 +236,19 @@ class DefaultSessionRunner(SessionRunnerBase):
             if self._cancel_if_owner_revoked(queue_item):
                 break
 
-            self.run_node(invocation, queue_item)
+            if self._calibration_run_id is None:
+                self.run_node(invocation, queue_item)
+            elif not self._run_calibration_node(invocation, queue_item, self._calibration_run_id):
+                break
 
             # The session is complete if all invocations have been run or there is an error on the session.
             # At this time, the queue item may be canceled, but the object itself here won't be updated yet. We must
             # use the cancel event to check if the session is canceled.
             session_finished = queue_item.session.is_complete()
             already_terminal = self._is_canceled() or queue_item.status in ["failed", "canceled", "completed"]
-            if session_finished or already_terminal:
-                # Last pass, so the check at the top will not run again — which leaves the
-                # node that just ran, the only node of a one-node graph, as the one node
-                # nothing re-checks. A revocation committed while it executed would
-                # otherwise let the item be recorded as completed.
+            if session_finished:
+                # Re-check ownership after the final node. The next pass still lets the scheduler
+                # materialize any downstream node that became ready while finalizing a loop.
                 #
                 # Deliberately narrow, because after a node the balance is the reverse of
                 # what it is before one: there is no execution left to refuse, only a
@@ -229,7 +259,12 @@ class DefaultSessionRunner(SessionRunnerBase):
                 # A suspended workflow call is not `is_complete()`, so it is untouched here
                 # and re-checked when the parent resumes.
                 if session_finished and not already_terminal and not queue_item.session.has_error():
-                    self._cancel_if_owner_revoked(queue_item, unreadable_is_active=True)
+                    if self._cancel_if_owner_revoked(queue_item, unreadable_is_active=True):
+                        break
+                if not already_terminal:
+                    continue
+
+            if already_terminal:
                 break
 
     def _cancel_if_owner_revoked(self, queue_item: SessionQueueItem, *, unreadable_is_active: bool = False) -> bool:
@@ -240,16 +275,176 @@ class DefaultSessionRunner(SessionRunnerBase):
             f"Canceling queue item {queue_item.item_id}: owner {queue_item.user_id} is deactivated, "
             "deleted, or could not be verified"
         )
+        # A copy for the queue to update: the session loop's own item keeps the status it had.
+        canceling = copy.copy(queue_item)
         with suppress(SessionQueueItemNotFoundError):
-            self._services.session_queue.cancel_queue_item(queue_item.item_id)
+            self._settle(
+                queue_item.item_id,
+                lambda: self._services.session_queue.cancel_queue_item(queue_item.item_id, queue_item=canceling),
+                queue_item=canceling,
+            )
         return True
+
+    def _settle(
+        self,
+        item_id: int,
+        transition: Callable[[], SessionQueueItem],
+        *,
+        queue_item: Optional[SessionQueueItem] = None,
+    ) -> SessionQueueItem:
+        """Run a terminal queue transition of the item and keep the item it returned in `_settled_item`: a calibration
+        item's outcome, should the queue prune or clear the item before the runner records it. The queue announces a
+        transition after committing it and updating a supplied `queue_item`. Keep that snapshot if the announcement
+        raises and the transition moved it to a final status, even if the row was pruned meanwhile; otherwise read the
+        row back while it still exists."""
+        status_before = None if queue_item is None else queue_item.status
+        try:
+            settled = transition()
+        except Exception as error:
+            if (
+                queue_item is not None
+                and queue_item.status != status_before
+                and queue_item.status in ("completed", "failed", "canceled")
+            ):
+                self._settled_item = queue_item
+            elif not isinstance(error, SessionQueueItemNotFoundError):
+                with suppress(Exception):
+                    current = self._services.session_queue.get_queue_item(item_id)
+                    if current.status in ("completed", "failed", "canceled"):
+                        self._settled_item = current
+            raise
+        self._settled_item = settled
+        return settled
 
     def run(self, queue_item: SessionQueueItem):
         # Exceptions raised outside `run_node` are handled by the processor. There is no need to catch them here.
 
+        self._refresh_user_fits()
+        # getattr, like the workflow-call lifecycle's reads: runners also execute stand-in items without an origin.
+        run_id = calibration_run_id(getattr(queue_item, "origin", None))
+        if run_id is not None:
+            self._run_calibration_item(queue_item, run_id)
+            return
         self._on_before_run_session(queue_item=queue_item)
         self._run_session_loop(queue_item)
         self._on_after_run_session(queue_item=queue_item)
+
+    def _refresh_user_fits(self) -> None:
+        """Let this item's estimates read the calibration store as it is now: once per item, never per estimate."""
+        # getattr: stand-in service containers that runners execute with need not carry the calibration service.
+        service = getattr(self._services, "working_memory_calibration", None)
+        if service is None:
+            return
+        try:
+            service.refresh_user_fits()
+        except Exception:
+            # The fits read so far stay in force; a store that cannot be read must not fail a generation.
+            self._services.logger.warning("Could not refresh the working-memory user fits", exc_info=True)
+
+    def _run_calibration_item(self, queue_item: SessionQueueItem, run_id: str) -> None:
+        """Run a working-memory calibration item, measuring each node (see `working_memory.probe`).
+
+        The item is admitted again here, whatever admitted it to the queue -- a retry and a workflow-call child carry
+        the origin and owner of the item they came from: its owner must still be an administrator, the machine must
+        still calibrate on one GPU, and its run must still exist. Otherwise it fails before any node runs.
+        """
+        service = self._services.working_memory_calibration
+        raised: Optional[BaseException] = None
+        # The item as the queue left it after the session (`_settled_item`): once the item is gone, only the runner can
+        # tell a prune of a finished item (completed, failed or canceled) from a clear that removed it before it
+        # finished.
+        self._settled_item = None
+        try:
+            try:
+                refusal = (
+                    "Working-memory calibration is not available in this process."
+                    if service is None
+                    else service.admit(queue_item, run_id)
+                )
+            except Exception as error:
+                self._services.logger.warning(f"Could not admit calibration item {queue_item.item_id}", exc_info=True)
+                refusal = f"Could not admit the calibration item: {error}"
+            if refusal is not None:
+                self._services.logger.warning(f"Failing calibration item {queue_item.item_id}: {refusal}")
+                failing = copy.copy(queue_item)
+                with suppress(SessionQueueItemNotFoundError):
+                    self._settle(
+                        queue_item.item_id,
+                        lambda: self._services.session_queue.fail_queue_item(
+                            queue_item.item_id, "WorkingMemoryCalibrationError", refusal, refusal, queue_item=failing
+                        ),
+                        queue_item=failing,
+                    )
+                return
+            self._calibration_run_id = run_id
+            try:
+                self._on_before_run_session(queue_item=queue_item)
+                self._run_session_loop(queue_item)
+                self._on_after_run_session(queue_item=queue_item)
+            finally:
+                self._calibration_run_id = None
+        except BaseException as error:
+            raised = error
+            raise
+        finally:
+            # Also when the session raised: `admit` recorded the item as running, and only this replaces that.
+            if service is not None:
+                try:
+                    service.observe(queue_item, run_id, raised, self._settled_item)
+                except Exception:
+                    self._services.logger.warning(
+                        f"Could not record the outcome of calibration item {queue_item.item_id}", exc_info=True
+                    )
+
+    def _run_calibration_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem, run_id: str) -> bool:
+        """Run one node of a calibration item inside a probe scope and persist its windows, whether the node completed,
+        failed or was canceled; unless it completed, they are persisted invalid. Returns False when they could not be
+        persisted: the item has failed then."""
+        service = self._services.working_memory_calibration
+        try:
+            assert service is not None
+            # Read before the node runs: a model reset while it runs removes points these windows must not bring back.
+            model_reset_epochs = service.model_reset_epochs(run_id)
+        except Exception as error:
+            return self._fail_calibration_node(invocation, queue_item, error)
+        with probe.calibration_scope(
+            run_id=run_id,
+            queue_item_id=queue_item.item_id,
+            # The source id: what the client that built the graph knows the node by.
+            node_id=queue_item.session.prepared_source_mapping.get(invocation.id, invocation.id),
+            node_type=invocation.get_type(),
+        ) as scope:
+            self._node_outcome = None
+            self.run_node(invocation, queue_item)
+            if self._node_outcome != "completed":
+                # A node that neither completed nor failed was canceled: `run_node` passes over a CanceledException.
+                scope.invalidate("exception" if self._node_outcome == "failed" else "canceled")
+        if not scope.windows:
+            return True
+        try:
+            service.record_windows(run_id, scope.windows, model_reset_epochs)
+        except Exception as error:
+            return self._fail_calibration_node(invocation, queue_item, error)
+        return True
+
+    def _fail_calibration_node(
+        self, invocation: BaseInvocation, queue_item: SessionQueueItem, error: Exception
+    ) -> bool:
+        """Fail the item whose node's measurements cannot be saved. Call from the `except` block (for the traceback)."""
+        message = f"Could not save the working-memory measurements of node {invocation.id}: {error}"
+        self._services.logger.error(message, exc_info=True)
+        details = traceback.format_exc()
+        # A copy for the queue to update, as in `_cancel_if_owner_revoked`.
+        failing = copy.copy(queue_item)
+        with suppress(SessionQueueItemNotFoundError):
+            self._settle(
+                queue_item.item_id,
+                lambda: self._services.session_queue.fail_queue_item(
+                    queue_item.item_id, "WorkingMemoryCalibrationError", message, details, queue_item=failing
+                ),
+                queue_item=failing,
+            )
+        return False
 
     def run_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem):
         try:
@@ -257,10 +452,37 @@ class DefaultSessionRunner(SessionRunnerBase):
             with self._services.performance_statistics.collect_stats(invocation, queue_item.session_id):
                 self._on_before_run_node(invocation, queue_item)
 
+                execution_ref = queue_item.session.get_execution_ref(invocation.id)
+                child_capability = None
+                workflow_inputs = None
+                workflow_authorizer = None
+                authorized_workflow_record = None
+                if isinstance(invocation, CallSavedWorkflowInvocation):
+                    child_capability = queue_item.session.build_child_execution_capability(
+                        execution_ref,
+                        authorization_context={"user_id": queue_item.user_id},
+                    )
+                    workflow_inputs = self.workflow_call_coordinator._collect_call_saved_workflow_inputs(
+                        invocation, queue_item
+                    )
+                if isinstance(invocation, CallSavedWorkflowInvocation):
+
+                    def workflow_authorizer(_workflow_id: str):
+                        nonlocal authorized_workflow_record
+                        authorized_workflow_record = invocation.validate_selected_workflow(context)
+                        return authorized_workflow_record
+
                 data = InvocationContextData(
                     invocation=invocation,
                     source_invocation_id=queue_item.session.prepared_source_mapping[invocation.id],
                     queue_item=queue_item,
+                    execution_frame=execution_ref.frame.iteration_path,
+                    execution_state_id=execution_ref.state_id,
+                    execution_frame_id=execution_ref.frame.frame_id,
+                    execution_workflow_call_depth=execution_ref.frame.workflow_call_depth,
+                    execution_child_capability=child_capability,
+                    execution_workflow_authorizer=workflow_authorizer,
+                    execution_workflow_inputs=workflow_inputs,
                 )
                 context = build_invocation_context(
                     data=data,
@@ -268,28 +490,86 @@ class DefaultSessionRunner(SessionRunnerBase):
                     is_canceled=self._is_canceled,
                 )
 
-                if isinstance(invocation, CallSavedWorkflowInvocation):
+                # Retain the queue boundary for compatibility contexts that cannot record lifecycle effects.
+                if isinstance(invocation, CallSavedWorkflowInvocation) and not getattr(
+                    context.execution_effects, "allow_lifecycle_effects", False
+                ):
                     workflow_record = invocation.validate_selected_workflow(context)
                     self.workflow_call_coordinator.begin_workflow_call_boundary(invocation, queue_item, workflow_record)
                     return
 
                 # Invoke the node, optionally on a borrowed idle GPU (text encoders only).
                 with self._maybe_offload_to_idle_gpu(invocation):
-                    output = invocation.invoke_internal(context=context, services=self._services)
+                    run_result = invocation.invoke_internal_with_effects(context=context, services=self._services)
+                output = run_result.output
                 control_collection = None
                 if self._on_after_run_node_callbacks and isinstance(invocation, (IterateInvocation, CollectInvocation)):
                     control_collection = invocation.collection
                 # Save output and history
-                queue_item.session.complete(invocation.id, output)
+                execution_ref = queue_item.session.get_execution_ref(
+                    invocation.id, effect_count=len(run_result.effects)
+                )
+                finalized_outputs = queue_item.session.apply(execution_ref, run_result)
+
+                if isinstance(invocation, CallSavedWorkflowInvocation):
+                    failure_effect = next(
+                        (effect for effect in run_result.effects if getattr(effect, "kind", None) == "fail"),
+                        None,
+                    )
+                    if failure_effect is not None:
+                        error_message = str(getattr(failure_effect, "message", ""))
+                        error_type = getattr(failure_effect, "error_type", None) or "ValueError"
+                        error_traceback = getattr(failure_effect, "error_traceback", None) or error_message
+                        self._on_node_error(
+                            invocation=invocation,
+                            queue_item=queue_item,
+                            error_type=error_type,
+                            error_message=error_message,
+                            error_traceback=error_traceback,
+                        )
+                        return
+
+                    if authorized_workflow_record is None:
+                        raise RuntimeError("Saved workflow execution completed without authorization.")
+                    workflow_record = authorized_workflow_record
+                    self._dispatch_workflow_call_effects(
+                        invocation=invocation,
+                        queue_item=queue_item,
+                        workflow_record=workflow_record,
+                        effects=run_result.effects,
+                    )
+                    return
 
                 if control_collection is not None:
                     invocation.collection = control_collection
                 try:
                     self._on_after_run_node(invocation, queue_item, output)
+                    for finalized_invocation, finalized_output in finalized_outputs:
+                        # For output collections are finalized when their matching ForReturn completes. Emit a
+                        # follow-up event so listeners receive the materialized final collection, not the placeholder
+                        # produced when the For iteration started.
+                        self._services.events.emit_invocation_complete(
+                            invocation=finalized_invocation,
+                            queue_item=queue_item,
+                            output=finalized_output,
+                        )
                 finally:
                     if control_collection is not None:
                         invocation.collection = []
 
+        except SessionQueueItemChangedError:
+            # A concurrent cancellation or terminal transition won the parent CAS. The in-memory session
+            # belongs to the losing worker and must not be persisted or emitted as a new invocation error.
+            try:
+                current_queue_item = self._services.session_queue.get_queue_item(queue_item.item_id)
+            except SessionQueueItemNotFoundError:
+                return
+            self._services.logger.info(
+                "Discarding stale workflow-call transition for queue item %s; current status is %s",
+                queue_item.item_id,
+                current_queue_item.status,
+            )
+            return
         except CanceledException:
             # A CanceledException is raised during the denoising step callback if the cancel event is set. We don't need
             # to do any handling here, and no error should be set - just pass and the cancellation will be handled
@@ -309,6 +589,29 @@ class DefaultSessionRunner(SessionRunnerBase):
                 error_message=error_message,
                 error_traceback=error_traceback,
             )
+
+    def _dispatch_workflow_call_effects(
+        self,
+        *,
+        invocation: CallSavedWorkflowInvocation,
+        queue_item: SessionQueueItem,
+        workflow_record,
+        effects,
+    ) -> None:
+        """Pass lifecycle intent through queue adapter, retaining old boundary fallback."""
+
+        hook = getattr(self.workflow_call_queue_lifecycle, "apply_execution_effects", None)
+        if hook is None:
+            hook = getattr(self.workflow_call_coordinator, "apply_execution_effects", None)
+        if hook is not None:
+            hook(
+                invocation=invocation,
+                queue_item=queue_item,
+                workflow_record=workflow_record,
+                effects=effects,
+            )
+            return
+        self.workflow_call_coordinator.begin_workflow_call_boundary(invocation, queue_item, workflow_record)
 
     @contextmanager
     def _maybe_offload_to_idle_gpu(self, invocation: BaseInvocation) -> Iterator[None]:
@@ -334,43 +637,32 @@ class DefaultSessionRunner(SessionRunnerBase):
             yield
             return
 
-        borrowed_device = GENERATION_DEVICE_POOL.try_borrow(exclude=native_device)
-        if borrowed_device is None:
-            yield
-            return
+        load = self._services.model_manager.load
+        # Read while the thread is still pinned to its own GPU.
+        native_cache = load.ram_cache if load is not None else None
+        with idle_device_borrowed(exclude=native_device) as borrowed_device:
+            if borrowed_device is None:
+                yield
+                return
 
-        self._services.logger.debug(
-            f"Running {invocation.get_type()} on idle device {borrowed_device} (session device {native_device})."
-        )
-        # Attribute the borrowed cache's activity to the RUNNING session. collect_stats() attached
-        # this session's CacheStats to the native device's cache before we re-pinned; the borrowed
-        # cache's .stats still points at whatever session last ran on that device — possibly an
-        # already-summarized one — so without this swap the encoder's cache hits/misses would be
-        # lost to (or corrupt) another session's numbers.
-        # Everything after the borrow succeeds must be inside the try: if re-pinning or the stats
-        # swap raises, the borrow lock has to be released anyway, or this GPU stays locked for the
-        # life of the process and can never be borrowed again.
-        native_cache = None
-        borrowed_cache = None
-        saved_borrowed_stats = None
-        try:
-            load = self._services.model_manager.load
-            native_cache = load.ram_cache if load is not None else None
-            TorchDevice.set_session_device(borrowed_device)
-            _set_torch_current_device(borrowed_device)
+            self._services.logger.debug(
+                f"Running {invocation.get_type()} on idle device {borrowed_device} (session device {native_device})."
+            )
+            # Attribute the borrowed cache's activity to the RUNNING session. collect_stats() attached
+            # this session's CacheStats to the native device's cache before we re-pinned; the borrowed
+            # cache's .stats still points at whatever session last ran on that device — possibly an
+            # already-summarized one — so without this swap the encoder's cache hits/misses would be
+            # lost to (or corrupt) another session's numbers.
             borrowed_cache = load.ram_cache if load is not None else None
-            saved_borrowed_stats = borrowed_cache.stats if borrowed_cache is not None else None
-            if borrowed_cache is not None and native_cache is not None and borrowed_cache is not native_cache:
-                borrowed_cache.stats = native_cache.stats
-            yield
-        finally:
+            swap_stats = borrowed_cache is not None and native_cache is not None and borrowed_cache is not native_cache
+            saved_borrowed_stats = borrowed_cache.stats if swap_stats else None
             try:
-                if borrowed_cache is not None and borrowed_cache is not native_cache:
-                    borrowed_cache.stats = saved_borrowed_stats
-                TorchDevice.set_session_device(native_device)
-                _set_torch_current_device(native_device)
+                if swap_stats:
+                    borrowed_cache.stats = native_cache.stats
+                yield
             finally:
-                GENERATION_DEVICE_POOL.release_borrow(borrowed_device)
+                if swap_stats:
+                    borrowed_cache.stats = saved_borrowed_stats
 
     def _on_before_run_session(self, queue_item: SessionQueueItem) -> None:
         """Called before a session is run.
@@ -387,8 +679,24 @@ class DefaultSessionRunner(SessionRunnerBase):
         if self._profiler is not None:
             self._profiler.start(profile_id=queue_item.session_id)
 
+        self._offload_other_architectures(queue_item)
+
         for callback in self._on_before_run_session_callbacks:
             callback(queue_item=queue_item)
+
+    def _offload_other_architectures(self, queue_item: SessionQueueItem) -> None:
+        """Clear this worker's VRAM of models the session does not name when it switches architecture.
+
+        Best effort: a failure costs at most the VRAM the offload would have freed, never the session.
+        """
+        model_manager = getattr(self._services, "model_manager", None)
+        load = model_manager.load if model_manager is not None else None
+        if load is None or not self._services.configuration.offload_on_architecture_switch:
+            return
+        try:
+            self._architecture_switch.before_session(queue_item.session.graph, load.ram_cache)
+        except Exception:
+            self._services.logger.warning("Could not clear VRAM for an architecture switch", exc_info=True)
 
     def _on_after_run_session(self, queue_item: SessionQueueItem) -> None:
         """Called after a session is run.
@@ -398,11 +706,16 @@ class DefaultSessionRunner(SessionRunnerBase):
         - If not already canceled or failed, complete the queue item.
         - Log and reset performance statistics.
         - Run any callbacks registered for this event.
-        """
 
+        Keeps the item as the queue left it in `_settled_item` before the statistics and callbacks run. When the queue
+        no longer has it, `_settled_item` keeps what an earlier terminal transition of the item returned.
+        """
         self._services.logger.debug(
             f"On after run session: queue item {queue_item.item_id}, session {queue_item.session_id}"
         )
+
+        # The item's preview frame is disposable: whatever the outcome, nothing may replay it now.
+        self._services.progress_previews.clear(queue_item.item_id)
 
         # If we are profiling, stop the profiler and dump the profile & stats
         if self._profiler is not None:
@@ -421,7 +734,13 @@ class DefaultSessionRunner(SessionRunnerBase):
             # The queue item may have been canceled or failed while the session was running. We should only complete it
             # if it is not already canceled or failed.
             if queue_item.status not in ["canceled", "failed"] and queue_item.session.is_complete():
-                queue_item = self._services.session_queue.complete_queue_item(queue_item.item_id, queue_item=queue_item)
+                completing = queue_item
+                queue_item = self._settle(
+                    completing.item_id,
+                    lambda: self._services.session_queue.complete_queue_item(completing.item_id, queue_item=completing),
+                    queue_item=completing,
+                )
+            self._settled_item = queue_item
 
             # We'll get a GESStatsNotFoundError if we try to log stats for an untracked graph, but in the processor
             # we don't care about that - suppress the error.
@@ -458,17 +777,22 @@ class DefaultSessionRunner(SessionRunnerBase):
 
         - Emits an invocation complete event.
         - Run any callbacks registered for this event.
+        - Records that the node completed (see `_run_calibration_node`).
         """
 
         self._services.logger.debug(
             f"On after run node: queue item {queue_item.item_id}, session {queue_item.session_id}, node {invocation.id} ({invocation.get_type()})"
         )
 
+        # The node's denoise is over: its last frame must not be replayed as if still running.
+        self._services.progress_previews.clear_node(queue_item.item_id, invocation.id)
+
         # Send complete event on successful runs
         self._services.events.emit_invocation_complete(invocation=invocation, queue_item=queue_item, output=output)
 
         for callback in self._on_after_run_node_callbacks:
             callback(invocation=invocation, queue_item=queue_item, output=output)
+        self._node_outcome = "completed"
 
     def _on_node_error(
         self,
@@ -477,15 +801,19 @@ class DefaultSessionRunner(SessionRunnerBase):
         error_type: str,
         error_message: str,
         error_traceback: str,
+        require_active: bool = False,
     ):
         """Called when a node errors. Node errors may occur when running or preparing the node..
 
+        - Records that the node failed, ahead of anything that can raise (see `_run_calibration_node`).
         - Set the node error on the session object.
         - Log the error.
         - Fail the queue item.
         - Emits an invocation error event.
         - Run any callbacks registered for this event.
         """
+        self._node_outcome = "failed"
+        self._services.progress_previews.clear_node(queue_item.item_id, invocation.id)
 
         self._services.logger.debug(
             f"On node error: queue item {queue_item.item_id}, session {queue_item.session_id}, node {invocation.id} ({invocation.get_type()})"
@@ -499,15 +827,27 @@ class DefaultSessionRunner(SessionRunnerBase):
         )
         self._services.logger.error(error_traceback)
 
+        # Keep the live session for the invocation error event. Terminal queue persistence may clean up prepared
+        # execution mappings, but the event still needs the source id for the invocation that failed.
+        event_queue_item = queue_item
+
         # Fail the queue item
-        queue_item = self._services.session_queue.set_queue_item_session(queue_item.item_id, queue_item.session)
-        queue_item = self._services.session_queue.fail_queue_item(
-            queue_item.item_id, error_type, error_message, error_traceback
+        if require_active:
+            saved = self._save_queue_item_session_if_active(queue_item)
+            if not saved:
+                return False
+            queue_item = self._services.session_queue.get_queue_item(queue_item.item_id)
+        else:
+            queue_item = self._services.session_queue.set_queue_item_session(queue_item.item_id, queue_item.session)
+        failing = queue_item.item_id
+        queue_item = self._settle(
+            failing,
+            lambda: self._services.session_queue.fail_queue_item(failing, error_type, error_message, error_traceback),
         )
 
         # Send error event
         self._services.events.emit_invocation_error(
-            queue_item=queue_item,
+            queue_item=event_queue_item,
             invocation=invocation,
             error_type=error_type,
             error_message=error_message,
@@ -522,6 +862,21 @@ class DefaultSessionRunner(SessionRunnerBase):
                 error_message=error_message,
                 error_traceback=error_traceback,
             )
+        return True
+
+    def _save_queue_item_session_if_active(self, queue_item: SessionQueueItem) -> bool:
+        """Persist a workflow-call transition only while its queue item remains active."""
+        saver = getattr(self._services.session_queue, "_save_queue_item_session_if_active", None)
+        if saver is not None:
+            return bool(saver(queue_item.item_id, queue_item.session))
+        try:
+            current_queue_item = self._services.session_queue.get_queue_item(queue_item.item_id)
+        except SessionQueueItemNotFoundError:
+            return False
+        if current_queue_item.status in ("completed", "failed", "canceled"):
+            return False
+        self._services.session_queue.save_queue_item_session(queue_item.item_id, queue_item.session)
+        return True
 
 
 class _SessionWorker:
@@ -536,8 +891,12 @@ class _SessionWorker:
         self.device = device
         self.runner = runner
         self.cancel_event = ThreadEvent()
+        self.poll_now_event = ThreadEvent()
         self.queue_item: Optional[SessionQueueItem] = None
         self.thread: Optional[Thread] = None
+        # Paged-out VRAM at the previous session's end and at the last warning; only this worker's thread uses them.
+        self.paging_last_bytes = 0
+        self.paging_warned_bytes = 0
 
     @property
     def label(self) -> str:
@@ -560,20 +919,30 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self._thread_limit = thread_limit
         self._polling_interval = polling_interval
         self._workers: list[_SessionWorker] = []
+        # One per worker, once `register_generation_devices` resolved them.
+        self._devices: Optional[list[Optional[torch.device]]] = None
 
-    def _resolve_devices(self) -> list[Optional[torch.device]]:
-        """Determine the per-worker devices from config.
+    def register_generation_devices(self, configuration: InvokeAIAppConfig) -> list[Optional[torch.device]]:
+        """Resolve the workers' devices and register them in `GENERATION_DEVICE_POOL`, so the model loader can find
+        idle GPUs to borrow. Returns the devices, one per worker.
 
-        Resolves `generation_devices` (which defaults to `"auto"` — every available GPU) into one
-        normalized device per worker. Returns a single `None` (legacy single-worker, device chosen by
-        the global config) only if the resolution is empty (e.g. `generation_devices` set to an empty
-        list).
+        Work outside the session queue borrows from the pool from the moment its service starts (the image index's
+        backfill, say), so the composition root calls this before the invoker starts any service
+        (`ApiDependencies.initialize`). `start` calls it only when nothing did: registering again would drop a borrow in
+        flight. Registering creates no CUDA context: the pool holds device objects, and a worker pins its GPU in CUDA
+        only once it claims its first queue item (#9413).
+
+        `generation_devices` (by default `"auto"`, every available GPU) resolves to one normalized device per worker,
+        or to a single `None` (one worker on the device the global config chooses) when the resolution is empty, as
+        with an empty list.
+
+        Raises RuntimeError while a worker an earlier `stop` gave up on still runs (see `stop`).
         """
-        generation_devices = self._invoker.services.configuration.generation_devices
-        devices = TorchDevice.get_generation_devices(generation_devices)
-        if not devices:
-            return [None]
-        return list(devices)
+        refuse_while_an_abandoned_worker_runs()
+        devices = TorchDevice.get_generation_devices(configuration.generation_devices)
+        self._devices = list(devices) if devices else [None]
+        GENERATION_DEVICE_POOL.set_generation_devices([d for d in self._devices if d is not None])
+        return self._devices
 
     def _clone_session_runner(self, template: SessionRunnerBase) -> SessionRunnerBase:
         """Create an independent runner for an additional worker.
@@ -601,22 +970,32 @@ class DefaultSessionProcessor(SessionProcessorBase):
         )
 
     def start(self, invoker: Invoker) -> None:
+        """Start one worker per generation device. Raises RuntimeError while a worker an earlier `stop` gave up on
+        still runs (see `stop`)."""
+        refuse_while_an_abandoned_worker_runs()
         self._invoker: Invoker = invoker
 
         self._resume_event = ThreadEvent()
         self._stop_event = ThreadEvent()
-        self._poll_now_event = ThreadEvent()
 
         register_events(QueueClearedEvent, self._on_queue_cleared)
         register_events(BatchEnqueuedEvent, self._on_batch_enqueued)
         register_events(QueueItemStatusChangedEvent, self._on_queue_item_status_changed)
         register_events(UserAccessChangedEvent, self._on_user_access_changed)
 
-        devices = self._resolve_devices()
+        devices = (
+            self._devices
+            if self._devices is not None
+            else self.register_generation_devices(self._invoker.services.configuration)
+        )
+        # A worker that stood aside for a lent GPU re-polls as soon as that borrow ends.
+        GENERATION_DEVICE_POOL.set_release_listener(self._poll_now)
 
-        # Register the generation devices so the model loader can discover idle GPUs to host text
-        # encoders on (see offload_text_encoders_to_idle_gpus). None means legacy single-device mode.
-        GENERATION_DEVICE_POOL.set_generation_devices([d for d in devices if d is not None])
+        # With more than one CUDA/HIP generation device, torch's post-conv-algorithm-search global
+        # emptyCache() convoys the peer GPU's in-flight step from C++, where the peer-aware
+        # empty_cache wrapper cannot intercept it. Trade it for cached workspace blocks instead.
+        if sum(1 for d in devices if d is not None and d.type == "cuda") > 1:
+            disable_conv_benchmark_empty_cache()
 
         # If profiling is enabled, create a profiler. The same profiler will be used for all sessions. Internally,
         # the profiler will create a new profile for each session. Profiling uses a process-global cProfile, which
@@ -664,13 +1043,21 @@ class DefaultSessionProcessor(SessionProcessorBase):
                 kwargs={
                     "worker": worker,
                     "stop_event": self._stop_event,
-                    "poll_now_event": self._poll_now_event,
                     "resume_event": self._resume_event,
                 },
             )
             worker.thread.start()
 
     def stop(self, *args, **kwargs) -> None:
+        """Stop the workers and wait for them to exit, up to `WORKER_STOP_TIMEOUT_SECONDS` for all of them together.
+
+        The invoker stops every other service once this returns, so a worker that exits in time never runs beside a
+        stopped service. A wait longer than `WORKER_STOP_NOTICE_SECONDS` names the worker and its queue item in the
+        log. A worker still in a node at the deadline is given up on, with an error in the log, so that shutdown
+        finishes: a node without a cancel point may never return. A later stop does not wait for it again. It keeps
+        its GPU, so until it exits no session processor of this process starts and none replaces the generation device
+        pool. The services it uses stop under it; once the database is disposed, its writes are refused.
+        """
         self._stop_event.set()
         # Cancel any in-progress generation so that long-running nodes (e.g. denoising) stop at
         # the next step boundary instead of running to completion. Without this, a generation
@@ -679,11 +1066,39 @@ class DefaultSessionProcessor(SessionProcessorBase):
         for worker in self._workers:
             worker.cancel_event.set()
         # Wake any worker sleeping in poll_now_event.wait() or blocked in resume_event.wait() (paused).
-        self._poll_now_event.set()
+        self._poll_now()
         self._resume_event.set()
 
+        deadline = time.monotonic() + WORKER_STOP_TIMEOUT_SECONDS
+        for worker in self._workers:
+            # A worker given up on by an earlier stop gets no second wait.
+            if worker.thread is None or worker.thread in _abandoned_workers:
+                continue
+            worker.thread.join(timeout=max(0.0, min(deadline - time.monotonic(), WORKER_STOP_NOTICE_SECONDS)))
+            remaining = deadline - time.monotonic()
+            if worker.thread.is_alive() and remaining > 0:
+                self._invoker.services.logger.info(
+                    f"Waiting up to {remaining:.0f}s for the {self._describe_running(worker)} to stop"
+                )
+                worker.thread.join(timeout=remaining)
+            if worker.thread.is_alive():
+                _abandoned_workers.append(worker.thread)
+                self._invoker.services.logger.error(
+                    f"The {self._describe_running(worker)} did not stop within {WORKER_STOP_TIMEOUT_SECONDS:.0f}s; "
+                    "shutting down without it. Restart the process before starting Invoke again."
+                )
+
+    @staticmethod
+    def _describe_running(worker: _SessionWorker) -> str:
+        assert worker.thread is not None
+        queue_item = worker.queue_item
+        item = f" (queue item {queue_item.item_id})" if queue_item is not None else ""
+        return f"session worker {worker.thread.name} on {worker.label}{item}"
+
     def _poll_now(self) -> None:
-        self._poll_now_event.set()
+        # Each consumer clears only its own notification, never another worker's wake-up.
+        for worker in self._workers:
+            worker.poll_now_event.set()
 
     async def _on_queue_cleared(self, event: FastAPIEvent[QueueClearedEvent]) -> None:
         # Cancel every worker currently running an item covered by the clear. A user-scoped
@@ -795,6 +1210,71 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     self._poll_now()
                 return
 
+    def _release_vram_after_session(self, worker: _SessionWorker) -> None:
+        """Return this worker's unoccupied cached VRAM to the driver now that its session is over.
+
+        A canceled session aborts mid-node, orphaning the whole denoise working set in the
+        caching allocator; nothing downstream (a VAE decode, say) runs to release it, so the
+        GPU keeps reporting the memory as used. Ask for the release explicitly. On a multi-GPU
+        box with a peer mid-render the call is deferred (see `TorchDevice.empty_cache`) and the
+        peer performs it at its next step boundary. A session that ran to completion has
+        released its own working memory along the way, so it only flushes a release a peer
+        deferred onto it — a flag test when nothing is pending.
+
+        With `clear_vram_after_session`, every unlocked model on this worker's device also moves to
+        RAM first (it stays cached there), and the release is forced past a busy peer: deferred, it
+        would leave the freed memory with the allocator while this worker's next session budgets its
+        first load, which then loads at minimum residency. Once per session, and the user opted in.
+
+        Both are best effort: the session's outcome is already recorded, and a free on a sick
+        device context must not fail the worker.
+        """
+        try:
+            services = self._invoker.services
+            if services.configuration.clear_vram_after_session and services.model_manager.load is not None:
+                services.model_manager.load.ram_cache.offload_models_from_vram_except(())
+                TorchDevice.empty_cache(force=True)
+            elif worker.cancel_event.is_set():
+                TorchDevice.empty_cache()
+            else:
+                TorchDevice.flush_deferred_empty_cache()
+        except Exception:
+            self._invoker.services.logger.warning(
+                f"Could not release cached VRAM after the session on {worker.label}", exc_info=True
+            )
+
+    def _warn_if_vram_paged(self, worker: _SessionWorker) -> None:
+        """Say so when Windows keeps part of this worker's GPU memory in shared system memory across sessions.
+
+        On a ROCm build under Windows an allocation that does not fit the video-memory budget, or finds no contiguous
+        VRAM, is placed in system memory instead of failing -- and another program on the same GPU can push this
+        process's memory out the same way. Every generation that touches it slows down, with nothing else in the log to
+        explain why. Only what was paged at the end of two consecutive sessions counts: an overflow at the end of a
+        decode can return to VRAM within seconds. Warns once per episode: again only after that grew by the threshold,
+        re-armed once a reading drops below it. `paged_bytes` answers None everywhere else, which keeps this silent.
+        """
+        try:
+            paged = paged_bytes(worker.device or TorchDevice.choose_torch_device())
+        except Exception:
+            self._invoker.services.logger.debug(f"Could not read paged VRAM on {worker.label}", exc_info=True)
+            return
+        if paged is None:
+            return
+        sustained = min(paged, worker.paging_last_bytes)
+        worker.paging_last_bytes = paged
+        if paged < _VRAM_PAGING_WARNING_BYTES:
+            worker.paging_warned_bytes = 0
+            return
+        if sustained < worker.paging_warned_bytes + _VRAM_PAGING_WARNING_BYTES:
+            return
+        worker.paging_warned_bytes = sustained
+        self._invoker.services.logger.warning(
+            f"Windows kept {sustained / 2**30:.1f} GiB of Invoke's GPU memory on {worker.label} in shared system memory "
+            "after the last two generations, which makes them much slower. Close other programs that use this GPU. If "
+            "it keeps happening, lower the image size, set max_cache_vram_gb lower or device_working_mem_gb higher, "
+            "and restart Invoke to get the memory back into VRAM."
+        )
+
     def resume(self) -> SessionProcessorStatus:
         if not self._resume_event.is_set():
             self._resume_event.set()
@@ -842,6 +1322,27 @@ class DefaultSessionProcessor(SessionProcessorBase):
         image_moves = getattr(self._invoker.services, "image_moves", None)
         return image_moves is not None and image_moves.is_maintenance_active()
 
+    def _dequeue_if_storage_maintenance_inactive(
+        self, device: Optional[str]
+    ) -> tuple[bool, Optional[SessionQueueItem]]:
+        """Atomically check storage maintenance state and claim the next queue item.
+
+        Gallery maintenance reserves its busy flag before taking the same mutation lock. If
+        this worker wins the lock first, the subsequent reservation sees the claimed item in
+        queue status; if maintenance wins, this worker leaves queued work pending.
+        """
+        image_moves = getattr(self._invoker.services, "image_moves", None)
+        mutation_lock = (
+            image_moves.image_mutation_lock(blocking=False) if image_moves is not None else nullcontext(True)
+        )
+        with mutation_lock as lock_acquired:
+            if not lock_acquired:
+                return False, None
+            if self._is_image_move_maintenance_active():
+                return False, None
+            item = self._invoker.services.session_queue.dequeue(device=device)
+            return True, item
+
     def _cancel_queue_item_if_owner_inactive(self, queue_item: SessionQueueItem) -> bool:
         """Cancel a dequeued item whose owner is deactivated, deleted, or unverifiable.
 
@@ -861,7 +1362,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self,
         worker: _SessionWorker,
         stop_event: ThreadEvent,
-        poll_now_event: ThreadEvent,
         resume_event: ThreadEvent,
     ):
         try:
@@ -884,7 +1384,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
             worker.cancel_event.clear()
 
             while not stop_event.is_set():
-                poll_now_event.clear()
+                worker.poll_now_event.clear()
 
                 # The previous item, if any, is finished with. Cleared here rather than
                 # after `run_queue_item` because the non-fatal error handler below needs it
@@ -903,11 +1403,6 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     if stop_event.is_set():
                         break
 
-                    if self._is_image_move_maintenance_active():
-                        self._invoker.services.logger.debug("Image storage maintenance is active")
-                        poll_now_event.wait(self._polling_interval)
-                        continue
-
                     # Clear any stale cancel signal from the previous item BEFORE claiming the next
                     # one. Clearing it after dequeue (as before) could wipe a cancel that arrived for
                     # the item we just claimed — e.g. during the gc.collect() below — silently losing
@@ -915,22 +1410,33 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     # stays set and is caught by the runner's _is_canceled() check.
                     worker.cancel_event.clear()
 
+                    # While this GPU is lent to a borrower, a session claimed here would only wait for the
+                    # borrow to end; leave the item for a free GPU. Every release wakes the workers.
+                    if GENERATION_DEVICE_POOL.is_lent(worker.device):
+                        worker.poll_now_event.wait(self._polling_interval)
+                        continue
+
                     # Get the next session to process. dequeue() atomically claims the item, so concurrent
                     # workers never receive the same item. Pass this worker's device so the item is
                     # tagged with the GPU that ran it (None in single-device/legacy mode).
-                    worker.queue_item = self._invoker.services.session_queue.dequeue(
+                    maintenance_inactive, worker.queue_item = self._dequeue_if_storage_maintenance_inactive(
                         device=str(worker.device) if worker.device is not None else None
                     )
+
+                    if not maintenance_inactive:
+                        self._invoker.services.logger.debug("Image storage maintenance is active")
+                        worker.poll_now_event.wait(self._polling_interval)
+                        continue
 
                     if worker.queue_item is None:
                         # The queue was empty, wait for next polling interval or event to try again
                         self._invoker.services.logger.debug("Waiting for next polling interval or event")
-                        poll_now_event.wait(self._polling_interval)
+                        worker.poll_now_event.wait(self._polling_interval)
                         continue
 
                     if device_pin_needed:
                         assert worker.device is not None
-                        # Called directly rather than via _set_torch_current_device(): that helper
+                        # Called directly rather than via set_torch_current_device(): that helper
                         # skips the pin when the backend reports unavailable, which is right for the
                         # idle-GPU borrow (devices there can be configured or faked for a backend
                         # this process cannot initialise) but would silently drop the pin this
@@ -1007,6 +1513,8 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         worker.runner.workflow_call_queue_lifecycle.run_queue_item(worker.queue_item)
                     finally:
                         GENERATION_DEVICE_POOL.release_session(worker.device)
+                    self._release_vram_after_session(worker)
+                    self._warn_if_vram_paged(worker)
 
                 except Exception as e:
                     error_type = e.__class__.__name__
@@ -1019,7 +1527,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         error_traceback=error_traceback,
                     )
                     # Wait for next polling interval or event to try again
-                    poll_now_event.wait(self._polling_interval)
+                    worker.poll_now_event.wait(self._polling_interval)
                     continue
         except Exception as e:
             # Fatal error in this worker, log and pass - we're done here
@@ -1053,6 +1561,8 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self._invoker.services.logger.error(error_traceback)
 
         if queue_item is not None:
+            # This path bypasses the runner's after-session hook; the item's frame must not outlive it.
+            self._invoker.services.progress_previews.clear(queue_item.item_id)
             try:
                 queue_item = self._invoker.services.session_queue.set_queue_item_session(
                     queue_item.item_id, queue_item.session

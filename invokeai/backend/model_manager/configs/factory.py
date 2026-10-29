@@ -3,22 +3,31 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
+    TypeVar,
     Union,
 )
 
-from pydantic import Discriminator, TypeAdapter, ValidationError
+from pydantic import BaseModel, Discriminator, TypeAdapter, ValidationError
 from typing_extensions import Annotated, Any
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.app.util.misc import uuid_string
+from invokeai.backend.architectures import resolve_default_settings
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
 from invokeai.backend.model_manager.configs.base import Config_Base
-from invokeai.backend.model_manager.configs.clip_embed import CLIPEmbed_Diffusers_G_Config, CLIPEmbed_Diffusers_L_Config
+from invokeai.backend.model_manager.configs.clip_embed import (
+    CLIPEmbed_Checkpoint_G_Config,
+    CLIPEmbed_Checkpoint_L_Config,
+    CLIPEmbed_Diffusers_G_Config,
+    CLIPEmbed_Diffusers_L_Config,
+)
 from invokeai.backend.model_manager.configs.clip_vision import CLIPVision_Diffusers_Config
 from invokeai.backend.model_manager.configs.controlnet import (
     ControlAdapterDefaultSettings,
     ControlNet_Checkpoint_Anima_Config,
+    ControlNet_Checkpoint_Flux2_Config,
     ControlNet_Checkpoint_FLUX_Config,
+    ControlNet_Checkpoint_QwenImage_Config,
     ControlNet_Checkpoint_SD1_Config,
     ControlNet_Checkpoint_SD2_Config,
     ControlNet_Checkpoint_SDXL_Config,
@@ -28,14 +37,20 @@ from invokeai.backend.model_manager.configs.controlnet import (
     ControlNet_Diffusers_SD2_Config,
     ControlNet_Diffusers_SDXL_Config,
 )
+from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
 from invokeai.backend.model_manager.configs.flux_redux import FLUXRedux_Checkpoint_Config
 from invokeai.backend.model_manager.configs.gemma2_encoder import (
     Gemma2Encoder_Gemma2Encoder_Config,
     Gemma2Encoder_GGUF_Config,
 )
+from invokeai.backend.model_manager.configs.gemma4_encoder import (
+    Gemma4Encoder_Gemma4Encoder_LTX2_Config,
+    Gemma4Encoder_GGUF_LTX2_Config,
+)
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
 from invokeai.backend.model_manager.configs.ip_adapter import (
+    IPAdapter_Checkpoint_Anima_Config,
     IPAdapter_Checkpoint_FLUX_Config,
     IPAdapter_Checkpoint_SD1_Config,
     IPAdapter_Checkpoint_SD2_Config,
@@ -57,6 +72,8 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_LyCORIS_Flux2_Config,
     LoRA_LyCORIS_FLUX_Config,
     LoRA_LyCORIS_Krea2_Config,
+    LoRA_LyCORIS_LTX2_Config,
+    LoRA_LyCORIS_MiniMaxH3_Config,
     LoRA_LyCORIS_QwenImage_Config,
     LoRA_LyCORIS_SD1_Config,
     LoRA_LyCORIS_SD2_Config,
@@ -67,12 +84,19 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_OMI_SDXL_Config,
     LoraModelDefaultSettings,
 )
+from invokeai.backend.model_manager.configs.ltx2_duration_head import LTX2DurationHead_Checkpoint_Config
 from invokeai.backend.model_manager.configs.main import (
     Main_BnBNF4_FLUX_Config,
     Main_Checkpoint_Anima_Config,
+    Main_Checkpoint_ErnieImage_Config,
     Main_Checkpoint_Flux2_Config,
     Main_Checkpoint_FLUX_Config,
+    Main_Checkpoint_Ideogram4_Config,
     Main_Checkpoint_Krea2_Config,
+    Main_Checkpoint_LTX2_Config,
+    Main_Checkpoint_MiniMaxH3_Config,
+    Main_Checkpoint_MossImage_Config,
+    Main_Checkpoint_QwenImage21_Config,
     Main_Checkpoint_QwenImage_Config,
     Main_Checkpoint_SD1_Config,
     Main_Checkpoint_SD2_Config,
@@ -86,6 +110,10 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_FLUX_Config,
     Main_Diffusers_Ideogram4_Config,
     Main_Diffusers_Krea2_Config,
+    Main_Diffusers_LTX2_Config,
+    Main_Diffusers_MiniMaxH3_Config,
+    Main_Diffusers_MossImage_Config,
+    Main_Diffusers_QwenImage21_Config,
     Main_Diffusers_QwenImage_Config,
     Main_Diffusers_SD1_Config,
     Main_Diffusers_SD2_Config,
@@ -94,9 +122,14 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_SDXLRefiner_Config,
     Main_Diffusers_Wan_Config,
     Main_Diffusers_ZImage_Config,
+    Main_GGUF_Anima_Config,
+    Main_GGUF_ErnieImage_Config,
     Main_GGUF_Flux2_Config,
     Main_GGUF_FLUX_Config,
+    Main_GGUF_Ideogram4_Config,
     Main_GGUF_Krea2_Config,
+    Main_GGUF_LTX2_Config,
+    Main_GGUF_QwenImage21_Config,
     Main_GGUF_QwenImage_Config,
     Main_GGUF_Wan_Config,
     Main_GGUF_ZImage_Config,
@@ -106,7 +139,6 @@ from invokeai.backend.model_manager.configs.main import (
     Main_SDNQ_Flux2_Config,
     Main_SDNQ_FLUX_Config,
     Main_SDNQ_ZImage_Config,
-    MainModelDefaultSettings,
 )
 from invokeai.backend.model_manager.configs.mistral_encoder import (
     MistralEncoder_Checkpoint_Config,
@@ -120,6 +152,7 @@ from invokeai.backend.model_manager.configs.pid_decoder import (
     PiDDecoder_Checkpoint_SD3_Config,
     PiDDecoder_Checkpoint_SDXL_Config,
 )
+from invokeai.backend.model_manager.configs.qwen3_5_encoder import Qwen35Encoder_Checkpoint_Config
 from invokeai.backend.model_manager.configs.qwen3_encoder import (
     Qwen3Encoder_Checkpoint_Config,
     Qwen3Encoder_GGUF_Config,
@@ -129,6 +162,8 @@ from invokeai.backend.model_manager.configs.qwen3_encoder import (
 )
 from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
     Qwen3VLEncoder_Checkpoint_Config,
+    Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config,
+    Qwen3VLEncoder_GGUF_Config,
     Qwen3VLEncoder_Qwen3VLEncoder_Config,
 )
 from invokeai.backend.model_manager.configs.qwen_vl_encoder import (
@@ -161,18 +196,23 @@ from invokeai.backend.model_manager.configs.vae import (
     VAE_Checkpoint_Anima_Config,
     VAE_Checkpoint_Flux2_Config,
     VAE_Checkpoint_FLUX_Config,
+    VAE_Checkpoint_QwenImage21_Config,
     VAE_Checkpoint_QwenImage_Config,
     VAE_Checkpoint_SD1_Config,
     VAE_Checkpoint_SD2_Config,
+    VAE_Checkpoint_SD3_Config,
     VAE_Checkpoint_SDXL_Config,
     VAE_Checkpoint_Wan_Config,
     VAE_Diffusers_Flux2_Config,
+    VAE_Diffusers_FLUX_Config,
+    VAE_Diffusers_QwenImage21_Config,
     VAE_Diffusers_SD1_Config,
+    VAE_Diffusers_SD3_Config,
     VAE_Diffusers_SDXL_Config,
     VAE_Diffusers_Wan_Config,
 )
 from invokeai.backend.model_manager.configs.wan_t5_encoder import WanT5Encoder_WanT5Encoder_Config
-from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk, read_safetensors_header
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
@@ -180,8 +220,104 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     variant_type_adapter,
 )
+from invokeai.backend.quantization.gguf.loaders import COMFY_QUANT_KEY_PREFIX, parse_q8_cr_markers
 
 logger = logging.getLogger(__name__)
+
+_FP8_SAFETENSORS_DTYPES = frozenset({"F8_E4M3", "F8_E5M2"})
+
+# What single-file checkpoints bundle beside their denoiser. Float8 weights there say nothing about the denoiser.
+_BUNDLED_COMPONENT_KEY_PREFIXES = ("cond_stage_model.", "conditioner.", "first_stage_model.", "text_encoders.", "vae.")
+
+# Where a diffusers folder keeps its denoiser. A single-component folder (a ControlNet) keeps it at the root.
+_DENOISER_SUBFOLDERS = frozenset({"transformer", "unet"})
+
+SettingsT = TypeVar("SettingsT", bound=BaseModel)
+
+
+def _denoiser_stores_float8_weights(mod: ModelOnDisk) -> bool:
+    """Whether the denoiser's weights are stored in a float8 the storage cast can reproduce, judged by the safetensors
+    headers and never by a file name.
+
+    Only headers are read, a few KB each. A header that cannot be read is no evidence of float8 weights: identification
+    did not need that file, and picking a default setting is no reason to fail an install.
+
+    Scaled fp8 checkpoints count too. They briefly did not: FP8 Storage used to fold their per-tensor scales away and
+    let the layerwise cast re-encode the result as *unscaled* fp8, which on `flux-2-klein-4b-fp8` flushed 3.4% of the
+    weights to zero for the byte count the file already had. The loaders now keep such a file in its own scaled form
+    instead, so switching the setting on is lossless and worth doing by default.
+    """
+    if mod.path.is_file():
+        candidates = [mod.path]
+    else:
+        candidates = [
+            path
+            for path in mod.weight_files()
+            if path.parent == mod.path or path.relative_to(mod.path).parts[0] in _DENOISER_SUBFOLDERS
+        ]
+
+    stores_float8 = False
+    for path in candidates:
+        if path.suffix != ".safetensors":
+            continue
+        try:
+            header = read_safetensors_header(path)
+        except (OSError, ValueError) as e:
+            logger.debug(f"Could not read the safetensors header of {path} to look for float8 weights: {e}")
+            continue
+        denoiser = {key: info for key, info in header.items() if not key.startswith(_BUNDLED_COMPONENT_KEY_PREFIXES)}
+        stores_float8 = stores_float8 or any(
+            isinstance(info, dict) and info.get("dtype") in _FP8_SAFETENSORS_DTYPES for info in denoiser.values()
+        )
+    return stores_float8
+
+
+def _identified_default_settings(
+    recommended: SettingsT | None,
+    settings_cls: type[SettingsT],
+    mod: ModelOnDisk,
+    override_fields: dict[str, Any] | None,
+    # Quoted: `AnyModelConfig` is the union of the concrete config classes and is assembled further down
+    # this module. `Config_Base` would not do — it declares none of base/type/format, which only a concrete
+    # class does (enforced by `__pydantic_init_subclass__`).
+    config: "AnyModelConfig",
+) -> SettingsT | None:
+    """Layer the settings sent with an install, and FP8 Storage for a float8 denoiser, over the recommended defaults.
+
+    An install setting wins over detection in both directions. Fields the settings class does not have (a main-model
+    field sent along with a LoRA install) are dropped, since nothing would read them.
+
+    FP8 Storage is enabled only where the model's own loader implements it. It used to be enabled for any float8
+    denoiser whose format was not already quantized, which wrote `fp8_storage: true` onto records whose loader ignores
+    it -- a Wan fp8 install was told its weights were halved and then loaded at bf16 size. `fp8_storage_verdict` is the
+    same answer the loader gate and the API row give; see `load/fp8_capability.py`.
+
+    A request sent with the install is dropped for such a model rather than stored. The detail panel does not offer the
+    control where the loader ignores it, so a stored `true` would be a value nobody can see or clear again -- and the
+    Add Models flow has one FP8 Storage checkbox for whatever is being installed, so it is easy to send for a model
+    that cannot use it.
+    """
+    requested = (override_fields or {}).get("default_settings") or {}
+    update = {
+        name: value for name, value in requested.items() if name in settings_cls.model_fields and value is not None
+    }
+
+    # Imported here, not at module scope: `model_loader_registry` imports this module, so the reverse edge would close
+    # a cycle. Identification runs long after import time, and the import is a `sys.modules` hit after the first.
+    from invokeai.backend.model_manager.load.fp8_capability import fp8_storage_verdict
+
+    if not fp8_storage_verdict(config.base, config.type, config.format).supported:
+        update.pop("fp8_storage", None)
+    elif "fp8_storage" not in update and _denoiser_stores_float8_weights(mod):
+        logger.info(f"{mod.name}: denoiser weights are stored in float8, enabling FP8 Storage by default")
+        update["fp8_storage"] = True
+
+    if not update:
+        return recommended
+    current = recommended.model_dump() if recommended is not None else {}
+    return settings_cls.model_validate({**current, **update})
+
+
 app_config = get_config()
 
 # Known model file extensions for sanity checking
@@ -198,6 +334,7 @@ _MODEL_EXTENSIONS = {
 # Known config file names for diffusers/transformers models
 _CONFIG_FILES = {
     "model_index.json",
+    "modular_model_index.json",
     "config.json",
 }
 
@@ -210,7 +347,17 @@ _MAX_SEARCH_DEPTH = 2
 # Classes introduced by the versions pinned by this checkout may not exist in the interpreter used by
 # lightweight config tests. Keep explicit markers only for those newly supported classes; established
 # classes are resolved from the installed Diffusers/Transformers exports below.
-_PINNED_MODEL_CLASS_MARKERS = {"Krea2Pipeline"}
+_PINNED_MODEL_CLASS_MARKERS = {
+    "Krea2Pipeline",
+    # MiniMax H3 classes exist only in an unreleased diffusers branch (vendored under
+    # invokeai/backend/minimax_h3); the installed diffusers cannot resolve them.
+    "MiniMaxH3ModularPipeline",
+    "MiniMaxH3Transformer3DModel",
+    "AutoencoderKLMiniMaxH3",
+    "AutoencoderKLMiniMaxH3Audio",
+    # MOSS-Image's pipeline is remote code upstream; its classes are vendored under invokeai/backend/moss_image.
+    "MOSSImagePipeline",
+}
 
 
 def _is_known_model_marker(config_name: str, config: Any) -> bool:
@@ -236,15 +383,16 @@ def _is_known_model_marker(config_name: str, config: Any) -> bool:
         except Exception:
             return False
 
-    if config_name == "model_index.json":
+    if config_name in ("model_index.json", "modular_model_index.json"):
         class_name = config.get("_class_name")
-        return class_name in _PINNED_MODEL_CLASS_MARKERS or has_model_export(
+        # Non-str _class_name (e.g. a list) must read as "not a marker", not TypeError on the set lookup.
+        return (isinstance(class_name, str) and class_name in _PINNED_MODEL_CLASS_MARKERS) or has_model_export(
             diffusers, class_name, (DiffusionPipeline,)
         )
 
     class_name = config.get("_class_name")
     if (
-        class_name in _PINNED_MODEL_CLASS_MARKERS
+        (isinstance(class_name, str) and class_name in _PINNED_MODEL_CLASS_MARKERS)
         or has_model_export(diffusers, class_name, (ModelMixin, DiffusionPipeline))
         or has_model_export(transformers, class_name, (PreTrainedModel, PretrainedConfig))
     ):
@@ -272,11 +420,15 @@ AnyModelConfig = Annotated[
         Annotated[Main_Diffusers_Flux2_Config, Main_Diffusers_Flux2_Config.get_tag()],
         Annotated[Main_Diffusers_CogView4_Config, Main_Diffusers_CogView4_Config.get_tag()],
         Annotated[Main_Diffusers_QwenImage_Config, Main_Diffusers_QwenImage_Config.get_tag()],
+        Annotated[Main_Diffusers_QwenImage21_Config, Main_Diffusers_QwenImage21_Config.get_tag()],
         Annotated[Main_Diffusers_Wan_Config, Main_Diffusers_Wan_Config.get_tag()],
         Annotated[Main_Diffusers_ZImage_Config, Main_Diffusers_ZImage_Config.get_tag()],
         Annotated[Main_Diffusers_ErnieImage_Config, Main_Diffusers_ErnieImage_Config.get_tag()],
         Annotated[Main_Diffusers_Ideogram4_Config, Main_Diffusers_Ideogram4_Config.get_tag()],
         Annotated[Main_Diffusers_Krea2_Config, Main_Diffusers_Krea2_Config.get_tag()],
+        Annotated[Main_Diffusers_MiniMaxH3_Config, Main_Diffusers_MiniMaxH3_Config.get_tag()],
+        Annotated[Main_Diffusers_LTX2_Config, Main_Diffusers_LTX2_Config.get_tag()],
+        Annotated[Main_Diffusers_MossImage_Config, Main_Diffusers_MossImage_Config.get_tag()],
         # Main (Pipeline) - checkpoint format
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
         # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
@@ -287,10 +439,16 @@ AnyModelConfig = Annotated[
         Annotated[Main_Checkpoint_Flux2_Config, Main_Checkpoint_Flux2_Config.get_tag()],
         Annotated[Main_Checkpoint_FLUX_Config, Main_Checkpoint_FLUX_Config.get_tag()],
         Annotated[Main_Checkpoint_QwenImage_Config, Main_Checkpoint_QwenImage_Config.get_tag()],
+        Annotated[Main_Checkpoint_QwenImage21_Config, Main_Checkpoint_QwenImage21_Config.get_tag()],
         Annotated[Main_Checkpoint_Wan_Config, Main_Checkpoint_Wan_Config.get_tag()],
         Annotated[Main_Checkpoint_ZImage_Config, Main_Checkpoint_ZImage_Config.get_tag()],
+        Annotated[Main_Checkpoint_ErnieImage_Config, Main_Checkpoint_ErnieImage_Config.get_tag()],
+        Annotated[Main_Checkpoint_Ideogram4_Config, Main_Checkpoint_Ideogram4_Config.get_tag()],
         Annotated[Main_Checkpoint_Krea2_Config, Main_Checkpoint_Krea2_Config.get_tag()],
         Annotated[Main_Checkpoint_Anima_Config, Main_Checkpoint_Anima_Config.get_tag()],
+        Annotated[Main_Checkpoint_MiniMaxH3_Config, Main_Checkpoint_MiniMaxH3_Config.get_tag()],
+        Annotated[Main_Checkpoint_LTX2_Config, Main_Checkpoint_LTX2_Config.get_tag()],
+        Annotated[Main_Checkpoint_MossImage_Config, Main_Checkpoint_MossImage_Config.get_tag()],
         # Main (Pipeline) - quantized formats
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
         # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
@@ -298,9 +456,14 @@ AnyModelConfig = Annotated[
         Annotated[Main_GGUF_Flux2_Config, Main_GGUF_Flux2_Config.get_tag()],
         Annotated[Main_GGUF_FLUX_Config, Main_GGUF_FLUX_Config.get_tag()],
         Annotated[Main_GGUF_QwenImage_Config, Main_GGUF_QwenImage_Config.get_tag()],
+        Annotated[Main_GGUF_QwenImage21_Config, Main_GGUF_QwenImage21_Config.get_tag()],
         Annotated[Main_GGUF_Wan_Config, Main_GGUF_Wan_Config.get_tag()],
         Annotated[Main_GGUF_ZImage_Config, Main_GGUF_ZImage_Config.get_tag()],
         Annotated[Main_GGUF_Krea2_Config, Main_GGUF_Krea2_Config.get_tag()],
+        Annotated[Main_GGUF_Ideogram4_Config, Main_GGUF_Ideogram4_Config.get_tag()],
+        Annotated[Main_GGUF_ErnieImage_Config, Main_GGUF_ErnieImage_Config.get_tag()],
+        Annotated[Main_GGUF_LTX2_Config, Main_GGUF_LTX2_Config.get_tag()],
+        Annotated[Main_GGUF_Anima_Config, Main_GGUF_Anima_Config.get_tag()],
         # IMPORTANT: FLUX.2 must be listed BEFORE FLUX.1 here. An ambiguous SDNQ transformer
         # checkpoint (prefixed FLUX.2 keys) can look like a FLUX.1 main model, so FLUX.2 must get
         # first refusal. Main_SDNQ_FLUX_Config additionally rejects FLUX.2 state dicts to keep the
@@ -316,19 +479,23 @@ AnyModelConfig = Annotated[
         Annotated[VAE_Checkpoint_SD2_Config, VAE_Checkpoint_SD2_Config.get_tag()],
         Annotated[VAE_Checkpoint_SDXL_Config, VAE_Checkpoint_SDXL_Config.get_tag()],
         Annotated[VAE_Checkpoint_FLUX_Config, VAE_Checkpoint_FLUX_Config.get_tag()],
+        Annotated[VAE_Checkpoint_SD3_Config, VAE_Checkpoint_SD3_Config.get_tag()],
         Annotated[VAE_Checkpoint_Flux2_Config, VAE_Checkpoint_Flux2_Config.get_tag()],
-        # IMPORTANT: VAE_Checkpoint_Wan_Config must be checked BEFORE QwenImage —
-        # both share the AutoencoderKLWan architecture and the Wan config relies
-        # on a filename heuristic to claim 16-channel files; ordering here lets
-        # Wan win when the filename suggests it.
+        # Wan and Qwen-Image share the 16-channel AutoencoderKLWan layout. The order here decides
+        # nothing (see "Configs must exclude each other" in new-model-integration.mdx): both configs
+        # defer on `_filename_suggests_wan`, which is what hands a file named for Wan to Wan.
         Annotated[VAE_Checkpoint_Wan_Config, VAE_Checkpoint_Wan_Config.get_tag()],
         Annotated[VAE_Checkpoint_QwenImage_Config, VAE_Checkpoint_QwenImage_Config.get_tag()],
         Annotated[VAE_Checkpoint_Anima_Config, VAE_Checkpoint_Anima_Config.get_tag()],
+        Annotated[VAE_Checkpoint_QwenImage21_Config, VAE_Checkpoint_QwenImage21_Config.get_tag()],
         # VAE - diffusers format
         Annotated[VAE_Diffusers_SD1_Config, VAE_Diffusers_SD1_Config.get_tag()],
         Annotated[VAE_Diffusers_SDXL_Config, VAE_Diffusers_SDXL_Config.get_tag()],
+        Annotated[VAE_Diffusers_FLUX_Config, VAE_Diffusers_FLUX_Config.get_tag()],
+        Annotated[VAE_Diffusers_SD3_Config, VAE_Diffusers_SD3_Config.get_tag()],
         Annotated[VAE_Diffusers_Flux2_Config, VAE_Diffusers_Flux2_Config.get_tag()],
         Annotated[VAE_Diffusers_Wan_Config, VAE_Diffusers_Wan_Config.get_tag()],
+        Annotated[VAE_Diffusers_QwenImage21_Config, VAE_Diffusers_QwenImage21_Config.get_tag()],
         # PiD Decoder - checkpoint format
         Annotated[PiDDecoder_Checkpoint_FLUX_Config, PiDDecoder_Checkpoint_FLUX_Config.get_tag()],
         Annotated[PiDDecoder_Checkpoint_Flux2_Config, PiDDecoder_Checkpoint_Flux2_Config.get_tag()],
@@ -342,6 +509,8 @@ AnyModelConfig = Annotated[
         Annotated[ControlNet_Checkpoint_FLUX_Config, ControlNet_Checkpoint_FLUX_Config.get_tag()],
         Annotated[ControlNet_Checkpoint_ZImage_Config, ControlNet_Checkpoint_ZImage_Config.get_tag()],
         Annotated[ControlNet_Checkpoint_Anima_Config, ControlNet_Checkpoint_Anima_Config.get_tag()],
+        Annotated[ControlNet_Checkpoint_QwenImage_Config, ControlNet_Checkpoint_QwenImage_Config.get_tag()],
+        Annotated[ControlNet_Checkpoint_Flux2_Config, ControlNet_Checkpoint_Flux2_Config.get_tag()],
         # ControlNet - diffusers format
         Annotated[ControlNet_Diffusers_SD1_Config, ControlNet_Diffusers_SD1_Config.get_tag()],
         Annotated[ControlNet_Diffusers_SD2_Config, ControlNet_Diffusers_SD2_Config.get_tag()],
@@ -358,6 +527,12 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_LyCORIS_ZImage_Config, LoRA_LyCORIS_ZImage_Config.get_tag()],
         Annotated[LoRA_LyCORIS_Krea2_Config, LoRA_LyCORIS_Krea2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_QwenImage_Config, LoRA_LyCORIS_QwenImage_Config.get_tag()],
+        # MiniMax H3 keys on H3-exclusive submodules (fused ``attn.qkv_proj``,
+        # ``adaln_proj.linear``) and rejects other architectures' signatures, so it
+        # is mutually exclusive with Wan/Anima regardless of order (locked in by
+        # ``test_minimax_h3_lora_probe_independence.py``).
+        Annotated[LoRA_LyCORIS_LTX2_Config, LoRA_LyCORIS_LTX2_Config.get_tag()],
+        Annotated[LoRA_LyCORIS_MiniMaxH3_Config, LoRA_LyCORIS_MiniMaxH3_Config.get_tag()],
         # Wan and Anima both target ``blocks.X`` shapes; their LoRA probes are
         # mutually exclusive — Wan rejects Anima's ``_proj``/``mlp``/
         # ``adaln_modulation`` markers, Anima requires at least one of those
@@ -388,8 +563,20 @@ AnyModelConfig = Annotated[
         # Qwen3-VL Encoder (Qwen3-VL multimodal encoder for Krea-2) - checked BEFORE the text-only Qwen3
         # encoder so single-file VL checkpoints (which also carry generic model.layers.* keys) are not
         # misclassified as the Z-Image Qwen3 encoder. The VL probe requires the visual tower.
+        # MiniMax H3's truncated 32B conditioning encoder goes first: it matches on explicit
+        # safetensors metadata without reading tensors, and the Krea-2 config below is locked to
+        # the 4B shape so neither can claim the other's files.
+        Annotated[Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config, Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config.get_tag()],
         Annotated[Qwen3VLEncoder_Checkpoint_Config, Qwen3VLEncoder_Checkpoint_Config.get_tag()],
+        # Kept mutually exclusive with Qwen3Encoder_GGUF_Config by an architecture-metadata check on
+        # both sides, NOT by position in this list: identification iterates `Config_Base.CONFIG_CLASSES`
+        # (a set) and `matches_sort_key` puts both encoders in the same bucket, so a double match would
+        # be resolved by arbitrary set-iteration order. The check is load-bearing because llama.cpp
+        # keeps the visual tower in a separate mmproj file -- a Qwen3-VL GGUF has none to probe for and
+        # satisfies the text-only Qwen3 GGUF heuristic in full.
+        Annotated[Qwen3VLEncoder_GGUF_Config, Qwen3VLEncoder_GGUF_Config.get_tag()],
         Annotated[Qwen3VLEncoder_Qwen3VLEncoder_Config, Qwen3VLEncoder_Qwen3VLEncoder_Config.get_tag()],
+        Annotated[Qwen35Encoder_Checkpoint_Config, Qwen35Encoder_Checkpoint_Config.get_tag()],
         # Qwen3 Encoder
         Annotated[Qwen3Encoder_Qwen3Encoder_Config, Qwen3Encoder_Qwen3Encoder_Config.get_tag()],
         Annotated[Qwen3Encoder_Checkpoint_Config, Qwen3Encoder_Checkpoint_Config.get_tag()],
@@ -402,6 +589,8 @@ AnyModelConfig = Annotated[
         Annotated[MistralEncoder_GGUF_Config, MistralEncoder_GGUF_Config.get_tag()],
         # Gemma 2 Encoder (used by PiD)
         Annotated[Gemma2Encoder_Gemma2Encoder_Config, Gemma2Encoder_Gemma2Encoder_Config.get_tag()],
+        Annotated[Gemma4Encoder_Gemma4Encoder_LTX2_Config, Gemma4Encoder_Gemma4Encoder_LTX2_Config.get_tag()],
+        Annotated[Gemma4Encoder_GGUF_LTX2_Config, Gemma4Encoder_GGUF_LTX2_Config.get_tag()],
         Annotated[Gemma2Encoder_GGUF_Config, Gemma2Encoder_GGUF_Config.get_tag()],
         # Qwen VL Encoder (Qwen2.5-VL multimodal encoder for Qwen Image)
         Annotated[QwenVLEncoder_Diffusers_Config, QwenVLEncoder_Diffusers_Config.get_tag()],
@@ -425,6 +614,7 @@ AnyModelConfig = Annotated[
         Annotated[IPAdapter_Checkpoint_SD2_Config, IPAdapter_Checkpoint_SD2_Config.get_tag()],
         Annotated[IPAdapter_Checkpoint_SDXL_Config, IPAdapter_Checkpoint_SDXL_Config.get_tag()],
         Annotated[IPAdapter_Checkpoint_FLUX_Config, IPAdapter_Checkpoint_FLUX_Config.get_tag()],
+        Annotated[IPAdapter_Checkpoint_Anima_Config, IPAdapter_Checkpoint_Anima_Config.get_tag()],
         # T2I Adapter - diffusers format
         Annotated[T2IAdapter_Diffusers_SD1_Config, T2IAdapter_Diffusers_SD1_Config.get_tag()],
         Annotated[T2IAdapter_Diffusers_SDXL_Config, T2IAdapter_Diffusers_SDXL_Config.get_tag()],
@@ -432,9 +622,12 @@ AnyModelConfig = Annotated[
         Annotated[Spandrel_Checkpoint_Config, Spandrel_Checkpoint_Config.get_tag()],
         Annotated[CLIPEmbed_Diffusers_G_Config, CLIPEmbed_Diffusers_G_Config.get_tag()],
         Annotated[CLIPEmbed_Diffusers_L_Config, CLIPEmbed_Diffusers_L_Config.get_tag()],
+        Annotated[CLIPEmbed_Checkpoint_G_Config, CLIPEmbed_Checkpoint_G_Config.get_tag()],
+        Annotated[CLIPEmbed_Checkpoint_L_Config, CLIPEmbed_Checkpoint_L_Config.get_tag()],
         Annotated[CLIPVision_Diffusers_Config, CLIPVision_Diffusers_Config.get_tag()],
         Annotated[SigLIP_Diffusers_Config, SigLIP_Diffusers_Config.get_tag()],
         Annotated[FLUXRedux_Checkpoint_Config, FLUXRedux_Checkpoint_Config.get_tag()],
+        Annotated[LTX2DurationHead_Checkpoint_Config, LTX2DurationHead_Checkpoint_Config.get_tag()],
         Annotated[LlavaOnevision_Diffusers_Config, LlavaOnevision_Diffusers_Config.get_tag()],
         Annotated[TextLLM_Diffusers_Config, TextLLM_Diffusers_Config.get_tag()],
         Annotated[ExternalApiModelConfig, ExternalApiModelConfig.get_tag()],
@@ -487,6 +680,52 @@ class ModelClassificationResult:
 
 
 class ModelConfigFactory:
+    @staticmethod
+    def _detach_traceback(e: Exception) -> Exception:
+        """Drop the traceback and exception chain from a failed match before it is stored.
+
+        A stored traceback pins the frames of the config class that raised it, and those frames hold the
+        model's whole state dict in their locals. Exception/traceback/frame is a reference cycle, so the
+        state dict survives until the cyclic collector runs - and that collector is driven by object
+        counts, while a state dict is a few thousand objects holding gigabytes. Installing a queue of
+        models therefore accumulates every probed checkpoint in RAM (and, for safetensors, keeps the file
+        mapped, which is why moving the file afterwards needs retries on Windows).
+
+        Nothing reads these tracebacks: `details` is only ever consumed for the exception's type and
+        message.
+        """
+        e.__traceback__ = None
+        e.__context__ = None
+        e.__cause__ = None
+        return e
+
+    @staticmethod
+    def _raise_for_unsupported_gguf_quantization(mod: ModelOnDisk, config: Config_Base) -> None:
+        """Refuse a GGUF whose ComfyUI-GGUF quantization the matched config's loader cannot decode.
+
+        Here rather than in each GGUF config: the question is the same for all of them, and a GGUF config
+        added later is refused by default instead of installing a file it fails on at the first render.
+        `InvalidMatchError`, so the installer shows the reason rather than registering an unknown model.
+        Read from the cached metadata, so a large file is not re-read once per candidate.
+        """
+        if getattr(config, "format", None) is not ModelFormat.GGUFQuantized:
+            return
+        metadata = mod.metadata()
+        if not type(config).DECODES_GGUF_Q8_CR:
+            # Nothing this config's loader runs decodes any of the converter's schemes, so whatever its
+            # JSON says is beside the point -- parsing it first would report a detail of the scheme (a
+            # marker on a tensor that is not a weight, say) in place of the reason the file is refused.
+            if any(key.startswith(COMFY_QUANT_KEY_PREFIX) for key in metadata):
+                raise InvalidMatchError(
+                    f"{mod.path.name} uses ComfyUI-GGUF's own quantization (Q8_CR or similar), which this model "
+                    "type cannot load yet. Use a GGML-quantized (Q8_0, Q4_K, ...) or safetensors build instead."
+                )
+            return
+        try:
+            parse_q8_cr_markers(metadata, mod.path.name)
+        except ValueError as e:
+            raise InvalidMatchError(str(e)) from None
+
     @staticmethod
     def from_dict(fields: dict[str, Any]) -> AnyModelConfig:
         """Return the appropriate config object from raw dict values."""
@@ -692,24 +931,35 @@ class ModelConfigFactory:
         for candidate_class in filter(lambda x: x is not Unknown_Config, Config_Base.CONFIG_CLASSES):
             candidate_name = candidate_class.__name__
             try:
+                candidate_fields = fields
+                # Preserve the explicit encoder choice for InvokeAI IP-Adapter probes; this field is not part of
+                # the common model record changes, but re-identification can carry it from the stored config.
+                if (
+                    override_fields is not None
+                    and "image_encoder_model_id" in override_fields
+                    and "image_encoder_model_id" in candidate_class.model_fields
+                ):
+                    candidate_fields = {**fields, "image_encoder_model_id": override_fields["image_encoder_model_id"]}
                 # Technically, from_model_on_disk returns a Config_Base, but in practice it will always be a member of
                 # the AnyModelConfig union.
-                details[candidate_name] = candidate_class.from_model_on_disk(mod, fields)  # type: ignore
+                candidate = candidate_class.from_model_on_disk(mod, candidate_fields)
+                ModelConfigFactory._raise_for_unsupported_gguf_quantization(mod, candidate)
+                details[candidate_name] = candidate  # type: ignore
             except NotAMatchError as e:
                 # This means the model didn't match this config class. It's not an error, just no match.
-                details[candidate_name] = e
+                details[candidate_name] = ModelConfigFactory._detach_traceback(e)
             except InvalidMatchError as e:
                 # This means the model *is* this config class' kind of model, but is unusable (e.g. a
                 # truncated checkpoint). Recorded like any other result here; the fallback below is
                 # what treats it differently from a plain no-match.
-                details[candidate_name] = e
+                details[candidate_name] = ModelConfigFactory._detach_traceback(e)
             except ValidationError as e:
                 # This means the model matched, but we couldn't create the pydantic model instance for the config.
                 # Maybe invalid overrides were provided?
-                details[candidate_name] = e
+                details[candidate_name] = ModelConfigFactory._detach_traceback(e)
             except Exception as e:
                 # Some other unexpected error occurred. Store the exception for reporting later.
-                details[candidate_name] = e
+                details[candidate_name] = ModelConfigFactory._detach_traceback(e)
 
         # Extract just the successful matches
         matches = [r for r in details.values() if isinstance(r, Config_Base)]
@@ -736,16 +986,34 @@ class ModelConfigFactory:
         # Now do any post-processing needed for specific model types/bases/etc.
         match config.type:
             case ModelType.Main:
-                # Pass variant if available (e.g., for Flux2 models). Name and path are used to
-                # detect ERNIE-Image-Turbo, which has no distinct variant on the config.
+                # Variant, name and path all narrow the result: four architectures have
+                # per-variant defaults, and ERNIE-Image-Turbo has no variant on the config at all,
+                # so its name is the only signal. What each architecture recommends lives in
+                # invokeai/backend/architectures/defs/.
                 variant = getattr(config, "variant", None)
-                config.default_settings = MainModelDefaultSettings.from_base(
-                    config.base, variant, config.name, config.path
+                config.default_settings = _identified_default_settings(
+                    resolve_default_settings(config.base, variant, config.name, config.path),
+                    MainModelDefaultSettings,
+                    mod,
+                    override_fields,
+                    config=config,
                 )
             case ModelType.ControlNet | ModelType.T2IAdapter | ModelType.ControlLoRa:
-                config.default_settings = ControlAdapterDefaultSettings.from_model_name(config.name)
+                config.default_settings = _identified_default_settings(
+                    ControlAdapterDefaultSettings.from_model_name(config.name),
+                    ControlAdapterDefaultSettings,
+                    mod,
+                    override_fields,
+                    config=config,
+                )
             case ModelType.LoRA:
-                config.default_settings = LoraModelDefaultSettings()
+                config.default_settings = _identified_default_settings(
+                    LoraModelDefaultSettings(),
+                    LoraModelDefaultSettings,
+                    mod,
+                    override_fields,
+                    config=config,
+                )
             case _:
                 pass
 

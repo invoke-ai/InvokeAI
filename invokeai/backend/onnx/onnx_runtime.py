@@ -1,4 +1,3 @@
-# Copyright (c) 2024 The InvokeAI Development Team
 import os
 import sys
 from pathlib import Path

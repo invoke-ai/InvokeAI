@@ -10,10 +10,11 @@ Some Anima LoRAs also target the Qwen3 text encoder with lora_te_ prefix keys
 """
 
 import re
-from typing import Dict
+from typing import Dict, Optional
 
 import torch
 
+from invokeai.backend.anima.block_layout import KNOWN_DEPTHS, adapter_block_positions
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
@@ -64,6 +65,18 @@ _KOHYA_UNET_KEY_REPLACEMENTS = [
     ("mlp_layer2", "mlp.layer2"),
 ]
 
+# Anima's six trainable linear modules outside the DiT and LLM-adapter blocks. These need exact
+# mappings because their leaf names contain underscores (for example ``linear_1``), so they cannot
+# be recovered safely by splitting every underscore into a period.
+_KOHYA_UNET_NON_BLOCK_KEY_MAP = {
+    "final_layer_linear": "final_layer.linear",
+    "final_layer_adaln_modulation_1": "final_layer.adaln_modulation.1",
+    "final_layer_adaln_modulation_2": "final_layer.adaln_modulation.2",
+    "t_embedder_1_linear_1": "t_embedder.1.linear_1",
+    "t_embedder_1_linear_2": "t_embedder.1.linear_2",
+    "x_embedder_proj_1": "x_embedder.proj.1",
+}
+
 # Mapping for Qwen3 text encoder Kohya keys.
 _KOHYA_TE_KEY_REPLACEMENTS = [
     ("self_attn_k_proj", "self_attn.k_proj"),
@@ -81,10 +94,14 @@ def _convert_kohya_unet_key(kohya_layer_name: str) -> str:
 
     Example: lora_unet_blocks_0_cross_attn_k_proj -> blocks.0.cross_attn.k_proj
     Example: lora_unet_llm_adapter_blocks_0_cross_attn_k_proj -> llm_adapter.blocks.0.cross_attn.k_proj
+    Example: lora_unet_final_layer_linear -> final_layer.linear
     """
     key = kohya_layer_name
     if key.startswith("lora_unet_"):
         key = key[len("lora_unet_") :]
+
+    if non_block_key := _KOHYA_UNET_NON_BLOCK_KEY_MAP.get(key):
+        return non_block_key
 
     # Handle llm_adapter prefix: strip it, run the standard block conversion, then re-add with dot
     llm_adapter_prefix = ""
@@ -298,3 +315,31 @@ def lora_model_from_anima_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
             layers[final_key] = layer
 
     return ModelPatchRaw(layers=layers)
+
+
+_TRANSFORMER_BLOCK_KEY_RE = re.compile(rf"^{re.escape(ANIMA_LORA_TRANSFORMER_PREFIX)}blocks\.(\d+)\.")
+
+
+def anima_lora_for_depth(patch: ModelPatchRaw, target_depth: int) -> tuple[ModelPatchRaw, Optional[int]]:
+    """The LoRA with its DiT block keys moved to where `target_depth`'s model keeps the blocks it was trained on.
+
+    A LoRA trained on Anima base, applied to a depth-expanded finetune (see `invokeai.backend.anima.block_layout`),
+    would otherwise patch the wrong blocks from the third one on. Returns the patch -- a new one sharing the layers,
+    so the cached LoRA stays as it is -- and the depth it was moved from, or the patch itself and None when nothing
+    moves. Only `blocks.N.` keys of the transformer move; the LLM adapter's own `llm_adapter.blocks.N.` and the text
+    encoder's keys do not.
+    """
+    indices = [int(match.group(1)) for key in patch.layers if (match := _TRANSFORMER_BLOCK_KEY_RE.match(key))]
+    if not indices:
+        return patch, None
+    positions = adapter_block_positions(max(indices), target_depth)
+    if positions is None:
+        return patch, None
+
+    def moved(key: str) -> str:
+        return _TRANSFORMER_BLOCK_KEY_RE.sub(
+            lambda m: f"{ANIMA_LORA_TRANSFORMER_PREFIX}blocks.{positions[int(m.group(1))]}.", key, count=1
+        )
+
+    source_depth = next(depth for depth in KNOWN_DEPTHS if depth > max(indices))
+    return ModelPatchRaw(layers={moved(key): layer for key, layer in patch.layers.items()}), source_depth

@@ -1,0 +1,542 @@
+import type { GeneratedImageContract } from '@features/gallery';
+
+export type RegionalGuidanceReferenceImageAsset = GeneratedImageContract;
+
+export type RegionalGuidanceIPAdapterMethod = 'full' | 'style' | 'composition' | 'style_strong' | 'style_precise';
+
+export interface RegionalGuidanceModelRef {
+  key: string;
+  name: string;
+  base: string;
+  type: string;
+  format?: string;
+  variant?: string | null;
+  hash?: string;
+  submodel_type?: string;
+  [key: string]: unknown;
+}
+
+export type RegionalGuidanceReferenceImageConfig =
+  | {
+      type: 'ip_adapter';
+      image: RegionalGuidanceReferenceImageAsset | null;
+      model: RegionalGuidanceModelRef | null;
+      weight: number;
+      beginEndStepPct: [number, number];
+      method: RegionalGuidanceIPAdapterMethod;
+      clipVisionModel: 'ViT-H' | 'ViT-G' | 'ViT-L';
+    }
+  | {
+      type: 'flux_redux';
+      image: RegionalGuidanceReferenceImageAsset | null;
+      model: RegionalGuidanceModelRef | null;
+      imageInfluence: 'lowest' | 'low' | 'medium' | 'high' | 'highest';
+    };
+
+export interface RegionalGuidanceReferenceImage {
+  id: string;
+  isEnabled: boolean;
+  config: RegionalGuidanceReferenceImageConfig;
+}
+
+export interface CanvasPlacementContract {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  opacity: number;
+}
+
+export interface CanvasStagingCandidateContract extends GeneratedImageContract {
+  placement: CanvasPlacementContract;
+  sourceBackendItemId?: number;
+}
+
+/** The legacy-shaped staging area; v3 state extends it with `autoSwitchMode`. */
+export interface CanvasStagingAreaContract {
+  sourceQueueItemId?: string;
+  selectedLayerId?: string;
+  pendingImageIds: string[];
+  pendingImages: CanvasStagingCandidateContract[];
+  selectedImageIndex: number;
+  isVisible: boolean;
+  areThumbnailsVisible: boolean;
+}
+
+// Four top-first stack forests hold raster, control, regional guidance and inpaint nodes. Leaves use transforms
+// and stable image names, never ephemeral URLs. Groups gate descendant enabled, locked and hidden state.
+
+export type CanvasBlendMode =
+  | 'normal'
+  | 'multiply'
+  | 'screen'
+  | 'overlay'
+  | 'darken'
+  | 'lighten'
+  | 'color-dodge'
+  | 'color-burn'
+  | 'hard-light'
+  | 'soft-light'
+  | 'difference'
+  | 'exclusion'
+  | 'hue'
+  | 'saturation'
+  | 'color'
+  | 'luminosity';
+
+/**
+ * Stable custom-font identity. Persist family and label for unresolved-font recovery; browser-only family aliases
+ * are never persisted.
+ */
+export interface CanvasTextFontRef {
+  id: string;
+  contentHash: string;
+  family: string;
+  label: string;
+}
+
+/** CSS font style accepted by both CanvasRenderingContext2D and FontFace. */
+export type CanvasTextFontStyle = 'normal' | 'italic' | 'oblique';
+
+/** Explicit OpenType variation coordinates, keyed by four-character axis tag. */
+export type CanvasTextFontVariations = Readonly<Record<string, number>>;
+
+/** A reference to a persisted image asset by name, not by resolved URL. */
+export interface CanvasImageRef {
+  imageName: string;
+  width: number;
+  height: number;
+  contentHash?: string;
+}
+
+/** The box-parametric shape kinds; `polygon` carries its own point list instead. */
+export type ParametricShapeKind = 'rect' | 'ellipse' | 'triangle' | 'star';
+
+export type CanvasLayerSourceContract =
+  | {
+      type: 'paint';
+      bitmap: CanvasImageRef | null;
+      /**
+       * Bitmap origin in layer-local pixels, possibly negative. Paint bitmaps cover only content; absent or zero
+       * preserves legacy document-sized bitmaps at the origin.
+       */
+      offset?: { x: number; y: number };
+    }
+  | { type: 'image'; image: CanvasImageRef }
+  | {
+      type: 'text';
+      content: string;
+      fontFamily: string;
+      fontSize: number;
+      fontWeight: number;
+      /** Optional stable custom-font identity; omitted for built-in/legacy text. */
+      fontRef?: CanvasTextFontRef;
+      /** Defaults to `normal` for documents written before v4. */
+      fontStyle?: CanvasTextFontStyle;
+      /** Defaults to an empty coordinate set for documents written before v4. */
+      fontVariations?: CanvasTextFontVariations;
+      lineHeight: number;
+      align: 'left' | 'center' | 'right';
+      color: string;
+    }
+  | {
+      type: 'shape';
+      kind: ParametricShapeKind | 'polygon';
+      /** Polygon vertices in layer-local px across the `width`×`height` box, closed implicitly. */
+      points?: { x: number; y: number }[];
+      width: number;
+      height: number;
+      fill: string | null;
+      stroke: string | null;
+      strokeWidth: number;
+    }
+  | {
+      type: 'gradient';
+      kind: 'linear' | 'radial';
+      angle: number;
+      stops: { offset: number; color: string }[];
+      /**
+       * Layer-local gradient extent, initialized from the bbox and preserved across angle edits. Legacy absence
+       * defaults to document dimensions via `getSourceContentRect`.
+       */
+      width?: number;
+      height?: number;
+      /**
+       * Where the gradient sits in the extent (layer-local px): the midpoint of
+       * a linear ramp, or the radial center. Absent = the extent center.
+       */
+      center?: { x: number; y: number };
+      /** Linear stop distance or radial radius; absence fits the ramp to the extent. */
+      span?: number;
+    };
+
+/** The pixel-backed sources: an uploaded image or a paint bitmap. */
+export type CanvasPixelSourceContract = Extract<CanvasLayerSourceContract, { type: 'image' | 'paint' }>;
+
+/** Photoshop's layer-color palette; also the PSD `layerColor` vocabulary. */
+export const CANVAS_COLOR_LABELS = ['red', 'orange', 'yellow', 'green', 'blue', 'violet', 'gray'] as const;
+export type CanvasColorLabel = (typeof CANVAS_COLOR_LABELS)[number];
+
+export interface CanvasLayerBaseContract {
+  id: string;
+  name: string;
+  isEnabled: boolean;
+  isLocked: boolean;
+  opacity: number;
+  blendMode: CanvasBlendMode;
+  /** Organizational color label; display-only, absent means none. */
+  colorLabel?: CanvasColorLabel;
+  transform: { x: number; y: number; scaleX: number; scaleY: number; rotation: number };
+}
+
+export interface CanvasAdjustmentCurves {
+  r?: [number, number][];
+  g?: [number, number][];
+  b?: [number, number][];
+}
+
+interface CanvasAdjustmentEntryBase {
+  id: string;
+  isEnabled: boolean;
+  /** A user-given name; absent entries display their type's name. */
+  name?: string;
+}
+
+/**
+ * Non-destructive raster adjustment, applied in list order. Disabling preserves settings while excluding it from
+ * renders.
+ */
+export type CanvasAdjustmentEntry =
+  | (CanvasAdjustmentEntryBase & { type: 'brightness-contrast'; brightness: number; contrast: number })
+  | (CanvasAdjustmentEntryBase & {
+      type: 'exposure';
+      /** Photographic stops, −5 to +5, applied in linear light (2^stops). */
+      stops: number;
+    })
+  | (CanvasAdjustmentEntryBase & {
+      type: 'levels';
+      /** Input remap: 0–255 with `inBlack < inWhite`; `gamma` is the midtone exponent base (1 = linear). */
+      inBlack: number;
+      inWhite: number;
+      gamma: number;
+      outBlack: number;
+      outWhite: number;
+      /** Which channels the remap drives; absent ⇒ all three. */
+      channel?: 'rgb' | 'r' | 'g' | 'b';
+    })
+  | (CanvasAdjustmentEntryBase & { type: 'curves'; curves: CanvasAdjustmentCurves })
+  | (CanvasAdjustmentEntryBase & { type: 'hsl'; saturation: number })
+  | (CanvasAdjustmentEntryBase & {
+      type: 'hue';
+      /** Rotation around the color wheel in degrees, -180 to 180. */
+      rotation: number;
+    })
+  | (CanvasAdjustmentEntryBase & { type: 'invert' })
+  | (CanvasAdjustmentEntryBase & {
+      /** Film grain; alpha is untouched and fully transparent pixels stay transparent. */
+      type: 'noise';
+      /**
+       * Sample shape. Both share the standard deviation `amount` sets, so switching keeps perceived strength. Grain
+       * larger than one pixel sums many samples, so both tend toward gaussian as `size` grows.
+       */
+      distribution: 'gaussian' | 'uniform';
+      /**
+       * `monochrome`: one sample shared by R, G and B (luminance grain). `color`: an independent sample per channel.
+       * `chroma`: independent samples on OKLab a and b, keeping OKLab lightness, so only hue and colorfulness vary.
+       */
+      grain: 'monochrome' | 'color' | 'chroma';
+      /**
+       * `flat`: the same strength at every tone. `midtones`: strength scales by 4·Y′·(1 − Y′), with Y′ the Rec. 709 luma
+       * (0–1) of the pixel entering the noise pass, so grain is full at mid-grey and fades to none at black and white.
+       */
+      response: 'flat' | 'midtones';
+      /**
+       * Grain size in reference-space pixels, finite, 1–8: grains about `size` pixels across. 1 is an independent
+       * sample per pixel; larger sizes blur that sample field with a Gaussian of standard deviation `√(size² − 1) / 2`
+       * pixels (squared widths add: one pixel's 1 plus the blur's 4σ²), renormalized so strength stays the standard
+       * deviation `amount` sets. Sizes under about 1.14, whose blur no 8-bit pixel would show, render as 1.
+       */
+      size: number;
+      /**
+       * Strength 0–1, the standard deviation at full response. Monochrome and color: `amount × 128` in 0–255 channel
+       * units, so 100% is half the channel range (very heavy, mostly clipped), 1–5% subtle grain or dither and 10%
+       * clearly visible grain. Chroma: `amount × 0.32` on OKLab a and b each, about the total OKLab spread color grain
+       * of the same amount gives mid-grey, so equal amounts look comparably strong. 0 is identity.
+       */
+      amount: number;
+      /**
+       * Pattern seed, uint32. Noise is a pure function of the seed, the integer pixel coordinate in the stack's
+       * reference space (layer-local pixels for a layer's own stack, document pixels for a group's) and the channel.
+       */
+      seed: number;
+    })
+  /**
+   * Spatial entries match the backend's Clarity, Texture and Contrast Dehaze nodes. Each reads a neighborhood of
+   * OKLab lightness across the owner's whole surface (layer-local pixels for a layer's stack, document pixels for a
+   * group's) within its alpha bounds, so unlike the entries above it is neither per-pixel nor region independent.
+   * `amount` is a percentage, −200 to 200 (0 is identity); out-of-range values are clamped when evaluated.
+   */
+  | (CanvasAdjustmentEntryBase & {
+      /** Local contrast of mid-size detail, midtones weighted. `size`: feature size in pixels, 4–1000. */
+      type: 'clarity';
+      amount: number;
+      size: number;
+    })
+  | (CanvasAdjustmentEntryBase & {
+      /** Local contrast of fine detail; positive amounts spare noise-level flat areas. `size`: pixels, 1–100. */
+      type: 'texture';
+      amount: number;
+      size: number;
+    })
+  | (CanvasAdjustmentEntryBase & {
+      /** Removes (positive) or adds (negative) haze; its radius follows the alpha bounds' shorter side. */
+      type: 'dehaze';
+      amount: number;
+    });
+
+/** A raster layer's ordered adjustment stack, applied top to bottom. */
+export type CanvasAdjustmentsContract = readonly CanvasAdjustmentEntry[];
+
+export interface CanvasControlAdapterContract {
+  kind:
+    | 'controlnet'
+    | 't2i_adapter'
+    | 'control_lora'
+    | 'z_image_control'
+    | 'anima_lllite'
+    | 'qwen_image_control'
+    | 'flux2_control';
+  model: string | null;
+  weight: number;
+  beginEndStepPct: [number, number];
+  controlMode: 'balanced' | 'more_prompt' | 'more_control' | 'unbalanced' | null;
+}
+
+export interface CanvasMaskFillContract {
+  style: 'solid' | 'grid' | 'crosshatch' | 'diagonal' | 'horizontal' | 'vertical';
+  color: string;
+}
+
+export interface CanvasMaskContract {
+  bitmap: CanvasImageRef | null;
+  fill: CanvasMaskFillContract;
+  /**
+   * Content-sized mask bitmap origin in layer-local pixels, possibly negative. Absent or zero preserves legacy
+   * document-sized masks; matches {@link CanvasLayerSourceContract} paint offsets.
+   */
+  offset?: { x: number; y: number };
+}
+
+/**
+ * Singleton regenerate region using the raster layer's live alpha as inpaint coverage. It follows strokes, erasure
+ * and transforms, contributes while the layer does, and stores only overlay fill. Absence means never added.
+ */
+export interface CanvasLayerRegionContract {
+  isEnabled: boolean;
+  name?: string;
+  fill: CanvasMaskFillContract;
+}
+
+export interface CanvasRasterLayerContractV2 extends CanvasLayerBaseContract {
+  type: 'raster';
+  source: CanvasLayerSourceContract;
+  adjustments?: CanvasAdjustmentsContract;
+  inpaint?: CanvasLayerRegionContract;
+  isTransparencyLocked?: boolean;
+  filter?: { type: string; settings: Record<string, unknown> };
+}
+
+/** What a control layer's image should control; a closed set, so an unknown value refuses the document. */
+export const CONTROL_TYPES = ['pose', 'depth', 'edges', 'softedge', 'lineart', 'sketch', 'color', 'tile'] as const;
+export type ControlType = (typeof CONTROL_TYPES)[number];
+
+/** A detector (filter node type) and its settings; the type string stays open so newer detectors survive a load. */
+export interface CanvasControlDetectionContract {
+  type: string;
+  settings: Record<string, unknown>;
+}
+
+/**
+ * Control layers may derive their map from a kept original. Invariants (`document/controlDerivation.ts`):
+ * I1 no `controlType` ⇒ no `detection`, `original` or `originalTransform`;
+ * I2 `detection === null` ⇒ no `original`: `source` is used as-is;
+ * I3 `original` present ⇒ `detection` is an object and `source` is the map derived from it;
+ * I4 the map is current when `detection` is null or absent, or an `original` is kept and `filter` structurally equals
+ * `detection`;
+ * I5 detection runs on `original ?? (filter ? null : source)`, so map-only layers cannot re-detect.
+ */
+export interface CanvasControlLayerContract extends CanvasLayerBaseContract {
+  type: 'control';
+  /** The pixels generation uses: the derived map once detection ran. */
+  source: CanvasLayerSourceContract;
+  adapter: CanvasControlAdapterContract;
+  withTransparencyEffect: boolean;
+  /** The filter that produced `source`'s pixels; absent when they are not a filter result. */
+  filter?: CanvasControlDetectionContract;
+  /**
+   * Display-only visibility for overlay layers; generation is unchanged. Absence means visible. Raster layers
+   * instead use `isEnabled` for both visibility and participation.
+   */
+  isHidden?: boolean;
+  /** What the image controls. Absent means no type chosen (legacy or new); never written as null. */
+  controlType?: ControlType;
+  /** The detector for `controlType`. `null` means "None: use the image as-is"; absent means legacy (no choice). */
+  detection?: CanvasControlDetectionContract | null;
+  /** The pre-detection pixels, kept so detection can re-run; a persisted image reference like `source`. */
+  original?: CanvasPixelSourceContract;
+  /** Maps `original`'s local frame into the layer-local frame of `source`; absent means identity. */
+  originalTransform?: CanvasLayerBaseContract['transform'];
+}
+
+/**
+ * The roles a region can take in a layout prompt, in the order the settings offer them; the load schema and the
+ * settings read this list. A closed persisted set: a build that does not know a stored role refuses the canvas instead
+ * of rewriting it (`projects/README.md`, "Additive canvas values"). Canvas invocation hands each role to Generation's
+ * layout type, so a role the graph cannot send fails to compile there.
+ */
+export const CANVAS_REGIONAL_LAYOUT_KINDS = ['object', 'character', 'text'] as const;
+
+/**
+ * A region's role for models that compose the image from layout boxes (MOSS-Image). `text` is the exact visible text
+ * of a `text` region; other kinds keep it so switching back restores it.
+ */
+export interface CanvasRegionalLayoutContract {
+  kind: (typeof CANVAS_REGIONAL_LAYOUT_KINDS)[number];
+  text?: string;
+}
+
+export interface CanvasRegionalGuidanceLayerContract extends CanvasLayerBaseContract {
+  type: 'regional_guidance';
+  mask: CanvasMaskContract;
+  positivePrompt: string | null;
+  negativePrompt: string | null;
+  autoNegative: boolean;
+  referenceImages: RegionalGuidanceReferenceImage[];
+  /** Layout role for layout-based models; absence means an object region. Mask-based models ignore it. */
+  layout?: CanvasRegionalLayoutContract;
+  /**
+   * Display-only visibility for overlay layers; generation is unchanged. Absence means visible. Raster layers
+   * instead use `isEnabled` for both visibility and participation.
+   */
+  isHidden?: boolean;
+}
+
+/** A mask's noise modifier; disabling keeps the tuned level out of generation without losing it. */
+export interface CanvasMaskNoiseContract {
+  level: number;
+  isEnabled: boolean;
+}
+
+/** A mask's denoise-limit modifier; disabled or absent, generation uses the default limit. */
+export interface CanvasMaskDenoiseContract {
+  limit: number;
+  isEnabled: boolean;
+}
+
+export interface CanvasInpaintMaskLayerContract extends CanvasLayerBaseContract {
+  type: 'inpaint_mask';
+  mask: CanvasMaskContract;
+  /** Absent ⇒ the modifier was never added; the Layers tree projects it as a child row. */
+  noise?: CanvasMaskNoiseContract;
+  denoise?: CanvasMaskDenoiseContract;
+  /**
+   * Display-only visibility for overlay layers; generation is unchanged. Absence means visible. Raster layers
+   * instead use `isEnabled` for both visibility and participation.
+   */
+  isHidden?: boolean;
+}
+
+export type CanvasLayerContract =
+  | CanvasRasterLayerContractV2
+  | CanvasControlLayerContract
+  | CanvasRegionalGuidanceLayerContract
+  | CanvasInpaintMaskLayerContract;
+
+export type CanvasLayerStackKind = CanvasLayerContract['type'];
+
+/**
+ * Groups contain only their own stack's nodes. `isHidden` is display-only and valid only for overlay stacks.
+ * Raster-only adjustments apply to composited children before the parent; identity adjustments pass through.
+ */
+export interface CanvasGroupContract {
+  id: string;
+  type: 'group';
+  name: string;
+  isEnabled: boolean;
+  isLocked: boolean;
+  isHidden?: boolean;
+  /** Raster-stack groups only; absent means 1. Applies to the group's isolated composite. */
+  opacity?: number;
+  /** Raster-stack groups only; absent means 'normal'. Applies to the group's isolated composite. */
+  blendMode?: CanvasBlendMode;
+  /** Organizational color label; display-only, absent means none. */
+  colorLabel?: CanvasColorLabel;
+  adjustments?: CanvasAdjustmentsContract;
+  /** Index 0 is the top-most child. */
+  children: CanvasNodeContract[];
+}
+
+export type CanvasNodeContract = CanvasLayerContract | CanvasGroupContract;
+
+/** One top-first forest per stack; a node's stack is the forest it lives in. */
+export type CanvasStackForests = Record<CanvasLayerStackKind, CanvasNodeContract[]>;
+
+/** The composition order, bottom stack first; the one table every consumer reads. */
+export const LAYER_STACK_ORDER: readonly CanvasLayerStackKind[] = [
+  'raster',
+  'control',
+  'regional_guidance',
+  'inpaint_mask',
+];
+
+/** The same stacks as the panel lists them, top first. */
+export const LAYER_STACKS_TOP_FIRST: readonly CanvasLayerStackKind[] = [...LAYER_STACK_ORDER].reverse();
+
+export const CANVAS_MAX_NODE_DEPTH = 10;
+export const CANVAS_MAX_NODE_COUNT = 10_000;
+
+export interface CanvasDocumentContractV3 {
+  /**
+   * Schema this document needs: 3 for plain content, 4 for custom-font typography, 5 for noise or spatial
+   * (clarity, texture, dehaze) adjustments, 6 for control-layer derivation fields. Each document mutation raises it to
+   * the newer of its content's need and the canvas state's version. A restored snapshot's document keeps its own,
+   * possibly lower, version until the next mutation; the state's version and the project's compatibility floor stay
+   * put meanwhile.
+   */
+  version: 3 | 4 | 5 | 6;
+  width: number;
+  height: number;
+  background: 'transparent' | { color: string };
+  stacks: CanvasStackForests;
+  bbox: { x: number; y: number; width: number; height: number };
+  /** A leaf or a group; leaf-only tools refuse a group rather than guessing a descendant. */
+  selectedLayerId: string | null;
+}
+
+export interface CanvasSnapshotContract {
+  id: string;
+  name: string;
+  createdAt: string;
+  document: CanvasDocumentContractV3;
+}
+
+export interface CanvasStagingAreaContractV2 extends CanvasStagingAreaContract {
+  autoSwitchMode: 'off' | 'latest' | 'progress';
+}
+
+export interface CanvasStateContractV3 {
+  /**
+   * Newest schema the state needs: the newest of its previous version, the live document's and every snapshot's
+   * (3 plain, 4 custom-font typography, 5 noise or spatial adjustments, 6 control-layer derivation fields). Sticky:
+   * removing that content never lowers it.
+   */
+  version: 3 | 4 | 5 | 6;
+  document: CanvasDocumentContractV3;
+  /**
+   * Monotonic wholesale-replacement counter. The mirror clears pixel history whenever it changes, including
+   * replacements reusing dimensions and layer ids that ordinary diffs cannot detect.
+   */
+  documentRevision: number;
+  snapshots: CanvasSnapshotContract[];
+  stagingArea: CanvasStagingAreaContractV2;
+}

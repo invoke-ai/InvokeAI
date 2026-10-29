@@ -149,10 +149,42 @@ class Krea2ConditioningInfo:
     prompt_embeds_mask: torch.Tensor | None = None
     """Attention mask for prompt_embeds. Shape: (batch_size, seq_len). 1/True for valid, 0/False for padding."""
 
+    num_reference_images: int = 0
+    """How many reference images the prompt was encoded with (edit mode), as ``Picture 1..N`` in that order.
+
+    0 for a text-only prompt. A denoise that receives reference latents needs as many, in the same order: the
+    encoder and the transformer must see the same references, or the LoRA reads one image and edits another.
+    """
+
     def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
         self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
         if self.prompt_embeds_mask is not None:
             self.prompt_embeds_mask = self.prompt_embeds_mask.to(device=device)
+        return self
+
+
+@dataclass
+class QwenImage21ConditioningInfo:
+    """Qwen-Image-2.1 text conditioning from the Qwen3-VL-8B encoder.
+
+    The last decoder layer's output before the final norm, with the system-prompt prefix removed.
+    """
+
+    prompt_embeds: torch.Tensor
+    """Shape: (1, seq_len, hidden=4096). One prompt, so no padding and no mask."""
+
+    image_pad_mask: torch.Tensor | None = None
+    """Shape: (1, seq_len), True at the reference images' `<|image_pad|>` slots; None without references. Each
+    slot stands for 2x2 latent tokens of a reference, in the order the references were encoded."""
+
+    reference_grids: tuple[tuple[int, int], ...] = ()
+    """Per reference, in order: its slots as (rows, columns), so the denoise node can match each reference's
+    latents by shape, not only by count."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        if self.image_pad_mask is not None:
+            self.image_pad_mask = self.image_pad_mask.to(device=device)
         return self
 
 
@@ -173,11 +205,91 @@ class AnimaConditioningInfo:
     t5xxl_weights: Optional[torch.Tensor] = None
     """Per-token weights for prompt weighting. Shape: (seq_len,). None means uniform weight."""
 
+    qwen35_states: Optional[torch.Tensor] = None
+    """Qwen3.5 4B hidden states for Anima-3.8B's semantic connector, one row per tapped layer (7, 15,
+    23, 31). Shape: (num_layers, seq_len, 2560). None when the prompt was encoded without Qwen3.5."""
+
+    qwen35_mask: Optional[torch.Tensor] = None
+    """True for valid Qwen3.5 tokens. Shape: (seq_len,). All False for an empty prompt."""
+
     def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
         self.qwen3_embeds = self.qwen3_embeds.to(device=device, dtype=dtype)
         self.t5xxl_ids = self.t5xxl_ids.to(device=device)
         if self.t5xxl_weights is not None:
             self.t5xxl_weights = self.t5xxl_weights.to(device=device, dtype=dtype)
+        if self.qwen35_states is not None:
+            self.qwen35_states = self.qwen35_states.to(device=device, dtype=dtype)
+        if self.qwen35_mask is not None:
+            self.qwen35_mask = self.qwen35_mask.to(device=device)
+        return self
+
+
+@dataclass
+class MiniMaxH3ConditioningInfo:
+    """MiniMax H3 text conditioning from the Qwen3-VL-32B conditioner.
+
+    ``prompt_embeds`` is the *unnormalized* hidden state after the conditioner's 50th decoder
+    layer. ``text_token_tags`` is the per-row modality tag of every embedding row (text rows
+    tagged 1, keyframe vision-block rows tagged 0 = video); the denoise node builds the packed
+    sequence layout from it, so it must travel with the embeddings.
+    """
+
+    prompt_embeds: torch.Tensor
+    """Qwen3-VL layer-50 hidden states. Shape: (1, num_text_tokens, 5120)."""
+
+    text_token_tags: torch.Tensor
+    """Per-row modality tags. Shape: (num_text_tokens,), dtype long."""
+
+    keyframe_anchors: tuple[str, ...] = ()
+    """Which keyframes ("first"/"last", packed order) were part of the vision context. The
+    denoise node cross-checks this against its frame-conditioning input: keyframes must reach
+    the text conditioning and the VAE condition rows together, or not at all."""
+
+    width: int | None = None
+    """Canvas width the keyframes were prepared at (None when no keyframes)."""
+
+    height: int | None = None
+    """Canvas height the keyframes were prepared at (None when no keyframes)."""
+
+    reference_signature: tuple[str, ...] = ()
+    """Per-reference fingerprints (packed order) of a Ref2VA request's vision context. The
+    denoise node cross-checks this against its reference-conditioning input: the references
+    must reach the text conditioning and the VAE condition rows together, in the same order,
+    with the same options."""
+
+    reference_num_frames: int | None = None
+    """The generated frame count the references were truncated for (None without references)."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        # Tags are structural (long); only the device moves.
+        self.text_token_tags = self.text_token_tags.to(device=device)
+        return self
+
+
+@dataclass
+class LTX2ConditioningInfo:
+    """LTX-2 text conditioning, already passed through the LTX-2 text connectors.
+
+    The Gemma-4 hidden states are stacked (all layers), normalised and projected per modality by the
+    connectors inside the text-encoder invocation, so the denoise node receives the two streams the
+    transformer's prompt cross-attention consumes and never touches the connectors itself.
+    """
+
+    video_embeds: torch.Tensor
+    """Video-branch prompt embeddings. Shape: (1, num_text_tokens, 4096)."""
+
+    audio_embeds: torch.Tensor
+    """Audio-branch prompt embeddings. Shape: (1, num_text_tokens, 2048)."""
+
+    attention_mask: torch.Tensor
+    """Binary token mask over the connector output (1 = attend). Shape: (1, num_text_tokens)."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.video_embeds = self.video_embeds.to(device=device, dtype=dtype)
+        self.audio_embeds = self.audio_embeds.to(device=device, dtype=dtype)
+        # The mask is structural; only the device moves.
+        self.attention_mask = self.attention_mask.to(device=device)
         return self
 
 
@@ -203,6 +315,18 @@ class WanConditioningInfo:
 
 
 @dataclass
+class MossImageConditioningInfo:
+    """MOSS-Image text conditioning: Qwen3.5-9B's last hidden state, after its final norm, for one unpadded prompt."""
+
+    prompt_embeds: torch.Tensor
+    """Shape: (seq_len, 4096)."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        return self
+
+
+@dataclass
 class ConditioningFieldData:
     # If you change this class, adding more types, you _must_ update the instantiation of ObjectSerializerDisk in
     # invokeai/app/api/dependencies.py, adding the types to the list of safe globals. If you do not, torch will be
@@ -218,8 +342,12 @@ class ConditioningFieldData:
         | List[Ideogram4ConditioningInfo]
         | List[QwenImageConditioningInfo]
         | List[Krea2ConditioningInfo]
+        | List[QwenImage21ConditioningInfo]
         | List[AnimaConditioningInfo]
         | List[WanConditioningInfo]
+        | List[MiniMaxH3ConditioningInfo]
+        | List[LTX2ConditioningInfo]
+        | List[MossImageConditioningInfo]
     )
 
 

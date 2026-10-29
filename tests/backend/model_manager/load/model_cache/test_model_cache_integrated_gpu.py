@@ -7,6 +7,7 @@ integrated-GPU probe stubbed, so no Intel hardware is required.
 """
 
 import logging
+from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -56,12 +57,17 @@ def _make_cache(
         )
 
 
+@contextmanager
 def _patch_integrated(is_integrated: bool | None):
     """Stub the Level Zero probe. None models a device whose type cannot be determined."""
-    return patch(
-        "invokeai.backend.model_manager.load.model_cache.model_cache.xpu_device_is_integrated",
-        return_value=is_integrated,
-    )
+    with (
+        patch("invokeai.backend.util.devices.xpu_device_is_integrated", return_value=is_integrated),
+        patch(
+            "invokeai.backend.model_manager.load.model_cache.model_cache.xpu_device_is_integrated",
+            return_value=is_integrated,
+        ),
+    ):
+        yield
 
 
 def _logged_messages(logger: MagicMock) -> list[str]:
@@ -190,7 +196,7 @@ def test_relocking_a_resident_model_on_an_integrated_gpu_is_not_refused(mock_log
             entry.cached_model._is_in_vram = True
             assert entry.cached_model.cur_vram_bytes() == entry.cached_model.total_bytes()
             # Free memory is now smaller than the model (it is the model); the re-lock must pass.
-            assert cache._move_model_to_vram(entry, vram_available=0) == 0
+            assert cache._move_model_to_vram(entry, vram_available=0) == (0, False)
             assert "m" in cache._cached_models
     finally:
         cache.shutdown()
@@ -205,7 +211,7 @@ def test_oversized_model_on_a_discrete_card_still_tries(mock_logger: MagicMock):
             cache.put("m", DummyModule())
             entry = _entry(cache, "m")
             entry.cached_model.full_load_to_vram = MagicMock(return_value=123)
-            assert cache._move_model_to_vram(entry, vram_available=0) == 123
+            assert cache._move_model_to_vram(entry, vram_available=0) == (123, False)
     finally:
         cache.shutdown()
 
@@ -217,7 +223,7 @@ def test_cpu_execution_device_is_not_guarded(mock_logger: MagicMock):
         cache.put("m", DummyModule())
         entry = _entry(cache, "m")
         entry.cached_model.full_load_to_vram = MagicMock(return_value=7)
-        assert cache._move_model_to_vram(entry, vram_available=0) == 7
+        assert cache._move_model_to_vram(entry, vram_available=0) == (7, False)
     finally:
         cache.shutdown()
 
@@ -236,7 +242,7 @@ def test_mps_is_left_alone(mock_logger: MagicMock):
         # Present the cached model as MPS-resident without needing a Mac.
         entry.cached_model._compute_device = torch.device("mps")
         entry.cached_model.full_load_to_vram = MagicMock(return_value=42)
-        assert cache._move_model_to_vram(entry, vram_available=0) == 42
+        assert cache._move_model_to_vram(entry, vram_available=0) == (42, False)
     finally:
         cache.shutdown()
 

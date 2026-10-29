@@ -1,6 +1,10 @@
+import accelerate
 import pytest
 import torch
 
+from invokeai.backend.anima.anima_transformer import AnimaTransformer
+from invokeai.backend.anima.checkpoint_layout import ANIMA_TRANSFORMER_CONFIG
+from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     ANIMA_LORA_QWEN3_PREFIX,
     ANIMA_LORA_TRANSFORMER_PREFIX,
@@ -8,9 +12,11 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
 from invokeai.backend.patches.lora_conversions.anima_lora_conversion_utils import (
     _convert_kohya_te_key,
     _convert_kohya_unet_key,
+    anima_lora_for_depth,
     is_state_dict_likely_anima_lora,
     lora_model_from_anima_state_dict,
 )
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from tests.backend.patches.lora_conversions.lora_state_dicts.anima_lora_kohya_format import (
     state_dict_keys as anima_kohya_keys,
 )
@@ -103,6 +109,13 @@ def test_is_state_dict_likely_anima_lora_false_for_random():
         ("lora_unet_blocks_0_adaln_modulation_cross_attn_1", "blocks.0.adaln_modulation_cross_attn.1"),
         ("lora_unet_blocks_0_adaln_modulation_self_attn_1", "blocks.0.adaln_modulation_self_attn.1"),
         ("lora_unet_blocks_0_adaln_modulation_mlp_1", "blocks.0.adaln_modulation_mlp.1"),
+        # Non-block transformer modules
+        ("lora_unet_final_layer_linear", "final_layer.linear"),
+        ("lora_unet_final_layer_adaln_modulation_1", "final_layer.adaln_modulation.1"),
+        ("lora_unet_final_layer_adaln_modulation_2", "final_layer.adaln_modulation.2"),
+        ("lora_unet_t_embedder_1_linear_1", "t_embedder.1.linear_1"),
+        ("lora_unet_t_embedder_1_linear_2", "t_embedder.1.linear_2"),
+        ("lora_unet_x_embedder_proj_1", "x_embedder.proj.1"),
         # LLM Adapter keys
         ("lora_unet_llm_adapter_blocks_0_cross_attn_k_proj", "llm_adapter.blocks.0.cross_attn.k_proj"),
         ("lora_unet_llm_adapter_blocks_0_cross_attn_q_proj", "llm_adapter.blocks.0.cross_attn.q_proj"),
@@ -116,6 +129,18 @@ def test_is_state_dict_likely_anima_lora_false_for_random():
 def test_convert_kohya_unet_key(kohya_key: str, expected: str):
     """Test that Kohya unet keys are correctly converted to model parameter paths."""
     assert _convert_kohya_unet_key(kohya_key) == expected
+
+
+@pytest.mark.parametrize(
+    "kohya_key",
+    [
+        "lora_unet_final_layer_linear_extra",
+        "lora_unet_x_embedder_proj_10",
+    ],
+)
+def test_convert_kohya_unet_key_does_not_guess_unknown_non_block_paths(kohya_key: str):
+    """Near-matches stay unchanged instead of being mapped to a different real module."""
+    assert _convert_kohya_unet_key(kohya_key) == kohya_key.removeprefix("lora_unet_")
 
 
 @pytest.mark.parametrize(
@@ -153,6 +178,66 @@ def test_lora_model_from_anima_state_dict(sd_keys: dict[str, list[int]]):
     state_dict = keys_to_mock_state_dict(sd_keys)
     lora_model = lora_model_from_anima_state_dict(state_dict)
     assert len(lora_model.layers) > 0
+
+
+def test_kohya_non_block_layers_resolve_alongside_blocks_adapter_and_text_encoder():
+    """Converted Kohya paths and weight shapes match the real Anima module graph."""
+    non_block_source_to_module = {
+        "lora_unet_final_layer_linear": "final_layer.linear",
+        "lora_unet_final_layer_adaln_modulation_1": "final_layer.adaln_modulation.1",
+        "lora_unet_final_layer_adaln_modulation_2": "final_layer.adaln_modulation.2",
+        "lora_unet_t_embedder_1_linear_1": "t_embedder.1.linear_1",
+        "lora_unet_t_embedder_1_linear_2": "t_embedder.1.linear_2",
+        "lora_unet_x_embedder_proj_1": "x_embedder.proj.1",
+    }
+    # Keep block and LLM-adapter keys in the same conversion to catch precedence regressions, and retain a text-encoder
+    # key to ensure the transformer-only mapping does not affect the separate Qwen route.
+    coexisting_source_to_expected = {
+        "lora_unet_blocks_0_self_attn_q_proj": f"{ANIMA_LORA_TRANSFORMER_PREFIX}blocks.0.self_attn.q_proj",
+        "lora_unet_llm_adapter_blocks_0_cross_attn_k_proj": (
+            f"{ANIMA_LORA_TRANSFORMER_PREFIX}llm_adapter.blocks.0.cross_attn.k_proj"
+        ),
+        "lora_te_layers_0_self_attn_q_proj": f"{ANIMA_LORA_QWEN3_PREFIX}model.layers.0.self_attn.q_proj",
+    }
+
+    with accelerate.init_empty_weights():
+        transformer = AnimaTransformer(**{**ANIMA_TRANSFORMER_CONFIG, "num_blocks": 1})
+
+    rank = 4
+    state_dict: dict[str, torch.Tensor] = {}
+    for source_key, module_name in non_block_source_to_module.items():
+        module = transformer.get_submodule(module_name)
+        assert isinstance(module, torch.nn.Linear), f"{module_name} is not a Linear"
+        state_dict[f"{source_key}.lora_down.weight"] = torch.empty(rank, module.in_features)
+        state_dict[f"{source_key}.lora_up.weight"] = torch.empty(module.out_features, rank)
+
+    for source_key, patch_key in coexisting_source_to_expected.items():
+        if patch_key.startswith(ANIMA_LORA_TRANSFORMER_PREFIX):
+            module_name = patch_key.removeprefix(ANIMA_LORA_TRANSFORMER_PREFIX)
+            module = transformer.get_submodule(module_name)
+            assert isinstance(module, torch.nn.Linear), f"{module_name} is not a Linear"
+            in_features, out_features = module.in_features, module.out_features
+        else:
+            # This test keeps the Qwen key only to pin routing coexistence; its module graph is owned by the encoder.
+            in_features = out_features = 8
+        state_dict[f"{source_key}.lora_down.weight"] = torch.empty(rank, in_features)
+        state_dict[f"{source_key}.lora_up.weight"] = torch.empty(out_features, rank)
+
+    patch = lora_model_from_anima_state_dict(state_dict)
+
+    expected_non_block_keys = {
+        f"{ANIMA_LORA_TRANSFORMER_PREFIX}{module_name}" for module_name in non_block_source_to_module.values()
+    }
+    assert set(patch.layers) == expected_non_block_keys | set(coexisting_source_to_expected.values())
+
+    for patch_key in expected_non_block_keys:
+        module_name = patch_key.removeprefix(ANIMA_LORA_TRANSFORMER_PREFIX)
+        module = transformer.get_submodule(module_name)
+        assert isinstance(module, torch.nn.Linear), f"{module_name} is not a Linear"
+        layer = patch.layers[patch_key]
+        assert isinstance(layer, LoRALayer)
+        assert layer.down.shape == (rank, module.in_features)
+        assert layer.up.shape == (module.out_features, rank)
 
 
 def test_kohya_unet_keys_get_transformer_prefix():
@@ -228,3 +313,65 @@ def test_empty_state_dict_returns_empty_model():
     """An empty state dict should produce a ModelPatchRaw with no layers."""
     lora_model = lora_model_from_anima_state_dict({})
     assert len(lora_model.layers) == 0
+
+
+# --- depth-expanded finetunes ------------------------------------------------------------------------
+
+
+def _patch(*keys: str) -> ModelPatchRaw:
+    return ModelPatchRaw(layers={key: object() for key in keys})  # type: ignore[misc]
+
+
+T = ANIMA_LORA_TRANSFORMER_PREFIX
+
+
+def test_a_base_lora_moves_to_the_base_blocks_of_anima_2_9b() -> None:
+    original = _patch(
+        f"{T}blocks.0.self_attn.q_proj",
+        f"{T}blocks.2.cross_attn.k_proj",
+        f"{T}blocks.27.mlp.layer2",
+        f"{T}llm_adapter.blocks.3.self_attn.q_proj",
+        f"{ANIMA_LORA_QWEN3_PREFIX}layers.2.self_attn.q_proj",
+    )
+    moved, moved_from = anima_lora_for_depth(original, 40)
+
+    assert moved_from == 28
+    assert sorted(moved.layers) == sorted(
+        [
+            f"{T}blocks.0.self_attn.q_proj",
+            f"{T}blocks.3.cross_attn.k_proj",
+            f"{T}blocks.39.mlp.layer2",
+            # The LLM adapter's own blocks and the text encoder are not DiT blocks.
+            f"{T}llm_adapter.blocks.3.self_attn.q_proj",
+            f"{ANIMA_LORA_QWEN3_PREFIX}layers.2.self_attn.q_proj",
+        ]
+    )
+    # The same layer objects, and the cached LoRA itself untouched.
+    assert set(map(id, moved.layers.values())) == set(map(id, original.layers.values()))
+    assert f"{T}blocks.27.mlp.layer2" in original.layers
+
+
+def test_a_base_lora_moves_to_the_base_blocks_of_anima_3_8b() -> None:
+    moved, moved_from = anima_lora_for_depth(_patch(f"{T}blocks.2.mlp.layer1", f"{T}blocks.27.mlp.layer1"), 52)
+    assert moved_from == 28
+    assert sorted(moved.layers) == [f"{T}blocks.4.mlp.layer1", f"{T}blocks.51.mlp.layer1"]
+
+
+def test_an_anima_2_9b_lora_moves_to_its_blocks_in_anima_3_8b() -> None:
+    moved, moved_from = anima_lora_for_depth(_patch(f"{T}blocks.3.mlp.layer1", f"{T}blocks.39.mlp.layer1"), 52)
+    assert moved_from == 40
+    assert sorted(moved.layers) == [f"{T}blocks.4.mlp.layer1", f"{T}blocks.51.mlp.layer1"]
+
+
+@pytest.mark.parametrize(
+    ("keys", "depth"),
+    [
+        ((f"{T}blocks.27.mlp.layer1",), 28),
+        ((f"{T}blocks.39.mlp.layer1",), 40),
+        ((f"{T}llm_adapter.blocks.0.self_attn.q_proj", f"{ANIMA_LORA_QWEN3_PREFIX}layers.0.mlp.up_proj"), 40),
+    ],
+    ids=["base-on-base", "2.9B-on-2.9B", "no-dit-blocks"],
+)
+def test_a_lora_for_this_depth_is_returned_as_it_is(keys, depth) -> None:
+    original = _patch(*keys)
+    assert anima_lora_for_depth(original, depth) == (original, None)

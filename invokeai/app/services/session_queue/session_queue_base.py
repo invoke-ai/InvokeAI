@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any, Coroutine, Optional
 
 from invokeai.app.services.session_queue.session_queue_common import (
@@ -12,12 +13,16 @@ from invokeai.app.services.session_queue.session_queue_common import (
     ClearResult,
     DeleteAllExceptCurrentResult,
     DeleteByDestinationResult,
+    EnqueueBatchReceipt,
     EnqueueBatchResult,
     IsEmptyResult,
     IsFullResult,
     ItemIdsResult,
     NodeFieldValue,
     PruneResult,
+    QueueItemDeliveryResult,
+    QueueItemLineage,
+    QueueItemOwner,
     RetryItemsResult,
     SessionQueueCountsByDestination,
     SessionQueueItem,
@@ -25,8 +30,14 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueStatus,
 )
 from invokeai.app.services.shared.graph import GraphExecutionState
-from invokeai.app.services.shared.pagination import CursorPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import CursorPaginatedResults, SQLiteDirection
+
+
+@dataclass(frozen=True)
+class WorkflowCallChildCompletion:
+    parent_queue_item: SessionQueueItem
+    should_resume: bool
+    aggregated_values: dict[str, Any]
 
 
 class SessionQueueBase(ABC):
@@ -44,19 +55,59 @@ class SessionQueueBase(ABC):
 
     @abstractmethod
     def enqueue_batch(
-        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system"
+        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system", *, all_or_none: bool = False
     ) -> Coroutine[Any, Any, EnqueueBatchResult]:
-        """Enqueues all permutations of a batch for execution for a specific user."""
+        """Enqueues all permutations of a batch for execution for a specific user. A queue without room for all of
+        them takes as many as fit, or with `all_or_none` none of them. A repeat with the batch's idempotency key
+        returns the key's settled receipt as it is: `all_or_none` is not part of the payload the receipt matches."""
         pass
 
     @abstractmethod
-    def get_current(self, queue_id: str) -> Optional[SessionQueueItem]:
+    def acknowledge_enqueue(self, queue_id: str, idempotency_key: str, user_id: str = "system") -> None:
+        """Acknowledge that the caller recorded an enqueue result durably."""
+        pass
+
+    @abstractmethod
+    def get_enqueue_receipt(
+        self, queue_id: str, idempotency_key: str, user_id: str = "system"
+    ) -> Optional[EnqueueBatchReceipt]:
+        """Get an idempotent enqueue result owned by the user, if it exists."""
+        pass
+
+    @abstractmethod
+    def replay_enqueue(
+        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system"
+    ) -> Optional[EnqueueBatchResult]:
+        """What `enqueue_batch` answers a repeat of `batch` (which has an idempotency key) with, from the key's receipt;
+        None once the queue has collected the receipt. Never admits items: unlike a repeat of the enqueue, a receipt
+        collected meanwhile cannot let the batch in a second time. A receipt of another payload raises
+        `EnqueueIdempotencyConflictError`."""
+        pass
+
+    @abstractmethod
+    def get_current(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
         """Gets the currently-executing session queue item"""
         pass
 
     @abstractmethod
-    def get_next(self, queue_id: str) -> Optional[SessionQueueItem]:
+    def get_current_for_api(
+        self, queue_id: str, origin_prefix: Optional[str] = None, owner_id: Optional[str] = None
+    ) -> Optional[SessionQueueItem]:
+        """Gets the current item in the response projection used by API reads; with owner_id, of that user's items
+        only."""
+        pass
+
+    @abstractmethod
+    def get_next(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
         """Gets the next session queue item (does not dequeue it)"""
+        pass
+
+    @abstractmethod
+    def get_next_for_api(
+        self, queue_id: str, origin_prefix: Optional[str] = None, owner_id: Optional[str] = None
+    ) -> Optional[SessionQueueItem]:
+        """Gets the next item in the response projection used by API reads; with owner_id, of that user's items
+        only."""
         pass
 
     @abstractmethod
@@ -85,11 +136,14 @@ class SessionQueueBase(ABC):
         queue_id: str,
         user_id: Optional[str] = None,
         acting_user_id: Optional[str] = None,
+        origin_prefix: Optional[str] = None,
         is_admin: bool = False,
+        owner_id: Optional[str] = None,
     ) -> SessionQueueStatus:
         """Gets the status of the queue.
 
-        Aggregate counts (pending/in_progress/.../total) are always global across all users.
+        owner_id limits everything below, counts and current item alike, to that user's items; it is a filter,
+        unlike user_id. Without it, aggregate counts (pending/in_progress/.../total) are global across all users.
         If user_id is provided, the requesting user's own counts are additionally returned in
         the user_pending/user_in_progress fields (left None otherwise). Admin callers should
         also pass their user_id so personal UI (e.g. the progress bar) can distinguish their
@@ -105,6 +159,11 @@ class SessionQueueBase(ABC):
         any user's current item. Redaction stays fail-closed - a caller that passes user_id
         without is_admin gets the non-admin behavior.
         """
+        pass
+
+    @abstractmethod
+    def has_active_queue_work(self) -> bool:
+        """Return whether any queue has pending or in-progress work."""
         pass
 
     @abstractmethod
@@ -135,8 +194,9 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def cancel_queue_item(self, item_id: int) -> SessionQueueItem:
-        """Cancels a session queue item"""
+    def cancel_queue_item(self, item_id: int, queue_item: Optional[SessionQueueItem] = None) -> SessionQueueItem:
+        """Cancels a session queue item and its workflow-call chain. A supplied `queue_item`, the item's own, takes the
+        committed cancellation before it is announced, as with `complete_queue_item`."""
         pass
 
     @abstractmethod
@@ -151,9 +211,15 @@ class SessionQueueBase(ABC):
 
     @abstractmethod
     def fail_queue_item(
-        self, item_id: int, error_type: str, error_message: str, error_traceback: str
+        self,
+        item_id: int,
+        error_type: str,
+        error_message: str,
+        error_traceback: str,
+        queue_item: Optional[SessionQueueItem] = None,
     ) -> SessionQueueItem:
-        """Fails a session queue item"""
+        """Fails a session queue item. A supplied `queue_item`, the item's own, takes the committed failure before it is
+        announced, as with `complete_queue_item`."""
         pass
 
     @abstractmethod
@@ -178,13 +244,19 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def cancel_by_queue_id(self, queue_id: str) -> CancelByQueueIDResult:
-        """Cancels all queue items with matching queue ID"""
+    def cancel_by_queue_id(
+        self, queue_id: str, user_id: Optional[str] = None, origin_prefix: Optional[str] = None
+    ) -> CancelByQueueIDResult:
+        """Cancels every queue item, in-progress items included. If user_id is provided, only cancels items
+        owned by that user; if origin_prefix is provided, only cancels items whose origin starts with it."""
         pass
 
     @abstractmethod
-    def cancel_all_except_current(self, queue_id: str, user_id: Optional[str] = None) -> CancelAllExceptCurrentResult:
-        """Cancels all queue items except in-progress items. If user_id is provided, only cancels items owned by that user."""
+    def cancel_all_except_current(
+        self, queue_id: str, user_id: Optional[str] = None, origin_prefix: Optional[str] = None
+    ) -> CancelAllExceptCurrentResult:
+        """Cancels all queue items except in-progress items. If user_id is provided, only cancels items owned by
+        that user; if origin_prefix is provided, only cancels items whose origin starts with it."""
         pass
 
     @abstractmethod
@@ -214,14 +286,40 @@ class SessionQueueBase(ABC):
         """Gets all queue items that match the given parameters"""
         pass
 
+    def list_all_queue_items_for_api(
+        self,
+        queue_id: str,
+        destination: Optional[str] = None,
+    ) -> list[SessionQueueItem]:
+        """Gets queue items for API serialization without changing the service read contract."""
+        return self.list_all_queue_items(queue_id=queue_id, destination=destination)
+
     @abstractmethod
     def get_queue_item_ids(
         self,
         queue_id: str,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
-        user_id: Optional[str] = None,
+        owner_id: Optional[str] = None,
+        origin_prefix: Optional[str] = None,
+        limit: Optional[int] = None,
     ) -> ItemIdsResult:
-        """Gets all queue item ids that match the given parameters. If user_id is provided, only returns items for that user."""
+        """Gets the ids of queue items that match the given parameters, in the requested created_at order.
+
+        If owner_id is provided, only returns items for that user. If limit is provided, returns only the first
+        `limit` ids of that order. total_count is the number of ids in item_ids, which equals the number of
+        matching items only when no limit is given."""
+        pass
+
+    @abstractmethod
+    def get_queue_item_lineage(self, queue_id: str, origin_prefix: str) -> list[QueueItemLineage]:
+        """The status, origin and retry source of every item whose origin starts with `origin_prefix` (ignoring
+        case), in no order."""
+        pass
+
+    @abstractmethod
+    def get_unfinished_origins(self, queue_id: str, origin_prefix: str) -> set[str]:
+        """The origins of the items pending, in progress or waiting whose origin starts with `origin_prefix` (ignoring
+        case). Found through the items' status: it costs the queue's unfinished items, not its history."""
         pass
 
     @abstractmethod
@@ -234,6 +332,36 @@ class SessionQueueBase(ABC):
         """Gets a session queue item by ID for a given queue"""
         pass
 
+    def get_queue_item_for_api(self, item_id: int) -> SessionQueueItem:
+        """Gets a queue item in the response projection used by API reads."""
+        return self.get_queue_item(item_id=item_id)
+
+    @abstractmethod
+    def get_queue_item_owner(self, item_id: int) -> QueueItemOwner:
+        """Gets a queue item's queue and owner without reading its session, for authorizing frequent requests."""
+        pass
+
+    @abstractmethod
+    def claim_queue_item_delivery(self, item_id: int, claimant: str) -> QueueItemDeliveryResult:
+        """Claims delivering a queue item's results for a claimant: `claimed` unless they were delivered or another
+        claimant's unexpired claim holds them."""
+        pass
+
+    @abstractmethod
+    def confirm_queue_item_delivery(self, item_id: int) -> QueueItemDeliveryResult:
+        """Marks a queue item's results delivered, whoever claimed them."""
+        pass
+
+    @abstractmethod
+    def release_queue_item_delivery(self, item_id: int, claimant: str) -> QueueItemDeliveryResult:
+        """Drops a claimant's claim of a queue item's undelivered results, if it holds one."""
+        pass
+
+    @abstractmethod
+    def get_queue_item_workflow_json(self, item_id: int) -> str | None:
+        """Gets only the workflow metadata JSON for a queue item, if present."""
+        pass
+
     @abstractmethod
     def set_queue_item_session(self, item_id: int, session: GraphExecutionState) -> SessionQueueItem:
         """Sets the session for a session queue item. Use this to update the session state."""
@@ -242,6 +370,22 @@ class SessionQueueBase(ABC):
     @abstractmethod
     def save_queue_item_session(self, item_id: int, session: GraphExecutionState) -> None:
         """Persists a queue item's session without loading and returning the full queue item."""
+        pass
+
+    @abstractmethod
+    def record_workflow_call_child_completion(
+        self, parent_item_id: int, child_item_id: int, output_values: dict[str, Any]
+    ) -> WorkflowCallChildCompletion | None:
+        """Records one child completion against the latest parent session atomically."""
+        pass
+
+    @abstractmethod
+    def enqueue_workflow_call_children(
+        self,
+        parent_queue_item: SessionQueueItem,
+        child_sessions: list[tuple[GraphExecutionState, list[NodeFieldValue] | None]],
+    ) -> list[SessionQueueItem]:
+        """Enqueues child executions and publishes the complete waiting parent state atomically."""
         pass
 
     @abstractmethod

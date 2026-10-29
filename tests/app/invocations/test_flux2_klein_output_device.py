@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import torch
 
-from invokeai.app.invocations.flux2_klein_text_encoder import Flux2KleinTextEncoderInvocation
+from invokeai.app.invocations.text_encoder.flux2_klein_text_encoder import Flux2KleinTextEncoderInvocation
 
 
 def test_flux2_klein_conditioning_is_saved_on_cpu(monkeypatch):

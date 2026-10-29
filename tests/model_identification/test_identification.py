@@ -7,11 +7,11 @@ from typing import Any
 
 import pytest
 
+from invokeai.backend.architectures import resolve_default_settings
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
 from invokeai.backend.model_manager.configs.factory import (
     ModelConfigFactory,
 )
-from invokeai.backend.model_manager.configs.main import MainModelDefaultSettings
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
 )
@@ -40,12 +40,15 @@ def test_controlnet_t2i_default_settings(model_name: str, preprocessor: str | No
         (BaseModelType.StableDiffusion1, {"width": 512, "height": 512}),
         (BaseModelType.StableDiffusion2, {"width": 768, "height": 768}),
         (BaseModelType.StableDiffusionXL, {"width": 1024, "height": 1024}),
-        (BaseModelType.StableDiffusionXLRefiner, None),
+        # The refiner refines an SDXL latent, so it shares SDXL's canvas — but not its steps or CFG,
+        # which the UI drives with its own refiner parameters.
+        (BaseModelType.StableDiffusionXLRefiner, {"width": 1024, "height": 1024}),
+        # A sentinel, not an architecture: it is never registered, so there is nothing to resolve.
         (BaseModelType.Any, None),
     ],
 )
 def test_default_settings_main(base: BaseModelType, attrs: dict[str, Any] | None):
-    settings = MainModelDefaultSettings.from_base(base)
+    settings = resolve_default_settings(base)
     if attrs is None:
         assert settings is None
     else:
@@ -77,6 +80,10 @@ def test_model_identification(model_path: Path):
     test_metadata_path = model_path / "__test_metadata__.json"
     test_metadata = json.loads(test_metadata_path.read_text())
 
+    expected_refusal = test_metadata.get("expected_refusal")
+    if expected_refusal and "expected_config_attrs" in test_metadata:
+        pytest.fail(f"{id}: set either expected_refusal or expected_config_attrs, not both")
+
     if file_name := test_metadata.get("file_name", ""):
         model_path = model_path / file_name
 
@@ -89,6 +96,15 @@ def test_model_identification(model_path: Path):
     except Exception as e:
         print(mod.path)
         pytest.fail(f"{id}: Exception during model probing: {e}")
+
+    if expected_refusal:
+        # Exactly one: the installer shows the first refusal, and the order of the candidate configs is not fixed.
+        reasons = [str(e) for e in result.invalid_matches]
+        if result.config is not None or len(reasons) != 1 or expected_refusal not in reasons[0]:
+            pytest.fail(
+                f"{id}: expected exactly one refusal containing {expected_refusal!r}, got {result.config!r}, {reasons}"
+            )
+        return
 
     if result.config is None:
         pytest.fail(f"{id}: no match, detailed results:\n{pformat(result.details)}")

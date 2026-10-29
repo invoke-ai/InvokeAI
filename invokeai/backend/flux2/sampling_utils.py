@@ -9,6 +9,8 @@ import math
 import torch
 from einops import rearrange
 
+from invokeai.backend.util.devices import TorchDevice
+
 
 def get_noise_flux2(
     num_samples: int,
@@ -36,7 +38,7 @@ def get_noise_flux2(
     """
     # We always generate noise on the same device and dtype then cast to ensure consistency.
     rand_device = "cpu"
-    rand_dtype = torch.float16
+    rand_dtype = TorchDevice.choose_noise_dtype(torch.float16)
 
     # FLUX.2 uses 32 latent channels
     # Latent dimensions: height/8, width/8 (from VAE downsampling)
@@ -53,6 +55,36 @@ def get_noise_flux2(
         dtype=rand_dtype,
         generator=torch.Generator(device=rand_device).manual_seed(seed),
     ).to(device=device, dtype=dtype)
+
+
+def get_flux2_bn_stats(vae: torch.nn.Module) -> tuple[torch.Tensor, torch.Tensor] | None:
+    """Extract the latent BatchNorm statistics from a FLUX.2 VAE.
+
+    The FLUX.2 VAE normalizes the patchified 128-channel latent with a BatchNorm that has
+    affine=False, so there are no learnable weight/bias: y = (x - mean) / std, x = y * std + mean.
+
+    Returns:
+        (bn_mean, bn_std) of shape (128,), or None if the VAE has no initialized BN layer.
+    """
+    # Eval mode keeps a forward pass from updating the running statistics.
+    vae.eval()
+
+    # The BN layer sits at different locations depending on the model format.
+    bn_layer = None
+    if hasattr(vae, "bn"):
+        bn_layer = vae.bn
+    elif hasattr(vae, "batch_norm"):
+        bn_layer = vae.batch_norm
+    elif hasattr(vae, "encoder") and hasattr(vae.encoder, "bn"):
+        bn_layer = vae.encoder.bn
+
+    if bn_layer is None or bn_layer.running_mean is None or bn_layer.running_var is None:
+        return None
+
+    bn_mean = bn_layer.running_mean.clone()
+    bn_eps = bn_layer.eps if hasattr(bn_layer, "eps") else 1e-4  # BFL uses 1e-4
+    bn_std = torch.sqrt(bn_layer.running_var.clone() + bn_eps)
+    return bn_mean, bn_std
 
 
 def pack_flux2(x: torch.Tensor) -> torch.Tensor:
@@ -107,21 +139,6 @@ def unpack_flux2(x: torch.Tensor, height: int, width: int) -> torch.Tensor:
     )
 
 
-# Config for the scheduler the FLUX.2 txt2img path builds. Shared with the schedule-shift test so the
-# manual shift used by img2img/inpainting is always checked against the scheduler the node actually
-# uses, rather than against a copy that can drift out of sync.
-FLUX2_TXT2IMG_SCHEDULER_KWARGS = {
-    "num_train_timesteps": 1000,
-    "shift": 3.0,
-    "use_dynamic_shifting": True,
-    "base_shift": 0.5,
-    "max_shift": 1.15,
-    "base_image_seq_len": 256,
-    "max_image_seq_len": 4096,
-    "time_shift_type": "exponential",
-}
-
-
 def compute_empirical_mu(image_seq_len: int, num_steps: int) -> float:
     """Compute mu for FLUX.2 schedule shifting.
 
@@ -152,14 +169,13 @@ def get_schedule_flux2(
 ) -> list[float]:
     """Get linear timestep schedule for FLUX.2.
 
-    Returns a linear sigma schedule from 1.0 to 1/num_steps.
-    The actual schedule shifting is handled by the FlowMatchEulerDiscreteScheduler
-    using the mu parameter and use_dynamic_shifting=True.
+    Returns a linear sigma schedule from 1.0 to 1/num_steps, unshifted. Callers shift it with
+    ``time_shift_flux2()``.
 
     Args:
         num_steps: Number of denoising steps.
         image_seq_len: Number of image tokens (packed_h * packed_w). Currently unused,
-            but kept for API compatibility. The scheduler computes shifting internally.
+            but kept for API compatibility.
 
     Returns:
         List of linear sigmas from 1.0 to 1/num_steps, plus final 0.0.
@@ -167,7 +183,6 @@ def get_schedule_flux2(
     import numpy as np
 
     # Create linear sigmas from 1.0 to 1/num_steps
-    # The scheduler will apply dynamic shifting using mu parameter
     sigmas = np.linspace(1.0, 1 / num_steps, num_steps)
     sigmas_list = [float(s) for s in sigmas]
 
@@ -178,18 +193,15 @@ def get_schedule_flux2(
 
 
 def time_shift_flux2(sigmas: list[float], mu: float) -> list[float]:
-    """Apply the exponential schedule shift that the txt2img scheduler applies internally.
+    """Apply the exponential schedule shift that diffusers' Flux2KleinPipeline scheduler applies.
 
-    ``get_schedule_flux2()`` returns an unshifted linear schedule because the
-    FlowMatchEulerDiscreteScheduler used for txt2img shifts it itself from ``mu``. Code paths that
-    step the schedule manually (img2img, inpainting) must apply the shift themselves, otherwise they
-    run the model on a completely different sigma trajectory than txt2img does: with 9 steps the
-    shifted schedule bottoms out at sigma 0.485, the linear one at 0.111. A distilled model such as
-    FLUX.2 Klein is never trained at the low end of the linear schedule and leaves a grainy residue
-    there.
+    ``get_schedule_flux2()`` returns an unshifted linear schedule. Every FLUX.2 path runs it shifted,
+    otherwise the model sees a completely different sigma trajectory: with 9 steps the shifted
+    schedule bottoms out at sigma 0.485, the linear one at 0.111. A distilled model such as FLUX.2
+    Klein is never trained at the low end of the linear schedule and leaves a grainy residue there.
 
     Mirrors diffusers' ``FlowMatchEulerDiscreteScheduler._time_shift_exponential`` with an exponent
-    of 1.0, which is how the scheduler invokes it::
+    of 1.0, which is how the scheduler invokes it under dynamic shifting::
 
         sigma' = exp(mu) / (exp(mu) + (1 / sigma - 1))
 

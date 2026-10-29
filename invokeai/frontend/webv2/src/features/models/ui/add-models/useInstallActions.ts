@@ -1,0 +1,95 @@
+import { installModel, type InstallModelRequest } from '@features/models/data/api';
+import { getAccessTokenForSource } from '@features/models/data/apiKeys';
+import { addInstallJob } from '@features/models/data/installsStore';
+import { useNotify } from '@features/models/ui/useModelsNotify';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
+import { getApiErrorMessage } from '@platform/transport/http';
+import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+/**
+ * Attach saved Civitai tokens unless explicitly overridden. Bulk callers suppress success toasts and summarize;
+ * failures always notify.
+ */
+export const useInstallActions = () => {
+  const { t } = useTranslation();
+  const notify = useNotify();
+  const [pendingSources, setPendingSources] = useState<ReadonlySet<string>>(new Set());
+
+  const install = useCallback(
+    async (request: InstallModelRequest, options?: { silent?: boolean }): Promise<boolean> => {
+      const owner = captureAccountScope();
+
+      setPendingSources((current) => new Set(current).add(request.source));
+
+      try {
+        const job = await installModel(
+          {
+            ...request,
+            accessToken: request.accessToken ?? getAccessTokenForSource(request.source),
+          },
+          owner.signal
+        );
+
+        assertAccountScopeCurrent(owner);
+        addInstallJob(job);
+
+        if (!options?.silent) {
+          notify.success(t('models.modelInstallQueued'), request.source);
+        }
+
+        return true;
+      } catch (error) {
+        if (!isAccountScopeCurrent(owner)) {
+          return false;
+        }
+
+        notify.error(t('models.modelInstallFailedToStart'), getApiErrorMessage(error, t('common.unknownError')));
+
+        return false;
+      } finally {
+        if (isAccountScopeCurrent(owner)) {
+          setPendingSources((current) => {
+            const next = new Set(current);
+
+            next.delete(request.source);
+
+            return next;
+          });
+        }
+      }
+    },
+    [notify, t]
+  );
+
+  /**
+   * Queue many installs sequentially and silently; returns how many were
+   * accepted so the caller can emit one summary. Failures still toast
+   * individually via `install`'s error path.
+   */
+  const installMany = useCallback(
+    async (requests: InstallModelRequest[]): Promise<number> => {
+      const owner = captureAccountScope();
+      let queued = 0;
+
+      for (const request of requests) {
+        if (!isAccountScopeCurrent(owner)) {
+          break;
+        }
+
+        if (await install(request, { silent: true })) {
+          queued += 1;
+        }
+      }
+
+      return queued;
+    },
+    [install]
+  );
+
+  return { install, installMany, pendingSources };
+};

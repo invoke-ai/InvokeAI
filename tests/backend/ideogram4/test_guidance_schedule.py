@@ -8,7 +8,7 @@ dropped — the regression that motivated capping the polish tail at ``num_steps
 
 import pytest
 
-from invokeai.app.invocations.ideogram4_denoise import _effective_guidance_schedule
+from invokeai.app.invocations.ideogram4.ideogram4_denoise import _effective_guidance_schedule
 from invokeai.backend.ideogram4.sampler_configs import PRESETS
 
 _QUALITY = PRESETS["V4_QUALITY_48"]  # num_steps=48, schedule=(3.0,)*3 + (7.0,)*45

@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
-
 from typing import Optional
 
 import torch
@@ -28,7 +26,10 @@ from invokeai.app.invocations.fields import (
     Krea2ConditioningField,
     Krea2StyleReferenceField,
     LatentsField,
+    MiniMaxH3ConditioningField,
+    MossImageConditioningField,
     OutputField,
+    QwenImage21ConditioningField,
     QwenImageConditioningField,
     SD3ConditioningField,
     TensorField,
@@ -540,6 +541,17 @@ class Krea2ConditioningOutput(BaseInvocationOutput):
         return cls(conditioning=Krea2ConditioningField(conditioning_name=conditioning_name, mask=mask))
 
 
+@invocation_output("qwen_image_2_1_conditioning_output")
+class QwenImage21ConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a Qwen-Image-2.1 conditioning tensor."""
+
+    conditioning: QwenImage21ConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "QwenImage21ConditioningOutput":
+        return cls(conditioning=QwenImage21ConditioningField(conditioning_name=conditioning_name))
+
+
 @invocation_output("anima_conditioning_output")
 class AnimaConditioningOutput(BaseInvocationOutput):
     """Base class for nodes that output an Anima text conditioning tensor."""
@@ -560,6 +572,28 @@ class WanConditioningOutput(BaseInvocationOutput):
     @classmethod
     def build(cls, conditioning_name: str) -> "WanConditioningOutput":
         return cls(conditioning=WanConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("minimax_h3_conditioning_output")
+class MiniMaxH3ConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a MiniMax H3 conditioning tensor."""
+
+    conditioning: MiniMaxH3ConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "MiniMaxH3ConditioningOutput":
+        return cls(conditioning=MiniMaxH3ConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("moss_image_conditioning_output")
+class MossImageConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a MOSS-Image conditioning tensor."""
+
+    conditioning: MossImageConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "MossImageConditioningOutput":
+        return cls(conditioning=MossImageConditioningField(conditioning_name=conditioning_name))
 
 
 @invocation_output("wan_ref_image_output")

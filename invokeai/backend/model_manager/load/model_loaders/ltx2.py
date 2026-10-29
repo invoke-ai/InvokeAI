@@ -1,0 +1,783 @@
+"""Loader registrations for LTX-2 (Lightricks) audio-video generation models.
+
+Three records make a generation (see ``configs/main.py`` for the split), the transformer either of the first two:
+
+- ``Main`` / ``Checkpoint`` -- the 22B transformer as one official-layout single file: bf16, or Comfy
+  ``int8_tensorwise``(+convrot) / ``nvfp4`` with the layers named by a marker or in the header.
+  Quantized linears stay packed and dequantize per forward (``Int8ConvrotLinear`` / ``NVFP4Linear``);
+  bf16 files take the FP8-storage path when the device policy asks for it.
+- ``Main`` / ``GGUFQuantized`` -- the same transformer from a community GGUF build. Its Linears stay
+  packed as ``GGMLTensor``; the text connectors every build bundles beside it are never read.
+- ``Main`` / ``Diffusers`` -- the component folder: video VAE, audio VAE, vocoder, text projection
+  and connectors, latent upsamplers, each an official-layout single file mapped onto its diffusers
+  class here. A folder that also holds a transformer file serves that too.
+- ``Gemma4Encoder`` / ``Gemma4Encoder`` -- the Lightricks-tuned Gemma-4-12B text tower with its
+  tokenizer, loaded into ``transformers.Gemma4TextModel`` (bf16 or int8-convrot).
+- ``Gemma4Encoder`` / ``GGUFQuantized`` -- the same tower from a GGUF conversion, tokenizer packed in.
+
+Every model class is the installed diffusers' / transformers' own; the pinned configs and key maps
+live in ``invokeai.backend.ltx2.component_configs`` and were verified shape-for-shape against the
+released 2.5 files.
+
+Cache accounting follows the discipline the loader-seam tests pin: ``get_size_fs`` sizes the file(s)
+a submodel is read from so ``_load_and_cache`` reserves the read before it happens, and every path
+reserves what a cast will produce *before* widening a tensor.
+"""
+
+import json
+from collections.abc import Callable, Iterable, Mapping
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Any, Optional
+
+import accelerate
+import torch
+
+from invokeai.backend.ltx2 import checkpoint_layout as layout
+from invokeai.backend.ltx2 import component_configs as cc
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.gemma4_encoder import (
+    GGUF_TOKENIZER_ASSETS,
+    Gemma4Encoder_Gemma4Encoder_LTX2_Config,
+    Gemma4Encoder_GGUF_LTX2_Config,
+    gguf_gemma4_text_config,
+)
+from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
+from invokeai.backend.model_manager.configs.ltx2_duration_head import LTX2DurationHead_Checkpoint_Config
+from invokeai.backend.model_manager.configs.main import (
+    Main_Checkpoint_LTX2_Config,
+    Main_Diffusers_LTX2_Config,
+    Main_GGUF_LTX2_Config,
+)
+from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
+from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_loaders._single_file_guards import (
+    reject_float8_weights,
+    reject_formats_declared_in_the_header,
+)
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
+from invokeai.backend.model_manager.taxonomy import (
+    AnyModel,
+    BaseModelType,
+    ModelFormat,
+    ModelType,
+    SubModelType,
+)
+from invokeai.backend.quantization.fp8_scaled import (
+    cast_state_dict,
+    parse_quantization_metadata,
+    predict_cast_state_dict_size,
+    read_safetensors_metadata,
+    strip_layer_path_prefix,
+)
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.gguf.loaders import WrappedGGUFReader, gguf_sd_loader, unpack_ggml_at_load
+from invokeai.backend.quantization.int8_convrot import (
+    INT8_TENSORWISE_FORMAT,
+    drop_unconsumed_quantization_sidecars,
+    extract_int8_convrot_markers,
+    install_int8_convrot_layers,
+    reject_unmarked_int8_weights,
+    resolve_quantized_module_paths,
+)
+from invokeai.backend.quantization.load_plan import reserve_for_load
+from invokeai.backend.quantization.nvfp4 import (
+    NVFP4_FORMAT,
+    install_nvfp4_layers,
+    pop_nvfp4_layers,
+    predict_nvfp4_install_size,
+)
+from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, reject_incomplete_load
+
+_TRANSFORMER_SUPPORTED_NOTE = (
+    "Only unquantized (bf16) LTX-2 transformer files, and Comfy 'int8_tensorwise' (int8-convrot) or 'nvfp4' "
+    "files whose layers are named by a marker or in the header, are supported."
+)
+_ENCODER_SUPPORTED_NOTE = (
+    "Only unquantized (bf16) and Comfy 'int8_tensorwise' (int8-convrot) LTX-2 Gemma-4 encoder files are supported."
+)
+_COMPONENT_SUPPORTED_NOTE = "LTX-2 component files (VAEs, vocoder, connectors, upsamplers) must be unquantized."
+
+_ROLE_LABELS = {
+    layout.ROLE_VIDEO_VAE: "video VAE",
+    layout.ROLE_AUDIO_VAE: "audio VAE",
+    layout.ROLE_VOCODER: "vocoder",
+    layout.ROLE_TEXT_PROJECTION: "text projection",
+    layout.ROLE_VIDEO_CONNECTOR: "video text connector",
+    layout.ROLE_AUDIO_CONNECTOR: "audio text connector",
+    layout.ROLE_SPATIAL_UPSAMPLER: "spatial latent upsampler",
+    layout.ROLE_TEMPORAL_UPSAMPLER: "temporal latent upsampler",
+    layout.ROLE_TRANSFORMER: "transformer",
+}
+
+# Which component files a submodel is read from; the connectors join three.
+_SUBMODEL_ROLES: dict[SubModelType, tuple[str, ...]] = {
+    SubModelType.Transformer: (layout.ROLE_TRANSFORMER,),
+    SubModelType.VAE: (layout.ROLE_VIDEO_VAE,),
+    SubModelType.AudioVAE: (layout.ROLE_AUDIO_VAE,),
+    SubModelType.Vocoder: (layout.ROLE_VOCODER,),
+    SubModelType.Connectors: (layout.ROLE_TEXT_PROJECTION, layout.ROLE_VIDEO_CONNECTOR, layout.ROLE_AUDIO_CONNECTOR),
+    SubModelType.LatentUpsampler: (layout.ROLE_SPATIAL_UPSAMPLER,),
+    SubModelType.TemporalLatentUpsampler: (layout.ROLE_TEMPORAL_UPSAMPLER,),
+}
+
+_CONNECTOR_KEY_PREFIXES = (
+    "video_embeddings_connector.",
+    "audio_embeddings_connector.",
+    "text_embedding_projection.",
+)
+
+
+def _component_path(config: Main_Diffusers_LTX2_Config, role: str) -> Path:
+    """The file a component folder holds for ``role``, or an actionable error naming what to install."""
+    name = config.components.get(role)
+    path = Path(config.path) / name if name is not None else None
+    if path is None or not path.is_file():
+        what = f"has no {_ROLE_LABELS.get(role, role)} file" if name is None else f"is missing its {name}"
+        raise ValueError(
+            f"This LTX-2 component folder {what}. Install the LTX-2.5 components (the starter model) or add the "
+            "missing file to the folder."
+        )
+    return path
+
+
+def _read_dense_component(
+    path: Path, what: str, logger: Any, key_filter: Callable[[str], bool] | None = None
+) -> dict[str, torch.Tensor]:
+    """Read an unquantized component file, refusing a quantized one by name before the tensor read.
+
+    With ``key_filter`` only the matching tensors are read (through the safetensors header), for a
+    component that shares its file with another -- the official transformer files bundle the two
+    connectors beside 38 GB of transformer weights.
+    """
+    from safetensors import safe_open
+    from safetensors.torch import load_file
+
+    reject_formats_declared_in_the_header(path, what, logger, frozenset(), _COMPONENT_SUPPORTED_NOTE)
+    if key_filter is None:
+        sd = load_file(path)
+    else:
+        with safe_open(path, framework="pt", device="cpu") as f:
+            sd = {key: f.get_tensor(key) for key in f.keys() if key_filter(key)}
+    reject_float8_weights(sd, what, path, _COMPONENT_SUPPORTED_NOTE)
+    # An int8 build of a component declares itself nowhere this loader reads (it accepts no
+    # quantized components at all); refuse it by name rather than at the strict load.
+    reject_unmarked_int8_weights(sd, {}, "LTX-2")
+    return sd
+
+
+def _assign_state_dict(model: torch.nn.Module, sd: dict[str, torch.Tensor], what: str) -> torch.nn.Module:
+    """Strict assignment onto a meta-built model; every tensor must land, and nothing may be left over."""
+    missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
+    if unexpected:
+        raise RuntimeError(f"Unexpected keys loading {what}: {sorted(unexpected)[:5]}...")
+    if missing:
+        raise RuntimeError(f"Missing keys loading {what}: {sorted(missing)[:5]}...")
+    return model
+
+
+def _is_bundled_component(key: str) -> bool:
+    """Whether ``key`` belongs to a component a release stores beside the transformer (connectors, VAEs)."""
+    return layout.strip_transformer_prefix(key).startswith(cc.TRANSFORMER_FOREIGN_PREFIXES)
+
+
+def _diffusers_transformer_key_map(official_keys: Iterable[str]) -> dict[str, str]:
+    """Official -> diffusers name for every bare transformer key, quantization side channels included.
+
+    The converter re-inserts renamed keys at the end of the dict, so positions cannot be paired; sentinels can.
+    """
+    from diffusers.loaders.single_file_utils import convert_ltx2_transformer_to_diffusers
+
+    renamed = convert_ltx2_transformer_to_diffusers({key: key for key in official_keys})
+    renamed, _ = cc.finish_transformer_keys(renamed)
+    return {old: new for new, old in renamed.items()}
+
+
+def _build_transformer(sd: Mapping[str, Any]) -> torch.nn.Module:
+    """The diffusers transformer on the meta device, shaped for the file ``sd`` was read from.
+
+    The keyframe absolute position embedding is a 2.5.1 addition that the nvfp4 release omits; its presence
+    is a fact about the file, not the generation.
+    """
+    from diffusers import LTX2VideoTransformer3DModel
+
+    config = {**cc.LTX2_5_TRANSFORMER_CONFIG, "use_keyframes_abs_pos_embedding": "keyframes_abs_pos_embedding" in sd}
+    with accelerate.init_empty_weights():
+        return LTX2VideoTransformer3DModel(**config)
+
+
+def _require_transformer_submodel(submodel_type: Optional[SubModelType]) -> None:
+    if submodel_type is not SubModelType.Transformer:
+        raise ValueError(
+            "LTX-2 single-file checkpoints serve only the transformer. The VAEs, vocoder and connectors "
+            "come from an installed LTX-2 component folder and the text encoder from the Gemma-4 encoder "
+            f"record. Received: {submodel_type.value if submodel_type else 'None'}"
+        )
+
+
+class _LTX2ComponentLoading:
+    """The per-component loaders, shared by the folder loader and (for the transformer) the
+    single-file loader. Mixed into ``ModelLoader`` subclasses, so ``self._ram_cache`` / ``_logger`` exist."""
+
+    _ram_cache: Any
+    _logger: Any
+
+    def _reserve_for_cast(self, sd: dict[str, torch.Tensor], dtype: torch.dtype) -> None:
+        """Reserve what the cast to ``dtype`` will leave resident, before any tensor widens."""
+        self._ram_cache.make_room(predict_cast_state_dict_size(sd, dtype, keep_fp8=False))
+
+    def _build_dense(
+        self, factory: Callable[[], torch.nn.Module], sd: dict[str, torch.Tensor], what: str, dtype: torch.dtype
+    ) -> AnyModel:
+        self._reserve_for_cast(sd, dtype)
+        cast_state_dict(sd, dtype, keep_fp8=False)
+        with accelerate.init_empty_weights():
+            model = factory()
+        return _assign_state_dict(model, sd, what)
+
+    def _load_video_vae(self, path: Path) -> AnyModel:
+        from diffusers import AutoencoderKLLTX2Video
+
+        dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        sd = cc.convert_video_vae_keys(_read_dense_component(path, "LTX-2 video VAE", self._logger))
+        return self._build_dense(
+            lambda: AutoencoderKLLTX2Video(**cc.LTX2_5_VIDEO_VAE_CONFIG), sd, "LTX-2 video VAE", dtype
+        )
+
+    def _load_audio_vae(self, path: Path) -> AnyModel:
+        from diffusers import AutoencoderKLLTX2Audio
+
+        # Kept fp32 like the H3 audio VAE: it is small (~0.1 GB) and half-precision artifacts in
+        # decoded audio are audible.
+        sd = cc.convert_audio_vae_keys(_read_dense_component(path, "LTX-2 audio VAE", self._logger))
+        return self._build_dense(
+            lambda: AutoencoderKLLTX2Audio(**cc.LTX2_5_AUDIO_VAE_CONFIG), sd, "LTX-2 audio VAE", torch.float32
+        )
+
+    def _load_vocoder(self, path: Path) -> AnyModel:
+        from diffusers.pipelines.ltx2.vocoder import LTX2VocoderWithBWE
+
+        # fp32 for the same reason as the audio VAE. The anti-aliasing resampler filter is a
+        # non-persistent buffer the constructor computes; buffers are real even under the meta
+        # context, so the strict load below never looks for it.
+        sd = cc.convert_vocoder_keys(_read_dense_component(path, "LTX-2 vocoder", self._logger))
+        return self._build_dense(
+            lambda: LTX2VocoderWithBWE(**cc.LTX2_5_VOCODER_CONFIG), sd, "LTX-2 vocoder", torch.float32
+        )
+
+    def _load_connectors(self, config: Main_Diffusers_LTX2_Config) -> AnyModel:
+        from diffusers.pipelines.ltx2.connectors import LTX2TextConnectors
+
+        dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        sd: dict[str, torch.Tensor] = {}
+        for role in _SUBMODEL_ROLES[SubModelType.Connectors]:
+            path = _component_path(config, role)
+            raw = _read_dense_component(
+                path,
+                f"LTX-2 {_ROLE_LABELS[role]}",
+                self._logger,
+                key_filter=lambda key: layout.strip_transformer_prefix(key).startswith(_CONNECTOR_KEY_PREFIXES),
+            )
+            sd.update(cc.convert_connector_keys(raw))
+        return self._build_dense(
+            lambda: LTX2TextConnectors(**cc.LTX2_5_CONNECTORS_CONFIG), sd, "LTX-2 text connectors", dtype
+        )
+
+    def _load_upsampler(self, path: Path, temporal: bool) -> AnyModel:
+        from diffusers.pipelines.ltx2.latent_upsampler import LTX2LatentUpsamplerModel
+
+        dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        what = "LTX-2 temporal latent upsampler" if temporal else "LTX-2 spatial latent upsampler"
+        params = cc.LTX2_5_TEMPORAL_UPSAMPLER_CONFIG if temporal else cc.LTX2_5_SPATIAL_UPSAMPLER_CONFIG
+        sd = _read_dense_component(path, what, self._logger)
+        return self._build_dense(lambda: LTX2LatentUpsamplerModel(**params), sd, what, dtype)
+
+    def _load_transformer_from_file(self, path: Path, config: AnyModelConfig) -> AnyModel:
+        """The transformer from one official-layout file: bf16, int8-convrot or nvfp4.
+
+        Formats this loader cannot read are refused from the header before the tensor read; every
+        reservation is made while the state dict still holds its packed dtypes; nvfp4 layers are
+        taken out before either side-channel reader can pair their scales with the wrong weight.
+        """
+        from safetensors.torch import load_file
+
+        assert isinstance(self, ModelLoader)
+        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        what = "LTX-2 transformer"
+
+        reject_formats_declared_in_the_header(
+            path, what, self._logger, {INT8_TENSORWISE_FORMAT, NVFP4_FORMAT}, _TRANSFORMER_SUPPORTED_NOTE
+        )
+        sd = load_file(path)
+        metadata = read_safetensors_metadata(path, self._logger)
+
+        # Bare names from here on (the prefix is optional in the official layout, and the header
+        # names quantized layers without it). Components a bundled release stores beside the
+        # transformer are not this model's: dropped by their official prefixes, before any accounting.
+        foreign: list[str] = []
+        for key in list(sd):
+            bare = layout.strip_transformer_prefix(key)
+            if _is_bundled_component(key):
+                foreign.append(key)
+                del sd[key]
+            elif bare != key:
+                sd[bare] = sd.pop(key)
+        if foreign:
+            self._logger.info(f"{what}: ignoring {len(foreign)} tensor(s) of bundled components (e.g. {foreign[0]}).")
+
+        # Official -> diffusers names, recorded for every key (weights, scales and the nvfp4 payloads
+        # about to be popped) so the quantization side channel follows its weights.
+        key_map = _diffusers_transformer_key_map(sd)
+
+        def diffusers_module_path(official_path: str) -> str:
+            return key_map.get(f"{official_path}.weight", f"{official_path}.weight")[: -len(".weight")]
+
+        # Comfy's nvfp4 builds name their layers in the header. Take them out before either
+        # side-channel reader pairs a scale with a weight, and before the undeclared-fp8 refusal:
+        # nvfp4's block scales are float8 tensors of their own.
+        header_layers = strip_layer_path_prefix(parse_quantization_metadata(metadata))
+        nvfp4_payloads = {
+            diffusers_module_path(official): payload
+            for official, payload in pop_nvfp4_layers(sd, header_layers=header_layers).items()
+        }
+        reject_float8_weights(sd, what, path, _TRANSFORMER_SUPPORTED_NOTE)
+
+        # ``int8_tensorwise`` has to be recognised before the key conversion: that conversion renames
+        # ``.weight`` by substring and carries a sibling ``.weight_scale`` along but not ``.comfy_quant``.
+        int8_markers = extract_int8_convrot_markers(sd)
+        reject_unmarked_int8_weights(sd, int8_markers, "LTX-2")
+        # In place: the dict handed in is the one the cache-room records are taken on.
+        for key in set(sd) - set(drop_unconsumed_quantization_sidecars(sd)):
+            del sd[key]
+        quantized = resolve_quantized_module_paths(int8_markers, key_map)
+        for key in list(sd):
+            sd[key_map[key]] = sd.pop(key)
+
+        model = _build_transformer(sd)
+        skip_patterns = _model_declared_skip_patterns(model)
+        nvfp4_bytes = predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns)
+
+        if quantized:
+            quantized = install_int8_convrot_layers(
+                model,
+                sd,
+                quantized,
+                model_dtype,
+                architecture="LTX-2",
+                reserve=self._ram_cache.make_room,
+                skip_patterns=skip_patterns,
+                extra_reserved_bytes=nvfp4_bytes,
+            )
+            self._logger.info(
+                f"{what}: kept {len(quantized)} of {len(int8_markers)} layer(s) in int8 "
+                "(int8_tensorwise checkpoint, dequantized per forward)"
+            )
+        else:
+            reserve_for_load(
+                self._ram_cache.make_room,
+                sd,
+                model_dtype,
+                keep_fp8=False,
+                model=model,
+                skip_patterns=skip_patterns,
+                fp8_layers={},
+                nvfp4_payloads=nvfp4_payloads,
+            )
+            cast_state_dict(sd, model_dtype, keep_fp8=False, model=model, skip_patterns=skip_patterns)
+
+        if nvfp4_payloads:
+            packed = install_nvfp4_layers(model, sd, nvfp4_payloads, model_dtype, skip_patterns)
+            self._logger.info(f"{what}: kept {packed} of {len(nvfp4_payloads)} nvfp4 layer(s) packed.")
+
+        load_state_dict_ignoring_extras(model, sd, source=f"{what} single file", assign=True, allow_missing=True)
+        reject_incomplete_load(model, what=f"{what} single file")
+        # ``assign=True`` aliases every param to its ``sd`` tensor; drop the dict's references before
+        # the FP8 cast or each original stays reachable while its fp8 copy is allocated.
+        sd.clear()
+
+        if not quantized and not nvfp4_payloads:
+            model = self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
+        return model
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.LTX2, type=ModelType.Main, format=ModelFormat.Diffusers)
+class LTX2FolderModel(_LTX2ComponentLoading, ModelLoader):
+    """Loader for an LTX-2 component folder (and its transformer, when the folder has one)."""
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        """The file(s) the submodel is read from -- there is no ``<submodel>/`` subfolder to size."""
+        if not isinstance(config, Main_Diffusers_LTX2_Config) or submodel_type not in _SUBMODEL_ROLES:
+            return 0
+        files = {config.components.get(role) for role in _SUBMODEL_ROLES[submodel_type]} - {None}
+        return sum((model_path / name).stat().st_size for name in files if (model_path / name).is_file())
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, Main_Diffusers_LTX2_Config):
+            raise ValueError(f"Unexpected config type {type(config).__name__} for an LTX-2 folder loader.")
+        if submodel_type is None:
+            raise Exception("A submodel type must be provided when loading LTX-2 folders.")
+
+        match submodel_type:
+            case SubModelType.Transformer:
+                if layout.ROLE_TRANSFORMER not in config.components:
+                    raise ValueError(
+                        "This LTX-2 folder holds only the shared components - it is a components-only install. "
+                        "In the LTX-2 Model Loader, select a single-file LTX-2 transformer (safetensors or GGUF) "
+                        "to use with it."
+                    )
+                return self._load_transformer_from_file(_component_path(config, layout.ROLE_TRANSFORMER), config)
+            case SubModelType.VAE:
+                return self._load_video_vae(_component_path(config, layout.ROLE_VIDEO_VAE))
+            case SubModelType.AudioVAE:
+                return self._load_audio_vae(_component_path(config, layout.ROLE_AUDIO_VAE))
+            case SubModelType.Vocoder:
+                return self._load_vocoder(_component_path(config, layout.ROLE_VOCODER))
+            case SubModelType.Connectors:
+                return self._load_connectors(config)
+            case SubModelType.LatentUpsampler:
+                return self._load_upsampler(_component_path(config, layout.ROLE_SPATIAL_UPSAMPLER), temporal=False)
+            case SubModelType.TemporalLatentUpsampler:
+                return self._load_upsampler(_component_path(config, layout.ROLE_TEMPORAL_UPSAMPLER), temporal=True)
+            case SubModelType.TextEncoder | SubModelType.Tokenizer:
+                raise ValueError(
+                    "LTX-2 component folders carry no text encoder. The Gemma-4 encoder is its own model record; "
+                    "select it in the LTX-2 Model Loader's text encoder field."
+                )
+            case _:
+                raise ValueError(f"Unsupported submodel type {submodel_type} for LTX-2 folders.")
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.LTX2, type=ModelType.Main, format=ModelFormat.Checkpoint)
+class LTX2CheckpointModel(_LTX2ComponentLoading, ModelLoader):
+    """Loader for LTX-2 single-file transformers (bf16, Comfy int8-convrot or header-named nvfp4)."""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, Main_Checkpoint_LTX2_Config):
+            raise ValueError(f"Unexpected config type {type(config).__name__} for an LTX-2 checkpoint loader.")
+        _require_transformer_submodel(submodel_type)
+        return self._load_from_singlefile(config)
+
+    def _load_from_singlefile(self, config: Main_Checkpoint_LTX2_Config) -> AnyModel:
+        return self._load_transformer_from_file(Path(config.path), config)
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.LTX2, type=ModelType.Main, format=ModelFormat.GGUFQuantized)
+class LTX2GGUFModel(ModelLoader):
+    """Loader for LTX-2 single-file transformers in GGUF (the community Q2_K to Q8_0 builds).
+
+    The Linear weights stay packed as ``GGMLTensor`` and dequantize per forward through the model cache's
+    autocast layers; what the model reads outside a matmul, and what is not quantized at all, is unpacked
+    here (see `unpack_ggml_at_load`). The text connectors every build bundles beside the transformer are
+    skipped before their data is read: as for the official files, the component folder supplies them.
+
+    No `fp8_storage` declaration: FP8 Storage is refused for every quantized format by rule.
+    """
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, Main_GGUF_LTX2_Config):
+            raise ValueError(f"Unexpected config type {type(config).__name__} for an LTX-2 GGUF loader.")
+        _require_transformer_submodel(submodel_type)
+
+        what = "LTX-2 transformer GGUF"
+        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        foreign: list[str] = []
+
+        def keep(key: str) -> bool:
+            if _is_bundled_component(key):
+                foreign.append(key)
+                return False
+            return True
+
+        read = gguf_sd_loader(Path(config.path), compute_dtype, keep=keep)
+        if foreign:
+            self._logger.info(f"{what}: ignoring {len(foreign)} tensor(s) of bundled components (e.g. {foreign[0]}).")
+        bare = {layout.strip_transformer_prefix(key): value for key, value in read.items()}
+        read.clear()
+        key_map = _diffusers_transformer_key_map(bare)
+        sd = {key_map[key]: value for key, value in bare.items()}
+        bare.clear()
+
+        model = _build_transformer(sd)
+        unpacked = unpack_ggml_at_load(sd, model, _model_declared_skip_patterns(model), self._ram_cache.make_room)
+        load_state_dict_ignoring_extras(model, sd, source=what, assign=True, allow_missing=True)
+        reject_incomplete_load(model, what=what)
+        sd.clear()
+
+        self._logger.info(
+            f"{what}: {unpacked} unquantized or non-Linear tensor(s) unpacked at load, the remaining Linear "
+            "weights kept packed"
+        )
+        return model
+
+
+# The text tower's tensors. The unified layout nests them under ``model.language_model`` beside vision/audio
+# embedders and the tied head; Lightricks' with-proj release, and the GGUF conversions of it, add the text
+# projection (the connectors', which the component folder supplies), vision/audio stubs and packed tokenizer and
+# config files. Only what is named here is read; anything else a file carries is not the tower's. A bare
+# `Gemma4TextModel` save names the same tensors without a root.
+_GEMMA4_TOWER_PREFIXES = tuple(
+    f"{root}{part}"
+    for root in ("model.language_model.", "model.", "")
+    for part in ("embed_tokens.", "layers.", "norm.")
+)
+
+
+def _is_gemma4_tower_key(key: str) -> bool:
+    return key.startswith(_GEMMA4_TOWER_PREFIXES)
+
+
+def _normalize_gemma4_tower_keys(sd: dict[str, Any]) -> None:
+    """In place: drop what is not the tower and strip the prefix ``Gemma4TextModel`` names its tensors without."""
+    for key in list(sd):
+        if not _is_gemma4_tower_key(key):
+            del sd[key]
+            continue
+        bare = key
+        for prefix in ("model.language_model.", "model."):
+            if bare.startswith(prefix):
+                bare = bare[len(prefix) :]
+                break
+        if bare != key:
+            sd[bare] = sd.pop(key)
+
+
+def _gemma4_text_config(config: Mapping[str, Any]) -> Any:
+    """``Gemma4TextConfig`` from a config.json: the unified model's ``text_config``, or the text config itself."""
+    from transformers import Gemma4TextConfig
+
+    text_config = config.get("text_config") if isinstance(config.get("text_config"), dict) else config
+    return Gemma4TextConfig(
+        **{k: v for k, v in text_config.items() if k not in ("architectures", "model_type", "transformers_version")}
+    )
+
+
+def _assign_gemma4_tower(model: torch.nn.Module, sd: dict[str, Any], what: str) -> None:
+    missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
+    if unexpected:
+        raise RuntimeError(f"Unexpected keys loading {what}: {sorted(unexpected)[:5]}...")
+    # The rotary inverse-frequency buffers are computed by the constructor, not stored.
+    stray = [k for k in missing if not k.startswith("rotary_emb.")]
+    if stray:
+        raise RuntimeError(f"Missing keys loading {what}: {sorted(stray)[:5]}...")
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.LTX2, type=ModelType.Gemma4Encoder, format=ModelFormat.Gemma4Encoder)
+class LTX2Gemma4EncoderModel(ModelLoader):
+    """Loader for the LTX-2.5 Gemma-4-12B text tower (bf16 or Comfy int8-convrot) and its tokenizer.
+
+    Only the text tower is built (``Gemma4TextModel``, verified key-for-key against the release): the
+    unified model's vision/audio embedders are never used, and the LM head is tied and never run.
+    Quantized files keep their int8 weights + per-channel scales resident (``Int8ConvrotLinear``).
+    """
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        """Size the one weight file (the tokenizer is a few MB); the folder may nest it one level down."""
+        if not isinstance(config, Gemma4Encoder_Gemma4Encoder_LTX2_Config):
+            return 0
+        root = model_path / config.subfolder if config.subfolder else model_path
+        if submodel_type is SubModelType.TextEncoder:
+            weight = root / config.weight_file
+            return weight.stat().st_size if weight.is_file() else 0
+        return sum(p.stat().st_size for p in root.glob("tokenizer*") if p.is_file())
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, Gemma4Encoder_Gemma4Encoder_LTX2_Config):
+            raise ValueError(f"Unexpected config type {type(config).__name__} for an LTX-2 Gemma-4 loader.")
+        root = Path(config.path) / config.subfolder if config.subfolder else Path(config.path)
+        match submodel_type:
+            case SubModelType.Tokenizer:
+                from transformers import AutoTokenizer
+
+                # ``fix_mistral_regex=False``: transformers' Mistral-regex heuristic short-circuits on
+                # the sibling ``config.json``'s ``transformers_version``, which the release does not
+                # carry, so it advises the fix for this folder whatever the model is. Taking the advice
+                # prepends the Tekken split regex to Gemma's pre-tokenizer and shatters words
+                # ("inconsistent" becomes "in" + "consistent"), which would mis-tokenize every prompt.
+                # Passing it explicitly keeps the released pre-tokenizer -- what the reference
+                # pipelines encode with -- and states the decision instead of repeating the advice.
+                return AutoTokenizer.from_pretrained(root, local_files_only=True, fix_mistral_regex=False)
+            case SubModelType.TextEncoder:
+                return self._load_text_encoder(root / config.weight_file, root / "config.json")
+            case _:
+                raise ValueError(
+                    "The LTX-2 Gemma-4 encoder serves the text encoder and its tokenizer. "
+                    f"Received: {submodel_type.value if submodel_type else 'None'}"
+                )
+
+    def _load_text_encoder(self, weight_path: Path, config_path: Path) -> AnyModel:
+        from safetensors.torch import load_file
+        from transformers.models.gemma4.modeling_gemma4 import Gemma4TextModel
+
+        what = "LTX-2 Gemma-4 encoder"
+        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+
+        reject_formats_declared_in_the_header(
+            weight_path, what, self._logger, {INT8_TENSORWISE_FORMAT}, _ENCODER_SUPPORTED_NOTE
+        )
+        sd = load_file(weight_path)
+        reject_float8_weights(sd, what, weight_path, _ENCODER_SUPPORTED_NOTE)
+
+        _normalize_gemma4_tower_keys(sd)
+
+        int8_markers = extract_int8_convrot_markers(sd)
+        reject_unmarked_int8_weights(sd, int8_markers, "LTX-2 Gemma-4")
+        for key in set(sd) - set(drop_unconsumed_quantization_sidecars(sd)):
+            del sd[key]
+
+        te_config = _gemma4_text_config(json.loads(config_path.read_text(encoding="utf-8")))
+        with accelerate.init_empty_weights():
+            model = Gemma4TextModel(te_config)
+
+        if int8_markers:
+            # The shared helper: foreign-scale refusal, reservation before the split, the dense cast
+            # and the module swap, in that order.
+            install_int8_convrot_layers(
+                model, sd, int8_markers, model_dtype, architecture="LTX-2 Gemma-4", reserve=self._ram_cache.make_room
+            )
+        else:
+            self._ram_cache.make_room(predict_cast_state_dict_size(sd, model_dtype, keep_fp8=False))
+            cast_state_dict(sd, model_dtype, keep_fp8=False)
+
+        _assign_gemma4_tower(model, sd, what)
+        sd.clear()
+        return model
+
+
+def _gguf_asset_bytes(value: torch.Tensor, name: str) -> bytes:
+    """A file a GGUF conversion packed in one byte per element: as ``I8``, or widened to ``I16`` (elix3r)."""
+    data = value.quantized_data if isinstance(value, GGMLTensor) else value
+    if data.dtype == torch.int8:
+        return data.view(torch.uint8).numpy().tobytes()
+    if data.dtype.is_floating_point or (data.numel() and (int(data.min()) < 0 or int(data.max()) > 255)):
+        raise ValueError(f"The GGUF's {name!r} is not a byte array.")
+    return data.to(torch.uint8).numpy().tobytes()
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.LTX2, type=ModelType.Gemma4Encoder, format=ModelFormat.GGUFQuantized)
+class LTX2Gemma4EncoderGGUFModel(ModelLoader):
+    """Loader for the LTX-2.5 Gemma-4-12B text tower from a GGUF conversion, and the tokenizer packed into it.
+
+    The tower keeps its Linear weights packed as ``GGMLTensor``. Everything read outside a matmul is unpacked
+    here (see `unpack_ggml_at_load`), and it has to be: ``Gemma4RMSNorm`` reads ``weight.float()``, the layer
+    scalars multiply activations directly and the embedding is indexed. The tokenizer is rebuilt from the
+    packed files with the same call the folder loader makes, and the model config from the metadata.
+    """
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        """The bytes a submodel reads from the file: the tower's tensors, or only the tokenizer's few MB."""
+        if not isinstance(config, Gemma4Encoder_GGUF_LTX2_Config):
+            return 0
+        if submodel_type is SubModelType.TextEncoder:
+            keep = _is_gemma4_tower_key
+        elif submodel_type is SubModelType.Tokenizer:
+            keep = GGUF_TOKENIZER_ASSETS.__contains__
+        else:
+            return 0
+        with WrappedGGUFReader(model_path) as reader:
+            return sum(int(tensor.n_bytes) for tensor in reader.tensors if keep(tensor.name))
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, Gemma4Encoder_GGUF_LTX2_Config):
+            raise ValueError(f"Unexpected config type {type(config).__name__} for an LTX-2 Gemma-4 GGUF loader.")
+        path = Path(config.path)
+        match submodel_type:
+            case SubModelType.Tokenizer:
+                return self._load_tokenizer(path)
+            case SubModelType.TextEncoder:
+                return self._load_text_encoder(path)
+            case _:
+                raise ValueError(
+                    "The LTX-2 Gemma-4 encoder serves the text encoder and its tokenizer. "
+                    f"Received: {submodel_type.value if submodel_type else 'None'}"
+                )
+
+    def _load_tokenizer(self, path: Path) -> AnyModel:
+        from transformers import AutoTokenizer
+
+        assets = gguf_sd_loader(path, torch.float32, keep=GGUF_TOKENIZER_ASSETS.__contains__)
+        # The fast tokenizer reads both files into memory; a scanner still holding one must not fail the load.
+        with TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            for name, file_name in GGUF_TOKENIZER_ASSETS.items():
+                (Path(folder) / file_name).write_bytes(_gguf_asset_bytes(assets[name], name))
+            # `fix_mistral_regex=False` for the reason the folder loader gives: the packed files are the
+            # folder's, byte for byte.
+            return AutoTokenizer.from_pretrained(folder, local_files_only=True, fix_mistral_regex=False)
+
+    def _load_text_encoder(self, path: Path) -> AnyModel:
+        from transformers.models.gemma4.modeling_gemma4 import Gemma4TextModel
+
+        what = "LTX-2 Gemma-4 encoder GGUF"
+        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        sd = gguf_sd_loader(path, compute_dtype, keep=_is_gemma4_tower_key)
+        try:
+            te_config = _gemma4_text_config(gguf_gemma4_text_config(ModelOnDisk(path).metadata()))
+        except NotAMatchError:
+            raise ValueError(f"{path.name} carries no Gemma-4 model config in its metadata.") from None
+        _normalize_gemma4_tower_keys(sd)
+        with accelerate.init_empty_weights():
+            model = Gemma4TextModel(te_config)
+        unpacked = unpack_ggml_at_load(sd, model, (), self._ram_cache.make_room)
+        _assign_gemma4_tower(model, sd, what)
+        sd.clear()
+        self._logger.info(
+            f"{what}: {unpacked} tensor(s) read outside a matmul unpacked at load, the Linear weights kept packed"
+        )
+        return model
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.LTX2, type=ModelType.LTX2DurationHead, format=ModelFormat.Checkpoint)
+class LTX2DurationHeadLoader(_LTX2ComponentLoading, ModelLoader):
+    """Loads the LTX-2 duration head.
+
+    The only LTX-2 component that needs no key conversion: it is published in diffusers layout
+    already, in bf16.
+
+    Widened to fp32 on the way in, for the same reason the audio VAE and the vocoder are: the head
+    emits a single scalar, and everything downstream is a threshold. A clamp and a floor onto the
+    8k+1 grid turn it into a frame count, so a prediction that lands near a grid boundary resolves
+    to one of two answers a whole 8 frames apart -- and bf16 carries about three decimal digits.
+    Paying 3.6 MB to take that coin-flip out of the shot's length is the cheapest trade here.
+    """
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        from diffusers.pipelines.ltx2.duration_head import LTX2DurationHead
+
+        if not isinstance(config, LTX2DurationHead_Checkpoint_Config):
+            raise ValueError(f"Unexpected model config type: {type(config)}.")
+
+        # The guarded reader, like every other LTX-2 component: a quantized build of the head carries
+        # the same 19 keys, and upcasting its weights without their scales would load cleanly and
+        # predict nonsense.
+        sd = _read_dense_component(Path(config.path), "LTX-2 duration head", self._logger)
+        return self._build_dense(LTX2DurationHead, sd, "LTX-2 duration head", torch.float32)

@@ -1,8 +1,19 @@
 """Tests for the Qwen Image denoise invocation."""
 
-import pytest
+import json
+from pathlib import Path
+from types import SimpleNamespace
 
-from invokeai.app.invocations.qwen_image_denoise import QwenImageDenoiseInvocation
+import pytest
+import torch
+from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
+
+from invokeai.app.invocations.qwen_image import qwen_image_denoise
+from invokeai.app.invocations.qwen_image.qwen_image_denoise import QwenImageDenoiseInvocation
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+    ConditioningFieldData,
+    QwenImageConditioningInfo,
+)
 
 
 class TestPrepareCfgScale:
@@ -195,3 +206,124 @@ class TestBuildImgShapes:
         assert len(result[0]) == 2
         assert result[0][0] == (1, 40, 56)
         assert result[0][1] == (1, 64, 48)
+
+
+@pytest.mark.parametrize(
+    ("width", "height", "mu"),
+    [
+        # One token per 16x16 pixels (8x VAE, 2x2 patches). The stock fit is mu = 0.5 + 0.4 * (tokens - 256) / 7936.
+        (16, 16, 0.5 - 0.4 * 255 / 7936),  # 1 token: below the lower anchor the line keeps running
+        (1024, 1024, 0.6935483870967742),  # 4096 tokens: 0.5 + 0.4 * 3840 / 7936
+        (2048, 1008, 0.8935483870967742),  # 8064 tokens: 0.5 + 0.4 * 7808 / 7936; area decides, not a side
+        (2048, 1024, 0.9),  # 8192 tokens: the fit's end
+        (4096, 4096, 0.9),  # 65536 tokens: 3.790 extrapolated
+    ],
+)
+def test_without_a_scheduler_folder_mu_follows_the_stock_fit_and_holds_at_its_end(
+    tmp_path: Path, width: int, height: int, mu: float
+) -> None:
+    # A GGUF or single-file transformer has no scheduler/ folder.
+    _, actual = QwenImageDenoiseInvocation._schedule(tmp_path / "qwen-image.gguf", width, height, 2, None)
+
+    assert actual == pytest.approx(mu, abs=1e-12)
+
+
+def _with_scheduler_config(model_path: Path) -> Path:
+    (model_path / "scheduler").mkdir(parents=True)
+    (model_path / "scheduler" / "scheduler_config.json").write_text(
+        json.dumps(
+            {
+                "_class_name": "FlowMatchEulerDiscreteScheduler",
+                "use_dynamic_shifting": True,
+                "base_image_seq_len": 256,
+                "max_image_seq_len": 1024,
+                "base_shift": 0.3,
+                "max_shift": 1.5,
+                "shift_terminal": 0.02,
+                "time_shift_type": "exponential",
+            }
+        )
+    )
+    return model_path
+
+
+@pytest.mark.parametrize(
+    ("size", "mu"),
+    [
+        (384, 0.8),  # 576 tokens: 0.3 + 1.2 * 320 / 768
+        (2048, 1.5),  # 16384 tokens: held at this config's max_shift
+    ],
+)
+def test_a_checkpoints_own_scheduler_config_sets_the_fit(tmp_path: Path, size: int, mu: float) -> None:
+    scheduler, actual = QwenImageDenoiseInvocation._schedule(_with_scheduler_config(tmp_path), size, size, 2, None)
+
+    assert actual == pytest.approx(mu, abs=1e-12)
+    assert scheduler.config.max_shift == 1.5
+
+
+def test_an_explicit_shift_sets_mu_at_any_size_with_the_checkpoints_scheduler(tmp_path: Path) -> None:
+    scheduler, mu = QwenImageDenoiseInvocation._schedule(_with_scheduler_config(tmp_path), 4096, 4096, 2, 3.0)
+
+    assert mu == pytest.approx(1.0986122886681098, abs=1e-12)  # ln 3
+    assert scheduler.config.max_shift == 1.5
+
+
+class _StopAtTimesteps(Exception):
+    """Ends a run once the scheduler has been handed its mu."""
+
+
+class _TinyQwenImageTransformer:
+    """Stands in for `QwenImageTransformer2DModel`: the config the node reads before it sets the schedule."""
+
+    config = SimpleNamespace(patch_size=2, out_channels=16)
+
+
+def _run_to_scheduler(monkeypatch, model_path: Path, width: int, height: int, shift: float | None = None) -> float:
+    """Run `_run_diffusion` with the real scheduler up to `set_timesteps` and return the mu it was handed."""
+    monkeypatch.setattr(qwen_image_denoise, "QwenImageTransformer2DModel", _TinyQwenImageTransformer)
+    monkeypatch.setattr(qwen_image_denoise.TorchDevice, "choose_torch_device", lambda: torch.device("cpu"))
+    captured: list[float] = []
+
+    def capture_mu(self, *, sigmas, mu, device) -> None:
+        captured.append(mu)
+        # A frame of real size need not be denoised to know the mu it was handed.
+        raise _StopAtTimesteps
+
+    monkeypatch.setattr(FlowMatchEulerDiscreteScheduler, "set_timesteps", capture_mu)
+    conditioning = ConditioningFieldData(conditionings=[QwenImageConditioningInfo(prompt_embeds=torch.zeros(1, 4, 8))])
+    context = SimpleNamespace(
+        models=SimpleNamespace(
+            load=lambda _identifier: SimpleNamespace(model=_TinyQwenImageTransformer()),
+            get_config=lambda _identifier: SimpleNamespace(),
+            get_absolute_path=lambda _config: model_path,
+        ),
+        conditioning=SimpleNamespace(load=lambda _name: conditioning),
+    )
+    node = QwenImageDenoiseInvocation.model_construct(
+        latents=None,
+        reference_latents=None,
+        denoise_mask=None,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        transformer=SimpleNamespace(transformer=SimpleNamespace(), loras=[]),
+        positive_conditioning=SimpleNamespace(conditioning_name="positive"),
+        negative_conditioning=None,
+        cfg_scale=1.0,
+        width=width,
+        height=height,
+        steps=40,
+        seed=0,
+        shift=shift,
+    )
+
+    with pytest.raises(_StopAtTimesteps):
+        node._run_diffusion(context)
+
+    assert len(captured) == 1
+    return captured[0]
+
+
+def test_an_explicit_shift_reaches_the_scheduler(monkeypatch, tmp_path) -> None:
+    mu = _run_to_scheduler(monkeypatch, tmp_path / "qwen-image.gguf", 4096, 4096, shift=3.0)
+
+    assert mu == pytest.approx(1.0986122886681098, abs=1e-12)  # ln 3

@@ -1,0 +1,64 @@
+---
+title: Wan 2.2
+lastUpdated: 2026-09-29
+alsoListedIn:
+  - users-guide/models/local-models
+sidebar:
+   order: 1
+---
+
+Wan 2.2 creates short videos from a text-only prompt, or a prompt plus
+starting images for the first and/or last frames. Unlike LTX-2 or
+MiniMax H3, Wan cannot generate a soundtrack (but you can use LTX-2's
+[conditioning mode](../introduction#conditioning-clip-ltx-2-only) to add one).
+
+### License
+
+Wan 2.2 (T2V-A14B, I2V-A14B and TI2V-5B), its text encoder and the Lightning LoRAs are released under **Apache 2.0**, which allows commercial use. None of the downloads is gated.
+
+This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
+
+### The Wan Models
+
+Wan 2.2 ships three transformer variants, plus a shared text encoder and two VAEs. All share the same diffusion-style sampling but differ in size, conditioning, and intended task.
+
+| Variant | Task | Params | VAE | Conditioning |
+|---|---|---|---|---|
+| **T2V-A14B** | Text → Video | 14B × 2 experts | A14B VAE (16-ch, 8× spatial) | Text only |
+| **I2V-A14B** | Image+Text → Video | 14B × 2 experts | A14B VAE (16-ch, 8× spatial) | Text + reference image (36-channel concat) |
+| **TI2V-5B** | Text → Video OR Image+Text → Video | 5B (single) | Wan 2.2-VAE (48-ch, 16× spatial) | Text, optionally with reference image (first-frame mask blend) |
+
+* **T2V-A14B** generates videos from a text prompt alone. Best motion coherence and prompt-following of the three.
+* **I2V-A14B** locks the first frame to a reference image you supply, and also handles first-to-last interpolation and extension. Best subject-preservation.
+* **TI2V-5B** is the small single-expert variant. It does both text-to-video and image-to-video at substantially lower VRAM, with somewhat less stable long-range coherence.
+
+#### High-noise and low-noise transformers (A14B variants only)
+
+The A14B models are a **mixture-of-experts (MoE)** pair — *two* 14B transformers per variant. The denoise loop swaps between them at a model-defined boundary timestep:
+
+* **High-noise expert** runs early, when the latents are still mostly noise: composition, layout, broad motion.
+* **Low-noise expert** runs late, when the latents are close to clean: detail and texture.
+
+InvokeAI handles the swap automatically. In the Video panel, a single-file A14B main takes its partner through the **Transformer (Low Noise)** component slot; a Diffusers A14B main carries both experts internally. **TI2V-5B is single-expert** — no swap, no low-noise CFG, no second slot.
+
+#### Lightning (the Wan fast path)
+
+The stock A14B variants need ~40–50 denoise steps. The **Lightning distillation LoRAs** collapse that to **4 steps** at CFG 1 with minimal quality loss — about a 10× speedup. There's a pair per variant (one per expert); the panel's Lightning toggle wires both automatically.
+
+:::tip
+**TI2V-5B has no Lightning LoRA.** Its smaller size makes each step cheap; run it at 40–50 steps for a similar wall-clock to A14B + Lightning.
+:::
+
+#### Installing Wan models
+
+Two **starter bundles**:
+
+* **Wan 2.2 Text-to-Video** (~36 GB) — UMT5-XXL text encoder, both VAEs, TI2V-5B Q4_K_M, T2V-A14B Q4_K_M (high + low), T2V Lightning (high + low).
+* **Wan 2.2 Image-to-Video** (~32 GB) — UMT5-XXL, A14B VAE, I2V-A14B Q4_K_M (high + low), I2V Lightning (high + low).
+
+The bundles are independent; installing both totals ~56 GB (shared components are deduplicated). Higher-quality Q8_0 quantizations and full Diffusers builds are available a-la-carte in the starter models list.
+
+:::tip
+**On a 12 GB VRAM card**: install just the Text-to-Video bundle and use TI2V-5B — it covers both text-to-video and image-to-video and fits comfortably. The A14B variants will technically run via aggressive offloading but are slow and prone to OOM.
+:::
+

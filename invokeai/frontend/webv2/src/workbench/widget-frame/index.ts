@@ -1,0 +1,14 @@
+export { WidgetActionsMenu } from './WidgetActionsMenu';
+export { WidgetBar, type WidgetBarGroup, type WidgetBarItem } from './WidgetBar';
+export { WidgetEnableMenu, type WidgetEnableMenuItem } from './WidgetEnableMenu';
+export { WidgetFailureBoundary } from './WidgetFailureBoundary';
+export { WidgetIdentityIcon } from './WidgetIdentityIcon';
+export { FieldPlaceholder, WidgetHeader, WidgetHeaderActionsGroup, WidgetPanelFrame } from './WidgetFrames';
+export { StatusWidgetChip } from '@platform/ui/StatusWidgetChip';
+export { WidgetInstanceContextMenu, type WidgetInstanceContextMenuTarget } from './WidgetInstanceContextMenu';
+export { WidgetRegionDropOverlay } from './WidgetRegionDropOverlay';
+export { WidgetSourceLockBadge } from './WidgetSourceLockBadge';
+export { WidgetStrip } from './WidgetStrip';
+export { MissingWidgetFrame, WidgetChromeSlotById, WidgetRenderer, WidgetRendererById } from './WidgetRenderer';
+export { useWidgetIntentPreloadProps } from './useWidgetIntentPreload';
+export { useWidgetSortable } from './useWidgetSortable';

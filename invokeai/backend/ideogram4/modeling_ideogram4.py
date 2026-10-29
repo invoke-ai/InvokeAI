@@ -223,6 +223,17 @@ def _sinusoidal_embedding(t: torch.Tensor, dim: int, scale: float = 1e4) -> torc
     return emb
 
 
+def compute_dtype_of(linear: nn.Module) -> torch.dtype:
+    """The dtype a (possibly quantized) Linear computes in.
+
+    `weight.dtype` alone is wrong for every quantized build: nf4 stores uint8, fp8 storage stores
+    float8, and torch has arithmetic kernels for neither. Each carries the real compute dtype on the
+    module, so that is read first. Used by the two forwards that cast their *inputs* to it and by
+    the denoise loop, which sizes its conditioning buffers the same way.
+    """
+    return getattr(linear, "compute_dtype", None) or linear.weight.dtype
+
+
 class Ideogram4EmbedScalar(nn.Module):
     def __init__(self, dim: int, input_range: tuple[float, float]) -> None:
         super().__init__()
@@ -237,7 +248,7 @@ class Ideogram4EmbedScalar(nn.Module):
         x = x.to(torch.float32)
         scaled = 1e4 * (x - self.range_min) / (self.range_max - self.range_min)
         emb = _sinusoidal_embedding(scaled, self.dim)
-        emb = emb.to(getattr(self.mlp_in, "compute_dtype", None) or self.mlp_in.weight.dtype)
+        emb = emb.to(compute_dtype_of(self.mlp_in))
         emb = F.silu(self.mlp_in(emb))
         return self.mlp_out(emb)
 
@@ -256,6 +267,14 @@ class Ideogram4FinalLayer(nn.Module):
 
 class Ideogram4Transformer(nn.Module):
     """Ideogram 4 flow-matching transformer."""
+
+    # Read by `_model_declared_skip_patterns` on both fp8 paths (kept-quantized and layerwise
+    # storage), the same way diffusers models declare theirs. `forward` and
+    # `Ideogram4EmbedScalar.forward` derive the dtype they cast their *inputs* to from these two
+    # Linears' weights; an fp8 weight there turns every activation into float8, which torch has no
+    # arithmetic kernels for. Both are tiny (0.6M and 0.5M parameters against 8.9B), so excluding
+    # them costs nothing measurable.
+    _skip_layerwise_casting_patterns = ["input_proj", "t_embedding"]
 
     def __init__(self, config: Ideogram4Config) -> None:
         super().__init__()
@@ -327,7 +346,7 @@ class Ideogram4Transformer(nn.Module):
         batch_size, seq_len, in_channels = x.shape
         assert in_channels == self.config.in_channels
 
-        param_dtype = getattr(self.input_proj, "compute_dtype", None) or self.input_proj.weight.dtype
+        param_dtype = compute_dtype_of(self.input_proj)
         x = x.to(param_dtype)
         t = t.to(param_dtype)
         llm_features = llm_features.to(param_dtype)

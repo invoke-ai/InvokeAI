@@ -1,5 +1,8 @@
+import logging
 import sqlite3
+from collections.abc import Callable
 from contextlib import closing
+from datetime import datetime
 from logging import Logger
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -7,7 +10,8 @@ from tempfile import TemporaryDirectory
 import pytest
 from pydantic import ValidationError
 
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.sqlite_migrator import sqlite_migrator_impl
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import (
     MigrateCallback,
     Migration,
@@ -16,7 +20,7 @@ from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import 
     MigrationVersionError,
 )
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import (
-    SqliteMigrator,
+    Migrator,
 )
 
 
@@ -36,9 +40,9 @@ def memory_db_cursor(memory_db_conn: sqlite3.Connection) -> sqlite3.Cursor:
 
 
 @pytest.fixture
-def migrator(logger: Logger) -> SqliteMigrator:
-    db = SqliteDatabase(db_path=None, logger=logger, verbose=False)
-    return SqliteMigrator(db=db)
+def migrator(logger: Logger) -> Migrator:
+    db = Database.open_sqlite(None, logger)
+    return Migrator(db)
 
 
 @pytest.fixture
@@ -134,15 +138,13 @@ def test_explicit_migration_id_and_dependency_are_preserved(no_op_migrate_callba
     assert migration.to_version is None
 
 
-def test_migration_set_add_migration(migrator: SqliteMigrator, migration_no_op: Migration) -> None:
+def test_migration_set_add_migration(migrator: Migrator, migration_no_op: Migration) -> None:
     migration = migration_no_op
     migrator._migration_set.register(migration)
     assert migration in migrator._migration_set._migrations
 
 
-def test_migration_set_may_not_register_dupes(
-    migrator: SqliteMigrator, no_op_migrate_callback: MigrateCallback
-) -> None:
+def test_migration_set_may_not_register_dupes(migrator: Migrator, no_op_migrate_callback: MigrateCallback) -> None:
     migrate_0_to_1_a = Migration(from_version=0, to_version=1, callback=no_op_migrate_callback)
     migrate_0_to_1_b = Migration(from_version=0, to_version=1, callback=no_op_migrate_callback)
     migrator._migration_set.register(migrate_0_to_1_a)
@@ -275,28 +277,28 @@ def test_migration_runs(memory_db_cursor: sqlite3.Cursor, migrate_callback_creat
     assert memory_db_cursor.fetchone() is not None
 
 
-def test_migrator_registers_migration(migrator: SqliteMigrator, migration_no_op: Migration) -> None:
+def test_migrator_registers_migration(migrator: Migrator, migration_no_op: Migration) -> None:
     migration = migration_no_op
     migrator.register_migration(migration)
     assert migration in migrator._migration_set._migrations
 
 
-def test_migrator_creates_migrations_table(migrator: SqliteMigrator) -> None:
-    cursor = migrator._db._conn.cursor()
+def test_migrator_creates_migrations_table(migrator: Migrator) -> None:
+    cursor = migrator._database.sqlite.conn.cursor()
     migrator._create_migrations_table(cursor)
     cursor.execute("SELECT * FROM sqlite_master WHERE type='table' AND name='migrations';")
     assert cursor.fetchone() is not None
 
 
-def test_migrator_creates_applied_migrations_table(migrator: SqliteMigrator) -> None:
-    cursor = migrator._db._conn.cursor()
+def test_migrator_creates_applied_migrations_table(migrator: Migrator) -> None:
+    cursor = migrator._database.sqlite.conn.cursor()
     migrator._create_applied_migrations_table(cursor)
     cursor.execute("SELECT * FROM sqlite_master WHERE type='table' AND name='applied_migrations';")
     assert cursor.fetchone() is not None
 
 
-def test_migrator_migration_sets_version(migrator: SqliteMigrator, migration_no_op: Migration) -> None:
-    cursor = migrator._db._conn.cursor()
+def test_migrator_migration_sets_version(migrator: Migrator, migration_no_op: Migration) -> None:
+    cursor = migrator._database.sqlite.conn.cursor()
     migrator._create_migrations_table(cursor)
     migrator.register_migration(migration_no_op)
     migrator.run_migrations()
@@ -304,8 +306,8 @@ def test_migrator_migration_sets_version(migrator: SqliteMigrator, migration_no_
     assert cursor.fetchone()[0] == 1
 
 
-def test_migrator_gets_current_version(migrator: SqliteMigrator, migration_no_op: Migration) -> None:
-    cursor = migrator._db._conn.cursor()
+def test_migrator_gets_current_version(migrator: Migrator, migration_no_op: Migration) -> None:
+    cursor = migrator._database.sqlite.conn.cursor()
     assert migrator._get_current_version(cursor) == 0
     migrator._create_migrations_table(cursor)
     assert migrator._get_current_version(cursor) == 0
@@ -314,8 +316,8 @@ def test_migrator_gets_current_version(migrator: SqliteMigrator, migration_no_op
     assert migrator._get_current_version(cursor) == 1
 
 
-def test_migrator_runs_single_migration(migrator: SqliteMigrator, migration_create_test_table: Migration) -> None:
-    cursor = migrator._db._conn.cursor()
+def test_migrator_runs_single_migration(migrator: Migrator, migration_create_test_table: Migration) -> None:
+    cursor = migrator._database.sqlite.conn.cursor()
     migrator._create_migrations_table(cursor)
     migrator._run_migration(migration_create_test_table)
     assert migrator._get_current_version(cursor) == 1
@@ -323,8 +325,8 @@ def test_migrator_runs_single_migration(migrator: SqliteMigrator, migration_crea
     assert cursor.fetchone() is not None
 
 
-def test_migrator_runs_all_migrations_in_memory(migrator: SqliteMigrator) -> None:
-    cursor = migrator._db._conn.cursor()
+def test_migrator_runs_all_migrations_in_memory(migrator: Migrator) -> None:
+    cursor = migrator._database.sqlite.conn.cursor()
     migrations = [Migration(from_version=i, to_version=i + 1, callback=create_migrate(i)) for i in range(0, 3)]
     for migration in migrations:
         migrator.register_migration(migration)
@@ -333,9 +335,9 @@ def test_migrator_runs_all_migrations_in_memory(migrator: SqliteMigrator) -> Non
 
 
 def test_migrator_bootstraps_applied_migrations_from_legacy_versions(
-    migrator: SqliteMigrator, no_op_migrate_callback: MigrateCallback
+    migrator: Migrator, no_op_migrate_callback: MigrateCallback
 ) -> None:
-    cursor = migrator._db._conn.cursor()
+    cursor = migrator._database.sqlite.conn.cursor()
     migrator._create_migrations_table(cursor)
     cursor.execute("INSERT INTO migrations (version) VALUES (1);")
     cursor.execute("INSERT INTO migrations (version) VALUES (2);")
@@ -356,8 +358,8 @@ def test_migrator_backs_up_file_db_before_metadata_only_bootstrap(
 ) -> None:
     with TemporaryDirectory() as tempdir:
         original_db_path = Path(tempdir) / "invokeai.db"
-        db = SqliteDatabase(db_path=original_db_path, logger=logger, verbose=False)
-        cursor = db._conn.cursor()
+        db = Database.open_sqlite(original_db_path, logger)
+        cursor = db.sqlite.conn.cursor()
         cursor.execute("CREATE TABLE test (id INTEGER PRIMARY KEY);")
         cursor.execute(
             """--sql
@@ -369,14 +371,14 @@ def test_migrator_backs_up_file_db_before_metadata_only_bootstrap(
         )
         cursor.execute("INSERT INTO migrations (version) VALUES (0);")
         cursor.execute("INSERT INTO migrations (version) VALUES (1);")
-        db._conn.commit()
+        db.sqlite.conn.commit()
 
-        migrator = SqliteMigrator(db=db)
+        migrator = Migrator(db)
         migrator.register_migration(Migration(from_version=0, to_version=1, callback=no_op_migrate_callback))
 
         assert migrator.run_migrations() is False
 
-        db._conn.close()
+        db.sqlite.conn.close()
         assert migrator._backup_path is not None
         with closing(sqlite3.connect(migrator._backup_path)) as backup_db_conn:
             backup_db_cursor = backup_db_conn.cursor()
@@ -386,8 +388,8 @@ def test_migrator_backs_up_file_db_before_metadata_only_bootstrap(
             assert backup_db_cursor.fetchone() is None
 
 
-def test_migrator_runs_branching_graph_migrations(migrator: SqliteMigrator) -> None:
-    cursor = migrator._db._conn.cursor()
+def test_migrator_runs_branching_graph_migrations(migrator: Migrator) -> None:
+    cursor = migrator._database.sqlite.conn.cursor()
     executed: list[str] = []
 
     def create_migration(migration_id: str, depends_on: str | None) -> Migration:
@@ -413,9 +415,9 @@ def test_migrator_runs_branching_graph_migrations(migrator: SqliteMigrator) -> N
 
 
 def test_migrator_rejects_unknown_applied_migration(
-    migrator: SqliteMigrator, no_op_migrate_callback: MigrateCallback
+    migrator: Migrator, no_op_migrate_callback: MigrateCallback
 ) -> None:
-    cursor = migrator._db._conn.cursor()
+    cursor = migrator._database.sqlite.conn.cursor()
     migrator._create_migrations_table(cursor)
     migrator._create_applied_migrations_table(cursor)
     cursor.execute("INSERT INTO applied_migrations (migration_id) VALUES ('future_migration');")
@@ -427,9 +429,9 @@ def test_migrator_rejects_unknown_applied_migration(
 
 
 def test_migrator_rejects_unknown_applied_migration_before_creating_legacy_table(
-    migrator: SqliteMigrator, no_op_migrate_callback: MigrateCallback
+    migrator: Migrator, no_op_migrate_callback: MigrateCallback
 ) -> None:
-    cursor = migrator._db._conn.cursor()
+    cursor = migrator._database.sqlite.conn.cursor()
     migrator._create_applied_migrations_table(cursor)
     cursor.execute("INSERT INTO applied_migrations (migration_id) VALUES ('future_migration');")
     cursor.connection.commit()
@@ -443,9 +445,9 @@ def test_migrator_rejects_unknown_applied_migration_before_creating_legacy_table
 
 
 def test_migrator_rejects_inconsistent_applied_legacy_version(
-    migrator: SqliteMigrator, no_op_migrate_callback: MigrateCallback
+    migrator: Migrator, no_op_migrate_callback: MigrateCallback
 ) -> None:
-    cursor = migrator._db._conn.cursor()
+    cursor = migrator._database.sqlite.conn.cursor()
     migrator._create_migrations_table(cursor)
     migrator._create_applied_migrations_table(cursor)
     cursor.execute("INSERT INTO migrations (version) VALUES (1);")
@@ -468,9 +470,9 @@ def test_migrator_rejects_inconsistent_applied_legacy_version(
 
 
 def test_migrator_rejects_applied_legacy_migration_missing_legacy_row(
-    migrator: SqliteMigrator, no_op_migrate_callback: MigrateCallback
+    migrator: Migrator, no_op_migrate_callback: MigrateCallback
 ) -> None:
-    cursor = migrator._db._conn.cursor()
+    cursor = migrator._database.sqlite.conn.cursor()
     migrator._create_migrations_table(cursor)
     migrator._create_applied_migrations_table(cursor)
     cursor.execute("INSERT INTO migrations (version) VALUES (1);")
@@ -494,10 +496,8 @@ def test_migrator_rejects_applied_legacy_migration_missing_legacy_row(
     assert callback_ran is False
 
 
-def test_migrator_rejects_unknown_legacy_version(
-    migrator: SqliteMigrator, no_op_migrate_callback: MigrateCallback
-) -> None:
-    cursor = migrator._db._conn.cursor()
+def test_migrator_rejects_unknown_legacy_version(migrator: Migrator, no_op_migrate_callback: MigrateCallback) -> None:
+    cursor = migrator._database.sqlite.conn.cursor()
     migrator._create_migrations_table(cursor)
     cursor.execute("INSERT INTO migrations (version) VALUES (1);")
     cursor.execute("INSERT INTO migrations (version) VALUES (2);")
@@ -509,9 +509,9 @@ def test_migrator_rejects_unknown_legacy_version(
 
 
 def test_migrator_rejects_unknown_legacy_version_before_creating_applied_table(
-    migrator: SqliteMigrator, no_op_migrate_callback: MigrateCallback
+    migrator: Migrator, no_op_migrate_callback: MigrateCallback
 ) -> None:
-    cursor = migrator._db._conn.cursor()
+    cursor = migrator._database.sqlite.conn.cursor()
     migrator._create_migrations_table(cursor)
     cursor.execute("INSERT INTO migrations (version) VALUES (1);")
     cursor.execute("INSERT INTO migrations (version) VALUES (2);")
@@ -528,35 +528,35 @@ def test_migrator_rejects_unknown_legacy_version_before_creating_applied_table(
 def test_migrator_runs_all_migrations_file(logger: Logger) -> None:
     with TemporaryDirectory() as tempdir:
         original_db_path = Path(tempdir) / "invokeai.db"
-        db = SqliteDatabase(db_path=original_db_path, logger=logger, verbose=False)
-        migrator = SqliteMigrator(db=db)
+        db = Database.open_sqlite(original_db_path, logger)
+        migrator = Migrator(db)
         migrations = [Migration(from_version=i, to_version=i + 1, callback=create_migrate(i)) for i in range(0, 3)]
         for migration in migrations:
             migrator.register_migration(migration)
         migrator.run_migrations()
         with closing(sqlite3.connect(original_db_path)) as original_db_conn:
             original_db_cursor = original_db_conn.cursor()
-            assert SqliteMigrator._get_current_version(original_db_cursor) == 3
+            assert Migrator._get_current_version(original_db_cursor) == 3
         # Must manually close else we get an error on Windows
-        db._conn.close()
+        db.sqlite.conn.close()
 
 
 def test_migrator_backs_up_db(logger: Logger) -> None:
     with TemporaryDirectory() as tempdir:
         original_db_path = Path(tempdir) / "invokeai.db"
-        db = SqliteDatabase(db_path=original_db_path, logger=logger, verbose=False)
+        db = Database.open_sqlite(original_db_path, logger)
         # Write some data to the db to test for successful backup
-        temp_cursor = db._conn.cursor()
+        temp_cursor = db.sqlite.conn.cursor()
         temp_cursor.execute("CREATE TABLE test (id INTEGER PRIMARY KEY);")
-        db._conn.commit()
+        db.sqlite.conn.commit()
         # Set up the migrator
-        migrator = SqliteMigrator(db=db)
+        migrator = Migrator(db)
         migrations = [Migration(from_version=i, to_version=i + 1, callback=create_migrate(i)) for i in range(0, 3)]
         for migration in migrations:
             migrator.register_migration(migration)
         migrator.run_migrations()
         # Must manually close else we get an error on Windows
-        db._conn.close()
+        db.sqlite.conn.close()
         assert original_db_path.exists()
         # We should have a backup file when we migrated a file db
         assert migrator._backup_path
@@ -567,10 +567,190 @@ def test_migrator_backs_up_db(logger: Logger) -> None:
             assert backup_db_cursor.fetchone() is not None
 
 
-def test_migrator_makes_no_changes_on_failed_migration(
-    migrator: SqliteMigrator, migration_no_op: Migration, failing_migrate_callback: MigrateCallback
+def _warnings(caplog: pytest.LogCaptureFixture) -> list[str]:
+    return [record.getMessage() for record in caplog.records if record.levelno == logging.WARNING]
+
+
+def test_migrating_an_existing_database_warns_with_the_backup_path(
+    tmp_path: Path, logger: Logger, caplog: pytest.LogCaptureFixture, no_op_migrate_callback: MigrateCallback
 ) -> None:
-    cursor = migrator._db._conn.cursor()
+    # The fixture's logger has no parent for caplog's root handler to hear.
+    logger.addHandler(caplog.handler)
+    db = Database.open_sqlite(tmp_path / "invokeai.db", logger)
+    first = Migration(from_version=0, to_version=1, callback=no_op_migrate_callback)
+    created = Migrator(db)
+    created.register_migration(first)
+    created.run_migrations()
+
+    updated = Migrator(db)
+    updated.register_migration(first)
+    updated.register_migration(Migration(from_version=1, to_version=2, callback=no_op_migrate_callback))
+    caplog.clear()
+    assert updated.run_migrations() is True
+    db.dispose()
+
+    [warning] = _warnings(caplog)
+    assert updated._backup_path is not None and updated._backup_path.is_file()
+    assert str(updated._backup_path) in warning
+    assert "Older versions of InvokeAI cannot use it" in warning
+    assert sqlite_migrator_impl.UPGRADE_DOCS_URL in warning
+
+
+def test_the_warning_is_logged_before_the_first_migration_runs(
+    tmp_path: Path, logger: Logger, caplog: pytest.LogCaptureFixture, no_op_migrate_callback: MigrateCallback
+) -> None:
+    # A migration that fails, or crashes the process, must still leave the user the backup's path.
+    logger.addHandler(caplog.handler)
+    db = Database.open_sqlite(tmp_path / "invokeai.db", logger)
+    first = Migration(from_version=0, to_version=1, callback=no_op_migrate_callback)
+    created = Migrator(db)
+    created.register_migration(first)
+    created.run_migrations()
+
+    seen_when_migrating: list[str] = []
+
+    def failing_migrate(cursor: sqlite3.Cursor, **kwargs) -> None:
+        assert updated._backup_path is not None and updated._backup_path.is_file()
+        seen_when_migrating.extend(_warnings(caplog))
+        raise ValueError("the migration failed")
+
+    updated = Migrator(db)
+    updated.register_migration(first)
+    updated.register_migration(Migration(from_version=1, to_version=2, callback=failing_migrate))
+    caplog.clear()
+    with pytest.raises(MigrationError, match="the migration failed"):
+        updated.run_migrations()
+    db.dispose()
+
+    [warning] = seen_when_migrating
+    assert updated._backup_path is not None and str(updated._backup_path) in warning
+    assert "Older versions of InvokeAI cannot use it" in warning
+
+
+def test_bootstrapping_and_migrating_a_legacy_database_warns_once_with_the_pre_bootstrap_backup(
+    tmp_path: Path, logger: Logger, caplog: pytest.LogCaptureFixture, no_op_migrate_callback: MigrateCallback
+) -> None:
+    # A database from before the applied migration IDs: legacy rows only.
+    db_path = tmp_path / "invokeai.db"
+    with closing(sqlite3.connect(db_path)) as conn:
+        conn.execute("CREATE TABLE migrations (version INTEGER PRIMARY KEY, migrated_at DATETIME);")
+        conn.execute("INSERT INTO migrations (version) VALUES (0), (1);")
+        conn.commit()
+    logger.addHandler(caplog.handler)
+    db = Database.open_sqlite(db_path, logger)
+    migrator = Migrator(db)
+    migrator.register_migration(Migration(from_version=0, to_version=1, callback=no_op_migrate_callback))
+    migrator.register_migration(Migration(from_version=1, to_version=2, callback=no_op_migrate_callback))
+
+    assert migrator.run_migrations() is True
+    db.dispose()
+
+    [warning] = _warnings(caplog)
+    [backup] = tmp_path.glob("invokeai_backup_*.db")
+    assert str(backup) in warning
+    # The backup is of the database before the bootstrap wrote its records.
+    with closing(sqlite3.connect(backup)) as conn:
+        assert conn.execute("SELECT name FROM sqlite_master WHERE name = 'applied_migrations';").fetchone() is None
+
+
+def test_creating_or_reopening_a_database_does_not_warn(
+    tmp_path: Path, logger: Logger, caplog: pytest.LogCaptureFixture
+) -> None:
+    logger.addHandler(caplog.handler)
+    db = Database.open_sqlite(tmp_path / "invokeai.db", logger)
+    migrations = [Migration(from_version=i, to_version=i + 1, callback=create_migrate(i)) for i in range(0, 3)]
+    for _ in range(2):
+        migrator = Migrator(db)
+        for migration in migrations:
+            migrator.register_migration(migration)
+        migrator.run_migrations()
+    db.dispose()
+
+    assert _warnings(caplog) == []
+
+
+def test_migrating_a_memory_database_does_not_warn(
+    migrator: Migrator, logger: Logger, caplog: pytest.LogCaptureFixture, no_op_migrate_callback: MigrateCallback
+) -> None:
+    logger.addHandler(caplog.handler)
+    migrator.register_migration(Migration(from_version=0, to_version=1, callback=no_op_migrate_callback))
+    migrator.run_migrations()
+    migrator.register_migration(Migration(from_version=1, to_version=2, callback=no_op_migrate_callback))
+
+    assert migrator.run_migrations() is True
+
+    assert _warnings(caplog) == []
+
+
+def _record_unknown_applied_migration(cursor: sqlite3.Cursor) -> str:
+    cursor.execute(
+        "CREATE TABLE applied_migrations (migration_id TEXT PRIMARY KEY, legacy_version INTEGER UNIQUE, "
+        "migrated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')));"
+    )
+    cursor.execute("INSERT INTO applied_migrations (migration_id) VALUES ('2999_01_01_future');")
+    return "unknown applied migration IDs: 2999_01_01_future"
+
+
+def _record_unknown_legacy_version(cursor: sqlite3.Cursor) -> str:
+    cursor.execute("CREATE TABLE migrations (version INTEGER PRIMARY KEY, migrated_at DATETIME);")
+    cursor.execute("INSERT INTO migrations (version) VALUES (0), (1), (2);")
+    return "unknown legacy migration version: 2"
+
+
+@pytest.mark.parametrize("record_newer_state", [_record_unknown_applied_migration, _record_unknown_legacy_version])
+def test_a_database_a_newer_version_updated_is_refused_with_where_its_backups_are(
+    tmp_path: Path,
+    logger: Logger,
+    no_op_migrate_callback: MigrateCallback,
+    record_newer_state: Callable[[sqlite3.Cursor], str],
+) -> None:
+    db_path = tmp_path / "invokeai.db"
+    with closing(sqlite3.connect(db_path)) as conn:
+        problem = record_newer_state(conn.cursor())
+        conn.commit()
+    # A backup from an earlier update, which the error must neither name nor touch.
+    earlier_backup = tmp_path / "invokeai_backup_20260101-120000.db"
+    earlier_backup.write_bytes(b"earlier state")
+    db = Database.open_sqlite(db_path, logger)
+    migrator = Migrator(db)
+    migrator.register_migration(Migration(from_version=0, to_version=1, callback=no_op_migrate_callback))
+
+    with pytest.raises(MigrationError) as refused:
+        migrator.run_migrations()
+    db.dispose()
+
+    message = str(refused.value)
+    assert problem in message
+    assert f"InvokeAI writes one to {tmp_path} as invokeai_backup_<date>-<time>.db" in message
+    assert sqlite_migrator_impl.UPGRADE_DOCS_URL in message
+    assert earlier_backup.name not in message
+    assert sorted(tmp_path.glob("invokeai_backup_*")) == [earlier_backup]
+    assert earlier_backup.read_bytes() == b"earlier state"
+
+
+def test_a_tool_checking_a_database_a_newer_version_updated_gets_where_its_backups_are(
+    tmp_path: Path, logger: Logger, no_op_migrate_callback: MigrateCallback
+) -> None:
+    db_path = tmp_path / "invokeai.db"
+    with closing(sqlite3.connect(db_path)) as conn:
+        _record_unknown_applied_migration(conn.cursor())
+        conn.commit()
+    db = Database.open_sqlite(db_path, logger)
+    migrator = Migrator(db)
+    migrator.register_migration(Migration(from_version=0, to_version=1, callback=no_op_migrate_callback))
+
+    with pytest.raises(MigrationError, match="unknown applied migration IDs: 2999_01_01_future") as refused:
+        migrator.has_pending_migrations()
+    db.dispose()
+
+    assert f"InvokeAI writes one to {tmp_path} as invokeai_backup_<date>-<time>.db" in str(refused.value)
+    assert sqlite_migrator_impl.UPGRADE_DOCS_URL in str(refused.value)
+
+
+def test_migrator_makes_no_changes_on_failed_migration(
+    migrator: Migrator, migration_no_op: Migration, failing_migrate_callback: MigrateCallback
+) -> None:
+    cursor = migrator._database.sqlite.conn.cursor()
     migrator.register_migration(migration_no_op)
     migrator.run_migrations()
     assert migrator._get_current_version(cursor) == 1
@@ -582,8 +762,63 @@ def test_migrator_makes_no_changes_on_failed_migration(
     assert [row[0] for row in cursor.fetchall()] == ["migration_1"]
 
 
-def test_idempotent_migrations(migrator: SqliteMigrator, migration_create_test_table: Migration) -> None:
-    cursor = migrator._db._conn.cursor()
+def test_migrator_rolls_back_ddl_a_failed_migration_already_issued(
+    migrator: Migrator, migration_no_op: Migration
+) -> None:
+    """A migration that only ever issues DDL must still be all-or-nothing.
+
+    Python's sqlite3 opens an implicit transaction before DML and never before DDL, so without an
+    explicit `BEGIN` every `CREATE`/`DROP`/`ALTER` here would commit on its own and survive the
+    failure. That is not a theoretical tidiness point: a table rebuild that drops the original and
+    dies before renaming the replacement leaves the database with no such table *and* the migration
+    unrecorded, so every subsequent start re-runs it and fails again.
+    """
+
+    def migrate(cursor: sqlite3.Cursor, **kwargs) -> None:
+        cursor.execute("CREATE TABLE ddl_only (id INTEGER PRIMARY KEY);")
+        cursor.execute("DROP TABLE ddl_only;")
+        cursor.execute("CREATE TABLE ddl_only_replacement (id INTEGER PRIMARY KEY);")
+        raise Exception("Bad migration")
+
+    cursor = migrator._database.sqlite.conn.cursor()
+    migrator.register_migration(migration_no_op)
+    migrator.run_migrations()
+    migrator.register_migration(Migration(from_version=1, to_version=2, callback=migrate))
+
+    with pytest.raises(MigrationError, match="Bad migration"):
+        migrator.run_migrations()
+
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ddl_only_replacement';")
+    assert cursor.fetchone() is None
+    assert migrator._get_current_version(cursor) == 1
+    cursor.execute("SELECT migration_id FROM applied_migrations ORDER BY migration_id;")
+    assert [row[0] for row in cursor.fetchall()] == ["migration_1"]
+
+
+def test_migrator_rolls_back_a_failed_migration_that_mixed_ddl_and_dml(
+    migrator: Migrator, migration_no_op: Migration
+) -> None:
+    """The same guarantee where the DDL precedes the first row written."""
+
+    def migrate(cursor: sqlite3.Cursor, **kwargs) -> None:
+        cursor.execute("CREATE TABLE mixed (id INTEGER PRIMARY KEY);")
+        cursor.execute("INSERT INTO mixed (id) VALUES (1);")
+        raise Exception("Bad migration")
+
+    cursor = migrator._database.sqlite.conn.cursor()
+    migrator.register_migration(migration_no_op)
+    migrator.run_migrations()
+    migrator.register_migration(Migration(from_version=1, to_version=2, callback=migrate))
+
+    with pytest.raises(MigrationError, match="Bad migration"):
+        migrator.run_migrations()
+
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='mixed';")
+    assert cursor.fetchone() is None
+
+
+def test_idempotent_migrations(migrator: Migrator, migration_create_test_table: Migration) -> None:
+    cursor = migrator._database.sqlite.conn.cursor()
     migrator.register_migration(migration_create_test_table)
     migrator.run_migrations()
     # not throwing is sufficient
@@ -595,20 +830,20 @@ def test_migration_27_creates_users_table(logger: Logger) -> None:
     """Test that migration 27 creates the users table and related tables."""
     from invokeai.app.services.shared.sqlite_migrator.migrations.migration_27 import Migration27Callback
 
-    db = SqliteDatabase(db_path=None, logger=logger, verbose=False)
-    cursor = db._conn.cursor()
+    db = Database.open_sqlite(None, logger)
+    cursor = db.sqlite.conn.cursor()
 
     # Create minimal tables that migration 27 expects to exist
     cursor.execute("CREATE TABLE IF NOT EXISTS boards (board_id TEXT PRIMARY KEY);")
     cursor.execute("CREATE TABLE IF NOT EXISTS images (image_name TEXT PRIMARY KEY);")
     cursor.execute("CREATE TABLE IF NOT EXISTS workflows (workflow_id TEXT PRIMARY KEY);")
     cursor.execute("CREATE TABLE IF NOT EXISTS session_queue (item_id INTEGER PRIMARY KEY);")
-    db._conn.commit()
+    db.sqlite.conn.commit()
 
     # Run migration callback directly (not through migrator to avoid chain validation)
     migration_callback = Migration27Callback()
     migration_callback(cursor)
-    db._conn.commit()
+    db.sqlite.conn.commit()
 
     # Verify users table exists
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users';")
@@ -665,7 +900,7 @@ def test_migration_27_creates_users_table(logger: Logger) -> None:
     assert jwt_row is not None
     assert len(jwt_row[0]) == 64  # 32 bytes = 64 hex characters
 
-    db._conn.close()
+    db.sqlite.conn.close()
 
 
 def test_migration_27_with_existing_client_state_data(logger: Logger) -> None:
@@ -675,8 +910,8 @@ def test_migration_27_with_existing_client_state_data(logger: Logger) -> None:
     from invokeai.app.services.shared.sqlite_migrator.migrations.migration_21 import Migration21Callback
     from invokeai.app.services.shared.sqlite_migrator.migrations.migration_27 import Migration27Callback
 
-    db = SqliteDatabase(db_path=None, logger=logger, verbose=False)
-    cursor = db._conn.cursor()
+    db = Database.open_sqlite(None, logger)
+    cursor = db.sqlite.conn.cursor()
 
     # Run migration 21 to create old-style client_state with data column
     Migration21Callback()(cursor)
@@ -685,7 +920,7 @@ def test_migration_27_with_existing_client_state_data(logger: Logger) -> None:
         "INSERT INTO client_state (id, data) VALUES (1, ?);",
         (json.dumps({"galleryView": "images", "lastBoardId": "board123"}),),
     )
-    db._conn.commit()
+    db.sqlite.conn.commit()
 
     # Run migration 27 pre-reqs
     cursor.execute("CREATE TABLE IF NOT EXISTS boards (board_id TEXT PRIMARY KEY);")
@@ -693,11 +928,11 @@ def test_migration_27_with_existing_client_state_data(logger: Logger) -> None:
     cursor.execute("CREATE TABLE IF NOT EXISTS workflows (workflow_id TEXT PRIMARY KEY);")
     cursor.execute("CREATE TABLE IF NOT EXISTS session_queue (item_id INTEGER PRIMARY KEY);")
     cursor.execute("CREATE TABLE IF NOT EXISTS style_presets (id TEXT PRIMARY KEY);")
-    db._conn.commit()
+    db.sqlite.conn.commit()
 
     # Run migration 27
     Migration27Callback()(cursor)
-    db._conn.commit()
+    db.sqlite.conn.commit()
 
     # Verify new client_state schema
     cursor.execute("PRAGMA table_info(client_state);")
@@ -715,15 +950,15 @@ def test_migration_27_with_existing_client_state_data(logger: Logger) -> None:
     assert ("system", "galleryView", "images") in rows
     assert ("system", "lastBoardId", "board123") in rows
 
-    db._conn.close()
+    db.sqlite.conn.close()
 
 
 def test_migration_27_without_client_state_data_column(logger: Logger) -> None:
     """Test that migration 27 handles old client_state table without the data column."""
     from invokeai.app.services.shared.sqlite_migrator.migrations.migration_27 import Migration27Callback
 
-    db = SqliteDatabase(db_path=None, logger=logger, verbose=False)
-    cursor = db._conn.cursor()
+    db = Database.open_sqlite(None, logger)
+    cursor = db.sqlite.conn.cursor()
 
     # Create old client_state WITHOUT data column (simulating an older migration 21)
     cursor.execute(
@@ -734,7 +969,7 @@ def test_migration_27_without_client_state_data_column(logger: Logger) -> None:
         );
         """
     )
-    db._conn.commit()
+    db.sqlite.conn.commit()
 
     # Run migration 27 pre-reqs
     cursor.execute("CREATE TABLE IF NOT EXISTS boards (board_id TEXT PRIMARY KEY);")
@@ -742,11 +977,11 @@ def test_migration_27_without_client_state_data_column(logger: Logger) -> None:
     cursor.execute("CREATE TABLE IF NOT EXISTS workflows (workflow_id TEXT PRIMARY KEY);")
     cursor.execute("CREATE TABLE IF NOT EXISTS session_queue (item_id INTEGER PRIMARY KEY);")
     cursor.execute("CREATE TABLE IF NOT EXISTS style_presets (id TEXT PRIMARY KEY);")
-    db._conn.commit()
+    db.sqlite.conn.commit()
 
     # Run migration 27 - should not raise even without data column
     Migration27Callback()(cursor)
-    db._conn.commit()
+    db.sqlite.conn.commit()
 
     # Verify new client_state schema
     cursor.execute("PRAGMA table_info(client_state);")
@@ -760,4 +995,30 @@ def test_migration_27_without_client_state_data_column(logger: Logger) -> None:
     cursor.execute("SELECT COUNT(*) FROM client_state;")
     assert cursor.fetchone()[0] == 0
 
-    db._conn.close()
+    db.sqlite.conn.close()
+
+
+def test_a_backup_of_the_same_second_is_kept_and_the_next_one_numbered(
+    tmp_path: Path, logger: Logger, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Migrating a database again right away, as on a restart after a failed migration, must not fail on, or
+    # replace, the backup the first run made.
+    class SameSecond(datetime):
+        @classmethod
+        def now(cls, tz: object = None) -> "SameSecond":
+            return cls(2026, 10, 7, 12, 0, 0)
+
+    monkeypatch.setattr(sqlite_migrator_impl, "datetime", SameSecond)
+    db = Database.open_sqlite(tmp_path / "invokeai.db", logger)
+    db.sqlite.conn.execute("CREATE TABLE test (id INTEGER PRIMARY KEY);")
+    db.sqlite.conn.commit()
+
+    first = Migrator(db)
+    first._backup_db()
+    second = Migrator(db)
+    second._backup_db()
+
+    assert first._backup_path == tmp_path / "invokeai_backup_20261007-120000.db"
+    assert second._backup_path == tmp_path / "invokeai_backup_20261007-120000-1.db"
+    assert first._backup_path.is_file() and second._backup_path.is_file()
+    db.dispose()

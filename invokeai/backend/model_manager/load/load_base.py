@@ -1,8 +1,8 @@
-# Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """
 Base class for model loading in InvokeAI.
 """
 
+import time
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from logging import Logger
@@ -20,10 +20,14 @@ from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_w
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache import (
     MODEL_LOAD_LOCK,
+    VRAM_MOVE_PASS_BYTES,
     FirstUseClaim,
     ModelCache,
 )
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
+from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.working_memory import probe
+from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate
 
 
 class LoadedModelWithoutConfig:
@@ -137,42 +141,148 @@ class LoadedModelWithoutConfig:
             if release_hold is not None:
                 release_hold(self._cache_record, hold_epoch)
 
-    def __enter__(self) -> AnyModel:
-        # Hold the MODEL_LOAD_LOCK read lock across the VRAM load (lock() runs
-        # load_state_dict(assign=True), which calls register_parameter) so it can't overlap a
-        # concurrent model construction that has the global register_parameter -> meta patch active.
-        # Acquired before the cache's own lock to keep a consistent lock order (see MODEL_LOAD_LOCK).
+    def _lock_paced(self, working_mem_bytes: Optional[int]) -> None:
+        """Move the model into VRAM in bounded passes, yielding the global load lock between them.
+
+        Each pass holds the MODEL_LOAD_LOCK read lock across its slice of the VRAM load (the move
+        runs load_state_dict(assign=True), which calls register_parameter, so it must not overlap
+        a concurrent model construction that has the global register_parameter -> meta patch
+        active), acquired before the cache's own lock to keep the documented lock order. Nothing
+        is held between passes, so a construction (write lock) queued on any worker runs in the
+        gap instead of waiting out the entire multi-GB stream — the write-preferring lock
+        guarantees the queued construction wins that gap. A failed pass behaves exactly like a
+        failed lock(): the cache has already unpinned the entry, so no unlock is owed here.
+
+        Known trade-off of yielding mid-stream: another load on the SAME device cache can slip
+        into a gap and pin VRAM this stream's budget had counted on. The stream then settles at
+        correspondingly lower residency (after trimming its own bytes if needed to preserve the
+        working-memory reservation) — exactly what a fresh lock() would compute at that instant.
+        Pre-pacing behavior made the interleaver wait instead. Residency recovers at the next
+        invocation's re-lock, once the interleaver unlocks.
+        """
+        stream_started_at = time.time()
         with MODEL_LOAD_LOCK.read_lock():
-            self._cache.lock(self._cache_record, None)
-        self._end_first_use_window()
+            settled = self._cache.lock(self._cache_record, working_mem_bytes, max_move_bytes=VRAM_MOVE_PASS_BYTES)
+        # Termination backstop: pathological interleavings (another thread's budget disagreeing
+        # with ours can unload what a pass just loaded) could in principle re-truncate forever.
+        # After comfortably more passes than the model's size can honestly require, run one final
+        # uncapped pass — with no cap, a pass can never report itself truncated, so it settles.
+        remaining_capped_passes = self._cache_record.cached_model.total_bytes() // VRAM_MOVE_PASS_BYTES + 8
+        while not settled:
+            remaining_capped_passes -= 1
+            with MODEL_LOAD_LOCK.read_lock():
+                settled = self._cache.continue_lock(
+                    self._cache_record,
+                    working_mem_bytes,
+                    max_move_bytes=VRAM_MOVE_PASS_BYTES if remaining_capped_passes > 0 else None,
+                    stream_started_at=stream_started_at,
+                )
+            if remaining_capped_passes <= 0:
+                # The uncapped pass settles by construction; guard against a regression in that
+                # invariant turning this loop into a spin.
+                assert settled, "uncapped continue_lock pass did not settle"
+
+    def _lock_on_device(self, working_mem_bytes: Optional[int], *, offload_others: bool = False) -> None:
+        """Lock the model onto its compute device and repair its required tensors there. Nothing stays locked if this
+        raises.
+
+        While a calibration scope is open anywhere (`probe.armed`), the working-memory probe hears of the lock from its
+        start until it has settled with the tensors repaired: inside a measured window on this thread that interval is
+        a co-lock, which moves weights and is kept out of the window's peak; on another thread it voids the window.
+        The lock is in `probe.locking` from before `armed` is read until it has settled or failed, so a window that
+        opens on this cache meanwhile is void even if this read missed the scope arming.
+
+        `offload_others`: first move every other unlocked model on the device to RAM whole, within that interval. A
+        calibration lock asks for it (`model_on_device`): the lock itself offloads only the shortfall it predicts and
+        splits the last model it moves, and a split can free a little less than predicted, so the measured model would
+        run partly resident and its window fit no line. Locked models, a window's co-locks among them, stay.
+        """
+        observed = locked = False
+        probe.locking.append(self._cache)
         try:
+            observed = probe.armed
+            if observed:
+                probe.lock_started(self._cache, self._cache_record)
+            if offload_others:
+                # The global load lock before the cache's own, as `_lock_paced` takes them: a move to RAM loads state
+                # dicts, which must not overlap a model construction.
+                with MODEL_LOAD_LOCK.read_lock():
+                    self._cache.offload_unlocked_models_from_vram(keep_cache_keys=(self._cache_record.key,))
+            self._lock_paced(working_mem_bytes)
+            locked = True
+            self._end_first_use_window()
             self.repair_required_tensors_on_device()
-            return self.model
-        except Exception:
-            self._cache.unlock(self._cache_record)
+        except BaseException:
+            if locked:
+                self._cache.unlock(self._cache_record)
+                locked = False
             raise
+        finally:
+            probe.locking.remove(self._cache)
+            if observed:
+                probe.lock_settled(self._cache, self._cache_record, locked)
+
+    def _unlock(self) -> None:
+        self._cache.unlock(self._cache_record)
+        if probe.armed:
+            probe.unlocked(self._cache, self._cache_record)
+
+    def __enter__(self) -> AnyModel:
+        self._lock_on_device(None)
+        return self.model
 
     def __exit__(self, *args: Any, **kwargs: Any) -> None:
-        self._cache.unlock(self._cache_record)
+        self._unlock()
 
     @contextmanager
     def model_on_device(
-        self, working_mem_bytes: Optional[int] = None
+        self, working_mem_bytes: Optional[int] = None, *, working_memory: Optional[WorkingMemoryEstimate] = None
     ) -> Generator[Tuple[Optional[Dict[str, torch.Tensor]], AnyModel], None, None]:
         """Return a tuple consisting of the model's state dict (if it exists) and the locked model on execution device.
 
         :param working_mem_bytes: The amount of working memory to keep available on the compute device when loading the
             model.
+        :param working_memory: A working-memory estimate whose `reservation_bytes` is kept available instead; see
+            `invokeai.backend.working_memory`. Pass this or `working_mem_bytes`, not both. Inside a calibration scope
+            (`working_memory.probe`) on a GPU, the lock first moves every other unlocked model on the device to RAM,
+            reserves calibration headroom on top, and the probe measures the operation from the settled lock until the
+            unlock.
         """
-        # See __enter__ for why the VRAM load is wrapped in the read lock.
-        with MODEL_LOAD_LOCK.read_lock():
-            self._cache.lock(self._cache_record, working_mem_bytes)
-        self._end_first_use_window()
+        if isinstance(working_mem_bytes, WorkingMemoryEstimate):
+            raise TypeError(
+                "model_on_device() got a WorkingMemoryEstimate as working_mem_bytes; pass it as working_memory=."
+            )
+        calibration: Optional[probe.ProbeScope] = None
+        if working_memory is not None:
+            if working_mem_bytes is not None:
+                raise ValueError("Pass either working_mem_bytes or working_memory to model_on_device(), not both.")
+            working_mem_bytes = working_memory.reservation_bytes
+            message = (
+                f"Working memory for {self._cache_record.key}: {working_memory.estimator} reserves "
+                f"{working_mem_bytes / 2**20:.0f} MB ({working_memory.source})"
+            )
+            scope = probe.current_scope()
+            if scope is not None and self.compute_device.type != "cpu":
+                calibration = scope
+                working_mem_bytes = probe.calibration_reservation(working_mem_bytes)
+                message += f"; the calibration lock reserves {working_mem_bytes / 2**20:.0f} MB"
+            InvokeAILogger.get_logger(__name__).debug(message)
+        self._lock_on_device(working_mem_bytes, offload_others=calibration is not None)
+        window = None
         try:
-            self.repair_required_tensors_on_device()
+            if calibration is not None:
+                assert working_memory is not None and working_mem_bytes is not None
+                window = calibration.open_window(self._cache, self._cache_record, working_memory, working_mem_bytes)
             yield (self._cache_record.cached_model.get_cpu_state_dict(), self._cache_record.cached_model.model)
+        except BaseException as error:
+            if window is not None:
+                window.close(error)
+                window = None
+            raise
         finally:
-            self._cache.unlock(self._cache_record)
+            if window is not None:
+                window.close(None)
+            self._unlock()
 
     @property
     def model(self) -> AnyModel:
@@ -183,11 +293,13 @@ class LoadedModelWithoutConfig:
     def model_in_ram(self) -> Generator[AnyModel, None, None]:
         """Pin the model's cache record in RAM without moving the model to its execution device."""
         self._cache.lock_in_ram(self._cache_record)
-        self._end_first_use_window()
+        if probe.armed:
+            probe.locked_in_ram(self._cache, self._cache_record)
         try:
+            self._end_first_use_window()
             yield self.model
         finally:
-            self._cache.unlock(self._cache_record)
+            self._unlock()
 
     @property
     def compute_device(self) -> torch.device:
@@ -204,6 +316,22 @@ class LoadedModelWithoutConfig:
     def supports_partial_loading(self) -> bool:
         """Whether this model can stream individual weights between RAM and the compute device."""
         return isinstance(self._cache_record.cached_model, CachedModelWithPartialLoad)
+
+    @property
+    def weight_bytes(self) -> int:
+        """Total size of this model's weights, resident or not."""
+        return self._cache_record.cached_model.total_bytes()
+
+    @property
+    def resident_weight_bytes(self) -> int:
+        """How many of this model's weight bytes currently sit on the compute device.
+
+        A caller that has to bound its own residency — because it holds a second model of the same
+        size at the same time — needs this to size its `unload_from_vram` request. Exposed here so
+        such a caller does not have to reach through `_cache_record.cached_model`, whose lifetime
+        the cache owns.
+        """
+        return self._cache_record.cached_model.cur_vram_bytes()
 
     def repair_required_tensors_on_device(self) -> int:
         """Repair required tensors that should be resident on the cached model's execution device."""
@@ -244,6 +372,14 @@ class LoadedModel(LoadedModelWithoutConfig):
     ):
         super().__init__(cache_record=cache_record, cache=cache, first_use_claim=first_use_claim)
         self.config = config
+
+
+class StaleModelConfigError(RuntimeError):
+    """The model record changed in a load-affecting way after the caller read it.
+
+    Raised instead of admitting a model built from the superseded record: the edit has already
+    invalidated the cache, so admitting it would serve the old weights to later requests.
+    """
 
 
 class ModelLoaderBase(ABC):
