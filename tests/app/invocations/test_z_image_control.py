@@ -91,7 +91,7 @@ def _loaded(model, lock) -> MagicMock:
 
 
 def _yielding(model):
-    # The transformer and the control are locked with `working_mem_bytes`, the VAE with `working_memory`.
+    # The transformer and the VAE are locked with `working_memory`, the control with `working_mem_bytes`.
     return lambda **_kwargs: nullcontext((None, model))
 
 
@@ -184,8 +184,8 @@ def test_the_control_is_locked_with_the_same_reservation_and_hooked_inside_the_e
     with pytest.raises(_Stop):
         _denoise()._run_diffusion(context)
 
-    reserved = transformer_info.model_on_device.call_args.kwargs["working_mem_bytes"]
-    assert control_info.model_on_device.call_args.kwargs["working_mem_bytes"] == reserved
+    reserved = transformer_info.model_on_device.call_args.kwargs["working_memory"]
+    assert control_info.model_on_device.call_args.kwargs["working_mem_bytes"] == reserved.reservation_bytes
     # Two entry pre-hooks, the refiner pair and the three Lite layers.
     assert hooks_at_patching == [2 + 2 + 3]
     assert _hook_count(transformer) == 0
