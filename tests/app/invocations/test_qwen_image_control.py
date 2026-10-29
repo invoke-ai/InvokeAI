@@ -3,9 +3,10 @@ trained for, reserves the hints and the score matrices beside the activations, l
 reservation inside the exit stack, gates it per step, and builds the packed control context from the field's images
 the way it packs its latents.
 
-The denoise runs its transformer in bfloat16, which the CPU test fleet cannot matmul, so every run here stops at the
-transformer's lock or at the LoRA patcher, or runs the loop with the transformer's forward stood in. The forward with
-the hooks is covered in `tests/backend/fun_controlnet`.
+The denoise runs its transformer in bfloat16, which the CPU test fleet cannot matmul, so the Fun runs here stop at the
+transformer's lock or at the LoRA patcher, or run the loop with the transformer's forward stood in; the forward with
+the hooks is covered in `tests/backend/fun_controlnet`. The InstantX runs go through the real tiny transformer and
+ControlNet, each widening what the node feeds it to float32 (`_Float32Compute`).
 """
 
 from contextlib import contextmanager, nullcontext
@@ -15,6 +16,7 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 from diffusers.models.autoencoders.autoencoder_kl_qwenimage import AutoencoderKLQwenImage
+from diffusers.models.controlnets.controlnet_qwenimage import QwenImageControlNetModel
 from diffusers.models.transformers.transformer_qwenimage import QwenImageTransformer2DModel
 from PIL import Image
 from pydantic import ValidationError
@@ -314,12 +316,13 @@ def test_with_control_the_lock_reserves_the_hints_too_and_the_images_are_encoded
     with pytest.raises(_Stop):
         _denoise()._run_diffusion(context)
 
-    expected = QwenImageDenoiseInvocation._estimate_working_memory(
-        image_seq_len=16,
-        text_seq_len=TEXT_TOKENS,
-        element_size=torch.bfloat16.itemsize,
-        num_control_blocks=len(CONTROL_LAYERS),
-        control_hidden_size=HIDDEN,
+    expected = (
+        QwenImageDenoiseInvocation._estimate_working_memory(
+            image_seq_len=16,
+            text_seq_len=TEXT_TOKENS,
+            element_size=torch.bfloat16.itemsize,
+        )
+        + (len(CONTROL_LAYERS) + 4) * 16 * HIDDEN * torch.bfloat16.itemsize
     )
     assert transformer_info.model_on_device.call_args.kwargs["working_mem_bytes"] == expected
     # The control image and the masked inpaint image went through the VAE before the transformer was locked.
@@ -463,7 +466,7 @@ def test_the_control_images_are_encoded_with_the_fields_tiling(
     monkeypatch.setattr(QwenImageImageToLatentsInvocation, "vae_encode", staticmethod(recording))
 
     _denoise(control=_control_field(tiled=tiled, tile_size=tile_size))._build_control_context(
-        context, LATENT_SIDE, LATENT_SIDE
+        context, _tiny_branch(), LATENT_SIDE, LATENT_SIDE
     )
 
     # Once for the control image, once for the masked inpaint image, both with the field's tiling.
@@ -482,7 +485,7 @@ def test_the_control_context_is_the_encoded_images_packed_like_the_latents(tmp_p
     vae_info = _loaded(vae, _yielding(vae))
     context = _context(tmp_path, vae_info=vae_info)
 
-    packed = _denoise()._build_control_context(context, LATENT_SIDE, LATENT_SIDE)
+    packed = _denoise()._build_control_context(context, _tiny_branch(), LATENT_SIDE, LATENT_SIDE)
 
     assert packed.shape == (1, (LATENT_SIDE // 2) ** 2, 33 * 4)
     # Channel-major within a token: feature c * 4 + dy * 2 + dx of token (i, j) is channel c at (2i + dy, 2j + dx).
@@ -502,3 +505,258 @@ def test_the_control_context_is_the_encoded_images_packed_like_the_latents(tmp_p
     masked = _as_denoise_input(_inpaint_image(), "RGB")
     masked[..., : SIDE // 2, : SIDE // 2] = 0.0
     assert torch.equal(context_4d[:, 17:], encode(masked))
+
+
+# --- the InstantX ControlNet ---
+
+INSTANTX_BLOCKS = 2
+INSTANTX_SCALE = 0.9
+
+
+def _widened(value):
+    if isinstance(value, torch.Tensor):
+        return value.float() if value.is_floating_point() else value
+    if isinstance(value, (list, tuple)):
+        return type(value)(_widened(item) for item in value)
+    return value
+
+
+class _Float32Compute:
+    """Runs the real forward in float32 on what the node feeds it in bfloat16, and hands the result back in the
+    dtype it was fed: the bfloat16 GEMM the CPU fleet lacks, done wider. The direct restatement calls the same
+    models, so both sides see the same arithmetic."""
+
+    def forward(self, **kwargs):
+        dtype = kwargs["hidden_states"].dtype
+        output = super().forward(**{name: _widened(value) for name, value in kwargs.items()})  # type: ignore[misc]
+        return [tensor.to(dtype) for tensor in output]
+
+
+class _InstantXTransformer(_Float32Compute, QwenImageTransformer2DModel):
+    """The tiny transformer, recording every forward the node makes: its arguments and its output."""
+
+    def forward(self, **kwargs):
+        output = super().forward(**kwargs)
+        self.calls.append(SimpleNamespace(kwargs=kwargs, output=output[0]))
+        return (output[0],)
+
+
+class _InstantXControlNet(_Float32Compute, QwenImageControlNetModel):
+    """The tiny ControlNet, counting its forwards."""
+
+    def forward(self, **kwargs):
+        self.calls += 1
+        return super().forward(**kwargs)
+
+
+def _randomized(model: torch.nn.Module, seed: int) -> torch.nn.Module:
+    """Every parameter from N(0, 0.1): diffusers zero-initialises `controlnet_blocks` and `controlnet_x_embedder`,
+    which would make every residual zero and every comparison here vacuous, and leaves the modulation gates near
+    zero."""
+    torch.manual_seed(seed)
+    for parameter in model.parameters():
+        torch.nn.init.normal_(parameter, std=0.1)
+    return model.eval()
+
+
+def _instantx_transformer() -> _InstantXTransformer:
+    model = _InstantXTransformer(
+        patch_size=2,
+        in_channels=64,
+        out_channels=16,
+        num_layers=4,
+        attention_head_dim=8,
+        num_attention_heads=2,
+        joint_attention_dim=8,
+        axes_dims_rope=(2, 4, 2),
+    )
+    model.calls = []
+    _randomized(model, seed=10)
+    return model
+
+
+def _instantx_controlnet() -> _InstantXControlNet:
+    model = _InstantXControlNet(
+        patch_size=2,
+        in_channels=64,
+        out_channels=16,
+        num_layers=INSTANTX_BLOCKS,
+        attention_head_dim=8,
+        num_attention_heads=2,
+        joint_attention_dim=8,
+        axes_dims_rope=(2, 4, 2),
+    )
+    model.calls = 0
+    _randomized(model, seed=11)
+    return model
+
+
+# Distinct prompts, the positive one padded, so a ControlNet fed the negative prompt or its mask would show.
+_PROMPTS = {
+    "pos": (torch.randn(1, TEXT_TOKENS, 8, generator=torch.Generator().manual_seed(20)), [True, True, True, False]),
+    "neg": (torch.randn(1, TEXT_TOKENS, 8, generator=torch.Generator().manual_seed(21)), [True, True, True, True]),
+}
+
+
+def _prompt(name: str) -> tuple[torch.Tensor, torch.Tensor]:
+    """A prompt as the denoise holds it: embeddings in bfloat16, the mask as is."""
+    embeds, mask = _PROMPTS[name]
+    return embeds.to(torch.bfloat16), torch.tensor([mask])
+
+
+def _instantx_context(tmp_path, transformer, controlnet, vae) -> MagicMock:
+    context = _context(
+        tmp_path,
+        _loaded(transformer, _yielding(transformer)),
+        _loaded(controlnet, _yielding(controlnet)),
+        _loaded(vae, _yielding(vae)),
+    )
+    context.conditioning.load.side_effect = lambda name: ConditioningFieldData(
+        conditionings=[
+            QwenImageConditioningInfo(
+                prompt_embeds=_PROMPTS[name][0], prompt_embeds_mask=torch.tensor([_PROMPTS[name][1]])
+            )
+        ]
+    )
+    return context
+
+
+def _instantx_field(**overrides) -> QwenImageControlField:
+    fields = {"inpaint_image_name": None, "inpaint_mask_name": None, "control_context_scale": INSTANTX_SCALE}
+    fields.update(overrides)
+    return _control_field(**fields)
+
+
+def _expected_control_latents(vae) -> torch.Tensor:
+    """diffusers' pipeline: the control image at generation size in [-1, 1], encoded and normalised, packed 2x2 into
+    `(1, tokens, 64)` and cast to the prompt's dtype."""
+    pixels = _as_denoise_input(_control_image(), "RGB")
+    latents = QwenImageImageToLatentsInvocation.vae_encode(_loaded(vae, _yielding(vae)), pixels).squeeze(2)
+    half = LATENT_SIDE // 2
+    packed = latents.view(1, 16, half, 2, half, 2).permute(0, 2, 4, 1, 3, 5).reshape(1, half * half, 64)
+    return packed.to(torch.bfloat16)
+
+
+@torch.no_grad()
+def test_an_instantx_step_is_the_diffusers_controlnet_pipeline_step(tmp_path) -> None:
+    """Every step's two transformer forwards are what QwenImageControlNetPipeline computes from that step's
+    latents: the ControlNet once, on the positive prompt and its mask at `timestep / 1000`, and its scaled residuals
+    added in both guidance branches."""
+    transformer, controlnet, vae = _instantx_transformer(), _instantx_controlnet(), _tiny_vae()
+    context = _instantx_context(tmp_path, transformer, controlnet, vae)
+
+    _denoise(control=_instantx_field())._run_diffusion(context)
+
+    calls = list(transformer.calls)
+    assert len(calls) == 4 and controlnet.calls == 2
+    control_latents = _expected_control_latents(vae)
+    img_shapes = [[(1, LATENT_SIDE // 2, LATENT_SIDE // 2)]]
+    pos_embeds, pos_mask = _prompt("pos")
+    neg_embeds, neg_mask = _prompt("neg")
+    for positive, negative in (calls[0:2], calls[2:4]):
+        latents, timestep = positive.kwargs["hidden_states"], positive.kwargs["timestep"]
+        samples = controlnet(
+            hidden_states=latents,
+            controlnet_cond=control_latents,
+            conditioning_scale=INSTANTX_SCALE,
+            encoder_hidden_states=pos_embeds,
+            encoder_hidden_states_mask=pos_mask,
+            timestep=timestep,
+            img_shapes=img_shapes,
+            return_dict=False,
+        )
+        shared = {"hidden_states": latents, "timestep": timestep, "img_shapes": img_shapes, "return_dict": False}
+        expected_positive = transformer(
+            encoder_hidden_states=pos_embeds,
+            encoder_hidden_states_mask=pos_mask,
+            controlnet_block_samples=samples,
+            **shared,
+        )[0]
+        expected_negative = transformer(
+            encoder_hidden_states=neg_embeds,
+            encoder_hidden_states_mask=neg_mask,
+            controlnet_block_samples=samples,
+            **shared,
+        )[0]
+        uncontrolled = transformer(encoder_hidden_states=pos_embeds, encoder_hidden_states_mask=pos_mask, **shared)[0]
+
+        assert torch.equal(negative.kwargs["hidden_states"], latents)
+        assert torch.equal(positive.output, expected_positive)
+        assert torch.equal(negative.output, expected_negative)
+        # The residuals move the prediction, so the comparisons above can fail.
+        assert not torch.equal(positive.output, uncontrolled)
+
+
+@torch.no_grad()
+def test_an_instantx_control_at_scale_zero_generates_what_no_control_does(tmp_path) -> None:
+    vae = _tiny_vae()
+
+    def generate(**overrides) -> torch.Tensor:
+        transformer, controlnet = _instantx_transformer(), _instantx_controlnet()
+        context = _instantx_context(tmp_path, transformer, controlnet, vae)
+        return _denoise(**overrides)._run_diffusion(context)
+
+    uncontrolled = generate(control=None, vae=None)
+
+    assert torch.equal(generate(control=_instantx_field(control_context_scale=0.0)), uncontrolled)
+    assert not torch.equal(generate(control=_instantx_field()), uncontrolled)
+
+
+@torch.no_grad()
+def test_an_instantx_control_outside_its_step_range_runs_no_controlnet(tmp_path) -> None:
+    """Four steps, the second half controlled: the ControlNet runs on the two steps inside the range only, and both
+    guidance forwards of a step take the same residuals or none."""
+    transformer, controlnet, vae = _instantx_transformer(), _instantx_controlnet(), _tiny_vae()
+    context = _instantx_context(tmp_path, transformer, controlnet, vae)
+
+    _denoise(steps=4, control=_instantx_field(begin_step_percent=0.5, end_step_percent=1.0))._run_diffusion(context)
+
+    assert controlnet.calls == 2
+    samples = [call.kwargs["controlnet_block_samples"] for call in transformer.calls]
+    assert samples[:4] == [None] * 4
+    assert all(isinstance(residuals, list) and len(residuals) == INSTANTX_BLOCKS for residuals in samples[4:])
+    assert samples[4] is samples[5] and samples[6] is samples[7]
+
+
+@pytest.mark.parametrize("overrides", [{}, {"image_name": None}], ids=["control-and-inpaint", "inpaint-alone"])
+def test_an_instantx_control_refuses_inpaint_inputs(tmp_path, overrides) -> None:
+    transformer, controlnet, vae = _instantx_transformer(), _instantx_controlnet(), _tiny_vae()
+    context = _instantx_context(tmp_path, transformer, controlnet, vae)
+    vae_info = context.models.load(_model(ModelType.VAE))
+
+    with pytest.raises(ValueError, match="no inpainting condition"):
+        _denoise(control=_control_field(**overrides))._run_diffusion(context)
+
+    # Refused before anything was encoded or run.
+    assert vae_info.model_on_device.call_count == 0
+    assert transformer.calls == [] and controlnet.calls == 0
+
+
+def test_an_instantx_control_reserves_its_residuals_and_is_locked_with_the_same_reservation(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    transformer, controlnet, vae = _instantx_transformer(), _instantx_controlnet(), _tiny_vae()
+    context = _instantx_context(tmp_path, transformer, controlnet, vae)
+    transformer_info = context.models.load(_model(ModelType.Main))
+    control_info = context.models.load(_model(ModelType.ControlNet))
+    hooks_at_patching: list[int] = []
+
+    def stop(**_kwargs):
+        hooks_at_patching.append(_hook_count(transformer))
+        raise _Stop
+
+    monkeypatch.setattr(LayerPatcher, "apply_smart_model_patches", stop)
+
+    with pytest.raises(_Stop):
+        _denoise(control=_instantx_field())._run_diffusion(context)
+
+    plain = QwenImageDenoiseInvocation._estimate_working_memory(
+        image_seq_len=16, text_seq_len=TEXT_TOKENS, element_size=torch.bfloat16.itemsize
+    )
+    # The scaled residuals, one per block, alive through both guidance forwards: 16 tokens at the ControlNet's width.
+    residuals = INSTANTX_BLOCKS * 16 * HIDDEN * torch.bfloat16.itemsize
+    reserved = transformer_info.model_on_device.call_args.kwargs["working_mem_bytes"]
+    assert reserved == plain + residuals
+    assert control_info.model_on_device.call_args.kwargs["working_mem_bytes"] == reserved
+    # Nothing is hooked into the transformer: the ControlNet runs beside it.
+    assert hooks_at_patching == [0]

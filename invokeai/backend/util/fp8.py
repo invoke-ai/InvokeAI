@@ -9,6 +9,9 @@ parameter — reports `float8_e4m3fn`. That is a *storage* dtype: torch has no C
 arithmetic on it (`"pow_cuda" not implemented for 'Float8_e4m3fn'`). So any code that reads a
 model's dtype in order to build or cast *tensors* (latents, noise, conditioning, control images,
 LoRA patch weights) must use `get_model_compute_dtype()` instead of `model.dtype`.
+
+The widened weights are memory one forward needs beyond the model's resident size, which a
+working-memory estimate prices with `peak_fp8_cast_transient_bytes()`.
 """
 
 import torch
@@ -72,3 +75,42 @@ def get_model_compute_dtype(model: torch.nn.Module) -> torch.dtype:
         "expect a dtype mismatch during the forward pass."
     )
     return fallback
+
+
+def peak_fp8_cast_transient_bytes(model: torch.nn.Module, compute_dtype: torch.dtype) -> int:
+    """Peak bytes one forward transiently needs to run this model's float8-stored weights in `compute_dtype`.
+
+    Two paths keep weights in float8 and widen them per forward, and both leave the stored tensors resident:
+
+    - FP8 Storage (`ModelLoader._wrap_forward_with_fp8_cast`): a layer's hooks widen its params to the compute
+      dtype when its forward starts and put the stored ones back when it ends, so the widened copies die with the
+      layer's forward.
+    - float8 weights a checkpoint ships and the loader keeps packed (`fp8_scaled.should_keep_fp8_weights`, or FP8
+      Storage on a scaled-fp8 checkpoint): `CustomLinear` dequantizes them per forward with `dequantize_weight`,
+      which holds the widened weight and its product with the `weight_scale` at once, two compute-dtype copies.
+
+    The hooked layers are leaf modules and run one after another, each freeing its copies before the next widens, so
+    the peak is the largest single layer's: its float8 params at the compute dtype, twice for one with a
+    `weight_scale`. Zero for a model that holds no float8 parameter. A quantized payload in a tensor subclass (SDNQ,
+    GGUF) is its scheme's to dequantize, not one of these casts, and is not counted.
+
+    Assumes the layers widen to `compute_dtype`, the dtype the forward runs in, as the loaders record it
+    (`get_model_compute_dtype`); a model widened to another dtype would be cast again per layer, which this does not
+    count. Counts every kept checkpoint weight, also where `torch._scaled_mm` multiplies it in float8 without widening
+    it: whether it does is decided per forward (the fp8 matmul setting, the device, alignment, a producer's
+    full-precision hint, the weight's device under partial loading), and the miss over-reserves one layer. Does not
+    count the host-to-device copy of a layer that partial loading left on the CPU, which every partially loaded weight
+    costs, whatever its dtype.
+    """
+    peak = 0
+    for module in model.modules():
+        stored = sum(
+            param.numel()
+            for param in module.parameters(recurse=False)
+            if type(param.data) is torch.Tensor and param.dtype in FP8_STORAGE_DTYPES
+        )
+        if not stored:
+            continue
+        copies = 2 if getattr(module, "weight_scale", None) is not None else 1
+        peak = max(peak, copies * stored * compute_dtype.itemsize)
+    return peak

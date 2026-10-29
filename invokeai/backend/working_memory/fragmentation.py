@@ -41,9 +41,10 @@ class Measurement:
     """The fit-eligible windows of one operation at one size from one attempt, in the order they ran."""
 
     line: Hashable
-    """What its sizes are compared within: one line (operation and dtype) of one estimator version on one card and
+    """What its sizes are compared within: one line (`fit.Line.suffix`) of one estimator version on one card and
     platform or environment."""
-    pixels: int
+    size: int
+    """The operation's size on that line (`fit.Line.size`)."""
     demand: Sequence[int]
     reserved: Sequence[Optional[int]]
     """Each window's reserved delta."""
@@ -66,14 +67,14 @@ def fragmented(measurements: Sequence[Measurement]) -> list[bool]:
             lines.setdefault(measurement.line, []).append(index)
     for members in lines.values():
         kept: list[tuple[int, float]] = []
-        for index in sorted(members, key=lambda index: measurements[index].pixels):
+        for index in sorted(members, key=lambda index: measurements[index].size):
             measurement = measurements[index]
             largest = list(measurement.demand).index(max(measurement.demand))
             ratio = reserved_ratio(measurement.reserved[largest], measurement.allocated[largest])
-            if ratio_outlier(ratio, [kept_ratio for pixels, kept_ratio in kept if pixels < measurement.pixels]):
+            if ratio_outlier(ratio, [kept_ratio for size, kept_ratio in kept if size < measurement.size]):
                 flags[index] = True
             elif ratio is not None and measurement.reference:
-                kept.append((measurement.pixels, ratio))
+                kept.append((measurement.size, ratio))
     return flags
 
 
