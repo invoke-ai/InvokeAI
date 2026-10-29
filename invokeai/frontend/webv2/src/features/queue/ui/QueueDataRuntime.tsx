@@ -7,7 +7,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { useTranslation } from 'react-i18next';
 
-import { refreshModelCacheStats } from './modelCacheStore';
+import { refreshWatchedModelCacheStats } from './modelCacheStore';
 import { takeQueueActionRequest, useQueueActionRequest, type QueueActionRequest } from './queueActionRequests';
 import { clearQueueConfirmation, useQueueConfirmation } from './queueConfirmationStore';
 import { useQueueLoadState } from './queueDataStore';
@@ -18,7 +18,7 @@ export const attachQueueDataRuntime = (): (() => void) => {
   const runtime = createProductionQueueRealtimeRuntime({
     invalidate: () => invalidateQueueQueries(queryClient),
     progress: itemProgressStore,
-    refreshModelCache: refreshModelCacheStats,
+    refreshModelCache: refreshWatchedModelCacheStats,
   });
 
   // Read device options once because changes require restart; hide labels for single-accelerator systems.

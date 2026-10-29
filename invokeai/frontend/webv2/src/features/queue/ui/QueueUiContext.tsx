@@ -14,7 +14,7 @@ export interface QueueUiAdapter {
   activeProjectId: string | null;
   /** Names the active-project scope in confirmations and results. */
   activeProjectName: string | null;
-  /** The invocation cache endpoints are admin-only; the footer hides for everyone else. */
+  /** The invocation cache endpoints are admin-only; the Cache popover shows its row to administrators alone. */
   canManageInvocationCache: boolean;
   canManageProcessor: boolean;
   canManageItem(item: QueueItemReadModel): boolean;
