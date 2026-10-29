@@ -317,6 +317,12 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def get_unfinished_origins(self, queue_id: str, origin_prefix: str) -> set[str]:
+        """The origins of the items pending, in progress or waiting whose origin starts with `origin_prefix` (ignoring
+        case). Found through the items' status: it costs the queue's unfinished items, not its history."""
+        pass
+
+    @abstractmethod
     def get_queue_item_summaries_by_ids(self, queue_id: str, item_ids: list[int]) -> list[SessionQueueItemSummary]:
         """Gets lightweight queue item summaries in the requested item ID order."""
         pass

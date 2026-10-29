@@ -173,6 +173,17 @@ class TestEstimateVaeWorkingMemoryWan:
         )
         assert estimate < VAE_PRETILE_VRAM_FRACTION * 22.4 * 2**30
 
+    @pytest.mark.parametrize(("z_dim", "spatial_scale", "width", "height"), [(16, 8, 1280, 720), (48, 16, 1280, 704)])
+    def test_tiling_fits_a_121_frame_720p_decode_on_8gb_cards(self, z_dim, spatial_scale, width, height):
+        """Tiling is what lets a small card run a clip whose untiled decode it cannot hold: tiled, 720p at 121 frames
+        reserved about 3.5 GiB. An estimate past an 8 GB card's tiling line would push the VAE itself off the card
+        for a decode that fits there."""
+        vae = _mock_wan_vae(z_dim=z_dim, spatial_scale=spatial_scale, dtype=torch.bfloat16)
+        estimate = estimate_vae_working_memory_wan(
+            operation="decode", vae=vae, pixel_height=height, pixel_width=width, pixel_frames=121, tile_size=256
+        )
+        assert estimate < VAE_PRETILE_VRAM_FRACTION * 8 * 2**30
+
     def test_multi_frame_decode_estimate_triggers_tiling_on_12gb_cards(self):
         """Conservative video estimates must engage the tiling fallback for both Wan VAEs."""
         for z_dim, spatial_scale in ((16, 8), (48, 16)):
@@ -403,6 +414,40 @@ class TestWanInvocationsRequestWorkingMemory:
             assert mock_estimate.call_count == 1
             vae.enable_tiling.assert_not_called()
             vae_info.model_on_device.assert_called_once_with(working_mem_bytes=100 * 2**30)
+
+    def test_latents_to_video_keeps_streaming_when_tiling_would_need_more(self):
+        """Tiling holds six copies of the clip; streaming holds one 4-frame chunk. At 832x480x481 on an 8 GB card the
+        streaming decode is past the tiling line, but the tiled one would need even more (7.97 vs 7.45 GiB)."""
+        vae = _mock_wan_vae()
+        vae_info = _mock_vae_info(vae)
+        vae_info.compute_device = torch.device("cuda")
+        mock_context = self._video_context(vae_info)
+        mock_context.tensors.load.return_value = torch.zeros(1, 16, 121, 60, 104)
+        mock_context.config.get.return_value.wan_memory_optimization = True
+        mock_context.config.get.return_value.auto_tiled_decode = True
+
+        with (
+            patch(
+                "invokeai.app.invocations.vae.wan_latents_to_video.iter_wan_vae_decode_chunks",
+                side_effect=RuntimeError("decoded past the reservation"),
+            ),
+            patch("invokeai.app.invocations.vae.wan_latents_to_video.make_mp4_writer"),
+            patch.object(TorchDevice, "empty_cache"),
+            patch("torch.cuda.get_device_properties", return_value=MagicMock(total_memory=8 * 2**30)),
+            patch("invokeai.backend.util.wddm.local_video_memory", return_value=None),
+        ):
+            invocation = WanLatentsToVideoInvocation.model_construct(
+                latents=MagicMock(latents_name="l"), vae=MagicMock(vae=MagicMock()), fps=16
+            )
+            with pytest.raises(RuntimeError, match="decoded past the reservation"):
+                invocation.invoke(mock_context)
+
+        streaming = estimate_vae_working_memory_wan(
+            operation="decode", vae=vae, pixel_height=480, pixel_width=832, pixel_frames=481, streaming=True
+        )
+        assert streaming > VAE_PRETILE_VRAM_FRACTION * 8 * 2**30
+        vae.enable_tiling.assert_not_called()
+        vae_info.model_on_device.assert_called_once_with(working_mem_bytes=streaming)
 
     def test_latents_to_video_skips_tiling_for_cpu_only_vae(self):
         """A cpu_only VAE runs in system RAM; VRAM-based tiling must not kick in, even with a small GPU present."""
