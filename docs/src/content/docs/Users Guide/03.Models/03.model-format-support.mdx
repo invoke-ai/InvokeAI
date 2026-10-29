@@ -20,7 +20,7 @@ speeds are on each family's own page.
 - – no such build exists
 
 How an unsupported file fails depends on the file. Some are not recognized at all and install as an unknown model,
-with the reason only in the server log: the Diffusers layout of LTX-2 and the GGUF builds of LTX-2, MiniMax H3 and the
+with the reason only in the server log: the Diffusers layout of LTX-2 and the GGUF builds of MiniMax H3 and the
 Ministral 3B encoder. Others are recognized by their layer names and fail, or misbehave, only when they load.
 
 ## Main models
@@ -35,13 +35,13 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
 | [Z-Image](/users-guide/models/local-models/z-image/) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
 | [Qwen-Image](/users-guide/models/local-models/qwen-image/) | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ |
 | [Qwen-Image-2.1](/users-guide/models/local-models/qwen-image-2-1/) | ✓ | ✓ | ✓ | ✓ | R | – | ✓ | ✗ | ✗ |
-| [Anima](/users-guide/models/local-models/anima/) | – | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ |
+| [Anima](/users-guide/models/local-models/anima/) | – | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ |
 | [Krea-2](/users-guide/models/local-models/krea-2/) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ |
 | [Ideogram 4](/users-guide/models/local-models/ideogram4/) | ✓ | ✓ | ✓ | ✓ | R | ✓ | ✓ | ✗ | inside the Diffusers folder |
-| [ERNIE-Image](/users-guide/models/local-models/ernie-image/) | ✓ | ✓ | L | L | L | ✗ | ✗ | ✗ | ✗ |
+| [ERNIE-Image](/users-guide/models/local-models/ernie-image/) | ✓ | ✓ | L | L | L | ✗ | ✓ | ✗ | ✗ |
 | [MOSS-Image](/users-guide/models/local-models/moss-image/) | ✓ | ✓ | R | R | R | R | R | ✗ | ✗ |
 | [Wan 2.2](/users-guide/video-generation/wan-22/) | ✓ | ✓ | ✓ | L | L | L | ✓ | ✗ | ✗ |
-| [LTX-2](/users-guide/video-generation/ltx-2/) (2.5 only) | official layout ✓, Diffusers layout ✗ | ✓ | L | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| [LTX-2](/users-guide/video-generation/ltx-2/) (2.5 only) | official layout ✓, Diffusers layout ✗ | ✓ | L | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ |
 | [MiniMax H3](/users-guide/video-generation/minimax-h3/) | ✓ | ✓ | L | ✓ | L | ✗ | ✗ | ✗ | ✗ |
 
 - **int8** means ComfyUI's `int8_convrot` (`int8_tensorwise`) builds; on NVIDIA GPUs, [int8 Compute](/configuration/optimization/int8-compute/)
@@ -51,9 +51,9 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
   transformer at install, unscaled fp8 included.
 - **GGUF** covers the llama.cpp types (Q4_0 through Q8_0, the K-quants, BF16). ComfyUI-GGUF's `Q8_CR` files load
   for Krea-2 only; for every other model with GGUF support the install fails.
-- LTX-2.0/2.3 files fail to install with a message. Wan 2.1, Wan Animate, S2V, Fun-Control and VACE single files and
-  GGUFs are not recognized as Wan 2.2 and install as unknown models; a Wan 2.1 Diffusers folder is not detected and
-  is not supported either.
+- LTX-2.0/2.3 files, GGUF builds included, fail to install with a message. Wan 2.1, Wan Animate, S2V, Fun-Control
+  and VACE single files and GGUFs are not recognized as Wan 2.2 and install as unknown models; a Wan 2.1 Diffusers
+  folder is not detected and is not supported either.
 
 ## Text encoders
 
@@ -70,7 +70,7 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
 | Mistral Small 3 | FLUX.2 dev | ✓ | ✓ | ✓ | L | ✓ | ✓ | ✗ |
 | Ministral 3B | ERNIE-Image | ✓ | ✓ | ✓ | L | L | ✗ | ✗ |
 | Gemma-2 2B | PiD decoders | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ |
-| Gemma-4 12B | LTX-2 | ✓ (bf16 or int8) | ✗ | L | in the folder | L | ✗ | ✗ |
+| Gemma-4 12B | LTX-2 | ✓ (bf16 or int8) | ✗ | L | in the folder | L | ✓ (LTX-2.5 conversions) | ✗ |
 | UMT5 | Wan 2.2 | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 
 The single-file CLIP builds are ComfyUI's `clip_l` and `clip_g`, as used by FLUX.1 and SD 3. SD and SDXL take their
@@ -79,9 +79,11 @@ CLIP encoders from the main model only, so a separate CLIP file does not change 
 FLUX.1 takes CLIP-L only.
 
 The Qwen3-VL GGUF encoder is the language model only; a separate `mmproj` vision file is refused, and split
-multi-part GGUFs have to be joined before installing. The Gemma-4 encoder installs only as a folder: its
-`config.json` and tokenizer files next to exactly one weight file, bf16 or int8. A standalone `.safetensors` file is
-not recognized.
+multi-part GGUFs have to be joined before installing. The Gemma-4 encoder installs as a folder (its `config.json`
+and tokenizer files next to exactly one weight file, bf16 or int8) or as a GGUF conversion of the LTX-2.5 encoder
+that packs its tokenizer and config in, such as elix3r's or Rootport's. Google's stock Gemma-4-12B GGUF fails to
+install with a message, since LTX-2 needs the Lightricks-tuned weights; its `mmproj` file is not recognized. A
+standalone `.safetensors` file is not recognized.
 
 The Qwen3.5 4B and 9B install as the same encoder type but are not interchangeable: Anima-3.8B takes only
 the 4B and MOSS-Image only the 9B, and each refuses the other. A 9B file must hold the whole language model:
@@ -111,7 +113,7 @@ not check, so a quantized file there fails with an unclear error or decodes inco
 | SDXL | ✓ (LyCORIS, Diffusers, OMI) | ✓ | IP-Adapter, T2I-Adapter, textual inversion |
 | FLUX.1 | ✓ (LyCORIS, Diffusers, OMI) | ✓ | Control LoRA, IP-Adapter, Redux |
 | FLUX.2, Z-Image | ✓ (LyCORIS, Diffusers) | FLUX.2 [dev] (single-file checkpoint), Z-Image | |
-| Qwen-Image, Krea-2, Wan 2.2, Anima | ✓ (LyCORIS/kohya, including LoKR where noted on the family page) | Qwen-Image (single-file checkpoint), Anima (ControlNet-LLLite) | |
+| Qwen-Image, Krea-2, Wan 2.2, Anima | ✓ (LyCORIS/kohya, including LoKR where noted on the family page) | Qwen-Image (single-file checkpoint: Fun and InstantX ControlNet Unions; InstantX Inpainting is refused), Anima (ControlNet-LLLite) | |
 | Qwen-Image-2.1 | ✓ (ComfyUI, diffusers/PEFT and kohya, including LoKR, LoHA and DoRA as noted on the family page) | ✗ | |
 | LTX-2, MiniMax H3 | ✓ (plain low-rank; LoKR, LoHA and DoRA are refused) | ✗ | |
 | SD 3, CogView4, Ideogram 4, ERNIE-Image, MOSS-Image | ✗ | ✗ | |
