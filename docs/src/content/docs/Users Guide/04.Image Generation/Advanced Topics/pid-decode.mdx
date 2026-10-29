@@ -72,6 +72,8 @@ When PiD mode is not *Off*, pick your **PiD Decoder** and **Gemma-2 Encoder** be
 
 PiD is available in both the **Generate** tab (text-to-image) and on the **Canvas** (image-to-image), in both Fit and Native modes.
 
+In the Workflow editor, each base has its own PiD decode node, such as *Latents to Image - Qwen-Image + PiD (4x SR)*. They take the denoised latent as the model produced it; only the **FLUX.2** node also needs the FLUX.2 VAE connected, because it reads the VAE's latent statistics to bring the latent into the form PiD was trained on.
+
 ## Running PiD on an existing image
 
 Everything above describes PiD as a *decode* step: it needs the latent the model just produced, so it only exists inside a generation. If you want to push an image you already have through PiD, the Workflow editor has a separate **PiD Upscale (4x)** node.

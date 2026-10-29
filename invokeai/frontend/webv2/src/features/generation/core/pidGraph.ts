@@ -26,7 +26,12 @@ const PID_DECODE_NODE_TYPE_SET: ReadonlySet<string> = new Set(Object.values(PID_
 export const isPidDecodeNodeType = (type: string | undefined): type is PidDecodeNodeType =>
   type !== undefined && PID_DECODE_NODE_TYPE_SET.has(type);
 
-/** Retain VAE edges for runtime scaling constants even though PiD replaces decode. */
+/**
+ * The decode node types that take a `vae` input. PiD takes the latent in the VAE's normalized space, and only
+ * FLUX.2 stores it denormalized, so only its decode reads the VAE (BatchNorm statistics to normalize its latent).
+ * The others take the stored latent as is, but the edge still records which VAE the graph decodes with:
+ * `findVaeSource` reads it to give a Canvas img2img encode that same VAE, override and seamless wrapping included.
+ */
 const PID_DECODE_NODES_WITH_VAE_INPUT: ReadonlySet<string> = new Set([
   'flux2_pid_decode',
   'qwen_image_pid_decode',
@@ -69,7 +74,7 @@ interface AddPidDecodeArg {
   positivePrompt: BackendInvocationContract;
   /** The seed node, reused for PiD's internal decode noise so results reproduce. */
   seed: BackendInvocationContract;
-  /** VAE source, wired only for decode nodes that read its constants. */
+  /** The VAE the graph decodes with, wired into every decode node that takes a `vae` input. */
   vaeSource?: BackendInvocationContract;
   /** The VAE output field on `vaeSource` (model loaders expose `vae`). */
   vaeField?: string;
