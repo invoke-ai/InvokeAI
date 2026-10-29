@@ -105,13 +105,35 @@ export interface QueueCoordinatorCallbacks {
   onGalleryRefresh(): void;
 }
 
-type TerminalOutcome = { status: 'completed' } | { status: 'failed'; error: string } | { status: 'canceled' };
+/**
+ * Why a backend item failed: the error the backend reported, a failure it gave no reason for, or the item vanishing
+ * from the queue (a clear deletes rows without a terminal event).
+ */
+export type QueueItemFailureCause = 'removed' | 'reported' | 'unexplained';
+
+type TerminalOutcome =
+  | { status: 'completed' }
+  | { cause: QueueItemFailureCause; error: string; status: 'failed' }
+  | { status: 'canceled' };
 
 /** Thrown by `waitForResults` when the backend reports the run was canceled. */
 export class QueueItemCancelledError extends Error {
   constructor(localQueueItemId: string) {
     super(`Queue item ${localQueueItemId} was canceled.`);
     this.name = 'QueueItemCancelledError';
+  }
+}
+
+/** Thrown by `waitForResults` when a backend item of the run failed; names that item so the failure can point at it. */
+export class QueueItemFailedError extends Error {
+  readonly backendItemId: number;
+  readonly failure: QueueItemFailureCause;
+
+  constructor(backendItemId: number, message: string, failure: QueueItemFailureCause) {
+    super(message);
+    this.backendItemId = backendItemId;
+    this.failure = failure;
+    this.name = 'QueueItemFailedError';
   }
 }
 
@@ -213,7 +235,11 @@ const toTerminalOutcome = (
   }
 
   if (status === 'failed') {
-    return { error: error ?? errorType ?? 'Generation failed.', status: 'failed' };
+    const reason = error ?? errorType;
+
+    return reason
+      ? { cause: 'reported', error: reason, status: 'failed' }
+      : { cause: 'unexplained', error: 'Generation failed.', status: 'failed' };
   }
 
   return { status: 'canceled' };
@@ -725,6 +751,7 @@ export const createQueueCoordinator = (
         } catch (error) {
           if (isActive() && error instanceof ApiError && error.status === 404) {
             settleWait(backendItemId, {
+              cause: 'removed',
               error: `Queue item ${backendItemId} is no longer on the backend queue.`,
               status: 'failed',
             });
@@ -1210,10 +1237,16 @@ export const createQueueCoordinator = (
 
     try {
       const outcomes = await Promise.all(run.outcomePromises);
-      const failure = outcomes.find((outcome) => outcome.status === 'failed');
+      // A genuine failure explains the run better than an item that vanished beside it, and leaves something to retry.
+      const genuineFailureIndex = outcomes.findIndex(
+        (outcome) => outcome.status === 'failed' && outcome.cause !== 'removed'
+      );
+      const failureIndex =
+        genuineFailureIndex >= 0 ? genuineFailureIndex : outcomes.findIndex((outcome) => outcome.status === 'failed');
+      const failure = outcomes[failureIndex];
 
-      if (failure) {
-        throw new Error(failure.error);
+      if (failure?.status === 'failed') {
+        throw new QueueItemFailedError(run.backendItemIds[failureIndex], failure.error, failure.cause);
       }
 
       const completedBackendItemIds = run.backendItemIds.filter(

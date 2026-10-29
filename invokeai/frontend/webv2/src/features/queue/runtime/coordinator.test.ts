@@ -24,6 +24,7 @@ import {
   createQueueCoordinator,
   QueueEnqueueNotAcceptedError,
   QueueItemCancelledError,
+  QueueItemFailedError,
   type QueueCoordinator,
   type QueueCoordinatorBackendPort,
   type QueueCoordinatorCallbacks,
@@ -349,18 +350,22 @@ describe('queueCoordinator', () => {
     expect(harness.api.getItem).not.toHaveBeenCalled();
   });
 
-  it('rejects with the backend error message when a run fails', async () => {
+  it('rejects with the backend error message and the item that failed when a run fails', async () => {
+    harness.api.enqueueGenerate.mockResolvedValue({ batchId: 'batch-1', enqueued: 2, itemIds: [1, 2], requested: 2 });
     harness.coordinator.connect();
 
     await harness.coordinator.submitGenerate('local-1', generateRequest);
     const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
 
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1 }));
     harness.socket.fire(
       'queue_item_status_changed',
-      createStatusEvent({ error_message: 'CUDA out of memory', item_id: 1, status: 'failed' })
+      createStatusEvent({ error_message: 'CUDA out of memory', item_id: 2, status: 'failed' })
     );
 
-    await expect(resultsPromise).rejects.toThrow('CUDA out of memory');
+    const failure = await resultsPromise.catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(QueueItemFailedError);
+    expect(failure).toMatchObject({ backendItemId: 2, failure: 'reported', message: 'CUDA out of memory' });
   });
 
   it('rejects with QueueItemCancelledError when the backend cancels a run', async () => {
@@ -2352,7 +2357,31 @@ describe('queueCoordinator', () => {
     harness.api.getItem.mockRejectedValue(new ApiError('not found', 404));
     harness.socket.fire('connect', undefined);
 
-    await expect(resultsPromise).rejects.toThrow('no longer on the backend queue');
+    const failure = await resultsPromise.catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(QueueItemFailedError);
+    // Vanished, not failed: nothing is left to show or retry, and a clear this tab asked for explains it.
+    expect(failure).toMatchObject({ failure: 'removed', message: expect.stringContaining('no longer on the backend') });
+  });
+
+  it('reports the item that failed over one that vanished beside it', async () => {
+    harness.api.enqueueGenerate.mockResolvedValue({ batchId: 'batch-1', enqueued: 2, itemIds: [1, 2], requested: 2 });
+    harness.coordinator.connect();
+
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
+
+    harness.api.getItem.mockImplementation((itemId: number) =>
+      // Item 2 never answers the sweep; its own status event settles it.
+      itemId === 1 ? Promise.reject(new ApiError('not found', 404)) : new Promise<never>(() => {})
+    );
+    harness.socket.fire('connect', undefined);
+    harness.socket.fire(
+      'queue_item_status_changed',
+      createStatusEvent({ error_message: 'CUDA out of memory', item_id: 2, status: 'failed' })
+    );
+
+    const failure = await resultsPromise.catch((error: unknown) => error);
+    expect(failure).toMatchObject({ backendItemId: 2, failure: 'reported', message: 'CUDA out of memory' });
   });
 
   it('prefers one batch cancellation request, falling back to item ids', async () => {

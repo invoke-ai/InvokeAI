@@ -12,6 +12,7 @@ describe('queueConfirmationStore', () => {
 
     requestQueueConfirmation({
       body: 'Clear queued work?',
+      cancelLabel: 'Keep items',
       confirmLabel: 'Clear queue',
       onConfirm,
       title: 'Clear queue?',

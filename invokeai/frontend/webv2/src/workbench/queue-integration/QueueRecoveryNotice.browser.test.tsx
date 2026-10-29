@@ -79,6 +79,11 @@ vi.mock('@platform/ui/ConfirmDialog', () => ({
     </div>
   ),
 }));
+const library = vi.hoisted(() => ({ summaries: [] as { id: string; name: string }[] }));
+vi.mock('@workbench/projects/library', () => ({
+  useProjectLibrarySelector: <Selected,>(selector: (snapshot: { summaries: typeof library.summaries }) => Selected) =>
+    selector({ summaries: library.summaries }),
+}));
 vi.mock('@workbench/projects/projectLifecycleLocks', () => ({
   acquireProjectMutationLock: vi.fn(() => Promise.resolve(harness.lockResult)),
 }));
@@ -133,6 +138,7 @@ const clickButton = async (text: string) => {
 };
 
 beforeEach(() => {
+  library.summaries = [];
   harness.accountCurrent = true;
   harness.deleteForProject.mockReset();
   harness.deleteForProject.mockResolvedValue({ kind: 'removed' });
@@ -205,6 +211,15 @@ describe('QueueRecoveryNotice', () => {
     });
     expect(fileName).toBe('closed-2.queue-recovery.json');
     expect(mediaType).toBe('application/json');
+  });
+
+  it('names the project by its library name, and by its id only while the library does not know it', async () => {
+    library.summaries = [{ id: 'closed-1', name: 'Portraits' }];
+    await renderNotice({ openProjectIds: ['open-project'] });
+
+    expect(document.body.textContent).toContain('shell.queueRecovery.description:{"project":"Portraits"}');
+    await clickButton('shell.queueRecovery.next');
+    expect(document.body.textContent).toContain('shell.queueRecovery.descriptionUnnamed:{"projectId":"closed-2"}');
   });
 
   it('discards only the selected project after confirmation and releases the lifecycle lock', async () => {

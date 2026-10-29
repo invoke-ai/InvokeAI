@@ -384,7 +384,14 @@ const createCommands = (
     notifications: {
       add: command('recordNotice'),
       clear: command('clearNotifications'),
+      dismiss: command('dismissNotification', (notificationId: string) => ({ notificationId })),
+      withdrawRetry: command('withdrawNotificationRetry', (itemId: number) => ({ itemId })),
       markAllRead: command('markAllNotificationsRead'),
+      markRead: command('markNotificationsRead', (notificationIds: readonly string[]) => ({ notificationIds })),
+      restore: command(
+        'restoreNotifications',
+        (notifications: ActionPayload<'restoreNotifications'>['notifications']) => ({ notifications })
+      ),
       recordWidgetFailure: command(
         'recordWidgetFailure',
         (failure: ActionPayload<'recordWidgetFailure'>['failure']) => ({ failure })
@@ -457,10 +464,8 @@ const createCommands = (
           ...(notice ? { notice } : {}),
         })
       ),
-      cancelAll: command('cancelAllQueueItems', (projectId?: string) => ({ projectId })),
-      cancelAllExceptCurrent: command(
-        'cancelAllQueueItemsExceptCurrent',
-        (projectId?: string, currentQueueItemId?: string | null) => ({ currentQueueItemId, projectId })
+      cancelUnsubmitted: command('cancelUnsubmittedQueueItems', (projectId?: string) =>
+        projectId === undefined ? {} : { projectId }
       ),
       clearCompleted: command('clearCompletedQueueItems'),
       markBackendCancelled: command('markQueueItemBackendCancelled'),

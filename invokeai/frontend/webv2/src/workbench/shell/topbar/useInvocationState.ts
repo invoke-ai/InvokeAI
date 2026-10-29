@@ -181,7 +181,7 @@ export const useInvocationState = (): InvocationState => {
 
   const issues = useMemo(
     (): InvocationIssue[] => [
-      ...(isConnected ? [] : [{ layerId: null, message: 'The backend is disconnected.' }]),
+      ...(isConnected ? [] : [{ layerId: null, message: t('topbar.invoke.serverDisconnected') }]),
       ...(expansionReason === null ? [] : [{ layerId: null, message: expansionReason }]),
       ...resolvedRoute.validationReasons.map((reason) => ({
         layerId: typeof reason === 'object' && 'controlLayerIssue' in reason ? reason.controlLayerIssue.layerId : null,

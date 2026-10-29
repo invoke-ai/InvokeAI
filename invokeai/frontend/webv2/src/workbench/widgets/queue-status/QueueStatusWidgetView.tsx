@@ -1,11 +1,13 @@
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Stack, Text } from '@chakra-ui/react';
-import { getDeterminateProgressPercent, getQueueSummary } from '@features/queue/contracts';
+import { useModelLoads } from '@features/models';
+import { getDeterminateProgressPercent, getQueueActivity, getQueueSummary } from '@features/queue/contracts';
 import { useIsProcessorPaused } from '@features/queue/react';
 import { useActiveQueueProgress } from '@workbench/queue-integration/useActiveQueueProgress';
 import { StatusWidgetChip } from '@workbench/widget-frame';
-import { ListOrderedIcon, PauseIcon } from 'lucide-react';
+import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { CloudOffIcon, ListOrderedIcon, PauseIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { getQueueStatusChip, getQueueStatusProgress } from './queueStatusModel';
@@ -14,16 +16,21 @@ export const QueueStatusWidgetView = ({ presentation }: WidgetViewProps) => {
   const { t } = useTranslation();
   const { progress, queueItems } = useActiveQueueProgress();
   const isPaused = useIsProcessorPaused();
+  const isConnected = useWorkbenchSelector((snapshot) => snapshot.backendConnection.status === 'connected');
+  const modelLoads = useModelLoads();
   // Derive counts without progress so batch sub-image updates change percent only.
   const summary = getQueueSummary(queueItems);
-  const chip = getQueueStatusChip(summary, isPaused);
+  const chip = getQueueStatusChip(
+    summary,
+    getQueueActivity({ hasOpenWork: summary.total > 0, isConnected, isLoadingModels: modelLoads.length > 0, isPaused })
+  );
   const percent = getDeterminateProgressPercent(progress?.percentage);
   const label =
     chip.labelKey === 'idle'
       ? t('widgets.queueStatus.idle')
-      : t(`widgets.queueStatus.${chip.labelKey}`, { count: chip.count });
-  const showPercent = chip.tone === 'running' && percent !== null;
-  const detail = chip.tone === 'running' ? progress?.message.trim() : undefined;
+      : t(`widgets.queueStatus.${chip.labelKey}`, { count: chip.count, model: modelLoads[0]?.label });
+  const showPercent = chip.labelKey === 'queued' && percent !== null;
+  const detail = chip.labelKey === 'queued' ? progress?.message.trim() : undefined;
 
   if (presentation === 'tooltip') {
     return (
@@ -46,8 +53,9 @@ export const QueueStatusWidgetView = ({ presentation }: WidgetViewProps) => {
   return (
     <StatusWidgetChip
       hiddenLabel={t('widgets.labels.queueStatus')}
-      icon={chip.tone === 'paused' ? PauseIcon : ListOrderedIcon}
+      icon={chip.tone === 'paused' ? PauseIcon : chip.tone === 'offline' ? CloudOffIcon : ListOrderedIcon}
       progress={getQueueStatusProgress(chip, progress?.percentage)}
+      tone={chip.tone === 'offline' ? 'warning' : undefined}
     >
       {label}
       {/* Reserved, tabular digits: the chip must not reflow the status bar as

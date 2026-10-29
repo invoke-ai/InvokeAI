@@ -18,6 +18,12 @@ export interface NotificationActionContext {
   isProjectOpen: (projectId: string) => boolean;
   /** Brings the widget forward where the layout has it, otherwise opens it, and moves focus there. */
   openWidget: (widgetId: WidgetTypeId) => void;
+  /** Opens the queue at a backend item. */
+  revealQueueItem: (itemId: number) => void;
+  /** Whether a notice may still offer Retry for this backend item: not once it was retried from one. */
+  canRetryQueueItem: (itemId: number) => boolean;
+  /** Re-runs a failed or canceled backend item, at most once, and reports how that went. */
+  retryQueueItem: (action: { canvasProjectId?: string; itemId: number }) => void;
   t: TFunction;
 }
 
@@ -44,6 +50,15 @@ const handlers: {
       return widget === null ? null : t('notifications.actions.openWidget', { widget });
     },
     run: ({ widgetId }, { openWidget }) => openWidget(widgetId),
+  },
+  'reveal-queue-item': {
+    label: (_action, { getWidgetLabel, t }) =>
+      getWidgetLabel('queue') === null ? null : t('notifications.actions.showInQueue'),
+    run: ({ itemId }, { revealQueueItem }) => revealQueueItem(itemId),
+  },
+  'retry-queue-item': {
+    label: ({ itemId }, { canRetryQueueItem, t }) => (canRetryQueueItem(itemId) ? t('common.retry') : null),
+    run: (action, { retryQueueItem }) => retryQueueItem(action),
   },
   undo: {
     hold: ({ undoId }) => holdNotificationUndo(undoId),

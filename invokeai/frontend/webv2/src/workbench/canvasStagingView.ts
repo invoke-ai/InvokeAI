@@ -261,5 +261,12 @@ export const getFirstCanvasPlaceholderSlotIndex = (
 export const isCancellableQueueItem = (item: QueueItem): boolean =>
   item.cancellable && (item.status === 'pending' || item.status === 'running');
 
+/**
+ * A run this tab queued that the backend has not accepted: never sent, or its enqueue still in flight. A backend
+ * cancel cannot reach it; only marking it canceled here stops it (an enqueue that lands then is canceled at once).
+ */
+export const isUnsubmittedQueueItem = (item: QueueItem): boolean =>
+  isCancellableQueueItem(item) && !item.backendItemIds?.length;
+
 export const getCancelableCanvasStagingQueueItemId = (slot: CanvasStagingSlot | undefined): string | null =>
   slot?.kind === 'placeholder' ? slot.queueItemId : null;

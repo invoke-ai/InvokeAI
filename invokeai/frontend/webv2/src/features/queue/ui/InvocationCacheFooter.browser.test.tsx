@@ -12,6 +12,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { InvocationCacheFooter } from './InvocationCacheFooter';
+import { createTestQueueUiAdapter } from './queueUiAdapter.testing';
 import { QueueUiProvider, type QueueUiAdapter } from './QueueUiContext';
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
@@ -37,19 +38,7 @@ const status = (overrides: Partial<InvocationCacheStatusDTO> = {}): InvocationCa
 });
 
 const notify = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
-const adapter: QueueUiAdapter = {
-  ItemActions: () => null,
-  activeProjectId: null,
-  canManageInvocationCache: true,
-  canManageItem: () => true,
-  canManageProcessor: true,
-  canViewItemDetails: () => true,
-  isConnected: true,
-  isProjectOpen: () => true,
-  notify,
-  openQueue: () => undefined,
-  queueJobsScope: 'all',
-};
+const adapter: QueueUiAdapter = createTestQueueUiAdapter({ canManageInvocationCache: true, notify });
 
 let host: HTMLDivElement;
 let root: Root;

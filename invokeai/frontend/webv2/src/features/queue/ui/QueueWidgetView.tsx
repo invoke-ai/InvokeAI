@@ -1,19 +1,19 @@
+import type { QueueActivity } from '@features/queue/core/queueActivity';
+
 import { Stack } from '@chakra-ui/react';
-import { getPersonalQueueActivity } from '@features/queue/core/types';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { StatusWidgetChip } from '@platform/ui/StatusWidgetChip';
-import { ListOrderedIcon } from 'lucide-react';
+import { CloudOffIcon, ListOrderedIcon, PauseIcon, type LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { QueueFilterId } from './queueFilters';
 
 import { CurrentBatchSection } from './NowNextSection';
-import { useQueueCounts } from './queueDataStore';
 import { QueueFilterTabs } from './QueueFilterTabs';
-import { QueueStats } from './QueueStats';
 import { usePendingQueueItemReveal } from './queueUiStore';
 import { RecentSection } from './RecentSection';
+import { useQueueWidgetActivity } from './useQueueWidgetActivity';
 
 export const QueueWidgetView = ({
   presentation,
@@ -22,20 +22,8 @@ export const QueueWidgetView = ({
   presentation?: 'compact' | 'expanded' | 'tooltip';
   region: 'bottom' | 'center' | 'dialog' | 'floating' | 'left' | 'popover' | 'right';
 }) => {
-  const { t } = useTranslation();
-  const counts = useQueueCounts();
-  const activity = getPersonalQueueActivity(counts);
-
   if (region === 'bottom' && presentation !== 'expanded') {
-    const isGenerating = activity.inProgress > 0;
-
-    return (
-      <StatusWidgetChip icon={ListOrderedIcon} tone={isGenerating ? 'accent' : undefined}>
-        {isGenerating
-          ? t('widgets.queue.generating', { count: activity.inProgress })
-          : t('widgets.queue.queued', { count: activity.pending })}
-      </StatusWidgetChip>
-    );
+    return <QueueStatusChip />;
   }
 
   return <QueueContent />;
@@ -53,19 +41,57 @@ const QueueContent = () => {
     setFilter('all');
   }
 
-  // The stats and filter stay put while the item lists scroll on their own.
+  // The counted filters stay put while the item lists scroll on their own.
   return (
     <Stack gap="3" h="full" minH="0" pt="3">
       <Stack flexShrink={0} gap="3" px="3">
-        <QueueStats />
         <QueueFilterTabs value={filter} onChange={setFilter} />
       </Stack>
       <Scrollable flex="1" label={t('widgets.queue.items')} minH="0" overflowX="hidden">
         <Stack gap="3" pb="3" px="3">
-          <CurrentBatchSection revealRequest={revealRequest} />
+          <CurrentBatchSection filter={filter} revealRequest={revealRequest} />
           <RecentSection filter={filter} revealRequest={revealRequest} />
         </Stack>
       </Scrollable>
     </Stack>
+  );
+};
+
+const chipIcons = {
+  idle: ListOrderedIcon,
+  'loading-model': ListOrderedIcon,
+  offline: CloudOffIcon,
+  paused: PauseIcon,
+  running: ListOrderedIcon,
+} satisfies Record<QueueActivity, LucideIcon>;
+
+const QueueStatusChip = () => {
+  const { t } = useTranslation();
+  const { activity, inProgress, loadingModel, pending } = useQueueWidgetActivity();
+  const openCount = inProgress + pending;
+  const label =
+    activity === 'offline'
+      ? t('widgets.queueStatus.offline', { count: openCount })
+      : activity === 'paused'
+        ? t('widgets.queueStatus.paused', { count: openCount })
+        : activity === 'loading-model'
+          ? t('widgets.queueStatus.loadingModel', { model: loadingModel })
+          : inProgress > 0
+            ? t('widgets.queue.generating', { count: inProgress })
+            : t('widgets.queue.queued', { count: pending });
+
+  return (
+    <StatusWidgetChip
+      icon={chipIcons[activity]}
+      tone={
+        activity === 'offline'
+          ? 'warning'
+          : activity === 'running' || activity === 'loading-model'
+            ? 'accent'
+            : undefined
+      }
+    >
+      {label}
+    </StatusWidgetChip>
   );
 };

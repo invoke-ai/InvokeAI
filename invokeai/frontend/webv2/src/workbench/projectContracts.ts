@@ -113,6 +113,13 @@ export type WorkbenchNotificationCategory = 'enqueue' | 'run-outcome';
  */
 export type WorkbenchNotificationAction =
   | { kind: 'open-widget'; widgetId: WidgetTypeId }
+  /** Opens the queue at this backend item. */
+  | { kind: 'reveal-queue-item'; itemId: number }
+  /**
+   * Re-runs this failed or canceled backend item from its saved session, once. `canvasProjectId`: a Canvas run's
+   * project, whose rerun is staged only by a tab with it open.
+   */
+  | { kind: 'retry-queue-item'; itemId: number; canvasProjectId?: string }
   /**
    * Runs the closure `useNotify().undoable` holds in its session-only registry, at most once. With `projectId`, only
    * while that project is open.
@@ -124,8 +131,11 @@ export interface WorkbenchNotification {
   kind: WorkbenchNotificationKind;
   title: string;
   titleKey?: string;
+  /** Interpolation values for `titleKey`; `title` holds the same text in English. */
+  titleValues?: Readonly<Record<string, string | number>>;
   message?: string;
   messageKey?: string;
+  messageValues?: Readonly<Record<string, string | number>>;
   createdAt: string;
   projectId?: string;
   isRead: boolean;

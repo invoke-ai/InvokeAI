@@ -14,6 +14,7 @@ import type { WorkbenchInternalStore } from './workbenchStore';
 import { createCanvasDimsSync } from './canvasDimsSync';
 import { createWorkbenchFocusController, FocusRegionProvider } from './focusRegions';
 import { createShortcutHintSources, ShortcutHintSourcesProvider } from './hotkeys/hintSources';
+import { startConnectionNotices } from './shell/notifications/connectionNotices';
 import { useWorkbenchInternalStore, useWorkbenchQueries, useWorkbenchSubscription } from './WorkbenchContext';
 import { getProjectGalleryBoardReferences } from './workbenchState';
 
@@ -24,10 +25,16 @@ export const WorkbenchRuntime = () => {
   useMountEffect(() => {
     const canvasDimsSync = createCanvasDimsSync(store);
     const boardReferenceCheck = createGalleryBoardReferenceCheck(store);
+    const stopConnectionNotices = startConnectionNotices({
+      getStatus: () => store.getSnapshot().backendConnection.status,
+      notifications: store.commands.notifications,
+      subscribe: store.subscribe,
+    });
 
     return () => {
       canvasDimsSync.dispose();
       boardReferenceCheck.dispose();
+      stopConnectionNotices();
     };
   });
 

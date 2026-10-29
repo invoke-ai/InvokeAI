@@ -1,7 +1,6 @@
 import type { ImageRecallKind } from '@workbench/image-actions/imageRecall';
 import type { ResultDestination } from '@workbench/invocationContracts';
 
-import { invalidateGallery } from '@features/gallery/queries';
 import {
   adjustFocusedPromptAttention,
   flushGenerateDrafts,
@@ -9,7 +8,7 @@ import {
   promptHistoryNavigation,
 } from '@features/generation/react';
 import { ensureModelsLoaded, getModelsSnapshot } from '@features/models';
-import { queueCommands } from '@features/queue';
+import { requestQueueAction } from '@features/queue/reveal';
 import { useInvocationTemplatesSelector } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
@@ -17,7 +16,6 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
-import { useQueryClient } from '@tanstack/react-query';
 import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
 import { describeControlLayerIssue } from '@workbench/controlLayerChecks';
 import { useWorkbenchFocus, useWorkbenchFocusTarget } from '@workbench/focusRegions';
@@ -102,9 +100,8 @@ export const useRegisterFirstPartyCommands = () => {
   const queries = useWorkbenchQueries();
   const focus = useWorkbenchFocus();
   const getFocusTarget = useWorkbenchFocusTarget();
-  const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const { layout, notifications, queue, widgets } = commands;
+  const { layout, notifications, widgets } = commands;
   useInvocationTemplatesSelector((snapshot) => snapshot.status);
 
   useMountEffect(() => {
@@ -300,23 +297,16 @@ export const useRegisterFirstPartyCommands = () => {
       ...layoutPresetCommands.map(({ id, presetId, title }) =>
         commandApi.register({ handler: () => void layout.activatePreset(presetId), id, title })
       ),
+      // The queue menus' own actions: scoped like them, and confirming by the same rules.
       commandApi.register({
-        handler: () => {
-          const owner = captureAccountScope();
-
-          void queueCommands.cancelCurrentItem().finally(() => {
-            if (isAccountScopeCurrent(owner)) {
-              return invalidateGallery(queryClient, owner);
-            }
-          });
-        },
+        handler: () => requestQueueAction('cancel-current'),
         id: 'app.cancelQueueItem',
         title: 'Cancel current queue item',
       }),
       commandApi.register({
-        handler: () => queue.cancelAll(queries.getSnapshot().activeProject.id),
+        handler: () => requestQueueAction('cancel-all'),
         id: 'app.clearQueue',
-        title: 'Clear queue',
+        title: 'Cancel all queue items',
       }),
       commandApi.register({
         handler: () =>

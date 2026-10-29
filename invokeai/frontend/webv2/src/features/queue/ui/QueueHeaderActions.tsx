@@ -1,60 +1,34 @@
-import type { QueueItemReadModel } from '@features/queue/core/types';
-
-/* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import { Icon } from '@chakra-ui/react';
-import { queueCommands } from '@features/queue/publicApi';
-import { getApiErrorMessage } from '@platform/transport/http';
 import { Button } from '@platform/ui/Button';
 import { XIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { refreshQueue, useNowNextItems } from './queueDataStore';
-import { useQueueUi } from './QueueUiContext';
+import { getQueueAction, useQueueActions } from './queueMenuActions';
 
-export const getQueueHeaderCancelState = ({
-  currentStatus,
-  isConnected,
-}: {
-  currentStatus: QueueItemReadModel['status'] | null;
-  isConnected: boolean;
-}): { disabled: boolean; itemLabel: string } => ({
-  disabled: !isConnected || currentStatus !== 'in_progress',
-  itemLabel: 'widgets.queue.cancelCurrent',
-});
-
+/** Cancelling the running item is cheap (Retry brings it back), so the header button acts without asking. */
 export const QueueHeaderActions = () => {
   const { t } = useTranslation();
-  const { canManageItem, isConnected, notify } = useQueueUi();
-  const { current } = useNowNextItems();
+  const cancelCurrent = getQueueAction(useQueueActions(), 'cancel-current');
   const [busy, setBusy] = useState(false);
-  const currentItemId = current?.id ?? null;
-  const { disabled, itemLabel } = getQueueHeaderCancelState({
-    currentStatus: current && canManageItem(current) ? current.status : null,
-    isConnected,
-  });
 
-  const onCancel = async () => {
-    if (disabled || currentItemId === null) {
+  const onCancel = useCallback(async () => {
+    if (!cancelCurrent || cancelCurrent.disabled) {
       return;
     }
 
     setBusy(true);
-
     try {
-      await queueCommands.cancelItem(currentItemId);
-      await refreshQueue();
-    } catch (error) {
-      notify.error(t('common.cancelFailed'), getApiErrorMessage(error, t('widgets.queue.couldNotCancelCurrentItem')));
+      await cancelCurrent.trigger();
     } finally {
       setBusy(false);
     }
-  };
+  }, [cancelCurrent]);
 
   return (
-    <Button disabled={disabled} loading={busy} size="sm" variant="outline" onClick={onCancel}>
+    <Button disabled={cancelCurrent?.disabled ?? true} loading={busy} size="sm" variant="outline" onClick={onCancel}>
       <Icon as={XIcon} boxSize="3.5" />
-      {t(itemLabel)}
+      {t('widgets.queue.cancelCurrent')}
     </Button>
   );
 };

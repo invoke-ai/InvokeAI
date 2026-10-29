@@ -1,5 +1,6 @@
 import type { WorkbenchNotification, WorkbenchNotificationKind } from '@workbench/projectContracts';
 import type { WorkbenchPreferences } from '@workbench/settings/contracts';
+import type { TFunction } from 'i18next';
 
 import { ACTION_TOAST_DURATION_MS, createActionToast } from '@platform/ui/toaster';
 
@@ -16,6 +17,15 @@ const notificationToastType: Record<WorkbenchNotificationKind, 'error' | 'info' 
   info: 'info',
   success: 'success',
 };
+
+/** A notification's title and message in the current language; the English text stands in where no key exists. */
+export const resolveNotificationText = (
+  notification: WorkbenchNotification,
+  t: TFunction
+): { message: string | undefined; title: string } => ({
+  message: notification.messageKey ? t(notification.messageKey, notification.messageValues) : notification.message,
+  title: notification.titleKey ? t(notification.titleKey, notification.titleValues) : notification.title,
+});
 
 export interface NotificationToastSources {
   actionContext: NotificationActionContext;
@@ -41,7 +51,7 @@ export const startNotificationToasts = ({
   let toastedKeys = new Set(notifications.map(getToastKey));
 
   const show = (notification: WorkbenchNotification): void => {
-    const { t } = actionContext;
+    const text = resolveNotificationText(notification, actionContext.t);
     const descriptors = notification.actions ?? [];
     const actions = resolveNotificationActions(descriptors, actionContext);
     const duration = notification.persistent
@@ -52,7 +62,7 @@ export const startNotificationToasts = ({
 
     createActionToast({
       actions,
-      description: notification.messageKey ? t(notification.messageKey) : notification.message,
+      description: text.message,
       ...(duration === undefined ? {} : { duration }),
       ...(descriptors.length > 0
         ? {
@@ -64,7 +74,7 @@ export const startNotificationToasts = ({
           }
         : {}),
       ...(actions.length > 0 || notification.persistent ? { signal: lifetime.signal } : {}),
-      title: notification.titleKey ? t(notification.titleKey) : notification.title,
+      title: text.title,
       type: notificationToastType[notification.kind],
     });
     holdNotificationActions(descriptors);

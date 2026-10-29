@@ -237,7 +237,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('app', 'selectVideoPreset', ['alt+3']),
   hotkey('app', 'selectAutomatePreset', ['alt+4'], { title: 'Select Workflow Preset' }),
   hotkey('app', 'cancelQueueItem', ['shift+x']),
-  hotkey('app', 'clearQueue', ['mod+shift+x']),
+  hotkey('app', 'clearQueue', ['mod+shift+x'], { title: 'Cancel all queue items' }),
   hotkey('app', 'selectGenerateTab', ['1']),
   hotkey('app', 'selectCanvasTab', ['2']),
   hotkey('app', 'selectUpscalingTab', ['3']),

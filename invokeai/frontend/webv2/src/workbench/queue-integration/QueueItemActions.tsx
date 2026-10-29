@@ -7,19 +7,53 @@ import { Button, CloseButton } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
 import { JsonPreview } from '@platform/ui/JsonPreview';
 import { Tabs } from '@platform/ui/Tabs';
-import { useNotify } from '@workbench/useNotify';
-import { FileTextIcon, WandSparklesIcon } from 'lucide-react';
+import { FileTextIcon, TriangleAlertIcon } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-type DetailView = 'graph' | 'item' | 'results' | 'workflow';
+type DetailView = 'error' | 'graph' | 'item' | 'results' | 'workflow';
 
+const hasErrorDetail = (detail: QueueItemDetailReadModel): boolean =>
+  Boolean(detail.errorTraceback || detail.errorMessage);
+
+/** A failure leads with what went wrong; the raw data follows. */
 const getDetailViews = (detail: QueueItemDetailReadModel): DetailView[] => [
+  ...(hasErrorDetail(detail) ? (['error'] as const) : []),
   'item',
   'graph',
   'results',
   ...(detail.workflow ? (['workflow'] as const) : []),
 ];
+
+const QueueItemErrorView = ({ detail, itemId }: { detail: QueueItemDetailReadModel; itemId: number }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Stack gap="2">
+      <Stack gap="0.5">
+        {detail.errorType ? (
+          <Text fontFamily="mono" fontSize="sm" fontWeight="600">
+            {detail.errorType}
+          </Text>
+        ) : null}
+        {detail.errorMessage ? (
+          <Text color="fg.error" fontSize="sm" overflowWrap="anywhere">
+            {detail.errorMessage}
+          </Text>
+        ) : null}
+      </Stack>
+      {detail.errorTraceback ? (
+        <JsonPreview
+          copyFailedLabel={t('widgets.queue.copyTracebackFailed')}
+          copyLabel={t('widgets.queue.copyTraceback')}
+          label={t('widgets.queue.tracebackLabel', { id: itemId })}
+          maxH="50vh"
+          text={detail.errorTraceback}
+        />
+      ) : null}
+    </Stack>
+  );
+};
 
 const getDetailValue = (item: QueueItemReadModel, detail: QueueItemDetailReadModel, view: DetailView): unknown => {
   switch (view) {
@@ -30,7 +64,7 @@ const getDetailValue = (item: QueueItemReadModel, detail: QueueItemDetailReadMod
     case 'workflow':
       return detail.workflow;
     default:
-      return { ...item, errorTraceback: detail.errorTraceback, priority: detail.priority };
+      return { ...item, priority: detail.priority };
   }
 };
 
@@ -38,7 +72,7 @@ const getDetailValue = (item: QueueItemReadModel, detail: QueueItemDetailReadMod
 const QueueItemDetailBody = ({ item, open }: { item: QueueItemReadModel; open: boolean }) => {
   const { t } = useTranslation();
   const { detail, error, loadState, retry, retrying } = useQueueItemDetail(item.id, open);
-  const [view, setView] = useState<DetailView>('item');
+  const [view, setView] = useState<DetailView>(item.status === 'failed' ? 'error' : 'item');
   const onViewChange = useCallback((details: { value: string }) => setView(details.value as DetailView), []);
   // A successful retry replaces the focused Retry button with the views; focus follows onto the selected one.
   const focusAfterRetryRef = useRef(false);
@@ -98,13 +132,17 @@ const QueueItemDetailBody = ({ item, open }: { item: QueueItemReadModel; open: b
       </Tabs.List>
       {views.map((candidate) => (
         <Tabs.Content key={candidate} value={candidate} pt="2">
-          <JsonPreview
-            copyFailedLabel={t('widgets.queue.copyFailed')}
-            copyLabel={t('widgets.queue.copyJson')}
-            label={t('widgets.queue.itemJsonLabel', { id: item.id })}
-            maxH="55vh"
-            value={getDetailValue(item, detail, candidate)}
-          />
+          {candidate === 'error' ? (
+            <QueueItemErrorView detail={detail} itemId={item.id} />
+          ) : (
+            <JsonPreview
+              copyFailedLabel={t('widgets.queue.copyFailed')}
+              copyLabel={t('widgets.queue.copyJson')}
+              label={t('widgets.queue.itemJsonLabel', { id: item.id })}
+              maxH="55vh"
+              value={getDetailValue(item, detail, candidate)}
+            />
+          )}
         </Tabs.Content>
       ))}
     </Tabs.Root>
@@ -113,13 +151,8 @@ const QueueItemDetailBody = ({ item, open }: { item: QueueItemReadModel; open: b
 
 export const QueueItemActions = ({ item }: { item: QueueItemReadModel }) => {
   const { t } = useTranslation();
-  const notify = useNotify();
   const [jsonOpen, setJsonOpen] = useState(false);
-
-  const onSendToCanvas = useCallback(
-    () => notify.info(t('widgets.queue.sendToCanvas'), t('widgets.queue.sendToCanvasComingSoon')),
-    [notify, t]
-  );
+  const isFailed = item.status === 'failed';
 
   const openJson = useCallback(() => setJsonOpen(true), []);
   const closeJson = useCallback(() => setJsonOpen(false), []);
@@ -127,13 +160,9 @@ export const QueueItemActions = ({ item }: { item: QueueItemReadModel }) => {
   return (
     <>
       <ButtonGroup flexWrap="wrap" minW="0" rowGap="1" size="sm" variant="subtle">
-        <Button disabled variant="ghost" onClick={onSendToCanvas}>
-          <Icon as={WandSparklesIcon} boxSize="3" />
-          {t('widgets.queue.sendToCanvas')}
-        </Button>
         <Button onClick={openJson}>
-          <Icon as={FileTextIcon} boxSize="3" />
-          {t('common.viewJson')}
+          <Icon as={isFailed ? TriangleAlertIcon : FileTextIcon} boxSize="3" />
+          {isFailed ? t('widgets.queue.viewError') : t('common.viewJson')}
         </Button>
       </ButtonGroup>
 

@@ -63,7 +63,9 @@ const start = (store: ReturnType<typeof createWorkbenchStore>) =>
       },
       getWidgetById,
       getWidgetsForRegion,
+      notifications: store.commands.notifications,
       queries: store.queries,
+      retryQueueItems: () => Promise.resolve([]),
       t: i18next.t,
       widgets: store.commands.widgets,
     }),
@@ -153,6 +155,30 @@ describe('notification toasts in the editor', () => {
       { kind: 'open-widget', widgetId: 'queue' },
       { kind: 'open-widget', widgetId: 'not-installed' },
     ]);
+  });
+
+  it('keeps a failed run on screen in the current language, with a way to the failed item', async () => {
+    await act(() =>
+      store().commands.notifications.add({
+        actions: [
+          { itemId: 41, kind: 'reveal-queue-item' },
+          { itemId: 41, kind: 'retry-queue-item' },
+        ],
+        kind: 'error',
+        message: '“A castle at dusk”: CUDA out of memory',
+        persistent: true,
+        title: 'Run failed in Portraits',
+        titleKey: 'notifications.runOutcome.failed',
+        titleValues: { project: 'Portraits' },
+      })
+    );
+    const toast = await openToast(i18next.t('notifications.runOutcome.failed', { project: 'Portraits' }));
+
+    expect(buttonLabels(toast)).toEqual(['Show in queue', 'Retry']);
+    await act(() => actionButtons(toast)[0]!.click());
+
+    const project = store().getSnapshot().activeProject;
+    expect(project.widgetInstances[project.widgetRegions.right.activeInstanceId]?.typeId).toBe('queue');
   });
 
   it('undoes an undoable action once, from its toast, without a closure in workbench state', async () => {

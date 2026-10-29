@@ -9,6 +9,7 @@ import type {
   QueueResultVideo,
   QueueRunOrigin,
 } from '@features/queue/core/types';
+import type { QueueCancelRequestPort } from '@features/queue/runtime/cancelRequests';
 import type { BackendConnectionStatus } from '@platform/transport/types';
 
 import { collectSubmissionInputMediaNames, type SubmissionInputMediaNames } from '@features/queue/core/graphInputMedia';
@@ -22,6 +23,7 @@ import {
 } from '@features/queue/core/promptBatch';
 import { QUEUE_SOURCE_RESULT_NODE_IDS, shouldSubmitPendingQueueItem } from '@features/queue/core/submissionRules';
 import {
+  buildQueueItemOrigin,
   isTerminalBackendStatus,
   isUtilityQueueItemOrigin,
   parseQueueItemOrigin,
@@ -34,6 +36,7 @@ import {
   createQueueCoordinator,
   QueueEnqueueNotAcceptedError,
   QueueItemCancelledError,
+  QueueItemFailedError,
   type QueueCoordinator,
   type QueueModelLoadPort,
   type QueueNodeExecutionPort,
@@ -133,12 +136,18 @@ export interface QueueHistoryCommands {
   }): void;
   setStatus(payload: {
     error?: string;
+    /** Set when `error` is a stand-in the notice words itself: the backend gave no reason, or the item vanished. */
+    errorCode?: QueueRunErrorCode;
+    /** The backend item whose failure ended the run, so the failure notice can show and retry it. */
+    failedBackendItemId?: number;
     notify?: boolean;
     projectId: string;
     queueItemId: string;
     status: QueueItem['status'];
   }): void;
 }
+
+export type QueueRunErrorCode = 'removed' | 'unexplained';
 
 type QueueItemBackendSubmission =
   | { kind: 'generate'; request: QueueEnqueueGenerateRequest }
@@ -427,8 +436,11 @@ const TRANSIENT_SERVER_STATUSES = [502, 503, 504];
 const isDeterministicServerError = (error: unknown): boolean =>
   error instanceof ApiError && error.status >= 500 && !TRANSIENT_SERVER_STATUSES.includes(error.status);
 
+const NO_CANCEL_REQUESTS: QueueCancelRequestPort = { wasRequestedHere: () => false };
+
 export const createQueueRuntime = ({
   backend,
+  cancelRequests = NO_CANCEL_REQUESTS,
   destinations,
   ensureProjectPersisted,
   ensureTemplatesLoaded,
@@ -440,6 +452,8 @@ export const createQueueRuntime = ({
   viewerUserId = null,
 }: {
   backend: QueueBackendPort;
+  /** Cancels this tab already announced; a run they end reports no outcome of its own. */
+  cancelRequests?: QueueCancelRequestPort;
   destinations: QueueResultDestinationPort;
   ensureProjectPersisted?(projectId: string): Promise<'ready' | 'refused' | 'retry'>;
   ensureTemplatesLoaded: () => void;
@@ -1165,13 +1179,45 @@ export const createQueueRuntime = ({
         return;
       }
 
+      // A cancel or clear this tab asked for already said so; the run ending is no news.
+      const wasRequestedHere = () =>
+        cancelRequests.wasRequestedHere({
+          backendBatchId: getRouteTarget(history, queueItem.id)?.queueItem?.backendBatchId,
+          backendItemIds,
+          origin: buildQueueItemOrigin(queueItem.id, projectId),
+          submittedAt: queueItem.snapshot.submittedAt,
+        });
+
       if (error instanceof QueueItemCancelledError) {
-        commands.setStatus({ projectId, queueItemId: queueItem.id, status: 'cancelled' });
+        commands.setStatus({ notify: !wasRequestedHere(), projectId, queueItemId: queueItem.id, status: 'cancelled' });
+        return;
+      }
+
+      // A clear deletes rows without a terminal event; the run vanished rather than failed, and there is nothing left
+      // to show or retry.
+      if (error instanceof QueueItemFailedError && error.failure === 'removed') {
+        if (wasRequestedHere()) {
+          commands.setStatus({ notify: false, projectId, queueItemId: queueItem.id, status: 'cancelled' });
+        } else {
+          commands.setStatus({
+            error: error.message,
+            errorCode: 'removed',
+            projectId,
+            queueItemId: queueItem.id,
+            status: 'failed',
+          });
+        }
         return;
       }
 
       commands.setStatus({
         error: toErrorMessage(error),
+        ...(error instanceof QueueItemFailedError
+          ? {
+              failedBackendItemId: error.backendItemId,
+              ...(error.failure === 'unexplained' ? { errorCode: 'unexplained' as const } : {}),
+            }
+          : {}),
         projectId,
         queueItemId: queueItem.id,
         status: 'failed',
@@ -2281,6 +2327,7 @@ export const createQueueRuntime = ({
               }
               commands.setStatus({
                 error: 'This run is no longer on the backend queue (it may have been cleared).',
+                errorCode: 'removed',
                 notify: false,
                 projectId: project.id,
                 queueItemId: currentQueueItem.id,

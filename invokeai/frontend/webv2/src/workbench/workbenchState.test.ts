@@ -3463,43 +3463,27 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(getProject(state, originProject.id).queue.items[0]?.status).toBe('cancelled');
   });
 
-  it('cancels all active cancellable queue items from the queue actions menu', () => {
+  it('cancels only the runs the backend never accepted, in the project asked for', () => {
     let state = submitGenerate(primeGenerate());
+    const originProject = getActiveProject(state);
+    const accepted = originProject.queue.items[0]!;
 
+    state = workbenchReducer(state, {
+      backendItemIds: [41],
+      projectId: originProject.id,
+      queueItemId: accepted.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    state = submitGenerate(primeGenerate(state));
     state = workbenchReducer(state, { type: 'createProject' });
     state = submitGenerate(primeGenerate(state));
-    state = workbenchReducer(state, { type: 'cancelAllQueueItems' });
+    state = workbenchReducer(state, { projectId: originProject.id, type: 'cancelUnsubmittedQueueItems' });
 
-    expect(
-      state.projects.flatMap((project) =>
-        project.queue.items.map((item) => ({ cancellationPending: item.cancellationPending, status: item.status }))
-      )
-    ).toEqual([
-      { cancellationPending: true, status: 'cancelled' },
-      { cancellationPending: true, status: 'cancelled' },
+    expect(getProject(state, originProject.id).queue.items.map((item) => item.status)).toEqual([
+      'cancelled',
+      'running',
     ]);
-  });
-
-  it('cancels active queue items except the current one', () => {
-    let state = submitGenerate(primeGenerate());
-    const firstQueueItemId = getActiveProject(state).queue.items[0].id;
-
-    state = submitGenerate(primeGenerate(state));
-    state = workbenchReducer(state, {
-      currentQueueItemId: firstQueueItemId,
-      type: 'cancelAllQueueItemsExceptCurrent',
-    });
-
-    expect(
-      getActiveProject(state).queue.items.map((item) => ({
-        cancellationPending: item.cancellationPending,
-        id: item.id,
-        status: item.status,
-      }))
-    ).toEqual([
-      { cancellationPending: true, id: getActiveProject(state).queue.items[0].id, status: 'cancelled' },
-      { cancellationPending: undefined, id: firstQueueItemId, status: 'pending' },
-    ]);
+    expect(getActiveProject(state).queue.items.map((item) => item.status)).toEqual(['pending']);
   });
 
   it('records backend item cancellation without cancelling the whole local batch', () => {
@@ -3554,18 +3538,6 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       cancelledBackendItemIds: [11, 12],
       status: 'cancelled',
     });
-  });
-
-  it('scopes cancel all queue items to a project when requested', () => {
-    let state = submitGenerate(primeGenerate());
-    const originProject = getActiveProject(state);
-
-    state = workbenchReducer(state, { type: 'createProject' });
-    state = submitGenerate(primeGenerate(state));
-    state = workbenchReducer(state, { projectId: originProject.id, type: 'cancelAllQueueItems' });
-
-    expect(getProject(state, originProject.id).queue.items.map((item) => item.status)).toEqual(['cancelled']);
-    expect(getActiveProject(state).queue.items.map((item) => item.status)).toEqual(['pending']);
   });
 
   it('clears completed and failed queue items while preserving active and cancelled items', () => {
@@ -3680,9 +3652,9 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(cancelledItem?.status).toBe('cancelled');
     expect(cancelledItem?.backendItemIds).toEqual([42]);
     expect(getActiveProject(state).canvas.stagingArea.pendingImages).toEqual([]);
-    expect(state.notifications.map((notification) => notification.title)).toEqual([
-      'Invocation cancellation requested',
-      'Invocation queued',
+    expect(state.notifications.map((notification) => notification.titleKey ?? notification.title)).toEqual([
+      'notifications.run.cancelRequested',
+      'notifications.run.queued',
     ]);
   });
 
@@ -3700,16 +3672,16 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     state = workbenchReducer(state, { queueItemId: queueItem.id, type: 'cancelQueueItem' });
 
     expect(getActiveProject(state).queue.items[0]?.status).toBe('completed');
-    expect(state.notifications.map((notification) => notification.title)).toEqual([
-      'Invocation completed',
-      'Invocation queued',
+    expect(state.notifications.map((notification) => notification.titleKey ?? notification.title)).toEqual([
+      'notifications.run.completed',
+      'notifications.run.queued',
     ]);
   });
 
   it('records notifications for errors and successful operations', () => {
     let state = submitGenerate(primeGenerate());
 
-    expect(state.notifications[0]?.title).toBe('Invocation queued');
+    expect(state.notifications[0]?.titleKey).toBe('notifications.run.queued');
 
     const queueItem = getActiveProject(state).queue.items[0];
 
@@ -3722,10 +3694,10 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     state = commitSelectedStagedImage(state);
     state = workbenchReducer(state, { message: 'boom', type: 'recordError' });
 
-    expect(state.notifications.map((notification) => notification.title)).toEqual([
+    expect(state.notifications.map((notification) => notification.titleKey ?? notification.title)).toEqual([
       'Error',
-      'Invocation completed',
-      'Invocation queued',
+      'notifications.run.completed',
+      'notifications.run.queued',
     ]);
     expect(state.notifications.every((notification) => !notification.isRead)).toBe(true);
 
@@ -3738,6 +3710,85 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(state.notifications).toEqual([]);
 
     expect(state.notifications).toEqual([]);
+  });
+
+  it('says which run failed and where, stays until dismissed, and offers to show and retry the failed item', () => {
+    let state = submitGenerate(primeGenerate(undefined, { positivePrompt: 'A lighthouse in a storm' }));
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0]!;
+
+    state = workbenchReducer(state, {
+      error: 'CUDA out of memory',
+      failedBackendItemId: 41,
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      status: 'failed',
+      type: 'setQueueItemStatus',
+    });
+
+    expect(state.notifications[0]).toMatchObject({
+      actions: [
+        { itemId: 41, kind: 'reveal-queue-item' },
+        { itemId: 41, kind: 'retry-queue-item' },
+      ],
+      category: 'run-outcome',
+      kind: 'error',
+      message: '“A lighthouse in a storm”: CUDA out of memory',
+      persistent: true,
+      projectId: project.id,
+      titleKey: 'notifications.runOutcome.failed',
+      titleValues: { project: project.name },
+    });
+  });
+
+  it('reports a failure no backend item explains without follow-ups it cannot offer', () => {
+    let state = submitGenerate(primeGenerate());
+    const project = getActiveProject(state);
+
+    state = workbenchReducer(state, {
+      error: 'This run was not submitted because its project cannot be saved.',
+      projectId: project.id,
+      queueItemId: project.queue.items[0]!.id,
+      status: 'failed',
+      type: 'setQueueItemStatus',
+    });
+
+    expect(state.notifications[0]).toMatchObject({ kind: 'error', persistent: true });
+    expect(state.notifications[0]).not.toHaveProperty('actions');
+  });
+
+  it('names a canceled run without keeping its notice on screen', () => {
+    let state = submitGenerate(primeGenerate(undefined, { positivePrompt: 'Dusk over the bay' }));
+    const project = getActiveProject(state);
+
+    state = workbenchReducer(state, {
+      projectId: project.id,
+      queueItemId: project.queue.items[0]!.id,
+      status: 'cancelled',
+      type: 'setQueueItemStatus',
+    });
+
+    expect(state.notifications[0]).toMatchObject({
+      kind: 'info',
+      message: '“Dusk over the bay”',
+      titleKey: 'notifications.runOutcome.canceled',
+    });
+    expect(state.notifications[0]).not.toHaveProperty('persistent');
+  });
+
+  it('dismisses one notification and restores a cleared list behind newer ones', () => {
+    let state = reduceWorkbench(createInitialWorkbenchState(), { kind: 'info', title: 'First', type: 'recordNotice' });
+    state = reduceWorkbench(state, { kind: 'info', title: 'Second', type: 'recordNotice' });
+    const cleared = state.notifications;
+
+    state = reduceWorkbench(state, { notificationId: cleared[0]!.id, type: 'dismissNotification' });
+    expect(state.notifications.map((notification) => notification.title)).toEqual(['First']);
+
+    state = reduceWorkbench(state, { type: 'clearNotifications' });
+    state = reduceWorkbench(state, { kind: 'success', title: 'Cleared', type: 'recordNotice' });
+    state = reduceWorkbench(state, { notifications: cleared, type: 'restoreNotifications' });
+
+    expect(state.notifications.map((notification) => notification.title)).toEqual(['Cleared', 'Second', 'First']);
   });
 
   it('coalesces back-to-back identical notifications instead of stacking them', () => {
@@ -3865,7 +3916,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       });
 
       expect(getActiveProject(next).queue.items.length).toBeGreaterThan(0);
-      expect(next.notifications[0]?.title).toBe('Invocation queued');
+      expect(next.notifications[0]?.titleKey).toBe('notifications.run.queued');
       expect(next.notifications[0]?.category).toBe('enqueue');
       expect(next.notifications[0]?.kind).toBe('success');
     });
@@ -3928,7 +3979,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       });
 
       expect(getProject(state, otherProjectId).queue.items).toHaveLength(1);
-      expect(state.notifications[0]?.title).toBe('Invocation queued');
+      expect(state.notifications[0]?.titleKey).toBe('notifications.run.queued');
       expect(state.notifications[0]?.projectId).toBe(otherProjectId);
     });
   });

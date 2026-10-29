@@ -277,7 +277,6 @@
       "pending": "Pending",
       "waiting": "Waiting"
     },
-    "total": "Total",
     "unknownError": "Unknown error.",
     "unknownTime": "Unknown time",
     "view": "View",
@@ -362,9 +361,38 @@
       "info": "Info",
       "success": "Success"
     },
-    "markRead": "Mark Read",
+    "markRead": "Mark read",
     "actions": {
-      "openWidget": "Open {{widget}}"
+      "openWidget": "Open {{widget}}",
+      "showInQueue": "Show in queue"
+    },
+    "runOutcome": {
+      "canceled": "Run canceled in {{project}}",
+      "failed": "Run failed in {{project}}",
+      "failedMessage": "“{{label}}”: {{reason}}",
+      "removedMessage": "“{{label}}” is no longer on the server queue; it may have been cleared.",
+      "removedMessageUnlabeled": "The run is no longer on the server queue; it may have been cleared.",
+      "unexplainedMessage": "“{{label}}” failed without a reason from the server.",
+      "unexplainedMessageUnlabeled": "The server gave no reason."
+    },
+    "connection": {
+      "lost": "Lost connection to the server",
+      "lostMessage": "Reconnecting… Queued work waits until the connection is back.",
+      "restored": "Reconnected to the server"
+    },
+    "repeatCount": "×{{count}}",
+    "cleared_one": "{{count}} notification cleared",
+    "cleared_other": "{{count}} notifications cleared",
+    "run": {
+      "queued": "Queued in {{project}}",
+      "completed": "Finished in {{project}}",
+      "completedUnnamed": "Run finished",
+      "completedImages_one": "{{count}} image from “{{label}}”",
+      "completedImages_other": "{{count}} images from “{{label}}”",
+      "completedImagesUnlabeled_one": "{{count}} image",
+      "completedImagesUnlabeled_other": "{{count}} images",
+      "cancelRequested": "Stopping a run in {{project}}",
+      "label": "“{{label}}”"
     }
   },
   "topbar": {
@@ -390,7 +418,8 @@
       "issueCount_one": "Invoke · {{count}} issue",
       "issueCount_other": "Invoke · {{count}} issues",
       "showIssue_one": "Invoke unavailable, {{count}} issue. Show it: {{reason}}",
-      "showIssue_other": "Invoke unavailable, {{count}} issues. Show the first: {{reason}}"
+      "showIssue_other": "Invoke unavailable, {{count}} issues. Show the first: {{reason}}",
+      "serverDisconnected": "The server is disconnected."
     },
     "iterations": {
       "fixedModelOnly": "Model only runs once: the upscaler gives the same image every time.",
@@ -454,8 +483,6 @@
       "idle": "Queue idle",
       "imageProgress": "Image {{current}} of {{total}}",
       "imageProgressPercent": "Image {{current}} of {{total}}, {{percent}} percent",
-      "loadingImage": "Loading image {{current}}/{{total}}",
-      "loadingModels": "Loading models",
       "loadingModelsCount_one": "Loading {{count}} model",
       "loadingModelsCount_other": "Loading {{count}} models",
       "more": "{{count}} more…",
@@ -467,8 +494,22 @@
       "remaining_other": "{{count}} images remaining. Open queue",
       "route": "{{source}} to {{destination}} · {{graph}}",
       "shiftCancelsAll": "Shift-click cancels all",
-      "waitingForProgress": "Backend accepted batch; waiting for progress event.",
-      "waitingToStart": "Waiting to start"
+      "waitingForProgress": "Starting…",
+      "waitingToStart": "Waiting to start",
+      "generatingImage": "Generating image {{current}} of {{total}}",
+      "loadingModel": "Loading {{model}}…",
+      "projectProgress": "Project queue progress",
+      "reconnecting": "Reconnecting…",
+      "remainingOffline_one": "{{count}} item waiting for the connection. Open queue",
+      "remainingOffline_other": "{{count}} items waiting for the connection. Open queue",
+      "offlineWaiting_one": "Reconnecting to the server, {{count}} item waiting",
+      "offlineWaiting_other": "Reconnecting to the server, {{count}} items waiting",
+      "pausedWaiting_one": "Processor paused, {{count}} item waiting",
+      "pausedWaiting_other": "Processor paused, {{count}} items waiting",
+      "offlineDescription_one": "{{count}} item is queued. It continues when the connection is back.",
+      "offlineDescription_other": "{{count}} items are queued. They continue when the connection is back.",
+      "pausedDescription_one": "{{count}} item waits until you resume the processor.",
+      "pausedDescription_other": "{{count}} items wait until you resume the processor."
     },
     "routing": {
       "change": "Change routing",
@@ -2431,7 +2472,7 @@
     },
     "queueRecovery": {
       "actionFailed": "The queue recovery action failed.",
-      "description": "Project {{projectId}} has locally saved queue run recovery data.",
+      "description": "{{project}} has locally saved queue run recovery data.",
       "discard": "Discard recovery",
       "discardConfirmBody": "Permanently discard this project's local queue recovery data? This does not cancel work that may still be running on the server.",
       "discardConfirmTitle": "Discard queue recovery?",
@@ -2446,7 +2487,8 @@
       "previous": "Previous",
       "storageUnavailable": "Browser queue recovery storage may contain data, but it cannot be inspected in this browser session.",
       "storageUnavailableTitle": "Queue recovery storage is unavailable",
-      "title": "Queue run recovery available"
+      "title": "Queue run recovery available",
+      "descriptionUnnamed": "Project {{projectId}} has locally saved queue run recovery data."
     },
     "deleteLayoutPreset": "Delete preset",
     "deleteLayoutPresetBody": "Delete \"{{name}}\"? This only removes the saved preset.",
@@ -3309,9 +3351,7 @@
       "unstarVideo": "Unstar video"
     },
     "queue": {
-      "allScopedItemsRequested": "All scoped queue items were requested.",
       "actionConfirmationTitle": "{{action}}?",
-      "backendItem": "Backend queue item {{id}}.",
       "batch": "Batch",
       "batchCancellationRequested": "Batch cancellation requested",
       "batchCanceledCount_one": "{{count}} queue item was canceled.",
@@ -3322,38 +3362,33 @@
       "cancelBatch": "Cancel batch",
       "cancelBatchConfirmationBody": "This cancels every unfinished item in this batch. Other batches keep running.",
       "cancelBatchTitle": "Cancel this batch?",
-      "cancelAllExceptCurrentRequested": "All pending scoped items except the current item were requested.",
       "cancelAllItems": "Cancel all items",
-      "cancelConfirmationBody": "This requests cancellation for queue work in the current scope. In-progress items may stop after the backend acknowledges cancellation.",
       "cancelCurrent": "Cancel current",
       "cancelCurrentItem": "Cancel current item",
       "cancelItem": "Cancel queue item #{{id}}",
       "cancellationRequested": "Cancellation requested",
       "clearAllItems": "Clear all items",
-      "clearFailedConfirmationBody": "This permanently removes failed queue items in the current queue scope.",
       "clearFailedItems": "Clear failed items",
       "clearFailedTitle": "Clear failed queue items?",
-      "clearFinishedConfirmationBody": "This permanently removes completed, canceled and failed queue items in the current queue scope. Pending and running work is kept.",
       "clearFinishedItems": "Clear finished items",
       "clearFinishedTitle": "Clear finished queue items?",
       "copyFailed": "Failed to copy JSON",
       "copyJson": "Copy JSON",
       "couldNotCancelBatch": "Could not cancel this batch.",
-      "clearQueue": "Clear queue",
-      "clearQueueConfirmationBody": "This permanently clears queue items in the current queue scope.",
       "clearQueueTitle": "Clear queue?",
       "couldNotCancelCurrentItem": "Could not cancel the current item.",
       "couldNotCancelItem": "Could not cancel this item.",
-      "couldNotCancelItems": "Could not cancel scoped queue items.",
+      "couldNotCancelItems": "Could not cancel the queue items.",
       "couldNotChangeProcessor": "Could not change the queue processor.",
       "couldNotClearFailedItems": "Could not clear failed queue items.",
       "couldNotClearFinishedItems": "Could not clear finished queue items.",
       "couldNotRetryItem": "Could not retry this item.",
       "couldNotClearQueue": "Could not clear the queue.",
-      "currentBatch": "Current Batch",
+      "currentBatch": "Current batch",
       "detailLoadFailed": "The saved execution data could not be loaded.",
       "detailLoading": "Loading saved execution data…",
       "detailViews": {
+        "error": "Error",
         "graph": "Graph",
         "item": "Item",
         "results": "Results",
@@ -3416,7 +3451,6 @@
         "usedOfTotal": "{{used}} of {{total}} used"
       },
       "noCurrentItem": "No current item",
-      "noCurrentItemDescription": "The scoped queue has no in-progress item to cancel.",
       "openQueue": "Open queue",
       "pauseProcessor": "Pause processor",
       "processorPaused": "Processor paused",
@@ -3437,8 +3471,6 @@
       "retryQueued": "Retry queued",
       "retryQueuedDescription": "Queue item #{{id}} was queued again from its saved session.",
       "retryQueuedProjectClosedDescription": "Queue item #{{id}} was queued again. Its result is staged on its project's Canvas in a tab where that project is open; with none open, it will not appear.",
-      "sendToCanvas": "Send to canvas",
-      "sendToCanvasComingSoon": "Sending queue results to the canvas is coming soon.",
       "settingsRecalled": "Settings recalled",
       "settingsRecalledDescription": "Loaded these settings into Generate.",
       "settingsRecalledIntoVideoDescription": "Loaded these settings into Video.",
@@ -3449,7 +3481,126 @@
         "label": "GPU",
         "shortLabel": "GPU {{index}}",
         "tooltip": "Ran on {{name}}"
-      }
+      },
+      "keepRunning": "Keep running",
+      "keepItems": "Keep items",
+      "clearQueueStopsWork_one": "{{count}} of them is running or queued and stops now.",
+      "clearQueueStopsWork_other": "{{count}} of them are running or queued and stop now.",
+      "processorPausedWaiting_one": "Processor paused, {{count}} item waiting",
+      "processorPausedWaiting_other": "Processor paused, {{count}} items waiting",
+      "processorPausedDescription_one": "{{count}} item waits until you resume.",
+      "processorPausedDescription_other": "{{count}} items wait until you resume.",
+      "unavailableWhileDisconnected": "Not available while the server is disconnected.",
+      "reconnecting": "Reconnecting…",
+      "itemNumber": "#{{id}}",
+      "loadingModel": "Loading {{model}}…",
+      "viewError": "View error",
+      "copyTraceback": "Copy traceback",
+      "copyTracebackFailed": "Failed to copy traceback",
+      "tracebackLabel": "Queue item {{id}} traceback",
+      "cancelAllConfirmationBody": {
+        "project_one": "Stops {{count}} running or queued item in {{project}}. Finished items stay in the history.",
+        "project_other": "Stops {{count}} running or queued items in {{project}}. Finished items stay in the history.",
+        "all_one": "Stops {{count}} running or queued item across all projects. Finished items stay in the history.",
+        "all_other": "Stops {{count}} running or queued items across all projects. Finished items stay in the history.",
+        "allUsers_one": "Stops {{count}} running or queued item across all projects, other users' included. Finished items stay in the history.",
+        "allUsers_other": "Stops {{count}} running or queued items across all projects, other users' included. Finished items stay in the history.",
+        "mine_one": "Stops {{count}} of your running or queued items across all your projects. Finished items stay in the history.",
+        "mine_other": "Stops {{count}} of your running or queued items across all your projects. Finished items stay in the history."
+      },
+      "cancelAllExceptCurrentConfirmationBody": {
+        "project_one": "Cancels {{count}} queued item in {{project}}. The running item keeps going.",
+        "project_other": "Cancels {{count}} queued items in {{project}}. The running item keeps going.",
+        "all_one": "Cancels {{count}} queued item across all projects. The running item keeps going.",
+        "all_other": "Cancels {{count}} queued items across all projects. The running item keeps going.",
+        "allUsers_one": "Cancels {{count}} queued item across all projects, other users' included. The running item keeps going.",
+        "allUsers_other": "Cancels {{count}} queued items across all projects, other users' included. The running item keeps going.",
+        "mine_one": "Cancels {{count}} of your queued items across all your projects. The running item keeps going.",
+        "mine_other": "Cancels {{count}} of your queued items across all your projects. The running item keeps going."
+      },
+      "cancelAllRequested": {
+        "project_one": "{{count}} item in {{project}} is stopping.",
+        "project_other": "{{count}} items in {{project}} are stopping.",
+        "all_one": "{{count}} item across all projects is stopping.",
+        "all_other": "{{count}} items across all projects are stopping.",
+        "allUsers_one": "{{count}} item across all projects, other users' included is stopping.",
+        "allUsers_other": "{{count}} items across all projects, other users' included are stopping.",
+        "mine_one": "{{count}} of your items is stopping.",
+        "mine_other": "{{count}} of your items are stopping."
+      },
+      "cancelAllExceptCurrentRequested": {
+        "project_one": "{{count}} queued item in {{project}} is canceled; the running item keeps going.",
+        "project_other": "{{count}} queued items in {{project}} are canceled; the running item keeps going.",
+        "all_one": "{{count}} queued item across all projects is canceled; the running item keeps going.",
+        "all_other": "{{count}} queued items across all projects are canceled; the running item keeps going.",
+        "allUsers_one": "{{count}} queued item across all projects, other users' included is canceled; the running item keeps going.",
+        "allUsers_other": "{{count}} queued items across all projects, other users' included are canceled; the running item keeps going.",
+        "mine_one": "{{count}} of your queued items is canceled; the running item keeps going.",
+        "mine_other": "{{count}} of your queued items are canceled; the running item keeps going."
+      },
+      "clearFailedConfirmationBody": {
+        "project_one": "Deletes {{count}} failed item in {{project}}. This can't be undone.",
+        "project_other": "Deletes {{count}} failed items in {{project}}. This can't be undone.",
+        "all_one": "Deletes {{count}} failed item across all projects. This can't be undone.",
+        "all_other": "Deletes {{count}} failed items across all projects. This can't be undone.",
+        "allUsers_one": "Deletes {{count}} failed item across all projects, other users' included. This can't be undone.",
+        "allUsers_other": "Deletes {{count}} failed items across all projects, other users' included. This can't be undone.",
+        "mine": "Deletes your failed items across all your projects. This can't be undone."
+      },
+      "clearFinishedConfirmationBody": {
+        "project_one": "Deletes {{count}} finished item in {{project}}: completed, canceled and failed. Running and queued items are kept.",
+        "project_other": "Deletes {{count}} finished items in {{project}}: completed, canceled and failed. Running and queued items are kept.",
+        "all_one": "Deletes {{count}} finished item across all projects: completed, canceled and failed. Running and queued items are kept.",
+        "all_other": "Deletes {{count}} finished items across all projects: completed, canceled and failed. Running and queued items are kept.",
+        "allUsers_one": "Deletes {{count}} finished item across all projects, other users' included: completed, canceled and failed. Running and queued items are kept.",
+        "allUsers_other": "Deletes {{count}} finished items across all projects, other users' included: completed, canceled and failed. Running and queued items are kept.",
+        "mine": "Deletes your finished items across all your projects: completed, canceled and failed. Running and queued items are kept."
+      },
+      "clearQueueConfirmationBody": {
+        "project_one": "Deletes {{count}} item in {{project}}, history included. This can't be undone.",
+        "project_other": "Deletes {{count}} items in {{project}}, history included. This can't be undone.",
+        "all_one": "Deletes {{count}} item across all projects, history included. This can't be undone.",
+        "all_other": "Deletes {{count}} items across all projects, history included. This can't be undone.",
+        "allUsers_one": "Deletes {{count}} item across all projects, other users' included, history included. This can't be undone.",
+        "allUsers_other": "Deletes {{count}} items across all projects, other users' included, history included. This can't be undone.",
+        "mine": "Deletes all your items across all your projects, history included. This can't be undone."
+      },
+      "failedItemsClearedDescription": {
+        "project_one": "Deleted {{count}} failed item in {{project}}.",
+        "project_other": "Deleted {{count}} failed items in {{project}}.",
+        "all_one": "Deleted {{count}} failed item across all projects.",
+        "all_other": "Deleted {{count}} failed items across all projects.",
+        "allUsers_one": "Deleted {{count}} failed item across all projects, other users' included.",
+        "allUsers_other": "Deleted {{count}} failed items across all projects, other users' included.",
+        "mine": "Deleted your failed items across all your projects."
+      },
+      "finishedItemsClearedDescription": {
+        "project_one": "Deleted {{count}} finished item in {{project}}.",
+        "project_other": "Deleted {{count}} finished items in {{project}}.",
+        "all_one": "Deleted {{count}} finished item across all projects.",
+        "all_other": "Deleted {{count}} finished items across all projects.",
+        "allUsers_one": "Deleted {{count}} finished item across all projects, other users' included.",
+        "allUsers_other": "Deleted {{count}} finished items across all projects, other users' included.",
+        "mine": "Deleted your finished items across all your projects."
+      },
+      "queueClearedDescription": {
+        "project_one": "Deleted {{count}} item in {{project}}.",
+        "project_other": "Deleted {{count}} items in {{project}}.",
+        "all_one": "Deleted {{count}} item across all projects.",
+        "all_other": "Deleted {{count}} items across all projects.",
+        "allUsers_one": "Deleted {{count}} item across all projects, other users' included.",
+        "allUsers_other": "Deleted {{count}} items across all projects, other users' included.",
+        "mine": "Deleted your items across all your projects."
+      },
+      "noCurrentItemDescription": {
+        "project": "Nothing is running in {{project}}.",
+        "all": "Nothing is running across all projects.",
+        "allUsers": "Nothing is running across all projects.",
+        "mine": "None of your items is running."
+      },
+      "actionHasNothingToDo": "There is nothing for this to act on right now.",
+      "revealUnavailable": "Queue item #{{id}} is not in this list",
+      "revealUnavailableDescription": "It may have been cleared, or it belongs to a project outside the ones the queue shows."
     },
     "autosaveStatus": {
       "attention": "Needs attention",
@@ -5239,14 +5390,16 @@
     },
     "queueStatus": {
       "idle": "Queue idle",
-      "paused": "{{count}} queued — paused",
-      "queued": "{{count}} queued"
+      "paused": "Paused · {{count}} waiting",
+      "queued": "{{count}} queued",
+      "offline": "{{count}} queued · reconnecting…",
+      "loadingModel": "Loading {{model}}…"
     },
     "serverStatus": {
-      "connected": "Connected to Server",
-      "connecting": "Connecting to Server",
-      "disconnected": "Disconnected from Server",
-      "label": "Server Status",
+      "connected": "Connected to server",
+      "connecting": "Connecting to server",
+      "disconnected": "Disconnected from server",
+      "label": "Server status",
       "labelWithError": "{{label}}: {{error}}"
     },
     "video": {

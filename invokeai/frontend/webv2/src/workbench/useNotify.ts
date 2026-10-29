@@ -25,6 +25,11 @@ export interface UndoableNotice {
   onUndo: () => void;
   /** The project the action changed: Undo is withdrawn once that project is no longer open. */
   projectId?: string;
+  /**
+   * Toast only, never recorded in the notification center: for undoing a change to the center itself, which a record
+   * of it would undo in turn (clearing the list would leave the clear's own notice in it).
+   */
+  transient?: boolean;
 }
 
 /**
@@ -68,8 +73,8 @@ export const useNotify = (): Notify => {
         }
       };
 
-    const undoable = (title: string, { message, onUndo, projectId }: UndoableNotice): void => {
-      if (commands) {
+    const undoable = (title: string, { message, onUndo, projectId, transient }: UndoableNotice): void => {
+      if (commands && !transient) {
         // The center keeps the notice as data; the closure waits in the registry until its toast closes.
         commands.notifications.add({
           actions: [{ kind: 'undo', undoId: registerNotificationUndo(onUndo), ...(projectId ? { projectId } : {}) }],

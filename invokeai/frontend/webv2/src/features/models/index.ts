@@ -20,7 +20,9 @@ export {
   type ModelsSnapshot,
 } from './data/modelsStore';
 export {
+  getModelLoads,
   modelLoadActivitySink,
+  subscribeModelLoads,
   useModelLoads,
   type ModelLoadActivitySink,
   type ModelLoadInfo,

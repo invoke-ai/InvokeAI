@@ -1,15 +1,16 @@
 import type { ModelLoadInfo } from '@features/models';
-import type { QueueItem } from '@features/queue/contracts';
+import type { QueueActivity, QueueItem } from '@features/queue/contracts';
 import type { QueueItemProgress } from '@features/queue/react';
 
 import { Badge, chakra, HStack, Icon, Menu, Portal, Progress, Stack, Text } from '@chakra-ui/react';
 import { useModelLoads } from '@features/models';
 import {
   getDeterminateProgressFraction,
+  getQueueActivity,
   getQueueItemExpectedImageCount,
   getQueueItemSnapshotPositivePrompt,
 } from '@features/queue/contracts';
-import { QueueMenuItems, useQueueMenuActions } from '@features/queue/menu';
+import { getQueueAction, QueueMenuItems, useQueueActions } from '@features/queue/menu';
 import { useIsProcessorPaused } from '@features/queue/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button, IconButton } from '@platform/ui/Button';
@@ -21,7 +22,7 @@ import { getDestinationLabel, getSourceLabel } from '@workbench/invocation';
 import { useActiveQueueProgress } from '@workbench/queue-integration/useActiveQueueProgress';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
-import { ListOrderedIcon, ListXIcon, PauseIcon, XIcon } from 'lucide-react';
+import { CloudOffIcon, ListOrderedIcon, ListXIcon, PauseIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useState, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -29,12 +30,29 @@ import { TopbarMenuChevron } from './TopbarMenuChevron';
 
 const TOOLTIP_CONTENT_PROPS = { maxW: '22rem', p: '0' };
 
-type QueueTone = 'idle' | 'running' | 'paused';
-
-const tonePalettes: Record<QueueTone, string | undefined> = {
+const activityPalettes: Record<QueueActivity, string | undefined> = {
   idle: undefined,
+  'loading-model': 'accent',
+  offline: 'orange',
   paused: 'orange',
   running: 'accent',
+};
+
+const activityIcons = {
+  idle: ListOrderedIcon,
+  'loading-model': ListOrderedIcon,
+  offline: CloudOffIcon,
+  paused: PauseIcon,
+  running: ListOrderedIcon,
+} satisfies Record<QueueActivity, typeof ListOrderedIcon>;
+
+/** Local queue item statuses, worded as the queue widget words backend ones. */
+const itemStatusLabelKeys: Record<QueueItem['status'], string> = {
+  cancelled: 'common.status.canceled',
+  completed: 'common.status.completed',
+  failed: 'common.status.failed',
+  pending: 'common.status.pending',
+  running: 'common.generating',
 };
 
 export const QueueCluster = () => {
@@ -42,8 +60,9 @@ export const QueueCluster = () => {
   const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.backendConnection.status);
   const modelLoads = useModelLoads();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
-  const actions = useQueueMenuActions({ includeOpenQueue: true });
-  const [cancelCurrent, cancelAll] = actions;
+  const actions = useQueueActions({ includeOpenQueue: true });
+  const cancelCurrent = getQueueAction(actions, 'cancel-current');
+  const cancelAll = getQueueAction(actions, 'cancel-all');
   const [isCancelHovered, setIsCancelHovered] = useState(false);
   const [isShiftHeld, setIsShiftHeld] = useState(false);
 
@@ -55,8 +74,12 @@ export const QueueCluster = () => {
 
   const isConnected = backendConnectionStatus === 'connected';
   const isPaused = useIsProcessorPaused();
-  const hasOpenWork = total > 0;
-  const tone: QueueTone = isPaused && hasOpenWork ? 'paused' : hasOpenWork && isConnected ? 'running' : 'idle';
+  const activity = getQueueActivity({
+    hasOpenWork: total > 0,
+    isConnected,
+    isLoadingModels: modelLoads.length > 0,
+    isPaused,
+  });
   const progressValue = getDeterminateProgressFraction(runningProgress?.percentage);
   const isCancellable = !cancelCurrent?.disabled;
   const [lastCancellable, setLastCancellable] = useState(isCancellable);
@@ -83,39 +106,44 @@ export const QueueCluster = () => {
     setIsCancelHovered(false);
     setIsShiftHeld(false);
   }, []);
+  // Shift-click reaches every item, so it confirms first; a plain click stops only the running one and does not.
   const handleCancelClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       if (event.shiftKey && cancelAll && !cancelAll.disabled) {
-        cancelAll.onClick();
+        void cancelAll.trigger();
         return;
       }
 
-      cancelCurrent?.onClick();
+      void cancelCurrent?.trigger();
     },
     [cancelAll, cancelCurrent]
   );
 
   return (
     <Menu.Root>
-      <Group attached colorPalette={tonePalettes[tone]} flexShrink={0}>
+      <Group attached colorPalette={activityPalettes[activity]} flexShrink={0}>
         <QueueButtonTooltip
+          activity={activity}
           current={current}
           item={runningItem}
           modelLoads={modelLoads}
           progress={runningProgress}
+          remaining={remaining}
           total={total}
         >
           <Button
-            aria-label={t('topbar.queue.remaining', { count: remaining })}
+            aria-label={t(activity === 'offline' ? 'topbar.queue.remainingOffline' : 'topbar.queue.remaining', {
+              count: remaining,
+            })}
             fontVariantNumeric="tabular-nums"
             overflow="hidden"
             position="relative"
             size="lg"
             px={2}
-            variant={tone === 'idle' ? 'outline' : 'subtle'}
+            variant={activity === 'idle' ? 'outline' : 'subtle'}
             onClick={handleOpenQueue}
           >
-            <Icon as={isPaused ? PauseIcon : ListOrderedIcon} position="relative" zIndex="1" />
+            <Icon as={activityIcons[activity]} position="relative" zIndex="1" />
             <chakra.span fontVariantNumeric="tabular-nums" position="relative" textAlign="center" zIndex="1">
               {remaining}
             </chakra.span>
@@ -163,7 +191,13 @@ export const QueueCluster = () => {
         </Menu.Trigger>
       </Group>
 
-      <QueueProgressAnnouncement current={current} progress={progressValue} total={total} />
+      <QueueProgressAnnouncement
+        activity={activity}
+        current={current}
+        progress={progressValue}
+        remaining={remaining}
+        total={total}
+      />
 
       <Portal>
         <Menu.Positioner>
@@ -195,23 +229,37 @@ const ShiftKeyWatcher = ({ onChange }: { onChange: (isShiftHeld: boolean) => voi
 };
 
 const QueueButtonTooltip = ({
+  activity,
   children,
   current,
   item,
   modelLoads,
   progress,
+  remaining,
   total,
 }: {
+  activity: QueueActivity;
   children: ReactNode;
   current: number;
   item?: QueueItem;
   modelLoads: ModelLoadInfo[];
   progress: QueueItemProgress | null;
+  remaining: number;
   total: number;
 }) => {
   const content = useMemo(
-    () => <QueueTooltip current={current} item={item} modelLoads={modelLoads} progress={progress} total={total} />,
-    [current, item, modelLoads, progress, total]
+    () => (
+      <QueueTooltip
+        activity={activity}
+        current={current}
+        item={item}
+        modelLoads={modelLoads}
+        progress={progress}
+        remaining={remaining}
+        total={total}
+      />
+    ),
+    [activity, current, item, modelLoads, progress, remaining, total]
   );
 
   return (
@@ -223,22 +271,30 @@ const QueueButtonTooltip = ({
 
 // Quantize screen-reader announcements so progress events do not flood the live region.
 const QueueProgressAnnouncement = ({
+  activity,
   current,
   progress,
+  remaining,
   total,
 }: {
+  activity: QueueActivity;
   current: number;
   progress: number | null;
+  remaining: number;
   total: number;
 }) => {
   const { t } = useTranslation();
   const decile = progress === null ? null : Math.round(progress * 10) * 10;
   const message =
-    total === 0
+    activity === 'idle'
       ? t('topbar.queue.idle')
-      : decile === null
-        ? t('topbar.queue.imageProgress', { current, total })
-        : t('topbar.queue.imageProgressPercent', { current, percent: decile, total });
+      : activity === 'offline'
+        ? t('topbar.queue.offlineWaiting', { count: remaining })
+        : activity === 'paused'
+          ? t('topbar.queue.pausedWaiting', { count: remaining })
+          : decile === null
+            ? t('topbar.queue.imageProgress', { current, total })
+            : t('topbar.queue.imageProgressPercent', { current, percent: decile, total });
 
   return (
     <chakra.span aria-live="polite" srOnly>
@@ -248,21 +304,40 @@ const QueueProgressAnnouncement = ({
 };
 
 const QueueTooltip = ({
+  activity,
   current,
   item,
   modelLoads,
   progress,
+  remaining,
   total,
 }: {
+  activity: QueueActivity;
   current: number;
   item?: QueueItem;
   modelLoads: ModelLoadInfo[];
   progress: QueueItemProgress | null;
+  remaining: number;
   total: number;
 }) => {
   const { t } = useTranslation();
   if (modelLoads.length > 0 && total === 0) {
     return <ModelLoadsTooltipContent modelLoads={modelLoads} />;
+  }
+
+  if (activity === 'offline' || activity === 'paused') {
+    return (
+      <Stack gap="1" p="3">
+        <Text fontSize="md" fontWeight="800">
+          {activity === 'offline' ? t('topbar.queue.reconnecting') : t('widgets.queue.processorPaused')}
+        </Text>
+        <Text color="fg.subtle" fontSize="xs">
+          {activity === 'offline'
+            ? t('topbar.queue.offlineDescription', { count: remaining })
+            : t('topbar.queue.pausedDescription', { count: remaining })}
+        </Text>
+      </Stack>
+    );
   }
 
   if (total === 0) {
@@ -282,12 +357,14 @@ const QueueTooltip = ({
     return (
       <Stack gap="2" p="3">
         <Text fontSize="md" fontWeight="800" fontVariantNumeric="tabular-nums">
-          {modelLoads.length ? t('topbar.queue.loadingModels') : t('topbar.queue.waitingToStart')}
+          {modelLoads[0]
+            ? t('topbar.queue.loadingModel', { model: modelLoads[0].label })
+            : t('topbar.queue.waitingToStart')}
         </Text>
         <Text color="fg.subtle" fontSize="xs">
           {t('topbar.queue.queuedImages', { count: total })}
         </Text>
-        {modelLoads.length ? <ModelLoadList modelLoads={modelLoads} /> : null}
+        {modelLoads.length > 1 ? <ModelLoadList modelLoads={modelLoads} /> : null}
       </Stack>
     );
   }
@@ -299,25 +376,25 @@ const QueueTooltip = ({
     Math.max(1, progress?.activeItemIndex ?? (progress?.completedItemCount ?? 0) + 1)
   );
   const activeBackendItemId = item.backendItemIds?.[activeItemIndex - 1];
-  const progressLabel = modelLoads.length
-    ? t('topbar.queue.loadingModelsCount', { count: modelLoads.length })
+  const progressLabel = modelLoads[0]
+    ? t('topbar.queue.loadingModel', { model: modelLoads[0].label })
     : progress?.message?.trim() || t('topbar.queue.waitingForProgress');
 
   return (
     <Stack gap="2" p="3" minW="18rem">
       <HStack justify="space-between" gap="3">
         <Text fontSize="md" fontWeight="800">
-          {t('topbar.queue.loadingImage', { current, total })}
+          {t('topbar.queue.generatingImage', { current, total })}
         </Text>
         <Badge colorPalette="blue" fontSize="xs">
-          {item.status}
+          {t(itemStatusLabelKeys[item.status])}
         </Badge>
       </HStack>
       <Stack gap="1">
         <Text color="fg.subtle" fontSize="xs">
           {progressLabel}
         </Text>
-        {modelLoads.length ? <ModelLoadList modelLoads={modelLoads} /> : null}
+        {modelLoads.length > 1 ? <ModelLoadList modelLoads={modelLoads} /> : null}
         <Progress.Root
           aria-label={t('topbar.queue.currentImageProgress')}
           max={1}

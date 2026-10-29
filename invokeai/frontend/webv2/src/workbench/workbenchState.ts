@@ -157,6 +157,7 @@ import {
   syncGenerateWidgetValuesWithModels,
 } from '@features/generation/settings';
 import { getQueueSourceResultSelection, MAX_QUEUE_BATCH_ITEMS } from '@features/queue';
+import { getQueueItemSnapshotLabel } from '@features/queue/contracts';
 import { getGenerationDevicesSnapshot, resolveRandDeviceMetadata } from '@features/queue/devices';
 import {
   clearDeletedUpscaleInput,
@@ -202,6 +203,7 @@ import {
   getFirstCanvasPlaceholderSlotIndex,
   type CanvasStagingSlot,
   isCancellableQueueItem,
+  isUnsubmittedQueueItem,
 } from './canvasStagingView';
 import {
   cascadeDefaultGeometry,
@@ -448,6 +450,10 @@ type WorkbenchReducerAction =
       queueItemId: string;
       status: QueueHistoryItemStatus;
       error?: string;
+      /** The backend item whose failure ended the run; its failure notice offers to show and retry it. */
+      failedBackendItemId?: number;
+      /** `error` is a stand-in: the backend gave no reason, or the item vanished from its queue. */
+      errorCode?: 'removed' | 'unexplained';
       notify?: boolean;
     }
   | {
@@ -571,8 +577,8 @@ type WorkbenchReducerAction =
       /** Replaces the generic cancellation notice when the caller knows why the run stopped. */
       notice?: { title: string; message: string };
     }
-  | { type: 'cancelAllQueueItems'; projectId?: string }
-  | { type: 'cancelAllQueueItemsExceptCurrent'; projectId?: string; currentQueueItemId?: string | null }
+  /** Cancels this tab's runs the backend has not accepted, in one project or every open one. */
+  | { type: 'cancelUnsubmittedQueueItems'; projectId?: string }
   | { type: 'clearCompletedQueueItems' }
   | { type: 'undoProjectChange' }
   | { type: 'redoProjectChange' }
@@ -594,7 +600,13 @@ type WorkbenchReducerAction =
   | { type: 'autosaveSucceeded'; savedAt: string }
   | { type: 'autosaveFailed'; error: string }
   | { type: 'markAllNotificationsRead' }
+  | { type: 'markNotificationsRead'; notificationIds: readonly string[] }
   | { type: 'clearNotifications' }
+  | { type: 'dismissNotification'; notificationId: string }
+  /** Withdraws Retry for a backend item from every notice once it has been retried. */
+  | { type: 'withdrawNotificationRetry'; itemId: number }
+  /** Puts back notifications a Clear removed (its Undo), behind any recorded since. */
+  | { type: 'restoreNotifications'; notifications: readonly WorkbenchNotification[] }
   | { type: 'recordWidgetFailure'; failure: WidgetFailure }
   | { type: 'setActiveProjectSettings'; settings: Partial<ProjectSettings> }
   | {
@@ -614,6 +626,11 @@ type WorkbenchReducerAction =
       message?: string;
       actions?: readonly WorkbenchNotificationAction[];
       persistent?: boolean;
+      /** With a key, the text follows the language; `title` and `message` are its English. */
+      titleKey?: string;
+      titleValues?: WorkbenchNotification['titleValues'];
+      messageKey?: string;
+      messageValues?: WorkbenchNotification['messageValues'];
     };
 
 const HISTORY_LIMIT = 40;
@@ -658,23 +675,29 @@ const createNotification = ({
   kind,
   message,
   messageKey,
+  messageValues,
   persistent,
   projectId,
   title,
   titleKey,
+  titleValues,
 }: {
   actions?: readonly WorkbenchNotificationAction[];
   category?: WorkbenchNotificationCategory;
   kind: WorkbenchNotificationKind;
   message?: string;
   messageKey?: string;
+  messageValues?: WorkbenchNotification['messageValues'];
   persistent?: boolean;
   projectId?: string;
   title: string;
   titleKey?: string;
+  titleValues?: WorkbenchNotification['titleValues'];
 }): WorkbenchNotification => ({
   ...(actions && actions.length > 0 ? { actions } : {}),
   ...(persistent ? { persistent } : {}),
+  ...(titleValues ? { titleValues } : {}),
+  ...(messageValues ? { messageValues } : {}),
   category,
   createdAt: now(),
   id: createId('notification'),
@@ -721,6 +744,129 @@ const addNotification = (state: WorkbenchState, notification: WorkbenchNotificat
   return { ...state, notifications: [notification, ...state.notifications].slice(0, NOTIFICATION_LIMIT) };
 };
 
+type NotificationText = Pick<WorkbenchNotification, 'message' | 'messageKey' | 'messageValues'>;
+
+/** A run's prompt or workflow name as its notices quote it; nothing when it has neither. */
+const describeRunLabel = (queueItem: QueueItem | undefined): NotificationText =>
+  withRunLabel(queueItem, (label) => ({
+    message: `“${label}”`,
+    messageKey: 'notifications.run.label',
+    messageValues: { label },
+  }));
+
+const withRunLabel = (
+  queueItem: QueueItem | undefined,
+  describe: (label: string) => NotificationText,
+  unlabeled: NotificationText = {}
+): NotificationText => {
+  const label = queueItem ? getQueueItemSnapshotLabel(queueItem) : '';
+
+  return label ? describe(label) : unlabeled;
+};
+
+/** Why a run failed, in words: the backend's own error verbatim, or a translated stand-in when it gave none. */
+const describeRunFailure = (
+  queueItem: QueueItem | undefined,
+  reason: string,
+  errorCode: 'removed' | 'unexplained' | undefined
+): NotificationText => {
+  if (errorCode === 'removed') {
+    return withRunLabel(
+      queueItem,
+      (label) => ({
+        message: `“${label}” is no longer on the server queue; it may have been cleared.`,
+        messageKey: 'notifications.runOutcome.removedMessage',
+        messageValues: { label },
+      }),
+      {
+        message: 'The run is no longer on the server queue; it may have been cleared.',
+        messageKey: 'notifications.runOutcome.removedMessageUnlabeled',
+      }
+    );
+  }
+
+  if (errorCode === 'unexplained' || !reason) {
+    return withRunLabel(
+      queueItem,
+      (label) => ({
+        message: `“${label}” failed without a reason from the server.`,
+        messageKey: 'notifications.runOutcome.unexplainedMessage',
+        messageValues: { label },
+      }),
+      { message: 'The server gave no reason.', messageKey: 'notifications.runOutcome.unexplainedMessageUnlabeled' }
+    );
+  }
+
+  return withRunLabel(
+    queueItem,
+    (label) => ({
+      message: `“${label}”: ${reason}`,
+      messageKey: 'notifications.runOutcome.failedMessage',
+      messageValues: { label, reason },
+    }),
+    { message: reason }
+  );
+};
+
+/**
+ * Says which run ended and where: its project, and its prompt or workflow name. A failure stays until dismissed and,
+ * once the backend item that failed is known and still there, offers to show it in the queue and to retry it.
+ */
+const createRunOutcomeNotification = (
+  project: Project,
+  // Absent when the run left the project's queue first, e.g. a clear; the notice then names the project alone.
+  queueItem: QueueItem | undefined,
+  {
+    error,
+    errorCode,
+    failedBackendItemId,
+    status,
+  }: {
+    error?: string;
+    errorCode?: 'removed' | 'unexplained';
+    failedBackendItemId?: number;
+    status: 'cancelled' | 'failed';
+  }
+): WorkbenchNotification => {
+  const titleValues = { project: project.name };
+
+  if (status === 'cancelled') {
+    return createNotification({
+      ...describeRunLabel(queueItem),
+      category: 'run-outcome',
+      kind: 'info',
+      projectId: project.id,
+      title: `Run canceled in ${project.name}`,
+      titleKey: 'notifications.runOutcome.canceled',
+      titleValues,
+    });
+  }
+
+  return createNotification({
+    ...describeRunFailure(queueItem, error?.trim() ?? '', errorCode),
+    // An item that vanished has nothing left to show or retry.
+    ...(failedBackendItemId === undefined || errorCode === 'removed'
+      ? {}
+      : {
+          actions: [
+            { itemId: failedBackendItemId, kind: 'reveal-queue-item' },
+            {
+              itemId: failedBackendItemId,
+              kind: 'retry-queue-item',
+              ...(queueItem?.snapshot.destination === 'canvas' ? { canvasProjectId: project.id } : {}),
+            },
+          ],
+        }),
+    category: 'run-outcome',
+    kind: 'error',
+    persistent: true,
+    projectId: project.id,
+    title: `Run failed in ${project.name}`,
+    titleKey: 'notifications.runOutcome.failed',
+    titleValues,
+  });
+};
+
 /** Adds queue feedback iff the reduction actually grew that project's queue. */
 const withEnqueueNotification = (
   state: WorkbenchState,
@@ -758,11 +904,13 @@ const withEnqueueNotification = (
   return addNotification(
     withMetadataNotice,
     createNotification({
+      ...describeRunLabel(queueItem),
       category: 'enqueue',
       kind: 'success',
-      message: `${after.name}: ${queueItem.snapshot.sourceId} to ${queueItem.snapshot.destination}`,
       projectId: after.id,
-      title: 'Invocation queued',
+      title: `Queued in ${after.name}`,
+      titleKey: 'notifications.run.queued',
+      titleValues: { project: after.name },
     })
   );
 };
@@ -3271,9 +3419,6 @@ const updateQueueItem = (project: Project, queueItemId: string, getItem: (item: 
 
 const isClearableQueueItem = (item: QueueItem): boolean => item.status === 'completed' || item.status === 'failed';
 
-const shouldApplyQueueBulkActionToProject = (project: Project, projectId?: string): boolean =>
-  projectId === undefined || project.id === projectId;
-
 const mergeImageResults = (
   existingImages: GeneratedImageContract[] | undefined,
   incomingImages: GeneratedImageContract[]
@@ -5120,18 +5265,17 @@ export const __workbenchReducerInternal = (
         return clampCanvasStagingSelection(nextProject, previousSelectedSlot);
       });
 
-      if (action.notify === false || (action.status !== 'failed' && action.status !== 'cancelled')) {
+      if (action.notify === false || !project || (action.status !== 'failed' && action.status !== 'cancelled')) {
         return nextState;
       }
 
       return addNotification(
         nextState,
-        createNotification({
-          category: 'run-outcome',
-          kind: action.status === 'failed' ? 'error' : 'info',
-          message: action.error ?? `Queue item ${action.queueItemId} ${action.status}.`,
-          projectId: action.projectId,
-          title: action.status === 'failed' ? 'Invocation failed' : 'Invocation cancelled',
+        createRunOutcomeNotification(project, queueItem, {
+          error: action.error,
+          errorCode: action.errorCode,
+          failedBackendItemId: action.failedBackendItemId,
+          status: action.status,
         })
       );
     }
@@ -5204,13 +5348,30 @@ export const __workbenchReducerInternal = (
         return nextState;
       }
 
+      const count = action.images.length;
+
       return addNotification(
         nextState,
         createNotification({
+          ...withRunLabel(
+            queueItem,
+            (label) => ({
+              message: `${count} image${count === 1 ? '' : 's'} from “${label}”`,
+              messageKey: 'notifications.run.completedImages',
+              messageValues: { count, label },
+            }),
+            {
+              message: `${count} image${count === 1 ? '' : 's'}`,
+              messageKey: 'notifications.run.completedImagesUnlabeled',
+              messageValues: { count },
+            }
+          ),
           kind: 'success',
-          message: `${action.images.length} image(s) routed from ${action.queueItemId}.`,
           projectId: action.projectId,
-          title: 'Invocation completed',
+          title: project ? `Finished in ${project.name}` : 'Run finished',
+          ...(project
+            ? { titleKey: 'notifications.run.completed', titleValues: { project: project.name } }
+            : { titleKey: 'notifications.run.completedUnnamed' }),
         })
       );
     }
@@ -5698,98 +5859,50 @@ export const __workbenchReducerInternal = (
         nextState,
         createNotification({
           kind: 'info',
-          message: action.notice?.message ?? `${targetProject.name}: ${action.queueItemId}`,
           projectId: targetProject.id,
-          title: action.notice?.title ?? 'Invocation cancellation requested',
+          // The caller's own words, already translated, when it knows why the run stopped.
+          ...(action.notice
+            ? { message: action.notice.message, title: action.notice.title }
+            : {
+                ...describeRunLabel(queueItem),
+                title: `Stopping a run in ${targetProject.name}`,
+                titleKey: 'notifications.run.cancelRequested',
+                titleValues: { project: targetProject.name },
+              }),
         })
       );
     }
-    case 'cancelAllQueueItems': {
-      const cancellableCount = state.projects.reduce(
-        (count, project) =>
-          shouldApplyQueueBulkActionToProject(project, action.projectId)
-            ? count + project.queue.items.filter(isCancellableQueueItem).length
-            : count,
-        0
-      );
-
-      if (cancellableCount === 0) {
+    case 'cancelUnsubmittedQueueItems': {
+      if (
+        !state.projects.some(
+          (project) =>
+            (action.projectId === undefined || project.id === action.projectId) &&
+            project.queue.items.some(isUnsubmittedQueueItem)
+        )
+      ) {
         return state;
       }
 
-      const nextState: WorkbenchState = {
+      return {
         ...state,
         projects: state.projects.map((project) => {
+          if (action.projectId !== undefined && project.id !== action.projectId) {
+            return project;
+          }
+
           const previousSelectedSlot = getSelectedCanvasStagingSlot(project);
           const nextProject: Project = {
             ...project,
             queue: {
-              items: shouldApplyQueueBulkActionToProject(project, action.projectId)
-                ? project.queue.items.map((item) =>
-                    isCancellableQueueItem(item) ? { ...item, cancellationPending: true, status: 'cancelled' } : item
-                  )
-                : project.queue.items,
+              items: project.queue.items.map((item) =>
+                isUnsubmittedQueueItem(item) ? { ...item, cancellationPending: true, status: 'cancelled' } : item
+              ),
             },
           };
 
           return clampCanvasStagingSelection(nextProject, previousSelectedSlot);
         }),
       };
-
-      return addNotification(
-        nextState,
-        createNotification({
-          kind: 'info',
-          message: `${cancellableCount} queue item${cancellableCount === 1 ? '' : 's'}.`,
-          title: 'Invocation cancellation requested',
-        })
-      );
-    }
-    case 'cancelAllQueueItemsExceptCurrent': {
-      const cancellableCount = state.projects.reduce(
-        (count, project) =>
-          shouldApplyQueueBulkActionToProject(project, action.projectId)
-            ? count +
-              project.queue.items.filter(
-                (item) => isCancellableQueueItem(item) && item.id !== action.currentQueueItemId
-              ).length
-            : count,
-        0
-      );
-
-      if (cancellableCount === 0) {
-        return state;
-      }
-
-      const nextState: WorkbenchState = {
-        ...state,
-        projects: state.projects.map((project) => {
-          const previousSelectedSlot = getSelectedCanvasStagingSlot(project);
-          const nextProject: Project = {
-            ...project,
-            queue: {
-              items: shouldApplyQueueBulkActionToProject(project, action.projectId)
-                ? project.queue.items.map((item) =>
-                    isCancellableQueueItem(item) && item.id !== action.currentQueueItemId
-                      ? { ...item, cancellationPending: true, status: 'cancelled' }
-                      : item
-                  )
-                : project.queue.items,
-            },
-          };
-
-          return clampCanvasStagingSelection(nextProject, previousSelectedSlot);
-        }),
-      };
-
-      return addNotification(
-        nextState,
-        createNotification({
-          kind: 'info',
-          message: `${cancellableCount} queue item${cancellableCount === 1 ? '' : 's'}.`,
-          title: 'Invocation cancellation requested',
-        })
-      );
     }
     case 'clearCompletedQueueItems': {
       return {
@@ -5955,13 +6068,68 @@ export const __workbenchReducerInternal = (
       );
     }
     case 'markAllNotificationsRead': {
+      if (state.notifications.every((notification) => notification.isRead)) {
+        return state;
+      }
+
       return {
         ...state,
-        notifications: state.notifications.map((notification) => ({ ...notification, isRead: true })),
+        notifications: state.notifications.map((notification) =>
+          notification.isRead ? notification : { ...notification, isRead: true }
+        ),
+      };
+    }
+    case 'markNotificationsRead': {
+      const ids = new Set(action.notificationIds);
+
+      if (!state.notifications.some((notification) => !notification.isRead && ids.has(notification.id))) {
+        return state;
+      }
+
+      return {
+        ...state,
+        notifications: state.notifications.map((notification) =>
+          !notification.isRead && ids.has(notification.id) ? { ...notification, isRead: true } : notification
+        ),
       };
     }
     case 'clearNotifications': {
-      return { ...state, notifications: [] };
+      return state.notifications.length === 0 ? state : { ...state, notifications: [] };
+    }
+    case 'dismissNotification': {
+      const notifications = state.notifications.filter((notification) => notification.id !== action.notificationId);
+
+      return notifications.length === state.notifications.length ? state : { ...state, notifications };
+    }
+    case 'withdrawNotificationRetry': {
+      const isRetry = (candidate: WorkbenchNotificationAction) =>
+        candidate.kind === 'retry-queue-item' && candidate.itemId === action.itemId;
+
+      if (!state.notifications.some((notification) => notification.actions?.some(isRetry))) {
+        return state;
+      }
+
+      return {
+        ...state,
+        notifications: state.notifications.map((notification) => {
+          if (!notification.actions?.some(isRetry)) {
+            return notification;
+          }
+
+          const { actions, ...rest } = notification;
+          const remaining = actions.filter((candidate) => !isRetry(candidate));
+
+          return remaining.length > 0 ? { ...rest, actions: remaining } : rest;
+        }),
+      };
+    }
+    case 'restoreNotifications': {
+      const currentIds = new Set(state.notifications.map((notification) => notification.id));
+      const restored = action.notifications.filter((notification) => !currentIds.has(notification.id));
+
+      return restored.length === 0
+        ? state
+        : { ...state, notifications: [...state.notifications, ...restored].slice(0, NOTIFICATION_LIMIT) };
     }
     case 'recordWidgetFailure': {
       const hasFailure = state.widgetFailures.some((failure) => failure.widgetId === action.failure.widgetId);
@@ -6017,8 +6185,12 @@ export const __workbenchReducerInternal = (
           actions: action.actions,
           kind: action.kind,
           message: action.message,
+          messageKey: action.messageKey,
+          messageValues: action.messageValues,
           persistent: action.persistent,
           title: action.title,
+          titleKey: action.titleKey,
+          titleValues: action.titleValues,
         })
       );
     }

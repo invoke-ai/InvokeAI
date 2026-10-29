@@ -840,7 +840,7 @@ describe('createWorkbenchStore', () => {
     expect(store.getSnapshot().activeProject.queue.items[0]?.status).toBe('cancelled');
     expect(store.getSnapshot().notifications[0]).toMatchObject({
       kind: 'info',
-      title: 'Invocation cancellation requested',
+      titleKey: 'notifications.run.cancelRequested',
     });
 
     store.commands.queue.clearCompleted();
