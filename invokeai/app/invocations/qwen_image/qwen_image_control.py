@@ -1,4 +1,5 @@
-"""Qwen Image ControlNet: the alibaba-pai Fun-ControlNet-Union for spatial control and inpainting."""
+"""Qwen Image ControlNet: alibaba-pai's Fun-ControlNet-Union for spatial control and inpainting, or InstantX's
+ControlNet-Union for spatial control."""
 
 from typing import Optional
 
@@ -18,7 +19,10 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.util.qwen_image_vae import QWEN_IMAGE_VAE_MIN_TILE_SIZE
 
-_CONTROL_SCALE_DESCRIPTION = "Strength of the control signal. Recommended range: 0.70-0.95."
+_CONTROL_SCALE_DESCRIPTION = (
+    "Strength of the control signal. Recommended range: 0.70-0.95 for the Fun-ControlNet-Union; for the InstantX "
+    "ControlNet-Union 0.80-1.00 on the original Qwen Image, about 1.5-2.0 on Qwen Image 2512."
+)
 _BEGIN_DESCRIPTION = "When the control is first applied (% of total steps)"
 _END_DESCRIPTION = "When the control is last applied (% of total steps)"
 _TILE_SIZE_DESCRIPTION = (
@@ -28,7 +32,8 @@ _TILE_SIZE_DESCRIPTION = (
 
 
 class QwenImageControlField(BaseModel):
-    """Qwen Image Fun-ControlNet conditioning: a control image, an inpaint image with its mask, or both."""
+    """Qwen Image ControlNet conditioning: a control image, an inpaint image with its mask, or both (the InstantX
+    ControlNet takes the control image alone)."""
 
     image_name: str | None = Field(default=None, description="The preprocessed control image (Canny, depth, pose, ...)")
     inpaint_image_name: str | None = Field(default=None, description="The image to inpaint")
@@ -61,10 +66,12 @@ class QwenImageControlOutput(BaseInvocationOutput):
     classification=Classification.Prototype,
 )
 class QwenImageControlInvocation(BaseInvocation):
-    """Configure the Qwen Image Fun-ControlNet-Union for spatial control, inpainting, or both.
+    """Configure a Qwen Image ControlNet for spatial control, inpainting, or both.
 
     Takes a preprocessed control image (Canny, HED, depth, pose, MLSD, ...) and/or an image to inpaint with its mask
-    (white is regenerated), plus the Qwen Image ControlNet model. Recommended control scale: 0.70-0.95.
+    (white is regenerated), plus the Qwen Image ControlNet model. The Fun-ControlNet-Union takes either or both
+    (recommended scale 0.70-0.95); the InstantX ControlNet-Union takes the control image only (0.80-1.00 on the
+    original Qwen Image, about 1.5-2.0 on Qwen Image 2512).
     """
 
     image: Optional[ImageField] = InputField(
