@@ -168,7 +168,6 @@ let root: Root | null = null;
 let queryClient = new QueryClient();
 let projectValues = new Map<string, ExternalStoreCore<Record<string, unknown>>>();
 let patches: Array<{ patch: Record<string, unknown>; projectId: string | undefined }> = [];
-let sizeResets: Array<{ patch: Record<string, unknown>; projectId: string | undefined }> = [];
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const storedValues = (projectId = 'project-1') => {
@@ -217,10 +216,6 @@ const createStableGroups = () => ({
     readGenerateValues: (projectId: string) => projectValues.get(projectId)?.getSnapshot() ?? null,
     patchGenerateSettings: (patch: Record<string, unknown>, projectId?: string) => {
       patches.push({ patch, projectId });
-      storedValues(projectId).patchSnapshot(patch);
-    },
-    resetDimensions: (patch: Record<string, unknown>, projectId?: string) => {
-      sizeResets.push({ patch, projectId });
       storedValues(projectId).patchSnapshot(patch);
     },
   },
@@ -315,7 +310,6 @@ beforeEach(async () => {
     ['project-2', createExternalStoreCore<Record<string, unknown>>({ ...INITIAL_VALUES, steps: 50 })],
   ]);
   patches = [];
-  sizeResets = [];
   stableGroups = createStableGroups();
   // Seeded, never-stale reads keep late responses from landing inside a counted window.
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
@@ -662,10 +656,9 @@ describe('GenerateSettingsForm render isolation', () => {
     await settle(noop, 400);
 
     // SDXL is native at 1024.
-    expect(sizeResets).toEqual([
+    expect(patches).toEqual([
       { patch: { aspectRatioId: '1:1', aspectRatioValue: 1, height: 1024, width: 1024 }, projectId: 'project-1' },
     ]);
-    expect(patches).toEqual([]);
     expect(storedValues().getSnapshot()).toMatchObject({ aspectRatioIsLocked: true, height: 1024, width: 1024 });
   });
 

@@ -193,11 +193,6 @@ export interface GenerationUiAdapter {
     patchGenerateSettings(values: Partial<GenerateSettings>, projectId?: string, origin?: 'user' | 'system'): void;
     /** A project's stored Generate values, read when an Undo runs; null once the project is closed. */
     readGenerateValues(projectId: string): Record<string, unknown> | null;
-    /**
-     * Applies a Reset size choice: the same patch, marked as a reset so a surface that frames the size (the canvas)
-     * can keep its centre rather than its top-left. Generation does not know which surface that is.
-     */
-    resetDimensions(values: Partial<GenerateSettings>, projectId?: string): void;
   };
 }
 

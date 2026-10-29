@@ -98,7 +98,7 @@ const renderView = (): string =>
   );
 
 const getAcceptButtonTag = (markup: string): string => {
-  const labelIndex = markup.indexOf('Accept to Layer');
+  const labelIndex = markup.indexOf('Accept to layer');
   const buttonIndex = markup.lastIndexOf('<button', labelIndex);
   return markup.slice(buttonIndex, markup.indexOf('>', buttonIndex) + 1);
 };

@@ -1,20 +1,26 @@
 /**
  * Share one engine per project through reference-counted leases. Delay disposal after the last release;
- * reacquisition cancels it so quick remounts reuse the warm engine.
+ * reacquisition cancels it so quick remounts reuse the warm engine. A disposed engine leaves its project's next engine
+ * the tool the person was on, their quick-switch bookmark and how many undo steps went with it, for this session.
  */
 
-import type { CanvasEngine as PublicCanvasEngine } from '@workbench/canvas-engine/api';
+import type {
+  CanvasDocumentContractV3,
+  CanvasEngine as PublicCanvasEngine,
+  ToolId,
+} from '@workbench/canvas-engine/api';
 import type { LiveCanvasEngines } from '@workbench/projects/projectAssets';
 
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
+import { getDocumentLeaves } from '@workbench/canvas-engine/api';
 import {
   createCanvasEngine,
   type CanvasEngine,
   type CanvasEngineOptions,
 } from '@workbench/canvas-operations/createCanvasEngine';
 
-/** Engine creation dependencies, minus the project id the registry supplies. */
-export type EngineDeps = Omit<CanvasEngineOptions, 'projectId'> & {
+/** Engine creation dependencies, minus what the registry supplies: the project id and its previous engine's carry. */
+export type EngineDeps = Omit<CanvasEngineOptions, 'droppedHistorySteps' | 'projectId'> & {
   /**
    * The mounted Workbench's held-media registry. It also identifies that Workbench: an engine is bound to the one
    * that created it, so a released engine is replaced rather than reused by the next Workbench.
@@ -24,6 +30,29 @@ export type EngineDeps = Omit<CanvasEngineOptions, 'projectId'> & {
 
 /** Default grace period before a released engine is disposed (30s). */
 export const DEFAULT_GRACE_PERIOD_MS = 30_000;
+
+/** Projects whose disposed engine's carry is kept; the oldest goes first. */
+const MAX_CARRIES = 32;
+
+/** What a disposed engine hands its project's next engine within the session. */
+interface EngineCarry {
+  activeTool: ToolId;
+  bookmarkedLayerId: string | null;
+  /** Undo and redo steps the disposal dropped, with those its history had already let go; History says so. */
+  droppedHistorySteps: number;
+}
+
+/** Whether the canvas holds nothing yet: no raster, control or regional layer, and no mask with coverage. */
+export const isBlankCanvasDocument = (document: CanvasDocumentContractV3 | null): boolean =>
+  getDocumentLeaves(document).every((layer) => layer.type === 'inpaint_mask' && layer.mask.bitmap === null);
+
+/**
+ * The tool a fresh engine starts on: the one its project's last engine was on, else Brush on a blank canvas with
+ * nothing selected (a new project's), whose first stroke paints a new layer. A selected empty mask, as older
+ * projects have, opens on View, so a first stroke never paints the mask by surprise.
+ */
+const initialTool = (carry: EngineCarry | undefined, document: CanvasDocumentContractV3 | null): ToolId =>
+  carry?.activeTool ?? (isBlankCanvasDocument(document) && !document?.selectedLayerId ? 'brush' : 'view');
 
 /** Injectable timer seam (defaults to the global timers). */
 export interface RegistryTimers {
@@ -68,6 +97,23 @@ export const createEngineRegistry = (
   const gracePeriodMs = options.gracePeriodMs ?? DEFAULT_GRACE_PERIOD_MS;
   const timers = options.timers ?? defaultTimers;
   const entries = new Map<string, RegistryEntry>();
+  const carries = new Map<string, EngineCarry>();
+
+  const keepCarry = (projectId: string, engine: CanvasEngine): void => {
+    const { dropped = 0, evicted, future, past } = engine.history.getEntries();
+    const activeTool = engine.interaction.get('activeTool');
+    carries.delete(projectId);
+    carries.set(projectId, {
+      // Select Object's tool belongs to its operation, which ends with the engine.
+      activeTool: activeTool === 'sam' ? 'view' : activeTool,
+      bookmarkedLayerId: engine.interaction.get('layerQuickSwitch').bookmarkedLayerId,
+      // Steps trimmed at cooldown or evicted before count too: History's start point says how many went.
+      droppedHistorySteps: past.length + future.length + evicted + dropped,
+    });
+    if (carries.size > MAX_CARRIES) {
+      carries.delete(carries.keys().next().value!);
+    }
+  };
 
   const cancelDisposal = (entry: RegistryEntry): void => {
     if (entry.disposeHandle !== null) {
@@ -89,6 +135,7 @@ export const createEngineRegistry = (
           return;
         }
         entries.delete(projectId);
+        keepCarry(projectId, entry.engine);
         entry.releaseLiveEngine();
         entry.engine.lifecycle.dispose();
       });
@@ -101,6 +148,7 @@ export const createEngineRegistry = (
       let firstError: unknown;
 
       entries.clear();
+      carries.clear();
       for (const entry of ownedEntries) {
         cancelDisposal(entry);
         entry.releaseLiveEngine();
@@ -136,12 +184,29 @@ export const createEngineRegistry = (
         // A released engine still writes through the Workbench that created it; a new Workbench gets its own.
         entries.delete(projectId);
         cancelDisposal(existing);
+        keepCarry(projectId, existing.engine);
         existing.releaseLiveEngine();
         existing.engine.lifecycle.dispose();
       }
-      const engine = createCanvasEngine({ projectId, ...deps });
+      const carry = carries.get(projectId);
+      carries.delete(projectId);
+      const engine = createCanvasEngine({ projectId, ...deps, droppedHistorySteps: carry?.droppedHistorySteps ?? 0 });
+      engine.tools.setTool(initialTool(carry, engine.document.getDocument()));
+      if (carry?.bookmarkedLayerId) {
+        // A bookmark naming a layer that is gone is ignored by its readers.
+        engine.interaction.set('layerQuickSwitch', {
+          bookmarkedLayerId: carry.bookmarkedLayerId,
+          previousLayerId: null,
+        });
+      }
       const releaseLiveEngine =
         liveEngines?.register(projectId, {
+          commitFrame: (from, to, label) =>
+            engine.layers.commitStructural(
+              label,
+              { bbox: to, type: 'setCanvasBbox' },
+              { bbox: from, type: 'setCanvasBbox' }
+            ).status === 'committed',
           // Document pushes cannot wait on an edit the user may never finish.
           flushPendingPixels: () => engine.lifecycle.flushPendingUploads({ waitForHeldPixels: false }),
           heldAssets: () => engine.history.getHeldAssetRefs(),

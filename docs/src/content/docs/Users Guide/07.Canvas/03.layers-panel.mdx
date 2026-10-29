@@ -1,7 +1,7 @@
 ---
 title: Layers panel guide
 description: A detailed guide to the Canvas Layers panel — the color picker, managing layers, history, the layer menu, and every layer type's settings in the Properties pane.
-lastUpdated: 2026-10-24
+lastUpdated: 2026-10-29
 ---
 
 import { Image } from 'astro:assets';
@@ -25,7 +25,7 @@ For an introduction to the layer types, see [Crafting images with the Canvas](/u
 
 The **Color** tab edits the two painting colors: the **Foreground color**, which the brush and text use, and the **Background color**. Click a chip to choose which one you are editing.
 
-* The color wheel, or a box picker via **Switch to box picker**, and a field for the value. The format button cycles through hex, RGB, HSL and HSB.
+* The color wheel, or a box picker via **Switch to box picker**, and the hex value, always shown. The format button next to it cycles through hex only, RGB, HSB and HSL, adding a field for each channel.
 * **Swap foreground and background colors** (**X**) and **Reset colors to black and white** (**D**).
 * **Pick a color from the canvas** — the eyedropper. You can also hold **Alt** on the canvas. A magnifying loupe shows the pixel under the pointer and its RGB values; see the [Canvas guide](/users-guide/canvas/canvas-guide/#tools).
 * When an inpaint mask or regional guidance layer is selected, a third chip, **Mask tint**, edits the color of its overlay.
@@ -40,15 +40,15 @@ The **Swatches** tab has built-in **Swatches**, your **Recent colors**, and the 
 
 ### The layer list
 
-Layers are grouped into four stacks: **Inpaint Masks**, **Regional Guidance**, **Control Layers** and **Raster Layers**. Within a stack, higher layers are drawn over lower ones. Click a stack's header to collapse it. Its buttons add a **New layer** of that type and, for masks, regional guidance and control layers, **Hide all** or **Show all**. The Raster Layers header also has **Merge visible** and **Export to PSD**.
+Layers are grouped into four stacks: **Inpaint Masks**, **Regional Guidance**, **Control Layers** and **Raster Layers**. Within a stack, higher layers are drawn over lower ones. Click a stack's header to collapse it. Its buttons add a **New layer** of that type, and **Hide all** or **Show all**: for raster layers this hides them (and leaves them out of generation); for masks, regional guidance and control layers it is **Hide all on canvas**, which only gets them out of view. The Raster Layers header also has **Merge visible** and **Export to PSD**. Collapsed stacks and groups stay as you left them when you switch to another open project and back.
 
 Each row shows, from left to right:
 
 * A colored stripe, if you gave the layer a color label.
-* A dot that turns the layer on or off (**Enable/disable layer**). A disabled layer takes no part in generation.
+* An eye button (**Show or hide layer**). A hidden layer is off the canvas and takes no part in generation.
 * A thumbnail, the layer type and the name.
-* An eye button (**Show/hide layer**) on masks, regional guidance and control layers. It only hides the layer from view; a hidden layer still affects generation.
-* A lock button (**Toggle lock**), which prevents editing.
+* On masks, regional guidance and control layers hidden with **Hide on canvas only** (in the layer menu), a closed-eye button: the layer is off the canvas but still affects generation. Click it to show the layer again.
+* A lock button (**Toggle lock**), which prevents editing. Painting, moving or transforming a locked layer is refused with a notice that says so.
 
 Rows can have child rows, shown with a chevron: adjustments and regenerate regions on raster layers, noise and denoise limits on inpaint masks, and reference images on regional guidance layers. Select a child row to edit it in Properties.
 
@@ -61,17 +61,19 @@ Drag an adjustment to reorder it, or drop it on another raster layer or group, o
 * **Rename** a layer by double-clicking its name or pressing **F2**. **Enter** saves and **Escape** cancels.
 * **Reorder** layers by dragging them, or with **Alt+↑** and **Alt+↓**. Layers can only move within their own stack.
 * **Blend mode** and **Opacity**, in the row above the list, apply to the selected layer. There are 16 blend modes, from Normal and Multiply to Color and Luminosity.
-* **Group** layers into folders with **Group selected layers**, or **Ctrl+G** on the canvas. **Alt+→** moves a layer into the group above it and **Alt+←** moves it out. A group's dot, eye and lock apply to everything in it.
+* **Group** layers into folders with **Group selected layers**, or **Ctrl+G** on the canvas. **Alt+→** moves a layer into the group above it and **Alt+←** moves it out. A group's eye and lock, and its **Hide group on canvas only**, apply to everything in it.
 * **Filter layers** at the bottom of the list shows only the layers whose names match.
 * The buttons beside the filter **Duplicate selected layers**, **Group selected layers** and **Delete selected layers**.
 
 ## History
 
-The **History** tab lists the canvas's edits, oldest first, with the current step highlighted and undone steps in italics. Click a step to go back or forward to it, or use the **Undo** and **Redo** buttons (**Ctrl+Z**, and **Ctrl+Shift+Z** or **Ctrl+Y**).
+The **History** tab lists the canvas's edits, oldest first, with the current step highlighted and undone steps in italics. The first row, **Start**, is the canvas before the oldest kept step. Click a step to go back or forward to it, or use the **Undo** and **Redo** buttons (**Ctrl+Z**, and **Ctrl+Shift+Z** or **Ctrl+Y**). While a Filter or Select Object operation runs, the steps wait until it ends. **Clear history** discards the undo steps after you confirm; the canvas itself does not change.
 
 <Image src={history} alt="The History tab listing the canvas's recent edits, such as Brush stroke, Regional guidance and Positive prompt." width={420} />
 
-The history keeps the last 64 steps. It lasts only while the project is open in your browser: reloading the page, or starting a new canvas, clears it.
+The history keeps the last 64 steps; when older ones are dropped, the Start row says how many. It lasts only while the project is open in your browser: reloading the page or clearing the canvas clears it, and so does leaving a project's canvas closed for a while, which the Start row then notes.
+
+Below the steps, **Restore points** list the canvases a **Clear canvas** replaced and the results a **Discard all** dropped, newest first, with what each brings back. **Restore** puts a cleared canvas back (its staged results too) and keeps the canvas it replaces as a restore point, with **Undo**; a discarded-results point puts its results back for review. A project keeps its five newest restore points of each kind, saved with it. Restoring a canvas saves strokes still uploading first, and waits while results are staged or a canvas generation runs, since restoring would throw those results away; the notice says so. Discarded results can be brought back at any time.
 
 ## The layer menu
 
@@ -87,7 +89,7 @@ The icons at the top **Arrange** the layer (move it to the front, forward, backw
   * **Copy to** — including **Copy layer to clipboard**, and copies to other layer types.
   * **Crop layer to frame** — keeps only the part of the layer inside the generation frame. It refuses, saying why, a layer that is locked or inside a locked group, a layer that lies entirely outside the frame (cropping would leave it empty), and a layer whose image could not be read, for example because it was deleted from the Gallery. A cropped control layer keeps its **Type**, but its cropped map becomes its image: the original it was detected from is no longer kept, and **Detection** changes to **None**.
   * **Save layer to board** — saves the layer to the Gallery as an upload, in Uncategorized or a board you pick from its submenu.
-  * **Disable layer**, **Lock layer**, **Bookmark for quick switch** and **Color label**. A bookmarked layer is where **Q** switches on the canvas; press **Q** again to return. The bookmark is temporary and is not saved in the project. It can reset when the canvas is released, for example after switching away from its project, and resets on reload.
+  * **Hide layer**, **Lock layer**, **Bookmark for quick switch** and **Color label**. A bookmarked layer is where **Q** switches on the canvas; press **Q** again to return. The bookmark is not saved in the project: it lasts while the project is open in your browser and resets on reload.
   * **Remove from group** — for a layer inside a group: moves it out, directly above the group. With several layers selected, it appears when they are all in the same group, and moves them together in their current order. The emptied group stays.
   * **Delete layer**.
 * **Raster layers:**
@@ -99,8 +101,8 @@ The icons at the top **Arrange** the layer (move it to the front, forward, backw
   * **Boolean operations** — combine the layer with the one below: intersect, cut out, cut away or exclude.
   * **Convert to** — make it a control layer, inpaint mask or regional guidance layer. Text, shape and gradient layers can also be rasterized into plain pixels. Control layers have no adjustments, so converting a layer with adjustments to a control layer, or using it as one, bakes them, with the layer's scaling and rotation, into its pixels; undo restores the raster layer with its adjustments.
 * **Control layers:** **Transform**, **Select object**, **Run workflow**, **Enable transparent preview**, and **Convert to raster layer**. A control layer's map comes from its **Detection** row in Properties, so it has no **Filter**.
-* **Inpaint masks:** **Add noise**, **Add denoise limit**, **Extract masked area** (copy the masked part of the image to a new layer), and **Hide layer**.
-* **Regional guidance:** **Enable auto-negative**, **Add reference image**, and **Hide layer**.
+* **Inpaint masks:** **Add noise**, **Add denoise limit**, **Extract masked area** (copy the masked part of the image to a new layer), and **Hide on canvas only**.
+* **Regional guidance:** **Enable auto-negative**, **Add reference image**, and **Hide on canvas only**.
 
 When several layers are selected, the menu also offers **Merge selected layers**. When only inpaint masks are selected, it offers **Merge masks** instead: the masks are combined into one new inpaint mask, named after the topmost one with "merged" added. It covers everywhere any of the masks did, at full strength whatever each mask's opacity, and takes the topmost mask's fill color and style. The new mask is placed where the topmost one was, even when the masks are in different groups, and replaces them. Merge masks needs two or more enabled, unlocked inpaint masks with content, whose noise and denoise limit settings match, since the new mask applies one setting to all of its area. When the item is unavailable, highlighting it shows why. One undo brings the original masks back.
 

@@ -65,8 +65,10 @@ const handlers: {
   },
   undo: {
     hold: ({ undoId }) => holdNotificationUndo(undoId),
-    label: ({ projectId, undoId }, { isProjectOpen, t }) =>
-      hasNotificationUndo(undoId) && (projectId === undefined || isProjectOpen(projectId)) ? t('common.undo') : null,
+    label: ({ label, projectId, undoId }, { isProjectOpen, t }) =>
+      hasNotificationUndo(undoId) && (projectId === undefined || isProjectOpen(projectId))
+        ? (label ?? t('common.undo'))
+        : null,
     release: ({ undoId }) => releaseNotificationUndo(undoId),
     withdrawal: ({ undoId }) => getNotificationUndoWithdrawal(undoId),
     run: ({ projectId, undoId }, { isProjectOpen }) => {

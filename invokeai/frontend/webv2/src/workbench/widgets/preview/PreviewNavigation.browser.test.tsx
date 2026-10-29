@@ -197,6 +197,8 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchExtensions: () => mocks.extensions,
   // Imported beside the focus provider; only the workbench runtime component, not rendered here, reads it.
   useWorkbenchInternalStore: () => null,
+  // No canvas engine is live here, so a frame resize the runtime asks for stays a plain write.
+  useWorkbenchLiveCanvasEngines: () => ({ commitFrame: () => false }),
   useWorkbenchQueries: () => ({ getSnapshot: () => ({ activeProject: mocks.project }) }),
   useWorkbenchSubscription: () => () => () => {},
   useWorkbenchSelector: (selector: (snapshot: unknown) => unknown) =>

@@ -34,6 +34,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CanvasProjectMutation } from './canvasProjectMutations';
 
 import { createEmptyCanvasDocument } from './canvasMigration';
+import { MAX_CANVAS_SNAPSHOTS } from './canvasProjectMutations';
 import { getCanvasStagingCandidateFingerprint, getCanvasStagingSlots } from './canvasStagingView';
 import { getLayoutPresetLabel, layoutPresets } from './layoutPresets';
 import { resolveSavedLayoutPreset } from './layoutPresetSnapshots';
@@ -115,6 +116,7 @@ const CANVAS_MUTATION_TYPES = new Set<CanvasProjectMutation['type']>([
   'rollbackStagedImageCommit',
   'resizeCanvasDocument',
   'restoreCanvasSnapshot',
+  'restoreStagedImages',
   'saveCanvasSnapshot',
   'setCanvasBbox',
   'setCanvasLayersEnabled',
@@ -3123,6 +3125,43 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(project.canvas.stagingArea.pendingImages).toEqual([]);
     expect(project.canvas.stagingArea.pendingImageIds).toEqual([]);
     expect(project.canvas.stagingArea.isVisible).toBe(false);
+  });
+
+  it('puts discarded candidates back where they were, after results that are still staged, once', () => {
+    let state = submitGenerate(
+      primeGenerate(withInvocationDestination(withEmptyCanvas(createInitialWorkbenchState()), 'canvas'))
+    );
+    const queueItem = getActiveProject(state).queue.items[0];
+    state = workbenchReducer(state, {
+      images: ['a.png', 'b.png', 'c.png'].map((name) => createImage(name, queueItem.id)),
+      projectId: getActiveProject(state).id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+    const previous = getActiveProject(state).canvas.stagingArea.pendingImages;
+    const { documentRevision } = getActiveProject(state).canvas;
+    state = workbenchReducer(state, { imageIndex: 1, type: 'setStagedImageIndex' });
+    state = workbenchReducer(state, { type: 'discardSelectedStagedImage' });
+    expect(getActiveProject(state).canvas.stagingArea.pendingImageIds).toEqual(['a.png', 'c.png']);
+
+    const undo = { documentRevision, images: [previous[1]!], previous, type: 'restoreStagedImages' } as const;
+    state = workbenchReducer(state, undo);
+    let { stagingArea } = getActiveProject(state).canvas;
+    expect(stagingArea.pendingImageIds).toEqual(['a.png', 'b.png', 'c.png']);
+    expect(stagingArea.selectedImageIndex).toBe(1);
+    expect(stagingArea.isVisible).toBe(true);
+    // A second Undo of the same discard finds it already staged.
+    expect(workbenchReducer(state, undo)).toBe(state);
+
+    // A discard of everything comes back whole; a canvas replaced meanwhile refuses it.
+    const all = getActiveProject(state).canvas.stagingArea.pendingImages;
+    state = workbenchReducer(state, { type: 'discardAllStagedImages' });
+    const restoreAll = { documentRevision, images: all, previous: all, type: 'restoreStagedImages' } as const;
+    const replaced = workbenchReducer(state, { document: createEmptyCanvasDocument(), type: 'replaceCanvasDocument' });
+    expect(workbenchReducer(replaced, restoreAll)).toBe(replaced);
+    state = workbenchReducer(state, restoreAll);
+    stagingArea = getActiveProject(state).canvas.stagingArea;
+    expect(stagingArea.pendingImageIds).toEqual(['a.png', 'b.png', 'c.png']);
   });
 
   it('normalizes ordinary queue results to the queued bbox origin and native image size', () => {
@@ -7508,7 +7547,7 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
     expect(getDocumentLeaves(getProject(state, activeProjectId).canvas.document)[0]?.opacity).not.toBe(0.25);
   });
 
-  it('seeds a new project canvas with a single empty inpaint mask, selected', () => {
+  it('seeds a new project canvas with a single empty inpaint mask, unselected', () => {
     const state = createInitialWorkbenchState();
     const { document } = getActiveProject(state).canvas;
 
@@ -7517,7 +7556,8 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
     expect(mask?.type).toBe('inpaint_mask');
     // Empty: no bitmap (no strokes) — so it never flips generation-mode detection.
     expect(mask && 'mask' in mask ? mask.mask.bitmap : 'missing').toBeNull();
-    expect(document.selectedLayerId).toBe(mask?.id);
+    // A first brush stroke paints a new layer; selecting the mask paints the area to inpaint.
+    expect(document.selectedLayerId).toBeNull();
   });
 
   it('adds a layer at its anchor and selects it', () => {
@@ -8715,6 +8755,203 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
 
     state = workbenchReducer(state, { snapshotId: 'snap-1', type: 'deleteCanvasSnapshot' });
     expect(getCanvas(state).snapshots).toEqual([]);
+  });
+
+  it('keeps the newest restore points, and restores a cleared canvas with the results it had staged', () => {
+    let state = submitGenerate(
+      primeGenerate(withInvocationDestination(withEmptyCanvas(createInitialWorkbenchState()), 'canvas'))
+    );
+    const queueItem = getActiveProject(state).queue.items[0];
+    state = workbenchReducer(state, {
+      images: [createImage('kept.png', queueItem.id)],
+      projectId: getActiveProject(state).id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+    state = workbenchReducer(state, {
+      anchor: stackTopAnchor(state.activeProjectId),
+      layer: createRasterLayer('a'),
+      type: 'addCanvasLayer',
+    });
+    for (let index = 0; index < MAX_CANVAS_SNAPSHOTS; index += 1) {
+      state = workbenchReducer(state, {
+        createdAt: 'now',
+        id: `old-${index}`,
+        name: 'Old',
+        type: 'saveCanvasSnapshot',
+      });
+    }
+    state = workbenchReducer(state, {
+      createdAt: 'now',
+      id: 'before-clear',
+      includeStaging: true,
+      kind: 'clear-canvas',
+      name: 'Before clearing',
+      type: 'saveCanvasSnapshot',
+    });
+    expect(getCanvas(state).snapshots.map((snapshot) => snapshot.id)).toEqual([
+      ...Array.from({ length: MAX_CANVAS_SNAPSHOTS - 1 }, (_, index) => `old-${index + 1}`),
+      'before-clear',
+    ]);
+    expect(
+      getCanvas(state)
+        .snapshots.at(-1)
+        ?.stagedImages?.map((image) => image.imageName)
+    ).toEqual(['kept.png']);
+
+    state = workbenchReducer(state, { document: createEmptyCanvasDocument(), type: 'replaceCanvasDocument' });
+    expect(getCanvas(state).stagingArea.pendingImages).toEqual([]);
+    state = workbenchReducer(state, { snapshotId: 'before-clear', type: 'restoreCanvasSnapshot' });
+    expect(getLayerIds(state)).toEqual(['a']);
+    expect(getCanvas(state).stagingArea.pendingImageIds).toEqual(['kept.png']);
+  });
+
+  it('swaps a restored point for one of the canvas it replaced, so restoring can be undone at the cap', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('first')]);
+    state = workbenchReducer(state, { createdAt: 'now', id: 'first', name: 'First', type: 'saveCanvasSnapshot' });
+    for (let index = 1; index < MAX_CANVAS_SNAPSHOTS; index += 1) {
+      state = workbenchReducer(state, {
+        createdAt: 'now',
+        id: `later-${index}`,
+        name: 'Later',
+        type: 'saveCanvasSnapshot',
+      });
+    }
+    state = workbenchReducer(state, { document: createEmptyCanvasDocument(), type: 'replaceCanvasDocument' });
+    const keep = (id: string) => ({ createdAt: 'now', id, name: 'Before restoring' });
+
+    state = workbenchReducer(state, {
+      keepCurrentAs: keep('undo'),
+      snapshotId: 'first',
+      type: 'restoreCanvasSnapshot',
+    });
+    expect(getLayerIds(state)).toEqual(['first']);
+    expect(getCanvas(state).snapshots).toHaveLength(MAX_CANVAS_SNAPSHOTS);
+    expect(getCanvas(state).snapshots.map((point) => point.id)).not.toContain('first');
+
+    state = workbenchReducer(state, { keepCurrentAs: keep('redo'), snapshotId: 'undo', type: 'restoreCanvasSnapshot' });
+    expect(getLayerIds(state)).toEqual([]);
+    expect(getDocumentLeaves(getCanvas(state).snapshots.at(-1)?.document).map((layer) => layer.id)).toEqual(['first']);
+  });
+
+  it('restores a canvas snapshot without the staging of the document it replaces', () => {
+    let state = submitGenerate(
+      primeGenerate(withInvocationDestination(withEmptyCanvas(createInitialWorkbenchState()), 'canvas'))
+    );
+    state = workbenchReducer(state, { createdAt: 'now', id: 'plain', name: 'Plain', type: 'saveCanvasSnapshot' });
+    const queueItem = getActiveProject(state).queue.items[0];
+    state = workbenchReducer(state, {
+      images: [createImage('later.png', queueItem.id)],
+      projectId: getActiveProject(state).id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+    state = workbenchReducer(state, { snapshotId: 'plain', type: 'restoreCanvasSnapshot' });
+    expect(getCanvas(state).stagingArea.pendingImages).toEqual([]);
+  });
+
+  it('re-stages the results a Discard all point kept and leaves the document alone', () => {
+    let state = submitGenerate(
+      primeGenerate(withInvocationDestination(withEmptyCanvas(createInitialWorkbenchState()), 'canvas'))
+    );
+    const queueItem = getActiveProject(state).queue.items[0];
+    state = workbenchReducer(state, {
+      images: [createImage('dropped.png', queueItem.id)],
+      projectId: getActiveProject(state).id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+    state = workbenchReducer(state, {
+      createdAt: 'now',
+      id: 'before-discard',
+      includeStaging: true,
+      kind: 'discard-results',
+      name: 'Before discarding',
+      type: 'saveCanvasSnapshot',
+    });
+    state = workbenchReducer(state, { type: 'discardAllStagedImages' });
+    state = workbenchReducer(state, {
+      anchor: stackTopAnchor(state.activeProjectId),
+      layer: createRasterLayer('painted-after'),
+      type: 'addCanvasLayer',
+    });
+    const { documentRevision } = getCanvas(state);
+
+    state = workbenchReducer(state, { snapshotId: 'before-discard', type: 'restoreCanvasSnapshot' });
+    expect(getCanvas(state).stagingArea.pendingImageIds).toEqual(['dropped.png']);
+    expect(getLayerIds(state)).toEqual(['painted-after']);
+    expect(getCanvas(state).documentRevision).toBe(documentRevision);
+  });
+
+  it('caps restore points per kind, so Discard all points never push a cleared canvas out', () => {
+    let state = submitGenerate(
+      primeGenerate(withInvocationDestination(withEmptyCanvas(createInitialWorkbenchState()), 'canvas'))
+    );
+    const queueItem = getActiveProject(state).queue.items[0];
+    state = workbenchReducer(state, {
+      images: [createImage('result.png', queueItem.id)],
+      projectId: getActiveProject(state).id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+    state = workbenchReducer(state, {
+      anchor: stackTopAnchor(state.activeProjectId),
+      layer: createRasterLayer('painted'),
+      type: 'addCanvasLayer',
+    });
+    state = workbenchReducer(state, {
+      createdAt: 'now',
+      id: 'cleared',
+      kind: 'clear-canvas',
+      name: 'Before clearing',
+      type: 'saveCanvasSnapshot',
+    });
+    for (let index = 0; index <= MAX_CANVAS_SNAPSHOTS; index += 1) {
+      state = workbenchReducer(state, {
+        createdAt: 'now',
+        id: `discard-${index}`,
+        includeStaging: true,
+        kind: 'discard-results',
+        name: 'Discarded results',
+        type: 'saveCanvasSnapshot',
+      });
+    }
+
+    const { snapshots } = getCanvas(state);
+    expect(snapshots.map((point) => point.id)).toEqual([
+      'cleared',
+      ...Array.from({ length: MAX_CANVAS_SNAPSHOTS }, (_, index) => `discard-${index + 1}`),
+    ]);
+    // A Discard all point brings back results only, so it stores no copy of the layers.
+    expect(getDocumentLeaves(snapshots.at(-1)?.document)).toEqual([]);
+    expect(snapshots.at(-1)?.stagedImages?.map((image) => image.imageName)).toEqual(['result.png']);
+    expect(getDocumentLeaves(snapshots[0]?.document).map((layer) => layer.id)).toContain('painted');
+  });
+
+  it('keeps a Discard all point and changes nothing when its results are all staged already', () => {
+    let state = submitGenerate(
+      primeGenerate(withInvocationDestination(withEmptyCanvas(createInitialWorkbenchState()), 'canvas'))
+    );
+    const queueItem = getActiveProject(state).queue.items[0];
+    state = workbenchReducer(state, {
+      images: [createImage('still-staged.png', queueItem.id)],
+      projectId: getActiveProject(state).id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+    state = workbenchReducer(state, {
+      createdAt: 'now',
+      id: 'point',
+      includeStaging: true,
+      kind: 'discard-results',
+      name: 'Discarded results',
+      type: 'saveCanvasSnapshot',
+    });
+    const before = getActiveProject(state);
+
+    state = workbenchReducer(state, { snapshotId: 'point', type: 'restoreCanvasSnapshot' });
+    expect(getActiveProject(state)).toBe(before);
+    expect(getCanvas(state).snapshots.map((point) => point.id)).toEqual(['point']);
   });
 
   it('bumps documentRevision on wholesale swaps (restore/replace) but not on ordinary edits', () => {

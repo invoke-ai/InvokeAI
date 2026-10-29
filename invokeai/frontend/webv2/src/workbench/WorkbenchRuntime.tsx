@@ -7,6 +7,7 @@ import {
   isAccountScopeCurrent,
   registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
+import i18next from 'i18next';
 import { useState } from 'react';
 
 import type { WorkbenchInternalStore } from './workbenchStore';
@@ -15,15 +16,24 @@ import { createCanvasDimsSync } from './canvasDimsSync';
 import { createWorkbenchFocusController, FocusRegionProvider } from './focusRegions';
 import { createShortcutHintSources, ShortcutHintSourcesProvider } from './hotkeys/hintSources';
 import { startConnectionNotices } from './shell/notifications/connectionNotices';
-import { useWorkbenchInternalStore, useWorkbenchQueries, useWorkbenchSubscription } from './WorkbenchContext';
+import {
+  useWorkbenchInternalStore,
+  useWorkbenchLiveCanvasEngines,
+  useWorkbenchQueries,
+  useWorkbenchSubscription,
+} from './WorkbenchContext';
 import { getProjectGalleryBoardReferences } from './workbenchState';
 
 /** Workbench-owned lifecycle adapter for aggregate-local synchronization. Cross-module adapters are constructed by App. */
 export const WorkbenchRuntime = () => {
   const store = useWorkbenchInternalStore();
+  const liveEngines = useWorkbenchLiveCanvasEngines();
 
   useMountEffect(() => {
-    const canvasDimsSync = createCanvasDimsSync(store);
+    // A frame resize Generate's size asks for joins canvas undo while the project's canvas engine is live.
+    const canvasDimsSync = createCanvasDimsSync(store, (projectId, from, to) =>
+      liveEngines.commitFrame(projectId, from, to, i18next.t('widgets.canvas.commands.resizeFrame'))
+    );
     const boardReferenceCheck = createGalleryBoardReferenceCheck(store);
     const stopConnectionNotices = startConnectionNotices({
       getStatus: () => store.getSnapshot().backendConnection.status,

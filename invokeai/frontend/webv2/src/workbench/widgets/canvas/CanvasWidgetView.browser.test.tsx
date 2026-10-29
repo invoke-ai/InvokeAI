@@ -29,6 +29,7 @@ import { getCanvasOperations, getControlSourceSnapshot } from '@workbench/canvas
 import { createControlDetectionStatusStore } from '@workbench/canvas-operations/controlDetectionStatusStore';
 import { createCanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import { createCanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
+import { runNotificationUndo } from '@workbench/shell/notifications/undoRegistry';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { createInstance } from 'i18next';
@@ -230,7 +231,7 @@ describe('CanvasWidgetView accept and stop', () => {
   it('accepts the result, then cancels its batch through the workbench queue command with the accept notice', async () => {
     const { store } = await renderView('running');
 
-    await page.getByRole('button', { exact: true, name: 'Accept to Layer' }).click();
+    await page.getByRole('button', { exact: true, name: 'Accept to layer' }).click();
 
     const project = store.getState().projects[0]!;
     expect(project.canvas.document.stacks.raster).toHaveLength(1);
@@ -245,11 +246,102 @@ describe('CanvasWidgetView accept and stop', () => {
   it('accepts a finished batch under the plain label and cancels nothing', async () => {
     const { store } = await renderView('completed');
 
-    await page.getByRole('button', { exact: true, name: 'Accept to Layer' }).click();
+    await page.getByRole('button', { exact: true, name: 'Accept to layer' }).click();
 
     const project = store.getState().projects[0]!;
     expect(project.canvas.document.stacks.raster).toHaveLength(1);
     expect(project.queue.items[0]?.status).toBe('completed');
+  });
+});
+
+describe('CanvasWidgetView staged results can come back', () => {
+  const second: CanvasStagingCandidateContract = {
+    ...candidate,
+    imageName: 'right-eye.png',
+    imageUrl: '/right-eye.png',
+    sourceBackendItemId: 2,
+    thumbnailUrl: '/right-eye-thumb.png',
+  };
+  const undoOf = (store: ReturnType<typeof createWorkbenchStore>) => {
+    const action = store.getState().notifications[0]?.actions?.find((entry) => entry.kind === 'undo');
+    return action?.kind === 'undo' ? () => runNotificationUndo(action.undoId) : null;
+  };
+  const staged = (store: ReturnType<typeof createWorkbenchStore>) =>
+    store.getState().projects[0]!.canvas.stagingArea.pendingImages.map((image) => image.imageName);
+
+  it('says the canvas is locked, and why, while its generation runs', async () => {
+    await renderView('running');
+    await expect.element(page.getByRole('status').getByText('Locked while generating')).toBeVisible();
+  });
+
+  it('says the canvas waits for review once the results are in, with help a keyboard can reach', async () => {
+    await renderView('completed');
+    const chip = page.getByRole('status').filter({ hasText: 'Locked while reviewing results' });
+    await expect.element(chip).toBeVisible();
+    expect(chip.element().textContent).toContain('Accept or discard the staged results to edit again.');
+    await act(() => (chip.element() as HTMLElement).focus());
+    expect(document.activeElement).toBe(chip.element());
+  });
+
+  it('discards a result with an Undo that puts it back for review', async () => {
+    const { store } = await renderView('completed');
+
+    await page.getByRole('button', { exact: true, name: 'Discard' }).click();
+    expect(staged(store)).toEqual([]);
+    expect(store.getState().notifications[0]).toMatchObject({ title: 'Result discarded' });
+
+    await act(() => undoOf(store)!());
+    expect(staged(store)).toEqual(['left-eye.png']);
+  });
+
+  it('discards all, stops the rest of the generation, keeps a restore point and offers the results back', async () => {
+    const { store } = await renderView('running', {
+      beforeRender: () =>
+        harness.store!.commands.canvas.appendStagingCandidate({
+          candidate: second,
+          projectId: harness.store!.getState().activeProjectId,
+        }),
+    });
+
+    await page.getByRole('button', { exact: true, name: 'Discard all' }).click();
+    const project = store.getState().projects[0]!;
+    expect(staged(store)).toEqual([]);
+    expect(project.queue.items[0]).toMatchObject({ status: 'cancelled' });
+    expect(project.canvas.snapshots.at(-1)).toMatchObject({ kind: 'discard-results', name: 'Discarded results' });
+    expect(store.getState().notifications[0]).toMatchObject({
+      message: 'Also stopped the queue item still running. Undo brings back the results, not the stopped item.',
+      title: 'Discarded 2 results',
+    });
+
+    await act(() => undoOf(store)!());
+    expect(staged(store)).toEqual(['left-eye.png', 'right-eye.png']);
+    // The Undo used up the restore point of the same results.
+    expect(store.getState().projects[0]!.canvas.snapshots).toEqual([]);
+  });
+
+  it('accepts one result and offers the ones it set aside back', async () => {
+    const { store } = await renderView('completed', {
+      beforeRender: () =>
+        harness.store!.commands.canvas.appendStagingCandidate({
+          candidate: second,
+          projectId: harness.store!.getState().activeProjectId,
+        }),
+    });
+
+    await page.getByRole('button', { exact: true, name: 'Accept to layer' }).click();
+    expect(store.getState().projects[0]!.canvas.document.stacks.raster).toHaveLength(1);
+    expect(staged(store)).toEqual([]);
+    expect(store.getState().notifications[0]).toMatchObject({ title: 'Result accepted' });
+    expect(store.getState().notifications[0]?.message).toMatch(/^Set aside 1 other result\./);
+    // The button brings back the results set aside, not the accept, and says so.
+    expect(store.getState().notifications[0]?.actions).toEqual([
+      expect.objectContaining({ kind: 'undo', label: 'Review the other result' }),
+    ]);
+
+    await act(() => undoOf(store)!());
+    expect(staged(store)).toEqual(['right-eye.png']);
+    // The accepted layer stays; undoing it is the canvas's own step.
+    expect(store.getState().projects[0]!.canvas.document.stacks.raster).toHaveLength(1);
   });
 });
 
@@ -346,7 +438,7 @@ describe('CanvasWidgetView control layer overlay', () => {
   it('shows no hint while staging locks the surface against drops', async () => {
     await renderView('completed', { selectedLayer: emptyControlLayer });
 
-    await expect.element(page.getByRole('button', { exact: true, name: 'Accept to Layer' })).toBeVisible();
+    await expect.element(page.getByRole('button', { exact: true, name: 'Accept to layer' })).toBeVisible();
     await expect.element(hint()).not.toBeInTheDocument();
   });
 
@@ -525,7 +617,7 @@ describe('CanvasWidgetView control layer overlay', () => {
   it('hides the view switch while staging locks the surface', async () => {
     await renderView('completed', { selectedLayer: readyLayer });
 
-    await expect.element(page.getByRole('button', { exact: true, name: 'Accept to Layer' })).toBeVisible();
+    await expect.element(page.getByRole('button', { exact: true, name: 'Accept to layer' })).toBeVisible();
     expect(viewSwitch().elements()).toHaveLength(0);
   });
 

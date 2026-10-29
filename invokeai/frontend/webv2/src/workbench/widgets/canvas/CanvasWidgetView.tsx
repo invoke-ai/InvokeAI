@@ -47,11 +47,13 @@ import {
 import { CanvasCreateFromBboxSubmenu } from './CanvasCreateFromBboxSubmenu';
 import { CanvasCropAllLayersMenuItem } from './CanvasCropAllLayersMenuItem';
 import { CanvasEditRefusalNotices } from './CanvasEditRefusalNotices';
+import { CanvasFrameLockFeed } from './CanvasFrameLockFeed';
 import { CanvasGlobalContextMenu } from './CanvasGlobalContextMenu';
 import { CANVAS_ONLY_HOTKEYS, executeCanvasHotkeyCommand } from './canvasHotkeyCommands';
 import { resolveCanvasImageDrop } from './canvasImageDnd';
 import { CanvasImageDropOverlay } from './CanvasImageDropOverlay';
 import { createCanvasInteractionLockReader, getCanvasInteractionCapabilities } from './canvasInteractionLock';
+import { CanvasLockChip, canvasLockToolReasonKey, type CanvasLockReason } from './CanvasLockChip';
 import { CanvasSaveToGallerySubmenu } from './CanvasSaveToGallerySubmenu';
 import {
   CANVAS_SETTINGS,
@@ -75,6 +77,7 @@ import { selectStagedPreviewSource, stagedPreviewKey } from './stagingPreview';
 import { INLINE_EDIT_SELECTOR } from './surfaceFocus';
 import { ToolStrip } from './ToolStrip';
 import { useCanvasGallerySave } from './useCanvasGallerySave';
+import { useStagingRecovery } from './useCanvasRecovery';
 import { useCreateFromBbox } from './useCreateFromBbox';
 import { useStagedResultGallerySave } from './useStagedResultGallerySave';
 import { reportLayerOperation, reportPreparedCommit, reportStructuralCommit } from './useStructuralCommit';
@@ -138,6 +141,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   const operationKind = operation?.status === 'active' ? operation.identity.kind : null;
   const { isSaving, save: saveToGallery } = useCanvasGallerySave(engine);
   const { createFromBbox, isCreating } = useCreateFromBbox(engine);
+  const stagingRecovery = useStagingRecovery();
 
   // Warm the split invocation chunk when Canvas mounts so the first submission need not download it.
   useMountEffect(preloadCanvasInvocation);
@@ -215,6 +219,11 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
     operationKind,
   });
   const isInteractionLocked = interactionCapabilities.isSurfaceInteractionLocked;
+  const lockReason: CanvasLockReason | null = !isInteractionLocked
+    ? null
+    : isCanvasGenerationInFlight
+      ? 'generating'
+      : 'reviewing';
 
   // A desktop file dropped on the canvas fills the selected control layer while it is empty, as the hint over it
   // says. Every file drag is taken here, since the browser's default would navigate away from the app. While it
@@ -415,14 +424,26 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       if (selectedSlot?.kind !== 'candidate' || !engine) {
         return;
       }
+      const before = { documentRevision: canvas.documentRevision, pendingImages: stagingArea.pendingImages };
+      const setsAsideOthers = !continueStaging && stagingArea.pendingImages.length > 1;
+      let stoppedBatch = false;
       const result = acceptStagedCandidate(
         {
           commit: (options) => engine.layers.commitStagedImage(options),
-          stopBatch: (queueItemId) =>
-            queue.cancel(projectId, queueItemId, {
-              message: t('widgets.canvas.staging.acceptStopMessage'),
-              title: t('widgets.canvas.staging.acceptStopTitle'),
-            }),
+          // With results set aside, the accept's own notice says the batch stopped, beside its Undo.
+          stopBatch: (queueItemId) => {
+            stoppedBatch = true;
+            queue.cancel(
+              projectId,
+              queueItemId,
+              setsAsideOthers
+                ? null
+                : {
+                    message: t('widgets.canvas.staging.acceptStopMessage'),
+                    title: t('widgets.canvas.staging.acceptStopTitle'),
+                  }
+            );
+          },
         },
         {
           candidate: selectedSlot.candidate,
@@ -431,12 +452,28 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
           selectedImageIndex: stagingArea.selectedImageIndex,
         }
       );
-      if (result.status !== 'committed' && result.status !== 'busy') {
+      if (result.status === 'committed') {
+        if (setsAsideOthers) {
+          stagingRecovery.reportAccepted(before, selectedSlot.candidate, stoppedBatch);
+        }
+      } else if (result.status !== 'busy') {
         // A candidate that left staging is as stale as one that changed under the accept.
         reportLayerOperation(result.status === 'missing' ? 'stale' : result.status, notify.error, t);
       }
     },
-    [engine, notify, projectId, queue, queueItems, selectedSlot, stagingArea.selectedImageIndex, t]
+    [
+      canvas.documentRevision,
+      engine,
+      notify,
+      projectId,
+      queue,
+      queueItems,
+      selectedSlot,
+      stagingArea.pendingImages,
+      stagingArea.selectedImageIndex,
+      stagingRecovery,
+      t,
+    ]
   );
   /* eslint-enable react/preserve-manual-memoization */
   const acceptStagedImage = useCallback(() => commitSelectedStagedImage(false), [commitSelectedStagedImage]);
@@ -446,14 +483,8 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
     (direction: -1 | 1) => canvasDispatch({ direction, type: 'cycleStagedImage' }),
     [canvasDispatch]
   );
-  const discardAllStagedImages = useCallback(
-    () => canvasDispatch({ type: 'discardAllStagedImages' }),
-    [canvasDispatch]
-  );
-  const discardSelectedStagedImage = useCallback(
-    () => canvasDispatch({ type: 'discardSelectedStagedImage' }),
-    [canvasDispatch]
-  );
+  const discardAllStagedImages = stagingRecovery.discardAll;
+  const discardSelectedStagedImage = stagingRecovery.discardSelected;
   const preloadStagedCandidate = useCallback(
     (imageName: string) => engine?.previews.preloadStagedPreview(imageName),
     [engine]
@@ -517,6 +548,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
           void cropAllLayersToFrame(engine.layers, notify, t);
         }
       },
+      discardSelectedStagedImage,
       dispatch: canvasDispatch,
       document,
       engine,
@@ -607,6 +639,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         />
       ) : null}
       <CanvasColorFeed engine={engine} />
+      {engine ? <CanvasFrameLockFeed key={projectId} engine={engine} projectId={projectId} /> : null}
       {engine ? <CanvasEditRefusalNotices key={projectId} engine={engine} /> : null}
       {engine && fontReferences.length > 0 ? (
         <Suspense fallback={null}>
@@ -620,7 +653,8 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         />
         {engine ? (
           <>
-            <ToolStrip engine={engine} isInteractionLocked={isInteractionLocked} />
+            <ToolStrip engine={engine} lockReason={lockReason ? t(canvasLockToolReasonKey(lockReason)) : null} />
+            {lockReason ? <CanvasLockChip reason={lockReason} /> : null}
             <ControlLayerCanvasOverlay engine={engine} isInteractionLocked={isInteractionLocked} />
             <CanvasLayerContextMenu
               beforeDangerItems={compositeSubmenus}

@@ -13,6 +13,10 @@ const ZOOM = gesture('zoom', [], 'scroll');
 const SAMPLE = gesture('sample', ['alt'], 'click');
 const CANCEL = gesture('cancel', ['esc']);
 const POLYGON_HINTS = [gesture('placePoint', [], 'click'), gesture('closePolygon', ['enter']), CANCEL];
+/** Alt held before or during a drag skips snapping to the grid (bbox, move, transform). */
+const FREE_OF_GRID = gesture('ignoreGrid', ['alt'], 'drag');
+/** C: hold for the Frame tool until release; a quick tap keeps it selected. */
+const FRAME_KEY = gesture('frameKey', ['c']);
 
 /** Fixed gestures follow engine tools; configurable commands are resolved by the Workbench host. */
 export const getCanvasShortcutHints = ({
@@ -80,6 +84,20 @@ export const getCanvasShortcutHints = ({
             CANCEL,
           ])
     );
+  } else if (tool === 'bbox') {
+    hints.push(
+      gesture('moveFrame', [], 'drag'),
+      gesture('resizeFrame', [], 'handleDrag'),
+      gesture('constrainFrame', ['shift'], 'drag'),
+      gesture('resizeFromCenter', ['ctrl'], 'handleDrag'),
+      FREE_OF_GRID,
+      FRAME_KEY
+    );
+  } else if (tool === 'move') {
+    hints.push(gesture('moveLayer', [], 'drag'), gesture('constrainMove', ['shift'], 'drag'), FREE_OF_GRID, {
+      commandId: 'canvas.nudgeRight',
+      labelKey: 'workbench.shortcuts.actions.nudge',
+    });
   } else if (tool === 'view') {
     hints.push(gesture('pan', [], 'drag'), ZOOM);
   } else if (tool === 'colorPicker') {
@@ -88,6 +106,7 @@ export const getCanvasShortcutHints = ({
     hints.push(
       { commandId: 'canvas.brushSizeDown', labelKey: 'workbench.shortcuts.actions.smaller' },
       { commandId: 'canvas.brushSizeUp', labelKey: 'workbench.shortcuts.actions.larger' },
+      gesture('straightLine', ['shift'], 'click'),
       SAMPLE
     );
   }

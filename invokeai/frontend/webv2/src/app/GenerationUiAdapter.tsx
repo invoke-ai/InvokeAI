@@ -36,7 +36,6 @@ import { createProjectedExternalStore } from '@platform/state/projectedExternalS
 import { shallowEqual } from '@platform/state/selectors';
 import { createActionToast } from '@platform/ui/toaster';
 import { type QueryClient, QueryObserver, useQueryClient } from '@tanstack/react-query';
-import { resetGenerateDims } from '@workbench/canvasDimsSync';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import {
   getWorkbenchPreferences,
@@ -333,7 +332,6 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
 
         return project ? getProjectWidgetValues(project, 'generate') : null;
       },
-      resetDimensions: (values, projectId) => resetGenerateDims(store, values, projectId),
     }),
     [generation, store]
   );

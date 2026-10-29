@@ -32,7 +32,7 @@ interface HarnessOptions {
   /** Mirror refresh fails, so an accepted mutation can never be mirrored. */
   readonly mirrorBroken?: boolean;
   readonly staged?: boolean;
-  /** Overrides the initial project's selection (its default inpaint mask). */
+  /** Overrides the initial selection: the new project's empty inpaint mask. */
   readonly selectedLayerId?: string | null;
 }
 
@@ -43,10 +43,13 @@ const createHarness = (options: HarnessOptions = {}) => {
     ...base,
     canvas: {
       ...base.canvas,
-      document:
-        options.selectedLayerId === undefined
-          ? base.canvas.document
-          : { ...base.canvas.document, selectedLayerId: options.selectedLayerId },
+      document: {
+        ...base.canvas.document,
+        selectedLayerId:
+          options.selectedLayerId === undefined
+            ? (getDocumentLeaves(base.canvas.document)[0]?.id ?? null)
+            : options.selectedLayerId,
+      },
       stagingArea: {
         ...base.canvas.stagingArea,
         isVisible: true,

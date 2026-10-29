@@ -1,7 +1,7 @@
 ---
 title: Crafting images with the Canvas
 description: An introduction to the Canvas — layers and masks, sending generations to the Canvas, inpainting, outpainting, regional prompts, control layers, drawing and adding gallery images.
-lastUpdated: 2026-10-24
+lastUpdated: 2026-10-29
 ---
 
 import { Image } from 'astro:assets';
@@ -66,7 +66,7 @@ In the Edit layout, **Invoke** uses the Canvas as its source and sends the resul
 
 When the source is the Canvas, the **Size** section's width and height are the frame's, and **Render at** at the bottom of the section chooses the size the model generates at before the result is scaled back to the frame (legacy versions called this *Scale before processing*): the frame's own size, the model's optimal size, or a custom size. The **Render** section adds **Denoising strength** below the guidance scale: how much image-to-image, inpainting and outpainting may change the existing content. The default is 75%, and the section header shows the current value. The Generate panel also adds a **Compositing** section at the bottom, which sets how inpainted and outpainted areas are filled and blended: **Infill method**, **Coherence pass mode**, **Coherence edge size**, **Coherence min denoise** and **Mask blur**.
 
-Results do not go straight onto the canvas. They appear in the **staging area**, a bar at the bottom of the canvas where you can step through the candidates, then **Accept to Layer** the one you want (it becomes a new raster layer), **Save to gallery**, or **Discard**. While results are staged, the canvas tools are locked except for **View**.
+Results do not go straight onto the canvas. They appear in the **staging area**, a bar at the bottom of the canvas where you can step through the candidates, then **Accept to layer** the one you want (it becomes a new raster layer), **Save to gallery**, or **Discard** (with **Undo**). While results are staged, the canvas tools are locked except for **View**, and a label at the top of the canvas says so.
 
 ## Inpainting
 
@@ -76,13 +76,13 @@ Inpainting regenerates part of an image and leaves the rest untouched: remove an
 
 <Steps>
 
-1. **Add an inpaint mask**, or select the one a new canvas starts with, in the **Inpaint Masks** stack.
+1. **Add an inpaint mask**, or select the empty one a new canvas starts with, in the **Inpaint Masks** stack. (A new canvas opens with nothing selected and the Brush active, so a stroke there paints a new raster layer.)
 
 2. **Paint the mask.** Choose the **Brush** (**B**) and paint over the area to regenerate, or draw it with the **Shape** tool (**R**). The mask shows as a tinted overlay. The **Eraser** (**E**) removes mask, and **[** and **]** change the brush size.
 
 3. **Describe the result** in the Generate panel's prompt: describe the whole picture as it should look, or just what should appear in the masked area.
 
-4. **Press Invoke**, then pick a result in the staging area and click **Accept to Layer**.
+4. **Press Invoke**, then pick a result in the staging area and click **Accept to layer**.
 
 </Steps>
 

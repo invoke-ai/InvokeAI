@@ -59,7 +59,7 @@ export type {
 } from './operationTypes';
 export { getCanvasOperations } from './operationAccess';
 export { IDLE_CONTROL_DETECTION_STATUS } from './controlDetectionStatusStore';
-export { getCanvasEngine } from './engineRegistry';
+export { getCanvasEngine, isBlankCanvasDocument } from './engineRegistry';
 export { saveCanvasToGallery, type CanvasGallerySaveRegion } from './saveCanvasToGallery';
 export {
   retryStagedResultBoard,

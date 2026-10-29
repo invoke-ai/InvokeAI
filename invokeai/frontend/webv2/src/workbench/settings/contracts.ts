@@ -143,6 +143,12 @@ export interface WorkbenchPreferences {
    * control layers left on automatic use it. Not shown in Settings.
    */
   controlModelMemory: Record<string, string>;
+  /**
+   * Canvas brush, eraser, shape and text options, restored whenever a canvas engine starts. Canvas owns its shape and
+   * normalizes it on every read (`canvas-operations/toolMemory.ts`); here it is only a plain object. Not shown in
+   * Settings.
+   */
+  canvasToolMemory: Readonly<Record<string, unknown>>;
 }
 
 export type SettingsSectionId = string;

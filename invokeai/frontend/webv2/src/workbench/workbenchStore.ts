@@ -471,7 +471,7 @@ const createCommands = (
         (projectId: string | undefined, queueItemId: string, notice?: ActionPayload<'cancelQueueItem'>['notice']) => ({
           projectId,
           queueItemId,
-          ...(notice ? { notice } : {}),
+          ...(notice !== undefined ? { notice } : {}),
         })
       ),
       cancelUnsubmitted: command('cancelUnsubmittedQueueItems', (projectId?: string) =>

@@ -271,6 +271,8 @@ export interface CanvasEngineErrorReport {
 /** Options for {@link createCanvasEngine}. */
 export interface CanvasEngineOptions {
   projectId: string;
+  /** Undo steps the project's previous engine was disposed with; History reports them until it is next cleared. */
+  droppedHistorySteps?: number;
   mutationPort: CanvasProjectMutationPort;
   /**
    * Uploads engine bitmaps durably because document layer refs must survive garbage collection. Networking remains
@@ -665,6 +667,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const persistenceController = new PersistenceController(bitmapStore);
 
   const historyController = new HistoryController({
+    droppedSteps: opts.droppedHistorySteps ?? 0,
     // A live float holds pixels no history entry knows about, and a preview holds unrecorded document values:
     // replaying over either would land on state the entry never saw. Put both back first; neither is itself
     // undoable until it commits.
@@ -1139,6 +1142,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     createPath2D: createPath2DImpl,
     dispatch: (action) => dispatchCanvasMutation(action),
     beginStrokeEdit: (initialBytes) => strokeEdits.begin(initialBytes),
+    reportEditRefusal,
     getDocument: () => mirror.getDocument(),
     getSelectedLayerIds: () => {
       const document = mirror.getDocument();
@@ -1611,10 +1615,16 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   /** Actual last non-null selection, retained across deselect/reselect and updated by engine selections too. */
   let lastSelectedLayerId: string | null = null;
+  let toolsReady = false;
   const mirror: DocumentMirror = createDocumentMirror(mutationPort, {
     onDocumentChanged: () => {
       editingController.transform.onDocumentChanged();
       stores.documentEpoch.set(stores.documentEpoch.get() + 1);
+      // A tool's cursor reads the selected layer (not-allowed over a locked or hidden one), which this may change.
+      // Skipped until the interaction controller exists, which the cursor reads.
+      if (toolsReady) {
+        updateCursor();
+      }
     },
     // Bbox changes need only overlay redraw unless a bbox-relative staged preview must move in the composite.
     // Explicitly placed candidates stay fixed.
@@ -1951,6 +1961,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     stepBrushSize: stepActiveBrushSize,
     updateCursor,
   });
+  toolsReady = true;
   const setTool = (toolId: ToolId, options?: { temporary?: boolean }): void => {
     colorSamples.onToolChange(toolId);
     interactionController.setTool(toolId, options);
@@ -2947,6 +2958,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getEditRevision: () => mutationContext.getEditRevision(),
     model: currentDocumentModel,
     replaceDocument: (document) => dispatchCanvasMutation({ document, type: 'replaceCanvasDocument' }, 'user'),
+    restoreSnapshot: (snapshotId, keepCurrentAs) =>
+      dispatchCanvasMutation(
+        { snapshotId, type: 'restoreCanvasSnapshot', ...(keepCurrentAs ? { keepCurrentAs } : {}) },
+        'user'
+      ),
   };
   const selectionCapability: CanvasEngineSelectionCapability = {
     deselect,

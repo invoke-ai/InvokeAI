@@ -2525,7 +2525,7 @@ describe('createCanvasEngine', () => {
     });
     expect(getDocumentLayer(cropped, 'locked')).toEqual(getDocumentLayer(before, 'locked'));
     expect(cropped.stacks.inpaint_mask.map((node) => node.id)).toEqual(['masks']);
-    expect(engine.history.getEntries()).toEqual({ future: [], past: ['Crop all layers to frame'] });
+    expect(engine.history.getEntries()).toEqual({ evicted: 0, future: [], past: ['Crop all layers to frame'] });
 
     await engine.history.undo();
     expect(engine.document.getDocument()).toEqual(before);
@@ -16892,7 +16892,7 @@ describe('engine selection: select all / deselect / invert + hasSelection store'
     expect(engine.stores.hasSelection.get()).toBe(false);
     await engine.history.redo();
     expect(engine.stores.hasSelection.get()).toBe(true);
-    expect(engine.history.getEntries()).toEqual({ future: ['Deselect'], past: ['Select all'] });
+    expect(engine.history.getEntries()).toEqual({ evicted: 0, future: ['Deselect'], past: ['Select all'] });
     engine.lifecycle.dispose();
   });
 });
@@ -19835,7 +19835,7 @@ describe('history entries and stepBy', () => {
     await flushMicrotasks();
     raf.flush();
 
-    expect(engine.history.getEntries()).toEqual({ future: [], past: [] });
+    expect(engine.history.getEntries()).toEqual({ evicted: 0, future: [], past: [] });
 
     engine.tools.setTool('brush');
     overlay.fire('pointerdown', pointerAt(5, 5));
@@ -19847,11 +19847,11 @@ describe('history entries and stepBy', () => {
     expect(afterStroke.future).toHaveLength(0);
 
     await engine.history.stepBy(-1);
-    expect(engine.history.getEntries()).toEqual({ future: afterStroke.past, past: [] });
+    expect(engine.history.getEntries()).toEqual({ evicted: 0, future: afterStroke.past, past: [] });
 
     // Clamped: asking for more redos than exist replays what is there and stops.
     await engine.history.stepBy(5);
-    expect(engine.history.getEntries()).toEqual({ future: [], past: afterStroke.past });
+    expect(engine.history.getEntries()).toEqual({ evicted: 0, future: [], past: afterStroke.past });
 
     engine.lifecycle.dispose();
   });
@@ -19917,7 +19917,7 @@ describe('pixel undo onto a cache that is no longer trustworthy', () => {
 
     expect(await engine.history.undo()).toBe('applied');
     expect(imageResolver.mock.calls.length).toBeGreaterThan(fetchesBeforeUndo);
-    expect(engine.history.getEntries()).toEqual({ future: ['Brush stroke'], past: [] });
+    expect(engine.history.getEntries()).toEqual({ evicted: 0, future: ['Brush stroke'], past: [] });
     engine.lifecycle.dispose();
   });
 
@@ -19928,7 +19928,7 @@ describe('pixel undo onto a cache that is no longer trustworthy', () => {
     fail = true;
 
     await expectReplayFailure(engine.history.undo(), /could not be restored/);
-    expect(engine.history.getEntries()).toEqual({ future: [], past: ['Brush stroke'] });
+    expect(engine.history.getEntries()).toEqual({ evicted: 0, future: [], past: ['Brush stroke'] });
     expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
     engine.lifecycle.dispose();
   });
@@ -20058,6 +20058,7 @@ describe('layer quick-switch memory', () => {
   const pressQuickSwitch = (engine: CanvasEngine, mutationPort: CanvasProjectMutationPort): void => {
     const document = engine.document.getDocument()!;
     executeCanvasHotkeyCommand('canvas.quickSwitch', {
+      discardSelectedStagedImage: () => undefined,
       document,
       engine,
       dispatch: (mutation) => mutationPort.dispatch(mutation, 'user'),
@@ -20419,5 +20420,79 @@ describe('control derivation composition', () => {
     });
     await expect(applicationHost.flushLayerUploads('control', {})).resolves.toBe('clean');
     engine.lifecycle.dispose();
+  });
+});
+
+describe('edit feedback on the surface', () => {
+  const attachEngine = (document: CanvasDocumentContractV3) => {
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
+    const windowListeners = new Map<string, (event: unknown) => void>();
+    vi.stubGlobal('addEventListener', (type: string, listener: (event: unknown) => void) =>
+      windowListeners.set(type, listener)
+    );
+    vi.stubGlobal('removeEventListener', (type: string) => windowListeners.delete(type));
+    const { dispatch, projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const overlay = createInputCanvas();
+    engine.surface.attach(createInputCanvas().element, overlay.element);
+    const refusals: CanvasEditRefusal[] = [];
+    engine.tools.onEditRefused((refusal) => refusals.push(refusal));
+    const key = (type: 'keydown' | 'keyup', code: string) =>
+      windowListeners.get(type)?.({ code, key: code, preventDefault: () => {}, target: null });
+    return { dispatch, engine, key, overlay, refusals };
+  };
+
+  it.each(['transform', 'bbox', 'move'] as const)(
+    'keeps %s when Alt is held before the drag, since Alt modifies its gesture',
+    (tool) => {
+      const h = attachEngine({ ...makeDoc(), selectedLayerId: 'a' });
+      h.engine.tools.setTool(tool);
+      h.overlay.fire('pointerenter', pointerAt(20, 20));
+      h.key('keydown', 'AltLeft');
+      expect(h.engine.stores.activeTool.get()).toBe(tool);
+      h.key('keyup', 'AltLeft');
+      // The picker still answers Alt where Alt means nothing else.
+      h.engine.tools.setTool('brush');
+      h.key('keydown', 'AltLeft');
+      expect(h.engine.stores.activeTool.get()).toBe('colorPicker');
+      h.key('keyup', 'AltLeft');
+      h.engine.lifecycle.dispose();
+    }
+  );
+
+  it('says why a stroke on a locked layer did nothing, and shows not-allowed until the layer is unlocked', () => {
+    const locked: CanvasLayerContract = {
+      ...(rasterLayer('paint') as CanvasRasterLayerContractV2),
+      isLocked: true,
+      name: 'Sky',
+      source: { bitmap: null, type: 'paint' },
+    };
+    const h = attachEngine({ ...makeDoc(), selectedLayerId: 'paint', stacks: stacksFrom([locked]) });
+    h.engine.tools.setTool('brush');
+    expect(h.engine.stores.cursor.get()).toBe('not-allowed');
+
+    h.overlay.fire('pointerenter', pointerAt(20, 20));
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointerup', pointerAt(20, 20, { buttons: 0 }));
+    expect(h.refusals).toEqual([{ layerId: 'paint', layerName: 'Sky', status: 'layer-locked' }]);
+    expect(getDocumentLeaves(h.engine.document.getDocument())).toHaveLength(1);
+
+    h.dispatch({ id: 'paint', patch: { isLocked: false }, type: 'updateCanvasLayer' });
+    expect(h.engine.stores.cursor.get()).toBe('crosshair');
+    h.engine.lifecycle.dispose();
   });
 });

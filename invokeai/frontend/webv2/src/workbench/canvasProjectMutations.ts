@@ -11,6 +11,8 @@ import {
   type CanvasNodeMove,
   type CanvasProjectMutation,
   type CanvasRasterLayerContractV2,
+  type CanvasSnapshotContract,
+  type CanvasSnapshotKind,
   type CanvasStackForests,
   type CanvasStateContractV3,
   type LayerStackKind,
@@ -45,6 +47,7 @@ import { repairSelectedLayerId, selectionAfterAcceptedResult } from '@workbench/
 import { prependProjectEvent } from '@workbench/projectEvents';
 
 import {
+  createEmptyCanvasDocument,
   newestCanvasSchemaVersion,
   normalizeCanvasDocumentContract,
   writableCanvasSchemaVersion,
@@ -57,6 +60,33 @@ import {
 
 export type { CanvasLayerBasePatch, CanvasLayerConfigPatch, CanvasProjectMutation } from '@workbench/canvas-engine/api';
 
+/**
+ * Restore points a canvas keeps of each kind (Clear canvas and Discard all each make one); older ones of that kind
+ * are dropped, so a run of discards never pushes out a cleared canvas.
+ */
+export const MAX_CANVAS_SNAPSHOTS = 5;
+
+const snapshotKind = (snapshot: CanvasSnapshotContract): CanvasSnapshotKind => snapshot.kind ?? 'clear-canvas';
+
+/** `snapshots` plus `added`, keeping the newest `MAX_CANVAS_SNAPSHOTS` of each kind in their order. */
+const withRestorePoint = (
+  snapshots: readonly CanvasSnapshotContract[],
+  added: CanvasSnapshotContract
+): CanvasSnapshotContract[] => {
+  const all = [...snapshots, added];
+  const kept = new Map<CanvasSnapshotKind, number>();
+  const keep = new Set<CanvasSnapshotContract>();
+  for (let index = all.length - 1; index >= 0; index -= 1) {
+    const kind = snapshotKind(all[index]!);
+    const count = kept.get(kind) ?? 0;
+    if (count < MAX_CANVAS_SNAPSHOTS) {
+      kept.set(kind, count + 1);
+      keep.add(all[index]!);
+    }
+  }
+  return all.filter((snapshot) => keep.has(snapshot));
+};
+
 const CANVAS_PROJECT_MUTATION_TYPES: ReadonlySet<string> = new Set<CanvasProjectMutation['type']>([
   'commitStagedImage',
   'rollbackStagedImageCommit',
@@ -67,6 +97,7 @@ const CANVAS_PROJECT_MUTATION_TYPES: ReadonlySet<string> = new Set<CanvasProject
   'cycleStagedImage',
   'deleteCanvasSnapshot',
   'discardAllStagedImages',
+  'restoreStagedImages',
   'discardSelectedStagedImage',
   'mergeCanvasLayersDown',
   'removeCanvasLayers',
@@ -683,6 +714,30 @@ const clearStagingArea = (stagingArea: CanvasStateContractV3['stagingArea']) => 
   sourceQueueItemId: undefined,
 });
 
+/** The canvas as a restore point; null when its document no longer normalizes. */
+const captureCanvasSnapshot = (
+  canvas: CanvasStateContractV3,
+  point: { id: string; name: string; createdAt: string; kind?: CanvasSnapshotKind; includeStaging?: boolean }
+): CanvasSnapshotContract | null => {
+  // A Discard all point brings back results only; an empty document of the canvas's size keeps the contract's shape
+  // without storing a copy nothing reads.
+  const document =
+    point.kind === 'discard-results'
+      ? createEmptyCanvasDocument(canvas.document.width, canvas.document.height)
+      : normalizeCanvasDocumentContract(structuredClone(canvas.document));
+  const { pendingImages } = canvas.stagingArea;
+  return document
+    ? {
+        createdAt: point.createdAt,
+        document,
+        id: point.id,
+        name: point.name,
+        ...(point.kind ? { kind: point.kind } : {}),
+        ...(point.includeStaging && pendingImages.length > 0 ? { stagedImages: structuredClone(pendingImages) } : {}),
+      }
+    : null;
+};
+
 const clampStagedImageIndex = (imageIndex: number, slotCount: number): number =>
   Math.min(Math.max(0, slotCount - 1), Math.max(0, imageIndex));
 
@@ -826,6 +881,50 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
           stagingArea: {
             ...canvas.stagingArea,
             isVisible: getCanvasStagingSlotCount(canvas, project.queue.items) > 0,
+          },
+        },
+      };
+    }
+    case 'restoreStagedImages': {
+      const { stagingArea } = project.canvas;
+      if (project.canvas.documentRevision !== mutation.documentRevision || mutation.images.length === 0) {
+        return project;
+      }
+      const restoring = new Set(mutation.images.map(getCanvasStagingCandidateFingerprint));
+      const staged = new Set(stagingArea.pendingImages.map(getCanvasStagingCandidateFingerprint));
+      const known = new Set(mutation.previous.map(getCanvasStagingCandidateFingerprint));
+      const pendingImages = [
+        ...mutation.previous.filter((image) => {
+          const fingerprint = getCanvasStagingCandidateFingerprint(image);
+          return staged.has(fingerprint) || restoring.has(fingerprint);
+        }),
+        // Results that arrived after the discard stay, after the ones it brings back.
+        ...stagingArea.pendingImages.filter((image) => !known.has(getCanvasStagingCandidateFingerprint(image))),
+      ];
+      if (pendingImages.length === stagingArea.pendingImages.length) {
+        return project;
+      }
+      const canvas = {
+        ...project.canvas,
+        stagingArea: {
+          ...stagingArea,
+          isVisible: true,
+          pendingImageIds: pendingImages.map((image) => image.imageName),
+          pendingImages,
+          sourceQueueItemId: stagingArea.sourceQueueItemId ?? mutation.images[0]!.sourceQueueItemId,
+        },
+      };
+      // Review resumes on the first result brought back.
+      const firstRestored = getCanvasStagingSlots(canvas, project.queue.items).findIndex(
+        (slot) => slot.kind === 'candidate' && restoring.has(getCanvasStagingCandidateFingerprint(slot.candidate))
+      );
+      return {
+        ...project,
+        canvas: {
+          ...canvas,
+          stagingArea: {
+            ...canvas.stagingArea,
+            selectedImageIndex: firstRestored >= 0 ? firstRestored : canvas.stagingArea.selectedImageIndex,
           },
         },
       };
@@ -1000,27 +1099,65 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
         : project;
     }
     case 'saveCanvasSnapshot': {
-      const document = normalizeCanvasDocumentContract(structuredClone(project.canvas.document));
-      return document
+      const snapshot = captureCanvasSnapshot(project.canvas, mutation);
+      return snapshot
         ? setCanvasState(project, {
             ...project.canvas,
-            snapshots: [
-              ...project.canvas.snapshots,
-              { createdAt: mutation.createdAt, document, id: mutation.id, name: mutation.name },
-            ],
+            snapshots: withRestorePoint(project.canvas.snapshots, snapshot),
           })
         : project;
     }
     case 'restoreCanvasSnapshot': {
       const snapshot = project.canvas.snapshots.find((entry) => entry.id === mutation.snapshotId);
-      const document = snapshot ? normalizeCanvasDocumentContract(structuredClone(snapshot.document)) : null;
-      return document
-        ? setCanvasState(project, {
-            ...project.canvas,
-            document: withRepairedSelection(document),
-            documentRevision: project.canvas.documentRevision + 1,
+      if (!snapshot) {
+        return project;
+      }
+      const remaining = project.canvas.snapshots.filter((entry) => entry !== snapshot);
+      if (snapshot.kind === 'discard-results') {
+        const restaged = applyCanvasProjectMutation(project, {
+          documentRevision: project.canvas.documentRevision,
+          images: snapshot.stagedImages ?? [],
+          previous: snapshot.stagedImages ?? [],
+          type: 'restoreStagedImages',
+        });
+        // Used up only once its results are back; when they all are already, the point stays.
+        return restaged === project ? project : { ...restaged, canvas: { ...restaged.canvas, snapshots: remaining } };
+      }
+      const document = normalizeCanvasDocumentContract(structuredClone(snapshot.document));
+      if (!document) {
+        return project;
+      }
+      const kept = mutation.keepCurrentAs
+        ? captureCanvasSnapshot(project.canvas, {
+            ...mutation.keepCurrentAs,
+            includeStaging: true,
+            kind: 'clear-canvas',
           })
-        : project;
+        : null;
+      const stagedImages = snapshot.stagedImages ? structuredClone(snapshot.stagedImages) : [];
+      const cleared = clearStagingArea(project.canvas.stagingArea);
+      // A new canvas session, like any document replacement: the outgoing staging and in-flight results belong to
+      // the replaced document. Results the point kept come back with it.
+      return setCanvasState(project, {
+        ...project.canvas,
+        document: withRepairedSelection(document),
+        documentRevision: project.canvas.documentRevision + 1,
+        snapshots: kept
+          ? withRestorePoint(remaining, kept)
+          : mutation.keepCurrentAs
+            ? remaining
+            : project.canvas.snapshots,
+        stagingArea:
+          stagedImages.length > 0
+            ? {
+                ...cleared,
+                isVisible: true,
+                pendingImageIds: stagedImages.map((image) => image.imageName),
+                pendingImages: stagedImages,
+                sourceQueueItemId: stagedImages[0]!.sourceQueueItemId,
+              }
+            : cleared,
+      });
     }
     case 'deleteCanvasSnapshot': {
       const snapshots = project.canvas.snapshots.filter((entry) => entry.id !== mutation.snapshotId);

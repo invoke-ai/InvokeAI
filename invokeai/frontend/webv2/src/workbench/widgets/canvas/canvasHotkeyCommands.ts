@@ -144,6 +144,8 @@ export interface CanvasHotkeyContext extends Omit<CanvasToolCommandContext, 'eng
   readonly hasStagingSlots: boolean;
   /** A staged candidate is selected, so Delete discards it instead of touching layers. */
   readonly hasSelectedStagedCandidate: boolean;
+  /** Discards the selected staged candidate and offers Undo, as the staging bar's Discard does. */
+  readonly discardSelectedStagedImage: () => void;
   readonly selectedLayerIds: readonly string[];
   readonly dispatch: CanvasProjectMutationDispatch;
   readonly copySelection: (cut: boolean) => void;
@@ -184,7 +186,7 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
   }
 
   if (commandId === 'canvas.deleteSelected' && ctx.hasSelectedStagedCandidate) {
-    dispatch({ type: 'discardSelectedStagedImage' });
+    ctx.discardSelectedStagedImage();
     return;
   }
 

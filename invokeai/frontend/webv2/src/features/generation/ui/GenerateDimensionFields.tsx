@@ -16,7 +16,7 @@ import { IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { ScrubberField } from '@platform/ui/ScrubberField';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
-import { ArrowLeftRightIcon, CheckIcon, LockIcon, RotateCcwIcon } from 'lucide-react';
+import { ArrowLeftRightIcon, CheckIcon, Link2Icon, LockIcon, RotateCcwIcon } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -684,6 +684,17 @@ export const GenerateDimensionFields = ({
                 </HStack>
               </GenerateFieldContextMenu>
               <GenerateIssueNotes section="dimensions" />
+              {project.invocationSourceId === 'canvas' ? (
+                // One frame-size model: the canvas frame is this size, so editing either edits both.
+                <Tooltip content={t('widgets.generate.linkedToCanvasFrameHelp')}>
+                  {/* Focusable so the help tooltip opens from the keyboard too; screen readers get it inline. */}
+                  <HStack color="fg.muted" focusVisibleRing="outside" gap="1" rounded="l1" tabIndex={0} w="fit-content">
+                    <Icon as={Link2Icon} aria-hidden boxSize="3" />
+                    <Text fontSize="xs">{t('widgets.generate.linkedToCanvasFrame')}</Text>
+                    <Text srOnly>{t('widgets.generate.linkedToCanvasFrameHelp')}</Text>
+                  </HStack>
+                </Tooltip>
+              ) : null}
 
               {selectedModel?.type === 'external_image_generator' ? (
                 <ExternalSizeSelect

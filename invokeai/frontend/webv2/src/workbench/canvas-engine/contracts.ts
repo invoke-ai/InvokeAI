@@ -494,11 +494,21 @@ export interface CanvasDocumentContractV3 {
   selectedLayerId: string | null;
 }
 
+/**
+ * Why a restore point exists. `clear-canvas` holds the document (and any staged results) a Clear canvas replaced;
+ * restoring it puts both back. `discard-results` holds staged results a Discard all dropped; restoring re-stages them
+ * and leaves the document alone. A point without a kind restores like `clear-canvas`.
+ */
+export type CanvasSnapshotKind = 'clear-canvas' | 'discard-results';
+
 export interface CanvasSnapshotContract {
   id: string;
   name: string;
   createdAt: string;
   document: CanvasDocumentContractV3;
+  kind?: CanvasSnapshotKind;
+  /** The staged results at capture time, when there were any. */
+  stagedImages?: CanvasStagingCandidateContract[];
 }
 
 export interface CanvasStagingAreaContractV2 extends CanvasStagingAreaContract {

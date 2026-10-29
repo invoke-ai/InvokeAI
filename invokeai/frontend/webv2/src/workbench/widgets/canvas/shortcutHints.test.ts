@@ -121,4 +121,21 @@ describe('Canvas gesture guidance', () => {
     expect(sam).not.toContain('canvas.undo');
     expect(sam).not.toContain('workbench.shortcuts.actions.apply');
   });
+
+  it('teaches the brush line, the frame and move gestures, and the C hold and tap', () => {
+    const brush = hintLabels(state);
+    expect(brush).toContain('workbench.shortcuts.actions.straightLine');
+    const bbox = hintLabels({ ...state, activeTool: 'bbox' });
+    expect(bbox.slice(0, 2)).toEqual([
+      'workbench.shortcuts.actions.moveFrame',
+      'workbench.shortcuts.actions.resizeFrame',
+    ]);
+    expect(bbox).toContain('workbench.shortcuts.actions.ignoreGrid');
+    expect(bbox).toContain('workbench.shortcuts.actions.frameKey');
+    const moveHints = hintLabels({ ...state, activeTool: 'move' });
+    expect(moveHints[0]).toBe('workbench.shortcuts.actions.moveLayer');
+    expect(moveHints).toContain('canvas.nudgeRight');
+    // Alt skips the grid on these tools, so it advertises no color sample.
+    expect([...bbox, ...moveHints]).not.toContain('workbench.shortcuts.actions.sample');
+  });
 });

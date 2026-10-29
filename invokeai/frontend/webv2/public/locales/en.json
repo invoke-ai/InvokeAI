@@ -219,7 +219,7 @@
     "desc": "Desc",
     "details": "Details",
     "discard": "Discard",
-    "discardAll": "Discard All",
+    "discardAll": "Discard all",
     "done": "Done",
     "duplicate": "Duplicate",
     "edit": "Edit",
@@ -3446,7 +3446,9 @@
       "promptResultStale": "That prompt is no longer open here, so the result was not applied.",
       "replacePrompt": "Replace prompt",
       "stopWaiting": "Stop waiting",
-      "undoStale": "Nothing to undo: those settings changed since."
+      "undoStale": "Nothing to undo: those settings changed since.",
+      "linkedToCanvasFrame": "Linked to the canvas frame",
+      "linkedToCanvasFrameHelp": "Width, height and the aspect lock follow the canvas frame. Changing them resizes the frame around its center, and canvas undo puts it back."
     },
     "upscale": {
       "concepts": "Concepts",
@@ -3926,7 +3928,7 @@
       "status": "Status: {{status}}"
     },
     "canvas": {
-      "acceptToLayer": "Accept to Layer",
+      "acceptToLayer": "Accept to layer",
       "candidateCount": "{{current}} of {{total}}",
       "clipboard": {
         "copyFailed": "Could not copy the selection to the clipboard",
@@ -3984,7 +3986,9 @@
         "zoomTo100": "Zoom to 100%",
         "zoomTo200": "Zoom to 200%",
         "zoomTo400": "Zoom to 400%",
-        "zoomTo800": "Zoom to 800%"
+        "zoomTo800": "Zoom to 800%",
+        "selectColorPickerTool": "Select color picker",
+        "resizeFrame": "Resize frame"
       },
       "contextMenu": {
         "createError": "Couldn't create from the frame",
@@ -4025,9 +4029,26 @@
         "fitBboxToLayers": "Fit frame to layers",
         "fitBboxToMasks": "Fit frame to masks",
         "fitToView": "Fit to view",
-        "newCanvasConfirm": "Clear all layers and start a fresh canvas? This cannot be undone.",
         "savingToGallery": "Saving…",
-        "zoomLevel": "Zoom level: {{zoom}}"
+        "zoomLevel": "Zoom level: {{zoom}}",
+        "cleared": "Canvas cleared",
+        "clearedMessage": "History keeps a restore point of it.",
+        "clearedStopped_one": "Stopped the queue item that was running.",
+        "clearedStopped_other": "Stopped the {{count}} queue items that were running.",
+        "clearUnsaved": "Canvas not cleared",
+        "clearUnsavedMessage": "Your latest strokes couldn’t be saved, so nothing was cleared. Try again in a moment.",
+        "clearCanvasTitle": "Clear the canvas?",
+        "clearConfirmLayers_one": "Removes the {{count}} layer and starts a fresh canvas with an empty inpaint mask.",
+        "clearConfirmLayers_other": "Removes all {{count}} layers and starts a fresh canvas with an empty inpaint mask.",
+        "clearConfirmStaged_one": "The {{count}} staged result goes too.",
+        "clearConfirmStaged_other": "The {{count}} staged results go too.",
+        "clearConfirmRestore": "History keeps a restore point, so you can bring all of it back. Canvas undo history is cleared.",
+        "clearConfirmInFlight_one": "A queue item for this canvas is still queued or running. Its results would be thrown away.",
+        "clearConfirmInFlight_other": "{{count}} queue items for this canvas are still queued or running. Their results would be thrown away.",
+        "clearConfirmStop_one": "Stop it now",
+        "clearConfirmStop_other": "Stop them now",
+        "operationRunning": "Finish or cancel the current canvas operation first.",
+        "clearFailedMessage": "The canvas didn’t take the change, so nothing was cleared. Try again in a moment."
       },
       "hideStagedResultPreview": "Hide staged result preview",
       "hideStagingThumbnails": "Hide staging thumbnails",
@@ -4068,7 +4089,6 @@
         "checkerboard": "Checkerboard background",
         "clipToBbox": "Clip strokes to frame",
         "clearCaches": "Clear caches",
-        "clearHistory": "Clear history",
         "grid": "Show grid",
         "invertBrushScroll": "Invert scroll for brush size",
         "label": "Canvas settings",
@@ -4104,13 +4124,28 @@
         "generating": "Generating…",
         "moreAcceptOptions": "More accept options",
         "recall": "Recall settings",
-        "saveAsDisabledLayer": "Keep as Hidden Layer",
+        "saveAsDisabledLayer": "Keep as hidden layer",
         "saveError": "Couldn't save to gallery",
         "saveToGallery": "Save to gallery",
         "saved": "Saved to gallery",
         "savedDescription": "{{name}} added to your gallery.",
         "savedToBoard": "Saved to {{board}}",
-        "showInGallery": "Show in Gallery"
+        "showInGallery": "Show in Gallery",
+        "discarded": "Result discarded",
+        "discardedAll_one": "Discarded {{count}} result",
+        "discardedAll_other": "Discarded {{count}} results",
+        "discardedAllKept": "History keeps a restore point of them.",
+        "discardedAllStopped_one": "Also stopped the queue item still running. Undo brings back the results, not the stopped item.",
+        "discardedAllStopped_other": "Also stopped {{count}} queue items still running. Undo brings back the results, not the stopped items.",
+        "stoppedGenerating_one": "Stopped the queue item still running",
+        "stoppedGenerating_other": "Stopped {{count}} queue items still running",
+        "acceptedOthers_one": "Set aside {{count}} other result. Undoing on the canvas removes only the new layer.",
+        "acceptedOthers_other": "Set aside {{count}} other results. Undoing on the canvas removes only the new layer.",
+        "acceptedStopped": "The rest of its batch was stopped and shows as cancelled in the queue.",
+        "notBroughtBack": "Results not brought back",
+        "notBroughtBackMessage": "They’re already staged, or the canvas was replaced since they were set aside.",
+        "reviewOthers_one": "Review the other result",
+        "reviewOthers_other": "Review the other {{count}}"
       },
       "structural": {
         "busy": "Another canvas operation is in progress, so this edit was not kept.",
@@ -4213,7 +4248,8 @@
         "textFontStyleOblique": "Oblique",
         "textSize": "Font size",
         "textWeight": "Weight",
-        "gradientPairPreset": "Foreground to background preset"
+        "gradientPairPreset": "Foreground to background preset",
+        "frameLinked": "Linked to Generate’s size: the size and aspect lock are shared."
       },
       "tools": {
         "bbox": "Generation frame",
@@ -4232,7 +4268,8 @@
         "text": "Text",
         "transform": "Transform",
         "view": "View",
-        "withHotkey": "{{label}} ({{hotkey}})"
+        "withHotkey": "{{label}} ({{hotkey}})",
+        "bboxHoldHelp": "Hold C to use it until you let go; tap C to stay on it."
       },
       "controlHint": {
         "title": "Drop an image here",
@@ -4251,6 +4288,41 @@
         "overlay": "Overlay",
         "failed": "Couldn't show the original image",
         "overBudget": "Not enough canvas memory to show the original image"
+      },
+      "editRefusal": {
+        "hidden": "“{{name}}” is hidden",
+        "hiddenMessage": "Show the layer to edit it.",
+        "hiddenOfferMessage": "Show the layer to paint on it, or paint on a new layer above it.",
+        "locked": "“{{name}}” is locked",
+        "lockedMessage": "Unlock the layer to edit it.",
+        "lockedOfferMessage": "Unlock the layer to paint on it, or paint on a new layer above it.",
+        "alphaLocked": "“{{name}}” has its transparency locked",
+        "alphaLockedMessage": "The eraser can’t remove pixels while transparency is locked.",
+        "loading": "“{{name}}” is still loading",
+        "loadingMessage": "Its pixels are on their way. Try again in a moment.",
+        "paintOnNewLayer": "Paint on a new layer"
+      },
+      "lock": {
+        "generating": "Locked while generating",
+        "reviewing": "Locked while reviewing results",
+        "generatingHelp": "Editing resumes once the results are in and you accept or discard them. You can still pan and zoom.",
+        "reviewingHelp": "Accept or discard the staged results to edit again. You can still pan and zoom.",
+        "toolGenerating": "Locked while generating. You can still pan and zoom with View.",
+        "toolReviewing": "Locked while reviewing results. Accept or discard them to edit again."
+      },
+      "restorePoints": {
+        "beforeClear": "Before clearing the canvas",
+        "discardedResults": "Discarded results",
+        "beforeRestore": "Before restoring “{{name}}”",
+        "restored": "Restored “{{name}}”",
+        "resultsBack": "Results are back for review",
+        "unavailable": "Couldn’t restore the canvas",
+        "unavailableMessage": "Its canvas is closed. Open it, then restore the point from History.",
+        "notRestored": "Canvas not restored",
+        "lockedByGeneration": "A generation is running or results wait for review on this canvas, and restoring would throw them away. They’re left as they are: accept or discard them, then restore the point from History.",
+        "unsavedMessage": "Your latest strokes couldn’t be saved, so nothing was restored. Try again in a moment.",
+        "alreadyStaged": "Those results are already staged",
+        "keptReplaced": "History keeps a restore point of the canvas it replaced."
       }
     },
     "workflow": {
@@ -4498,16 +4570,8 @@
         "exclude": "Exclude layer below",
         "extractMaskedArea": "Extract masked area",
         "fitToBbox": "Fit to frame",
-        "disableLayer": "Disable layer",
-        "enableLayer": "Enable layer",
-        "disableSelected": "Disable selected",
-        "enableSelected": "Enable selected",
-        "disableGroup": "Disable group",
-        "enableGroup": "Enable group",
         "hideLayer": "Hide layer",
         "showLayer": "Show layer",
-        "hideSelectedLayers": "Hide selected",
-        "showSelectedLayers": "Show selected",
         "intersect": "Intersect with layer below",
         "mergeSelected": "Merge selected layers",
         "lock": "Lock layer",
@@ -4534,10 +4598,9 @@
         "select": "Select {{name}}",
         "selectObject": "Select object",
         "toggleAutoNegative": "Toggle auto-negative",
-        "toggleHidden": "Show/hide layer",
+        "toggleHidden": "Show or hide on canvas",
         "toggleLock": "Toggle lock",
         "toggleTransparencyEffect": "Toggle transparent preview",
-        "toggleVisibility": "Enable/disable",
         "transform": "Transform",
         "unsupported": "This action is not supported for this layer.",
         "unreadable": "“{{name}}” could not be read (its image may have been deleted or damaged), so nothing was changed. Delete or replace that layer, then try again.",
@@ -4552,15 +4615,15 @@
         "indent": "Move into the group above",
         "outdent": "Move out of the group",
         "groupLocked": "Locked by a group",
-        "groupDisabled": "Disabled by a group",
-        "groupHidden": "Hidden by a group",
+        "groupDisabled": "Hidden by a group. Show the group to bring it back.",
+        "groupHidden": "Hidden on the canvas by a group. Generation still uses it.",
         "duplicateCount_one": "Duplicate layer",
         "duplicateCount_other": "Duplicate {{count}} layers",
         "groupCount_one": "Group layer",
         "groupCount_other": "Group {{count}} layers",
         "deleteCount_one": "Delete layer",
         "deleteCount_other": "Delete {{count}} layers",
-        "toggleActive": "Enable/disable layer",
+        "toggleActive": "Show or hide layer",
         "hideModifiers": "Hide modifiers",
         "showModifiers": "Show modifiers",
         "addDenoiseLimit": "Add denoise limit",
@@ -4575,7 +4638,20 @@
         "removeFromGroup": "Remove from group",
         "removeFromGroupLocked": "Unlock the layer and the groups that contain it first.",
         "transformIneligible": "Transform works on enabled raster and control layers with content.",
-        "useAsControlLayer": "Use as control layer"
+        "useAsControlLayer": "Use as control layer",
+        "hideSelected": "Hide selected",
+        "showSelected": "Show selected",
+        "hideOnCanvas": "Hide on canvas only",
+        "showOnCanvas": "Show on canvas",
+        "hideSelectedOnCanvas": "Hide selected on canvas only",
+        "showSelectedOnCanvas": "Show selected on canvas",
+        "hideGroup": "Hide group",
+        "showGroup": "Show group",
+        "hideGroupOnCanvas": "Hide group on canvas only",
+        "showGroupOnCanvas": "Show group on canvas",
+        "hideLayerTooltip": "Hide layer. A hidden layer is also left out of generation.",
+        "showLayerTooltip": "Show layer. While hidden, it is left out of generation.",
+        "canvasHiddenTooltip": "Hidden on the canvas only; generation still uses it. Click to show it."
       },
       "control": {
         "apply": "Apply",
@@ -4690,7 +4766,7 @@
         "needsReidentify": "Needs re-identify",
         "preview": "Preview filter",
         "validation": {
-          "capabilities_unavailable": "waiting for model capabilities to load.",
+          "capabilities_unavailable": "Waiting for model capabilities to load.",
           "choose_model": "Several installed models fit this control type; choose one.",
           "control_lora_limit": "Only one Control LoRA can be used at a time.",
           "detection_pending": "Detection is running or out of date; wait for it, or run it again from the layer's Properties.",
@@ -5103,8 +5179,9 @@
         "mergeVisible": "Merge visible",
         "new": "New layer",
         "showAll": "Show all",
-        "toggleVisibility": "Enable/disable group",
-        "toggleHidden": "Show/hide group"
+        "toggleVisibility": "Show or hide layers",
+        "hideAllOnCanvas": "Hide all on canvas",
+        "showAllOnCanvas": "Show all on canvas"
       },
       "groups": {
         "control": "Control Layers",
@@ -5237,14 +5314,32 @@
         "resize": "Resize color pane",
         "swatches": "Swatches",
         "tabs": "Color panes",
-        "maskTint": "Mask tint"
+        "maskTint": "Mask tint",
+        "formatTooltip": "Showing {{format}} values. Click for {{next}}."
       },
       "colorTargetTooltip": "{{label}} · {{hex}}",
       "historyPane": {
         "count_one": "{{count}} step",
         "count_other": "{{count}} steps",
         "empty": "No edits yet.",
-        "steps": "Edit history"
+        "steps": "Edit history",
+        "start": "Start",
+        "evicted_one": "{{count}} older step is no longer kept: the history keeps the newest {{max}}.",
+        "evicted_other": "{{count}} older steps are no longer kept: the history keeps the newest {{max}}.",
+        "dropped_one": "{{count}} earlier step was cleared when this canvas was closed.",
+        "dropped_other": "{{count}} earlier steps were cleared when this canvas was closed.",
+        "clear": "Clear history",
+        "clearTitle": "Clear canvas history?",
+        "clearConfirm_one": "Discards the {{count}} undo step for this canvas. The canvas itself doesn’t change, and restore points stay.",
+        "clearConfirm_other": "Discards the {{count}} undo steps for this canvas. The canvas itself doesn’t change, and restore points stay.",
+        "restorePoints": "Restore points",
+        "restore": "Restore",
+        "restoreLocked": "Restore once the staged results are accepted or discarded and nothing is generating.",
+        "pointCanvas": "Canvas",
+        "pointResults_one": "{{count}} result",
+        "pointResults_other": "{{count}} results",
+        "pointCanvasAndResults_one": "Canvas and {{count}} result",
+        "pointCanvasAndResults_other": "Canvas and {{count}} results"
       },
       "overviewPane": {
         "pan": "Pan the canvas view"
@@ -6509,7 +6604,17 @@
         "comparison": "Comparison mode",
         "swapImages": "Swap images",
         "invoke": "Invoke",
-        "cancelGeneration": "Cancel generation"
+        "cancelGeneration": "Cancel generation",
+        "straightLine": "Straight line from the last stroke",
+        "moveFrame": "Move frame",
+        "resizeFrame": "Resize frame",
+        "constrainFrame": "Keep proportions / straight move",
+        "resizeFromCenter": "Resize from center",
+        "ignoreGrid": "Ignore grid snapping",
+        "frameKey": "Hold for the frame tool; tap to stay on it",
+        "moveLayer": "Move layer",
+        "constrainMove": "Move along one axis",
+        "nudge": "Nudge"
       }
     }
   }

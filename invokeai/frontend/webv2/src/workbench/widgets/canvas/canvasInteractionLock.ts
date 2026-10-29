@@ -1,4 +1,4 @@
-import type { CanvasStateContractV3, ToolId } from '@workbench/canvas-engine/api';
+import type { CanvasStateContractV3 } from '@workbench/canvas-engine/api';
 import type { WorkbenchQueueItem as QueueItem } from '@workbench/queueHistoryContracts';
 
 export const isCanvasInteractionLocked = (canvas: CanvasStateContractV3, queueItems: readonly QueueItem[]): boolean =>
@@ -82,6 +82,3 @@ export const getCanvasInteractionCapabilities = ({
     isSurfaceInteractionLocked,
   };
 };
-
-export const isCanvasToolEnabled = (toolId: ToolId, isInteractionLocked: boolean): boolean =>
-  !isInteractionLocked || toolId === 'view';

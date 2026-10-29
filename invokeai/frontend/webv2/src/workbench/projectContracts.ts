@@ -122,9 +122,10 @@ export type WorkbenchNotificationAction =
   | { kind: 'retry-queue-item'; itemId: number; canvasProjectId?: string }
   /**
    * Runs the closure `useNotify().undoable` holds in its session-only registry, at most once. With `projectId`, only
-   * while that project is open.
+   * while that project is open. `label` replaces "Undo" when the button brings back something other than the
+   * reported action.
    */
-  | { kind: 'undo'; undoId: string; projectId?: string };
+  | { kind: 'undo'; undoId: string; projectId?: string; label?: string };
 
 export interface WorkbenchNotification {
   id: string;

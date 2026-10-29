@@ -419,6 +419,19 @@ describe('normalizeWorkbenchPreferences workflow library', () => {
   });
 });
 
+describe('normalizeWorkbenchPreferences canvas tool memory', () => {
+  it('keeps only the known tools, each a plain record, and an already-valid record as is', () => {
+    const valid = { brush: { size: 12 }, text: { fontSize: 40 } };
+    expect(store.normalizeWorkbenchPreferences({ canvasToolMemory: valid }).canvasToolMemory).toBe(valid);
+    expect(
+      store.normalizeWorkbenchPreferences({
+        canvasToolMemory: { brush: { size: 12 }, eraser: 'wide', junk: { a: 1 }, shape: [1] } as never,
+      }).canvasToolMemory
+    ).toEqual({ brush: { size: 12 } });
+    expect(store.normalizeWorkbenchPreferences({ canvasToolMemory: [] as never }).canvasToolMemory).toEqual({});
+  });
+});
+
 describe('normalizeWorkbenchPreferences appearance', () => {
   it('keeps high contrast off unless explicitly enabled', () => {
     expect(store.normalizeWorkbenchPreferences({}).highContrast).toBe(false);

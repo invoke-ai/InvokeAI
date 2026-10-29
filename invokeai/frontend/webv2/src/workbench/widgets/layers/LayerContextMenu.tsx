@@ -542,12 +542,12 @@ const LayerMenu = ({
       const index = getDocumentIndex(document);
       const isEnabled = !targets.every((id) => index.byId.get(id)?.node.isEnabled ?? true);
       commitPrepared(
-        t(isEnabled ? 'widgets.layers.actions.enableSelected' : 'widgets.layers.actions.disableSelected'),
+        t(isEnabled ? 'widgets.layers.actions.showSelected' : 'widgets.layers.actions.hideSelected'),
         (model) => model.prepare({ type: 'set-enabled', updates: targets.map((id) => ({ id, isEnabled })) })
       );
       return;
     }
-    patchBase(t('widgets.layers.actions.toggleVisibility'), { isEnabled: !layer.isEnabled });
+    patchBase(t('widgets.layers.actions.toggleActive'), { isEnabled: !layer.isEnabled });
   }, [commitPrepared, document, layer, patchBase, selectedIds, t]);
 
   const handleToggleHidden = useCallback(() => {
@@ -566,13 +566,15 @@ const LayerMenu = ({
       });
       const isHidden = !nodes.every((node) => isNodeHidden(node));
       commitPrepared(
-        t(isHidden ? 'widgets.layers.actions.hideSelectedLayers' : 'widgets.layers.actions.showSelectedLayers'),
+        t(isHidden ? 'widgets.layers.actions.hideSelectedOnCanvas' : 'widgets.layers.actions.showSelectedOnCanvas'),
         (model) => model.prepare({ type: 'set-hidden', updates: nodes.map((node) => ({ id: node.id, isHidden })) })
       );
       return;
     }
-    commitPrepared(t('widgets.layers.actions.toggleHidden'), (model) =>
-      model.prepare({ type: 'set-hidden', updates: [{ id: layer.id, isHidden: !isNodeHidden(layer) }] })
+    const isHidden = !isNodeHidden(layer);
+    commitPrepared(
+      t(isHidden ? 'widgets.layers.actions.hideOnCanvas' : 'widgets.layers.actions.showOnCanvas'),
+      (model) => model.prepare({ type: 'set-hidden', updates: [{ id: layer.id, isHidden }] })
     );
   }, [commitPrepared, document, layer, selectedIds, t]);
 

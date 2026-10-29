@@ -1,6 +1,8 @@
-import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { CanvasLayerContract, CanvasStagingCandidateContract } from '@workbench/canvas-engine/contracts';
+import type * as CanvasOperationsApi from '@workbench/canvas-operations/api';
 import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { Project } from '@workbench/projectContracts';
+import type { WorkbenchQueueItem as QueueItem } from '@workbench/queueHistoryContracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 
@@ -37,12 +39,18 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(activeProject()),
   useOptionalWorkbenchCommands: () => harness.store!.commands,
   useWorkbenchCommands: () => harness.store!.commands,
+  useWorkbenchQueries: () => harness.store!.queries,
 }));
 vi.mock('./engineStoreHooks', async (importOriginal) => ({
   ...(await importOriginal<typeof EngineStoreHooks>()),
   useCanvasDocumentEditingLocked: () => harness.editingLocked,
 }));
 vi.mock('@workbench/canvas-operations/react', () => ({ useCanvasEngine: () => harness.engine }));
+// Clear canvas looks the project's engine up when it runs, as an Undo arriving later would.
+vi.mock('@workbench/canvas-operations/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof CanvasOperationsApi>()),
+  getCanvasEngine: () => harness.engine ?? undefined,
+}));
 vi.mock('./useCanvasGallerySave', () => ({
   useCanvasGallerySave: () => ({ isSaving: harness.isSaving, save: harness.save }),
 }));
@@ -89,36 +97,63 @@ const paintedLayer: CanvasLayerContract = {
   type: 'raster' as const,
 };
 
+const stagedResult: CanvasStagingCandidateContract = {
+  height: 64,
+  imageName: 'staged.png',
+  imageUrl: '/staged.png',
+  placement: { height: 64, opacity: 1, width: 64, x: 0, y: 0 },
+  queuedAt: '2026-07-16T00:00:00.000Z',
+  sourceBackendItemId: 1,
+  sourceQueueItemId: 'batch',
+  thumbnailUrl: '/staged-thumb.png',
+  width: 64,
+};
+
 /**
  * Renders the actions on a fresh project holding `layers` (none by default) and the canvas widget values
- * `canvasValues`, recording the commands and hotkeys they register.
+ * `canvasValues`, recording the commands and hotkeys they register. `running` queues a canvas batch still generating
+ * for this canvas, whose first result is staged.
  */
 const renderActions = async ({
   canvasValues,
   layers = [],
-}: { canvasValues?: Record<string, unknown>; layers?: CanvasLayerContract[] } = {}) => {
+  running = false,
+}: { canvasValues?: Record<string, unknown>; layers?: CanvasLayerContract[]; running?: boolean } = {}) => {
   const initial = createInitialWorkbenchState();
-  const base = initial.projects[0]!;
-  const store = createWorkbenchStore(
+  const created = initial.projects[0]!;
+  const base =
     layers.length > 0
       ? {
-          ...initial,
-          projects: [
-            {
-              ...base,
-              canvas: {
-                ...base.canvas,
-                document: { ...base.canvas.document, stacks: stacksFrom(layers) },
-              },
-            },
-          ],
+          ...created,
+          canvas: { ...created.canvas, document: { ...created.canvas.document, stacks: stacksFrom(layers) } },
         }
-      : initial
-  );
+      : created;
+  const batch = {
+    backendBatchId: 'batch-backend',
+    backendItemIds: [1, 2],
+    cancellable: true,
+    completedBackendItemIds: [1],
+    id: 'batch',
+    snapshot: {
+      canvas: { document: base.canvas.document, documentRevision: base.canvas.documentRevision },
+      destination: 'canvas',
+      presentation: { batchCount: 2, height: 64, width: 64 },
+      sourceId: 'canvas',
+      submittedAt: '2026-07-16T00:00:00.000Z',
+    },
+    status: 'running',
+  } as unknown as QueueItem;
+  const store = createWorkbenchStore({
+    ...initial,
+    projects: [running ? { ...base, queue: { items: [batch] } } : base],
+  });
   if (canvasValues) {
     store.commands.widgets.patchValues('canvas', canvasValues);
   }
   const projectId = store.getState().activeProjectId;
+  if (running) {
+    store.commands.canvas.appendStagingCandidate({ candidate: stagedResult, projectId });
+  }
   harness.store = store;
   harness.engine = createCanvasEngine({
     backend: createTestStubRasterBackend(),
@@ -169,32 +204,78 @@ describe('CanvasHeaderActions clear canvas', () => {
     await clearButton().click();
 
     await expect.element(confirmDialog()).toBeVisible();
-    await expect.element(confirmDialog().getByRole('heading', { name: 'Clear canvas' })).toBeVisible();
+    await expect.element(confirmDialog().getByRole('heading', { name: 'Clear the canvas?' })).toBeVisible();
     await expect.element(confirmDialog().getByRole('button', { exact: true, name: 'Clear canvas' })).toBeVisible();
+    // The new project's empty inpaint mask is its one layer.
     await expect
-      .element(confirmDialog().getByText('Clear all layers and start a fresh canvas? This cannot be undone.'))
+      .element(confirmDialog().getByText('Removes the 1 layer and starts a fresh canvas with an empty inpaint mask.'))
       .toBeVisible();
+    // A blank canvas has nothing to bring back, so the dialog promises no restore point.
+    expect(confirmDialog().element().textContent).not.toContain('History keeps a restore point');
     expect(document.querySelector('[role="menu"]')).toBeNull();
   });
 
-  it('replaces the document once confirmed, layers and all', async () => {
+  it('names the staged results and the generation still running, and stops it while that is ticked', async () => {
+    const { store } = await renderActions({ layers: [paintedLayer], running: true });
+
+    await clearButton().click();
+    const text = () => confirmDialog().element().textContent;
+    await expect.element(confirmDialog().getByText('The 1 staged result goes too.')).toBeVisible();
+    expect(text()).toContain('History keeps a restore point');
+    expect(text()).toContain(
+      'A queue item for this canvas is still queued or running. Its results would be thrown away.'
+    );
+    await expect.element(confirmDialog().getByRole('checkbox', { name: 'Stop it now' })).toBeChecked();
+    await confirmDialog().getByRole('button', { exact: true, name: 'Clear canvas' }).click();
+
+    await expect.poll(() => store.getState().projects[0]!.queue.items[0]?.status).toBe('cancelled');
+    const canvas = store.getState().projects[0]!.canvas;
+    expect(canvas.document.stacks.raster).toHaveLength(0);
+    expect(canvas.snapshots[0]?.stagedImages?.map((image) => image.imageName)).toEqual(['staged.png']);
+  });
+
+  it('leaves the generation running once "Stop it now" is unticked', async () => {
+    const { store } = await renderActions({ layers: [paintedLayer], running: true });
+
+    await clearButton().click();
+    await confirmDialog().getByText('Stop it now').click();
+    await expect.element(confirmDialog().getByRole('checkbox', { name: 'Stop it now' })).not.toBeChecked();
+    await confirmDialog().getByRole('button', { exact: true, name: 'Clear canvas' }).click();
+
+    await expect.poll(() => store.getState().projects[0]!.canvas.document.stacks.raster).toHaveLength(0);
+    expect(store.getState().projects[0]!.queue.items[0]?.status).toBe('running');
+  });
+
+  it('replaces the document once confirmed, behind a restore point that brings it back', async () => {
     const { store } = await renderActions({ layers: [paintedLayer] });
     const before = store.getState().projects[0]!.canvas.documentRevision;
     expect(store.getState().projects[0]!.canvas.document.stacks.raster).toHaveLength(1);
 
     await clearButton().click();
+    await expect.element(confirmDialog().getByText(/Removes the 1 layer/)).toBeVisible();
     await confirmDialog().getByRole('button', { exact: true, name: 'Clear canvas' }).click();
 
     await expect.element(confirmDialog()).not.toBeInTheDocument();
-    expect(store.getState().projects[0]!.canvas.documentRevision).toBeGreaterThan(before);
-    expect(store.getState().projects[0]!.canvas.document.stacks.raster).toHaveLength(0);
+    await expect.poll(() => store.getState().projects[0]!.canvas.document.stacks.raster).toHaveLength(0);
+    const canvas = store.getState().projects[0]!.canvas;
+    expect(canvas.documentRevision).toBeGreaterThan(before);
+    expect(canvas.snapshots).toHaveLength(1);
+    expect(canvas.snapshots[0]).toMatchObject({ kind: 'clear-canvas', name: 'Before clearing the canvas' });
+
+    store.commands.canvas.apply(store.getState().activeProjectId, {
+      snapshotId: canvas.snapshots[0]!.id,
+      type: 'restoreCanvasSnapshot',
+    });
+    expect(store.getState().projects[0]!.canvas.document.stacks.raster.map((node) => node.id)).toEqual(['painted']);
   });
 
-  it('is disabled while editing is locked, and its command opens nothing then', async () => {
+  it('is unavailable while editing is locked, says why, and its command opens nothing then', async () => {
     harness.editingLocked = true;
     const { commands } = await renderActions();
 
-    await expect.element(clearButton()).toBeDisabled();
+    await expect.element(clearButton()).toHaveAttribute('aria-disabled', 'true');
+    await clearButton().click({ force: true });
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull();
     await act(() => commands.find((command) => command.id === 'canvas.newSession')!.handler!());
     expect(document.querySelector('[role="alertdialog"]')).toBeNull();
   });

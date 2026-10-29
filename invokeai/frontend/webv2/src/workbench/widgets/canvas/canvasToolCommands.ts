@@ -19,10 +19,13 @@ export const CANVAS_COMPANION_HOTKEYS = [
   ['canvas.tool.brush', 'widgets.canvas.commands.selectBrushTool', ['b']],
   ['canvas.tool.eraser', 'widgets.canvas.commands.selectEraserTool', ['e']],
   ['canvas.tool.lasso', 'widgets.canvas.commands.selectLassoTool', ['l']],
-  ['canvas.tool.marquee', 'widgets.canvas.commands.selectMarqueeTool', ['u']],
-  ['canvas.tool.shape', 'widgets.canvas.commands.selectShapeTool', ['r']],
+  // M and U as in other image editors: Marquee, then the Shape tool family.
+  ['canvas.tool.marquee', 'widgets.canvas.commands.selectMarqueeTool', ['m']],
+  ['canvas.tool.shape', 'widgets.canvas.commands.selectShapeTool', ['u']],
   ['canvas.tool.text', 'widgets.canvas.commands.selectTextTool', ['t']],
   ['canvas.tool.gradient', 'widgets.canvas.commands.selectGradientTool', ['g']],
+  // A sticky picker for those who would rather not hold Alt; Alt still picks from tools that do not read it.
+  ['canvas.tool.colorPicker', 'widgets.canvas.commands.selectColorPickerTool', ['i']],
   ['canvas.brushSizeDown', 'widgets.canvas.commands.decreaseBrushSize', ['[']],
   ['canvas.brushSizeUp', 'widgets.canvas.commands.increaseBrushSize', [']']],
   // The active color pair: X swaps, D resets to black/white.
@@ -160,6 +163,9 @@ export const executeCanvasToolCommand = (commandId: CanvasToolCommandId, ctx: Ca
       return;
     case 'canvas.tool.gradient':
       engine.tools.setTool('gradient');
+      return;
+    case 'canvas.tool.colorPicker':
+      engine.tools.setTool('colorPicker');
       return;
     case 'canvas.brushSizeDown':
       engine.tools.stepBrushSize(-1);

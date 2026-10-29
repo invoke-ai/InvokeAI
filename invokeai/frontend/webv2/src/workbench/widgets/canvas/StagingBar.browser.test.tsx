@@ -321,7 +321,7 @@ describe('StagingBar thumbnail strip', () => {
     await interact(() => trigger!.click());
 
     const menuItem = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find((item) =>
-      item.textContent?.includes('Keep as Hidden Layer')
+      item.textContent?.includes('Keep as hidden layer')
     );
     expect(menuItem).toBeDefined();
     await interact(() => menuItem!.click());
@@ -332,13 +332,13 @@ describe('StagingBar thumbnail strip', () => {
     const onAccept = vi.fn();
     const onSaveToLayerAndContinue = vi.fn();
     await renderStagingBar(1, 0, onSaveToLayerAndContinue, noop, noop, makeSlot, { onAccept });
-    const accept = page.getByRole('button', { exact: true, name: 'Accept to Layer' });
+    const accept = page.getByRole('button', { exact: true, name: 'Accept to layer' });
     await expect.element(accept).toBeVisible();
     await accept.click();
     expect(onAccept).toHaveBeenCalledOnce();
 
     await page.getByRole('button', { name: 'More accept options' }).click();
-    const keepHidden = page.getByRole('menuitem', { name: 'Keep as Hidden Layer' });
+    const keepHidden = page.getByRole('menuitem', { name: 'Keep as hidden layer' });
     await expect.element(keepHidden).toBeVisible();
     await keepHidden.click();
     expect(onSaveToLayerAndContinue).toHaveBeenCalledOnce();
@@ -358,7 +358,7 @@ describe('StagingBar thumbnail strip', () => {
         { canvasWidth, isGenerating: true }
       );
       const trigger = page.getByRole('button', { name: 'More accept options' }).element();
-      const accept = page.getByRole('button', { exact: true, name: 'Accept to Layer' }).element();
+      const accept = page.getByRole('button', { exact: true, name: 'Accept to layer' }).element();
       const bounds = overlay.getBoundingClientRect();
       expect(trigger.getBoundingClientRect().right).toBeLessThanOrEqual(bounds.right);
       expect(accept.getBoundingClientRect().left).toBeGreaterThanOrEqual(bounds.left);
@@ -376,7 +376,7 @@ describe('StagingBar thumbnail strip', () => {
         }
       }
       // The accept action keeps its full name, and Tooltip, however narrow the bar.
-      expect(accept.getAttribute('aria-label')).toBe('Accept to Layer');
+      expect(accept.getAttribute('aria-label')).toBe('Accept to layer');
       // Labelled or collapsed to its icon, the auto-switch trigger keeps the height of the bar's other controls.
       expect(
         page
@@ -385,7 +385,7 @@ describe('StagingBar thumbnail strip', () => {
           .getBoundingClientRect().height
       ).toBe(page.getByRole('button', { exact: true, name: 'Discard' }).element().getBoundingClientRect().height);
       // Collapsed or not, Discard All and the generating status keep their names.
-      await expect.element(page.getByRole('button', { name: 'Discard All' })).toBeVisible();
+      await expect.element(page.getByRole('button', { name: 'Discard all' })).toBeVisible();
       expect(page.getByRole('status').element().textContent).toBe('Generating…');
     }
   );

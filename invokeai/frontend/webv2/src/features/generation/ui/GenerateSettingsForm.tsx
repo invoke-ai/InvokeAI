@@ -63,7 +63,6 @@ export const GenerateSettingsForm = ({
   supportedModels,
 }: GenerateSettingsFormProps) => {
   const ui = useGenerationUi();
-  const { resetDimensions } = ui.settings;
   const isCanvasSource = ui.project.invocationSourceId === 'canvas';
   const [draft] = useState(() => createExternalStoreCore(settings));
   const latestSettingsRef = useRef(settings);
@@ -253,9 +252,10 @@ export const GenerateSettingsForm = ({
     [onPatchSettings, sendPatchNow]
   );
 
+  // A size reset lands at once, ahead of a pending size edit; on the canvas the frame keeps its centre, as for any size.
   const commitSizeReset = useCallback(
-    (patch: Partial<GenerateSettings>) => sendPatchNow(patch, resetDimensions),
-    [resetDimensions, sendPatchNow]
+    (patch: Partial<GenerateSettings>) => sendPatchNow(patch, onPatchSettings),
+    [onPatchSettings, sendPatchNow]
   );
 
   // The route's own checks on the settings as the form shows them. On a Canvas source the width and height are the

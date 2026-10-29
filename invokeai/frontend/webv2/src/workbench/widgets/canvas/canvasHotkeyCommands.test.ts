@@ -105,6 +105,7 @@ let pasteFromClipboard: Mock<() => void>;
 const contextOf = (overrides: Partial<CanvasHotkeyContext> = {}): CanvasHotkeyContext => ({
   copySelection,
   cropAllLayers: vi.fn(),
+  discardSelectedStagedImage: vi.fn(),
   dispatch,
   reportLayerOperation: vi.fn(),
   reportTransformRefusal: vi.fn(),
@@ -158,8 +159,10 @@ describe('staging precedence', () => {
   });
 
   it('delete discards the selected staged candidate before touching layers', () => {
-    const engine = run('canvas.deleteSelected', { hasSelectedStagedCandidate: true });
-    expect(dispatch).toHaveBeenCalledWith({ type: 'discardSelectedStagedImage' });
+    const discardSelectedStagedImage = vi.fn();
+    const engine = run('canvas.deleteSelected', { discardSelectedStagedImage, hasSelectedStagedCandidate: true });
+    expect(discardSelectedStagedImage).toHaveBeenCalledOnce();
+    expect(dispatch).not.toHaveBeenCalled();
     expect(engine.layers.commitPrepared).not.toHaveBeenCalled();
     expect(engine.selection.eraseSelection).not.toHaveBeenCalled();
   });

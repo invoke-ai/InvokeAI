@@ -1,7 +1,7 @@
 ---
 title: Generate Panel Reference
 description: Every section of the Generate panel in detail — size, render settings, negative prompts, advanced options, resetting to defaults, concepts, reference images and the prompt tools.
-lastUpdated: 2026-10-28
+lastUpdated: 2026-10-29
 sidebar:
   order: 1
 ---
@@ -23,7 +23,9 @@ The **Size** section sets the width and height of the image.
   * **Optimal size for** the current ratio — the model's optimal area at the current aspect ratio. It is absent at 1:1, where it would be the native square.
   * **Model defaults** — the size set in the model's default settings. It appears only when the model sets one.
 
-  Right-clicking the width and height and choosing **Reset to model default** also resets the size this way. On the Canvas, these resets keep the generation frame centered on the same point; typing or dragging a new width or height resizes the frame from its top-left corner. Size resets are not canvas edits, so they do not appear in the canvas's undo history.
+  Right-clicking the width and height and choosing **Reset to model default** also resets the size this way.
+
+When the Canvas is where you generate, the section says *Linked to the canvas frame*: the width, height and aspect lock are the generation frame's, and the frame's aspect lock is this one. Any change here, typed, dragged or reset, resizes the frame around its center, and while the canvas is open that resize is a canvas step, so undoing it on the canvas puts the frame and the size back. Resizing the frame on the canvas changes these fields; a frame you resize freely leaves the ratio **Free** even when it happens to match a preset, so only a ratio you choose or lock holds.
 
 Models produce their best results near their optimal size. Much larger images can show repeated subjects or distorted anatomy. To make a large image, generate at the optimal size and then upscale.
 

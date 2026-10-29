@@ -29,6 +29,8 @@ export interface UndoableNotice {
    * or report, when the target is gone.
    */
   onUndo: () => void;
+  /** The button's label when it brings back something other than the reported action; "Undo" otherwise. */
+  undoLabel?: string;
   /** The project the action changed: Undo is withdrawn once that project is no longer open. */
   projectId?: string;
   /**
@@ -84,13 +86,18 @@ export const useNotify = (): Notify => {
         }
       };
 
-    const undoable = (title: string, { message, onUndo, projectId, supersedes, transient }: UndoableNotice): void => {
+    const undoable = (
+      title: string,
+      { message, onUndo, projectId, supersedes, transient, undoLabel }: UndoableNotice
+    ): void => {
       const undoId = registerNotificationUndo(onUndo, supersedes);
 
       if (commands && !transient) {
         // The center keeps the notice as data; the closure waits in the registry until its toast closes.
         commands.notifications.add({
-          actions: [{ kind: 'undo', undoId, ...(projectId ? { projectId } : {}) }],
+          actions: [
+            { kind: 'undo', undoId, ...(projectId ? { projectId } : {}), ...(undoLabel ? { label: undoLabel } : {}) },
+          ],
           kind: 'success',
           message,
           title,
@@ -102,7 +109,7 @@ export const useNotify = (): Notify => {
 
       createActionToast({
         // Read at call time: only this path needs a translation, and the hook must not suspend or change identity.
-        actions: [{ label: i18next.t('common.undo'), onClick: () => runNotificationUndo(undoId) }],
+        actions: [{ label: undoLabel ?? i18next.t('common.undo'), onClick: () => runNotificationUndo(undoId) }],
         description: message,
         duration: ACTION_TOAST_DURATION_MS,
         onStatusChange: ({ status }) => {

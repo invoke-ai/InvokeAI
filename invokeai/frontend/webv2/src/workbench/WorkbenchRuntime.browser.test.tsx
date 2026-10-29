@@ -19,6 +19,8 @@ const runtimeMocks = vi.hoisted(() => ({ store: null as unknown as WorkbenchInte
 
 vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchInternalStore: () => runtimeMocks.store,
+  // No canvas engine is live here, so a frame resize the runtime asks for stays a plain write.
+  useWorkbenchLiveCanvasEngines: () => ({ commitFrame: () => false }),
   useWorkbenchQueries: () => runtimeMocks.store.queries,
   useWorkbenchSubscription: () => runtimeMocks.store.subscribe,
 }));

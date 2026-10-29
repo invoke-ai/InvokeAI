@@ -4,13 +4,14 @@ import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { Project } from '@workbench/projectContracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
-import { Box, HStack, Menu, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Box, Checkbox, HStack, Menu, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { useModifierHeld } from '@platform/react/useModifierHeld';
 import { Button, IconButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { MenuActionItem, MenuContent } from '@platform/ui/Menu';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
-import { getCanvasEngine } from '@workbench/canvas-operations/api';
+import { getDocumentLeaves } from '@workbench/canvas-engine/api';
+import { getCanvasEngine, isBlankCanvasDocument } from '@workbench/canvas-operations/api';
 import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { useNotify } from '@workbench/useNotify';
 import { getProjectWidgetValues } from '@workbench/widgetState';
@@ -20,7 +21,6 @@ import {
   CheckIcon,
   ChevronDownIcon,
   DatabaseIcon,
-  FilePlusIcon,
   FullscreenIcon,
   MaximizeIcon,
   Redo2Icon,
@@ -39,16 +39,17 @@ import { useModelGridSize } from './bboxGrid';
 import {
   applyFitBbox,
   CANVAS_HEADER_HOTKEYS,
-  confirmNewCanvas as confirmNewCanvasDocument,
   executeCanvasHeaderCommand,
   zoomAtViewportCentre,
 } from './canvasHeaderCommands';
+import { getInFlightCanvasItems } from './canvasRestorePoints';
 import { CANVAS_SNAP_TO_GRID_KEY, canvasSettingsEqual, resolveCanvasSettings } from './canvasSettings';
 import { useCanvasCanRedo, useCanvasCanUndo, useCanvasDocumentEditingLocked, useCanvasZoom } from './engineStoreHooks';
 import { computeFitBboxToLayers, computeFitBboxToMasks } from './fitBbox';
 import { FitFrameToMasksIcon } from './frameIcons';
 import { readCanvasCompositingSettings } from './invoke/canvasCompositing';
 import { useCanvasGallerySave } from './useCanvasGallerySave';
+import { useClearCanvas } from './useCanvasRecovery';
 import { reportStructuralCommit } from './useStructuralCommit';
 import { formatZoomPercent, zoomMenuOptions } from './zoomOptions';
 
@@ -110,12 +111,26 @@ const CanvasHeaderActionsInner = ({
   const maskBlur = useActiveProjectSelector(selectMaskBlur);
 
   const [isNewCanvasOpen, setIsNewCanvasOpen] = useState(false);
+  const [stopGenerations, setStopGenerations] = useState(true);
   const closeNewCanvas = useCallback(() => setIsNewCanvasOpen(false), []);
   const openNewCanvas = useCallback(() => {
     if (!editingLocked) {
+      setStopGenerations(true);
       setIsNewCanvasOpen(true);
     }
-  }, [editingLocked]);
+  }, [editingLocked, setStopGenerations]);
+  const onStopGenerationsChange = useCallback(
+    (details: { checked: boolean | 'indeterminate' }) => setStopGenerations(details.checked === true),
+    []
+  );
+  const clearCanvas = useClearCanvas();
+  const layerCount = getDocumentLeaves(document).length;
+  const stagedCount = useActiveProjectSelector((project) => project.canvas.stagingArea.pendingImages.length);
+  // Nothing to bring back: Clear keeps no restore point, so the dialog does not promise one.
+  const isBlank = stagedCount === 0 && isBlankCanvasDocument(document);
+  const inFlightCount = useActiveProjectSelector(
+    (project) => getInFlightCanvasItems(project.canvas, project.queue.items).length
+  );
 
   const setZoom = (value: number) => zoomAtViewportCentre(engine, value);
 
@@ -142,9 +157,35 @@ const CanvasHeaderActionsInner = ({
 
   const applyFit = (rect: Rect | null, refit: boolean) => applyFitBbox(commandContext(), rect, refit);
 
+  const clearBody = useMemo(
+    () => (
+      <Stack gap="2">
+        <Text>{t('widgets.canvas.controls.clearConfirmLayers', { count: layerCount })}</Text>
+        {stagedCount > 0 ? (
+          <Text>{t('widgets.canvas.controls.clearConfirmStaged', { count: stagedCount })}</Text>
+        ) : null}
+        {isBlank ? null : <Text>{t('widgets.canvas.controls.clearConfirmRestore')}</Text>}
+        {inFlightCount > 0 ? (
+          <>
+            <Text>{t('widgets.canvas.controls.clearConfirmInFlight', { count: inFlightCount })}</Text>
+            <Checkbox.Root checked={stopGenerations} size="sm" onCheckedChange={onStopGenerationsChange}>
+              <Checkbox.HiddenInput />
+              <Checkbox.Control>
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              <Checkbox.Label>{t('widgets.canvas.controls.clearConfirmStop', { count: inFlightCount })}</Checkbox.Label>
+            </Checkbox.Root>
+          </>
+        ) : null}
+      </Stack>
+    ),
+    [inFlightCount, isBlank, layerCount, onStopGenerationsChange, stagedCount, stopGenerations, t]
+  );
+
+  // The lock is the second gate behind the dialog: an operation that started while it was open owns the document.
   const confirmNewCanvas = useCallback(
-    () => confirmNewCanvasDocument({ document, editingLocked, engine }),
-    [document, editingLocked, engine]
+    () => (editingLocked ? undefined : clearCanvas(stopGenerations && inFlightCount > 0)),
+    [clearCanvas, editingLocked, inFlightCount, stopGenerations]
   );
 
   // Register catalog commands once while useEffectEvent reads current fit rects/dialog openers; new-session uses
@@ -303,24 +344,23 @@ const CanvasHeaderActionsInner = ({
         </Portal>
       </Menu.Root>
 
-      <Tooltip content={t('widgets.canvas.controls.clearCanvas')}>
-        <IconButton
-          aria-label={t('widgets.canvas.controls.clearCanvas')}
-          color="fg.muted"
-          disabled={editingLocked}
-          size="sm"
-          variant="ghost"
-          onClick={openNewCanvas}
-        >
-          <FilePlusIcon />
-        </IconButton>
-      </Tooltip>
+      <IconButton
+        aria-label={t('widgets.canvas.controls.clearCanvas')}
+        color="fg.muted"
+        size="sm"
+        tooltip={t('widgets.canvas.controls.clearCanvas')}
+        unavailableReason={editingLocked ? t('widgets.canvas.controls.operationRunning') : undefined}
+        variant="ghost"
+        onClick={openNewCanvas}
+      >
+        <Trash2Icon />
+      </IconButton>
 
       <ConfirmDialog
-        body={t('widgets.canvas.controls.newCanvasConfirm')}
+        body={clearBody}
         confirmLabel={t('widgets.canvas.controls.clearCanvas')}
         isOpen={isNewCanvasOpen}
-        title={t('widgets.canvas.controls.clearCanvas')}
+        title={t('widgets.canvas.controls.clearCanvasTitle')}
         onClose={closeNewCanvas}
         onConfirm={confirmNewCanvas}
       />
@@ -341,7 +381,6 @@ export const CanvasSettingsActions = (_props: WidgetViewProps) => {
 const CanvasSettingsActionsInner = ({ engine }: { engine: CanvasHeaderEngine }) => {
   const { t } = useTranslation();
   const shiftHeld = useModifierHeld('Shift');
-  const editingLocked = useCanvasDocumentEditingLocked(engine);
   if (!shiftHeld) {
     return null;
   }
@@ -357,15 +396,6 @@ const CanvasSettingsActionsInner = ({ engine }: { engine: CanvasHeaderEngine }) 
       <Button variant="ghost" justifyContent="start" onClick={() => engine.diagnostics.logDebugInfo()}>
         <BugIcon />
         {t('widgets.canvas.settings.logDebugInfo')}
-      </Button>
-      <Button
-        disabled={editingLocked}
-        variant="ghost"
-        justifyContent="start"
-        onClick={() => engine.history.clearHistory()}
-      >
-        <Trash2Icon />
-        {t('widgets.canvas.settings.clearHistory')}
       </Button>
     </Stack>
   );

@@ -31,6 +31,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   ChevronUpIcon,
+  CircleStopIcon,
   EyeIcon,
   EyeOffIcon,
   SaveIcon,
@@ -48,8 +49,8 @@ type AutoSwitchMode = CanvasStagingAreaContractV2['autoSwitchMode'];
 const THUMBNAIL_STRIP_HEIGHT = '5rem';
 const MENU_POSITIONING = { placement: 'top-end' } as const;
 /**
- * Below this bar width the "Generating" text and "Discard All" collapse to icons, so the accept split button (the
- * only pointer path to "Keep as Hidden Layer") stays inside the canvas. Measured on the staging slot itself.
+ * Below this bar width the "Generating" text and "Discard all" collapse to icons, so the accept split button (the
+ * only pointer path to "Keep as hidden layer") stays inside the canvas. Measured on the staging slot itself.
  */
 const COMPACT = '@container staging-bar (width < 48rem)';
 /**
@@ -304,14 +305,14 @@ export const StagingBar = ({
 
             {cancelableQueueItemId ? (
               <>
-                {/* Labelled while there is room; an icon with the tooltip once narrow, as Discard All does. */}
+                {/* Labelled while there is room; an icon with the tooltip once narrow, as Discard all does. */}
                 <Button
                   css={NARROW_HIDDEN_CSS}
                   flexShrink="0"
                   variant="ghost"
                   onClick={() => onCancelQueueItem(cancelableQueueItemId)}
                 >
-                  <XIcon />
+                  <CircleStopIcon />
                   {t('common.cancel')}
                 </Button>
                 <Tooltip content={t('common.cancel')}>
@@ -321,7 +322,7 @@ export const StagingBar = ({
                     variant="ghost"
                     onClick={() => onCancelQueueItem(cancelableQueueItemId)}
                   >
-                    <XIcon />
+                    <CircleStopIcon />
                   </IconButton>
                 </Tooltip>
               </>

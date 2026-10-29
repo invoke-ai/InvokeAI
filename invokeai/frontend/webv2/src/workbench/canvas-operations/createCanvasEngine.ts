@@ -7,7 +7,11 @@ import type { GenerationCompositeHost } from '@workbench/canvas-operations/gener
 import type { BackendGraphContract } from '@workbench/graphContracts';
 
 import { galleryDurability } from '@features/gallery';
-import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { createCanvasEngine as createCanvasEngineCore } from '@workbench/canvas-engine/engine';
 import { canvasApplicationPort } from '@workbench/canvas-operations/applicationPort';
 import { isUploadProjectNotFound } from '@workbench/canvas-operations/backend/canvasImages';
@@ -19,6 +23,7 @@ import { controlTypeForDetector } from '@workbench/controlTypes';
 import type { CanvasOperationCapability, CanvasOperationImplementation } from './contracts';
 
 import { attachCanvasOperations } from './operationAccess';
+import { bindCanvasToolMemory, type CanvasToolMemoryPort } from './toolMemory';
 
 export interface CanvasEngineOptions extends Omit<
   CoreCanvasEngineOptions,
@@ -32,6 +37,8 @@ export interface CanvasEngineOptions extends Omit<
   getMainModelBase?: () => string | null;
   /** The account's Select Object Auto Process preference; the widget layer injects the settings read. */
   readSelectObjectAutoProcess?: () => boolean;
+  /** Where the account keeps brush, eraser, shape and text options; the engine starts from them and saves changes. */
+  toolMemory?: CanvasToolMemoryPort;
   selectObjectDeps?: {
     uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ height: number; imageName: string; width: number }>;
     runGraph(options: {
@@ -78,6 +85,7 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     filterDeps,
     readSelectObjectAutoProcess,
     selectObjectDeps,
+    toolMemory,
     ...coreOptions
   } = options;
   const owner = captureAccountScope();
@@ -393,12 +401,26 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     },
   };
 
+  // Saves are dropped once the account changed: the engine outlives it only until the registry disposes it.
+  const toolMemoryBinding = toolMemory
+    ? bindCanvasToolMemory(core.stores, {
+        read: () => toolMemory.read(),
+        ...(toolMemory.subscribe ? { subscribe: toolMemory.subscribe } : {}),
+        write: (changed) => {
+          if (isAccountScopeCurrent(owner)) {
+            toolMemory.write(changed);
+          }
+        },
+      })
+    : null;
+
   let disposed = false;
   const disposeOperations = (): void => {
     if (disposed) {
       return;
     }
     disposed = true;
+    toolMemoryBinding?.dispose();
     uploadLifetime.abort();
     host.setSamInputHandler(null);
     host.setEscapeHandler(null);

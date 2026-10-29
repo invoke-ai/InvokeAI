@@ -334,6 +334,12 @@ export interface CanvasDocumentCapability {
   captureRestoreAnchor(nodeId: string): CanvasNodeInsertionAnchor | null;
   /** Swaps in a whole new document; the mirror treats it as a document swap and history clears. */
   replaceDocument(document: CanvasDocumentContractV3): boolean;
+  /**
+   * Restores one of the canvas's restore points, a document swap like `replaceDocument` (a Discard all point only
+   * re-stages its results). `keepCurrentAs` keeps the replaced canvas as a point in its place. False when nothing
+   * changed.
+   */
+  restoreSnapshot(snapshotId: string, keepCurrentAs?: { id: string; name: string; createdAt: string }): boolean;
   /** The pure model over the current document; the same instance until the document changes. */
   model(): CanvasDocumentModel | null;
 }
@@ -376,6 +382,13 @@ export interface CanvasHistoryEntries {
   past: readonly string[];
   /** Undone steps, next-redo first. */
   future: readonly string[];
+  /** The oldest steps dropped to stay within the history's entry cap or memory budget since it was last cleared. */
+  evicted: number;
+  /**
+   * Present while nonzero: the steps this canvas's previous engine held when it was disposed, which this one could
+   * not take over. Cleared with the history (Clear history, a document swap).
+   */
+  dropped?: number;
 }
 
 /**
@@ -402,12 +415,27 @@ export interface CanvasHistoryCapability {
 export type ColorSamplePhase = 'preview' | 'commit' | 'cancel';
 
 /**
+ * A tool press the selected layer cannot take, named so the notice can say which layer and why: it is hidden (disabled,
+ * itself or through a group), locked, has its transparency locked against the eraser, or its pixels have not loaded
+ * yet (the engine has started loading them; the next press can edit).
+ */
+export interface CanvasLayerEditRefusal {
+  readonly status: 'layer-hidden' | 'layer-locked' | 'layer-alpha-locked' | 'layer-loading';
+  readonly layerId: string;
+  readonly layerName: string;
+  /** The brush would have painted this image layer in place; a new paint layer above it can take the stroke. */
+  readonly canPaintNewLayer?: boolean;
+}
+
+/**
  * Why the engine refused an edit the user started without a caller to report to (a stroke, a shape). An
- * `AdjustmentRefusal` names a layer whose spatial adjustments cannot run, so its pixels cannot be baked for painting.
+ * `AdjustmentRefusal` names a layer whose spatial adjustments cannot run, so its pixels cannot be baked for painting;
+ * a `CanvasLayerEditRefusal` names a layer the active tool cannot edit.
  */
 export type CanvasEditRefusal =
   | SubsetOf<CanvasTransactionOutcome, 'busy' | 'gesture-active' | 'not-ready' | 'over-budget'>
-  | AdjustmentRefusal;
+  | AdjustmentRefusal
+  | CanvasLayerEditRefusal;
 
 export type LayerThumbnailRequestResult =
   | 'ready'
@@ -996,3 +1024,4 @@ export {
   resolveLayerThumbnailImageRef,
   type LayerThumbnailFallbackStage,
 } from './render/thumbnail';
+export { HISTORY_MAX_ENTRIES } from './history/history';

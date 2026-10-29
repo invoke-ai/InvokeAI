@@ -32,6 +32,7 @@ import {
   CopyIcon,
   CropIcon,
   DropletIcon,
+  EyeClosedIcon,
   EyeIcon,
   FilmIcon,
   FingerprintPatternIcon,
@@ -961,43 +962,45 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     section: 'output',
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
+  // One visibility model: hiding a layer takes it off the canvas and out of generation alike.
   {
-    defaultLabel: 'Enable/disable',
+    defaultLabel: 'Show or hide layer',
     getDefaultLabel: (context) =>
       isMultiTarget(context)
         ? allTargetsEnabled(context)
-          ? 'Disable selected'
-          : 'Enable selected'
+          ? 'Hide selected'
+          : 'Show selected'
         : context.layer.isEnabled
-          ? 'Disable layer'
-          : 'Enable layer',
-    getIcon: (context) => (allTargetsEnabled(context) ? CircleOffIcon : CircleIcon),
+          ? 'Hide layer'
+          : 'Show layer',
+    getIcon: (context) => (allTargetsEnabled(context) ? EyeOffIcon : EyeIcon),
     getLabelKey: (context) =>
       isMultiTarget(context)
         ? allTargetsEnabled(context)
-          ? 'widgets.layers.actions.disableSelected'
-          : 'widgets.layers.actions.enableSelected'
+          ? 'widgets.layers.actions.hideSelected'
+          : 'widgets.layers.actions.showSelected'
         : context.layer.isEnabled
-          ? 'widgets.layers.actions.disableLayer'
-          : 'widgets.layers.actions.enableLayer',
+          ? 'widgets.layers.actions.hideLayer'
+          : 'widgets.layers.actions.showLayer',
     handler: ({ effects }) => effects.toggleVisibility(),
-    icon: CircleIcon,
+    icon: EyeOffIcon,
     id: 'toggle-visibility',
     isEnabled: isInteractionFree,
     isVisible: alwaysVisible,
-    labelKey: 'widgets.layers.actions.toggleVisibility',
+    labelKey: 'widgets.layers.actions.toggleActive',
     order: 0,
     section: 'state',
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
+  // Overlays only: off the canvas to see the image under them, still used by generation.
   {
-    defaultLabel: 'Show/hide layer',
-    getDefaultLabel: (context) => (isNodeHidden(context.layer) ? 'Show layer' : 'Hide layer'),
-    getIcon: (context) => (isNodeHidden(context.layer) ? EyeIcon : EyeOffIcon),
+    defaultLabel: 'Hide on canvas only',
+    getDefaultLabel: (context) => (isNodeHidden(context.layer) ? 'Show on canvas' : 'Hide on canvas only'),
+    getIcon: (context) => (isNodeHidden(context.layer) ? EyeIcon : EyeClosedIcon),
     getLabelKey: (context) =>
-      isNodeHidden(context.layer) ? 'widgets.layers.actions.showLayer' : 'widgets.layers.actions.hideLayer',
+      isNodeHidden(context.layer) ? 'widgets.layers.actions.showOnCanvas' : 'widgets.layers.actions.hideOnCanvas',
     handler: ({ effects }) => effects.toggleHidden(),
-    icon: EyeOffIcon,
+    icon: EyeClosedIcon,
     id: 'toggle-hidden',
     isEnabled: (context) => isInteractionFree(context) && !context.hiddenByAncestor,
     isVisible: (context) => isHideableLayer(context.layer),

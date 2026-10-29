@@ -577,8 +577,11 @@ type WorkbenchReducerAction =
       type: 'cancelQueueItem';
       queueItemId: string;
       projectId?: string;
-      /** Replaces the generic cancellation notice when the caller knows why the run stopped. */
-      notice?: { title: string; message: string };
+      /**
+       * Replaces the generic cancellation notice when the caller knows why the run stopped; `null` when the caller
+       * reports the stop in a notice of its own.
+       */
+      notice?: { title: string; message: string } | null;
     }
   /** Cancels this tab's runs the backend has not accepted, in one project or every open one. */
   | { type: 'cancelUnsubmittedQueueItems'; projectId?: string }
@@ -1368,7 +1371,13 @@ const cloneCanvas = (canvas: CanvasStateContractV3): CanvasStateContractV3 => {
     version: canvas.version,
     document,
     documentRevision: canvas.documentRevision,
-    snapshots: canvas.snapshots.map((snapshot) => ({ ...snapshot, document: structuredClone(snapshot.document) })),
+    snapshots: canvas.snapshots.map((snapshot) => ({
+      ...snapshot,
+      document: structuredClone(snapshot.document),
+      ...(snapshot.stagedImages
+        ? { stagedImages: snapshot.stagedImages.map((image) => normalizeStagingCandidate(image, snapshot.document)) }
+        : {}),
+    })),
     stagingArea: {
       ...canvas.stagingArea,
       pendingImageIds: [...(canvas.stagingArea?.pendingImageIds ?? [])],
@@ -5996,7 +6005,7 @@ const reduceWorkbenchAction = (
         return clampCanvasStagingSelection(nextProject, previousSelectedSlot);
       });
 
-      if (!targetProject || !queueItem || !canCancelQueueItem) {
+      if (!targetProject || !queueItem || !canCancelQueueItem || action.notice === null) {
         return nextState;
       }
 

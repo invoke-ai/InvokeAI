@@ -5,6 +5,7 @@ import {
   type CanvasLayerCapability,
   type Rect,
 } from '@workbench/canvas-engine/api';
+import { resizeBboxAroundCentre } from '@workbench/canvasDimsSync';
 import { useBboxGrid, useBboxOptions } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useCallback } from 'react';
@@ -43,7 +44,7 @@ export const useBboxEditor = (engine: BboxEditorEngine) => {
         options.aspectLocked && options.aspectRatio > 0
           ? Math.max(1, Math.round(width / options.aspectRatio))
           : bbox.height;
-      commitBbox({ height, width, x: bbox.x, y: bbox.y });
+      commitBbox(resizeBboxAroundCentre(bbox, { height, width }));
     },
     [bbox, commitBbox, grid, options.aspectLocked, options.aspectRatio]
   );
@@ -55,7 +56,7 @@ export const useBboxEditor = (engine: BboxEditorEngine) => {
         options.aspectLocked && options.aspectRatio > 0
           ? Math.max(1, Math.round(height * options.aspectRatio))
           : bbox.width;
-      commitBbox({ height, width, x: bbox.x, y: bbox.y });
+      commitBbox(resizeBboxAroundCentre(bbox, { height, width }));
     },
     [bbox, commitBbox, grid, options.aspectLocked, options.aspectRatio]
   );

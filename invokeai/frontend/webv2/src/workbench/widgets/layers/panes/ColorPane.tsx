@@ -370,37 +370,51 @@ const ChannelFields = ({
     [activeHex, format, hsv, onCommitHex, onCommitHsv]
   );
 
+  const nextFormat = COLOR_PICKER_FORMATS[(COLOR_PICKER_FORMATS.indexOf(format) + 1) % COLOR_PICKER_FORMATS.length]!;
+
+  // The hex value stays in every format, so the code a person types or copies is always one field away.
   return (
-    <Flex gap="1" wrap="wrap">
-      <chakra.button
-        aria-label={t('widgets.layers.colorPane.format', { format: format.toUpperCase() })}
-        color="fg.muted"
-        flexShrink={0}
-        fontSize="xs"
-        fontWeight="700"
-        px="1.5"
-        rounded="sm"
-        textTransform="uppercase"
-        type="button"
-        _hover={FORMAT_HOVER_PROPS}
-        onClick={cycleFormat}
-      >
-        {format}
-      </chakra.button>
-      {format === 'hex' ? (
+    <Stack gap="1">
+      {/* The format switch follows the field, so it never reads as the field's label. */}
+      <Flex gap="1">
         <HexField hex={activeHex} onCommit={onCommitHex} />
-      ) : (
-        CHANNEL_KEYS[format].map((key, index) => (
-          <ChannelNumber
-            key={`${format}:${key}`}
-            index={index}
-            label={t(`widgets.layers.colorPane.channels.${key}`)}
-            value={channelValues[format][index]!}
-            onCommit={commitChannel}
-          />
-        ))
+        <Tooltip
+          content={t('widgets.layers.colorPane.formatTooltip', {
+            format: format.toUpperCase(),
+            next: nextFormat.toUpperCase(),
+          })}
+        >
+          <chakra.button
+            aria-label={t('widgets.layers.colorPane.format', { format: format.toUpperCase() })}
+            color="fg.muted"
+            flexShrink={0}
+            fontSize="xs"
+            fontWeight="700"
+            px="1.5"
+            rounded="sm"
+            textTransform="uppercase"
+            type="button"
+            _hover={FORMAT_HOVER_PROPS}
+            onClick={cycleFormat}
+          >
+            {format}
+          </chakra.button>
+        </Tooltip>
+      </Flex>
+      {format === 'hex' ? null : (
+        <Flex gap="1" wrap="wrap">
+          {CHANNEL_KEYS[format].map((key, index) => (
+            <ChannelNumber
+              key={`${format}:${key}`}
+              index={index}
+              label={t(`widgets.layers.colorPane.channels.${key}`)}
+              value={channelValues[format][index]!}
+              onCommit={commitChannel}
+            />
+          ))}
+        </Flex>
       )}
-    </Flex>
+    </Stack>
   );
 };
 

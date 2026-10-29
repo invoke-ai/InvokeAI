@@ -66,12 +66,25 @@ export interface CanvasHeldAssetRefs {
   readonly videos: readonly string[];
 }
 
-/** What a live Canvas engine holds beyond the document: media its undo state retains, and unsaved pixels. */
+/** A generation-frame rect, in document pixels. */
+export interface CanvasFrameRect {
+  readonly height: number;
+  readonly width: number;
+  readonly x: number;
+  readonly y: number;
+}
+
+/**
+ * What a live Canvas engine holds beyond the document: media its undo state retains and unsaved pixels; and the one
+ * edit a Workbench runtime records into its undo history, a frame resize Generate's size asked for.
+ */
 export interface LiveCanvasEngine {
   heldAssets(): CanvasHeldAssetRefs;
   subscribe(listener: () => void): () => void;
   /** Persists the engine's unsaved pixels into the document; rejects when they cannot be saved. */
   flushPendingPixels(): Promise<void>;
+  /** Moves the frame from `from` to `to` as one undoable canvas step named `label`; false when it was refused. */
+  commitFrame(from: CanvasFrameRect, to: CanvasFrameRect, label: string): boolean;
 }
 
 /** One mounted Workbench's live Canvas engines, each registered for as long as its undo state survives. */
@@ -81,6 +94,8 @@ export interface LiveCanvasEngines {
   subscribe(listener: () => void): () => void;
   /** Crosses the project's paint barrier; a project without a live engine has nothing unsaved. */
   flushPendingPixels(projectId: string): Promise<void>;
+  /** Records a frame resize in the project's canvas history; false without a live engine, or when it refused. */
+  commitFrame(projectId: string, from: CanvasFrameRect, to: CanvasFrameRect, label: string): boolean;
 }
 
 export const createLiveCanvasEngines = (): LiveCanvasEngines => {
@@ -88,6 +103,7 @@ export const createLiveCanvasEngines = (): LiveCanvasEngines => {
   const listeners = new Set<() => void>();
   const notify = (): void => listeners.forEach((listener) => listener());
   return {
+    commitFrame: (projectId, from, to, label) => sources.get(projectId)?.commitFrame(from, to, label) ?? false,
     flushPendingPixels: (projectId) => sources.get(projectId)?.flushPendingPixels() ?? Promise.resolve(),
     heldAssets: (projectId) => sources.get(projectId)?.heldAssets(),
     register: (projectId, source) => {

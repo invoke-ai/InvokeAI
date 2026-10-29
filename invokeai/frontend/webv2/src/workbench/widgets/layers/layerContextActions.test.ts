@@ -941,15 +941,25 @@ describe('getLayerContextActions', () => {
   });
 });
 
+describe('toggle-visibility', () => {
+  it('hides and shows the layer itself, the one visibility that generation also follows', () => {
+    const shown = getLayerContextActions(makeState(rasterLayer));
+    expect(byId(shown, 'toggle-visibility').labelKey).toBe('widgets.layers.actions.hideLayer');
+    expect(getEnglishTranslation('widgets.layers.actions.hideLayer')).toBe('Hide layer');
+    const off = getLayerContextActions(makeState({ ...rasterLayer, isEnabled: false }));
+    expect(byId(off, 'toggle-visibility').labelKey).toBe('widgets.layers.actions.showLayer');
+  });
+});
+
 describe('toggle-hidden', () => {
   it('offers hide-on-canvas to overlay layers only and yields to a hiding ancestor', () => {
     expect(idsFor(rasterLayer)).not.toContain('toggle-hidden');
     const control = getLayerContextActions(makeState(nonEmptyControlLayer));
     expect(byId(control, 'toggle-hidden').isDisabled).toBe(false);
-    expect(byId(control, 'toggle-hidden').labelKey).toBe('widgets.layers.actions.hideLayer');
-    expect(getEnglishTranslation('widgets.layers.actions.hideLayer')).toBe('Hide layer');
+    expect(byId(control, 'toggle-hidden').labelKey).toBe('widgets.layers.actions.hideOnCanvas');
+    expect(getEnglishTranslation('widgets.layers.actions.hideOnCanvas')).toBe('Hide on canvas only');
     const hidden = getLayerContextActions(makeState({ ...nonEmptyControlLayer, isHidden: true }));
-    expect(byId(hidden, 'toggle-hidden').labelKey).toBe('widgets.layers.actions.showLayer');
+    expect(byId(hidden, 'toggle-hidden').labelKey).toBe('widgets.layers.actions.showOnCanvas');
     const gated = getLayerContextActions(makeState(nonEmptyControlLayer, { hiddenByAncestor: true }));
     expect(byId(gated, 'toggle-hidden').isDisabled).toBe(true);
     const runtime = makeRuntimeContext(nonEmptyControlLayer);

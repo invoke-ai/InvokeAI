@@ -10,7 +10,6 @@ import {
   createCanvasInteractionLockReader,
   isCanvasInteractionLocked,
   isCanvasStagingActive,
-  isCanvasToolEnabled,
 } from './canvasInteractionLock';
 
 const createStagedCandidate = (): CanvasStagingCandidateContract => ({
@@ -236,19 +235,5 @@ describe('canvas interaction lock', () => {
     expect(isCanvasStagingActive({ hasStagedCandidates: true, isCanvasGenerationInFlight: false })).toBe(true);
     expect(isCanvasStagingActive({ hasStagedCandidates: false, isCanvasGenerationInFlight: true })).toBe(true);
     expect(isCanvasStagingActive({ hasStagedCandidates: false, isCanvasGenerationInFlight: false })).toBe(false);
-  });
-
-  it('allows only the view tool while staging locks canvas interactions', () => {
-    expect(isCanvasToolEnabled('view', true)).toBe(true);
-    expect(isCanvasToolEnabled('bbox', true)).toBe(false);
-    expect(isCanvasToolEnabled('brush', true)).toBe(false);
-    expect(isCanvasToolEnabled('move', true)).toBe(false);
-    expect(isCanvasToolEnabled('colorPicker', true)).toBe(false);
-  });
-
-  it('allows all tools when staging is inactive', () => {
-    expect(isCanvasToolEnabled('bbox', false)).toBe(true);
-    expect(isCanvasToolEnabled('brush', false)).toBe(true);
-    expect(isCanvasToolEnabled('colorPicker', false)).toBe(true);
   });
 });
