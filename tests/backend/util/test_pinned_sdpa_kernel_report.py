@@ -120,10 +120,34 @@ def _qkv(*shape: int, dtype: torch.dtype = torch.float32, device: str = "cpu") -
     return torch.randn(*shape, dtype=dtype, device=device)
 
 
+class TestCpuAttention:
+    """The ranking never applies on the CPU, so a CPU-only install, or CPU attention on a GPU install, is not reported
+    on -- and not asked about, which costs the dispatcher query."""
+
+    def test_attention_on_the_cpu_is_not_asked_about(self, pin, caplog, monkeypatch):
+        pin(SDPBackend.CUDNN_ATTENTION)
+        asked: list[str] = []
+        monkeypatch.setattr(attention, "sdpa_backend_choice", lambda query, *args, **kwargs: asked.append("asked"))
+        q = _qkv(1, 2, 8, 16)
+
+        with caplog.at_level(logging.WARNING, logger=LOGGER), attention_caller("flux_denoise"):
+            out = F.scaled_dot_product_attention(q, q, q)
+
+        assert asked == []
+        assert _reports(caplog) == []
+        assert torch.equal(out, TORCH_SDPA(q, q, q))
+
+
 class TestOnCpu:
-    """Which kernel torch's CPU dispatcher gives a call changes between releases -- torch 2.14's flash takes 3-D
+    """The report's decisions, run on the CPU standing in for a reported GPU device.
+
+    Which kernel torch's CPU dispatcher gives a call changes between releases -- torch 2.14's flash takes 3-D
     inputs and 2.13's does not, 2.7's refuses grouped-query calls -- so these force the serving kernel: math takes every
     call, so an exclusive math window makes it serve on any torch. Where flash has to serve, torch is asked first."""
+
+    @pytest.fixture(autouse=True)
+    def _cpu_stands_in_for_a_gpu(self, monkeypatch):
+        monkeypatch.setattr(attention, "_REPORTED_DEVICE_TYPES", frozenset({"cpu", "cuda", "xpu"}))
 
     def test_each_node_type_is_reported_once(self, pin, caplog):
         pin(SDPBackend.CUDNN_ATTENTION)
@@ -220,21 +244,6 @@ class TestOnCpu:
         assert torch.equal(out, unreported)
         assert [r.exc_info is not None for r in caplog.records if r.levelno == logging.WARNING] == [True], "said once"
         attention._warn_pinned_report_failed.cache_clear()
-
-    def test_a_device_the_dispatcher_cannot_answer_for_is_not_asked(self, pin, caplog, monkeypatch):
-        """On MPS the dispatcher query raises, at 79us a call. CPU stands in for such a device here."""
-        pin(SDPBackend.CUDNN_ATTENTION)
-        monkeypatch.setattr(attention, "_DISPATCHER_DEVICE_TYPES", frozenset({"cuda", "xpu"}))
-        asked: list[str] = []
-        monkeypatch.setattr(attention, "sdpa_backend_choice", lambda query, *args, **kwargs: asked.append("asked"))
-        q = _qkv(1, 2, 8, 16)
-
-        with caplog.at_level(logging.WARNING, logger=LOGGER):
-            out = F.scaled_dot_product_attention(q, q, q)
-
-        assert asked == []
-        assert _reports(caplog) == []
-        assert torch.equal(out, TORCH_SDPA(q, q, q))
 
     @pytest.mark.skipif(not torch.backends.mps.is_available(), reason="needs Apple Silicon")
     def test_attention_on_mps_is_not_asked_about(self, pin, caplog, monkeypatch):
@@ -345,6 +354,16 @@ class TestAtStartup:
             f"attention_backend '{backend}': {missing}, so GPU attention runs on the next kernel in that order. "
             "`attention_backend: auto` is the default."
         ]
+
+    @pytest.mark.parametrize("value", sorted(PINNED_BY_VALUE))
+    def test_pinning_math_warns_that_working_memory_does_not_cover_it(self, startup, caplog, value):
+        """Most estimators reserve nothing for the score matrix the math kernel builds."""
+        with caplog.at_level(logging.WARNING, logger=LOGGER):
+            startup(value)
+            attention.install_pinned_sdpa_kernel_report(PINNED_BY_VALUE[value])
+
+        warnings = [message for message in _reports(caplog) if "working-memory estimates" in message]
+        assert len(warnings) == (1 if value == "math" else 0)
 
     @pytest.mark.skipif(not torch.cuda.is_available(), reason="only a machine with a CUDA device can create a context")
     def test_pinning_a_kernel_at_startup_creates_no_cuda_context(self):

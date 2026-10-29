@@ -639,9 +639,11 @@ _pinned_reports_dropped = False
 _PINNED_REPORTS_LOCK = threading.Lock()
 # (device, kernel) -> whether the kernel serves a plain call on that GPU at all, asked once per GPU.
 _plain_call_served: dict[tuple[str, SDPBackend], bool] = {}
-# The device types torch registers `_fused_sdp_choice` for. On any other -- MPS -- the query raises, with about 7.7 KB
-# of message and 79us a call (measured on CPU for an equally raising query), so the report does not ask there.
-_DISPATCHER_DEVICE_TYPES = frozenset({"cpu", "cuda", "xpu"})
+# The device types the report asks about. torch registers `_fused_sdp_choice` for these and the CPU; on any other --
+# MPS -- the query raises, with about 7.7 KB of message and 79us a call (measured on CPU for an equally raising query).
+# The CPU is left out because the ranking never applies there: on a CPU-only install, or for CPU attention on a GPU
+# install, every node type would be reported with nothing to act on.
+_REPORTED_DEVICE_TYPES = frozenset({"cuda", "xpu"})
 
 
 def install_pinned_sdpa_kernel_report(pinned: SDPBackend) -> None:
@@ -654,8 +656,7 @@ def install_pinned_sdpa_kernel_report(pinned: SDPBackend) -> None:
     (node type from `attention_caller`, pinned kernel, kernel that serves the call, reason), and the call runs
     unchanged. The reasons are torch's answers, not a reimplementation of its eligibility rules:
 
-    * The tensors are not on a CUDA or ROCm GPU. torch picks those kernels without the ranking: on the CPU, flash
-      wherever it can and math otherwise.
+    * The tensors are on an XPU, where torch picks the kernel without the ranking.
     * The pinned kernel's enable flag is off, as inside an exclusive window such as ``INVOKE_KREA2_SDPA_BACKEND``'s.
     * The kernel serves no plain call on this GPU at all -- flash in Windows CUDA builds, cuDNN on ROCm. Asked once per
       GPU, with torch's ``can_use_*`` check on an fp16, unmasked, head_dim 64 call.
@@ -664,7 +665,8 @@ def install_pinned_sdpa_kernel_report(pinned: SDPBackend) -> None:
     * Otherwise the kernel cannot serve this call. The warning lists the call's properties, and then torch's own check
       runs once in debug mode, which prints torch's exact reason to stderr (as C++ warnings, not Python ones).
 
-    A call on a device the dispatcher cannot answer for -- MPS -- is not asked about at all, and one it names no kernel
+    A call on the CPU, where torch picks the kernel without the ranking (flash wherever it can, math otherwise), or on a
+    device the dispatcher cannot answer for -- MPS -- is not asked about at all, and one it names no kernel
     for, which inside an exclusive window can happen, is not reported. At most ``_MAX_PINNED_REPORTS`` reports are
     kept.
 
@@ -729,6 +731,13 @@ def install_pinned_sdpa_kernel_report(pinned: SDPBackend) -> None:
             f"attention_backend '{_PINNED_NAMES[pinned]}': {missing}, so GPU attention runs on the next kernel in "
             "that order. `attention_backend: auto` is the default."
         )
+    if pinned == SDPBackend.MATH:
+        logger.warning(
+            "attention_backend 'math' is a debugging mode: the math kernel materializes the full attention score "
+            "matrix, and the working-memory estimates of most model families do not include it, so generations may "
+            "run out of memory. On ROCm the SDPA guard splits large non-causal math-kernel calls into bounded chunks. "
+            "`attention_backend: auto` is the default."
+        )
 
 
 def _build_lacks_kernel(kernel: SDPBackend) -> str | None:
@@ -767,7 +776,7 @@ def _report_unpinned_call(
     global _pinned_reports_dropped
 
     device_type = query.device.type
-    if device_type not in _DISPATCHER_DEVICE_TYPES:
+    if device_type not in _REPORTED_DEVICE_TYPES:
         return
     if guarded and rocm_sdpa_uses_math_kernel(device_type, query.shape[-1]):
         if pinned == SDPBackend.MATH:

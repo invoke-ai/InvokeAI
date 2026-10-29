@@ -212,6 +212,8 @@ attention_backend: cudnn
 | `efficient` | Memory-efficient attention.                                                                                                           |
 | `math`      | PyTorch's unfused fallback. It builds the full attention score matrix, so it is much slower and needs far more memory. For debugging. |
 
+The working-memory estimates of most model families do not include the score matrix `math` builds, so with `math` generations can run out of memory; startup logs a warning saying so.
+
 A pinned kernel is never exclusive. A call it cannot serve — the build or GPU has no such kernel, or the call's precision, head size, mask or grouped-query heads rule it out — runs on the next kernel of the default order, and the log says so once per node type and reason:
 
 ```
