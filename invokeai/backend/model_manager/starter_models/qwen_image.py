@@ -206,3 +206,12 @@ qwen_image_fun_controlnet_union = StarterModel(
     "control images, plus inpainting. Works best at weights 0.70-0.95. Apache-2.0. ~3.5GB",
     type=ModelType.ControlNet,
 )
+qwen_image_instantx_controlnet_union = StarterModel(
+    name="Qwen Image InstantX ControlNet Union",
+    base=BaseModelType.QwenImage,
+    source="https://huggingface.co/Comfy-Org/Qwen-Image-InstantX-ControlNets/resolve/main/split_files/controlnet/Qwen-Image-InstantX-ControlNet-Union.safetensors",
+    description="InstantX's ControlNet for Qwen Image supporting Canny, Soft Edge, Depth and Pose control images; "
+    "no inpainting. Trained on the original Qwen Image: on Qwen Image 2512 use weights of about 1.5-2.0. Apache-2.0. "
+    "~3.5GB",
+    type=ModelType.ControlNet,
+)
