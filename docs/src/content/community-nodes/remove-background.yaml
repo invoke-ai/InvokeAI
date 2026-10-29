@@ -1,0 +1,9 @@
+title: Remove Background
+author: VeyDlin
+repo: https://github.com/VeyDlin/remove-background-node
+summary: Remove image backgrounds with the rembg package and several U2NET models.
+categories: [masks]
+thumbnail: ./remove-background.webp
+images:
+  - src: https://raw.githubusercontent.com/VeyDlin/remove-background-node/master/.readme/node.png
+    alt: The Remove Background node

@@ -15,7 +15,8 @@
     "src/features/video/core/__snapshots__/videoGraphNodeTypes.json",
     "src/features/upscale/core/__snapshots__/upscaleGraphNodeTypes.json",
     "src/features/upscale/core/__snapshots__/upscaleIndexClippedStarts.json",
-    "src/features/generation/core/__fixtures__/architectureCapabilities.json"
+    "src/features/generation/core/__fixtures__/architectureCapabilities.json",
+    "src/workbench/palette/docsSearchIndex.json"
   ],
   "printWidth": 120,
   "semi": true,

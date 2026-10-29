@@ -1,0 +1,30 @@
+title: Thresholding
+author: JPPhoto
+repo: https://github.com/JPPhoto/thresholding-node
+summary: Masks for the highlights, midtones and shadows of an image.
+description: >-
+  You can blur the lookup table used to make the masks from the source image.
+categories: [masks]
+thumbnail: ./thresholding.webp
+images:
+  - src: https://github.com/invoke-ai/InvokeAI/assets/34005131/c88ada13-fb3d-484c-a4fe-947b44712632
+    alt: The input image
+    caption: Input
+  - src: https://github.com/invoke-ai/InvokeAI/assets/34005131/727021c1-36ff-4ec8-90c8-105e00de986d
+    alt: Highlights mask
+    caption: Highlights
+  - src: https://github.com/invoke-ai/InvokeAI/assets/34005131/0b721bfc-f051-404e-b905-2f16b824ddfe
+    alt: Midtones mask
+    caption: Midtones
+  - src: https://github.com/invoke-ai/InvokeAI/assets/34005131/04c1297f-1c88-42b6-a7df-dd090b976286
+    alt: Shadows mask
+    caption: Shadows
+  - src: https://github.com/invoke-ai/InvokeAI/assets/34005131/19aa718a-70c1-4668-8169-d68f4bd13771
+    alt: Highlights mask with the lookup table blurred
+    caption: Highlights, LUT blur on
+  - src: https://github.com/invoke-ai/InvokeAI/assets/34005131/0a440e43-697f-4d17-82ee-f287467df0a5
+    alt: Midtones mask with the lookup table blurred
+    caption: Midtones, LUT blur on
+  - src: https://github.com/invoke-ai/InvokeAI/assets/34005131/0701fd0f-2ca7-4fe2-8613-2b52547bafce
+    alt: Shadows mask with the lookup table blurred
+    caption: Shadows, LUT blur on

@@ -1,0 +1,66 @@
+---
+import ArrowLeft from '@lucide/astro/icons/arrow-left';
+import ArrowRight from '@lucide/astro/icons/arrow-right';
+
+const { dir, pagination } = Astro.locals.starlightRoute;
+const { prev, next } = pagination;
+---
+
+{
+  (prev || next) && (
+    <div class="pagination-links print:hidden" dir={dir}>
+      {prev && (
+        <a class="docs-link-card" href={prev.href} rel="prev">
+          <span class="label docs-link-card__description">
+            <ArrowLeft class="docs-link-card__icon" size={14} />
+            {Astro.locals.t('page.previousLink')}
+          </span>
+          <span class="docs-link-card__title">{prev.label}</span>
+        </a>
+      )}
+      {next && (
+        <a class="docs-link-card" href={next.href} rel="next">
+          <span class="label docs-link-card__description">
+            {Astro.locals.t('page.nextLink')}
+            <ArrowRight class="docs-link-card__icon" size={14} />
+          </span>
+          <span class="docs-link-card__title">{next.label}</span>
+        </a>
+      )}
+    </div>
+  )
+}
+
+<style>
+  .pagination-links {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+    gap: 0.75rem;
+    margin-top: 2rem;
+
+    /* Starlight's `print:hidden` loses to this rule's display, so hide it in print here. */
+    @media print {
+      display: none;
+    }
+  }
+
+  /* The card itself is the shared `.docs-link-card` (custom.css); this lays out its label row and title. */
+  a {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    overflow-wrap: anywhere;
+  }
+
+  [rel='next'] {
+    grid-column: -2;
+    align-items: flex-end;
+    text-align: end;
+  }
+
+  .label {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+</style>

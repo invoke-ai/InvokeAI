@@ -1,0 +1,399 @@
+---
+// A weekly challenge's winners, each frame its image's shape. On wide screens the numbered places stand in one centred
+// row, bottoms aligned like a podium: the lead (1st, unless a winner was removed) tallest, lower places shorter, tied
+// places at one height (see `podiumLayout`). Runners-up and honourable mentions follow in centred rows of shorter
+// frames at one height. On phones the lead spans the column; lower places and mentions sit two to a row at one height
+// per row, a lone lower place spanning it. Every image shows whole and links to its largest size. The place is a text
+// badge.
+import type { CollectionEntry } from 'astro:content';
+import { getImage, Image } from 'astro:assets';
+
+import { frameAspect, pairSpans, placeLabel, podiumLayout, winnerAlt } from '../challenges.mjs';
+
+type Props = {
+  challenge: CollectionEntry<'challenges'>;
+  /**
+   * Images in view when the page opens, which load eagerly: `lead`, the top-placed image (with high priority), or
+   * `podium`, every numbered place. The rest load lazily.
+   */
+  eager?: 'lead' | 'podium';
+};
+
+const { challenge, eager } = Astro.props;
+const { theme, winners } = challenge.data;
+// The schema keeps winners in display order, numbered places first, and requires a numbered place.
+const podium = winners.filter(({ place }) => typeof place === 'number');
+const mentions = winners.filter(({ place }) => typeof place !== 'number');
+const { frames, span, mentionScale } = podiumLayout(podium);
+const leadPlace = podium[0].place;
+const sideCount = podium.filter(({ place }) => place !== leadPlace).length;
+
+const maxWidth = 2400;
+/** Candidate widths up to the image's own. */
+const widthsUpTo = (candidates: number[], width: number) => [
+  ...new Set(candidates.filter((candidate) => candidate < width).concat(Math.min(width, maxWidth))),
+];
+// The frame links to the largest size, as the showcase grid's tiles do.
+const fullImages = await Promise.all(
+  winners.map(({ image }) => getImage({ src: image, width: Math.min(image.width, maxWidth) })),
+);
+const fullSrc = (winner: (typeof winners)[number]) => fullImages[winners.indexOf(winner)].src;
+
+const round = (value: number) => Math.round(value * 10) / 10;
+// Phones: leads and a lone last lower place span the column; other lower places sit two to a row, as mentions do.
+const isFull = (winner: (typeof podium)[number], index: number) =>
+  winner.place === leadPlace || (sideCount % 2 === 1 && index === podium.length - 1);
+const halfSpans = pairSpans(frames.filter((_, index) => !isFull(podium[index], index)).map(({ aspect }) => aspect));
+const mentionAspects = mentions.map(({ image }) => frameAspect(image));
+const mentionSpans = pairSpans(mentionAspects);
+const mentionSpan = mentionAspects.reduce((sum, aspect) => sum + aspect, 0);
+
+// Display widths, matching the styles below. Wide screens: a podium frame is its share of the row, at most
+// `--lead-max` (36rem) times its scale tall; mentions are at most 12rem tall. Phones: a frame two to a row is its
+// share of its row.
+let half = 0;
+const podiumItems = podium.map((winner, index) => {
+  const { aspect, scale } = frames[index];
+  const isLead = winner.place === leadPlace;
+  const full = isFull(winner, index);
+  const pairSpan = full ? undefined : halfSpans[half++];
+  const wide = `(min-width: 50rem) min(${round(36 * scale * aspect)}rem, ${round((96 * scale * aspect) / span)}vw)`;
+  return {
+    winner,
+    isLead,
+    phone: full ? 'full' : 'half',
+    style: `--aspect: ${aspect}; --scale: ${scale}${pairSpan ? `; --pair-span: ${pairSpan}` : ''}`,
+    widths: widthsUpTo(isLead ? [640, 960, 1280, 1600, 1920] : [400, 640, 960, 1280], winner.image.width),
+    sizes: `${wide}, ${pairSpan ? `${round((100 * aspect) / pairSpan)}vw` : '100vw'}`,
+  };
+});
+const mentionItems = mentions.map((winner, index) => {
+  const aspect = mentionAspects[index];
+  return {
+    winner,
+    style: `--aspect: ${aspect}; --pair-span: ${mentionSpans[index]}`,
+    widths: widthsUpTo([320, 480, 640, 960], winner.image.width),
+    sizes: `(min-width: 50rem) ${round(12 * aspect)}rem, ${round((100 * aspect) / mentionSpans[index])}vw`,
+  };
+});
+const groups = [
+  { name: 'podium', items: podiumItems },
+  { name: 'mentions', items: mentionItems },
+].filter((group) => group.items.length > 0);
+---
+
+<div
+  class="winners not-content"
+  style={[
+    `--count: ${podium.length}; --span: ${span}; --mention-scale: ${mentionScale}`,
+    `--mention-count: ${mentions.length}; --mention-span: ${Math.round(mentionSpan * 1e4) / 1e4 || 1}`,
+  ].join('; ')}
+>
+  {
+    groups.map(({ name, items }) => (
+      <ul class={name} role="list">
+        {items.map((item) => {
+          const { winner } = item;
+          const isLead = 'isLead' in item && item.isLead;
+          const eagerLoad = (eager === 'podium' && name === 'podium') || (eager && isLead);
+          return (
+            <li
+              class:list={['winner', { 'winner--lead': isLead }]}
+              style={item.style}
+              data-phone={'phone' in item ? item.phone : undefined}
+            >
+              <figure>
+                <a class="frame" href={fullSrc(winner)}>
+                  <Image
+                    src={winner.image}
+                    alt={winnerAlt(winner, theme)}
+                    widths={item.widths}
+                    sizes={item.sizes}
+                    loading={eagerLoad ? 'eager' : 'lazy'}
+                    fetchpriority={eager && isLead ? 'high' : undefined}
+                  />
+                </a>
+                <figcaption>
+                  <span
+                    class:list={[
+                      'place',
+                      { 'place--first': winner.place === 1 },
+                      typeof winner.place === 'string' && `place--${winner.place}`,
+                    ]}
+                  >
+                    {placeLabel(winner.place)}
+                  </span>
+                  <span class="credit">
+                    {winner.title && <span class="credit__title">{winner.title}</span>}
+                    <span class="credit__artist">
+                      by{' '}
+                      {winner.artistUrl ? (
+                        <a href={winner.artistUrl} target="_blank" rel="nofollow ugc noopener noreferrer">
+                          {winner.artist}
+                        </a>
+                      ) : (
+                        winner.artist
+                      )}
+                    </span>
+                    {winner.model && <span class="credit__model">{winner.model}</span>}
+                  </span>
+                </figcaption>
+              </figure>
+            </li>
+          );
+        })}
+      </ul>
+    ))
+  }
+</div>
+
+<style>
+  .winners {
+    /* The podium's height comes from this element's width. */
+    container-type: inline-size;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    --gap-x: 1rem;
+    /*
+     * The lead frame's height on wide screens: at most --lead-max, and low enough for the whole row (--span lead
+     * heights wide, plus the gaps) to fit.
+     */
+    --lead-max: min(36rem, 72svh);
+    --lead-height: min(var(--lead-max), (100cqi - (var(--count) - 1) * var(--gap-x)) / var(--span));
+    /*
+     * Mentions' height: low enough for them all to fit one row (--mention-span heights wide, plus the gaps), at most
+     * the podium allows, and at least 7rem, below which they wrap onto more rows instead.
+     */
+    --mention-height: clamp(
+      7rem,
+      (100cqi - (var(--mention-count) - 1) * var(--gap-x)) / var(--mention-span),
+      min(12rem, var(--lead-height) * var(--mention-scale))
+    );
+  }
+
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .winner,
+  figure {
+    min-width: 0;
+    margin: 0;
+  }
+
+  figure {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+  }
+
+  /* The frame is the image's link: the strong border and the control fill on hover. */
+  /* Each frame takes its image's shape. */
+  .frame {
+    position: relative;
+    display: block;
+    aspect-ratio: var(--aspect);
+    overflow: hidden;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+    transition: var(--docs-control-transition);
+
+    &:hover {
+      border-color: var(--docs-border-strong);
+      background-color: var(--docs-control);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--docs-accent);
+      outline-offset: 2px;
+    }
+
+    /* Whole inside the frame, which only differs from the image's shape for extreme shapes. */
+    img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+  }
+
+  /*
+   * Wide screens: one row, each frame --scale lead heights tall and --aspect times as wide. Frames share the first grid
+   * row, aligned to its bottom, and captions the second.
+   */
+  @media (min-width: 50rem) {
+    .podium {
+      display: grid;
+      grid-auto-flow: column;
+      grid-template-rows: auto auto;
+      justify-content: center;
+      gap: 0.625rem var(--gap-x);
+    }
+
+    .podium .winner,
+    .podium figure {
+      display: grid;
+      grid-row: span 2;
+      grid-template-rows: subgrid;
+    }
+
+    .podium .winner {
+      width: calc(var(--lead-height) * var(--scale) * var(--aspect));
+    }
+
+    .podium .frame {
+      align-self: end;
+    }
+  }
+
+  /*
+   * Runners-up and honourable mentions: centred rows of frames at one height. Frames align to the top, so a caption
+   * that wraps lengthens only its own item.
+   */
+  .mentions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 1.25rem var(--gap-x);
+
+    .winner {
+      flex: none;
+      width: calc(var(--mention-height) * var(--aspect));
+    }
+
+    figcaption {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+
+  /*
+   * Phones: the lead and a lone lower place across the column, at most three quarters of the screen tall. Other lower
+   * places and the mentions sit two to a row at one height per row, each at its own width; a last one alone keeps the
+   * row above's height, centred.
+   */
+  @media (max-width: 49.99rem) {
+    .podium {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 1.5rem var(--gap-x);
+    }
+
+    [data-phone='full'] {
+      flex: 0 0 100%;
+
+      figure {
+        width: min(100%, 75svh * var(--aspect));
+        margin-inline: auto;
+      }
+    }
+
+    [data-phone='half'],
+    .mentions .winner {
+      /* The row's height: two frames, --pair-span heights wide; the pixel keeps rounding from wrapping them. */
+      --pair-height: calc((100cqi - var(--gap-x) - 1px) / var(--pair-span));
+      flex: none;
+      width: min(100%, var(--pair-height) * var(--aspect));
+
+      figcaption {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  }
+
+  figcaption {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.375rem 0.75rem;
+    font-size: var(--sl-text-sm);
+    line-height: 1.4;
+  }
+
+  /*
+   * The place in words: 1st place takes the solid accent, 2nd and 3rd the control fill, a runner-up the strong outline
+   * and an honourable mention the quiet one.
+   */
+  .place {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    min-height: 1.375rem;
+    padding: 0 0.5rem;
+    border: 1px solid var(--docs-border-strong);
+    border-radius: var(--docs-radius);
+    background-color: var(--docs-control);
+    color: var(--docs-text-strong);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .place--first {
+    border-color: var(--docs-accent);
+    background-color: var(--docs-accent);
+    color: var(--docs-accent-contrast);
+  }
+
+  .place--runner-up,
+  .place--honourable {
+    background-color: transparent;
+    font-weight: 500;
+  }
+
+  .place--honourable {
+    border-color: var(--docs-border);
+    color: var(--docs-text-muted);
+  }
+
+  .credit {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.125rem 0.5rem;
+    min-width: 0;
+  }
+
+  .credit__title {
+    color: var(--docs-text-strong);
+    font-weight: 600;
+  }
+
+  .winner--lead .credit__title {
+    font-size: 1.125rem;
+  }
+
+  .credit__artist {
+    color: var(--docs-text-muted);
+
+    a {
+      color: var(--docs-accent);
+      text-decoration: none;
+
+      &:hover {
+        color: var(--docs-accent-text);
+        text-decoration: underline;
+      }
+    }
+  }
+
+  .credit__model {
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-xs);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .frame {
+      transition: none;
+    }
+  }
+</style>

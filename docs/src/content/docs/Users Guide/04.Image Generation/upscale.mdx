@@ -1,92 +1,226 @@
 ---
 title: Upscaling
-lastUpdated: 2026-10-20
+description: Enlarge an image with an upscaler model, and optionally add new detail with a main model, from the Upscale panel or the gallery's image menu.
+lastUpdated: 2026-10-26
 sidebar:
   order: 8
 ---
 
-The **Upscale** panel enlarges an image. A Spandrel upscaling model (such as a Real-ESRGAN variant) enlarges it first. In **Refine** mode a main model then runs a short image-to-image pass over the result to invent detail that fits your prompt; in **Model only** mode the upscaler's result is the output.
+import { Card, CardGrid, Steps, TabItem, Tabs } from '@astrojs/starlight/components';
+import Callout from '@components/annotated/Callout.astro';
+import UpscalePanelSketch from '@components/annotated/UpscalePanelSketch.astro';
+import CompareImage from '@components/compare/CompareImage.astro';
+import ImageCompare from '@components/compare/ImageCompare.astro';
+import Pipeline from '@components/pipeline/Pipeline.astro';
+import PipelineBranch from '@components/pipeline/PipelineBranch.astro';
+import PipelineLane from '@components/pipeline/PipelineLane.astro';
+import PipelineStep from '@components/pipeline/PipelineStep.astro';
+import modelOnly from '../assets/upscale-model-only.webp';
+import refine from '../assets/upscale-refine.webp';
 
-Open it from the left rail. It is available in the Compose, Edit and Video layouts. To upscale a gallery image without opening the panel, use its context menu (see [Upscaling from the image menu](#upscaling-from-the-image-menu)).
+The **Upscale** panel enlarges an image. An upscaler model, run through Spandrel (such as a Real-ESRGAN variant), enlarges it first. In **Refine** mode a main model then runs a short image-to-image pass over the result to add detail that fits your prompt.
+
+Open the panel from the left region, where it sits behind Generate in the Compose and Edit layouts and behind Video in the Video layout. To upscale a gallery image without opening it, use the image menu (see [Upscaling from the image menu](#upscaling-from-the-image-menu)).
+
+<Pipeline label="How an upscale runs">
+  <PipelineStep title="Source image" />
+  <PipelineStep title="Upscaler model" description="Run through Spandrel" />
+  <PipelineBranch>
+    <PipelineLane label="Model only" />
+    <PipelineLane label="Refine">
+      <PipelineStep title="Sharpen" />
+      <PipelineStep title="Detail pass" description="Main model and prompt" />
+    </PipelineLane>
+  </PipelineBranch>
+  <PipelineStep title="Result" />
+</Pipeline>
 
 ## Refine or Model only
 
-The **Mode** switch at the top of the panel picks how the image is upscaled. Projects open in **Refine**, including projects saved before the switch existed.
+The **Mode** switch at the top of the panel picks how the image is upscaled.
 
-- **Refine** runs both passes: the upscaler, then the main model's detail pass. Everything below this section applies to it.
-- **Model only** runs the upscaler alone, with no main model, prompt or detail pass. The panel keeps only the source image, the Spandrel model and **Scale**; the prompt, Generation and Advanced sections are hidden. Model only does not need the model capability list Refine loads, so it works while that list is loading or could not be loaded.
+<CardGrid>
+  <Card title="Refine" icon="star">
+    The upscaler, then a detail pass with a main model and your prompt. Adds new detail; needs a main model of a supported family. The default, also for projects saved before the switch existed.
+  </Card>
+  <Card title="Model only" icon="rocket">
+    The upscaler alone: no main model, prompt or detail pass. Faster and faithful to the source. Always queues once whatever **Iterations** says, because the upscaler gives the same image every time.
+  </Card>
+</CardGrid>
 
-Switching modes keeps your Refine settings, so switching back restores them. A Model only run always queues once whatever the **Iterations** setting, because the upscaler gives the same image every time.
+Switching modes keeps your Refine settings, so switching back restores them. Model only does not need the model capability list Refine loads, so it works while that list is loading or could not be loaded.
 
-### Native scale
+<ImageCompare label="Model only and Refine results compared">
+  <CompareImage slot="before" src={modelOnly} alt="Model only: an illustrated girl in a red scarf in a snowy village at dusk, enlarged by the upscaler alone. Her eyes and the lantern beside her are soft and smeared." label="Model only" />
+  <CompareImage slot="after" src={refine} alt="Refine: the same crop after the detail pass. Her eyes, hair and scarf have crisp line work, and the lantern and wood grain show clean new detail." label="Refine" />
+  A crop of the same 2× upscale of a 1024 × 1024 SDXL illustration with the RealESRGAN x4plus upscaler. Refine ran with the panel's defaults: the **Balanced** preset, 30 steps, CFG 2 and an SDXL Tile ControlNet.
+</ImageCompare>
 
-Each upscaler has a native scale, such as 4× for 4x-UltraSharp. In Model only mode the panel shows a **Native scale** row when the upscaler's native scale is known, and explains how it reaches your **Scale**:
+## The Upscale panel
 
-- the upscaler runs until the image is at least the Scale you asked for, then resizes it down to that size, for example "Runs 4× once, then resizes to 2×" or "Runs 2× 2 times";
-- a 1× model (a restoration model) keeps the input size, so Scale has no effect.
+<UpscalePanelSketch label="Sketch of the Upscale panel in Refine mode beside the Preview: the Mode switch, the Source and treatment section with the source image, size preview, Spandrel model, Scale, treatment presets, Creativity and Structure, and the collapsed Detail guidance, Generation and Advanced sections. Numbered callouts mark the controls described below.">
+  <Callout x={46.72} y={11.76} labelSide="right" label="Mode">**Refine** or **Model only**. Model only hides everything below **Scale**.</Callout>
+  <Callout x={46.72} y={29.23} labelSide="right" label="Source image">Pick an image from the gallery, drag one in, or upload one.</Callout>
+  <Callout x={46.72} y={40.07} labelSide="right" label="Size preview">The input size, **Scale**, output size and output area. Model only adds the upscaler's **Native scale**. From 50 megapixels the output is marked **Large output**: it takes much longer and needs more VRAM.</Callout>
+  <Callout x={46.72} y={49.82} labelSide="right" label="Spandrel model">The upscaler. Choose one suited to your image: photography, illustration or linework.</Callout>
+  <Callout x={46.72} y={59.38} labelSide="right" label="Scale">The output size is the source size times this, from 1× to 16× in steps of 0.5. Default 4×.</Callout>
+  <Callout x={46.72} y={71.88} labelSide="right" label="Treatment">
+    Refine only.
 
-The output size is rounded down to a multiple of 8.
+    - **Treatment preset** sets Creativity and Structure together: **Conservative** (−5, 5), **Balanced** (0, 0), **Creative** (5, −2) or **Artistic** (8, −5).
+    - **Creativity**, −10 to 10: higher values invent more detail and give the prompt more influence.
+    - **Structure**, −10 to 10: higher values keep the source composition more strictly. Shown only when a Tile ControlNet is in use.
+  </Callout>
+  <Callout x={46.72} y={90.26} labelSide="right" label="More settings">
+    Refine only, collapsed until you open them.
 
-Upscalers record their native scale when they are installed. Upscalers installed with an earlier version have no recorded scale until you re-identify them in the Model Manager; until then Model only shows no Native scale row, and a note under the Spandrel model says the native scale is unknown. Users who manage models can open the upscaler in the Model Manager from that note.
+    - **Detail guidance**: the prompt, marked **Shared** because Generate uses the same project prompt. Describe the medium, texture and style rather than new content.
+    - **Generation**: the **Main model** for the detail pass, **Steps**, **CFG scale**, **Scheduler**, **Seed**, and concepts (LoRAs) that match the main model.
+    - **Advanced**: the Tile ControlNet and encoders the main model needs, **Tile size**, **Tile overlap**, **VAE**, **VAE precision**, and **CLIP skip** for SD1.5.
+  </Callout>
+</UpscalePanelSketch>
 
-To record it, open the upscaler's page in the Model Manager. A notice there says its native scale is unknown, and users who manage models can press **Re-identify model** and confirm; Invoke re-probes the file and the page then shows its native scale. Re-identifying also resets the model's custom variant and default settings. Other users are asked to contact an administrator.
-
-The result's metadata is the source image's metadata plus the upscaler and the Scale, so **Recall** on the result restores how the source was made.
-
-## Setting up an upscale
-
-The panel is split into sections, top to bottom:
-
-- **Source & treatment**
-  - **Source image**: pick an image from the gallery, drag one in, or upload one.
-  - **Spandrel model**: the first-pass upscaler. Choose one suited to your image: photography, illustration or linework.
-  - **Scale**: the output size is the source size multiplied by this value. The panel shows the resulting input and output size and warns when the output is large enough to need much more time and VRAM.
-  - **Treatment preset**, or **Creativity** and **Structure** directly. Higher Creativity invents more detail and gives the prompt more influence. Higher Structure keeps the source composition more strictly; it is only shown when a Tile ControlNet is in use.
-- **Detail guidance**: the prompt. It is the project prompt shared with Generate. For upscaling, describe the medium, texture and style rather than new content.
-- **Generation**: the **Main model** for the detail pass (**SD1.5**, **SDXL**, **FLUX.1**, **FLUX.2**, **Z-Image**, **Anima**, **Krea-2** or **Qwen Image**), steps, CFG scale, scheduler, seed, and LoRAs that match the main model. The scheduler list only holds schedulers that work for upscaling (see below).
-- **Advanced**: the components the main model needs (see below), tile size and tile overlap, VAE and VAE precision, and CLIP skip for SD1.5.
+The panel says what is missing before you can queue, for example "Select a compatible Tile or Union ControlNet." or "This model needs a T5 encoder selected." **Iterations** sits with the Invoke button in the top bar.
 
 ## What each model family needs
 
-| | SD1.5 / SDXL | FLUX.1 | FLUX.2 | Z-Image | Anima | Krea-2 | Qwen Image |
-|---|---|---|---|---|---|---|---|
-| Tile ControlNet | Required: a Tile or Union ControlNet for the same family, under **Advanced** | Not used; the Structure slider is hidden | Not used; the Structure slider is hidden | Optional: **Z-Image ControlNet Tile**, under **Advanced**. The Union ControlNet has no tile mode and is not offered | Not used; the Structure slider is hidden | Not used; the Structure slider is hidden | Not used; the Structure slider is hidden |
-| Negative prompt | Available | Not used; FLUX.1 ignores it, so it is hidden and not recorded | Not used; FLUX.2 ignores it, so it is hidden and not recorded | Used only when CFG is greater than 1 | Used only when CFG is greater than 1 | Used only when CFG is greater than 1 | Used only when CFG is greater than 1 |
-| CFG scale | Kept as you set it; back to 2 when you switch from a family that sets its own | Kept as you set it, and used as guidance; back to 2 when you switch from a family that sets its own | Set to the model's default when you pick the model, and used as guidance: 3.5 for FLUX.2 [dev], 1 for Klein, which ignores it | Set to the model's default when you pick the model: 1 for Z-Image Turbo, 4 for Z-Image Base | Set to the model's default when you pick the model: 4.5, or 6 for Anima-3.8B | Set to the model's default when you pick the model: 1 for Turbo, 5.5 for Raw | Set to the model's default when you pick the model: 4 |
-| Other components | Taken from the main model | Every FLUX.1 model except an SDNQ pipeline needs a **T5 Encoder**, **CLIP Embed** and **VAE**, all under **Advanced**. SDNQ pipelines bring their own. FLUX Fill models cannot be used | Klein needs a **Qwen3 Encoder** of its size (the 4B for Klein 4B, the 8B for Klein 9B), [dev] a **Mistral Encoder**, and both a FLUX.2 **VAE**, unless the model is a Diffusers install that brings its own; for Klein a complete SDNQ install does too | A **Qwen3 Encoder** (the 4B) and a FLUX **VAE**, unless the model is a Diffusers or complete SDNQ install that brings its own | A **Qwen3 Encoder** (the 0.6B) and a Qwen-Image **VAE**; Anima-3.8B also a **Qwen3.5 Encoder** | A **Qwen3-VL Encoder** (the 4B) and a Qwen-Image **VAE**, unless the model is a Diffusers install that brings its own | A **Qwen VL Encoder** and a Qwen-Image **VAE**, unless the model is a Diffusers install that brings its own. Qwen Image Edit models cannot be used: without a reference image they would carry a blank one the size of the output through every step, for about 2.5 to 3 times the time and nothing gained |
-| Detail pass | Tile by tile | One pass over the whole image | One pass over the whole image | One pass over the whole image | One pass over the whole image | One pass over the whole image | One pass over the whole image |
+Refine works with **SD1.5**, **SDXL**, **FLUX.1**, **FLUX.2**, **Z-Image**, **Anima**, **Krea-2** and **Qwen Image** main models.
 
-The panel says what is missing before you can queue, for example "Select a compatible Tile or Union ControlNet." or "This model needs a T5 encoder selected."
+| Family | Tile ControlNet | Negative prompt | Detail pass |
+| --- | --- | --- | --- |
+| SD1.5, SDXL | Required | Yes | Tile by tile |
+| FLUX.1, FLUX.2 | – | – | Whole image |
+| Z-Image | Optional | When CFG > 1 | Whole image |
+| Anima, Krea-2, Qwen Image | – | When CFG > 1 | Whole image |
+
+Where a family has no Tile ControlNet, **Structure** is hidden. Where it ignores the negative prompt, the prompt is hidden and not recorded.
+
+<Tabs>
+  <TabItem label="SD1.5 / SDXL">
+    - **Tile ControlNet**: required, a Tile or Union ControlNet of the same family, under **Advanced**. One is picked for you if installed.
+    - **CFG scale**: kept as you set it. It goes back to 2 when you switch from a family that sets its own.
+    - **Components**: taken from the main model. A **VAE** can replace the bundled one.
+    - **Scheduler**: any of the family's.
+  </TabItem>
+  <TabItem label="FLUX.1">
+    - **Tile ControlNet**: none.
+    - **CFG scale**: used as guidance, kept as you set it. It goes back to 2 when you switch from a family that sets its own.
+    - **Components**: a **T5 Encoder**, a **CLIP Embed** (CLIP-L) and a **VAE**, under **Advanced**. SDNQ pipelines bring their own.
+    - **Not supported**: FLUX Fill models.
+  </TabItem>
+  <TabItem label="FLUX.2">
+    - **Tile ControlNet**: none.
+    - **CFG scale**: used as guidance, and set when you pick the model: 3.5 for FLUX.2 [dev], 1 for Klein, which ignores it. At most 20.
+    - **Steps**: set when you pick the model: 4 for Klein 4B and 9B, 28 for Klein Base and [dev]. FLUX.2 runs all of **Steps** in the detail pass, so the panel's usual 30 would really run 30 times, more than seven times what Klein is distilled for.
+    - **Components**: Klein needs a **Qwen3 Encoder** of its size (4B for Klein 4B, 8B for Klein 9B), [dev] a **Mistral Encoder**, and both a FLUX.2 **VAE**. A Diffusers install brings its own; for Klein, a complete SDNQ install does too.
+  </TabItem>
+  <TabItem label="Z-Image">
+    - **Tile ControlNet**: optional, a **Z-Image ControlNet Tile**, under **Advanced**. The Union ControlNet has no tile mode and is not offered. Adding it lets **Structure** pull the result back toward the enlarged image, at the cost of a second network's memory and time; the pass has no tile seams for it to hold together.
+    - **CFG scale**: set when you pick the model: 1 for Z-Image Turbo, 4 for Z-Image Base.
+    - **Components**: a **Qwen3 Encoder** (4B) and a FLUX **VAE**. A Diffusers or complete SDNQ install brings its own.
+  </TabItem>
+  <TabItem label="Anima">
+    - **Tile ControlNet**: none.
+    - **CFG scale**: set when you pick the model: 4.5, or 6 for Anima-3.8B.
+    - **Components**: a **Qwen3 Encoder** (0.6B) and a **VAE** (the Wan 2.1 VAE, installed as an Anima, Qwen Image or Wan VAE). Anima-3.8B also needs a **Qwen3.5 Encoder**.
+  </TabItem>
+  <TabItem label="Krea-2">
+    - **Tile ControlNet**: none.
+    - **CFG scale**: set when you pick the model: 1 for Turbo, 5.5 for Raw.
+    - **Components**: a **Qwen3-VL Encoder** (4B) and a **VAE** (the Wan 2.1 VAE, installed as a Qwen Image or Anima VAE). A Diffusers install brings its own.
+  </TabItem>
+  <TabItem label="Qwen Image">
+    - **Tile ControlNet**: none.
+    - **CFG scale**: set when you pick the model: 4.
+    - **Components**: a **Qwen VL Encoder** and a **VAE** (the Wan 2.1 VAE, installed as a Qwen Image or Anima VAE). A Diffusers install brings its own.
+    - **Not supported**: Qwen Image Edit models. Without a reference image they would carry a blank one the size of the output through every step, for about 2.5 to 3 times the time and nothing gained.
+  </TabItem>
+</Tabs>
+
+A value "set when you pick the model" is the model's default setting, which you can change in the Model Manager. Switching from FLUX.2 to another family sets **Steps** back to 30.
 
 :::note[Output size]
-FLUX.1, FLUX.2, Z-Image, Krea-2 and Qwen Image need sizes that are a multiple of 16. When the enlarged image is not, the panel shrinks it slightly to the nearest fitting size before the detail pass — for example 2040 px becomes 2032 px.
+FLUX.1, FLUX.2, Z-Image, Krea-2 and Qwen Image need sizes that are a multiple of 16. When the enlarged image is not, the panel shrinks it slightly to the nearest fitting size before the detail pass: 2040 px becomes 2032 px. Other families, and Model only, round down to a multiple of 8.
 :::
 
-### Creativity on Z-Image, Anima, Krea-2 and Qwen Image
+## Creativity per family
 
-Z-Image, Anima, Krea-2 and Qwen Image count the start of the detail pass in steps rather than in noise level, so the same Creativity setting would add much more noise there than on FLUX.1. The panel translates Creativity for them: it starts the pass on the step whose noise level is closest to where FLUX.1 would start. A preset therefore means the same thing on every family, and the pass runs fewer steps than the Steps setting suggests. For example, **Balanced** at 30 steps on a 2048 px result runs the last 7 to 9, and each needs at least 2 steps. Krea-2 Turbo and Raw both keep your Steps setting: Turbo, distilled for 8 steps, then runs the end of a 30-step schedule, and Raw, the undistilled model, gets the steps it needs.
+**Creativity** sets how far down the noise schedule the detail pass starts: the higher, the noisier the start and the more the main model redraws. The panel offers only schedulers that start where Creativity puts the pass, and hides the field where only one is left.
 
-FLUX.2 starts where FLUX.1 does and then spreads all of your Steps over the rest of the pass, so 30 steps run 30 times. Picking a FLUX.2 model therefore sets its own step count: 4 for Klein 4B and 9B, 28 for Klein Base and [dev]. Switching to another family afterwards sets Steps back to 30.
+<details>
+<summary>Schedulers and steps for each family</summary>
 
-The panel offers only schedulers that start where Creativity puts the pass: **Euler** and **Heun** on FLUX.1 and Z-Image, and **Euler**, **DPM++ 2M**, **DPM++ 2M SDE** and **ER-SDE** on Anima. LCM builds its own noise schedule, so it would treat the enlarged image as pure noise. Anima's Heun starts below that point and leaves noise in the image. FLUX.2, Krea-2 and Qwen Image always run **Euler**, so they show no scheduler.
+| Family | Schedulers | Steps the pass runs |
+| --- | --- | --- |
+| SD1.5, SDXL | All of the family's | The part of **Steps** after the start: about half at **Balanced** |
+| FLUX.1 | Euler, Heun | The part of **Steps** after the start: **Balanced** at 30 steps runs about the last 8 from 1024 px up |
+| FLUX.2 | Euler only | Starts where FLUX.1 does, then spreads all of **Steps** over the rest of the pass, so 30 steps really run 30 times |
+| Z-Image | Euler, Heun | Starts at FLUX.1's noise level; **Balanced** at 30 steps on a 2048 px result runs the last 7 |
+| Anima | Euler, DPM++ 2M, DPM++ 2M SDE, ER-SDE | As Z-Image; the last 8 |
+| Krea-2 | Euler only | As Z-Image; the last 7. Turbo and Raw both keep your **Steps**: Turbo, distilled for 8 steps, runs the end of a 30-step schedule |
+| Qwen Image | Euler only | As Z-Image; the last 9 |
 
-The Z-Image Tile ControlNet is optional because the detail pass runs over the whole image at once: there are no tile seams for it to hold together. Adding it lets **Structure** pull the result back toward the enlarged image, at the cost of a second network's memory and time.
+Z-Image, Anima, Krea-2 and Qwen Image count the start in steps rather than in noise level, so the panel translates Creativity for them: it starts on the step whose noise level is closest to where FLUX.1 would start. A preset therefore means the same on every family. These families need at least 2 steps.
+
+LCM builds its own noise schedule, so it would treat the enlarged image as pure noise. Anima's Heun starts below Creativity's point and leaves noise in the image.
+
+</details>
 
 ## Memory
 
-For SD1.5 and SDXL the detail pass works in tiles, so the output can be much larger than what the model generates in one go. Larger tiles can improve continuity but need more VRAM; more tile overlap reduces seams but costs time and memory.
+| | SD1.5, SDXL | Other families |
+| --- | --- | --- |
+| Detail pass | In tiles, so the output can be much larger than the model generates in one go | Over the whole image at once: memory grows with the output size |
+| **Tile size** | The detail pass's tiles: larger tiles can improve continuity but need more VRAM | Only the VAE encode and decode tiles (Anima's decode picks its own) |
+| **Tile overlap** | More overlap reduces seams but costs time and memory | No effect |
 
-For FLUX.1, FLUX.2, Z-Image, Anima, Krea-2 and Qwen Image the detail pass runs over the whole image at once, so its memory use grows with the output size. There, **Tile size** only sets the tiles for the VAE encode and decode, and **Tile overlap** has no effect. Anima's decode picks its own tiles.
+Encoding and decoding the enlarged image with the VAE runs in tiles for every family. If you still run out of memory, see [Low-VRAM mode](/configuration/optimization/low-vram-mode/).
 
-For all model families, encoding and decoding the enlarged image with the VAE runs in tiles. See [Low-VRAM mode](/configuration/optimization/low-vram-mode/) if you still run out of memory.
+## Native scale
+
+Each upscaler has a native scale, such as 4× for 4x-UltraSharp. In Model only mode the upscaler runs until the image is at least the **Scale** you asked for, then resizes it down to that size. The size preview shows the **Native scale** and a note on how it gets there:
+
+| Scale | 2× upscaler | 4× upscaler |
+| --- | --- | --- |
+| 1.5× | Runs 2× once, then resizes to 1.5× | Runs 4× once, then resizes to 1.5× |
+| 2× | Runs 2× once | Runs 4× once, then resizes to 2× |
+| 4× | Runs 2× 2 times | Runs 4× once |
+| 8× | Runs 2× 3 times | Runs 4× 2 times, then resizes to 8× |
+
+When **Scale** equals the native scale the note is left out. A 1× model (a restoration model) keeps the input size, so **Scale** has no effect. In Refine mode the panel shows no native scale. FLUX.1, FLUX.2, Z-Image, Anima, Krea-2 and Qwen Image resize the upscaler's result to **Scale** before the detail pass; SD1.5 and SDXL keep the upscaler's size, so with a 1× model their result stays at the source size.
+
+A Model only result's metadata is the source image's metadata plus the upscaler and the **Scale**, so **Recall** on it restores how the source was made.
+
+### Upscalers with an unknown native scale
+
+Upscalers record their native scale when they are installed. One installed with an earlier version has none until it is re-identified: Model only then shows no **Native scale** row, and a note under the Spandrel model says the native scale is unknown. To record it:
+
+<Steps>
+
+1. Under the Spandrel model, press **Open in Model Manager**, or open the upscaler's page there yourself.
+
+2. Press **Re-identify model** and confirm. Invoke re-probes the file, and the page then shows the native scale. Re-identifying also resets the model's custom variant and default settings.
+
+</Steps>
+
+Only users who manage models can re-identify; others are asked to contact an administrator.
 
 ## Upscaling from the image menu
 
 Right-click an image in the gallery and open **Upscale**:
 
 - **Send to Upscale** opens the Upscale panel with the image as its source.
-- Under **Upscale now, model only**, each installed upscaler is listed by name with its native scale when it is known. Each one opens a list of factors: 1.5×, 2× and its native scale, marked "(native)". A factor offered twice is listed once, so a 2× upscaler offers 1.5× and 2×, and a 4× upscaler offers 1.5×, 2× and 4×. A 1× (restoration) model offers only 1×. Picking a factor queues a Model only upscale of the image straight away, without changing the Upscale panel or the current Invoke settings. Every factor runs as Model only mode runs it at that Scale, so the result has the same size as one from the Upscale panel (see [Native scale](#native-scale)): the native scale runs the upscaler once, and other factors resize the result to the factor.
+- **Upscale now, model only** lists each installed upscaler by name, with its native scale when it is known. Picking one of its factors queues a Model only upscale straight away, without changing the Upscale panel or the current Invoke settings.
 
-When no upscaler is installed, the model-only entry is disabled. An upscaler whose native scale is unknown offers **Native scale**, which runs it once at whatever size it produces, and a disabled **Other factors** entry with a note to re-identify it in the Model Manager. For other factors, or a fractional Scale such as 2.5×, use **Send to Upscale**.
+| Upscaler's native scale | Factors offered |
+| --- | --- |
+| 1× (restoration) | 1× |
+| 2× | 1.5×, 2× (native) |
+| 3× | 1.5×, 2×, 3× (native) |
+| 4× | 1.5×, 2×, 4× (native) |
+| 8× | 1.5×, 2×, 8× (native) |
+| Unknown | **Native scale**, which runs it once at whatever size it produces; **Other factors** is disabled with a note to re-identify it |
+
+Each factor runs as Model only runs it at that **Scale** (see [Native scale](#native-scale)), so the result has the same size as one from the panel. For other factors, or a fractional Scale such as 2.5×, use **Send to Upscale**. When no upscaler is installed, the entry is disabled.
 
 Results go to the gallery's auto-add board, wherever Invoke is currently set to send results. Their metadata is the source image's metadata plus the upscaler and its scale. If the source image's metadata cannot be read, nothing is queued and a notification says so.

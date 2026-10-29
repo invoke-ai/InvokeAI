@@ -1,0 +1,20 @@
+title: Size Stepper Nodes
+author: dwringer
+repo: https://github.com/dwringer/size-stepper-nodes
+summary: Calculate the intermediate sizes for multi-step upscaling workflows.
+description: >-
+  Enter your full size and orientation (portrait, landscape or random) in Final Size & Orientation, then plug it and
+  your initial generation size into Ideal Size Stepper to get one, two or three intermediate sizes for upscaling. The
+  outputs are only the intermediate sizes, not the initial or full size.
+categories: [sizing]
+nodes:
+  - name: Final Size & Orientation
+    description: Your full size dimensions and orientation.
+  - name: Ideal Size Stepper
+    description: One, two or three intermediate pairs of dimensions between the initial and full size.
+  - name: Random Switch (Integers)
+    description: A generic version of Final Size & Orientation without the orientation choice.
+thumbnail: ./size-stepper-nodes.webp
+images:
+  - src: https://raw.githubusercontent.com/dwringer/size-stepper-nodes/main/size_nodes_usage.jpg
+    alt: A workflow using the size stepper nodes

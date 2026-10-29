@@ -1,0 +1,21 @@
+title: Autostereogram Nodes
+author: skunkworxdark
+repo: https://github.com/skunkworxdark/autostereogram_nodes
+summary: Generate autostereogram images from a depth map.
+description: >-
+  In the author's words, not a very practically useful node, but more a 90s nostalgic indulgence.
+categories: [video-3d]
+thumbnail: ./autostereogram-nodes.webp
+images:
+  - src: https://raw.githubusercontent.com/skunkworxdark/autostereogram_nodes/refs/heads/main/images/spider-dots.png
+    alt: A random-dot autostereogram hiding a spider
+    caption: Autostereogram with a random-dot pattern
+  - src: https://raw.githubusercontent.com/skunkworxdark/autostereogram_nodes/refs/heads/main/images/spider.png
+    alt: A photo of a spider
+    caption: Source image
+  - src: https://raw.githubusercontent.com/skunkworxdark/autostereogram_nodes/refs/heads/main/images/spider-depth.png
+    alt: Grayscale depth map of the spider
+    caption: Depth map
+  - src: https://raw.githubusercontent.com/skunkworxdark/autostereogram_nodes/refs/heads/main/images/spider-pattern.png
+    alt: A patterned autostereogram hiding a spider
+    caption: Autostereogram with a pattern image

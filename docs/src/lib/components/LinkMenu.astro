@@ -1,0 +1,128 @@
+---
+import Check from '@lucide/astro/icons/check';
+import ChevronDown from '@lucide/astro/icons/chevron-down';
+
+type Props = {
+  /** The popup's id, unique on the page. */
+  id: string;
+  /** The trigger's text, after the optional `icon` slot. */
+  label: string;
+  accessibleLabel: string;
+  items: { label: string; note?: string; href: string; isCurrent: boolean; lang?: string }[];
+  /** `up` opens the popup above the trigger, for a menu at the bottom of the mobile drawer. */
+  direction?: 'down' | 'up';
+  /** Shows only the `icon` slot below 55rem, where the header has no room for the text beside the search field. */
+  iconOnlyWhenNarrow?: boolean;
+};
+
+// A header button that opens a list of links, such as the docs versions or languages.
+const { id, label, accessibleLabel, items, direction = 'down', iconOnlyWhenNarrow = false } = Astro.props;
+---
+
+<docs-link-menu class="link-menu">
+  <button
+    type="button"
+    class:list={[
+      'trigger docs-button docs-button--secondary docs-button--lg',
+      { 'trigger--icon-when-narrow': iconOnlyWhenNarrow },
+    ]}
+    aria-expanded="false"
+    aria-controls={id}
+    aria-label={accessibleLabel}
+  >
+    <slot name="icon" />
+    <span class="trigger__label">{label}</span>
+    <ChevronDown class="trigger__chevron" size={12} />
+  </button>
+  <ul id={id} class:list={['popup docs-popup', { 'popup--up': direction === 'up' }]} hidden>
+    {
+      items.map(({ label, note, href, isCurrent, lang }) => (
+        <li>
+          <a href={href} hreflang={lang} aria-current={isCurrent ? 'true' : undefined}>
+            <span class="label" lang={lang}>
+              {label}
+            </span>
+            {note && <span class="note">{note}</span>}
+            {isCurrent && <Check class="check" size={14} />}
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</docs-link-menu>
+
+<script>
+  import { bindDisclosure } from '../disclosure';
+
+  class DocsLinkMenu extends HTMLElement {
+    connectedCallback() {
+      bindDisclosure(this, this.querySelector('button')!, this.querySelector('ul')!);
+    }
+  }
+  customElements.define('docs-link-menu', DocsLinkMenu);
+</script>
+
+<style>
+  .link-menu {
+    position: relative;
+  }
+
+  .popup {
+    position: absolute;
+    inset-inline-end: 0;
+    top: calc(100% + 0.375rem);
+    z-index: 1;
+    min-width: 12rem;
+    margin: 0;
+    padding: 0.25rem;
+    list-style: none;
+    border: 1px solid var(--docs-border-strong);
+    border-radius: var(--docs-radius-lg);
+    background: var(--docs-control);
+    box-shadow: var(--docs-shadow-popup);
+  }
+
+  @media (max-width: 54.99rem) {
+    .trigger--icon-when-narrow {
+      width: var(--docs-button-height);
+      padding: 0;
+
+      :is(.trigger__label, .trigger__chevron) {
+        display: none;
+      }
+    }
+  }
+
+  .popup--up {
+    --docs-popup-offset: 4px;
+    top: auto;
+    bottom: calc(100% + 0.375rem);
+  }
+
+  a {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.5rem;
+    border-radius: var(--docs-radius);
+    color: var(--docs-text-strong);
+    text-decoration: none;
+
+    &:hover {
+      background: var(--docs-hover);
+    }
+  }
+
+  .label {
+    font-weight: 600;
+  }
+
+  .note {
+    color: var(--docs-text-subtle);
+  }
+
+  .check {
+    margin-inline-start: auto;
+    color: var(--docs-accent);
+  }
+</style>

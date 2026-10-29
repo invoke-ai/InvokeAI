@@ -1,0 +1,9 @@
+title: Contrast Limited Adaptive Histogram Equalization
+author: VeyDlin
+repo: https://github.com/VeyDlin/clahe-node
+summary: Enhance local contrast with adaptive histogram equalization and contrast limiting (CLAHE).
+categories: [image-effects]
+thumbnail: ./contrast-limited-adaptive-histogram-equalization.webp
+images:
+  - src: https://raw.githubusercontent.com/VeyDlin/clahe-node/master/.readme/node.png
+    alt: The Contrast Limited Adaptive Histogram Equalization node

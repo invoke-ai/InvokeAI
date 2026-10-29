@@ -1,0 +1,1055 @@
+---
+// The download page below its title: the launcher for the visitor's platform, whether their hardware runs Invoke,
+// what follows the download and the other ways to run it. An inline script picks the platform; without it, or on an
+// unknown platform, the hero shows all three downloads.
+import AppWindow from '@lucide/astro/icons/app-window';
+import Apple from '@lucide/astro/icons/apple';
+import ArrowRight from '@lucide/astro/icons/arrow-right';
+import ArrowUpRight from '@lucide/astro/icons/arrow-up-right';
+import Boxes from '@lucide/astro/icons/boxes';
+import Check from '@lucide/astro/icons/check';
+import Cloud from '@lucide/astro/icons/cloud';
+import CodeXml from '@lucide/astro/icons/code-xml';
+import Container from '@lucide/astro/icons/container';
+import Copy from '@lucide/astro/icons/copy';
+import Cpu from '@lucide/astro/icons/cpu';
+import Download from '@lucide/astro/icons/download';
+import Microchip from '@lucide/astro/icons/microchip';
+import Monitor from '@lucide/astro/icons/monitor';
+import Package from '@lucide/astro/icons/package';
+import Scale from '@lucide/astro/icons/scale';
+import Smartphone from '@lucide/astro/icons/smartphone';
+import Terminal from '@lucide/astro/icons/terminal';
+import UserRoundX from '@lucide/astro/icons/user-round-x';
+import WifiOff from '@lucide/astro/icons/wifi-off';
+
+import cachedRelease from '../../data/launcher-release.json';
+import { withBase } from '../base-path';
+import { formatSize, loadLauncherRelease } from '../launcher-release.mjs';
+import LauncherCards, { type LauncherPlatform } from './LauncherCards.astro';
+
+const href = (path: string) => withBase(path, import.meta.env.BASE_URL);
+
+// Labels only: the buttons download GitHub's latest release whatever this says, so the cached copy may lag behind.
+const release = await loadLauncherRelease({ fallback: cachedRelease, token: process.env.GITHUB_TOKEN });
+const releasedOn = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+}).format(new Date(release.publishedAt));
+
+const latest = 'https://github.com/invoke-ai/launcher/releases/latest/download/';
+const platforms = [
+  {
+    id: 'windows',
+    name: 'Windows',
+    icon: 'seti:windows',
+    file: 'EXE',
+    fileLabel: 'EXE installer',
+    note: 'Windows 10 or later, with an NVIDIA, AMD or Intel Arc GPU.',
+    href: `${latest}Invoke.Community.Edition.Setup.latest.exe`,
+  },
+  {
+    id: 'macos',
+    name: 'macOS',
+    qualifier: 'Apple Silicon',
+    icon: 'apple',
+    file: 'DMG',
+    fileLabel: 'DMG for Apple Silicon',
+    note: 'Apple Silicon (M-series) only; not Intel. macOS 14 or later.',
+    href: `${latest}Invoke.Community.Edition-latest-arm64.dmg`,
+  },
+  {
+    id: 'linux',
+    name: 'Linux',
+    icon: 'linux',
+    file: 'AppImage',
+    fileLabel: 'AppImage',
+    note: 'NVIDIA, AMD or Intel Arc GPU. Works on most distributions.',
+    href: `${latest}Invoke.Community.Edition-latest.AppImage`,
+  },
+].map((platform) => {
+  const asset = release.assets[platform.id as keyof typeof release.assets];
+  const size = asset && formatSize(asset.size);
+  return {
+    ...platform,
+    meta: [size, `v${release.version}`].filter(Boolean).join(' · '),
+    primaryMeta: [platform.fileLabel, size, `v${release.version}`, releasedOn].filter(Boolean).join(' · '),
+  } as LauncherPlatform & { fileLabel: string; primaryMeta: string };
+});
+
+const hardware = [
+  { Icon: Apple, label: 'Mac', text: 'Any Apple Silicon Mac; 16 GB+ memory recommended' },
+  { Icon: Cpu, label: 'NVIDIA', text: 'GTX 16xx / RTX 20xx and newer' },
+  { Icon: Cpu, label: 'AMD', text: 'Through ROCm, on Windows and Linux' },
+  { Icon: Cpu, label: 'Intel Arc', text: 'Alchemist, Battlemage and newer' },
+  {
+    Icon: Microchip,
+    label: 'ARM64 Linux',
+    text: 'CPU only, for API models such as GPT Image, through a',
+    link: { text: 'manual install', href: '/start-here/manual/' },
+  },
+  {
+    Icon: Microchip,
+    label: 'Windows on ARM64',
+    text: 'Developer preview with an NVIDIA RTX Spark GPU, through a manual install; see the',
+    link: { text: 'requirements', href: '/start-here/system-requirements/#windows-on-arm64-rtx-spark' },
+  },
+];
+
+// The minimum VRAM of the families in the hardware requirements table, rounded up to these four tiers.
+const vramTiers = [
+  { gb: 8, models: 'SDXL, Z-Image Turbo' },
+  { gb: 12, models: 'FLUX.1, FLUX.2 Klein' },
+  { gb: 16, models: 'Qwen-Image-2.1' },
+  { gb: 24, models: 'Krea-2, Ideogram 4' },
+];
+
+const steps = [
+  {
+    Icon: Download,
+    title: 'Install the launcher',
+    text: 'One click, with no Python to set up.',
+    link: '/start-here/installation/',
+  },
+  {
+    Icon: Package,
+    title: 'Install Invoke from the launcher',
+    text: 'It downloads Invoke and manages its updates.',
+    link: '/start-here/installation/',
+  },
+  {
+    Icon: Boxes,
+    title: 'Pick starter models on first run',
+    text: 'Models need tens of GB of disk, so start with a few.',
+    link: '/users-guide/models/introduction/',
+  },
+];
+
+const ways = [
+  { id: 'launcher', label: 'Launcher', Icon: AppWindow },
+  { id: 'manual', label: 'Manual', Icon: Terminal },
+  { id: 'docker', label: 'Docker', Icon: Container },
+  { id: 'cloud', label: 'Cloud', Icon: Cloud },
+];
+
+const cloudProviders = [
+  {
+    title: 'AI Badgr',
+    description: 'Launch the Invoke template on AI Badgr’s hosted GPUs.',
+    href: 'https://aibadgr.com/gpu/launch?template=invokeai',
+  },
+  {
+    title: 'RunPod',
+    description: 'RunPod’s guide to running Invoke on its GPU cloud.',
+    href: 'https://www.runpod.io/blog/invoke-ai-stable-diffusion-runpod-nfz18',
+  },
+  {
+    title: 'Railway',
+    description: 'Deploy the Invoke template on Railway.',
+    href: 'https://railway.com/deploy/invokeai',
+  },
+];
+---
+
+<div class="download not-content">
+  <div class="dl-hero">
+    <section class="dl-hero__main" aria-label="Download">
+      <p class="dl-hero__lede">The Invoke Launcher installs, updates and runs Invoke on your own machine.</p>
+      <ul class="chips">
+        <li class="chip">Launcher v{release.version}</li>
+        <li class="chip">Released <time datetime={release.publishedAt}>{releasedOn}</time></li>
+        <li>
+          <a class="chip chip--link" href={release.notesUrl}>
+            Release notes <ArrowUpRight aria-hidden="true" />
+          </a>
+        </li>
+        <li>
+          <a class="chip chip--link" href={href('/start-here/upgrading/')}>
+            Upgrading from v6 <ArrowRight aria-hidden="true" />
+          </a>
+        </li>
+      </ul>
+
+      <div class="phone">
+        <Smartphone class="phone__icon" aria-hidden="true" />
+        <div class="phone__body">
+          <h2 class="phone__title">Invoke runs on desktop</h2>
+          <p>Open this page on a Windows, macOS or Linux computer to download the launcher.</p>
+          <button type="button" class="docs-button docs-button--secondary phone__copy" data-copy-link hidden>
+            <Copy class="phone__copy-idle" aria-hidden="true" />
+            <Check class="phone__copy-done" aria-hidden="true" />
+            <span data-copy-label>Copy link</span>
+          </button>
+          <span class="sr-only" aria-live="polite" data-copy-status></span>
+        </div>
+      </div>
+
+      <div class="dl-primary">
+        {
+          platforms.map((platform) => (
+            <div class="dl-primary__option" data-for={platform.id}>
+              <a class="docs-button docs-button--primary docs-button--xl" href={platform.href}>
+                <Download aria-hidden="true" />
+                Download for {platform.name}
+              </a>
+              <p class="dl-primary__meta">{platform.primaryMeta}</p>
+              {platform.id === 'macos' && (
+                <p class="dl-primary__caveat">Apple Silicon (M-series) only; not Intel Macs.</p>
+              )}
+              <p class="dl-primary__also">
+                Also for{' '}
+                {platforms
+                  .filter((other) => other.id !== platform.id)
+                  .map((other, index) => (
+                    <>
+                      {index > 0 && <span aria-hidden="true"> · </span>}
+                      <a
+                        href={other.href}
+                        aria-label={`Download for ${other.name}${other.qualifier ? ` (${other.qualifier})` : ''}`}
+                      >
+                        {other.name}
+                        {other.qualifier && ` (${other.qualifier})`}
+                      </a>
+                    </>
+                  ))}
+              </p>
+            </div>
+          ))
+        }
+      </div>
+
+      <div class="dl-hero__cards">
+        <LauncherCards platforms={platforms} level={2} />
+      </div>
+    </section>
+
+    <section class="req" aria-labelledby="will-it-run">
+      <h2 id="will-it-run" class="req__title">Will it run?</h2>
+      <p class="req__os">
+        <Monitor aria-hidden="true" />
+        Windows 10+, macOS 14+ and Linux (Ubuntu 20.04+ is well-tested).
+      </p>
+      <ul class="req__list">
+        {
+          hardware.map(({ Icon, label, text, link }) => (
+            <li>
+              <Icon aria-hidden="true" />
+              <span>
+                <strong>{label}</strong> {text}
+                {link && (
+                  <>
+                    {' '}
+                    <a href={href(link.href)}>{link.text}</a>
+                  </>
+                )}
+              </span>
+            </li>
+          ))
+        }
+      </ul>
+      <h3 class="docs-eyebrow req__scale-title">GPU memory (VRAM) by model</h3>
+      <ol class="vram">
+        {
+          vramTiers.map(({ gb, models }) => (
+            <li class="vram__tier">
+              <span class="vram__bar" aria-hidden="true" />
+              <strong class="vram__gb">{gb} GB</strong>
+              <span class="vram__models">{models}</span>
+            </li>
+          ))
+        }
+      </ol>
+      <p class="req__note">Less VRAM often works too, just slower.</p>
+      <p class="req__links">
+        <a href={href('/start-here/system-requirements/')}>
+          Full hardware requirements <ArrowRight aria-hidden="true" />
+        </a>
+        <a href={href('/configuration/optimization/low-vram-mode/')}>
+          Low-VRAM mode <ArrowRight aria-hidden="true" />
+        </a>
+      </p>
+    </section>
+
+    <section class="next" aria-labelledby="what-happens-next">
+      <h2 id="what-happens-next" class="section-title">What happens next</h2>
+      <ol class="steps">
+        {
+          steps.map(({ Icon, title, text, link }, index) => (
+            <li>
+              <a class="docs-link-card step" href={href(link)}>
+                <span class="step__head">
+                  <span class="step__number" aria-hidden="true">
+                    {index + 1}
+                  </span>
+                  <Icon class="docs-link-card__icon" aria-hidden="true" />
+                </span>
+                <span class="step__text">
+                  <span class="docs-link-card__title">{title}</span>
+                  <span class="docs-link-card__description">{text}</span>
+                </span>
+              </a>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+
+    <script is:inline>
+      (() => {
+        const hero = document.currentScript.parentElement;
+        const data = navigator.userAgentData;
+        const ua = navigator.userAgent;
+        const source = (data?.platform || navigator.platform || ua || '').toLowerCase();
+        // Phones and tablets get the three downloads and, with no platform picked, the copy-link card. iPads report a
+        // Mac platform; a touch-first Windows tablet keeps its platform.
+        const mobile =
+          data?.mobile ??
+          (/android|iphone|ipad|ipod|mobile/i.test(ua) || (source.includes('mac') && navigator.maxTouchPoints > 1));
+        if (mobile || matchMedia('(pointer: coarse)').matches) hero.dataset.handheld = '';
+        // The Windows and Linux installers are x64 only, so ARM visitors choose from the three cards. Chromium on
+        // Windows on ARM reports x64 everywhere but in the high-entropy architecture hint.
+        const arm = /\b(aarch64|arm)/i.test(`${navigator.platform} ${ua}`);
+        const platform = mobile
+          ? null
+          : source.includes('mac')
+            ? 'macos'
+            : arm
+              ? null
+              : source.includes('win')
+                ? 'windows'
+                : source.includes('linux')
+                  ? 'linux'
+                  : null;
+        if (platform) hero.dataset.platform = platform;
+        if (platform && platform !== 'macos') {
+          data?.getHighEntropyValues?.(['architecture']).then(
+            ({ architecture }) => {
+              if (architecture === 'arm') delete hero.dataset.platform;
+            },
+            () => {},
+          );
+        }
+
+        const copy = hero.querySelector('[data-copy-link]');
+        if (!navigator.clipboard?.writeText) return;
+        const label = copy.querySelector('[data-copy-label]');
+        const status = hero.querySelector('[data-copy-status]');
+        let reset;
+        copy.hidden = false;
+        copy.addEventListener('click', async () => {
+          clearTimeout(reset);
+          try {
+            await navigator.clipboard.writeText(location.href);
+            copy.dataset.copied = '';
+            label.textContent = 'Copied';
+            status.textContent = 'Link copied to the clipboard';
+          } catch {
+            label.textContent = 'Could not copy';
+            status.textContent = 'Could not copy the link';
+          }
+          reset = setTimeout(() => {
+            delete copy.dataset.copied;
+            label.textContent = 'Copy link';
+            status.textContent = '';
+          }, 2000);
+        });
+      })();
+    </script>
+  </div>
+
+  <section class="ways" aria-labelledby="other-ways">
+    <h2 id="other-ways" class="section-title">Other ways to run it</h2>
+    <fieldset class="ways__picker">
+      <legend class="sr-only">Way to run Invoke</legend>
+      <div class="docs-segment-tabs">
+        {
+          ways.map(({ id, label, Icon }) => (
+            <label class="docs-segment-tab">
+              <input type="radio" name="download-way" value={id} checked={id === 'launcher'} />
+              <Icon size={14} aria-hidden="true" />
+              {label}
+            </label>
+          ))
+        }
+      </div>
+    </fieldset>
+
+    <div class="ways__panel" data-way="launcher">
+      <h3 class="ways__heading">Install with the launcher</h3>
+      <p class="ways__lede">The recommended way: the launcher sets up Python, Invoke and its updates for you.</p>
+      <LauncherCards platforms={platforms} level={4} />
+    </div>
+
+    <div class="ways__panel" data-way="manual">
+      <h3 class="ways__heading">Install manually</h3>
+      <p class="ways__lede">For developers and anyone who wants to manage the Python environment themselves.</p>
+      <div class="ways__cards">
+        <a class="docs-link-card way-card" href={href('/start-here/manual/')}>
+          <Terminal class="docs-link-card__icon" aria-hidden="true" />
+          <span class="docs-link-card__title">Manual installation guide</span>
+          <span class="docs-link-card__description">Install Invoke into a Python environment with uv.</span>
+        </a>
+        <a class="docs-link-card way-card" href="https://github.com/invoke-ai/InvokeAI/releases">
+          <ArrowUpRight class="docs-link-card__icon" aria-hidden="true" />
+          <span class="docs-link-card__title">Invoke releases on GitHub</span>
+          <span class="docs-link-card__description">Release notes and source for every version.</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="ways__panel" data-way="docker">
+      <h3 class="ways__heading">Run with Docker</h3>
+      <p class="ways__lede">Run Invoke in a container, without installing its dependencies on your system.</p>
+      <pre class="ways__code"><code>docker run --runtime=nvidia --gpus=all --publish 9090:9090 ghcr.io/invoke-ai/invokeai</code></pre>
+      <div class="ways__cards">
+        <a class="docs-link-card way-card" href={href('/configuration/docker/')}>
+          <Container class="docs-link-card__icon" aria-hidden="true" />
+          <span class="docs-link-card__title">Docker guide</span>
+          <span class="docs-link-card__description">AMD GPUs, building your own image and Docker Compose.</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="ways__panel" data-way="cloud">
+      <h3 class="ways__heading">No GPU? Run it on a rented one</h3>
+      <p class="ways__lede">These services run Invoke on their GPUs and bill you for the time you use.</p>
+      <div class="ways__cards ways__cards--three">
+        {
+          cloudProviders.map(({ title, description, href: providerHref }) => (
+            <a class="docs-link-card way-card" href={providerHref}>
+              <ArrowUpRight class="docs-link-card__icon" aria-hidden="true" />
+              <span class="docs-link-card__title">{title}</span>
+              <span class="docs-link-card__description">{description}</span>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <ul class="trust" aria-label="About Invoke">
+    <li><Scale aria-hidden="true" /> Apache 2.0 licensed</li>
+    <li><WifiOff aria-hidden="true" /> Runs offline</li>
+    <li><UserRoundX aria-hidden="true" /> No account needed</li>
+    <li>
+      <a href="https://github.com/invoke-ai/InvokeAI"><CodeXml aria-hidden="true" /> Source on GitHub</a>
+    </li>
+  </ul>
+</div>
+
+<style>
+  .download {
+    display: flex;
+    flex-direction: column;
+    gap: 3.5rem;
+  }
+
+  /* Hero */
+
+  /*
+   * The hero, the hardware card and the next steps share one grid. Two columns from 56rem: the steps run as a card
+   * strip under both, or, once the script has picked a platform and the hero is just a button, as a list in the
+   * space under it beside the taller hardware card.
+   */
+  .dl-hero {
+    display: grid;
+    grid-template-areas: 'main' 'req' 'next';
+    gap: 2.5rem 2rem;
+    align-items: start;
+  }
+
+  .dl-hero__main {
+    grid-area: main;
+  }
+
+  .req {
+    grid-area: req;
+  }
+
+  .next {
+    grid-area: next;
+  }
+
+  @media (min-width: 56rem) {
+    .dl-hero {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 25rem);
+      grid-template-areas: 'main req' 'next next';
+      column-gap: 2.5rem;
+    }
+
+    .dl-hero[data-platform] {
+      grid-template-areas: 'main req' 'next req';
+      grid-template-rows: auto 1fr;
+      row-gap: 2rem;
+
+      .section-title {
+        margin-bottom: 0.5rem;
+        color: var(--docs-text-muted);
+        font-size: var(--sl-text-sm);
+        letter-spacing: 0;
+      }
+
+      .steps {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0;
+      }
+
+      .step {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+        column-gap: 0.75rem;
+        margin-inline: -0.5rem;
+        padding: 0.375rem 0.5rem;
+        border-color: transparent;
+        border-radius: var(--docs-radius-lg);
+        background-color: transparent;
+
+        &:hover {
+          border-color: transparent;
+          background-color: var(--docs-hover);
+        }
+      }
+
+      .step__head {
+        gap: 0.5rem;
+        margin-bottom: 0;
+      }
+
+      .step__text {
+        display: block;
+      }
+
+      .step__text .docs-link-card__description {
+        margin-inline-start: 0.375rem;
+      }
+    }
+  }
+
+  .dl-hero__main {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    min-width: 0;
+  }
+
+  .dl-hero__lede {
+    max-width: 34rem;
+    margin: 0;
+    color: var(--docs-text-muted);
+    font-size: var(--sl-text-lg);
+    line-height: 1.5;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: -0.5rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    height: 1.5rem;
+    padding: 0 0.625rem;
+    border: 1px solid var(--docs-border);
+    border-radius: 999px;
+    background-color: var(--docs-surface);
+    color: var(--docs-text-muted);
+    font-size: var(--sl-text-xs);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+
+    :global(svg) {
+      width: 0.875rem;
+      height: 0.875rem;
+      color: var(--docs-text-subtle);
+    }
+  }
+
+  .chip--link {
+    color: var(--docs-text-strong);
+    text-decoration: none;
+    transition:
+      border-color 150ms ease,
+      background-color 150ms ease;
+
+    &:hover {
+      border-color: var(--docs-border-strong);
+      background-color: var(--docs-control);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--docs-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  /*
+   * The detected platform's button, or (without the script, or on a platform it does not know) all three cards.
+   */
+  .dl-primary,
+  .dl-primary__option {
+    display: none;
+  }
+
+  .dl-hero[data-platform] {
+    .dl-primary {
+      display: block;
+    }
+    .dl-hero__cards {
+      display: none;
+    }
+  }
+
+  .dl-hero[data-platform='windows'] .dl-primary__option[data-for='windows'],
+  .dl-hero[data-platform='macos'] .dl-primary__option[data-for='macos'],
+  .dl-hero[data-platform='linux'] .dl-primary__option[data-for='linux'] {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .dl-primary__option p {
+    margin: 0;
+  }
+
+  .dl-primary__meta {
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-xs);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dl-primary__caveat {
+    color: var(--docs-text-muted);
+    font-size: var(--sl-text-xs);
+  }
+
+  .dl-primary__option .dl-primary__also {
+    margin-top: 0.5rem;
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-sm);
+  }
+
+  a:not(.docs-button, .chip, .docs-link-card) {
+    color: var(--docs-accent);
+    text-decoration: none;
+
+    &:hover {
+      color: var(--docs-accent-text);
+      text-decoration: underline;
+      text-underline-offset: 0.2em;
+    }
+  }
+
+  /* Phones: say Invoke is for desktops, and offer to copy the link, before the downloads. */
+  .phone {
+    display: none;
+    gap: 0.75rem;
+    padding: 1rem;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+
+    :global(.phone__icon) {
+      flex: none;
+      width: 1.25rem;
+      height: 1.25rem;
+      margin-top: 0.125rem;
+      color: var(--docs-text-muted);
+    }
+  }
+
+  .dl-hero[data-handheld]:not([data-platform]) .phone {
+    display: flex;
+  }
+
+  /* Without the script, a narrow screen is most likely a phone. */
+  @media (scripting: none) and (max-width: 40rem) {
+    .phone {
+      display: flex;
+    }
+  }
+
+  .phone__body {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+
+    p {
+      margin: 0 0 0.5rem;
+      color: var(--docs-text-muted);
+      font-size: var(--sl-text-sm);
+    }
+  }
+
+  .phone__title {
+    margin: 0;
+    color: var(--docs-text-strong);
+    font-size: var(--sl-text-base);
+    font-weight: 600;
+  }
+
+  .phone__copy {
+    &[hidden] {
+      display: none;
+    }
+
+    :global(.phone__copy-done) {
+      display: none;
+      color: var(--invoke-success);
+    }
+
+    &[data-copied] {
+      :global(.phone__copy-idle) {
+        display: none;
+      }
+      :global(.phone__copy-done) {
+        display: block;
+      }
+    }
+  }
+
+  /* Will it run? */
+
+  .req {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    padding: 1.25rem;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+
+    :global(svg) {
+      flex: none;
+      width: 1rem;
+      height: 1rem;
+    }
+
+    p {
+      margin: 0;
+    }
+  }
+
+  .req__title {
+    margin: 0;
+    color: var(--docs-text-strong);
+    font-size: var(--sl-text-lg);
+    font-weight: 600;
+  }
+
+  .req__os {
+    display: flex;
+    gap: 0.5rem;
+    color: var(--docs-text-muted);
+    font-size: var(--sl-text-sm);
+    line-height: 1.5;
+
+    :global(svg) {
+      margin-top: 0.1875rem;
+      color: var(--docs-text-subtle);
+    }
+  }
+
+  .req__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0.875rem 0 0;
+    border-top: 1px solid var(--docs-border-subtle);
+    list-style: none;
+
+    li {
+      display: flex;
+      gap: 0.5rem;
+      margin: 0;
+      color: var(--docs-text-subtle);
+      font-size: var(--sl-text-sm);
+      line-height: 1.5;
+    }
+
+    :global(svg) {
+      margin-top: 0.1875rem;
+      color: var(--docs-text-subtle);
+    }
+
+    strong {
+      color: var(--docs-text-strong);
+      font-weight: 600;
+    }
+  }
+
+  .req__scale-title {
+    margin: 0.5rem 0 0;
+  }
+
+  /* Four tiers on one bar, brighter as they grow. */
+  .vram {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .vram__tier {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin: 0;
+    padding-inline-end: 0.375rem;
+    min-width: 0;
+  }
+
+  .vram__bar {
+    height: 0.375rem;
+    margin-bottom: 0.25rem;
+    background-color: color-mix(in oklab, var(--docs-accent) 35%, var(--docs-control));
+  }
+
+  .vram__tier:nth-child(2) .vram__bar {
+    background-color: color-mix(in oklab, var(--docs-accent) 57%, var(--docs-control));
+  }
+
+  .vram__tier:nth-child(3) .vram__bar {
+    background-color: color-mix(in oklab, var(--docs-accent) 78%, var(--docs-control));
+  }
+
+  .vram__tier:nth-child(4) .vram__bar {
+    background-color: var(--docs-accent);
+  }
+
+  .vram__tier:first-child .vram__bar {
+    border-start-start-radius: 999px;
+    border-end-start-radius: 999px;
+  }
+
+  .vram__tier:last-child .vram__bar {
+    border-start-end-radius: 999px;
+    border-end-end-radius: 999px;
+  }
+
+  .vram__gb {
+    color: var(--docs-text-strong);
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .vram__models {
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-xs);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  .req__note {
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-xs);
+  }
+
+  .req__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
+    padding-top: 0.875rem;
+    border-top: 1px solid var(--docs-border-subtle);
+    font-size: var(--sl-text-sm);
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-weight: 500;
+    }
+
+    :global(svg) {
+      width: 0.875rem;
+      height: 0.875rem;
+    }
+  }
+
+  /* Sections */
+
+  .section-title {
+    margin: 0 0 1rem;
+    color: var(--docs-text-strong);
+    font-size: var(--sl-text-h3);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+      display: flex;
+      margin: 0;
+    }
+  }
+
+  .step,
+  .way-card {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  .step__text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .step__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+  }
+
+  .step__number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border: 1px solid var(--docs-border);
+    border-radius: 999px;
+    color: var(--docs-text-muted);
+    font-family: var(--__sl-font-mono);
+    font-size: var(--sl-text-xs);
+  }
+
+  /* Other ways to run it: radio chips pick a panel; without `:has()` the chips hide and every panel shows. */
+  .ways__picker {
+    display: none;
+    min-width: 0;
+    margin: 0 0 1.25rem;
+    padding: 0;
+    border: 0;
+
+    .docs-segment-tabs {
+      flex-wrap: wrap;
+    }
+  }
+
+  .ways__panel + .ways__panel {
+    margin-top: 2rem;
+  }
+
+  @supports selector(:has(*)) {
+    .ways__picker {
+      display: block;
+    }
+
+    .ways__panel {
+      display: none;
+    }
+
+    .ways__panel + .ways__panel {
+      margin-top: 0;
+    }
+
+    .ways:has(input[value='launcher']:checked) [data-way='launcher'],
+    .ways:has(input[value='manual']:checked) [data-way='manual'],
+    .ways:has(input[value='docker']:checked) [data-way='docker'],
+    .ways:has(input[value='cloud']:checked) [data-way='cloud'] {
+      display: block;
+    }
+  }
+
+  .ways__heading {
+    margin: 0;
+    color: var(--docs-text-strong);
+    font-size: var(--sl-text-base);
+    font-weight: 600;
+  }
+
+  .ways__lede {
+    margin: 0.25rem 0 1rem;
+    color: var(--docs-text-subtle);
+    font-size: var(--sl-text-sm);
+  }
+
+  .ways__cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    gap: 0.75rem;
+  }
+
+  .ways__cards--three {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  }
+
+  .way-card :global(.docs-link-card__icon) {
+    margin-bottom: 0.5rem;
+  }
+
+  .ways__code {
+    margin: 0 0 0.75rem;
+    padding: 0.75rem 1rem;
+    overflow-x: auto;
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+    color: var(--docs-text);
+    font-family: var(--__sl-font-mono);
+    font-size: var(--sl-text-xs);
+  }
+
+  /* Trust strip */
+
+  .trust {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem 1.75rem;
+    margin: 0;
+    padding: 1.25rem 0 0;
+    border-top: 1px solid var(--docs-border-subtle);
+    list-style: none;
+
+    li,
+    a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      margin: 0;
+      color: var(--docs-text-subtle);
+      font-size: var(--sl-text-xs);
+    }
+
+    a:hover {
+      color: var(--docs-text-strong);
+      text-decoration: none;
+    }
+
+    :global(svg) {
+      width: 0.875rem;
+      height: 0.875rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chip--link {
+      transition: none;
+    }
+  }
+</style>

@@ -1,0 +1,15 @@
+title: Image to Character Art Image Nodes
+author: mickr777
+repo: https://github.com/mickr777/imagetoasciiimage
+summary: Convert an image into ASCII or Unicode character art.
+categories: [image-effects]
+thumbnail: ./image-to-character-art-image-nodes.webp
+images:
+  - src: https://user-images.githubusercontent.com/115216705/271817646-8e061fcc-9a2c-4fa9-bcc7-c0f7b01e9056.png
+    alt: An image redrawn as character art
+  - src: https://github.com/mickr777/imagetoasciiimage/assets/115216705/3c4990eb-2f42-46b9-90f9-0088b939dc6a
+    alt: A second character art example
+  - src: https://github.com/mickr777/imagetoasciiimage/assets/115216705/fee7f800-a4a8-41e2-a66b-c66e4343307e
+    alt: A third character art example
+  - src: https://github.com/mickr777/imagetoasciiimage/assets/115216705/1d9c1003-a45f-45c2-aac7-46470bb89330
+    alt: A fourth character art example

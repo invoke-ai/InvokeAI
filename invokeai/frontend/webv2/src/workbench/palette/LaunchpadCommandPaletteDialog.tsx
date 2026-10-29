@@ -6,12 +6,13 @@ import { useAvailableSettings } from '@workbench/settings/useAvailableSettings';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { PaletteEntry, SettingsEntryDeps } from './entries';
+import type { PaletteEntry, PaletteSearchProvider, SettingsEntryDeps } from './entries';
 
 import { CommandPaletteDialog } from './CommandPaletteDialog';
+import { createDocsProvider } from './docsSearchProvider';
 import { buildOpenSettingsEntry, buildSettingsEntries } from './entries';
 
-/** Launchpad-only palette adapter: navigation and settings, no editor providers. */
+/** Launchpad-only palette adapter: navigation, settings and docs search, no editor providers. */
 const LaunchpadCommandPaletteDialog = ({
   isOpen,
   modifierKeyLabel,
@@ -86,11 +87,14 @@ const LaunchpadCommandPaletteDialog = ({
     t,
   ]);
 
+  const providers = useMemo<PaletteSearchProvider[]>(() => [createDocsProvider({ t })], [t]);
+
   return (
     <CommandPaletteDialog
       entries={entries}
       isOpen={isOpen}
       modifierKeyLabel={modifierKeyLabel}
+      providers={providers}
       onClose={onClose}
       onExitComplete={onExitComplete}
     />

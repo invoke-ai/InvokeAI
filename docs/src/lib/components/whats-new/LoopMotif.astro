@@ -1,0 +1,343 @@
+---
+/*
+ * Loop nodes, as the workflow editor draws them: a For node takes a collection, an Image Processor body sits inside
+ * the dashed loop boundary, and a ForReturn closes each iteration. The dashed loop_linkage edge pairs the two, and
+ * For.output_collection leads out of the loop. Each item takes its turn through the body and lands in the output
+ * collection, four iterations and a pause. The still frame is the second iteration, its value halfway through.
+ */
+import { Image } from 'astro:assets';
+
+import landscape from '../../../assets/whats-new-landscape.webp';
+import { box } from './box';
+import Stage from './Stage.astro';
+
+const items = [0, 1, 2, 3];
+const itemY = (index: number) => 34 + index * 38;
+const still = 1;
+// Each iteration lasts 2s of the 10s cycle; a negative delay starts an element's cycle at its own iteration.
+const iterationDelay = (index: number) => `${index * 2 - 10}s`;
+const thumbProps = { src: landscape, alt: '', width: 96 };
+// Each item is a different part of the image; its result is the same part, processed.
+const crop = (index: number) => `object-position: ${index * 30}% 50%`;
+const ports = { item: 78, index: 96, outputCollection: 114, loopLinkage: 140 };
+---
+
+<Stage width={560} height={200}>
+  <svg class="wn-svg" viewBox="0 0 560 200" aria-hidden="true">
+    <rect class="boundary" x="216" y="50" width="136" height="80" rx="8"></rect>
+
+    <path class="edge" d="M50 93C58 93 56 78 66 78"></path>
+    <path class="edge" d="M182 78C205 78 205 96 228 96"></path>
+    <path class="edge" d="M340 96C362 96 362 78 384 78"></path>
+    <path class="edge" d="M182 114C200 114 194 188 214 188H486C508 188 500 106 510 106"></path>
+    <path class="linkage" d="M182 140C230 140 230 172 283 172S336 140 384 140"></path>
+
+    {
+      items.map((index) => (
+        <rect
+          class:list={['ring', { 'is-still': index === still }]}
+          x="15"
+          y={itemY(index) - 3}
+          width="36"
+          height="36"
+          rx="5"
+          style={`--delay: ${iterationDelay(index)}`}
+        />
+      ))
+    }
+
+    <g class="node">
+      <rect x="66" y="40" width="116" height="120" rx="6"></rect>
+      <path d="M66 60H182"></path>
+      <text class="node__title" x="74" y="53.5">For</text>
+      {
+        items.map((index) => (
+          <text
+            class:list={['counter', { 'is-still': index === still, 'counter--last': index === items.length - 1 }]}
+            x="174"
+            y="53.5"
+            text-anchor="end"
+            style={`--delay: ${iterationDelay(index)}`}
+          >
+            {index + 1} / {items.length}
+          </text>
+        ))
+      }
+      <text x="74" y={ports.item + 3}>collection</text>
+      <text x="174" y={ports.item + 3} text-anchor="end">item</text>
+      <text x="174" y={ports.index + 3} text-anchor="end">index</text>
+      <text x="174" y={ports.outputCollection + 3} text-anchor="end">output_collection</text>
+      <text x="174" y={ports.loopLinkage + 3} text-anchor="end">loop_linkage</text>
+    </g>
+
+    <g class="node">
+      <rect x="228" y="58" width="112" height="60" rx="6"></rect>
+      <path d="M228 78H340"></path>
+      <text class="node__title" x="236" y="71.5">Image Processor</text>
+      <text x="236" y="99">image</text>
+      <text x="332" y="99" text-anchor="end">image</text>
+    </g>
+
+    <g class="node">
+      <rect x="384" y="40" width="100" height="120" rx="6"></rect>
+      <path d="M384 60H484"></path>
+      <text class="node__title" x="392" y="53.5">ForReturn</text>
+      <text x="392" y={ports.item + 3}>output</text>
+      <text x="392" y={ports.loopLinkage + 3}>loop_linkage</text>
+    </g>
+
+    <g class="ports">
+      {[66, 182, 384].map((x) => <circle class="port--image" cx={x} cy={ports.item} r="3.5" />)}
+      <circle class="port--image" cx="228" cy="96" r="3.5"></circle>
+      <circle class="port--image" cx="340" cy="96" r="3.5"></circle>
+      <circle cx="182" cy={ports.index} r="3.5"></circle>
+      <circle class="port--image" cx="182" cy={ports.outputCollection} r="3.5"></circle>
+      <circle class="port--linkage" cx="182" cy={ports.loopLinkage} r="3.5"></circle>
+      <circle class="port--linkage" cx="384" cy={ports.loopLinkage} r="3.5"></circle>
+    </g>
+
+    <text class="caption" x="18" y="24">collection</text>
+    <text class="caption" x="544" y="24" text-anchor="end">output_collection</text>
+
+    <path class="token" pathLength="100" d="M182 78C205 78 205 96 228 96H340C362 96 362 78 384 78"></path>
+  </svg>
+
+  {
+    items.map((index) => (
+      <Image {...thumbProps} class="wn-abs thumb" style={`${box(18, itemY(index), 30, 30)}; ${crop(index)}`} />
+    ))
+  }
+  <div class="wn-abs results" style={box(514, 34, 30, 144)}>
+    {
+      items.map((index) => (
+        <Image
+          {...thumbProps}
+          class="wn-abs thumb thumb--processed"
+          style={`${box(0, itemY(index) - 34, 30, 30)}; ${crop(index)}`}
+        />
+      ))
+    }
+  </div>
+</Stage>
+
+<style>
+  .boundary {
+    fill: color-mix(in oklab, var(--invoke-success) 6%, transparent);
+    stroke: var(--invoke-success);
+    stroke-dasharray: 3 3;
+    stroke-opacity: 0.7;
+  }
+
+  .edge,
+  .linkage {
+    fill: none;
+    stroke-width: 1.5;
+  }
+
+  .edge {
+    stroke: var(--docs-border-strong);
+  }
+
+  .linkage {
+    stroke: var(--invoke-success);
+    stroke-dasharray: 4 3;
+  }
+
+  .node {
+    rect {
+      fill: var(--wn-panel);
+      stroke: var(--wn-line);
+    }
+
+    path {
+      stroke: var(--wn-line);
+    }
+
+    text {
+      fill: var(--wn-ink);
+      font-size: 8px;
+    }
+
+    .node__title {
+      fill: var(--wn-strong);
+      font-size: 9.5px;
+      font-weight: 600;
+    }
+  }
+
+  .counter {
+    font-family: var(--__sl-font-mono);
+    opacity: 0;
+
+    &.is-still {
+      opacity: 1;
+    }
+  }
+
+  .ports circle {
+    fill: var(--docs-border-strong);
+    stroke: var(--wn-panel);
+    stroke-width: 1.5;
+  }
+
+  .ports .port--image {
+    fill: var(--docs-accent);
+  }
+
+  .ports .port--linkage {
+    fill: var(--invoke-success);
+  }
+
+  .caption {
+    fill: var(--wn-ink);
+    font-family: var(--__sl-font-mono);
+    font-size: 8px;
+  }
+
+  .ring {
+    fill: none;
+    stroke: var(--docs-accent);
+    stroke-width: 1.5;
+    opacity: 0;
+
+    &.is-still {
+      opacity: 1;
+    }
+  }
+
+  /* A round-capped dash of almost no length: a dot that the offset moves along the path. */
+  .token {
+    fill: none;
+    stroke: var(--docs-accent-text);
+    stroke-width: 7;
+    stroke-linecap: round;
+    stroke-dasharray: 0.01 200;
+    stroke-dashoffset: -50;
+  }
+
+  .thumb {
+    border-radius: calc(var(--u) * 3);
+  }
+
+  .thumb--processed {
+    filter: grayscale(1) contrast(1.15);
+  }
+
+  .results {
+    clip-path: inset(0 0 79.2% 0);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .ring,
+    .counter {
+      animation: lp-turn 10s step-end var(--delay) infinite;
+    }
+
+    .counter--last {
+      animation-name: lp-turn-last;
+    }
+
+    .linkage {
+      animation: lp-march 2s linear infinite;
+    }
+
+    .token {
+      animation: lp-token 10s ease-in-out infinite;
+    }
+
+    .results {
+      animation: lp-results 10s var(--wn-ease) infinite;
+    }
+  }
+
+  @keyframes lp-turn {
+    0% {
+      opacity: 1;
+    }
+    20%,
+    100% {
+      opacity: 0;
+    }
+  }
+
+  /* The last count stays up through the pause after the final iteration. */
+  @keyframes lp-turn-last {
+    0% {
+      opacity: 1;
+    }
+    40%,
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes lp-march {
+    to {
+      stroke-dashoffset: -14;
+    }
+  }
+
+  /* Four trips through the body, one per iteration, then a pause. The dot rewinds while it is hidden. */
+  @keyframes lp-token {
+    0%,
+    20%,
+    40%,
+    60% {
+      stroke-dashoffset: 0;
+      opacity: 0;
+    }
+    2%,
+    22%,
+    42%,
+    62% {
+      stroke-dashoffset: 0;
+      opacity: 1;
+    }
+    13%,
+    33%,
+    53%,
+    73% {
+      stroke-dashoffset: -100;
+      opacity: 1;
+    }
+    15%,
+    19%,
+    35%,
+    39%,
+    55%,
+    59%,
+    75%,
+    100% {
+      stroke-dashoffset: -100;
+      opacity: 0;
+    }
+  }
+
+  /* Each result appears as its iteration's value arrives, top to bottom; at the end they clear together. */
+  @keyframes lp-results {
+    0%,
+    13% {
+      clip-path: inset(0 0 100% 0);
+    }
+    15%,
+    33% {
+      clip-path: inset(0 0 79.2% 0);
+    }
+    35%,
+    53% {
+      clip-path: inset(0 0 52.8% 0);
+    }
+    55%,
+    73% {
+      clip-path: inset(0 0 26.4% 0);
+    }
+    75%,
+    94% {
+      clip-path: inset(0 0 0 0);
+    }
+    99%,
+    100% {
+      clip-path: inset(0 0 100% 0);
+    }
+  }
+</style>

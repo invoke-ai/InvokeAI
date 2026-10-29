@@ -13,6 +13,7 @@
     "inputLabel": "Search commands and settings",
     "layoutPresetCommand": "{{name}} layout",
     "resultsLabel": "Command palette results",
+    "opensInNewTab": "Opens in a new tab",
     "placeholders": {
       "root": "Search commands, settings, and more…",
       "scope": "Search {{label}}…",
@@ -73,6 +74,7 @@
       "canvas": "Canvas",
       "commands": "Commands",
       "date": "Date",
+      "docs": "Docs",
       "gallery": "Gallery",
       "generation": "Generation",
       "images": "Images",
@@ -103,6 +105,7 @@
       "boardSubtitle": "Board · {{count}} image",
       "boardSubtitle_other": "Board · {{count}} images",
       "defaultWorkflow": "Default workflow",
+      "docs": "Docs",
       "images": "Images",
       "models": "Models",
       "noTitle": "Untitled generation",

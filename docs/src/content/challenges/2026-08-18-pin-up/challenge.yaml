@@ -1,0 +1,22 @@
+theme: Pin-Up
+brief: >-
+  Forget the classic beauty shot. Take the pin-up attitude and make it your own.
+startDate: 2026-08-18
+endDate: 2026-08-24
+discordUrl: https://discord.com/channels/1020123559063990373/1020355799945580585/1541369389583171594
+winners:
+  - place: 1
+    image: ./1-revenant.webp
+    artist: Revenant
+  - place: 2
+    image: ./2-mickr777.webp
+    artist: mickr777
+  - place: runner-up
+    image: ./runner-up-kylie.webp
+    artist: KYLIE
+  - place: runner-up
+    image: ./runner-up-mother-maiden-crow.webp
+    artist: Mother, Maiden, Crow
+  - place: runner-up
+    image: ./runner-up-subsector13.webp
+    artist: Subsector13

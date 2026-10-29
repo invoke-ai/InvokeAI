@@ -1,0 +1,16 @@
+title: Depth Map from Wavefront OBJ
+author: dwringer
+repo: https://github.com/dwringer/depth-from-obj-node
+summary: Render depth maps from triangulated Wavefront .obj files.
+description: >-
+  A simple 3D renderer that uses numpy and matplotlib to compute and color the scene, with parameters for the field of
+  view, camera position and model orientation.
+
+  An .obj must use triangulated meshes, so enable that option when exporting from a 3D modeling program. Each triangle
+  gets one solid color from its average depth, so large triangles cause anomalies. In Blender, the Remesh modifier can
+  subdivide a mesh into small pieces that work well within these limits.
+categories: [video-3d, control]
+thumbnail: ./depth-map-from-wavefront-obj.webp
+images:
+  - src: https://raw.githubusercontent.com/dwringer/depth-from-obj-node/main/depth_from_obj_usage.jpg
+    alt: A workflow rendering a depth map from an .obj model

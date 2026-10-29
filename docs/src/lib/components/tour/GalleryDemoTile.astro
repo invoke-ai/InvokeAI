@@ -1,0 +1,44 @@
+---
+// One thumbnail of the Gallery demo, after the app's `GalleryTileFrame.tsx` and `GalleryThumbnail.tsx`: the image is
+// the select button, the size badge and star button show on hover or focus, and a starred item keeps its star shown.
+import type { ImageMetadata } from 'astro';
+import { Image } from 'astro:assets';
+import Star from '@lucide/astro/icons/star';
+
+import type { GalleryDemoItem } from './gallery-demo.mjs';
+
+interface Props {
+  item: GalleryDemoItem;
+  image: ImageMetadata;
+  hidden?: boolean;
+  /** The grid's one Tab stop. */
+  tabStop?: boolean;
+}
+
+const { item, image, hidden = false, tabStop = false } = Astro.props;
+const size = Math.min(image.width, 208);
+---
+
+<div role="listitem" class="gd-tile" data-item-id={item.id} data-starred={item.starred ? '' : undefined} hidden={hidden}>
+  <button
+    type="button"
+    class="gd-tile-select"
+    data-tile-select
+    aria-pressed="false"
+    aria-label={`Select ${item.name} for preview`}
+    aria-keyshortcuts="."
+    tabindex={tabStop ? 0 : -1}
+  >
+    <Image src={image} alt="" width={size} height={size} loading="lazy" decoding="async" draggable="false" />
+  </button>
+  <span class="gd-badge gd-badge--solid gd-tile-dims gd-overlay" aria-hidden="true">{item.width}x{item.height}</span>
+  <button
+    type="button"
+    class="gd-tile-star gd-overlay"
+    data-tile-star
+    aria-label={`${item.starred ? 'Unstar' : 'Star'} ${item.name}`}
+    tabindex={tabStop ? 0 : -1}
+  >
+    <Star size={14} aria-hidden="true" />
+  </button>
+</div>

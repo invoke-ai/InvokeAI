@@ -1,0 +1,414 @@
+---
+/*
+ * The canvas as a stack of five layers, drawn apart: an image, a Canny control layer (its edge map as line art), a
+ * gradient in the Screen blend mode, text and a pressure-sensitive brush stroke. The gradient sweeps in, the control
+ * layer traces its edges, the stroke draws itself thin to thick to thin, the text appears, and the layers settle into
+ * one composite that exports a `.psd` before lifting apart again.
+ * The still frame is the full stack, drawn apart and labelled.
+ */
+import File from '@lucide/astro/icons/file';
+import { Image } from 'astro:assets';
+
+import landscape from '../../../assets/whats-new-landscape.webp';
+import { box } from './box';
+import Stage from './Stage.astro';
+
+// Top to bottom. `lift` is each layer's offset from the composite position, in stage units; `delay` staggers the
+// settle so the stack closes from the top.
+const layers = [
+  { id: 'brush', label: 'Brush', labelWidth: 40 },
+  { id: 'text', label: 'Text', labelWidth: 36 },
+  { id: 'gradient', label: 'Gradient · Screen', labelWidth: 84 },
+  { id: 'canny', label: 'Control · Canny', labelWidth: 78 },
+  { id: 'image', label: 'Layer 1', labelWidth: 46 },
+].map((layer, index) => ({ ...layer, lift: (index - 2) * 66, delay: `${index * 100}ms` }));
+
+const plane = box(40, 142, 136, 136);
+const word = 'COAST';
+// A tapered fill along an S-shaped centreline: the width follows the pressure as it builds and releases.
+const stroke =
+  'M14.2 112.1L17.5 106.5L20.9 102L24.3 98.6L27.7 96.2L31 94.7L34.2 94L37.3 93.7L40.4 94L43.6 94.5L46.9 95.4L50.4 96.5' +
+  'L54 97.7L57.9 99L62 100.3L66.3 101.5L70.7 102.6L75.4 103.3L80.2 103.6L85.2 103.4L90.3 102.5L95.3 100.9L100.2 98.5' +
+  'L104.9 95.3L109.3 91.3L113.4 86.4L117.3 80.6L120.9 73.9L124.2 66.1L123.8 65.9L118.5 72.3L113.5 77.6L108.6 81.7' +
+  'L104.1 84.8L99.7 87L95.7 88.5L91.9 89.3L88.2 89.7L84.6 89.7L81 89.5L77.3 89L73.5 88.3L69.6 87.5L65.5 86.7L61.4 85.8' +
+  'L57.2 85L52.9 84.4L48.6 84.1L44.3 84.1L40 84.5L35.8 85.5L31.8 87.1L28.1 89.5L24.7 92.4L21.6 96.1L18.8 100.5' +
+  'L16.2 105.8L13.8 111.9Z';
+// The landscape's edges as the image is drawn in the 136-unit plane: ridge, a peak's flank, the hill lines, the
+// meadow horizon, the rock and two grass contours.
+const edges = [
+  'M0 19.5L8 15.6L19.5 23L25 19.8L35 23L47 21L53 16.8L59.3 9.7L65.5 15L71 23L78 12.4L82.3 8L88.5 15L93 13.3' +
+    'L101 18.6L111.5 23L120 18.6L131 17.7L136 19.5',
+  'M59.3 9.7L52 22L42 32L31 40',
+  'M60 50C84 42 108 32 136 25',
+  'M0 46C14 47 30 52 42 61',
+  'M0 78C22 72 46 68 70 66S116 60 136 57',
+  'M4.4 120.4L10.6 113.3L19.5 106.2L31 101.8L35.4 97L46 98.2L53 104.4L55.8 113.3L53 124L44 130L26.6 132.8' +
+    'L10.6 132L5.3 126.6Z',
+  'M64 98C86 92 108 88 136 82',
+  'M68 124C90 116 112 112 136 108',
+];
+---
+
+<Stage width={280} height={420}>
+  {
+    layers.toReversed().map(({ id, lift, delay }) => (
+      <>
+        {id === 'canny' && <div class="wn-abs layer plate" style={`${plane}; --lift: ${lift}; --delay: ${delay}`} />}
+        <div class:list={['wn-abs layer', `layer--${id}`]} style={`${plane}; --lift: ${lift}; --delay: ${delay}`}>
+          {id === 'image' && <Image src={landscape} alt="" widths={[320, 480]} sizes="12rem" class="fill" />}
+          {id === 'canny' && (
+            <svg class="fill" viewBox="0 0 136 136" aria-hidden="true">
+              {edges.map((d, index) => (
+                <path pathLength="1" d={d} style={`--i: ${index}`} />
+              ))}
+            </svg>
+          )}
+          {id === 'gradient' && <div class="fill gradient" />}
+          {id === 'text' && (
+            <div class="wn-abs word" style={box(8, 14, 120, 42)}>
+              {[...word].map((letter, index) => (
+                <span style={`--i: ${index}`}>{letter}</span>
+              ))}
+            </div>
+          )}
+          {id === 'brush' && (
+            <svg class="fill" viewBox="0 0 136 136" aria-hidden="true">
+              <path d={stroke} />
+            </svg>
+          )}
+        </div>
+      </>
+    ))
+  }
+  {
+    layers.map(({ label, lift, labelWidth, delay }) => (
+      <div class="wn-abs tag" style={`${box(276 - labelWidth, 202, labelWidth, 16)}; --lift: ${lift}; --delay: ${delay}`}>
+        {label}
+      </div>
+    ))
+  }
+  <div class="wn-abs export" style={box(170, 248, 70, 26)}>
+    <File aria-hidden="true" />
+    .psd
+  </div>
+</Stage>
+
+<style>
+  /* An isometric plane: each layer is turned flat on its own, so no 3D context is needed. */
+  .layer {
+    border: 1px solid var(--wn-line);
+    translate: 0 calc(var(--lift) * var(--u));
+    transform: rotateX(55deg) rotateZ(-45deg);
+  }
+
+  .fill {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Transparent layers: a dashed outline and a faint fill while drawn apart, nothing in the composite. */
+  .layer--brush,
+  .layer--text {
+    --ghost-line: var(--wn-ink);
+    --ghost-fill: color-mix(in oklab, var(--wn-panel) 25%, transparent);
+    border-style: dashed;
+    border-color: var(--ghost-line);
+    background-color: var(--ghost-fill);
+  }
+
+  .layer--brush svg {
+    fill: var(--wn-strong);
+  }
+
+  .word {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: calc(var(--u) * 30);
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    text-shadow: 0 calc(var(--u) * 1) calc(var(--u) * 3) rgb(0 0 0 / 0.45);
+
+    span {
+      display: inline-block;
+    }
+  }
+
+  /* The stage isolates the blends, so they mix only with the layers below. */
+  .layer--gradient,
+  .layer--canny {
+    mix-blend-mode: screen;
+  }
+
+  .layer--gradient {
+    border-color: var(--wn-faint);
+  }
+
+  .gradient {
+    background-image: linear-gradient(to right, var(--docs-accent), transparent 90%);
+  }
+
+  /*
+   * Under the Screen-blended edge map while drawn apart, so it reads as its own black plane instead of showing the
+   * image layer through; it fades as the stack settles, leaving the edges over the image.
+   */
+  .plate {
+    border-color: transparent;
+    background-color: #000;
+  }
+
+  .layer--canny svg {
+    fill: none;
+    stroke: var(--wn-strong);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 1;
+  }
+
+  .tag {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 4);
+    background-color: var(--wn-panel);
+    color: var(--wn-strong);
+    white-space: nowrap;
+    translate: 0 calc(var(--lift) * var(--u));
+  }
+
+  .export {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--u) * 5);
+    padding-inline: calc(var(--u) * 8);
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 5);
+    background-color: var(--wn-raised);
+    box-shadow: var(--docs-shadow-popup);
+    color: var(--wn-strong);
+    font-family: var(--__sl-font-mono);
+    font-size: calc(var(--u) * 10.5);
+    /* Only the animation shows it: drawn apart, the tags hold this spot. */
+    opacity: 0;
+
+    svg {
+      flex: none;
+      width: calc(var(--u) * 13);
+      height: calc(var(--u) * 13);
+      color: var(--docs-accent);
+      stroke-width: 1.8;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .layer,
+    .tag {
+      animation: cv-stack 12s var(--wn-ease) var(--delay) infinite both;
+    }
+
+    .tag {
+      animation-name: cv-stack, cv-tag;
+    }
+
+    .layer--brush,
+    .layer--text {
+      animation-name: cv-stack, cv-ghost;
+    }
+
+    .plate {
+      animation-name: cv-stack, cv-plate;
+    }
+
+    .gradient {
+      animation: cv-sweep 12s var(--wn-ease) infinite;
+    }
+
+    .layer--brush svg {
+      animation: cv-stroke 12s var(--wn-ease) infinite;
+    }
+
+    /* Drawn as the image edges are detected; fainter in the composite, so they sit on the image. */
+    .layer--canny svg {
+      animation: cv-edge-fade 12s var(--wn-ease) var(--delay) infinite both;
+    }
+
+    .layer--canny path {
+      animation: cv-edge 12s var(--wn-ease) calc(var(--i) * 0.08s) infinite both;
+    }
+
+    .word span {
+      animation: cv-letter 12s var(--wn-ease) calc(var(--i) * 0.1s) infinite both;
+    }
+
+    .export {
+      animation: cv-export 12s var(--wn-ease) infinite;
+    }
+  }
+
+  @keyframes cv-stack {
+    0%,
+    46%,
+    93%,
+    100% {
+      translate: 0 calc(var(--lift) * var(--u));
+    }
+    56%,
+    84% {
+      translate: 0 0;
+    }
+  }
+
+  @keyframes cv-tag {
+    0%,
+    44%,
+    92%,
+    100% {
+      opacity: 1;
+    }
+    50%,
+    86% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes cv-ghost {
+    0%,
+    46%,
+    92%,
+    100% {
+      border-color: var(--ghost-line);
+      background-color: var(--ghost-fill);
+    }
+    54%,
+    86% {
+      border-color: transparent;
+      background-color: transparent;
+    }
+  }
+
+  @keyframes cv-plate {
+    0%,
+    46%,
+    92%,
+    100% {
+      opacity: 1;
+    }
+    54%,
+    86% {
+      opacity: 0;
+    }
+  }
+
+  /* In from the left; out to the right, which leaves it empty for the next sweep in. */
+  @keyframes cv-sweep {
+    0%,
+    6% {
+      clip-path: inset(0 100% 0 0);
+    }
+    18%,
+    88% {
+      clip-path: inset(0 0 0 0);
+    }
+    95%,
+    100% {
+      clip-path: inset(0 0 0 100%);
+    }
+  }
+
+  @keyframes cv-edge {
+    0%,
+    12% {
+      stroke-dashoffset: 1;
+    }
+    24%,
+    88% {
+      stroke-dashoffset: 0;
+    }
+    96%,
+    100% {
+      stroke-dashoffset: 1;
+    }
+  }
+
+  @keyframes cv-edge-fade {
+    0%,
+    46%,
+    92%,
+    100% {
+      opacity: 1;
+    }
+    54%,
+    86% {
+      opacity: 0.7;
+    }
+  }
+
+  /* A wipe along the stroke's direction, so its width visibly swells and tapers as it is laid down. */
+  @keyframes cv-stroke {
+    0%,
+    18% {
+      clip-path: inset(0 91% 0 0);
+      opacity: 1;
+    }
+    34%,
+    88% {
+      clip-path: inset(0 0 0 0);
+      opacity: 1;
+    }
+    93% {
+      clip-path: inset(0 0 0 0);
+      opacity: 0;
+    }
+    95%,
+    100% {
+      clip-path: inset(0 91% 0 0);
+      opacity: 0;
+    }
+  }
+
+  @keyframes cv-letter {
+    0%,
+    34% {
+      opacity: 0;
+      translate: 0 calc(var(--u) * 6);
+    }
+    41%,
+    88% {
+      opacity: 1;
+      translate: 0 0;
+    }
+    93%,
+    100% {
+      opacity: 0;
+      translate: 0 0;
+    }
+  }
+
+  /* Out of the composite, to rest beside it while the layers are settled. */
+  @keyframes cv-export {
+    0%,
+    58% {
+      opacity: 0;
+      translate: calc(var(--u) * -56) calc(var(--u) * -36);
+      scale: 0.6;
+    }
+    66%,
+    80% {
+      opacity: 1;
+      translate: 0 0;
+      scale: 1;
+    }
+    84%,
+    100% {
+      opacity: 0;
+      translate: 0 0;
+      scale: 1;
+    }
+  }
+</style>

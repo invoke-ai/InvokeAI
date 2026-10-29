@@ -1,0 +1,361 @@
+---
+/*
+ * The Upscale panel in Refine mode as an annotated app sketch: the left region with the Upscale panel
+ * (`features/upscale/ui/UpscaleWidgetView.tsx`) beside the Preview, which shows a result. Text is drawn as skeleton
+ * bars, so the sketch needs no translation; the callouts passed as children name the controls.
+ *
+ * Layout follows the panel top to bottom: the Mode segmented control above everything; the open Source & treatment
+ * section (`GenerateCollapsibleSection`) with the source image slot, the size preview (Input, Scale, Output, Output
+ * area), the Spandrel model field, the Scale, Creativity and Structure scrubbers (label left, value right, fill behind)
+ * and the four treatment presets; then the collapsed Detail guidance (with its Shared badge), Generation and Advanced
+ * sections. Scrubbers sit at the panel's defaults: Scale 4 of 1-16, Creativity and Structure 0 of -10-10, Balanced.
+ *
+ * Pins go in the gutter right of the panel (x 299 of 640), touching the right edge of what they name, at least 52
+ * units (8% of the width) apart: rows are spaced for that, and the treatment controls and the three collapsed
+ * sections each take one callout.
+ */
+import ChevronDown from '@lucide/astro/icons/chevron-down';
+import ChevronRight from '@lucide/astro/icons/chevron-right';
+import Eye from '@lucide/astro/icons/eye';
+import ImageUpscale from '@lucide/astro/icons/image-upscale';
+import SlidersHorizontal from '@lucide/astro/icons/sliders-horizontal';
+import X from '@lucide/astro/icons/x';
+import { Image } from 'astro:assets';
+
+import result from '../../../content/docs/Users Guide/assets/upscale-refine.webp';
+import { box } from '../whats-new/box';
+import Annotated from './Annotated.astro';
+
+type Props = {
+  /** Names the sketch for screen readers. */
+  label: string;
+};
+
+const { label } = Astro.props;
+
+const WIDTH = 640;
+const HEIGHT = 544;
+const sk = (width: number) => `--sk: ${width}`;
+
+// The panel's content column. The left region runs to 316, leaving a gutter right of the panel for the pins.
+const left = 16;
+const width = 268;
+const region = 316;
+
+/** A scrubber: its frame, the fill up to the value and the thumb line, with the label and value as skeletons. */
+const scrubbers = [
+  { y: 312, label: 30, value: 12, fill: (4 - 1) / 15 },
+  { y: 380, label: 48, value: 8, fill: 0.5 },
+  { y: 408, label: 44, value: 8, fill: 0.5 },
+];
+const presets = [58, 46, 40, 40];
+const collapsed = [
+  { y: 446, w: 84, badge: true },
+  { y: 476, w: 64 },
+  { y: 506, w: 56 },
+];
+const preflight = [
+  { label: 22, value: 52 },
+  { label: 24, value: 14 },
+  { label: 30, value: 52, strong: true },
+  { label: 46, value: 34, strong: true },
+];
+---
+
+<Annotated label={label} width={WIDTH} height={HEIGHT}>
+  <Fragment slot="sketch">
+    <div class="window wn-abs" style={box(0, 0, WIDTH, HEIGHT)}>
+      <!-- Left region: its widget tabs and the Upscale panel -->
+      <div class="wn-abs rule" style={`${box(0, 0, region, HEIGHT)}; border-right-width: 1px`}></div>
+      <div class="wn-abs rule" style={`${box(0, 0, region, 32)}; border-bottom-width: 1px`}></div>
+      <div class="wn-abs row tab" style={box(8, 5, 74, 22)}><SlidersHorizontal /><i class="sk" style={sk(40)}></i></div>
+      <div class="wn-abs row tab tab--current" style={box(86, 5, 70, 22)}>
+        <ImageUpscale /><i class="sk sk--strong" style={sk(36)}></i>
+      </div>
+
+      <!-- Mode -->
+      <i class="wn-abs sk sk--label" style={box(10, 42, 22, 3.5)}></i>
+      <div class="wn-abs segments" style={box(10, 52, 274, 24)}>
+        <span class="segment segment--on"><i class="sk sk--strong" style={sk(30)}></i></span>
+        <span class="segment"><i class="sk" style={sk(46)}></i></span>
+      </div>
+      <i class="wn-abs sk" style={box(10, 82, 210, 3.5)}></i>
+
+      <!-- Source & treatment, open -->
+      <div class="wn-abs section-open" style={box(6, 94, 284, 342)}></div>
+      <div class="wn-abs row section-head" style={box(12, 94, 272, 28)}>
+        <ChevronDown /><i class="sk sk--heading" style={sk(84)}></i>
+      </div>
+
+      <div class="wn-abs row slot" style={box(left, 128, width, 62)}>
+        <span class="thumb"><Image src={result} alt="" width={192} class="fill" /></span>
+        <span class="body">
+          <i class="sk sk--strong" style={sk(92)}></i>
+          <i class="sk" style={sk(56)}></i>
+        </span>
+        <span class="icon-button"><X /></span>
+      </div>
+
+      <div class="wn-abs preflight" style={box(left, 196, width, 44)}>
+        {
+          preflight.map(({ label, value, strong }) => (
+            <span class="row preflight__row">
+              <i class="sk" style={sk(label)} />
+              <i class="spacer" />
+              <i class:list={['sk', { 'sk--strong': strong }]} style={sk(value)} />
+            </span>
+          ))
+        }
+      </div>
+
+      <i class="wn-abs sk sk--label" style={box(left, 252, 58, 3.5)}></i>
+      <div class="wn-abs row select" style={box(left, 260, width, 22)}>
+        <i class="sk sk--strong" style={sk(110)}></i><i class="spacer"></i><ChevronDown />
+      </div>
+      <i class="wn-abs sk" style={box(left, 288, 226, 3.5)}></i>
+
+      <i class="wn-abs sk" style={box(left, 340, 190, 3.5)}></i>
+      {
+        scrubbers.map(({ y, label, value, fill }) => (
+          <div class="wn-abs row scrubber" style={`${box(left, y, width, 22)}; --fill: ${fill}`}>
+            <i class="scrubber__fill" />
+            <i class="sk sk--label" style={sk(label)} />
+            <i class="spacer" />
+            <i class="sk sk--strong" style={sk(value)} />
+          </div>
+        ))
+      }
+
+      <div class="wn-abs segments" style={box(left, 352, width, 22)}>
+        {
+          presets.map((w, index) => (
+            <span class:list={['segment', { 'segment--on': index === 1 }]}>
+              <i class:list={['sk', { 'sk--strong': index === 1 }]} style={sk(w)} />
+            </span>
+          ))
+        }
+      </div>
+
+      <!-- Detail guidance, Generation and Advanced, collapsed -->
+      {
+        collapsed.map(({ y, w, badge }) => (
+          <div class="wn-abs row section-head" style={box(12, y, 272, 28)}>
+            <ChevronRight />
+            <i class="sk sk--heading" style={sk(w)} />
+            {badge && (
+              <>
+                <i class="spacer" />
+                <span class="badge">
+                  <i class="sk" style={sk(26)} />
+                </span>
+              </>
+            )}
+          </div>
+        ))
+      }
+
+      <!-- Preview, showing a result -->
+      <div class="wn-abs rule" style={`${box(region, 0, WIDTH - region, 32)}; border-bottom-width: 1px`}></div>
+      <div class="wn-abs row tab tab--current" style={box(region + 8, 5, 66, 22)}>
+        <Eye /><i class="sk sk--strong" style={sk(36)}></i>
+      </div>
+      <Image src={result} alt="" width={640} class="wn-abs preview" style={box(region + 16, 175, 292, 195)} />
+    </div>
+  </Fragment>
+  <slot />
+</Annotated>
+
+<style>
+  .window {
+    overflow: hidden;
+    border-radius: inherit;
+    background-color: var(--wn-panel);
+    color: var(--wn-ink);
+    font-size: calc(var(--u) * 8);
+  }
+
+  /* Lucide icons size from `--i`, in stage units, set by the context that holds them. */
+  .window :global(.lucide) {
+    flex: none;
+    width: calc(var(--u) * var(--i, 9));
+    height: calc(var(--u) * var(--i, 9));
+    stroke-width: 2;
+  }
+
+  .rule {
+    border: 0 solid var(--wn-line);
+  }
+
+  .row {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: calc(var(--u) * 6);
+    white-space: nowrap;
+  }
+
+  .spacer {
+    flex: 1;
+  }
+
+  /* Skeleton text, `--sk` units wide. */
+  .sk {
+    flex: none;
+    width: calc(var(--u) * var(--sk));
+    height: calc(var(--u) * 3.5);
+    border-radius: calc(var(--u) * 2);
+    background-color: var(--wn-faint);
+  }
+
+  .wn-abs.sk {
+    width: calc(var(--u) * var(--w));
+    height: calc(var(--u) * var(--h));
+  }
+
+  .sk--strong {
+    background-color: color-mix(in oklab, var(--wn-strong) 45%, transparent);
+  }
+
+  .sk--label {
+    background-color: color-mix(in oklab, var(--wn-ink) 45%, transparent);
+  }
+
+  .sk--heading {
+    background-color: color-mix(in oklab, var(--wn-ink) 35%, transparent);
+  }
+
+  .tab {
+    --i: 8;
+    padding-inline: calc(var(--u) * 7);
+    border-radius: calc(var(--u) * 4);
+  }
+
+  .tab--current {
+    background-color: var(--wn-shown);
+    color: var(--wn-strong);
+  }
+
+  /* Segmented controls: Mode and the treatment presets. */
+  .segments {
+    display: flex;
+    gap: calc(var(--u) * 2);
+    padding: calc(var(--u) * 2);
+    border-radius: calc(var(--u) * 5);
+    background-color: var(--wn-raised);
+  }
+
+  .segment {
+    display: grid;
+    flex: 1;
+    place-items: center;
+    border-radius: calc(var(--u) * 4);
+  }
+
+  .segment--on {
+    background-color: var(--wn-panel);
+    box-shadow: 0 0 0 1px var(--wn-line);
+  }
+
+  .section-open {
+    border-radius: calc(var(--u) * 6);
+    background-color: color-mix(in oklab, var(--wn-raised) 45%, transparent);
+  }
+
+  .section-head {
+    --i: 9;
+    padding-inline: calc(var(--u) * 6);
+  }
+
+  .slot {
+    gap: calc(var(--u) * 10);
+    padding: calc(var(--u) * 6);
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 5);
+  }
+
+  .thumb {
+    display: block;
+    flex: none;
+    overflow: hidden;
+    width: calc(var(--u) * 75);
+    height: 100%;
+    border-radius: calc(var(--u) * 3);
+  }
+
+  .fill {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: calc(var(--u) * 7);
+  }
+
+  .icon-button {
+    --i: 9;
+    display: grid;
+    align-self: flex-start;
+    place-items: center;
+    width: calc(var(--u) * 18);
+    height: calc(var(--u) * 18);
+    border-radius: calc(var(--u) * 4);
+    color: var(--wn-strong);
+  }
+
+  .preflight {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: calc(var(--u) * 5.5);
+    padding-inline: calc(var(--u) * 10);
+    border-radius: calc(var(--u) * 5);
+    background-color: var(--wn-raised);
+  }
+
+  .select {
+    --i: 9;
+    padding-inline: calc(var(--u) * 8);
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 4);
+  }
+
+  /* A scrubber: the label and value inside the frame, the fill behind them up to the thumb line. */
+  .scrubber {
+    position: absolute;
+    overflow: hidden;
+    padding-inline: calc(var(--u) * 8);
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 4);
+
+    .sk {
+      position: relative;
+    }
+  }
+
+  .scrubber__fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: calc(var(--fill) * 100%);
+    border-right: calc(var(--u) * 2) solid var(--docs-accent);
+    background-color: color-mix(in oklab, var(--docs-accent) 22%, transparent);
+  }
+
+  .badge {
+    display: flex;
+    align-items: center;
+    height: calc(var(--u) * 13);
+    padding-inline: calc(var(--u) * 5);
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 3);
+    background-color: var(--wn-raised);
+  }
+
+  .preview {
+    border-radius: calc(var(--u) * 4);
+  }
+</style>

@@ -1,0 +1,11 @@
+title: Retroize
+author: Ar7ific1al
+repo: https://github.com/Ar7ific1al/invokeai-retroizeinode
+summary: Pixelize, quantize, palettize and dither images for a retro look.
+description: >-
+  Works on any image, from your gallery or from within the graph. Can also extract palettes from existing images.
+categories: [image-effects]
+thumbnail: ./retroize.webp
+images:
+  - src: https://github.com/Ar7ific1al/InvokeAI_nodes_retroize/assets/2306586/de8b4fa6-324c-4c2d-b36c-297600c73974
+    alt: Images retroized with pixelation and limited palettes

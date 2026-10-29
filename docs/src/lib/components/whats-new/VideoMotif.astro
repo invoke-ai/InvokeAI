@@ -1,0 +1,149 @@
+---
+/*
+ * Video with sound: a timeline of frames above a soundtrack waveform. The playhead sweeps across both; the frame
+ * under it lights up and each bar of the waveform peaks as it passes. The still frame stops the playhead mid-clip.
+ */
+import { Image } from 'astro:assets';
+
+import landscape from '../../../assets/whats-new-landscape.webp';
+import { box } from './box';
+import Stage from './Stage.astro';
+
+const track = { x: 20, width: 260 };
+// The playhead's position in the still frame, as a fraction of the track.
+const still = 0.45;
+const at = (x: number) => (x - track.x) / track.width;
+
+// Five frames of a slow pan across the image.
+const frameWidth = 48.8;
+const frames = [0, 1, 2, 3, 4].map((index) => {
+  const x = track.x + index * (frameWidth + 4);
+  return { x, start: at(x), lit: at(x) <= still && still < at(x + frameWidth), pan: index * 25 };
+});
+
+// A speech-like envelope; `peak` is a bar's height as the playhead passes.
+const bars = Array.from({ length: 40 }, (_, index) => {
+  const x = 26 + index * 6.2;
+  const level = 0.18 + 0.82 * Math.abs(Math.sin(index * 0.7) * Math.sin(index * 0.23 + 0.6));
+  return { x, at: at(x + 1.5), level: level.toFixed(3), peak: Math.min(1, level * 1.5 + 0.15).toFixed(3) };
+});
+
+const seconds = 6;
+// A negative delay starts each element's cycle partway through, so its moment lines up with the playhead.
+const delay = (fraction: number) => `${((fraction - 1) * seconds).toFixed(3)}s`;
+---
+
+<Stage width={300} height={190}>
+  {
+    frames.map(({ x, start, lit, pan }) => (
+      <Image
+        src={landscape}
+        alt=""
+        width={160}
+        class:list={['wn-abs frame', { 'is-lit': lit }]}
+        style={`${box(x, 20, frameWidth, 70)}; object-position: ${pan}% 50%; --delay: ${delay(start)}`}
+      />
+    ))
+  }
+  <div class="wn-abs audio" style={box(track.x, 100, track.width, 60)}></div>
+  {
+    bars.map(({ x, at: position, level, peak }) => (
+      <div
+        class:list={['wn-abs bar', { 'is-lit': Math.abs(position - still) < 0.03 }]}
+        style={`${box(x, 108, 3, 44)}; --level: ${level}; --peak: ${peak}; --delay: ${delay(position)}`}
+      />
+    ))
+  }
+  <div class="wn-abs playhead" style={`${box(track.x - 6, 6, 12, 162)}; --still: ${still * track.width}`}></div>
+</Stage>
+
+<style>
+  .frame {
+    border-radius: calc(var(--u) * 3);
+    opacity: 0.45;
+
+    &.is-lit {
+      opacity: 1;
+    }
+  }
+
+  .audio {
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 4);
+    background-color: var(--wn-panel);
+  }
+
+  .bar {
+    border-radius: calc(var(--u) * 1.5);
+    background-color: var(--docs-accent);
+    opacity: 0.5;
+    scale: 1 var(--level);
+
+    &.is-lit {
+      opacity: 1;
+      scale: 1 var(--peak);
+    }
+  }
+
+  /* A line with a grip on top, both centered on the box. */
+  .playhead {
+    translate: calc(var(--still) * var(--u)) 0;
+    background:
+      linear-gradient(var(--wn-strong), var(--wn-strong)) 50% 0 / calc(var(--u) * 12) calc(var(--u) * 8) no-repeat,
+      linear-gradient(var(--wn-strong), var(--wn-strong)) 50% 0 / calc(var(--u) * 1.5) 100% no-repeat;
+    filter: drop-shadow(0 0 calc(var(--u) * 3) var(--docs-bg));
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .frame,
+    .bar {
+      animation: 6s linear var(--delay) infinite;
+    }
+
+    .frame {
+      animation-name: vd-frame;
+    }
+
+    .bar {
+      animation-name: vd-bar;
+      animation-timing-function: ease-out;
+    }
+
+    .playhead {
+      animation: vd-playhead 6s linear infinite;
+    }
+  }
+
+  @keyframes vd-playhead {
+    from {
+      translate: 0 0;
+    }
+    to {
+      translate: calc(var(--u) * 260) 0;
+    }
+  }
+
+  /* Lit for as long as the playhead is over the frame: its width is 18.8% of the track. */
+  @keyframes vd-frame {
+    0%,
+    18.5% {
+      opacity: 1;
+    }
+    19.5%,
+    100% {
+      opacity: 0.45;
+    }
+  }
+
+  @keyframes vd-bar {
+    0% {
+      opacity: 1;
+      scale: 1 var(--peak);
+    }
+    12%,
+    100% {
+      opacity: 0.5;
+      scale: 1 var(--level);
+    }
+  }
+</style>

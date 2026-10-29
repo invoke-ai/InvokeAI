@@ -58,6 +58,8 @@ export interface PaletteEntry {
   isPersistentRecent: boolean;
   /** Enter pushes this value-picker stage instead of running the entry. */
   stage?: PaletteStage;
+  /** Running opens a page outside the app (a new browser tab); the row shows an external-link cue. */
+  opensExternally?: boolean;
   /** mod+Enter alternative, advertised in the footer while highlighted. */
   secondary?: { label: string; run: () => unknown };
   run: () => unknown;

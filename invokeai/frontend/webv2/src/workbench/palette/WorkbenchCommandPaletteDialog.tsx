@@ -31,6 +31,7 @@ import { useTranslation } from 'react-i18next';
 import type { PaletteEntry, PaletteSearchProvider, SettingsEntryDeps } from './entries';
 
 import { CommandPaletteDialog } from './CommandPaletteDialog';
+import { createDocsProvider } from './docsSearchProvider';
 import { buildCatalogCommandEntries, buildOpenSettingsEntry, buildSettingsEntries, getEntryKeys } from './entries';
 import { buildExtensionPaletteEntry, createExtensionSearchProvider } from './extensionPaletteAdapters';
 import {
@@ -251,6 +252,7 @@ const WorkbenchCommandPaletteDialog = ({
       ...extensionSearchProviders.map((provider) =>
         createExtensionSearchProvider(provider, extensions.commands.executeForSource)
       ),
+      createDocsProvider({ t }),
     ];
   }, [
     executeCommand,

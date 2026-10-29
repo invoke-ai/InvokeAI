@@ -1,295 +1,412 @@
 ---
 title: Low-VRAM mode
+description: How Invoke runs models larger than your GPU's memory, the invokeai.yaml settings that tune it, and what to do when you still run out of memory.
+lastUpdated: 2026-10-26
 sidebar:
   order: 2
 ---
 
-As of v5.6.0, Invoke has a low-VRAM mode. It works on systems with dedicated GPUs (Nvidia and AMD GPUs on Windows/Linux).
+import SetupPicker from '@components/SetupPicker.astro';
+import SetupSwitch from '@components/SetupSwitch.astro';
+import SetupVariant from '@components/SetupVariant.astro';
+import VramBudget from '@components/memory/VramBudget.astro';
 
-This allows you to generate even if your GPU doesn't have enough VRAM to hold full models. Most users should be able to run even the beefiest models - like the ~24GB unquantised FLUX dev model.
+Low-VRAM mode lets you generate with models larger than your GPU's memory, such as the ~24GB unquantized FLUX.1 dev.
+Invoke keeps as many of a model's layers in VRAM as fit and streams the rest from RAM as each step needs them.
 
-## Enabling Low-VRAM mode
+:::tip[On by default]
+Low-VRAM mode (`enable_partial_loading: true`) is on in every install, so there is nothing to turn on. It works on
+NVIDIA and AMD GPUs and on Intel GPUs, dedicated (Arc) or integrated. On Apple silicon and on the CPU, models load
+whole into system memory and the VRAM settings on this page do not apply.
 
-Low-VRAM mode is **enabled by default** via the `enable_partial_loading: true` setting in `invokeai.yaml`. No action is required to turn it on.
+Not sure which memory option fits your GPU and model? Start with
+[Which memory option do I need?](/configuration/optimization/memory-options/).
+:::
 
-**Windows users should also [disable the Nvidia sysmem fallback](#disabling-nvidia-sysmem-fallback-windows-only)**.
+## Platform notes
 
-It is possible to fine-tune the settings for best performance or if you still get out-of-memory errors (OOMs).
+Some drivers move memory that does not fit in VRAM into much slower system memory instead of failing. Pick your setup
+to see what to change for it.
 
-If you want to disable partial loading (e.g. on systems with plenty of VRAM where full loading is faster), add this line to your `invokeai.yaml` and restart Invoke:
+<SetupPicker shows="notes" />
+
+<SetupSwitch>
+<SetupVariant os="windows" gpu="nvidia">
+**Turn off the NVIDIA sysmem fallback.** When VRAM fills up, the Windows driver moves memory into system RAM. That
+sounds like what Invoke does itself, but the driver's version is not made for workloads like Invoke's and slows
+generation down massively.
+
+1. Open the **NVIDIA Control Panel**.
+2. In the left panel, expand **3D Settings** and click **Manage 3D Settings**.
+3. In the right panel, set **CUDA - Sysmem Fallback Policy** to **Prefer No Sysmem Fallback**.
+
+![The CUDA - Sysmem Fallback Policy setting in the NVIDIA Control Panel, set to Prefer No Sysmem Fallback](../assets/cuda-sysmem-fallback.png)
+</SetupVariant>
+<SetupVariant os="windows" gpu="amd">
+**AMD on Windows (ROCm).** With a ROCm build of PyTorch (see the [System Requirements](/start-here/system-requirements/)),
+Windows behaves as if NVIDIA's sysmem fallback were always on: an allocation that does not fit is moved into much
+slower system memory instead of failing, and stays there. Task Manager shows it as shared GPU memory. Invoke works
+around it:
+
+- The model cache plans against the video-memory budget Windows grants Invoke, not the card's total VRAM.
+- The PyTorch allocator defaults to `expandable_segments:True` (see `pytorch_cuda_alloc_conf` under
+  [Settings](#settings)), so fragmented VRAM does not push allocations out.
+- Decodes too large for the card are [tiled](#tiled-vae-decode-and-encode) before they start: waiting for an
+  out-of-memory error does not work here, because none comes.
+- When at least 512 MiB of Invoke's GPU memory stays in system memory after two generations in a row, the log says so
+  (`Windows kept … GiB of Invoke's GPU memory … in shared system memory`). Other programs on the same GPU, such as games
+  or browsers, can push Invoke's memory out too: close them. If it keeps happening, lower the image size, set
+  `max_cache_vram_gb` lower or `device_working_mem_gb` higher, and restart Invoke to get the memory back into VRAM.
+</SetupVariant>
+<SetupVariant gpu="intel arm64">
+Nothing to change for this GPU: the [settings](#settings) below apply as they are.
+</SetupVariant>
+<SetupVariant os="linux" gpu="nvidia amd">
+Nothing to change for this GPU: the [settings](#settings) below apply as they are.
+</SetupVariant>
+<SetupVariant gpu="apple none">
+Models load whole into system memory here, so partial loading and the VRAM settings below do not apply. To use less
+memory, use a smaller build of the model: see the
+[format comparison](/configuration/optimization/memory-options/#format-comparison).
+</SetupVariant>
+</SetupSwitch>
+
+## Settings
+
+All of these go in [`invokeai.yaml`](/configuration/invokeai-yaml/) and take effect after a restart. Most users need
+none of them.
+
+| Setting | Default | Change it when | Trade-off |
+| --- | --- | --- | --- |
+| `enable_partial_loading` | `true` | Every model you use fits in VRAM and you want them loaded whole. | Off, a model larger than free VRAM runs out of memory. |
+| `device_working_mem_gb` | `3` | You get out-of-memory errors during generation. | More working memory leaves less VRAM for model layers, so more of them stream from RAM. |
+| `reserve_vram_gb` | `0` | Another GPU program needs VRAM that Invoke should leave alone. | Models are offloaded or partially loaded sooner. |
+| `max_cache_vram_gb` | unset: measured | You want Invoke to use less VRAM than it could. | Invoke stops measuring the GPU, so VRAM other programs use is not seen. |
+| `max_cache_ram_gb` | unset: half your RAM minus 2 GB, within limits | You want more inactive models kept in RAM, or Invoke to use less RAM. | More: faster reloads, more RAM in use. |
+| `keep_ram_copy_of_weights` | `true` | RAM is consistently tight. | Off: lower average RAM use, slower model switching and LoRA patching. |
+| `offload_on_architecture_switch` | `true` | You alternate between model architectures that fit in VRAM together. | Off: other architectures' models stay in VRAM until a load needs the room. |
+| `clear_vram_after_session` | `false` | A generation that runs fine once runs out of memory, or slows down sharply, when repeated. | A few seconds per queue item to reload models from RAM. |
+| `pytorch_cuda_alloc_conf` | unset | You want to tune peak reserved VRAM, for example with `backend:cudaMallocAsync`. | The best value depends on the GPU, driver and CUDA version: test it. |
+| `auto_tiled_decode` | `true` | You never want a decode tiled unless you ask for it. | Decodes too large for the card run out of memory. |
+| `force_tiled_decode` | `false` | You want every supported decode and encode tiled. | Slower, and not pixel-identical to an untiled decode. |
+| `wan_memory_optimization` | `false` | Wan videos run out of memory. | Much slower, and not bit-identical at the same seed. |
+| `pid_memory_optimization` | `false` | PiD decodes run out of memory. | Not bit-identical at the same seed. |
+
+The details of each:
+
+<details>
+<summary><span>`enable_partial_loading`: partial model loading</span></summary>
+
+Invoke streams a model's layers between RAM and VRAM as they are needed. When a step needs layers that are not in
+VRAM and there is no room for them, inactive layers are moved to RAM. To load every model whole instead, for example
+on a GPU with plenty of VRAM where that is faster:
 
 ```yaml
 enable_partial_loading: false
 ```
 
-:::tip[How to find `invokeai.yaml`]
-  The `invokeai.yaml` configuration file lives in your install directory. To access it, run the **Invoke Community Edition** launcher and click the install location. This will open your install directory in a file explorer window.
+</details>
 
-  You'll see `invokeai.yaml` there and can edit it with any text editor. After making changes, restart Invoke.
+<details>
+<summary><span>`device_working_mem_gb`: working memory</span></summary>
 
-  If you don't see `invokeai.yaml`, launch Invoke once. It will create the file on its first startup.
-:::
-
-## Details and fine-tuning
-
-Low-VRAM mode and related workload-specific optimizations include:
-
-- Partial model loading (`enable_partial_loading`)
-- PyTorch CUDA allocator config (`pytorch_cuda_alloc_conf`)
-- Dynamic RAM and VRAM cache sizes (`max_cache_ram_gb`, `max_cache_vram_gb`)
-- Extra VRAM kept outside the model cache (`reserve_vram_gb`)
-- Working memory (`device_working_mem_gb`)
-- Keeping a RAM weight copy (`keep_ram_copy_of_weights`)
-- Tiled VAE decode and encode (`auto_tiled_decode`, `force_tiled_decode`)
-- Wan video memory optimization (`wan_memory_optimization`)
-- PiD decode activation chunking (`pid_memory_optimization`)
-
-Read on to learn about these features and understand how to fine-tune them for your system and use-cases.
-
-### Wan video memory optimization
-
-Wan video generation has an additional opt-in memory optimization:
+Invoke keeps some VRAM free as working memory for the computation itself: 3GB by default, enough for most uses. If
+you still run out of memory, raise it:
 
 ```yaml
-wan_memory_optimization: true
+device_working_mem_gb: 4
 ```
 
-This reserves VRAM so partial-load Wan transformer weights target about 2 GiB resident and stream remaining layers from RAM when partial model loading is enabled (the default). The explicit residency trim may be a no-op when cache admission already reaches that target. If `enable_partial_loading: false`, the activation, timestep, and VAE optimizations still apply, but transformer weights remain fully resident and the 2 GiB residency target is unavailable. It also chunks pointwise transformer activations, compacts TI2V per-token timestep conditioning, and streams untiled VAE decode chunks directly to MP4. It reduces peak VRAM during both denoise and decode, but generation can be substantially slower and requires enough system RAM for offloaded weights. Spatially tiled VAE decode continues to use its existing full-tile path.
+Some operations know their needs in advance and ask for more. A VAE decode, which turns the generation's output into
+an image, can need more than 3GB for a large image: Invoke calculates how much, and the model cache moves model layers
+out of VRAM until that much is free. The larger reservation lasts only for that operation. `device_working_mem_gb` is
+the floor: an operation never gets less.
 
-The optimized BF16 transformer path can produce small numerical differences because chunked matrix operations accumulate in a different order. Same-seed output is not guaranteed to be bit-identical; set `wan_memory_optimization: false` for the baseline path.
+</details>
 
-Developers with a CUDA or ROCm device can validate Wan VAE memory estimates with `python scripts/calibrate_wan_vae_working_memory.py --vae <directory-or-safetensors-file>`. The script reports allocated and reserved memory deltas; its implied scaling constant uses reserved memory, which is what the shipped estimator covers, because reserved memory is what the decode takes from the GPU. Pass `--no-streaming` to measure the default full decode. The shipped constant sits above what the script reports for most sizes, because it has to cover the highest measurement, an 832x480 decode inside a running server; `estimate covers` in the output says whether the estimate holds. Use `--tiling` to measure the spatially tiled full-decode fallback; it overrides streaming mode. Use `--tile-size <pixels>` to override the VAE's default tile size.
+<details>
+<summary><span>`reserve_vram_gb`: VRAM kept outside the model cache</span></summary>
 
-Direct MP4 streaming keeps the VAE cache lock while chunks are decoded and written. Wan's causal decoder state and weights must remain live for the sequence; releasing the lock would require a separate bounded decode and encode queue.
-
-### Partial model loading
-
-Invoke's partial model loading works by streaming model "layers" between RAM and VRAM as they are needed.
-
-When an operation needs layers that are not in VRAM, but there isn't enough room to load them, inactive layers are offloaded to RAM to make room.
-
-#### Enabling partial model loading
-
-Partial model loading is enabled by default. The corresponding setting in `invokeai.yaml` is:
-
-```yaml
-enable_partial_loading: true
-```
-
-Set it to `false` to disable partial loading.
-
-### PyTorch CUDA allocator config
-
-The PyTorch CUDA allocator's behavior can be configured using the `pytorch_cuda_alloc_conf` config. Tuning the allocator configuration can help to reduce the peak reserved VRAM. The optimal configuration is dependent on many factors (e.g. device type, VRAM, CUDA driver version, etc.), but switching from PyTorch's native allocator to using CUDA's built-in allocator works well on many systems. To try this, add the following line to your `invokeai.yaml` file:
-
-```yaml
-pytorch_cuda_alloc_conf: "backend:cudaMallocAsync"
-```
-
-When the setting is left unset, PyTorch's defaults apply, with one exception: with a ROCm build of PyTorch on Windows, Invoke uses `expandable_segments:True`. There, Windows does not fail an allocation it cannot fit into contiguous VRAM. It moves the allocation into much slower system memory instead, and fragmented VRAM makes that happen even when enough VRAM is free. Setting `pytorch_cuda_alloc_conf` yourself, or any of the `PYTORCH_ALLOC_CONF` / `PYTORCH_CUDA_ALLOC_CONF` / `PYTORCH_HIP_ALLOC_CONF` environment variables, replaces this default.
-
-A more complete explanation of the available configuration options is [here](https://pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf).
-
-### Dynamic RAM and VRAM cache sizes
-
-Loading models from disk is slow and can be a major bottleneck for performance. Invoke uses two model caches - RAM and VRAM - to reduce loading from disk to a minimum.
-
-By default, Invoke manages these caches' sizes dynamically for best performance.
-
-#### Fine-tuning cache sizes
-
-Prior to v5.6.0, the cache sizes were static, and for best performance, many users needed to manually fine-tune the `ram` and `vram` settings in `invokeai.yaml`.
-
-As of v5.6.0, the caches are dynamically sized. The `ram` and `vram` settings are no longer used, and new settings are added to configure the cache.
-
-**Most users will not need to fine-tune the cache sizes.**
-
-But, if your GPU has enough VRAM to hold models fully, you might get a perf boost by manually setting the cache sizes in `invokeai.yaml`:
-
-```yaml
-# The default max cache RAM size is logged on InvokeAI startup. It is determined based on your system RAM / VRAM.
-# You can override the default value by setting `max_cache_ram_gb`.
-# Increasing `max_cache_ram_gb` will increase the amount of RAM used to cache inactive models, resulting in faster model
-# reloads for the cached models.
-# As an example, if your system has 32GB of RAM and no other heavy processes, setting the `max_cache_ram_gb` to 28GB
-# might be a good value to achieve aggressive model caching.
-max_cache_ram_gb: 28
-
-# The default max cache VRAM size is adjusted dynamically based on the amount of available VRAM (taking into
-# consideration the VRAM used by other processes; with a ROCm build on Windows, the video-memory budget Windows grants
-# Invoke, beyond which it would move allocations into system memory).
-# You can override the default value by setting `max_cache_vram_gb`.
-# CAUTION: Most users should not manually set this value. See warning below.
-max_cache_vram_gb: 16
-```
-
-:::caution[Max safe value for `max_cache_vram_gb`]
-  Most users should not manually configure the `max_cache_vram_gb`. This configuration value caps model-cache residency; `device_working_mem_gb` and operation-specific reservations (e.g. VAE decode) are still subtracted from that cap for every model-cache operation, not only when Wan memory optimization is enabled. A cap below the active working-memory reservation can force aggressive model offloading.
-
-  For users who wish to configure `max_cache_vram_gb`, estimate the max safe value by subtracting both `device_working_mem_gb` and `reserve_vram_gb` from your GPU's VRAM. The default for `device_working_mem_gb` is 3GB, and `reserve_vram_gb` defaults to 0GB.
-
-  For example, with a 12GB GPU and default settings, the max safe value is `12GB - 3GB - 0GB = 9GB`.
-
-  If you increase `device_working_mem_gb` to 4GB and set `reserve_vram_gb` to 1GB, the max safe value is `12GB - 4GB - 1GB = 7GB`.
-
-  Most users who override `max_cache_vram_gb` are doing so because they wish to use significantly less VRAM, and should be setting `max_cache_vram_gb` to a value significantly less than the 'max safe value'.
-:::
-
-### Reserving VRAM outside the model cache
-
-`reserve_vram_gb` keeps the configured amount of VRAM unavailable to the model cache. This can leave room for other GPU workloads that are not managed by the cache. The default is `0`, so the option has no effect unless configured.
-
-For example, add this to `invokeai.yaml` to reserve 1GB:
+Keeps this much VRAM away from the model cache, for other GPU workloads the cache does not manage. It comes on top of
+`device_working_mem_gb` and any operation's own request. To reserve 1GB:
 
 ```yaml
 reserve_vram_gb: 1
 ```
 
-This reserve is in addition to `device_working_mem_gb` and any operation-specific working-memory requests. A larger reserve can cause models to be offloaded or partially loaded sooner.
+</details>
 
-### Working memory
+<details>
+<summary><span>`max_cache_vram_gb` and `max_cache_ram_gb`: cache sizes</span></summary>
 
-Invoke cannot use _all_ of your VRAM for model caching and loading. It requires some VRAM to use as working memory for various operations.
+Invoke caches models in RAM and VRAM so it rarely loads them from disk, and sizes both caches itself.
 
-Invoke reserves 3GB VRAM as working memory by default, which is enough for most use-cases. However, it is possible to fine-tune this setting if you still get OOMs.
+- **VRAM**: unless you set `max_cache_vram_gb`, Invoke measures the free VRAM before each load, taking into account
+  what other programs use (with a ROCm build on Windows, the budget Windows grants Invoke).
+- **RAM**: unless you set `max_cache_ram_gb`, the cache gets half your system RAM minus 2GB. On a machine with an
+  NVIDIA, AMD or dedicated Intel GPU that is capped at the GPU's VRAM minus `device_working_mem_gb` (or at
+  `max_cache_vram_gb` if you set it), elsewhere at 32GB, and it is never below 4GB. The log shows the result at
+  startup: `Calculated model RAM cache size: … MB`.
 
-#### Fine-tuning working memory
+For example, on a 32GB machine with no other heavy programs, `max_cache_ram_gb: 28` caches models aggressively, so
+they reload faster.
 
-You can increase the working memory size in `invokeai.yaml` to prevent OOMs:
+`max_cache_vram_gb` caps everything the cache plans for on the GPU: model weights, working memory and the reserve. See
+[The VRAM budget](#the-vram-budget) before setting it.
 
-```yaml
-# The default is 3GB - bump it up to 4GB to prevent OOMs.
-device_working_mem_gb: 4
-```
+</details>
 
-:::tip[Operations may request more working memory]
-  For some operations, we can determine VRAM requirements in advance and allocate additional working memory to prevent OOMs.
+<details>
+<summary><span>`keep_ram_copy_of_weights`: a RAM copy of loaded models</span></summary>
 
-  VAE decoding is one such operation. This operation converts the generation process's output into an image. For large image outputs, this might use more than the default working memory size of 3GB.
-
-  During this decoding step, Invoke calculates how much VRAM will be required to decode and requests that much VRAM from the model manager. If the amount exceeds the working memory size, the model manager will offload cached model layers from VRAM until there's enough VRAM to decode.
-
-  Once decoding completes, the model manager "reclaims" the extra VRAM allocated as working memory for future model loading operations.
-:::
-
-#### Calibrating a model's working memory
-
-Invoke's decode estimates are measured on a few reference GPUs. Your GPU, driver and settings can need more or less. A calibration measures what a model's VAE decode really takes on your GPU, and Invoke uses those measurements from then on.
-
-- **What it runs**: a few short text-to-image generations of the model at three sizes, up to the largest your GPU can decode in one piece with the VAE fully loaded in the memory free on it when the calibration is planned, in each VAE precision the model can decode in. Before each measured operation, Invoke moves the other models off the GPU, so the measured model is fully loaded. Each size runs once to warm up and twice more. The generations go through the normal queue, so they wait behind queued work and appear there like any other generation. Their images are intermediates: they never appear in the gallery or on a board, and Clear Intermediates removes them once the calibration has finished.
-- **Who and where**: administrators only. It needs exactly one GPU set as the generation device; with several, it is not available. One calibration runs on the GPU at a time: starting another while one runs, from another browser tab for instance, is refused until it has finished or you stop it. That includes the moment between two of its sizes: another administrator's calibration whose page was closed holds the GPU for two more minutes. Your own interrupted calibration does not hold you back: starting a new one replaces it. If another calibration ran on the GPU in between all the same, the first one cannot go on: calibrate it again. If the model, or another model the calibration loads, is replaced or reinstalled while the calibration runs, the sizes still to come fail with a note to calibrate again, and the calibration counts as stopped: the sizes it already measured are discarded too, since they measured the model as it was before.
-- **What it changes**: decodes up to the largest size measured use the measured values, plus the same 5% margin the built-in values carry. Measurements that a fragmented GPU memory pool inflated, or taken while the VAE was only partly on the GPU, are left out, and the Model Manager shows those sizes as not counted. Larger decodes use whichever of the measured and the built-in estimate is larger. Other models that decode the same way (for example, SD1.5 and SDXL models when you calibrate an SDXL model) use the measurements too. Because the estimate decides when a large decode is split into tiles up front, a calibration can change which large images are decoded in tiles.
-- **Where it applies**: on this kind of GPU only (identical cards share it), and only while the software that affects memory stays the same: the operating system, the PyTorch and GPU runtime versions, the memory-related environment variables and Invoke's memory settings. After such a change Invoke goes back to the built-in values until you calibrate again. A driver update keeps the measurements but marks them as possibly out of date until you calibrate again.
-- **Stopping it**: stopping a calibration started from the Model Manager, or clearing the queue while it runs, discards everything that calibration measured, the sizes that already finished included; the Model Manager shows those sizes as not counted because the calibration was stopped. Calibrate again to measure them. If a size fails for another reason, for example because the GPU runs out of memory at the largest size, the sizes that finished still count. A calibration run sent through the API without an `attempt_id` counts on its own instead: stopped, it keeps the sizes it measured. If they should not count, remove the run through the API (`DELETE /api/v2/models/working_memory/runs/{run_id}`), or reset the model's calibration in the Model Manager.
-- **What it does not cover**: image-to-image and inpainting encodes keep the built-in values.
-- **Reset**: remove a model's calibration from the Model Manager, or every calibration of this GPU; the change applies right away. Resetting one model removes only its own measurements: where other models' measurements cover the same decode, those still apply, and the Model Manager shows which models measured it. Otherwise the built-in values apply again.
-
-The measurements are stored next to the database in `working_memory/<device class id>.json`.
-
-### Keeping a RAM weight copy
-
-Invoke has the option of keeping a RAM copy of all model weights, even when they are loaded onto the GPU. This optimization is _on_ by default, and enables faster model switching and LoRA patching. Disabling this feature will reduce the average RAM load while running Invoke (peak RAM likely won't change), at the cost of slower model switching and LoRA patching. If you have limited RAM, you can disable this optimization:
+On by default: Invoke keeps a RAM copy of every model's weights while the model is in VRAM, which makes switching
+models and patching LoRAs faster. Turning it off lowers the average RAM use (the peak likely stays the same), at the
+cost of slower model switching and LoRA patching. On integrated Intel GPUs the setting is ignored, and the log says so
+once.
 
 ```yaml
-# Set to false to reduce the average RAM usage at the cost of slower model switching and LoRA patching.
 keep_ram_copy_of_weights: false
 ```
 
-### Switching between model architectures
+</details>
 
-When a generation uses main models of another architecture than the previous one on the same GPU (say, FLUX.1 after SDXL), Invoke first moves every model the new generation does not use from VRAM to RAM. Models both generations use, such as a shared VAE or text encoder, stay in VRAM. Moving models back from RAM costs a few seconds per switch, more with `keep_ram_copy_of_weights: false`, so if you alternate between architectures that would fit in VRAM together, you can turn this off:
+<details>
+<summary><span>`offload_on_architecture_switch`: switching between model architectures</span></summary>
+
+When a generation uses main models of another architecture than the previous one on the same GPU (say, FLUX.1 after
+SDXL), Invoke first moves every model the new generation does not use from VRAM to RAM. Models both use, such as a
+shared VAE or text encoder, stay. Moving models back costs a few seconds per switch, more with
+`keep_ram_copy_of_weights: false`. If you alternate between architectures that fit in VRAM together, turn it off:
 
 ```yaml
-# Keep other architectures' models in VRAM until a load needs the room.
 offload_on_architecture_switch: false
 ```
 
-### Clearing VRAM after every generation
+</details>
 
-If a generation runs fine the first time but runs out of memory when you repeat it, or slows down sharply because Windows moves part of it into shared GPU memory, you can have Invoke move the models it holds in VRAM to RAM after every queue item (every image of a batch) and hand the freed memory back to the GPU driver. The models stay cached in RAM, so each queue item then costs a few seconds for reloading them, not a full load from disk, and with `keep_ram_copy_of_weights: false` also the time to copy them back to RAM. On a machine with several GPUs, handing the memory back briefly holds up a generation running on another GPU. On CPU, Apple Silicon and integrated GPUs, whose VRAM is system memory, the setting changes nothing:
+<details>
+<summary><span>`clear_vram_after_session`: clearing VRAM after every generation</span></summary>
+
+After every queue item (every image of a batch), Invoke moves the models it holds in VRAM to RAM and hands the freed
+memory back to the GPU driver. The models stay cached in RAM, so each queue item then costs a few seconds to reload
+them, not a load from disk; with `keep_ram_copy_of_weights: false` also the time to copy them back to RAM. With several
+GPUs, handing the memory back briefly holds up a generation running on another GPU. On the CPU, Apple silicon and
+integrated Intel GPUs, whose VRAM is system memory, it changes nothing.
 
 ```yaml
 clear_vram_after_session: true
 ```
 
-### Tiled VAE decode and encode
+</details>
 
-Without tiling, the memory a VAE needs grows with the square of the image size. For FLUX.1, an untiled 3072² encode peaks at about 18.8 GiB on an RTX 4090, and a tiled one at 0.8 GiB, while tiled memory stays roughly flat as the image grows. Tiling costs some speed on smaller images.
+<details>
+<summary><span>`pytorch_cuda_alloc_conf`: the PyTorch allocator</span></summary>
 
-Invoke tiles large decodes by itself: when an untiled decode would claim most of the memory the GPU keeps resident, it decodes in tiles instead, for the FLUX.1, FLUX.2, Z-Image, Qwen-Image, Qwen-Image-2.1, Krea-2, Anima and Wan decodes, and for Qwen-Image-2.1's encodes as well. Because a tiled decode is not pixel-identical to an untiled one, this only kicks in for images too large for the card: for Z-Image on a 16GB GPU, for example, from about 1850x1850 on Nvidia and from about 1500x1500 on AMD, whose convolution library needs more memory. On a ROCm build under Windows the comparison uses the video-memory budget Windows grants Invoke, which is lower than the card's total and lower again while another program uses the GPU. Anima tiles a little earlier, because its untiled decode pushes the Anima model itself out of VRAM on 8GB cards. Wan videos are tiled from 832x480 on 8GB cards and from 720p on 16GB cards, where their untiled decodes need about as much memory as the card holds, or more.
-
-To always decode untiled unless you ask for tiling, turn this off. A decode too large for the card then runs out of memory: the FLUX.1, FLUX.2 and Z-Image decodes retry in tiles, the others fail, and on Windows the driver may move the decode into system memory and run it very slowly instead. Anima is not affected by this setting: there, tiling a large decode is what keeps the Anima model in VRAM, and turning it off would only make those decodes slower.
+Configures PyTorch's CUDA memory allocator, which can lower peak reserved VRAM. Using CUDA's own allocator works well
+on many systems:
 
 ```yaml
-auto_tiled_decode: false
+pytorch_cuda_alloc_conf: "backend:cudaMallocAsync"
 ```
 
-- **Always tile:** set `force_tiled_decode: true` in `invokeai.yaml`. It covers the VAE decode and encode for SD1.5/SDXL, FLUX.1, FLUX.2, Z-Image, Qwen-Image and Qwen-Image-2.1, the Anima encode, the control image of a Z-Image ControlNet, the control and inpaint images of a Qwen Image ControlNet and of a FLUX.2 [dev] ControlNet, and the Krea-2 style reference. Other model families (for example SD3, Wan and LTX-2) ignore it.
-- **Per node:** the SD, FLUX.1, FLUX.2, Z-Image, Qwen-Image and Qwen-Image-2.1 **Latents to Image** and **Image to Latents** nodes, and **Image to Latents - Anima**, have **Tiled** and **Tile Size** fields for workflows. So do the **Z-Image ControlNet**, **Qwen Image ControlNet** and **FLUX.2 [dev] ControlNet** nodes, for the images the denoise encodes. The [Upscale panel](/users-guide/image-generation/upscale/) turns tiling on by itself.
-- **Automatic retry:** if a FLUX.1, FLUX.2, Z-Image or Anima decode, or a FLUX.1 or FLUX.2 encode, runs out of memory, InvokeAI retries it once with tiling and logs that it did.
+Unset, PyTorch's defaults apply, with one exception: with a ROCm build of PyTorch on Windows, Invoke uses
+`expandable_segments:True`, because there fragmented VRAM makes Windows move allocations into system memory even when
+enough VRAM is free. Setting `pytorch_cuda_alloc_conf`, or any of the `PYTORCH_ALLOC_CONF`, `PYTORCH_CUDA_ALLOC_CONF`
+and `PYTORCH_HIP_ALLOC_CONF` environment variables, replaces that default. If `PYTORCH_CUDA_ALLOC_CONF` is already set
+to another value, it wins over `pytorch_cuda_alloc_conf` and the log warns about it. The options are explained in
+[PyTorch's documentation](https://pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf).
 
-MOSS-Image encodes and decodes with the FLUX.2 nodes, so everything this section says about FLUX.2 applies to it as well.
+</details>
 
-A tiled decode is not pixel-identical to a single-pass one. The VAE looks at the whole image at once, so the difference is spread over the image rather than limited to the tile seams; it is small (for a 1024x1024 FLUX.2 Klein image, 5.6 of 255 per pixel value on average, with no visible seams), but the same seed will not reproduce an untiled result exactly.
+<details>
+<summary><span>`wan_memory_optimization`: Wan video memory</span></summary>
 
-### PiD decode optimization
+Lowers Wan's peak VRAM during denoising and decoding, at the cost of much slower generation and enough system RAM for
+the offloaded weights:
 
-PiD decodes directly into high-resolution pixels, so its activation and sampler memory can exceed the working memory needed by a normal VAE decode. Partial model loading reduces memory used by PiD's weights, but does not reduce these full-resolution intermediates.
+- With partial loading on (the default) and an NVIDIA or AMD GPU, the Wan transformer keeps about 2GiB of its weights in
+  VRAM and streams the rest from RAM. That trim may change nothing when the model cache already loaded no more than
+  that. With `enable_partial_loading: false` the transformer stays fully in VRAM, but the other optimizations below
+  still apply.
+- Pointwise transformer activations run in chunks, and the TI2V model's per-token timestep conditioning is compacted.
+- An untiled VAE decode streams its chunks straight to the MP4. A spatially tiled decode keeps its usual full-tile path.
 
-To reduce PiD's peak VRAM use, enable its experimental memory optimization in `invokeai.yaml` and restart InvokeAI:
+Chunked matrix operations add up in a different order, so the image is not guaranteed to be bit-identical at the same
+seed. `wan_memory_optimization: false` is the baseline path.
+
+```yaml
+wan_memory_optimization: true
+```
+
+Developers can check the Wan VAE memory estimate on their GPU: see
+[Wan VAE Memory Calibration](/contributing/wan-vae-memory-calibration/).
+
+</details>
+
+<details>
+<summary><span>`pid_memory_optimization`: PiD decode memory</span></summary>
+
+[PiD](/users-guide/image-generation/advanced-topics/pid-decode/) decodes straight into high-resolution pixels, so its
+activations and sampler can need more than a normal VAE decode's working memory. Partial loading shrinks PiD's weights
+but not these full-resolution intermediates. This setting processes parts of PiD's pixel pathway in chunks and uses
+float32 instead of float64 sampler intermediates, for every PiD decoder. Measured on an RTX 4090, peak activation memory
+drops from ~3.7GB to ~1.5GB for a 2048px decode, and from ~0.9GB to ~0.5GB at 1024px. Speed stays about the same:
+chunking costs about 4%, which the cheaper sampler math mostly offsets.
+
+`device_working_mem_gb` is the floor of the reservation, so to get the full saving at 1024–2048px, lower it as far as
+your GPU allows.
+
+It is off by default because the output changes: the difference is small (around 43dB PSNR, indistinguishable side by
+side), but the same seed and workflow will not reproduce an unoptimized decode. The setting is server-wide and not
+recorded in image metadata, so each decode logs its resolution, patch-token count and whether chunking engaged
+(`PiD memory optimization enabled for a … decode`).
 
 ```yaml
 pid_memory_optimization: true
 ```
 
-This setting processes parts of the PiD pixel pathway in chunks and uses float32 instead of float64 sampler intermediates. It applies to every supported PiD decoder. Measured on an RTX 4090, peak activation memory for a 2048px decode drops from ~3.7 GB to ~1.5 GB (1024px: ~0.9 GB to ~0.5 GB).
+</details>
 
-`device_working_mem_gb` sets a floor for the reservation. To realize the full PiD savings at 1024px-2048px, lower that setting as needed for your GPU.
+## Calibrating a model's working memory
 
-It is disabled by default because it is **not output-preserving**. The combined optimized path is not guaranteed to be bit-exact: chunking can change GPU kernel and reduction choices, while the float32 sampler differs from the default float64 path. The few-step sampler amplifies the difference into a slightly different image. The delta is small — around 43 dB PSNR, visually indistinguishable in side-by-side comparisons — but it is real, so the same seed and workflow will not reproduce an unoptimized decode exactly. Decoding speed is roughly unchanged: chunking costs about 4%, which the cheaper sampler math largely offsets.
+In the Model Manager, select a model, open **Working memory** and choose **Calibrate**.
 
-When the setting is active, each decode logs the resolution, the patch-token count and whether chunking actually engaged — worth checking, since the option is server-wide and never recorded in image metadata. See [PiD Super-Resolution Decode](/users-guide/image-generation/advanced-topics/pid-decode/) for supported models and usage.
+Invoke's decode estimates are measured on a few reference GPUs. Your GPU, driver and settings can need more or less. A
+calibration measures what a model's VAE decode really takes on your GPU, and Invoke uses those measurements from then
+on.
 
-### Disabling Nvidia sysmem fallback (Windows only)
+- **What it runs**: a few short text-to-image generations of the model at three sizes, up to the largest your GPU can
+  decode in one piece with the VAE fully loaded in the memory free on it when the calibration is planned, in each VAE
+  precision the model can decode in. Before each measured operation, Invoke moves the other models off the GPU, so the
+  measured model is fully loaded. Each size runs once to warm up and twice more. The generations go through the normal
+  queue, so they wait behind queued work and appear there like any other generation. Their images are intermediates:
+  they never appear in the gallery or on a board, and Clear Intermediates removes them once the calibration has
+  finished.
+- **Who and where**: administrators only. It needs exactly one GPU set as the generation device; with several, it is not
+  available. One calibration runs on the GPU at a time: starting another while one runs, from another browser tab for
+  instance, is refused until it has finished or you stop it. That includes the moment between two of its sizes: another
+  administrator's calibration whose page was closed holds the GPU for two more minutes. Your own interrupted calibration
+  does not hold you back: starting a new one replaces it. If another calibration ran on the GPU in between all the same,
+  the first one cannot go on: calibrate it again. If the model, or another model the calibration loads, is replaced or
+  reinstalled while the calibration runs, the sizes still to come fail with a note to calibrate again, and the
+  calibration counts as stopped: the sizes it already measured are discarded too, since they measured the model as it
+  was before.
+- **What it changes**: decodes up to the largest size measured use the measured values, plus the same 5% margin the
+  built-in values carry. Measurements that a fragmented GPU memory pool inflated, or taken while the VAE was only partly
+  on the GPU, are left out, and the Model Manager shows those sizes as not counted. Larger decodes use whichever of the
+  measured and the built-in estimate is larger. Other models that decode the same way (for example, SD1.5 and SDXL
+  models when you calibrate an SDXL model) use the measurements too. Because the estimate decides when a large decode is
+  split into tiles up front, a calibration can change which large images are decoded in tiles.
+- **Where it applies**: on this kind of GPU only (identical cards share it), and only while the software that affects
+  memory stays the same: the operating system, the PyTorch and GPU runtime versions, the memory-related environment
+  variables and Invoke's memory settings. After such a change Invoke goes back to the built-in values until you
+  calibrate again. A driver update keeps the measurements but marks them as possibly out of date until you calibrate
+  again.
+- **Stopping it**: stopping a calibration started from the Model Manager, or clearing the queue while it runs, discards
+  everything that calibration measured, the sizes that already finished included; the Model Manager shows those sizes as
+  not counted because the calibration was stopped. Calibrate again to measure them. If a size fails for another reason,
+  for example because the GPU runs out of memory at the largest size, the sizes that finished still count. A calibration
+  run sent through the API without an `attempt_id` counts on its own instead: stopped, it keeps the sizes it measured.
+  If they should not count, remove the run through the API (`DELETE /api/v2/models/working_memory/runs/{run_id}`), or
+  reset the model's calibration in the Model Manager.
+- **What it does not cover**: image-to-image and inpainting encodes keep the built-in values.
+- **Reset**: remove a model's calibration from the Model Manager, or every calibration of this GPU; the change applies
+  right away. Resetting one model removes only its own measurements: where other models' measurements cover the same
+  decode, those still apply, and the Model Manager shows which models measured it. Otherwise the built-in values apply
+  again.
 
-On Windows, Nvidia GPUs are able to use system RAM when their VRAM fills up via **sysmem fallback**. While it sounds like a good idea on the surface, in practice it causes massive slowdowns during generation.
+The measurements are stored next to the database in `working_memory/<device class id>.json`.
 
-It is strongly suggested to disable this feature:
+## The VRAM budget
 
-- Open the **NVIDIA Control Panel** app.
-- Expand **3D Settings** on the left panel.
-- Click **Manage 3D Settings** in the left panel.
-- Find **CUDA - Sysmem Fallback Policy** in the right panel and set it to **Prefer No Sysmem Fallback**.
+Most users should leave `max_cache_vram_gb` unset. If you set it, it caps everything the model cache plans for on the
+GPU, and the cache subtracts the working memory and the reserve from it before loading any model:
 
-![cuda-sysmem-fallback](../assets/cuda-sysmem-fallback.png)
+<VramBudget title="What the model cache may fill with a 12GB cap and default settings" cap={12} working={3} reserve={0} />
 
-:::tip[Invoke does the same thing, but better]
-  If the sysmem fallback feature sounds familiar, that's because Invoke's partial model loading strategy is conceptually very similar - use VRAM when there's room, else fall back to RAM.
+- Set it no higher than the VRAM Invoke can actually use. A cap replaces the measurement of free VRAM, so memory other
+  programs take is no longer accounted for.
+- A cap at or below `device_working_mem_gb` plus `reserve_vram_gb` leaves no room for models, which forces aggressive
+  offloading. With `device_working_mem_gb: 4` and `reserve_vram_gb: 1`, a 12GB cap leaves 7GB for models.
+- Most people who set it want Invoke to use much less VRAM, and set it well below their GPU's VRAM.
 
-  Unfortunately, the Nvidia implementation is not optimized for applications like Invoke and does more harm than good.
-:::
+## Tiled VAE decode and encode
 
-### AMD GPUs on Windows (ROCm)
+Without tiling, the memory a VAE needs grows with the square of the image size: for FLUX.1, an untiled 3072² encode
+peaks at about 18.8GiB on an RTX 4090, a tiled one at 0.8GiB, and tiled memory stays roughly flat as the image grows.
+Tiling costs some speed on smaller images, and a tiled result is not pixel-identical to an untiled one.
 
-With a ROCm build of PyTorch (see the [System Requirements](/start-here/system-requirements/)), Windows behaves as if the Nvidia sysmem fallback were always on: an allocation that does not fit is moved into much slower system memory instead of failing, and it stays there. Task Manager shows it as shared GPU memory. Invoke works around this where it can:
+| Model | Automatic (`auto_tiled_decode`) | Always (`force_tiled_decode`) | Per node (**Tiled** field) | Retried tiled after out of memory |
+| --- | --- | --- | --- | --- |
+| SD 1.5, SDXL | – | decode, encode | **Latents to Image**, **Image to Latents** | – |
+| FLUX.1 | decode | decode, encode | **Latents to Image**, **Image to Latents** | decode, encode |
+| FLUX.2 | decode | decode, encode, [dev] ControlNet control and inpaint images | **Latents to Image**, **Image to Latents**, **FLUX.2 [dev] ControlNet** | decode, encode |
+| Z-Image | decode | decode, encode, ControlNet control image | **Latents to Image**, **Image to Latents**, **Z-Image ControlNet** | decode |
+| Qwen-Image | decode | decode, encode, ControlNet control and inpaint images | **Latents to Image**, **Image to Latents**, **Qwen Image ControlNet** | – |
+| Qwen-Image-2.1 | decode, encode | decode, encode | **Latents to Image**, **Image to Latents** | – |
+| Krea-2 | decode | decode, style reference | Qwen-Image's **Latents to Image** | – |
+| Anima | decode, whatever the setting | encode | **Image to Latents - Anima** | decode |
+| Wan 2.2 | video decode (**Latents to Video - Wan 2.2**) | – | – | – |
+| SD 3, LTX-2 | – | – | – | – |
 
-- The model cache plans against the video-memory budget Windows grants Invoke, not against the card's total VRAM.
-- The PyTorch allocator defaults to `expandable_segments:True` (see [PyTorch CUDA allocator config](#pytorch-cuda-allocator-config)), so fragmented VRAM does not force allocations out.
-- Decodes too large for the card are tiled before they start (see [Tiled VAE decode and encode](#tiled-vae-decode-and-encode)); waiting for an out-of-memory error does not work there, because none comes.
-- When part of Invoke's GPU memory stays in system memory across two generations, the log says so. Other programs using the same GPU, like games or browsers, can push Invoke's memory out as well; close them. If it keeps happening, lower the image size, set `max_cache_vram_gb` lower or `device_working_mem_gb` higher, and restart Invoke to get the memory back into VRAM.
+- **Automatic** tiling starts only when an untiled decode would take most of the memory the GPU keeps resident, so it
+  kicks in only for images too large for the card: for Z-Image on a 16GB GPU, from about 1850x1850 on NVIDIA and from
+  about 1500x1500 on AMD, whose convolution library needs more memory. Anima tiles a little earlier, because its untiled
+  decode pushes the Anima model out of VRAM on 8GB cards. Wan videos tile from 832x480 on 8GB cards and from 720p on
+  16GB cards.
+- **Krea-2** decodes with the Qwen-Image **Latents to Image** node, so it follows that node's settings and field.
+- **MOSS-Image** encodes and decodes with the FLUX.2 **Latents to Image** and **Image to Latents** nodes, so it
+  follows the FLUX.2 row for decodes and encodes.
+- **LTX-2** always decodes its video in tiles, sized by the node's own **Tile Size** fields.
+- The [Upscale panel](/users-guide/image-generation/upscale/) turns tiling on by itself. Nodes with a **Tiled** field
+  also have a **Tile Size** field.
+
+<details>
+<summary>Turning automatic tiling off</summary>
+
+```yaml
+auto_tiled_decode: false
+```
+
+Decodes then run untiled unless tiling is requested. A decode too large for the card runs out of memory: the FLUX.1,
+FLUX.2 and Z-Image decodes retry tiled (the log says `VAE decode ran out of memory; retrying with tiling`), the others
+fail, and on Windows the driver may move the decode into system memory and run it very slowly instead. On a ROCm build
+under Windows, automatic tiling compares against the video-memory budget Windows grants Invoke, which is lower than the
+card's total and lower again while another program uses the GPU.
+
+Anima ignores this setting: there, tiling a large decode is what keeps the Anima model in VRAM, so untiled decodes would
+only be slower.
+
+</details>
+
+<details>
+<summary>How different is a tiled image?</summary>
+
+The VAE looks at the whole image at once, so the difference is spread over the image rather than limited to the tile
+seams. It is small: for a 1024x1024 FLUX.2 Klein image, 5.6 of 255 per pixel value on average, with no visible seams.
+But the same seed will not reproduce an untiled result exactly.
+
+</details>
 
 ## Troubleshooting
 
+| Symptom | What to do |
+| --- | --- |
+| Out-of-memory errors during generation | Raise `device_working_mem_gb` to 4 or more. Check that `max_cache_vram_gb` is not set too high (see [The VRAM budget](#the-vram-budget)). |
+| Out of memory while decoding a large image | Check the [tiling table](#tiled-vae-decode-and-encode): set `force_tiled_decode: true`, or turn on **Tiled** in the node. SD 1.5 and SDXL are not tiled automatically. |
+| A generation runs fine once, then runs out of memory or slows down sharply when repeated | `clear_vram_after_session: true`. |
+| Generation is very slow and Task Manager shows shared GPU memory in use (Windows) | NVIDIA: turn off the sysmem fallback. AMD: close other programs using the GPU and see the AMD notes. Both under [Platform notes](#platform-notes). |
+| Switching between, say, SDXL and FLUX.1 takes a few seconds every time | If both fit in VRAM together, `offload_on_architecture_switch: false`. |
+| RAM use is consistently high | `keep_ram_copy_of_weights: false`, or a lower `max_cache_ram_gb`. |
+| Invoke exits with error code `3221225477` on Windows, or crashes with `0xc0000005` in `eventvwr.msc` | The Windows page file ran out: see below. |
+
 ### Windows page file
 
-Invoke has high virtual memory (a.k.a. 'committed memory') requirements. This can cause issues on Windows if the page file size limits are hit. (See this issue for the technical details on why this happens: https://github.com/invoke-ai/InvokeAI/issues/7563).
+Invoke needs a lot of virtual memory (also called committed memory). On Windows this can hit the page file's size
+limit, and Invoke crashes; [issue #7563](https://github.com/invoke-ai/InvokeAI/issues/7563) has the technical details.
+The crash usually comes with Windows error code `3221225477`, or with no error at all and an error `0xc0000005` (the same
+code in hex) in `eventvwr.msc`.
 
-If you run out of page file space, InvokeAI may crash. Often, these crashes will happen with one of the following errors:
-
-- InvokeAI exits with Windows error code `3221225477`
-- InvokeAI crashes without an error, but `eventvwr.msc` reveals an error with code `0xc0000005` (the hex equivalent of `3221225477`)
-
-If you are running out of page file space, try the following solutions:
-
-- Make sure that you have sufficient disk space for the page file to grow. Watch your disk usage as Invoke runs. If it climbs near 100% leading up to the crash, then this is very likely the source of the issue. Clear out some disk space to resolve the issue.
-- Make sure that your page file is set to "System managed size" (this is the default) rather than a custom size. Under the "System managed size" policy, the page file will grow dynamically as needed.
+- Make sure the disk has room for the page file to grow. Watch disk usage while Invoke runs: if it climbs to near 100%
+  before the crash, this is very likely the cause. Free up disk space.
+- Make sure the page file is set to **System managed size** (the default), not a custom size, so it grows as needed.

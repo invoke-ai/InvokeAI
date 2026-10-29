@@ -1,0 +1,14 @@
+title: Match Histogram
+author: skunkworxdark
+repo: https://github.com/skunkworxdark/match_histogram
+summary: Match the histogram of one image to another's.
+description: >-
+  Like the core `Color Correct` node, but it works in the YCbCr color space, handles images of different sizes and
+  needs no mask. It can transfer only the luminance channel, and save the output as grayscale.
+
+  A good use is normalizing the colors of an image that went through the tiled upscaling workflow of the XYGrid nodes.
+categories: [image-effects]
+thumbnail: ./match-histogram.webp
+images:
+  - src: https://github.com/skunkworxdark/match_histogram/assets/21961335/ed12f329-a0ef-444a-9bae-129ed60d6097
+    alt: An image before and after its histogram was matched to a reference

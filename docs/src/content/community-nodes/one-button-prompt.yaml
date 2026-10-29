@@ -1,0 +1,15 @@
+title: One Button Prompt
+author: AIrjen
+repo: https://github.com/AIrjen/OneButtonPrompt_X_InvokeAI
+summary: An extensive suite of automatic prompt generation and prompt helper nodes.
+description: >-
+  The main node generates prompts from a set of parameters. Other nodes include Auto Negative Prompt, One Button
+  Artify and Create Prompt Variant.
+categories: [prompts]
+thumbnail: ./one-button-prompt.webp
+images:
+  - src: https://raw.githubusercontent.com/AIrjen/OneButtonPrompt_X_InvokeAI/refs/heads/main/images/background.png
+    alt: One Button Prompt banner
+  - src: https://raw.githubusercontent.com/AIrjen/OneButtonPrompt_X_InvokeAI/refs/heads/main/images/OBP_nodes_invokeai.png
+    alt: The One Button Prompt nodes in the workflow editor
+    caption: The nodes

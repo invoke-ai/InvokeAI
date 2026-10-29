@@ -1,0 +1,7 @@
+title: Flip Pose
+author: JPPhoto
+repo: https://github.com/JPPhoto/flip-pose-node
+summary: Flip an OpenPose image horizontally, recoloring it so it faces the right way.
+description: >-
+  Does not work with OpenPose hands.
+categories: [control]
