@@ -605,7 +605,7 @@ Packages are discovered automatically. A directory of node modules without an `_
            ...
    ```
 
-   Report progress with `context.util.sd_step_callback(state, BaseModelType.NewModel)`; it renders previews through the architecture's `LatentSpaceFacet`. The denoise node is also where these are checked: interrupts (`context.util.is_canceled()`), inpainting, img2img through `denoising_start`, and a working-memory estimate passed to `model_on_device(working_mem_bytes=<int>)`, or `working_memory=` for an estimator that declares an `EstimatorSpec`, as MOSS-Image's (`invokeai/backend/moss_image/working_memory.py`) does; see the VAE step below and the [model manager](/development/architecture/model-manager/).
+   Report progress with `context.util.sd_step_callback(state, BaseModelType.NewModel)`; it renders previews through the architecture's `LatentSpaceFacet`. The denoise node is also where these are checked: interrupts (`context.util.is_canceled()`), inpainting, img2img through `denoising_start`, and a working-memory estimate passed to `model_on_device()`: `working_memory=` from an estimator that declares an `EstimatorSpec`, so that calibration runs measure the forward (the Z-Image denoise's is in `invokeai/backend/z_image/denoise_working_memory.py`, MOSS-Image's in `invokeai/backend/moss_image/working_memory.py`), or `working_mem_bytes=<int>` for a plain reservation. A model locked while the transformer is, such as a ControlNet adapter, reserves the estimate's `reservation_bytes` with `working_mem_bytes=`. See the VAE step below and the [model manager](/development/architecture/model-manager/).
 
 4. **VAE encode and decode** (`vae/new_model_image_to_latents.py`, `vae/new_model_latents_to_image.py`)
 

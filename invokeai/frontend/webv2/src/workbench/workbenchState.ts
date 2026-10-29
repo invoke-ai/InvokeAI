@@ -87,7 +87,6 @@ import {
   generatedVideoToGalleryItem,
   settleGallerySearchScope,
 } from '@features/gallery/contracts';
-import { planSeedSubmission } from '@platform/core/seed';
 import { describeError } from '@platform/logging/normalize';
 import { WIDGET_REGIONS } from '@workbench/layoutContracts';
 import { prependProjectEvent, PROJECT_EVENT_LIMIT } from '@workbench/projectEvents';
@@ -143,14 +142,13 @@ import {
   applyProjectPromptDraft,
   cloneGenerateWidgetValues,
   createDynamicPromptsSampleSeed,
-  getEffectivePrompts,
   getGenerationModelAvailabilityReasons,
   getPromptDraftFromValues,
   getPromptHistoryItemFromGenerateSettings,
-  hasDynamicPromptSyntax,
   migrateProjectPromptDraft,
   normalizeGenerateSettings,
   normalizeGenerateWidgetValues,
+  planGenerateSubmission,
   removePromptHistoryItem,
   sanitizeBatchCount,
   syncGenerateWidgetValuesWithModels,
@@ -3599,36 +3597,21 @@ const enqueueCompiledSnapshot = (
           : route.sourceId === 'video'
             ? videoSettings
             : null;
-  // Resolve template-merged prompts here, where Generate and Canvas submissions converge; Upscale merges to
-  // identity.
-  const effectivePrompts = sourceGenerateSettings ? getEffectivePrompts(sourceGenerateSettings) : null;
-  // Record expansions for Generate routes even when only one prompt results. Inspect merged prompts because
-  // templates may introduce dynamic syntax.
-  const expandedPositivePrompts =
-    route.sourceId !== 'upscale' &&
-    route.sourceId !== 'video' &&
-    compiled.positivePrompts &&
-    compiled.positivePrompts.length > 0 &&
-    effectivePrompts &&
-    hasDynamicPromptSyntax(effectivePrompts.positivePrompt)
-      ? compiled.positivePrompts
-      : undefined;
-  const expandedSeedBehaviour = expandedPositivePrompts
-    ? (canvasGenerateSettings ?? generateSettings)?.dynamicPromptsSeedBehaviour
-    : undefined;
+  // Resolve template-merged prompts and seeds here, where Generate and Canvas submissions converge; Upscale and Video
+  // merge to identity and never expand.
+  const submissionPlan = sourceGenerateSettings
+    ? planGenerateSubmission(
+        sourceGenerateSettings,
+        route.sourceId === 'upscale' || route.sourceId === 'video' ? undefined : compiled.positivePrompts
+      )
+    : null;
+  const effectivePrompts = submissionPlan?.effectivePrompts ?? null;
+  const expandedPositivePrompts = submissionPlan?.submission.positivePrompts;
   // The draw the expansion used. Generate expands before dispatch, so the project's sample seed may have rotated
   // since; recall and rotation follow the expansion, not the project.
   const expansionSampleSeed = expandedPositivePrompts ? (compiled.positivePromptsSampleSeed ?? null) : null;
   // Compilation already reserved the starting seed; failures and cancellations do not roll the sequence back.
-  const seedPlan = sourceGenerateSettings
-    ? planSeedSubmission({
-        batchCount: sourceGenerateSettings.batchCount,
-        promptCount: expandedPositivePrompts?.length ?? 1,
-        seedBehaviour: expandedSeedBehaviour ?? 'per-iteration',
-        seedMode: sourceGenerateSettings.seedMode,
-        startSeed: sourceGenerateSettings.seed,
-      })
-    : null;
+  const seedPlan = submissionPlan?.seedPlan ?? null;
   const backendSubmission: QueueCompiledSubmission = !backendGraph
     ? { error: `${route.sourceId} queue item is missing a compiled backend graph.`, kind: 'invalid' }
     : route.sourceId === 'workflow'
@@ -3645,21 +3628,14 @@ const enqueueCompiledSnapshot = (
             // active workflow changes.
             ...(compiled.projectWorkflowId ? { projectWorkflowId: compiled.projectWorkflowId } : {}),
           }
-      : sourceGenerateSettings && effectivePrompts
+      : submissionPlan
         ? {
-            batchCount: sourceGenerateSettings.batchCount,
+            ...submissionPlan.submission,
             graph: backendGraph,
             kind: 'generate',
-            // Disabling the negative prompt also suppresses the template's negative side.
-            negativePrompt: sourceGenerateSettings.negativePromptEnabled ? effectivePrompts.negativePrompt : '',
             negativePromptNodeId: generate?.negativePromptNodeId ?? 'negative_prompt',
-            positivePrompt: effectivePrompts.positivePrompt,
             positivePromptNodeId: generate?.positivePromptNodeId ?? 'positive_prompt',
-            ...(expandedPositivePrompts ? { positivePrompts: expandedPositivePrompts } : {}),
-            seed: sourceGenerateSettings.seed,
-            ...(expandedSeedBehaviour ? { seedBehaviour: expandedSeedBehaviour } : {}),
             seedNodeId: generate?.seedNodeId ?? 'seed',
-            seedStep: seedPlan?.step ?? 0,
           }
         : { error: `${route.sourceId} queue item is missing source submission metadata.`, kind: 'invalid' };
   // A workflow compiles every node's board in (Auto included), so its board-less results stay Uncategorized.

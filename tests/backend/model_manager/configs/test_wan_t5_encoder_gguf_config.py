@@ -15,11 +15,15 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+import gguf
+import numpy as np
 import pytest
+from gguf.quants import quantize
 
 from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
 from invokeai.backend.model_manager.configs.t5_encoder import T5Encoder_GGUF_Config
 from invokeai.backend.model_manager.configs.wan_t5_encoder import WanT5Encoder_GGUF_Config
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from tests.model_identification.stripped_model_on_disk import StrippedModelOnDisk
 
 _STRIPPED = Path(__file__).parents[3] / "model_identification" / "stripped_models"
@@ -163,3 +167,67 @@ def test_an_encoder_decoder_umt5_gguf_is_refused_as_such(tmp_path: Path) -> None
 
     assert any("'t5'" in reason and "encoder-only" in reason for reason in refusals)
     assert not any("incomplete" in reason for reason in refusals)
+
+
+# Identification of a real file, through `ModelOnDisk`: it reads the GGUF header only, so every probe the two
+# configs make must hold on tensors that have names, shapes and quantization types but no values.
+
+_T5_V1_1_VOCAB_SIZE = 32128
+_UMT5_VOCAB_SIZE = 256384
+_WIDTH = 32  # One Q8_0 block per row.
+
+
+def _write_llamacpp_t5_encoder_gguf(path: Path, *, vocab_size: int, bias_in_every_block: bool) -> None:
+    """A two-block llama.cpp ``t5encoder`` GGUF with the tensor names and metadata city96's files carry.
+
+    The values are zeros, since identification never reads them. The token embedding is one element wide:
+    only its row count, the vocabulary, tells T5 v1.1 from UMT5, and at full width a 256k vocabulary would
+    take hundreds of MB to write.
+    """
+    writer = gguf.GGUFWriter(str(path), "t5encoder")
+    writer.add_uint32("t5encoder.block_count", 2)
+    writer.add_tokenizer_model("t5")
+    writer.add_token_list(["<pad>", "</s>", "<unk>"])
+    writer.add_add_space_prefix(True)
+    writer.add_eos_token_id(1)
+    writer.add_pad_token_id(0)
+    writer.add_add_eos_token(True)
+
+    matrix = quantize(np.zeros((_WIDTH, _WIDTH), dtype=np.float32), gguf.GGMLQuantizationType.Q8_0)
+    norm = np.zeros(_WIDTH, dtype=np.float32)
+    writer.add_tensor("token_embd.weight", np.zeros((vocab_size, 1), dtype=np.float16))
+    writer.add_tensor("enc.output_norm.weight", norm)
+    for block in range(2):
+        prefix = f"enc.blk.{block}"
+        for name in ("attn_q", "attn_k", "attn_v", "attn_o", "ffn_gate", "ffn_up", "ffn_down"):
+            writer.add_tensor(
+                f"{prefix}.{name}.weight", matrix, raw_shape=matrix.shape, raw_dtype=gguf.GGMLQuantizationType.Q8_0
+            )
+        writer.add_tensor(f"{prefix}.attn_norm.weight", norm)
+        writer.add_tensor(f"{prefix}.ffn_norm.weight", norm)
+        if block == 0 or bias_in_every_block:
+            writer.add_tensor(f"{prefix}.attn_rel_b.weight", np.zeros((32, 2), dtype=np.float32))
+    writer.write_header_to_file()
+    writer.write_kv_data_to_file()
+    writer.write_tensors_to_file()
+    writer.close()
+
+
+@pytest.mark.parametrize(
+    ("vocab_size", "bias_in_every_block", "expected"),
+    [(_UMT5_VOCAB_SIZE, True, WanT5Encoder_GGUF_Config), (_T5_V1_1_VOCAB_SIZE, False, T5Encoder_GGUF_Config)],
+    ids=["umt5", "t5_v1_1"],
+)
+def test_a_real_gguf_identifies_from_its_header_alone(
+    tmp_path: Path, vocab_size: int, bias_in_every_block: bool, expected: type
+) -> None:
+    path = tmp_path / "encoder.gguf"
+    _write_llamacpp_t5_encoder_gguf(path, vocab_size=vocab_size, bias_in_every_block=bias_in_every_block)
+    mod = ModelOnDisk(path)
+
+    result = ModelConfigFactory.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
+
+    assert result.match_count == 1
+    assert isinstance(result.config, expected)
+    # What the configs probed is what production identification reads: the header, not the tensor data.
+    assert all(tensor.quantized_data.is_meta for tensor in mod.load_state_dict().values())
