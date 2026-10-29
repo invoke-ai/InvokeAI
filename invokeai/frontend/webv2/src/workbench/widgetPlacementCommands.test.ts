@@ -270,10 +270,10 @@ describe('widget placement commands', () => {
       openWidgetPlacement({
         widgets,
         getWidgetsForRegion: createRegistry({
-          bottom: [createWidget({ bottomPanel: 'tooltip', id: 'diagnostics', label: 'Diagnostics' })],
+          bottom: [createWidget({ bottomPanel: 'tooltip', id: 'server-status', label: 'Server Status' })],
         }),
         options: { preferredRegions: ['bottom'] },
-        typeId: 'diagnostics',
+        typeId: 'server-status',
       })
     ).toEqual({ ok: false, reason: 'unavailable' });
     expect(

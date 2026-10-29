@@ -11,6 +11,7 @@ import {
   registerWidgets,
 } from './widgetRegistry';
 import { upscaleWidgetManifest } from './widgets/upscale/manifest';
+import { RETIRED_REGION_WIDGET_TYPE_IDS, RETIRED_WIDGET_TYPE_IDS } from './workbenchState';
 
 const TestIcon = () => null;
 const TestView = () => null;
@@ -32,12 +33,27 @@ describe('widget registry', () => {
   it('registers first-party widget manifests without icon validation failures', () => {
     const widgets = registerFirstPartyWidgets();
 
-    expect(widgets).toHaveLength(17);
+    expect(widgets).toHaveLength(16);
     expect(widgets.map((widget) => widget.manifest.id)).toEqual(
       expect.arrayContaining(['layers', 'image-map', 'shortcuts'])
     );
     expect(widgets.flatMap((widget) => widget.failure ?? [])).toEqual([]);
     expect(widgets.every((widget) => widget.status === 'enabled')).toBe(true);
+  });
+
+  it('no longer offers a region a type its stored placements are stripped from', () => {
+    const retired = Object.entries(RETIRED_REGION_WIDGET_TYPE_IDS).flatMap(([region, typeIds]) =>
+      [...(typeIds ?? [])].map((typeId) => ({ region, typeId }))
+    );
+
+    expect(retired).not.toEqual([]);
+    for (const { region, typeId } of retired) {
+      expect(getWidgetById(typeId)?.manifest.allowedRegions, typeId).not.toContain(region);
+    }
+  });
+
+  it('registers none of the retired widget types', () => {
+    expect([...RETIRED_WIDGET_TYPE_IDS].filter((typeId) => getWidgetById(typeId))).toEqual([]);
   });
 
   it('uses the image-upscale icon for Upscale', () => {

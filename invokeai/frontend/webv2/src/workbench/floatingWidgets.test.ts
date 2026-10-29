@@ -1061,7 +1061,7 @@ describe('interaction with presets and undo', () => {
     let state = workbenchReducer(createInitialWorkbenchState(), {
       region: 'right',
       type: 'toggleRegionWidget',
-      widgetId: 'project',
+      widgetId: 'diagnostics',
     });
     state = workbenchReducer(state, { instanceId: 'gallery', type: 'floatWidget' });
     state = workbenchReducer(state, { presetId: 'compose', type: 'saveLayoutPreset' });

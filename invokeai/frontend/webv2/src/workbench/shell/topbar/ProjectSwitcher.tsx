@@ -8,9 +8,10 @@ import { flushGenerateDrafts } from '@features/generation/react';
 import { useModelLoads } from '@features/models';
 import { getProjectQueueIndicatorState } from '@features/queue/contracts';
 import { useQueueItemProgress } from '@features/queue/react';
+import { canCopyText, copyText } from '@platform/browser/clipboard';
 import { Button } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
-import { MenuContent, MenuHeadingGroup } from '@platform/ui/Menu';
+import { MenuContent, MenuHeadingGroup, MenuItem } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { RenameDialog } from '@platform/ui/RenameDialog';
 import { toaster } from '@platform/ui/toaster';
@@ -21,7 +22,7 @@ import { refreshProjectLibrary, renameLibraryProject, useProjectLibrarySelector 
 import { useProjectSyncAttention } from '@workbench/projects/syncStore';
 import { useProjectActions } from '@workbench/projects/useProjectActions';
 import { useExportOpenProject } from '@workbench/projects/useProjectFileActions';
-import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { useNotify } from '@workbench/useNotify';
 import {
   useActiveProjectSelector,
   useWorkbenchCommands,
@@ -30,8 +31,8 @@ import {
 } from '@workbench/WorkbenchContext';
 import {
   CheckIcon,
+  CopyIcon,
   FileDownIcon,
-  FolderCogIcon,
   FolderOpenIcon,
   PencilIcon,
   PlusIcon,
@@ -72,7 +73,7 @@ export const ProjectSwitcher = () => {
   const { projects } = useWorkbenchCommands();
   const { closeProject, deleteProject, openProject } = useProjectActions();
   const startExport = useExportOpenProject();
-  const openWorkbenchWidget = useOpenWorkbenchWidget();
+  const notify = useNotify();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const returnFocus = useCallback(() => triggerRef.current, []);
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
@@ -148,7 +149,12 @@ export const ProjectSwitcher = () => {
     setHasRequestedDelete(true);
     setDeleteTarget({ id: activeProjectId, name: activeProjectName });
   }, [activeProjectId, activeProjectName]);
-  const showActiveProjectDetails = useCallback(() => openWorkbenchWidget('project'), [openWorkbenchWidget]);
+  const copyActiveProjectId = useCallback(() => {
+    copyText(activeProjectId).then(
+      () => notify.success(t('topbar.project.idCopied')),
+      () => notify.error(t('common.couldNotCopy'), t('common.clipboardBlocked'))
+    );
+  }, [activeProjectId, notify, t]);
   const exportActiveProject = useCallback(() => {
     flushGenerateDrafts();
 
@@ -219,10 +225,14 @@ export const ProjectSwitcher = () => {
                   <Icon as={PencilIcon} boxSize="3.5" />
                   <Menu.ItemText>{t('projects.renameWithEllipsis')}</Menu.ItemText>
                 </Menu.Item>
-                <Menu.Item value="project-details" onClick={showActiveProjectDetails}>
-                  <Icon as={FolderCogIcon} boxSize="3.5" />
-                  <Menu.ItemText>{t('common.details')}</Menu.ItemText>
-                </Menu.Item>
+                <MenuItem
+                  unavailableReason={canCopyText() ? undefined : t('common.copyUnavailable')}
+                  value="copy-project-id"
+                  onClick={copyActiveProjectId}
+                >
+                  <Icon as={CopyIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('topbar.project.copyId')}</Menu.ItemText>
+                </MenuItem>
                 <Menu.Item value="export-project" onClick={exportActiveProject}>
                   <Icon as={FileDownIcon} boxSize="3.5" />
                   <Menu.ItemText>{t('common.export')}</Menu.ItemText>

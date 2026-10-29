@@ -217,7 +217,6 @@
     "created": "Created",
     "delete": "Delete",
     "desc": "Desc",
-    "details": "Details",
     "discard": "Discard",
     "discardAll": "Discard all",
     "done": "Done",
@@ -229,10 +228,8 @@
     "generating": "Generating",
     "graph": "Graph",
     "import": "Import",
-    "id": "ID",
     "item": "Item",
     "json": "JSON",
-    "lastSaved": "Last saved",
     "loadingApplication": "Loading Application",
     "managerQueue": {
       "actions": "Actions",
@@ -249,7 +246,6 @@
     "name": "Name",
     "nothingHereYet": "Nothing here yet.",
     "none": "None",
-    "notYet": "Not yet",
     "open": "Open",
     "pageNumber": "Page {{page}}",
     "pages": "Pages",
@@ -280,7 +276,6 @@
       "waiting": "Waiting"
     },
     "unknownError": "Unknown error.",
-    "unknownTime": "Unknown time",
     "view": "View",
     "viewJson": "View JSON",
     "widgetViewUnavailable": "Widget view unavailable.",
@@ -520,6 +515,10 @@
     "projectSwitcher": {
       "trigger": "Switch project. Current project: {{name}}",
       "triggerNeedsAttention": "Switch project. Current project: {{name}}. An open project needs attention"
+    },
+    "project": {
+      "copyId": "Copy project ID",
+      "idCopied": "Project ID copied"
     },
     "queue": {
       "actions": "Queue actions",
@@ -2829,7 +2828,6 @@
       "transform": "Transform",
       "notifications": "Notifications",
       "preview": "Preview",
-      "project": "Project",
       "queue": "Queue",
       "queueStatus": "Queue status",
       "serverStatus": "Server Status",
@@ -3598,23 +3596,6 @@
       "setSource": "Set source",
       "previewFailed": "Could not open the graph preview",
       "viewGraph": "View graph"
-    },
-    "project": {
-      "copyId": "Copy project id",
-      "activeRuns": "Active runs",
-      "activeRunCounts": "{{running}} running · {{queued}} queued",
-      "events": "Events",
-      "graphNodes": "Graph nodes",
-      "idCopied": "Project id copied",
-      "nameHelp": "Saved with the project.",
-      "nameLabel": "Project name",
-      "sync": "Sync",
-      "syncOffline": "Offline — awaiting sync",
-      "syncSynced": "Synced (revision {{revision}})",
-      "syncConflict": "Needs conflict resolution",
-      "syncUpdateClient": "Update Invoke to sync",
-      "syncWaiting": "Waiting to sync",
-      "workflows": "Workflows"
     },
     "preview": {
       "commands": {
@@ -6089,8 +6070,6 @@
       "stepsFixed": "This checkpoint samples a fixed schedule of {{steps}} steps."
     },
     "diagnostics": {
-      "chipClean": "Clean",
-      "chipLabel": "Diagnostics: {{label}}",
       "chipProblems_one": "{{count}} problem",
       "chipProblems_other": "{{count}} problems",
       "clearFilters": "Clear filters",

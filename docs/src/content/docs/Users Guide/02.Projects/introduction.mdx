@@ -64,9 +64,9 @@ The name of the active project appears in the top bar. Click it, or press <kbd>C
 - **Recent**: up to five other projects you edited lately.
 - **New project** and **Open project**, which lists every saved project that is not already open.
 
-<Image src={projectSwitcher} alt="The project switcher open from the top bar, showing project details and commands, the open project, recent projects, New project and Open project." width={420} />
+<Image src={projectSwitcher} alt="The project switcher open from the top bar, showing the active project's commands, the open project, recent projects, New project and Open project." width={420} />
 
-The switcher also carries commands for the active project: **Rename…**, **Details**, **Export**, **Close** and **Delete project…**. **Details** opens the **Project** widget, which shows the project's name, when it was last saved and whether it is in sync with the server.
+The switcher also carries commands for the active project: **Rename…**, **Copy project ID**, **Export**, **Close** and **Delete project…**. **Copy project ID** puts the project's ID on the clipboard.
 
 The shortcut works even while you are typing in a prompt box. You can rebind it in the hotkey settings, where it is called **Open project switcher**.
 
@@ -92,7 +92,7 @@ See [the gallery](/users-guide/gallery/introduction/) for more about boards.
 
 ## Saving and syncing
 
-Changes save to the server automatically, about half a second after you stop making them. If the connection drops, your browser keeps the unsaved changes and Invoke retries until the save goes through. The Project widget and the workflow toolbar show the current state, for example **Project saved to the server** or **Saving project…**.
+Changes save to the server automatically, about half a second after you stop making them. If the connection drops, your browser keeps the unsaved changes and Invoke retries until the save goes through. The **Autosave** status in the status bar shows the current state, for example **Saved** or **Saving…**; hover over it for when the project last saved and which open projects need attention. The workflow toolbar shows it too, for example **Project saved to the server** or **Saving project…**.
 
 Because projects live on the server, the same project can be open in two browser tabs or on two computers. If both change it before either has saved, Invoke shows a **Project changed elsewhere** banner and lets you decide:
 

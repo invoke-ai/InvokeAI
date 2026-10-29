@@ -1637,7 +1637,6 @@ const createWidgetStates = (): WidgetStateMap => ({
   layers: { id: 'layers', label: 'Layers', values: {}, version: 1 },
   notifications: { id: 'notifications', label: 'Notifications', values: {}, version: 1 },
   preview: { id: 'preview', label: 'Preview', values: {}, version: 1 },
-  project: { id: 'project', label: 'Project', values: {}, version: 1 },
   queue: { id: 'queue', label: 'Queue', values: {}, version: 1 },
   'server-status': { id: 'server-status', label: 'Server Status', values: {}, version: 1 },
   users: { id: 'users', label: 'Users', values: {}, version: 1 },
@@ -1672,7 +1671,6 @@ const defaultWidgetInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
   'autosave-status': 'autosave-status',
   canvas: 'canvas',
   diagnostics: 'diagnostics',
-  'diagnostics:bottom': 'diagnostics',
   gallery: 'gallery',
   'gallery:bottom': 'gallery',
   'gallery:center': 'gallery',
@@ -1683,7 +1681,6 @@ const defaultWidgetInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
   layers: 'layers',
   notifications: 'notifications',
   preview: 'preview',
-  project: 'project',
   queue: 'queue',
   'server-status': 'server-status',
   workflow: 'workflow',
@@ -1780,8 +1777,12 @@ const ensureEditRightRegion = (right: WidgetRegionState): WidgetRegionState => {
   return { ...right, activeInstanceId: edit.activeInstanceId, instanceIds: [...edit.instanceIds] };
 };
 
-/** The canvas editors that folded into the Layers panel; anything persisted about them drops on load. */
-const RETIRED_WIDGET_TYPE_IDS: ReadonlySet<string> = new Set(['properties', 'transform']);
+/**
+ * Retired widget types; anything persisted about them drops on load. The canvas editors folded into the Layers panel;
+ * the Project panel's rename and id copy live in the project switcher, its sync state in the Autosave status.
+ */
+const RETIRED_CANVAS_EDITOR_TYPE_IDS: ReadonlySet<string> = new Set(['properties', 'transform']);
+export const RETIRED_WIDGET_TYPE_IDS: ReadonlySet<string> = new Set([...RETIRED_CANVAS_EDITOR_TYPE_IDS, 'project']);
 
 const withoutRetiredInstances = (
   region: WidgetRegionState,
@@ -1794,8 +1795,78 @@ const withoutRetiredInstances = (
   return {
     ...region,
     activeInstanceId: retired.has(region.activeInstanceId) ? (instanceIds[0] ?? '') : region.activeInstanceId,
+    ...(region.alignEndInstanceIds
+      ? { alignEndInstanceIds: region.alignEndInstanceIds.filter((instanceId) => !retired.has(instanceId)) }
+      : {}),
     instanceIds,
   };
+};
+
+/**
+ * Widget types a region no longer hosts. Diagnostics left the status bar: a stored bottom copy drops on load and the
+ * widget stays addable on the right.
+ */
+export const RETIRED_REGION_WIDGET_TYPE_IDS: Readonly<Partial<Record<WidgetRegion, ReadonlySet<string>>>> = {
+  bottom: new Set(['diagnostics']),
+};
+
+/**
+ * Stored placements with retired widgets removed: instances of retired types leave every region and the instance
+ * map, and the region's first remaining widget comes to the front; an instance docked where its type is no longer
+ * hosted leaves only that region (which collapses rather than expanding its next widget when it was in front), and
+ * the instance map once nothing else places it. A docked id without an instance is read by its default type: its
+ * id, or the part before `:` (`diagnostics:bottom`).
+ */
+const stripRetiredWidgets = <Instance extends { typeId: string }>(
+  widgetRegions: Readonly<Record<WidgetRegion, WidgetRegionState>>,
+  widgetInstances: Readonly<Record<WidgetInstanceId, Instance>>,
+  storedFloatingWidgets: unknown
+): {
+  widgetInstances: Record<WidgetInstanceId, Instance>;
+  widgetRegions: Record<WidgetRegion, WidgetRegionState>;
+} => {
+  const typeOf = (instanceId: WidgetInstanceId): string =>
+    widgetInstances[instanceId]?.typeId ?? instanceId.split(':', 1)[0]!;
+  const isTypeRetired = (instanceId: WidgetInstanceId) => RETIRED_WIDGET_TYPE_IDS.has(typeOf(instanceId));
+  const regions = { ...widgetRegions };
+  const displaced = new Set<WidgetInstanceId>();
+
+  for (const regionId of WIDGET_REGIONS) {
+    const retiredTypes = RETIRED_REGION_WIDGET_TYPE_IDS[regionId];
+    const region = regions[regionId];
+    const regionRetired = new Set(
+      region.instanceIds.filter((instanceId) => retiredTypes?.has(typeOf(instanceId)) === true)
+    );
+    const typeRetired = new Set(region.instanceIds.filter(isTypeRetired));
+
+    for (const instanceId of regionRetired) {
+      displaced.add(instanceId);
+    }
+    const stripped = withoutRetiredInstances(region, new Set([...typeRetired, ...regionRetired]));
+    const isEmptied = stripped !== region && stripped.instanceIds.length === 0;
+
+    regions[regionId] =
+      regionId !== 'center' && (isEmptied || regionRetired.has(region.activeInstanceId))
+        ? { ...stripped, isCollapsed: true }
+        : stripped;
+  }
+
+  const floatingIds = new Set(
+    storedFloatingWidgets && typeof storedFloatingWidgets === 'object' ? Object.keys(storedFloatingWidgets) : []
+  );
+  const isStillPlaced = (instanceId: WidgetInstanceId) =>
+    floatingIds.has(instanceId) ||
+    WIDGET_REGIONS.some(
+      (regionId) =>
+        regions[regionId].instanceIds.includes(instanceId) || regions[regionId].activeInstanceId === instanceId
+    );
+  const instances = Object.fromEntries(
+    Object.entries(widgetInstances).filter(
+      ([instanceId]) => !isTypeRetired(instanceId) && (!displaced.has(instanceId) || isStillPlaced(instanceId))
+    )
+  );
+
+  return { widgetInstances: instances, widgetRegions: regions };
 };
 
 // Adopt queue-status for the historical bottom default. Placement normalization removes any instance already
@@ -2032,31 +2103,35 @@ const assembleWorkbenchProject = (
     };
   }
 
-  // The canvas editors folded into the Layers panel; an instance of the retired widgets has nothing to render.
-  const retiredInstanceIds = new Set(
-    Object.values(widgetInstances)
-      .filter((instance) => RETIRED_WIDGET_TYPE_IDS.has(instance.typeId))
-      .map((instance) => instance.id)
-  );
-  for (const instanceId of retiredInstanceIds) {
-    delete widgetInstances[instanceId];
-  }
-  const rightRegion = ensureEditRightRegion(
-    withoutRetiredInstances(
-      ensureRightRegion(legacyWidgetRegions?.right ?? legacyWidgetRegions?.['right-panel']),
-      retiredInstanceIds
+  // Historical Edit rails were recorded with the canvas editors, which folded into Layers, but with any Project panel
+  // still in place; compare them that way so a customized rail is never mistaken for a default.
+  const storedRight = ensureRightRegion(legacyWidgetRegions?.right ?? legacyWidgetRegions?.['right-panel']);
+  const rightWithoutEditors = withoutRetiredInstances(
+    storedRight,
+    new Set(
+      storedRight.instanceIds.filter((instanceId) =>
+        RETIRED_CANVAS_EDITOR_TYPE_IDS.has(widgetInstances[instanceId]?.typeId ?? instanceId)
+      )
     )
   );
-
-  const placement = normalizeFloatingPlacement(
+  const editRight = ensureEditRightRegion(rightWithoutEditors);
+  const stripped = stripRetiredWidgets(
     {
       left: leftRegion,
-      right: rightRegion,
+      right: editRight === rightWithoutEditors ? storedRight : editRight,
       bottom: bottomRegion,
       center: ensureCenterRegion(legacyWidgetRegions?.center, project.layout.centerViewId),
     },
+    widgetInstances,
+    (project as Partial<Project>).floatingWidgets
+  );
+  const dockedRegions = stripped.widgetRegions;
+  const placedInstances = stripped.widgetInstances;
+
+  const placement = normalizeFloatingPlacement(
+    dockedRegions,
     (project as Partial<Project>).floatingWidgets,
-    (instanceId) => Object.hasOwn(widgetInstances, instanceId)
+    (instanceId) => Object.hasOwn(placedInstances, instanceId)
   );
 
   return {
@@ -2066,7 +2141,7 @@ const assembleWorkbenchProject = (
     floatingWidgets: placement.floatingWidgets,
     lastFloatingGeometry: normalizeLastFloatingGeometry(
       (project as Partial<Project>).lastFloatingGeometry,
-      (instanceId) => Object.hasOwn(widgetInstances, instanceId),
+      (instanceId) => Object.hasOwn(placedInstances, instanceId),
       placement.floatingWidgets
     ),
     // Resolve historical built-in preset ids to their current arrangements to avoid false layout drift.
@@ -2079,7 +2154,7 @@ const assembleWorkbenchProject = (
     queue: isArriving ? { items: [] } : project.queue,
     settings: normalizeProjectSettings(project.settings),
     widgetRegions: placement.widgetRegions,
-    widgetInstances,
+    widgetInstances: placedInstances,
     workflowHistories: isArriving ? {} : (project.workflowHistories ?? {}),
     workflows: resolveProjectWorkflows(project.workflows, legacyProjectGraph),
   };
@@ -2380,24 +2455,18 @@ const raiseFloatingWidget = (
 };
 
 const cloneLayoutPresetSnapshot = (snapshot: LayoutPresetSnapshot): LayoutPresetSnapshot => {
-  // Strip retired editor instances when rebuilding account presets to keep applied layouts drift-free.
-  const retired = new Set(
-    Object.values(snapshot.widgetInstances)
-      .filter((instance) => RETIRED_WIDGET_TYPE_IDS.has(instance.typeId))
-      .map((instance) => instance.id)
+  // Strip retired widgets when rebuilding account presets to keep applied layouts drift-free.
+  const { widgetInstances, widgetRegions } = stripRetiredWidgets(
+    cloneLayoutPresetWidgetRegions(snapshot.widgetRegions),
+    snapshot.widgetInstances,
+    snapshot.floatingWidgets
   );
-  const widgetRegions = cloneLayoutPresetWidgetRegions(snapshot.widgetRegions);
-  for (const region of Object.keys(widgetRegions) as WidgetRegion[]) {
-    widgetRegions[region] = withoutRetiredInstances(widgetRegions[region], retired);
-  }
   // Stored placements are read the way a project's are, so an applied preset matches the snapshot it came from.
   return normalizeLayoutPresetSnapshot({
     floatingWidgets: snapshot.floatingWidgets,
     layout: { ...snapshot.layout, panels: { ...snapshot.layout.panels } },
     widgetInstances: Object.fromEntries(
-      Object.entries(snapshot.widgetInstances)
-        .filter(([, instance]) => !retired.has(instance.id))
-        .map(([instanceId, instance]) => [instanceId, { ...instance }])
+      Object.entries(widgetInstances).map(([instanceId, instance]) => [instanceId, { ...instance }])
     ),
     widgetRegions,
   });

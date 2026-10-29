@@ -19,7 +19,6 @@ export type FirstPartyWidgetTypeId =
   | 'layers'
   | 'notifications'
   | 'preview'
-  | 'project'
   | 'queue'
   | 'queue-status'
   | 'server-status'

@@ -1149,7 +1149,6 @@
           "source:src/workbench/widgets/preview/previewSettings.ts",
           "source:src/workbench/widgets/preview/settingsContribution.ts",
           "source:src/workbench/widgets/preview/spanPlaybackRequest.ts",
-          "source:src/workbench/widgets/project/manifest.ts",
           "source:src/workbench/widgets/queue-status/manifest.ts",
           "source:src/workbench/widgets/queue/manifest.ts",
           "source:src/workbench/widgets/server-status/manifest.ts",

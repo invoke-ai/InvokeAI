@@ -6,7 +6,7 @@ import { reportProjectSync } from '@workbench/projects/syncStore';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 const harness = vi.hoisted(() => {
   const state = {
@@ -26,6 +26,9 @@ const harness = vi.hoisted(() => {
 
   return {
     ...state,
+    canCopyText: vi.fn(() => true),
+    copyText: vi.fn((_text: string) => Promise.resolve()),
+    notify: { error: vi.fn(), success: vi.fn() },
     flushGenerateDrafts: vi.fn(() => {
       state.events.push('flush');
       state.prompt = 'prompt from the immediate debounced edit';
@@ -69,7 +72,8 @@ vi.mock('@workbench/projects/useProjectActions', () => ({
 vi.mock('@workbench/projects/useProjectFileActions', () => ({
   useExportOpenProject: () => harness.startExport,
 }));
-vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => vi.fn() }));
+vi.mock('@platform/browser/clipboard', () => ({ canCopyText: harness.canCopyText, copyText: harness.copyText }));
+vi.mock('@workbench/useNotify', () => ({ useNotify: () => harness.notify }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(harness.makeProject()),
   useWorkbenchCommands: () => ({ projects: { create: vi.fn(), rename: vi.fn() } }),
@@ -98,6 +102,10 @@ beforeEach(async () => {
   harness.flushGenerateDrafts.mockClear();
   harness.getProject.mockClear();
   harness.startExport.mockClear();
+  harness.canCopyText.mockReset().mockReturnValue(true);
+  harness.copyText.mockReset().mockResolvedValue(undefined);
+  harness.notify.error.mockClear();
+  harness.notify.success.mockClear();
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -221,5 +229,44 @@ describe('ProjectSwitcher', () => {
 
     expect(harness.state.events).toEqual(['flush', 'read', 'export']);
     expect(harness.state.exportedPrompt).toBe('prompt from the immediate debounced edit');
+  });
+
+  const copyItem = () => page.getByRole('menuitem', { name: 'topbar.project.copyId' }).query() as HTMLElement | null;
+
+  it('copies the active project id from the menu and reports a blocked clipboard', async () => {
+    await vi.waitFor(() => expect(copyItem()).not.toBeNull());
+    await act(() => userEvent.click(copyItem()!));
+
+    expect(harness.copyText).toHaveBeenCalledWith('project-1');
+    await vi.waitFor(() => expect(harness.notify.success).toHaveBeenCalledWith('topbar.project.idCopied'));
+
+    harness.copyText.mockRejectedValueOnce(new Error('blocked'));
+    await act(() => setProjectSwitcherOpen(true));
+    await vi.waitFor(() => expect(copyItem()).not.toBeNull());
+    await act(() => userEvent.click(copyItem()!));
+
+    await vi.waitFor(() =>
+      expect(harness.notify.error).toHaveBeenCalledWith('common.couldNotCopy', 'common.clipboardBlocked')
+    );
+  });
+
+  it('explains why the id cannot be copied when the clipboard is unavailable', async () => {
+    harness.canCopyText.mockReturnValue(false);
+    await act(() => setProjectSwitcherOpen(false));
+    await act(() => setProjectSwitcherOpen(true));
+    await vi.waitFor(() => expect(copyItem()?.getAttribute('aria-disabled')).toBe('true'));
+
+    const item = copyItem()!;
+    const description = (item.getAttribute('aria-describedby') ?? '')
+      .split(' ')
+      .map((id) => document.getElementById(id)?.textContent)
+      .join(' ');
+    expect(description).toContain('common.copyUnavailable');
+
+    // Playwright refuses to click an aria-disabled item; the guard under test is the item's own.
+    await act(() => userEvent.click(item, { force: true }));
+    expect(harness.copyText).not.toHaveBeenCalled();
+    expect(harness.notify.success).not.toHaveBeenCalled();
+    expect(harness.notify.error).not.toHaveBeenCalled();
   });
 });
