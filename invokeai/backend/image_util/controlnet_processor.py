@@ -170,7 +170,8 @@ def process_controlnet_image(image_name: str, model_key: str, services: Invocati
         )
 
         # Invoke the processor
-        output = invocation.invoke(context)
+        with context_data.invocation_resources:
+            output = invocation.invoke(context)
 
         # Get the processed image DTO
         processed_image_dto = services.images.get_dto(output.image.image_name)
