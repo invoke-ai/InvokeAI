@@ -10,11 +10,15 @@ becomes a `probe_demand` point: per card (device class), estimator, version, pla
 data file that declares its estimator's coefficients, keeping the larger of itself and a shipped `probe_demand` point
 of the same card, platform and features; the carried values are then refitted with `fit.py`. A stand-in stays one
 until fresh-process points at two sizes far enough apart measure its line: `probe_demand` points can raise it, never
-lower it.
+lower it. A line that already covers its points by the shipped margin stays as it is; one that does not is raised by
+the least that keeps the upper bounds of the points priced on it (`fit.raised_pair`, `bounds.line_bounds`).
 
-Without `--write` the changes are printed only. An export of another estimator version than the registered spec, or a
-window whose features the spec's terms cannot evaluate, is refused. So is a result any point's bounds
-(`working_memory/bounds.py`, the data test's rule) reject, and a line raised on a point flagged as fragmentation unless
+Without `--write` the changes are printed only. Exit status 2 refuses input the build cannot use: an export of another
+estimator version than the registered spec, a window whose features the spec's terms cannot evaluate, a platform
+`platform.MEASURED` does not list, or fresh-process points too few for a line. Exit status 1 refuses data that
+conflicts with the bounds, after printing the changes it would make, and writes nothing: points no line at or above
+the fit can cover within those upper bounds, with the points that conflict named; a result any point's bounds
+(`working_memory/bounds.py`, the data test's rule) reject; and a line raised on a point flagged as fragmentation unless
 `--accept-fragmentation` is given.
 """
 
@@ -38,7 +42,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     CalibrationPoint,
     CalibrationStoreFile,
 )
-from invokeai.backend.working_memory.bounds import bound_violation, evaluate_point, point_id
+from invokeai.backend.working_memory.bounds import bound_violation, evaluate_point, line_bounds, point_id
 from invokeai.backend.working_memory.coefficients import (
     CoefficientEntry,
     MeasuredPoint,
@@ -46,12 +50,13 @@ from invokeai.backend.working_memory.coefficients import (
     load_data,
 )
 from invokeai.backend.working_memory.fit import (
+    LineConflict,
     capping_spans,
     entry_key,
     fit_points,
     fitted_values,
     line_of,
-    shipped_pair,
+    raised_pair,
 )
 from invokeai.backend.working_memory.fragmentation import Measurement, fragmented
 from invokeai.backend.working_memory.platform import Platform, is_measured, platform_for_environment
@@ -71,6 +76,11 @@ _RUNTIME_FACTS = ("cuda", "hip", "cudnn", "miopen", "xpu")
 
 class BuildError(ValueError):
     pass
+
+
+class BoundConflict(BuildError):
+    """Points no line can cover within the upper bounds of the points priced on it (`fit.LineConflict`): the data
+    conflicts with the bounds, which `main` refuses as it refuses a result the bounds reject, not as unusable input."""
 
 
 @dataclass(frozen=True)
@@ -325,27 +335,32 @@ def merge_points(
     return merged
 
 
-def refit(data: Mapping[str, WorkingMemoryData]) -> dict[str, WorkingMemoryData]:
-    """`data` with every carried value that is not a stand-in set to its fit. A stand-in line whose in-fit
-    fresh-process points now span the sizes a fit needs (`fit.capping_spans`) is fitted from then on, as the data test
-    requires. Any other stays a stand-in, raised where the fit of its points lies above it: `probe_demand` points bound
-    it from below only, so they never lower it."""
+def refit(data: Mapping[str, WorkingMemoryData], specs: Mapping[str, EstimatorSpec]) -> dict[str, WorkingMemoryData]:
+    """`data` with every carried value that is not a stand-in set to its fit, within the upper bounds its points set
+    (`bounds.line_bounds`). A stand-in line whose in-fit fresh-process points now span the sizes a fit needs
+    (`fit.capping_spans`) is fitted from then on, as the data test requires. Any other stays a stand-in, kept where it
+    covers its points by the shipped margin and otherwise raised by the least the bounds allow (`fit.raised_pair`):
+    `probe_demand` points bound it from below only, so they never lower it.
+
+    Raises `BoundConflict` where no line keeps the bounds, `BuildError` where the points cannot fit a line."""
     groups = fit_points(data.values())
+    ceilings = line_bounds(data.values(), specs)
 
     def raised_stand_ins(entry: CoefficientEntry) -> dict[str, float]:
         values = entry.values or {}
         raised = {}
         for suffix in sorted({name[2:] for name in entry.stand_ins}):
-            line = groups.get((entry_key(entry), suffix))
-            if not line:
+            key = (entry_key(entry), suffix)
+            if key not in groups:
                 continue
+            floor = (values[f"k_{suffix}"], values[f"b_{suffix}"])
             try:
-                k, b = shipped_pair([(point.pixels, point.bytes) for point in line])
-            except ValueError:
-                # Too few sizes for a line; `bound_violations` refuses a stand-in below one of them.
-                continue
-            raised[f"k_{suffix}"] = max(values[f"k_{suffix}"], k)
-            raised[f"b_{suffix}"] = max(values[f"b_{suffix}"], b)
+                k, b = raised_pair(floor, groups[key], ceilings.get(key, ()))
+            except LineConflict as e:
+                raise BoundConflict(
+                    f"the points cannot raise a stand-in: {entry.estimator} on {entry.platform}, {suffix}: {e}"
+                ) from e
+            raised[f"k_{suffix}"], raised[f"b_{suffix}"] = k, b
         return raised
 
     def measured_lines_fitted(entry: CoefficientEntry) -> CoefficientEntry:
@@ -359,7 +374,9 @@ def refit(data: Mapping[str, WorkingMemoryData]) -> dict[str, WorkingMemoryData]
         for name, file in data.items()
     }
     try:
-        fitted = fitted_values(staged.values())
+        fitted = fitted_values(staged.values(), ceilings)
+    except LineConflict as e:
+        raise BoundConflict(f"the points cannot fit a line: {e}") from e
     except ValueError as e:
         raise BuildError(f"the points cannot fit a line: {e}") from e
 
@@ -565,9 +582,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         exports = export_paths(args.exports)
         entries = [entry for file in before.values() for entry in file.coefficients]
         build = build_points(exports, specs, entries)
-        after = refit(merge_points(before, build.points))
-        violations = bound_violations(after, specs)
-        reviews = review_lines(before, after, build.points)
+        merged = merge_points(before, build.points)
+        conflict: BoundConflict | None = None
+        try:
+            after = refit(merged, specs)
+        except BoundConflict as e:
+            # The points still show, with their windows, so the conflict can be read against them.
+            after, conflict = merged, e
     except BuildError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
@@ -584,6 +605,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 f": reserved MiB {', '.join(map(_mib, spread.reserved))} while allocated MiB "
                 f"{', '.join(map(_mib, spread.allocated))}; max/first {spread.first_to_max:.2f}"
             )
+    if conflict is not None:
+        print(f"error: not written: the points conflict with the bounds: {conflict}", file=sys.stderr)
+        return 1
+    violations = bound_violations(after, specs)
+    reviews = review_lines(before, after, build.points)
     for change in reviews:
         (old_k, old_b), (new_k, new_b) = change.old, change.new
         flagged = change.fragmented(build.spreads)

@@ -24,14 +24,11 @@ import torch
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.working_memory.coefficients import ResolvedCoefficients, find_entry, shipped_data
 from invokeai.backend.working_memory.estimate import FeatureValue, WorkingMemoryEstimate
-from invokeai.backend.working_memory.fit import EntryKey, entry_key, fits_a_line, line_of, user_pair
+from invokeai.backend.working_memory.fit import EntryKey, LineKey, entry_key, fits_a_line, line_of, user_pair
 from invokeai.backend.working_memory.platform import Platform, priced_as
 
 if TYPE_CHECKING:
     from invokeai.backend.working_memory.spec import EstimatorSpec
-
-LineKey = tuple[EntryKey, str]
-"""A line: the entry that carries its values, and its ``<operation>_<dtype>`` suffix."""
 
 
 @dataclass(frozen=True)
