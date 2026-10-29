@@ -53,6 +53,7 @@ from invokeai.backend.working_memory.coefficients import shipped_coefficients
 from invokeai.backend.working_memory.fingerprint import DeviceClass, Environment
 from invokeai.backend.working_memory.platform import platform_for
 from invokeai.backend.working_memory.probe import CounterDelta, MeasuredWindow
+from invokeai.backend.z_image.denoise_working_memory import Z_IMAGE_DENOISE_SPEC
 from tests.fixtures.working_memory_calibration import (
     GPU,
     HeldEnqueue,
@@ -229,10 +230,10 @@ def _baseline(value: int) -> CounterDelta:
 def test_a_fresh_servers_plan_sizes_for_the_outside_use_its_stored_windows_recorded(
     tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A fresh server reads 300 MiB outside torch where the stored windows recorded 2755592192 bytes, so the cache can
-    give 16304 MiB less those: 14340390912 bytes, below 0.9 of the card (15386384793). A calibration lock moves every
-    other model out first, so only the VAE stays beside the decode: less 1 GiB for it, a reservation (1.5x the
-    estimate) may take 13266649088. fp16 at 2100 B/px: 2048px needs 13212057600, 2112px 14050713600. fp32 at 6000
+    """A fresh server reads 300 MiB outside torch where the stored decode windows recorded 2755592192 bytes, so the
+    cache can give 16304 MiB less those: 14340390912 bytes, below 0.9 of the card (15386384793). A calibration lock
+    moves every other model out first, so only the VAE stays beside the decode: less 1 GiB for it, a reservation (1.5x
+    the estimate) may take 13266649088. fp16 at 2100 B/px: 2048px needs 13212057600, 2112px 14050713600. fp32 at 6000
     B/px: 1152px needs 11943936000, 1216px 13307904000. The reading alone would have allowed 2112px and 1216px."""
     per_pixel = {"fp16": 2100, "fp32": 6000}
     idle = DeviceMemory(capacity_bytes=(16304 - 300) * MIB, outside_torch_bytes=300 * MIB)
@@ -243,13 +244,19 @@ def test_a_fresh_servers_plan_sizes_for_the_outside_use_its_stored_windows_recor
         device_memory=lambda device: idle,
     )
     run_id = _create(service)
+    decode = measured_window(run_id, estimator=VAE_SD_SPEC.id, version=VAE_SD_SPEC.version)
     windows = [
-        measured_window(run_id).model_copy(update={"driver": _baseline(driver), "reserved": _baseline(reserved)})
+        decode.model_copy(update={"driver": _baseline(driver), "reserved": _baseline(reserved)})
         for driver, reserved in RX9060XT_BASELINES
     ]
     # An invalid window says nothing about what a decode finds.
     invalid = {"driver": _baseline(16 * 2**30), "valid": False, "fit_eligible": False, "reasons": ["oom"]}
     windows.append(windows[2].model_copy(update=invalid))
+    # Nor does a Z-Image forward's, whose estimator no user calibration moves, however much it found outside torch.
+    forward = measured_window(
+        run_id, model_key="transformer-key", estimator=Z_IMAGE_DENOISE_SPEC.id, version=Z_IMAGE_DENOISE_SPEC.version
+    )
+    windows.append(forward.model_copy(update={"driver": _baseline(12 * 2**30), "reserved": _baseline(2**30)}))
     service.record_windows(run_id, windows)
     reads: list[str] = []
     real_read = CalibrationStore.read
@@ -2109,3 +2116,34 @@ def test_a_stopped_service_no_longer_feeds_estimates(tmp_path: Path, started, mo
     service.stop(mock_invoker)
 
     assert _estimate() == _shipped()
+
+
+def _forward(run_id: str, image_tokens: int) -> MeasuredWindow:
+    """A plain Z-Image forward's window of model-a's transformer, on a token line its estimator's line admits."""
+    features = {"image_tokens": image_tokens, "text_tokens": 512, "tokens": image_tokens + 512, "dtype": "bf16",
+                "control_blocks": 0, "has_attention_mask": False, "regional_bias_bytes": 0, "score_matrix_bytes": 0,
+                "lora_count": 0, "dequant_transient_bytes": 0, "fp8_cast_transient_bytes": 0}  # fmt: skip
+    window = measured_window(
+        run_id, model_key="model-a:transformer", estimator="denoise.z_image", version=Z_IMAGE_DENOISE_SPEC.version
+    )
+    return window.model_copy(update={"features": features, "demand_bytes": 5000 * image_tokens})
+
+
+def test_denoise_windows_are_kept_but_feed_no_user_line_and_count_as_fitting_none(tmp_path: Path, started) -> None:
+    """The Z-Image denoise is not user-calibrated: its windows stay in the store, the summary shows no line for them
+    and counts them among the model's windows that fit none, and its estimates stay shipped while the decode's move."""
+    service = started(tmp_path)
+    run_id = _create(service)
+    forwards = [_forward(run_id, image) for image in (1024, 4096, 16384)]
+    service.record_windows(run_id, _on_the_line(run_id) + forwards)
+
+    summary = service.get_model_summary("model-a")
+
+    assert [(line.estimator, line.line) for line in summary.lines] == [("vae.sd", "decode_fp16")]
+    assert summary.excluded_windows == len(forwards)
+    assert [run.point_count for run in summary.runs] == [6]
+    service.refresh_user_fits()
+    assert _estimate() == _user_bytes(1024)
+    features = forwards[1].features
+    shipped = shipped_coefficients(Z_IMAGE_DENOISE_SPEC, PLATFORM)
+    assert Z_IMAGE_DENOISE_SPEC.estimate(features, GPU) == Z_IMAGE_DENOISE_SPEC.evaluate(features, shipped)

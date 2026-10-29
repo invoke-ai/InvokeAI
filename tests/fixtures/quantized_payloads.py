@@ -15,6 +15,7 @@ import json
 from collections.abc import Mapping
 from typing import Any, NamedTuple
 
+import numpy as np
 import torch
 
 from invokeai.backend.quantization.block_scale_tiles import check_tile_layout
@@ -218,6 +219,25 @@ def q8_cr_marker(*, group_size: int = CONVROT_GROUP_SIZE, **overrides: Any) -> d
     }
 
 
+# gguf-py can read K-quants but not write them. A super-block's bytes are all valid codes, so random ones with sane
+# fp16 super-scales make a real Q4_K tensor; what it means comes from gguf-py's reference reader, not from us.
+_Q4_K_BLOCK_BYTES = 144  # d (fp16), dmin (fp16), 12 bytes of 6-bit scales and mins, 128 bytes of 4-bit codes
+_Q4_K_SUPER_SCALE = np.float16(1e-3).tobytes()
+
+
+def random_q4_k(shape: tuple[int, ...], rng: np.random.Generator) -> np.ndarray:
+    """A packed ``Q4_K`` tensor of logical ``shape`` (rows, cols), cols a multiple of 256.
+
+    The super-scales are set in *every* block -- the 3-D view guarantees it -- since a random one decodes to
+    inf or NaN, which an equality check then skips silently.
+    """
+    rows, cols = shape
+    blocks = rng.integers(0, 256, size=(rows, cols // 256, _Q4_K_BLOCK_BYTES), dtype=np.uint8)
+    blocks[..., 0:2] = np.frombuffer(_Q4_K_SUPER_SCALE, dtype=np.uint8)
+    blocks[..., 2:4] = np.frombuffer(_Q4_K_SUPER_SCALE, dtype=np.uint8)
+    return blocks.reshape(rows, -1)
+
+
 def write_gguf(
     path: Any,
     tensors: Mapping[str, torch.Tensor],
@@ -225,13 +245,15 @@ def write_gguf(
     quant: Mapping[str, Mapping[str, Any] | str] | None = None,
     q8_0: Mapping[str, torch.Tensor] | None = None,
     architecture: str = "krea2",
+    metadata: Mapping[str, str] | None = None,
 ) -> None:
     """Write a GGUF the way ComfyUI-GGUF lays out a ``Q8_CR`` file.
 
     ``tensors`` are stored by dtype: int8 as GGML ``I8`` (how the converter stores Q8_CR codes), float32
     as ``F32``, float16 as ``F16``. ``quant`` maps a weight name to its JSON, written as the string
     ``comfy.gguf.quant.<weight name>`` (a string is written as it is, for malformed metadata). ``q8_0`` tensors are GGML-quantized, which is what the converter's
-    target-size plans put beside Q8_CR layers in the same file.
+    target-size plans put beside Q8_CR layers in the same file. ``metadata`` adds string keys, such as the
+    ``model_version`` some converters carry over from the source file's header.
     """
     import gguf
 
@@ -241,6 +263,8 @@ def write_gguf(
         torch.float16: gguf.GGMLQuantizationType.F16,
     }
     writer = gguf.GGUFWriter(str(path), architecture)
+    for key, value in (metadata or {}).items():
+        writer.add_string(key, value)
     for name, marker in (quant or {}).items():
         writer.add_string(f"comfy.gguf.quant.{name}", marker if isinstance(marker, str) else json.dumps(dict(marker)))
     for name, tensor in tensors.items():

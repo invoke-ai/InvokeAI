@@ -1555,7 +1555,11 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
                     file = read.file if read is not None else None
                 if held_back is None:
                     held_back = self._held_back(file) if file is not None else {}
-                fit = user_fit_of(file, env.id, platform, held_back=held_back)[0] if file is not None else None
+                fit = (
+                    user_fit_of(file, env.id, platform, import_estimator_modules(), held_back=held_back)[0]
+                    if file is not None
+                    else None
+                )
                 fits[key] = _DeviceFit(
                     signature=signature, env_id=env.id, platform=platform, fit=fit, file=file, held_back=held_back
                 )
@@ -1729,6 +1733,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             assert device is not None
             return self._untiled_decode_reservation(estimator, height, width, dtype, device)
 
+        specs = import_estimator_modules()
         return build_plan(
             target,
             store.all_models(),
@@ -1738,8 +1743,8 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             precision=self._services.configuration.precision,
             vae_dtypes=self._vae_dtypes_on(device),
             reservation=reservation,
-            specs=import_estimator_modules(),
-            capacity_bytes=self._decode_capacity(device) if device is not None else None,
+            specs=specs,
+            capacity_bytes=self._decode_capacity(device, specs) if device is not None else None,
             working_memory_floor_bytes=int(self._services.configuration.device_working_mem_gb * 2**30),
             force_tiled_decode=self._services.configuration.force_tiled_decode,
         )
@@ -1757,21 +1762,22 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         outside = None if reading.driver is None or reading.reserved is None else reading.driver - reading.reserved
         return DeviceMemory(capacity_bytes=cache.calibration_capacity(), outside_torch_bytes=outside)
 
-    def _decode_capacity(self, device: torch.device) -> int:
+    def _decode_capacity(self, device: torch.device, specs: Mapping[str, EstimatorSpec]) -> int:
         """What the model cache can give one decode and its VAE on `device` (`DeviceMemory.capacity_bytes`): what a
         calibration's lock gets once its pre-lock offload ran, the cache's reserves and cap applied.
 
         This process's memory outside torch's allocator counts at the larger of what it is now and the most a stored
-        window of this environment found it at (`recorded_outside_torch_bytes`): it grows with the first generations
-        (on ROCm under Windows, HIP's retained pool and MIOpen's workspaces, from about 0.3 GB in a fresh server to
-        2.6 GB on an RX 9060 XT), so a fresh server's reading alone overstates what a decode will find. Without a stored
-        window, a first calibration sizes for the reading alone. Where the driver gives no figure now, the recorded one
-        counts whole. The store is the one `refresh_user_fits` read last; nothing here reads it again."""
+        window of this environment found it at (`recorded_outside_torch_bytes`, over the windows of the estimators a
+        user calibration moves): it grows with the first generations (on ROCm under Windows, HIP's retained pool and
+        MIOpen's workspaces, from about 0.3 GB in a fresh server to 2.6 GB on an RX 9060 XT), so a fresh server's
+        reading alone overstates what a decode will find. Without a stored window, a first calibration sizes for the
+        reading alone. Where the driver gives no figure now, the recorded one counts whole. The store is the one
+        `refresh_user_fits` read last; nothing here reads it again."""
         memory = self._device_memory(device)
         capacity = memory.capacity_bytes
         known = self._fits.get(_device_key(device))
         if known is not None and known.file is not None:
-            recorded = recorded_outside_torch_bytes(known.file, known.env_id)
+            recorded = recorded_outside_torch_bytes(known.file, known.env_id, specs)
             if recorded is not None:
                 capacity -= max(0, recorded - (memory.outside_torch_bytes or 0))
         return capacity
