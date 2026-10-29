@@ -410,7 +410,7 @@ describe('gallery maintenance in Data & workspace settings', () => {
     expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
     expect(confirmButton.disabled).toBe(true);
     const cancelButton = [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')].find(
-      (button) => button.textContent?.includes('Cancel')
+      (button) => button.textContent?.includes('common.cancel')
     )!;
     expect(cancelButton.disabled).toBe(true);
     expect(getButton(operations[0].button)?.disabled).toBe(true);

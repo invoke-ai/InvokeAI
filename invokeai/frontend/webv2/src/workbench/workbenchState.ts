@@ -42,6 +42,7 @@ import type {
   ProjectUndoSnapshot,
   PromptHistoryItem,
   WorkbenchNotification,
+  WorkbenchNotificationAction,
   WorkbenchNotificationCategory,
   ProjectLoadResult,
   WorkbenchNotificationKind,
@@ -606,7 +607,14 @@ type WorkbenchReducerAction =
       projectId?: string;
     }
   | { type: 'setBackendConnectionStatus'; status: WorkbenchState['backendConnection']['status']; error?: string }
-  | { type: 'recordNotice'; kind: WorkbenchNotificationKind; title: string; message?: string };
+  | {
+      type: 'recordNotice';
+      kind: WorkbenchNotificationKind;
+      title: string;
+      message?: string;
+      actions?: readonly WorkbenchNotificationAction[];
+      persistent?: boolean;
+    };
 
 const HISTORY_LIMIT = 40;
 /** A pause this long between same-key edits (typing, dragging) starts a new undo step. */
@@ -645,22 +653,28 @@ const createId = (prefix: string): string =>
   `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 const createNotification = ({
+  actions,
   category,
   kind,
   message,
   messageKey,
+  persistent,
   projectId,
   title,
   titleKey,
 }: {
+  actions?: readonly WorkbenchNotificationAction[];
   category?: WorkbenchNotificationCategory;
   kind: WorkbenchNotificationKind;
   message?: string;
   messageKey?: string;
+  persistent?: boolean;
   projectId?: string;
   title: string;
   titleKey?: string;
 }): WorkbenchNotification => ({
+  ...(actions && actions.length > 0 ? { actions } : {}),
+  ...(persistent ? { persistent } : {}),
   category,
   createdAt: now(),
   id: createId('notification'),
@@ -685,11 +699,16 @@ const addNotification = (state: WorkbenchState, notification: WorkbenchNotificat
     newest.title === notification.title &&
     newest.message === notification.message
   ) {
+    const { actions: _previousActions, persistent: _previousPersistent, ...previous } = newest;
+
     return {
       ...state,
       notifications: [
         {
-          ...newest,
+          ...previous,
+          // The repeat's follow-ups act on the latest occurrence (say, the queue item that just failed).
+          ...(notification.actions ? { actions: notification.actions } : {}),
+          ...(notification.persistent ? { persistent: notification.persistent } : {}),
           createdAt: notification.createdAt,
           isRead: false,
           occurrenceCount: (newest.occurrenceCount ?? 1) + 1,
@@ -5994,7 +6013,13 @@ export const __workbenchReducerInternal = (
     case 'recordNotice': {
       return addNotification(
         state,
-        createNotification({ kind: action.kind, message: action.message, title: action.title })
+        createNotification({
+          actions: action.actions,
+          kind: action.kind,
+          message: action.message,
+          persistent: action.persistent,
+          title: action.title,
+        })
       );
     }
     case 'setActiveProjectSettings': {

@@ -3751,6 +3751,49 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(twice.notifications[0]?.id).toBe(once.notifications[0]?.id);
   });
 
+  it('gives a coalesced error the follow-ups of its latest occurrence', () => {
+    const notice = (widgetId: 'gallery' | 'queue') =>
+      ({
+        actions: [{ kind: 'open-widget', widgetId }],
+        kind: 'error',
+        message: 'CUDA out of memory',
+        persistent: true,
+        title: 'Invocation failed',
+        type: 'recordNotice',
+      }) as const;
+
+    const once = reduceWorkbench(createInitialWorkbenchState(), notice('gallery'));
+    const twice = reduceWorkbench(once, notice('queue'));
+
+    expect(twice.notifications).toHaveLength(1);
+    expect(twice.notifications[0]).toMatchObject({
+      actions: [{ kind: 'open-widget', widgetId: 'queue' }],
+      occurrenceCount: 2,
+      persistent: true,
+    });
+  });
+
+  it('drops the follow-ups of a coalesced error whose repeat offers none', () => {
+    const once = reduceWorkbench(createInitialWorkbenchState(), {
+      actions: [{ kind: 'open-widget', widgetId: 'queue' }],
+      kind: 'error',
+      message: 'CUDA out of memory',
+      persistent: true,
+      title: 'Invocation failed',
+      type: 'recordNotice',
+    });
+    const twice = reduceWorkbench(once, {
+      kind: 'error',
+      message: 'CUDA out of memory',
+      title: 'Invocation failed',
+      type: 'recordNotice',
+    });
+
+    expect(twice.notifications[0]?.occurrenceCount).toBe(2);
+    expect(Object.keys(twice.notifications[0] ?? {})).not.toContain('actions');
+    expect(Object.keys(twice.notifications[0] ?? {})).not.toContain('persistent');
+  });
+
   it('includes the error context detail in the recordError notification message', () => {
     const state = createInitialWorkbenchState();
 

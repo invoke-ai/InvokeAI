@@ -1,18 +1,42 @@
-import type { WorkbenchNotificationKind } from '@workbench/projectContracts';
+import type { WorkbenchNotificationAction, WorkbenchNotificationKind } from '@workbench/projectContracts';
 
-import { toaster } from '@platform/ui';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
+import { ACTION_TOAST_DURATION_MS, createActionToast, toaster } from '@platform/ui/toaster';
+import i18next from 'i18next';
 import { useMemo } from 'react';
 
+import { registerNotificationUndo } from './shell/notifications/undoRegistry';
 import { useOptionalWorkbenchCommands } from './WorkbenchContext';
+
+export interface NotifyOptions {
+  /** Toast buttons as plain descriptors (see `WorkbenchNotificationAction`); only the workbench can run them. */
+  actions?: readonly WorkbenchNotificationAction[];
+  /** The toast stays until dismissed: for failures the user must not miss. It still closes with the account. */
+  persistent?: boolean;
+}
+
+export interface UndoableNotice {
+  message?: string;
+  /**
+   * Reverts the action the notice reports. Offered once, while the toast shows, for this account only. The toast
+   * outlives tab switches, so the closure must capture its target's ids (never "the active project") and do nothing,
+   * or report, when the target is gone.
+   */
+  onUndo: () => void;
+  /** The project the action changed: Undo is withdrawn once that project is no longer open. */
+  projectId?: string;
+}
 
 /**
  * Notification helper: records into the workbench shell when present, and
  * falls back to global toasts for project-independent surfaces like Home.
  */
 export interface Notify {
-  success: (title: string, message?: string) => void;
-  error: (title: string, message?: string) => void;
-  info: (title: string, message?: string) => void;
+  success: (title: string, message?: string, options?: NotifyOptions) => void;
+  error: (title: string, message?: string, options?: NotifyOptions) => void;
+  info: (title: string, message?: string, options?: NotifyOptions) => void;
+  /** Reports an action that already happened, with an Undo button: the house style for reversible actions. */
+  undoable: (title: string, notice: UndoableNotice) => void;
 }
 
 const notificationToastType: Record<WorkbenchNotificationKind, 'error' | 'info' | 'success'> = {
@@ -27,14 +51,46 @@ export const useNotify = (): Notify => {
   return useMemo(() => {
     const record =
       (kind: WorkbenchNotificationKind) =>
-      (title: string, message?: string): void => {
+      (title: string, message?: string, options: NotifyOptions = {}): void => {
         if (commands) {
-          commands.notifications.add({ kind, message, title });
+          commands.notifications.add({ ...options, kind, message, title });
+        } else if (options.persistent) {
+          createActionToast({
+            actions: [],
+            description: message,
+            duration: Number.POSITIVE_INFINITY,
+            signal: captureAccountScope().signal,
+            title,
+            type: notificationToastType[kind],
+          });
         } else {
           toaster.create({ description: message, title, type: notificationToastType[kind] });
         }
       };
 
-    return { error: record('error'), info: record('info'), success: record('success') };
+    const undoable = (title: string, { message, onUndo, projectId }: UndoableNotice): void => {
+      if (commands) {
+        // The center keeps the notice as data; the closure waits in the registry until its toast closes.
+        commands.notifications.add({
+          actions: [{ kind: 'undo', undoId: registerNotificationUndo(onUndo), ...(projectId ? { projectId } : {}) }],
+          kind: 'success',
+          message,
+          title,
+        });
+        return;
+      }
+
+      createActionToast({
+        // Read at call time: only this path needs a translation, and the hook must not suspend or change identity.
+        actions: [{ label: i18next.t('common.undo'), onClick: onUndo }],
+        description: message,
+        duration: ACTION_TOAST_DURATION_MS,
+        signal: captureAccountScope().signal,
+        title,
+        type: 'success',
+      });
+    };
+
+    return { error: record('error'), info: record('info'), success: record('success'), undoable };
   }, [commands]);
 };

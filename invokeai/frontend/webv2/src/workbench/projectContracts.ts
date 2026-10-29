@@ -106,6 +106,19 @@ export type WorkbenchNotificationKind = 'error' | 'success' | 'info';
 /** `run-outcome`: a queue item the user submitted failed or was cancelled. */
 export type WorkbenchNotificationCategory = 'enqueue' | 'run-outcome';
 
+/**
+ * A follow-up a notification offers, as plain data: notifications live in workbench state, so they never hold a
+ * closure. The notification toaster resolves each kind to a label and a handler (see
+ * `shell/notifications/README.md`); a kind it cannot offer right now is left out.
+ */
+export type WorkbenchNotificationAction =
+  | { kind: 'open-widget'; widgetId: WidgetTypeId }
+  /**
+   * Runs the closure `useNotify().undoable` holds in its session-only registry, at most once. With `projectId`, only
+   * while that project is open.
+   */
+  | { kind: 'undo'; undoId: string; projectId?: string };
+
 export interface WorkbenchNotification {
   id: string;
   kind: WorkbenchNotificationKind;
@@ -120,6 +133,10 @@ export interface WorkbenchNotification {
   category?: WorkbenchNotificationCategory;
   /** Coalesced repeat count (see addNotification); absent = 1. */
   occurrenceCount?: number;
+  /** Buttons its toast shows, primary first. */
+  actions?: readonly WorkbenchNotificationAction[];
+  /** Its toast stays until dismissed, for failures the user must not miss. */
+  persistent?: boolean;
 }
 
 export interface PromptHistoryItem {

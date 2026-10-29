@@ -1,4 +1,3 @@
-import type { ToastAction } from '@platform/ui/toaster';
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { invalidateGallery, invalidateGalleryBoardDestinations } from '@features/gallery/queries';
@@ -10,6 +9,7 @@ import {
 } from '@platform/state/accountLifecycle';
 import { createKeyedTransientStore } from '@platform/state/externalStore';
 import { ApiError } from '@platform/transport/http';
+import { ACTION_TOAST_DURATION_MS, createActionToast, type ToastAction } from '@platform/ui/toaster';
 import { useQueryClient } from '@tanstack/react-query';
 import { saveCanvasToGallery, type CanvasGallerySaveRegion } from '@workbench/canvas-operations/api';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
@@ -19,7 +19,7 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { getCanvasGallerySaveErrorAction, withMatchingCanvasProject } from './canvasGallerySaveState';
-import { ACTION_TOAST_DURATION_MS, announce, describeBoard } from './gallerySaveToast';
+import { describeBoard } from './gallerySaveToast';
 import { describeAdjustmentRefusal } from './useStructuralCommit';
 
 type CanvasGallerySaveEngine = Pick<CanvasEngineHandle, 'document' | 'exports' | 'lifecycle' | 'projectId'>;
@@ -74,7 +74,8 @@ export const useCanvasGallerySave = (
             };
             const showActions = queries.isActiveProject(project.id) ? [showInGallery] : [];
 
-            announce(owner, {
+            createActionToast({
+              signal: owner.signal,
               actions: showActions,
               description: t('widgets.canvas.staging.savedDescription', { name: result.imageName }),
               ...(showActions.length > 0 ? { duration: ACTION_TOAST_DURATION_MS } : {}),

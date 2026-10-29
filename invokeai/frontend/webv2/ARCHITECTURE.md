@@ -57,6 +57,7 @@ Behavior specs live beside their owning code. Read the owner's document before c
 | Font catalog and registration                                 | [features/fonts/README.md](src/features/fonts/README.md)                               |
 | Project documents, workflows, persistence, and recovery       | [workbench/projects/README.md](src/workbench/projects/README.md)                       |
 | Widget placement, floating windows, focus, and shortcut hints | [workbench/widget-frame/README.md](src/workbench/widget-frame/README.md)               |
+| Notifications, toast actions, and undo notices                | [workbench/shell/notifications/README.md](src/workbench/shell/notifications/README.md) |
 | Settings contributions and the settings dialog                | [workbench/settings/README.md](src/workbench/settings/README.md)                       |
 | Widget manifests and extension discovery                      | [workbench/extensions/README.md](src/workbench/extensions/README.md)                   |
 | Canvas engine                                                 | [workbench/canvas-engine/ARCHITECTURE.md](src/workbench/canvas-engine/ARCHITECTURE.md) |

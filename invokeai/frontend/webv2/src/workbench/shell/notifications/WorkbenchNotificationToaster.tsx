@@ -1,53 +1,38 @@
-import type { WorkbenchNotificationKind } from '@workbench/projectContracts';
-
-import { toaster } from '@platform/ui';
-import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
-import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
-import { useEffect, useRef } from 'react';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { useWorkbenchFocus } from '@workbench/focusRegions';
+import { getWorkbenchPreferences } from '@workbench/settings/store';
+import { useWorkbenchCommands, useWorkbenchQueries, useWorkbenchSubscription } from '@workbench/WorkbenchContext';
+import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
 import { useTranslation } from 'react-i18next';
 
-import { getToastKey, shouldToastNotification } from './toastPolicy';
-
-const notificationToastType: Record<WorkbenchNotificationKind, 'error' | 'info' | 'success'> = {
-  error: 'error',
-  info: 'info',
-  success: 'success',
-};
+import { createEditorNotificationActionContext } from './editorNotificationActions';
+import { startNotificationToasts } from './notificationToasts';
 
 export const WorkbenchNotificationToaster = () => {
-  const { t } = useTranslation();
-  const notifications = useWorkbenchSelector((snapshot) => snapshot.notifications);
-  const notifyOnEnqueue = useWorkbenchPreferenceSelector((prefs) => prefs.notifyOnEnqueue);
-  const toastedNotificationIdsRef = useRef<Set<string> | null>(null);
+  const { i18n } = useTranslation();
+  const queries = useWorkbenchQueries();
+  const subscribe = useWorkbenchSubscription();
+  const { widgets } = useWorkbenchCommands();
+  const { getWidgetById, getWidgetsForRegion } = useWorkbenchWidgetRegistry();
+  const focus = useWorkbenchFocus();
 
-  useEffect(() => {
-    if (toastedNotificationIdsRef.current === null) {
-      toastedNotificationIdsRef.current = new Set(notifications.map(getToastKey));
-      return;
-    }
-
-    for (const notification of [...notifications].reverse()) {
-      const toastKey = getToastKey(notification);
-
-      if (toastedNotificationIdsRef.current.has(toastKey)) {
-        continue;
-      }
-
-      toastedNotificationIdsRef.current.add(toastKey);
-
-      if (!shouldToastNotification(notification, { notifyOnEnqueue })) {
-        continue;
-      }
-
-      queueMicrotask(() => {
-        toaster.create({
-          description: notification.messageKey ? t(notification.messageKey) : notification.message,
-          title: notification.titleKey ? t(notification.titleKey) : notification.title,
-          type: notificationToastType[notification.kind],
-        });
-      });
-    }
-  }, [notifications, notifyOnEnqueue, t]);
+  // Everything read here lives as long as the editor: the store, the widget registry, the focus controller, and the
+  // i18n instance, whose `t` follows language changes.
+  useMountEffect(() =>
+    startNotificationToasts({
+      actionContext: createEditorNotificationActionContext({
+        focus,
+        getWidgetById,
+        getWidgetsForRegion,
+        queries,
+        t: i18n.t,
+        widgets,
+      }),
+      getNotifications: () => queries.getSnapshot().notifications,
+      getPreferences: getWorkbenchPreferences,
+      subscribe,
+    })
+  );
 
   return null;
 };

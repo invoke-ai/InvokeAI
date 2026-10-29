@@ -131,6 +131,7 @@ export const useRegisterFirstPartyCommands = () => {
 
   const notifyNoImageSelected = () =>
     notifications.add({
+      actions: [{ kind: 'open-widget', widgetId: 'gallery' }],
       kind: 'info',
       message: 'Select an image in Gallery or Preview first.',
       title: 'No image selected',

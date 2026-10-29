@@ -180,11 +180,13 @@
     "canceled": "Canceled",
     "clear": "Clear",
     "clearSearch": "Clear search",
+    "dismissNotification": "Dismiss notification",
     "dontShowMeThese": "Don't show me these",
     "learnMore": "Learn more",
     "noOptionsFound": "No matches",
     "openSelector": "Open selector",
     "searchOptions": "Search…",
+    "undo": "Undo",
     "close": "Close",
     "colorPicker": {
       "format": "Color format: {{format}}",
@@ -360,7 +362,10 @@
       "info": "Info",
       "success": "Success"
     },
-    "markRead": "Mark Read"
+    "markRead": "Mark Read",
+    "actions": {
+      "openWidget": "Open {{widget}}"
+    }
   },
   "topbar": {
     "appMenu": {

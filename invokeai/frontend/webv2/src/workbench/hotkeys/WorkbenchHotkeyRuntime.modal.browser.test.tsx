@@ -77,6 +77,7 @@ const Scene = () => {
       {confirmHost ? (
         <ConfirmDialog
           body="Delete the selected image?"
+          cancelLabel="Cancel"
           confirmLabel="Delete"
           isOpen={confirm}
           title="Delete image"

@@ -26,6 +26,7 @@ vi.mock('react-i18next', () => ({
     t: (key: string, values?: Record<string, unknown>) => {
       const count = Number(values?.count ?? 0);
       const messages: Record<string, string> = {
+        'common.cancel': 'Cancel',
         'widgets.gallery.deleteConfirmLabel': 'Delete',
         'widgets.gallery.deleteConfirmSkip': "Don't ask me again",
         'widgets.gallery.deleteConfirmSkipHint': 'You can turn this confirmation back on in Settings.',
