@@ -914,9 +914,13 @@ iterations, and upstream collections beyond those boundaries are excluded. Befor
 active invocation's inputs are recorded.
 
 The resolved-input record describes the image's invocation; it is not used for editor restoration. Optional internal
-`resolved_inputs` parameters carry it through `ImageService.create()` and `DiskImageFileStorage.save()`. It can be read
-from the PNG's `Image.info`; it is not merged into user-owned `invokeai_metadata` or returned in the workflow/graph API.
-Legacy calls omit the field, and old PNGs remain readable without rewriting. Image file copies preserve all chunks.
+`resolved_inputs` parameters carry it through `ImageService.create()` and `DiskImageFileStorage.save()`. The existing
+`GET /api/v1/images/i/{image_name}/workflow` response exposes this PNG record as optional `resolved_inputs` stringified
+Graph JSON, with `null` for older images. `ImageService.get_resolved_inputs()` reads the file from the record's
+subfolder, behind the route's existing read-access and storage-maintenance guards. Inspection can prefer this record,
+while the response's unchanged `workflow` and source `graph` remain the editor restoration inputs. It is not merged
+into user-owned `invokeai_metadata`. Legacy calls omit the field, and old PNGs remain readable without rewriting.
+Video responses use the shared response model's `null` default. Image file copies preserve all chunks.
 
 No expanded runtime graph is serialized for either field. Each image stores one source graph plus one compact input
 record. Nested-loop tests count their combined UTF-8 bytes. A source with a literal collection includes that collection

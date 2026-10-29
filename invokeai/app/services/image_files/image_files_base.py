@@ -144,3 +144,8 @@ class ImageFileStorageBase(ABC):
     def get_graph(self, image_name: str, image_subfolder: str = "") -> Optional[str]:
         """Gets the graph of an image."""
         pass
+
+    @abstractmethod
+    def get_resolved_inputs(self, image_name: str, image_subfolder: str = "") -> Optional[str]:
+        """Gets the per-image resolved-input Graph JSON, when present."""
+        pass

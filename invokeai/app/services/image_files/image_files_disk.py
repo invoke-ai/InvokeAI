@@ -688,6 +688,13 @@ class DiskImageFileStorage(ImageFileStorageBase):
             return graph
         return None
 
+    def get_resolved_inputs(self, image_name: str, image_subfolder: str = "") -> str | None:
+        image = self.get(image_name, image_subfolder=image_subfolder)
+        resolved_inputs = image.info.get("invokeai_resolved_inputs", None)
+        if isinstance(resolved_inputs, str):
+            return resolved_inputs
+        return None
+
     def __validate_storage_folders(self) -> None:
         """Checks if the required output folders exist and create them if they don't"""
         folders: list[Path] = [self.__output_folder, self.__thumbnails_folder]

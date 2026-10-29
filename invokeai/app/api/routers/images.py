@@ -380,6 +380,10 @@ def get_image_metadata(
 class WorkflowAndGraphResponse(BaseModel):
     workflow: Optional[str] = Field(description="The workflow used to generate the image, as stringified JSON")
     graph: Optional[str] = Field(description="The graph used to generate the image, as stringified JSON")
+    resolved_inputs: Optional[str] = Field(
+        default=None,
+        description="The image's per-invocation resolved inputs, as stringified Graph JSON, when available",
+    )
 
 
 @images_router.get(
@@ -395,7 +399,8 @@ def get_image_workflow(
     try:
         workflow = ApiDependencies.invoker.services.images.get_workflow(image_name)
         graph = ApiDependencies.invoker.services.images.get_graph(image_name)
-        return WorkflowAndGraphResponse(workflow=workflow, graph=graph)
+        resolved_inputs = ApiDependencies.invoker.services.images.get_resolved_inputs(image_name)
+        return WorkflowAndGraphResponse(workflow=workflow, graph=graph, resolved_inputs=resolved_inputs)
     except Exception:
         raise HTTPException(status_code=404)
 

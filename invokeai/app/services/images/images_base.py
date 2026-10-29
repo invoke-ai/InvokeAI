@@ -118,6 +118,11 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
+    def get_resolved_inputs(self, image_name: str) -> Optional[str]:
+        """Gets an image's resolved-input Graph JSON, when present."""
+        pass
+
+    @abstractmethod
     def get_path(self, image_name: str, thumbnail: bool = False) -> str:
         """Gets an image's path."""
         pass

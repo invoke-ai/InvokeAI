@@ -426,6 +426,22 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error("Problem getting image graph")
             raise
 
+    def get_resolved_inputs(self, image_name: str) -> Optional[str]:
+        try:
+            record = self.__invoker.services.image_records.get(image_name)
+            return self.__invoker.services.image_files.get_resolved_inputs(
+                image_name, image_subfolder=record.image_subfolder
+            )
+        except ImageRecordNotFoundException:
+            self.__invoker.services.logger.debug(f"Image record not found: {image_name}")
+            raise
+        except ImageFileNotFoundException:
+            self.__invoker.services.logger.error("Image file not found")
+            raise
+        except Exception:
+            self.__invoker.services.logger.error("Problem getting image resolved inputs")
+            raise
+
     def get_path(self, image_name: str, thumbnail: bool = False) -> str:
         try:
             record = self.__invoker.services.image_records.get(image_name)

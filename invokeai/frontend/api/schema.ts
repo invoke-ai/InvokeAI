@@ -53621,6 +53621,11 @@ export type components = {
              * @description The graph used to generate the image, as stringified JSON
              */
             graph: string | null;
+            /**
+             * Resolved Inputs
+             * @description The image's per-invocation resolved inputs, as stringified Graph JSON, when available
+             */
+            resolved_inputs?: string | null;
         };
         /** WorkflowCallCompatibility */
         WorkflowCallCompatibility: {
