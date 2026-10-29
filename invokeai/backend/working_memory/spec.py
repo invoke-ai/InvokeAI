@@ -6,6 +6,7 @@ from typing import Final
 
 import torch
 
+from invokeai.backend.working_memory import user_fit
 from invokeai.backend.working_memory.coefficients import ResolvedCoefficients, shipped_coefficients
 from invokeai.backend.working_memory.estimate import FeatureValue, WorkingMemoryEstimate, WorkingMemoryTerm
 from invokeai.backend.working_memory.platform import platform_for
@@ -37,8 +38,14 @@ class EstimatorSpec:
     terms: TermsFunction = field(compare=False, repr=False)
 
     def estimate(self, features: Mapping[str, FeatureValue], device: torch.device) -> WorkingMemoryEstimate:
-        """The estimate for an operation on `device`, priced with the shipped coefficients of the platform it runs on."""
-        return self.evaluate(features, shipped_coefficients(self, platform_for(device)))
+        """The estimate for an operation on `device`, priced with the shipped coefficients of the platform it runs on,
+        and with the user's own line where a calibration of this device measured it (`user_fit.resolve`)."""
+        platform = platform_for(device)
+        shipped = shipped_coefficients(self, platform)
+        fit = user_fit.user_fit_for(self, platform, device)
+        if fit is None:
+            return self.evaluate(features, shipped)
+        return user_fit.resolve(self, features, shipped, fit)
 
     def evaluate(
         self, features: Mapping[str, FeatureValue], coefficients: ResolvedCoefficients
