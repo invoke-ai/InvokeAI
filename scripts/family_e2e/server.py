@@ -76,6 +76,15 @@ class ServerError(RuntimeError):
     pass
 
 
+class TerminationError(ServerError):
+    """A process tree that may still run after `terminate`: its kill failed, or a process of it outlived the wait."""
+
+    def __init__(self, message: str, survivors: list[list[float]]) -> None:
+        super().__init__(message)
+        self.survivors = survivors
+        """[pid, create time] of each process of the tree that still ran; empty when none could be identified."""
+
+
 def read_template_settings(template_root: Path) -> dict[str, Any]:
     """The template's `invokeai.yaml` settings (empty when the root has none), refusing what the tool cannot copy."""
     path = template_root / CONFIG_FILE
@@ -445,10 +454,13 @@ def living_members(pgid: int) -> list[int]:
     living = []
     for pid in psutil.pids():
         try:
-            if os.getpgid(pid) == pgid and psutil.Process(pid).status() != psutil.STATUS_ZOMBIE:
-                living.append(pid)
-        except (OSError, psutil.Error):
-            continue  # gone, or not visible to this process
+            if os.getpgid(pid) != pgid or psutil.Process(pid).status() == psutil.STATUS_ZOMBIE:
+                continue
+        except (OSError, psutil.NoSuchProcess):
+            continue  # gone, or in no group this process can see
+        except psutil.AccessDenied:
+            pass  # a member whose state this process may not read has not been seen to exit
+        living.append(pid)
     return living
 
 
@@ -460,23 +472,54 @@ def terminate(process: subprocess.Popen[Any], job: KillOnCloseJob | None) -> Non
     its id while it has members or the leader is unreaped. That group is killed even when its leader has exited;
     the server's liveness checks leave an exited leader unreaped (`exit_status`), and it is reaped only after the
     kill. The tree is captured before the kill, from the root Popen still holds.
+
+    Raises TerminationError when the kill fails, or when a process of the tree (or, on POSIX, of the group) still runs
+    STOP_TIMEOUT_S after it: such a tree may still write its scratch root.
     """
     try:
         root = psutil.Process(process.pid)
         tree = [root, *root.children(recursive=True)]
     except psutil.Error:
         tree = []
-    if job is not None:
-        job.close()
-    else:
-        kill_group(process.pid)
+    group = process.pid if job is None else None
+    try:
+        if job is not None:
+            job.close()
+        else:
+            kill_group(process.pid)
+    except OSError as e:
+        survivors = _identities([p for p in tree if p.is_running()], group)
+        raise TerminationError(
+            f"the kill of pid {process.pid} and its descendants failed ({e}); may still run: {_pids(survivors)}",
+            survivors,
+        ) from e
     _, alive = psutil.wait_procs(tree, timeout=STOP_TIMEOUT_S)
-    if alive:
-        logger.warning("processes still running after the kill: %s", ", ".join(str(p.pid) for p in alive))
+    survivors = _identities(alive, group)
+    if survivors:
+        raise TerminationError(
+            f"{_pids(survivors)} still running {STOP_TIMEOUT_S:g}s after the kill of pid {process.pid}", survivors
+        )
     try:
         process.wait(timeout=STOP_TIMEOUT_S)
-    except subprocess.TimeoutExpired:
-        process.kill()
+    except subprocess.TimeoutExpired as e:
+        survivors = _identities([p for p in tree if p.pid == process.pid], None)
+        raise TerminationError(f"pid {process.pid} still running {STOP_TIMEOUT_S:g}s after its kill", survivors) from e
+
+
+def _identities(processes: list[psutil.Process], pgid: int | None) -> list[list[float]]:
+    """[pid, create time] of `processes` and, given a group id, of the group's living members (POSIX)."""
+    found = {p.pid: p for p in processes}
+    for pid in living_members(pgid) if pgid is not None else []:
+        if pid not in found:
+            try:
+                found[pid] = psutil.Process(pid)
+            except psutil.NoSuchProcess:
+                continue
+    return [[pid, p.create_time()] for pid, p in sorted(found.items())]
+
+
+def _pids(identities: list[list[float]]) -> str:
+    return f"pid {', '.join(str(int(i[0])) for i in identities)}" if identities else "no process identified"
 
 
 def remove_tree(path: Path) -> list[str]:
@@ -530,8 +573,11 @@ class ServerProcess:
             return f.read().decode("utf-8", errors="replace")
 
     def stop(self) -> None:
-        terminate(self.process, self.job)
-        self.console.close()
+        """Kills the server tree; raises TerminationError while a process of it may still run."""
+        try:
+            terminate(self.process, self.job)
+        finally:
+            self.console.close()
 
 
 def launch_server(
@@ -550,7 +596,8 @@ def launch_server(
     killed while it starts, and only what the runner records then names it for `stop` and `resume`: the runner's
     registration holds the run lock and refuses to enter once the run is stopped (`_Session.server_registration`).
     The one wait inside it: when recording the pid fails, the server is killed and waited for before the registration
-    ends, since a `stop` after it would find that server in no heartbeat.
+    ends, since a `stop` after it would find that server in no heartbeat. A launch that fails kills its server; when
+    that kill fails too, TerminationError replaces the launch's error, which it carries as its context.
     """
     env = server_env(spec, device_env)
     invokeai_file = verify_interpreter(spec, env)
@@ -567,8 +614,9 @@ def launch_server(
             try:
                 on_spawn(process.pid)
             except BaseException:
-                terminate(process, job)
-                process = None
+                # Killed once, here: the handler below must not wait for it again.
+                unrecorded, process = process, None
+                terminate(unrecorded, job)
                 raise
         port = _wait_for_port(process, log_path, log_offset, console_path)
         base_url = f"http://127.0.0.1:{port}"
@@ -576,9 +624,11 @@ def launch_server(
         serving = _serving_process(process.pid, port)
     except BaseException:
         # A recorded server is killed outside the registration: `stop` finds it, and the run lock is not kept waiting.
-        if process is not None:
-            terminate(process, job)
-        console.close()
+        try:
+            if process is not None:
+                terminate(process, job)
+        finally:
+            console.close()
         raise
     return ServerProcess(process, console, log_path, base_url, serving, cmd, invokeai_file, job)
 
