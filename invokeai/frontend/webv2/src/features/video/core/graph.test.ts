@@ -776,6 +776,16 @@ describe('compileVideoGraph — LTX-2', () => {
     expect(loader.text_encoder_model).toEqual(LTX2_ENCODER);
   });
 
+  it('assembles a GGUF transformer with the component folder, as it does a single-file checkpoint', () => {
+    const model = ltx2Model('ltx2_distilled', 'gguf_quantized');
+    const { backendGraph } = compileVideoGraph(ltx2SettingsFor(model), model);
+    const loader = nodeOfType(backendGraph, 'ltx2_model_loader');
+
+    expect(loader.model).toEqual(model);
+    expect(loader.component_source).toEqual(LTX2_COMPONENTS);
+    expect(loader.text_encoder_model).toEqual(LTX2_ENCODER);
+  });
+
   it('decodes through the video VAE, the audio VAE and the vocoder', () => {
     const model = ltx2Model('ltx2_dev');
     const { backendGraph } = compileVideoGraph(ltx2SettingsFor(model), model);

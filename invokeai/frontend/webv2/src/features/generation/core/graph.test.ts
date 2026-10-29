@@ -1731,7 +1731,7 @@ describe('PiD decode', () => {
     expect(getNodeByType(graph, 'gemma2_encoder_loader')).toMatchObject({ gemma2_model: gemma2 });
   });
 
-  it('does not wire a VAE into decoders that use fixed constants', () => {
+  it('wires no VAE into the FLUX.1 decode, which has no VAE input', () => {
     const graph = compile(fluxModel, {
       clipEmbedModel: clipEmbed,
       t5EncoderModel: t5Encoder,
@@ -1740,13 +1740,19 @@ describe('PiD decode', () => {
     });
     const decode = getNodeByType(graph, 'flux_pid_decode');
 
-    // FLUX.1 and SD3 use fixed VAE constants and expose no `vae` input.
     expect(getEdge(graph, decode!.id, 'vae')).toBeUndefined();
   });
 
-  it('wires a VAE into decoders that read its constants at runtime', () => {
+  it('wires the VAE into the Qwen-Image decode, recording the VAE the graph decodes with', () => {
     const graph = compile(qwenImageModel, { ...pidSettings('qwen-image') });
     const decode = getNodeByType(graph, 'qwen_image_pid_decode');
+
+    expect(getEdge(graph, decode!.id, 'vae')?.source.node_id).toBe('model_loader');
+  });
+
+  it('wires the VAE into the FLUX.2 decode, which normalizes with its BatchNorm statistics', () => {
+    const graph = compile(flux2Model, { ...pidSettings('flux2') });
+    const decode = getNodeByType(graph, 'flux2_pid_decode');
 
     expect(getEdge(graph, decode!.id, 'vae')?.source.node_id).toBe('model_loader');
   });

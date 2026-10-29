@@ -16,6 +16,8 @@ from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.vae_tiling_scope import resolve_tile_size
 from invokeai.backend.working_memory.estimate import FeatureValue, WorkingMemoryEstimate, WorkingMemoryTerm
+from invokeai.backend.working_memory.fit import convolution_line
+from invokeai.backend.working_memory.platform import platform_for
 from invokeai.backend.working_memory.spec import EstimatorSpec, register
 
 # Share of the device's memory an untiled decode may claim before the decode nodes tile it up front (see
@@ -77,7 +79,7 @@ def should_pretile_vae_decode(
     return True
 
 
-# The diffusers AutoencoderKL (SD1/SDXL, SD3, CogView4) and the FLUX.1 AutoEncoder run the same
+# The diffusers AutoencoderKL (SD1/SDXL, SD3) and the FLUX.1 AutoEncoder run the same
 # mid-block self-attention as the FLUX.2 VAE: one head over the 512-channel width, on the
 # 8x-downsampled grid. Where that attention runs on the math kernel (see `sdpa_score_matrix_bytes`)
 # its score matrix is the dominant term for a large untiled image, exactly as it is for FLUX.2;
@@ -114,25 +116,96 @@ def _vae_mid_block_score_matrix_bytes(
     )
 
 
-# The SD1/SDXL, SD3, CogView4, FLUX.1 and FLUX.2 VAEs run the same diffusers AutoencoderKL convolution stack, and pay
-# the same for it: peak reserved bytes per output pixel per element byte, one fitted coefficient per operation
-# (`k_decode`, `k_encode`) and convolution backend. The values ship in `backend/working_memory/data/vae.json`, with the
-# points they were fitted on and the per-card table behind them; `scripts/calibrate_flux2_working_memory.py --only vae`
-# reproduces that table on any build.
+# The SD1/SDXL, SD3, FLUX.1 and FLUX.2 VAEs run the same diffusers AutoencoderKL convolution stack, and pay the same
+# for it: a line in the output's pixel count per operation and the dtype it runs in, `k_<operation>_<dtype>`
+# bytes per pixel plus `b_<operation>_<dtype>` bytes the process pays whatever the size, shipped per convolution
+# backend and allocator (`platform_for`). The values ship in `backend/working_memory/data/vae.json` with the points
+# they are fitted on (`backend/working_memory/fit.py`); `scripts/calibrate_flux2_working_memory.py --only vae`
+# measures a build against them. Every spec here declares that line (`fit.convolution_line`) and opts in to user
+# calibration (`user_calibrated`), so a calibration run's decode windows refit these lines per device.
 #
-# MIOpen's convolution workspaces are simply larger than cuDNN's -- ~1.6x for a decode, ~2.4x for an encode. This is
-# not the attention term: it shows up identically on the fused path, and the implied coefficients are flat across
-# resolution on both backends, so the linear model itself holds. Nor is "encoding costs half of decoding" architectural:
-# it is a cuDNN property (0.49 there, 0.78 on MIOpen), which is why each operation carries its own coefficient instead
-# of a ratio. Shipping the MIOpen values everywhere would add ~60% to every cuDNN decode for nothing, so the
-# coefficients follow the backend of the device the VAE runs on (`platform_for`).
+# None of the three scales out of the line. The demand does not follow the element size: on MIOpen fp16 needs about a
+# third of what bf16 does, and on both backends fp32 needs less per value byte than bf16. The allocator matters as
+# much: `cudaMallocAsync` needs 25-35% less than the native allocator on cuDNN. And MIOpen's bf16 workspaces are
+# larger than cuDNN's, ~1.5x for a decode and ~2.4x for an encode -- not the attention term, which shows up the same
+# on the fused path. The base is why the per-pixel figure rises at small sizes; on HIP it includes the ~300 MiB the
+# driver maps beyond the allocator's own figure on the first operation of a process.
+#
+# Each estimator declares the lines of the dtypes it can run, and the estimate prices the dtype the operation will run
+# in, which is not always the dtype the cached VAE holds (see `sd_vae_run_dtype`). CogView4's VAE is an AutoencoderKL
+# too, but a wider one (block widths up to 1024, three layers per block, no mid-block attention): it carries its own
+# lines, about 1.9x the family's for a decode.
 #
 # Caveat for AMD users: `MIOPEN_FIND_MODE=2` (FAST) selects convolution algorithms heuristically instead of by
 # benchmark, and measured a uniform 1.28x more memory at every resolution when the MIOpen values were first fitted.
-# Invoke has since made FAST its default (`run_app.py`); the RX 9060 XT measurement was taken under it and did not show
-# the 1.28x. If you see decodes exceed their reservation on another card, raise `device_working_mem_gb`.
-_AUTOENCODER_KL_COEFFICIENTS = frozenset({"k_decode", "k_encode"})
-_CONV_BACKEND_KEYS = ("conv_backend",)
+# Invoke has since made FAST its default (`run_app.py`); the RX 9060 XT points were taken under it. If you see decodes
+# exceed their reservation on another card, raise `device_working_mem_gb`.
+_PLATFORM_KEYS = ("conv_backend", "allocator")
+_DTYPE_NAMES: dict[torch.dtype, str] = {torch.float16: "fp16", torch.bfloat16: "bf16", torch.float32: "fp32"}
+_ELEMENT_SIZES = {"fp16": 2, "bf16": 2, "fp32": 4}
+
+
+def _convolution_coefficients(*dtypes: str) -> frozenset[str]:
+    """The coefficients of the convolution lines for both operations in these dtypes."""
+    return frozenset(
+        f"{part}_{operation}_{dtype}" for part in ("k", "b") for operation in ("decode", "encode") for dtype in dtypes
+    )
+
+
+def dtype_name(dtype: torch.dtype) -> str:
+    name = _DTYPE_NAMES.get(dtype)
+    if name is None:
+        raise ValueError(f"No VAE working-memory coefficients are measured for {dtype}.")
+    return name
+
+
+def _compute_dtype(vae: torch.nn.Module) -> torch.dtype:
+    """The dtype a VAE no node casts computes in.
+
+    An SDNQ VAE computes in its packed weights' `compute_dtype`: they dequantize to it, and the layer casts every other
+    operand to it, an fp32 bias included. Otherwise it is that of the first floating-point parameter wider than a byte:
+    narrower weights (fp8 storage) are what a layer dequantizes from, not what its activations are.
+
+    A packed parameter's `compute_dtype` wins over any floating-point one, so an SDNQ VAE that kept whole layers
+    unquantized in fp32 would be priced below its real cost; that case is not verified for the shipped SDNQ VAEs.
+    """
+    first_wide_float: torch.dtype | None = None
+    for param in vae.parameters():
+        packed_compute_dtype = getattr(param, "compute_dtype", None)
+        if isinstance(packed_compute_dtype, torch.dtype):
+            return packed_compute_dtype
+        if first_wide_float is None and param.is_floating_point() and param.element_size() > 1:
+            first_wide_float = param.dtype
+    if first_wide_float is not None:
+        return first_wide_float
+    raise ValueError(f"{type(vae).__name__} has no floating-point parameters to compute in.")
+
+
+def _estimate(spec: EstimatorSpec, features: Mapping[str, FeatureValue], device: torch.device) -> WorkingMemoryEstimate:
+    """`spec.estimate`, refusing a dtype the spec has no line for with the estimator, dtype and platform named, rather
+    than a bare `KeyError` from inside the terms."""
+    line = f"k_{features['operation']}_{features['dtype']}"
+    if line not in spec.coefficients:
+        raise ValueError(
+            f"Working-memory estimator '{spec.id}' has no {features['dtype']} {features['operation']} line on "
+            f"{platform_for(device)}: the VAE computes in a dtype it is not measured for."
+        )
+    return spec.estimate(features, device)
+
+
+def _convolutions(
+    features: Mapping[str, FeatureValue], values: Mapping[str, float], pixels: float, samples: int = 1
+) -> tuple[WorkingMemoryTerm, ...]:
+    """The convolution line of this operation and dtype over `pixels` output pixels, for `samples` samples.
+
+    The base scales with the samples too. That is an upper bound rather than a fit -- the base is paid once per process
+    -- and it keeps a batch at exactly that many single-sample estimates.
+    """
+    line = f"{features['operation']}_{features['dtype']}"
+    return (
+        WorkingMemoryTerm.fitted("convolutions", f"k_{line}", pixels * samples, values),
+        WorkingMemoryTerm.fitted("convolution_base", f"b_{line}", samples, values),
+    )
 
 
 def _peak_of_two_phases(
@@ -170,38 +243,61 @@ def _peak_of_two_phases(
 
 
 def _sd_terms(features: Mapping[str, FeatureValue], values: Mapping[str, float]) -> tuple[WorkingMemoryTerm, ...]:
-    coefficient = f"k_{features['operation']}"
-    element_size = cast(int, features["element_size"])
     tile = cast(int | None, features["tile"])
     if tile is not None:
-        area_bytes = tile * tile * element_size
         # We add 25% to the working memory estimate when tiling is enabled to account for factors like tile overlap
         # and number of tiles. We could make this more precise in the future, but this should be good enough for
         # most use cases.
-        convolutions = WorkingMemoryTerm.fitted("convolutions", coefficient, area_bytes * 1.25, values)
+        terms = _convolutions(features, values, tile * tile * 1.25)
     else:
-        area_bytes = cast(int, features["height"]) * cast(int, features["width"]) * element_size
-        convolutions = WorkingMemoryTerm.fitted("convolutions", coefficient, area_bytes, values)
+        terms = _convolutions(features, values, cast(int, features["height"]) * cast(int, features["width"]))
 
-    terms: tuple[WorkingMemoryTerm, ...] = (convolutions,)
     # The tiny autoencoder has no mid-block attention, so it is priced without a score matrix.
     if features["vae_class"] == "AutoencoderKL":
         terms = _peak_of_two_phases(terms, cast(int, features["score_matrix_bytes"]))
-    if features["fp32"]:
-        # If we are running in FP32, then we should account for the likely increase in model size (~250MB).
-        terms += (WorkingMemoryTerm("fp32_weights", 250 * 2**20, True),)
+    upcast_weight_bytes = cast(int, features["upcast_weight_bytes"])
+    if upcast_weight_bytes:
+        terms += (WorkingMemoryTerm("upcast_weights", upcast_weight_bytes, True),)
     return terms
 
 
 VAE_SD_SPEC = register(
     EstimatorSpec(
         id="vae.sd",
-        version=1,
-        coefficients=_AUTOENCODER_KL_COEFFICIENTS,
-        platform_keys=_CONV_BACKEND_KEYS,
+        version=2,
+        coefficients=_convolution_coefficients("fp16", "fp32"),
+        platform_keys=_PLATFORM_KEYS,
         terms=_sd_terms,
+        line=convolution_line,
+        user_calibrated=True,
     )
 )
+
+
+def sd_vae_run_dtype(operation: Literal["encode", "decode"], fp32: bool, device: torch.device) -> torch.dtype:
+    """The dtype the SD1/SDXL nodes cast the shared VAE to before they run it: `l2i` and `i2l` cast with this, and
+    `estimate_vae_working_memory_sd15_sdxl` prices it, so the two cannot drift.
+
+    fp32 when the node asks for it, and for a decode on the CPU; fp16 otherwise, on every GPU and for every
+    `precision`, so bf16 never runs. The cached VAE's own dtype says nothing about it: it is the one the VAE was loaded
+    in, which the model cache returns it to when the node's lock ends.
+    """
+    if fp32 or (operation == "decode" and device.type == "cpu"):
+        return torch.float32
+    return torch.float16
+
+
+def _upcast_weight_bytes(vae: torch.nn.Module, run_dtype: torch.dtype) -> int:
+    """What the node's in-place cast to `run_dtype` adds to the VAE's resident weights.
+
+    The cast runs once the cache has placed the VAE, so the growth comes out of the reservation: 160 MiB for the 83.7M
+    parameters of the SD1/SDXL VAE going from fp16 to fp32, nothing for a VAE loaded in fp32. Read before the lock,
+    the VAE holds the dtype it was loaded in: the model cache returns it there when the previous node's lock ended.
+    Measured points exclude resident weights by construction (they record 0 here), so the fitted line does not cover
+    it. An upcast encode casts the decoder's mid-block and post-quant conv back, so for it this counts a little more
+    than grows: conservative.
+    """
+    return sum(p.numel() * max(0, run_dtype.itemsize - p.element_size()) for p in vae.parameters())
 
 
 def estimate_vae_working_memory_sd15_sdxl(
@@ -214,12 +310,13 @@ def estimate_vae_working_memory_sd15_sdxl(
 ) -> WorkingMemoryEstimate:
     """Estimate the working memory required to encode or decode the given tensor.
 
-    It was found experimentally that the peak working memory scales linearly with the number of pixels and the element
-    size (precision). This estimate is accurate for both SD1 and SDXL. `device` is where the VAE will run; it picks the
-    convolution backend's coefficients and defaults to the session device.
+    It was found experimentally that the peak working memory is a line in the number of pixels, per dtype. This
+    estimate is accurate for both SD1 and SDXL. It prices the dtype the node will cast the VAE to (`sd_vae_run_dtype`),
+    not the one the cached VAE holds. `device` is where the VAE will run; it picks the platform's coefficients and
+    defaults to the session device.
     """
-    element_size = 4 if fp32 else 2
     device = device if device is not None else TorchDevice.choose_torch_device()
+    run_dtype = sd_vae_run_dtype(operation, fp32, device)
     latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
     height = latent_scale_factor_for_operation * image_tensor.shape[-2]
     width = latent_scale_factor_for_operation * image_tensor.shape[-1]
@@ -233,26 +330,23 @@ def estimate_vae_working_memory_sd15_sdxl(
         "height": height,
         "width": width,
         "tile": tile_size,
-        "element_size": element_size,
-        "fp32": fp32,
+        "dtype": dtype_name(run_dtype),
         "vae_class": "AutoencoderKL" if isinstance(vae, AutoencoderKL) else "AutoencoderTiny",
+        "upcast_weight_bytes": _upcast_weight_bytes(vae, run_dtype),
     }
     if isinstance(vae, AutoencoderKL):
-        score_dtype = torch.float32 if fp32 else next(vae.parameters()).dtype
         score_h, score_w = (tile_size, tile_size) if tile_size is not None else (height, width)
-        features["score_matrix_bytes"] = _vae_mid_block_score_matrix_bytes(score_h, score_w, score_dtype, device=device)
+        features["score_matrix_bytes"] = _vae_mid_block_score_matrix_bytes(score_h, score_w, run_dtype, device=device)
 
-    return VAE_SD_SPEC.estimate(features, device)
+    return _estimate(VAE_SD_SPEC, features, device)
 
 
 def _single_pass_terms(
     features: Mapping[str, FeatureValue], values: Mapping[str, float]
 ) -> tuple[WorkingMemoryTerm, ...]:
     """An untiled AutoencoderKL pass: the convolutions over the whole image, or the mid-block score matrix."""
-    coefficient = f"k_{features['operation']}"
-    area_bytes = cast(int, features["height"]) * cast(int, features["width"]) * cast(int, features["element_size"])
-    convolutions = WorkingMemoryTerm.fitted("convolutions", coefficient, area_bytes, values)
-    return _peak_of_two_phases((convolutions,), cast(int, features["score_matrix_bytes"]))
+    convolutions = _convolutions(features, values, cast(int, features["height"]) * cast(int, features["width"]))
+    return _peak_of_two_phases(convolutions, cast(int, features["score_matrix_bytes"]))
 
 
 def _single_pass_features(
@@ -261,23 +355,32 @@ def _single_pass_features(
     latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
     height = latent_scale_factor_for_operation * image_tensor.shape[-2]
     width = latent_scale_factor_for_operation * image_tensor.shape[-1]
-    param = next(vae.parameters())
+    dtype = _compute_dtype(vae)
     return {
         "operation": operation,
         "height": height,
         "width": width,
-        "element_size": param.element_size(),
-        "score_matrix_bytes": _vae_mid_block_score_matrix_bytes(height, width, param.dtype, device=device),
+        "dtype": dtype_name(dtype),
+        "score_matrix_bytes": _vae_mid_block_score_matrix_bytes(height, width, dtype, device=device),
     }
 
 
+def _cogview4_terms(features: Mapping[str, FeatureValue], values: Mapping[str, float]) -> tuple[WorkingMemoryTerm, ...]:
+    """An untiled CogView4 VAE pass: its convolutions over the whole image. It has no mid-block attention
+    (`mid_block_add_attention: false`), so there is no score matrix to price."""
+    return _convolutions(features, values, cast(int, features["height"]) * cast(int, features["width"]))
+
+
+# The CogView4 loader forces bf16: the VAE produces black images in fp16.
 VAE_COGVIEW4_SPEC = register(
     EstimatorSpec(
         id="vae.cogview4",
-        version=1,
-        coefficients=_AUTOENCODER_KL_COEFFICIENTS,
-        platform_keys=_CONV_BACKEND_KEYS,
-        terms=_single_pass_terms,
+        version=2,
+        coefficients=_convolution_coefficients("bf16"),
+        platform_keys=_PLATFORM_KEYS,
+        terms=_cogview4_terms,
+        line=convolution_line,
+        user_calibrated=True,
     )
 )
 
@@ -294,7 +397,14 @@ def estimate_vae_working_memory_cogview4(
     device.
     """
     device = device if device is not None else TorchDevice.choose_torch_device()
-    return VAE_COGVIEW4_SPEC.estimate(_single_pass_features(operation, image_tensor, vae, device), device)
+    latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
+    features: dict[str, FeatureValue] = {
+        "operation": operation,
+        "height": latent_scale_factor_for_operation * image_tensor.shape[-2],
+        "width": latent_scale_factor_for_operation * image_tensor.shape[-1],
+        "dtype": dtype_name(_compute_dtype(vae)),
+    }
+    return _estimate(VAE_COGVIEW4_SPEC, features, device)
 
 
 # What a tiled decode does *not* bound: the assembled image, several times over, per output pixel.
@@ -330,28 +440,23 @@ _VAE_MOMENT_CHANNELS_PER_LATENT = 2
 
 def _flux_terms(features: Mapping[str, FeatureValue], values: Mapping[str, float]) -> tuple[WorkingMemoryTerm, ...]:
     operation = features["operation"]
-    coefficient = f"k_{operation}"
     out_h = cast(int, features["height"])
     out_w = cast(int, features["width"])
-    element_size = cast(int, features["element_size"])
+    element_size = _ELEMENT_SIZES[cast(str, features["dtype"])]
     tile = cast(int | None, features["tile"])
 
     if tile is None:
-        area_bytes = out_h * out_w * element_size
-        convolution_phase: tuple[WorkingMemoryTerm, ...] = (
-            WorkingMemoryTerm.fitted("convolutions", coefficient, area_bytes, values),
-        )
+        convolution_phase = _convolutions(features, values, out_h * out_w)
         return _peak_of_two_phases(convolution_phase, cast(int, features["score_matrix_bytes"]))
 
     # `calc_tiles_min_overlap` clamps the tile to the image *per axis*, so the largest tile the
     # decode builds is this, not `tile` squared. Without the clamp an 8192px tile on a
     # 1024x8200 image -- tiled, because one axis exceeds it -- prices 8192x8192.
-    area_bytes = min(tile, out_h) * min(tile, out_w) * element_size
     # A 25% margin for tile overlap and the number of tiles, mirroring the SD1/SDXL estimator.
-    convolutions = WorkingMemoryTerm.fitted("convolutions", coefficient, area_bytes * 1.25, values)
+    convolutions = _convolutions(features, values, min(tile, out_h) * min(tile, out_w) * 1.25)
     if operation == "decode":
         convolution_phase = (
-            convolutions,
+            *convolutions,
             WorkingMemoryTerm(
                 "assembled_image",
                 out_h * out_w * _IMAGE_CHANNELS * (_FLUX_VAE_TILED_IMAGE_COPIES * element_size + 1),
@@ -377,20 +482,24 @@ def _flux_terms(features: Mapping[str, FeatureValue], values: Mapping[str, float
             * element_size
         )
         convolution_phase = (
-            convolutions,
+            *convolutions,
             WorkingMemoryTerm("input_image", out_h * out_w * _IMAGE_CHANNELS * element_size, True),
             WorkingMemoryTerm("assembled_moments", moments * live_moment_copies, True),
         )
     return _peak_of_two_phases(convolution_phase, cast(int, features["score_matrix_bytes"]))
 
 
+# The FLUX.1 loaders avoid fp16, which this autoencoder is broken in, except one: an SDNQ VAE folder loads through the
+# generic VAE loader and computes in the configured precision, which `auto` makes fp16 on CUDA.
 VAE_FLUX_SPEC = register(
     EstimatorSpec(
         id="vae.flux",
-        version=1,
-        coefficients=_AUTOENCODER_KL_COEFFICIENTS,
-        platform_keys=_CONV_BACKEND_KEYS,
+        version=2,
+        coefficients=_convolution_coefficients("fp16", "bf16", "fp32"),
+        platform_keys=_PLATFORM_KEYS,
         terms=_flux_terms,
+        line=convolution_line,
+        user_calibrated=True,
     )
 )
 
@@ -418,7 +527,7 @@ def estimate_vae_working_memory_flux(
     backend's coefficients. Defaults to the session device.
     """
     latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
-    param = next(vae.parameters())
+    dtype = _compute_dtype(vae)
     device = device if device is not None else TorchDevice.choose_torch_device()
 
     out_h = latent_scale_factor_for_operation * image_tensor.shape[-2]
@@ -443,9 +552,9 @@ def estimate_vae_working_memory_flux(
         "operation": operation,
         "height": out_h,
         "width": out_w,
-        "element_size": param.element_size(),
+        "dtype": dtype_name(dtype),
         "tile": tile,
-        "score_matrix_bytes": _vae_mid_block_score_matrix_bytes(score_h, score_w, param.dtype, device=device),
+        "score_matrix_bytes": _vae_mid_block_score_matrix_bytes(score_h, score_w, dtype, device=device),
     }
     if tile is not None and operation != "decode":
         # Read from the VAE rather than hard-coded: an overlap factor of 0.5 would make the tiles
@@ -454,7 +563,7 @@ def estimate_vae_working_memory_flux(
         features["latent_channels"] = getattr(getattr(vae, "config", None), "latent_channels", 16)
         features["tile_overlap_factor"] = getattr(vae, "tile_overlap_factor", 0.25)
 
-    return VAE_FLUX_SPEC.estimate(features, device)
+    return _estimate(VAE_FLUX_SPEC, features, device)
 
 
 # The FLUX.2 VAE runs one attention block at the bottom of the encoder and one at the top of the
@@ -468,30 +577,29 @@ _FLUX2_VAE_SPATIAL_COMPRESSION = 8
 
 
 def _flux2_terms(features: Mapping[str, FeatureValue], values: Mapping[str, float]) -> tuple[WorkingMemoryTerm, ...]:
-    coefficient = f"k_{features['operation']}"
-    element_size = cast(int, features["element_size"])
     batch_size = cast(int, features["batch_size"])
     tile = cast(int | None, features["tile"])
     height, width = cast(int, features["height"]), cast(int, features["width"])
     if tile is not None:
-        # The largest slice `AutoencoderKLFlux2` takes: the tile, clamped to the image per axis.
-        area_bytes = min(tile, height) * min(tile, width) * element_size
-        # Add 25% for tile overlap and the blending buffers, mirroring the SD1/SDXL estimate.
-        convolutions = WorkingMemoryTerm.fitted("convolutions", coefficient, area_bytes * 1.25 * batch_size, values)
+        # The largest slice `AutoencoderKLFlux2` takes: the tile, clamped to the image per axis. Add 25% for tile
+        # overlap and the blending buffers, mirroring the SD1/SDXL estimate.
+        convolutions = _convolutions(features, values, min(tile, height) * min(tile, width) * 1.25, samples=batch_size)
     else:
-        area_bytes = height * width * element_size
-        convolutions = WorkingMemoryTerm.fitted("convolutions", coefficient, area_bytes * batch_size, values)
+        convolutions = _convolutions(features, values, height * width, samples=batch_size)
     # Both terms are per sample; the larger is reserved (see `_peak_of_two_phases` for why, and the measurements).
-    return _peak_of_two_phases((convolutions,), cast(int, features["score_matrix_bytes"]))
+    return _peak_of_two_phases(convolutions, cast(int, features["score_matrix_bytes"]))
 
 
+# The FLUX.2 loaders avoid fp16 (as FLUX.1's do), and none of them goes through the generic VAE loader.
 VAE_FLUX2_SPEC = register(
     EstimatorSpec(
         id="vae.flux2",
-        version=1,
-        coefficients=_AUTOENCODER_KL_COEFFICIENTS,
-        platform_keys=_CONV_BACKEND_KEYS,
+        version=2,
+        coefficients=_convolution_coefficients("bf16", "fp32"),
+        platform_keys=_PLATFORM_KEYS,
         terms=_flux2_terms,
+        line=convolution_line,
+        user_calibrated=True,
     )
 )
 
@@ -505,16 +613,16 @@ def estimate_vae_working_memory_flux2(
 ) -> WorkingMemoryEstimate:
     """Estimate the working memory required to encode or decode with the FLUX.2 (32-channel) VAE.
 
-    Peak memory scales linearly with pixel area and element size, as it does for the FLUX.1 VAE, and
-    the implied coefficient is flat across 512-1536px on every backend measured. What is *not* constant
-    is the coefficient itself: MIOpen's convolution workspaces cost ~1.6x cuDNN's for a decode and ~2.4x
-    for an encode, so it is shipped per backend -- see `_AUTOENCODER_KL_COEFFICIENTS` for the caveats
-    and `backend/working_memory/data/vae.json` for the fitted values and their points. Peak *reserved*
-    memory is what is measured throughout, the conservative quantity that includes allocator overhead.
+    Peak memory is a line in pixel area per dtype, as it is for the FLUX.1 VAE, from 512 to 2048px on
+    every backend measured. The line itself is not one: MIOpen's bf16 convolution workspaces cost ~1.5x
+    cuDNN's for a decode and ~2.4x for an encode, and the allocator and the dtype move it as much, so it
+    is shipped per platform and dtype -- see `_convolution_coefficients` for the caveats and
+    `backend/working_memory/data/vae.json` for the fitted values and their points. The points measure
+    peak *reserved* memory or more, the conservative quantity that includes allocator overhead.
 
-    For reference, decoding 1024x1024 peaks at ~4.3GB on cuDNN and ~6.6GB on MIOpen, and 1536x1536 at
-    ~9.6GB -- far above the default ``device_working_mem_gb``, which is why this estimate must be
-    passed to the model cache.
+    For reference, decoding 1024x1024 in bf16 peaks at ~4.3GB on cuDNN and ~6.6GB on MIOpen, and
+    1536x1536 at ~9.6GB -- far above the default ``device_working_mem_gb``, which is why this estimate
+    must be passed to the model cache.
 
     That linear term holds only while ``AutoencoderKLFlux2``'s mid-block attention runs through a
     fused SDPA kernel, which is what CUDA does (verified: the memory-efficient kernel takes the
@@ -546,7 +654,7 @@ def estimate_vae_working_memory_flux2(
     bound. The score matrix is shaped (batch, heads, S, S), so it scales the same way. The encode
     call sites all pass batch 1 today; the shared estimator does not assume it.
     """
-    param = next(vae.parameters())
+    dtype = _compute_dtype(vae)
     device = device if device is not None else TorchDevice.choose_torch_device()
     batch_size = image_tensor.shape[0] if image_tensor.dim() >= 4 else 1
     latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
@@ -570,17 +678,17 @@ def estimate_vae_working_memory_flux2(
         "width": out_w,
         "tile": tile,
         "batch_size": batch_size,
-        "element_size": param.element_size(),
+        "dtype": dtype_name(dtype),
         "score_matrix_bytes": sdpa_score_matrix_bytes(
             device=device,
-            dtype=param.dtype,
+            dtype=dtype,
             # The score matrix is (batch, heads, S, S); one head per sample prices the whole batch.
             num_heads=_FLUX2_VAE_MID_BLOCK_HEADS * batch_size,
             head_dim=_FLUX2_VAE_MID_BLOCK_HEAD_DIM,
             seq_len=mid_block_seq_len,
         ),
     }
-    return VAE_FLUX2_SPEC.estimate(features, device)
+    return _estimate(VAE_FLUX2_SPEC, features, device)
 
 
 def estimate_vae_working_memory_anima(
@@ -1077,13 +1185,17 @@ def estimate_vae_working_memory_qwen_image(
     return int(working_memory)
 
 
+# The SD3 VAE loads in the configured precision and runs uncast: `auto` gives fp16 on CUDA, and bf16 and fp32 are
+# honoured. It carries the family's values in `data/vae.json`, as the one member that runs all three.
 VAE_SD3_SPEC = register(
     EstimatorSpec(
         id="vae.sd3",
-        version=1,
-        coefficients=_AUTOENCODER_KL_COEFFICIENTS,
-        platform_keys=_CONV_BACKEND_KEYS,
+        version=2,
+        coefficients=_convolution_coefficients("fp16", "bf16", "fp32"),
+        platform_keys=_PLATFORM_KEYS,
         terms=_single_pass_terms,
+        line=convolution_line,
+        user_calibrated=True,
     )
 )
 
@@ -1100,4 +1212,32 @@ def estimate_vae_working_memory_sd3(
     device.
     """
     device = device if device is not None else TorchDevice.choose_torch_device()
-    return VAE_SD3_SPEC.estimate(_single_pass_features(operation, image_tensor, vae, device), device)
+    return _estimate(VAE_SD3_SPEC, _single_pass_features(operation, image_tensor, vae, device), device)
+
+
+def estimate_untiled_vae_decode(
+    estimator: str, height: int, width: int, dtype: str, device: torch.device
+) -> WorkingMemoryEstimate:
+    """The estimate an untiled single-image decode of `height` x `width` output pixels in `dtype` gets from the decode
+    node that prices with `estimator`, on `device`: the features each estimator builds from its VAE, without one.
+
+    For planning sizes before anything is loaded (a calibration plan). The SD1/SDXL VAE is priced as one already in
+    `dtype`, so without the growth of an in-place cast, which a first fp32 decode after an fp16 one adds on top.
+    """
+    torch_dtype = {name: candidate for candidate, name in _DTYPE_NAMES.items()}.get(dtype)
+    if torch_dtype is None:
+        raise ValueError(f"No VAE working-memory coefficients are measured for {dtype}.")
+    features: dict[str, FeatureValue] = {"operation": "decode", "height": height, "width": width, "dtype": dtype}
+    if estimator == VAE_COGVIEW4_SPEC.id:
+        return _estimate(VAE_COGVIEW4_SPEC, features, device)
+    features["score_matrix_bytes"] = _vae_mid_block_score_matrix_bytes(height, width, torch_dtype, device=device)
+    if estimator == VAE_SD3_SPEC.id:
+        return _estimate(VAE_SD3_SPEC, features, device)
+    if estimator == VAE_FLUX_SPEC.id:
+        return _estimate(VAE_FLUX_SPEC, features | {"tile": None}, device)
+    if estimator == VAE_FLUX2_SPEC.id:
+        return _estimate(VAE_FLUX2_SPEC, features | {"tile": None, "batch_size": 1}, device)
+    if estimator == VAE_SD_SPEC.id:
+        sd_features = features | {"tile": None, "vae_class": "AutoencoderKL", "upcast_weight_bytes": 0}
+        return _estimate(VAE_SD_SPEC, sd_features, device)
+    raise ValueError(f"No untiled decode is priced by working-memory estimator '{estimator}'.")
