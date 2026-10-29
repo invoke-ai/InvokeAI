@@ -177,6 +177,7 @@ const createControlLayerCollector = (
           ...(typeof resolved.hash === 'string' ? { hash: resolved.hash } : {}),
         },
         modelCondInChannels: resolved.cond_in_channels,
+        modelControlArchitecture: resolved.control_architecture,
         weight: adapter.weight,
       });
       return true;
