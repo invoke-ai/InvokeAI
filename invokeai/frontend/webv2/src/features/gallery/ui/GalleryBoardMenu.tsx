@@ -397,8 +397,8 @@ const BoardExportProjectMenuItem = ({ board }: { board: GalleryBoard }) => {
 const SUBMENU_POSITIONING = { gutter: 2, placement: 'right-start' } as const;
 
 /**
- * Where a board can go: the Library, the open project, then the account's other projects by name — every tier
- * but the one it is in. Nested so the board menu keeps its one-level shape for the common actions.
+ * Where a board can go: the Library, then under a Projects heading the open project and the account's other projects
+ * by name — every tier but the one it is in. Nested so the board menu keeps its one-level shape for the common actions.
  */
 const BoardMoveSubMenu = ({
   board,
@@ -417,20 +417,17 @@ const BoardMoveSubMenu = ({
     },
     [actions, onBoardMoved]
   );
-  const destinations = useMemo(() => {
+  const projects = useMemo(() => {
     const others = [...projectNames]
       .filter(([id]) => id !== projectId && id !== board.projectId)
       .map(([id, name]) => ({ id, label: name }))
       .sort((left, right) => left.label.localeCompare(right.label));
 
-    return [
-      ...(board.projectId !== null ? [{ id: null, label: t('widgets.gallery.boardGroups.library') }] : []),
-      ...(board.projectId !== projectId ? [{ id: projectId, label: projectName }] : []),
-      ...others,
-    ];
-  }, [board.projectId, projectId, projectName, projectNames, t]);
+    return [...(board.projectId !== projectId ? [{ id: projectId, label: projectName }] : []), ...others];
+  }, [board.projectId, projectId, projectName, projectNames]);
+  const canMoveToLibrary = board.projectId !== null;
 
-  if (destinations.length === 0) {
+  if (!canMoveToLibrary && projects.length === 0) {
     return null;
   }
 
@@ -448,15 +445,29 @@ const BoardMoveSubMenu = ({
       <Portal>
         <Menu.Positioner>
           <ScrollableMenuContent minW="12rem">
-            {destinations.map((destination) => (
+            {canMoveToLibrary ? (
               <BoardMoveMenuItem
-                key={destination.id ?? 'library'}
                 boardId={board.id}
-                destinationId={destination.id}
-                label={destination.label}
+                destinationId={null}
+                label={t('widgets.gallery.boardGroups.library')}
                 onMove={handleMove}
               />
-            ))}
+            ) : null}
+            {canMoveToLibrary && projects.length > 0 ? <Menu.Separator /> : null}
+            {projects.length > 0 ? (
+              <Menu.ItemGroup>
+                <Menu.ItemGroupLabel>{t('widgets.gallery.boardGroups.projects')}</Menu.ItemGroupLabel>
+                {projects.map((destination) => (
+                  <BoardMoveMenuItem
+                    key={destination.id}
+                    boardId={board.id}
+                    destinationId={destination.id}
+                    label={destination.label}
+                    onMove={handleMove}
+                  />
+                ))}
+              </Menu.ItemGroup>
+            ) : null}
           </ScrollableMenuContent>
         </Menu.Positioner>
       </Portal>

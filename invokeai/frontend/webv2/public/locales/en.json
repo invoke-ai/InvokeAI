@@ -5400,6 +5400,7 @@
       "archivedBoards": "Archived boards",
       "autoAddBadgeTooltip": "New generations, canvas saves and pasted uploads land here, as do workflow nodes whose board is Auto.",
       "autoAddRedirectedTooltip": "{{name}} can’t take new results (you can only view it, or it is gone), so new generations, canvas saves and pasted uploads land here instead, as do workflow nodes whose board is Auto.",
+        "projects": "Projects",
       "autoAddToBoard": "Save new results here",
       "searchScopeAll": "All boards",
       "searchScopeBoard": "This board",

@@ -35,6 +35,7 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.mediaCountsTwo': `${String(values?.first)} and ${String(values?.second)}`,
         'widgets.gallery.videoCount': `${String(values?.count)} videos`,
         'widgets.gallery.boardGroups.library': 'Library',
+        'widgets.gallery.boardGroups.projects': 'Projects',
         'widgets.gallery.moveBoard': 'Move to…',
       };
 
@@ -279,6 +280,27 @@ const renderMenuFor = async (menuBoard: GalleryBoard, overrides: Partial<Gallery
   });
 };
 
+const projectGroupElement = () =>
+  Array.from(document.querySelectorAll<HTMLElement>('[role="group"]')).find(
+    (element) => element.querySelector('[data-part="item-group-label"]')?.textContent === 'Projects'
+  );
+
+const projectGroup = () => {
+  const group = projectGroupElement();
+
+  return group
+    ? {
+        label: 'Projects',
+        items: Array.from(group.querySelectorAll('[role="menuitem"]')).map((item) => item.textContent),
+      }
+    : undefined;
+};
+
+const libraryItem = () =>
+  Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
+    (element) => element.textContent === 'Library'
+  );
+
 const menuItemLabels = () =>
   Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).map((item) => item.textContent);
 
@@ -297,6 +319,10 @@ it('offers every tier but the one the board is in, and moves it there', async ()
   expect(
     menuItemLabels().filter((label) => label === 'Library' || label === 'Harbor Tower' || label === 'Mahogany House')
   ).toEqual(['Library', 'Harbor Tower']);
+  // The Library stands apart, above the projects' heading.
+  expect(projectGroup()).toEqual({ label: 'Projects', items: ['Harbor Tower'] });
+  expect(libraryItem()?.closest('[role="group"]')).toBeNull();
+  expect(libraryItem()?.nextElementSibling?.getAttribute('role')).toBe('separator');
 
   const library = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
     (element) => element.textContent === 'Library'
@@ -320,6 +346,9 @@ it('offers a Library board the open project first', async () => {
   expect(
     menuItemLabels().filter((label) => label === 'Library' || label === 'Harbor Tower' || label === 'Mahogany House')
   ).toEqual(['Mahogany House', 'Harbor Tower']);
+  expect(projectGroup()).toEqual({ label: 'Projects', items: ['Mahogany House', 'Harbor Tower'] });
+  expect(libraryItem()).toBeUndefined();
+  expect(projectGroupElement()?.previousElementSibling?.getAttribute('role')).not.toBe('separator');
 });
 
 it('leaves an inbox with only the actions its project does not own', async () => {
