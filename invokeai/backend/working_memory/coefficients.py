@@ -14,7 +14,7 @@ from dataclasses import asdict, dataclass
 from importlib.resources import files
 from importlib.resources.abc import Traversable
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Literal, Self
+from typing import TYPE_CHECKING, Final, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 
@@ -69,17 +69,21 @@ class CoefficientEntry(_DataModel):
         return self
 
 
+LOWER_BOUND_ONLY_METHODS: Final = frozenset({"probe_demand"})
+"""Point methods that bound an estimate from below only (see `MeasuredPoint.holds_upper_bound`)."""
+
+
 class MeasuredPoint(_DataModel):
     """One measured operation. The estimate for its features must be at least `measured_bytes`, and where a fitted
-    term decides an in-fit point, at most 1.3 times that (or `max_ratio`). Measured with the model's weights already in
-    place, so `measured_bytes` is the operation's working memory alone."""
+    term decides an in-fit point that `holds_upper_bound`, at most 1.3 times that (or `max_ratio`). Measured with the
+    model's weights already in place, so `measured_bytes` is the operation's working memory alone."""
 
     estimator: str
     version: int
     platform: dict[str, str]
     features: dict[str, FeatureValue]
     measured_bytes: int
-    method: Literal["reserved_peak", "driver_peak", "demand_peak", "device_peak"]
+    method: Literal["reserved_peak", "driver_peak", "demand_peak", "probe_demand", "device_peak"]
     """How `measured_bytes` was read, each as a peak over its value just before the operation:
 
     - ``reserved_peak``: the caching allocator's reserved bytes, one fresh process per point. Reserved rather than
@@ -89,9 +93,14 @@ class MeasuredPoint(_DataModel):
     - ``demand_peak``: the largest of the driver-level, the reserved and the allocated peak, the larger of two runs,
       one fresh process per point. The driver-level figure is what reserved misses: on HIP the first operation of a
       process maps ~300 MiB beyond ``max_memory_reserved``.
-    - ``device_peak``: the drop in the driver's free memory (`torch.cuda.mem_get_info`, polled during the operation),
-      the larger over the forwards measured. It counts the allocator's reserve and whatever is allocated around it, so
-      it is at least the reserved peak."""
+    - ``device_peak``: the drop in the driver's free memory (`torch.cuda.mem_get_info`, polled during the operation)
+      below its value just before it, the larger over the forwards measured. It counts the allocator's reserve and
+      whatever is allocated around it, so it is at least the reserved peak.
+    - ``probe_demand``: the working-memory probe's ``demand_bytes`` (`probe.MeasuredWindow`), the largest over the
+      valid, fit-eligible windows of calibration runs in a running server, warm-ups included.
+      `scripts/working_memory/build_shipped.py` builds these points from calibration store exports. A lower bound
+      only: a warm window in a running server can read well below the cold first run after a server start, which is
+      the worst case the reservation must cover, so it may raise a line but never caps one."""
     device: str
     provenance: str
     max_ratio: float | None = None
@@ -101,6 +110,17 @@ class MeasuredPoint(_DataModel):
     """False for a point measured in a regime its platform does not run, kept to check another term: CUDA with the
     math attention kernel forced, whose score matrix shares the forward with the convolutions. The fit leaves it out,
     and it gets the lower bound only."""
+
+    @model_validator(mode="after")
+    def _max_ratio_needs_an_upper_bound(self) -> Self:
+        if self.max_ratio is not None and not self.holds_upper_bound:
+            raise ValueError(f"a {self.method} point bounds its estimate from below only; it takes no max_ratio")
+        return self
+
+    @property
+    def holds_upper_bound(self) -> bool:
+        """Whether the point also bounds its estimate from above: a fresh-process peak, not a `probe_demand` window."""
+        return self.method not in LOWER_BOUND_ONLY_METHODS
 
 
 class WorkingMemoryData(_DataModel):
