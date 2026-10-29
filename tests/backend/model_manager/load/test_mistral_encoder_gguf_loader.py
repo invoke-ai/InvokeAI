@@ -33,8 +33,8 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
     apply_custom_layers_to_model,
 )
 from invokeai.backend.model_manager.load.model_loaders.mistral_encoder import MistralEncoderGGUFLoader
-from invokeai.backend.model_manager.load.quantized_embedding import _PEAK_COPIES as PEAK_COPIES
 from invokeai.backend.model_manager.taxonomy import MistralVariantType
+from invokeai.backend.quantization.gguf.ggml_tensor import HOST_DEQUANT_PEAK_COPIES as PEAK_COPIES
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 
 _Q8_0 = gguf.GGMLQuantizationType.Q8_0

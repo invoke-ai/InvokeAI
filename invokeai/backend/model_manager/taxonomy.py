@@ -130,6 +130,8 @@ class SubModelType(str, Enum):
     Tokenizer2 = "tokenizer_2"
     Tokenizer3 = "tokenizer_3"
     Processor = "processor"
+    # A vision-language encoder's vision tower alone, which the text encoder is loaded without; edits attach it
+    # while they encode, so the language model is cached once. Krea-2 and Qwen-Image-2.1.
     VisionEncoder = "vision_encoder"
     PromptEnhancer = "pe"
     PromptEnhancerTokenizer = "pe_tokenizer"

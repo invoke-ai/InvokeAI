@@ -8,16 +8,19 @@ the wrong model.
 GGUF fixtures are headers only -- shapes and string metadata, in the identification suite's stripped
 form -- because the real tensors run to gigabytes and identification never reads them. Real stripped
 headers of unsloth's llama.cpp build (``llama``) and gguf-org's cow build live in
-``tests/model_identification/stripped_models``.
+``tests/model_identification/stripped_models``. One real file, at a scaled-down geometry, checks that the
+install's header read sees what those fixtures hold.
 """
 
 import json
 from pathlib import Path
 
 import gguf
+import numpy as np
 import pytest
 import torch
 
+from invokeai.backend.model_manager.configs import mistral_encoder
 from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
 from invokeai.backend.model_manager.configs.mistral_encoder import (
@@ -27,6 +30,7 @@ from invokeai.backend.model_manager.configs.mistral_encoder import (
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import MistralVariantType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from tests.model_identification.strip_model import create_stripped_model
 from tests.model_identification.stripped_model_on_disk import StrippedModelOnDisk
 
 _TEKKEN_VOCAB = 131072
@@ -83,6 +87,70 @@ def test_a_llamacpp_mistral_small_3_is_accepted_under_its_newer_architecture_nam
 
     assert isinstance(config, MistralEncoder_GGUF_Config)
     assert config.variant is MistralVariantType.Mistral24B
+
+
+_TINY_VOCAB, _TINY_HIDDEN, _TINY_MLP = 64, 64, 128
+
+
+@pytest.fixture
+def _shrink_mistral_small_3(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Mistral Small 3's width, MLP and vocabulary floor scaled down, so a real file stays a few KB: its
+    embedding alone is over 100 MB at the smallest quantization."""
+    monkeypatch.setattr(mistral_encoder, "_MISTRAL_3_HIDDEN_SIZE", _TINY_HIDDEN)
+    monkeypatch.setattr(mistral_encoder, "_MISTRAL_3_INTERMEDIATE_SIZE", _TINY_MLP)
+    monkeypatch.setattr(mistral_encoder, "_MISTRAL_3_MIN_VOCAB_SIZE", _TINY_VOCAB)
+
+
+def _write_real_llamacpp_gguf(path: Path, architecture: str, **strings: str) -> Path:
+    """A real llama.cpp-named GGUF at the shrunk geometry and the cow build's 30 layers, matrices Q8_0.
+    ``strings`` are further string metadata, keyed under the architecture's prefix."""
+    writer = gguf.GGUFWriter(str(path), architecture)
+    for key, value in strings.items():
+        writer.add_string(f"{architecture}.{key}", value)
+    shapes = {"token_embd.weight": (_TINY_VOCAB, _TINY_HIDDEN), "blk.0.ffn_gate.weight": (_TINY_MLP, _TINY_HIDDEN)}
+    shapes |= {f"blk.{layer}.attn_q.weight": (_TINY_HIDDEN, _TINY_HIDDEN) for layer in range(30)}
+    rng = np.random.default_rng(0)
+    for name, shape in shapes.items():
+        packed = gguf.quantize(rng.standard_normal(shape).astype(np.float32), gguf.GGMLQuantizationType.Q8_0)
+        writer.add_tensor(name, packed, raw_shape=packed.shape, raw_dtype=gguf.GGMLQuantizationType.Q8_0)
+    writer.write_header_to_file()
+    writer.write_kv_data_to_file()
+    writer.write_tensors_to_file()
+    writer.close()
+    return path
+
+
+@pytest.mark.usefixtures("_shrink_mistral_small_3")
+def test_a_real_gguf_is_identified_from_its_header_as_its_stripped_fixture_is(tmp_path: Path) -> None:
+    """Install reads a GGUF's header only: names, logical shapes, quantization types and metadata. The rules
+    here have to hold on that read, and a fixture stripped from the file has to identify the same way."""
+    path = _write_real_llamacpp_gguf(tmp_path / "cow.gguf", "llama")
+
+    config = ModelConfigFactory.from_model_on_disk(ModelOnDisk(path), allow_unknown=False).config
+
+    assert isinstance(config, MistralEncoder_GGUF_Config)
+    assert config.variant is MistralVariantType.Cow
+    stripped = create_stripped_model(path, tmp_path / "stripped")
+    stripped_mod = StrippedModelOnDisk(stripped.path / path.name)
+    stripped_config = ModelConfigFactory.from_model_on_disk(stripped_mod, allow_unknown=False).config
+    assert isinstance(stripped_config, MistralEncoder_GGUF_Config)
+    assert stripped_config.variant is MistralVariantType.Cow
+
+
+@pytest.mark.usefixtures("_shrink_mistral_small_3")
+@pytest.mark.parametrize(
+    ("architecture", "strings", "reason"),
+    [("qwen3", {}, "architecture"), ("mistral3", {"rope.scaling.type": "yarn"}, "'yarn' RoPE scaling")],
+    ids=["another-architecture", "yarn"],
+)
+def test_a_real_gguf_is_refused_by_the_metadata_its_header_carries(
+    tmp_path: Path, architecture: str, strings: dict[str, str], reason: str
+) -> None:
+    """The tensors of the file accepted above, so only the header's metadata can refuse it."""
+    path = _write_real_llamacpp_gguf(tmp_path / "other.gguf", architecture, **strings)
+
+    with pytest.raises(NotAMatchError, match=reason):
+        MistralEncoder_GGUF_Config.from_model_on_disk(ModelOnDisk(path), {})
 
 
 @pytest.mark.parametrize("architecture", ["qwen3", None])

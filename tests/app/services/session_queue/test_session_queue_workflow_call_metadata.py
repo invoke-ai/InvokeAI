@@ -1024,6 +1024,30 @@ def test_cancel_child_uses_metadata_chain_walk_and_hydrates_each_item_once(
     assert hydrate_calls == 2
 
 
+def test_a_canceled_child_takes_the_cancellation_into_its_own_snapshot_and_cancels_its_chain(
+    session_queue: SessionQueue,
+) -> None:
+    """The snapshot is the child's alone: the chain's other items are canceled without it."""
+    parent_item_id, parent_session, child_sessions = _build_waiting_workflow_call_parent(session_queue, child_count=1)
+    child_item_id = _insert_queue_item(
+        session_queue,
+        session=child_sessions[0],
+        status="pending",
+        workflow_call_id=parent_session.waiting_workflow_call_execution.id,  # type: ignore[union-attr]
+        parent_item_id=parent_item_id,
+        parent_session_id=parent_session.id,
+        root_item_id=parent_item_id,
+        workflow_call_depth=1,
+    )
+    snapshot = session_queue.get_queue_item(child_item_id)
+
+    canceled = session_queue.cancel_queue_item(child_item_id, queue_item=snapshot)
+
+    assert canceled is snapshot and (snapshot.item_id, snapshot.status) == (child_item_id, "canceled")
+    assert session_queue.get_queue_item(child_item_id).status == "canceled"
+    assert session_queue.get_queue_item(parent_item_id).status == "canceled"
+
+
 def test_cancel_queue_item_cascades_from_child_to_waiting_parents(session_queue: SessionQueue) -> None:
     parent_session = GraphExecutionState(graph=Graph())
     child_session = GraphExecutionState(graph=Graph())

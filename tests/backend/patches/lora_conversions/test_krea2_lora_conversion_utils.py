@@ -47,8 +47,8 @@ def test_peft_dora_layer_preserves_magnitude_and_alpha() -> None:
     assert isinstance(layer, DoRALayer)
     assert layer._alpha == 1.0
     assert torch.equal(layer.dora_scale, dora_scale)
-    # `.dora_scale` is the LyCORIS magnitude: it indexes the *input* dim.
-    assert layer.magnitude_is_out_dim is False
+    # A `(out_features, 1)` `.dora_scale` is the LyCORIS `wd_on_out=True` magnitude: it indexes the *output* dim.
+    assert layer.magnitude_is_out_dim is True
 
 
 def test_peft_layer_without_explicit_alpha_uses_rank_default() -> None:
