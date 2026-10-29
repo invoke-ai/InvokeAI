@@ -36,15 +36,15 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.z_image_lora_constants import Z_IMAGE_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
-from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
+from invokeai.backend.quantization.dequantizing_linear import requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.rectified_flow.schedule_shift import ShiftFit, time_shift
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ZImageConditioningInfo
-from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.fp8 import get_model_compute_dtype
 from invokeai.backend.util.sage_attention import sage_attention_scope
+from invokeai.backend.z_image.denoise_working_memory import estimate_z_image_denoise_working_memory
 from invokeai.backend.z_image.extensions.regional_prompting_extension import ZImageRegionalPromptingExtension
 from invokeai.backend.z_image.text_conditioning import ZImageTextConditioning
 from invokeai.backend.z_image.z_image_control_adapter import ZImageControlAdapter
@@ -52,20 +52,7 @@ from invokeai.backend.z_image.z_image_controlnet_extension import (
     ZImageControlNetExtension,
     z_image_forward_with_control,
 )
-from invokeai.backend.z_image.z_image_patchify_utils import SEQ_MULTI_OF
 from invokeai.backend.z_image.z_image_transformer_patch import patch_transformer_for_regional_prompting
-
-# The transformer's width and head count, which its ControlNet adapters share: 30 heads of 128.
-Z_IMAGE_HIDDEN_SIZE = 3840
-Z_IMAGE_ATTENTION_HEADS = 30
-# Peak reserved activation bytes per attended token on a fused SDPA kernel; see `_estimate_working_memory`.
-Z_IMAGE_BYTES_PER_TOKEN = int(0.25 * 1024**2)
-
-
-def _padded(tokens: int) -> int:
-    """The transformer pads the image and the caption token runs to a multiple of `SEQ_MULTI_OF` each."""
-    return tokens + (-tokens) % SEQ_MULTI_OF
-
 
 # The shift fit of diffusers' ZImagePipeline. 4096 image tokens is a 1024x1024 frame -- one megapixel, and where the
 # reference fit ends. Extrapolated past it the shift runs away fast -- 25 at 2048px, 810 at 3072px and 103_777 at
@@ -268,76 +255,6 @@ class ZImageDenoiseInvocation(BaseInvocation):
             sigmas.append(1.0 if t >= 1 else 0.0 if t <= 0 else time_shift(shift, t))
         return sigmas
 
-    @staticmethod
-    def _estimate_working_memory(
-        image_seq_len: int,
-        text_seq_len: int,
-        num_loras: int,
-        num_control_blocks: int = 0,
-        regional_attention_bias_bytes: int = 0,
-        has_attention_mask: bool = False,
-        device: torch.device | None = None,
-        dtype: torch.dtype = torch.bfloat16,
-    ) -> int:
-        """Estimate peak transformer working memory (bytes) so the model cache keeps that much VRAM free.
-
-        The transformer attends over one unified sequence of image and caption tokens, each run padded to a
-        multiple of ``SEQ_MULTI_OF``. On a fused SDPA kernel its activations scale linearly with that sequence.
-        Measured as peak reserved memory in bf16 on CUDA with a 512-token caption, by
-        `scripts/calibrate_z_image_working_memory.py`: 0.99 GiB at 1024px (4608 tokens), 1.96 GiB at 1440px (8640)
-        and 3.85 GiB at 2048px (16896) -- 0.22 to 0.23 MB per token, unchanged between 2 and 4 blocks, because a
-        no-grad forward frees each block's intermediates. 0.25 MB per token bounds every point on its own, with
-        room for the ~5% more ROCm needed on FLUX.2. The fixed base covers what does not scale with the sequence
-        -- fp8 weights cast per forward, and allocator slack across steps; the caller adds the dequantization copy
-        of an int8, nvfp4 or GGUF build. Conditional and unconditional
-        passes run one after the other, so only the longer caption counts.
-
-        Where SDPA has no fused kernel for these shapes it materializes the score matrices, and those dominate:
-        on ROCm under Windows, whose fused kernels are disabled, a 1024px generation spilled 7.7 GB into shared
-        system memory while this node reserved only the default working memory. ``sdpa_score_matrix_bytes`` adds
-        the term only where it is really built. An attention mask narrows which fused kernels a build can use, so
-        the call is told whether one is passed: regional prompting's additive bias, or the padding mask the
-        ControlNet forward always builds. The plain forward passes none at batch size 1.
-
-        A ControlNet adapter first runs its own blocks over a sequence of the same length and keeps one hint per
-        block, alive through the main layers. Measured over the plain forward at 1024px: 3.3, 5.9 and 18.9
-        hint-sized tensors (sequence x width x element size) for 1, 6 and 15 blocks, so n + 4 are charged.
-        """
-        GB = 1024**3
-        seq_len = _padded(image_seq_len) + _padded(text_seq_len)
-        estimated = seq_len * Z_IMAGE_BYTES_PER_TOKEN + int(1.0 * GB)
-        estimated += regional_attention_bias_bytes
-        estimated += sdpa_score_matrix_bytes(
-            device=device if device is not None else TorchDevice.choose_torch_device(),
-            dtype=dtype,
-            num_heads=Z_IMAGE_ATTENTION_HEADS,
-            head_dim=Z_IMAGE_HIDDEN_SIZE // Z_IMAGE_ATTENTION_HEADS,
-            seq_len=seq_len,
-            has_attn_mask=has_attention_mask,
-            # The attention goes through diffusers' `dispatch_attention_fn`, which can route around torch's SDPA.
-            via_diffusers_dispatch=True,
-        )
-        if num_control_blocks:
-            estimated += (num_control_blocks + 4) * seq_len * Z_IMAGE_HIDDEN_SIZE * dtype.itemsize
-        estimated += int(0.5 * num_loras * GB)
-        return estimated
-
-    @staticmethod
-    def _regional_attention_bias_bytes(
-        regional_attn_mask: torch.Tensor | None, image_seq_len: int, dtype: torch.dtype
-    ) -> int:
-        """What `regional_forward` allocates per positive pass for regional prompting: a boolean copy of the mask,
-        the additive bias over the padded unified sequence, and the image-to-image block `torch.where` fills it
-        from. The mask itself is already on the device when the estimate is taken. Measured at 1024px on CUDA: 68 MiB
-        over the plain forward, against 93 MiB charged."""
-        if regional_attn_mask is None:
-            return 0
-        mask_side = regional_attn_mask.shape[0]
-        unified_seq_len = _padded(image_seq_len) + _padded(mask_side - image_seq_len)
-        return (
-            mask_side * mask_side + (unified_seq_len * unified_seq_len + image_seq_len * image_seq_len) * dtype.itemsize
-        )
-
     def _run_diffusion(self, context: InvocationContext) -> torch.Tensor:
         device = TorchDevice.choose_torch_device()
         inference_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
@@ -520,28 +437,23 @@ class ZImageDenoiseInvocation(BaseInvocation):
             # transformer as that takes. Without it the cache reserves only `device_working_mem_gb`, which a
             # build that materializes the score matrices (ROCm on Windows, MPS) overruns several times at 1024px.
             regional_attn_mask = regional_extension.regional_attn_mask
-            working_mem_bytes = self._estimate_working_memory(
+            working_memory = estimate_z_image_denoise_working_memory(
+                transformer_info.model,
                 image_seq_len=img_seq_len,
                 text_seq_len=max(
                     pos_prompt_embeds.shape[0], neg_prompt_embeds.shape[0] if neg_prompt_embeds is not None else 0
                 ),
-                num_loras=len(self.transformer.loras),
-                num_control_blocks=num_control_blocks,
-                regional_attention_bias_bytes=self._regional_attention_bias_bytes(
-                    regional_attn_mask, img_seq_len, inference_dtype
-                ),
+                lora_count=len(self.transformer.loras),
+                control_blocks=num_control_blocks,
+                regional_attn_mask=regional_attn_mask,
                 has_attention_mask=regional_attn_mask is not None or control_model_info is not None,
                 device=device,
                 dtype=inference_dtype,
             )
-            # An int8_tensorwise, nvfp4 or GGUF build materializes each quantized linear's weight per forward, alive
-            # alongside the activations above and invisible to them. Read from the unlocked model; zero for
-            # every other build.
-            working_mem_bytes += peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
 
             # Load transformer - always use base transformer, control is handled via extension
             (cached_weights, transformer) = exit_stack.enter_context(
-                transformer_info.model_on_device(working_mem_bytes=working_mem_bytes)
+                transformer_info.model_on_device(working_memory=working_memory)
             )
 
             # Whether LoRA has to go on as a sidecar. Asked of the loaded module tree, not the
@@ -557,9 +469,11 @@ class ZImageDenoiseInvocation(BaseInvocation):
             if self.control is not None:
                 assert control_model_info is not None
                 # Locked with the same working memory: the transformer can no longer be offloaded, so an
-                # adapter placed with only the default reservation would fill the room kept for the forward.
+                # adapter placed with only the default reservation would fill the room kept for the forward. A
+                # plain reservation, not a second estimate: inside the transformer's calibration window this lock
+                # is a co-lock, whose weights go into the window's offset rather than its demand.
                 (_, control_adapter) = exit_stack.enter_context(
-                    control_model_info.model_on_device(working_mem_bytes=working_mem_bytes)
+                    control_model_info.model_on_device(working_mem_bytes=working_memory.reservation_bytes)
                 )
                 assert isinstance(control_adapter, ZImageControlAdapter)
 

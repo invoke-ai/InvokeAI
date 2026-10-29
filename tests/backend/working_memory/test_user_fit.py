@@ -10,12 +10,14 @@ from invokeai.backend.working_memory import user_fit
 from invokeai.backend.working_memory.coefficients import shipped_coefficients
 from invokeai.backend.working_memory.fit import shipped_pair, user_pair
 from invokeai.backend.working_memory.platform import Platform, platform_for
-from invokeai.backend.working_memory.spec import EstimatorSpec
-from invokeai.backend.working_memory.user_fit import UserFit, UserPoint, fit_user_lines
+from invokeai.backend.working_memory.spec import EstimatorSpec, import_estimator_modules
+from invokeai.backend.working_memory.user_fit import UserFit, UserLine, UserPoint, fit_user_lines
+from invokeai.backend.z_image.denoise_working_memory import Z_IMAGE_DENOISE_SPEC
 
 MIB = 2**20
 DEVICE = torch.device("cuda:0")
 PLATFORM = platform_for(DEVICE)
+SPECS = import_estimator_modules()
 
 
 def _features(side: int, dtype: str = "fp16", tile: int | None = None, **extra: object) -> dict:
@@ -38,7 +40,7 @@ def _points(slope: int, base: int, sides: tuple[int, ...] = (512, 768, 1024), dt
 
 
 def _fit(points: list[UserPoint]) -> UserFit:
-    lines, problems = fit_user_lines(points, PLATFORM)
+    lines, problems = fit_user_lines(points, PLATFORM, SPECS)
     assert lines, problems
     return UserFit(label="user:dc:env", platform=PLATFORM, lines=lines)
 
@@ -171,14 +173,14 @@ def test_only_untiled_single_sample_autoencoder_kl_windows_with_demand_and_a_kno
         UserPoint("vae.unknown", 2, _features(2048), 10**12),
     ]
 
-    lines, _ = fit_user_lines(good + ignored, PLATFORM)
+    lines, _ = fit_user_lines(good + ignored, PLATFORM, SPECS)
 
     [line] = lines.values()
     assert (line.k, line.b, line.x_min, line.x_max, line.points) == (945, 420 * MIB, 512**2, 1024**2, 2)
 
 
 def test_a_line_measured_at_sizes_too_close_together_fits_nothing_and_says_why() -> None:
-    lines, problems = fit_user_lines(_points(900, 400 * MIB, sides=(1024, 1280)), PLATFORM)
+    lines, problems = fit_user_lines(_points(900, 400 * MIB, sides=(1024, 1280)), PLATFORM, SPECS)
     assert not lines
     [problem] = problems.values()
     assert "measure more sizes" in problem
@@ -200,3 +202,31 @@ def test_a_provider_that_raises_leaves_estimates_shipped_and_only_its_own_regist
     provide(_fit(_points(900, 400 * MIB)))
     user_fit.clear_user_fit_provider(broken)
     assert VAE_SD_SPEC.estimate(features, DEVICE).source.startswith("user:")
+
+
+def _denoise_features(image_tokens: int) -> dict:
+    """A plain Z-Image forward, whose features its line admits (`EstimatorSpec.line`)."""
+    return {"image_tokens": image_tokens, "text_tokens": 512, "tokens": image_tokens + 512, "dtype": "bf16",
+            "control_blocks": 0, "has_attention_mask": False, "regional_bias_bytes": 0, "score_matrix_bytes": 0,
+            "lora_count": 0, "dequant_transient_bytes": 0, "fp8_cast_transient_bytes": 0}  # fmt: skip
+
+
+def test_the_z_image_denoise_is_moved_by_no_user_line(provide) -> None:
+    """Its line is the shipped fit's alone (`user_calibrated` is off): plain forwards on a token line fit no user line
+    beside a decode's, and a fit that carried a line for its entry anyway leaves its estimates shipped."""
+    forwards = [
+        UserPoint(Z_IMAGE_DENOISE_SPEC.id, Z_IMAGE_DENOISE_SPEC.version, _denoise_features(image), 5000 * image)
+        for image in (1024, 4096, 16384)
+    ]
+    assert Z_IMAGE_DENOISE_SPEC.line(forwards[0].features).fits
+
+    lines, problems = fit_user_lines([*forwards, *_points(900, 400 * MIB)], PLATFORM, SPECS)
+
+    assert [suffix for _, suffix in lines] == ["decode_fp16"] and not problems
+    carrier = user_fit.carrier_key(Z_IMAGE_DENOISE_SPEC.id, Z_IMAGE_DENOISE_SPEC.version, PLATFORM)
+    assert carrier is not None
+    low = UserLine(k=1, b=MIB, x_min=1024, x_max=2**20, points=3)
+    provide(UserFit(label="user:dc:env", platform=PLATFORM, lines={(carrier, "denoise_bf16"): low}))
+    features = _denoise_features(4096)
+    shipped = Z_IMAGE_DENOISE_SPEC.evaluate(features, shipped_coefficients(Z_IMAGE_DENOISE_SPEC, PLATFORM))
+    assert Z_IMAGE_DENOISE_SPEC.estimate(features, DEVICE) == shipped
