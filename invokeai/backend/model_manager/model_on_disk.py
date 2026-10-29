@@ -12,7 +12,7 @@ from safetensors import safe_open
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant
-from invokeai.backend.quantization.gguf.loaders import WrappedGGUFReader, gguf_sd_loader
+from invokeai.backend.quantization.gguf.loaders import WrappedGGUFReader, gguf_header_state_dict
 from invokeai.backend.quantization.sdnq.loaders import sdnq_sd_loader
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.silence_warnings import SilenceWarnings
@@ -210,9 +210,10 @@ class ModelOnDisk:
                 checkpoint = torch.load(path, map_location="meta")
                 assert isinstance(checkpoint, dict)
             elif path.suffix.endswith(".gguf"):
-                # Identification reads shapes and never builds a module. Whether a Q8_CR file's quantization
-                # is supported is decided from its metadata by `ModelConfigFactory`, once, not per candidate.
-                checkpoint = gguf_sd_loader(path, compute_dtype=torch.float32, q8_cr="ignore")
+                # Shapes and quantization types from the header, like the safetensors branch: the tensor data
+                # is never read. Whether a Q8_CR file's quantization is supported is decided from its metadata
+                # by `ModelConfigFactory`, once, not per candidate.
+                checkpoint = gguf_header_state_dict(path, compute_dtype=torch.float32)
             elif path.suffix.endswith(".safetensors"):
                 if _is_sdnq_safetensors(path):
                     checkpoint = sdnq_sd_loader(path, compute_dtype=torch.float32)
