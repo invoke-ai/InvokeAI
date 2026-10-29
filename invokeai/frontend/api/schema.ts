@@ -10392,14 +10392,16 @@ export type components = {
         };
         /**
          * ControlNet_Checkpoint_QwenImage_Config
-         * @description Model config for Qwen-Image Fun-ControlNet adapter models (Safetensors checkpoint).
+         * @description Model config for Qwen-Image ControlNet models (Safetensors checkpoint), in either of two designs.
          *
-         *     Qwen-Image Fun-ControlNets are standalone adapters containing only the control branch
-         *     (control_img_in, control_blocks) that extends the base Qwen-Image transformer with spatial
-         *     conditioning capabilities.
+         *     alibaba-pai's Fun-ControlNet-Union is a control branch (control_img_in, control_blocks) hooked into the base
+         *     Qwen-Image transformer. Supports Canny, HED, Depth, Pose, MLSD, Scribble, Gray and inpainting; recommended
+         *     control_context_scale 0.70-0.95.
          *
-         *     Supports: Canny, HED, Depth, Pose, MLSD, Scribble, Gray, inpainting.
-         *     Recommended control_context_scale: 0.70-0.95.
+         *     InstantX's ControlNet-Union is a five-block copy of the transformer (controlnet_x_embedder, transformer_blocks,
+         *     controlnet_blocks) whose block outputs are added to the base image stream. Supports Canny, Soft Edge, Depth and
+         *     Pose; recommended control_context_scale 0.80-1.00 on the original Qwen Image it was trained on, about 1.5-2.0 on
+         *     Qwen Image 2512. It takes no inpainting condition.
          */
         ControlNet_Checkpoint_QwenImage_Config: {
             /**
@@ -10478,6 +10480,13 @@ export type components = {
              */
             base: "qwen-image";
             default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
+            /**
+             * Control Architecture
+             * @description Which Qwen-Image ControlNet design the file holds: 'fun_union' (alibaba-pai Fun-ControlNet-Union, control and inpainting) or 'instantx_union' (InstantX ControlNet-Union, control only). Records written before the field existed are Fun-ControlNets.
+             * @default fun_union
+             * @enum {string}
+             */
+            control_architecture: "fun_union" | "instantx_union";
         };
         /** ControlNet_Checkpoint_SD1_Config */
         ControlNet_Checkpoint_SD1_Config: {
@@ -43342,7 +43351,8 @@ export type components = {
         };
         /**
          * QwenImageControlField
-         * @description Qwen Image Fun-ControlNet conditioning: a control image, an inpaint image with its mask, or both.
+         * @description Qwen Image ControlNet conditioning: a control image, an inpaint image with its mask, or both (the InstantX
+         *     ControlNet takes the control image alone).
          */
         QwenImageControlField: {
             /**
@@ -43367,7 +43377,7 @@ export type components = {
             control_model: components["schemas"]["ModelIdentifierField"];
             /**
              * Control Context Scale
-             * @description Strength of the control signal. Recommended range: 0.70-0.95.
+             * @description Strength of the control signal. Recommended range: 0.70-0.95 for the Fun-ControlNet-Union; for the InstantX ControlNet-Union 0.80-1.00 on the original Qwen Image, about 1.5-2.0 on Qwen Image 2512.
              * @default 0.85
              */
             control_context_scale?: number;
@@ -43398,10 +43408,12 @@ export type components = {
         };
         /**
          * Qwen Image ControlNet
-         * @description Configure the Qwen Image Fun-ControlNet-Union for spatial control, inpainting, or both.
+         * @description Configure a Qwen Image ControlNet for spatial control, inpainting, or both.
          *
          *     Takes a preprocessed control image (Canny, HED, depth, pose, MLSD, ...) and/or an image to inpaint with its mask
-         *     (white is regenerated), plus the Qwen Image ControlNet model. Recommended control scale: 0.70-0.95.
+         *     (white is regenerated), plus the Qwen Image ControlNet model. The Fun-ControlNet-Union takes either or both
+         *     (recommended scale 0.70-0.95); the InstantX ControlNet-Union takes the control image only (0.80-1.00 on the
+         *     original Qwen Image, about 1.5-2.0 on Qwen Image 2512).
          */
         QwenImageControlInvocation: {
             /**
@@ -43444,7 +43456,7 @@ export type components = {
             control_model?: components["schemas"]["ModelIdentifierField"] | null;
             /**
              * Control Scale
-             * @description Strength of the control signal. Recommended range: 0.70-0.95.
+             * @description Strength of the control signal. Recommended range: 0.70-0.95 for the Fun-ControlNet-Union; for the InstantX ControlNet-Union 0.80-1.00 on the original Qwen Image, about 1.5-2.0 on Qwen Image 2512.
              * @default 0.85
              */
             control_context_scale?: number;
