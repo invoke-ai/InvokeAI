@@ -1,7 +1,7 @@
 ---
 title: Ideogram 4
 description: Generate images with the Ideogram 4 text-to-image models.
-lastUpdated: 2026-10-08
+lastUpdated: 2026-10-11
 sidebar:
   order: 6
 ---
@@ -105,4 +105,32 @@ Ideogram 4 ships with a **content safety filter baked into the released model we
 
 The filter is known to **false-positive on completely benign prompts**, and the quantized builds can trigger it more readily. Invoke always sends the model a structured JSON prompt, which tends to trip the filter less than plain text; if you hit it, rephrasing or adjusting the prompt usually clears it.
 :::
+
+### LoRA
+
+Ideogram 4 LoRAs are supported in the layouts trainers publish them in: ai-toolkit and the LoRAs on Civitai
+(`diffusion_model.` prefix, fused attention), including LoKR, and the diffusers training script (`transformer.` prefix,
+split attention projections, which Invoke fuses). DoRA files, and files with layers that match no Ideogram 4
+transformer module, are refused when you install them; LoHA files are not recognized. Add them in the **Guidance**
+section like any other concept.
+
+- **Both branches.** Every published Ideogram 4 LoRA is one set of weights trained on the conditional model. Invoke
+  applies it to the unconditional branch as well, the way ai-toolkit samples: applied to the conditional branch alone,
+  guidance amplifies the LoRA's effect, and style LoRAs come out oversaturated. In a workflow, connect the LoRA loader
+  to the denoise node's **Transformer** input only; LoRAs on **Transformer (Unconditional)** are refused.
+- **Quantized builds.** On the GGUF files, the bundled fp8 and nf4 folders, the int8 single files, and the scaled-fp8
+  single files when they stay in fp8 (with `fp8_compute` or **FP8 Storage**), the LoRA is applied alongside the weights
+  instead of being merged into them. It then stays in VRAM for the whole generation, and InvokeAI reserves room for
+  it. The bundled fp8 folder is the exception: its weights always stay fully on the GPU, so the LoRA's room comes out
+  of what the generation has. On a 24 GB card that costs nothing measurable at 1024×1024; above that the folder already
+  runs at the card's limit without a LoRA, and a large LoRA makes that tighter. A LoKR is applied in weight space on
+  these builds and is noticeably slower than
+  a plain LoRA of the same size (on the GGUF Q4_0 pair at 1024×1024 and 20 steps, about 70 s per image against 40 s).
+- **Turbo LoRAs.** Few-step LoRAs such as TurboTime work, but Invoke's sampler presets always end with a polish step at
+  a fixed guidance and keep the unconditional branch, so they do not run as the guidance-free model those LoRAs aim for.
+- **Unconditional LoRA.** A LoRA meant to stand in for the unconditional transformer installs as an ordinary LoRA;
+  that replacement role is not supported.
+
+Earlier versions identified Ideogram 4 LoRAs as Z-Image LoRAs. Select such a LoRA in the Model Manager and use
+**Re-identify** to fix it.
 

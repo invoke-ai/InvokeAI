@@ -115,7 +115,8 @@ not check, so a quantized file there fails with an unclear error or decodes inco
 | FLUX.2, Z-Image | ✓ (LyCORIS, Diffusers) | FLUX.2 [dev] (single-file checkpoint), Z-Image | |
 | Qwen-Image, Krea-2, Wan 2.2, Anima | ✓ (LyCORIS/kohya, including LoKR where noted on the family page) | Qwen-Image (single-file checkpoint: Fun and InstantX ControlNet Unions; InstantX Inpainting is refused), Anima (ControlNet-LLLite) | |
 | LTX-2, MiniMax H3 | ✓ (plain low-rank; LoKR, LoHA and DoRA are refused) | ✗ | |
-| SD 3, CogView4, Ideogram 4, ERNIE-Image, Qwen-Image-2.1, MOSS-Image | ✗ | ✗ | |
+| Ideogram 4 | ✓ (ai-toolkit/ComfyUI and diffusers, LoKR too; DoRA is refused, LoHA is not recognized) | ✗ | |
+| SD 3, CogView4, ERNIE-Image, Qwen-Image-2.1, MOSS-Image | ✗ | ✗ | |
 
 [PiD decoders](/users-guide/image-generation/advanced-topics/pid-decode/) load for FLUX.1, FLUX.2, SD 3, SDXL and
 Qwen-Image (v1 and v1.5, bf16 and int8 builds). MOSS-Image uses the FLUX.2 decoders.
