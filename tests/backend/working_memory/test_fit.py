@@ -5,14 +5,18 @@ from fractions import Fraction
 
 import pytest
 
-from invokeai.backend.working_memory.bounds import line_bounds, point_id
+from invokeai.backend.working_memory.bounds import bound_violation, evaluate_point, line_bounds, point_id
 from invokeai.backend.working_memory.coefficients import CoefficientEntry, MeasuredPoint, ValuesFrom, WorkingMemoryData
+from invokeai.backend.working_memory.estimate import WorkingMemoryTerm
 from invokeai.backend.working_memory.fit import (
     SHIPPED_MARGIN,
     FitPoint,
+    Line,
     LineBound,
     LineConflict,
+    convolution_line,
     entry_key,
+    fit_points,
     fitted_values,
     hand_set_values,
     raised_pair,
@@ -20,8 +24,29 @@ from invokeai.backend.working_memory.fit import (
     upper_envelope,
 )
 from invokeai.backend.working_memory.spec import EstimatorSpec, import_estimator_modules
+from invokeai.backend.z_image import denoise_working_memory
+from invokeai.backend.z_image.denoise_working_memory import Z_IMAGE_DENOISE_SPEC
 
 MIB = 2**20
+GIB = 2**30
+
+
+def _no_terms(features, values):
+    return ()
+
+
+# Throwaway estimators on the convolution line every VAE estimator declares.
+SPECS = {
+    estimator: EstimatorSpec(
+        id=estimator,
+        version=1,
+        coefficients=frozenset(),
+        platform_keys=("conv_backend",),
+        terms=_no_terms,
+        line=convolution_line,
+    )
+    for estimator in ("lender", "borrower")
+}
 
 # A process base plus a per-pixel cost, read with the scatter real points have: the shape the VAE points take.
 SCATTERED = [(262144, 940 * MIB), (589824, 1540 * MIB), (1048576, 2380 * MIB), (1638400, 3120 * MIB)]
@@ -133,7 +158,7 @@ def test_a_line_is_fitted_on_the_single_sample_untiled_points_of_every_member_th
             MeasuredPoint.model_validate(_point("lender", "decode", 2048, 90000).model_dump() | {"in_fit": False}),
         ],
     )
-    fitted = fitted_values([data], {})[("lender", 1, (("conv_backend", "cudnn"),))]
+    fitted = fitted_values([data], SPECS, {})[("lender", 1, (("conv_backend", "cudnn"),))]
     assert (fitted["k_decode_bf16"], fitted["b_decode_bf16"]) == shipped_pair(
         [(512 * 512, 1100 * MIB), (1024 * 1024, 4400 * MIB)]
     )
@@ -146,7 +171,7 @@ def test_a_line_without_enough_points_names_its_entry() -> None:
         points=[_point("lender", "decode", 512, 1100)],
     )
     with pytest.raises(ValueError, match=r"lender on \{'conv_backend': 'cudnn'\}, decode_bf16"):
-        fitted_values([data], {})
+        fitted_values([data], SPECS, {})
 
 
 def _bounded_by(points: list[MeasuredPoint]) -> dict:
@@ -182,7 +207,7 @@ def test_a_line_its_fresh_process_points_do_not_span_is_not_fitted(points) -> No
         schema_version=1, coefficients=[_entry("lender", {"k_decode_bf16": 0.0, "b_decode_bf16": 0.0})], points=points
     )
     with pytest.raises(ValueError, match=r"decode_bf16: its fresh-process points measure .* keep it a stand-in"):
-        fitted_values([data], {})
+        fitted_values([data], SPECS, {})
 
 
 def test_a_probe_point_never_lowers_a_half_of_the_fresh_process_fit() -> None:
@@ -194,7 +219,7 @@ def test_a_probe_point_never_lowers_a_half_of_the_fresh_process_fit() -> None:
         coefficients=[_entry("lender", {"k_decode_bf16": 0.0, "b_decode_bf16": 0.0})],
         points=[*fresh, _probe(2048, 2560)],
     )
-    line = fitted_values([data], _bounded_by(fresh))[("lender", 1, (("conv_backend", "cudnn"),))]
+    line = fitted_values([data], SPECS, _bounded_by(fresh))[("lender", 1, (("conv_backend", "cudnn"),))]
 
     fresh_k, fresh_b = shipped_pair([(512 * 512, 1024 * MIB), (1024 * 1024, 1229 * MIB)])
     assert fresh_b == 1004 * MIB
@@ -208,22 +233,30 @@ def test_a_declared_stand_in_line_is_not_fitted() -> None:
         update={"stand_ins": ["k_decode_bf16", "b_decode_bf16"]}
     )
     data = WorkingMemoryData(schema_version=1, coefficients=[entry], points=[])
-    assert fitted_values([data], {}) == {}
+    assert fitted_values([data], SPECS, {}) == {}
 
 
 @pytest.mark.parametrize(
-    "platform_keys, exempt", [(("conv_backend",), set()), ((), {"k_token"})], ids=["keyed", "unkeyed"]
+    "platform_keys, token_base, exempt",
+    [(("conv_backend",), False, set()), ((), False, {"k_token"}), ((), True, set())],
+    ids=["keyed", "unkeyed", "unkeyed-carried-line"],
 )
-def test_only_an_estimator_keyed_by_no_platform_trait_carries_a_value_off_a_pixel_line(platform_keys, exempt) -> None:
+def test_only_an_estimator_keyed_by_no_platform_trait_carries_a_value_off_a_line(
+    platform_keys, token_base, exempt
+) -> None:
     """A keyed estimator's value off a line counts as unfitted; an unkeyed one's is hand-set. Lines are fitted either
-    way."""
-    entry = _entry("estimator", {"k_decode_bf16": 1.0, "b_decode_bf16": 0.0, "k_token": 220000.0})
+    way, and a slope whose base ships with it is a carried line, hand-set nowhere."""
+    values = {"k_decode_bf16": 1.0, "b_decode_bf16": 0.0, "k_token": 220000.0} | (
+        {"b_token": 0.0} if token_base else {}
+    )
+    entry = _entry("estimator", values)
     spec = EstimatorSpec(
         id="estimator",
         version=1,
         coefficients=frozenset(entry.values or {}),
         platform_keys=platform_keys,
         terms=lambda features, values: (),
+        line=convolution_line,
     )
     assert hand_set_values(entry, spec) == exempt
 
@@ -237,7 +270,7 @@ def test_a_probe_point_raises_a_line_but_does_not_choose_it() -> None:
 
     def fitted(*probes: MeasuredPoint) -> tuple[int, int]:
         data = WorkingMemoryData(schema_version=1, coefficients=[_entry("lender", values)], points=[*fresh, *probes])
-        line = fitted_values([data], _bounded_by(fresh))[("lender", 1, (("conv_backend", "cudnn"),))]
+        line = fitted_values([data], SPECS, _bounded_by(fresh))[("lender", 1, (("conv_backend", "cudnn"),))]
         return line["k_decode_bf16"], line["b_decode_bf16"]
 
     def probe(px: int, mib: int) -> MeasuredPoint:
@@ -252,6 +285,162 @@ def test_a_probe_point_raises_a_line_but_does_not_choose_it() -> None:
     # Above the line at 1536px it raises the line to cover it.
     raised = fitted(probe(1536, 3600))
     assert raised != shipped and raised[0] * 1536 * 1536 + raised[1] >= 1.05 * 3600 * MIB
+
+
+DENOISE_PLATFORM = {"conv_backend": "cudnn", "allocator": "native"}
+SLOPE, BASE = 225280, 100 * MIB
+"""The line the Z-Image denoise forwards below are measured on: 220 KiB per attended token plus 100 MiB."""
+
+
+def _forward(image_tokens: int, text_tokens: int = 512, **off_line: object) -> dict:
+    """A Z-Image denoise forward's features as its estimator records them: the plain forward, unless `off_line` sets
+    one of its analytic features."""
+    plain = {"image_tokens": image_tokens, "text_tokens": text_tokens, "tokens": image_tokens + text_tokens,
+             "dtype": "bf16", "control_blocks": 0, "has_attention_mask": False, "regional_bias_bytes": 0,
+             "score_matrix_bytes": 0, "lora_count": 0, "dequant_transient_bytes": 0, "fp8_cast_transient_bytes": 0}  # fmt: skip
+    return plain | off_line
+
+
+def _measured_forward(features: dict, above_the_line: int = 0) -> MeasuredPoint:
+    return MeasuredPoint(
+        estimator=Z_IMAGE_DENOISE_SPEC.id,
+        version=Z_IMAGE_DENOISE_SPEC.version,
+        platform=DENOISE_PLATFORM,
+        features=features,
+        measured_bytes=SLOPE * features["tokens"] + BASE + above_the_line,
+        method="demand_peak",
+        device="NVIDIA GeForce RTX 4090",
+        provenance="-",
+    )
+
+
+DENOISE_ENTRY = CoefficientEntry(
+    estimator=Z_IMAGE_DENOISE_SPEC.id,
+    version=Z_IMAGE_DENOISE_SPEC.version,
+    platform=DENOISE_PLATFORM,
+    values=dict.fromkeys(Z_IMAGE_DENOISE_SPEC.coefficients, 0.0),
+    stand_ins=[f"{part}_denoise_{dtype}" for part in ("k", "b") for dtype in ("fp16", "fp32")],
+    provenance="-",
+)
+"""An entry whose bf16 line the forwards below fit."""
+
+
+def test_a_token_line_is_fitted_on_the_plain_forwards_and_bounds_every_forward() -> None:
+    """Plain forwards of 1024 to 16384 image tokens and two caption lengths lie on one line in their image and caption
+    tokens together. A ControlNet forward, one whose score matrix is materialized and one of a quantized model measure
+    more, by what their own terms price; at 4096 image tokens, fitted on, each would raise the line. The fit is the
+    plain forwards' line plus 5%, and under it every forward holds its bounds, the others with their terms on top."""
+    hints = (6 + 4) * 4608 * 3840 * 2
+    forwards = [
+        *(_measured_forward(_forward(image)) for image in (1024, 4096, 16384)),
+        _measured_forward(_forward(4096, text_tokens=96)),
+        _measured_forward(_forward(4096, control_blocks=6, has_attention_mask=True), above_the_line=hints * 9 // 10),
+        _measured_forward(_forward(4096, score_matrix_bytes=GIB), above_the_line=768 * MIB),
+        _measured_forward(_forward(4096, dequant_transient_bytes=200 * MIB), above_the_line=200 * MIB),
+    ]
+    data = WorkingMemoryData(schema_version=1, coefficients=[DENOISE_ENTRY], points=forwards)
+
+    [fitted] = fitted_values(
+        [data],
+        {Z_IMAGE_DENOISE_SPEC.id: Z_IMAGE_DENOISE_SPEC},
+        line_bounds([data], {Z_IMAGE_DENOISE_SPEC.id: Z_IMAGE_DENOISE_SPEC}),
+    ).values()
+
+    assert fitted == {"k_denoise_bf16": 236544, "b_denoise_bf16": 105 * MIB}
+    entry = DENOISE_ENTRY.model_copy(update={"values": (DENOISE_ENTRY.values or {}) | fitted})
+    shipped = data.model_copy(update={"coefficients": [entry]})
+    for forward in forwards:
+        estimate = evaluate_point(forward, Z_IMAGE_DENOISE_SPEC, [shipped])
+        assert bound_violation(forward, Z_IMAGE_DENOISE_SPEC, estimate) is None, forward.features
+
+
+def test_any_analytic_term_takes_the_forwards_it_prices_out_of_the_token_line_fit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The line takes a forward only where every analytic term of the estimator comes to nothing, read off the terms
+    themselves: a term added to the estimator takes the forwards it prices out of the fit, and their ids say so. A
+    forward that passes an attention mask leaves it too, though no term prices the mask: it narrows the kernels SDPA
+    can pick."""
+    terms = denoise_working_memory._terms
+
+    def with_a_new_term(features, values):
+        return (*terms(features, values), WorkingMemoryTerm("new_transient", features.get("new_bytes", 0), True))
+
+    monkeypatch.setattr(denoise_working_memory, "_terms", with_a_new_term)
+    priced = _measured_forward(_forward(4096, new_bytes=GIB), above_the_line=GIB)
+    masked = _measured_forward(_forward(4096, has_attention_mask=True), above_the_line=GIB)
+    plain = [_measured_forward(_forward(image)) for image in (1024, 16384)]
+    data = WorkingMemoryData(schema_version=1, coefficients=[DENOISE_ENTRY], points=[*plain, priced, masked])
+
+    [line] = fit_points([data], {Z_IMAGE_DENOISE_SPEC.id: Z_IMAGE_DENOISE_SPEC}).values()
+
+    assert [point.size for point in line] == [1024 + 512, 16384 + 512]
+    assert Z_IMAGE_DENOISE_SPEC.line(priced.features) == Line(
+        "denoise_bf16", 4608, False, "denoise-bf16-4096+512tok-new_transient=1073741824"
+    )
+    assert Z_IMAGE_DENOISE_SPEC.line(masked.features) == Line(
+        "denoise_bf16", 4608, False, "denoise-bf16-4096+512tok-attention_mask"
+    )
+
+
+def _probe_forward(features: dict, above_the_line: int = 0) -> MeasuredPoint:
+    return _measured_forward(features, above_the_line).model_copy(update={"method": "probe_demand"})
+
+
+def test_a_token_line_its_fresh_forwards_do_not_span_is_not_fitted() -> None:
+    """One fresh forward at 4096 image tokens and warm windows at 1024 and 16384: together they span 11x, but the one
+    fresh size pins nothing at the others, where a cold first run can lie above the windows."""
+    forwards = [_probe_forward(_forward(1024)), _measured_forward(_forward(4096)), _probe_forward(_forward(16384))]
+    data = WorkingMemoryData(schema_version=1, coefficients=[DENOISE_ENTRY], points=forwards)
+
+    with pytest.raises(ValueError, match=r"denoise_bf16: its fresh-process points measure .* keep it a stand-in"):
+        fitted_values(
+            [data],
+            {Z_IMAGE_DENOISE_SPEC.id: Z_IMAGE_DENOISE_SPEC},
+            line_bounds([data], {Z_IMAGE_DENOISE_SPEC.id: Z_IMAGE_DENOISE_SPEC}),
+        )
+
+
+def test_a_probe_forward_never_lowers_a_half_of_the_fresh_token_fit() -> None:
+    """A warm window at 16384 image tokens, 512 MiB above the fresh forwards' line (4242 MiB), takes no part in the
+    fresh fit, 236544 bytes per token and a 105 MiB base, which reserves 3916.5 MiB at its 16896 tokens, short of the
+    4454.1 MiB it needs with 5%. The raise starts from that fit and keeps both halves at least there. Averaged over the
+    fresh sizes, whose middle is 3072 tokens, a slope reaching a size past it costs less than a base: so the base stays
+    105 MiB and the slope rises to 269908 bytes per token, which keeps the fresh forwards' upper bounds in tokens."""
+    fresh = [_measured_forward(_forward(image)) for image in (1024, 4096)]
+    window = _probe_forward(_forward(16384), above_the_line=512 * MIB)
+    data = WorkingMemoryData(schema_version=1, coefficients=[DENOISE_ENTRY], points=[*fresh, window])
+
+    [fitted] = fitted_values(
+        [data],
+        {Z_IMAGE_DENOISE_SPEC.id: Z_IMAGE_DENOISE_SPEC},
+        line_bounds([data], {Z_IMAGE_DENOISE_SPEC.id: Z_IMAGE_DENOISE_SPEC}),
+    ).values()
+
+    fresh_k, fresh_b = shipped_pair([(p.features["tokens"], p.measured_bytes) for p in fresh])
+    assert (fresh_k, fresh_b) == (236544, 105 * MIB)
+    assert fitted["b_denoise_bf16"] == fresh_b
+    assert fitted["k_denoise_bf16"] == 269908 > fresh_k
+    assert fitted["k_denoise_bf16"] * window.features["tokens"] + fitted["b_denoise_bf16"] >= window.measured_bytes
+
+
+def test_a_token_window_no_line_covers_within_the_fresh_bounds_is_refused() -> None:
+    """2 GiB above the line at 16384 image tokens, the window (5778 MiB) needs 6066.9 MiB at 16896 attended tokens.
+    With the fresh fit's 105 MiB base that takes 369999 bytes per token, which puts the fresh 4096-token forward at
+    1731 MiB, over 1.3x its 1090 MiB (1417 MiB): the bound, in tokens, conflicts with the window."""
+    fresh = [_measured_forward(_forward(image)) for image in (1024, 4096)]
+    window = _probe_forward(_forward(16384), above_the_line=2 * GIB)
+    data = WorkingMemoryData(schema_version=1, coefficients=[DENOISE_ENTRY], points=[*fresh, window])
+    specs = {Z_IMAGE_DENOISE_SPEC.id: Z_IMAGE_DENOISE_SPEC}
+
+    with pytest.raises(LineConflict) as refused:
+        fitted_values([data], specs, line_bounds([data], specs))
+
+    message = str(refused.value)
+    assert "denoise_bf16: no line at or above k=236544, b=105 MiB covers 5778 MiB at size 16896 by 5%" in message
+    assert message.endswith(
+        "-denoise-bf16-4096+512tok-NVIDIAGeForceRTX4090-demand_peak (measured 1090 MiB, at most 1417 MiB)"
+    )
 
 
 LENDER_DECODE = (("lender", 1, (("conv_backend", "cudnn"),)), "decode_bf16")
@@ -286,7 +475,7 @@ def test_a_probe_no_hull_edge_covers_within_the_bounds_raises_the_line_between_t
     the lines that do, it reserves least averaged over 512px to 1024px."""
     assert shipped_pair([(512 * 512, 1000 * MIB), (1024 * 1024, 2500 * MIB)]) == (2100, 525 * MIB)
 
-    line = fitted_values([_with_probe(1700)], _capped_at(1.3))[LENDER_DECODE[0]]
+    line = fitted_values([_with_probe(1700)], SPECS, _capped_at(1.3))[LENDER_DECODE[0]]
 
     assert (line["k_decode_bf16"], line["b_decode_bf16"]) == (2100, 735 * MIB)
 
@@ -295,10 +484,10 @@ def test_a_probe_no_line_covers_within_the_bounds_is_refused_naming_the_conflict
     """Held to 1.1x the 512px decode, 1100 MiB, a line at or above the fresh fit's 2100 bytes per pixel and 525 MiB
     cannot reach 1785 MiB at 512x1024 px: the probe and the 512px bound conflict, the 1024px bound takes no part."""
     with pytest.raises(LineConflict) as refused:
-        fitted_values([_with_probe(1700)], _capped_at(1.1))
+        fitted_values([_with_probe(1700)], SPECS, _capped_at(1.1))
 
     message = str(refused.value)
-    assert "no line at or above k=2100, b=525 MiB covers 1700 MiB at 524288 px by 5%" in message
+    assert "no line at or above k=2100, b=525 MiB covers 1700 MiB at size 524288 by 5%" in message
     assert message.endswith("within the upper bound of fresh 512px")
 
 
@@ -306,7 +495,7 @@ def test_a_line_that_covers_every_point_by_the_margin_is_kept_whatever_their_own
     """A stand-in of 4000 bytes per pixel and no base covers probes of 900 MiB at 512px and 3000 MiB at 1024px by more
     than 5%. Their own fit has a base of its own; taking it on top would raise the line at every size."""
     probes = [FitPoint(512 * 512, 900 * MIB, False), FitPoint(1024 * 1024, 3000 * MIB, False)]
-    assert shipped_pair([(p.pixels, p.bytes) for p in probes])[1] > 0
+    assert shipped_pair([(p.size, p.bytes) for p in probes])[1] > 0
 
     assert raised_pair((4000, 0), probes, []) == (4000, 0)
 
@@ -362,28 +551,29 @@ def test_a_line_is_bounded_by_every_point_priced_on_it_where_it_decides() -> Non
         points=[upcast, tiled, scores, out_of_fit, *unbounded],
     )
 
-    bounds = line_bounds([data], import_estimator_modules())
+    specs = import_estimator_modules()
+    bounds = line_bounds([data], specs)
 
     assert set(bounds) == {(entry_key(lender), "decode_fp16")}
     by_point = {bound.point: bound[:3] for bound in bounds[(entry_key(lender), "decode_fp16")]}
     # Named by id, measured bytes and the most the estimate may reserve: two points can share an id.
     assert by_point == {
-        f"{point_id(upcast)} (measured 4000 MiB, at most 5200 MiB)": (
+        f"{point_id(upcast, specs['vae.sd'])} (measured 4000 MiB, at most 5200 MiB)": (
             Fraction(1024**2),
             Fraction(1),
             Fraction(1.3) * 4000 * MIB - 160 * MIB,
         ),
-        f"{point_id(tiled)} (measured 3000 MiB, at most 3900 MiB)": (
+        f"{point_id(tiled, specs['vae.sd'])} (measured 3000 MiB, at most 3900 MiB)": (
             Fraction(512**2 * 5, 4),
             Fraction(1),
             Fraction(1.3) * 3000 * MIB,
         ),
-        f"{point_id(scores)} (measured 9000 MiB, at most 11700 MiB)": (
+        f"{point_id(scores, specs['vae.sd'])} (measured 9000 MiB, at most 11700 MiB)": (
             Fraction(1024**2),
             Fraction(1),
             Fraction(1.3) * 9000 * MIB,
         ),
-        f"{point_id(out_of_fit)} (measured 1200 MiB, at most 1800 MiB)": (
+        f"{point_id(out_of_fit, specs['vae.sd'])} (measured 1200 MiB, at most 1800 MiB)": (
             Fraction(512**2),
             Fraction(1),
             Fraction(1.5) * 1200 * MIB,
@@ -403,7 +593,7 @@ def test_a_probe_the_raised_line_covers_leaves_it_where_it_is() -> None:
 
     def raised(*probes: MeasuredPoint) -> tuple[float, float]:
         data = WorkingMemoryData(schema_version=1, coefficients=[_entry("lender", values)], points=[*FRESH, *probes])
-        line = fitted_values([data], _capped_at(1.3))[LENDER_DECODE[0]]
+        line = fitted_values([data], SPECS, _capped_at(1.3))[LENDER_DECODE[0]]
         return line["k_decode_bf16"], line["b_decode_bf16"]
 
     first = probe(512, 1536, 2200)
@@ -435,4 +625,4 @@ def test_a_raise_without_the_bounds_of_its_fresh_process_points_is_refused() -> 
     """Fresh-process points always bound their line (`bounds.line_bounds`); a raise given none of them would be free
     to break all of them."""
     with pytest.raises(ValueError, match="no upper bounds are given"):
-        fitted_values([_with_probe(1700)], {})
+        fitted_values([_with_probe(1700)], SPECS, {})

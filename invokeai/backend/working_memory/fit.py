@@ -1,39 +1,49 @@
 """The shipped fit: the values under `data/` reproduced from their measured points.
 
-The AutoencoderKL estimators price their convolutions as a line in the output's pixel count, one per operation and
-dtype: `k_<operation>_<dtype>` bytes per pixel plus `b_<operation>_<dtype>` bytes, the base a process pays whatever the
-size. Each carried pair is the upper envelope of the fresh-process points it is resolved for (see `upper_envelope`),
-plus `SHIPPED_MARGIN`, raised where the line's other points need it (`raised_pair`). A point joins the fit of the entry
-its estimator resolves to on its platform -- the lender's, where the estimator borrows -- when it is a single-sample,
-untiled operation of that pair (`in_fit` unless measured out of regime) with no weight growth. Tiled points bound their
-estimates but fit nothing: the tile term reuses the untiled pair. Nor does a point whose VAE an in-place cast grew
-(`upcast_weight_bytes`): its demand includes the growth, which the estimate prices as a term of its own. A point that
-bounds its estimate from below only (`MeasuredPoint.holds_upper_bound`, a `probe_demand` window) takes no part in the
-envelope: the fresh-process points cap a line. It is covered by the line all the same. Where the envelope covers it by
-the margin, the pair stays as it is; where not, `raised_pair` raises it by the least that keeps the upper bounds of
-every point priced on the line (`bounds.line_bounds`), found exactly among all lines, and refuses, naming the points
-that conflict, only where no line keeps them (`LineConflict`). A line is fitted only once its fresh-process points alone
-span two sizes `MIN_AREA_RATIO` apart (`fitted_pair`); until then it stays a stand-in, which the other points bound from
-below and raise the same way.
+An estimator's fitted terms price a line per operation and dtype: `k_<suffix>` bytes per unit of the line's size plus
+`b_<suffix>` bytes, the base a process pays whatever the size. Its `EstimatorSpec.line` says which line an operation's
+features price on, their size on it, and whether a measurement of them can join its fit (`Line`). The AutoencoderKL
+estimators price their convolutions on a line in the output's pixels (`convolution_line`); the Z-Image denoise prices
+its forward on one in attended tokens. Each carried pair is the upper envelope of the fresh-process points it is
+resolved for (see `upper_envelope`), plus `SHIPPED_MARGIN`, raised where the line's other points need it
+(`raised_pair`). A point joins the fit of the entry its estimator resolves to on its platform -- the lender's, where the
+estimator borrows -- when it is `in_fit` (not measured out of regime) and its line admits it.
 
-`tests/backend/working_memory/test_shipped_coefficients.py` holds every carried value on such a line that is not a
-declared stand-in to `fitted_values` of the shipped points, so a new point that moves a fit fails there with the value
-to ship. A value on no pixel line is hand-set, which `hand_set_values` allows only for an estimator keyed by no platform
-trait: the MOSS-Image denoise's `k_token`, bytes per attended token with no base. Its points still decide and bound it
-there; this module fits pixel lines only.
+A line is fitted on its points' demand as measured; no term is subtracted from it. So a line admits only measurements
+whose demand is the line's alone. Where an estimate adds a term of its own on top of the line, a measurement of it fits
+nothing: a tiled VAE operation (the tile term reuses the untiled pair), a VAE an in-place cast grew
+(`upcast_weight_bytes`), and every denoise forward with an analytic term. Such a measurement still bounds the line from
+above where it holds an upper bound (`bounds.line_bounds`). The VAE mid-block score matrix is not such a term: an
+estimate reserves the larger of it and the convolutions, which peak apart, and on the builds that materialize it the
+convolutions stay the larger over the measured sizes (`vae_working_memory._peak_of_two_phases`); the CUDA points that
+force a math kernel are out of fit. A point that bounds its estimate from below only (`MeasuredPoint.holds_upper_bound`,
+a `probe_demand` window) takes no part in the envelope: the fresh-process points cap a line. It is covered by the line
+all the same. Where the envelope covers it by the margin, the pair stays as it is; where not, `raised_pair` raises it by
+the least that keeps the upper bounds of every point priced on the line (`bounds.line_bounds`), found exactly among all
+lines, and refuses, naming the points that conflict, only where no line keeps them (`LineConflict`). A line is fitted
+only once its fresh-process points alone span two sizes `MIN_AREA_RATIO` apart (`fitted_pair`); until then it stays a
+stand-in, which the other points bound from below and raise the same way.
+
+`tests/backend/working_memory/test_shipped_coefficients.py` holds every carried value that is not a declared stand-in
+to `fitted_values` of the shipped points, so a new point that moves a fit fails there with the value to ship. A
+`legacy` entry's hand-set values are neither fitted nor held to a fit. A value on no line its entry carries is hand-set
+too, which `hand_set_values` allows only for an estimator keyed by no platform trait: the MOSS-Image denoise's
+`k_token`, bytes per attended token, whose entry ships no base for its line. Its points still decide and bound it
+there.
 
 A user's own calibration fits the same lines from its windows (`user_pair`, read by `user_fit.py`), with
-`USER_MARGIN`, the same margin. No fresh-process point caps a user line and no floor holds it, so its envelope always
-covers its points and is never raised.
+`USER_MARGIN`, the same margin, for the estimators that opt in (`EstimatorSpec.user_calibrated`). No fresh-process
+point caps a user line and no floor holds it, so its envelope always covers its points and is never raised.
 """
 
 import math
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from fractions import Fraction
 from itertools import combinations
 from typing import TYPE_CHECKING, Final, NamedTuple, Optional
 
 from invokeai.backend.working_memory.coefficients import CoefficientEntry, MeasuredPoint, WorkingMemoryData, find_entry
+from invokeai.backend.working_memory.estimate import FeatureValue
 
 if TYPE_CHECKING:
     from invokeai.backend.working_memory.spec import EstimatorSpec
@@ -47,8 +57,8 @@ USER_MARGIN: Final = SHIPPED_MARGIN
 measures the card it prices, and the windows that would inflate it (fragmented, partly resident) never join it."""
 
 MIN_AREA_RATIO: Final = 2
-"""How far apart the sizes a line is fitted on must lie, as a ratio of pixel counts: closer points pin the intercept
-no better than their noise."""
+"""How far apart the sizes a line is fitted on must lie, as a ratio of its sizes (pixel or token counts): closer points
+pin the intercept no better than their noise."""
 
 _MIB: Final = 2**20
 
@@ -56,7 +66,54 @@ EntryKey = tuple[str, int, tuple[tuple[str, str], ...]]
 """An entry's estimator id, version and platform keys: what a point is resolved by."""
 
 LineKey = tuple[EntryKey, str]
-"""A line: the entry that carries its values, and its ``<operation>_<dtype>`` suffix."""
+"""A line: the entry that carries its values, and its suffix (`Line.suffix`)."""
+
+
+class Line(NamedTuple):
+    """Where an operation's features place it on the line its estimator's fitted terms price it on."""
+
+    suffix: str
+    """``<operation>_<dtype>``, naming the line's coefficients ``k_<suffix>`` and ``b_<suffix>``."""
+    size: int
+    """The operation's size on the line, in the unit its slope is per: output pixels, attended tokens."""
+    fits: bool
+    """Whether a measurement of these features can join the line's fit: its demand is the line's alone."""
+    label: str
+    """How a point of these features reads in its id (`bounds.point_id`), e.g. ``decode-bf16-1024x1024-tile512``, with
+    ``-scores`` where a VAE operation's build materializes the mid-block score matrix."""
+
+
+LineFunction = Callable[[Mapping[str, FeatureValue]], Optional[Line]]
+"""What an `EstimatorSpec` declares about its fitted line: the `Line` an operation's features place it on, or None for
+features that name no line."""
+
+
+def convolution_line(features: Mapping[str, FeatureValue]) -> Optional[Line]:
+    """The AutoencoderKL convolution line ``<operation>_<dtype>``, in output pixels: every VAE estimator's.
+
+    An untiled single-sample operation of an AutoencoderKL whose VAE no in-place cast grew fits it. Tiled operations
+    reuse the untiled line, the cast's growth is a term of its own, and the lines are the AutoencoderKL convolutions':
+    the SD estimator also prices the tiny autoencoder (`vae_class` AutoencoderTiny) on them, a different network whose
+    windows say nothing about those lines. Estimators that name no `vae_class` price an AutoencoderKL only.
+    """
+    operation, dtype = features.get("operation"), features.get("dtype")
+    height, width = features.get("height"), features.get("width")
+    if not isinstance(operation, str) or not isinstance(dtype, str):
+        return None
+    if not isinstance(height, int) or not isinstance(width, int):
+        return None
+    tile, batch = features.get("tile"), features.get("batch_size", 1)
+    fits = (
+        tile is None
+        and batch == 1
+        and not features.get("upcast_weight_bytes", 0)
+        and features.get("vae_class", "AutoencoderKL") == "AutoencoderKL"
+    )
+    tiled = f"-tile{tile}" if tile is not None else ""
+    batched = f"-b{batch}" if batch != 1 else ""
+    scored = "-scores" if features.get("score_matrix_bytes") else ""
+    label = f"{operation}-{dtype}-{height}x{width}{tiled}{batched}{scored}"
+    return Line(f"{operation}_{dtype}", height * width, fits, label)
 
 
 def entry_key(entry: CoefficientEntry | MeasuredPoint) -> EntryKey:
@@ -64,7 +121,7 @@ def entry_key(entry: CoefficientEntry | MeasuredPoint) -> EntryKey:
 
 
 class FitPoint(NamedTuple):
-    pixels: int
+    size: int
     bytes: int
     caps: bool
     """Whether the point takes part in choosing the line (`MeasuredPoint.holds_upper_bound`); every point is covered."""
@@ -72,9 +129,10 @@ class FitPoint(NamedTuple):
 
 class LineBound(NamedTuple):
     """An upper bound a point sets on a line it is priced on (`bounds.line_bounds`): its estimate's terms on the line,
-    ``k * pixels + b * bases``, at most `ceiling` bytes."""
+    ``k * size + b * bases``, at most `ceiling` bytes. `size` is in the line's unit and counts every unit the estimate
+    prices at the slope: a batch's samples, a tile with its overlap."""
 
-    pixels: Fraction
+    size: Fraction
     bases: Fraction
     ceiling: Fraction
     point: str
@@ -88,7 +146,7 @@ class LineConflict(ValueError):
 
 
 def spans(sizes: Iterable[int]) -> bool:
-    """Whether the pixel counts include two at least `MIN_AREA_RATIO` apart: enough to fit a line on."""
+    """Whether the sizes include two at least `MIN_AREA_RATIO` apart: enough to fit a line on."""
     distinct = sorted(set(sizes))
     return len(distinct) >= 2 and distinct[-1] >= MIN_AREA_RATIO * distinct[0]
 
@@ -108,7 +166,7 @@ def upper_envelope(points: Sequence[tuple[int, int]]) -> tuple[Fraction, Fractio
     sizes = sorted({x for x, _ in points})
     if not spans(sizes):
         raise ValueError(
-            f"an envelope needs two sizes at least {MIN_AREA_RATIO}x apart in pixels, got {sizes}; measure more sizes"
+            f"an envelope needs two sizes at least {MIN_AREA_RATIO}x apart, got {sizes}; measure more sizes"
         )
 
     highest = {x: max(y for px, y in points if px == x) for x in sizes}
@@ -137,7 +195,7 @@ def upper_envelope(points: Sequence[tuple[int, int]]) -> tuple[Fraction, Fractio
 
 def shipped_pair(points: Sequence[tuple[int, int]]) -> tuple[int, int]:
     """The slope and intercept to ship for these points: the envelope plus `SHIPPED_MARGIN`, the slope rounded up to
-    a whole byte per pixel and the intercept to a whole MiB."""
+    a whole byte per unit of size and the intercept to a whole MiB."""
     k, b = upper_envelope(points)
     margin = 1 + SHIPPED_MARGIN
     return math.ceil(k * margin), math.ceil(b * margin / _MIB) * _MIB
@@ -145,7 +203,7 @@ def shipped_pair(points: Sequence[tuple[int, int]]) -> tuple[int, int]:
 
 def user_pair(points: Sequence[tuple[int, int]]) -> tuple[int, int]:
     """The slope and intercept a user calibration's points give a line: the envelope plus `USER_MARGIN`, the slope
-    rounded up to a whole byte per pixel and the intercept to a whole MiB.
+    rounded up to a whole byte per unit of size and the intercept to a whole MiB.
 
     Every user point is a `probe_demand` window, so all of them rate the envelope's edges, and none caps the line or
     floors it: the envelope covers them all, with no raise (`raised_pair`) to search for. Raises like
@@ -155,67 +213,46 @@ def user_pair(points: Sequence[tuple[int, int]]) -> tuple[int, int]:
     return math.ceil(k * margin), math.ceil(b * margin / _MIB) * _MIB
 
 
-def line_of(features: Mapping[str, object]) -> Optional[tuple[str, int]]:
-    """The convolution line an operation of these features is priced on, ``<operation>_<dtype>``, and its size in
-    output pixels; None for features that name no such line."""
-    operation, dtype = features.get("operation"), features.get("dtype")
-    height, width = features.get("height"), features.get("width")
-    if not isinstance(operation, str) or not isinstance(dtype, str):
-        return None
-    if not isinstance(height, int) or not isinstance(width, int):
-        return None
-    return f"{operation}_{dtype}", height * width
-
-
-def fits_a_line(features: Mapping[str, object]) -> bool:
-    """Whether a point of these features can join its line's fit: an untiled single-sample operation of an
-    AutoencoderKL whose VAE no in-place cast grew. Tiled points reuse the untiled line, the cast's growth is a term of
-    its own, and the lines are the AutoencoderKL convolutions': the SD estimator also prices the tiny autoencoder
-    (`vae_class` AutoencoderTiny) on them, a different network whose windows say nothing about those lines.
-    Estimators that name no `vae_class` price an AutoencoderKL only."""
-    return (
-        features.get("tile") is None
-        and features.get("batch_size", 1) == 1
-        and not features.get("upcast_weight_bytes", 0)
-        and features.get("vae_class", "AutoencoderKL") == "AutoencoderKL"
-        and line_of(features) is not None
-    )
-
-
-def _pairs(entry: CoefficientEntry) -> set[str]:
-    """The `<operation>_<dtype>` suffixes an entry carries both halves of a convolution line for."""
+def carried_lines(entry: CoefficientEntry) -> set[str]:
+    """The suffixes an entry carries both halves of a line for."""
     names = set(entry.values or {})
     return {name[2:] for name in names if name.startswith("k_") and f"b_{name[2:]}" in names}
 
 
 def hand_set_values(entry: CoefficientEntry, spec: "EstimatorSpec") -> set[str]:
-    """The values `entry` may carry that no fit reproduces: those on no pixel line, for a `spec` keyed by no platform
-    trait. Any other spec prices convolutions, whose every value is half of a line, so a value off one there is a typo
-    or a term the fit never checks, and none is exempt."""
+    """The values `entry` may carry that no fit reproduces: those on no line it carries (`carried_lines`), for a `spec`
+    keyed by no platform trait. The MOSS-Image denoise declares its line in attended tokens, but its entry carries the
+    slope alone; shipping a fitted base (`b_token`) with it makes that a carried line, and its exemption goes. Any
+    other spec prices lines whose every value is half of one, so a value off one there is a typo or a term the fit
+    never checks, and none is exempt."""
     if spec.platform_keys:
         return set()
-    lines = {f"{part}_{suffix}" for suffix in _pairs(entry) for part in ("k", "b")}
+    lines = {f"{part}_{suffix}" for suffix in carried_lines(entry) for part in ("k", "b")}
     return set(entry.values or {}) - lines
 
 
-def fit_points(data: Iterable[WorkingMemoryData]) -> Mapping[LineKey, list[FitPoint]]:
+def fit_points(
+    data: Iterable[WorkingMemoryData], specs: Mapping[str, "EstimatorSpec"]
+) -> Mapping[LineKey, list[FitPoint]]:
     """Per carried entry and line, the points that line is fitted on.
 
     A point belongs to the entry its own estimator's entry resolves to on its platform, one `values_from` hop, and to
-    the line its operation and dtype name. Lines no point measures are absent.
+    the line its estimator's `EstimatorSpec.line` places its features on, where that admits them. `specs` holds the
+    spec of every estimator a point names. Lines no point measures are absent.
     """
     files = list(data)
     entries = [entry for file in files for entry in file.coefficients]
     groups: dict[LineKey, list[FitPoint]] = {}
     for point in (point for file in files for point in file.points):
-        found = line_of(point.features)
-        if not point.in_fit or found is None or not fits_a_line(point.features):
+        if not point.in_fit:
+            continue
+        line = specs[point.estimator].line(point.features)
+        if line is None or not line.fits:
             continue
         owner = carrier_of(entries, point)
-        suffix, pixels = found
-        if suffix in _pairs(owner):
-            line = groups.setdefault((entry_key(owner), suffix), [])
-            line.append(FitPoint(pixels, point.measured_bytes, point.holds_upper_bound))
+        if line.suffix in carried_lines(owner):
+            fitted_on = groups.setdefault((entry_key(owner), line.suffix), [])
+            fitted_on.append(FitPoint(line.size, point.measured_bytes, point.holds_upper_bound))
     return groups
 
 
@@ -229,37 +266,70 @@ def carrier_of(entries: Sequence[CoefficientEntry], point: MeasuredPoint) -> Coe
     return find_entry(entries, entry.values_from.estimator, entry.values_from.version, point.platform, where)
 
 
-def fitted_values(
-    data: Iterable[WorkingMemoryData], bounds: Mapping[LineKey, Sequence[LineBound]]
-) -> Mapping[EntryKey, Mapping[str, float]]:
-    """Per entry that carries values, what `fitted_pair` gives each line it does not declare a stand-in, within the
-    upper bounds `bounds` holds for it (`bounds.line_bounds` of the same data).
+def entry_fit(
+    entry: CoefficientEntry,
+    groups: Mapping[LineKey, Sequence[FitPoint]],
+    bounds: Mapping[LineKey, Sequence[LineBound]],
+) -> tuple[dict[str, float], dict[str, str], dict[str, str]]:
+    """What `fitted_pair` gives each line `entry` carries and does not declare a stand-in, from `groups`
+    (`fit_points`) within `bounds` (`bounds.line_bounds` of the same data); per such line its points cannot fit, why;
+    and per such line whose points conflict with the bounds (`LineConflict`), why."""
+    key = entry_key(entry)
+    values: dict[str, float] = {}
+    problems: dict[str, str] = {}
+    conflicts: dict[str, str] = {}
+    for suffix in sorted(carried_lines(entry)):
+        if {f"k_{suffix}", f"b_{suffix}"} <= set(entry.stand_ins):
+            continue
+        line = groups.get((key, suffix), [])
+        if not line:
+            problems[suffix] = "no in-fit point measures it"
+            continue
+        try:
+            k, b = fitted_pair(line, bounds.get((key, suffix), ()))
+        except LineConflict as e:
+            conflicts[suffix] = str(e)
+            continue
+        except ValueError as e:
+            problems[suffix] = str(e)
+            continue
+        values |= {f"k_{suffix}": k, f"b_{suffix}": b}
+    return values, problems, conflicts
 
-    Raises, naming the entry and line, where the points cannot fit that line: `LineConflict` where they conflict with
-    the upper bounds, `ValueError` where they do not measure it well enough.
+
+def fitted_values(
+    data: Iterable[WorkingMemoryData],
+    specs: Mapping[str, "EstimatorSpec"],
+    bounds: Mapping[LineKey, Sequence[LineBound]],
+) -> Mapping[EntryKey, Mapping[str, float]]:
+    """Per entry that carries values and is not `legacy`, what `fitted_pair` gives each line it does not declare a
+    stand-in (`entry_fit`), within the upper bounds `bounds` holds for it (`bounds.line_bounds` of the same data).
+
+    Raises, naming the entry and line, where the points cannot fit that line: `ValueError` where they do not measure
+    it well enough, `LineConflict` where they conflict with the upper bounds.
     """
     files = list(data)
-    groups = fit_points(files)
+    groups = fit_points(files, specs)
     fitted: dict[EntryKey, dict[str, float]] = {}
-    for entry in (entry for file in files for entry in file.coefficients if entry.values is not None):
-        key = entry_key(entry)
-        for suffix in sorted(_pairs(entry)):
-            if {f"k_{suffix}", f"b_{suffix}"} <= set(entry.stand_ins):
-                continue
-            try:
-                k, b = fitted_pair(groups.get((key, suffix), []), bounds.get((key, suffix), ()))
-            except LineConflict as e:
-                raise LineConflict(f"{entry.estimator} on {entry.platform}, {suffix}: {e}") from e
-            except ValueError as e:
-                raise ValueError(f"{entry.estimator} on {entry.platform}, {suffix}: {e}") from e
-            fitted.setdefault(key, {}).update({f"k_{suffix}": k, f"b_{suffix}": b})
+    for entry in (entry for file in files for entry in file.coefficients):
+        if entry.values is None or entry.legacy:
+            continue
+        values, problems, conflicts = entry_fit(entry, groups, bounds)
+        if problems:
+            suffix, problem = next(iter(problems.items()))
+            raise ValueError(f"{entry.estimator} on {entry.platform}, {suffix}: {problem}")
+        if conflicts:
+            suffix, conflict = next(iter(conflicts.items()))
+            raise LineConflict(f"{entry.estimator} on {entry.platform}, {suffix}: {conflict}")
+        if values:
+            fitted[entry_key(entry)] = values
     return fitted
 
 
 def capping_spans(line: Sequence[FitPoint]) -> bool:
     """Whether a line's fresh-process points alone span the sizes a fit needs, as only then is it fitted. Warm
     windows, or one fresh size with warm windows at others, could pin it below what a cold first run needs."""
-    return spans(point.pixels for point in line if point.caps)
+    return spans(point.size for point in line if point.caps)
 
 
 def fitted_pair(line: Sequence[FitPoint], bounds: Sequence[LineBound]) -> tuple[float, float]:
@@ -268,26 +338,26 @@ def fitted_pair(line: Sequence[FitPoint], bounds: Sequence[LineBound]) -> tuple[
     the fresh-process fit, and one that fit already covers leaves it as it is.
 
     Raises unless the fresh-process points span (`capping_spans`), and where no raise keeps every bound."""
-    capping = [(p.pixels, p.bytes) for p in line if p.caps]
+    capping = [(p.size, p.bytes) for p in line if p.caps]
     if not capping_spans(line):
         raise ValueError(
-            f"its fresh-process points measure {sorted({x for x, _ in capping})} pixels, not two sizes at least "
+            f"its fresh-process points measure sizes {sorted({x for x, _ in capping})}, not two at least "
             f"{MIN_AREA_RATIO}x apart; keep it a stand-in until they do"
         )
     return raised_pair(shipped_pair(capping), line, bounds)
 
 
 class _HalfPlane(NamedTuple):
-    """``k * pixels + b * bases >= limit``, or ``<=`` where `upper`, on a candidate line ``(k, b)``."""
+    """``k * size + b * bases >= limit``, or ``<=`` where `upper`, on a candidate line ``(k, b)``."""
 
-    pixels: Fraction
+    size: Fraction
     bases: Fraction
     limit: Fraction
     upper: bool
     why: str
 
     def holds(self, k: Fraction, b: Fraction) -> bool:
-        value = k * self.pixels + b * self.bases
+        value = k * self.size + b * self.bases
         return value <= self.limit if self.upper else value >= self.limit
 
 
@@ -295,10 +365,10 @@ def _corners(constraints: Sequence[_HalfPlane]) -> Iterator[tuple[Fraction, Frac
     """Every line where the boundaries of two constraints meet and all of them hold: the corners of the region of
     lines that satisfy them, exactly. With both floors among them the region has a corner unless it is empty."""
     for p, q in combinations(constraints, 2):
-        det = p.pixels * q.bases - p.bases * q.pixels
+        det = p.size * q.bases - p.bases * q.size
         if det:
             k = (p.limit * q.bases - p.bases * q.limit) / det
-            b = (p.pixels * q.limit - p.limit * q.pixels) / det
+            b = (p.size * q.limit - p.limit * q.size) / det
             if all(c.holds(k, b) for c in constraints):
                 yield k, b
 
@@ -328,7 +398,7 @@ def raised_pair(
     middle of that range, plus ``b``), or all its points' sizes where none caps it; the steeper on a tie, as
     `upper_envelope` breaks them. Probe sizes do not move that measure, so a line raised for some probes stays where it
     is when another probe it covers arrives. The pair is rounded up as `shipped_pair` rounds it, and `bounds` are kept
-    with room for that rounding: one byte per pixel and one MiB of base.
+    with room for that rounding: one byte per unit of size and one MiB of base.
 
     Raises `LineConflict`, naming the points that cannot be satisfied together, where no line at or above `floor`
     covers the points within `bounds`. Raises `ValueError` where a raise is needed and `line` has fresh-process points
@@ -338,10 +408,10 @@ def raised_pair(
     margin = 1 + SHIPPED_MARGIN
     highest: dict[int, int] = {}
     for point in line:
-        highest[point.pixels] = max(highest.get(point.pixels, 0), point.bytes)
+        highest[point.size] = max(highest.get(point.size, 0), point.bytes)
     # Every line at or above the floor covers what the floor covers: only the other points constrain the raise.
     uncovered = [
-        _HalfPlane(Fraction(x), Fraction(1), margin * y, False, f"{y / _MIB:.0f} MiB at {x} px")
+        _HalfPlane(Fraction(x), Fraction(1), margin * y, False, f"{y / _MIB:.0f} MiB at size {x}")
         for x, y in sorted(highest.items())
         if k_floor * x + b_floor < margin * y
     ]
@@ -357,10 +427,10 @@ def raised_pair(
         _HalfPlane(Fraction(0), Fraction(1), b_floor, False, "the base floor"),
     ]
     caps = [
-        _HalfPlane(bound.pixels, bound.bases, bound.ceiling - bound.pixels - bound.bases * _MIB, True, bound.point)
+        _HalfPlane(bound.size, bound.bases, bound.ceiling - bound.size - bound.bases * _MIB, True, bound.point)
         for bound in bounds
     ]
-    sizes = [point.pixels for point in line if point.caps] or list(highest)
+    sizes = [point.size for point in line if point.caps] or list(highest)
     middle = Fraction(min(sizes) + max(sizes), 2)
     best = min(_corners([*floors, *uncovered, *caps]), key=lambda kb: (kb[0] * middle + kb[1], -kb[0]), default=None)
     if best is None:

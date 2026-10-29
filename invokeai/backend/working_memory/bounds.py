@@ -14,6 +14,7 @@ The fit keeps the upper bounds while it raises a line for points above it: `line
 the line, which `fit.raised_pair` satisfies.
 """
 
+import json
 from collections.abc import Iterable, Mapping
 from fractions import Fraction
 from types import MappingProxyType
@@ -22,7 +23,7 @@ from typing import TYPE_CHECKING, Final, Optional
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.backend.working_memory.coefficients import MeasuredPoint, WorkingMemoryData, resolve_coefficients
 from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate
-from invokeai.backend.working_memory.fit import LineBound, LineKey, carrier_of, entry_key, line_of
+from invokeai.backend.working_memory.fit import LineBound, LineKey, carried_lines, carrier_of, entry_key
 from invokeai.backend.working_memory.platform import Platform
 
 if TYPE_CHECKING:
@@ -51,23 +52,18 @@ spikes at small sizes and a second run reserving up to 1.6x the first at large o
 cannot stay within 1.3x of all of them. Windows ROCm defaults to expandable segments; this is the override's price."""
 
 
-def point_id(point: MeasuredPoint) -> str:
-    """A readable id of a point: estimator, platform, operation, dtype, size, tile, batch, prompt tokens, a
-    materialized score matrix, card and method. The platform, operation and dtype show where the point names them: an
-    estimator keyed by no platform trait records none, and one whose features name no operation or dtype (the
-    MOSS-Image denoise) none of those."""
-    features = point.features
+def point_id(point: MeasuredPoint, spec: "EstimatorSpec") -> str:
+    """A readable id of a point: estimator, platform, its features as its estimator's line labels them (`fit.Line`:
+    operation, dtype, size, tile, batch and a materialized score matrix of a VAE operation; size and prompt tokens of a
+    MOSS-Image denoise), card and method. Features that name no line show as they are. An estimator keyed by no
+    platform trait records none."""
+    found = spec.line(point.features)
+    label = found.label if found is not None else json.dumps(point.features, sort_keys=True, separators=(",", ":"))
     platform = ",".join(point.platform.values())
-    head = [point.estimator, *([platform] if platform else [])]
-    head += [str(features[name]) for name in ("operation", "dtype") if name in features]
-    shape = f"{features.get('height')}x{features.get('width')}"
-    tile = f"-tile{features['tile']}" if features.get("tile") is not None else ""
-    batch = f"-b{features['batch_size']}" if features.get("batch_size", 1) != 1 else ""
-    text = f"-text{features['text_tokens']}" if "text_tokens" in features else ""
-    scores = "-scores" if features.get("score_matrix_bytes") else ""
     out_of_fit = "-outfit" if not point.in_fit else ""
     card = point.device.split(" (")[0].replace(" ", "")
-    return f"{'-'.join(head)}-{shape}{tile}{batch}{text}{scores}{out_of_fit}-{card}-{point.method}"
+    head = f"{point.estimator}-{platform}" if platform else point.estimator
+    return f"{head}-{label}{out_of_fit}-{card}-{point.method}"
 
 
 _ANY_PLATFORM: Final = Platform("cudnn", "native", "linux")
@@ -94,7 +90,7 @@ def fitted_decides(estimate: WorkingMemoryEstimate) -> bool:
     return any(term.included and term.coefficient is not None for term in estimate.terms)
 
 
-def upper_bound_ratio(point: MeasuredPoint, fitted: bool) -> Optional[float]:
+def upper_bound_ratio(point: MeasuredPoint, spec: "EstimatorSpec", fitted: bool) -> Optional[float]:
     """How many times the point its estimate may reserve at most, as a fitted term decides it or not (`fitted`); None
     where the point sets it no upper bound. An out-of-fit point checks another term, and a lower-bound-only point is no
     cold first run: neither caps a fitted term."""
@@ -103,17 +99,17 @@ def upper_bound_ratio(point: MeasuredPoint, fitted: bool) -> Optional[float]:
     if point.max_ratio is not None:
         return point.max_ratio
     if fitted and point.in_fit:
-        return UPPER_BOUND_EXCEPTIONS.get(point_id(point), MAX_OVER_RESERVATION)
+        return UPPER_BOUND_EXCEPTIONS.get(point_id(point, spec), MAX_OVER_RESERVATION)
     return None
 
 
-def bound_violation(point: MeasuredPoint, estimate: WorkingMemoryEstimate) -> Optional[str]:
-    """Why `estimate` breaks a bound `point` sets for it, or None."""
+def bound_violation(point: MeasuredPoint, spec: "EstimatorSpec", estimate: WorkingMemoryEstimate) -> Optional[str]:
+    """Why `estimate`, the estimate `spec` gives `point`'s features, breaks a bound `point` sets for it, or None."""
     fitted = fitted_decides(estimate)
     reserved = estimate.reservation_bytes if fitted else max(estimate.reservation_bytes, WORKING_MEMORY_FLOOR)
     if reserved < point.measured_bytes:
         return f"reserves {reserved / 2**30:.3f} GiB for a measured {point.measured_bytes / 2**30:.3f} GiB"
-    max_ratio = upper_bound_ratio(point, fitted)
+    max_ratio = upper_bound_ratio(point, spec, fitted)
     if max_ratio is not None:
         ratio = estimate.reservation_bytes / point.measured_bytes
         if ratio > max_ratio:
@@ -133,12 +129,14 @@ def line_bounds(
 ) -> Mapping[LineKey, list[LineBound]]:
     """Per line, the upper bounds its points set on it, which `fit.raised_pair` keeps when it raises the line.
 
-    A point bounds the line of its operation and dtype on the entry that carries its values (`fit.carrier_of`) where
-    it holds an upper bound with a fitted term deciding (`upper_bound_ratio`): a tiled, batched or upcast point too,
-    although no line is fitted on one. Its terms are read where the line's decide (`_DECIDING`), the other included
-    terms at the bytes `data` prices them at, so the bound reads
-    ``k * pixels + b * bases + others <= ratio * measured``. Where another term decides at the raised line, this holds
-    the line to more than `bound_violation` asks: the line still lies within the point's ratio.
+    A point bounds the line its estimator's `EstimatorSpec.line` places its features on, on the entry that carries its
+    values (`fit.carrier_of`), where it holds an upper bound with a fitted term deciding (`upper_bound_ratio`). That
+    includes a point the line does not admit to its fit (`fit.Line.fits`): a tiled, batched or upcast VAE operation, a
+    denoise forward with an analytic term. Its terms are read where the line's decide (`_DECIDING`), the other included
+    terms at the bytes `data` prices them at, so the bound reads ``k * size + b * bases + others <= ratio * measured``,
+    `size` in the units the terms price at the slope (pixels, tokens, a batch's samples). Where another term decides at
+    the raised line, this holds the line to more than `bound_violation` asks: the line still lies within the point's
+    ratio.
 
     The other terms keep the bytes of the values `data` carries, before any refit: a term on a second line that the
     same refit moves would be priced at its old value here. No shipped estimator prices one point on two lines."""
@@ -146,15 +144,16 @@ def line_bounds(
     entries = [entry for file in files for entry in file.coefficients]
     bounds: dict[LineKey, list[LineBound]] = {}
     for point in (point for file in files for point in file.points):
-        found = line_of(point.features)
-        ratio = upper_bound_ratio(point, fitted=True)
+        spec = specs[point.estimator]
+        found = spec.line(point.features)
+        ratio = upper_bound_ratio(point, spec, fitted=True)
         if found is None or ratio is None:
             continue
-        spec = specs[point.estimator]
-        k_name, b_name = f"k_{found[0]}", f"b_{found[0]}"
-        values = dict(resolve_coefficients(files, spec, _platform_of(point, spec), origin="data").values)
-        if k_name not in values or b_name not in values:
+        carrier = carrier_of(entries, point)
+        if found.suffix not in carried_lines(carrier):
             continue
+        k_name, b_name = f"k_{found.suffix}", f"b_{found.suffix}"
+        values = dict(resolve_coefficients(files, spec, _platform_of(point, spec), origin="data").values)
         terms = spec.terms(point.features, values | {k_name: _DECIDING, b_name: _DECIDING})
         on_line = [term for term in terms if term.included and term.coefficient in (k_name, b_name)]
         if not on_line:
@@ -162,12 +161,13 @@ def line_bounds(
         others = sum(term.bytes for term in terms if term.included and term.coefficient not in (k_name, b_name))
         allowed = Fraction(ratio) * point.measured_bytes
         # Two points can share an id (repeated measurements); their bytes tell them apart.
-        label = f"{point_id(point)} (measured {point.measured_bytes / _MIB:.0f} MiB, at most {allowed / _MIB:.0f} MiB)"
+        measured = f"measured {point.measured_bytes / _MIB:.0f} MiB, at most {allowed / _MIB:.0f} MiB"
+        label = f"{point_id(point, spec)} ({measured})"
         bound = LineBound(
-            pixels=sum((Fraction(term.scale or 0) for term in on_line if term.coefficient == k_name), Fraction(0)),
+            size=sum((Fraction(term.scale or 0) for term in on_line if term.coefficient == k_name), Fraction(0)),
             bases=sum((Fraction(term.scale or 0) for term in on_line if term.coefficient == b_name), Fraction(0)),
             ceiling=allowed - Fraction(others),
             point=label,
         )
-        bounds.setdefault((entry_key(carrier_of(entries, point)), found[0]), []).append(bound)
+        bounds.setdefault((entry_key(carrier), found.suffix), []).append(bound)
     return bounds
