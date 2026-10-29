@@ -31,7 +31,7 @@ def test_runtime_import_without_graph() -> None:
     assert_module_imports_without_graph("invokeai.app.services.shared.graph_if_runtime")
 
 
-def test_empty_if_frame_analysis_recomputes_dynamic_branch_axes(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_empty_if_frame_analysis_reuses_static_branch_axes(monkeypatch: pytest.MonkeyPatch) -> None:
     state = GraphExecutionState(graph=Graph(nodes={"if": IfInvocation(id="if")}))
     original = graph_if_runtime._get_if_branch_frame_axes
     analysis_count = 0
@@ -44,7 +44,7 @@ def test_empty_if_frame_analysis_recomputes_dynamic_branch_axes(monkeypatch: pyt
     monkeypatch.setattr(graph_if_runtime, "_get_if_branch_frame_axes", count_analysis)
 
     assert [graph_if_runtime._has_empty_if_frame(state, "if") for _ in range(20)] == [False] * 20
-    assert analysis_count == 20
+    assert analysis_count == 1
 
 
 @pytest.mark.parametrize(
@@ -226,7 +226,7 @@ def test_nested_if_iteration_paths_use_supplied_source_graph_recursively() -> No
 
 def test_unresolved_nested_literal_if_chain_has_no_condition_path() -> None:
     nodes = {"iterator": IterateInvocation(id="iterator"), "guarded": IfInvocation(id="guarded")}
-    nodes.update({f"if-{i}": IfInvocation(id=f"if-{i}", condition=True) for i in range(24)})
+    nodes.update({f"if-{i}": IfInvocation(id=f"if-{i}", condition=True) for i in range(600)})
     edges = [
         Edge(
             source=EdgeConnection(node_id="iterator", field="item"),
@@ -234,7 +234,7 @@ def test_unresolved_nested_literal_if_chain_has_no_condition_path() -> None:
         )
     ]
     previous = "guarded"
-    for i in range(24):
+    for i in range(600):
         edges.append(
             Edge(
                 source=EdgeConnection(node_id=previous, field="value"),
@@ -376,7 +376,7 @@ def test_edge_frame_axis_traversal_caches_shared_nested_ifs(monkeypatch: pytest.
     assert branch_lookups <= chain_length + 1
 
 
-def test_resolved_nested_if_keeps_selected_branch_axes(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_nested_if_frame_axes_do_not_depend_on_runtime_branch_selection(monkeypatch: pytest.MonkeyPatch) -> None:
     graph = Graph(
         nodes={
             "condition": BooleanLogicInvocation(id="condition"),
@@ -410,18 +410,20 @@ def test_resolved_nested_if_keeps_selected_branch_axes(monkeypatch: pytest.Monke
     state = GraphExecutionState(graph=graph)
     state.source_prepared_mapping["if"] = {"if-exec"}
     state._resolved_if_exec_branches["if-exec"] = "true_input"
-    monkeypatch.setattr(
-        graph_if_runtime,
-        "_get_if_branch_frame_axes",
-        lambda *_args, **_kwargs: {"true_input": ("true-axis",), "false_input": ()},
-    )
     iterator_ancestry = _IteratorAncestry(state)
-    monkeypatch.setattr(iterator_ancestry, "get_frame_iterators", lambda _axis_id: ())
 
-    assert graph_if_runtime._get_edge_frame_axes(state, iterator_ancestry, edge, {}) == ("true-axis",)
+    assert graph_if_runtime._get_if_static_frame_analysis(state, iterator_ancestry, "if")[0] == {
+        "true_input": (),
+        "false_input": (),
+    }
+    state._resolved_if_exec_branches["if-exec"] = "false_input"
+    assert graph_if_runtime._get_if_static_frame_analysis(state, iterator_ancestry, "if")[0] == {
+        "true_input": (),
+        "false_input": (),
+    }
 
 
-def test_static_if_analysis_refreshes_branch_axes_after_selection_rollback(
+def test_static_if_analysis_is_independent_of_runtime_branch_selection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     graph = Graph(
@@ -467,10 +469,9 @@ def test_static_if_analysis_refreshes_branch_axes_after_selection_rollback(
     state.source_prepared_mapping["inner"] = {"inner-exec"}
     iterator_ancestry = _IteratorAncestry(state)
 
-    def branch_axes(current_state: GraphExecutionState, _ancestry: object, node_id: str, _cache: dict) -> dict:
+    def branch_axes(_current_state: GraphExecutionState, _ancestry: object, node_id: str, _cache: dict) -> dict:
         if node_id == "outer":
-            selected = current_state._resolved_if_exec_branches.get("inner-exec")
-            return {"true_input": ("iterate",) if selected else (), "false_input": ()}
+            return {"true_input": (), "false_input": ()}
         return {"true_input": (), "false_input": ()}
 
     monkeypatch.setattr(graph_if_runtime, "_get_if_branch_frame_axes", branch_axes)
@@ -481,7 +482,7 @@ def test_static_if_analysis_refreshes_branch_axes_after_selection_rollback(
     }
     state._resolved_if_exec_branches["inner-exec"] = "true_input"
     assert graph_if_runtime._get_if_static_frame_analysis(state, iterator_ancestry, "outer")[0] == {
-        "true_input": ("iterate",),
+        "true_input": (),
         "false_input": (),
     }
     state._resolved_if_exec_branches.clear()

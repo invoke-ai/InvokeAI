@@ -1265,8 +1265,8 @@ class _ExecutionNodeBuilder:
     ) -> list[str]:
         if isinstance(self._state.graph.get_node(source_node_id), IfInvocation):
             iterator_ancestry = self._get_iterator_ancestry(iterator_graph or self.iterator_graph())
-            branch_axes_by_field = graph_if_runtime._get_if_branch_frame_axes(
-                self._state, iterator_ancestry, source_node_id, {}
+            branch_axes_by_field = graph_if_runtime._get_if_runtime_branch_frame_axes(
+                self._state, iterator_ancestry, source_node_id
             )
             branch_axes = [branch_axes_by_field[branch] for branch in ("true_input", "false_input")]
             condition_axes = {
@@ -1346,6 +1346,16 @@ class _ExecutionNodeBuilder:
             )
         return iteration_paths
 
+    def _collect_has_nested_if_for_final_input(self, collect_id: str) -> bool:
+        ancestry = self._get_iterator_ancestry(self.iterator_graph())
+        return any(
+            isinstance(self._state.graph.get_node(edge.source.node_id), IfInvocation)
+            and any(
+                graph_if_runtime._get_if_static_frame_analysis(self._state, ancestry, edge.source.node_id)[1].values()
+            )
+            for edge in self._state.graph._get_input_edges(collect_id, ITEM_FIELD)
+        )
+
     def _get_collect_candidate_group_keys(self, edge: Edge) -> set[tuple[int, ...]]:
         source_node_id = edge.source.node_id
         iterator_node_ids = self._get_collect_source_iterator_ids(source_node_id)
@@ -1362,7 +1372,7 @@ class _ExecutionNodeBuilder:
                     for branch_edge in self._state.graph._get_input_edges(source_node.id, branch)
                 )
             )
-            if not nested_literal_if:
+            if not (nested_literal_if and self._collect_has_nested_if_for_final_input(edge.destination.node_id)):
                 group_depth = max(group_depth - 1, 0)
 
         group_keys: set[tuple[int, ...]] = set()
@@ -1829,7 +1839,11 @@ class _ExecutionNodeBuilder:
                             yield mapping
                             continue
                         axis_id = axes[-1]
-                        prepared_axis_ids = self._get_prepared_nodes_for_source(axis_id)
+                        prepared_axis_ids = (
+                            self._get_prepared_nodes_for_source(axis_id)
+                            if axis_id in self._state.source_prepared_mapping
+                            else set()
+                        )
                         for prepared_axis_id in sorted(prepared_axis_ids, key=self._state._get_iteration_path):
                             yield [*mapping, (axis_id, prepared_axis_id)]
 
@@ -2027,10 +2041,11 @@ class _ExecutionNodeBuilder:
         """Attach only the selected branch edge to condition-ready If executions."""
 
         source_graph = self._state._get_source_graph_flat()
+        self._ensure_activation_candidate_index(source_graph)
         # Prepared branch sources do not change during this sweep. Index them by frame once per source edge;
         # keeping the index local means graph edits, rollback, and restore rebuild it on the next call.
         prepared_exec_by_edge_path: dict[tuple[str, str], dict[tuple[int, ...], str]] = {}
-        source_order = {node_id: index for index, node_id in enumerate(nx.topological_sort(source_graph))}
+        source_order = self._activation_candidate_topological_index
         pending_exec_nodes = sorted(
             self._state._pending_if_exec_nodes,
             key=lambda exec_node_id: (
@@ -2287,7 +2302,7 @@ class _ExecutionNodeBuilder:
         if not condition_edges or any(not edges for edges in branch_edges):
             return False
 
-        branch_axes = graph_if_runtime._get_if_branch_frame_axes(self._state, iterator_ancestry, node_id, {})
+        branch_axes = graph_if_runtime._get_if_runtime_branch_frame_axes(self._state, iterator_ancestry, node_id)
         axes = [set(branch_axes[field]) for field in ("true_input", "false_input")]
         condition_axes = {
             axis_id for edge in condition_edges for axis_id in iterator_ancestry.get_frame_axes_for_edge(edge)
@@ -2547,7 +2562,6 @@ class _ExecutionNodeBuilder:
         expanded_if_id = self._expand_root_if_for_completed_collect_branch(g)
         if expanded_if_id is not None:
             return expanded_if_id
-        self._attach_pending_if_inputs()
         self._ensure_activation_candidate_index(g)
         deferred_root_collect_if_descendants = self._get_unexecuted_root_collect_if_descendants(g)
         if self._has_if_nodes:
@@ -2680,7 +2694,11 @@ class _ExecutionNodeBuilder:
                     for other in prepared_item_paths
                 )
             }
-            if len(prepared_nested_ids) > 1 and len(prepared_item_paths) > 1:
+            if (
+                self._collect_has_nested_if_for_final_input(next_node_id)
+                and len(prepared_nested_ids) > 1
+                and len(prepared_item_paths) > 1
+            ):
                 for iteration_path in sorted(prepared_item_paths):
                     iteration_mapping: list[tuple[str, str]] = []
                     for input_edge in collect_inputs:

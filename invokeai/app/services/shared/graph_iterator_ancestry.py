@@ -36,6 +36,8 @@ class _IteratorAncestry:
         self._has_iterator_ancestor: dict[str, bool] | None = None
         self._ordered_iterator_ancestors: dict[str, tuple[str, ...]] = {}
         self._frame_iterators: dict[str, tuple[str, ...]] = {}
+        self.frame_axes_cache: dict[str, Optional[tuple[str, ...]]] = {}
+        self.if_final_axes_by_edge: dict[Edge, tuple[set[str], set[str]]] = {}
         self.effective_iteration_paths_by_edge: dict[Edge, set[tuple[int, ...]]] = {}
 
     def clear_effective_iteration_paths(self) -> None:
