@@ -1,7 +1,7 @@
 ---
 title: FLUX.2
 description: Generate and edit images with FLUX.2 Klein (4B and 9B, distilled and Base) and FLUX.2 [dev], including multi-reference image editing and the FLUX.2 [dev] Fun-ControlNet-Union.
-lastUpdated: 2026-10-18
+lastUpdated: 2026-10-28
 sidebar:
   order: 5
 ---
@@ -189,6 +189,8 @@ layers, the Qwen3 or Mistral encoder. In workflows use **Apply LoRA - Flux2 Klei
 FLUX.2 [dev]** (and their *Collection* versions). Supported layouts include LyCORIS, Diffusers/PEFT and
 ComfyUI/OneTrainer PEFT files whose module names start with `diffusion_model.`. Per-layer `.alpha` values in
 these `diffusion_model.` files set the LoRA scale.
+LyCORIS LoKr and LoHA files are supported in BFL and kohya layouts; each LoKr operand may be stored whole
+or as a factorized `_a` / `_b` pair.
 
 ## PiD super-resolution decode
 
