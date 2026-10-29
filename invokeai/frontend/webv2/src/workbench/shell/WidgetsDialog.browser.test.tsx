@@ -47,8 +47,7 @@ let root: Root | null = null;
 const store = () => workbench.store!;
 const activeProject = () => store().getSnapshot().activeProject;
 const row = (key: string) => page.getByRole('dialog').element().querySelector(`[data-widgets-row="${key}"]`);
-const groupLabel = (key: string) =>
-  document.getElementById(row(key)?.closest('ul')?.getAttribute('aria-labelledby') ?? '')?.textContent;
+const sectionItems = (name: string) => page.getByRole('list', { name }).getByRole('listitem').elements();
 
 beforeEach(async () => {
   accountLifecycle.activate('widgets-dialog-test');
@@ -85,14 +84,14 @@ afterEach(async () => {
 describe('WidgetsDialog', () => {
   it('lists placed widgets with where they are, and brings a removed one back', async () => {
     // Compose docks the Queue on the right and leaves Layers out.
-    expect(groupLabel('queue')).toBe('In this layout');
+    expect(sectionItems('In this layout')).toContain(row('queue'));
     expect(row('queue')?.textContent).toContain('Right panel');
-    expect(groupLabel('type:layers')).toBe('Not in this layout');
+    expect(sectionItems('Not in this layout')).toContain(row('type:layers'));
 
     await act(() => page.getByRole('button', { name: 'Remove Queue (Right panel)' }).click());
 
     expect(activeProject().widgetRegions.right.instanceIds).not.toContain('queue');
-    expect(groupLabel('type:queue')).toBe('Not in this layout');
+    expect(sectionItems('Not in this layout')).toContain(row('type:queue'));
     // The row's buttons changed under focus; focus lands on what the list offers for that widget now.
     await expect.element(page.getByRole('button', { name: 'Add Queue' })).toHaveFocus();
 
@@ -117,6 +116,21 @@ describe('WidgetsDialog', () => {
         (instanceId) => activeProject().widgetInstances[instanceId]?.typeId === 'autosave-status'
       )
     ).toBe(true);
+  });
+
+  it('keeps the last center view, saying why its Remove is unavailable', async () => {
+    await act(() => page.getByRole('button', { name: 'Remove Gallery (Center)' }).click());
+    const center = [...activeProject().widgetRegions.center.instanceIds];
+    const remove = page.getByRole('button', { name: 'Remove Preview (Center)' });
+
+    await expect.element(remove).toHaveAttribute('aria-disabled', 'true');
+    await expect.element(remove).toHaveAccessibleDescription('The center always shows one view.');
+
+    // A pointer click would be refused as disabled; dispatch one to prove the action itself is blocked.
+    await act(() => (remove.element() as HTMLElement).click());
+
+    expect(activeProject().widgetRegions.center.instanceIds).toEqual(center);
+    await expect.element(page.getByRole('dialog', { name: 'Widgets' })).toBeVisible();
   });
 
   it('lists rows that read the same in one order: by where they are', () => {

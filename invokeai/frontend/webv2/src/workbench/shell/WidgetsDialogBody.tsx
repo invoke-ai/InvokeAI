@@ -1,10 +1,13 @@
+/* oxlint-disable react-perf/jsx-no-jsx-as-prop -- ListItem slots take JSX; the React Compiler memoizes them. */
 import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { RegisteredWidget } from '@workbench/widgetContracts';
 
-import { HStack, Portal, Stack, Text } from '@chakra-ui/react';
-import { Button, CloseButton, useUnavailableControl } from '@platform/ui/Button';
+import { Box, Portal, Stack } from '@chakra-ui/react';
+import { Button, CloseButton } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
-import { Tooltip } from '@platform/ui/Tooltip';
+import { ListItem } from '@platform/ui/list/ListItem';
+import { ListSectionHeader } from '@platform/ui/list/ListSectionHeader';
+import { ListStack } from '@platform/ui/list/ListStack';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
 import { revealOrOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -17,7 +20,7 @@ import {
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { closeWidgetsDialog, getWidgetsDialogReturnFocus } from './widgetsDialogStore';
@@ -190,23 +193,20 @@ const WidgetsGroup = ({
   actions: WidgetsListActions;
   label: string;
   rows: readonly WidgetsListRow[];
-}) => {
-  const headingId = useId();
-
-  return rows.length === 0 ? null : (
-    <Stack gap="1">
-      <Text color="fg.subtle" fontSize="xs" fontWeight="700" id={headingId} textTransform="uppercase">
-        {label}
-      </Text>
-      <Stack aria-labelledby={headingId} as="ul" gap="0.5" listStyleType="none" m="0" p="0">
+}) =>
+  rows.length === 0 ? null : (
+    // Row surfaces bleed into the dialog padding so their text lines up with the description above.
+    <Stack gap="0" mx="-2">
+      <ListSectionHeader count={rows.length} label={label} />
+      <ListStack label={label} dividers>
         {rows.map((row) => (
           <WidgetsRow key={getRowKey(row)} actions={actions} row={row} />
         ))}
-      </Stack>
+      </ListStack>
     </Stack>
   );
-};
 
+/** Rows are static: their buttons are the tab stops, so a row's surface never takes focus itself. */
 const WidgetsRow = ({ actions, row }: { actions: WidgetsListActions; row: WidgetsListRow }) => {
   const { t } = useTranslation();
   const { getWidgetsForRegion } = useWorkbenchWidgetRegistry();
@@ -220,83 +220,60 @@ const WidgetsRow = ({ actions, row }: { actions: WidgetsListActions; row: Widget
     row.instanceId === null ? row.label : t('shell.widgets.rowName', { label: row.label, placement: placementLabel });
 
   return (
-    <HStack
-      as="li"
-      borderColor="border.subtle"
-      borderWidth="1px"
-      data-widgets-row={getRowKey(row)}
-      data-widgets-type={row.widget.manifest.id}
-      gap="2"
-      px="2.5"
-      py="1.5"
-      rounded="md"
-    >
-      <WidgetIcon boxSize="3.5" color="fg.muted" flexShrink={0} icon={row.widget.manifest.icon} />
-      <Stack flex="1" gap="0" minW="0">
-        <Text fontSize="sm" fontWeight="600" truncate>
-          {row.label}
-        </Text>
-        <Text color="fg.muted" fontSize="xs">
-          {placementLabel}
-        </Text>
-      </Stack>
-      <HStack flexShrink={0} gap="1">
-        {row.instanceId === null ? (
-          isOpenable ? (
-            <Button
-              aria-label={t('shell.widgets.addNamed', { label: name })}
-              size="xs"
-              variant="outline"
-              onClick={run('add')}
-            >
-              {t('shell.widgets.add')}
-            </Button>
-          ) : null
-        ) : (
-          <>
-            <Button
-              aria-label={t('shell.widgets.showNamed', { label: name })}
-              size="xs"
-              variant="outline"
-              onClick={run('show')}
-            >
-              {t('shell.widgets.show')}
-            </Button>
-            {row.placement.kind === 'floating' ? (
+    // The list item carries the keys focusRow looks rows up by; ListItem renders the row inside it.
+    <Box data-widgets-row={getRowKey(row)} data-widgets-type={row.widget.manifest.id} role="listitem">
+      <ListItem
+        actions={
+          row.instanceId === null ? (
+            isOpenable ? (
               <Button
-                aria-label={t('shell.widgets.dockNamed', { label: name })}
+                aria-label={t('shell.widgets.addNamed', { label: name })}
                 size="xs"
-                variant="ghost"
-                onClick={run('dock')}
+                variant="outline"
+                onClick={run('add')}
               >
-                {t('shell.widgets.dock')}
+                {t('shell.widgets.add')}
               </Button>
-            ) : null}
-            <RemoveButton label={name} required={row.isRequired} onRemove={run('remove')} />
-          </>
-        )}
-      </HStack>
-    </HStack>
+            ) : null
+          ) : (
+            <>
+              <Button
+                aria-label={t('shell.widgets.showNamed', { label: name })}
+                size="xs"
+                variant="outline"
+                onClick={run('show')}
+              >
+                {t('shell.widgets.show')}
+              </Button>
+              {row.placement.kind === 'floating' ? (
+                <Button
+                  aria-label={t('shell.widgets.dockNamed', { label: name })}
+                  size="xs"
+                  variant="ghost"
+                  onClick={run('dock')}
+                >
+                  {t('shell.widgets.dock')}
+                </Button>
+              ) : null}
+              {/* The center always keeps one view, so its last one cannot be removed; the button says why. */}
+              <Button
+                aria-label={t('shell.widgets.removeNamed', { label: name })}
+                size="xs"
+                unavailableReason={row.isRequired ? t('widgets.requiredCenterView') : undefined}
+                variant="ghost"
+                onClick={run('remove')}
+              >
+                {t('shell.widgets.remove')}
+              </Button>
+            </>
+          )
+        }
+        description={placementLabel}
+        leading={<WidgetIcon boxSize="4" color="fg.muted" flexShrink={0} icon={row.widget.manifest.icon} />}
+        role="presentation"
+        title={row.label}
+        titleTruncate="end"
+      />
+    </Box>
   );
-};
-
-/** The center always keeps one view, so its last one cannot be removed; the button says why instead of vanishing. */
-const RemoveButton = ({ label, onRemove, required }: { label: string; onRemove: () => void; required: boolean }) => {
-  const { t } = useTranslation();
-  const unavailable = useUnavailableControl(required ? t('widgets.requiredCenterView') : undefined, undefined);
-  const button = (
-    <Button
-      {...unavailable?.props}
-      aria-label={t('shell.widgets.removeNamed', { label })}
-      opacity={required ? 0.5 : undefined}
-      size="xs"
-      variant="ghost"
-      onClick={required ? undefined : onRemove}
-    >
-      {t('shell.widgets.remove')}
-      {unavailable?.description}
-    </Button>
-  );
-
-  return required ? <Tooltip content={t('widgets.requiredCenterView')}>{button}</Tooltip> : button;
 };
