@@ -4671,8 +4671,9 @@
         "addReferenceImage": "Add reference image",
         "autoNegative": "Auto-Negative",
         "clearReferenceImage": "Clear reference image",
+        "layoutBoxHelp": "{{model}} places the rectangle around everything painted on this layer inside the frame, so the shape does not matter and separate areas share one box.",
         "layoutKind": "Region type",
-        "layoutKindHelp": "{{model}} places the rectangle around everything painted on this layer inside the frame, so the shape does not matter and separate areas share one box. Character is for people and creatures, Object for everything else.",
+        "layoutKindHelp": "Character is for people and creatures, Object for everything else.",
         "layoutKinds": {
           "character": "Character",
           "object": "Object",

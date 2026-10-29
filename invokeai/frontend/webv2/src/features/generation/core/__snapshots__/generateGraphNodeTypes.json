@@ -620,6 +620,7 @@
     },
     "core_metadata": {
       "inputs": [
+        "ideogram4_caption",
         "negative_prompt",
         "positive_prompt",
         "seed"

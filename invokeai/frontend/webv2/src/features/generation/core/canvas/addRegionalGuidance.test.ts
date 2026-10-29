@@ -184,11 +184,22 @@ const hasEdge = (graph: TestGraph, s: string, sf: string, d: string, df: string)
 seedArchitectureCapabilities();
 
 describe('isRegionalGuidanceSupportedForBase', () => {
-  it('supports every base whose encoder takes a mask and whose denoiser takes a conditioning list', () => {
-    for (const base of ['sd-1', 'sd-2', 'sdxl', 'flux', 'flux2', 'krea-2', 'z-image', 'anima', 'moss-image']) {
+  it('supports every base that masks conditioning or places regions in a layout prompt', () => {
+    for (const base of [
+      'sd-1',
+      'sd-2',
+      'sdxl',
+      'flux',
+      'flux2',
+      'krea-2',
+      'z-image',
+      'anima',
+      'moss-image',
+      'ideogram-4',
+    ]) {
       expect(isRegionalGuidanceSupportedForBase(base), base).toBe(true);
     }
-    for (const base of ['sd-3', 'cogview4', 'qwen-image', 'ideogram-4', 'wan', 'external']) {
+    for (const base of ['sd-3', 'cogview4', 'qwen-image', 'wan', 'external']) {
       expect(isRegionalGuidanceSupportedForBase(base), base).toBe(false);
     }
   });
@@ -235,10 +246,20 @@ describe('getRegionalGuidanceSupport', () => {
     expect(getRegionalGuidanceSupport(null)).toBeNull();
   });
 
-  it('places MOSS-Image regions as layout boxes, with no negative or reference-image side', () => {
+  it('places MOSS-Image and Ideogram 4 regions as layout boxes, with no negative or reference-image side', () => {
     expect(getRegionalGuidanceSupport('moss-image')).toEqual({
       autoNegative: false,
       label: 'MOSS-Image',
+      layoutKinds: ['object', 'character', 'text'],
+      mode: 'layout',
+      negativePrompt: false,
+      referenceImages: null,
+    });
+    // The structured caption has object elements only.
+    expect(getRegionalGuidanceSupport('ideogram-4')).toEqual({
+      autoNegative: false,
+      label: 'Ideogram 4',
+      layoutKinds: ['object'],
       mode: 'layout',
       negativePrompt: false,
       referenceImages: null,
@@ -607,14 +628,23 @@ describe('getRegionalGuidanceRejectionReason — layout bases', () => {
 });
 
 describe('getLayoutRegionIssue', () => {
+  const allKinds = ['object', 'character', 'text'] as const;
+
   it('ignores text the object and character kinds keep for a later switch back', () => {
-    expect(getLayoutRegionIssue({ layout: { kind: 'object', text: '' }, positivePrompt: 'a cat' })).toBeNull();
-    expect(getLayoutRegionIssue({ layout: { kind: 'character' }, positivePrompt: 'a cat' })).toBeNull();
+    expect(
+      getLayoutRegionIssue({ layout: { kind: 'object', text: '' }, positivePrompt: 'a cat' }, allKinds)
+    ).toBeNull();
+    expect(getLayoutRegionIssue({ layout: { kind: 'character' }, positivePrompt: 'a cat' }, allKinds)).toBeNull();
   });
 
   it('names the caption before the text when both are missing', () => {
-    expect(getLayoutRegionIssue({ layout: { kind: 'text' }, positivePrompt: null })).toBe('missing_prompt');
-    expect(getLayoutRegionIssue({ layout: { kind: 'text' }, positivePrompt: 'a sign' })).toBe('missing_text');
+    expect(getLayoutRegionIssue({ layout: { kind: 'text' }, positivePrompt: null }, allKinds)).toBe('missing_prompt');
+    expect(getLayoutRegionIssue({ layout: { kind: 'text' }, positivePrompt: 'a sign' }, allKinds)).toBe('missing_text');
+  });
+
+  it('places a stored text role as an object on a base without text regions', () => {
+    expect(getLayoutRegionIssue({ layout: { kind: 'text' }, positivePrompt: 'a sign' }, ['object'])).toBeNull();
+    expect(getLayoutRegionIssue({ layout: { kind: 'text' }, positivePrompt: ' ' }, ['object'])).toBe('missing_prompt');
   });
 });
 
@@ -624,6 +654,18 @@ describe('getLayoutPromptRejectionReason', () => {
   it('refuses placeable regions around a blank prompt on a layout base', () => {
     expect(getLayoutPromptRejectionReason({ base: 'moss-image', prompt: ' \n', regions: [placeable] })).toBe(
       'MOSS-Image needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.'
+    );
+  });
+
+  it('counts a stored text role without visible text as placeable on Ideogram 4', () => {
+    expect(
+      getLayoutPromptRejectionReason({
+        base: 'ideogram-4',
+        prompt: '',
+        regions: [{ layout: { kind: 'text' }, positivePrompt: 'a sign' }],
+      })
+    ).toBe(
+      'Ideogram 4 needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.'
     );
   });
 
