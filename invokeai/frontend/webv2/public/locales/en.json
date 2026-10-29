@@ -2171,6 +2171,22 @@
         "label": "Theme",
         "description": "Choose the workbench colors."
       },
+      "themeAdjustments": {
+        "label": "Color and contrast",
+        "description": "Customize the selected theme's surfaces, text and accent colors.",
+        "open": "Customize color and contrast",
+        "account": "Saved for your account and selected theme.",
+        "install": "Saved for this install and selected theme.",
+        "reset": "Reset theme colors",
+        "background": "Application background",
+        "panels": "Section panels and menus",
+        "inputs": "Input field brightness",
+        "inputBorders": "Input field borders",
+        "text": "Text brightness (black to white)",
+        "brand": "Primary accent (Invoke)",
+        "accent": "Selection and focus color",
+        "highContrast": "High contrast temporarily uses the native palette; your adjustments remain saved."
+      },
       "highContrast": {
         "label": "High contrast",
         "description": "Strengthen text and border contrast on every theme."

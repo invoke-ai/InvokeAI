@@ -1,5 +1,6 @@
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { shallowEqual } from '@platform/state/selectors';
+import { applyThemeAdjustmentsToRoot } from '@theme/adjustments';
 import { applyPromptFontSizeToRoot, applyThemeToRoot } from '@theme/applyTheme';
 import { DEFAULT_THEME, THEMES_BY_ID } from '@theme/system';
 import { subscribeWorkbenchPreferences, useWorkbenchSettingsSelector } from '@workbench/settings/store';
@@ -31,11 +32,12 @@ const applyRootFlag = (dataKey: 'highContrast' | 'reduceMotion', hintKey: string
 };
 
 export const ThemeController = () => {
-  const { highContrast, reduceMotion, status, themeId } = useWorkbenchSettingsSelector(
+  const { highContrast, reduceMotion, status, themeAdjustments, themeId } = useWorkbenchSettingsSelector(
     (snapshot) => ({
       highContrast: snapshot.preferences.highContrast,
       reduceMotion: snapshot.preferences.reduceMotion,
       status: snapshot.status,
+      themeAdjustments: snapshot.preferences.themeAdjustments,
       themeId: snapshot.preferences.themeId,
     }),
     shallowEqual
@@ -45,19 +47,23 @@ export const ThemeController = () => {
 
   useLayoutEffect(() => {
     if (!hasResolved) {
+      // An account switch must not paint the next user's loading screen with the previous user's colors.
+      applyThemeAdjustmentsToRoot(DEFAULT_THEME, undefined, false);
       return;
     }
 
     const theme = THEMES_BY_ID[themeId] ?? DEFAULT_THEME;
 
     applyThemeToRoot(theme.id);
+    applyThemeAdjustmentsToRoot(theme, themeAdjustments[theme.id], highContrast);
 
     try {
       window.localStorage.setItem(THEME_HINT_STORAGE_KEY, theme.id);
     } catch {
       // Storage unavailable — the next load just paints the default theme.
     }
-  }, [hasResolved, themeId]);
+    return () => applyThemeAdjustmentsToRoot(theme, undefined, false);
+  }, [hasResolved, highContrast, themeAdjustments, themeId]);
 
   useLayoutEffect(() => {
     if (hasResolved) {

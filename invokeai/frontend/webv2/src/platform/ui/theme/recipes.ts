@@ -385,6 +385,16 @@ export const formControlInteraction = {
   },
 };
 
+/** These rules apply only while the active user's Appearance adjustments explicitly set an input color. */
+const themeInputColors = {
+  '&:is(:root[data-theme-input-bg] *)': { bg: 'var(--wb-theme-input-bg)' },
+  '&:is(:root[data-theme-input-border] *)': {
+    borderColor: 'var(--wb-theme-input-border)',
+    _invalid: { borderColor: 'border.error' },
+    _focusVisible: { borderColor: 'accent.solid' },
+  },
+} as const;
+
 const formControlOpen = { borderColor: 'accent.solid' };
 
 /** Use focus-within for composite fields such as InputShell. */
@@ -427,6 +437,7 @@ export const inputRecipe = defineRecipe({
   base: {
     ...chakraRecipes.input.base,
     ...formControlInteraction,
+    ...themeInputColors,
   },
 });
 
@@ -443,6 +454,7 @@ export const textareaRecipe = defineRecipe({
   base: {
     ...chakraRecipes.textarea.base,
     ...formControlInteraction,
+    ...themeInputColors,
   },
 });
 
@@ -477,6 +489,7 @@ export const numberInputSlotRecipe = defineSlotRecipe({
     input: {
       ...chakraSlotRecipes.numberInput.base?.input,
       ...formControlInteraction,
+      ...themeInputColors,
     },
   },
 });
@@ -574,6 +587,7 @@ export const selectSlotRecipe = defineSlotRecipe({
     trigger: {
       ...chakraSlotRecipes.select.base?.trigger,
       ...formControlInteraction,
+      ...themeInputColors,
       _expanded: formControlOpen,
     },
     content: {
@@ -626,6 +640,7 @@ export const comboboxSlotRecipe = defineSlotRecipe({
     input: {
       ...chakraSlotRecipes.combobox.base?.input,
       ...formControlInteraction,
+      ...themeInputColors,
       _expanded: formControlOpen,
     },
     item: {

@@ -37,6 +37,7 @@ const section = (id: string, label: string, fields: readonly SettingDefinition[]
 
 export const appearanceSettings = section('appearance', 'Appearance', [
   custom('themeId', 'Theme'),
+  custom('themeAdjustments', 'Color and contrast'),
   {
     id: 'language',
     label: text('language.label', 'Language'),

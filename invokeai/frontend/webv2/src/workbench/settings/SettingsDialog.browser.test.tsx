@@ -211,12 +211,13 @@ describe('settings dialog', () => {
       for (const section of ['Workflow', 'Queue', 'Appearance', 'Behavior']) {
         await act(() => page.getByRole('button', { name: section, exact: true }).click());
         await expect.element(page.getByRole('dialog', { name: `Settings: ${section}`, exact: true })).toBeVisible();
-        expect(dialogContent()?.querySelector('[data-custom-editor]')?.getAttribute('data-custom-editor') ?? null).toBe(
-          section === 'Appearance' ? 'themeId' : null
+        const visibleEditors = [...(dialogContent()?.querySelectorAll('[data-custom-editor]') ?? [])].map((element) =>
+          element.getAttribute('data-custom-editor')
         );
+        expect(visibleEditors).toEqual(section === 'Appearance' ? ['themeId', 'themeAdjustments'] : []);
       }
       expect(loadingPlaceholders).toEqual([]);
-      expect(mountedCustomEditors).toEqual(['themeId']);
+      expect(mountedCustomEditors).toEqual(['themeId', 'themeAdjustments']);
     } finally {
       observer.disconnect();
     }

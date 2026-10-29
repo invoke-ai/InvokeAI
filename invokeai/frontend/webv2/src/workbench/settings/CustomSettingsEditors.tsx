@@ -8,8 +8,9 @@ import { INTERMEDIATES_SETTING_ID } from '@features/intermediates';
 import { Button, ConfirmDialog } from '@platform/ui';
 import { resolveSettingsText } from '@platform/ui/settings/contracts';
 import { ModifiedSettingIndicator } from '@platform/ui/settings/ModifiedSettingIndicator';
+import { previewAdjustedSwatches, type ThemeAdjustment } from '@theme/adjustments';
 import { themeCardRecipe } from '@theme/recipes';
-import { previewSwatches, THEMES, type ThemeDefinition } from '@theme/system';
+import { THEMES, type ThemeDefinition } from '@theme/system';
 import { areLoggingPreferencesDefault, resetLoggingPreferences } from '@workbench/diagnostics/loggingPreferences';
 import { clearAllWorkbenchData } from '@workbench/projects/syncedPersistence';
 import { useOptionalWorkbenchCommands, useOptionalWorkbenchPersistenceService } from '@workbench/WorkbenchContext';
@@ -32,6 +33,7 @@ import {
   useWorkbenchPreferenceSelector,
   useWorkbenchSettingsSelector,
 } from './store';
+import { ThemeAdjustmentSettings } from './ThemeAdjustmentSettings';
 
 const THEME_GRID_COLUMNS = { base: 2, md: 3 };
 const DEVELOPER_GRID_COLUMNS = { base: 1, md: 2 };
@@ -45,6 +47,7 @@ const LazyGalleryMaintenance = lazy(() =>
 
 export const ThemeSettings = () => {
   const themeId = useWorkbenchPreferenceSelector((preferences) => preferences.themeId);
+  const themeAdjustments = useWorkbenchPreferenceSelector((preferences) => preferences.themeAdjustments);
   const selectTheme = useCallback((nextThemeId: WorkbenchThemeId) => {
     void patchWorkbenchPreferences({ themeId: nextThemeId });
   }, []);
@@ -52,24 +55,32 @@ export const ThemeSettings = () => {
   return (
     <SimpleGrid columns={THEME_GRID_COLUMNS} gap="3">
       {THEMES.map((theme) => (
-        <ThemeCard key={theme.id} selected={theme.id === themeId} theme={theme} onSelect={selectTheme} />
+        <ThemeCard
+          key={theme.id}
+          adjustment={themeAdjustments[theme.id]}
+          selected={theme.id === themeId}
+          theme={theme}
+          onSelect={selectTheme}
+        />
       ))}
     </SimpleGrid>
   );
 };
 
 const ThemeCard = ({
+  adjustment,
   onSelect,
   selected,
   theme,
 }: {
+  adjustment?: ThemeAdjustment;
   onSelect: (themeId: WorkbenchThemeId) => void;
   selected: boolean;
   theme: ThemeDefinition;
 }) => {
   const recipe = useSlotRecipe({ recipe: themeCardRecipe });
   const styles = recipe({ selected });
-  const [surface, control, brandColor, accentColor] = previewSwatches(theme);
+  const [surface, control, brandColor, accentColor] = previewAdjustedSwatches(theme, adjustment);
   const handleSelect = useCallback(() => onSelect(theme.id), [onSelect, theme.id]);
 
   return (
@@ -275,6 +286,9 @@ const CustomSettingField = ({ field, onReveal }: SettingFieldProps) => {
     if (field.id === 'themeId') {
       return preferences.themeId !== DEFAULT_PREFERENCES.themeId;
     }
+    if (field.id === 'themeAdjustments') {
+      return Object.keys(preferences.themeAdjustments).length > 0;
+    }
     if (field.id === 'developerLogNamespaces') {
       return DEVELOPER_LOG_NAMESPACES.some(
         (namespace) =>
@@ -289,6 +303,9 @@ const CustomSettingField = ({ field, onReveal }: SettingFieldProps) => {
   switch (field.id) {
     case 'themeId':
       editor = <ThemeSettings />;
+      break;
+    case 'themeAdjustments':
+      editor = <ThemeAdjustmentSettings />;
       break;
     case 'developerLogNamespaces':
       editor = <DeveloperNamespacesSettings />;

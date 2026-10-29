@@ -9,6 +9,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { appearanceSettings, developerSettings, hotkeysSettings, workspaceSettings } from './applicationContributions';
 import CustomSettingField from './CustomSettingsEditors';
@@ -72,6 +73,58 @@ describe('custom setting modified indicators', () => {
     expect(modifiedIndicators()).toHaveLength(1);
     await selectTheme(THEMES.find((theme) => theme.id === DEFAULT_PREFERENCES.themeId)!.label);
     expect(modifiedIndicators()).toHaveLength(0);
+  });
+
+  it('offers per-theme color and text controls without hiding the original Appearance fields', async () => {
+    await render(appearanceSettings.fields.find((field) => field.id === 'themeAdjustments')!);
+    const open = [...host.querySelectorAll('button')].find((button) =>
+      button.textContent?.includes('Customize color')
+    )!;
+    await act(() => open.click());
+    expect(host.textContent).toContain('Text brightness');
+    expect(host.querySelector('[role="slider"][aria-label="Text brightness (black to white)"]')).not.toBeNull();
+    expect(appearanceSettings.fields.some((field) => field.id === 'language')).toBe(true);
+    expect(appearanceSettings.fields.some((field) => field.id === 'highContrast')).toBe(true);
+
+    await act(() => patchWorkbenchPreferences({ themeAdjustments: { classic: { textLightness: 0 } } }));
+    expect(modifiedIndicators()).toHaveLength(1);
+    const reset = [...host.querySelectorAll('button')].find((button) =>
+      button.textContent?.includes('Reset theme colors')
+    )!;
+    await act(() => reset.click());
+    await expect.poll(() => Object.keys(getWorkbenchPreferences().themeAdjustments).length).toBe(0);
+    expect(modifiedIndicators()).toHaveLength(0);
+  });
+
+  it('does not let a stale Appearance control overwrite a newly signed-in user', async () => {
+    await render(appearanceSettings.fields.find((field) => field.id === 'themeAdjustments')!);
+    const open = [...host.querySelectorAll('button')].find((button) =>
+      button.textContent?.includes('Customize color')
+    )!;
+    await act(() => open.click());
+    await act(() => patchWorkbenchPreferences({ themeAdjustments: { classic: { textLightness: 0 } } }));
+
+    await act(() => accountLifecycle.activate('second-user'));
+    expect(getWorkbenchPreferences().themeAdjustments).toEqual({});
+    await act(() => patchWorkbenchPreferences({ themeAdjustments: { classic: { textLightness: 100 } } }));
+    const oldReset = [...host.querySelectorAll('button')].find((button) =>
+      button.textContent?.includes('Reset theme colors')
+    )!;
+    await act(() => oldReset.click());
+    expect(getWorkbenchPreferences().themeAdjustments.classic?.textLightness).toBe(100);
+  });
+
+  it('saves a text brightness change from the keyboard for the selected theme', async () => {
+    await render(appearanceSettings.fields.find((field) => field.id === 'themeAdjustments')!);
+    const open = [...host.querySelectorAll('button')].find((button) =>
+      button.textContent?.includes('Customize color')
+    )!;
+    await act(() => open.click());
+    const slider = host.querySelector<HTMLElement>('[role="slider"][aria-label="Text brightness (black to white)"]')!;
+    slider.focus();
+    await act(() => userEvent.keyboard('{Home}'));
+    await expect.poll(() => getWorkbenchPreferences().themeAdjustments.classic?.textLightness).toBe(0);
+    expect(getWorkbenchPreferences().themeAdjustments.light).toBeUndefined();
   });
 
   it('marks a changed namespace selection and clears the marker after restoring that checkbox', async () => {

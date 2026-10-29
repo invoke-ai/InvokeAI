@@ -22,6 +22,7 @@ import {
 } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 import { createSingleFlight } from '@platform/state/singleFlight';
+import { normalizeThemeAdjustments } from '@theme/adjustments';
 import { isPromptFontSize } from '@theme/scale';
 import { DEFAULT_THEME_ID, resolveWorkbenchThemeId } from '@theme/themes';
 import { deleteClientStateValue, getClientStateValue, setClientStateValue } from '@workbench/projects/api';
@@ -78,6 +79,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   showPromptSyntaxHighlighting: true,
   showFocusRegionHighlight: true,
   themeId: DEFAULT_THEME_ID,
+  themeAdjustments: {},
   whatsNewSeenVersion: null,
   workflowEdgeStyle: 'curved',
   workflowEdgesBehindNodes: false,
@@ -423,6 +425,7 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
       ? preferences.showPromptSyntaxHighlighting
       : DEFAULT_PREFERENCES.showPromptSyntaxHighlighting,
   themeId: resolveWorkbenchThemeId(preferences?.themeId) ?? DEFAULT_PREFERENCES.themeId,
+  themeAdjustments: normalizeThemeAdjustments(preferences?.themeAdjustments),
   whatsNewSeenVersion:
     typeof preferences?.whatsNewSeenVersion === 'string'
       ? preferences.whatsNewSeenVersion

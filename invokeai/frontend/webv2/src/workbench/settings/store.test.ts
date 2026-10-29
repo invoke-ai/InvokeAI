@@ -197,6 +197,41 @@ describe('loadWorkbenchSettings', () => {
 });
 
 describe('patchWorkbenchPreferences', () => {
+  it('shares theme adjustments across browsers in single-user mode through the install backend', async () => {
+    await store.loadWorkbenchSettings();
+    await store.patchWorkbenchPreferences({ themeAdjustments: { classic: { textLightness: 0 } } });
+    expect(readBackendPreferences().themeAdjustments).toEqual({ classic: { textLightness: 0 } });
+
+    storage.clear(); // A second browser has no local copy; it still loads the same system user's server preferences.
+    vi.resetModules();
+    store = await import('./store');
+    expect((await store.loadWorkbenchSettings()).themeAdjustments).toEqual({ classic: { textLightness: 0 } });
+  });
+
+  it('isolates theme adjustments by account and restores them on another session', async () => {
+    const savedByUser = new Map<string, string>();
+    api.getClientStateValue.mockImplementation((key: string) =>
+      Promise.resolve(savedByUser.get(`${account.accountLifecycle.capture().accountId}:${key}`) ?? null)
+    );
+    api.setClientStateValue.mockImplementation((key: string, value: string) => {
+      savedByUser.set(`${account.accountLifecycle.capture().accountId}:${key}`, value);
+      return Promise.resolve();
+    });
+
+    account.accountLifecycle.activate('user-a', ':user:a');
+    await store.loadWorkbenchSettings();
+    await store.patchWorkbenchPreferences({ themeAdjustments: { classic: { textLightness: 0 } } });
+    account.accountLifecycle.invalidate();
+    account.accountLifecycle.activate('user-b', ':user:b');
+    expect((await store.loadWorkbenchSettings()).themeAdjustments).toEqual({});
+    await store.patchWorkbenchPreferences({ themeAdjustments: { classic: { textLightness: 100 } } });
+
+    account.accountLifecycle.invalidate();
+    account.accountLifecycle.activate('user-a', ':user:a');
+    storage.clear(); // No browser cache: the account's server copy still wins.
+    expect((await store.loadWorkbenchSettings()).themeAdjustments).toEqual({ classic: { textLightness: 0 } });
+  });
+
   it('persists to the backend and localStorage', async () => {
     seedBackendPreferences({ themeId: 'osakaJade' });
     await store.loadWorkbenchSettings();
