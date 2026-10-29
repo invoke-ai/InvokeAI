@@ -45,9 +45,10 @@ def lora_model_from_qwen_image_21_state_dict(state_dict: dict[str, torch.Tensor]
         # partial LoRA that passes for a whole one.
         raise ValueError(
             f"{len(unsupported)} key(s) of this LoRA do not apply to Qwen-Image-2.1, e.g. {unsupported[0]!r}. Each "
-            "key must name a layer this model has, and only once; each layer must be complete and of one kind. A "
-            "norm takes only a full diff, and the fused gate_up only a low-rank, PEFT DoRA or full layer with an even "
-            "number of rows, in a block that does not also name the gate_layer or proj it is split into."
+            "key must name a layer this model has, and only once; each layer must be complete, of one kind, and "
+            "update a weight of exactly that layer's shape. A norm takes only a full diff, and the fused gate_up only "
+            "a low-rank, PEFT DoRA or full layer, in a block that does not also name the gate_layer or proj it is "
+            "split into."
         )
 
     grouped: dict[str, dict[str, torch.Tensor]] = {}

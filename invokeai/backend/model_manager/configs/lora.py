@@ -1203,14 +1203,14 @@ class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
 
 def _is_qwen_image21_lora(state_dict: dict[str | int, Any]) -> bool:
-    """A Qwen-Image-2.1 LoRA that applies in full, every layer complete and on a module this transformer has.
+    """A Qwen-Image-2.1 LoRA that applies in full: every layer complete, on a module this transformer has, and of
+    that module's weight shape.
 
-    That every key must name a Qwen-Image-2.1 module also rules out the families whose module names it shares, as
-    long as their LoRA touches one module 2.1 lacks. FLUX.2 Klein 9B is as wide (4096); its text embedders, single
-    blocks and text stream (`add_q_proj`, `ff`) are its own. A Klein LoRA on its double blocks' image attention has
-    a 2.1 LoRA's names and width, and reads as one. `proj_out` and `norm_out.linear` share the names but not the
-    output widths (Klein's are 128 and 8192, 2.1's 64 and 4096): beside that attention they are taken too and do
-    not fit, and on their own they are no 2.1 evidence.
+    That every key must name a Qwen-Image-2.1 module of its shape also rules out the families whose module names it
+    shares, as long as their LoRA touches one module 2.1 lacks or shapes differently. FLUX.2 Klein 9B is as wide
+    (4096); its text embedders, single blocks and text stream (`add_q_proj`, `ff`) are its own, and its `proj_out`
+    and `norm_out.linear` have 128 and 8192 output rows where 2.1's have 64 and 4096. A Klein LoRA on nothing but its
+    double blocks' image attention has a 2.1 LoRA's names and shapes, and reads as one.
     """
     return _has_qwen_image21_lora_keys(state_dict) and not qwen_image_21_unsupported_lora_keys(state_dict)
 

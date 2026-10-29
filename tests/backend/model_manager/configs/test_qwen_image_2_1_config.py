@@ -175,8 +175,8 @@ def test_an_attention_only_lora_is_told_apart_by_its_width(tmp_path: Path) -> No
 
 def test_a_lora_on_the_gated_mlp_is_qwen_image_2_1(tmp_path: Path) -> None:
     kohya = {
-        "lora_unet_transformer_blocks_0_img_mlp_gate_up.lora_down.weight": torch.zeros(4, 3072),
-        "lora_unet_transformer_blocks_0_img_mlp_gate_up.lora_up.weight": torch.zeros(3072, 4),
+        "lora_unet_transformer_blocks_0_img_mlp_gate_up.lora_down.weight": torch.zeros(4, 4096),
+        "lora_unet_transformer_blocks_0_img_mlp_gate_up.lora_up.weight": torch.zeros(24576, 4),
     }
     for sd in (kohya, _comfy_gate_up_lora()):
         assert not _probe(LoRA_LyCORIS_QwenImage_Config, sd, tmp_path)
@@ -292,10 +292,24 @@ _OTHER_KINDS = {
 }
 
 
+def _pair(name: str, out_features: int, in_features: int = 4096) -> dict[str, torch.Tensor]:
+    return {f"{name}.lora_A.weight": _z(4, in_features), f"{name}.lora_B.weight": _z(out_features, 4)}
+
+
+# Qwen-Image-2.1's output layers as its checkpoint has them: `proj_out` 64 x 4096, `norm_out.linear` 4096 x 4096.
+_OUTPUT_LAYERS = _pair("transformer.proj_out", 64) | _pair("transformer.norm_out.linear", 4096)
+
+
 @pytest.mark.parametrize(
     "sd",
-    [_comfy_gate_up_lora(), _attention_lora(4096), *_OUTPUT_OR_MLP.values(), *_OTHER_KINDS.values()],
-    ids=["gate_up", "attention", *_OUTPUT_OR_MLP.keys(), *_OTHER_KINDS.keys()],
+    [
+        _comfy_gate_up_lora(),
+        _attention_lora(4096),
+        _attention_lora(4096) | _OUTPUT_LAYERS,
+        *_OUTPUT_OR_MLP.values(),
+        *_OTHER_KINDS.values(),
+    ],
+    ids=["gate_up", "attention", "attention-and-output-layers", *_OUTPUT_OR_MLP.keys(), *_OTHER_KINDS.keys()],
 )
 def test_a_qwen_image_2_1_lora_is_claimed_by_its_config_alone(sd: dict[str, torch.Tensor], tmp_path: Path) -> None:
     assert _probe(LoRA_LyCORIS_QwenImage21_Config, sd, tmp_path)
@@ -307,10 +321,6 @@ def test_a_qwen_image_2_1_lora_is_claimed_by_its_config_alone(sd: dict[str, torc
     ]
     assert others
     assert [c.__name__ for c in others if _probe(c, sd, tmp_path)] == []
-
-
-def _pair(name: str, out_features: int, in_features: int = 4096) -> dict[str, torch.Tensor]:
-    return {f"{name}.lora_A.weight": _z(4, in_features), f"{name}.lora_B.weight": _z(out_features, 4)}
 
 
 @pytest.mark.parametrize(
@@ -329,13 +339,22 @@ def test_a_flux2_klein_9b_lora_is_not_qwen_image_2_1(extra: dict[str, torch.Tens
     assert not _probe(LoRA_LyCORIS_QwenImage21_Config, _attention_lora(4096) | extra, tmp_path)
 
 
-def test_a_klein_lora_on_its_double_blocks_image_attention_reads_as_qwen_image_2_1(tmp_path: Path) -> None:
-    """A known ambiguity, pinned: a FLUX.2 Klein 9B LoRA on its double blocks' image attention has a 2.1 LoRA's
-    names and width. Its `proj_out` and `norm_out.linear` share the names but not the output widths (128 and 8192
-    against 64 and 4096): beside that attention they are taken along, on their own they are no 2.1 evidence."""
-    output_layers = _pair("transformer.proj_out", 128) | _pair("transformer.norm_out.linear", 8192)
-    assert _probe(LoRA_LyCORIS_QwenImage21_Config, _attention_lora(4096) | output_layers, tmp_path)
-    assert not _probe(LoRA_LyCORIS_QwenImage21_Config, output_layers, tmp_path)
+# FLUX.2 Klein 9B's output layers, which diffusers names as Qwen-Image-2.1 does, as its checkpoint has them:
+# `final_layer.linear` (`proj_out`) 128 x 4096 and `final_layer.adaLN_modulation.1` (`norm_out.linear`) 8192 x 4096.
+_KLEIN_OUTPUT_LAYERS = {
+    "proj-out": _pair("transformer.proj_out", 128),
+    "norm-out": _pair("transformer.norm_out.linear", 8192),
+}
+
+
+@pytest.mark.parametrize("output_layer", _KLEIN_OUTPUT_LAYERS.values(), ids=_KLEIN_OUTPUT_LAYERS.keys())
+def test_a_klein_lora_with_its_output_layers_is_not_qwen_image_2_1(
+    output_layer: dict[str, torch.Tensor], tmp_path: Path
+) -> None:
+    """A FLUX.2 Klein 9B LoRA on its double blocks' image attention has a 2.1 LoRA's names and shapes (a known
+    ambiguity: on that alone it reads as 2.1). Its output layers have the names too, but not 2.1's rows: as a 2.1
+    LoRA it would install and fail at generation."""
+    assert not _probe(LoRA_LyCORIS_QwenImage21_Config, _attention_lora(4096) | output_layer, tmp_path)
 
 
 # Qwen-Image-2.1 LoRAs that apply in full, with the prefix their layout uses.
@@ -378,6 +397,23 @@ def _part_that_does_not_apply(defect: str, whole: dict[str, torch.Tensor], prefi
         | _pair(f"{block_0}.img_mlp.gate_layer", 12288),
         "diff-and-pair": lambda: _pair(f"{block_2}.attn.to_q", 4096) | {f"{block_2}.attn.to_q.diff": _z(4096, 4096)},
         "odd-row-gate-up": lambda: _pair(f"{block_2}.img_mlp.gate_up", 24575),
+        # Layers on modules 2.1 has, of shapes it does not: each would fail at generation. FLUX.2 Klein 9B's output
+        # layers first.
+        "proj-out-rows": lambda: _pair(f"{prefix}proj_out", 128),
+        "norm-out-rows": lambda: _pair(f"{prefix}norm_out.linear", 8192),
+        "mlp-out-input-width": lambda: _pair(f"{block_2}.img_mlp.out", 4096, 4096),
+        "gate-up-of-one-halfs-rows": lambda: _pair(f"{block_2}.img_mlp.gate_up", 12288),
+        "lokr-input-width": lambda: {
+            f"{block_2}.attn.to_v.lokr_w1": _z(4, 4),
+            f"{block_2}.attn.to_v.lokr_w2": _z(1024, 768),
+        },
+        "loha-output-width": lambda: {
+            f"{block_2}.img_mlp.gate_layer.{name}": _z(4096, 4) if name.endswith("_a") else _z(4, 4096)
+            for name in ("hada_w1_a", "hada_w1_b", "hada_w2_a", "hada_w2_b")
+        },
+        "diff-output-width": lambda: {f"{block_2}.attn.to_out.0.diff": _z(3072, 4096)},
+        "magnitude-length": lambda: _pair(f"{block_2}.attn.to_k", 4096)
+        | {f"{block_2}.attn.to_k.lora_magnitude_vector.weight": _z(3072)},
     }[defect]()
 
 
@@ -393,11 +429,23 @@ _DEFECTS = [
     "gate-up-and-gate-layer",
     "diff-and-pair",
     "odd-row-gate-up",
+    "mlp-out-input-width",
+    "gate-up-of-one-halfs-rows",
+    "lokr-input-width",
+    "loha-output-width",
+    "diff-output-width",
+    "magnitude-length",
 ]
 
 
-@pytest.mark.parametrize("defect", _DEFECTS)
-@pytest.mark.parametrize("layout", _WHOLE_LORAS)
+# Klein 9B's output layers only beside ComfyUI's gate_up, a module Klein lacks: beside attention alone they would make
+# a real Klein file, whose identity is FLUX.2's detection to settle, not this test's.
+_CASES = [(layout, defect) for layout in _WHOLE_LORAS for defect in _DEFECTS] + [
+    ("comfy-gate-up", defect) for defect in ("proj-out-rows", "norm-out-rows")
+]
+
+
+@pytest.mark.parametrize(("layout", "defect"), _CASES, ids=[f"{layout}-{defect}" for layout, defect in _CASES])
 def test_a_qwen_image_2_1_lora_that_applies_only_in_part_is_claimed_by_no_config(
     layout: str, defect: str, tmp_path: Path
 ) -> None:

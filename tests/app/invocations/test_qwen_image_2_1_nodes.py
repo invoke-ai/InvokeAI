@@ -1010,21 +1010,17 @@ def _run_with_a_lora(
         apply_custom_layers_to_model,
     )
     from invokeai.backend.patches.layer_patcher import LayerPatcher
-    from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_conversion_utils import (
-        lora_model_from_qwen_image_21_state_dict,
-    )
 
     # As if the layer were on the GPU: on the CPU every LoRA runs as a sidecar, whatever the format.
     monkeypatch.setattr(LayerPatcher, "_is_any_part_of_layer_on_cpu", staticmethod(lambda _module: False))
     transformer = _LinearTransformer()
     # As the model cache holds it: GGUF's sidecar path wraps these layers.
     apply_custom_layers_to_model(transformer)
-    patch = lora_model_from_qwen_image_21_state_dict(
+    patch = _toy_patch(
         {
-            "diffusion_model.transformer_blocks.0.attn.to_q.lora_A.weight": _DOWN,
-            "diffusion_model.transformer_blocks.0.attn.to_q.lora_B.weight": _UP,
-            "diffusion_model.transformer_blocks.0.attn.norm_q.diff": torch.full((8,), 0.25),
-            "diffusion_model.txt_in.text_norm.diff": torch.full((8,), -0.5),
+            "transformer_blocks.0.attn.to_q": {"lora_A.weight": _DOWN, "lora_B.weight": _UP},
+            "transformer_blocks.0.attn.norm_q": {"diff": torch.full((8,), 0.25)},
+            "txt_in.text_norm": {"diff": torch.full((8,), -0.5)},
         }
     )
     lora_info = SimpleNamespace(model=patch, model_in_ram=nullcontext)
@@ -1075,15 +1071,30 @@ def test_a_sidecar_lora_widens_the_room_the_transformer_is_loaded_with(monkeypat
     assert applied > without
 
 
-def _patch(module: str = "transformer_blocks.0.attn.to_q", **values: torch.Tensor):
-    """A converted LoRA with the given values on one module; to_q and to_k are 8 x 8 in `_LinearTransformer`."""
-    from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_conversion_utils import (
-        lora_model_from_qwen_image_21_state_dict,
+def _toy_patch(layers: dict[str, dict[str, torch.Tensor]]):
+    """A LoRA patch on the toy transformers here, keyed and built as the Qwen-Image-2.1 conversion builds one: each
+    module path a layer of its parameters. Built directly, as the conversion refuses every shape but the real model's.
+    """
+    from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
+    from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_constants import (
+        QWEN_IMAGE_21_LORA_NORM_PREFIX,
+        QWEN_IMAGE_21_LORA_TRANSFORMER_PREFIX,
+        is_norm,
+        split_key,
     )
+    from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
-    return lora_model_from_qwen_image_21_state_dict(
-        {f"diffusion_model.{module}.{name}": value for name, value in values.items()}
-    )
+    patches = {}
+    for module, values in layers.items():
+        layer = {split_key(f"diffusion_model.{module}.{name}")[1]: value for name, value in values.items()}
+        prefix = QWEN_IMAGE_21_LORA_NORM_PREFIX if is_norm(module) else QWEN_IMAGE_21_LORA_TRANSFORMER_PREFIX
+        patches[prefix + module] = any_lora_layer_from_state_dict(layer)
+    return ModelPatchRaw(layers=patches)
+
+
+def _patch(module: str = "transformer_blocks.0.attn.to_q", **values: torch.Tensor):
+    """A LoRA patch with the given values on one module; to_q and to_k are 8 x 8 in `_LinearTransformer`."""
+    return _toy_patch({module: values})
 
 
 def _low_rank(rank: int, module: str = "transformer_blocks.0.attn.to_q", out_features: int = 8):
