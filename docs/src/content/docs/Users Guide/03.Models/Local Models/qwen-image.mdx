@@ -1,7 +1,7 @@
 ---
 title: Qwen Image
-description: Generate and edit images with the Qwen Image 2512 text-to-image model and the Qwen Image Edit 2511 reference-image editing model, including GGUF installs, the Lightning LoRAs and the Fun-ControlNet-Union.
-lastUpdated: 2026-10-18
+description: Generate and edit images with the Qwen Image 2512 text-to-image model and the Qwen Image Edit 2511 reference-image editing model, including GGUF installs, the Lightning LoRAs and the Fun and InstantX ControlNet Unions.
+lastUpdated: 2026-10-19
 sidebar:
   order: 8
 ---
@@ -22,8 +22,8 @@ and only the text-to-image variant takes a [ControlNet](#controlnet).
 
 ## License
 
-Qwen Image 2512, Qwen Image Edit 2511, the Lightning LoRAs, the Qwen2.5-VL text encoder and the Qwen Image
-ControlNet Union are released under **Apache 2.0**, which allows commercial use. None of the downloads is gated.
+Qwen Image 2512, Qwen Image Edit 2511, the Lightning LoRAs, the Qwen2.5-VL text encoder and both Qwen Image
+ControlNet Unions are released under **Apache 2.0**, which allows commercial use. None of the downloads is gated.
 
 This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
 
@@ -139,26 +139,42 @@ In the workflow editor use **Apply LoRA - Qwen Image** or **Apply LoRA Collectio
 
 ## ControlNet
 
-The **Qwen Image ControlNet Union** starter model is alibaba-pai's *Fun-ControlNet-Union* for Qwen Image 2512
-(~3.5 GB, Apache 2.0). One model handles every condition: **Canny**, **HED**, **Depth**, **Pose**, **MLSD**,
-**Scribble** and **Gray** control images, plus **inpainting**. It is trained for the text-to-image transformer:
-with a Qwen Image Edit model selected, a control layer's settings and the **Invoke** button say that the
-ControlNet is not compatible, and nothing is generated until the layer is disabled or the model changed.
+Two ControlNets are starter models, both a single model for several conditions (~3.5 GB each, Apache 2.0):
+
+| Starter model | Design | Conditions | Recommended weight |
+| ------------- | ------ | ---------- | ------------------ |
+| **Qwen Image ControlNet Union** | alibaba-pai's *Fun-ControlNet-Union* for Qwen Image 2512 | **Canny**, **HED**, **Depth**, **Pose**, **MLSD**, **Scribble** and **Gray** control images, plus **inpainting** | `0.70` to `0.95` |
+| **Qwen Image InstantX ControlNet Union** | InstantX's *ControlNet-Union*, trained on the original Qwen Image | **Canny**, **Soft Edge** (HED), **Depth** and **Pose** control images; control only | about `1.5` to `2.0` on Qwen Image 2512 (`0.80` to `1.00` on the original Qwen Image) |
+
+The two work differently. The Fun union is a control branch inside the transformer that reads the control image
+and, when inpainting, the region being regenerated. The InstantX union is a five-block copy of the transformer that
+runs beside it once per step and adds its output to the transformer's blocks; it takes the control image and
+nothing else; InstantX recommends 30 steps at CFG 4 for it. InstantX trained it on the original Qwen Image, and on
+Qwen Image 2512 it guides weakly at its card's `0.80` to `1.00`: a pose skeleton barely moves the figure at `1.0`
+and is followed at `1.5` to `2.0`. The Fun union is trained for Qwen Image 2512 directly. InvokeAI tells the two
+apart from the file on install; a copy of the InstantX union installed by an earlier version as a Qwen Image main model is fixed by
+**Re-identify** in the Model Manager. InstantX's separate *Inpainting* ControlNet is not supported yet and is
+refused on install.
+
+Both are trained for the text-to-image transformer: with a Qwen Image Edit model selected, a control layer's
+settings and the **Invoke** button say that the ControlNet is not compatible, and nothing is generated until the
+layer is disabled or the model changed.
 
 On the Canvas, add a **Control Layer** while a Qwen Image model is selected. Its adapter type is **Qwen Image
-ControlNet** and its pixels are the control image; the layer's **Filter** turns a raster into one of the
-conditions (Canny, HED, Depth Anything, DW Openpose, MLSD, Scribble or Grayscale). The layer's **Weight** is
-the model's control scale: it ranges from `0` to `2`, starts at `0.85`, and `0.70` to `0.95` is the
-recommended range. **Only one** Qwen Image control layer can be used per generation.
+ControlNet**, its model either union, and its pixels are the control image; the layer's **Filter** turns a raster
+into one of the conditions (Canny, HED, Depth Anything, DW Openpose, MLSD, Scribble or Grayscale). The layer's
+**Weight** is the model's control scale: it ranges from `0` to `2` and starts at `0.85`. **Only one** Qwen Image
+control layer can be used per generation.
 
-When the Canvas inpaints or outpaints with a control layer present, the ControlNet also receives the image being
-regenerated and the mask of the region as its inpainting condition. Without a control layer, inpainting and
-outpainting work as before.
+When the Canvas inpaints or outpaints with a Fun union layer present, the ControlNet also receives the image being
+regenerated and the mask of the region as its inpainting condition. An InstantX union layer only guides the
+regenerated region with its control image. Without a control layer, inpainting and outpainting work as before.
 
 In the workflow editor, the same thing is the **Qwen Image ControlNet** node feeding the **Control** input of
 **Denoise - Qwen Image**. Give it a control **Image**, an **Inpaint Image** together with its **Inpaint Mask**
-(white is regenerated), or both. **Denoise - Qwen Image** then also needs its **VAE** input connected, which it
-uses to encode these images.
+(white is regenerated), or both; with the InstantX union, a control **Image** only, and the denoise refuses inpaint
+inputs. **Denoise - Qwen Image** then also needs its **VAE** input connected, which it uses to encode these
+images.
 
 ## PiD super-resolution decode
 
@@ -173,7 +189,7 @@ Decoder Qwen-Image (2K to 4K)* decoders (including an int8 build of the latter) 
 | **Main Model - Qwen Image**                 | Loads the transformer, VAE and Qwen VL encoder (or a component source) |
 | **Prompt - Qwen Image**                     | Encodes the prompt and any reference images                         |
 | **Denoise - Qwen Image**                    | Runs sampling; accepts reference latents, img2img latents, masks and a ControlNet |
-| **Qwen Image ControlNet**                   | Configures the ControlNet Union: control image and/or inpaint image with mask, scale, step range |
+| **Qwen Image ControlNet**                   | Configures either ControlNet Union: control image and/or inpaint image with mask (Fun only), scale, step range |
 | **Image to Latents - Qwen Image**           | VAE encode                                                          |
 | **Latents to Image - Qwen Image**           | VAE decode                                                          |
 | **Latents to Image - Qwen-Image + PiD (4x SR)** | PiD super-resolution decode                                     |
