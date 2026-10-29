@@ -22,6 +22,7 @@ from invokeai.backend.model_manager.starter_models.anima import (
     anima_lllite_scribble_preview3,
     anima_lllite_sketch,
     anima_qwen3_5_encoder,
+    anima_turbo_gguf_q8_0,
     anima_vae,
 )
 from invokeai.backend.model_manager.starter_models.cogview4 import cogview4
@@ -180,8 +181,10 @@ from invokeai.backend.model_manager.starter_models.krea_2 import (
 from invokeai.backend.model_manager.starter_models.ltx_2 import (
     ltx2_5_components,
     ltx2_5_dev_transformer_bf16,
+    ltx2_5_dev_transformer_gguf_q4_k_m,
     ltx2_5_dev_transformer_int8,
     ltx2_5_distilled_lora,
+    ltx2_5_distilled_transformer_gguf_q4_k_m,
     ltx2_5_distilled_transformer_int8,
     ltx2_5_distilled_transformer_nvfp4,
     ltx2_5_duration_head,
@@ -531,6 +534,8 @@ STARTER_MODELS: list[StarterModel] = [
     ltx2_5_dev_transformer_int8,
     ltx2_5_distilled_transformer_int8,
     ltx2_5_distilled_transformer_nvfp4,
+    ltx2_5_dev_transformer_gguf_q4_k_m,
+    ltx2_5_distilled_transformer_gguf_q4_k_m,
     ltx2_5_distilled_lora,
     ltx2_5_dev_transformer_bf16,
     ltx2_5_text_encoder_int8,
@@ -568,6 +573,7 @@ STARTER_MODELS: list[StarterModel] = [
     alibabacloud_wan26_t2i,
     alibabacloud_qwen_image_edit_max,
     anima_base,
+    anima_turbo_gguf_q8_0,
     anima_2_9b,
     anima_2_9b_int8,
     anima_3_8b,
