@@ -6,10 +6,12 @@ import type {
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
   CanvasState,
+  CanvasVectorLayerState,
   CroppableImageWithDims,
   ImageWithDims,
   RefImageState,
 } from 'features/controlLayers/store/types';
+import { zCanvasVectorLayerState } from 'features/controlLayers/store/types';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
 import { z } from 'zod';
 
@@ -37,11 +39,27 @@ export const parseManifest = (data: unknown): CanvasProjectManifest => {
 export type CanvasProjectState = {
   rasterLayers: CanvasRasterLayerState[];
   controlLayers: CanvasControlLayerState[];
+  vectorLayers: CanvasVectorLayerState[];
   inpaintMasks: CanvasInpaintMaskState[];
   regionalGuidance: CanvasRegionalGuidanceState[];
   bbox: CanvasState['bbox'];
   selectedEntityIdentifier: CanvasState['selectedEntityIdentifier'];
   bookmarkedEntityIdentifier: CanvasState['bookmarkedEntityIdentifier'];
+};
+
+const zCanvasProjectState = z.object({
+  rasterLayers: z.array(z.any()),
+  controlLayers: z.array(z.any()),
+  vectorLayers: z.array(zCanvasVectorLayerState).default([]),
+  inpaintMasks: z.array(z.any()),
+  regionalGuidance: z.array(z.any()),
+  bbox: z.any(),
+  selectedEntityIdentifier: z.any().nullable(),
+  bookmarkedEntityIdentifier: z.any().nullable(),
+});
+
+export const parseCanvasProjectState = (data: unknown): CanvasProjectState => {
+  return zCanvasProjectState.parse(data) as CanvasProjectState;
 };
 
 // #endregion

@@ -1,5 +1,7 @@
 import type { AppStore } from 'app/store/store';
+import { canvasMetadataRecalled } from 'features/controlLayers/store/canvasSlice';
 import { setHiDiffusionEnabled } from 'features/controlLayers/store/paramsSlice';
+import { getVectorLayerState } from 'features/controlLayers/store/util';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ImageMetadataHandlers, MetadataUtils, parseMetadataHandler } from './parsing';
@@ -13,6 +15,43 @@ const createMockStore = () => ({
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const createStore = () => createMockStore() as any;
+
+describe('vector canvas metadata recall', () => {
+  it('recalls metadata containing only vector layers', async () => {
+    const store = createMockStore();
+    const metadata = {
+      canvas_v2_metadata: {
+        rasterLayers: [],
+        controlLayers: [],
+        regionalGuidance: [],
+        inpaintMasks: [],
+        vectorLayers: [getVectorLayerState('vector')],
+      },
+    };
+    const handler = ImageMetadataHandlers.CanvasLayers;
+    const parsed = await handler.parse(metadata, store as unknown as AppStore);
+    await handler.recall?.(parsed, store as unknown as AppStore);
+    expect(store.dispatch).toHaveBeenCalledWith(canvasMetadataRecalled(parsed));
+  });
+
+  it('does not recall empty legacy metadata', async () => {
+    const store = createMockStore();
+    const handler = ImageMetadataHandlers.CanvasLayers;
+    const parsed = await handler.parse(
+      {
+        canvas_v2_metadata: {
+          rasterLayers: [],
+          controlLayers: [],
+          regionalGuidance: [],
+          inpaintMasks: [],
+        },
+      },
+      store as unknown as AppStore
+    );
+    await handler.recall?.(parsed, store as unknown as AppStore);
+    expect(store.dispatch).not.toHaveBeenCalled();
+  });
+});
 
 describe('Qwen metadata parsing', () => {
   it('normalizes synchronous parser throws into rejected promises', async () => {

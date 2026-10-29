@@ -7,6 +7,7 @@ import { CanvasEntityAdapterControlLayer } from 'features/controlLayers/konva/Ca
 import { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterInpaintMask';
 import { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRegionalGuidance';
+import { CanvasEntityAdapterVectorLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterVectorLayer';
 import type { CanvasEntityAdapter, CanvasEntityAdapterFromType } from 'features/controlLayers/konva/CanvasEntity/types';
 import { CanvasEntityRendererModule } from 'features/controlLayers/konva/CanvasEntityRendererModule';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
@@ -22,6 +23,7 @@ import {
   isInpaintMaskEntityIdentifier,
   isRasterLayerEntityIdentifier,
   isRegionalGuidanceEntityIdentifier,
+  isVectorLayerEntityIdentifier,
 } from 'features/controlLayers/store/types';
 import Konva from 'konva';
 import type { Atom } from 'nanostores';
@@ -49,6 +51,7 @@ export class CanvasManager extends CanvasModuleBase {
   adapters = {
     rasterLayers: new SyncableMap<string, CanvasEntityAdapterRasterLayer>(),
     controlLayers: new SyncableMap<string, CanvasEntityAdapterControlLayer>(),
+    vectorLayers: new SyncableMap<string, CanvasEntityAdapterVectorLayer>(),
     regionMasks: new SyncableMap<string, CanvasEntityAdapterRegionalGuidance>(),
     inpaintMasks: new SyncableMap<string, CanvasEntityAdapterInpaintMask>(),
   };
@@ -147,6 +150,9 @@ export class CanvasManager extends CanvasModuleBase {
       case 'control_layer':
         adapter = this.adapters.controlLayers.get(entityIdentifier.id);
         break;
+      case 'vector_layer':
+        adapter = this.adapters.vectorLayers.get(entityIdentifier.id);
+        break;
       case 'regional_guidance':
         adapter = this.adapters.regionMasks.get(entityIdentifier.id);
         break;
@@ -169,6 +175,8 @@ export class CanvasManager extends CanvasModuleBase {
         return this.adapters.rasterLayers.delete(entityIdentifier.id);
       case 'control_layer':
         return this.adapters.controlLayers.delete(entityIdentifier.id);
+      case 'vector_layer':
+        return this.adapters.vectorLayers.delete(entityIdentifier.id);
       case 'regional_guidance':
         return this.adapters.regionMasks.delete(entityIdentifier.id);
       case 'inpaint_mask':
@@ -194,6 +202,7 @@ export class CanvasManager extends CanvasModuleBase {
     return [
       ...this.adapters.rasterLayers.values(),
       ...this.adapters.controlLayers.values(),
+      ...this.adapters.vectorLayers.values(),
       ...this.adapters.regionMasks.values(),
       ...this.adapters.inpaintMasks.values(),
     ];
@@ -218,6 +227,10 @@ export class CanvasManager extends CanvasModuleBase {
     } else if (isControlLayerEntityIdentifier(entityIdentifier)) {
       const adapter = new CanvasEntityAdapterControlLayer(entityIdentifier, this);
       this.adapters.controlLayers.set(adapter.id, adapter);
+      return adapter;
+    } else if (isVectorLayerEntityIdentifier(entityIdentifier)) {
+      const adapter = new CanvasEntityAdapterVectorLayer(entityIdentifier, this);
+      this.adapters.vectorLayers.set(adapter.id, adapter);
       return adapter;
     } else if (isRegionalGuidanceEntityIdentifier(entityIdentifier)) {
       const adapter = new CanvasEntityAdapterRegionalGuidance(entityIdentifier, this);
@@ -287,6 +300,7 @@ export class CanvasManager extends CanvasModuleBase {
       $isBusy: this.$isBusy.get(),
       rasterLayers: Array.from(this.adapters.rasterLayers.values()).map((adapter) => adapter.repr()),
       controlLayers: Array.from(this.adapters.controlLayers.values()).map((adapter) => adapter.repr()),
+      vectorLayers: Array.from(this.adapters.vectorLayers.values()).map((adapter) => adapter.repr()),
       inpaintMasks: Array.from(this.adapters.inpaintMasks.values()).map((adapter) => adapter.repr()),
       regionMasks: Array.from(this.adapters.regionMasks.values()).map((adapter) => adapter.repr()),
       stateApi: this.stateApi.repr(),

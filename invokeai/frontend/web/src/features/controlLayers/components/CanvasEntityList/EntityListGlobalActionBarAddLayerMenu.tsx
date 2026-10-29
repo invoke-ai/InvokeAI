@@ -5,6 +5,7 @@ import {
   useAddNewRegionalGuidanceWithARefImage,
   useAddRasterLayer,
   useAddRegionalGuidance,
+  useAddVectorLayer,
 } from 'features/controlLayers/hooks/addLayerHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useIsEntityTypeEnabled } from 'features/controlLayers/hooks/useIsEntityTypeEnabled';
@@ -20,9 +21,11 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
   const addRegionalReferenceImage = useAddNewRegionalGuidanceWithARefImage();
   const addRasterLayer = useAddRasterLayer();
   const addControlLayer = useAddControlLayer();
+  const addVectorLayer = useAddVectorLayer();
   const isRegionalGuidanceEnabled = useIsEntityTypeEnabled('regional_guidance');
   const isControlLayerEnabled = useIsEntityTypeEnabled('control_layer');
   const isInpaintLayerEnabled = useIsEntityTypeEnabled('inpaint_mask');
+  const isVectorLayerEnabled = useIsEntityTypeEnabled('vector_layer');
 
   return (
     <Menu>
@@ -52,6 +55,9 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
         <MenuGroup title={t('controlLayers.layer_other')}>
           <MenuItem icon={<PiPlusBold />} onClick={addControlLayer} isDisabled={!isControlLayerEnabled}>
             {t('controlLayers.controlLayer')}
+          </MenuItem>
+          <MenuItem icon={<PiPlusBold />} onClick={addVectorLayer} isDisabled={!isVectorLayerEnabled}>
+            {t('controlLayers.vectorLayer')}
           </MenuItem>
           <MenuItem icon={<PiPlusBold />} onClick={addRasterLayer}>
             {t('controlLayers.rasterLayer')}

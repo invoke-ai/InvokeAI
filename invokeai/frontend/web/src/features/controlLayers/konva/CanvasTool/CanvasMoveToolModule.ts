@@ -85,6 +85,14 @@ export class CanvasMoveToolModule extends CanvasModuleBase {
     const isMoveToolSelected = this.parent.$tool.get() === 'move';
     const isThisEntityTransforming = this.manager.stateApi.$transformingAdapter.get() === selectedEntity;
 
+    if (
+      selectedEntity.transformer.$isProcessing.get() ||
+      (this.parent.tools.path.hasActiveEditSession() &&
+        !(isThisEntityTransforming && selectedEntity.transformer.getIsTransformingVectorPath()))
+    ) {
+      return;
+    }
+
     if (isBusy) {
       // When the canvas is busy, we shouldn't allow nudging - except when the canvas is busy transforming the selected
       // entity. Nudging is allowed during transformation, regardless of the selected tool.

@@ -2184,7 +2184,8 @@ const CanvasLayers: SingleMetadataHandler<CanvasMetadata> = {
       value.controlLayers.length === 0 &&
       value.rasterLayers.length === 0 &&
       value.inpaintMasks.length === 0 &&
-      value.regionalGuidance.length === 0
+      value.regionalGuidance.length === 0 &&
+      value.vectorLayers.length === 0
     ) {
       // Nothing to recall
       return;
@@ -2199,7 +2200,8 @@ const CanvasLayers: SingleMetadataHandler<CanvasMetadata> = {
       value.controlLayers.length +
       value.rasterLayers.length +
       value.inpaintMasks.length +
-      value.regionalGuidance.length;
+      value.regionalGuidance.length +
+      value.vectorLayers.length;
     return <MetadataPrimitiveValue value={`${count} ${t('controlLayers.layer', { count })}`} />;
   },
 };
