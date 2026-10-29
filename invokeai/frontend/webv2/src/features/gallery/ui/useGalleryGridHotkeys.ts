@@ -121,7 +121,7 @@ export const useGalleryGridHotkeys = ({
   toggleItem: (item: GalleryItem) => void;
 }) => {
   const { t } = useTranslation();
-  const { actions, gallery, itemActions, runtime } = useGalleryWidget();
+  const { actions, gallery, itemActions, loadedItems, runtime } = useGalleryWidget();
   const { followProgressSession, gallery: galleryCommands } = useGalleryUi();
   // A run of Shift+arrows keeps the anchor it started from; the range it last reached says whether it is still running.
   const keyboardRangeRef = useRef<{ anchorKey: GalleryItemKey | null; reachedKey: GalleryItemKey } | null>(null);
@@ -232,7 +232,13 @@ export const useGalleryGridHotkeys = ({
     }
 
     if (commandId === 'gallery.deleteSelection' && actionSelectionRefs.length > 0) {
-      void itemActions.deleteItems(actionSelectionRefs, { returnFocus: getDialogReturnFocus() });
+      // A member no loaded page holds is off screen: the deletion then always asks and shows what it takes.
+      const loadedKeys = new Set(loadedItems.map(toGalleryItemKey));
+
+      void itemActions.deleteItems(actionSelectionRefs, {
+        returnFocus: getDialogReturnFocus(),
+        targetsOffScreen: actionSelectionRefs.some((ref) => !loadedKeys.has(toGalleryItemKey(ref))),
+      });
       return;
     }
 

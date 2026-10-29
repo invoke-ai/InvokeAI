@@ -123,7 +123,11 @@ describe('PasteMediaRuntime', () => {
   beforeEach(async () => {
     mocks.canUseAsReferenceImage = true;
     mocks.project = createInitialWorkbenchState().projects[0]!;
-    getProjectWidgetInstance(mocks.project, 'gallery')!.state.values.selectedBoardId = 'board-1';
+    // Following the selected board, so pastes go where the gallery is.
+    Object.assign(getProjectWidgetInstance(mocks.project, 'gallery')!.state.values, {
+      followSelectedBoard: true,
+      selectedBoardId: 'board-1',
+    });
     applyThemeToRoot(DEFAULT_THEME_ID);
     mocks.sendToCanvas.mockReset().mockResolvedValue(undefined);
     mocks.uploadFiles.mockReset().mockResolvedValue([uploadedImage]);

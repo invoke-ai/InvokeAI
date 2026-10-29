@@ -263,7 +263,7 @@ const itemActions = {
   },
   deleteItems: (refs: GalleryItemRef[], options?: { returnFocus?: () => HTMLElement | null }) =>
     state.confirmDeletion
-      ? confirmationRef.current!(refs, () => applyDeletion(refs), options?.returnFocus)
+      ? confirmationRef.current!(refs, () => applyDeletion(refs), { returnFocus: options?.returnFocus })
       : applyDeletion(refs),
   // The listing holds unstarred items only, so starring moves an item into the strip and back.
   setItemsStarred: (refs: GalleryItemRef[], starred: boolean) => {

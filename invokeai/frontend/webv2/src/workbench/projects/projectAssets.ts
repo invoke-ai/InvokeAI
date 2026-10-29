@@ -27,7 +27,7 @@ export const GALLERY_SELECTION_KEYS: ReadonlySet<string> = new Set([
 
 /**
  * Strip gallery board IDs while preserving authored workflow board inputs. A dropped auto-add board falls back to
- * following the selected board.
+ * the default destination, the project's inbox.
  */
 export const GALLERY_INSTALLATION_KEYS: ReadonlySet<string> = new Set([
   'autoAddBoardId',

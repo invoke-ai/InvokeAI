@@ -12,6 +12,7 @@ import {
   legacyGeneratedImageToGalleryItem,
   toGalleryItemKey,
 } from '@features/gallery';
+import { getGalleryMoveTargets } from '@features/gallery/contracts';
 import { galleryKeys } from '@features/gallery/queries';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { getModelOnlyUpscaleFactors, getSpandrelNativeScale } from '@features/upscale';
@@ -22,6 +23,7 @@ import { MenuContent, MenuIconItem } from '@platform/ui';
 import { MenuActionItem, MenuItem } from '@platform/ui/Menu';
 import { ScrollableMenuContent } from '@platform/ui/ScrollableMenuContent';
 import { useQuery } from '@tanstack/react-query';
+import { formatHotkeyPartLabel } from '@workbench/hotkeys/keys';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { LAYER_KIND_ICONS } from '@workbench/widgets/layers/layerTypeIcon';
@@ -339,6 +341,7 @@ const GalleryItemContextMenuContent = ({
                 allStarred={target.allStarred}
                 boards={boards}
                 itemRefs={target.itemRefs}
+                listingBoardId={target.listingBoardId}
                 loadedItems={target.items}
                 primaryItem={item}
                 onRequestDeletion={onRequestDeletion}
@@ -376,7 +379,7 @@ const SingleItemMenuItems = ({
   onRequestDeletion: (itemRefs: GalleryItemRef[]) => void;
 }) => {
   const { t } = useTranslation();
-  const mediaLabel = item.kind === 'video' ? 'video' : 'item';
+  const isVideo = item.kind === 'video';
   const handleOpenInNewTab = useCallback(() => actions.openItemInNewTab(item), [actions, item]);
   const handleDownload = useCallback(() => void actions.downloadItem(item), [actions, item]);
   const handleOpenPreview = useCallback(() => actions.openItemInPreview(item), [actions, item]);
@@ -389,6 +392,7 @@ const SingleItemMenuItems = ({
     [actions, itemRef]
   );
   const handleDelete = useCallback(() => onRequestDeletion([itemRef]), [itemRef, onRequestDeletion]);
+  const singleSourceBoardIds = useMemo(() => [item.boardId], [item.boardId]);
   const owner = captureAccountScope();
   const videoItem = item.kind === 'video' ? item : null;
   // The record answers whether a workflow is embedded only when the listing did not say.
@@ -457,21 +461,34 @@ const SingleItemMenuItems = ({
       <HStack gap="1">
         <MenuIconItem
           icon={ExternalLinkIcon}
-          label="Open in new tab"
+          label={t('widgets.gallery.itemMenu.openInNewTab')}
           value="open-in-new-tab"
           onSelect={handleOpenInNewTab}
         />
         <MenuIconItem
           icon={DownloadIcon}
-          label={`Download ${mediaLabel}`}
+          label={t(isVideo ? 'widgets.gallery.itemMenu.downloadVideo' : 'widgets.gallery.itemMenu.downloadImage')}
           value="download-item"
           onSelect={handleDownload}
         />
-        <MenuIconItem icon={EyeIcon} label="Open in preview" value="open-in-preview" onSelect={handleOpenPreview} />
+        <MenuIconItem
+          icon={EyeIcon}
+          label={t('widgets.gallery.itemMenu.openInPreview')}
+          value="open-in-preview"
+          onSelect={handleOpenPreview}
+        />
         <MenuIconItem
           icon={StarIcon}
           iconFill={item.starred ? 'currentColor' : 'none'}
-          label={`${item.starred ? 'Unstar' : 'Star'} ${mediaLabel}`}
+          label={t(
+            isVideo
+              ? item.starred
+                ? 'widgets.preview.unstarVideo'
+                : 'widgets.preview.starVideo'
+              : item.starred
+                ? 'widgets.preview.unstarImage'
+                : 'widgets.preview.starImage'
+          )}
           value="toggle-starred"
           onSelect={handleToggleStarred}
         />
@@ -486,50 +503,50 @@ const SingleItemMenuItems = ({
             value="load-video-workflow"
             onClick={handleLoadVideoWorkflow}
           />
-          <ContextSubMenu icon={AsteriskIcon} label="Recall Metadata">
+          <ContextSubMenu icon={AsteriskIcon} label={t('widgets.gallery.itemMenu.recallMetadata')}>
             <ContextMenuItem
               disabled={isLoadingVideoRecall || !videoRecallCapabilities.all}
               icon={AsteriskIcon}
-              label="Recall All"
+              label={t('widgets.gallery.itemActions.recall.verbs.all')}
               value="video-recall-all"
               onClick={handleVideoRecallAll}
             />
             <ContextMenuItem
               disabled={isLoadingVideoRecall || !videoRecallCapabilities.remix}
               icon={ShuffleIcon}
-              label="Remix Video"
+              label={t('widgets.gallery.itemMenu.remixVideo')}
               value="video-remix"
               onClick={handleVideoRecallRemix}
             />
             <ContextMenuItem
               disabled={isLoadingVideoRecall || !videoRecallCapabilities.prompts}
               icon={QuoteIcon}
-              label="Use Prompt"
+              label={t('widgets.gallery.itemActions.recall.verbs.prompts')}
               value="video-use-prompt"
               onClick={handleVideoRecallPrompts}
             />
             <ContextMenuItem
               disabled={isLoadingVideoRecall || !videoRecallCapabilities.seed}
               icon={SproutIcon}
-              label="Use Seed"
+              label={t('widgets.gallery.itemActions.recall.verbs.seed')}
               value="video-use-seed"
               onClick={handleVideoRecallSeed}
             />
           </ContextSubMenu>
           <ContextMenuItem
             icon={ClapperboardIcon}
-            label="Extend in Video"
+            label={t('widgets.gallery.itemMenu.extendInVideo')}
             value="extend-in-video"
             onClick={handleExtendInVideo}
           />
           <ContextMenuItem
             disabled={!actions.canUseAsReferenceVideo}
             icon={FilmIcon}
-            label="Use as Reference Video"
+            label={t('widgets.gallery.itemMenu.useAsReferenceVideo')}
             value="use-as-reference-video"
             onClick={handleUseAsReferenceVideo}
           />
-          <ContextSubMenu icon={AudioLinesIcon} label="Use as Conditioning Clip">
+          <ContextSubMenu icon={AudioLinesIcon} label={t('widgets.gallery.itemMenu.useAsConditioningClip')}>
             <ContextMenuItem
               disabled={!actions.canUseAsConditioningClip.audio}
               icon={AudioLinesIcon}
@@ -569,12 +586,12 @@ const SingleItemMenuItems = ({
         </>
       ) : null}
       <FindInGalleryMenuItem itemRef={itemRef} />
-      <ChangeBoardSubMenu boards={boards} currentBoardId={item.boardId} onMove={handleMove} />
+      <ChangeBoardSubMenu boards={boards} itemBoardIds={singleSourceBoardIds} onMove={handleMove} />
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
         isDanger
         icon={Trash2Icon}
-        label={item.kind === 'video' ? 'Delete Video' : 'Delete Item'}
+        label={t(isVideo ? 'widgets.gallery.itemMenu.deleteVideo' : 'widgets.gallery.itemMenu.deleteImage')}
         value="delete-item"
         onClick={handleDelete}
       />
@@ -587,6 +604,7 @@ const BulkItemMenuItems = ({
   allStarred: knownAllStarred,
   boards,
   itemRefs,
+  listingBoardId,
   loadedItems,
   primaryItem,
   onRequestDeletion,
@@ -595,10 +613,13 @@ const BulkItemMenuItems = ({
   allStarred: boolean | undefined;
   boards: GalleryBoard[];
   itemRefs: GalleryItemRef[];
+  /** The board the listing the selection was made in reads, where items no page holds sit. */
+  listingBoardId: string | undefined;
   loadedItems: GalleryItem[];
   primaryItem: GalleryItem;
   onRequestDeletion: (itemRefs: GalleryItemRef[]) => void;
 }) => {
+  const { t } = useTranslation();
   const allStarred =
     knownAllStarred ?? (loadedItems.length === itemRefs.length && loadedItems.every((item) => item.starred));
   const handleOpenInNewTab = useCallback(() => actions.openItemInNewTab(primaryItem), [actions, primaryItem]);
@@ -616,23 +637,24 @@ const BulkItemMenuItems = ({
     [actions, itemRefs]
   );
   const handleDelete = useCallback(() => onRequestDeletion(itemRefs), [itemRefs, onRequestDeletion]);
+  const itemBoardIds = useMemo(() => loadedItems.map((item) => item.boardId), [loadedItems]);
 
   return (
     <>
       <Text color="fg.subtle" fontSize="xs" fontWeight="700" px="3" py="1.5" textTransform="uppercase">
-        {itemRefs.length} items selected
+        {t('widgets.gallery.itemMenu.itemsSelected', { count: itemRefs.length })}
       </Text>
       <Menu.Separator borderColor="border.subtle" />
       <HStack gap="1">
         <MenuIconItem
           icon={ExternalLinkIcon}
-          label="Open in new tab"
+          label={t('widgets.gallery.itemMenu.openInNewTab')}
           value="open-primary-in-new-tab"
           onSelect={handleOpenInNewTab}
         />
         <MenuIconItem
           icon={EyeIcon}
-          label="Open in preview"
+          label={t('widgets.gallery.itemMenu.openInPreview')}
           value="open-primary-in-preview"
           onSelect={handleOpenPreview}
         />
@@ -641,22 +663,28 @@ const BulkItemMenuItems = ({
       <ContextMenuItem
         icon={StarIcon}
         iconFill={allStarred ? 'currentColor' : 'none'}
-        label={allStarred ? 'Unstar All' : 'Star All'}
+        label={t(allStarred ? 'widgets.gallery.unstarSelection' : 'widgets.gallery.starSelection')}
         value="toggle-starred-all"
         onClick={handleToggleStarred}
       />
       <ContextMenuItem
         icon={DownloadIcon}
-        label="Download Selection"
+        label={t('widgets.gallery.downloadSelection')}
         value="download-selection"
         onClick={handleDownload}
       />
-      <ChangeBoardSubMenu boards={boards} currentBoardId={null} onMove={handleMove} />
+      <ChangeBoardSubMenu
+        boards={boards}
+        itemBoardIds={itemBoardIds}
+        listingBoardId={listingBoardId}
+        unloadedCount={itemRefs.length - loadedItems.length}
+        onMove={handleMove}
+      />
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
         isDanger
         icon={Trash2Icon}
-        label="Delete Selection"
+        label={t('widgets.gallery.deleteSelection')}
         value="delete-selection"
         onClick={handleDelete}
       />
@@ -807,6 +835,7 @@ const SingleImageMenuItems = ({
     [actions, image.imageName]
   );
   const handleDelete = useCallback(() => onRequestDeletion([image.imageName]), [image.imageName, onRequestDeletion]);
+  const imageSourceBoardIds = useMemo(() => [image.boardId], [image.boardId]);
   const imageItemRef = useMemo<GalleryItemRef>(() => ({ kind: 'image', name: image.imageName }), [image.imageName]);
   const handleRecallAll = useRecallImageDataHandler(actions, image, 'all');
   const handleRecallRemix = useRecallImageDataHandler(actions, image, 'remix');
@@ -858,46 +887,46 @@ const SingleImageMenuItems = ({
         value="load-workflow"
         onClick={handleLoadWorkflow}
       />
-      <ContextSubMenu icon={AsteriskIcon} label="Recall Metadata">
+      <ContextSubMenu icon={AsteriskIcon} label={t('widgets.gallery.itemMenu.recallMetadata')}>
         <ContextMenuItem
           disabled={isLoadingRecallCapabilities || !recallCapabilities.all}
           icon={AsteriskIcon}
-          label="Recall All"
+          label={t('widgets.gallery.itemActions.recall.verbs.all')}
           value="recall-all"
           onClick={handleRecallAll}
         />
         <ContextMenuItem
           disabled={isLoadingRecallCapabilities || !recallCapabilities.remix}
           icon={ShuffleIcon}
-          label="Remix Image"
+          label={t('widgets.gallery.itemActions.recall.verbs.remix')}
           value="remix"
           onClick={handleRecallRemix}
         />
         <ContextMenuItem
           disabled={isLoadingRecallCapabilities || !recallCapabilities.prompts}
           icon={QuoteIcon}
-          label="Use Prompt"
+          label={t('widgets.gallery.itemActions.recall.verbs.prompts')}
           value="use-prompt"
           onClick={handleRecallPrompts}
         />
         <ContextMenuItem
           disabled={isLoadingRecallCapabilities || !recallCapabilities.seed}
           icon={SproutIcon}
-          label="Use Seed"
+          label={t('widgets.gallery.itemActions.recall.verbs.seed')}
           value="use-seed"
           onClick={handleRecallSeed}
         />
         <ContextMenuItem
           disabled={isLoadingRecallCapabilities || !recallCapabilities.dimensions}
           icon={RulerIcon}
-          label="Use Size"
+          label={t('widgets.gallery.itemActions.recall.verbs.dimensions')}
           value="use-size"
           onClick={handleRecallDimensions}
         />
         <ContextMenuItem
           disabled={isLoadingRecallCapabilities || !recallCapabilities.clipSkip}
           icon={ScissorsIcon}
-          label="Use CLIP Skip"
+          label={t('widgets.gallery.itemActions.recall.verbs.clipSkip')}
           value="use-clip-skip"
           onClick={handleRecallClipSkip}
         />
@@ -907,14 +936,14 @@ const SingleImageMenuItems = ({
       <UpscaleSubMenu image={image} onSendToUpscale={handleSendToUpscale} />
       <ContextMenuItem
         icon={ClapperboardIcon}
-        label="Send to Video"
+        label={t('widgets.gallery.itemMenu.sendToVideo')}
         value="send-to-video"
         onClick={handleSendToVideo}
       />
       <ContextMenuItem
         disabled={!actions.canUseAsReferenceImage}
         icon={ImageIcon}
-        label="Use as Reference Image"
+        label={t('widgets.gallery.itemMenu.useAsReferenceImage')}
         value="use-as-reference-image"
         onClick={handleUseAsReferenceImage}
       />
@@ -928,13 +957,15 @@ const SingleImageMenuItems = ({
         // Use the same availability signal as Use Prompt to disable empty recall upfront.
         disabled={isLoadingRecallCapabilities || !recallCapabilities.prompts}
         icon={TypeIcon}
-        label="Use as Prompt Template"
+        label={t('widgets.gallery.itemMenu.useAsPromptTemplate')}
         value="use-as-prompt-template"
         onClick={handleSavePromptAsTemplate}
       />
       <ContextMenuItem
+        // The grid's shortcut for the same action, otherwise found only by accident.
+        detail={t('widgets.gallery.itemMenu.compareShortcut', { key: formatHotkeyPartLabel('alt') })}
         icon={ImagesIcon}
-        label="Select for Compare"
+        label={t('widgets.preview.selectForCompare')}
         value="select-for-compare"
         onClick={handleSelectForCompare}
       />
@@ -946,9 +977,15 @@ const SingleImageMenuItems = ({
       />
       <Menu.Separator borderColor="border.subtle" />
       <FindInGalleryMenuItem itemRef={imageItemRef} />
-      <ChangeBoardSubMenu boards={boards} currentBoardId={image.boardId} onMove={handleMove} />
+      <ChangeBoardSubMenu boards={boards} itemBoardIds={imageSourceBoardIds} onMove={handleMove} />
       <Menu.Separator borderColor="border.subtle" />
-      <ContextMenuItem isDanger icon={Trash2Icon} label="Delete Image" value="delete-image" onClick={handleDelete} />
+      <ContextMenuItem
+        isDanger
+        icon={Trash2Icon}
+        label={t('widgets.gallery.itemMenu.deleteImage')}
+        value="delete-image"
+        onClick={handleDelete}
+      />
     </>
   );
 };
@@ -966,10 +1003,16 @@ const useUseAsReferenceImageHandler = (actions: ImageActions, image: GalleryImag
   useCallback(() => actions.useAsReferenceImage(image), [actions, image]);
 
 const OpenInNewTabQuickMenuItem = ({ image }: { image: GalleryImage }) => {
+  const { t } = useTranslation();
   const handleClick = useCallback(() => window.open(image.imageUrl, '_blank', 'noopener'), [image.imageUrl]);
 
   return (
-    <MenuIconItem icon={ExternalLinkIcon} label="Open in new tab" value="open-in-new-tab" onSelect={handleClick} />
+    <MenuIconItem
+      icon={ExternalLinkIcon}
+      label={t('widgets.gallery.itemMenu.openInNewTab')}
+      value="open-in-new-tab"
+      onSelect={handleClick}
+    />
   );
 };
 
@@ -980,7 +1023,7 @@ const CopyQuickMenuItem = ({ actions, image }: { actions: ImageActions; image: G
   return (
     <MenuIconItem
       icon={CopyIcon}
-      label="Copy to clipboard"
+      label={t('widgets.gallery.itemMenu.copyToClipboard')}
       unavailableReason={canCopyImage() ? undefined : t('common.copyUnavailable')}
       value="copy-to-clipboard"
       onSelect={handleClick}
@@ -989,18 +1032,35 @@ const CopyQuickMenuItem = ({ actions, image }: { actions: ImageActions; image: G
 };
 
 const DownloadQuickMenuItem = ({ actions, image }: { actions: ImageActions; image: GalleryImage }) => {
+  const { t } = useTranslation();
   const handleClick = useCallback(() => void actions.downloadImage(image), [actions, image]);
 
-  return <MenuIconItem icon={DownloadIcon} label="Download image" value="download-image" onSelect={handleClick} />;
+  return (
+    <MenuIconItem
+      icon={DownloadIcon}
+      label={t('widgets.gallery.itemMenu.downloadImage')}
+      value="download-image"
+      onSelect={handleClick}
+    />
+  );
 };
 
 const OpenPreviewQuickMenuItem = ({ actions, image }: { actions: ImageActions; image: GalleryImage }) => {
+  const { t } = useTranslation();
   const handleClick = useCallback(() => actions.openImageInPreview(image), [actions, image]);
 
-  return <MenuIconItem icon={EyeIcon} label="Open in preview" value="open-in-preview" onSelect={handleClick} />;
+  return (
+    <MenuIconItem
+      icon={EyeIcon}
+      label={t('widgets.gallery.itemMenu.openInPreview')}
+      value="open-in-preview"
+      onSelect={handleClick}
+    />
+  );
 };
 
 const ToggleStarQuickMenuItem = ({ actions, image }: { actions: ImageActions; image: GalleryImage }) => {
+  const { t } = useTranslation();
   const handleClick = useCallback(
     () => void actions.setImagesStarred([image.imageName], !image.starred),
     [actions, image.imageName, image.starred]
@@ -1010,7 +1070,7 @@ const ToggleStarQuickMenuItem = ({ actions, image }: { actions: ImageActions; im
     <MenuIconItem
       icon={StarIcon}
       iconFill={image.starred ? 'currentColor' : 'none'}
-      label={image.starred ? 'Unstar image' : 'Star image'}
+      label={t(image.starred ? 'widgets.preview.unstarImage' : 'widgets.preview.starImage')}
       value="toggle-starred"
       onSelect={handleClick}
     />
@@ -1030,7 +1090,9 @@ const BulkMenuItems = ({
   images: GalleryImage[];
   onRequestDeletion: (imageNames: string[]) => void;
 }) => {
+  const { t } = useTranslation();
   const allStarred = images.every((image) => image.starred);
+  const sourceBoardIds = useMemo(() => images.map((image) => image.boardId), [images]);
   const handleToggleStarred = useCallback(
     () => void actions.setImagesStarred(imageNames, !allStarred),
     [actions, allStarred, imageNames]
@@ -1045,7 +1107,7 @@ const BulkMenuItems = ({
   return (
     <>
       <Text color="fg.subtle" fontSize="xs" fontWeight="700" px="3" py="1.5" textTransform="uppercase">
-        {images.length} images selected
+        {t('widgets.gallery.itemMenu.imagesSelected', { count: images.length })}
       </Text>
       <Menu.Separator borderColor="border.subtle" />
       <CanvasDestinationMenuItems actions={actions} images={images} />
@@ -1053,22 +1115,22 @@ const BulkMenuItems = ({
       <ContextMenuItem
         icon={StarIcon}
         iconFill={allStarred ? 'currentColor' : 'none'}
-        label={allStarred ? 'Unstar All' : 'Star All'}
+        label={t(allStarred ? 'widgets.gallery.unstarSelection' : 'widgets.gallery.starSelection')}
         value="toggle-starred-all"
         onClick={handleToggleStarred}
       />
       <ContextMenuItem
         icon={DownloadIcon}
-        label="Download Selection"
+        label={t('widgets.gallery.downloadSelection')}
         value="download-selection"
         onClick={handleDownload}
       />
-      <ChangeBoardSubMenu boards={boards} currentBoardId={null} onMove={handleMove} />
+      <ChangeBoardSubMenu boards={boards} itemBoardIds={sourceBoardIds} onMove={handleMove} />
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
         isDanger
         icon={Trash2Icon}
-        label="Delete Selection"
+        label={t('widgets.gallery.deleteSelection')}
         value="delete-selection"
         onClick={handleDelete}
       />
@@ -1115,23 +1177,31 @@ const FindInGalleryMenuItem = ({ itemRef }: { itemRef: GalleryItemRef }) => {
   );
 };
 
+/** The move targets the selection bar offers too (`getGalleryMoveTargets`), for the items' boards as known. */
 const ChangeBoardSubMenu = ({
   boards,
-  currentBoardId,
+  itemBoardIds,
+  listingBoardId,
+  unloadedCount = 0,
   onMove,
 }: {
   boards: GalleryBoard[];
-  currentBoardId: string | null;
+  itemBoardIds: readonly string[];
+  listingBoardId?: string;
+  unloadedCount?: number;
   onMove: (boardId: string) => void;
 }) => {
   const { t } = useTranslation();
   const handleRemoveFromBoard = useCallback(() => onMove('none'), [onMove]);
   const handleSelectBoard = useCallback((board: GalleryBoard) => onMove(board.id), [onMove]);
-  const destinations = useMemo(() => boards.filter((board) => board.id !== currentBoardId), [boards, currentBoardId]);
+  const { boards: destinations, canRemoveFromBoard } = useMemo(
+    () => getGalleryMoveTargets(boards, { itemBoardIds, listingBoardId, unloadedCount }),
+    [boards, itemBoardIds, listingBoardId, unloadedCount]
+  );
 
   return (
     <ContextSubMenu icon={FolderIcon} label={t('widgets.gallery.changeBoard')}>
-      {currentBoardId !== 'none' && (
+      {canRemoveFromBoard && (
         <ContextMenuItem
           icon={FolderIcon}
           label={t('widgets.gallery.removeFromBoard')}
@@ -1343,6 +1413,7 @@ const ContextSubMenu = ({
 );
 
 const ContextMenuItem = ({
+  detail,
   disabled,
   icon,
   iconFill,
@@ -1352,6 +1423,8 @@ const ContextMenuItem = ({
   value,
   onClick,
 }: {
+  /** A short hint after the label, such as the pointer shortcut for the same action. */
+  detail?: string;
   disabled?: boolean;
   icon: LucideIcon;
   /** Lucide icons are stroke-only, so `'currentColor'` is how an on state reads. */
@@ -1375,6 +1448,11 @@ const ContextMenuItem = ({
       <Text flex="1" fontSize="md">
         {label}
       </Text>
+      {detail ? (
+        <Text color="fg.muted" flexShrink={0} fontSize="sm">
+          {detail}
+        </Text>
+      ) : null}
     </HStack>
   </MenuItem>
 );

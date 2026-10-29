@@ -1,5 +1,6 @@
 import type { GalleryUiAdapter } from '@features/gallery/react';
 import type { Project } from '@workbench/projectContracts';
+import type * as SettingsStoreModule from '@workbench/settings/store';
 import type * as OpenWorkbenchWidgetModule from '@workbench/useOpenWorkbenchWidget';
 import type { OpenWorkbenchWidgetOptions, RegisteredWidget, WidgetTypeId } from '@workbench/widgetContracts';
 import type { ReactNode } from 'react';
@@ -12,6 +13,17 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GalleryUiAdapterProvider } from './GalleryUiAdapter';
+
+const preferences = vi.hoisted(() => ({ galleryDestinationNoticeShown: false, ready: true }));
+vi.mock('@workbench/settings/store', async (importOriginal) => ({
+  ...(await importOriginal<typeof SettingsStoreModule>()),
+  areWorkbenchPreferencesReady: () => preferences.ready,
+  getWorkbenchPreferences: () => preferences,
+  patchWorkbenchPreferences: (patch: Partial<typeof preferences>) => {
+    Object.assign(preferences, patch);
+    return Promise.resolve();
+  },
+}));
 
 let store: ReturnType<typeof createWorkbenchStore>;
 let adapter: GalleryUiAdapter;
@@ -51,6 +63,7 @@ vi.mock('@workbench/useOpenWorkbenchWidget', async (importOriginal) => {
 });
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(store.getSnapshot().activeProject),
+  useOptionalWorkbenchCommands: () => store.commands,
   useWorkbenchCommands: () => store.commands,
   useWorkbenchInternalStore: () => store,
   useWorkbenchPersistenceService: () => ({ ensureProjectOnServer: () => Promise.resolve() }),
@@ -199,5 +212,66 @@ describe('Gallery settings adapter ownership', () => {
 
     renderAdapter().gallery.updateSettings({ showImageDimensions: true });
     expect(values(previous.projectId).showImageDimensions).toBe(true);
+  });
+});
+
+describe('Gallery destination notice', () => {
+  const infoNotices = () =>
+    store.getSnapshot().notifications.filter((notice) => notice.title === 'widgets.gallery.destinationNoticeTitle');
+  const storeLegacyFollow = (projectId: string) =>
+    store.commands.widgets.patchValues('gallery', { autoAddBoardId: 'follow' }, projectId);
+
+  beforeEach(() => {
+    preferences.galleryDestinationNoticeShown = false;
+    preferences.ready = true;
+  });
+
+  it('says once per account, as a project that followed browses away, that new results stay where they go', () => {
+    const owner = renderAdapter();
+    storeLegacyFollow(owner.projectId);
+
+    owner.noteBoardBrowsed?.('elsewhere');
+    owner.noteBoardBrowsed?.('another');
+
+    expect(infoNotices()).toHaveLength(1);
+    expect(preferences.galleryDestinationNoticeShown).toBe(true);
+  });
+
+  it.each([
+    ['a project that never followed', () => undefined],
+    [
+      'a project following on purpose',
+      (projectId: string) => {
+        storeLegacyFollow(projectId);
+        store.commands.gallery.updateSettings({ followSelectedBoard: true }, projectId);
+      },
+    ],
+    [
+      'preferences not read yet',
+      (projectId: string) => {
+        storeLegacyFollow(projectId);
+        preferences.ready = false;
+      },
+    ],
+  ])('says nothing for %s', (_case, arrange) => {
+    const owner = renderAdapter();
+    arrange(owner.projectId);
+
+    owner.noteBoardBrowsed?.('elsewhere');
+
+    expect(infoNotices()).toHaveLength(0);
+    expect(preferences.galleryDestinationNoticeShown).toBe(false);
+  });
+});
+
+describe('Gallery settings for a named project', () => {
+  it('writes a project that is open but not active, and nothing once it is closed', () => {
+    const first = renderAdapter();
+    store.commands.projects.create();
+
+    first.gallery.updateSettings({ autoAddBoardId: 'board-1' }, first.projectId);
+    expect(values(first.projectId).autoAddBoardId).toBe('board-1');
+    expect(first.getProjectGalleryValues?.(first.projectId)).toMatchObject({ autoAddBoardId: 'board-1' });
+    expect(first.getProjectGalleryValues?.('closed-project')).toBeNull();
   });
 });

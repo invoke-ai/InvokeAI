@@ -74,6 +74,8 @@ export interface WorkbenchPreferences {
   reduceMotion: boolean;
   showFocusRegionHighlight: boolean;
   confirmImageDeletion: boolean;
+  /** The note that browsing a board no longer changes where new results go was shown; once per account. */
+  galleryDestinationNoticeShown: boolean;
   /** Auto-switch the Invoke source/destination to match the surface being edited; locks always win. */
   autoSwitchInvocationRoute: boolean;
   queueJobsScope: 'active-project' | 'all';

@@ -69,6 +69,7 @@ const mocks = vi.hoisted(() => ({
   itemMoveToBoard: vi.fn(),
   itemSetStarred: vi.fn(),
   notificationsAdd: vi.fn(),
+  notifyUndoable: vi.fn(),
   onImagesDeleted: vi.fn(),
   openWorkbenchWidget: vi.fn((..._args: unknown[]): { ok: boolean; reason?: string; region?: string } => ({
     ok: true,
@@ -168,6 +169,10 @@ vi.mock('@features/models', () => ({
         { base: 'flux', key: 'flux-model', name: 'FLUX', type: 'main' },
       ],
     }),
+}));
+
+vi.mock('@workbench/useNotify', () => ({
+  useNotify: () => ({ undoable: (...args: unknown[]) => mocks.notifyUndoable(...args) }),
 }));
 
 vi.mock('@workbench/useOpenWorkbenchWidget', () => ({
@@ -1233,7 +1238,7 @@ describe('partial image mutation outcomes', () => {
 type ExpectedItemActions = {
   deleteItems(
     refs: Array<{ kind: 'image' | 'video'; name: string }>,
-    options?: { returnFocus?: () => HTMLElement | null }
+    options?: { returnFocus?: () => HTMLElement | null; targetsOffScreen?: boolean }
   ): Promise<void>;
   downloadItem(item: { fullUrl: string; kind: 'image' | 'video'; name: string }): Promise<void>;
   downloadItems(
@@ -1272,7 +1277,11 @@ describe('mixed item mutation outcomes', () => {
     });
 
     // The dialog learns where focus goes once the deletion has removed the control that asked for it.
-    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), returnFocus, []);
+    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), {
+      canSkipFutureConfirmations: true,
+      returnFocus,
+      usage: [],
+    });
     expect(mocks.itemDelete).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -1291,6 +1300,31 @@ describe('mixed item mutation outcomes', () => {
 
     expect(mocks.requestDeletionConfirmation).not.toHaveBeenCalled();
     expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal));
+  });
+
+  it.each([
+    [
+      'more than one item',
+      [
+        { kind: 'image' as const, name: 'a.png' },
+        { kind: 'video' as const, name: 'b.mp4' },
+      ],
+      false,
+    ],
+    ['an item off screen', [{ kind: 'image' as const, name: 'a.png' }], true],
+  ])('asks before deleting %s even with routine confirmations off', async (_case, refs, targetsOffScreen) => {
+    mocks.requestDeletionConfirmation.mockImplementation(() => Promise.resolve());
+
+    await act(async () => {
+      await getItemActions().deleteItems(refs, { targetsOffScreen });
+    });
+
+    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), {
+      canSkipFutureConfirmations: false,
+      returnFocus: undefined,
+      usage: [],
+    });
+    expect(mocks.itemDelete).not.toHaveBeenCalled();
   });
 
   it('still confirms, naming the surfaces, when the project uses an item and confirmation is off', async () => {
@@ -1312,9 +1346,11 @@ describe('mixed item mutation outcomes', () => {
       await getItemActions().deleteItems(refs);
     });
 
-    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), undefined, [
-      { names: ['source.png'], surface: 'upscale' },
-    ]);
+    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), {
+      canSkipFutureConfirmations: false,
+      returnFocus: undefined,
+      usage: [{ names: ['source.png'], surface: 'upscale' }],
+    });
     expect(mocks.itemDelete).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -1335,6 +1371,92 @@ describe('mixed item mutation outcomes', () => {
       kind: 'success',
       title: 'Moved to Uncategorized',
     });
+  });
+
+  it('reports a move to another board with an Undo that returns each item to the board it came from', async () => {
+    const refs = [
+      { kind: 'image' as const, name: 'a.png' },
+      { kind: 'video' as const, name: 'b.mp4' },
+      { kind: 'image' as const, name: 'unknown.png' },
+    ];
+    mocks.getItemBoardIds.mockReturnValue(
+      new Map([
+        ['image:a.png', 'board-1'],
+        ['video:b.mp4', 'none'],
+      ])
+    );
+    mocks.itemMoveToBoard.mockResolvedValue({ affectedBoardIds: [], failed: [], succeeded: refs });
+
+    await act(async () => {
+      await getItemActions().moveItemsToBoard(refs, 'board-2');
+    });
+
+    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+    // The hook's board list does not name board-2.
+    expect(mocks.notifyUndoable).toHaveBeenCalledExactlyOnceWith('Moved to widgets.gallery.unknownBoard', {
+      onUndo: expect.any(Function),
+      projectId: 'project-1',
+    });
+
+    mocks.getItemBoardIds.mockReturnValue(new Map());
+    const [, { onUndo }] = mocks.notifyUndoable.mock.calls[0] as [string, { onUndo: () => void }];
+    await act(async () => {
+      onUndo();
+      await Promise.resolve();
+    });
+
+    // Each back to its own board; one whose board was not known stays where it went.
+    expect(mocks.itemMoveToBoard.mock.calls.slice(1).map(([moved, boardId]) => [moved, boardId])).toEqual([
+      [[refs[0]], 'board-1'],
+      [[refs[1]], 'none'],
+    ]);
+    // Undoing reports plainly: there is no Undo of the Undo.
+    expect(mocks.notifyUndoable).toHaveBeenCalledOnce();
+  });
+
+  it('reports a star with an Undo that gives each item back its own flag', async () => {
+    const refs = [
+      { kind: 'image' as const, name: 'was-starred.png' },
+      { kind: 'image' as const, name: 'was-not.png' },
+      { kind: 'image' as const, name: 'unknown.png' },
+    ];
+    mocks.getItemStarred.mockReturnValue(
+      new Map([
+        ['image:was-starred.png', true],
+        ['image:was-not.png', false],
+      ])
+    );
+    mocks.itemSetStarred.mockResolvedValue({ affectedBoardIds: [], failed: [], succeeded: refs });
+
+    await act(async () => {
+      await getItemActions().setItemsStarred(refs, true);
+    });
+
+    const [, { onUndo }] = mocks.notifyUndoable.mock.calls[0] as [string, { onUndo: () => void }];
+    await act(async () => {
+      onUndo();
+      await Promise.resolve();
+    });
+
+    // Only the item the star is known to have changed is unstarred again; one whose flag was not known stays.
+    expect(mocks.itemSetStarred).toHaveBeenLastCalledWith([refs[1]], false, expect.any(AbortSignal));
+    expect(mocks.itemSetStarred).toHaveBeenCalledTimes(2);
+  });
+
+  it('offers no Undo for a move that partly failed', async () => {
+    const refs = [
+      { kind: 'image' as const, name: 'a.png' },
+      { kind: 'image' as const, name: 'b.png' },
+    ];
+    mocks.getItemBoardIds.mockReturnValue(new Map([['image:a.png', 'board-1']]));
+    mocks.itemMoveToBoard.mockResolvedValue({ affectedBoardIds: [], failed: [refs[1]], succeeded: [refs[0]] });
+
+    await act(async () => {
+      await getItemActions().moveItemsToBoard(refs, 'board-2');
+    });
+
+    expect(mocks.notifyUndoable).not.toHaveBeenCalled();
+    expect(mocks.reportError).toHaveBeenCalledOnce();
   });
 
   it('moves mixed refs optimistically and reverts only the failed qualified key', async () => {

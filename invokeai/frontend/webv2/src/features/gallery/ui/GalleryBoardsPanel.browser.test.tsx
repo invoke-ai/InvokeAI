@@ -4,7 +4,9 @@ import type { GalleryBoard } from '@features/gallery/core/types';
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, KeyboardSensor, MouseSensor, pointerWithin, useSensor, useSensors } from '@dnd-kit/core';
 import { DEFAULT_GALLERY_SETTINGS, type GallerySettings } from '@features/gallery/core/settings';
+import { galleryBoardsOptions } from '@features/gallery/data/queries';
 import { dragWithMouse } from '@platform/browser/mouseDrag.testing';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -138,20 +140,26 @@ const renderPanel = async (gallery: GalleryStateView = createGallery(), { withDr
     region: 'left',
   } as unknown as GalleryWidgetContextValue;
 
+  // The listing submissions decide destinations from, as an earlier submission would have left it.
+  const queryClient = new QueryClient();
+  queryClient.setQueryData(galleryBoardsOptions({ includeArchived: true }).queryKey, gallery.boards);
+
   await act(() =>
     root?.render(
       <ChakraProvider value={system}>
-        <GalleryWidgetContext value={contextValue}>
-          {withDrag ? (
-            <WorkbenchDrag>
-              <GalleryBoardsPanel />
-            </WorkbenchDrag>
-          ) : (
-            <DndContext>
-              <GalleryBoardsPanel />
-            </DndContext>
-          )}
-        </GalleryWidgetContext>
+        <QueryClientProvider client={queryClient}>
+          <GalleryWidgetContext value={contextValue}>
+            {withDrag ? (
+              <WorkbenchDrag>
+                <GalleryBoardsPanel />
+              </WorkbenchDrag>
+            ) : (
+              <DndContext>
+                <GalleryBoardsPanel />
+              </DndContext>
+            )}
+          </GalleryWidgetContext>
+        </QueryClientProvider>
       </ChakraProvider>
     )
   );
@@ -179,6 +187,7 @@ const getRowsBySection = (): Record<string, string[]> => {
     ).map((row) =>
       (row.textContent ?? '')
         .replace(/\d+ \| \d+$/, '')
+        .replace('widgets.gallery.autoAddBadge', '')
         .replace('Alice Example', '')
         .trim()
     );
@@ -276,6 +285,12 @@ describe('GalleryBoardsPanel', () => {
     expect(sections['Mahogany House']).toEqual(['Inbox', 'Façades']);
     expect(sections.Library).toEqual(['Uncategorized', 'dogs', 'Cats']);
     expect(sections.Archived).toEqual(['GORL']);
+    // Nothing chosen: new results go to the project's inbox, and only its row says so.
+    expect(
+      getBoardRows()
+        .filter((row) => row.textContent?.includes('widgets.gallery.autoAddBadge'))
+        .map((row) => row.textContent?.replace(/widgets\.gallery\.autoAddBadge.*$/, ''))
+    ).toEqual(['Inbox']);
   });
 
   it('lists other projects under their names only when they are shown', async () => {
@@ -670,19 +685,37 @@ describe('GalleryBoardsPanel', () => {
     expect(actions.updateSettings).toHaveBeenCalledWith({ expandedBoardSections: ['other-users'] });
   });
 
-  it('marks the inbox Auto when the selected board is one the caller may only view', async () => {
+  it('marks the inbox Auto when the followed selected board is one the caller may only view', async () => {
     const shared = createBoard({
       access: { actions: ['read'], adminOverride: false, generalAccess: 'viewer', role: 'viewer' },
       id: 'refs',
       name: 'Client references',
       ownerName: 'Cleo',
     });
-    await renderPanel({ ...createGallery(), boards: [...boards, shared], selectedBoardId: 'refs' });
+    await renderPanel({
+      ...createGallery({ followSelectedBoard: true }),
+      boards: [...boards, shared],
+      selectedBoardId: 'refs',
+    });
 
     const inboxRow = getBoardRows().find((row) => row.textContent?.startsWith('Inbox'));
     const sharedRow = getBoardRows().find((row) => row.textContent?.startsWith('Client references'));
     expect(inboxRow?.textContent).toContain('widgets.gallery.autoAddBadge');
     expect(sharedRow?.textContent).not.toContain('widgets.gallery.autoAddBadge');
+  });
+
+  it('marks the board results go to as submissions decide it: a chosen board, else the inbox', async () => {
+    const autoRows = () =>
+      getBoardRows()
+        .filter((row) => row.textContent?.includes('widgets.gallery.autoAddBadge'))
+        .map((row) => row.textContent?.replace(/widgets\.gallery\.autoAddBadge.*$/, ''));
+
+    await renderPanel(createGallery({ autoAddBoardId: 'dogs' }));
+    expect(autoRows()).toEqual(['dogs']);
+
+    // A chosen board no listing holds any more (deleted elsewhere) sends results to the inbox.
+    await renderPanel(createGallery({ autoAddBoardId: 'gone' }));
+    expect(autoRows()).toEqual(['Inbox']);
   });
 
   it('persists a collapsed section', async () => {

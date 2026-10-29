@@ -5470,6 +5470,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     let state = primeGenerate();
 
     listGalleryBoardsInCache('board-1');
+    state = workbenchReducer(state, { settings: { followSelectedBoard: true }, type: 'updateGallerySettings' });
     state = workbenchReducer(state, { boardId: 'board-1', type: 'selectGalleryBoard' });
     state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
     state = submitGenerate(state);
@@ -6365,6 +6366,31 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(getActiveProject(state).settings.viewerAutoSwitch).toBe('off');
   });
 
+  it('drops a multi-selection a search, filter or patched setting takes off screen, keeping the Preview item', () => {
+    const select = (state: WorkbenchState) =>
+      workbenchReducer(state, {
+        itemKeys: ['image:a.png', 'image:b.png'],
+        primaryItem: createGalleryImageItem('b.png'),
+        type: 'setGalleryMultiSelection',
+      });
+    const values = (state: WorkbenchState) => getProjectWidgetValues(getActiveProject(state), 'gallery');
+    let state = select(createInitialWorkbenchState());
+
+    state = workbenchReducer(state, { searchTerm: 'sunset', type: 'setGallerySearchTerm' });
+    expect(values(state).selectedImageNames).toEqual([]);
+    expect(values(state).selectedImageName).toBe('image:b.png');
+
+    state = workbenchReducer(select(state), { starredOnly: true, type: 'setGalleryStarredOnly' });
+    expect(values(state).selectedImageNames).toEqual([]);
+
+    // Writers outside the reducer's own cases (a media filter from the settings command) are held to the same rule.
+    state = workbenchReducer(select(state), { settings: { mediaFilter: 'video' }, type: 'updateGallerySettings' });
+    expect(values(state).selectedImageNames).toEqual([]);
+
+    state = workbenchReducer(select(state), { settings: { imageDensityPercent: 10 }, type: 'updateGallerySettings' });
+    expect(values(state).selectedImageNames).toEqual(['image:a.png', 'image:b.png']);
+  });
+
   it('resets the page and stamps the selection query when the starred-only filter changes', () => {
     let state = createInitialWorkbenchState();
 
@@ -6611,14 +6637,32 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
     expect(values.selectedBoardId).toBe('none');
     expect(values.semanticImageQuery).toBeNull();
-    // A deleted auto-add board hands results back to the selection.
-    expect(values.autoAddBoardId).toBe('follow');
+    // A deleted auto-add board hands results back to the default destination.
+    expect(values.autoAddBoardId).toBeNull();
   });
 
-  it('stores selected backend board id for gallery submissions', () => {
+  it('sends gallery submissions to the project inbox, not the board being browsed, unless following it', () => {
+    let state = createInitialWorkbenchState();
+
+    listGalleryBoardsInCache('browsed', 'inbox');
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { projectBoardId: 'inbox' },
+      widgetId: 'gallery',
+    });
+    state = workbenchReducer(state, { boardId: 'browsed', type: 'selectGalleryBoard' });
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = primeGenerate(state);
+    state = submitGenerate(state);
+
+    expect(getActiveProject(state).queue.items[0]?.snapshot.galleryBoardId).toBe('inbox');
+  });
+
+  it('stores the selected backend board id for gallery submissions while following it', () => {
     let state = createInitialWorkbenchState();
 
     listGalleryBoardsInCache('backend-board-id');
+    state = workbenchReducer(state, { settings: { followSelectedBoard: true }, type: 'updateGallerySettings' });
     state = workbenchReducer(state, { boardId: 'backend-board-id', type: 'selectGalleryBoard' });
     state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
     state = primeGenerate(state);
@@ -7286,7 +7330,8 @@ describe('workbench backend connection recovery', () => {
       selectedBoardId: 'none',
       selectedImage: { ...video, boardId: 'none' },
       selectedImageName: `video:${video.name}`,
-      selectedImageNames: [`image:${image.name}`, `video:${video.name}`],
+      // The gallery now shows Uncategorized, a different listing: the item stays in Preview, unselected in the grid.
+      selectedImageNames: [],
     });
   });
 

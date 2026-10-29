@@ -15,7 +15,7 @@ const createProject = (selectedBoardId: string): Project => {
   const project = structuredClone(createInitialWorkbenchState().projects[0]!);
   const gallery = getProjectWidgetInstance(project, 'gallery')!;
 
-  gallery.state.values = { ...gallery.state.values, selectedBoardId };
+  gallery.state.values = { ...gallery.state.values, followSelectedBoard: true, selectedBoardId };
 
   return project;
 };
@@ -118,7 +118,10 @@ describe('saveStagedResultToGallery', () => {
     );
 
     // What a project switch or a new destination choice does to the captured snapshot's successor.
-    getProjectWidgetInstance(project, 'gallery')!.state.values = { selectedBoardId: 'board-z' };
+    getProjectWidgetInstance(project, 'gallery')!.state.values = {
+      followSelectedBoard: true,
+      selectedBoardId: 'board-z',
+    };
     promotion.resolve(promoted('staged.png'));
 
     expect(await saving).toMatchObject({ boardId: 'board-a', status: 'saved' });

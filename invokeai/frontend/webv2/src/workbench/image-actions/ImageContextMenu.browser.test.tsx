@@ -77,8 +77,13 @@ vi.mock('@workbench/WorkbenchContext', () => ({
 // Keys stand in for copy; the one interpolated value a test reads, an upscale factor, is shown as the locale does.
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { scale?: number }) =>
-      options?.scale === undefined ? key : `${options.scale}×${key.endsWith('.factorNative') ? ' (native)' : ''}`,
+    t: (key: string, options?: { key?: string; scale?: number }) =>
+      // The hint renders beside its label as written, short; a key there would widen the menu past the viewport.
+      key === 'widgets.gallery.itemMenu.compareShortcut'
+        ? `${String(options?.key)}+click`
+        : options?.scale === undefined
+          ? key
+          : `${options.scale}×${key.endsWith('.factorNative') ? ' (native)' : ''}`,
   }),
 }));
 
@@ -286,7 +291,7 @@ describe('ImageContextMenu deletion delegation', () => {
     const deleteItems = vi.fn(() => Promise.resolve());
     await renderMenu(createActions(deleteItems), [image('single.png')]);
 
-    await interact(() => getMenuItem('Delete Image').click());
+    await interact(() => getMenuItem('widgets.gallery.itemMenu.deleteImage').click());
 
     expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'single.png' }]);
     expect(getOpenAlertDialog()).toBeNull();
@@ -378,7 +383,7 @@ describe('ImageContextMenu starred state', () => {
       y: 20,
     });
 
-    expect(starIconFill('Star image')).toBe('none');
+    expect(starIconFill('widgets.preview.starImage')).toBe('none');
 
     await interact(() => root?.unmount());
     host?.remove();
@@ -391,7 +396,7 @@ describe('ImageContextMenu starred state', () => {
       y: 20,
     });
 
-    expect(starIconFill('Unstar image')).not.toBe('none');
+    expect(starIconFill('widgets.preview.unstarImage')).not.toBe('none');
   });
 
   it('fills the bulk star only once every selected item is starred', async () => {
@@ -403,7 +408,7 @@ describe('ImageContextMenu starred state', () => {
       y: 20,
     });
 
-    expect(getComputedStyle(getMenuItem('Star All').querySelector('svg')!).fill).toBe('none');
+    expect(getComputedStyle(getMenuItem('widgets.gallery.starSelection').querySelector('svg')!).fill).toBe('none');
 
     await interact(() => root?.unmount());
     host?.remove();
@@ -416,7 +421,9 @@ describe('ImageContextMenu starred state', () => {
       y: 20,
     });
 
-    expect(getComputedStyle(getMenuItem('Unstar All').querySelector('svg')!).fill).not.toBe('none');
+    expect(getComputedStyle(getMenuItem('widgets.gallery.unstarSelection').querySelector('svg')!).fill).not.toBe(
+      'none'
+    );
   });
 });
 
@@ -436,13 +443,13 @@ describe('ImageContextMenu canvas destinations', () => {
   const ADD = 'widgets.canvas.import.addToCurrentCanvas';
   const NEW_PROJECT = 'widgets.canvas.import.newProjectFromImage';
 
-  it('leads the single-image actions group, right after Recall Metadata, with the two canvas destinations', async () => {
+  it('leads the single-image actions group, right after Recall metadata, with the two canvas destinations', async () => {
     await renderMenu(createActions(vi.fn()), [image('image-0.png')]);
     const sequence = menuSequence();
-    const recallIndex = sequence.indexOf('Recall Metadata');
+    const recallIndex = sequence.indexOf('widgets.gallery.itemMenu.recallMetadata');
 
     expect(sequence.slice(recallIndex, recallIndex + 5)).toEqual([
-      'Recall Metadata',
+      'widgets.gallery.itemMenu.recallMetadata',
       '—',
       ADD,
       NEW_PROJECT,
@@ -456,7 +463,7 @@ describe('ImageContextMenu canvas destinations', () => {
       Array.from({ length: 3 }, (_, index) => image(`image-${index}.png`))
     );
 
-    expect(menuSequence().slice(0, 5)).toEqual(['—', ADD, NEW_PROJECT, '—', 'Star All']);
+    expect(menuSequence().slice(0, 5)).toEqual(['—', ADD, NEW_PROJECT, '—', 'widgets.gallery.starSelection']);
   });
 
   it.each([1, 3])('adds the %s targeted image(s) to the current canvas as the chosen layer', async (count) => {
@@ -521,7 +528,9 @@ describe('ImageContextMenu canvas destinations', () => {
     await renderMenu(actions, [image('image-0.png')]);
     const sequence = menuSequence();
 
-    expect(sequence[sequence.indexOf('Use as Reference Image') + 1]).toBe('widgets.gallery.itemActions.useAsControl');
+    expect(sequence[sequence.indexOf('widgets.gallery.itemMenu.useAsReferenceImage') + 1]).toBe(
+      'widgets.gallery.itemActions.useAsControl'
+    );
     await interact(() => getMenuItem('widgets.gallery.itemActions.useAsControl').click());
 
     expect(vi.mocked(actions.sendImageAsControl).mock.calls.map(([entry]) => entry.imageName)).toEqual(['image-0.png']);
@@ -546,10 +555,10 @@ describe('ImageContextMenu video placement', () => {
     const actions = { ...createActions(vi.fn()), canUseAsReferenceVideo: true };
     await renderVideoMenu(actions, video);
 
-    await interact(() => getMenuItem('Extend in Video').click());
+    await interact(() => getMenuItem('widgets.gallery.itemMenu.extendInVideo').click());
     expect(actions.sendToInitialVideo).toHaveBeenCalledExactlyOnceWith(video);
 
-    await interact(() => getMenuItem('Use as Reference Video').click());
+    await interact(() => getMenuItem('widgets.gallery.itemMenu.useAsReferenceVideo').click());
     expect(actions.useAsReferenceVideo).toHaveBeenCalledExactlyOnceWith(video);
   });
 
@@ -557,8 +566,8 @@ describe('ImageContextMenu video placement', () => {
     const actions = createActions(vi.fn());
     await renderVideoMenu(actions, item('video', 'clip.mp4'));
 
-    expect(getMenuItem('Use as Reference Video').getAttribute('aria-disabled')).toBe('true');
-    expect(getMenuItem('Extend in Video').getAttribute('aria-disabled')).not.toBe('true');
+    expect(getMenuItem('widgets.gallery.itemMenu.useAsReferenceVideo').getAttribute('aria-disabled')).toBe('true');
+    expect(getMenuItem('widgets.gallery.itemMenu.extendInVideo').getAttribute('aria-disabled')).not.toBe('true');
   });
 
   it('enables Load Workflow once the video is known to embed one and hands the video to the action', async () => {
@@ -600,7 +609,7 @@ describe('ImageContextMenu video placement', () => {
   });
 
   const openConditioningSubmenu = async (): Promise<void> => {
-    await hoverItem(getMenuItem('Use as Conditioning Clip'));
+    await hoverItem(getMenuItem('widgets.gallery.itemMenu.useAsConditioningClip'));
     await settleUntil(
       () =>
         Array.from(document.querySelectorAll('[role="menuitem"]')).some(
@@ -662,18 +671,18 @@ describe('ImageContextMenu mixed-media action visibility', () => {
       y: 20,
     });
 
-    expect(document.querySelector('[aria-label="Open in new tab"]')).not.toBeNull();
-    expect(document.querySelector('[aria-label="Download video"]')).not.toBeNull();
-    expect(document.querySelector('[aria-label="Open in preview"]')).not.toBeNull();
-    expect(document.querySelector('[aria-label="Star video"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="widgets.gallery.itemMenu.openInNewTab"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="widgets.gallery.itemMenu.downloadVideo"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="widgets.gallery.itemMenu.openInPreview"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="widgets.preview.starVideo"]')).not.toBeNull();
     expect(document.body.textContent).toContain('widgets.gallery.changeBoard');
-    expect(document.body.textContent).toContain('Delete Video');
-    expect(document.body.textContent).not.toContain('Copy to clipboard');
+    expect(document.body.textContent).toContain('widgets.gallery.itemMenu.deleteVideo');
+    expect(document.body.textContent).not.toContain('widgets.gallery.itemMenu.copyToClipboard');
     expect(document.body.textContent).not.toContain('widgets.preview.copyCurrentFrame');
     // Videos carry their own Recall Metadata submenu (parameter recall).
-    expect(document.body.textContent).toContain('Recall Metadata');
+    expect(document.body.textContent).toContain('widgets.gallery.itemMenu.recallMetadata');
     expect(document.body.textContent).not.toContain('widgets.gallery.itemActions.upscale.label');
-    expect(document.body.textContent).not.toContain('Select for Compare');
+    expect(document.body.textContent).not.toContain('widgets.preview.selectForCompare');
     expect(document.body.textContent).not.toContain('widgets.canvas.import.addToCurrentCanvas');
     expect(document.body.textContent).not.toContain('widgets.canvas.import.newProjectFromImage');
   });
@@ -748,17 +757,17 @@ describe('ImageContextMenu mixed-media action visibility', () => {
       y: 20,
     };
     // Selecting closes the menu, so each quick item gets its own open.
-    await pickQuickItem('Open in new tab');
+    await pickQuickItem('widgets.gallery.itemMenu.openInNewTab');
     await interact(() => root?.unmount());
     host?.remove();
     await renderItemMenu(actions, target);
-    await pickQuickItem('Open in preview');
+    await pickQuickItem('widgets.gallery.itemMenu.openInPreview');
 
     expect(actions.openItemInNewTab).toHaveBeenCalledWith(primaryVideo);
     expect(actions.openItemInPreview).toHaveBeenCalledWith(primaryVideo);
-    expect(document.body.textContent).not.toContain('Copy to clipboard');
-    expect(document.body.textContent).not.toContain('Recall Metadata');
-    expect(document.body.textContent).not.toContain('Select for Compare');
+    expect(document.body.textContent).not.toContain('widgets.gallery.itemMenu.copyToClipboard');
+    expect(document.body.textContent).not.toContain('widgets.gallery.itemMenu.recallMetadata');
+    expect(document.body.textContent).not.toContain('widgets.preview.selectForCompare');
     expect(document.body.textContent).not.toContain('widgets.canvas.import.addToCurrentCanvas');
     expect(document.body.textContent).not.toContain('widgets.canvas.import.newProjectFromImage');
   });
@@ -772,7 +781,7 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     ];
     await renderItemMenu(actions, { allStarred: true, itemRefs: refs, items: [loadedImage], x: 20, y: 20 });
 
-    await interact(() => getMenuItem('Unstar All').click());
+    await interact(() => getMenuItem('widgets.gallery.unstarSelection').click());
     expect(actions.setItemsStarred).toHaveBeenCalledWith(refs, false);
   });
 
@@ -790,22 +799,22 @@ describe('ImageContextMenu mixed-media action visibility', () => {
       y: 20,
     });
 
-    expect(document.body.textContent).toContain('2 items selected');
-    expect(document.body.textContent).toContain('Star All');
-    expect(document.body.textContent).toContain('Download Selection');
+    expect(document.body.textContent).toContain('widgets.gallery.itemMenu.itemsSelected');
+    expect(document.body.textContent).toContain('widgets.gallery.starSelection');
+    expect(document.body.textContent).toContain('widgets.gallery.downloadSelection');
     expect(document.body.textContent).toContain('widgets.gallery.changeBoard');
-    expect(document.body.textContent).toContain('Delete Selection');
+    expect(document.body.textContent).toContain('widgets.gallery.deleteSelection');
     expect(document.body.textContent).not.toContain('widgets.canvas.import.addToCurrentCanvas');
     expect(document.body.textContent).not.toContain('widgets.canvas.import.newProjectFromImage');
-    await pickQuickItem('Open in new tab');
+    await pickQuickItem('widgets.gallery.itemMenu.openInNewTab');
     await interact(() => root?.unmount());
     host?.remove();
     await renderItemMenu(actions, { itemRefs: refs, items: [loadedImage], x: 20, y: 20 });
-    await pickQuickItem('Open in preview');
+    await pickQuickItem('widgets.gallery.itemMenu.openInPreview');
     expect(actions.openItemInNewTab).toHaveBeenCalledWith(loadedImage);
     expect(actions.openItemInPreview).toHaveBeenCalledWith(loadedImage);
 
-    await interact(() => getMenuItem('Star All').click());
+    await interact(() => getMenuItem('widgets.gallery.starSelection').click());
     expect(actions.setItemsStarred).toHaveBeenCalledWith(refs, true);
   });
 });
@@ -825,7 +834,7 @@ describe('ImageContextMenu change-board destinations', () => {
     projectId: null,
     videoCount: 0,
   });
-  const renderWithBoards = async (boards: GalleryBoard[], listedValue = 'board-theirs') => {
+  const renderWithBoards = async (boards: GalleryBoard[], listedValue = 'board-theirs', target = image('one.png')) => {
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
@@ -836,7 +845,7 @@ describe('ImageContextMenu change-board destinations', () => {
           <ImageContextMenu
             actions={createActions(vi.fn())}
             boards={boards}
-            target={{ images: [image('one.png')], x: 20, y: 20 }}
+            target={{ images: [target], x: 20, y: 20 }}
             onClose={vi.fn()}
           />
         </ChakraProvider>
@@ -876,6 +885,36 @@ describe('ImageContextMenu change-board destinations', () => {
       ])
     ).toEqual(['widgets.gallery.boardGroups.library', 'widgets.gallery.boardGroups.otherUsers']);
     expect(document.querySelector('[data-value="board-mine"]')).not.toBeNull();
+  });
+
+  it("offers what the selection bar offers: no archived board, not the item's own, and Uncategorized as a move", async () => {
+    const owned = {
+      actions: ['read', 'add_media'],
+      adminOverride: false,
+      generalAccess: 'restricted',
+      role: 'owner',
+    } as const;
+    await renderWithBoards(
+      [board('here', owned), { ...board('old', owned), archived: true }, board('there', owned)],
+      'board-there',
+      { ...image('one.png'), boardId: 'here' }
+    );
+
+    expect(document.querySelector('[data-value="board-here"]')).toBeNull();
+    expect(document.querySelector('[data-value="board-old"]')).toBeNull();
+    expect(document.querySelector('[data-value="remove-from-board"]')).not.toBeNull();
+  });
+
+  it('offers no move to Uncategorized for an item already there', async () => {
+    const owned = {
+      actions: ['read', 'add_media'],
+      adminOverride: false,
+      generalAccess: 'restricted',
+      role: 'owner',
+    } as const;
+    await renderWithBoards([board('there', owned)], 'board-there');
+
+    expect(document.querySelector('[data-value="remove-from-board"]')).toBeNull();
   });
 
   it('grows a long board list past the old 18rem cap, keeps it on screen, and scrolls to the last board by keyboard', async () => {

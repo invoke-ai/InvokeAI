@@ -1443,6 +1443,43 @@ describe('GalleryImageGrid mixed item cells', () => {
     );
   });
 
+  it('says a hotkey deletion reaches an item off screen when a selected member is on no loaded page', async () => {
+    await renderGallery(
+      createGallery({
+        items: [createItem('image', 'loaded.png')],
+        selectedItemKey: 'image:loaded.png',
+        selectedItemKeys: ['image:loaded.png', 'video:unloaded.mp4'],
+      })
+    );
+
+    registeredCommands.get('gallery.deleteSelection')?.();
+
+    expect(imageActionMocks.deleteItems).toHaveBeenCalledWith(
+      [
+        { kind: 'image', name: 'loaded.png' },
+        { kind: 'video', name: 'unloaded.mp4' },
+      ],
+      expect.objectContaining({ targetsOffScreen: true })
+    );
+  });
+
+  it('leaves a primary item no listed page holds out of the hotkeys', async () => {
+    await renderGallery(
+      createGallery({
+        items: [createItem('image', 'listed.png')],
+        primarySelectedItemKey: 'image:elsewhere.png',
+        selectedItemKey: null,
+        selectedItemKeys: [],
+      })
+    );
+
+    registeredCommands.get('gallery.deleteSelection')?.();
+    registeredCommands.get('gallery.starImage')?.();
+
+    expect(imageActionMocks.deleteItems).not.toHaveBeenCalled();
+    expect(imageActionMocks.setItemsStarred).not.toHaveBeenCalled();
+  });
+
   it('select-all and common hotkeys target ordered same-name mixed refs independently', async () => {
     const items = [createItem('image', 'shared'), createItem('video', 'shared')];
     await renderGallery(
@@ -1470,7 +1507,7 @@ describe('GalleryImageGrid mixed item cells', () => {
         { kind: 'image', name: 'shared' },
         { kind: 'video', name: 'shared' },
       ],
-      { returnFocus: undefined }
+      { returnFocus: undefined, targetsOffScreen: false }
     );
     expect(imageActionMocks.setItemsStarred).toHaveBeenCalledWith(
       [

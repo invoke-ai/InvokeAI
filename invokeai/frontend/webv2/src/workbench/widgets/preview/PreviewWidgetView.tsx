@@ -40,6 +40,7 @@ import {
   useQueueItemSwapProgressImage,
 } from '@features/queue/react';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
+import { Button } from '@platform/ui/Button';
 import {
   imageUrlToStreamingSource,
   progressImageToStreamingSource,
@@ -47,6 +48,7 @@ import {
 } from '@platform/ui/streaming-image/streamingImageSource';
 import { useStreamingImageSource } from '@platform/ui/streaming-image/useStreamingImageSource';
 import { useQuery } from '@tanstack/react-query';
+import { useWorkbenchFocus } from '@workbench/focusRegions';
 import {
   ImageContextMenu,
   useDeletionConfirmation,
@@ -54,6 +56,8 @@ import {
   type ImageContextMenuTarget,
 } from '@workbench/image-actions';
 import { QueueProgressRail } from '@workbench/queue-integration/QueueProgressRail';
+import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { revealPlacedWidget } from '@workbench/widgetPlacementCommands';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
   useActiveProjectId,
@@ -934,6 +938,22 @@ const LivePreview = ({
 
 const EmptyPreview = () => {
   const { t } = useTranslation();
+  const openWidget = useOpenWorkbenchWidget();
+  const { widgets } = useWorkbenchCommands();
+  const queries = useWorkbenchQueries();
+  const { focusFloating, focusRegion } = useWorkbenchFocus();
+  // Where the layout already has the Gallery, bring that one forward and focus it; opening it would move it.
+  const showGallery = useCallback(() => {
+    const revealed = revealPlacedWidget({ project: queries.getSnapshot().activeProject, typeId: 'gallery', widgets });
+
+    if (!revealed) {
+      openWidget('gallery');
+    } else if (revealed.kind === 'floating') {
+      focusFloating(revealed.instanceId);
+    } else {
+      focusRegion(revealed.region, 'gallery');
+    }
+  }, [focusFloating, focusRegion, openWidget, queries, widgets]);
 
   return (
     <PreviewFrame frameHeight={1} frameWidth={1} isLive={false} shouldAntialiasLiveImage source={null} variant="inset">
@@ -941,9 +961,12 @@ const EmptyPreview = () => {
         <Text fontSize="lg" fontWeight="800">
           {t('widgets.preview.noGallerySelection')}
         </Text>
-        <Text color="fg.muted" fontSize="xs">
+        <Text color="fg.muted" fontSize="md">
           {t('widgets.preview.emptyDescription')}
         </Text>
+        <Button size="sm" variant="outline" onClick={showGallery}>
+          {t('widgets.preview.showGallery')}
+        </Button>
       </Stack>
     </PreviewFrame>
   );

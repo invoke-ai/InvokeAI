@@ -64,6 +64,7 @@ import {
   type GalleryCanvasImportDestination,
 } from '@workbench/canvas-operations/api';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
+import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useRevealLayerProperties } from '@workbench/widgets/layers/revealLayerProperties';
 import { getProjectWidgetInstance, getProjectWidgetValues } from '@workbench/widgetState';
@@ -227,6 +228,7 @@ export const useImageActions = ({
   const revealLayerProperties = useRevealLayerProperties();
   const commands = useWorkbenchCommands();
   const { gallery, generation, notifications } = commands;
+  const notify = useNotify();
   const queries = useWorkbenchQueries();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -283,7 +285,10 @@ export const useImageActions = ({
     const getBoardName = (boardId: string) => {
       const board = boards.find((board) => board.id === boardId);
 
-      return board ? getGalleryBoardLabel(board, t) : t('widgets.gallery.uncategorized');
+      // Uncategorized has no entry of its own in every host's list; another board missing from it is not Uncategorized.
+      return board
+        ? getGalleryBoardLabel(board, t)
+        : t(boardId === 'none' ? 'widgets.gallery.uncategorized' : 'widgets.gallery.unknownBoard');
     };
     const getLatestProject = () => {
       const snapshot = queries.getSnapshot();
@@ -329,7 +334,8 @@ export const useImageActions = ({
       action: 'delete' | 'move' | 'star' | 'unstar',
       requestedCount: number,
       result: GalleryItemMutationResult,
-      boardId?: string
+      boardId?: string,
+      onUndo?: (() => void) | null
     ) => {
       if (result.failed.length > 0) {
         recordError(
@@ -345,17 +351,22 @@ export const useImageActions = ({
         return;
       }
 
-      recordSuccess(
-        t(`widgets.gallery.itemActions.${action}.success`, {
-          board: boardId ? getBoardName(boardId) : undefined,
-          count: result.succeeded.length,
-        })
-      );
+      const title = t(`widgets.gallery.itemActions.${action}.success`, {
+        board: boardId ? getBoardName(boardId) : undefined,
+        count: result.succeeded.length,
+      });
+
+      if (onUndo) {
+        notify.undoable(title, { onUndo, projectId });
+      } else {
+        recordSuccess(title);
+      }
     };
     const runItemMutation = async ({
       action,
       applyConfirmed,
       boardId,
+      getUndo,
       mutate,
       requested,
       rollback,
@@ -363,6 +374,8 @@ export const useImageActions = ({
       action: 'delete' | 'move' | 'star' | 'unstar';
       applyConfirmed: (result: GalleryItemMutationResult, signal: AbortSignal) => Promise<void> | void;
       boardId?: string;
+      /** How to revert a change that fully succeeded, offered as Undo; null when there is nothing it could revert. */
+      getUndo?: (succeeded: readonly GalleryItemRef[]) => (() => void) | null;
       mutate: (signal: AbortSignal) => Promise<GalleryItemMutationResult>;
       requested: GalleryItemRef[];
       /** Undo the optimistic apply. Runs once, only when the account scope that requested
@@ -405,7 +418,13 @@ export const useImageActions = ({
         return;
       }
 
-      reportMutationOutcome(action, requested.length, result, boardId);
+      reportMutationOutcome(
+        action,
+        requested.length,
+        result,
+        boardId,
+        result.failed.length === 0 ? getUndo?.(result.succeeded) : null
+      );
     };
     const deleteItemsConfirmed = (items: GalleryItemRef[]): Promise<void> => {
       // Capture successor context before optimistic removal. Any rejected items restore the widget snapshot; the
@@ -565,13 +584,45 @@ export const useImageActions = ({
       const project = projectId ? queries.getProject(projectId) : queries.getSnapshot().activeProject;
       const usage = project ? collectMediaUsage(project, items) : [];
 
-      // Media the project still uses is always confirmed: the opt-out covers routine deletions, not ones that
-      // leave authored work pointing at nothing.
-      return confirmImageDeletion || usage.length > 0
-        ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items), options?.returnFocus, usage)
+      // The opt-out covers deleting one item the user is looking at. A batch, an item off screen and media the
+      // project still uses always ask: the dialog names what goes, and authored work would point at nothing.
+      const canSkipFutureConfirmations = items.length === 1 && options?.targetsOffScreen !== true;
+
+      return confirmImageDeletion || usage.length > 0 || !canSkipFutureConfirmations
+        ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items), {
+            canSkipFutureConfirmations,
+            returnFocus: options?.returnFocus,
+            usage,
+          })
         : deleteItemsConfirmed(items);
     };
-    const moveItemsToBoard = (items: GalleryItemRef[], boardId: string): Promise<void> => {
+    /** Groups refs by a known prior value; refs whose prior value is unknown are left out. */
+    const groupByPrior = <Value>(
+      refs: readonly GalleryItemRef[],
+      getPrior: (key: GalleryItemKey) => Value | undefined
+    ): Map<Value, GalleryItemRef[]> => {
+      const groups = new Map<Value, GalleryItemRef[]>();
+
+      for (const ref of refs) {
+        const prior = getPrior(toGalleryItemKey(ref));
+
+        if (prior === undefined) {
+          continue;
+        }
+
+        const group = groups.get(prior);
+
+        if (group) {
+          group.push(ref);
+        } else {
+          groups.set(prior, [ref]);
+        }
+      }
+
+      return groups;
+    };
+    // Undo is the same mutation back, reported without an Undo of its own.
+    const moveItemsToBoard = (items: GalleryItemRef[], boardId: string, offerUndo = true): Promise<void> => {
       // On partial move failure, restore then reapply confirmed items. Capture prior boards from cache and store,
       // preferring cache; invalidation reconciles conflicts.
       const previousBoardIds = new Map<GalleryItemKey, string>(
@@ -651,6 +702,22 @@ export const useImageActions = ({
           }
         },
         boardId,
+        getUndo: (succeeded) => {
+          // Back to each item's own board as known before the move; an item whose board was not known stays.
+          const groups = groupByPrior(succeeded, (key) => {
+            const previousBoardId = previousBoardIds.get(key);
+
+            return previousBoardId === boardId ? undefined : previousBoardId;
+          });
+
+          return offerUndo && groups.size > 0
+            ? () => {
+                for (const [previousBoardId, refs] of groups) {
+                  void moveItemsToBoard(refs, previousBoardId, false);
+                }
+              }
+            : null;
+        },
         mutate: (signal) => galleryItemOrganization.moveToBoard(items, boardId, signal),
         requested: items,
         rollback: () => {
@@ -666,7 +733,7 @@ export const useImageActions = ({
 
       gallery.patchItems(keys, { starred });
     };
-    const setItemsStarred = (items: GalleryItemRef[], starred: boolean): Promise<void> => {
+    const setItemsStarred = (items: GalleryItemRef[], starred: boolean, offerUndo = true): Promise<void> => {
       // Cache star changes move items between listing partitions and need snapshot/CAS rollback. Store restoration
       // uses each actual prior flag, never blanket inversion.
       const previousStarred = new Map<GalleryItemKey, boolean>(
@@ -708,6 +775,22 @@ export const useImageActions = ({
             starred,
           });
           patchStarredStoreOnly(result.failed.map(toGalleryItemKey), !starred);
+        },
+        // Back to each item's own flag as known before; an item whose flag was not known stays as the action left it.
+        getUndo: (succeeded) => {
+          const groups = groupByPrior(succeeded, (key) => {
+            const prior = previousStarred.get(key);
+
+            return prior === starred ? undefined : prior;
+          });
+
+          return offerUndo && groups.size > 0
+            ? () => {
+                for (const [prior, refs] of groups) {
+                  void setItemsStarred(refs, prior, false);
+                }
+              }
+            : null;
         },
         mutate: (signal) => galleryItemOrganization.setStarred(items, starred, signal),
         requested: items,
@@ -1378,6 +1461,7 @@ export const useImageActions = ({
     getItemActionContext,
     models,
     notifications,
+    notify,
     onImagesDeleted,
     openWorkbenchWidget,
     projectId,

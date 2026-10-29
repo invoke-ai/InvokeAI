@@ -1,10 +1,9 @@
 import type { SettingFieldProps } from '@platform/ui/settings/contracts';
 
-import { DEFAULT_GALLERY_SETTINGS, GALLERY_AUTO_ADD_FOLLOW, getGallerySettings } from '@features/gallery/core/settings';
+import { DEFAULT_GALLERY_SETTINGS, getGallerySettings } from '@features/gallery/core/settings';
 import { SettingControl } from '@platform/ui/settings/SettingControl';
 import { useCallback } from 'react';
 
-import { getGalleryDestinationBoardId } from './galleryStateView';
 import { useGalleryUi } from './GalleryUiContext';
 
 export const GallerySettingField = ({ field, surface, target }: SettingFieldProps) => {
@@ -17,12 +16,7 @@ export const GallerySettingField = ({ field, surface, target }: SettingFieldProp
         return;
       }
 
-      if (field.id === 'followSelectedBoard' && typeof value === 'boolean') {
-        // Leaving follow pins today's destination, so nothing moves until another board is chosen.
-        gallery.updateSettings({
-          autoAddBoardId: value ? GALLERY_AUTO_ADD_FOLLOW : (getGalleryDestinationBoardId(galleryValues) ?? 'none'),
-        });
-      } else if (field.id === 'imageSize' && typeof value === 'number') {
+      if (field.id === 'imageSize' && typeof value === 'number') {
         gallery.updateSettings({ imageDensityPercent: 100 - value });
       } else if (field.id === 'thumbnailFit' && (value === 'square' || value === 'aspect')) {
         gallery.updateSettings({ thumbnailFit: value });
@@ -39,6 +33,7 @@ export const GallerySettingField = ({ field, surface, target }: SettingFieldProp
         (field.id === 'showImageDimensions' ||
           field.id === 'showPendingItems' ||
           field.id === 'middleClickOpensInNewTab' ||
+          field.id === 'followSelectedBoard' ||
           field.id === 'showDateBoards' ||
           field.id === 'showArchivedBoards' ||
           field.id === 'showOtherProjectBoards') &&
@@ -47,25 +42,19 @@ export const GallerySettingField = ({ field, surface, target }: SettingFieldProp
         gallery.updateSettings({ [field.id]: value });
       }
     },
-    [disabled, field.id, gallery, galleryValues]
+    [disabled, field.id, gallery]
   );
   const value =
-    field.id === 'followSelectedBoard'
-      ? settings.autoAddBoardId === GALLERY_AUTO_ADD_FOLLOW
-      : field.id === 'imageSize'
-        ? 100 - settings.imageDensityPercent
-        : settings[field.id as keyof typeof settings];
+    field.id === 'imageSize' ? 100 - settings.imageDensityPercent : settings[field.id as keyof typeof settings];
 
   if (typeof value !== 'boolean' && typeof value !== 'number' && typeof value !== 'string') {
     return null;
   }
 
   const defaultValue =
-    field.id === 'followSelectedBoard'
-      ? true
-      : field.id === 'imageSize'
-        ? 100 - DEFAULT_GALLERY_SETTINGS.imageDensityPercent
-        : DEFAULT_GALLERY_SETTINGS[field.id as keyof typeof DEFAULT_GALLERY_SETTINGS];
+    field.id === 'imageSize'
+      ? 100 - DEFAULT_GALLERY_SETTINGS.imageDensityPercent
+      : DEFAULT_GALLERY_SETTINGS[field.id as keyof typeof DEFAULT_GALLERY_SETTINGS];
   return (
     <SettingControl
       isModified={value !== defaultValue}

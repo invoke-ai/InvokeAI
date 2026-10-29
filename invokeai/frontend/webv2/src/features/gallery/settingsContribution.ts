@@ -78,6 +78,7 @@ export const gallerySettingsContribution: SettingsContribution = {
       id: 'followSelectedBoard',
       kind: 'boolean',
       label: (t) => t('widgets.gallery.followSelectedBoard'),
+      description: (t) => t('widgets.gallery.followSelectedBoardDescription'),
       group: (t) => t('widgets.gallery.destination'),
       keywords: 'auto add board destination results workflow',
       scope: 'instance',

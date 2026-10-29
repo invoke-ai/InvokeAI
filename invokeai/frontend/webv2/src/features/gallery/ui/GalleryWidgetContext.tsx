@@ -21,6 +21,8 @@ import type { GalleryListingState, GallerySparseListing } from './useGalleryData
  */
 export interface GalleryActions {
   archiveBoard: (boardId: string, archived: boolean) => Promise<void>;
+  /** Drops the whole selection, the item Preview shows included. */
+  clearSelection: () => void;
   /** In the given project, or in the Library for null. */
   /** Resolves `true` once the board exists and is selected; a reported failure resolves `false`. */
   createBoard: (boardName: string, projectId: string | null) => Promise<boolean>;

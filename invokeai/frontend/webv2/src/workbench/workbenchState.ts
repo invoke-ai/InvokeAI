@@ -64,7 +64,6 @@ import {
   getPersistedSelectedGalleryItemKeys,
   stripInfiniteWindowAnchor,
   stripUnresolvableGallerySearch,
-  GALLERY_AUTO_ADD_FOLLOW,
   gallerySemanticReferenceKey,
   getGallerySettings,
   toGalleryMediaKind,
@@ -86,7 +85,7 @@ import {
   type GeneratedImageContract,
   type GeneratedVideoContract,
   generatedVideoToGalleryItem,
-  settleGallerySearchScope,
+  settleGalleryValues,
 } from '@features/gallery/contracts';
 import { planSeedSubmission } from '@platform/core/seed';
 import { describeError } from '@platform/logging/normalize';
@@ -1444,8 +1443,11 @@ const updateProjectWidgetState = (
 };
 
 /** Widget-owned rules every write of a widget type's values keeps; the values themselves when none applies. */
-const settleWidgetValues = (typeId: WidgetTypeId, values: Record<string, unknown>): Record<string, unknown> =>
-  typeId === 'gallery' ? settleGallerySearchScope(values) : values;
+const settleWidgetValues = (
+  typeId: WidgetTypeId,
+  previous: Record<string, unknown>,
+  values: Record<string, unknown>
+): Record<string, unknown> => (typeId === 'gallery' ? settleGalleryValues(previous, values) : values);
 
 const updateProjectWidgetValues = (
   project: Project,
@@ -1453,7 +1455,7 @@ const updateProjectWidgetValues = (
   getValues: (values: Record<string, unknown>) => Record<string, unknown>
 ): Project =>
   updateProjectWidgetState(project, widgetId, (widgetState) => {
-    const values = settleWidgetValues(widgetId, getValues(widgetState.values));
+    const values = settleWidgetValues(widgetId, widgetState.values, getValues(widgetState.values));
 
     return values === widgetState.values ? widgetState : { ...widgetState, values };
   });
@@ -1469,7 +1471,7 @@ const updateProjectWidgetInstanceValues = (
     return project;
   }
 
-  const values = settleWidgetValues(instance.typeId, getValues(instance.state.values));
+  const values = settleWidgetValues(instance.typeId, instance.state.values, getValues(instance.state.values));
 
   if (values === instance.state.values) {
     return project;
@@ -1950,8 +1952,9 @@ const assembleWorkbenchProject = (
     const hasRecentImages = 'recentImages' in instance.state.values;
     // The retired live-follow pause stamp; Auto-switch replaced it, so it leaves stored workspaces on the next save.
     const hasRetiredPause = 'liveFollowPausedAt' in instance.state.values;
-    // A search stripped here (or saved without one) leaves no scope behind for the next search.
-    const settledValues = settleGallerySearchScope(strippedValues ?? instance.state.values);
+    // A search stripped here (or saved without one) leaves no scope behind for the next search, and no selection made
+    // in the listing it narrowed.
+    const settledValues = settleGalleryValues(instance.state.values, strippedValues ?? instance.state.values);
 
     if (settledValues === instance.state.values && !hasRecentImages && !hasRetiredPause) {
       continue;
@@ -3315,7 +3318,7 @@ export const getProjectGalleryBoardReferences = (project: Project): string[] => 
       .filter((item) => item.status === 'pending' || item.status === 'running')
       .map((item) => item.snapshot.galleryBoardId),
   ]) {
-    if (typeof boardId === 'string' && boardId !== GALLERY_AUTO_ADD_FOLLOW && boardId !== values.projectBoardId) {
+    if (typeof boardId === 'string' && boardId !== values.projectBoardId) {
       references.add(boardId);
     }
   }
@@ -3353,7 +3356,7 @@ const reconcileDeletedGalleryBoard = (
         ? { galleryPage: 0, selectedBoardId: 'none', semanticImageQuery: null, semanticSearchText: null }
         : {}),
       ...(projectBoardWasDeleted ? { projectBoardId: null } : {}),
-      ...(autoAddBoardWasDeleted ? { autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW } : {}),
+      ...(autoAddBoardWasDeleted ? { autoAddBoardId: null } : {}),
     };
   });
   let didChangeQueue = false;

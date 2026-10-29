@@ -333,7 +333,7 @@ const MetadataRow = ({
       onRecall(recallKind);
     }
   }, [onRecall, recallKind]);
-  const recallVerb = recallKind ? getImageRecallVerb(recallKind) : null;
+  const recallVerb = recallKind ? getImageRecallVerb(recallKind, t) : null;
 
   return (
     <DataList.Item alignItems="start" className="group">

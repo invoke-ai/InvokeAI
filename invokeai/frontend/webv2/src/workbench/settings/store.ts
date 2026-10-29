@@ -60,6 +60,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   enableInformationalPopovers: true,
   enableModelDescriptions: true,
   exportIncludesWorkspace: true,
+  galleryDestinationNoticeShown: false,
   generatePresets: [],
   generateSectionsOpen: {},
   highContrast: false,
@@ -411,6 +412,7 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.alphaNoticeAcknowledged === 'boolean'
       ? preferences.alphaNoticeAcknowledged
       : DEFAULT_PREFERENCES.alphaNoticeAcknowledged,
+  galleryDestinationNoticeShown: preferences?.galleryDestinationNoticeShown === true,
   reduceMotion:
     typeof preferences?.reduceMotion === 'boolean' ? preferences.reduceMotion : DEFAULT_PREFERENCES.reduceMotion,
   selectObjectAutoProcess:
@@ -697,6 +699,9 @@ export const useWorkbenchPreferenceSelector = <Selected>(
 ): Selected => useWorkbenchSettingsSelector((snapshot) => selector(snapshot.preferences), isEqual);
 
 export const getWorkbenchPreferences = (): WorkbenchPreferences => store.getSnapshot().preferences;
+
+/** Whether the preferences read are the account's, hydrated, rather than the defaults that stand in until then. */
+export const areWorkbenchPreferencesReady = (): boolean => store.getSnapshot().status === 'ready';
 
 /** Non-React runtimes use this to keep infrastructure configuration current. */
 export const subscribeWorkbenchPreferences = (listener: (preferences: WorkbenchPreferences) => void): (() => void) => {

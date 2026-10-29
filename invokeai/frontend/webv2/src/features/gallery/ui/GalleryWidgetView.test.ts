@@ -1,3 +1,4 @@
+import { formatGalleryMediaCounts } from '@features/gallery/core/mediaCounts';
 import i18n from 'i18next';
 import { describe, expect, it } from 'vitest';
 
@@ -38,33 +39,24 @@ describe('mixed-media gallery translations', () => {
     });
 
     expect(instance.t('widgets.gallery.statusChip', { count: 12 })).toBe('Gallery: 12 items');
-    expect(
-      instance.t('widgets.gallery.boardItemCounts', {
-        assets: instance.t('widgets.gallery.assetCount', { count: 4 }),
-        images: instance.t('widgets.gallery.imageCount', { count: 2 }),
-        videos: instance.t('widgets.gallery.videoCount', { count: 3 }),
-      })
-    ).toBe('2 images · 3 videos · 4 uploads');
+    const t = (key: string, values?: Record<string, number | string>) => instance.t(key, values);
+    expect(formatGalleryMediaCounts(t, { images: 2, uploads: 4, videos: 3 })).toBe('2 images, 3 videos, and 4 uploads');
     expect(instance.t('widgets.gallery.downloadBoardWithOmission', { count: 2 })).toBe(
       'Download board (2 videos omitted)'
     );
     expect(
       instance.t('widgets.gallery.uploadSummary', {
         board: 'Clips',
-        failed: 1,
-        images: instance.t('widgets.gallery.imageCount', { count: 2 }),
-        videos: instance.t('widgets.gallery.videoCount', { count: 3 }),
+        media: formatGalleryMediaCounts(t, { images: 1, videos: 0 }),
       })
-    ).toBe('2 images and 3 videos uploaded to Clips. 1 failed.');
+    ).toBe('1 image uploaded to Clips.');
+    expect(instance.t('widgets.gallery.uploadFailedCount', { count: 1 })).toBe('1 file failed.');
     expect(instance.t('widgets.gallery.uploadSplit')).toBe('Images appear in Uploads; videos appear in Media.');
     expect(
-      instance.t('widgets.gallery.deleteBoardMediaOutcome', {
-        failedImages: instance.t('widgets.gallery.imageCount', { count: 1 }),
-        failedVideos: instance.t('widgets.gallery.videoCount', { count: 2 }),
-        images: instance.t('widgets.gallery.imageCount', { count: 3 }),
-        videos: instance.t('widgets.gallery.videoCount', { count: 4 }),
+      instance.t('widgets.gallery.deleteBoardMediaFailed', {
+        media: formatGalleryMediaCounts(t, { images: 1, videos: 2 }),
       })
-    ).toBe('Deleted 3 images and 4 videos; 1 image and 2 videos could not be deleted.');
+    ).toBe('1 image and 2 videos could not be deleted.');
     expect(instance.t('widgets.preview.videoLabel', { name: 'clip.mp4' })).toBe('Video clip.mp4');
     expect(instance.t('widgets.preview.videoFailed')).toBe('Video could not be loaded');
     expect(instance.t('widgets.preview.copyCurrentFrame')).toBe('Copy Current Frame');

@@ -6,6 +6,7 @@ import { useDndContext, useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { toGalleryItemKey } from '@features/gallery/core/items';
+import { formatGalleryMediaCounts } from '@features/gallery/core/mediaCounts';
 import { IconButton } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Tooltip } from '@platform/ui/Tooltip';
@@ -48,7 +49,7 @@ export const GalleryBoardRow = ({
    * managed through its project, and never outside the workbench's drag context.
    */
   dragScope?: string;
-  /** Results without a board of their own land here (the gallery is not following its selection). */
+  /** Results without a board of their own land here: the destination the header names. */
   isAutoAddTarget?: boolean;
   /** The view-only board whose results come here instead, named in the Auto badge's tooltip. */
   autoAddRedirectedFrom?: string;
@@ -109,10 +110,12 @@ export const GalleryBoardRow = ({
   const dragOrigin = isDragging ? (active?.rect.current.initial ?? null) : null;
 
   const counts = getBoardCounts(board);
-  const mediaCount = Math.max(0, counts.imageCount + counts.videoCount - counts.assetVideoCount);
+  // The badge reads "Media | Uploads", the two tabs; its label spells out what each holds.
   const countsBreakdown = t('widgets.gallery.boardCountsBreakdown', {
-    assets: counts.assetCount + counts.assetVideoCount,
-    media: mediaCount,
+    media:
+      formatGalleryMediaCounts(t, { images: counts.images, videos: counts.videos }) ||
+      t('widgets.gallery.imageCount', { count: 0 }),
+    uploads: t('widgets.gallery.assetCount', { count: counts.uploads }),
   });
 
   const handleSelect = useCallback(() => onSelectBoard(board.id), [board.id, onSelectBoard]);
@@ -170,24 +173,26 @@ export const GalleryBoardRow = ({
   const actions = useMemo(
     () =>
       onOpenMenu ? (
-        <IconButton
-          aria-label={t('widgets.gallery.boardActionsForBoard', { name: spokenLabel })}
-          className="board-row-actions"
-          flexShrink={0}
-          // Its menu anchors to this button, so it must not fade out beneath it.
-          opacity={isMenuOpen ? 1 : 0}
-          // 24px: the target-size floor, and short enough for the 28px row.
-          size="sm"
-          transition="opacity var(--wb-motion-duration-medium) ease"
-          variant="ghost"
-          onClick={handleActionsClick}
-          // Pressing the menu button must not start dragging the row it sits on.
-          onMouseDown={stopPropagation}
-          onPointerDown={stopPropagation}
-          onPointerUp={stopPropagation}
-        >
-          <MoreVerticalIcon />
-        </IconButton>
+        <Tooltip content={t('widgets.gallery.boardActionsForBoard', { name: spokenLabel })}>
+          <IconButton
+            aria-label={t('widgets.gallery.boardActionsForBoard', { name: spokenLabel })}
+            className="board-row-actions"
+            flexShrink={0}
+            // Its menu anchors to this button, so it must not fade out beneath it.
+            opacity={isMenuOpen ? 1 : 0}
+            // 24px: the target-size floor, and short enough for the 28px row.
+            size="sm"
+            transition="opacity var(--wb-motion-duration-medium) ease"
+            variant="ghost"
+            onClick={handleActionsClick}
+            // Pressing the menu button must not start dragging the row it sits on.
+            onMouseDown={stopPropagation}
+            onPointerDown={stopPropagation}
+            onPointerUp={stopPropagation}
+          >
+            <MoreVerticalIcon />
+          </IconButton>
+        </Tooltip>
       ) : null,
     [handleActionsClick, isMenuOpen, onOpenMenu, spokenLabel, stopPropagation, t]
   );
@@ -268,7 +273,7 @@ export const GalleryBoardRow = ({
         ) : null}
         <Tooltip content={countsBreakdown}>
           <Badge aria-label={countsBreakdown} flexShrink={0} fontVariantNumeric="tabular-nums" variant="subtle">
-            {mediaCount} | {counts.assetCount}
+            {counts.media} | {counts.uploads}
           </Badge>
         </Tooltip>
       </GalleryBoardRowShell>

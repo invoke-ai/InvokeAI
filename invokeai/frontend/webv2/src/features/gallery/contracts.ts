@@ -17,10 +17,12 @@ export { canOnBoard, isOwnGalleryBoard } from './core/boardAccess';
 export {
   getGalleryBoardDestinationGroups,
   getGalleryBoardLabel,
+  getGalleryMoveTargets,
   type GalleryBoardDestinationGroup,
   type GalleryBoardTranslate,
 } from './core/boardLabels';
 export { normalizeGalleryImage } from './core/image';
+export { formatGalleryMediaCounts, type GalleryMediaCounts } from './core/mediaCounts';
 export {
   assertNeverGalleryItem,
   classifyGalleryUpload,
@@ -58,7 +60,6 @@ export {
 } from './core/semanticImageQuery';
 export {
   DEFAULT_GALLERY_SETTINGS,
-  GALLERY_AUTO_ADD_FOLLOW,
   getGalleryMediaFilter,
   getGallerySettings,
   toGalleryMediaKind,
@@ -70,6 +71,7 @@ export {
 export {
   getGalleryAutoAddBoardId,
   getGalleryCompareImage,
+  getGalleryDefaultDestinationBoardId,
   getGalleryMediaFilterMenuProps,
   getGalleryDestinationBoardId,
   getGalleryPage,
@@ -81,6 +83,7 @@ export {
   getGallerySemanticImageQuery,
   getGalleryView,
   settleGallerySearchScope,
+  settleGalleryValues,
   type GallerySelectedImageQuery,
 } from './ui/galleryStateView';
 export {

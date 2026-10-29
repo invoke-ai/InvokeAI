@@ -125,6 +125,20 @@ void i18n.use(initReactI18next).init({
       translation: {
         common: { countOfTotal: '{{count}} of {{total}}', copy: 'Copy' },
         widgets: {
+          gallery: {
+            itemActions: {
+              recall: {
+                verbs: {
+                  all: 'Recall all',
+                  clipSkip: 'Use CLIP skip',
+                  dimensions: 'Use size',
+                  prompts: 'Use prompt',
+                  remix: 'Remix image',
+                  seed: 'Use seed',
+                },
+              },
+            },
+          },
           preview: {
             details: 'Details',
             framesPerSecond: '{{count}} fps',
@@ -412,7 +426,7 @@ describe('Preview query-driven Details', () => {
     expect(document.body.textContent).toContain('Test Model');
     expect(document.body.textContent).toContain('queue-image');
 
-    await interact(() => document.querySelector<HTMLButtonElement>('[aria-label="Use Prompt"]')?.click());
+    await interact(() => document.querySelector<HTMLButtonElement>('[aria-label="Use prompt"]')?.click());
     expect(actions.recallImageData).toHaveBeenCalledWith(actionImage, 'prompts');
   });
 
@@ -430,12 +444,12 @@ describe('Preview query-driven Details', () => {
 
     // Only the row buttons carry aria-labels; the verb-row buttons are named
     // by their visible text, so the attribute selector is unambiguous.
-    const seedRecall = document.querySelector<HTMLButtonElement>('[aria-label="Use Seed"]');
+    const seedRecall = document.querySelector<HTMLButtonElement>('[aria-label="Use seed"]');
     expect(seedRecall).not.toBeNull();
-    expect(document.querySelector('[aria-label="Use Prompt"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="Use prompt"]')).not.toBeNull();
     // No size row was parsed, so no row carries the size verb even though the
     // capability itself is available.
-    expect(document.querySelector('[aria-label="Use Size"]')).toBeNull();
+    expect(document.querySelector('[aria-label="Use size"]')).toBeNull();
 
     // The model row has no single-field verb — copy stays its only action.
     const modelRow = [...(document.querySelectorAll('.chakra-data-list__item') ?? [])].find((row) =>
@@ -457,7 +471,7 @@ describe('Preview query-driven Details', () => {
       await vi.waitFor(() => expect(document.body.textContent).toContain('42'));
     });
 
-    expect(document.querySelector('[aria-label="Use Seed"]')).toBeNull();
+    expect(document.querySelector('[aria-label="Use seed"]')).toBeNull();
   });
 
   it('updates row recall verbs when capability inputs change without refetching cached metadata', async () => {
@@ -465,7 +479,7 @@ describe('Preview query-driven Details', () => {
 
     await renderDetails({ isOpen: true, item: imageItem });
     await act(async () => {
-      await vi.waitFor(() => expect(document.querySelector('[aria-label="Use Prompt"]')).not.toBeNull());
+      await vi.waitFor(() => expect(document.querySelector('[aria-label="Use prompt"]')).not.toBeNull());
     });
 
     actions = {
@@ -474,7 +488,7 @@ describe('Preview query-driven Details', () => {
     } as unknown as ImageActions;
     await renderDetails({ isOpen: true, item: imageItem });
 
-    expect(document.querySelector('[aria-label="Use Prompt"]')).toBeNull();
+    expect(document.querySelector('[aria-label="Use prompt"]')).toBeNull();
     expect(galleryMocks.imageMetadata).toHaveBeenCalledOnce();
   });
 });

@@ -102,6 +102,8 @@ const mocks = vi.hoisted(() => {
   ];
 
   return {
+    openWidget: vi.fn(),
+    revealPlacedWidget: vi.fn((..._args: unknown[]): unknown => null),
     commands: {
       account: { updateProjectPreferences: vi.fn() },
       gallery: {
@@ -176,9 +178,19 @@ const mocks = vi.hoisted(() => {
   };
 });
 
+vi.mock('@workbench/widgetPlacementCommands', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  revealPlacedWidget: (...args: unknown[]) => mocks.revealPlacedWidget(...args),
+}));
+
+vi.mock('@workbench/useOpenWorkbenchWidget', () => ({
+  useOpenWorkbenchWidget: () => mocks.openWidget,
+}));
+
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => 'project-1',
   useActiveProjectSelector: (selector: (project: typeof mocks.project) => unknown) => selector(mocks.project),
+  useOptionalWorkbenchCommands: () => mocks.commands,
   useOptionalWorkbenchExtensions: () => mocks.extensions,
   useWidgetValuesSelector: () => ({}),
   useWorkbenchCommands: () => mocks.commands,
@@ -455,6 +467,7 @@ await i18n.use(initReactI18next).init({
           preview: {
             commands: { nextItem: 'Show next item', previousItem: 'Show previous item' },
             noGallerySelection: 'No gallery selection',
+            showGallery: 'Show Gallery',
             framesPerSecond: '{{count}} fps',
             itemCount_one: '{{count}} item',
             itemCount_other: '{{count}} items',
@@ -3896,5 +3909,32 @@ describe('preview label clear selection', () => {
 
     expect(host!.textContent).toContain('No gallery selection');
     expect(clearButton()).toBeNull();
+  });
+
+  it('offers the way to a selection from the empty state', async () => {
+    setGalleryValues({ selectedImage: null, selectedImageName: null, selectedImageNames: [] });
+
+    await render();
+    const showGallery = Array.from(host!.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Show Gallery'
+    );
+    await userEvent.click(showGallery!);
+
+    expect(mocks.openWidget).toHaveBeenCalledExactlyOnceWith('gallery');
+  });
+
+  it('brings a Gallery the layout already has forward rather than opening it again', async () => {
+    setGalleryValues({ selectedImage: null, selectedImageName: null, selectedImageNames: [] });
+    mocks.revealPlacedWidget.mockReturnValueOnce({ kind: 'region', region: 'right' });
+    mocks.openWidget.mockClear();
+
+    await render();
+    const showGallery = Array.from(host!.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Show Gallery'
+    );
+    await userEvent.click(showGallery!);
+
+    expect(mocks.revealPlacedWidget).toHaveBeenCalledWith(expect.objectContaining({ typeId: 'gallery' }));
+    expect(mocks.openWidget).not.toHaveBeenCalled();
   });
 });
