@@ -66,6 +66,7 @@ from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.lora_conversions.anima_lora_conversion_utils import anima_lora_for_depth
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import (
     RectifiedFlowInpaintExtension,
     assert_broadcastable,
@@ -789,7 +790,17 @@ class AnimaDenoiseInvocation(BaseInvocation):
                         set_priority=True,
                     )
                 )
-            (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
+            # A GGUF or int8_tensorwise build dequantizes each quantized Linear per forward, a transient its
+            # resident size does not cover. Passed alone because this node has no activation estimate, so the
+            # cache floors it at `device_working_mem_gb`; zero for other builds. Read from the unlocked model.
+            (cached_weights, transformer) = exit_stack.enter_context(
+                transformer_info.model_on_device(
+                    working_mem_bytes=peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
+                )
+            )
+            # Asked of the loaded module tree as well as the format: an int8_tensorwise checkpoint keeps its
+            # quantized weights as buffers of `DequantizingLinear` modules, which a direct patch cannot write.
+            force_sidecar_patching = requires_sidecar_patching(transformer, transformer_info.config.format)
 
             # Prepare the ControlNet-LLLite adapters if provided. Each adapter's
             # conditioning image is built ONCE per generation (not per step).
@@ -836,6 +847,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     prefix=ANIMA_LORA_TRANSFORMER_PREFIX,
                     dtype=inference_dtype,
                     cached_weights=cached_weights,
+                    force_sidecar_patching=force_sidecar_patching,
                 )
             )
 

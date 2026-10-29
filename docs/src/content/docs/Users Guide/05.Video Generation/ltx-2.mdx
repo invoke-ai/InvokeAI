@@ -1,6 +1,6 @@
 ---
 title: LTX-2
-lastUpdated: 2026-10-03
+lastUpdated: 2026-10-11
 alsoListedIn:
   - users-guide/models/local-models
 sidebar:
@@ -125,9 +125,19 @@ Available separately in the starter models list:
 
 * **LTX-2.5 Distilled LoRA** (~8.9 GB) — the [fast path](#the-distilled-lora-fast-path-on-dev) for the Dev transformer. Not needed if you use the Distilled transformer.
 * **LTX-2.5 Dev Transformer (bf16)** (~38 GB) and **LTX-2.5 Text Encoder (Gemma-4 12B, bf16)** (~24 GB) — unquantized builds, for a 48 GB+ card or partial loading.
+* **LTX-2.5 Dev Transformer (GGUF Q4_K_M)** and **LTX-2.5 Distilled Transformer (GGUF Q4_K_M)** (~15.7 GB each) — community [GGUF builds](#installing-ltx-2) that hold ~12.5 GiB on the card against ~18 GiB for int8.
+* **LTX-2.5 Text Encoder (Gemma-4 12B, GGUF Q4_K_M)** (~9.2 GB) — a community GGUF build of the encoder for the **Gemma-4 encoder** slot, lighter than int8 and further from the unquantized encoder (see the GGUF text encoders note below).
 * **LTX-2.5 Distilled Transformer (NVFP4)** (~18.7 GB) — Lightricks' official 4-bit build of the Distilled transformer, an alternative to the int8 one with the same eight-step schedule. It is barely smaller on disk than the int8 build (the last six transformer blocks and some projections are kept in bf16), so on a 16 GB card it still runs partially loaded — but a larger share of it fits on the card, which makes it the faster choice there: on an RTX 5060 Ti (16 GB) at 512×512×161 frames it ran at 6.5 s/step against 9.8 s/step for the int8 build. The 4-bit weights are unpacked layer by layer, so any GPU can run it; with enough VRAM to hold either build entirely, expect no speed advantage. License-gated: needs a Hugging Face token whose account has accepted the LTX-2.5 license. There is no NVFP4 build of the Dev transformer.
 * **LTX-2.5 Duration Head** (3.6 MB) — enables [Auto duration](#auto-duration). License-gated: needs a Hugging Face token whose account has accepted the LTX-2.5 license.
 * **LTX-2.5 Prompt Enhancer (Gemma-4 E2B)** (~10 GB) — enables [prompt enhancement](#prompt-enhancement).
+
+**GGUF builds.** Community GGUF conversions of the LTX-2.5 transformer, such as `vantagewithai/LTX-2.5-GGUF` (Dev and Distilled; its Q4_K_M builds are in the starter models list), `Abiray/LTX-2.5-Distilled-GGUF` or `realrebelai/LTX-2.5_GGUFs`, run like the int8 single files: select one in the Video panel, with the LTX-2.5 Components in the **Model components** slot and the Gemma-4 encoder in its slot. The text connectors each build carries beside the transformer are not used; the components folder supplies them. Dev or Distilled is read from the file name, so keep the published names, or set **Variant** in the model's **Edit** view after renaming a file.
+
+On the card, a Q4_K_M build holds ~12.5 GiB against ~18 GiB for int8, and Q8_0 ~19.2 GiB. On an RTX 4090 at 1248×704×121 frames (Distilled, 8 steps) Q4_K_M stayed fully resident and ran at 6.1 s/step against 5.8–6.0 s/step for int8, which ran 94 % resident; Q8_0 ran at 5.45 s/step. At small sizes the gap widens, because unpacking the 4- to 6-bit weights costs the same every step however short the clip: at 896×512×49 frames Q4_K_M ran at 1.87 s/step, int8 at 1.64 and Q8_0 at 1.28. At the same seed, Q8_0 renders nearly the same video as int8; Q4_K_M can frame the scene differently.
+
+Two kinds of GGUF are refused when you install them: LTX-2.3 builds (`unsloth/LTX-2.3-GGUF`, `QuantStack/LTX-2.3-GGUF`), as every LTX-2.3 file is, and ComfyUI-GGUF `Q8_CR` builds; use a Q8_0 build or the int8 single file instead. A GGUF installed with an earlier version of Invoke was registered as an unknown model: select it in the Model Manager and use **Re-identify model**. Installing a GGUF reads the whole file into RAM once, so for a moment it needs about its own size in free RAM.
+
+**GGUF text encoders.** GGUF conversions of the LTX-2.5 Gemma-4 encoder that pack its tokenizer and config in go in the **Gemma-4 encoder** slot like the int8 folder: `Rootport/Nz-Gemma4-12B-LTX25` (the file in its `TextEncoder` folder; its Q4_K_M build is in the starter models list) and `elix3r/gemma4-12b-with-proj-ltx-2.5-GGUF` (license-gated: accept the repository's terms on Hugging Face and install with a token). Only the Gemma tower is read; the text projection these files also carry comes from the components folder. On the card the tower holds ~7.6 GiB as Q4_K_M and ~9.2 GiB as Q5_K_M, against ~12 GiB for int8 and ~22 GiB for bf16, and each encodes a prompt in about a second on an RTX 4090. Measured against the bf16 encoder over eight prompts, the connector outputs drift by 4.1 % (video) and 1.6 % (audio) with elix3r's Q5_K_M, close to int8's 2.0 % and 0.6 %, and by 5.6 % and 3.4 % with Rootport's Q4_K_M. At the same seed all of them render the same scene; Q4_K_M frames it a little differently. Google's stock Gemma-4-12B GGUF is refused at install: LTX-2 needs the Lightricks-tuned weights.
 
 LTX-2 does not condition on the last hidden state of its text encoder the way most models do: it stacks the hidden states of *every* Gemma layer and runs them through a separate connector model. That is why the encoder is a large, separate download.
 
