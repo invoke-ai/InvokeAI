@@ -16,6 +16,7 @@ import type {
   Ideogram4SamplerPreset,
   LoraModelConfig,
   MainModelConfig,
+  ModelIdentifierConfig,
   QwenImageEncoderQuantization,
   VaeModelConfig,
   VaePrecision,
@@ -535,6 +536,19 @@ const areModelSnapshotsEqual = (a: unknown, b: unknown): boolean => {
   }
 };
 
+/**
+ * Whether an installed model is the same file as a saved choice that is no longer installed: a reinstall gives the
+ * file a new key but keeps its hash. Type, base and (where the saved choice names one) variant must agree as well, so
+ * a file registered differently is not taken for it.
+ */
+export const isSameModelFile = (candidate: ModelIdentifierConfig, saved: ModelIdentifierConfig): boolean =>
+  Boolean(saved.hash) &&
+  candidate.hash === saved.hash &&
+  candidate.type === saved.type &&
+  candidate.base === saved.base &&
+  (saved.variant === undefined || saved.variant === null || candidate.variant === saved.variant);
+
+/** Refreshes each concept from the catalog, finding a reinstalled LoRA again by its file hash. */
 export const syncGenerateLorasWithModels = (loras: GenerateLora[], models: readonly unknown[]): GenerateLora[] => {
   const modelsByKey = new Map<string, LoraModelConfig>();
 
@@ -544,9 +558,23 @@ export const syncGenerateLorasWithModels = (loras: GenerateLora[], models: reado
     }
   }
 
+  // Keys the list holds, and keys a rematch in this pass has given out: two removed concepts with the same file must
+  // not both become the one reinstalled concept.
+  const claimedKeys = new Set(loras.map((lora) => lora.model.key));
+  const findReinstalled = (saved: LoraModelConfig): LoraModelConfig | undefined => {
+    for (const model of modelsByKey.values()) {
+      if (isSameModelFile(model, saved) && !claimedKeys.has(model.key)) {
+        claimedKeys.add(model.key);
+        return model;
+      }
+    }
+
+    return undefined;
+  };
+
   let didSync = false;
   const syncedLoras = loras.map((lora) => {
-    const currentModel = modelsByKey.get(lora.model.key);
+    const currentModel = modelsByKey.get(lora.model.key) ?? findReinstalled(lora.model);
 
     if (!currentModel || areModelSnapshotsEqual(currentModel, lora.model)) {
       return lora;

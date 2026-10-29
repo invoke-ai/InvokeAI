@@ -85,8 +85,6 @@ export interface GalleryWidgetContextValue {
    */
   filter: GalleryItemsFilter;
   itemActions: GalleryItemActions;
-  /** The infinite window is full and the board holds images it cannot reach. */
-  isWindowTruncated: boolean;
   /** How the listing behind `gallery.items` stands for the current scope, and its recovery. */
   listing: GalleryListingState;
   /** Everything on hand — strip first, then the listing, without repeats — for lookups by key. */

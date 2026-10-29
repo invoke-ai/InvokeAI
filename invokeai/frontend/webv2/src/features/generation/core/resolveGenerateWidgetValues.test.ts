@@ -129,6 +129,53 @@ describe('resolveGenerateWidgetValues', () => {
     expect(result?.systemPatch).toMatchObject({ model: reinstalled, modelKey: reinstalled.key });
   });
 
+  it('does not take a file with the same hash registered under another base or variant for the saved model', () => {
+    const removed = createModel('removed', { hash: 'blake3:abc', variant: 'normal' });
+    const otherBase = createModel('other-base', { base: 'sd-1', hash: 'blake3:abc', variant: 'normal' });
+    const otherVariant = createModel('other-variant', { hash: 'blake3:abc', variant: 'inpaint' });
+    const storedValues = createValues(removed);
+    const result = resolveGenerateWidgetValues({ models: [otherBase, otherVariant], storedValues });
+
+    expect(result?.values.model).toBe(removed);
+  });
+
+  it('finds a reinstalled concept again by its file hash, unless the list already holds it', () => {
+    const model = createModel('current');
+    const removedLora = { base: 'sdxl', hash: 'blake3:lora', key: 'old-lora', name: 'Style', type: 'lora' as const };
+    const reinstalledLora = { ...removedLora, key: 'new-lora' };
+    const storedValues = createValues(model, { loras: [{ isEnabled: true, model: removedLora, weight: 0.7 }] });
+    const result = resolveGenerateWidgetValues({ models: [model, reinstalledLora], storedValues });
+
+    expect(result?.values.loras).toEqual([{ isEnabled: true, model: reinstalledLora, weight: 0.7 }]);
+    expect(result?.systemPatch?.loras).toEqual(result?.values.loras);
+
+    const both = createValues(model, {
+      loras: [
+        { isEnabled: true, model: removedLora, weight: 0.7 },
+        { isEnabled: true, model: reinstalledLora, weight: 1 },
+      ],
+    });
+
+    expect(resolveGenerateWidgetValues({ models: [model, reinstalledLora], storedValues: both })?.values.loras).toBe(
+      both.loras
+    );
+
+    // Two removed copies of one file: only the first takes the reinstalled concept; the other stays as saved.
+    const copy = { ...removedLora, key: 'old-lora-copy' };
+    const twice = createValues(model, {
+      loras: [
+        { isEnabled: true, model: removedLora, weight: 0.7 },
+        { isEnabled: true, model: copy, weight: 0.4 },
+      ],
+    });
+
+    expect(
+      resolveGenerateWidgetValues({ models: [model, reinstalledLora], storedValues: twice })?.values.loras.map(
+        (lora) => lora.model.key
+      )
+    ).toEqual(['new-lora', 'old-lora-copy']);
+  });
+
   it('defaults a choice that never named a model', () => {
     const available = createModel('available');
     const { model: _, ...withoutModel } = createValues(createModel('unknown'), { modelKey: '' });

@@ -6,6 +6,7 @@ import { getDeterminateProgressPercent } from '@features/queue/contracts';
 import { useItemProgress, useQueueItemProgressImage } from '@features/queue/react';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
+import { Tooltip } from '@platform/ui/Tooltip';
 import { CheckIcon, ChevronRightIcon, HourglassIcon } from 'lucide-react';
 import { useCallback, useEffectEvent, useId, useLayoutEffect, useRef } from 'react';
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
@@ -251,68 +252,69 @@ const GalleryProgressTile = ({
     placeholderAspectRatio === null ? FILL_CELL : placeholderAspectRatio >= 1 ? FILL_WIDTH : FILL_HEIGHT;
 
   return (
-    <chakra.button
-      ref={buttonRef}
-      type="button"
-      focusVisibleRing="inside"
-      aria-label={`${label} · ${status}`}
-      aria-pressed={isShownSelected}
-      aria-disabled={session.state !== 'running'}
-      data-gallery-session-id={session.id}
-      tabIndex={session.state === 'running' ? 0 : -1}
-      borderColor={isShownSelected ? 'accent.solid' : 'border.subtle'}
-      borderWidth="2px"
-      css={isShownSelected ? SELECTED_TILE_CSS : undefined}
-      flexShrink={0}
-      minW="0"
-      overflow="hidden"
-      rounded="md"
-      textAlign="start"
-      title={`${label} · ${status}`}
-      position="relative"
-      w={`${size}px`}
-      onClick={follow}
-    >
-      <StreamingImageFrame
-        alignItems="center"
-        aspectRatio={1}
-        display="flex"
-        fit={fit === 'aspect' ? 'contain' : 'cover'}
-        justifyContent="center"
-        liveImage={progressImageToStreamingSource(image)}
-        shouldAntialiasLiveImage={antialiasProgressImages}
-        w="full"
+    <Tooltip content={`${label} · ${status}`}>
+      <chakra.button
+        ref={buttonRef}
+        type="button"
+        focusVisibleRing="inside"
+        aria-label={`${label} · ${status}`}
+        aria-pressed={isShownSelected}
+        aria-disabled={session.state !== 'running'}
+        data-gallery-session-id={session.id}
+        tabIndex={session.state === 'running' ? 0 : -1}
+        borderColor={isShownSelected ? 'accent.solid' : 'border.subtle'}
+        borderWidth="2px"
+        css={isShownSelected ? SELECTED_TILE_CSS : undefined}
+        flexShrink={0}
+        minW="0"
+        overflow="hidden"
+        rounded="md"
+        textAlign="start"
+        position="relative"
+        w={`${size}px`}
+        onClick={follow}
       >
-        {session.state === 'queued' ? (
-          <Box bg="bg.subtle" aspectRatio={placeholderAspectRatio ?? undefined} {...placeholderSize} />
-        ) : (
-          <Skeleton aspectRatio={placeholderAspectRatio ?? undefined} {...placeholderSize} />
-        )}
-      </StreamingImageFrame>
-      <Box
-        position="absolute"
-        bottom="1"
-        right="1"
-        pointerEvents="none"
-        bg="bg/85"
-        rounded="full"
-        p="0.5"
-        display="flex"
-      >
-        {session.state === 'running' && percentage === null ? (
-          // The app-wide spinner, not the ring's indeterminate sweep, for unknown progress.
-          <Spinner aria-label={status} boxSize="4" role="progressbar" />
-        ) : session.state === 'running' ? (
-          <ProgressCircle.Root aria-label={status} value={percentage}>
-            <ProgressCircle.Circle>
-              <ProgressCircle.Track />
-              <ProgressCircle.Range />
-            </ProgressCircle.Circle>
-          </ProgressCircle.Root>
-        ) : (
-          <Icon as={session.state === 'queued' ? HourglassIcon : CheckIcon} boxSize="4" aria-label={status} />
-        )}
-      </Box>
-    </chakra.button>
+        <StreamingImageFrame
+          alignItems="center"
+          aspectRatio={1}
+          display="flex"
+          fit={fit === 'aspect' ? 'contain' : 'cover'}
+          justifyContent="center"
+          liveImage={progressImageToStreamingSource(image)}
+          shouldAntialiasLiveImage={antialiasProgressImages}
+          w="full"
+        >
+          {session.state === 'queued' ? (
+            <Box bg="bg.subtle" aspectRatio={placeholderAspectRatio ?? undefined} {...placeholderSize} />
+          ) : (
+            <Skeleton aspectRatio={placeholderAspectRatio ?? undefined} {...placeholderSize} />
+          )}
+        </StreamingImageFrame>
+        <Box
+          position="absolute"
+          bottom="1"
+          right="1"
+          pointerEvents="none"
+          bg="bg/85"
+          rounded="full"
+          p="0.5"
+          display="flex"
+        >
+          {session.state === 'running' && percentage === null ? (
+            // The app-wide spinner, not the ring's indeterminate sweep, for unknown progress.
+            <Spinner aria-label={status} boxSize="4" role="progressbar" />
+          ) : session.state === 'running' ? (
+            <ProgressCircle.Root aria-label={status} value={percentage}>
+              <ProgressCircle.Circle>
+                <ProgressCircle.Track />
+                <ProgressCircle.Range />
+              </ProgressCircle.Circle>
+            </ProgressCircle.Root>
+          ) : (
+            <Icon as={session.state === 'queued' ? HourglassIcon : CheckIcon} boxSize="4" aria-label={status} />
+          )}
+        </Box>
+      </chakra.button>
+    </Tooltip>
   );
 };

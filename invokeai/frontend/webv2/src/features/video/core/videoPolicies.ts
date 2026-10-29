@@ -11,6 +11,7 @@ import type {
 import {
   getCompatibleDiffusersComponentSource,
   isDiffusersMainForBase,
+  isLoraCompatibleWithModel,
   isLoraModelConfig,
   isWanLoraTargetingMain,
 } from '@features/generation/settings';
@@ -2272,8 +2273,13 @@ export const getVideoModelAvailabilityReasons = (
     }
   }
 
+  // Only LoRAs the graph would load need to be installed; disabled or incompatible ones are skipped, as in Generate.
   for (const lora of settings.loras) {
-    if (!hasModelKey(models, lora.model.key, 'lora')) {
+    if (
+      lora.isEnabled &&
+      isLoraCompatibleWithModel(lora.model, model) &&
+      !hasModelKey(models, lora.model.key, 'lora')
+    ) {
       reasons.push(`LoRA "${lora.model.name}" is no longer installed.`);
     }
   }

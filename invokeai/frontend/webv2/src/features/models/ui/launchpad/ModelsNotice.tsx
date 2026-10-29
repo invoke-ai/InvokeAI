@@ -1,4 +1,4 @@
-import type { ModelBase, ModelConfig, StarterModelBundle } from '@features/models/core/types';
+import type { ModelBase, ModelConfig, ModelInstallJob, StarterModelBundle } from '@features/models/core/types';
 
 import { Flex, Icon, Link, Spinner, Stack, Text, Wrap } from '@chakra-ui/react';
 import { ensureInstallsLoaded, isActiveInstallStatus, useInstallsSelector } from '@features/models/data/installsStore';
@@ -6,7 +6,6 @@ import { ensureModelsLoaded, useModelsSelector } from '@features/models/data/mod
 import { ensureStartersLoaded, useStartersSelector } from '@features/models/data/startersStore';
 import { getStarterBundleInstallSources } from '@features/models/ui/add-models/starterModelInstallSources';
 import { useInstallActions } from '@features/models/ui/add-models/useInstallActions';
-import { buildInstallQueueRows, summarizeInstallQueue } from '@features/models/ui/install-queue/queueModel';
 import { useModelsUi } from '@features/models/ui/ModelsUiContext';
 import { openAddModelsWithBundle, openInstallQueue } from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
@@ -17,8 +16,20 @@ import { Button } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { useNavigate } from '@tanstack/react-router';
 import { ArrowRightIcon, BoxIcon, DownloadIcon, ExternalLinkIcon, TriangleAlertIcon } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState, type RefObject } from 'react';
+import {
+  Component,
+  Suspense,
+  use,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { importQueueModel } from './importQueueModel';
 
 /**
  * Home's first-run model guidance. Generation needs a main or hosted generator model; until one exists, managers get
@@ -43,6 +54,16 @@ const PANEL_STYLE = {
   p: '4',
   rounded: 'lg',
 } as const;
+
+// The Model Manager's install queue model counts the installs that need attention. Home loads it only once an install
+// may need one: imported statically, it costs every Home visit a request.
+type QueueModel = Awaited<ReturnType<typeof importQueueModel>>;
+// A failed load stays cached so `use` throws it to the boundary; only the boundary's Retry starts a new one.
+let queueModelLoad: Promise<QueueModel> | null = null;
+const loadQueueModel = (): Promise<QueueModel> => (queueModelLoad ??= importQueueModel());
+const reloadQueueModel = (): void => {
+  queueModelLoad = null;
+};
 
 /** Models a generation can run on; encoders, adapters and upscalers alone cannot generate. */
 const canGenerate = (model: ModelConfig): boolean => model.type === 'main' || model.type === 'external_image_generator';
@@ -134,8 +155,9 @@ const ManagerModelsNotice = ({ isMissingModels }: { isMissingModels: boolean }) 
   const jobs = useInstallsSelector((snapshot) => snapshot.jobs);
   const dismissedJobIds = useInstallsSelector((snapshot) => snapshot.dismissedJobIds);
   const activeInstallCount = useMemo(() => jobs.filter((job) => isActiveInstallStatus(job.status)).length, [jobs]);
-  const attentionCount = useMemo(
-    () => summarizeInstallQueue(buildInstallQueueRows(jobs, dismissedJobIds)).attention,
+  // Only failed and paused jobs can need attention; the queue model decides which paused ones do.
+  const mayNeedAttention = useMemo(
+    () => jobs.some((job) => !dismissedJobIds.has(job.id) && (job.status === 'error' || job.status === 'paused')),
     [dismissedJobIds, jobs]
   );
 
@@ -148,16 +170,22 @@ const ManagerModelsNotice = ({ isMissingModels }: { isMissingModels: boolean }) 
     ensureInstallsLoaded();
   });
 
-  const activity =
-    activeInstallCount > 0 || attentionCount > 0 ? (
-      <Stack gap="2">
-        {activeInstallCount > 0 ? <InstallProgress count={activeInstallCount} /> : null}
-        {attentionCount > 0 ? <InstallsNeedAttention count={attentionCount} /> : null}
-      </Stack>
-    ) : null;
+  const progress = activeInstallCount > 0 ? <InstallProgress count={activeInstallCount} /> : null;
+  // Without models or progress to frame it, the attention row brings its own panel, so a count of zero leaves none.
+  const attention = mayNeedAttention ? (
+    <AttentionSlot dismissedJobIds={dismissedJobIds} framed={!isMissingModels && !progress} jobs={jobs} />
+  ) : null;
+  const activity = progress ? (
+    <Stack gap="2">
+      {progress}
+      {attention}
+    </Stack>
+  ) : (
+    attention
+  );
 
   if (!isMissingModels) {
-    return activity ? <Stack {...PANEL_STYLE}>{activity}</Stack> : null;
+    return progress ? <Stack {...PANEL_STYLE}>{activity}</Stack> : activity;
   }
 
   return (
@@ -204,19 +232,82 @@ const InstallProgress = ({ count }: { count: number }) => {
   );
 };
 
-const InstallsNeedAttention = ({ count }: { count: number }) => {
+const MaybePanel = ({ children, framed }: { children: ReactNode; framed: boolean }) =>
+  framed ? <Stack {...PANEL_STYLE}>{children}</Stack> : children;
+
+interface AttentionProps {
+  dismissedJobIds: ReadonlySet<number>;
+  framed: boolean;
+  jobs: readonly ModelInstallJob[];
+}
+
+/** The count waits for the queue model alone: the rest of the notice stays up while it loads or if it fails. */
+const AttentionSlot = (props: AttentionProps) => (
+  <AttentionBoundary framed={props.framed}>
+    <Suspense fallback={null}>
+      <InstallsNeedAttention {...props} />
+    </Suspense>
+  </AttentionBoundary>
+);
+
+class AttentionBoundary extends Component<{ children: ReactNode; framed: boolean }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  retry = () => {
+    reloadQueueModel();
+    this.setState({ failed: false });
+  };
+  render() {
+    return this.state.failed ? (
+      <MaybePanel framed={this.props.framed}>
+        <AttentionLoadFailed onRetry={this.retry} />
+      </MaybePanel>
+    ) : (
+      this.props.children
+    );
+  }
+}
+
+const AttentionLoadFailed = ({ onRetry }: { onRetry: () => void }) => {
   const { t } = useTranslation();
-  const review = useOpenInstallQueue();
 
   return (
-    <Flex align="center" gap="2" wrap="wrap">
+    <Flex align="center" gap="2" role="alert" wrap="wrap">
       <Icon as={TriangleAlertIcon} boxSize="4" color="fg.error" />
-      <Text fontSize="md">{t('models.launchpad.installsNeedAttention', { count })}</Text>
-      <Button size="sm" variant="outline" onClick={review}>
-        {t('models.launchpad.reviewInstalls')}
-        <ArrowRightIcon />
+      <Text fontSize="md">{t('models.launchpad.installsCheckFailed')}</Text>
+      <Button size="sm" variant="outline" onClick={onRetry}>
+        {t('common.retry')}
       </Button>
     </Flex>
+  );
+};
+
+const InstallsNeedAttention = ({ dismissedJobIds, framed, jobs }: AttentionProps) => {
+  const { t } = useTranslation();
+  const review = useOpenInstallQueue();
+  const { buildInstallQueueRows, summarizeInstallQueue } = use(loadQueueModel());
+  const count = useMemo(
+    () => summarizeInstallQueue(buildInstallQueueRows(jobs, dismissedJobIds)).attention,
+    [buildInstallQueueRows, dismissedJobIds, jobs, summarizeInstallQueue]
+  );
+
+  if (count === 0) {
+    return null;
+  }
+
+  return (
+    <MaybePanel framed={framed}>
+      <Flex align="center" gap="2" wrap="wrap">
+        <Icon as={TriangleAlertIcon} boxSize="4" color="fg.error" />
+        <Text fontSize="md">{t('models.launchpad.installsNeedAttention', { count })}</Text>
+        <Button size="sm" variant="outline" onClick={review}>
+          {t('models.launchpad.reviewInstalls')}
+          <ArrowRightIcon />
+        </Button>
+      </Flex>
+    </MaybePanel>
   );
 };
 

@@ -119,7 +119,7 @@ export const HomePage = () => {
 
         <Box outline="none" ref={projectsRef} tabIndex={-1}>
           {status === 'error' && summaries.length === 0 ? (
-            <ProjectsLoadError getRecoveryFocus={getRecoveryFocus} />
+            <ProjectsLoadError getRecoveryFocus={getRecoveryFocus} layout="state" />
           ) : isFirstLoad ? (
             <Skeleton minH="24" rounded="lg" />
           ) : mostRecent ? (

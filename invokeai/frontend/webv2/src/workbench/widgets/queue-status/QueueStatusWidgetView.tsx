@@ -1,12 +1,9 @@
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Stack, Text } from '@chakra-ui/react';
-import { useModelLoads } from '@features/models';
-import { getDeterminateProgressPercent, getQueueActivity, getQueueSummary } from '@features/queue/contracts';
-import { useIsProcessorPaused } from '@features/queue/react';
-import { useActiveQueueProgress } from '@workbench/queue-integration/useActiveQueueProgress';
+import { getDeterminateProgressPercent } from '@features/queue/contracts';
+import { useQueueChromeActivity } from '@workbench/queue-integration/useActiveQueueProgress';
 import { StatusWidgetChip } from '@workbench/widget-frame';
-import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { CloudOffIcon, ListOrderedIcon, PauseIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -14,16 +11,8 @@ import { getQueueStatusChip, getQueueStatusProgress } from './queueStatusModel';
 
 export const QueueStatusWidgetView = ({ presentation }: WidgetViewProps) => {
   const { t } = useTranslation();
-  const { progress, queueItems } = useActiveQueueProgress();
-  const isPaused = useIsProcessorPaused();
-  const isConnected = useWorkbenchSelector((snapshot) => snapshot.backendConnection.status === 'connected');
-  const modelLoads = useModelLoads();
-  // Derive counts without progress so batch sub-image updates change percent only.
-  const summary = getQueueSummary(queueItems);
-  const chip = getQueueStatusChip(
-    summary,
-    getQueueActivity({ hasOpenWork: summary.total > 0, isConnected, isLoadingModels: modelLoads.length > 0, isPaused })
-  );
+  const { activity, elsewhere, modelLoads, progress, remaining, summary } = useQueueChromeActivity();
+  const chip = getQueueStatusChip({ remaining }, activity);
   const percent = getDeterminateProgressPercent(progress?.percentage);
   const label =
     chip.labelKey === 'idle'
@@ -44,6 +33,13 @@ export const QueueStatusWidgetView = ({ presentation }: WidgetViewProps) => {
         {detail ? (
           <Text color="fg.subtle" fontSize="xs">
             {detail}
+          </Text>
+        ) : null}
+        {elsewhere > 0 ? (
+          <Text color="fg.subtle" fontSize="xs">
+            {t(summary.total === 0 ? 'topbar.queue.queuedElsewhere' : 'topbar.queue.alsoQueuedElsewhere', {
+              count: elsewhere,
+            })}
           </Text>
         ) : null}
       </Stack>

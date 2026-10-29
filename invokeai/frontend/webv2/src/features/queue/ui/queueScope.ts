@@ -1,5 +1,5 @@
 import type { QueueItem } from '@features/queue/core/historyTypes';
-import type { QueueItemReadModel, QueueQueryScope } from '@features/queue/core/types';
+import type { QueueItemReadModel, QueueQueryScope, QueueReadModel } from '@features/queue/core/types';
 import type { TFunction } from 'i18next';
 
 import { buildProjectQueueItemOriginPrefix, parseQueueItemOrigin } from '@features/queue/data/events';
@@ -20,6 +20,45 @@ export const isQueueItemReadModelInProject = (
   }
 
   return project.queue.items.some((item) => item.backendItemIds?.includes(serverItem.id) ?? false);
+};
+
+/**
+ * The viewer's open work in the queue scope that is not among the project's own runs: their scoped count of pending and
+ * running items, less the open items the read model shows belonging to the project. Counting from the project's side
+ * keeps a run that just finished here, still open in a read model awaiting its refetch, from reading as work elsewhere;
+ * the project's own record of the backend items its open runs wait on covers those past the read model's recent window.
+ */
+export const getQueueOpenWorkElsewhere = (
+  model: Pick<QueueReadModel, 'current' | 'items' | 'next'>,
+  scopedOpen: number,
+  project: { queue: { items: QueueItem[] } }
+): number => {
+  const seen = new Set<number>();
+  let projectOpen = 0;
+
+  for (const item of [model.current, model.next, ...model.items]) {
+    if (!item || seen.has(item.id)) {
+      continue;
+    }
+
+    seen.add(item.id);
+
+    if ((item.status === 'pending' || item.status === 'in_progress') && isQueueItemReadModelInProject(item, project)) {
+      projectOpen += 1;
+    }
+  }
+
+  // The window holds at most the newest items; a large run of the project's reaches past it, so its own record of the
+  // backend items it still waits on counts too. The window covers the moment after a run ends here, before the refetch.
+  const projectOpenLocally = project.queue.items
+    .filter((item) => item.status === 'pending' || item.status === 'running')
+    .reduce((sum, item) => {
+      const done = new Set([...(item.completedBackendItemIds ?? []), ...(item.cancelledBackendItemIds ?? [])]);
+
+      return sum + (item.backendItemIds ?? []).filter((id) => !done.has(id)).length;
+    }, 0);
+
+  return Math.max(0, scopedOpen - Math.max(projectOpen, projectOpenLocally));
 };
 
 export const getQueueQueryScope = ({

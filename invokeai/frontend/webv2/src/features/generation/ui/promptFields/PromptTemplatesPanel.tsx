@@ -10,7 +10,6 @@ import { toPromptTemplateSnapshot } from '@features/generation/data/promptTempla
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
 import { PromptTemplateImage } from '@features/generation/ui/promptFields/PromptTemplateImage';
-import { GenerateLoadError } from '@features/generation/ui/shared/GenerateLoadError';
 import { downloadBlob } from '@platform/browser/downloadBlob';
 import {
   assertAccountScopeCurrent,
@@ -20,6 +19,7 @@ import {
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
+import { LoadError } from '@platform/ui/LoadError';
 import { Row } from '@platform/ui/Row';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { Tooltip } from '@platform/ui/Tooltip';
@@ -140,7 +140,8 @@ export const PromptTemplatesPanel = ({
 
       {/* A failed refresh keeps the templates read before; only a failure with nothing to show fills the list. */}
       {catalog.isError && catalog.templates.length > 0 ? (
-        <GenerateLoadError
+        <LoadError
+          detail={catalog.errorDetail}
           isRetrying={catalog.isRetrying}
           layout="inline"
           message={t('widgets.generate.promptTemplates.couldNotRefresh')}
@@ -152,7 +153,8 @@ export const PromptTemplatesPanel = ({
         {catalog.isLoading ? (
           <PanelMessage>{t('widgets.generate.promptTemplates.loading')}</PanelMessage>
         ) : catalog.isError && catalog.templates.length === 0 ? (
-          <GenerateLoadError
+          <LoadError
+            detail={catalog.errorDetail}
             isRetrying={catalog.isRetrying}
             layout="state"
             message={t('widgets.generate.promptTemplates.couldNotLoad')}

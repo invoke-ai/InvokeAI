@@ -13,12 +13,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CanvasProjectMutation } from './canvasProjectMutations';
 
-import {
-  type CanvasDimsSnapshot,
-  createCanvasDimsSync,
-  reconcileCanvasDims,
-  resizeBboxAroundCentre,
-} from './canvasDimsSync';
+import { type CanvasDimsSnapshot, createCanvasDimsSync, reconcileCanvasDims } from './canvasDimsSync';
 import { getProjectWidgetValues } from './widgetState';
 import { createWorkbenchStore } from './workbenchStore';
 
@@ -291,22 +286,6 @@ const setupCanvasStore = () => {
 
   return { getSyncDispatches: () => syncDispatches, store, sync };
 };
-
-describe('resizeBboxAroundCentre (pure)', () => {
-  it('keeps the centre of the frame', () => {
-    // Centre (516, 708); a 1024 square around it starts at (4, 196).
-    expect(resizeBboxAroundCentre(bbox(832, 1216, 100, 100), { height: 1024, width: 1024 })).toEqual(
-      bbox(1024, 1024, 4, 196)
-    );
-  });
-
-  it('rounds a half-pixel offset from an odd size difference to whole pixels', () => {
-    // 10 + (513 - 512) / 2 = 10.5 and 20 + (512 - 515) / 2 = 18.5.
-    expect(resizeBboxAroundCentre(bbox(513, 512, 10, 20), { height: 515, width: 512 })).toEqual(bbox(512, 515, 11, 19));
-    // -0.5 rounds to zero, not negative zero.
-    expect(resizeBboxAroundCentre(bbox(513, 512, 0, 0), { height: 512, width: 514 }).x).toBe(0);
-  });
-});
 
 describe('Generate size edits on the canvas (wiring)', () => {
   seedArchitectureCapabilities();

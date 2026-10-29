@@ -8,7 +8,7 @@ import { getGalleryUploadAccept, toGalleryItemKey } from '@features/gallery/core
 import { GALLERY_PAGE_SIZE, galleryItemsPageOptions } from '@features/gallery/data/queries';
 import { BoardCover, BoardCoverIcon } from '@features/gallery/ui/GalleryBoardCover';
 import { getGalleryBoardGroups } from '@features/gallery/ui/galleryBoardGroups';
-import { GalleryAnnouncer, GalleryLoadErrorState, GalleryLoadNotice } from '@features/gallery/ui/GalleryLoadError';
+import { GalleryAnnouncer, GalleryLoadNotice } from '@features/gallery/ui/GalleryLoadError';
 import { GallerySearchField } from '@features/gallery/ui/GallerySearchField';
 import { GallerySearchHelp } from '@features/gallery/ui/GallerySearchHelp';
 import { getGalleryProjectBoardId, getGallerySelectedBoardId } from '@features/gallery/ui/galleryStateView';
@@ -18,7 +18,9 @@ import { GalleryViewSegmentTabs } from '@features/gallery/ui/GalleryViewTabs';
 import { useGalleryUploadAction } from '@features/gallery/ui/useGalleryUploadAction';
 import { useGalleryUploadInput } from '@features/gallery/ui/useGalleryUploadInput';
 import { isImeComposing } from '@platform/browser/imeComposition';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, CloseButton, IconButton } from '@platform/ui/Button';
+import { LoadError } from '@platform/ui/LoadError';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { Tooltip } from '@platform/ui/Tooltip';
@@ -432,8 +434,6 @@ export const GalleryPickerView = ({
         accept,
         activeItem,
         isSearching,
-        isWindowTruncated: data.isWindowTruncated,
-        loadedCount: itemSlots.size,
         pane: scope.pane,
         remaining: getGalleryPickerRemaining(accept, selection),
         total,
@@ -540,11 +540,16 @@ export const GalleryPickerView = ({
         role="tabpanel"
       >
         {scope.pane === 'boards' && isBoardListUnavailable ? (
-          <GalleryLoadErrorState
-            read={data.boardsState}
+          <LoadError
+            detail={data.boardsState.error ? getApiErrorMessage(data.boardsState.error, '') : null}
+            flex="1"
+            isRetrying={data.boardsState.isRetrying}
+            layout="state"
+            message={t('widgets.gallery.boardsLoadFailed')}
+            py="6"
             retryLabel={t('widgets.gallery.retryLoadingBoards')}
-            title={t('widgets.gallery.boardsLoadFailed')}
             onFocusLost={focusSearch}
+            onRetry={data.boardsState.retry}
           />
         ) : scope.pane === 'boards' ? (
           <GalleryPickerBoards
@@ -560,11 +565,16 @@ export const GalleryPickerView = ({
             onSelect={handleSelectBoard}
           />
         ) : data.listing.status === 'error' ? (
-          <GalleryLoadErrorState
-            read={data.listing}
+          <LoadError
+            detail={data.listing.error ? getApiErrorMessage(data.listing.error, '') : null}
+            flex="1"
+            isRetrying={data.listing.isRetrying}
+            layout="state"
+            message={t('widgets.gallery.listingLoadFailed')}
+            py="6"
             retryLabel={t('widgets.gallery.retryLoadingItems')}
-            title={t('widgets.gallery.listingLoadFailed')}
             onFocusLost={focusSearch}
+            onRetry={data.listing.retry}
           />
         ) : showsGrid ? (
           <GalleryPickerGrid

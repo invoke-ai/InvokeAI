@@ -5,7 +5,7 @@ import type { CanvasStagingSlot } from '@workbench/canvasStagingView';
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -23,9 +23,22 @@ vi.mock('@features/queue/react', async (importOriginal) => ({
   useQueueItemProgress: () => queueProgress.current,
 }));
 vi.mock('./StagingItemContextMenu', () => ({
-  StagingItemContextMenu: ({ target }: { target: { slot: { id: string }; x: number; y: number } }) => {
+  StagingItemContextMenu: ({
+    onClose,
+    target,
+  }: {
+    onClose: () => void;
+    target: { slot: { id: string }; x: number; y: number };
+  }) => {
     contextMenu.targets.push({ slotId: target.slot.id, x: target.x, y: target.y });
-    return <div data-testid="staging-context-menu" />;
+    // Stands in for the menu's dismissal: the menu holds focus, then unmounts and drops it.
+    return (
+      <div data-testid="staging-context-menu">
+        <button type="button" onClick={onClose}>
+          Close menu
+        </button>
+      </div>
+    );
   },
 }));
 
@@ -465,6 +478,114 @@ describe('StagingBar thumbnail strip', () => {
       );
     }
   );
+});
+
+describe('StagingBar focus', () => {
+  const nextFrame = () =>
+    act(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        })
+    );
+
+  /** A canvas region whose surface outlives the bar, which unmounts with its last result as the canvas's does. */
+  const CanvasWithStaging = ({ slots }: { slots: CanvasStagingSlot[] }) => {
+    const [remaining, setRemaining] = useState(slots);
+    const selected = remaining[0];
+    const discardSelected = () => setRemaining((current) => current.slice(1));
+
+    return (
+      <Box h="400px" position="relative" role="region" w={`${CANVAS_WIDTH}px`}>
+        <Box data-canvas-surface="" data-testid="surface" h="full" tabIndex={-1} />
+        <CanvasBottomOverlay.Root>
+          {remaining.length > 0 ? (
+            <CanvasBottomOverlay.Staging>
+              <StagingBar
+                antialiasProgressImages={false}
+                areThumbnailsVisible
+                autoSwitchMode="off"
+                canAccept
+                hasMultipleSlots={remaining.length > 1}
+                isGenerating={false}
+                isSavingToGallery={false}
+                isVisible
+                selectedCandidate={selected?.kind === 'candidate' ? selected.candidate : undefined}
+                selectedImageIndex={0}
+                selectedSlot={selected}
+                slots={remaining}
+                onAccept={noop}
+                onCancelQueueItem={noop}
+                onCycle={noop}
+                onDiscardAll={() => setRemaining([])}
+                onDiscardSelected={discardSelected}
+                onPreloadCandidate={noop}
+                onSelectImage={noop}
+                onSaveToGallery={() => Promise.resolve()}
+                onSaveToLayerAndContinue={noop}
+                onSetAutoSwitch={noop}
+                onToggleThumbnails={noop}
+                onToggleVisibility={noop}
+              />
+            </CanvasBottomOverlay.Staging>
+          ) : null}
+        </CanvasBottomOverlay.Root>
+      </Box>
+    );
+  };
+
+  const renderCanvas = async (slotCount: number) => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await interact(() =>
+      root?.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <CanvasWithStaging slots={Array.from({ length: slotCount }, (_, index) => makeSlot(index))} />
+          </ChakraProvider>
+        </I18nextProvider>
+      )
+    );
+    const thumbnails = () =>
+      Array.from(host!.querySelectorAll<HTMLElement>('[data-scope="scroll-area"][data-part="viewport"] button'));
+    return { surface: host.querySelector<HTMLElement>('[data-testid="surface"]')!, thumbnails };
+  };
+
+  it('hands focus to the canvas surface when discarding the last result removes the bar', async () => {
+    const { surface, thumbnails } = await renderCanvas(1);
+
+    await act(() => thumbnails()[0]!.focus());
+    await act(() => userEvent.keyboard('{Delete}'));
+    await nextFrame();
+
+    expect(host!.querySelector('[data-testid="staging-context-menu"]')).toBeNull();
+    expect(document.activeElement).toBe(surface);
+  });
+
+  it('hands focus to the canvas surface after Discard all', async () => {
+    const { surface } = await renderCanvas(3);
+
+    await userEvent.click(page.getByRole('button', { exact: true, name: 'Discard all' }).first());
+    await nextFrame();
+
+    expect(document.activeElement).toBe(surface);
+  });
+
+  it('returns focus to the thumbnail a dismissed menu opened from', async () => {
+    const { thumbnails } = await renderCanvas(3);
+
+    await act(() => thumbnails()[0]!.focus());
+    await act(() => {
+      thumbnails()[0]!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    });
+    const close = page.getByRole('button', { name: 'Close menu' });
+    await act(() => (close.element() as HTMLElement).focus());
+    await act(() => (close.element() as HTMLElement).click());
+    await nextFrame();
+
+    expect(document.activeElement).toBe(thumbnails()[0]);
+  });
 });
 
 describe('StagingBar keys', () => {

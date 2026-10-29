@@ -23,6 +23,7 @@ const harness = vi.hoisted(() => ({
 vi.mock('@workbench/queue-integration/useActiveQueueProgress', () => ({
   useActiveQueueProgress: () => ({ progress: harness.progress, queueItems: [], summary: harness.summary }),
 }));
+vi.mock('@workbench/useNotify', () => ({ useNotify: () => ({ error: () => {} }) }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchCommands: () => ({ generation: { setSource: (sourceId: string) => harness.sources.push(sourceId) } }),
 }));

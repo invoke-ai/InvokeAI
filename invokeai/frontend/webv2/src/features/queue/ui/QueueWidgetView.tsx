@@ -75,7 +75,7 @@ const QueueStatusChip = () => {
       : activity === 'paused'
         ? t('widgets.queueStatus.paused', { count: openCount })
         : activity === 'loading-model'
-          ? t('widgets.queueStatus.loadingModel', { model: loadingModel })
+          ? t('widgets.queue.loadingModel', { model: loadingModel })
           : inProgress > 0
             ? t('widgets.queue.generating', { count: inProgress })
             : t('widgets.queue.queued', { count: pending });

@@ -18,7 +18,7 @@ import { clampDimension, deriveAspectRatioId, getGenerationDimensions } from '@f
 
 import type { WorkbenchCommands } from './workbenchStore';
 
-import { resolveModelGrid } from './widgets/canvas/bboxGrid';
+import { resizeBboxAroundCentre, resolveModelGrid } from './widgets/canvas/bboxGrid';
 import {
   CANVAS_SCALING_KEYS,
   fitCanvasScalingToRatio,
@@ -152,15 +152,6 @@ export const reconcileCanvasDims = ({
 
   return { kind: 'none' };
 };
-
-/** The frame resized to `size` around its centre; the position rounds to whole pixels. */
-export const resizeBboxAroundCentre = (bbox: Bbox, size: Pick<Bbox, 'height' | 'width'>): Bbox => ({
-  height: size.height,
-  width: size.width,
-  // `+ 0` folds the -0 that rounding a small negative offset yields.
-  x: Math.round(bbox.x + (bbox.width - size.width) / 2) + 0,
-  y: Math.round(bbox.y + (bbox.height - size.height) / 2) + 0,
-});
 
 /** The minimal workbench store surface the sync depends on. */
 export interface CanvasDimsSyncStore {

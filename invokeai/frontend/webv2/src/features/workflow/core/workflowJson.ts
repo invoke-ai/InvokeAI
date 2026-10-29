@@ -284,7 +284,7 @@ export const parseWorkflowJson = (raw: unknown): ParsedWorkflow => {
   const parsed = zWorkflowJson.safeParse(raw);
 
   if (!parsed.success) {
-    throw new Error('This file is not a recognizable InvokeAI workflow.');
+    throw new Error('This file is not a recognizable Invoke workflow.');
   }
 
   const warnings: string[] = [];

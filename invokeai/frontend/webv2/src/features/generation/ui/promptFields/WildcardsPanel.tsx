@@ -16,7 +16,6 @@ import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
 import { PromptTextarea } from '@features/generation/ui/promptFields/PromptTextarea';
 import { WildcardTransferActions } from '@features/generation/ui/promptFields/WildcardTransferActions';
-import { GenerateLoadError } from '@features/generation/ui/shared/GenerateLoadError';
 import { WildcardDeleteError } from '@features/generation/ui/useWildcards';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton } from '@platform/ui/Button';
@@ -25,6 +24,7 @@ import { Field } from '@platform/ui/Field';
 import { List } from '@platform/ui/list/List';
 import { ListItem } from '@platform/ui/list/ListItem';
 import { ListSelectionBar } from '@platform/ui/list/ListSelectionBar';
+import { LoadError } from '@platform/ui/LoadError';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { CheckIcon, PencilIcon, PlusIcon, TrashIcon, XIcon } from 'lucide-react';
 import { memo, useCallback, useId, useMemo, useRef, useState } from 'react';
@@ -310,7 +310,8 @@ export const WildcardsPanel = ({
 
       {/* A failed refresh keeps the wildcards read before; only a failure with nothing to show fills the list. */}
       {catalog.isError && catalog.wildcards.length > 0 ? (
-        <GenerateLoadError
+        <LoadError
+          detail={catalog.errorDetail}
           isRetrying={catalog.isRetrying}
           layout="inline"
           message={t('widgets.generate.dynamicPrompts.couldNotRefreshWildcards')}
@@ -377,7 +378,8 @@ export const WildcardsPanel = ({
           density="snug"
           emptyState={
             catalog.isError && catalog.wildcards.length === 0 ? (
-              <GenerateLoadError
+              <LoadError
+                detail={catalog.errorDetail}
                 isRetrying={catalog.isRetrying}
                 layout="state"
                 message={t('widgets.generate.dynamicPrompts.couldNotLoadWildcards')}

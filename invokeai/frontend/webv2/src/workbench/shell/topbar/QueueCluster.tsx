@@ -3,15 +3,12 @@ import type { QueueActivity, QueueItem } from '@features/queue/contracts';
 import type { QueueItemProgress } from '@features/queue/react';
 
 import { Badge, chakra, HStack, Icon, Menu, Portal, Progress, Stack, Text } from '@chakra-ui/react';
-import { useModelLoads } from '@features/models';
 import {
   getDeterminateProgressFraction,
-  getQueueActivity,
   getQueueItemExpectedImageCount,
   getQueueItemSnapshotPositivePrompt,
 } from '@features/queue/contracts';
 import { getQueueAction, QueueMenuItems, useQueueActions } from '@features/queue/menu';
-import { useIsProcessorPaused } from '@features/queue/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button, IconButton } from '@platform/ui/Button';
 import { Group } from '@platform/ui/Group';
@@ -19,9 +16,8 @@ import { MenuContent } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getDestinationLabel, getSourceLabel } from '@workbench/invocation';
-import { useActiveQueueProgress } from '@workbench/queue-integration/useActiveQueueProgress';
+import { useQueueChromeActivity } from '@workbench/queue-integration/useActiveQueueProgress';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { CloudOffIcon, ListOrderedIcon, ListXIcon, PauseIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useState, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -57,8 +53,6 @@ const itemStatusLabelKeys: Record<QueueItem['status'], string> = {
 
 export const QueueCluster = () => {
   const { t } = useTranslation();
-  const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.backendConnection.status);
-  const modelLoads = useModelLoads();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const actions = useQueueActions({ includeOpenQueue: true });
   const cancelCurrent = getQueueAction(actions, 'cancel-current');
@@ -66,20 +60,20 @@ export const QueueCluster = () => {
   const [isCancelHovered, setIsCancelHovered] = useState(false);
   const [isShiftHeld, setIsShiftHeld] = useState(false);
 
-  const { progress: runningProgress, queueItems, summary } = useActiveQueueProgress();
-  const { current, remaining, total } = summary;
+  const {
+    activity,
+    elsewhere,
+    modelLoads,
+    progress: runningProgress,
+    queueItems,
+    remaining,
+    summary,
+  } = useQueueChromeActivity();
+  const { current, total } = summary;
   const runningItem = summary.runningQueueItemId
     ? queueItems.find((item) => item.id === summary.runningQueueItemId)
     : undefined;
 
-  const isConnected = backendConnectionStatus === 'connected';
-  const isPaused = useIsProcessorPaused();
-  const activity = getQueueActivity({
-    hasOpenWork: total > 0,
-    isConnected,
-    isLoadingModels: modelLoads.length > 0,
-    isPaused,
-  });
   const progressValue = getDeterminateProgressFraction(runningProgress?.percentage);
   const isCancellable = !cancelCurrent?.disabled;
   const [lastCancellable, setLastCancellable] = useState(isCancellable);
@@ -125,6 +119,7 @@ export const QueueCluster = () => {
         <QueueButtonTooltip
           activity={activity}
           current={current}
+          elsewhere={elsewhere}
           item={runningItem}
           modelLoads={modelLoads}
           progress={runningProgress}
@@ -232,6 +227,7 @@ const QueueButtonTooltip = ({
   activity,
   children,
   current,
+  elsewhere,
   item,
   modelLoads,
   progress,
@@ -241,6 +237,7 @@ const QueueButtonTooltip = ({
   activity: QueueActivity;
   children: ReactNode;
   current: number;
+  elsewhere: number;
   item?: QueueItem;
   modelLoads: ModelLoadInfo[];
   progress: QueueItemProgress | null;
@@ -252,6 +249,7 @@ const QueueButtonTooltip = ({
       <QueueTooltip
         activity={activity}
         current={current}
+        elsewhere={elsewhere}
         item={item}
         modelLoads={modelLoads}
         progress={progress}
@@ -259,7 +257,7 @@ const QueueButtonTooltip = ({
         total={total}
       />
     ),
-    [activity, current, item, modelLoads, progress, remaining, total]
+    [activity, current, elsewhere, item, modelLoads, progress, remaining, total]
   );
 
   return (
@@ -291,10 +289,13 @@ const QueueProgressAnnouncement = ({
       : activity === 'offline'
         ? t('topbar.queue.offlineWaiting', { count: remaining })
         : activity === 'paused'
-          ? t('topbar.queue.pausedWaiting', { count: remaining })
-          : decile === null
-            ? t('topbar.queue.imageProgress', { current, total })
-            : t('topbar.queue.imageProgressPercent', { current, percent: decile, total });
+          ? t('widgets.queue.processorPausedWaiting', { count: remaining })
+          : // The live region names no source: whether work is elsewhere flickers while the queue catches up.
+            total === 0
+            ? t('widgets.queueStatus.queued', { count: remaining })
+            : decile === null
+              ? t('topbar.queue.imageProgress', { current, total })
+              : t('topbar.queue.imageProgressPercent', { current, percent: decile, total });
 
   return (
     <chakra.span aria-live="polite" srOnly>
@@ -306,6 +307,7 @@ const QueueProgressAnnouncement = ({
 const QueueTooltip = ({
   activity,
   current,
+  elsewhere,
   item,
   modelLoads,
   progress,
@@ -314,6 +316,8 @@ const QueueTooltip = ({
 }: {
   activity: QueueActivity;
   current: number;
+  /** Open work in the queue scope beyond the project's runs, which `remaining` includes. */
+  elsewhere: number;
   item?: QueueItem;
   modelLoads: ModelLoadInfo[];
   progress: QueueItemProgress | null;
@@ -321,6 +325,12 @@ const QueueTooltip = ({
   total: number;
 }) => {
   const { t } = useTranslation();
+  const alsoElsewhere =
+    elsewhere > 0 ? (
+      <Text color="fg.subtle" fontSize="xs">
+        {t('topbar.queue.alsoQueuedElsewhere', { count: elsewhere })}
+      </Text>
+    ) : null;
   if (modelLoads.length > 0 && total === 0) {
     return <ModelLoadsTooltipContent modelLoads={modelLoads} />;
   }
@@ -329,7 +339,7 @@ const QueueTooltip = ({
     return (
       <Stack gap="1" p="3">
         <Text fontSize="md" fontWeight="800">
-          {activity === 'offline' ? t('topbar.queue.reconnecting') : t('widgets.queue.processorPaused')}
+          {activity === 'offline' ? t('widgets.queue.reconnecting') : t('widgets.queue.processorPaused')}
         </Text>
         <Text color="fg.subtle" fontSize="xs">
           {activity === 'offline'
@@ -340,7 +350,7 @@ const QueueTooltip = ({
     );
   }
 
-  if (total === 0) {
+  if (activity === 'idle') {
     return (
       <Stack gap="1" p="3">
         <Text fontSize="md" fontWeight="800" fontVariantNumeric="tabular-nums">
@@ -353,17 +363,32 @@ const QueueTooltip = ({
     );
   }
 
+  // Work in the queue scope that this project's runs do not account for: another project's, or another tab's.
+  if (total === 0) {
+    return (
+      <Stack gap="1" p="3">
+        <Text fontSize="md" fontWeight="800" fontVariantNumeric="tabular-nums">
+          {t('widgets.queueStatus.queued', { count: remaining })}
+        </Text>
+        <Text color="fg.subtle" fontSize="xs">
+          {t('topbar.queue.queuedElsewhere', { count: remaining })}
+        </Text>
+      </Stack>
+    );
+  }
+
   if (!item) {
     return (
       <Stack gap="2" p="3">
         <Text fontSize="md" fontWeight="800" fontVariantNumeric="tabular-nums">
           {modelLoads[0]
-            ? t('topbar.queue.loadingModel', { model: modelLoads[0].label })
+            ? t('widgets.queue.loadingModel', { model: modelLoads[0].label })
             : t('topbar.queue.waitingToStart')}
         </Text>
         <Text color="fg.subtle" fontSize="xs">
           {t('topbar.queue.queuedImages', { count: total })}
         </Text>
+        {alsoElsewhere}
         {modelLoads.length > 1 ? <ModelLoadList modelLoads={modelLoads} /> : null}
       </Stack>
     );
@@ -377,7 +402,7 @@ const QueueTooltip = ({
   );
   const activeBackendItemId = item.backendItemIds?.[activeItemIndex - 1];
   const progressLabel = modelLoads[0]
-    ? t('topbar.queue.loadingModel', { model: modelLoads[0].label })
+    ? t('widgets.queue.loadingModel', { model: modelLoads[0].label })
     : progress?.message?.trim() || t('topbar.queue.waitingForProgress');
 
   return (
@@ -427,6 +452,7 @@ const QueueTooltip = ({
           {prompt}
         </Text>
       ) : null}
+      {alsoElsewhere}
     </Stack>
   );
 };

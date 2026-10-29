@@ -18,7 +18,11 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const CARD_HOVER = { bg: 'bg.muted', borderColor: 'border.emphasized' } as const;
-const LINK_STYLE = { cursor: 'default', inset: 0, position: 'absolute' } as const;
+// The card clips its overlay link's own outline, so the card draws the keyboard focus ring around itself.
+const LINK_STYLE = { cursor: 'default', inset: 0, outline: 'none', position: 'absolute' } as const;
+const CARD_FOCUS_RING = {
+  '&:has(> a:focus-visible)': { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '2px' },
+} as const;
 const CARD_TRANSITION =
   'border-color var(--wb-motion-duration-medium) ease, background var(--wb-motion-duration-medium) ease';
 const COVER_WIDTH = { base: '32', sm: '40' } as const;
@@ -47,6 +51,7 @@ export const ResumeCard = ({
   return (
     <Flex
       align="stretch"
+      css={CARD_FOCUS_RING}
       bg="bg.subtle"
       borderColor="border.subtle"
       borderWidth="1px"

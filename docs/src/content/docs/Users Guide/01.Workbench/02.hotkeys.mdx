@@ -1,200 +1,214 @@
 ---
-title: Hotkey shortcuts
-description: Learn how to use and customize hotkeys in InvokeAI, and how developers can interact with the hotkey system.
-lastUpdated: 2026-02-19
+title: Keyboard shortcuts
+description: Every default keyboard shortcut in Invoke, where each one works, and how to change, add, disable or reset shortcuts in Settings.
+lastUpdated: 2026-10-29
 ---
 
-import { Tabs, TabItem, Steps, Card, CardGrid, Icon } from '@astrojs/starlight/components';
+import { Steps } from '@astrojs/starlight/components';
 
-InvokeAI allows you to customize all keyboard shortcuts (hotkeys) to match your workflow preferences. This guide covers how to use and customize hotkeys as a user, as well as providing technical documentation for developers.
+Most commands in Invoke have a keyboard shortcut, and you can change any of them. This page explains where shortcuts work, how to change them, and lists every default.
 
-## User Guide
+In the tables, <kbd>Mod</kbd> means <kbd>Ctrl</kbd> on Windows and Linux and <kbd>Cmd</kbd> on macOS. On macOS, <kbd>Alt</kbd> is the <kbd>Option</kbd> key. Invoke shows each shortcut with your platform's key names.
 
-<CardGrid>
-  <Card title="View All Hotkeys" icon="magnifier">
-    See all available keyboard shortcuts organized by category in one place.
-  </Card>
-  <Card title="Customize Any Hotkey" icon="pencil">
-    Change any shortcut to your preference, or assign multiple key combinations to the same action.
-  </Card>
-  <Card title="Smart Validation" icon="approve-check-circle">
-    Built-in validation prevents invalid combinations.
-  </Card>
-  <Card title="Persistent Settings" icon="setting">
-    Your custom hotkeys are safely stored and restored across sessions.
-  </Card>
-</CardGrid>
+## Where shortcuts work
 
-### Opening the Hotkeys Modal
+- **App** shortcuts work anywhere in the workbench.
+- **Panel** shortcuts (Canvas, Workflows, Viewer, Gallery) work only while that panel has keyboard focus. Click in a panel, or move focus to it, to give its keys priority. The Viewer shortcuts belong to the **Preview** panel.
+- When a panel shortcut uses the same key as an App shortcut, the panel's shortcut wins while that panel has focus, and the App shortcut works everywhere else. For example, <kbd>T</kbd> selects the Text tool on the Canvas and collapses the left panel elsewhere.
+- While you type in a text field, single-key shortcuts do nothing so your typing is never interrupted. Shortcuts that make sense while writing a prompt still work there: Invoke, Invoke Front, Invoke To Other Destination, Focus Prompt, the prompt history and prompt weight keys, Open Project Switcher, Open Settings, the command palette, and the region and widget focus keys.
+- While a dialog is open, only the command palette shortcut works.
+- An open menu or list keeps its own arrow keys, <kbd>Enter</kbd>, <kbd>Esc</kbd>, <kbd>Space</kbd> and letter keys.
+- A bare <kbd>Space</kbd> or <kbd>Enter</kbd> on a focused button or tile always presses it, whatever the shortcut. A focused slider or radio group likewise keeps its arrow keys, <kbd>Home</kbd> and <kbd>End</kbd>.
+- Some shortcuts, such as the Canvas's <kbd>Mod</kbd>+<kbd>1</kbd> zoom, are also browser shortcuts. They work only when the browser passes the keys to the page.
 
-Press <kbd>Shift</kbd> + <kbd>?</kbd> or click the **keyboard icon** in the application to open the Hotkeys Modal.
+The **Shortcuts** chip in the status bar lists the keys for whatever has focus, including Canvas pointer gestures and hold keys that are not customizable, such as holding <kbd>C</kbd> for the frame tool.
 
-### Managing Hotkeys
+## Changing shortcuts
 
-<Tabs>
-  <TabItem label="Viewing">
-    - Browse all available hotkeys organized by category (App, Canvas, Gallery, Workflows, etc.).
-    - Search for specific hotkeys using the search bar.
-    - See the current key combination for each action.
-  </TabItem>
-  <TabItem label="Customizing">
-    <Steps>
-    1. Click the **pencil** button by the hotkey you want to change, or click the **plus** button to add a new one.
-    2. Enter your new hotkey combination in the editor.
-       - Use modifier buttons for quick-insert (<kbd>Mod</kbd>, <kbd>Ctrl</kbd>, <kbd>Shift</kbd>, <kbd>Alt</kbd>).
-       - Check the live preview to see how your hotkey will look.
-    3. Click the **checkmark** or press <kbd>Enter</kbd> to save.
-    </Steps>
-  </TabItem>
-  <TabItem label="Resetting">
-    - **Reset a single hotkey:** Click the counter-clockwise arrow icon next to customized hotkeys.
-    - **Reset all hotkeys:** In Edit Mode, click the **Reset All to Default** button at the bottom.
-  </TabItem>
-</Tabs>
+Open **Settings** (<kbd>Mod</kbd>+<kbd>,</kbd>, or the app menu) and choose **Keyboard shortcuts**. You can also choose **Keyboard Shortcuts** in the [command palette](#app), or **Keyboard shortcut settings** in the status bar's **Shortcuts** chip.
 
-### Hotkey Format Reference
-
-When customizing hotkeys, use the following formats:
-
-- **Valid Modifiers:** `mod` (Ctrl on Windows/Linux, Cmd on Mac), `ctrl`, `shift`, `alt`
-- **Valid Keys:** Letters (`a-z`), Numbers (`0-9`), Function keys (`f1-f12`), Special keys (`enter`, `space`, `tab`, `backspace`, `delete`, `escape`), Arrow keys (`up`, `down`, `left`, `right`)
-- **Multiple alternatives:** Separate with commas (e.g., `mod+enter, ctrl+enter`)
-
-:::tip
-  **Valid Hotkeys:** `mod+s`, `ctrl+shift+p`, `f5, mod+r`<br/>
-  **Invalid Hotkeys:** `mod+` (no key after modifier), `shift+ctrl+` (ends with modifier)
-:::
-
----
-
-## Developer Guide
-
-The hotkeys system allows developers to centrally define, manage, and validate hotkeys throughout the application. It is built on top of `react-hotkeys-hook`.
-
-### Architecture
-
-The customizable hotkeys feature comprises the following components:
-
-<Tabs>
-  <TabItem label="State & Persistence">
-    **Hotkeys State Slice (`hotkeysSlice.ts`)**
-    - Stores custom hotkey mappings in Redux state.
-    - Persisted to IndexedDB using `redux-remember`.
-    - Provides actions to change, reset individual, or reset all hotkeys.
-  </TabItem>
-  <TabItem label="Hooks">
-    **`useHotkeyData` Hook (`useHotkeyData.ts`)**
-    - Defines all default hotkeys and merges them with custom hotkeys from the store.
-    - Returns the effective hotkeys to be used.
-    - Provides platform-specific key translations.
-  </TabItem>
-  <TabItem label="UI Components">
-    - **`HotkeyEditor.tsx`**: Inline editor with live preview, validation, and modifier insertion.
-    - **`HotkeysModal.tsx`**: The modal interface supporting View/Edit modes, searching, and categories.
-  </TabItem>
-</Tabs>
-
-### Adding New Hotkeys
-
-To add a new hotkey to the system, follow these steps:
+The **Hotkeys** list groups every shortcut under App, Canvas, Workflows, Viewer and Gallery, whether or not that panel is in your layout. **Search hotkeys** filters the list by command name or default key. Your shortcuts are saved with your account and apply in every project.
 
 <Steps>
-1. **Add Translation Strings**
-   In `invokeai/frontend/webv1/public/locales/en.json`:
-   ```json
-   {
-     "hotkeys": {
-       "app": {
-         "myAction": {
-           "title": "My Action",
-           "desc": "Description of what this hotkey does"
-         }
-       }
-     }
-   }
-   ```
-
-2. **Register the Hotkey**
-   In `invokeai/frontend/webv1/src/features/system/components/HotkeysModal/useHotkeyData.ts`:
-   ```typescript
-   // Inside the appropriate category builder function
-   addHotkey('app', 'myAction', ['mod+k']); // Default binding
-   ```
-
-3. **Use the Hotkey in Components**
-   ```tsx
-   import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-
-   const MyComponent = () => {
-     const handleAction = useCallback(() => {
-       // Your action here
-     }, []);
-
-     // Automatically uses custom hotkeys if configured
-     useRegisteredHotkeys({
-       id: 'myAction',
-       category: 'app', // 'app', 'canvas', 'viewer', 'gallery', 'workflows'
-       callback: handleAction,
-       options: { enabled: true, preventDefault: true },
-       dependencies: [handleAction]
-     });
-
-     // ...
-   };
-   ```
+1. Click a key chip on a row to change it. The chip reads **Press keys**: press the new combination. Press <kbd>Esc</kbd> to stop recording without changing the chip, or click the trash button to remove that key.
+2. Click **+** (**Add hotkey**) to give the command another key. A command can have several.
+3. Click the check mark (**Save hotkey edit**) to keep the change, or **×** (**Cancel hotkey edit**) to discard it.
 </Steps>
 
-### Common Patterns
+- **Disable** removes every key from a command. The row then reads **Disabled**.
+- A dot next to a command's name marks a shortcut that differs from its default. The **Reset hotkey** button on the row returns it to the default; **Reset all**, at the top of the list, resets every shortcut.
 
-<Tabs>
-  <TabItem label="Conditional Hotkeys">
-    Only enable hotkeys when certain conditions are met:
-    ```typescript
-    useRegisteredHotkeys({
-      id: 'save',
-      category: 'app',
-      callback: handleSave,
-      options: {
-        enabled: hasUnsavedChanges && !isLoading, // Only when valid
-        preventDefault: true
-      },
-      dependencies: [hasUnsavedChanges, isLoading, handleSave]
-    });
-    ```
-  </TabItem>
-  <TabItem label="Focus-Scoped Hotkeys">
-    Ensure hotkeys are only active when a specific region is focused:
-    ```tsx
-    import { useFocusRegion } from 'common/hooks/focus';
+Invoke checks each change before you save it:
 
-    const MyComponent = () => {
-      const focusRegionRef = useFocusRegion('myRegion');
+- **Conflicts with …** (in red) means another command already uses that key where this one works, so the key would do two things at once. The check mark stays disabled until you choose another key or change the other command first.
+- **Duplicate binding in this hotkey** means the same key is listed twice on one row.
+- **Takes this key from … while … has focus** and **… takes this key while … has focus** (in yellow) mean a panel shortcut and an App shortcut share the key. This is allowed: each still works in its own place, as described in [Where shortcuts work](#where-shortcuts-work).
 
-      // Hotkey only works when this region has focus
-      useRegisteredHotkeys({
-        id: 'myAction',
-        category: 'app',
-        callback: handleAction,
-        options: { enabled: true }
-      });
+## App
 
-      return <div ref={focusRegionRef}>...</div>;
-    };
-    ```
-  </TabItem>
-  <TabItem label="Multiple Alternatives">
-    Provide multiple alternatives for the same action:
-    ```typescript
-    // In useHotkeyData.ts
-    addHotkey('canvas', 'redo', ['mod+shift+z', 'mod+y']); // Two alternatives
-    ```
-  </TabItem>
-</Tabs>
+These work anywhere in the workbench.
 
-:::caution[Best Practices]
-- **Use `mod` instead of `ctrl`**: Automatically maps to <kbd>Cmd</kbd> on Mac, <kbd>Ctrl</kbd> elsewhere.
-- **Provide descriptive translations**: Help users understand what each hotkey does.
-- **Avoid conflicts**: Check existing hotkeys before adding new ones.
-- **Check enabled state**: Only activate hotkeys when the action is available.
-- **Use dependencies correctly**: Ensure callbacks are stable with `useCallback`.
-:::
+| Keys | Command | What it does |
+| --- | --- | --- |
+| <kbd>Mod</kbd>+<kbd>K</kbd> | Open Command Palette | Opens or closes the command palette, even while you type or a dialog is open |
+| <kbd>Mod</kbd>+<kbd>Enter</kbd> | Invoke | Queues the active route |
+| <kbd>Mod</kbd>+<kbd>Shift</kbd>+<kbd>Enter</kbd> | Invoke Front | Queues ahead of your pending items |
+| <kbd>Mod</kbd>+<kbd>Alt</kbd>+<kbd>Enter</kbd> | Invoke To Other Destination | Queues once with results sent to the other destination (Gallery instead of Canvas, or Canvas instead of Gallery). The saved route does not change. |
+| <kbd>Shift</kbd>+<kbd>X</kbd> | Cancel Queue Item | Cancels the item that is running |
+| <kbd>Mod</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd> | Cancel all queue items | Cancels every unfinished item, after you confirm |
+| <kbd>Alt</kbd>+<kbd>A</kbd> | Focus Prompt | Opens Generate and puts the cursor in the prompt |
+| <kbd>Alt</kbd>+<kbd>↑</kbd> / <kbd>Alt</kbd>+<kbd>↓</kbd> | Prompt History Prev / Prompt History Next | Steps through your prompt history |
+| <kbd>Ctrl</kbd>+<kbd>↑</kbd> / <kbd>Ctrl</kbd>+<kbd>↓</kbd> | Prompt Weight Up / Prompt Weight Down | Raises or lowers the attention weight at the cursor in a prompt field. Works only when the selected model reads attention syntax; <kbd>Ctrl</kbd> is Control on macOS too. |
+| <kbd>Mod</kbd>+<kbd>P</kbd> | Open Project Switcher | Opens the project switcher |
+| <kbd>Mod</kbd>+<kbd>,</kbd> | Open Settings | Opens Settings |
+| <kbd>1</kbd> | Open Generate | Shows the Generate panel |
+| <kbd>2</kbd> | Open Canvas | Shows the Canvas in the center |
+| <kbd>3</kbd> | Open Upscale | Shows the Upscale panel |
+| <kbd>4</kbd> | Open Workflow editor | Shows the Workflow editor in the center |
+| <kbd>5</kbd> | Open Model Manager | Opens the Model Manager |
+| <kbd>6</kbd> | Open Queue | Shows the Queue panel |
+
+### Layout and focus
+
+| Keys | Command | What it does |
+| --- | --- | --- |
+| <kbd>T</kbd> or <kbd>O</kbd> | Toggle Left Panel | Collapses or expands the left panel |
+| <kbd>G</kbd> | Toggle Right Panel | Collapses or expands the right panel |
+| <kbd>F</kbd> | Toggle Panels | Collapses or expands all side and bottom panels at once |
+| <kbd>Z</kbd> | Toggle Preview | Swaps the Preview into or out of the center |
+| <kbd>Mod</kbd>+<kbd>Alt</kbd>+<kbd>Z</kbd> | Undo layout change | Undoes the last change to the layout |
+| <kbd>Mod</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> | Redo layout change | Redoes the layout change you undid |
+| <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd> | Select Compose Preset, Select Edit Preset, Select Video Preset, Select Workflow Preset | Switches to that built-in layout preset |
+| <kbd>Alt</kbd>+<kbd>Shift</kbd>+arrow keys (<kbd>Ctrl</kbd>+<kbd>Cmd</kbd>+arrow keys on macOS) | Focus Region Left, Right, Up, Down | Moves keyboard focus to the neighbouring region of the workbench |
+| <kbd>Alt</kbd>+<kbd>Page Up</kbd> / <kbd>Alt</kbd>+<kbd>Page Down</kbd> | Select Previous Widget / Select Next Widget | Shows the previous or next panel in the focused region |
+
+**Revert layout to saved preset**, **Save Layout Preset** and **Show widgets** have no default keys; assign them in Settings if you use them often. See [Guided tour](/users-guide/workbench/introduction/) for layouts and presets.
+
+## Canvas
+
+These work while the Canvas has focus. The tool, brush size, color and undo keys also work while the **Layers** panel has focus.
+
+### Tools and colors
+
+| Keys | Command | What it does |
+| --- | --- | --- |
+| <kbd>H</kbd> | Select view tool | View tool |
+| <kbd>V</kbd> | Select move tool | Move tool |
+| <kbd>Shift</kbd>+<kbd>T</kbd> | Transform selected layer | Starts transforming the selected layer, or selects the Transform tool when no layer is selected |
+| <kbd>B</kbd> | Select brush tool | Brush tool |
+| <kbd>E</kbd> | Select eraser tool | Eraser tool |
+| <kbd>L</kbd> | Select lasso tool | Lasso tool; press again to switch between freehand and polygon |
+| <kbd>M</kbd> | Select marquee tool | Marquee tool; press again to switch between rectangle and ellipse |
+| <kbd>U</kbd> | Select shape tool | Shape tool; press again to cycle through rectangle, ellipse, triangle, star, polygon and freehand |
+| <kbd>T</kbd> | Select text tool | Text tool |
+| <kbd>G</kbd> | Select gradient tool | Gradient tool |
+| <kbd>I</kbd> | Select color picker | Color picker tool |
+| <kbd>[</kbd> / <kbd>]</kbd> | Decrease brush/eraser size / Increase brush/eraser size | Changes the brush or eraser size |
+| <kbd>X</kbd> | Swap foreground and background colors | Swaps the color pair |
+| <kbd>D</kbd> | Reset colors to black and white | Resets the color pair |
+| <kbd>Mod</kbd>+<kbd>Z</kbd> | Undo canvas edit | Undoes the last canvas edit |
+| <kbd>Mod</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> or <kbd>Mod</kbd>+<kbd>Y</kbd> | Redo canvas edit | Redoes the canvas edit you undid |
+
+**Select generation frame tool** has no default key, because <kbd>C</kbd> already selects the frame tool while you hold it.
+
+### Layers and selection
+
+| Keys | Command | What it does |
+| --- | --- | --- |
+| <kbd>Alt</kbd>+<kbd>[</kbd> / <kbd>Alt</kbd>+<kbd>]</kbd> | Previous canvas entity / Next canvas entity | With more than one staged or generating result, steps through the results. Otherwise selects the previous or next layer. |
+| <kbd>Q</kbd> | Quick switch to bookmarked or previous layer | Selects the bookmarked layer, or the layer you had selected before |
+| Arrow keys | Nudge layer left, right, up, down | Moves the selected layer 1 px |
+| <kbd>Shift</kbd>+arrow keys | Nudge layer left, right, up, down 10px | Moves the selected layer 10 px |
+| <kbd>Delete</kbd> or <kbd>Backspace</kbd> | Delete selected canvas item | Erases the selected pixels when there is a selection; otherwise deletes the selected layers |
+| <kbd>Shift</kbd>+<kbd>C</kbd> | Clear selected mask | Clears the selected mask layer |
+| <kbd>Shift</kbd>+<kbd>H</kbd> | Hide control, guidance and mask layers | Hides or shows the control, guidance and mask layers |
+| <kbd>Mod</kbd>+<kbd>C</kbd> / <kbd>Mod</kbd>+<kbd>X</kbd> | Copy selection / Cut selection | Copies or cuts the selection |
+| <kbd>Mod</kbd>+<kbd>V</kbd> | Paste image | Pastes an image from the clipboard |
+| <kbd>Mod</kbd>+<kbd>A</kbd> | Select all | Selects all the canvas content |
+| <kbd>Mod</kbd>+<kbd>D</kbd> | Deselect | Clears the selection |
+| <kbd>Mod</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> | Invert selection | Inverts the selection |
+| <kbd>Mod</kbd>+<kbd>J</kbd> | Duplicate layer | Duplicates the selected layers, or copies the selected pixels to a new layer when there is a selection |
+| <kbd>Mod</kbd>+<kbd>G</kbd> | Group selected layers | Groups the selected layers |
+| <kbd>Mod</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> | Ungroup selected layers | Ungroups a selected group, or moves selected layers out of their group |
+| <kbd>Mod</kbd>+<kbd>E</kbd> | Merge layer down | Merges the selected layer into the one below |
+| <kbd>Mod</kbd>+<kbd>]</kbd> / <kbd>Mod</kbd>+<kbd>[</kbd> | Bring layer forward / Send layer backward | Moves the selected layers one step up or down |
+| <kbd>Mod</kbd>+<kbd>Shift</kbd>+<kbd>]</kbd> / <kbd>Mod</kbd>+<kbd>Shift</kbd>+<kbd>[</kbd> | Bring layer to front / Send layer to back | Moves the selected layers to the top or bottom |
+
+### Frame and view
+
+| Keys | Command | What it does |
+| --- | --- | --- |
+| <kbd>Shift</kbd>+<kbd>N</kbd> | Fit frame to layers | Fits the generation frame around the layers, then fits the view |
+| <kbd>Shift</kbd>+<kbd>B</kbd> | Fit frame to masks | Fits the generation frame around the masks |
+| <kbd>Mod</kbd>+<kbd>Alt</kbd>+<kbd>N</kbd> | Clear canvas | Asks to clear the canvas |
+| <kbd>Mod</kbd>+<kbd>1</kbd> to <kbd>Mod</kbd>+<kbd>4</kbd> | Zoom to 100%, 200%, 400%, 800% | Zooms around the center of the view |
+
+**Crop all layers to frame**, **Save Canvas to Gallery** and **Save Frame to Gallery** have no default keys.
+
+### Staging bar
+
+When the staging bar under the Canvas has focus, its own keys apply instead of the Canvas's, and they can't be changed:
+
+| Keys | What it does |
+| --- | --- |
+| <kbd>←</kbd> / <kbd>→</kbd> | With more than one result, steps to the previous or next result |
+| <kbd>Delete</kbd> or <kbd>Backspace</kbd> | Discards the selected result |
+
+Arrow keys never nudge a layer while focus is in the staging bar.
+
+## Workflows
+
+These work while the Workflow editor has focus.
+
+| Keys | Command |
+| --- | --- |
+| <kbd>Shift</kbd>+<kbd>A</kbd> or <kbd>Space</kbd> | Add workflow node |
+| <kbd>Mod</kbd>+<kbd>C</kbd> | Copy workflow selection |
+| <kbd>Mod</kbd>+<kbd>V</kbd> | Paste workflow selection |
+| <kbd>Mod</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> | Paste workflow selection with connections |
+| <kbd>Mod</kbd>+<kbd>D</kbd> | Duplicate workflow selection |
+| <kbd>Mod</kbd>+<kbd>A</kbd> | Select all workflow nodes |
+| <kbd>Delete</kbd> or <kbd>Backspace</kbd> | Delete workflow selection |
+| <kbd>Mod</kbd>+<kbd>Z</kbd> | Undo workflow edit |
+| <kbd>Mod</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> or <kbd>Mod</kbd>+<kbd>Y</kbd> | Redo workflow edit |
+
+## Viewer
+
+These work while the Preview has focus. The recall keys and **Load Workflow** also work in the Gallery; they act on the selected image.
+
+| Keys | Command | What it does |
+| --- | --- | --- |
+| <kbd>←</kbd> / <kbd>→</kbd> | Show previous item / Show next item | Steps through the Gallery's items, except while comparing |
+| <kbd>Delete</kbd> or <kbd>Backspace</kbd> | Delete preview image | Deletes the shown item |
+| <kbd>T</kbd> | Toggle filmstrip | Shows or hides the filmstrip |
+| <kbd>I</kbd> | Toggle details | Shows or hides the details |
+| <kbd>1</kbd> | Zoom preview to 100% | Shows an image at actual size |
+| <kbd>F</kbd> | Zoom preview to fit | Fits an image to the Preview |
+| <kbd>C</kbd> | Swap comparison images | Swaps the two images being compared |
+| <kbd>M</kbd> | Next comparison mode | Switches to the next comparison mode while comparing |
+| <kbd>R</kbd> | Remix | Recalls the image's settings, except the seed |
+| <kbd>A</kbd> | Recall All | Recalls all of the image's settings |
+| <kbd>S</kbd> | Recall Seed | Recalls the seed |
+| <kbd>P</kbd> | Recall Prompts | Recalls the prompts |
+| <kbd>D</kbd> | Use Size | Recalls the image size |
+| <kbd>W</kbd> | Load Workflow | Opens the workflow saved in the image or video in the Workflow editor |
+
+## Gallery
+
+These work while the Gallery has focus. See [Gallery reference](/users-guide/gallery/gallery-reference/) for how selection works.
+
+| Keys | Command | What it does |
+| --- | --- | --- |
+| Arrow keys, or <kbd>Alt</kbd>+arrow keys | Gallery navigation up, right, down, left | Moves to the next item and selects it |
+| <kbd>Shift</kbd>+arrow keys | Extend gallery selection up, right, down, left | Extends the selection |
+| <kbd>Mod</kbd>+arrow keys | Move gallery focus up, right, down, left without selecting | Moves focus without changing the selection |
+| <kbd>Mod</kbd>+<kbd>A</kbd> | Select all gallery images on page | Selects every item on the page |
+| <kbd>Delete</kbd> or <kbd>Backspace</kbd> | Delete gallery selection | Deletes the selected items |
+| <kbd>R</kbd> | Remix | Recalls the selected image's settings, except the seed |
+| <kbd>.</kbd> | Toggle gallery image star | Stars or unstars the selected items |
+
+**Clear gallery selection**, **Add or remove the focused gallery item from the selection** and **Toggle gallery starred-only filter** have no default keys.
+
+## Image Map
+
+While the Image Map has focus, <kbd>Esc</kbd> runs **Clear cluster selection**. It is listed under App in Settings while an Image Map is open.

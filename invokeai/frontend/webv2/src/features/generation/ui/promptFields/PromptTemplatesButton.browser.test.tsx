@@ -14,6 +14,7 @@ import { userEvent } from 'vitest/browser';
 const catalog: PromptTemplateCatalog = {
   create: vi.fn(),
   defaultTemplates: [],
+  errorDetail: null,
   exportCsv: vi.fn(),
   importFile: vi.fn(),
   isError: false,

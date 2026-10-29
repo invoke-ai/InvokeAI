@@ -189,7 +189,7 @@ export const CenterArea = () => {
               typeId={floatedInstance.typeId}
             />
           ) : (
-            <FallbackCenterView label="Center widget unavailable" />
+            <FallbackCenterView />
           )}
         </Box>
 
@@ -413,7 +413,7 @@ const KeptCenterViewSlot = ({ instanceId }: { instanceId: string }) => {
   const widget = instance ? getWidgetById(instance.typeId) : undefined;
 
   if (!instance || !widget || widget.status !== 'enabled') {
-    return <FallbackCenterView label="Center widget unavailable" />;
+    return <FallbackCenterView />;
   }
 
   return <WidgetRendererById instanceId={instance.id} widget={widget} region="center" />;
@@ -466,10 +466,14 @@ const FloatedCenterView = ({
   );
 };
 
-const FallbackCenterView = ({ label }: { label: string }) => (
-  <Flex align="center" h="full" justify="center" w="full">
-    <Text color="fg.subtle" fontSize="lg" textTransform="capitalize">
-      {label} view
-    </Text>
-  </Flex>
-);
+const FallbackCenterView = () => {
+  const { t } = useTranslation();
+
+  return (
+    <Flex align="center" h="full" justify="center" w="full">
+      <Text color="fg.subtle" fontSize="lg">
+        {t('common.widgetViewUnavailable')}
+      </Text>
+    </Flex>
+  );
+};

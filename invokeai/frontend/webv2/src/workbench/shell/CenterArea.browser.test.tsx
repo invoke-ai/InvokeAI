@@ -331,7 +331,7 @@ describe('CenterArea with its last view floating', () => {
     centerAreaMocks.project.widgetRegions.center = { ...dockedCenter, instanceIds: [] };
     await render(<CenterArea />);
 
-    expect(host?.textContent).toContain('unavailable');
+    expect(host?.textContent).toContain('common.widgetViewUnavailable');
     expect(button('Show window')).toBeUndefined();
   });
 });

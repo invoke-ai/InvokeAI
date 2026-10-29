@@ -1,40 +1,40 @@
-import type { InvocationSourceId } from '@workbench/invocationContracts';
 import type { FocusEvent, KeyboardEvent, MouseEvent } from 'react';
 
-import {
-  Box,
-  HStack,
-  Icon,
-  Kbd,
-  Popover,
-  Portal,
-  ProgressCircle,
-  SegmentGroup,
-  Separator,
-  Spinner,
-  Stack,
-  Text,
-} from '@chakra-ui/react';
+import { Box, Icon, Kbd, Popover, Portal, ProgressCircle, Spinner } from '@chakra-ui/react';
 import { getDeterminateProgressFraction } from '@features/queue/contracts';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button, useUnavailableControl } from '@platform/ui/Button';
 import { PopoverContent } from '@platform/ui/Popover';
-import { WidgetIcon } from '@workbench/iconResolver';
-import { ROUTE_LABEL_KEYS } from '@workbench/invocation';
 import { useActiveQueueProgress } from '@workbench/queue-integration/useActiveQueueProgress';
-import { getWidgetById } from '@workbench/widgetRegistry';
-import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { ArrowRightIcon, CircleAlertIcon, PlayIcon, WifiOffIcon } from 'lucide-react';
+import { useNotify } from '@workbench/useNotify';
+import { CircleAlertIcon, PlayIcon } from 'lucide-react';
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { InvocationIssue, InvocationState } from './useInvocationState';
+import type * as InvokePopoverBodyModule from './InvokePopoverBody';
+import type { InvocationState } from './useInvocationState';
 
 import { getInvokeIconMode } from './invokeButtonModel';
-import { useInvokeIssueActions } from './invokeIssueActions';
 import { HIDE_BELOW_HINT_WIDTH } from './topbarBreakpoints';
 import { TopbarShortcutKeys } from './TopbarShortcutKeys';
 import { useTopbarShortcutBinding } from './useTopbarShortcut';
+
+type InvokePopoverBodyComponent = typeof InvokePopoverBodyModule.InvokePopoverBody;
+
+// The card and its issue fixes (which reach Generate, workflow and model owners) stay off editor boot. Hover and focus
+// start the load; opening waits for it, so the card never shows empty.
+let loadedPopoverBody: InvokePopoverBodyComponent | null = null;
+let popoverBodyModule: Promise<InvokePopoverBodyComponent> | null = null;
+
+/** A failed load is forgotten, so the next hover or click tries again. */
+const loadPopoverBody = (): Promise<InvokePopoverBodyComponent> =>
+  (popoverBodyModule ??= import('./InvokePopoverBody').then(
+    (module) => (loadedPopoverBody = module.InvokePopoverBody),
+    (error: unknown) => {
+      popoverBodyModule = null;
+      throw error;
+    }
+  ));
 
 /**
  * Invoke sits on top of its attached neighbours with full control corners; the iterations field and routing button
@@ -56,6 +56,10 @@ const PREVIEW_CLOSE_DELAY_MS = 200;
  * takes focus into the list so its fixes are a Tab away.
  */
 type IssuesPopoverMode = 'closed' | 'pinned' | 'preview';
+/** An open waiting on the card's chunk. Compared by identity: a later request, even of the same mode, replaces it. */
+interface PendingOpen {
+  mode: Exclude<IssuesPopoverMode, 'closed'>;
+}
 
 /**
  * Keep Invoke geometry and availability stable while work runs. Only the icon changes to progress; hover or
@@ -64,6 +68,7 @@ type IssuesPopoverMode = 'closed' | 'pinned' | 'preview';
  */
 export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const { t } = useTranslation();
+  const notify = useNotify();
   const { invoke, isPreparing, isValid, issues } = state;
   const shortcutBinding = useTopbarShortcutBinding('app.invoke');
   const frontBinding = useTopbarShortcutBinding('app.invokeFront');
@@ -75,6 +80,12 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const contentRef = useRef<HTMLDivElement>(null);
   const timers = useRef<{ close?: number; open?: number }>({});
   const [mode, setMode] = useState<IssuesPopoverMode>('closed');
+  // State, not the module variable, so the render that opens the card sees the body.
+  const [PopoverBody, setPopoverBody] = useState<InvokePopoverBodyComponent | null>(() => loadedPopoverBody);
+  // The open waiting on the body's chunk; any later open or close supersedes it. The ref answers the load's callbacks;
+  // the state marks the button busy.
+  const pendingOpen = useRef<PendingOpen | null>(null);
+  const [isOpenPending, setIsOpenPending] = useState(false);
   // A jump to an issue's fix moves focus there; closing then must not pull it back to the button.
   const [returnsFocus, setReturnsFocus] = useState(true);
 
@@ -87,28 +98,95 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   // Blocked by issues: the count replaces the shortcut, and activation opens the issue list.
   const showsIssues = !isValid && !isPreparing && issues.length > 0;
 
+  const setPendingOpen = useCallback((pending: PendingOpen | null) => {
+    pendingOpen.current = pending;
+    setIsOpenPending(pending !== null);
+  }, []);
+  const cancelPendingPin = useCallback(() => {
+    if (pendingOpen.current?.mode === 'pinned') {
+      setPendingOpen(null);
+    }
+  }, [setPendingOpen]);
   const clearTimers = useCallback(() => {
     window.clearTimeout(timers.current.open);
     window.clearTimeout(timers.current.close);
     timers.current = {};
-  }, []);
+    setPendingOpen(null);
+  }, [setPendingOpen]);
+  const openWhenLoaded = useCallback(
+    (next: PendingOpen['mode'], onOpen?: () => void) => {
+      // A click outranks hover: a pointer re-entering while the click's card loads must not demote it to a preview.
+      if (next === 'preview' && pendingOpen.current?.mode === 'pinned') {
+        return;
+      }
+
+      const open = (component: InvokePopoverBodyComponent) => {
+        setPopoverBody(() => component);
+        setMode((current) => (next === 'preview' && current !== 'closed' ? current : next));
+        onOpen?.();
+      };
+
+      if (loadedPopoverBody) {
+        setPendingOpen(null);
+        open(loadedPopoverBody);
+        return;
+      }
+
+      const request: PendingOpen = { mode: next };
+      setPendingOpen(request);
+      void loadPopoverBody().then(
+        (component) => {
+          if (pendingOpen.current === request) {
+            setPendingOpen(null);
+            open(component);
+          }
+        },
+        () => {
+          if (pendingOpen.current !== request) {
+            return;
+          }
+
+          setPendingOpen(null);
+          // A hover that came to nothing says nothing; a click gets an answer. The next attempt retries the load.
+          if (next === 'pinned') {
+            notify.error(t('topbar.invoke.cardLoadFailed'));
+          }
+        }
+      );
+    },
+    [notify, setPendingOpen, t]
+  );
   const schedulePreview = useCallback(() => {
     window.clearTimeout(timers.current.close);
-    timers.current.open = window.setTimeout(
-      () => setMode((current) => (current === 'closed' ? 'preview' : current)),
-      PREVIEW_OPEN_DELAY_MS
-    );
-  }, []);
+    // Start the card's chunk now, so the preview after the delay (or a click before it) opens with its content.
+    void loadPopoverBody().catch(() => {});
+    timers.current.open = window.setTimeout(() => openWhenLoaded('preview'), PREVIEW_OPEN_DELAY_MS);
+  }, [openWhenLoaded]);
   const schedulePreviewClose = useCallback(() => {
     window.clearTimeout(timers.current.open);
+    if (pendingOpen.current?.mode === 'preview') {
+      setPendingOpen(null);
+    }
     timers.current.close = window.setTimeout(
       () => setMode((current) => (current === 'preview' ? 'closed' : current)),
       PREVIEW_CLOSE_DELAY_MS
     );
-  }, []);
+  }, [setPendingOpen]);
 
   // A preview timer must not outlive the button it would open the list for.
   useMountEffect(() => clearTimers);
+  // A press elsewhere while a click's card loads takes the click back, even where pressing does not move focus, so a
+  // late chunk never opens the card over what the person turned to.
+  useMountEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!buttonRef.current?.contains(event.target as Node | null)) {
+        cancelPendingPin();
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+  });
   const handlePointerEnter = useCallback(() => {
     setIsHovered(true);
     schedulePreview();
@@ -130,12 +208,13 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const handleBlur = useCallback(
     (event: FocusEvent<HTMLButtonElement>) => {
       setIsFocused(false);
-      // Focus moving into the card keeps it; anywhere else ends a preview.
+      // Focus moving into the card keeps it; anywhere else ends a preview, and a click's card still loading.
       if (!contentRef.current?.contains(event.relatedTarget as Node | null)) {
+        cancelPendingPin();
         schedulePreviewClose();
       }
     },
-    [schedulePreviewClose]
+    [cancelPendingPin, schedulePreviewClose]
   );
   // Focus goes to the list's first control once the list has mounted; opening on hover never moves it.
   const focusFirstControl = useCallback(() => {
@@ -177,10 +256,9 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
       }
 
       // Shown as a preview or not yet: either way the click pins it and moves focus to its first control.
-      setMode('pinned');
-      focusFirstControl();
+      openWhenLoaded('pinned', focusFirstControl);
     },
-    [canInvoke, clearTimers, focusFirstControl, invoke, mode, showsIssues]
+    [canInvoke, clearTimers, focusFirstControl, invoke, mode, openWhenLoaded, showsIssues]
   );
   const handleOpenChange = useCallback(
     ({ open }: { open: boolean }) => {
@@ -252,6 +330,7 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
         <Button
           {...unavailable?.props}
           ref={buttonRef}
+          aria-busy={isOpenPending || undefined}
           aria-controls={mode === 'closed' ? undefined : contentId}
           aria-expanded={showsIssues ? mode === 'pinned' : undefined}
           aria-haspopup={showsIssues ? 'dialog' : undefined}
@@ -274,7 +353,10 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
         >
           {/* Decorative: the queue's progress has its own status surfaces, and it must not change the button's name. */}
           <Box aria-hidden alignItems="center" boxSize="3.5" display="flex" justifyContent="center" position="relative">
-            {showsIssues ? (
+            {isOpenPending ? (
+              // The card is on its way: the slot says so until it opens.
+              <Spinner borderWidth="1.5px" boxSize="3.5" color={showsIssues ? 'fg.muted' : 'bg'} />
+            ) : showsIssues ? (
               <Icon as={CircleAlertIcon} boxSize="3.5" color="fg.error" />
             ) : iconMode.mode === 'play' ? (
               <Icon as={PlayIcon} boxSize="3.5" />
@@ -315,209 +397,17 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
             onPointerEnter={clearTimers}
             onPointerLeave={mode === 'preview' ? schedulePreviewClose : undefined}
           >
-            <InvokePopoverBody
-              frontShortcut={frontBinding?.display ?? null}
-              shortcutParts={shortcutParts}
-              state={state}
-              onJump={handleJump}
-            />
+            {PopoverBody ? (
+              <PopoverBody
+                frontShortcut={frontBinding?.display ?? null}
+                shortcutParts={shortcutParts}
+                state={state}
+                onJump={handleJump}
+              />
+            ) : null}
           </PopoverContent>
         </Popover.Positioner>
       </Portal>
     </Popover.Root>
-  );
-};
-
-const InvokePopoverBody = ({
-  frontShortcut,
-  onJump,
-  shortcutParts,
-  state,
-}: {
-  frontShortcut: string | null;
-  /** An action that leads elsewhere closes the list, leaving focus where the action put it. */
-  onJump: () => void;
-  shortcutParts: string[] | null;
-  state: InvocationState;
-}) => {
-  const { t } = useTranslation();
-  const { batchCount, invocation, isPreparing, isValid, issues, promptExpansion, workflowBatchSize } = state;
-  const source = t(ROUTE_LABEL_KEYS[invocation.sourceId]);
-  const destination = t(ROUTE_LABEL_KEYS[invocation.destination]);
-  const promptCount = promptExpansion.count;
-  const runs = t('topbar.invoke.summary.runs', { count: batchCount });
-  const summary =
-    invocation.sourceId === 'generate' || invocation.sourceId === 'upscale' || invocation.sourceId === 'video'
-      ? promptExpansion.isLoading
-        ? t('topbar.invoke.expandingPrompts')
-        : t('topbar.invoke.summary.prompts', {
-            generations: t('topbar.invoke.summary.generations', { count: promptCount * batchCount }),
-            iterations: t('topbar.invoke.summary.iterations', { count: batchCount }),
-            prompts: t('topbar.invoke.summary.promptCount', { count: promptCount }),
-          })
-      : workflowBatchSize === undefined
-        ? t('topbar.invoke.summary.runsOnly', {
-            generations: t('topbar.invoke.summary.generations', { count: batchCount }),
-            runs,
-            source,
-          })
-        : workflowBatchSize === null
-          ? t('topbar.invoke.summary.batchPending', { runs, source })
-          : t('topbar.invoke.summary.batch', {
-              generations: t('topbar.invoke.summary.generations', { count: batchCount * workflowBatchSize }),
-              items: t('topbar.invoke.summary.batchItems', { count: workflowBatchSize }),
-              runs,
-              source,
-            });
-
-  return (
-    <Stack gap="2" maxW="22rem" minW="17rem">
-      <HStack justify="space-between">
-        <Popover.Title fontSize="sm" fontWeight="700">
-          {isPreparing
-            ? t('topbar.invoke.preparing')
-            : isValid
-              ? t('topbar.invoke.addToQueue')
-              : t('topbar.invoke.unableToQueue')}
-        </Popover.Title>
-        {shortcutParts ? (
-          <Kbd variant="subtle">
-            <TopbarShortcutKeys parts={shortcutParts} />
-          </Kbd>
-        ) : null}
-      </HStack>
-      <InvokeRoute destination={destination} state={state} />
-      <Text color="fg.muted" fontSize="xs">
-        {summary}
-      </Text>
-      <Separator borderColor="border.subtle" />
-      {isPreparing ? (
-        <Text color="fg.muted" fontSize="sm">
-          {t('topbar.invoke.preparing')}
-        </Text>
-      ) : issues.length > 0 ? (
-        <InvokeIssueList issues={issues} onJump={onJump} />
-      ) : (
-        <Text color="fg.muted" fontSize="sm">
-          {t('topbar.invoke.addingImagesTo', { destination })}
-        </Text>
-      )}
-      <Text color="fg.subtle" fontSize="xs">
-        {frontShortcut === null
-          ? t('topbar.invoke.invokeFrontHintNoShortcut')
-          : t('topbar.invoke.invokeFrontHint', { shortcut: frontShortcut })}
-      </Text>
-    </Stack>
-  );
-};
-
-/**
- * Names what Invoke runs and where results go, and switches the source in place: among the sources this layout holds,
- * plus the current one when it is missing, so the choice is never between things the user cannot see.
- */
-const InvokeRoute = ({ destination, state }: { destination: string; state: InvocationState }) => {
-  const { t } = useTranslation();
-  const { generation } = useWorkbenchCommands();
-  const { invocation, placedTypeIds, sources } = state;
-  const options = sources.filter(
-    (candidate) => placedTypeIds.has(candidate.typeId) || candidate.sourceId === invocation.sourceId
-  );
-  const handleChange = useCallback(
-    ({ value }: { value: string | null }) => {
-      if (value) {
-        generation.setSource(value as InvocationSourceId);
-      }
-    },
-    [generation]
-  );
-
-  return (
-    <Stack gap="1">
-      <Text color="fg.subtle" fontSize="xs" fontWeight="700" textTransform="uppercase">
-        {t('topbar.invoke.runs')}
-      </Text>
-      <HStack gap="2" wrap="wrap">
-        {options.length > 1 ? (
-          <SegmentGroup.Root
-            aria-label={t('topbar.routing.source')}
-            size="xs"
-            value={invocation.sourceId}
-            onValueChange={handleChange}
-          >
-            <SegmentGroup.Indicator />
-            {options.map((option) => (
-              <SegmentGroup.Item key={option.sourceId} value={option.sourceId}>
-                <SegmentGroup.ItemHiddenInput />
-                <SegmentGroup.ItemText alignItems="center" display="flex" fontSize="xs" gap="1">
-                  <WidgetIcon boxSize="3" icon={getWidgetById(option.typeId)?.manifest.icon} />
-                  {t(ROUTE_LABEL_KEYS[option.sourceId])}
-                </SegmentGroup.ItemText>
-              </SegmentGroup.Item>
-            ))}
-          </SegmentGroup.Root>
-        ) : (
-          <Text fontSize="sm" fontWeight="600">
-            {t(ROUTE_LABEL_KEYS[invocation.sourceId])}
-          </Text>
-        )}
-        <HStack color="fg.muted" gap="1">
-          <Icon aria-hidden as={ArrowRightIcon} boxSize="3" />
-          <Text fontSize="sm">{t('topbar.invoke.resultsTo', { destination })}</Text>
-        </HStack>
-      </HStack>
-    </Stack>
-  );
-};
-
-const InvokeIssueList = ({ issues, onJump }: { issues: readonly InvocationIssue[]; onJump: () => void }) => {
-  const getActions = useInvokeIssueActions();
-
-  return (
-    <Stack as="ul" gap="2" listStyleType="none" m="0" p="0">
-      {issues.map((issue, index) => {
-        const actions = getActions(issue);
-
-        return (
-          // Two issues can read the same (two nodes missing the same input), so the position keeps keys apart.
-          // oxlint-disable-next-line react/no-array-index-key -- the list is rebuilt whole on every change.
-          <Stack key={`${index}:${issue.message}`} as="li" gap="1">
-            <HStack align="start" gap="1.5">
-              <Icon
-                aria-hidden
-                as={issue.target.kind === 'connection' ? WifiOffIcon : CircleAlertIcon}
-                boxSize="3"
-                color={issue.target.kind === 'connection' ? 'fg.muted' : 'fg.error'}
-                flexShrink={0}
-                mt="0.5"
-              />
-              <Text color="fg" fontSize="sm" lineHeight="1.4" textWrap="pretty">
-                {issue.message}
-              </Text>
-            </HStack>
-            {actions.length > 0 ? (
-              <HStack gap="1" ps="4.5" wrap="wrap">
-                {actions.map((action) => (
-                  <Button
-                    key={action.id}
-                    size="xs"
-                    data-issue-action=""
-                    variant="outline"
-                    // oxlint-disable-next-line react-perf/jsx-no-new-function-as-prop -- a few buttons per shown issue.
-                    onClick={() => {
-                      action.run();
-                      if (!action.stays) {
-                        onJump();
-                      }
-                    }}
-                  >
-                    {action.label}
-                  </Button>
-                ))}
-              </HStack>
-            ) : null}
-          </Stack>
-        );
-      })}
-    </Stack>
   );
 };

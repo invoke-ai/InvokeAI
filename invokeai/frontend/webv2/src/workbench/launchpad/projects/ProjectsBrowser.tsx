@@ -155,7 +155,13 @@ export const ProjectsBrowser = ({
   return (
     <Scrollable flex="1" h="full" label={t('launchpad.sections.projects')} minH="0" viewportRef={scrollRef}>
       <Box css={MEASURE_SX} pb="8" ref={measureRef}>
-        {status === 'error' ? <ProjectsLoadError getRecoveryFocus={getRecoveryFocus} mb="4" /> : null}
+        {status === 'error' ? (
+          <ProjectsLoadError
+            getRecoveryFocus={getRecoveryFocus}
+            layout={summaries.length === 0 ? 'state' : 'inline'}
+            mb="4"
+          />
+        ) : null}
 
         {/* A failed listing is not an empty library: the alert above is the whole state until a retry lands. */}
         {status === 'error' && summaries.length === 0 ? null : isFirstLoad ? (

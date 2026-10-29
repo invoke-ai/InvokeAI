@@ -4,12 +4,7 @@ import type { GalleryImage, GeneratedImageContract } from '@features/gallery/cor
 import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
 import { describe, expect, it } from 'vitest';
 
-import {
-  getGalleryRecentItems,
-  isGalleryWindowTruncated,
-  mapGalleryItemPageSlots,
-  mergeGalleryItemWindow,
-} from './useGalleryData';
+import { getGalleryRecentItems, mapGalleryItemPageSlots, mergeGalleryItemWindow } from './useGalleryData';
 
 const createImage = (index: number, overrides: Partial<GalleryImage> = {}): GalleryImage => ({
   boardId: 'none',
@@ -314,30 +309,5 @@ describe('mergeGalleryItemWindow', () => {
         recentImages: [],
       }).map((item) => item.name)
     ).toEqual(['a.png', '_draft.png', 'Z.png', 'A.png', '!bang.png']);
-  });
-});
-
-describe('isGalleryWindowTruncated', () => {
-  const atCap = { hasNextPage: false, isPaginated: false, loadedRowCount: 600, maxRows: 600, total: 1_000 };
-
-  it('reports truncation only when the full window hides reachable images', () => {
-    expect(isGalleryWindowTruncated(atCap)).toBe(true);
-  });
-
-  it('does not report truncation at the true end of a board', () => {
-    expect(isGalleryWindowTruncated({ ...atCap, total: 600 })).toBe(false);
-    expect(isGalleryWindowTruncated({ ...atCap, loadedRowCount: 240, total: 240 })).toBe(false);
-  });
-
-  it('does not report truncation while more pages can still be loaded', () => {
-    expect(isGalleryWindowTruncated({ ...atCap, hasNextPage: true })).toBe(false);
-  });
-
-  it('never reports truncation in paginated mode, where every page is reachable', () => {
-    expect(isGalleryWindowTruncated({ ...atCap, isPaginated: true, loadedRowCount: 60, maxRows: 60 })).toBe(false);
-  });
-
-  it('does not report truncation before the backend total is known', () => {
-    expect(isGalleryWindowTruncated({ ...atCap, total: null })).toBe(false);
   });
 });

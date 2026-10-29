@@ -14,6 +14,7 @@ import {
 import { syncPromptTemplateWithCatalog } from './promptTemplates';
 import {
   isGenerateWidgetValues,
+  isSameModelFile,
   normalizeGenerateSettings,
   normalizeGenerateWidgetValues,
   syncGenerateWidgetValuesWithModels,
@@ -88,13 +89,12 @@ export const resolveGenerateWidgetValues = ({
   const normalizedWidgetValues = normalizeGenerateWidgetValues(storedValues);
   const storedModel = normalizedWidgetValues?.model;
   // A chosen model that is no longer installed stays chosen: the model card names it and Invoke waits until the user
-  // picks another or it returns. Reinstalling gives it a new key but the same file hash, so it is found again by hash.
+  // picks another or it returns. Reinstalling gives it a new key but the same file hash, so it is found again by hash
+  // (and its type, base and variant).
   // Only values with no runnable choice (first run, an unknown family) take the default.
   const selectedModel =
     supportedModels.find((model) => model.key === normalizedSettings?.modelKey) ??
-    (storedModel?.hash
-      ? supportedModels.find((model) => model.hash === storedModel.hash && model.type === storedModel.type)
-      : undefined) ??
+    (storedModel ? supportedModels.find((model) => isSameModelFile(model, storedModel)) : undefined) ??
     (storedModel &&
     storedModel.key === normalizedSettings?.modelKey &&
     isGenerateModelSelectable(storedModel) &&

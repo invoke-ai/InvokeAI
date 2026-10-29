@@ -1,18 +1,20 @@
-import { Alert } from '@chakra-ui/react';
-import { Button } from '@platform/ui/Button';
+import { LoadError } from '@platform/ui/LoadError';
 import { getProjectLibrary, refreshProjectLibrary, useProjectLibrarySelector } from '@workbench/projects/library';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * A failed project listing, with a retry: shown instead of the empty state, never beside it. A retry that recovers
- * removes this alert, so `getRecoveryFocus` names where focus goes then (the first project, say) instead of the page.
+ * A failed project listing, with a retry: the whole state where there are no projects to show (`state`), or above the
+ * projects an earlier read listed (`inline`), never beside the empty state. A retry that recovers removes this alert,
+ * so `getRecoveryFocus` names where focus goes then (the first project, say) instead of the page.
  */
 export const ProjectsLoadError = ({
   getRecoveryFocus,
+  layout,
   mb,
 }: {
   getRecoveryFocus: () => HTMLElement | null;
+  layout: 'inline' | 'state';
   mb?: string;
 }) => {
   const { t } = useTranslation();
@@ -21,7 +23,7 @@ export const ProjectsLoadError = ({
   // The library keeps its error status until a refresh succeeds, so the button shows the attempt itself.
   const retry = useCallback(() => {
     setIsRetrying(true);
-    void refreshProjectLibrary().finally(() => {
+    return refreshProjectLibrary().finally(() => {
       setIsRetrying(false);
       if (getProjectLibrary().status === 'ready') {
         // After the commit that replaced this alert with the projects.
@@ -31,16 +33,15 @@ export const ProjectsLoadError = ({
   }, [getRecoveryFocus]);
 
   return (
-    <Alert.Root borderRadius="md" mb={mb} role="alert" status="error">
-      <Alert.Indicator />
-      <Alert.Content flex="1">
-        <Alert.Title fontSize="md">{t('projects.failedToLoad')}</Alert.Title>
-        {error ? <Alert.Description fontSize="md">{error}</Alert.Description> : null}
-      </Alert.Content>
-      <Button loading={isRetrying} size="sm" variant="outline" onClick={retry}>
-        {t('common.retry')}
-      </Button>
-    </Alert.Root>
+    <LoadError
+      detail={error}
+      isRetrying={isRetrying}
+      layout={layout}
+      mb={mb}
+      message={t('projects.failedToLoad')}
+      size="md"
+      onRetry={retry}
+    />
   );
 };
 

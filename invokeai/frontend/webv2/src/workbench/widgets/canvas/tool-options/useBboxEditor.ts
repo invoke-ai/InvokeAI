@@ -5,7 +5,7 @@ import {
   type CanvasLayerCapability,
   type Rect,
 } from '@workbench/canvas-engine/api';
-import { resizeBboxAroundCentre } from '@workbench/canvasDimsSync';
+import { resizeBboxAroundCentre } from '@workbench/widgets/canvas/bboxGrid';
 import { useBboxGrid, useBboxOptions } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useCallback } from 'react';

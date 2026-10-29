@@ -58,8 +58,6 @@ export interface GalleryData {
   isLoadingItems: boolean;
   /** The resolved selected board; the items came from it unless the search looks in every board. */
   selectedBoardId: string;
-  /** Distinguish reaching the window cap from reaching the board end; only truncation needs an explanation. */
-  isWindowTruncated: boolean;
   /** The current scope's items; null until it has something to show, and whenever it failed without data. */
   items: GalleryItem[] | null;
   /** The current query's failure, or null while it is healthy. */
@@ -281,21 +279,6 @@ export const getGalleryRecentItems = ({
 
   return recentItems;
 };
-
-/** A false hasNextPage can mean either completion or truncation. Paginated mode remains fully reachable. */
-export const isGalleryWindowTruncated = ({
-  hasNextPage,
-  isPaginated,
-  loadedRowCount,
-  maxRows,
-  total,
-}: {
-  hasNextPage: boolean;
-  isPaginated: boolean;
-  loadedRowCount: number;
-  maxRows: number;
-  total: number | null;
-}): boolean => !isPaginated && !hasNextPage && total !== null && loadedRowCount >= maxRows && total > loadedRowCount;
 
 export const useGalleryData = ({
   galleryView,
@@ -812,15 +795,6 @@ export const useGalleryData = ({
   );
   const total = sparseViewport ? (observedTotal ?? stableTotal) : (queryData?.pages[0]?.total ?? null);
   const hasMore = !sparseViewport && !isPaginated && queryData !== undefined && Boolean(hasNextPage);
-  const isWindowTruncated =
-    !sparseViewport &&
-    isGalleryWindowTruncated({
-      hasNextPage: Boolean(hasNextPage),
-      isPaginated,
-      loadedRowCount: backendItems.length,
-      maxRows,
-      total,
-    });
   const fetchMore = useCallback(async () => {
     const result = await fetchNextPage();
 
@@ -964,7 +938,6 @@ export const useGalleryData = ({
     filter,
     hasMore,
     isLoadingItems: sparseViewport ? activePageLoading : isFetching,
-    isWindowTruncated,
     items,
     listing,
     loadMore,

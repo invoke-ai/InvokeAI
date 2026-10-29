@@ -26,6 +26,7 @@ let root: Root | null = null;
 const catalog: WildcardCatalog = {
   applyWrites: vi.fn(),
   create: vi.fn(),
+  errorDetail: null,
   isError: false,
   isLoading: false,
   isRetrying: false,
@@ -171,12 +172,15 @@ it('animates the conflict dialog out instead of unmounting it on cancel', async 
 });
 
 describe('a failed wildcard read', () => {
-  it('says the read failed, with a retry, instead of offering to create the first wildcard', async () => {
-    const failed = { ...emptyCatalog, isError: true, retry: vi.fn() };
+  it('says the read failed and why, with a retry, instead of offering to create the first wildcard', async () => {
+    const failed = { ...emptyCatalog, errorDetail: 'Database is locked', isError: true, retry: vi.fn() };
 
     await renderPanel(true, failed);
 
-    expect(host!.textContent).toContain('widgets.generate.dynamicPrompts.couldNotLoadWildcards');
+    expect(host!.querySelector('[role="alert"]')?.textContent).toContain(
+      'widgets.generate.dynamicPrompts.couldNotLoadWildcards'
+    );
+    expect(host!.querySelector('[role="alert"]')?.textContent).toContain('Database is locked');
     expect(host!.textContent).not.toContain('widgets.generate.dynamicPrompts.noWildcardsYet');
     // Selecting and exporting act on a list there is none of.
     expect(host!.innerHTML).not.toContain('widgets.generate.dynamicPrompts.selectAllWildcards');
@@ -249,6 +253,7 @@ describe('finding a wildcard', () => {
   const manyCatalog: WildcardCatalog = {
     applyWrites: vi.fn(),
     create: vi.fn(),
+    errorDetail: null,
     isError: false,
     isLoading: false,
     isRetrying: false,

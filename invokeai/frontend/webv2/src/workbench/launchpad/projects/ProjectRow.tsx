@@ -17,7 +17,7 @@ import { useProjectActionsMenu, useProjectActionsMenuTrigger } from './ProjectAc
 import { ProjectCompatibilityBadge } from './ProjectCompatibilityBadge';
 import { ProjectCover } from './ProjectCover';
 
-const LINK_STYLE = { cursor: 'default', inset: 0, position: 'absolute' } as const;
+const LINK_STYLE = { cursor: 'default', inset: 0, outline: 'none', position: 'absolute' } as const;
 const REVEAL_ON_HOVER = { opacity: 1 } as const;
 const THUMBNAIL_WIDTH = '14';
 
@@ -58,8 +58,10 @@ export const ProjectRow = ({
     >
       {/* A project this build cannot open has no link and no tab stop; its compatibility badge says why. */}
       {isCompatible ? (
+        // The row's primary control: the row recipe draws its focus ring around the whole row.
         <Link
           aria-label={t('projects.openProjectLabel', { name: summary.name })}
+          data-list-primary=""
           search={projectSearch}
           style={LINK_STYLE}
           to="/app"

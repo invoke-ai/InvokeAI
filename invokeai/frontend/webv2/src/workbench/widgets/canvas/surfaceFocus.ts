@@ -3,6 +3,9 @@
  * another widget.
  */
 
+/** Marks the focusable canvas surface, for chrome that hands focus back to it once it unmounts. */
+export const CANVAS_SURFACE_ATTR = 'data-canvas-surface';
+
 /**
  * Elements that own their own focus/caret and must NOT be focus-stolen by the
  * surface: the text tool's contenteditable overlay and any inline input the

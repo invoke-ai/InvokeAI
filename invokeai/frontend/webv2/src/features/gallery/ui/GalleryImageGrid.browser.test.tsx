@@ -228,7 +228,6 @@ void i18n.use(initReactI18next).init({
             starredItems: 'Starred',
             unstarImage: 'Unstar {{name}}',
             uncategorized: 'Uncategorized',
-            windowLimit: 'Limited to {{count}}',
           },
           preview: {
             compare: 'Compare',
@@ -549,7 +548,6 @@ const Harness = ({
     filter: getStableFilter(gallery),
     gallery,
     itemActions: imageActionMocks,
-    isWindowTruncated: false,
     listing: currentListing,
     loadedItems: mergeGalleryLoadedItems(currentStrip.items, gallery.items),
     projectName: 'Project',
@@ -635,7 +633,6 @@ const QueryBackedGalleryHarness = ({
     filter: sparseData.filter,
     gallery,
     itemActions: imageActionMocks,
-    isWindowTruncated: false,
     listing: sparseData.listing,
     loadedItems: mergeGalleryLoadedItems(currentStrip.items, sparseData.items ?? []),
     projectName: 'Project',
@@ -3792,9 +3789,9 @@ describe('shared gallery progress section', () => {
     for (const [boardState, status] of cases) {
       currentListing = { ...READY_LISTING, status };
       await renderGallery(createGallery(boardState));
-      expect(host?.querySelector('button[title^="Workflow A ·"]')).not.toBeNull();
+      expect(host?.querySelector('button[aria-label^="Workflow A ·"]')).not.toBeNull();
     }
-    await click(host!.querySelector<HTMLButtonElement>('button[title^="Workflow A ·"]')!);
+    await click(host!.querySelector<HTMLButtonElement>('button[aria-label^="Workflow A ·"]')!);
     expect(followProgressSession).toHaveBeenCalledWith('run:1', { revealPreview: true });
     expect(host?.querySelectorAll('[role="listitem"]')).toHaveLength(currentGallery.items.length);
   });
@@ -3938,18 +3935,18 @@ describe('shared gallery progress section', () => {
       label: `Slot ${index + 1}`,
     }));
     await renderGallery();
-    const tile = host!.querySelector<HTMLButtonElement>('button[title^="Slot 4 ·"]')!;
+    const tile = host!.querySelector<HTMLButtonElement>('button[aria-label^="Slot 4 ·"]')!;
     const image = tile.querySelector('img');
     expect(image).not.toBeNull();
     tile.focus();
     host!.style.width = '520px';
     await renderGallery(createGallery({ settings: { ...DENSE_SETTINGS, imageDensityPercent: 100 } }));
-    expect(host!.querySelector('button[title^="Slot 4 ·"]')).toBe(tile);
+    expect(host!.querySelector('button[aria-label^="Slot 4 ·"]')).toBe(tile);
     expect(tile.querySelector('img')).toBe(image);
     expect(document.activeElement).toBe(tile);
     currentProgressSessions = currentProgressSessions.slice(1);
     await renderGallery();
-    expect(host!.querySelector('button[title^="Slot 4 ·"]')).toBe(tile);
+    expect(host!.querySelector('button[aria-label^="Slot 4 ·"]')).toBe(tile);
     expect(tile.querySelector('img')).toBe(image);
     expect(document.activeElement).toBe(tile);
   });
@@ -4042,7 +4039,7 @@ describe('shared gallery progress section', () => {
     setStrip([createItem('image', 'starred.png', { starred: true })]);
     const gallery = createGallery({ selectedItemKey: 'image:last.png', selectedItemKeys: ['image:last.png'] });
     await renderGallery(gallery);
-    host!.querySelector<HTMLButtonElement>('button[title^="Workflow A ·"]')!.focus();
+    host!.querySelector<HTMLButtonElement>('button[aria-label^="Workflow A ·"]')!.focus();
     currentProgressSessions = [];
     await renderGallery(gallery);
     const current = host!.querySelector('button[aria-current="true"]');
@@ -4076,7 +4073,7 @@ describe('shared gallery progress section', () => {
     await renderGallery(createGallery({ settings: { ...DENSE_SETTINGS, progressSectionCollapsed: true } }));
     expect(host?.querySelector('[data-progress-disclosure]')?.getAttribute('aria-expanded')).toBe('false');
     await renderGallery(createGallery());
-    host!.querySelector<HTMLButtonElement>('button[title^="Workflow A ·"]')!.focus();
+    host!.querySelector<HTMLButtonElement>('button[aria-label^="Workflow A ·"]')!.focus();
     currentProgressSessions = [];
     mocks.progressFrame = null;
     await renderGallery();

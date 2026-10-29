@@ -59,7 +59,7 @@ describe('mixed-media gallery translations', () => {
     ).toBe('1 image and 2 videos could not be deleted.');
     expect(instance.t('widgets.preview.videoLabel', { name: 'clip.mp4' })).toBe('Video clip.mp4');
     expect(instance.t('widgets.preview.videoFailed')).toBe('Video could not be loaded');
-    expect(instance.t('widgets.preview.copyCurrentFrame')).toBe('Copy Current Frame');
-    expect(instance.t('widgets.preview.videoDetails')).toBe('Video Details');
+    expect(instance.t('widgets.preview.copyCurrentFrame')).toBe('Copy current frame');
+    expect(instance.t('widgets.preview.videoDetails')).toBe('Video details');
   });
 });

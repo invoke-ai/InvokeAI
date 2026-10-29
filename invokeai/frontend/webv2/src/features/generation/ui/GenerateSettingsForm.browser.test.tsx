@@ -958,10 +958,10 @@ describe('GenerateSettingsForm model loading', () => {
 
     await settle(() => retry.click());
     expect(refresh).toHaveBeenCalledOnce();
-    expect(retry.dataset.loading).toBeDefined();
+    expect(retry.getAttribute('aria-busy')).toBe('true');
 
     await settle(() => finish());
-    expect(retry.dataset.loading).toBeUndefined();
+    expect(retry.hasAttribute('aria-busy')).toBe(false);
   });
 });
 

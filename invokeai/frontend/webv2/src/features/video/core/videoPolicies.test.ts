@@ -1543,6 +1543,18 @@ describe('getVideoModelAvailabilityReasons', () => {
 
     expect(installed).toEqual([]);
   });
+
+  it('ignores LoRAs the graph would skip: disabled ones and ones for another family', () => {
+    const model = wanModel('i2v_a14b');
+    const settings = settingsFor(model, {
+      loras: [
+        { isEnabled: false, model: LIGHTNING_T2V_HIGH as never, weight: 1 },
+        { isEnabled: true, model: { base: 'sdxl', key: 'sdxl-style', name: 'SDXL style', type: 'lora' }, weight: 1 },
+      ],
+    });
+
+    expect(getVideoModelAvailabilityReasons(model, settings, [model])).toEqual([]);
+  });
 });
 
 const ref2vaTransformer = (key = 'h3-ref2va-ckpt'): MainModelConfig => ({

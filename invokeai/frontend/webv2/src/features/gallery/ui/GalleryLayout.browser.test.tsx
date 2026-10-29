@@ -132,7 +132,6 @@ const contextBase = {
   boardsState: READY,
   filter: { boardId: 'dogs', galleryView: 'images', searchTerm: '' },
   gallery,
-  isWindowTruncated: false,
   listing: READY,
   starredStrip: EMPTY_GALLERY_STARRED_STRIP,
   itemActions: {

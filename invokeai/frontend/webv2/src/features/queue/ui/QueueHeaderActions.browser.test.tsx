@@ -95,8 +95,19 @@ describe('QueueHeaderActions', () => {
     await vi.waitFor(() => expect(commands.cancelItem).toHaveBeenCalledWith(7));
   });
 
-  it("offers no cancel for another user's running item, nor while disconnected", async () => {
+  it("offers no cancel for another user's running item", async () => {
     expect((await render(createTestQueueUiAdapter({ canManageItem: () => false }))).disabled).toBe(true);
-    expect((await render(createTestQueueUiAdapter({ isConnected: false }))).disabled).toBe(true);
+  });
+
+  it('says why it cannot cancel while disconnected, and cancels nothing', async () => {
+    const cancel = await render(createTestQueueUiAdapter({ isConnected: false }));
+
+    expect(cancel.getAttribute('aria-disabled')).toBe('true');
+    const description = document.getElementById(cancel.getAttribute('aria-describedby')!);
+    expect(description?.textContent).toBe('widgets.queue.unavailableWhileDisconnected');
+
+    await act(() => cancel.click());
+
+    expect(commands.cancelItem).not.toHaveBeenCalled();
   });
 });

@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import {
   useCallback,
+  useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
@@ -48,6 +49,7 @@ import { useTranslation } from 'react-i18next';
 
 import { CanvasFloatingBarDivider } from './CanvasFloatingBar';
 import { StagingItemContextMenu, type StagingItemContextMenuTarget } from './StagingItemContextMenu';
+import { CANVAS_SURFACE_ATTR } from './surfaceFocus';
 
 type AutoSwitchMode = CanvasStagingAreaContractV2['autoSwitchMode'];
 
@@ -154,8 +156,8 @@ export const StagingBar = ({
   onToggleVisibility,
 }: StagingBarProps) => {
   const { t } = useTranslation();
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const [contextMenuTarget, setContextMenuTarget] = useState<StagingItemContextMenuTarget | null>(null);
-  const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
   // The menu's candidate actions act on the selection, so it only stays open
   // while its slot is the selected one: an auto-switch to a newer result
   // closes it rather than letting Discard hit the wrong candidate.
@@ -177,19 +179,48 @@ export const StagingBar = ({
   };
 
   /**
-   * After a keyboard discard, focus stays in the bar instead of falling to the page: on the result now selected
-   * when thumbnails show, else on a step button that still works, else on the bar itself.
+   * After a discard or a closed thumbnail menu, focus stays with the results instead of falling to the page: on
+   * `preferred` (the thumbnail the menu opened from), else the result now selected when thumbnails show, else a step
+   * button that still works, else the bar itself. Once the last result is gone, and the bar with it, the canvas
+   * surface takes focus, so the canvas's keys keep working. Focus the user already moved elsewhere stays there.
    */
-  const restoreFocusAfterDiscard = (root: HTMLElement) => {
+  const keepFocusWithResults = (preferred?: () => HTMLElement | null) => {
+    const root = rootRef.current;
+    if (!root) {
+      return;
+    }
+    const surface = root.closest('[role="region"]')?.querySelector<HTMLElement>(`[${CANVAS_SURFACE_ATTR}]`) ?? null;
     requestAnimationFrame(() => {
-      if (!root.isConnected || root.contains(document.activeElement)) {
+      if (document.activeElement !== null && document.activeElement !== document.body) {
+        return;
+      }
+      if (!root.isConnected) {
+        surface?.focus({ preventScroll: true });
         return;
       }
       const target =
+        preferred?.() ??
         (areThumbnailsVisible ? root.querySelector<HTMLElement>(`[${THUMBNAIL_ATTR}][aria-current="true"]`) : null) ??
         root.querySelector<HTMLElement>(`[${STEP_ATTR}]:not(:disabled)`) ??
         root;
       target.focus();
+    });
+  };
+  const discardSelected = () => {
+    onDiscardSelected();
+    keepFocusWithResults();
+  };
+  const discardAll = () => {
+    onDiscardAll();
+    keepFocusWithResults();
+  };
+  // A menu with no trigger restores focus nowhere; send it back to the thumbnail it opened from.
+  const closeContextMenu = () => {
+    const slotId = contextMenuTarget?.slot.id;
+    setContextMenuTarget(null);
+    keepFocusWithResults(() => {
+      const index = slots.findIndex((slot) => slot.id === slotId);
+      return index < 0 ? null : (rootRef.current?.querySelector<HTMLElement>(`[${THUMBNAIL_ATTR}="${index}"]`) ?? null);
     });
   };
 
@@ -213,8 +244,7 @@ export const StagingBar = ({
     const isArrow = event.key.startsWith('Arrow');
     if (event.key === 'Delete' || event.key === 'Backspace') {
       if (selectedCandidate) {
-        onDiscardSelected();
-        restoreFocusAfterDiscard(event.currentTarget);
+        discardSelected();
       }
     } else if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !event.shiftKey && hasMultipleSlots) {
       const direction = event.key === 'ArrowLeft' ? -1 : 1;
@@ -249,7 +279,8 @@ export const StagingBar = ({
       animationName="slide-from-bottom, fade-in"
       css={STAGING_ROOT_CSS}
       gap="2"
-      // Reachable by script only: the focus target of last resort after a keyboard discard.
+      ref={rootRef}
+      // Reachable by script only: the focus target of last resort after a discard.
       tabIndex={-1}
       w="full"
       onKeyDown={handleKeyDown}
@@ -260,7 +291,7 @@ export const StagingBar = ({
           target={contextMenuTarget}
           onAccept={onAccept}
           onClose={closeContextMenu}
-          onDiscard={onDiscardSelected}
+          onDiscard={discardSelected}
           onSaveToGallery={handleSaveToGallery}
         />
       ) : null}
@@ -458,14 +489,14 @@ export const StagingBar = ({
                 </Tooltip>
 
                 <Tooltip content={t('common.discard')}>
-                  <IconButton aria-label={t('common.discard')} variant="ghost" onClick={onDiscardSelected}>
+                  <IconButton aria-label={t('common.discard')} variant="ghost" onClick={discardSelected}>
                     <XIcon />
                   </IconButton>
                 </Tooltip>
 
                 <CanvasFloatingBarDivider css={NARROW_HIDDEN_CSS} />
 
-                <Button css={WIDE_ONLY_CSS} flexShrink="0" variant="ghost" onClick={onDiscardAll}>
+                <Button css={WIDE_ONLY_CSS} flexShrink="0" variant="ghost" onClick={discardAll}>
                   <Trash2Icon />
                   {t('common.discardAll')}
                 </Button>
@@ -474,7 +505,7 @@ export const StagingBar = ({
                     aria-label={t('common.discardAll')}
                     css={COMPACT_ONLY_CSS}
                     variant="ghost"
-                    onClick={onDiscardAll}
+                    onClick={discardAll}
                   >
                     <Trash2Icon />
                   </IconButton>

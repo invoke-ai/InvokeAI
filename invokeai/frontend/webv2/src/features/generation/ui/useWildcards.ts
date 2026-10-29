@@ -12,6 +12,7 @@ import {
   wildcardsQueryOptions,
 } from '@features/generation/data/wildcards';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
@@ -54,7 +55,10 @@ export interface WildcardCatalog {
   isError: boolean;
   /** A retry after a failed read is on its way. */
   isRetrying: boolean;
-  retry: () => void;
+  /** The server's reason for the failed read, when it gave one. */
+  errorDetail: string | null;
+  /** Settles once the read it starts does. */
+  retry: () => Promise<unknown>;
   create: (wildcard: { name: string; values: string[] }) => Promise<void>;
   update: (id: string, changes: { name?: string; values?: string[] }) => Promise<void>;
   remove: (id: string) => Promise<void>;
@@ -204,13 +208,14 @@ export const useWildcards = (): WildcardCatalog => {
   return {
     applyWrites,
     create,
+    errorDetail: query.isError ? getApiErrorMessage(query.error, '') || null : null,
     isError: query.isError,
     isLoading: query.isPending,
     isRetrying: query.isError && query.isFetching,
     knownNames,
     remove,
     removeMany,
-    retry: () => void query.refetch(),
+    retry: () => query.refetch(),
     update,
     wildcards,
   };

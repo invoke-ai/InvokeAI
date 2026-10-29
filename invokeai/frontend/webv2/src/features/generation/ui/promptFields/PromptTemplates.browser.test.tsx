@@ -146,6 +146,7 @@ const defaultTemplate: PromptTemplateRecord = {
 const createCatalog = (overrides: Partial<PromptTemplateCatalog> = {}): PromptTemplateCatalog => ({
   create: vi.fn(),
   defaultTemplates: [defaultTemplate],
+  errorDetail: null,
   exportCsv: vi.fn(),
   importFile: vi.fn(),
   isError: false,

@@ -158,7 +158,8 @@ export const ColorPane = () => {
           )}
         </Box>
         <Stack flex="1" gap="2" minW="0">
-          <HStack gap="1">
+          {/* Wraps rather than clips its trailing tools when the pane is narrow. */}
+          <HStack flexWrap="wrap" gap="1">
             <TargetChips
               maskTint={maskTint}
               pair={pair}

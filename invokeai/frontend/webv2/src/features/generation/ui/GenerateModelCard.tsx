@@ -14,6 +14,7 @@ import { areArraysEqual, useExternalStoreSelector } from '@platform/state/select
 import { Button } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { Field } from '@platform/ui/Field';
+import { LoadError } from '@platform/ui/LoadError';
 import { useCallback, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -28,7 +29,6 @@ import {
   usePendingGenerateModelSwitch,
 } from './modelSelectionNotice';
 import { useGenerateSectionIssues } from './shared/GenerateIssues';
-import { GenerateLoadError } from './shared/GenerateLoadError';
 
 const MAIN_MODEL_TYPES = ['main', 'external_image_generator'];
 
@@ -69,7 +69,7 @@ export const GenerateModelCard = ({
   const { refresh: refreshModels } = ui.models;
   const retryModels = useCallback(() => {
     setIsRetryingModels(true);
-    void refreshModels().finally(() => setIsRetryingModels(false));
+    return refreshModels().finally(() => setIsRetryingModels(false));
   }, [refreshModels]);
   // Shared with the palette, which asks this card to confirm a lossy switch it cannot show itself.
   const pendingSwitchModel = usePendingGenerateModelSwitch(projectId);
@@ -194,7 +194,7 @@ export const GenerateModelCard = ({
           {t('widgets.generate.loadingModels')}
         </Text>
       ) : loadError ? (
-        <GenerateLoadError
+        <LoadError
           detail={loadError}
           isRetrying={isRetryingModels}
           layout="inline"

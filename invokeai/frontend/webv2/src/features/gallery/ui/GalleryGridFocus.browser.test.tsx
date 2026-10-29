@@ -334,7 +334,6 @@ const GalleryRegion = ({ runtime }: { runtime: ReturnType<typeof createGalleryRu
     boardsState: READY_LISTING,
     filter,
     gallery,
-    isWindowTruncated: false,
     itemActions,
     listing,
     loadedItems: mergeGalleryLoadedItems(strip, gallery.items),
