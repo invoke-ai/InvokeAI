@@ -147,9 +147,15 @@ def _window(driver, reserved, allocated) -> FreshWindow:
     return FreshWindow(driver, reserved, allocated, 0, max(readable), method, ())
 
 
-def test_without_the_drivers_figure_in_every_run_a_point_reads_torchs_counters_alone():
-    """The cold run's driver figure counts more than torch's allocator holds; mixing it in, the bytes would not be what
-    the method names."""
+def test_a_cold_runs_driver_figure_survives_a_warm_run_without_one():
+    """On ROCm a first forward maps a few hundred MiB above torch's reserve; a warm run that cannot read the driver must
+    not drop that figure for torch's counters alone."""
     windows = [_window(7800, 2000, 1500), _window(None, 2500, 2800)]
+
+    assert measured_bytes_and_method(windows) == (7800, "demand_peak")
+
+
+def test_the_method_names_the_counter_the_largest_figure_came_from():
+    windows = [_window(2000, 1900, 1500), _window(None, 2500, 2800)]
 
     assert measured_bytes_and_method(windows) == (2800, "reserved_peak")

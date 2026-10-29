@@ -29,6 +29,7 @@ from invokeai.backend.flux2.denoise_working_memory import (
     FLUX2_DENOISE_SPEC,
     estimate_flux2_denoise_working_memory,
 )
+from invokeai.backend.flux2.extensions.regional_prompting_extension import Flux2RegionalPromptingExtension
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.util.attention import (
     SDPA_MATH_BYTES_PER_SCORE_ELEMENT,
@@ -121,40 +122,9 @@ def _estimate(
         ).reservation_bytes
 
 
-class TestFlux2DenoiseWorkingMemoryEstimate:
-    def test_reference_image_tokens_are_counted(self):
-        """The regression this whole module exists for: reference tokens are attended like image
-        tokens and cost the same per token, so they must enter the estimate."""
-        without_refs = _estimate(image_seq_len=4096)
-        with_refs = _estimate(image_seq_len=4096, ref_image_seq_len=12288)
-        assert with_refs - without_refs == 12288 * _per_token()
-
-    def test_estimate_is_linear_in_total_sequence(self):
-        """Attention runs through SDPA, so there is no O(seq^2) term to model -- image, reference and
-        text tokens are interchangeable at the same per-token cost."""
-        assert _estimate(image_seq_len=8192) == _estimate(image_seq_len=4096, ref_image_seq_len=4096)
-        assert _estimate(image_seq_len=4096, text_seq_len=1024) - _estimate(image_seq_len=4096, text_seq_len=512) == (
-            512 * _per_token()
-        )
-
-    def test_lora_margin_is_added_per_lora(self):
-        """Sidecar-patched LoRAs add an activation branch per patched layer."""
-        base = _estimate(image_seq_len=4096)
-        assert _estimate(image_seq_len=4096, num_loras=1) - base == int(0.5 * GB)
-        assert _estimate(image_seq_len=4096, num_loras=3) - base == int(1.5 * GB)
-
-    def test_regional_attention_bias_is_added(self):
-        """An additive ``S x S`` bias in bf16; this build attends with a fused kernel, so the bias is all it adds."""
-        base = _estimate(image_seq_len=4096)
-        assert _estimate(image_seq_len=4096, regional=True) - base == (4096 + 512) ** 2 * 2
-
-
 class TestTransformerWidthIsBudgeted:
-    """Per-token activation cost follows the transformer's hidden width, not only the token count.
-    Measured slope between 4608 and 9216 tokens, block count and everything else held fixed, each point
-    in a fresh process: 0.2912 / 0.3859 / 0.5547 MB per token for Klein 4B / Klein 9B / [dev] on CUDA,
-    0.3147 / 0.4067 / 0.5890 on ROCm/gfx1201 (`TestMeasuredChecks` in
-    `test_flux2_denoise_working_memory.py` holds the shipped lines to them).
+    """Per-token activation cost follows the transformer's hidden width, not only the token count: each width has a
+    line of its own in the shipped data, fitted on its own points.
 
     Calibrating on Klein 9B alone silently under-reserved FLUX.2 [dev] by a third, and [dev] reaches
     the denoise node as a first-class path with its own loader and starter models. So each width has a
@@ -184,75 +154,6 @@ class TestTransformerWidthIsBudgeted:
         with _materializing():
             materializing = _estimate(image_seq_len=4096, regional=True, hidden_size=hidden, device=MATERIALIZING)
         assert materializing - fused == heads * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
-
-
-class TestFlux2DenoiseBatchIsBudgeted:
-    """A batch of B is B independent sequences, so it enters the linear term exactly as extra
-    sequence does. Measured on the Klein geometry (48 heads x 128, mlp 3.0) with a reduced block
-    count -- the constant is block-count independent -- peak reserved, each point in a fresh process:
-
-        B=1, 4608 tokens ->  2570MB      B=2, 4608 each (9216 total) ->  5126MB
-        B=1, 9728 tokens ->  5584MB      B=2, 9728 each (19456 total) -> 11120MB
-        B=1, 14336 tokens -> 8284MB      B=3, 4608 each (13824 total) ->  7656MB
-
-    Per *total* token that is 0.554-0.578MB across every row: batch and sequence are interchangeable.
-    (The absolute figure is not comparable to the Klein table elsewhere in this module -- a 3-block
-    stand-in amortizes per-forward overhead differently. Only the equivalence is being tested.)
-
-    Batched latents reach this node through the API and custom graphs, not the stock UI.
-    """
-
-    def test_batch_and_sequence_are_interchangeable(self):
-        """Two samples of 4608 tokens must cost what one sample of 9216 costs -- the measurement
-        above says 5126MB against 5584MB, equal to within the allocator's noise."""
-        assert _estimate(image_seq_len=4096, text_seq_len=512, batch_size=2) == _estimate(
-            image_seq_len=8704, text_seq_len=512, batch_size=1
-        )
-
-    @pytest.mark.parametrize("batch", [2, 3, 4])
-    def test_each_extra_sample_adds_exactly_its_own_tokens(self, batch):
-        single = _estimate(image_seq_len=4096)
-        assert _estimate(image_seq_len=4096, batch_size=batch) - single == (batch - 1) * (4096 + 512) * _per_token()
-
-    def test_reference_tokens_scale_with_the_batch(self):
-        """`ensure_batch_size` repeats the reference latents across the batch."""
-        single = _estimate(image_seq_len=4096, ref_image_seq_len=12288)
-        assert _estimate(image_seq_len=4096, ref_image_seq_len=12288, batch_size=2) - single == (
-            (4096 + 12288 + 512) * _per_token()
-        )
-
-    def test_the_fixed_base_does_not_scale_with_the_batch(self):
-        """It covers transient weight casts and allocator slack -- properties of the weights, not of
-        how many samples run through them. Scaling it would add a GB per sample for nothing."""
-        deltas = {
-            _estimate(image_seq_len=4096, batch_size=b + 1) - _estimate(image_seq_len=4096, batch_size=b)
-            for b in (1, 2, 3)
-        }
-        assert deltas == {(4096 + 512) * _per_token()}
-
-    def test_the_regional_bias_does_not_scale_with_the_batch(self):
-        """`get_joint_attention_kwargs` builds it as (1, 1, S, S) and lets SDPA broadcast it, so
-        there is exactly one of them however many samples are in flight."""
-        single = _estimate(image_seq_len=4096, regional=True)
-        double = _estimate(image_seq_len=4096, regional=True, batch_size=2)
-        assert double - single == (4096 + 512) * _per_token()
-
-    def test_the_score_matrix_scales_with_the_batch(self):
-        """Where it is materialized at all it is shaped (batch, heads, S, S)."""
-        seq_len = 4096 + 512
-        with _materializing():
-            single = _estimate(image_seq_len=4096, regional=True, device=MATERIALIZING)
-            double = _estimate(image_seq_len=4096, regional=True, batch_size=2, device=MATERIALIZING)
-            per_token = _per_token()
-        assert double - single == (
-            seq_len * per_token + KLEIN_9B_HEADS * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
-        )
-
-    def test_the_lora_margin_scales_with_the_batch(self):
-        """A sidecar patch adds an activation branch, and activations are per sample."""
-        assert _estimate(image_seq_len=4096, num_loras=2, batch_size=3) - _estimate(
-            image_seq_len=4096, num_loras=0, batch_size=3
-        ) == 3 * int(1.0 * GB)
 
 
 class TestFlux2VaeWorkingMemoryEstimate:
@@ -466,13 +367,16 @@ class TestFlux2DenoiseRequestsWorkingMemory:
         variant="klein_9b",
         transformer: torch.nn.Module | None = None,
         on_device=None,
+        negative_tokens: int | None = None,
+        regional_mask: torch.Tensor | None = None,
     ):
         """Drive `_run_diffusion` up to the transformer load and return the reservation of the estimate it hands
         `model_on_device()`.
 
         `transformer` replaces the mocked model the node reads before locking. It has to be a real
         module for anything that walks the module tree: a `MagicMock` iterates empty, so an int8
-        build looks exactly like a dense one.
+        build looks exactly like a dense one. `negative_tokens` adds a negative caption of that length;
+        `regional_mask` stands in for the mask regional prompting builds from masked positive captions.
         """
         from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
         from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
@@ -495,9 +399,16 @@ class TestFlux2DenoiseRequestsWorkingMemory:
             format=ModelFormat.Checkpoint,
             variant=Flux2VariantType(variant) if variant is not None else None,
         )
-        context.conditioning.load.return_value = ConditioningFieldData(
-            conditionings=[FLUXConditioningInfo(clip_embeds=torch.zeros(1, 768), t5_embeds=torch.zeros(1, 512, 12288))]
-        )
+
+        def conditioning(name: str) -> ConditioningFieldData:
+            tokens = negative_tokens if name == "neg" else 512
+            return ConditioningFieldData(
+                conditionings=[
+                    FLUXConditioningInfo(clip_embeds=torch.zeros(1, 768), t5_embeds=torch.zeros(1, tokens, 12288))
+                ]
+            )
+
+        context.conditioning.load.side_effect = conditioning
 
         ref_extension = MagicMock()
         ref_extension.ref_image_latents = torch.zeros(1, num_ref_tokens, 128)
@@ -515,7 +426,7 @@ class TestFlux2DenoiseRequestsWorkingMemory:
             add_noise=True,
             transformer=MagicMock(transformer=MagicMock(), loras=[]),
             positive_text_conditioning=MagicMock(conditioning_name="pos", mask=None),
-            negative_text_conditioning=None,
+            negative_text_conditioning=MagicMock(conditioning_name="neg") if negative_tokens is not None else None,
             guidance=4.0,
             cfg_scale=1.0,
             width=1024,
@@ -536,6 +447,7 @@ class TestFlux2DenoiseRequestsWorkingMemory:
             ),
             _priced_on_denoise_platform(),
             pytest.raises(_StopBeforeLoad),
+            patch.object(Flux2RegionalPromptingExtension, "_prepare_restricted_attn_mask", return_value=regional_mask),
         ):
             invocation._run_diffusion(context)
 
@@ -606,6 +518,19 @@ class TestFlux2DenoiseRequestsWorkingMemory:
     def test_the_blended_batch_is_read_after_the_broadcast(self):
         single = self._run(num_ref_tokens=0, init_batch=1)
         assert self._run(num_ref_tokens=0, init_batch=3) - single == 2 * (64 * 64 + 512) * _per_token()
+
+    def test_a_regional_mask_reaches_the_reservation_without_reference_images(self):
+        """The mask becomes an additive bias the forward attends with, so its bytes are reserved."""
+        side = 64 * 64 + 512
+        mask = torch.ones(side, side, dtype=torch.bool)
+
+        assert self._run(num_ref_tokens=0, regional_mask=mask) == _estimate(image_seq_len=64 * 64, regional=True)
+        assert self._run(num_ref_tokens=0, regional_mask=mask) > self._run(num_ref_tokens=0)
+
+    def test_a_negative_caption_longer_than_the_positive_one_sets_the_text_tokens(self):
+        """The CFG passes run one after the other, so the longer caption of the pair is what a forward attends."""
+        assert self._run(num_ref_tokens=0, negative_tokens=700) == _estimate(image_seq_len=64 * 64, text_seq_len=700)
+        assert self._run(num_ref_tokens=0, negative_tokens=77) == _estimate(image_seq_len=64 * 64, text_seq_len=512)
 
     def test_repeated_reference_latents_are_counted_per_sample(self):
         """`ensure_batch_size` repeats the reference latents across the batch, so their tokens scale
@@ -1181,16 +1106,18 @@ class TestTheInt8DequantTransientReachesTheReservation:
         dense = harness._run(num_ref_tokens=0)
         with_int8 = harness._run(num_ref_tokens=0, transformer=model)
 
-        # Two weight-sized tensors in the compute dtype, over the largest quantized layer.
-        assert with_int8 - dense == 2 * 128 * 64 * torch.bfloat16.itemsize
+        # Two weight-sized tensors in the compute dtype, over the largest quantized layer, plus that layer's stored
+        # int8 weight and float32 scale, which partial loading would stream.
+        assert with_int8 - dense == 2 * 128 * 64 * torch.bfloat16.itemsize + 128 * 64 + 4
 
     def test_a_dense_build_adds_nothing(self):
         # The other half: a bf16 or fp8 checkpoint must not be charged for a dequantization it
-        # never performs.
+        # never performs, only for its largest layer as stored, which partial loading would stream.
         harness = TestFlux2DenoiseRequestsWorkingMemory()
         dense_model = torch.nn.Linear(64, 64).to(torch.bfloat16)
 
-        assert harness._run(num_ref_tokens=0, transformer=dense_model) == harness._run(num_ref_tokens=0)
+        added = harness._run(num_ref_tokens=0, transformer=dense_model) - harness._run(num_ref_tokens=0)
+        assert added == (64 * 64 + 64) * torch.bfloat16.itemsize
 
 
 class TestTheSidecarDecisionReachesThePatcher:

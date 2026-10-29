@@ -66,6 +66,7 @@ from invokeai.backend.stable_diffusion.diffusers_pipeline import (
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.sage_attention import sage_attention_scope
+from invokeai.backend.working_memory import probe
 
 FLUX2_MAX_HIDDEN_SIZE = 6144
 
@@ -548,15 +549,20 @@ class Flux2DenoiseInvocation(BaseInvocation):
             control_gate: Callable[[int], None] | None = None
             if control_branch_info is not None:
                 assert self.control is not None and control_context is not None
-                # Locked with the same working memory: the transformer can no longer be offloaded, so a branch placed
-                # with only the default reservation would fill the room kept for the forward. A plain reservation, not
+                # Locked keeping free what the transformer's lock keeps free: the transformer can no longer be
+                # offloaded, so a branch placed with only the default reservation would fill the room kept for the
+                # forward. Inside a calibration scope that is the calibration reservation, as `model_on_device` applies
+                # it to the transformer, so the branch cannot use up the window's headroom. A plain reservation, not
                 # the estimate: inside the transformer's calibration window this lock is a co-lock, whose weights go
                 # into the window's offset rather than its demand, where a second estimate would open a nested window
                 # that freezes the transformer's for the whole loop. The loader built the branch in bfloat16, this
                 # node's inference dtype; the branch casts what crosses into its chain and the hints back
                 # (`Flux2FunControlBranch.block_runner` / `add_hint`), so nothing cache-managed is cast.
+                _, branch_reservation = probe.lock_reservation(
+                    working_memory.reservation_bytes, control_branch_info.compute_device
+                )
                 (_, control_branch) = exit_stack.enter_context(
-                    control_branch_info.model_on_device(working_mem_bytes=working_memory.reservation_bytes)
+                    control_branch_info.model_on_device(working_mem_bytes=branch_reservation)
                 )
                 assert isinstance(control_branch, Flux2FunControlBranch)
                 control_hooks = exit_stack.enter_context(

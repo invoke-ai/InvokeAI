@@ -61,6 +61,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Final, Literal, Optional
 
+import torch
 from pydantic import BaseModel, ConfigDict
 
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
@@ -593,6 +594,17 @@ _current_scope: contextvars.ContextVar[Optional[ProbeScope]] = contextvars.Conte
 def current_scope() -> Optional[ProbeScope]:
     """The calibration scope open on this thread, if any."""
     return _current_scope.get()
+
+
+def lock_reservation(reservation_bytes: int, device: torch.device) -> tuple[Optional[ProbeScope], int]:
+    """What a lock on `device` keeps free for an estimate of `reservation_bytes`, and the calibration scope it locks
+    under: inside a scope open on this thread and on a GPU, that scope and the calibration reservation
+    (`calibration_reservation`); otherwise None and the estimate's bytes. The model loader applies it to a measured
+    lock, and a node to every lock beside one that must not use up the window's headroom."""
+    scope = current_scope()
+    if scope is None or device.type == "cpu":
+        return None, reservation_bytes
+    return scope, calibration_reservation(reservation_bytes)
 
 
 class _EmptyCacheObserver:

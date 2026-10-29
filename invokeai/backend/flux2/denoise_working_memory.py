@@ -50,11 +50,37 @@ platform nothing measures is priced as a measured one (`priced_as`), and the two
 fp8 weights cast per forward, which an fp8-stored model reserves as a term of its own as well, so it pays that cast
 twice wherever they price.
 
+CUDA on Linux reuses the RTX 4090's Windows-measured lines as they are, without the unmeasured floor: its entries are
+keyed for every OS (`platform.MEASURED`), as the Z-Image and VAE estimators' cuDNN entries are. That is a judgement,
+not a measurement. A forward's activations are torch tensors from the same caching allocator over the same attention
+and GEMM kernels on both systems; what made MIOpen's Windows lines differ, HIP's runtime and allocator under Windows, has
+no counterpart on CUDA, where the Windows driver model, if anything, maps more per allocation than Linux does. A floor
+there would charge the legacy 1 GiB base to the platform most FLUX.2 users run on, for a gap nothing has shown.
+
 The analytic terms:
 
+- The largest layer's stored weights, for a transformer the model cache may load partially: the weights it leaves in
+  RAM are copied to the device per forward, one layer at a time, and the copy is alive during its layer's matmul
+  alongside the activations. No point prices it: every point is a fully resident model. The size is read off the
+  transformer, the largest module's own parameters and buffers as stored (`calc_tensor_size`, as the cache counts
+  them): in bf16 the single-stream blocks' fused projection (`to_qkv_mlp_proj`, ``width x 9 width``), 679,477,248
+  bytes for [dev]; for an fp8-stored or GGUF build its float8 or quantized bytes, whose widened copy is the fp8 cast or
+  dequant transient's term. A real [dev] in bf16 with 15.0 of its 64.4 GB resident on the RTX 4090 (native
+  allocator) demanded 5509 MB at 8704 tokens (1024px with one 1024px reference), 5459 MB at 8612 (1440px) and 3305 MB
+  at 4608 (1024px), 535, 518 and 719 MB above the resident 2-block points; the line alone reserved 0.96, 0.96 and 0.85
+  times that, with this term 1.08, 1.08 and 1.05 times. The node charges it on every forward: whether the cache loads
+  the transformer whole is decided by the lock this estimate sizes, after it, so residency is unknown when the
+  estimate is taken. A fully resident model over-reserves one layer. The calibration script, whose models are always
+  resident, declares them so (`weights_resident`), and the term is zero.
 - Regional prompting's additive attention bias, one ``S x S`` tensor in the compute dtype broadcast over the batch and
   the heads (`Flux2RegionalPromptingExtension.get_joint_attention_kwargs`). The node passes no mask with reference
   images, which the mask does not cover.
+- With that bias, a second copy of it per sample, its last dimension padded to a multiple of 8: on CUDA a masked
+  forward goes to the memory-efficient kernel, which materializes the bias in a layout of its own. On the RTX 4090
+  (native allocator, 2-block Klein 9B width, 1440px with two 512-token regional captions, S = 9124, a 166.5 MB bias)
+  the masked forward took 158 MB more of the driver's figure and 168 MB more reserved than the unmasked one, about one
+  bias-sized transient, with allocated unchanged; its demand, 3761 MB with the bias, is 1.03 times below what the
+  estimate reserved without this term. No fit point is masked, so the copy is priced on every platform, aligned or not.
 - Where SDPA has no fused kernel for these shapes it materializes the score matrices, shaped (batch, heads, S, S):
   `sdpa_score_matrix_bytes` prices them only where they are really built. A mask narrows which fused kernels a build
   can use, so the call is told whether one is passed.
@@ -77,6 +103,7 @@ import torch
 
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
+from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 from invokeai.backend.util.fp8 import peak_fp8_cast_transient_bytes
 from invokeai.backend.working_memory.estimate import FeatureValue, WorkingMemoryEstimate, WorkingMemoryTerm
 from invokeai.backend.working_memory.fit import Line, off_line_reasons
@@ -88,6 +115,8 @@ FLUX2_ATTENTION_HEAD_DIM: Final = 128
 FLUX2_HIDDEN_SIZES: Final = (3072, 4096, 6144)
 """The transformer widths with a line: Klein 4B, Klein 9B and [dev]."""
 
+_BIAS_ALIGNMENT: Final = 8
+"""The last-dimension alignment the memory-efficient attention kernel pads an attention bias to."""
 _CONTROL_HINTS_BEYOND_BLOCKS: Final = 4
 _LORA_PATCH_BYTES: Final = 2**29
 _DTYPE_NAMES: Final[Mapping[torch.dtype, str]] = {torch.bfloat16: "bf16"}
@@ -144,10 +173,16 @@ def _terms(features: Mapping[str, FeatureValue], values: Mapping[str, float]) ->
             * cast(int, features["hidden_size"])
             * _ELEMENT_SIZES[cast(str, features["dtype"])]
         )
+    # Both absent from the points measured before these terms existed, which are fully resident forwards without a
+    # mask: zero is what such a point streams and pads, though a forward the node prices now always carries them.
+    streamed_layer_bytes = cast(int, features.get("streamed_layer_bytes", 0))
+    padded_bias_bytes = cast(int, features.get("padded_bias_bytes", 0))
     return (
         WorkingMemoryTerm.fitted("activations", f"k_{suffix}", cast(int, features["tokens"]) * batch, values),
         WorkingMemoryTerm.fitted("base", f"b_{suffix}", 1, values),
         WorkingMemoryTerm("regional_attention_bias", cast(int, features["regional_bias_bytes"]), True),
+        WorkingMemoryTerm("padded_attention_bias", padded_bias_bytes, True),
+        WorkingMemoryTerm("streamed_layer", streamed_layer_bytes, True),
         WorkingMemoryTerm("attention_scores", cast(int, features["score_matrix_bytes"]), True),
         WorkingMemoryTerm("control_hints", hint_bytes, True),
         WorkingMemoryTerm("lora_patches", cast(int, features["lora_count"]) * batch * _LORA_PATCH_BYTES, True),
@@ -156,10 +191,30 @@ def _terms(features: Mapping[str, FeatureValue], values: Mapping[str, float]) ->
     )
 
 
+def _largest_layer_bytes(transformer: torch.nn.Module) -> int:
+    """The largest module's own parameters and buffers as stored: what partial loading copies for one layer."""
+    return max(
+        (
+            sum(calc_tensor_size(t) for t in (*module.parameters(recurse=False), *module.buffers(recurse=False)))
+            for module in transformer.modules()
+        ),
+        default=0,
+    )
+
+
+def _padded_bias_bytes(mask: Optional[torch.Tensor], dtype: torch.dtype) -> int:
+    """One sample's copy of the additive bias in `dtype`, its last dimension padded to `_BIAS_ALIGNMENT`; 0 without one."""
+    if mask is None:
+        return 0
+    columns = mask.shape[-1]
+    padded = -(-columns // _BIAS_ALIGNMENT) * _BIAS_ALIGNMENT
+    return mask.numel() // columns * padded * dtype.itemsize
+
+
 FLUX2_DENOISE_SPEC = register(
     EstimatorSpec(
         id="denoise.flux2",
-        version=1,
+        version=2,
         coefficients=_COEFFICIENTS,
         platform_keys=("conv_backend", "allocator"),
         terms=_terms,
@@ -179,6 +234,7 @@ def estimate_flux2_denoise_working_memory(
     lora_count: int,
     control_blocks: int = 0,
     regional_attn_mask: Optional[torch.Tensor] = None,
+    weights_resident: bool = False,
     device: torch.device,
     dtype: torch.dtype,
 ) -> WorkingMemoryEstimate:
@@ -188,7 +244,8 @@ def estimate_flux2_denoise_working_memory(
     `hidden_size` its width. `image_seq_len`, `ref_image_seq_len` and `text_seq_len` are one sample's token counts, the
     longer caption of a CFG pair, and `batch_size` the samples the forward runs. `control_blocks` is the
     Fun-ControlNet branch's block count, 0 without one. `regional_attn_mask` is regional prompting's mask, which the
-    forward passes as an additive bias.
+    forward passes as an additive bias. `weights_resident` is True only where the caller knows every weight stays on
+    the device for the forward; otherwise the largest layer, which partial loading would stream, is reserved too.
     """
     dtype_name = _DTYPE_NAMES.get(dtype)
     if dtype_name is None or hidden_size not in FLUX2_HIDDEN_SIZES:
@@ -208,6 +265,8 @@ def estimate_flux2_denoise_working_memory(
         "dtype": dtype_name,
         "has_attention_mask": has_attention_mask,
         "regional_bias_bytes": regional_attn_mask.numel() * dtype.itemsize if regional_attn_mask is not None else 0,
+        "padded_bias_bytes": _padded_bias_bytes(regional_attn_mask, dtype) * batch_size,
+        "streamed_layer_bytes": 0 if weights_resident else _largest_layer_bytes(transformer),
         "score_matrix_bytes": sdpa_score_matrix_bytes(
             device=device,
             dtype=dtype,

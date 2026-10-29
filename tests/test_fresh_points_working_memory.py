@@ -79,7 +79,7 @@ def _common(features: dict, estimator: str = "denoise.z_image") -> dict:
     """The fields of a point the measurement does not decide, as a measuring process takes them."""
     return {
         "estimator": estimator,
-        "version": 1,
+        "version": import_estimator_modules()[estimator].version,
         "platform": dataclasses.asdict(Platform("cudnn", "native", "windows")),
         "features": features,
         "device": "NVIDIA GeForce RTX 4090",
@@ -137,13 +137,17 @@ class _Exit(Exception):
 def test_a_measuring_process_reports_its_line_on_the_result_line_and_leaves_with_its_status(
     monkeypatch: pytest.MonkeyPatch, capsys, fails: bool
 ) -> None:
-    """It leaves through `os._exit`, past Python's shutdown, whose HIP teardown can hang on Windows."""
-    applied: list[str] = []
-    monkeypatch.setattr(fresh_points, "apply_server_runtime", lambda alloc_conf, logger: applied.append(alloc_conf))
+    """It leaves through `os._exit`, past Python's shutdown, whose HIP teardown can hang on Windows. The server's runtime
+    is set up before the measurement, which must see the allocator a server would run with."""
+    calls: list[str] = []
+    monkeypatch.setattr(
+        fresh_points, "apply_server_runtime", lambda alloc_conf, logger: calls.append(f"runtime {alloc_conf}")
+    )
     monkeypatch.setattr(fresh_points.os, "_exit", lambda code: (_ for _ in ()).throw(_Exit(code)))
     point = ZPoint("fit", 1024, 512, "bfloat16", 2)
 
     def measure_point(measured, force):
+        calls.append("measure")
         if fails:
             raise RuntimeError("no device")
         return {"status": "point", "point": dataclasses.asdict(measured), "force": force}
@@ -153,7 +157,7 @@ def test_a_measuring_process_reports_its_line_on_the_result_line_and_leaves_with
         fresh_points.measure_in_this_process(request, point_type=ZPoint, measure=measure_point, logger_name="test")
 
     out = capsys.readouterr()
-    assert applied == ["backend:cudaMallocAsync"]
+    assert calls == ["runtime backend:cudaMallocAsync", "measure"]
     if fails:
         assert left.value.code == 1 and fresh_points.RESULT_PREFIX not in out.out and "no device" in out.err
     else:

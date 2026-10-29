@@ -107,7 +107,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -132,7 +132,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -149,7 +149,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native"
@@ -167,7 +167,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -193,7 +193,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -2355,7 +2355,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2382,7 +2382,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2409,7 +2409,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2436,7 +2436,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2463,7 +2463,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2490,7 +2490,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2517,7 +2517,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2544,7 +2544,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2571,7 +2571,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2598,7 +2598,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2625,7 +2625,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2652,7 +2652,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2679,7 +2679,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2706,7 +2706,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2733,7 +2733,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2760,7 +2760,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2787,7 +2787,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2814,7 +2814,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2841,7 +2841,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2868,7 +2868,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2895,7 +2895,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2922,7 +2922,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2949,7 +2949,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -2976,7 +2976,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -3003,7 +3003,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -3030,7 +3030,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -3057,7 +3057,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -3084,7 +3084,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -3111,7 +3111,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -3138,7 +3138,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -3165,7 +3165,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3192,7 +3192,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3219,7 +3219,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3246,7 +3246,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3273,7 +3273,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3300,7 +3300,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3327,7 +3327,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3354,7 +3354,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3381,7 +3381,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3408,7 +3408,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3435,7 +3435,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3462,7 +3462,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3489,7 +3489,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3516,7 +3516,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3543,7 +3543,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3570,7 +3570,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3597,7 +3597,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3624,7 +3624,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3651,7 +3651,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3678,7 +3678,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3705,7 +3705,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3732,7 +3732,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3759,7 +3759,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3786,7 +3786,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3813,7 +3813,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3840,7 +3840,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3867,7 +3867,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3894,7 +3894,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3921,7 +3921,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3948,7 +3948,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -3975,7 +3975,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4003,7 +4003,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4031,7 +4031,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4059,7 +4059,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4087,7 +4087,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4115,7 +4115,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4143,7 +4143,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4171,7 +4171,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4199,7 +4199,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4227,7 +4227,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4255,7 +4255,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4283,7 +4283,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4311,7 +4311,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4339,7 +4339,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4367,7 +4367,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4395,7 +4395,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4423,7 +4423,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4451,7 +4451,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4479,7 +4479,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4507,7 +4507,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4535,7 +4535,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4563,7 +4563,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4591,7 +4591,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4619,7 +4619,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4647,7 +4647,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4675,7 +4675,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4703,7 +4703,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4731,7 +4731,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -4759,7 +4759,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -4787,7 +4787,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -4815,7 +4815,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -4843,7 +4843,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -4871,7 +4871,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -4899,7 +4899,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -4927,7 +4927,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -4955,7 +4955,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -4983,7 +4983,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5011,7 +5011,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5039,7 +5039,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5067,7 +5067,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5095,7 +5095,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5123,7 +5123,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5151,7 +5151,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5179,7 +5179,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5207,7 +5207,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5235,7 +5235,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5263,7 +5263,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5291,7 +5291,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5319,7 +5319,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5347,7 +5347,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5375,7 +5375,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5403,7 +5403,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5431,7 +5431,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5459,7 +5459,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5487,7 +5487,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5515,7 +5515,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -5543,7 +5543,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -5570,7 +5570,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -5597,7 +5597,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -5624,7 +5624,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -5651,7 +5651,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -5678,7 +5678,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -5705,7 +5705,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -5732,7 +5732,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "native"
@@ -5759,7 +5759,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -5786,7 +5786,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -5813,7 +5813,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -5840,7 +5840,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -5867,7 +5867,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -5894,7 +5894,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -5921,7 +5921,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -5948,7 +5948,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -5975,7 +5975,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "cudnn",
         "allocator": "cudaMallocAsync"
@@ -6002,7 +6002,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -6030,7 +6030,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -6058,7 +6058,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -6086,7 +6086,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -6114,7 +6114,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -6142,7 +6142,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "expandable",
@@ -6170,7 +6170,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -6198,7 +6198,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -6226,7 +6226,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -6254,7 +6254,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",
@@ -6282,7 +6282,7 @@
     },
     {
       "estimator": "denoise.flux2",
-      "version": 1,
+      "version": 2,
       "platform": {
         "conv_backend": "miopen",
         "allocator": "native",

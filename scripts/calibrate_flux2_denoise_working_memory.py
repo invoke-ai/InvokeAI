@@ -34,7 +34,9 @@ after the runtime setup, so its `score_matrix_bytes` reflects the attention kern
 Each point is priced before it runs: the estimate for it plus its weights. It is skipped when that exceeds free device
 memory, unless `--force`. An oversized allocation does not always fail: where the driver backs it with system RAM
 (NVIDIA's sysmem fallback, AMD on Windows) it pages, which can stall the whole machine. `--dry-run` prints that price
-per point as a CPU prices it, with the shipped values of cuDNN under the native allocator.
+per point as a CPU prices it: a CPU is an unmeasured platform, so that is cuDNN's native-allocator entry floored at the
+legacy constants (`unmeasured_floor`), above what the point's measured platform reserves wherever the fit lies below
+them.
 
 Modes
 -----
@@ -268,6 +270,8 @@ def _estimate(point: Point, device: "torch.device") -> "WorkingMemoryEstimate":
         text_seq_len=point.text_tokens,
         batch_size=point.batch,
         lora_count=0,
+        # Measured whole on the device: nothing is streamed per forward.
+        weights_resident=True,
         device=device,
         dtype=getattr(torch, DTYPE),
     )
@@ -497,8 +501,9 @@ def _summarize_checks(lines: Sequence[Mapping[str, Any]]) -> None:
 
 
 def _print_plan(points: Sequence[Point]) -> None:
-    """The planned points, each priced as a CPU prices it: the estimate with the shipped values of cuDNN under the
-    native allocator, the forced math kernel's score matrix included, plus the weights."""
+    """The planned points, each priced as a CPU prices it, plus the weights: the estimate with cuDNN's native-allocator
+    values floored at the legacy constants, as every unmeasured platform's, the forced math kernel's score matrix
+    included."""
     import torch
     from torch.nn.attention import SDPBackend, sdpa_kernel
 

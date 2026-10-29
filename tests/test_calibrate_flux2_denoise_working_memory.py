@@ -89,6 +89,18 @@ def test_each_widths_caption_width_is_the_model_managers(width: int) -> None:
     assert flux2_hidden_size(flux2_variant_from_context_dim(script.CONTEXT_DIMS[width])) == width
 
 
+@pytest.mark.parametrize("width", sorted(script.CONTEXT_DIMS))
+def test_the_measured_transformer_has_the_geometry_the_loader_builds_at_its_width(width: int) -> None:
+    """The loader sizes a FLUX.2 transformer from its checkpoint's `context_embedder` (hidden size by caption width),
+    with heads of 128 and as many as the hidden size holds (`model_loaders/flux.py`). A model measured at another inner
+    width would put its points on the wrong width's line."""
+    model = script._transformer(width, 1)
+
+    assert model.context_embedder.weight.shape == (width, script.CONTEXT_DIMS[width])
+    assert model.inner_dim == width
+    assert (model.config.attention_head_dim, model.config.num_attention_heads) == (128, width // 128)
+
+
 def test_a_point_is_priced_on_its_widths_line_over_the_tokens_of_every_sample() -> None:
     """Three 1024px references at a 1024px generation, two samples: the references' tokens are those
     `Flux2RefImageExtension` concatenates, repeated per sample, and the forward fits its width's line."""

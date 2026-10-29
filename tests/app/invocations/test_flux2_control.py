@@ -34,6 +34,7 @@ from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, FLUXConditioningInfo
 from invokeai.backend.util import attention
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.working_memory import probe
 
 SIDE = 64  # an 8x8 latent: 16 image tokens
 IMAGE_TOKENS = (SIDE // 16) ** 2
@@ -349,12 +350,21 @@ def test_the_control_context_is_zero_for_the_reference_tokens(monkeypatch: pytes
     assert torch.all(control_context[:, :IMAGE_TOKENS].abs().sum(dim=-1) > 0)
 
 
+@pytest.mark.parametrize(
+    "calibrating, device, calibration_lock",
+    [(False, "cuda", False), (True, "cuda", True), (True, "cpu", False)],
+    ids=["outside-a-scope", "in-a-scope-on-a-gpu", "in-a-scope-on-the-cpu"],
+)
 def test_the_branch_is_locked_with_the_same_reservation_and_hooked_inside_the_exit_stack(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, calibrating: bool, device: str, calibration_lock: bool
 ) -> None:
+    """Inside a calibration scope the transformer's lock keeps the calibration reservation free on a GPU, and so does
+    the branch's, which would otherwise use up the window's headroom."""
     transformer, branch = _tiny_transformer(), _tiny_branch()
     transformer_info = _loaded(transformer, _yielding(transformer))
     control_info = _loaded(branch, _yielding(branch))
+    control_info.compute_device = torch.device(device)
+    monkeypatch.setattr(probe, "current_scope", lambda: object() if calibrating else None)
     context = _context(transformer_info, control_info)
     hooks_at_patching: list[int] = []
 
@@ -369,7 +379,8 @@ def test_the_branch_is_locked_with_the_same_reservation_and_hooked_inside_the_ex
 
     # A plain reservation: a second estimate would open a calibration window nested in the transformer's.
     reserved = transformer_info.model_on_device.call_args.kwargs["working_memory"].reservation_bytes
-    assert control_info.model_on_device.call_args.kwargs == {"working_mem_bytes": reserved}
+    expected = probe.calibration_reservation(reserved) if calibration_lock else reserved
+    assert control_info.model_on_device.call_args.kwargs == {"working_mem_bytes": expected}
     assert hooks_at_patching == [1 + NUM_CONTROL_BLOCKS]
     assert _hook_count(transformer) == 0
 
