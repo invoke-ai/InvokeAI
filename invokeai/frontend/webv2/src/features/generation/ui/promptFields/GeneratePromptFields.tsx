@@ -4,7 +4,7 @@ import type { PromptTemplateSnapshot } from '@features/generation/core/promptTem
 import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 import type { PromptTemplateChange } from '@features/generation/ui/promptFields/PromptTemplatesButton';
 
-import { HStack, Stack, Tag } from '@chakra-ui/react';
+import { Stack } from '@chakra-ui/react';
 import { getPromptPolicy } from '@features/generation/core/baseGenerationPolicies';
 import { sanitizeBatchCount } from '@features/generation/core/batch';
 import { flattenPromptTemplateExpansion } from '@features/generation/core/promptTemplates';
@@ -13,7 +13,6 @@ import { flushGenerateDrafts } from '@features/generation/ui/generateDraftRegist
 import { offerGenerateUndo } from '@features/generation/ui/generateUndo';
 import { useGenerateValues, useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { useExternalStoreSelector } from '@platform/state/selectors';
-import { Tooltip } from '@platform/ui/Tooltip';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -247,8 +246,6 @@ export const GeneratePromptFields = ({
     [onCommitImmediate]
   );
 
-  const clearPromptTemplate = useCallback(() => applyPromptTemplate(null), [applyPromptTemplate]);
-
   const savedPromptModels = useMemo(
     () => ({
       expandPromptModelKey: settings.expandPromptModelKey,
@@ -280,21 +277,6 @@ export const GeneratePromptFields = ({
         onUsePrompt={usePromptHistoryItem}
       />
 
-      {settings.promptTemplate ? (
-        <HStack>
-          <Tag.Root variant="surface">
-            <Tag.Label>{settings.promptTemplate.name}</Tag.Label>
-            <Tag.EndElement>
-              <Tooltip content={t('widgets.generate.clearPromptTemplate')}>
-                <Tag.CloseTrigger
-                  aria-label={t('widgets.generate.clearPromptTemplate')}
-                  onClick={clearPromptTemplate}
-                />
-              </Tooltip>
-            </Tag.EndElement>
-          </Tag.Root>
-        </HStack>
-      ) : null}
       {promptPolicy.negativeVisible ? (
         <NegativePromptField
           heightPx={promptValues.negativePromptHeightPx}

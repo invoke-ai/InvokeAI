@@ -2854,7 +2854,6 @@
       "capabilitiesUnavailableForRecall": "Model capabilities are not loaded, so settings that depend on the model cannot be applied yet. Prompts and seed can. If loading failed, retry from the Generate panel.",
       "capabilitiesUnavailableForSetup": "Model capabilities are not loaded, so this project cannot be set up for Generate yet. If loading failed, retry from the Generate panel.",
       "cfgRescale": "CFG rescale",
-      "clearPromptTemplate": "Stop using this template",
       "clearReferenceImages": "Remove all",
       "clipSkip": "CLIP skip",
       "collapseReferenceImage": "Collapse reference image",

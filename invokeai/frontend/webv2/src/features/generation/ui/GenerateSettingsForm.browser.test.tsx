@@ -1084,14 +1084,21 @@ describe('GenerateSettingsForm prompt changes past the prompt text', () => {
     });
   });
 
-  it('stops using a template from its tag, with an Undo that applies it again', async () => {
+  it('stops using a template from the Templates panel, with an Undo that applies it again', async () => {
     const undoable = vi.fn();
     const template = { id: 'cinematic', name: 'Cinematic', negativePrompt: '', positivePrompt: '{prompt}, 35mm' };
     stableGroups.notifications.undoable = undoable;
     storedValues().patchSnapshot({ promptTemplate: template });
     await renderAdapter(buildAdapter());
 
-    await settle(() => buttonNamed('widgets.generate.clearPromptTemplate').click());
+    await settle(() => buttonNamed('widgets.generate.promptTemplates.title').click(), 50);
+    await settle(
+      () =>
+        [...document.querySelectorAll<HTMLButtonElement>('[data-scope="popover"] button')]
+          .find((button) => button.textContent === 'widgets.generate.promptTemplates.clearApplied')!
+          .click(),
+      50
+    );
 
     expect(storedValues().getSnapshot().promptTemplate).toBeNull();
     expect(undoable).toHaveBeenCalledExactlyOnceWith('widgets.generate.promptTemplateCleared', {
