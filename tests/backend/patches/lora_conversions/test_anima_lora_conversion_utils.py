@@ -3,7 +3,7 @@ import pytest
 import torch
 
 from invokeai.backend.anima.anima_transformer import AnimaTransformer
-from invokeai.backend.model_manager.load.model_loaders.anima import ANIMA_TRANSFORMER_CONFIG
+from invokeai.backend.anima.checkpoint_layout import ANIMA_TRANSFORMER_CONFIG
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     ANIMA_LORA_QWEN3_PREFIX,
