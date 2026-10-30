@@ -32,7 +32,7 @@ export {
   type UserUpdateRequest,
 } from './data/api';
 export { AccountMenu } from './ui/AccountMenu';
-export { AccountMenuSection, useHasAccountSection } from './ui/AccountMenuSection';
+export { AccountMenuSection, AccountProfileDialog, useHasAccountSection } from './ui/AccountMenuSection';
 export { AuthUnavailableScreen } from './ui/AuthUnavailableScreen';
 export { SessionExpiryNotice } from './ui/SessionExpiryNotice';
 export { LoginScreen, readLoginReturnPath } from './ui/LoginScreen';

@@ -1,7 +1,7 @@
 import type { DonationMenuItemProps } from '@workbench/shell/DonationMenuItem';
 
 import { Badge, Box, chakra, HStack, Icon, Menu, Portal } from '@chakra-ui/react';
-import { AccountMenuSection, useCapabilities, useHasAccountSection } from '@features/identity';
+import { AccountMenuSection, AccountProfileDialog, useCapabilities, useHasAccountSection } from '@features/identity';
 import { getQueueSummary } from '@features/queue/contracts';
 import { APP_VERSION, DOCS_URL } from '@platform/runtime/appMetadata';
 import { IconButton } from '@platform/ui/Button';
@@ -68,8 +68,13 @@ export const AppMenu = () => {
   const openQueue = useCallback(() => openWorkbenchWidget('queue'), [openWorkbenchWidget]);
   const openSettings = useCallback(() => openWorkbenchSettings(), []);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  // The menu item is gone once the dialog closes; focus returns to the menu's own button.
-  const openWidgets = useCallback(() => openWidgetsDialogFrom(() => triggerRef.current), []);
+  // The menu item is gone once a dialog it opened closes; focus returns to the menu's own button.
+  const getTrigger = useCallback(() => triggerRef.current, []);
+  const openWidgets = useCallback(() => openWidgetsDialogFrom(getTrigger), [getTrigger]);
+  // Lives outside the menu: its content unmounts once the menu closes, which would take the dialog along.
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const openProfile = useCallback(() => setIsProfileOpen(true), []);
+  const closeProfile = useCallback(() => setIsProfileOpen(false), []);
   const queryClient = useQueryClient();
   // Rendered only once loaded: a lazy() boundary would suspend on open and React delays its reveal, shifting rows.
   // A chunk that fails to load (e.g. after an upgrade) leaves the optional link absent.
@@ -94,96 +99,101 @@ export const AppMenu = () => {
   );
 
   return (
-    <Menu.Root lazyMount positioning={MENU_POSITIONING} onOpenChange={handleOpenChange}>
-      <Menu.Trigger asChild>
-        <IconButton
-          ref={triggerRef}
-          aria-label={t('topbar.appMenu.open')}
-          className="group"
-          pe="1.5"
-          size="lg"
-          variant="ghost"
-          onFocus={preloadDonationMenuItem}
-          onPointerEnter={preloadDonationMenuItem}
-        >
-          <AppMenuGlyph />
-        </IconButton>
-      </Menu.Trigger>
-      <Portal>
-        <Menu.Positioner>
-          <MenuContent minW="15rem">
-            <MenuHeadingGroup label="Invoke" trailing={`v${APP_VERSION}`}>
-              <Menu.Item value="launchpad" onClick={openLaunchpad}>
-                <Icon as={HouseIcon} boxSize="3.5" />
-                <Menu.ItemText>{t('topbar.appMenu.launchpad')}</Menu.ItemText>
-              </Menu.Item>
-            </MenuHeadingGroup>
-            <Menu.Separator />
-            <Menu.ItemGroup>
-              <Menu.ItemGroupLabel>{t('topbar.appMenu.manage')}</Menu.ItemGroupLabel>
-              <Menu.Item value="projects" onClick={openProjects}>
-                <Icon as={FolderIcon} boxSize="3.5" />
-                <Menu.ItemText>{t('launchpad.sections.projects')}</Menu.ItemText>
-              </Menu.Item>
-              {canManageModels ? (
-                <Menu.Item value="models" onClick={openModels}>
-                  <Icon as={BoxIcon} boxSize="3.5" />
-                  <Menu.ItemText>{t('models.manager')}</Menu.ItemText>
+    <>
+      <Menu.Root lazyMount positioning={MENU_POSITIONING} onOpenChange={handleOpenChange}>
+        <Menu.Trigger asChild>
+          <IconButton
+            ref={triggerRef}
+            aria-label={t('topbar.appMenu.open')}
+            className="group"
+            pe="1.5"
+            size="lg"
+            variant="ghost"
+            onFocus={preloadDonationMenuItem}
+            onPointerEnter={preloadDonationMenuItem}
+          >
+            <AppMenuGlyph />
+          </IconButton>
+        </Menu.Trigger>
+        <Portal>
+          <Menu.Positioner>
+            <MenuContent minW="15rem">
+              <MenuHeadingGroup label="Invoke" trailing={`v${APP_VERSION}`}>
+                <Menu.Item value="launchpad" onClick={openLaunchpad}>
+                  <Icon as={HouseIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('topbar.appMenu.launchpad')}</Menu.ItemText>
                 </Menu.Item>
-              ) : null}
-              {canManageNodes ? (
-                <Menu.Item value="nodes" onClick={openNodes}>
-                  <Icon as={BlocksIcon} boxSize="3.5" />
-                  <Menu.ItemText>{t('nodes.manager')}</Menu.ItemText>
+              </MenuHeadingGroup>
+              <Menu.Separator />
+              <Menu.ItemGroup>
+                <Menu.ItemGroupLabel>{t('topbar.appMenu.manage')}</Menu.ItemGroupLabel>
+                <Menu.Item value="projects" onClick={openProjects}>
+                  <Icon as={FolderIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('launchpad.sections.projects')}</Menu.ItemText>
                 </Menu.Item>
-              ) : null}
-              <Menu.Item value="fonts" onClick={openFonts}>
-                <Icon as={TypeIcon} boxSize="3.5" />
-                <Menu.ItemText>{t('launchpad.sections.fonts')}</Menu.ItemText>
-              </Menu.Item>
-              <Menu.Item value="queue" onClick={openQueue}>
-                <Icon as={ListOrderedIcon} boxSize="3.5" />
-                <Menu.ItemText>{t('widgets.labels.queue')}</Menu.ItemText>
-                {queuedCount > 0 ? (
-                  <Badge colorPalette="accent" fontSize="xs" ms="auto" variant="surface">
-                    {queuedCount}
-                  </Badge>
+                {canManageModels ? (
+                  <Menu.Item value="models" onClick={openModels}>
+                    <Icon as={BoxIcon} boxSize="3.5" />
+                    <Menu.ItemText>{t('models.manager')}</Menu.ItemText>
+                  </Menu.Item>
                 ) : null}
-              </Menu.Item>
-              <Menu.Item value="widgets" onClick={openWidgets}>
-                <Icon as={LayoutGridIcon} boxSize="3.5" />
-                <Menu.ItemText>{t('shell.widgets.menuItem')}</Menu.ItemText>
-              </Menu.Item>
-            </Menu.ItemGroup>
-            {DonationMenuItem ? <DonationMenuItem separated /> : null}
-            {hasAccount ? (
-              <>
-                <Menu.Separator />
-                <AccountMenuSection />
-              </>
-            ) : null}
-            <Menu.Separator />
-            <HStack gap="0.5" px="0" py="0">
-              <SearchMenuAction />
-              <SettingsMenuAction onClick={openSettings} />
-              <AppMenuAction
-                icon={LightbulbFilamentIcon}
-                label={t('whatsNew.whatsNewInInvoke')}
-                value="whats-new"
-                onClick={openWhatsNew}
-              />
-              <AppMenuLink
-                href={DOCS_URL}
-                icon={BookOpenTextIcon}
-                label={t('topbar.appMenu.documentation')}
-                value="documentation"
-              />
-              <AppMenuLink href={DISCORD_URL} icon={DiscordIcon} label="Discord" value="discord" />
-            </HStack>
-          </MenuContent>
-        </Menu.Positioner>
-      </Portal>
-    </Menu.Root>
+                {canManageNodes ? (
+                  <Menu.Item value="nodes" onClick={openNodes}>
+                    <Icon as={BlocksIcon} boxSize="3.5" />
+                    <Menu.ItemText>{t('nodes.manager')}</Menu.ItemText>
+                  </Menu.Item>
+                ) : null}
+                <Menu.Item value="fonts" onClick={openFonts}>
+                  <Icon as={TypeIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('launchpad.sections.fonts')}</Menu.ItemText>
+                </Menu.Item>
+                <Menu.Item value="queue" onClick={openQueue}>
+                  <Icon as={ListOrderedIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('widgets.labels.queue')}</Menu.ItemText>
+                  {queuedCount > 0 ? (
+                    <Badge colorPalette="accent" fontSize="xs" ms="auto" variant="surface">
+                      {queuedCount}
+                    </Badge>
+                  ) : null}
+                </Menu.Item>
+                <Menu.Item value="widgets" onClick={openWidgets}>
+                  <Icon as={LayoutGridIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('shell.widgets.menuItem')}</Menu.ItemText>
+                </Menu.Item>
+              </Menu.ItemGroup>
+              {DonationMenuItem ? <DonationMenuItem separated /> : null}
+              {hasAccount ? (
+                <>
+                  <Menu.Separator />
+                  <AccountMenuSection onOpenProfile={openProfile} />
+                </>
+              ) : null}
+              <Menu.Separator />
+              <HStack gap="0.5" px="0" py="0">
+                <SearchMenuAction />
+                <SettingsMenuAction onClick={openSettings} />
+                <AppMenuAction
+                  icon={LightbulbFilamentIcon}
+                  label={t('whatsNew.whatsNewInInvoke')}
+                  value="whats-new"
+                  onClick={openWhatsNew}
+                />
+                <AppMenuLink
+                  href={DOCS_URL}
+                  icon={BookOpenTextIcon}
+                  label={t('topbar.appMenu.documentation')}
+                  value="documentation"
+                />
+                <AppMenuLink href={DISCORD_URL} icon={DiscordIcon} label="Discord" value="discord" />
+              </HStack>
+            </MenuContent>
+          </Menu.Positioner>
+        </Portal>
+      </Menu.Root>
+      {hasAccount ? (
+        <AccountProfileDialog finalFocusEl={getTrigger} isOpen={isProfileOpen} onClose={closeProfile} />
+      ) : null}
+    </>
   );
 };
 
