@@ -566,55 +566,98 @@ describe('optimistic board updates', () => {
     );
   });
 
-  it('reports an archive with an Undo that brings the board back and, unchosen since, its results', async () => {
+  /** Archives the viewed auto-add board and returns its toast's Undo, run until the unarchive request settles. */
+  const archiveViewedAutoAddBoard = async () => {
     galleryValues = { autoAddBoardId: 'board-1' };
     await renderProbe();
     mocks.updateGalleryBoard.mockResolvedValue(undefined);
-
     await act(async () => {
       await actionsRef.current?.archiveBoard('board-1', true);
     });
+    const [, { onUndo }] = mocks.notificationsUndoable.mock.calls[0] as [string, { onUndo: () => void }];
+
+    return async () => {
+      const requests = mocks.updateGalleryBoard.mock.calls.length;
+      await act(async () => {
+        onUndo();
+        await vi.waitFor(() => expect(mocks.updateGalleryBoard.mock.calls.length).toBe(requests + 1));
+        await mocks.updateGalleryBoard.mock.results.at(-1)?.value?.catch(() => undefined);
+      });
+    };
+  };
+
+  it('reports an archive with an Undo that brings the board back and, unchosen since, its results and selection', async () => {
+    const undo = await archiveViewedAutoAddBoard();
 
     expect(mocks.notificationsAdd).not.toHaveBeenCalled();
     expect(mocks.notificationsUndoable).toHaveBeenCalledExactlyOnceWith('widgets.gallery.boardArchived', {
       onUndo: expect.any(Function),
     });
     expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: null });
+    expect(selectBoard).toHaveBeenCalledExactlyOnceWith('none');
 
-    // The archiving project, by its id, still sends results to the default; whichever project is on screen now.
-    mocks.projectGalleryValues.mockImplementation((projectId) => (projectId === 'project-1' ? {} : null));
-    const [, { onUndo }] = mocks.notificationsUndoable.mock.calls[0] as [string, { onUndo: () => void }];
-    await act(async () => {
-      onUndo();
-      await Promise.resolve();
-    });
+    // The archiving project, by its id, still sends results to the default and shows Uncategorized.
+    mocks.projectGalleryValues.mockImplementation((projectId) =>
+      projectId === 'project-1' ? { selectedBoardId: 'none' } : null
+    );
+    await undo();
 
     expect(mocks.updateGalleryBoard).toHaveBeenLastCalledWith('board-1', { archived: false }, expect.anything());
     expect(updateSettings).toHaveBeenLastCalledWith({ autoAddBoardId: 'board-1' }, 'project-1');
+    expect(selectBoard).toHaveBeenLastCalledWith('board-1');
     // Unarchiving is not itself undone.
     expect(mocks.notificationsUndoable).toHaveBeenCalledOnce();
   });
 
   it.each([
     ['its project closed', null],
-    ['its project chose another destination since', { autoAddBoardId: 'board-3' }],
-  ])('leaves the destination alone when the archive is undone after %s', async (_case, values) => {
-    galleryValues = { autoAddBoardId: 'board-1' };
-    await renderProbe();
-    mocks.updateGalleryBoard.mockResolvedValue(undefined);
-    await act(async () => {
-      await actionsRef.current?.archiveBoard('board-1', true);
-    });
+    [
+      'its project chose another destination and board since',
+      { autoAddBoardId: 'board-3', selectedBoardId: 'board-3' },
+    ],
+  ])('leaves the destination and selection alone when the archive is undone after %s', async (_case, values) => {
+    const undo = await archiveViewedAutoAddBoard();
 
     mocks.projectGalleryValues.mockReturnValue(values);
-    const [, { onUndo }] = mocks.notificationsUndoable.mock.calls[0] as [string, { onUndo: () => void }];
-    await act(async () => {
-      onUndo();
-      await Promise.resolve();
-    });
+    await undo();
 
     expect(mocks.updateGalleryBoard).toHaveBeenLastCalledWith('board-1', { archived: false }, expect.anything());
     expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: null });
+    expect(selectBoard).toHaveBeenCalledExactlyOnceWith('none');
+  });
+
+  it('restores nothing when the server refuses to unarchive the board', async () => {
+    const undo = await archiveViewedAutoAddBoard();
+
+    mocks.projectGalleryValues.mockReturnValue({ selectedBoardId: 'none' });
+    mocks.updateGalleryBoard.mockRejectedValueOnce(new Error('unarchive failed'));
+    await undo();
+
+    // Results keep going to the default rather than to a board that is still archived.
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: null });
+    expect(selectBoard).toHaveBeenCalledExactlyOnceWith('none');
+    expect(mocks.notificationsReportError).toHaveBeenCalledOnce();
+  });
+
+  it('restores the destination but selects nothing once another project is open', async () => {
+    const undo = await archiveViewedAutoAddBoard();
+
+    mocks.projectGalleryValues.mockImplementation((projectId) =>
+      projectId === 'project-1' ? { selectedBoardId: 'none' } : null
+    );
+    await act(() => {
+      root?.render(
+        <QueryClientProvider client={new QueryClient()}>
+          <GalleryUiProvider adapter={{ ...adapter, galleryValues, projectId: 'project-2' }}>
+            <Probe galleryView={galleryView} ref={actionsRef} selectedBoardId="none" />
+          </GalleryUiProvider>
+        </QueryClientProvider>
+      );
+    });
+    await undo();
+
+    expect(updateSettings).toHaveBeenLastCalledWith({ autoAddBoardId: 'board-1' }, 'project-1');
+    expect(selectBoard).toHaveBeenCalledExactlyOnceWith('none');
   });
 
   it('restores the archived board selection on failure only while still on Uncategorized', async () => {

@@ -20,12 +20,12 @@ import {
 import { ApiError, getApiErrorCode, getApiErrorMessage } from '@platform/transport/http';
 import { toaster } from '@platform/ui/toaster';
 import { useQueryClient } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { GalleryActions } from './GalleryWidgetContext';
 
-import { getGallerySearchScope } from './galleryStateView';
+import { getGalleryRawSelectedBoardId, getGallerySearchScope } from './galleryStateView';
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryUploadAction } from './useGalleryUploadAction';
 
@@ -61,6 +61,11 @@ export const useGalleryActions = ({
   const isSearchingAllBoards = getGallerySearchScope(galleryValues) === 'all';
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  // The project on screen now, for an Undo that can only select a board in the open project.
+  const openProjectIdRef = useRef(projectId);
+
+  // eslint-disable-next-line react/refs
+  openProjectIdRef.current = projectId;
   // A search of every board has no board to upload to; the upload action refuses it.
   const uploadFiles = useGalleryUploadAction({
     boards,
@@ -110,7 +115,8 @@ export const useGalleryActions = ({
       return board ? getGalleryBoardLabel(board, t) : t('widgets.gallery.uncategorized');
     };
 
-    const archiveBoard: GalleryActions['archiveBoard'] = async (boardId, archived) => {
+    /** Resolves whether the server took the change, for an Undo to restore only what it can stand behind. */
+    const setBoardArchived = async (boardId: string, archived: boolean): Promise<boolean> => {
       const owner = captureAccountScope();
       const rollback = patchGalleryBoardCaches(queryClient, boardId, { archived });
       const movedSelectionAway = archived && boardId === selectedBoardId;
@@ -133,26 +139,44 @@ export const useGalleryActions = ({
           name: getBoardName(boardId),
         });
 
+        const undoArchive = async () => {
+          if (!(await setBoardArchived(boardId, false))) {
+            return;
+          }
+          // Back to what the archive changed, in the project it changed them in (the toast outlives a project
+          // switch), and each only while that project still has what the archive left: no destination, and
+          // Uncategorized on screen.
+          const values = movedSelectionAway || stoppedAutoAdding ? getProjectGalleryValues?.(projectId) : null;
+
+          if (!values) {
+            return;
+          }
+          if (stoppedAutoAdding && getGallerySettings(values).autoAddBoardId === null) {
+            gallery.updateSettings({ autoAddBoardId: boardId }, projectId);
+          }
+          // Selecting acts on the open project only.
+          if (
+            movedSelectionAway &&
+            openProjectIdRef.current === projectId &&
+            getGalleryRawSelectedBoardId(values) === 'none'
+          ) {
+            gallery.selectBoard(boardId);
+          }
+        };
+
         if (archived && notifications.undoable) {
           notifications.undoable(title, {
-            onUndo: () => {
-              void archiveBoard(boardId, false);
-              // Results go back to the board in the project that sent them there, read and written by its id (the
-              // toast outlives a project switch), and only while that project has chosen no other destination since.
-              const values = stoppedAutoAdding ? getProjectGalleryValues?.(projectId) : null;
-
-              if (values && getGallerySettings(values).autoAddBoardId === null) {
-                gallery.updateSettings({ autoAddBoardId: boardId }, projectId);
-              }
-            },
+            onUndo: () => void undoArchive(),
           });
         } else {
           recordSuccess(title);
         }
         refresh();
+
+        return true;
       } catch (error: unknown) {
         if (!isAccountScopeCurrent(owner)) {
-          return;
+          return false;
         }
 
         rollback();
@@ -167,11 +191,15 @@ export const useGalleryActions = ({
         }
 
         recordBoardError(boardId, error);
+
+        return false;
       }
     };
 
     return {
-      archiveBoard,
+      archiveBoard: async (boardId, archived) => {
+        await setBoardArchived(boardId, archived);
+      },
       createBoard: async (boardName, projectId) => {
         const owner = captureAccountScope();
 
