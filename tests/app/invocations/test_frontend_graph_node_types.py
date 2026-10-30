@@ -111,7 +111,7 @@ SUPPORTED_BASE_COUNTS = {"generate": 17, "video": 3, "upscale": 8}
 # values while keeping the names would otherwise leave every annotation check below passing over a
 # short list. They are not per-architecture expectations, so removing an architecture means lowering
 # them deliberately.
-LITERAL_FLOORS = {"generate": (80, 380), "video": (23, 135), "upscale": (56, 225)}
+LITERAL_FLOORS = {"generate": (80, 385), "video": (23, 135), "upscale": (56, 225)}
 
 
 @pytest.mark.parametrize("contract", sorted(CONTRACTS), ids=lambda contract: contract)

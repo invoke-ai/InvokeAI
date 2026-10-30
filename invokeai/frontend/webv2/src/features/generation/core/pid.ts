@@ -23,7 +23,7 @@ export const isPidMode = (value: unknown): value is PidMode =>
 /** Native PiD scales the target by 4; other modes use 1. */
 export const getPidScale = (mode: PidMode): number => (mode === 'native' ? PID_SCALE : 1);
 
-/** Z-Image reuses FLUX's decoder, FLUX.3 and MOSS-Image FLUX.2's, whose latents they share; unsupported bases return null. */
+/** Z-Image reuses FLUX's decoder; FLUX.3 and MOSS-Image reuse FLUX.2's, whose latents they share. Unsupported bases return null. */
 export const getPidDecoderBaseForMainBase = (base: string | null | undefined): KnownModelBase | null => {
   switch (base) {
     case 'z-image':

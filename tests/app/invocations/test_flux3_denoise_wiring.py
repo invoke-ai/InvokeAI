@@ -107,7 +107,7 @@ def _drive(
 
     with (
         patch.object(flux3_denoise.TorchDevice, "choose_torch_device", return_value=torch.device("cpu")),
-        patch.object(flux3_denoise, "get_flux2_bn_stats", return_value=(BN_MEAN, BN_STD)),
+        patch.object(flux3_denoise, "read_vae_bn_stats", return_value=(BN_MEAN, BN_STD)),
         patch.object(flux3_denoise, "get_noise_flux3", return_value=noise),
         patch.object(flux3_denoise, "peak_dequant_transient_bytes", return_value=0),
         patch.object(flux3_denoise, "denoise", recording_denoise),

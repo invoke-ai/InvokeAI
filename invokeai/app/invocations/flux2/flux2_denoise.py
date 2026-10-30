@@ -34,12 +34,11 @@ from invokeai.backend.flux.schedulers import FLUX_SCHEDULER_LABELS, FLUX_SCHEDUL
 from invokeai.backend.flux2.denoise import denoise
 from invokeai.backend.flux2.denoise_working_memory import estimate_flux2_denoise_working_memory
 from invokeai.backend.flux2.extensions.regional_prompting_extension import Flux2RegionalPromptingExtension
-from invokeai.backend.flux2.latent_norm import bn_denormalize, bn_normalize
+from invokeai.backend.flux2.latent_norm import bn_denormalize, bn_normalize, read_vae_bn_stats
 from invokeai.backend.flux2.ref_image_extension import Flux2RefImageExtension
 from invokeai.backend.flux2.sampling_utils import (
     compute_empirical_mu,
     generate_img_ids_flux2,
-    get_flux2_bn_stats,
     get_noise_flux2,
     get_schedule_flux2,
     pack_flux2,
@@ -177,7 +176,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
     def _get_bn_stats(self, context: InvocationContext) -> Optional[Tuple[torch.Tensor, torch.Tensor]]:
         """Extract the latent BN statistics (bn_mean, bn_std) from the wired FLUX.2 VAE, or None if it has none."""
         with context.models.load(self.vae.vae).model_on_device() as (_, vae):
-            return get_flux2_bn_stats(vae)
+            return read_vae_bn_stats(vae)
 
     def _prepare_normalized_start_latents(
         self,

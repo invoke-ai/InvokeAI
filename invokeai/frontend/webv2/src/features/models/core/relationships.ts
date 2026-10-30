@@ -47,16 +47,17 @@ export const CROSS_BASE_ALLOWANCES: Readonly<
     anima: new Set(['krea-2']),
     /** z_image_model_loader; flux2_klein_model_loader; anima_model_loader ("A FLUX VAE can also be used"). */
     flux: new Set(['anima', 'flux2', 'z-image']),
-    /** flux3_model_loader, moss_image_model_loader: both take the FLUX.2 VAE. */
+    /** flux3_model_loader (FLUX.3 ships the FLUX.2 VAE); moss_image_model_loader (the FLUX.2 VAE, the base it installs under). */
     flux2: new Set(['flux3', 'moss-image']),
     /** krea2_model_loader; anima_model_loader ("Wan 2.1 / QwenImage VAE"). */
     'qwen-image': new Set(['anima', 'krea-2']),
     /** anima_model_loader ("Wan 2.1 / QwenImage VAE"). */
     wan: new Set(['anima']),
   },
-  /** Z-Image reuses the FLUX decoder, FLUX.3 and MOSS-Image the FLUX.2 one (assert_pid_decoder_matches_base). */
+  /** z_image_pid_decode reuses the FLUX decoder, MOSS-Image flux2_pid_decode's (assert_pid_decoder_matches_base). */
   pid_decoder: {
     flux: new Set(['z-image']),
+    /** flux2_pid_decode decodes FLUX.3 and MOSS-Image latents, which are FLUX.2 latents. */
     flux2: new Set(['flux3', 'moss-image']),
   },
 };
