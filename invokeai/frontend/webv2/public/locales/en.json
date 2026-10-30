@@ -5716,11 +5716,56 @@
           "success_other": "Moved {{count}} items to {{board}}."
         },
         "recall": {
+          "appliedFields": "Applied {{fields, list}}.",
+          "cannotRecallImage": "Cannot recall image data",
           "conceptsNotRestored": "Concepts not restored: {{concepts}}.",
+          "fieldsApplied_one": "{{count}} field applied to Generate.",
+          "fieldsApplied_other": "{{count}} fields applied to Generate.",
+          "imageMetadataUnsupported": "This image does not include supported Generate metadata.",
           "nothingRecalled": "No recallable image data",
+          "nothingRecalledVideo": "No recallable video data",
           "partiallyRecalled": "Some image data was not recalled",
           "unnamedConcept": "unnamed concept",
           "unnamedRefiner": "unnamed refiner",
+          "videoMetadataUnsupported": "This video does not include supported Video metadata.",
+          "fields": {
+            "cfg": "CFG",
+            "components": "components",
+            "extendContext": "context frames",
+            "fps": "FPS",
+            "frames": "frames",
+            "loras": "concepts",
+            "media": "conditioning media",
+            "model": "model",
+            "prompts": "prompts",
+            "seed": "seed",
+            "size": "size",
+            "steps": "steps"
+          },
+          "imageTitles": {
+            "all": "Recalled image metadata",
+            "clipSkip": "Recalled CLIP skip",
+            "dimensions": "Recalled image size",
+            "prompts": "Recalled prompts",
+            "remix": "Recalled remix settings",
+            "seed": "Recalled seed"
+          },
+          "parameters": {
+            "applied": "Recalled parameters",
+            "cannotApply": "Cannot apply recalled parameters",
+            "nothingApplied": "No recalled parameters applied",
+            "nothingAppliedDescription": "The request did not include any parameters the Generate panel uses.",
+            "partiallyApplied": "Some recalled parameters were not applied",
+            "skipped": "{{key}}: {{reason}}",
+            "skippedWithDetail": "{{key}}: {{reason}} ({{detail}})",
+            "skipReasons": {
+              "incompatible": "incompatible with the current model",
+              "invalid": "invalid value",
+              "limit": "over the reference image limit",
+              "unresolved": "not found",
+              "unsupported": "not supported by the Generate panel"
+            }
+          },
           "skippedConcept": {
             "ambiguous": "{{name}} (matches more than one installed model)",
             "duplicate": "{{name}} (listed more than once)",
@@ -5742,6 +5787,12 @@
             "prompts": "Use prompt",
             "remix": "Remix image",
             "seed": "Use seed"
+          },
+          "videoTitles": {
+            "all": "Recalled video data",
+            "prompts": "Recalled prompts",
+            "remix": "Remixed video",
+            "seed": "Recalled seed"
           }
         },
         "star": {
