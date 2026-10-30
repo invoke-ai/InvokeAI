@@ -302,36 +302,56 @@ export const createWorkbenchFocusController = ({
 const FocusRegionContext = createContext<WorkbenchFocusController | null>(null);
 
 const highlightBase = {
-  border: '1px solid',
-  borderColor: 'transparent',
   borderRadius: 'md',
   content: '""',
   opacity: 0,
   pointerEvents: 'none',
   position: 'absolute',
-  transition: 'border-color var(--wb-motion-duration-fast) ease, opacity var(--wb-motion-duration-fast) ease',
   // Above resize handles, so the outline runs through the middle of their grips.
   zIndex: 4,
 } as const;
 
-const regionHighlight = (inset: string) => ({
-  '&[data-highlighted="true"]::after': { borderColor: 'accent.solid', opacity: 1 },
+const fade = (property: string) =>
+  `${property} var(--wb-motion-duration-fast) ease, opacity var(--wb-motion-duration-fast) ease`;
+
+/**
+ * `inside` strokes inward from the box edge (a border), `outside` strokes outward from it (an outline). Each paints
+ * its 1px from one snapped edge, so the side a stroke grows toward picks which CSS edge anchors it.
+ */
+const STROKES = {
+  inside: {
+    hidden: { border: '1px solid', borderColor: 'transparent', transition: fade('border-color') },
+    shown: { borderColor: 'accent.solid' },
+  },
+  outside: {
+    hidden: { outline: '1px solid', outlineColor: 'transparent', transition: fade('outline-color') },
+    shown: { outlineColor: 'accent.solid' },
+  },
+} as const;
+
+const regionHighlight = (inset: string, stroke: keyof typeof STROKES) => ({
+  '&[data-highlighted="true"]::after': { ...STROKES[stroke].shown, opacity: 1 },
   // The region outline represents frame focus. Controls keep their own rings, and disabling the highlight
   // restores the browser's frame indicator as well.
   '&[data-highlighted="true"]:focus-visible, &[data-highlighted="true"] [data-hotkey-widget-instance-id]:focus-visible':
     {
       outline: 'none',
     },
-  '&::after': { ...highlightBase, inset },
+  '&::after': { ...highlightBase, ...STROKES[stroke].hidden, inset },
 });
 
-// Sideways edges sit on the neighbouring divider or rail border rather than beside it. A panel's own divider is
-// already its frame's edge; top and bottom stay inside because the workbench row clips vertical overflow.
+// Sideways edges sit on the neighbouring divider or rail border rather than beside it; top and bottom stay inside
+// because the workbench row clips vertical overflow. Neighbours draw their shared edge on the same 1px column,
+// anchored from one edge of that divider: the left divider's left edge and the right divider's right edge. The
+// center strokes inward from its box, extended over both dividers; a side panel strokes outward from a box pulled
+// 1px in off its divider, which also anchors its rail-side edge on the rail border's own edge. Anchoring both
+// neighbours to one CSS edge keeps fractional zoom from snapping their columns onto different device pixels. The
+// bottom divider spans the side panels too, so only the bottom's own outline lies on it.
 const HIGHLIGHT_STYLES = {
-  bottom: regionHighlight('0 0 -1px 0'),
-  center: regionHighlight('0 -1px'),
-  left: regionHighlight('0 0 0 -1px'),
-  right: regionHighlight('0 -1px 0 0'),
+  bottom: regionHighlight('0 0 -1px 0', 'inside'),
+  center: regionHighlight('0 -1px', 'inside'),
+  left: regionHighlight('1px 1px 1px 0', 'outside'),
+  right: regionHighlight('1px 0 1px 1px', 'outside'),
 } satisfies Record<WidgetRegion, unknown>;
 
 /** Provides the workbench's focus controller (see `WorkbenchFocusProvider`) to everything below it. */
