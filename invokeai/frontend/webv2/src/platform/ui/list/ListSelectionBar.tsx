@@ -75,7 +75,8 @@ export const ListSelectionBar = ({
       {Children.toArray(children).length > 0 ? (
         <>
           <Separator borderColor="border.subtle" h="4" orientation="vertical" />
-          {children}
+          {/* Adjacent actions sit as close as a row's actions do. */}
+          <HStack gap="0.5">{children}</HStack>
         </>
       ) : null}
     </HStack>
