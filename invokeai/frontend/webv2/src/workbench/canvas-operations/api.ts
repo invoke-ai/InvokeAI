@@ -60,7 +60,7 @@ export type {
 export { getCanvasOperations } from './operationAccess';
 export { IDLE_CONTROL_DETECTION_STATUS } from './controlDetectionStatusStore';
 export { getCanvasEngine, isBlankCanvasDocument } from './engineRegistry';
-export { saveCanvasToGallery, type CanvasGallerySaveRegion } from './saveCanvasToGallery';
+export { resolveCanvasSaveBoardId, saveCanvasToGallery, type CanvasGallerySaveRegion } from './saveCanvasToGallery';
 export {
   retryStagedResultBoard,
   saveStagedResultToGallery,

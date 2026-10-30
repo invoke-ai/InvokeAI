@@ -11,7 +11,11 @@ import { createKeyedTransientStore } from '@platform/state/externalStore';
 import { ApiError } from '@platform/transport/http';
 import { ACTION_TOAST_DURATION_MS, createActionToast, type ToastAction } from '@platform/ui/toaster';
 import { useQueryClient } from '@tanstack/react-query';
-import { saveCanvasToGallery, type CanvasGallerySaveRegion } from '@workbench/canvas-operations/api';
+import {
+  resolveCanvasSaveBoardId,
+  saveCanvasToGallery,
+  type CanvasGallerySaveRegion,
+} from '@workbench/canvas-operations/api';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { useNotify } from '@workbench/useNotify';
 import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
@@ -30,7 +34,12 @@ registerAccountOwnedResource({ clear: () => savingProjects.clear(), name: 'canva
 
 export const useCanvasGallerySave = (
   engine: CanvasGallerySaveEngine | null
-): { isSaving: boolean; save: (region: CanvasGallerySaveRegion) => Promise<void> } => {
+): {
+  /** Names the board a save started now would go to, as the save resolves it; null when it cannot be named. */
+  describeDestination: () => Promise<string | null>;
+  isSaving: boolean;
+  save: (region: CanvasGallerySaveRegion) => Promise<void>;
+} => {
   const { t } = useTranslation();
   const notify = useNotify();
   const queries = useWorkbenchQueries();
@@ -120,5 +129,17 @@ export const useCanvasGallerySave = (
     [engine, findGalleryItem, notifications, notify, queries, queryClient, t]
   );
 
-  return { isSaving, save };
+  const describeDestination = useCallback(async (): Promise<string | null> => {
+    const project = queries.getSnapshot().activeProject;
+    const owner = captureAccountScope();
+    try {
+      const boardId = (await resolveCanvasSaveBoardId(project)) ?? 'none';
+      const board = await describeBoard(queryClient, project, boardId, t);
+      return isAccountScopeCurrent(owner) && board.kind === 'named' ? board.label : null;
+    } catch {
+      return null;
+    }
+  }, [queries, queryClient, t]);
+
+  return { describeDestination, isSaving, save };
 };

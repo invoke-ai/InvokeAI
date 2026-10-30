@@ -30,3 +30,9 @@ export const shouldFocusCanvasSurface = (
   }
   return true;
 };
+
+/** The focusable surface of one canvas widget instance, wherever its chrome renders; null while it is not mounted. */
+export const findCanvasSurface = (instanceId: string): HTMLElement | null =>
+  document.querySelector<HTMLElement>(
+    `[data-hotkey-widget-instance-id="${CSS.escape(instanceId)}"] [${CANVAS_SURFACE_ATTR}]`
+  );

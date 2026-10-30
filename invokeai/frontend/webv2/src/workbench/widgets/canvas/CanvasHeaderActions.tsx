@@ -1,4 +1,5 @@
-import type { Rect } from '@workbench/canvas-engine/api';
+import type { CanvasDocumentContractV3, Rect } from '@workbench/canvas-engine/api';
+import type { CanvasGallerySaveRegion, CreateFromBboxDestination } from '@workbench/canvas-operations/api';
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { Project } from '@workbench/projectContracts';
@@ -8,11 +9,13 @@ import { Box, Checkbox, HStack, Menu, Portal, Spinner, Stack, Text } from '@chak
 import { useModifierHeld } from '@platform/react/useModifierHeld';
 import { Button, IconButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
-import { MenuActionItem, MenuContent } from '@platform/ui/Menu';
+import { MenuActionItem, MenuContent, MenuHeadingGroup, type MenuActionItemProps } from '@platform/ui/Menu';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
-import { getDocumentLeaves } from '@workbench/canvas-engine/api';
+import { getBaseRasterContentBounds, getDocumentLeaves } from '@workbench/canvas-engine/api';
 import { getCanvasEngine, isBlankCanvasDocument } from '@workbench/canvas-operations/api';
 import { useCanvasEngine } from '@workbench/canvas-operations/react';
+import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
+import { useShortcutBinding } from '@workbench/hotkeys/useShortcutBinding';
 import { useNotify } from '@workbench/useNotify';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
@@ -23,17 +26,19 @@ import {
   FullscreenIcon,
   Redo2Icon,
   SaveIcon,
+  ScanIcon,
   Trash2Icon,
   Undo2Icon,
   ZoomInIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { CanvasHeaderCommandContext } from './canvasHeaderCommands';
 import type { ResolvedCanvasSettings } from './canvasSettings';
 
 import { useModelGridSize } from './bboxGrid';
+import { CreateFromBboxMenuItems } from './CanvasCreateFromBboxSubmenu';
 import {
   applyFitBbox,
   CANVAS_HEADER_HOTKEYS,
@@ -42,18 +47,36 @@ import {
 } from './canvasHeaderCommands';
 import { getInFlightCanvasItems } from './canvasRestorePoints';
 import { CANVAS_SNAP_TO_GRID_KEY, canvasSettingsEqual, resolveCanvasSettings } from './canvasSettings';
-import { useCanvasCanRedo, useCanvasCanUndo, useCanvasDocumentEditingLocked, useCanvasZoom } from './engineStoreHooks';
+import {
+  useCanvasCanRedo,
+  useCanvasCanUndo,
+  useCanvasDocumentEditingLocked,
+  useCanvasRedoLabel,
+  useCanvasUndoLabel,
+  useCanvasZoom,
+} from './engineStoreHooks';
 import { computeFitBboxToLayers, computeFitBboxToMasks } from './fitBbox';
 import { FitFrameToMasksIcon } from './frameIcons';
 import { readCanvasCompositingSettings } from './invoke/canvasCompositing';
+import { findCanvasSurface } from './surfaceFocus';
 import { useCanvasGallerySave } from './useCanvasGallerySave';
 import { useClearCanvas } from './useCanvasRecovery';
+import { useCreateFromBbox } from './useCreateFromBbox';
 import { reportStructuralCommit } from './useStructuralCommit';
 import { formatZoomPercent, zoomMenuOptions } from './zoomOptions';
 
 type CanvasHeaderEngine = Pick<
   CanvasEngineHandle,
-  'diagnostics' | 'document' | 'exports' | 'history' | 'interaction' | 'layers' | 'lifecycle' | 'projectId' | 'viewport'
+  | 'diagnostics'
+  | 'document'
+  | 'exports'
+  | 'history'
+  | 'interaction'
+  | 'layers'
+  | 'lifecycle'
+  | 'projectId'
+  | 'tools'
+  | 'viewport'
 >;
 
 const ZOOM_OPTIONS = zoomMenuOptions();
@@ -79,16 +102,18 @@ const selectModelVariant = (project: Project): string | null => {
   return typeof values?.model?.variant === 'string' ? values.model.variant : null;
 };
 
-export const CanvasHeaderActions = ({ runtime }: WidgetViewProps) => {
+export const CanvasHeaderActions = ({ instance, runtime }: WidgetViewProps) => {
   const engine = useCanvasEngine();
-  return engine ? <CanvasHeaderActionsInner engine={engine} runtime={runtime} /> : null;
+  return engine ? <CanvasHeaderActionsInner engine={engine} instanceId={instance.id} runtime={runtime} /> : null;
 };
 
 const CanvasHeaderActionsInner = ({
   engine,
+  instanceId,
   runtime,
 }: {
   engine: CanvasHeaderEngine;
+  instanceId: string;
   runtime: WidgetViewProps['runtime'];
 }) => {
   const { t } = useTranslation();
@@ -97,10 +122,22 @@ const CanvasHeaderActionsInner = ({
   const zoomLabel = formatZoomPercent(zoom);
   const canUndo = useCanvasCanUndo(engine);
   const canRedo = useCanvasCanRedo(engine);
+  const undoLabel = useCanvasUndoLabel(engine);
+  const redoLabel = useCanvasRedoLabel(engine);
+  const undoText = undoLabel
+    ? t('widgets.canvas.controls.undoStep', { label: undoLabel })
+    : t('widgets.canvas.controls.undo');
+  const redoText = redoLabel
+    ? t('widgets.canvas.controls.redoStep', { label: redoLabel })
+    : t('widgets.canvas.controls.redo');
   const editingLocked = useCanvasDocumentEditingLocked(engine);
-  const { isSaving, save: saveToGallery } = useCanvasGallerySave(engine);
+  const { describeDestination, isSaving, save: saveToGallery } = useCanvasGallerySave(engine);
+  const { createFromBbox, isCreating } = useCreateFromBbox(engine);
   const saveMenuIds = useTooltipTriggerIds();
   const zoomMenuIds = useTooltipTriggerIds();
+  const frameMenuIds = useTooltipTriggerIds();
+  const frameLabel = t('widgets.canvas.controls.frame');
+  const lockReason = editingLocked ? t('widgets.canvas.controls.operationRunning') : undefined;
   const saveLabel = isSaving
     ? t('widgets.canvas.controls.savingToGallery')
     : t('widgets.canvas.contextMenu.saveToGallery');
@@ -156,6 +193,29 @@ const CanvasHeaderActionsInner = ({
   });
 
   const applyFit = (rect: Rect | null, refit: boolean) => applyFitBbox(commandContext(), rect, refit);
+
+  // Select the Frame tool, then hand focus to the surface once the menu has returned it to the trigger.
+  const editFrame = () => {
+    engine.tools.setTool('bbox');
+    requestAnimationFrame(() => findCanvasSurface(instanceId)?.focus({ preventScroll: true }));
+  };
+
+  // The save destination is only certain at save time; the menu names it as resolved when it opens.
+  const [destination, setDestination] = useState<{ label: string | null; projectId: string } | null>(null);
+  const destinationRequest = useRef(0);
+  const onSaveMenuOpenChange = (details: { open: boolean }) => {
+    if (!details.open) {
+      return;
+    }
+    const request = ++destinationRequest.current;
+    const projectId = engine.projectId;
+    void describeDestination().then((label) => {
+      if (destinationRequest.current === request) {
+        setDestination({ label, projectId });
+      }
+    });
+  };
+  const destinationLabel = destination?.projectId === engine.projectId ? destination.label : null;
 
   const clearBody = useMemo(
     () => (
@@ -250,37 +310,63 @@ const CanvasHeaderActionsInner = ({
         </Portal>
       </Menu.Root>
 
-      <Tooltip content={t('widgets.canvas.controls.fitBboxToLayers')}>
-        <IconButton
-          aria-label={t('widgets.canvas.controls.fitBboxToLayers')}
-          color="fg.muted"
-          disabled={editingLocked || !fitLayersRect}
-          size="sm"
-          variant="ghost"
-          onClick={() => applyFit(fitLayersRect, true)}
-        >
-          <FullscreenIcon />
-        </IconButton>
-      </Tooltip>
-
-      <Tooltip content={t('widgets.canvas.controls.fitBboxToMasks')}>
-        <IconButton
-          aria-label={t('widgets.canvas.controls.fitBboxToMasks')}
-          color="fg.muted"
-          disabled={editingLocked || !fitMasksRect}
-          size="sm"
-          variant="ghost"
-          onClick={() => applyFit(fitMasksRect, false)}
-        >
-          <FitFrameToMasksIcon />
-        </IconButton>
-      </Tooltip>
+      <Menu.Root ids={frameMenuIds} lazyMount positioning={ZOOM_MENU_POSITIONING} unmountOnExit>
+        <Tooltip content={frameLabel} ids={frameMenuIds}>
+          <Menu.Trigger asChild>
+            <Button aria-label={frameLabel} color="fg.muted" size="sm" variant="ghost">
+              <ScanIcon aria-hidden />
+              <ChevronDownIcon size={12} />
+            </Button>
+          </Menu.Trigger>
+        </Tooltip>
+        <Portal>
+          <Menu.Positioner>
+            <MenuContent minW="15rem" py="1">
+              <MenuActionItem
+                icon={ScanIcon}
+                label={t('widgets.canvas.controls.editFrame')}
+                value="edit-frame"
+                onSelect={editFrame}
+              />
+              <Menu.Separator />
+              <CommandMenuItem
+                commandId="canvas.fitBboxToLayers"
+                disabled={editingLocked || !fitLayersRect}
+                icon={FullscreenIcon}
+                label={t('widgets.canvas.controls.fitBboxToLayers')}
+                value="fit-layers"
+                onSelect={() => applyFit(fitLayersRect, true)}
+              />
+              <CommandMenuItem
+                commandId="canvas.fitBboxToMasks"
+                disabled={editingLocked || !fitMasksRect}
+                icon={FitFrameToMasksIcon}
+                label={t('widgets.canvas.controls.fitBboxToMasks')}
+                value="fit-masks"
+                onSelect={() => applyFit(fitMasksRect, false)}
+              />
+              <Menu.Separator />
+              <MenuHeadingGroup
+                label={t('widgets.canvas.controls.useFrameAs')}
+                trailing={t('widgets.canvas.controls.useFrameAsNote')}
+              >
+                {/* The context menu's Create from frame items; one composite runs at a time. */}
+                <CreateFromBboxMenuItems
+                  disabled={isSaving || isCreating}
+                  unavailableReason={lockReason}
+                  onCreate={(target: CreateFromBboxDestination) => void createFromBbox(target)}
+                />
+              </MenuHeadingGroup>
+            </MenuContent>
+          </Menu.Positioner>
+        </Portal>
+      </Menu.Root>
 
       <HeaderDivider />
 
-      <Tooltip content={t('widgets.canvas.commands.undo')}>
+      <Tooltip content={undoText}>
         <IconButton
-          aria-label={t('widgets.canvas.commands.undo')}
+          aria-label={undoText}
           color="fg.muted"
           disabled={editingLocked || !canUndo}
           size="sm"
@@ -291,9 +377,9 @@ const CanvasHeaderActionsInner = ({
         </IconButton>
       </Tooltip>
 
-      <Tooltip content={t('widgets.canvas.commands.redo')}>
+      <Tooltip content={redoText}>
         <IconButton
-          aria-label={t('widgets.canvas.commands.redo')}
+          aria-label={redoText}
           color="fg.muted"
           disabled={editingLocked || !canRedo}
           size="sm"
@@ -306,14 +392,20 @@ const CanvasHeaderActionsInner = ({
 
       <HeaderDivider />
 
-      <Menu.Root ids={saveMenuIds} positioning={MENU_POSITIONING}>
+      <Menu.Root
+        ids={saveMenuIds}
+        lazyMount
+        positioning={MENU_POSITIONING}
+        unmountOnExit
+        onOpenChange={onSaveMenuOpenChange}
+      >
         <Tooltip content={saveLabel} ids={saveMenuIds}>
           <Menu.Trigger asChild>
             <Button
               aria-busy={isSaving || undefined}
               aria-label={saveLabel}
               color="fg.muted"
-              disabled={editingLocked || isSaving}
+              disabled={editingLocked || isSaving || isCreating}
               size="sm"
               variant="ghost"
             >
@@ -324,18 +416,11 @@ const CanvasHeaderActionsInner = ({
         </Tooltip>
         <Portal>
           <Menu.Positioner>
-            <MenuContent minW="13rem" py="1">
-              <MenuActionItem
-                icon={SaveIcon}
-                label={t('widgets.canvas.contextMenu.saveCanvasToGallery')}
-                value="save-canvas"
-                onSelect={() => void saveToGallery('canvas')}
-              />
-              <MenuActionItem
-                icon={SaveIcon}
-                label={t('widgets.canvas.contextMenu.saveBboxToGallery')}
-                value="save-bbox"
-                onSelect={() => void saveToGallery('bbox')}
+            <MenuContent minW="15rem" py="1">
+              <SaveMenuItems
+                board={destinationLabel}
+                document={document}
+                onSave={(region: CanvasGallerySaveRegion) => void saveToGallery(region)}
               />
             </MenuContent>
           </Menu.Positioner>
@@ -363,6 +448,70 @@ const CanvasHeaderActionsInner = ({
         onConfirm={confirmNewCanvas}
       />
     </HStack>
+  );
+};
+
+/** A menu item trailed by its command's effective first binding, remaps included, as keycaps. */
+const CommandMenuItem = ({ commandId, ...item }: Omit<MenuActionItemProps, 'shortcut'> & { commandId: string }) => {
+  const parts = useShortcutBinding(commandId)?.parts;
+  // The binding's parts are a fresh array on every read; their serialized form is the stable key.
+  const partsKey = parts ? JSON.stringify(parts) : null;
+  const shortcut = useMemo(
+    () => (partsKey ? <ShortcutKeycaps parts={JSON.parse(partsKey) as string[]} /> : undefined),
+    [partsKey]
+  );
+  return <MenuActionItem {...item} shortcut={shortcut} />;
+};
+
+/** "{w} × {h} · {board}", dropping whichever part is unknown; undefined when neither is. */
+const describeSave = (
+  t: (key: string, options?: Record<string, unknown>) => string,
+  size: { height: number; width: number } | null,
+  board: string | null
+): string | undefined => {
+  if (size && board) {
+    return t('widgets.canvas.controls.saveHint', { ...size, board });
+  }
+  if (size) {
+    return t('widgets.canvas.controls.saveHintSize', size);
+  }
+  return board ?? undefined;
+};
+
+/**
+ * The frame save, then the whole canvas, each saying what it would save and where. Mounted only while the menu is
+ * open, so the canvas content bounds (the rect the canvas save exports) are planned then, not on every edit.
+ */
+const SaveMenuItems = ({
+  board,
+  document,
+  onSave,
+}: {
+  board: string | null;
+  document: CanvasDocumentContractV3;
+  onSave: (region: CanvasGallerySaveRegion) => void;
+}) => {
+  const { t } = useTranslation();
+  const content = useMemo(() => getBaseRasterContentBounds(document), [document]);
+  const frameSize = { height: Math.round(document.bbox.height), width: Math.round(document.bbox.width) };
+
+  return (
+    <>
+      <MenuActionItem
+        hint={describeSave(t, frameSize, board)}
+        icon={SaveIcon}
+        label={t('widgets.canvas.contextMenu.saveBboxToGallery')}
+        value="save-bbox"
+        onSelect={() => onSave('bbox')}
+      />
+      <MenuActionItem
+        hint={describeSave(t, content ? { height: content.height, width: content.width } : null, board)}
+        icon={SaveIcon}
+        label={t('widgets.canvas.contextMenu.saveCanvasToGallery')}
+        value="save-canvas"
+        onSelect={() => onSave('canvas')}
+      />
+    </>
   );
 };
 

@@ -14,7 +14,7 @@ This page describes the Canvas itself: its tools, controls and menus. For an int
 
 Each project has one canvas. It opens in the center of the **Edit** layout (**Alt+2**), or press **2** to bring it to the front.
 
-<Image src={toolbar} alt="The Canvas with its tool strip on the left and the header buttons along the top: the zoom menu, fit frame buttons, undo and redo, save, clear canvas, settings and more." width={560} />
+<Image src={toolbar} alt="The Canvas with its tool strip on the left and the header buttons along the top: the zoom menu, the Frame menu, undo and redo, save, clear canvas, settings and more." width={560} />
 
 ## Tools
 
@@ -81,10 +81,13 @@ In InvokeAI 6, the Lasso drew directly into an inpaint mask, and created one if 
 The buttons along the top of the canvas, from left to right:
 
 * **Zoom** — shows the current zoom level. Its menu offers **Fit to view**, then the zoom levels from 25% to 500%.
-* **Fit frame to layers** (**Shift+N**) — resizes the generation frame to the area all layers cover. With **Snap to grid** on, the frame then shrinks inward to the model's grid, so it can trim up to one grid step less one pixel from each edge of the layers.
-* **Fit frame to masks** (**Shift+B**) — resizes the generation frame to enclose the inpaint masks, with a margin of the **Mask blur** (in the Generate panel's **Compositing** section) plus 8 pixels, so the blurred edge of the mask stays inside the frame. With the default blur of 16, the margin is 24 pixels. With **Snap to grid** on, the frame then grows outward to the model's grid, so the margin can be wider but never narrower.
-* **Undo canvas edit** (**Ctrl+Z**) and **Redo canvas edit** (**Ctrl+Shift+Z** or **Ctrl+Y**).
-* **Save Canvas to Gallery** — saves the visible canvas as an image on the board new results go to, named under **Saving to** in the Gallery header (see [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes)). Its arrow offers **Save Frame to Gallery**, which saves only what is inside the generation frame. A message names the board the image went to; its **Show in Gallery** button selects the image in the Gallery and keeps the Canvas in the center.
+* **Frame** — a menu for the generation frame:
+  * **Edit frame** selects the Frame tool, so you can drag its handles or type a size in the tool options.
+  * **Fit frame to layers** (**Shift+N**) resizes the generation frame to the area all layers cover. With **Snap to grid** on, the frame then shrinks inward to the model's grid, so it can trim up to one grid step less one pixel from each edge of the layers.
+  * **Fit frame to masks** (**Shift+B**) resizes the generation frame to enclose the inpaint masks, with a margin of the **Mask blur** (in the Generate panel's **Compositing** section) plus 8 pixels, so the blurred edge of the mask stays inside the frame. With the default blur of 16, the margin is 24 pixels. With **Snap to grid** on, the frame then grows outward to the model's grid, so the margin can be wider but never narrower.
+  * **Use frame as** takes a snapshot of what is inside the frame as a **New global reference image**, **New regional reference image**, **New control layer** or **New raster layer**, the same as **Create from frame** in the right-click menu. Later edits to the canvas do not change the snapshot.
+* **Undo** (**Ctrl+Z**) and **Redo** (**Ctrl+Shift+Z** or **Ctrl+Y**). Their tooltips name the step they would undo or redo.
+* **Save to Gallery** — a menu with **Save Frame to Gallery**, which saves only what is inside the generation frame, and **Save Canvas to Gallery**, which saves the area the visible raster layers cover. Each item shows the size it would save and the board it goes to: the board new results go to, named under **Saving to** in the Gallery header (see [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes)). A message names the board the image went to; its **Show in Gallery** button selects the image in the Gallery and keeps the Canvas in the center.
 * **Clear canvas** (**Ctrl+Alt+N**, **Cmd+Option+N** on macOS) — clears all layers and staged results and starts a fresh canvas with an empty inpaint mask. The confirmation says how many layers and staged results go, and when generations are still running for this canvas it offers to stop them (otherwise their results are thrown away when they finish). Strokes still being saved are saved first; if they cannot be, nothing is cleared. A restore point in the [History](/users-guide/canvas/layers-panel/#history) tab keeps the cleared canvas, and the notice that follows has **Undo** (a blank canvas keeps no restore point). The canvas's undo history is cleared.
 * **Canvas settings** — see [below](#canvas-settings).
 
