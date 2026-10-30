@@ -9,7 +9,15 @@ import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { ScrollableMenuContent } from '@platform/ui/ScrollableMenuContent';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDownIcon, ChevronsDownUpIcon, ChevronsUpDownIcon, ImageIcon, SquareArrowDownIcon } from 'lucide-react';
+import {
+  ChevronDownIcon,
+  ChevronsDownUpIcon,
+  ChevronsUpDownIcon,
+  ImageIcon,
+  PanelLeftCloseIcon,
+  PanelLeftOpenIcon,
+  SquareArrowDownIcon,
+} from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -23,6 +31,8 @@ import { useGalleryDestination } from './useGalleryDestination';
 type GalleryChromeProps = { region: GalleryWidgetProps['region'] };
 
 const LABEL_EXPANDED_PROPS = { bg: 'transparent' } as const;
+/** The boards sidebar sits at the inline start, so its panel icon flips with the text direction. */
+const MIRRORED_IN_RTL = { transform: 'scaleX(-1)' } as const;
 
 const useGalleryChromeBoards = () => {
   const { gallery, galleryValues } = useGalleryUi();
@@ -89,7 +99,23 @@ export const GalleryWidgetLabel = ({ region }: GalleryChromeProps) => {
       >
         {selectedBoard ? <BoardCover board={selectedBoard} /> : <BoardCoverIcon icon={ImageIcon} />}
         <MiddleTruncate fontWeight="600" minW="0" text={boardName} />
-        <Icon as={isCollapsed ? ChevronsUpDownIcon : ChevronsDownUpIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
+        {/* The center view shows the boards as a sidebar beside the grid; the rails stack them above it. */}
+        {region === 'center' ? (
+          <Icon
+            _rtl={MIRRORED_IN_RTL}
+            as={isCollapsed ? PanelLeftOpenIcon : PanelLeftCloseIcon}
+            boxSize="3.5"
+            color="fg.subtle"
+            flexShrink={0}
+          />
+        ) : (
+          <Icon
+            as={isCollapsed ? ChevronsUpDownIcon : ChevronsDownUpIcon}
+            boxSize="3"
+            color="fg.subtle"
+            flexShrink={0}
+          />
+        )}
       </Button>
     </HStack>
   );

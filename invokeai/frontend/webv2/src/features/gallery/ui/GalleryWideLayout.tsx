@@ -49,16 +49,20 @@ export const GalleryWideLayout = () => {
           >
             <GalleryBoardsPanel />
           </Flex>
-          <ResizeHandle
-            label={t('widgets.gallery.resizeBoardPanel')}
-            max={GALLERY_BOARD_PANEL_MAX_WIDTH_PX}
-            min={GALLERY_BOARD_PANEL_MIN_WIDTH_PX}
-            orientation="vertical"
-            pane="before"
-            paneRef={boardPanelRef}
-            value={boardPanelWidthPx}
-            onCommit={handleCommitWidth}
-          />
+          {/* Inset like the panel: the handle paints above the center chrome islands, so a full-height line would
+              cross them. */}
+          <Flex flexShrink={0} pb="2" pt={CHROME_INSET_PADDING_TOP}>
+            <ResizeHandle
+              label={t('widgets.gallery.resizeBoardPanel')}
+              max={GALLERY_BOARD_PANEL_MAX_WIDTH_PX}
+              min={GALLERY_BOARD_PANEL_MIN_WIDTH_PX}
+              orientation="vertical"
+              pane="before"
+              paneRef={boardPanelRef}
+              value={boardPanelWidthPx}
+              onCommit={handleCommitWidth}
+            />
+          </Flex>
         </>
       )}
       <Stack flex="1" gap="0" minH="0" minW="0">
