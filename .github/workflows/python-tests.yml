@@ -125,6 +125,8 @@ jobs:
       - name: checkout
         # https://github.com/nschloe/action-cached-lfs-checkout
         uses: nschloe/action-cached-lfs-checkout@385a8ecc719e50b8c71af6ab01a624b486b7c3bc
+        with:
+          persist-credentials: false
 
       - name: check for changed python files
         if: ${{ inputs.always_run != true }}
@@ -238,6 +240,8 @@ jobs:
       - name: checkout
         if: ${{ inputs.always_run != true }}
         uses: nschloe/action-cached-lfs-checkout@385a8ecc719e50b8c71af6ab01a624b486b7c3bc
+        with:
+          persist-credentials: false
 
       - name: check for changed python files
         if: ${{ inputs.always_run != true }}
@@ -298,6 +302,8 @@ jobs:
     steps:
       - name: checkout
         uses: nschloe/action-cached-lfs-checkout@385a8ecc719e50b8c71af6ab01a624b486b7c3bc
+        with:
+          persist-credentials: false
 
       - name: setup uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
