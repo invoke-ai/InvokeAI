@@ -42,26 +42,37 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useNavigate: () => harness.navigate,
 }));
-vi.mock('@workbench/useNotify', () => ({ useNotify: () => ({ error: harness.notifyError }) }));
-vi.mock('@workbench/WorkbenchContext', () => ({
-  useWorkbenchLiveCanvasEngines: () => ({ flushPendingPixels: harness.flushCanvasPixels }),
-  useWorkbenchCommands: () => ({
-    gallery: { reconcileDeletedBoardOutcome: harness.reconcileDeletedBoardOutcome },
-    projects: { close: harness.close },
-  }),
-  useWorkbenchPersistenceAdapter: () => ({ getState: () => ({ projects: [harness.project] }) }),
-  useWorkbenchPersistenceService: () => ({
-    flushProjectToServer: harness.flush,
-    persistEmptySession: harness.persistEmptySession,
-    releaseProjectSync: harness.releaseProjectSync,
-    reopenSession: harness.reopenSession,
-  }),
-  useWorkbenchQueries: () => ({
+// Services the workbench hands out are stable for its lifetime; the doubles are too, so identity checks hold.
+const services = vi.hoisted(() => ({
+  canvasEngines: { flushPendingPixels: () => harness.flushCanvasPixels() },
+  commands: {
+    gallery: { reconcileDeletedBoardOutcome: (...args: unknown[]) => harness.reconcileDeletedBoardOutcome(...args) },
+    projects: { close: (...args: unknown[]) => harness.close(...(args as [])) },
+  },
+  notify: { error: (...args: unknown[]) => harness.notifyError(...args) },
+  persistence: { getState: () => ({ projects: [harness.project] }) },
+  persistenceService: {
+    flushProjectToServer: (...args: unknown[]) => harness.flush(...args),
+    persistEmptySession: (...args: unknown[]) => harness.persistEmptySession(...args),
+    releaseProjectSync: (...args: unknown[]) => harness.releaseProjectSync(...args),
+    reopenSession: (...args: unknown[]) => harness.reopenSession(...args),
+  },
+  queries: {
     getProject: () => harness.project,
     getSnapshot: () => ({ projects: [harness.project, createDraftProject([harness.project])] }),
-  }),
+  },
+  t: (key: string) => key,
 }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+
+vi.mock('@workbench/useNotify', () => ({ useNotify: () => services.notify }));
+vi.mock('@workbench/WorkbenchContext', () => ({
+  useWorkbenchLiveCanvasEngines: () => services.canvasEngines,
+  useWorkbenchCommands: () => services.commands,
+  useWorkbenchPersistenceAdapter: () => services.persistence,
+  useWorkbenchPersistenceService: () => services.persistenceService,
+  useWorkbenchQueries: () => services.queries,
+}));
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: services.t }) }));
 
 import { useProjectActions } from './useProjectActions';
 
@@ -69,8 +80,11 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const HarnessBody = () => {
-  const { closeProject, deleteProject } = useProjectActions();
+const seenOpenProjects: unknown[] = [];
+
+const HarnessBody = (_props: { renderCount?: number }) => {
+  const { closeProject, deleteProject, openProject } = useProjectActions();
+  seenOpenProjects.push(openProject);
   return (
     <>
       <button onClick={() => closeProject(harness.project)}>close</button>
@@ -82,9 +96,9 @@ const HarnessBody = () => {
 
 // Deleting invalidates the gallery's board lists, so the hook reads the query client.
 const queryClient = new QueryClient();
-const Harness = () => (
+const Harness = ({ renderCount }: { renderCount?: number }) => (
   <QueryClientProvider client={queryClient}>
-    <HarnessBody />
+    <HarnessBody renderCount={renderCount} />
   </QueryClientProvider>
 );
 
@@ -121,6 +135,15 @@ afterEach(async () => {
 });
 
 describe('useProjectActions', () => {
+  it('keeps its actions stable across re-renders, so callers can memoize what they build from them', async () => {
+    seenOpenProjects.length = 0;
+    await act(() => root?.render(<Harness renderCount={1} />));
+    await act(() => root?.render(<Harness renderCount={2} />));
+
+    expect(seenOpenProjects).toHaveLength(2);
+    expect(seenOpenProjects[1]).toBe(seenOpenProjects[0]);
+  });
+
   it('blocks project deletion while a queue run is active and offers the queue', async () => {
     harness.project.queue.items = [{ status: 'running' } as Project['queue']['items'][number]];
     await act(() => root?.render(<Harness />));
