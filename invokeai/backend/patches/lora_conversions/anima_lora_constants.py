@@ -36,7 +36,7 @@ _PEFT_ANIMA_RE = re.compile(
 # ``transformer_blocks.N.attn`` and Wan's ``blocks.N.attn1`` layouts. ``ff.net`` is not a signature because FLUX
 # uses the same path; it is converted only after another layer has identified the file as Anima.
 _DIFFUSERS_ANIMA_RE = re.compile(
-    r"(transformer|base_model\.model\.transformer)\.transformer_blocks\.\d+\.(attn1|attn2)\."
+    r"^(?:transformer\.|base_model\.model\.(?:transformer\.)?)?transformer_blocks\.\d+\.(?:attn1|attn2)\."
 )
 
 

@@ -280,6 +280,19 @@ def test_diffusers_cosmos_layers_map_to_real_anima_modules():
         assert layer.up.shape == (module.out_features, rank)
 
 
+@pytest.mark.parametrize("model_prefix", ["", "base_model.model."], ids=["bare", "peft"])
+def test_diffusers_cosmos_prefix_variants_map_to_anima(model_prefix: str):
+    source = f"{model_prefix}transformer_blocks.0.attn1.to_q"
+    state_dict = {
+        f"{source}.lora_A.weight": torch.empty(4, 2048),
+        f"{source}.lora_B.weight": torch.empty(2048, 4),
+    }
+
+    patch = lora_model_from_anima_state_dict(state_dict)
+
+    assert set(patch.layers) == {f"{ANIMA_LORA_TRANSFORMER_PREFIX}blocks.0.self_attn.q_proj"}
+
+
 def test_kohya_unet_keys_get_transformer_prefix():
     """Test that Kohya unet keys are prefixed with the transformer prefix."""
     state_dict = keys_to_mock_state_dict(anima_kohya_keys)

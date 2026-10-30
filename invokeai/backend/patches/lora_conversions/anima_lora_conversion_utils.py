@@ -341,6 +341,7 @@ def lora_model_from_anima_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
             if not is_text_encoder:
                 for prefix in [
                     "base_model.model.transformer.",
+                    "base_model.model.",
                     "transformer.",
                     "diffusion_model.",
                 ]:
