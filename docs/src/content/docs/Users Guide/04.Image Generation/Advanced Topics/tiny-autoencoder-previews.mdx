@@ -1,0 +1,79 @@
+---
+title: Tiny AutoEncoder Previews
+lastUpdated: 2026-10-28
+sidebar:
+  order: 13
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components'
+
+While a model denoises, InvokeAI shows a preview of the image after each step. By default the preview is a linear
+projection of the latents: one pixel per latent, upscaled, so it is blurry and its colours are approximate. A
+**Tiny AutoEncoder** (TAE) is a small decoder by [madebyollin](https://github.com/madebyollin/taesd) (MIT license)
+that turns the same latents into a preview close to the final image, in about 25 ms on an RTX 4090. It needs a GPU:
+on CPU-only installs it is not recommended (see [Cost and fallback](#cost-and-fallback)).
+
+TAE previews change only what you see while a generation runs. The finished image is decoded by the model's VAE as
+always and is identical with the setting on or off.
+
+## Enabling TAE previews
+
+<Steps>
+1. Set the option in `invokeai.yaml`, then restart InvokeAI:
+
+   ```yaml
+   tiny_autoencoder_previews: true
+   ```
+
+   It is a server setting and is off by default. See [All Settings](/configuration/invokeai-yaml/#all-settings).
+
+2. In **Model Manager → Starter Models**, install the Tiny AutoEncoder for the families you generate with
+   (search for *preview decoder*). Each one is 5 to 31 MB.
+</Steps>
+
+| Starter model | Previews for |
+|---|---|
+| TAESD (SD 1.x/2.x preview decoder) | SD 1.x, SD 2.x |
+| TAESDXL (SDXL preview decoder) | SDXL, SDXL Refiner |
+| TAESD3 (SD3 preview decoder) | SD 3 |
+| TAEF1 (FLUX.1 preview decoder) | FLUX.1, Z-Image |
+| TAEF2 (FLUX.2 preview decoder) | FLUX.2, ERNIE-Image |
+| TAEQI2.1 (Qwen-Image-2.1 preview decoder) | Qwen-Image-2.1 |
+
+A TAE serves every family that denoises in its latent space, so you need only one per row. To install a TAE file
+you already have, see [Preview decoders](/users-guide/models/model-format-support/#preview-decoders-tiny-autoencoders)
+for the files InvokeAI accepts.
+
+FLUX.1, FLUX.2 and ERNIE-Image preview the image the model predicts, so the preview is clean from the first step.
+Z-Image, SD 3 and Qwen-Image-2.1 preview the current noisy latent: early previews show sharp noise, which clears as
+denoising proceeds. SD 1.x/2.x and SDXL depend on the scheduler: DDIM, DDPM, Euler, Euler a, Heun, LMS, KDPM2,
+KDPM2 a and DPM++ SDE report their prediction and preview cleanly; DPM++ 2M, 2M SDE, 3M and 2S, UniPC, DEIS, PNDM,
+LCM, TCD and ER-SDE preview the noisy latent.
+
+All other families keep the linear preview: Qwen-Image, Qwen-Image Edit, Krea-2, Anima, CogView4, Ideogram 4,
+Wan 2.2 and LTX-2. MiniMax H3 previews with its own built-in decoder whatever this setting says.
+
+## Cost and fallback
+
+Only the preview frames that are actually sent to the UI are decoded, between two denoising steps. Previews are at
+most 1024 pixels on their long edge; larger generations are previewed at reduced resolution and shown at full size.
+At that size, on an RTX 4090, a preview takes about 25 ms and about 0.65 GB of VRAM while it decodes (about 0.16 GB
+for Qwen-Image-2.1). Without a GPU a preview takes about 2 seconds, so TAE previews are not recommended on CPU-only
+installs.
+
+InvokeAI spaces TAE preview frames so that previews cost at most about a tenth of the denoising time. On fast models
+the preview therefore updates a few times per second rather than after every step. In practice the cost is lower: on
+an RTX 4090, denoising a 1024×1024 SDXL image in 30 steps took about 4.44 s with TAE previews against 4.18 s
+without, roughly 6% more.
+
+InvokeAI falls back to the linear preview by itself, and the generation always continues:
+
+- **No matching TAE installed:** linear previews. The server log names the family once.
+- **The TAE does not fit in VRAM** next to the running model: linear previews for that generation, noted once in
+  the server log. This is the case whenever the main model is only partially loaded into VRAM, as on low-VRAM cards.
+- **Loading or decoding the TAE fails:** a warning with the error in the server log, once per kind of failure,
+  then linear previews for the rest of that generation.
+
+<Aside type="note">
+If more than one installed TAE fits a family, InvokeAI uses the one that is alphabetically first by name.
+</Aside>

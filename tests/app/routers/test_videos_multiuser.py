@@ -1141,7 +1141,7 @@ def test_get_video_workflow_returns_workflow_and_graph_for_owner(
     )
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.json() == {"workflow": '{"nodes": []}', "graph": '{"edges": []}'}
+    assert response.json() == {"workflow": '{"nodes": []}', "graph": '{"edges": []}', "resolved_inputs": None}
 
 
 def test_get_video_workflow_returns_nulls_when_video_has_none(
@@ -1159,7 +1159,7 @@ def test_get_video_workflow_returns_nulls_when_video_has_none(
     )
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.json() == {"workflow": None, "graph": None}
+    assert response.json() == {"workflow": None, "graph": None, "resolved_inputs": None}
 
 
 def test_get_video_workflow_missing_video_returns_404(client: TestClient, mock_invoker: Invoker, user1_token: str):
