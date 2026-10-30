@@ -63,7 +63,7 @@ On a multi-user installation, only a board's owner or an administrator can delet
 
 Right-click an item, or several selected items, for its menu.
 
-<Image src={imageMenu} alt="The context menu for an image, with quick-action icons at the top followed by Load Workflow, Recall Metadata, Add to Current Canvas, New Project from Image, Send to Upscale, Send to Video, Use as Reference Image, Use as Prompt Template, Select for Compare, Generate PBR Maps, Find in Gallery, Move to board and Delete image." width={420} />
+<Image src={imageMenu} alt="The context menu for an image: quick-action icons at the top, then Load workflow; under Continue working, Edit on Canvas, Upscale, Send to Video, Add to Canvas as… and New project from image; under Use image as, Use as reference image, Use as control and Use as prompt template; then Reuse from image, Select for compare, Generate PBR maps, Find in Gallery, Move to board and Delete image." width={420} />
 
 For an image, the menu offers:
 
@@ -71,8 +71,9 @@ For an image, the menu offers:
 * **Load workflow** — open the workflow that made the image. Unavailable for images without one.
 * **Continue working** — **Edit on Canvas** adds the image to the open project's canvas as an image layer and opens Canvas; **Upscale** sends it to the Upscale panel or upscales it at once; **Send to Video** uses it as the first frame in the Video panel; **Add to Canvas as…** adds it as a layer of the kind you choose; **New project from image** starts a new project whose canvas holds the image, sized to fit it.
 * **Use image as** — **Use as reference image**, **Use as control** and **Use as prompt template**. Its **Reuse from image** submenu restores the settings that made the image: **Remix image**, **All settings**, **Use prompt**, **Use seed**, **Use size** and **Use CLIP skip**; see [Resetting to defaults](/users-guide/image-generation/generate-panel/#resetting-to-defaults). Settings an image does not record are unavailable.
-* **Generate PBR maps** — queue normal, roughness and displacement maps of the image. They are saved to the board new results go to, or to the project's Inbox if you can't add to that board (Uncategorized when there is neither), and a notice reports when they are ready. The first run downloads the PBR models.
 * **Select for compare** — compare the image with the selected one; **Alt**-click (**Option**-click on macOS) on a thumbnail does the same.
+* **Generate PBR maps** — queue normal, roughness and displacement maps of the image. They are saved to the board new results go to, or to the project's Inbox if you can't add to that board (Uncategorized when there is neither), and a notice reports when they are ready. The first run downloads the PBR models.
+* **Find in Gallery** — select the image in its own board and scroll the grid to it, clearing a search or filter that would hide it.
 * **Move to board** and **Delete image**.
 
 A video's menu has the equivalent actions for video, including **Extend in Video**, **Use as reference video** and **Use as conditioning clip**. With several items selected, the menu offers the actions that apply to all of them, such as **Star selection**, **Download selection**, **Move to board** and **Delete selection**; for several images it also leads with **Add to Canvas as…** and **New project from images**.
