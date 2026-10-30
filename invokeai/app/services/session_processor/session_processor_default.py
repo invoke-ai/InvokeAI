@@ -502,7 +502,12 @@ class DefaultSessionRunner(SessionRunnerBase):
 
                 # Invoke the node, optionally on a borrowed idle GPU (text encoders only). Its attention calls are
                 # attributed to its type, which the pinned-kernel report (`attention_backend`) names.
-                with self._maybe_offload_to_idle_gpu(invocation), attention_caller(invocation.get_type()):
+                # Leaving `invocation_resources` releases what the context held for the run, however it ended.
+                with (
+                    self._maybe_offload_to_idle_gpu(invocation),
+                    attention_caller(invocation.get_type()),
+                    data.invocation_resources,
+                ):
                     run_result = invocation.invoke_internal_with_effects(context=context, services=self._services)
                 output = run_result.output
                 control_collection = None

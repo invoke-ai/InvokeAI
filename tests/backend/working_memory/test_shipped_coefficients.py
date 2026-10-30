@@ -30,6 +30,7 @@ from invokeai.backend.working_memory.bounds import (
     UPPER_BOUND_EXCEPTIONS,
     bound_violation,
     evaluate_point,
+    line_bounds,
     point_id,
 )
 from invokeai.backend.working_memory.coefficients import (
@@ -70,10 +71,13 @@ OUT_OF_FIT = {((("allocator", "native"), ("conv_backend", "cudnn")), "RTX 4090",
 """The out-of-fit points by platform, device and method: the six CUDA forced-math-kernel decodes and encodes, which
 check the score-matrix term. A point that leaves the fit needs an edit here."""
 
-LEGACY_ENTRIES = {("denoise.z_image", (("allocator", "native"), ("conv_backend", "miopen")))}
+LEGACY_ENTRIES = {
+    ("denoise.z_image", (("allocator", "native"), ("conv_backend", "miopen"))),
+    ("denoise.flux2", (("allocator", "native"), ("conv_backend", "miopen"))),
+}
 """The entries, by estimator and platform keys, that carry hand-set constants (`CoefficientEntry.legacy`) rather than
-fits of measured points: the Z-Image denoise on ROCm with the native allocator off Windows, which nothing measures yet.
-Shipping an entry's points and fit removes it from here."""
+fits of measured points: the Z-Image and FLUX.2 denoise on ROCm with the native allocator off Windows, which nothing
+measures yet. Shipping an entry's points and fit removes it from here."""
 
 # Imported deliberately rather than relying on whichever modules ran first: a spec missing from the registry is a spec
 # whose data nobody checks.
@@ -192,7 +196,7 @@ def test_every_fitted_value_is_the_shipped_fit_of_its_points() -> None:
     """The values are reproducible from the points rather than hand-tuned. A new point that moves a fit fails here,
     naming the values to ship. Only `hand_set_values` are exempt: values off a line their entry carries, of an
     estimator keyed by no platform trait, which its points decide and bound but nothing fits."""
-    fitted = fitted_values(shipped_data().values(), SPECS)
+    fitted = fitted_values(shipped_data().values(), SPECS, line_bounds(shipped_data().values(), SPECS))
     stale = {}
     for entry in ENTRIES:
         if entry.values is None or entry.legacy:

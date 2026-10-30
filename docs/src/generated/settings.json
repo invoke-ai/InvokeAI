@@ -771,6 +771,17 @@
     },
     {
       "category": "GENERATION",
+      "default": false,
+      "description": "Render denoising previews with an installed Tiny AutoEncoder instead of the linear latent projection. Install the matching Tiny AutoEncoder starter model; families without one keep linear previews. A preview costs about 25 ms and 0.65 GB of transient VRAM on an RTX 4090; not recommended on CPU-only installs, where one takes about 2 s.",
+      "env_var": "INVOKEAI_TINY_AUTOENCODER_PREVIEWS",
+      "literal_values": [],
+      "name": "tiny_autoencoder_previews",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
       "default": "auto",
       "description": "Attention type.",
       "env_var": "INVOKEAI_ATTENTION_TYPE",
