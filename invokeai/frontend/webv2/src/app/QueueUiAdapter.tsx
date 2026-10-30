@@ -53,6 +53,7 @@ export const QueueUiAdapterProvider = ({ children }: { children: ReactNode }) =>
       activeProjectName,
       ItemActions: QueueItemActions,
       canManageInvocationCache: canManageAppConfig,
+      canManageModelCache: canManageModels,
       canManageProcessor: canManageModels,
       canManageItem: (item) => getQueueItemAccess(item, viewer).canManage,
       canViewItemDetails: (item) => getQueueItemAccess(item, viewer).canViewDetails,

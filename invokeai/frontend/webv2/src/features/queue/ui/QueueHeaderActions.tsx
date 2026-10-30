@@ -40,8 +40,17 @@ const ROW_COLUMNS = 'auto minmax(3rem, 1fr) auto 2.25rem auto';
 const FULL_ROW = '1 / -1';
 const VALUE_COLUMNS = '2 / 5';
 
-/** The queue header opens both server caches in one popover; the invocation cache row is for administrators only. */
+/**
+ * The queue header opens both server caches in one popover. Each row needs its admin-only capability; with neither, the
+ * button is absent rather than an empty popover.
+ */
 export const QueueHeaderActions = () => {
+  const { canManageInvocationCache, canManageModelCache } = useQueueUi();
+
+  return canManageInvocationCache || canManageModelCache ? <CachePopover /> : null;
+};
+
+const CachePopover = () => {
   const { t } = useTranslation();
   const triggerIds = useTooltipTriggerIds();
   const titleId = useId();
@@ -74,7 +83,7 @@ export const QueueHeaderActions = () => {
 /** Mounted only while open, so opening refreshes both readings and a closed popover polls nothing. */
 const CachePanel = () => {
   const { t } = useTranslation();
-  const { canManageInvocationCache } = useQueueUi();
+  const { canManageInvocationCache, canManageModelCache } = useQueueUi();
 
   return (
     <Stack gap="2.5">
@@ -84,12 +93,16 @@ const CachePanel = () => {
       <Grid alignItems="center" columnGap="2.5" rowGap="2" templateColumns={ROW_COLUMNS}>
         {canManageInvocationCache ? (
           <InvocationCacheSection>
-            <RowSeparator />
-            <ModelCacheRow />
+            {canManageModelCache ? (
+              <>
+                <RowSeparator />
+                <ModelCacheRow />
+              </>
+            ) : null}
           </InvocationCacheSection>
-        ) : (
+        ) : canManageModelCache ? (
           <ModelCacheRow />
-        )}
+        ) : null}
       </Grid>
     </Stack>
   );

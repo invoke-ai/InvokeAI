@@ -107,12 +107,19 @@ afterEach(async () => {
   host.remove();
 });
 
-const render = async ({ canManageInvocationCache = true } = {}) => {
+interface Access {
+  canManageInvocationCache?: boolean;
+  canManageModelCache?: boolean;
+}
+
+const render = async ({ canManageInvocationCache = true, canManageModelCache = true }: Access = {}) => {
   await act(() =>
     root.render(
       <ChakraProvider value={system}>
         <QueryClientProvider client={queryClient}>
-          <QueueUiProvider adapter={createTestQueueUiAdapter({ canManageInvocationCache, notify })}>
+          <QueueUiProvider
+            adapter={createTestQueueUiAdapter({ canManageInvocationCache, canManageModelCache, notify })}
+          >
             <QueueHeaderActions />
           </QueueUiProvider>
         </QueryClientProvider>
@@ -120,13 +127,13 @@ const render = async ({ canManageInvocationCache = true } = {}) => {
     )
   );
 
-  return host.querySelector<HTMLButtonElement>('button')!;
+  return host.querySelector<HTMLButtonElement>('button');
 };
 
 const dialog = () => document.querySelector<HTMLElement>('[role="dialog"]');
 
-const open = async (options?: { canManageInvocationCache?: boolean }) => {
-  const trigger = await render(options);
+const open = async (options?: Access) => {
+  const trigger = (await render(options))!;
   await act(() => userEvent.click(trigger));
   await vi.waitFor(() => expect(dialog()).not.toBeNull());
   // The status read retries once before it reports a failure.
@@ -147,7 +154,7 @@ const progressbar = (name: string) =>
 
 describe('QueueHeaderActions', () => {
   it('opens the Cache popover from its header button, moving focus in and back out', async () => {
-    const trigger = await render();
+    const trigger = (await render())!;
 
     expect(host.querySelectorAll('button')).toHaveLength(1);
     expect(trigger.getAttribute('aria-label')).toBe('widgets.queue.cache.title');
@@ -188,7 +195,7 @@ describe('QueueHeaderActions', () => {
   });
 
   it('reads no cache statistics while closed, and follows model loads only while open', async () => {
-    const trigger = await render();
+    const trigger = (await render())!;
     // What the realtime runtime does on a model load or reconnect.
     await refreshWatchedModelCacheStats();
 
@@ -262,14 +269,27 @@ describe('QueueHeaderActions', () => {
     expect(server.setInvocationsEnabled).toHaveBeenLastCalledWith(true);
   });
 
-  it('shows a non-administrator only the model cache', async () => {
-    await open({ canManageInvocationCache: false });
+  it('offers a non-administrator no Cache button, and reads neither cache', async () => {
+    expect(await render({ canManageInvocationCache: false, canManageModelCache: false })).toBeNull();
 
-    expect(dialog()!.textContent).toContain('widgets.queue.cache.models');
-    expect(dialog()!.textContent).not.toContain('widgets.queue.cache.invocations');
-    expect(button('widgets.queue.cache.clearModels')).toBeDefined();
-    expect(button('widgets.queue.cache.disable')).toBeUndefined();
+    // What the realtime runtime does on a model load: nothing is watching, so the admin-only stats are not read.
+    await refreshWatchedModelCacheStats();
+    expect(server.modelStats).not.toHaveBeenCalled();
     expect(server.invocationStatus).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { access: { canManageModelCache: false }, hidden: 'models', shown: 'invocations' },
+    { access: { canManageInvocationCache: false }, hidden: 'invocations', shown: 'models' },
+  ])('shows only the $shown row to a viewer who may manage only that cache', async ({ access, hidden, shown }) => {
+    await open(access);
+
+    expect(dialog()!.textContent).toContain(`widgets.queue.cache.${shown}`);
+    expect(dialog()!.textContent).not.toContain(`widgets.queue.cache.${hidden}`);
+    expect(button('widgets.queue.cache.clearModels') !== undefined).toBe(shown === 'models');
+    expect(button('widgets.queue.cache.disable') !== undefined).toBe(shown === 'invocations');
+    expect(server.modelStats.mock.calls.length > 0).toBe(shown === 'models');
+    expect(server.invocationStatus.mock.calls.length > 0).toBe(shown === 'invocations');
   });
 
   it('disables the invocation commands and says why when the server keeps no cache', async () => {

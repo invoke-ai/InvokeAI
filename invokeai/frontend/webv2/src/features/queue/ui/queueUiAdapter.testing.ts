@@ -8,6 +8,7 @@ export const createTestQueueUiAdapter = (overrides: Partial<QueueUiAdapter> = {}
   activeProjectId: null,
   activeProjectName: null,
   canManageInvocationCache: false,
+  canManageModelCache: false,
   canManageItem: () => true,
   canManageProcessor: true,
   canViewItemDetails: () => true,

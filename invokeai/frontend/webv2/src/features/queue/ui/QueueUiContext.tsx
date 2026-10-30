@@ -16,6 +16,8 @@ export interface QueueUiAdapter {
   activeProjectName: string | null;
   /** The invocation cache endpoints are admin-only; the Cache popover shows its row to administrators alone. */
   canManageInvocationCache: boolean;
+  /** Model cache stats and clearing are admin-only too; without either cache the Cache button is absent. */
+  canManageModelCache: boolean;
   canManageProcessor: boolean;
   canManageItem(item: QueueItemReadModel): boolean;
   canViewItemDetails(item: QueueItemReadModel): boolean;
