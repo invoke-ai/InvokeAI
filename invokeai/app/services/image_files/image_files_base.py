@@ -63,6 +63,7 @@ class ImageFileStorageBase(ABC):
         graph: Optional[str] = None,
         thumbnail_size: int = 256,
         image_subfolder: str = "",
+        resolved_inputs: Optional[str] = None,
     ) -> None:
         """Saves an image and a 256x256 WEBP thumbnail. Returns a tuple of the image name, thumbnail name, and created timestamp."""
         pass
@@ -142,4 +143,9 @@ class ImageFileStorageBase(ABC):
     @abstractmethod
     def get_graph(self, image_name: str, image_subfolder: str = "") -> Optional[str]:
         """Gets the graph of an image."""
+        pass
+
+    @abstractmethod
+    def get_resolved_inputs(self, image_name: str, image_subfolder: str = "") -> Optional[str]:
+        """Gets the per-image resolved-input Graph JSON, when present."""
         pass

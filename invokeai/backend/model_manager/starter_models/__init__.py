@@ -128,6 +128,7 @@ from invokeai.backend.model_manager.starter_models.flux import (
     pid_1_5_decoder_flux_2kto4k_int8,
     pid_decoder_flux_2k,
     pid_decoder_flux_2kto4k,
+    taef1,
     union_cnet_flux,
 )
 from invokeai.backend.model_manager.starter_models.flux2 import (
@@ -156,6 +157,7 @@ from invokeai.backend.model_manager.starter_models.flux2 import (
     pid_1_5_decoder_flux2_2kto4k_int8,
     pid_decoder_flux2_2k,
     pid_decoder_flux2_2kto4k,
+    taef2,
 )
 from invokeai.backend.model_manager.starter_models.ideogram_4 import (
     ideogram_4_fp8,
@@ -220,6 +222,7 @@ from invokeai.backend.model_manager.starter_models.qwen_image import (
     qwen_image_gguf_q4_k_m,
     qwen_image_gguf_q6_k,
     qwen_image_gguf_q8_0,
+    qwen_image_instantx_controlnet_union,
     qwen_image_lightning_4step,
     qwen_image_lightning_8step,
     qwen_image_vae,
@@ -229,6 +232,7 @@ from invokeai.backend.model_manager.starter_models.qwen_image_2_1 import (
     qwen_image_2_1_gguf_q4_k_m,
     qwen_image_2_1_turbo,
     qwen_image_2_1_vae,
+    taeqi2_1,
 )
 from invokeai.backend.model_manager.starter_models.sd_1 import (
     canny_sd1,
@@ -257,6 +261,7 @@ from invokeai.backend.model_manager.starter_models.sd_1 import (
     t2i_canny_sd1,
     t2i_depth_sd1,
     t2i_sketch_sd1,
+    taesd,
     tile_sd1,
 )
 from invokeai.backend.model_manager.starter_models.sd_3 import (
@@ -264,6 +269,7 @@ from invokeai.backend.model_manager.starter_models.sd_3 import (
     pid_decoder_sd3_2kto4k,
     sd35_large,
     sd35_medium,
+    taesd3,
 )
 from invokeai.backend.model_manager.starter_models.sdxl import (
     alien_lora_sdxl,
@@ -284,6 +290,7 @@ from invokeai.backend.model_manager.starter_models.sdxl import (
     t2i_canny_sdxl,
     t2i_lineart_sdxl,
     t2i_sketch_sdxl,
+    taesdxl,
     tile_sdxl,
     union_cnet_sdxl,
 )
@@ -337,6 +344,7 @@ STARTER_MODELS: list[StarterModel] = [
     flux_schnell_sdnq,
     sd35_medium,
     sd35_large,
+    taesd3,
     ideogram_4_nf4,
     ideogram_4_fp8,
     ideogram_4_single_file,
@@ -360,7 +368,10 @@ STARTER_MODELS: list[StarterModel] = [
     archvis_sdxl,
     sdxl_refiner,
     sdxl_fp16_vae_fix,
+    taesd,
+    taesdxl,
     flux_vae,
+    taef1,
     alien_lora_sdxl,
     noodle_lora_sdxl,
     easy_neg_sd1,
@@ -420,6 +431,7 @@ STARTER_MODELS: list[StarterModel] = [
     smollm2_1_7b_instruct,
     flux_fill,
     flux2_vae,
+    taef2,
     flux2_klein_4b,
     flux2_klein_4b_single,
     flux2_klein_4b_fp8,
@@ -471,6 +483,7 @@ STARTER_MODELS: list[StarterModel] = [
     qwen_image_lightning_4step,
     qwen_image_lightning_8step,
     qwen_image_fun_controlnet_union,
+    qwen_image_instantx_controlnet_union,
     flux_krea,
     flux_krea_quantized,
     z_image_turbo,
@@ -502,6 +515,7 @@ STARTER_MODELS: list[StarterModel] = [
     qwen_image_2_1,
     qwen_image_2_1_gguf_q4_k_m,
     qwen_image_2_1_vae,
+    taeqi2_1,
     qwen3_vl_encoder_8b,
     moss_image_base,
     moss_image_sft,

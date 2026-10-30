@@ -421,17 +421,19 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         total_steps = len(sigmas) - 1
         step_callback = self._step_callback(context)
-        step_callback(
-            PipelineIntermediateState(
-                step=0,
-                order=1,
-                total_steps=total_steps,
-                timestep=int(sigmas[0].item() * 1000),
-                latents=unpack_latents(latents, latent_height, latent_width),
-            )
-        )
 
         with transformer_info.model_on_device(working_mem_bytes=working_memory) as (_, transformer):
+            # Inside the lock: a Tiny AutoEncoder preview loads its TAE only if it fits next to the locked model.
+            step_callback(
+                PipelineIntermediateState(
+                    step=0,
+                    order=1,
+                    total_steps=total_steps,
+                    timestep=int(sigmas[0].item() * 1000),
+                    latents=unpack_latents(latents, latent_height, latent_width),
+                )
+            )
+
             # One cache per guidance branch, for this run only.
             num_blocks = len(transformer.transformer_blocks)
             pos_cache = QwenImage21KVCache(num_blocks) if use_cache else None
