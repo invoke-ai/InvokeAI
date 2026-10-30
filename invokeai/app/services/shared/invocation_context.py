@@ -1,5 +1,6 @@
+from contextlib import ExitStack
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
@@ -30,7 +31,8 @@ from invokeai.app.services.shared.execution_effects import ExecutionEffectsRecor
 from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.videos.videos_common import VideoDTO
 from invokeai.app.services.wildcard_records.wildcard_records_common import build_wildcard_manager
-from invokeai.app.util.step_callback import diffusion_step_callback
+from invokeai.app.util.step_callback import PreviewRender, diffusion_step_callback
+from invokeai.app.util.tiny_autoencoder_previews import TinyAutoencoderPreviews
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
@@ -90,6 +92,10 @@ class InvocationContextData:
     """Engine-owned saved-workflow authorization callback, when enabled."""
     execution_workflow_inputs: dict[str, Any] | None = None
     """Resolved saved-workflow inputs supplied by the execution adapter."""
+    invocation_resources: ExitStack = field(default_factory=ExitStack)
+    """What the context holds for this run of the invocation, such as a Tiny AutoEncoder locked for previews.
+
+    Whoever runs the invocation closes it once the invocation returns or raises."""
 
 
 class InvocationContextInterface:
@@ -851,6 +857,7 @@ class UtilInterface(InvocationContextInterface):
     ) -> None:
         super().__init__(services, data)
         self._is_canceled = is_canceled
+        self._previews: TinyAutoencoderPreviews | None = None
 
     def is_canceled(self) -> bool:
         """Checks if the current session has been canceled.
@@ -873,10 +880,11 @@ class UtilInterface(InvocationContextInterface):
         """
 
         diffusion_step_callback(
-            signal_progress=self.signal_progress,
+            signal_preview=self._signal_preview,
             intermediate_state=intermediate_state,
             base_model=base_model,
             is_canceled=self.is_canceled,
+            render=self._get_previews().render,
         )
 
     def flux_step_callback(self, intermediate_state: PipelineIntermediateState) -> None:
@@ -891,10 +899,11 @@ class UtilInterface(InvocationContextInterface):
         """
 
         diffusion_step_callback(
-            signal_progress=self.signal_progress,
+            signal_preview=self._signal_preview,
             intermediate_state=intermediate_state,
             base_model=BaseModelType.Flux,
             is_canceled=self.is_canceled,
+            render=self._get_previews().render,
         )
 
     def flux2_step_callback(self, intermediate_state: PipelineIntermediateState) -> None:
@@ -906,10 +915,11 @@ class UtilInterface(InvocationContextInterface):
         """
 
         diffusion_step_callback(
-            signal_progress=self.signal_progress,
+            signal_preview=self._signal_preview,
             intermediate_state=intermediate_state,
             base_model=BaseModelType.Flux2,
             is_canceled=self.is_canceled,
+            render=self._get_previews().render,
         )
 
     def signal_progress(
@@ -966,6 +976,22 @@ class UtilInterface(InvocationContextInterface):
                 original size.
         """
 
+        if image is not None:
+            self._signal_preview(message, percentage, lambda: (image, image_size))
+            return
+
+        # See _signal_preview: imageless progress is a step boundary too.
+        TorchDevice.flush_deferred_empty_cache()
+        self._services.events.emit_invocation_progress(
+            queue_item=self._data.queue_item,
+            invocation=self._data.invocation,
+            message=message,
+            percentage=percentage,
+        )
+
+    def _signal_preview(self, message: str, percentage: float | None, render: PreviewRender) -> None:
+        """Signal an image-bearing progress frame, rendering the image only if the frame is emitted."""
+
         # Every denoise loop reports here once per step, so this is where a busy worker reaches a
         # natural boundary in its own GPU work. If a peer deferred a process-global empty_cache
         # (skipped so as not to stall THIS worker mid-step), run it now, from this thread, where
@@ -973,33 +999,45 @@ class UtilInterface(InvocationContextInterface):
         # blocks. A flag test when nothing is pending.
         TorchDevice.flush_deferred_empty_cache()
 
-        queue_item = self._data.queue_item
-
-        if image is None:
-            self._services.events.emit_invocation_progress(
-                queue_item=queue_item,
-                invocation=self._data.invocation,
-                message=message,
-                percentage=percentage,
-            )
-            return
-
         # Image-bearing frames are revisioned and throttled by the preview store, and the emitted
         # event is retained there so a reconnecting client can be given the latest frame instead
-        # of waiting for the next step. Throttled frames are dropped before the JPEG encode.
+        # of waiting for the next step. Throttled frames are dropped before the render and the
+        # JPEG encode. A Tiny AutoEncoder's frames are expensive enough to widen the interval.
+        queue_item = self._data.queue_item
         previews = self._services.progress_previews
-        revision = previews.reserve_revision(queue_item.item_id, queue_item.session_id, percentage)
+        renderer = self._get_previews()
+        revision = previews.reserve_revision(
+            queue_item.item_id, queue_item.session_id, percentage, min_interval_s=renderer.min_frame_interval_s
+        )
         if revision is None:
             return
+        with renderer.measure_frame():
+            image, image_size = render()
+            progress_image = ProgressImage.build(image, image_size)
         event = self._services.events.emit_invocation_progress(
             queue_item=queue_item,
             invocation=self._data.invocation,
             message=message,
             percentage=percentage,
-            image=ProgressImage.build(image, image_size),
+            image=progress_image,
             revision=revision,
         )
         previews.record(event)
+
+    def _get_previews(self) -> TinyAutoencoderPreviews:
+        """What renders and paces this invocation's preview frames, created on the first one.
+
+        With `tiny_autoencoder_previews` off, it renders every frame linearly at the store's interval.
+        """
+        if self._previews is None:
+            self._previews = TinyAutoencoderPreviews(
+                self._services,
+                user_id=self._data.queue_item.user_id,
+                enabled=self._services.configuration.tiny_autoencoder_previews,
+            )
+            # A TAE stays locked from the first preview until the invocation's runner closes this.
+            self._data.invocation_resources.callback(self._previews.close)
+        return self._previews
 
 
 class WildcardsInterface(InvocationContextInterface):
