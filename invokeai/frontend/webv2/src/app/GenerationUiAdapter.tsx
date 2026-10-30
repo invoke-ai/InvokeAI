@@ -66,6 +66,22 @@ const SEED_HISTORY_LIMIT = 6;
 
 type GenerationQueueInsights = ReturnType<GenerationUiAdapter['queueInsights']['getSnapshot']>;
 
+/** A removed preset put back at its old position (or last), or null while one with its id is still saved. */
+const reinsertPreset = <Preset extends { id: string }>(
+  presets: readonly Preset[],
+  preset: Preset,
+  index: number
+): Preset[] | null => {
+  if (presets.some((candidate) => candidate.id === preset.id)) {
+    return null;
+  }
+
+  const next = [...presets];
+
+  next.splice(Math.min(Math.max(index, 0), next.length), 0, preset);
+  return next;
+};
+
 const EMPTY_QUEUE_INSIGHTS: GenerationQueueInsights = { secondsPerRun: null, seedHistory: [] };
 
 /**
@@ -366,6 +382,13 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
           ),
         });
       },
+      restore: (preset, index) => {
+        const restored = reinsertPreset(getWorkbenchPreferences().krea2RebalancePresets, preset, index);
+
+        if (restored) {
+          void patchWorkbenchPreferences({ krea2RebalancePresets: restored });
+        }
+      },
       save: (label, weights, multiplier) => {
         const preset = { id: createUuid(), label, multiplier, weights };
 
@@ -398,6 +421,13 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
             preset.id === presetId ? { ...preset, label } : preset
           ),
         });
+      },
+      restore: (preset, index) => {
+        const restored = reinsertPreset(getWorkbenchPreferences().generatePresets, preset, index);
+
+        if (restored) {
+          void patchWorkbenchPreferences({ generatePresets: restored });
+        }
       },
       save: (label, values) => {
         const preset = { id: createUuid(), label, values };

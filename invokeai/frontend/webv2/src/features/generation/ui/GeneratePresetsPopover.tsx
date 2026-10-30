@@ -9,18 +9,9 @@ import {
 import { GENERATE_TOOL_MODEL_PICK_KEYS, normalizeGenerateSettings } from '@features/generation/core/settings';
 import { resolveGenerateWidgetValues } from '@features/generation/settings';
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
-import {
-  Button,
-  ConfirmDialog,
-  IconButton,
-  PopoverContent,
-  RenameDialog,
-  Row,
-  Scrollable,
-  Tooltip,
-} from '@platform/ui';
+import { Button, IconButton, PopoverContent, RenameDialog, Row, Scrollable, Tooltip } from '@platform/ui';
 import { BookmarkIcon, CheckIcon, PencilIcon, PlusIcon, SearchIcon, Trash2Icon } from 'lucide-react';
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { GeneratePresetRecord } from './GenerationUiContext';
@@ -168,6 +159,7 @@ const PresetRow = ({
         <IconButton
           aria-label={t('widgets.generate.deletePresetNamed', { name: preset.label })}
           colorPalette="red"
+          data-preset-delete={preset.id}
           variant="ghost"
           onClick={handleDelete}
         >
@@ -184,9 +176,9 @@ export const GeneratePresetsPopover = () => {
   const ui = useGenerationUi();
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const contentRef = useRef<HTMLDivElement>(null);
   const [dialogSubject, setDialogSubject] = useState<PresetDialogSubject | null>(null);
   const dialog = useExitRetainedValue(dialogSubject);
-  const [pendingDelete, setPendingDelete] = useState<GeneratePresetRecord | null>(null);
   // Tooltip and Popover must share the trigger ID to preserve anchoring.
   const triggerId = useId();
   const triggerIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
@@ -339,14 +331,29 @@ export const GeneratePresetsPopover = () => {
     [dialogSubject, includePrompts, ui.generateValues, ui.presets]
   );
 
-  const cancelDelete = useCallback(() => setPendingDelete(null), []);
-  const confirmDelete = useCallback(() => {
-    if (pendingDelete) {
-      ui.presets.remove(pendingDelete.id);
-    }
+  // Deleting is undoable, so it asks nothing. The active preset is derived from the settings, which a delete leaves
+  // alone: Undo brings the preset back as active if the settings still match it.
+  const deletePreset = useCallback(
+    (preset: GeneratePresetRecord) => {
+      const index = ui.presets.presets.findIndex((candidate) => candidate.id === preset.id);
+      const { restore } = ui.presets;
+      // Focus moves before the row leaves, to the next row's delete button (the previous one's after the last row), so
+      // deleting several presets needs no Tab back from the top; with no row left, to the popover itself.
+      const shownIndex = filteredPresets.findIndex((candidate) => candidate.id === preset.id);
+      const neighbour = filteredPresets[shownIndex + 1] ?? filteredPresets[shownIndex - 1];
+      const content = contentRef.current;
+      const neighbourDelete = neighbour
+        ? content?.querySelector<HTMLElement>(`[data-preset-delete="${CSS.escape(neighbour.id)}"]`)
+        : null;
 
-    setPendingDelete(null);
-  }, [pendingDelete, ui.presets]);
+      (neighbourDelete ?? content)?.focus();
+      ui.presets.remove(preset.id);
+      ui.notifications.undoable(t('widgets.generate.presetDeleted', { name: preset.label }), {
+        onUndo: () => restore(preset, index),
+      });
+    },
+    [filteredPresets, t, ui.notifications, ui.presets]
+  );
 
   const presetsLabel = t('widgets.generate.presets');
   // Tooltip and accessible name carry the visible preset label (label-in-name).
@@ -383,7 +390,7 @@ export const GeneratePresetsPopover = () => {
         </Tooltip>
         <Portal>
           <Popover.Positioner>
-            <PopoverContent w="22rem">
+            <PopoverContent ref={contentRef} w="22rem">
               <Popover.Body p="2.5">
                 <Stack gap="2">
                   <PromptPanelHeader label={presetsLabel}>
@@ -425,7 +432,7 @@ export const GeneratePresetsPopover = () => {
                             isActive={preset.id === activePreset?.id}
                             preset={preset}
                             onApply={applyPreset}
-                            onDelete={setPendingDelete}
+                            onDelete={deletePreset}
                             onRename={openRenameDialog}
                           />
                         ))}
@@ -466,14 +473,6 @@ export const GeneratePresetsPopover = () => {
           ) : null}
         </RenameDialog>
       ) : null}
-      <ConfirmDialog
-        body={t('widgets.generate.presetDeleteBody', { name: pendingDelete?.label ?? '' })}
-        confirmLabel={t('common.delete')}
-        isOpen={pendingDelete !== null}
-        title={t('widgets.generate.presetDeleteTitle')}
-        onClose={cancelDelete}
-        onConfirm={confirmDelete}
-      />
     </>
   );
 };

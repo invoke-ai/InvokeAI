@@ -15,7 +15,6 @@ import {
 } from '@features/generation/core/conditioningRebalance';
 // Use subpath imports to stay within the direct-importer budget.
 import { IconButton } from '@platform/ui/Button';
-import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { Field } from '@platform/ui/Field';
 import { MenuContent } from '@platform/ui/Menu';
 import { RenameDialog } from '@platform/ui/RenameDialog';
@@ -65,13 +64,12 @@ export const GenerateConditioningRebalanceField = ({
   settings,
 }: GenerateConditioningRebalanceFieldProps) => {
   const { t } = useTranslation();
-  const { rebalancePresets } = useGenerationUi();
+  const { notifications, rebalancePresets } = useGenerationUi();
   const [previewWeights, setPreviewWeights] = useState<number[] | null>(null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   /** Non-null while the text field is being typed into, so a half-typed vector survives. */
   const [weightsDraft, setWeightsDraft] = useState<string | null>(null);
   const [presetDialog, setPresetDialog] = useState<PresetDialog | null>(null);
-  const [presetPendingDelete, setPresetPendingDelete] = useState<RebalancePreset | null>(null);
 
   const committedWeights = useMemo(
     () => parseRebalanceWeights(settings.krea2RebalanceWeights) ?? DEFAULT_WEIGHT_VECTOR,
@@ -165,11 +163,20 @@ export const GenerateConditioningRebalanceField = ({
     [presetDialog, rebalancePresets, settings.krea2RebalanceMultiplier, settings.krea2RebalanceWeights]
   );
 
-  const handleConfirmDelete = useCallback(() => {
-    if (presetPendingDelete) {
-      rebalancePresets.remove(presetPendingDelete.id);
-    }
-  }, [presetPendingDelete, rebalancePresets]);
+  // Deleting is undoable, so it asks nothing. The curve stays applied (shown as Custom); Undo brings the preset back,
+  // and with it the selection while the curve still matches.
+  const deletePreset = useCallback(
+    (preset: RebalancePreset) => {
+      const index = rebalancePresets.presets.findIndex((candidate) => candidate.id === preset.id);
+      const { restore } = rebalancePresets;
+
+      rebalancePresets.remove(preset.id);
+      notifications.undoable(t('widgets.generate.krea2RebalancePresetDeleted', { name: preset.label }), {
+        onUndo: () => restore(preset, index),
+      });
+    },
+    [notifications, rebalancePresets, t]
+  );
 
   const tapLabel = useCallback(
     (tap: number, layer: number) => t('widgets.generate.krea2RebalanceTapLabel', { layer, tap }),
@@ -247,7 +254,7 @@ export const GenerateConditioningRebalanceField = ({
                         data-danger=""
                         disabled={!isCustomPreset}
                         value="delete"
-                        onClick={() => activePreset && setPresetPendingDelete(activePreset)}
+                        onClick={() => activePreset && deletePreset(activePreset)}
                       >
                         <Menu.ItemText>{t('widgets.generate.krea2RebalancePresetDelete')}</Menu.ItemText>
                       </Menu.Item>
@@ -341,14 +348,6 @@ export const GenerateConditioningRebalanceField = ({
         }
         onClose={() => setPresetDialog(null)}
         onSubmit={handlePresetDialogSubmit}
-      />
-      <ConfirmDialog
-        body={t('widgets.generate.krea2RebalancePresetDeleteBody', { name: presetPendingDelete?.label ?? '' })}
-        confirmLabel={t('widgets.generate.krea2RebalancePresetDelete')}
-        isOpen={presetPendingDelete !== null}
-        title={t('widgets.generate.krea2RebalancePresetDelete')}
-        onClose={() => setPresetPendingDelete(null)}
-        onConfirm={handleConfirmDelete}
       />
     </>
   );

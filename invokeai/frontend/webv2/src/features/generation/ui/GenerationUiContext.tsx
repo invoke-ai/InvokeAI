@@ -170,6 +170,8 @@ export interface GenerationUiAdapter {
     save(label: string, values: Record<string, unknown>): GeneratePresetRecord;
     rename(presetId: string, label: string): void;
     remove(presetId: string): void;
+    /** Undoes a remove: puts `preset` back at `index` (or last), unless a preset with its id is still there. */
+    restore(preset: GeneratePresetRecord, index: number): void;
   };
   /**
    * Insights from the project's recent queue runs. Subscribing keeps the backing queue read observed, so only the
@@ -183,6 +185,8 @@ export interface GenerationUiAdapter {
     save(label: string, weights: string, multiplier: number): RebalancePreset;
     rename(presetId: string, label: string): void;
     remove(presetId: string): void;
+    /** Undoes a remove: puts `preset` back at `index` among the saved curves (or last), unless its id is still there. */
+    restore(preset: RebalancePreset, index: number): void;
   };
   sectionPreferences: {
     /** Persisted per-user open/closed overrides for panel sections; absent = section default. */

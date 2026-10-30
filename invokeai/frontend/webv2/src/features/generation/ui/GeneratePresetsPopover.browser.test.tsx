@@ -1,5 +1,5 @@
 import type { MainModelConfig } from '@features/generation/core/types';
-import type { GenerationUiAdapter } from '@features/generation/ui/GenerationUiContext';
+import type { GeneratePresetRecord, GenerationUiAdapter } from '@features/generation/ui/GenerationUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
@@ -26,6 +26,7 @@ await i18n.use(initReactI18next).init({
         widgets: {
           generate: {
             presetApplied: 'Applied preset {{name}}',
+            presetDeleted: 'Deleted preset {{name}}',
             presetIncludePrompts: 'Include prompts',
             savePresetAction: 'Save',
             savePresetTitle: 'Save preset',
@@ -267,6 +268,80 @@ describe('GeneratePresetsPopover', () => {
       expect.objectContaining({ positivePrompt: 'a lighthouse', steps: 12 }),
       'project-1'
     );
+  });
+
+  it('deletes a preset at once, and its Undo puts it back where it was, active again while the settings match', async () => {
+    const portrait = { ...getDefaultGenerateSettings(model), steps: 12 };
+    const stored = {
+      current: [
+        { id: 'preset-1', label: 'Landscape', values: { ...portrait, steps: 40 } },
+        { id: 'preset-2', label: 'Portrait', values: portrait },
+        { id: 'preset-3', label: 'Square', values: { ...portrait, steps: 20 } },
+      ] as GeneratePresetRecord[],
+    };
+    const undoable = vi.fn();
+    const buildAdapter = () =>
+      ({
+        ...ADAPTER,
+        generateValues: { getSnapshot: () => ({ ...portrait, model }), subscribe: () => () => {} },
+        models: { ...ADAPTER.models, catalog: [model] },
+        notifications: { ...ADAPTER.notifications, undoable },
+        presets: {
+          ...ADAPTER.presets,
+          presets: stored.current,
+          remove: (id: string) => {
+            stored.current = stored.current.filter((preset) => preset.id !== id);
+          },
+          restore: (preset: GeneratePresetRecord, index: number) => {
+            stored.current = [...stored.current.slice(0, index), preset, ...stored.current.slice(index)];
+          },
+        },
+      }) as unknown as GenerationUiAdapter;
+    // The trigger names the active preset after the section label.
+    const trigger = () => document.querySelector<HTMLElement>('[aria-label^="widgets.generate.presets"]')!;
+    const triggerLabel = () => trigger().getAttribute('aria-label');
+    const rowLabels = () =>
+      [...document.querySelectorAll('[data-scope="popover"][data-part="content"] button[type="button"]')]
+        .map((button) => button.textContent)
+        .filter((label) => label === 'Landscape' || label === 'Portrait' || label === 'Square');
+    await renderAdapter(buildAdapter());
+    expect(triggerLabel()).toBe('widgets.generate.presets · Portrait');
+    await act(() => userEvent.click(trigger()));
+
+    /** Untranslated, every row's delete button shares one label; rows keep catalog order. */
+    const deleteButtons = () => [
+      ...document.querySelectorAll<HTMLElement>('[aria-label="widgets.generate.deletePresetNamed"]'),
+    ];
+    const deleteRow = async (index: number) => {
+      await act(() => userEvent.click(deleteButtons()[index]!));
+      await renderAdapter(buildAdapter());
+    };
+    const [, , squareDelete] = deleteButtons();
+    await deleteRow(1);
+
+    // No confirmation: the preset is gone at once, and focus moves to the next row's delete button.
+    expect(modalDialog()).toBeNull();
+    expect(rowLabels()).toEqual(['Landscape', 'Square']);
+    expect(document.activeElement).toBe(squareDelete);
+    expect(triggerLabel()).toBe('widgets.generate.presets');
+    expect(undoable).toHaveBeenCalledExactlyOnceWith('Deleted preset Portrait', { onUndo: expect.any(Function) });
+
+    await act(() => undoable.mock.calls[0]![1].onUndo());
+    await renderAdapter(buildAdapter());
+
+    expect(rowLabels()).toEqual(['Landscape', 'Portrait', 'Square']);
+    expect(triggerLabel()).toBe('widgets.generate.presets · Portrait');
+
+    // Deleting the last row moves focus to the previous row; deleting the only row, to the popover itself.
+    const [landscapeDelete] = deleteButtons();
+    await deleteRow(2);
+    await deleteRow(1);
+    expect(rowLabels()).toEqual(['Landscape']);
+    expect(document.activeElement).toBe(landscapeDelete);
+
+    await deleteRow(0);
+    expect(rowLabels()).toEqual([]);
+    expect(document.activeElement).toBe(document.querySelector('[data-scope="popover"][data-part="content"]'));
   });
 
   it('animates the rename dialog out instead of unmounting it on close', async () => {
