@@ -32,7 +32,7 @@ afterEach(async () => {
 });
 
 describe('focus region highlight', () => {
-  it('lays the highlight over the borders beside the region', async () => {
+  const renderRegion = async (controller = createTestFocusController()) => {
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
@@ -40,14 +40,26 @@ describe('focus region highlight', () => {
     await act(() => {
       root?.render(
         <ChakraProvider value={system}>
-          <FocusRegionProvider controller={createTestFocusController()}>
+          <FocusRegionProvider controller={controller}>
             <FocusableRegion />
           </FocusRegionProvider>
         </ChakraProvider>
       );
     });
 
-    const region = host.querySelector<HTMLElement>('[data-testid="focus-region"]');
+    return host.querySelector<HTMLElement>('[data-testid="focus-region"]');
+  };
+
+  it('focuses the center before anything is pressed or focused', async () => {
+    const controller = createTestFocusController();
+    const region = await renderRegion(controller);
+
+    expect(controller.getTarget()).toEqual({ kind: 'region', region: 'center' });
+    expect(region?.getAttribute('data-highlighted')).toBe('true');
+  });
+
+  it('lays the highlight over the borders beside the region', async () => {
+    const region = await renderRegion();
     expect(region).not.toBeNull();
 
     await act(() => region?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
@@ -406,13 +418,14 @@ describe('workbench focus across regions and floating windows', () => {
 
     // The project switches before the window ever shows. Returning to it must not resurrect the old focus.
     projectId = 'project-2';
-    expect(controller.getTarget()).toBeNull();
+    expect(controller.getTarget()).toEqual({ kind: 'region', region: 'center' });
     await act(() => controller.clear());
     projectId = 'project-1';
     await rerender(true);
     await frames(4);
 
-    expect(controller.getTarget()).toBeNull();
+    // The left region press is forgotten: the center holds focus, and neither this region nor the window is outlined.
+    expect(controller.getTarget()).toEqual({ kind: 'region', region: 'center' });
     expect(highlighted()).toEqual({ region: 'false', window: 'false' });
     expect(document.activeElement).toBe(opener);
   });
@@ -425,7 +438,7 @@ describe('workbench focus across regions and floating windows', () => {
     // Docked or removed, with nothing else focused since.
     isWindowFloating = false;
 
-    expect(controller.getTarget()).toBeNull();
+    expect(controller.getTarget()).toEqual({ kind: 'region', region: 'center' });
   });
 
   it('abandons a pending focus move when the user presses somewhere else first', async () => {

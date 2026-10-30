@@ -18,7 +18,7 @@ type FocusDirection = 'left' | 'right' | 'up' | 'down';
 /**
  * Transient workbench focus, owned by one provider above the shell and the hotkey runtime. It is never persisted:
  * the outline, the hotkey target, and focus moves all read it, and it is fenced to the project and account it was
- * set under.
+ * set under. The center region, which every shell has, holds focus whenever nothing else does.
  */
 export interface WorkbenchFocusController {
   /**
@@ -27,7 +27,7 @@ export interface WorkbenchFocusController {
    * pending focus move's destination also abandons that move: the user went somewhere else on purpose.
    */
   activate(target: WorkbenchFocusTarget, options?: { byPointer?: boolean; projectId?: string }): FocusActivation;
-  /** Forget the target and abandon any focus move still waiting for its widget to show. */
+  /** Forget the target, so the center holds focus again, and abandon any focus move still waiting for its widget. */
   clear(): void;
   /** Focus the nearest visible docked region in this direction, without changing its selected widget. */
   focusAdjacentRegion(direction: FocusDirection): void;
@@ -40,11 +40,16 @@ export interface WorkbenchFocusController {
    */
   focusRegion(region: WidgetRegion, typeId?: string, instanceId?: WidgetInstanceId): void;
   /**
-   * Forget a window target whose window has docked or closed. It already reads as null; forgetting it keeps the
-   * same instance from taking focus back without being focused, should a preset or undo float it again.
+   * Forget a window target whose window has docked or closed, and tell subscribers the center holds focus again.
+   * Forgetting it also keeps the same instance from taking focus back without being focused, should a preset or undo
+   * float it again.
    */
   forgetClosedWindow(): void;
-  /** The focus target, or null once it no longer describes something on screen in this project and account. */
+  /**
+   * The focus target: the one recorded, or the center while none is recorded or the recorded one no longer describes
+   * something on screen in this project and account. Never null; the nullable type is shared with readers outside the
+   * provider, where there is no target.
+   */
   getTarget(): WorkbenchFocusTarget | null;
   subscribe(listener: () => void): () => void;
 }
@@ -62,6 +67,9 @@ export interface WorkbenchFocusScope {
 const FOCUS_MOVE_WAIT_MS = 1000;
 /** How long the move holds after it lands: a closing menu or dialog hands focus back to its trigger on the way out. */
 const FOCUS_MOVE_SETTLE_MS = 500;
+
+// One object, so external-store snapshots of the default stay stable between reads.
+const CENTER_TARGET: WorkbenchFocusTarget = Object.freeze({ kind: 'region', region: 'center' });
 
 const isSameTarget = (left: WorkbenchFocusTarget | null, right: WorkbenchFocusTarget): boolean =>
   left !== null &&
@@ -91,13 +99,13 @@ export const createWorkbenchFocusController = ({
   // The one place a target is judged. The owner clears eagerly on project and account changes, which is what
   // notifies subscribers and stops moves, and forgets a closed window on the next workbench change; this read-time
   // check covers the instant between such a change and the owner's response.
-  const getTarget = (): WorkbenchFocusTarget | null =>
+  const getTarget = (): WorkbenchFocusTarget =>
     entry &&
     entry.projectId === getProjectId() &&
     isAccountScopeCurrent(entry.owner) &&
     (entry.target.kind === 'region' || isFloating(entry.target.instanceId))
       ? entry.target
-      : null;
+      : CENTER_TARGET;
 
   /**
    * Leaves focus alone while it is inside the container, and gives up if the container never shows, the project or
@@ -217,9 +225,9 @@ export const createWorkbenchFocusController = ({
       }));
       const target = getTarget();
       const origin =
-        target?.kind === 'floating'
+        target.kind === 'floating'
           ? document.querySelector<HTMLElement>(`[data-floating-window="${CSS.escape(target.instanceId)}"]`)
-          : regions.find(({ container }) => container.dataset.focusRegion === target?.region)?.container;
+          : regions.find(({ container }) => container.dataset.focusRegion === target.region)?.container;
 
       if (!origin) {
         const center = regions.find(({ container }) => container.dataset.focusRegion === 'center');
@@ -238,8 +246,8 @@ export const createWorkbenchFocusController = ({
       const crossEnd = horizontal ? 'bottom' : 'right';
       // A window can overlap several docks. Use its center on the movement axis so its outer edges cannot
       // exclude all of them; docked regions still navigate from edge to edge.
-      const originStart = target?.kind === 'floating' ? (originRect[start] + originRect[end]) / 2 : originRect[start];
-      const originEnd = target?.kind === 'floating' ? originStart : originRect[end];
+      const originStart = target.kind === 'floating' ? (originRect[start] + originRect[end]) / 2 : originRect[start];
+      const originEnd = target.kind === 'floating' ? originStart : originRect[end];
       const candidates = regions.flatMap(({ container, rect }) => {
         const gap = forward ? rect[start] - originEnd : originStart - rect[end];
         if (container === origin || gap < -1) {
@@ -259,7 +267,7 @@ export const createWorkbenchFocusController = ({
       // the dock underneath its center instead of trapping keyboard focus in the window.
       const next =
         candidates[0]?.container ??
-        (target?.kind === 'floating'
+        (target.kind === 'floating'
           ? regions.find(
               ({ rect }) =>
                 rect.left <= originRect.left + originRect.width / 2 &&
@@ -280,6 +288,7 @@ export const createWorkbenchFocusController = ({
     forgetClosedWindow: () => {
       if (entry?.target.kind === 'floating' && !isFloating(entry.target.instanceId)) {
         entry = null;
+        notify();
       }
     },
     getTarget,

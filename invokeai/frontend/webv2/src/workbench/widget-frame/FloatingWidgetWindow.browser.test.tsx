@@ -645,7 +645,7 @@ describe('FloatingWidgetWindow focus', () => {
       floatingWindow().dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
     });
 
-    expect(controller.getTarget()).toBeNull();
+    expect(controller.getTarget()).toEqual({ kind: 'region', region: 'center' });
     expect(windowMocks.raiseFloating).not.toHaveBeenCalled();
   });
 
@@ -657,7 +657,7 @@ describe('FloatingWidgetWindow focus', () => {
     await act(() => floatingWindow().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
     await act(() => host!.querySelector<HTMLButtonElement>('button[aria-label="Shade"]')!.focus());
 
-    expect(controller.getTarget()).toBeNull();
+    expect(controller.getTarget()).toEqual({ kind: 'region', region: 'center' });
     expect(windowMocks.raiseFloating).not.toHaveBeenCalled();
   });
 

@@ -10,9 +10,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * The workbench's focus provider against a real store: focus is forgotten — and any focus move still waiting is
- * abandoned — when the project on screen changes, the account changes, the window closes, or the workbench
- * unmounts. Only the context plumbing is replaced.
+ * The workbench's focus provider against a real store: focus is forgotten, falling back to the center, and any focus
+ * move still waiting is abandoned when the project on screen changes, the account changes, the window closes, or the
+ * workbench unmounts. Only the context plumbing is replaced.
  */
 
 const runtimeMocks = vi.hoisted(() => ({ store: null as unknown as WorkbenchInternalStore }));
@@ -33,6 +33,9 @@ import {
 } from './focusRegions';
 import { WorkbenchFocusProvider } from './WorkbenchRuntime';
 import { createWorkbenchStore } from './workbenchStore';
+
+/** What the controller names once it has forgotten what was focused. */
+const CENTER = { kind: 'region', region: 'center' };
 
 type FocusApi = Pick<WorkbenchFocusController, 'focusFloating' | 'focusRegion' | 'getTarget'>;
 
@@ -68,6 +71,7 @@ const WindowStub = () => {
 const Harness = ({ showWindow }: { showWindow: boolean }) => (
   <>
     <Probe />
+    <div data-testid="center" {...useFocusRegionProps('center')} />
     <div data-testid="region" {...useFocusRegionProps('right')}>
       <button type="button">Region control</button>
     </div>
@@ -130,14 +134,14 @@ describe('WorkbenchFocusProvider', () => {
 
     await act(() => commands.projects.create());
     expect(getSnapshot().activeProject.id).not.toBe(firstProjectId);
-    expect(api.getTarget()).toBeNull();
+    expect(api.getTarget()).toEqual(CENTER);
 
     // Back on the first project, where the window the move was waiting for now shows.
     await act(() => commands.projects.switchTo(firstProjectId));
     await render(true);
     await frames(4);
 
-    expect(api.getTarget()).toBeNull();
+    expect(api.getTarget()).toEqual(CENTER);
     expect(document.activeElement).toBe(opener());
     expect(host!.querySelector('[data-testid="region"]')?.getAttribute('data-highlighted')).toBe('false');
   });
@@ -154,7 +158,7 @@ describe('WorkbenchFocusProvider', () => {
     await render(true);
     await frames(4);
 
-    expect(api.getTarget()).toBeNull();
+    expect(api.getTarget()).toEqual(CENTER);
     expect(document.activeElement).toBe(opener());
   });
 
@@ -163,9 +167,14 @@ describe('WorkbenchFocusProvider', () => {
     await press('window');
     expect(api.getTarget()).toEqual({ instanceId: 'image-map', kind: 'floating' });
 
+    const center = host!.querySelector('[data-testid="center"]')!;
+    expect(center.getAttribute('data-highlighted')).toBe('false');
+
     await act(() => runtimeMocks.store.commands.widgets.closeFloating('image-map'));
 
-    expect(api.getTarget()).toBeNull();
+    expect(api.getTarget()).toEqual(CENTER);
+    // Nothing else re-renders the center here: its outline returns only because forgetting the window notifies.
+    expect(center.getAttribute('data-highlighted')).toBe('true');
   });
 
   it('does not hand focus back to a window that floats again without being focused', async () => {
@@ -179,7 +188,7 @@ describe('WorkbenchFocusProvider', () => {
     await act(() => commands.widgets.float('image-map'));
 
     expect(runtimeMocks.store.getSnapshot().activeProject.floatingWidgets?.['image-map']).toBeDefined();
-    expect(api.getTarget()).toBeNull();
+    expect(api.getTarget()).toEqual(CENTER);
   });
 
   it('abandons a pending move when the workbench unmounts', async () => {
