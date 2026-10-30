@@ -5806,6 +5806,11 @@
           "success_one": "Starred {{count}} item.",
           "success_other": "Starred {{count}} items."
         },
+        "undoStale": {
+          "none_one": "Nothing to undo: that item changed since, or its earlier state was not known.",
+          "none_other": "Nothing to undo: those items changed since, or their earlier state was not known.",
+          "partial": "Restored {{restored}} of {{count}} items. The others changed since, or their earlier state was not known."
+        },
         "unstar": {
           "failure_one": "Could not unstar {{count}} item.",
           "failure_other": "Could not unstar {{count}} items.",

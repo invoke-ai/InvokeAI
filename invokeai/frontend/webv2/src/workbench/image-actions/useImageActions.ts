@@ -610,20 +610,93 @@ export const useImageActions = ({
 
       return groups;
     };
-    // Undo is the same mutation back, reported without an Undo of its own.
-    const moveItemsToBoard = (items: GalleryItemRef[], boardId: string, offerUndo = true): Promise<void> => {
-      // On partial move failure, restore then reapply confirmed items. Capture prior boards from cache and store,
-      // preferring cache; invalidation reconciles conflicts.
-      const previousBoardIds = new Map<GalleryItemKey, string>(
-        [...collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, items)].map(([key, fields]) => [
+    // Known boards and star flags from cache and store, preferring cache; invalidation reconciles conflicts.
+    const readKnownBoardIds = (refs: readonly GalleryItemRef[]): Map<GalleryItemKey, string> => {
+      const boardIds = new Map<GalleryItemKey, string>(
+        [...collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, refs)].map(([key, fields]) => [
           key,
           fields.boardId,
         ])
       );
 
-      for (const [key, cachedBoardId] of getGalleryItemBoardIdsFromCaches(queryClient, items)) {
-        previousBoardIds.set(key, cachedBoardId);
+      for (const [key, cachedBoardId] of getGalleryItemBoardIdsFromCaches(queryClient, refs)) {
+        boardIds.set(key, cachedBoardId);
       }
+
+      return boardIds;
+    };
+    const readKnownStarred = (refs: readonly GalleryItemRef[]): Map<GalleryItemKey, boolean> => {
+      const starred = new Map<GalleryItemKey, boolean>(
+        [...collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, refs)].map(([key, fields]) => [
+          key,
+          fields.starred,
+        ])
+      );
+
+      for (const [key, cachedStarred] of getGalleryItemStarredFromCaches(queryClient, refs)) {
+        starred.set(key, cachedStarred);
+      }
+
+      return starred;
+    };
+    /**
+     * Undo for a move or star: each item back to its own prior value. The toast outlives later actions, so at undo
+     * time only items still holding this action's value are reverted; a later move or star of the same item wins.
+     * Items whose prior value was not known stay as the action left them. Anything not restored is reported.
+     */
+    const getGalleryItemUndo = <Value>({
+      getCurrent,
+      painted,
+      previous,
+      revert,
+      succeeded,
+    }: {
+      getCurrent: (refs: readonly GalleryItemRef[]) => ReadonlyMap<GalleryItemKey, Value>;
+      painted: Value;
+      previous: ReadonlyMap<GalleryItemKey, Value>;
+      revert: (refs: GalleryItemRef[], prior: Value) => void;
+      succeeded: readonly GalleryItemRef[];
+    }): (() => void) | null => {
+      // An item already holding the painted value has nothing to undo.
+      const changed = succeeded.filter((ref) => previous.get(toGalleryItemKey(ref)) !== painted);
+      const groups = groupByPrior(changed, (key) => previous.get(key));
+
+      if (groups.size === 0) {
+        return null;
+      }
+
+      return () => {
+        const restorable = [...groups.values()].flat();
+        const current = getCurrent(restorable);
+        const unchanged = new Set(
+          selectItemKeysUnchangedSince(restorable.map(toGalleryItemKey), painted, (key) => current.get(key))
+        );
+        let restored = 0;
+
+        for (const [prior, refs] of groups) {
+          const kept = refs.filter((ref) => unchanged.has(toGalleryItemKey(ref)));
+
+          if (kept.length > 0) {
+            restored += kept.length;
+            revert(kept, prior);
+          }
+        }
+
+        if (restored < changed.length) {
+          notifications.add({
+            kind: 'info',
+            title:
+              restored === 0
+                ? t('widgets.gallery.itemActions.undoStale.none', { count: changed.length })
+                : t('widgets.gallery.itemActions.undoStale.partial', { count: changed.length, restored }),
+          });
+        }
+      };
+    };
+    // Undo is the same mutation back, reported without an Undo of its own.
+    const moveItemsToBoard = (items: GalleryItemRef[], boardId: string, offerUndo = true): Promise<void> => {
+      // On partial move failure, restore then reapply confirmed items.
+      const previousBoardIds = readKnownBoardIds(items);
 
       const rollbackCaches = patchGalleryItemCaches(queryClient, {
         boardId,
@@ -691,22 +764,16 @@ export const useImageActions = ({
           }
         },
         boardId,
-        getUndo: (succeeded) => {
-          // Back to each item's own board as known before the move; an item whose board was not known stays.
-          const groups = groupByPrior(succeeded, (key) => {
-            const previousBoardId = previousBoardIds.get(key);
-
-            return previousBoardId === boardId ? undefined : previousBoardId;
-          });
-
-          return offerUndo && groups.size > 0
-            ? () => {
-                for (const [previousBoardId, refs] of groups) {
-                  void moveItemsToBoard(refs, previousBoardId, false);
-                }
-              }
-            : null;
-        },
+        getUndo: (succeeded) =>
+          offerUndo
+            ? getGalleryItemUndo({
+                getCurrent: readKnownBoardIds,
+                painted: boardId,
+                previous: previousBoardIds,
+                revert: (refs, previousBoardId) => void moveItemsToBoard(refs, previousBoardId, false),
+                succeeded,
+              })
+            : null,
         mutate: (signal) => galleryItemOrganization.moveToBoard(items, boardId, signal),
         requested: items,
         rollback: () => {
@@ -725,16 +792,7 @@ export const useImageActions = ({
     const setItemsStarred = (items: GalleryItemRef[], starred: boolean, offerUndo = true): Promise<void> => {
       // Cache star changes move items between listing partitions and need snapshot/CAS rollback. Store restoration
       // uses each actual prior flag, never blanket inversion.
-      const previousStarred = new Map<GalleryItemKey, boolean>(
-        [...collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, items)].map(([key, fields]) => [
-          key,
-          fields.starred,
-        ])
-      );
-
-      for (const [key, cachedStarred] of getGalleryItemStarredFromCaches(queryClient, items)) {
-        previousStarred.set(key, cachedStarred);
-      }
+      const previousStarred = readKnownStarred(items);
 
       let rollbackCaches: (() => void) | null = patchGalleryItemCaches(queryClient, {
         kind: 'star',
@@ -765,22 +823,16 @@ export const useImageActions = ({
           });
           patchStarredStoreOnly(result.failed.map(toGalleryItemKey), !starred);
         },
-        // Back to each item's own flag as known before; an item whose flag was not known stays as the action left it.
-        getUndo: (succeeded) => {
-          const groups = groupByPrior(succeeded, (key) => {
-            const prior = previousStarred.get(key);
-
-            return prior === starred ? undefined : prior;
-          });
-
-          return offerUndo && groups.size > 0
-            ? () => {
-                for (const [prior, refs] of groups) {
-                  void setItemsStarred(refs, prior, false);
-                }
-              }
-            : null;
-        },
+        getUndo: (succeeded) =>
+          offerUndo
+            ? getGalleryItemUndo({
+                getCurrent: readKnownStarred,
+                painted: starred,
+                previous: previousStarred,
+                revert: (refs, prior) => void setItemsStarred(refs, prior, false),
+                succeeded,
+              })
+            : null,
         mutate: (signal) => galleryItemOrganization.setStarred(items, starred, signal),
         requested: items,
         // Restore known prior flags only where this action's painted value remains; cache rollback restores its
@@ -1150,7 +1202,6 @@ export const useImageActions = ({
         const owner = captureAccountScope();
         const didRecall = await executeImageRecall({
           commands,
-          generateValues,
           getGenerateValues: getLatestGenerateValues,
           image,
           isCanvasFrame: getLatestProject()?.invocation.sourceId === 'canvas',
@@ -1382,7 +1433,6 @@ export const useImageActions = ({
     currentGenerateValues,
     commands,
     gallery,
-    generateValues,
     generation,
     getItemActionContext,
     models,

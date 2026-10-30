@@ -195,7 +195,13 @@ export const useRegisterFirstPartyCommands = () => {
 
       const didRecall = await executeImageRecall({
         commands,
-        generateValues: getProjectWidgetValues(activeProject, 'generate'),
+        // Re-read on every call: recall awaits the image record, and a snapshot from the keypress would overwrite
+        // edits and recalls committed meanwhile.
+        getGenerateValues: () => {
+          const project = queries.getProject(activeProject.id);
+
+          return project ? getProjectWidgetValues(project, 'generate') : {};
+        },
         image,
         isCanvasFrame: activeProject.invocation.sourceId === 'canvas',
         kind,

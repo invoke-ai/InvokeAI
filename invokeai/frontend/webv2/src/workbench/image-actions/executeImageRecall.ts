@@ -272,7 +272,6 @@ export const getCurrentGenerateValues = ({
 
 export const executeImageRecall = async ({
   commands,
-  generateValues,
   getGenerateValues,
   image,
   isCanvasFrame,
@@ -284,8 +283,8 @@ export const executeImageRecall = async ({
   t,
 }: {
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
-  generateValues: Record<string, unknown>;
-  getGenerateValues?: () => Record<string, unknown>;
+  /** Re-read after every await: the commit writes the whole Generate record, so a snapshot would revert newer edits. */
+  getGenerateValues: () => Record<string, unknown>;
   image: GalleryImage;
   /** The project's route is Canvas, whose frame the Generate size is. */
   isCanvasFrame?: boolean;
@@ -316,8 +315,7 @@ export const executeImageRecall = async ({
       return false;
     }
 
-    const readGenerateValues = () =>
-      getCurrentGenerateValues({ generateValues: getGenerateValues?.() ?? generateValues, supportedModels });
+    const readGenerateValues = () => getCurrentGenerateValues({ generateValues: getGenerateValues(), supportedModels });
     const missingValuesNotice = () =>
       commands.notifications.add({
         kind: 'info',

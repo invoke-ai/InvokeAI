@@ -253,6 +253,9 @@ vi.mock('react-i18next', () => ({
       if (key === 'widgets.gallery.itemActions.move.success') {
         return `Moved to ${String(values?.board)}`;
       }
+      if (key.startsWith('widgets.gallery.itemActions.undoStale.')) {
+        return `${key}:${JSON.stringify(values)}`;
+      }
       if (key.startsWith('widgets.gallery.itemActions.loadWorkflow.loadedLabel')) {
         return `${key}:${String(values?.name)}`;
       }
@@ -1420,6 +1423,72 @@ describe('mixed item mutation outcomes', () => {
     ]);
     // Undoing reports plainly: there is no Undo of the Undo.
     expect(mocks.notifyUndoable).toHaveBeenCalledOnce();
+    // The item whose board was not known is reported, not silently skipped.
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'info',
+      title: 'widgets.gallery.itemActions.undoStale.partial:{"count":3,"restored":2}',
+    });
+  });
+
+  it('leaves an item a later move took elsewhere when an earlier move is undone', async () => {
+    const refs = [{ kind: 'image' as const, name: 'moved-twice.png' }];
+    mocks.itemMoveToBoard.mockResolvedValue({ affectedBoardIds: [], failed: [], succeeded: refs });
+
+    mocks.getItemBoardIds.mockReturnValue(new Map([['image:moved-twice.png', 'board-a']]));
+    await act(async () => {
+      await getItemActions().moveItemsToBoard(refs, 'board-b');
+    });
+    mocks.getItemBoardIds.mockReturnValue(new Map([['image:moved-twice.png', 'board-b']]));
+    await act(async () => {
+      await getItemActions().moveItemsToBoard(refs, 'board-c');
+    });
+    mocks.getItemBoardIds.mockReturnValue(new Map([['image:moved-twice.png', 'board-c']]));
+
+    const [[, first], [, second]] = mocks.notifyUndoable.mock.calls as [string, { onUndo: () => void }][];
+    await act(async () => {
+      first.onUndo();
+      await Promise.resolve();
+    });
+
+    expect(mocks.itemMoveToBoard).toHaveBeenCalledTimes(2);
+    expect(mocks.notificationsAdd).toHaveBeenCalledExactlyOnceWith({
+      kind: 'info',
+      title: 'widgets.gallery.itemActions.undoStale.none:{"count":1}',
+    });
+
+    // The newer move's Undo still applies.
+    await act(async () => {
+      second.onUndo();
+      await Promise.resolve();
+    });
+    expect(mocks.itemMoveToBoard).toHaveBeenLastCalledWith(refs, 'board-b', expect.any(AbortSignal));
+  });
+
+  it('leaves an item a later unstar changed when an earlier star is undone', async () => {
+    const refs = [{ kind: 'image' as const, name: 'toggled.png' }];
+    mocks.itemSetStarred.mockResolvedValue({ affectedBoardIds: [], failed: [], succeeded: refs });
+
+    mocks.getItemStarred.mockReturnValue(new Map([['image:toggled.png', false]]));
+    await act(async () => {
+      await getItemActions().setItemsStarred(refs, true);
+    });
+    mocks.getItemStarred.mockReturnValue(new Map([['image:toggled.png', true]]));
+    await act(async () => {
+      await getItemActions().setItemsStarred(refs, false);
+    });
+    mocks.getItemStarred.mockReturnValue(new Map([['image:toggled.png', false]]));
+
+    const [, { onUndo }] = mocks.notifyUndoable.mock.calls[0] as [string, { onUndo: () => void }];
+    await act(async () => {
+      onUndo();
+      await Promise.resolve();
+    });
+
+    expect(mocks.itemSetStarred).toHaveBeenCalledTimes(2);
+    expect(mocks.notificationsAdd).toHaveBeenCalledExactlyOnceWith({
+      kind: 'info',
+      title: 'widgets.gallery.itemActions.undoStale.none:{"count":1}',
+    });
   });
 
   it('reports a star with an Undo that gives each item back its own flag', async () => {
@@ -1440,6 +1509,7 @@ describe('mixed item mutation outcomes', () => {
       await getItemActions().setItemsStarred(refs, true);
     });
 
+    mocks.getItemStarred.mockReturnValue(new Map());
     const [, { onUndo }] = mocks.notifyUndoable.mock.calls[0] as [string, { onUndo: () => void }];
     await act(async () => {
       onUndo();
@@ -1449,6 +1519,11 @@ describe('mixed item mutation outcomes', () => {
     // Only the item the star is known to have changed is unstarred again; one whose flag was not known stays.
     expect(mocks.itemSetStarred).toHaveBeenLastCalledWith([refs[1]], false, expect.any(AbortSignal));
     expect(mocks.itemSetStarred).toHaveBeenCalledTimes(2);
+    // The item whose flag was not known is reported, not silently skipped.
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'info',
+      title: 'widgets.gallery.itemActions.undoStale.partial:{"count":2,"restored":1}',
+    });
   });
 
   it('offers no Undo for a move that partly failed', async () => {
