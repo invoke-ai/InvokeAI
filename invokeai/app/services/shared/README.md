@@ -842,7 +842,8 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
     not establish alignment. An asymmetric or distinct-axis Collect chain is rejected before invocation. A downstream
     `Collect` retains empty outer groups. A `For.output_collection` passed through zero or more literal-`True` `If`
     nodes into `Collect.item` keeps the `For`'s parent frame for every chain length; the `For` final closes only its
-    own axis.
+    own axis. When a wired Boolean condition resolves per parent frame to select a `For.output_collection`, its `If`
+    output retains those parent-frame groups through `Collect`, including through an outer literal-`True` `If`.
   - A root-frame condition choosing between branches with different deeper axes. When both branches retain the same
     nested axes, a root-frame condition runs the `If` once per available frame of the innermost axis. Selecting a root
     value over an axis reached only through an unselected `For` final output is the root-frame exception described
