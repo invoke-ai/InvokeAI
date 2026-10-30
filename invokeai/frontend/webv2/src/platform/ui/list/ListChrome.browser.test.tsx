@@ -128,6 +128,48 @@ describe('ListSelectionBar', () => {
     expect(buttonWithText('Delete').getBoundingClientRect().height).toBe(24);
     expect(barHeight()).toBe(idle);
   });
+
+  it.each(['row', 'none'] as const)(
+    'keeps its checkbox and actions in the row columns of a List with inset %s',
+    async (inset) => {
+      const ActionButton = ({ label }: { label: string }) => (
+        <IconButton aria-label={label} size="sm" variant="ghost">
+          <XIcon />
+        </IconButton>
+      );
+
+      await render(
+        <>
+          <ListSelectionBar checked={false} inset={inset} label="Select all" onCheckedChange={vi.fn()}>
+            <ActionButton label="Bar action" />
+          </ListSelectionBar>
+          <List
+            inset={inset}
+            label="subjects"
+            renderItem={(item: { id: string }, rowProps: ListRowProps) => (
+              <ListItem
+                {...rowProps}
+                actions={<ActionButton label={`${item.id} action`} />}
+                title={item.id}
+                onCheckedChange={vi.fn()}
+              />
+            )}
+            rows={listRowsFromItems([{ id: 'a' }], (item) => item.id)}
+          />
+        </>
+      );
+
+      const control = (scope: string) =>
+        host
+          .querySelector<HTMLElement>(`${scope} [data-scope="checkbox"][data-part="control"]`)!
+          .getBoundingClientRect();
+      const action = (label: string) =>
+        host.querySelector<HTMLElement>(`[aria-label="${label}"]`)!.getBoundingClientRect();
+
+      expect(control('[aria-label="Select all"]').left).toBeCloseTo(control('[data-list-row="a"]').left, 1);
+      expect(action('Bar action').right).toBeCloseTo(action('a action').right, 1);
+    }
+  );
 });
 
 describe('List busy state', () => {

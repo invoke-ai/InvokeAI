@@ -187,6 +187,25 @@ describe('wildcard list size', () => {
     expect(description.getBoundingClientRect().bottom).toBeLessThanOrEqual(row.getBoundingClientRect().bottom);
   });
 
+  it('runs rows to the selection bar edges and separates the transfer actions like the templates footer', async () => {
+    await renderPanel();
+
+    const row = host!.querySelector<HTMLElement>('[data-list-row="w1"]')!.getBoundingClientRect();
+    const bar = host!
+      .querySelector('[aria-label="widgets.generate.dynamicPrompts.selectAllWildcards"]')!
+      .parentElement!.getBoundingClientRect();
+    const divider = host!.querySelector('[role="separator"]')!.getBoundingClientRect();
+    const transferRow = [...host!.querySelectorAll('button')]
+      .find((button) => button.textContent === 'widgets.generate.dynamicPrompts.import')!
+      .parentElement!.getBoundingClientRect();
+
+    expect([row.left, row.right]).toEqual([bar.left, bar.right]);
+    expect([divider.left, divider.right]).toEqual([bar.left, bar.right]);
+    // spacing.2 either side, as the templates panel's Stack gap puts its footer divider.
+    expect(divider.top - row.bottom).toBe(8);
+    expect(transferRow.top - divider.bottom).toBe(8);
+  });
+
   it('caps a long list and scrolls it', async () => {
     await renderPanel(true, {
       ...catalog,

@@ -5,7 +5,7 @@ import type { ListRowProps } from '@platform/ui/list/List';
 import type { ListRow } from '@platform/ui/list/listRows';
 import type { ChangeEvent } from 'react';
 
-import { Box, Field as ChakraField, HStack, Input, Stack, Text } from '@chakra-ui/react';
+import { Box, Field as ChakraField, HStack, Input, Separator, Stack, Text } from '@chakra-ui/react';
 import {
   getWildcardNameError,
   getWildcardValuesError,
@@ -347,8 +347,9 @@ export const WildcardsPanel = ({
           </>
         ) : null}
 
-        {/* The last row's slot already ends in a row gap, so one step less keeps the transfer row 1.5 off it too. */}
-        <Stack gap="1">
+        {/* The last row's slot already ends in a row gap, so 1.5 here puts the footer divider 2 off the last row, as the
+          templates panel's footer sits off its list. */}
+        <Stack gap="1.5">
           {/* The bar heads the list it selects in: it sits off the first row by the rows' own gap. */}
           <Stack gap="0.5">
             {/* Nothing to select while the list could not be read. */}
@@ -359,6 +360,7 @@ export const WildcardsPanel = ({
                   checked={
                     hasSelection ? (hasUnselectedFiltered || filtered.length === 0 ? 'indeterminate' : true) : false
                   }
+                  inset="none"
                   isDisabled={filtered.length === 0 && !hasSelection}
                   label={t('widgets.generate.dynamicPrompts.selectAllWildcards')}
                   summary={
@@ -394,6 +396,7 @@ export const WildcardsPanel = ({
             <Box h={listHeightPx > 0 ? `min(${LIST_MAX_HEIGHT}, ${listHeightPx}px)` : undefined}>
               <List
                 density={LIST_DENSITY}
+                inset="none"
                 emptyState={
                   catalog.isError && catalog.wildcards.length === 0 ? (
                     <LoadError
@@ -431,7 +434,12 @@ export const WildcardsPanel = ({
             </Box>
           </Stack>
 
-          {isUnreadable ? null : <WildcardTransferActions catalog={catalog} />}
+          {isUnreadable ? null : (
+            <Stack gap="2">
+              <Separator />
+              <WildcardTransferActions catalog={catalog} />
+            </Stack>
+          )}
         </Stack>
       </Stack>
 

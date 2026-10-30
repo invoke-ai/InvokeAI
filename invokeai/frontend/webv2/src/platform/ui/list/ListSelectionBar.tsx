@@ -3,7 +3,13 @@ import type { ReactNode } from 'react';
 import { Checkbox, HStack, Separator, Text, type StackProps } from '@chakra-ui/react';
 import { Children, useId, useMemo } from 'react';
 
-import { LIST_CHECK_INSET, LIST_ROW_INSET } from './listLayout';
+import {
+  LIST_ACTIONS_PADDING,
+  LIST_CHECK_INSET,
+  LIST_CHECK_PADDING,
+  LIST_ROW_INSET,
+  type ListInset,
+} from './listLayout';
 
 export interface ListSelectionBarProps extends Omit<StackProps, 'children'> {
   /** `'indeterminate'` when some, but not every, matching row is selected. */
@@ -11,6 +17,8 @@ export interface ListSelectionBarProps extends Omit<StackProps, 'children'> {
   isDisabled?: boolean;
   /** Visible and accessible name of the select-all control. */
   label: string;
+  /** Match the `inset` of the List below so the checkbox and actions stay in the rows' columns. */
+  inset?: ListInset;
   onCheckedChange: () => void;
   /** Selection count or estimate, right-aligned; muted so the actions read first. */
   summary?: string;
@@ -31,6 +39,7 @@ const BAR_HEIGHT = 'calc({sizes.control.sm} + {spacing.2} + 1px)';
 export const ListSelectionBar = ({
   checked,
   children,
+  inset = 'row',
   isDisabled = false,
   label,
   summary,
@@ -49,8 +58,8 @@ export const ListSelectionBar = ({
       flexShrink={0}
       gap="2"
       h={BAR_HEIGHT}
-      pe={LIST_ROW_INSET}
-      ps={LIST_CHECK_INSET}
+      pe={inset === 'none' ? LIST_ACTIONS_PADDING : `calc(${LIST_ROW_INSET} + ${LIST_ACTIONS_PADDING})`}
+      ps={inset === 'none' ? LIST_CHECK_PADDING : LIST_CHECK_INSET}
       py="1"
       {...stackProps}
     >
