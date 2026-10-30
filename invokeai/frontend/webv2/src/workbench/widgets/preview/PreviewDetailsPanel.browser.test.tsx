@@ -1,6 +1,7 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import type { GalleryImage, GalleryImageItem, GalleryVideoItem } from '@features/gallery';
 import type * as GalleryModule from '@features/gallery';
+import type * as GalleryBackendModule from '@features/gallery/data/backend';
 import type { ImageIndexAvailability } from '@features/gallery/data/backend';
 import type * as GalleryQueriesModule from '@features/gallery/queries';
 import type * as IdentityModule from '@features/identity';
@@ -35,7 +36,6 @@ vi.mock('@features/gallery', async (importOriginal) => {
     ...actual,
     galleryImages: {
       ...actual.galleryImages,
-      metadata: () => Promise.resolve({ ...TALL_RECORD, positive_prompt: 'a tall prompt', seed: 7 }),
       workflow: () => Promise.resolve({ graph: null, workflow: '{"name":"image workflow"}' }),
     },
     galleryVideos: {
@@ -44,6 +44,11 @@ vi.mock('@features/gallery', async (importOriginal) => {
     },
   };
 });
+// The transport under the gallery's shared image metadata query.
+vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
+  ...(await importOriginal<typeof GalleryBackendModule>()),
+  getGalleryImageMetadata: () => Promise.resolve({ ...TALL_RECORD, positive_prompt: 'a tall prompt', seed: 7 }),
+}));
 const mocks = vi.hoisted(() => ({
   extensions: null as unknown as ExtensionRegistry,
   getImageLabels: vi.fn<() => Promise<ImageMapImageLabels | null>>(),

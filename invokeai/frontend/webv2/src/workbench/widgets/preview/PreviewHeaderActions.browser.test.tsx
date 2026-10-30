@@ -1,4 +1,4 @@
-import type * as GalleryModule from '@features/gallery';
+import type * as GalleryBackendModule from '@features/gallery/data/backend';
 import type * as IdentityModule from '@features/identity';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
@@ -111,18 +111,12 @@ const updateProjectPreferences = vi.hoisted(() => vi.fn());
 const showAll = vi.hoisted(() => vi.fn());
 const imageMetadata = vi.hoisted(() => vi.fn());
 vi.mock('@features/queue/react', () => ({ useProgressImage: () => null }));
-vi.mock('@features/gallery', async (importOriginal) => {
-  const actual = await importOriginal<typeof GalleryModule>();
-
-  return {
-    ...actual,
-    galleryImages: {
-      ...actual.galleryImages,
-      metadata: imageMetadata,
-      resolve: () => Promise.resolve({ hasWorkflow: false }),
-    },
-  };
-});
+// The transport, under both the gallery's shared metadata query and its public image port.
+vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
+  ...(await importOriginal<typeof GalleryBackendModule>()),
+  getGalleryImageByName: () => Promise.resolve({ hasWorkflow: false }),
+  getGalleryImageMetadata: imageMetadata,
+}));
 vi.mock('@features/identity', async (importOriginal) => ({
   ...(await importOriginal<typeof IdentityModule>()),
   useAuthSession: () => ({ accountEpoch: 1 }),

@@ -16,6 +16,7 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
+import { useQueryClient } from '@tanstack/react-query';
 import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
 import { describeControlLayerIssue } from '@workbench/controlLayerChecks';
 import { useWorkbenchFocus, useWorkbenchFocusTarget } from '@workbench/focusRegions';
@@ -107,6 +108,7 @@ export const useRegisterFirstPartyCommands = () => {
   const getFocusTarget = useWorkbenchFocusTarget();
   const { t } = useTranslation();
   const { layout, notifications, widgets } = commands;
+  const queryClient = useQueryClient();
   useInvocationTemplatesSelector((snapshot) => snapshot.status);
 
   useMountEffect(() => {
@@ -200,6 +202,7 @@ export const useRegisterFirstPartyCommands = () => {
         models: getAvailableModels() ?? [],
         owner,
         projectId: activeProject.id,
+        queryClient,
         t,
       });
 

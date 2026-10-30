@@ -1,10 +1,13 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import type { GalleryImage, GalleryImageItem, GalleryVideoItem } from '@features/gallery';
 import type * as GalleryModule from '@features/gallery';
+import type * as GalleryBackendModule from '@features/gallery/data/backend';
 import type * as IdentityModule from '@features/identity';
 import type { ImageActions, ImageRecallCapabilities } from '@workbench/image-actions';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { galleryKeys } from '@features/gallery/queries';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
@@ -28,17 +31,18 @@ vi.mock('@features/gallery', async (importOriginal) => {
 
   return {
     ...actual,
-    galleryImages: {
-      ...actual.galleryImages,
-      metadata: galleryMocks.imageMetadata,
-      workflow: galleryMocks.imageWorkflow,
-    },
+    galleryImages: { ...actual.galleryImages, workflow: galleryMocks.imageWorkflow },
     galleryVideos: {
       metadata: galleryMocks.videoMetadata,
       workflow: galleryMocks.videoWorkflow,
     },
   };
 });
+// The transport under the gallery's shared image metadata query.
+vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
+  ...(await importOriginal<typeof GalleryBackendModule>()),
+  getGalleryImageMetadata: galleryMocks.imageMetadata,
+}));
 vi.mock('@features/identity', async (importOriginal) => {
   const actual = await importOriginal<typeof IdentityModule>();
 
@@ -418,7 +422,10 @@ describe('Preview query-driven Details', () => {
     await renderDetails({ isOpen: true, item: imageItem });
 
     expect(galleryMocks.imageMetadata).toHaveBeenCalledWith('still.png', expect.any(AbortSignal));
-    expect(queryClient.getQueryCache().find({ queryKey: ['preview', 'details', 7, 'image:still.png'] })).toBeDefined();
+    // The gallery's shared entry, which the image's menus and recall commands read too.
+    expect(
+      queryClient.getQueryCache().find({ queryKey: galleryKeys.imageMetadata(captureAccountScope(), 'still.png') })
+    ).toBeDefined();
     await act(async () => {
       await vi.waitFor(() => expect(document.body.textContent).toContain('query-driven prompt'));
     });
@@ -427,6 +434,22 @@ describe('Preview query-driven Details', () => {
 
     await interact(() => document.querySelector<HTMLButtonElement>('[aria-label="Use prompt"]')?.click());
     expect(actions.recallImageData).toHaveBeenCalledWith(actionImage, 'prompts');
+  });
+
+  it('keeps the image workflow and graph tabs when its metadata cannot be read', async () => {
+    galleryMocks.imageMetadata.mockRejectedValueOnce(new Error('metadata unavailable'));
+    galleryMocks.imageWorkflow.mockResolvedValueOnce({ graph: '{"nodes":[]}', workflow: '{"name":"still"}' });
+
+    await renderDetails({ isOpen: true, item: imageItem });
+    await act(async () => {
+      await vi.waitFor(() => expect(getButton('Workflow').getAttribute('aria-disabled')).not.toBe('true'));
+    });
+
+    expect(getButton('Graph').getAttribute('aria-disabled')).not.toBe('true');
+    expect(getButton('Metadata').getAttribute('aria-disabled')).toBe('true');
+    // Recall still derives from what the image itself carries.
+    expect(actions.deriveImageRecallCapabilities).toHaveBeenLastCalledWith(actionImage, null);
+    expect(document.body.textContent).toContain('queue-image');
   });
 
   it('recalls a single field from its metadata row', async () => {

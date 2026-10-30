@@ -3,7 +3,9 @@ import type { GalleryImage, GalleryImageMetadata, GalleryItem, GalleryItemKey } 
 import { Box, DataList, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { galleryImages, galleryVideos } from '@features/gallery';
 import { toGalleryItemKey } from '@features/gallery/contracts';
+import { galleryImageMetadataOptions } from '@features/gallery/queries';
 import { canCopyText, copyText } from '@platform/browser/clipboard';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { IconButton, Scrollable, Tooltip } from '@platform/ui';
 import { JsonPreview } from '@platform/ui/JsonPreview';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
@@ -79,20 +81,6 @@ export const PreviewDetails = ({
   );
 };
 
-type PreviewDetailsData =
-  | {
-      graph: string | null;
-      kind: 'image';
-      metadata: GalleryImageMetadata | null;
-      workflow: string | null;
-    }
-  | {
-      graph: string | null;
-      kind: 'video';
-      metadata: Record<string, unknown> | null;
-      workflow: string | null;
-    };
-
 const PreviewDetailsQuery = ({
   accountEpoch,
   actions,
@@ -105,83 +93,108 @@ const PreviewDetailsQuery = ({
   image: GalleryImage | null;
   item: GalleryItem;
   itemKey: GalleryItemKey;
+}) =>
+  item.kind === 'video' ? (
+    <VideoDetailsQuery accountEpoch={accountEpoch} itemKey={itemKey} videoName={item.name} />
+  ) : image ? (
+    <ImageDetailsQuery accountEpoch={accountEpoch} actions={actions} image={image} itemKey={itemKey} />
+  ) : (
+    <DetailsTabs graph={null} metadata={null} workflow={null}>
+      <ImageDetails
+        actions={actions}
+        capabilities={EMPTY_IMAGE_RECALL_CAPABILITIES}
+        image={null}
+        isLoading={false}
+        metadata={null}
+      />
+    </DetailsTabs>
+  );
+
+const VideoDetailsQuery = ({
+  accountEpoch,
+  itemKey,
+  videoName,
+}: {
+  accountEpoch: number;
+  itemKey: GalleryItemKey;
+  videoName: string;
 }) => {
   const { t } = useTranslation();
   const detailsQuery = useQuery({
-    queryFn: async ({ signal }): Promise<PreviewDetailsData> => {
-      if (item.kind === 'image') {
-        if (!image) {
-          return { graph: null, kind: 'image', metadata: null, workflow: null };
-        }
-
-        // Show complete raw metadata alongside parsed fields because workflows may add arbitrary entries.
-        const [metadata, workflow] = await Promise.all([
-          galleryImages.metadata(item.name, signal),
-          galleryImages.workflow(item.name, signal),
-        ]);
-
-        return { graph: workflow.graph, kind: 'image', metadata, workflow: workflow.workflow };
-      }
-
+    queryFn: async ({ signal }) => {
       const [metadata, workflow] = await Promise.all([
-        galleryVideos.metadata(item.name, signal),
-        galleryVideos.workflow(item.name, signal),
+        galleryVideos.metadata(videoName, signal),
+        galleryVideos.workflow(videoName, signal),
       ]);
 
-      return { graph: workflow.graph, kind: 'video', metadata, workflow: workflow.workflow };
+      return { graph: workflow.graph, metadata, workflow: workflow.workflow };
     },
     queryKey: ['preview', 'details', accountEpoch, itemKey],
     retry: false,
   });
 
-  if (item.kind === 'video') {
-    if (detailsQuery.isPending) {
-      return (
-        <Text color="fg.subtle" fontSize="xs">
-          {t('widgets.preview.loadingMetadata')}
-        </Text>
-      );
-    }
-
-    const details = isVideoDetails(detailsQuery.data) ? detailsQuery.data : null;
-
+  if (detailsQuery.isPending) {
     return (
-      <DetailsTabs
-        graph={details?.graph ?? null}
-        metadata={details?.metadata ?? null}
-        workflow={details?.workflow ?? null}
-      />
+      <Text color="fg.subtle" fontSize="xs">
+        {t('widgets.preview.loadingMetadata')}
+      </Text>
     );
   }
 
-  const details = isImageDetails(detailsQuery.data) ? detailsQuery.data : null;
-  const capabilities =
-    image && details ? actions.deriveImageRecallCapabilities(image, details.metadata) : EMPTY_IMAGE_RECALL_CAPABILITIES;
+  const details = detailsQuery.data;
 
   return (
     <DetailsTabs
       graph={details?.graph ?? null}
       metadata={details?.metadata ?? null}
       workflow={details?.workflow ?? null}
+    />
+  );
+};
+
+/**
+ * Metadata comes from the gallery's shared entry, which the image's menus and recall commands also read; the embedded
+ * workflow and graph are Details' own read. Either failing leaves the other's tabs on offer.
+ */
+const ImageDetailsQuery = ({
+  accountEpoch,
+  actions,
+  image,
+  itemKey,
+}: {
+  accountEpoch: number;
+  actions: ImageActions;
+  image: GalleryImage;
+  itemKey: GalleryItemKey;
+}) => {
+  const metadataQuery = useQuery(galleryImageMetadataOptions(captureAccountScope(), image.imageName));
+  const workflowQuery = useQuery({
+    queryFn: ({ signal }) => galleryImages.workflow(image.imageName, signal),
+    queryKey: ['preview', 'details', accountEpoch, itemKey, 'workflow'],
+    retry: false,
+  });
+  // Show complete raw metadata alongside parsed fields because workflows may add arbitrary entries.
+  const metadata = metadataQuery.data ?? null;
+  const capabilities = metadataQuery.isPending
+    ? EMPTY_IMAGE_RECALL_CAPABILITIES
+    : actions.deriveImageRecallCapabilities(image, metadata);
+
+  return (
+    <DetailsTabs
+      graph={workflowQuery.data?.graph ?? null}
+      metadata={metadata}
+      workflow={workflowQuery.data?.workflow ?? null}
     >
       <ImageDetails
         actions={actions}
         capabilities={capabilities}
         image={image}
-        isLoading={detailsQuery.isPending}
-        metadata={details?.metadata ?? null}
+        isLoading={metadataQuery.isPending}
+        metadata={metadata}
       />
     </DetailsTabs>
   );
 };
-
-const isVideoDetails = (
-  value: PreviewDetailsData | undefined
-): value is Extract<PreviewDetailsData, { kind: 'video' }> => value?.kind === 'video';
-
-const isImageDetails = (
-  value: PreviewDetailsData | undefined
-): value is Extract<PreviewDetailsData, { kind: 'image' }> => value?.kind === 'image';
 
 const ImageDetails = ({
   actions,

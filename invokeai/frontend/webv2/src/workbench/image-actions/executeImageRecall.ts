@@ -6,10 +6,12 @@ import type {
   VaeModelConfig,
 } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
+import type { QueryClient } from '@tanstack/react-query';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
 
 import { galleryImages, galleryVideos } from '@features/gallery';
+import { fetchGalleryImageMetadata } from '@features/gallery/queries';
 import {
   getCompatibleReferenceImages,
   getDefaultGenerateSettings,
@@ -29,7 +31,6 @@ import {
   assertAccountScopeCurrent,
   captureAccountScope,
   isAccountScopeCurrent,
-  registerAccountOwnedResource,
   type AccountScope,
 } from '@platform/state/accountLifecycle';
 
@@ -75,15 +76,6 @@ const getSkippedConceptMessage = ({ name, reason }: ImageRecallSkip, t: TFunctio
       return t('widgets.gallery.itemActions.recall.skippedConcept.unresolved', values);
   }
 };
-
-const imageMetadataRequests = new Map<string, { owner: AccountScope; promise: Promise<unknown> }>();
-
-registerAccountOwnedResource({
-  clear: () => {
-    imageMetadataRequests.clear();
-  },
-  name: 'image-recall-metadata',
-});
 
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -206,31 +198,6 @@ export const executeLoadMediaWorkflow = async ({
   }
 };
 
-const loadImageMetadata = (imageName: string, owner: AccountScope): Promise<unknown> => {
-  const cachedRequest = imageMetadataRequests.get(imageName);
-
-  if (cachedRequest?.owner === owner) {
-    return cachedRequest.promise;
-  }
-
-  const request = galleryImages
-    .metadata(imageName, owner.signal)
-    .then((metadata) => {
-      assertAccountScopeCurrent(owner);
-
-      return metadata;
-    })
-    .catch((error: unknown) => {
-      if (imageMetadataRequests.get(imageName)?.promise === request) {
-        imageMetadataRequests.delete(imageName);
-      }
-      throw error;
-    });
-
-  imageMetadataRequests.set(imageName, { owner, promise: request });
-  return request;
-};
-
 /**
  * Drops reference images whose effective asset is no longer in the gallery,
  * using one bulk lookup. Entries without an asset are dropped as well.
@@ -301,6 +268,7 @@ export const executeImageRecall = async ({
   models,
   owner: callerOwner,
   projectId,
+  queryClient,
   t,
 }: {
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
@@ -314,6 +282,8 @@ export const executeImageRecall = async ({
   /** Caller-captured identity lifetime; direct synchronous callers may omit it. */
   owner?: AccountScope;
   projectId?: string;
+  /** Holds the gallery's shared image metadata entry, which menus and Preview Details may already have read. */
+  queryClient: QueryClient;
   t: TFunction;
 }): Promise<boolean> => {
   const owner = callerOwner ?? captureAccountScope();
@@ -347,7 +317,8 @@ export const executeImageRecall = async ({
       return false;
     }
 
-    const metadata = kind === 'dimensions' ? null : await loadImageMetadata(image.imageName, owner);
+    const metadata =
+      kind === 'dimensions' ? null : await fetchGalleryImageMetadata(queryClient, owner, image.imageName);
 
     assertAccountScopeCurrent(owner);
     const result = buildImageRecallSettings({

@@ -1,7 +1,8 @@
-import type * as GalleryModule from '@features/gallery';
 import type { GalleryImage } from '@features/gallery';
+import type * as GalleryBackendModule from '@features/gallery/data/backend';
 
-import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { fetchGalleryImageMetadata, galleryImageMetadataOptions } from '@features/gallery/queries';
+import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act } from 'react';
@@ -15,14 +16,12 @@ import { useImageRecallCapabilities } from './useImageRecallCapabilities';
 
 const gallery = vi.hoisted(() => ({ metadata: vi.fn(), resolve: vi.fn() }));
 
-vi.mock('@features/gallery', async (importOriginal) => {
-  const actual = await importOriginal<typeof GalleryModule>();
-
-  return {
-    ...actual,
-    galleryImages: { ...actual.galleryImages, metadata: gallery.metadata, resolve: gallery.resolve },
-  };
-});
+// The transport, under both the gallery's shared metadata query and its public image port.
+vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
+  ...(await importOriginal<typeof GalleryBackendModule>()),
+  getGalleryImageByName: gallery.resolve,
+  getGalleryImageMetadata: gallery.metadata,
+}));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -124,6 +123,42 @@ describe('useImageRecallCapabilities', () => {
     expect(latest()).toEqual({ capabilities: EMPTY_IMAGE_RECALL_CAPABILITIES, isLoading: false });
     expect(gallery.metadata).toHaveBeenCalledOnce();
     expect(gallery.resolve).toHaveBeenCalledOnce();
+  });
+
+  it('reads metadata from the gallery entry other readers share', async () => {
+    // Preview Details or a recall command read it first.
+    await queryClient.fetchQuery(galleryImageMetadataOptions(captureAccountScope(), IMAGE.imageName));
+    const derive = vi.fn<Derive>(() => SEED_ONLY);
+
+    await render(derive, IMAGE);
+    await loaded();
+
+    expect(derive).toHaveBeenLastCalledWith({ ...IMAGE, hasWorkflow: true }, { seed: 7 });
+    expect(gallery.metadata).toHaveBeenCalledOnce();
+  });
+
+  it('leaves a recall that joined its read to finish it when the menu closes first', async () => {
+    gallery.metadata.mockImplementationOnce(
+      (_name: string, signal: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason));
+        })
+    );
+    const derive = vi.fn<Derive>(() => SEED_ONLY);
+
+    await render(derive, IMAGE);
+    expect(gallery.metadata).toHaveBeenCalledOnce();
+    const firstSignal = gallery.metadata.mock.calls[0]?.[1] as AbortSignal;
+    // A recall picked from the open menu joins the menu's read.
+    const recallRead = fetchGalleryImageMetadata(queryClient, captureAccountScope(), IMAGE.imageName);
+
+    // The menu closes: its observer leaves and the shared read is cancelled.
+    await act(() => root?.unmount());
+    root = null;
+
+    expect(firstSignal.aborted).toBe(true);
+    await expect(recallRead).resolves.toEqual({ seed: 7 });
+    expect(gallery.metadata).toHaveBeenCalledTimes(2);
   });
 
   it('reports loading until the read lands', async () => {

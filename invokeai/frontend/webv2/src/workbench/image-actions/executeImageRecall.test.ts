@@ -1,10 +1,13 @@
 import type { GalleryImage } from '@features/gallery';
+import type * as GalleryBackendModule from '@features/gallery/data/backend';
 import type { GenerateModelConfig } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
 
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
+import { QueryClient } from '@tanstack/react-query';
 import { createInstance } from 'i18next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -16,7 +19,13 @@ const galleryApi = vi.hoisted(() => ({
 }));
 
 vi.mock('@features/gallery', () => galleryApi);
+// The transport under the gallery's shared metadata query.
+vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
+  ...(await importOriginal<typeof GalleryBackendModule>()),
+  getGalleryImageMetadata: galleryApi.galleryImages.metadata,
+}));
 
+import { galleryImageMetadataOptions, galleryKeys } from '@features/gallery/queries';
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
@@ -110,8 +119,11 @@ const createCommands = () => {
 
 seedArchitectureCapabilities();
 
+let queryClient: QueryClient;
+
 describe('executeImageRecall', () => {
   beforeEach(() => {
+    queryClient = new QueryClient();
     accountLifecycle.activate('test-account');
     galleryApi.galleryImages.metadata.mockReset();
     galleryApi.galleryImages.resolveMany.mockReset();
@@ -124,6 +136,7 @@ describe('executeImageRecall', () => {
 
     await expect(
       executeImageRecall({
+        queryClient,
         t,
         commands,
         generateValues: { modelKey: model.key },
@@ -142,6 +155,106 @@ describe('executeImageRecall', () => {
     expect(add).toHaveBeenCalledWith(expect.objectContaining({ kind: 'success', title: 'Recalled remix settings' }));
   });
 
+  it('recalls from metadata a menu or Preview Details already read, without reading it again', async () => {
+    const { commands, setSettings } = createCommands();
+    const recall = () =>
+      executeImageRecall({
+        queryClient,
+        t,
+        commands,
+        generateValues: { modelKey: model.key },
+        image,
+        kind: 'prompts',
+        models: [model],
+        projectId: 'project-1',
+      });
+
+    galleryApi.galleryImages.metadata.mockResolvedValue({ positive_prompt: 'recalled prompt' });
+
+    await expect(recall()).resolves.toBe(true);
+    await expect(recall()).resolves.toBe(true);
+
+    expect(galleryApi.galleryImages.metadata).toHaveBeenCalledOnce();
+    expect(setSettings).toHaveBeenLastCalledWith(
+      expect.objectContaining({ positivePrompt: 'recalled prompt' }),
+      'project-1'
+    );
+  });
+
+  it('reads again when the read it joined is cancelled while the account is current', async () => {
+    const { commands, setSettings } = createCommands();
+    let resolveFirstRead: ((value: unknown) => void) | undefined;
+
+    galleryApi.galleryImages.metadata
+      .mockImplementationOnce(
+        (_name: string, signal: AbortSignal) =>
+          new Promise((resolve, reject) => {
+            resolveFirstRead = resolve;
+            signal.addEventListener('abort', () => reject(signal.reason));
+          })
+      )
+      .mockResolvedValueOnce({ positive_prompt: 'recalled prompt' });
+
+    // Another reader started the read; recall joins it. Unmounting a real observer is covered by the hook's browser test.
+    void queryClient.prefetchQuery(galleryImageMetadataOptions(accountLifecycle.capture(), image.imageName));
+    const recall = executeImageRecall({
+      queryClient,
+      t,
+      commands,
+      generateValues: { modelKey: model.key },
+      image,
+      kind: 'prompts',
+      models: [model],
+      projectId: 'project-1',
+    });
+
+    await vi.waitFor(() => expect(resolveFirstRead).toBeDefined());
+    await queryClient.cancelQueries({
+      queryKey: galleryKeys.imageMetadata(accountLifecycle.capture(), image.imageName),
+    });
+
+    await expect(recall).resolves.toBe(true);
+    expect(galleryApi.galleryImages.metadata).toHaveBeenCalledTimes(2);
+    expect(setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ positivePrompt: 'recalled prompt' }),
+      'project-1'
+    );
+  });
+
+  it('reports an image the server no longer has as carrying no metadata, and a failed read as an error', async () => {
+    const { add, commands, setSettings } = createCommands();
+    const recall = () =>
+      executeImageRecall({
+        queryClient,
+        t,
+        commands,
+        generateValues: { modelKey: model.key },
+        image,
+        kind: 'prompts',
+        models: [model],
+        projectId: 'project-1',
+      });
+
+    galleryApi.galleryImages.metadata.mockRejectedValueOnce(new ApiError('Not Found', 404));
+    await expect(recall()).resolves.toBe(false);
+    expect(add).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'info', message: 'This image does not include supported Generate metadata.' })
+    );
+
+    queryClient.clear();
+    galleryApi.galleryImages.metadata.mockRejectedValueOnce(new ApiError('Internal Server Error', 500));
+    await expect(recall()).resolves.toBe(false);
+    expect(commands.notifications.reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ area: 'image-recall', message: 'Internal Server Error' })
+    );
+
+    // The failure left no answer behind, so the next recall reads again.
+    galleryApi.galleryImages.metadata.mockResolvedValueOnce({ positive_prompt: 'recalled prompt' });
+    await expect(recall()).resolves.toBe(true);
+    expect(galleryApi.galleryImages.metadata).toHaveBeenCalledTimes(3);
+    expect(setSettings).toHaveBeenCalledOnce();
+  });
+
   it.each([
     { label: 'restores every recorded concept', recorded: ['ink-lora'], skipNotice: false },
     { label: 'reports concepts it could not restore', recorded: ['ink-lora', 'deleted-lora'], skipNotice: true },
@@ -157,6 +270,7 @@ describe('executeImageRecall', () => {
 
     await expect(
       executeImageRecall({
+        queryClient,
         t,
         commands,
         generateValues: { modelKey: model.key },
@@ -194,6 +308,7 @@ describe('executeImageRecall', () => {
 
     await expect(
       executeImageRecall({
+        queryClient,
         t,
         commands,
         generateValues: { modelKey: model.key },
@@ -235,6 +350,7 @@ describe('executeImageRecall', () => {
 
     await expect(
       executeImageRecall({
+        queryClient,
         t,
         commands,
         generateValues: { modelKey: model.key, refinerModel: null, refinerStart: 0.9 },
@@ -266,6 +382,7 @@ describe('executeImageRecall', () => {
 
     await expect(
       executeImageRecall({
+        queryClient,
         t,
         commands,
         generateValues: { modelKey: model.key },
@@ -304,6 +421,7 @@ describe('executeImageRecall', () => {
 
     await expect(
       executeImageRecall({
+        queryClient,
         t,
         commands,
         generateValues: { modelKey: model.key },
@@ -343,6 +461,7 @@ describe('executeImageRecall', () => {
 
     await expect(
       executeImageRecall({
+        queryClient,
         t,
         commands,
         generateValues: { modelKey: model.key },
@@ -372,6 +491,7 @@ describe('executeImageRecall', () => {
     try {
       await expect(
         executeImageRecall({
+          queryClient,
           t,
           commands,
           generateValues: generateValues as unknown as Record<string, unknown>,
@@ -403,6 +523,7 @@ describe('executeImageRecall', () => {
     try {
       await expect(
         executeImageRecall({
+          queryClient,
           t,
           commands,
           // Never initialised: nothing but a model key, so the values would be synthesised.
@@ -430,6 +551,7 @@ describe('executeImageRecall', () => {
 
     await expect(
       executeImageRecall({
+        queryClient,
         t,
         commands,
         generateValues: { modelKey: model.key, positivePrompt: 'stale prompt' },
@@ -474,6 +596,7 @@ describe('executeImageRecall', () => {
 
     await expect(
       executeImageRecall({
+        queryClient,
         t,
         commands,
         generateValues: { modelKey: model.key },
@@ -522,6 +645,7 @@ describe('executeImageRecall', () => {
     galleryApi.galleryImages.resolveMany.mockResolvedValue([]);
 
     await executeImageRecall({
+      queryClient,
       t,
       commands,
       generateValues: { modelKey: model.key, referenceImages: [current] },
@@ -550,6 +674,7 @@ describe('executeImageRecall', () => {
       })
     );
     const oldRecall = executeImageRecall({
+      queryClient,
       t,
       commands: oldCommands.commands,
       generateValues: { modelKey: model.key },
@@ -566,6 +691,7 @@ describe('executeImageRecall', () => {
     galleryApi.galleryImages.metadata.mockResolvedValueOnce({ positive_prompt: 'user b' });
     await expect(
       executeImageRecall({
+        queryClient,
         t,
         commands: newCommands.commands,
         generateValues: { modelKey: model.key },
@@ -595,6 +721,7 @@ describe('executeImageRecall', () => {
 
     await expect(
       executeImageRecall({
+        queryClient,
         t,
         commands: oldCommands.commands,
         generateValues: { modelKey: model.key },

@@ -1,7 +1,12 @@
 import type { GalleryItem, GalleryItemKind, GalleryItemRef, GalleryItemsPage } from '@features/gallery/core/items';
 import type { GallerySemanticQuery, GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 import type { GallerySettings } from '@features/gallery/core/settings';
-import type { GalleryBoardOrderBy, GalleryOrderDir, GalleryView } from '@features/gallery/core/types';
+import type {
+  GalleryBoardOrderBy,
+  GalleryImageMetadata,
+  GalleryOrderDir,
+  GalleryView,
+} from '@features/gallery/core/types';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 
 import { toGalleryItemKey } from '@features/gallery/core/items';
@@ -12,7 +17,12 @@ import {
   GALLERY_STARRED_STRIP_LIMIT,
 } from '@features/gallery/core/paging';
 import { toGallerySemanticQuery } from '@features/gallery/core/semanticImageQuery';
-import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 import {
   hashKey,
   infiniteQueryOptions,
@@ -30,6 +40,7 @@ import {
   type GalleryItemLocation,
   type GalleryItemNames,
   fetchImageIndexAvailability,
+  getGalleryImageMetadata,
   getGalleryItemLocation,
   hydrateGalleryDateBoardItemPage,
   isDateBoardId,
@@ -210,9 +221,62 @@ export const galleryKeys = {
   /** What a video's context menu can offer (recall, embedded workflow), read from its record when opened. */
   videoMenuCapabilities: (owner: AccountScope, videoName: string | null) =>
     [...galleryKeys.itemsRoot(), 'menu-capabilities', getAccountKey(owner), videoName] as const,
-  /** What an image's menus derive recall from (its metadata, whether it embeds a workflow), read when opened. */
-  imageMenuRecallSources: (owner: AccountScope, imageName: string | null) =>
-    [...galleryKeys.itemsRoot(), 'menu-recall-sources', getAccountKey(owner), imageName] as const,
+  /** An image's generation metadata: one entry shared by its menus, Preview Details, and recall commands. */
+  imageMetadata: (owner: AccountScope, imageName: string) =>
+    [...galleryKeys.itemsRoot(), 'image-metadata', getAccountKey(owner), imageName] as const,
+  /** Whether an image embeds a workflow, for listings that do not say. */
+  imageHasWorkflow: (owner: AccountScope, imageName: string) =>
+    [...galleryKeys.itemsRoot(), 'image-has-workflow', getAccountKey(owner), imageName] as const,
+};
+
+/**
+ * An image's generation metadata. Null when it records none or the server no longer has the image (404); any other
+ * failure rejects, so the errored entry holds no answer and is read again by its next consumer. Metadata never changes
+ * for an image, so an answer is never read again.
+ */
+export const galleryImageMetadataOptions = (owner: AccountScope, imageName: string) =>
+  queryOptions({
+    queryFn: async ({ signal }): Promise<GalleryImageMetadata | null> => {
+      let metadata: GalleryImageMetadata | null;
+
+      try {
+        metadata = await getGalleryImageMetadata(imageName, AbortSignal.any([signal, owner.signal]));
+      } catch (error: unknown) {
+        if (!(error instanceof ApiError && error.status === 404)) {
+          throw error;
+        }
+        metadata = null;
+      }
+
+      assertAccountScopeCurrent(owner);
+
+      return metadata;
+    },
+    queryKey: galleryKeys.imageMetadata(owner, imageName),
+    // One policy whoever starts the read: a failure surfaces at once, and the next open or recall reads again.
+    retry: false,
+    staleTime: Infinity,
+  });
+
+/**
+ * Read an image's metadata through the shared entry outside React. A reader that unmounts mid-read cancels the fetch
+ * this call may have joined; the read then starts its own instead of failing. An explicit `cancelQueries` on the key
+ * is followed the same way while the account is current. An account change ends it.
+ */
+export const fetchGalleryImageMetadata = async (
+  client: QueryClient,
+  owner: AccountScope,
+  imageName: string
+): Promise<GalleryImageMetadata | null> => {
+  for (;;) {
+    try {
+      return await client.fetchQuery(galleryImageMetadataOptions(owner, imageName));
+    } catch (error: unknown) {
+      if (!isCancelledError(error) || !isAccountScopeCurrent(owner)) {
+        throw error;
+      }
+    }
+  }
 };
 
 const galleryItemNamesOptionsForOwner = (owner: AccountScope, filter: CanonicalGalleryItemsFilter) =>

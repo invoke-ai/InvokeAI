@@ -143,6 +143,7 @@ vi.mock('@features/workflow/preview', async () => {
 vi.mock('@features/gallery/queries', () => ({
   canAddToCachedGalleryBoard: (...args: unknown[]) => mocks.canAddToCachedGalleryBoard(...args),
   ensureGalleryBoardDestinations: () => mocks.ensureGalleryBoardDestinations(),
+  fetchGalleryImageMetadata: (_client: unknown, _owner: unknown, imageName: string) => mocks.imageMetadata(imageName),
   getGalleryItemBoardIdsFromCaches: (...args: unknown[]) => mocks.getItemBoardIds(...args),
   getGalleryItemStarredFromCaches: (...args: unknown[]) => mocks.getItemStarred(...args),
   invalidateGallery: (...args: unknown[]) => mocks.invalidateGallery(...args),

@@ -1,5 +1,6 @@
 export {
   canonicalizeGalleryItemsFilter,
+  fetchGalleryImageMetadata,
   fetchGalleryItemsPage,
   fetchVerifiedGalleryItemPage,
   flattenGalleryItemsData,
@@ -7,6 +8,7 @@ export {
   GALLERY_MAX_ROWS,
   GALLERY_PAGE_SIZE,
   galleryBoardsOptions,
+  galleryImageMetadataOptions,
   galleryItemLocationOptions,
   galleryItemNamesOptions,
   galleryItemsPageOptions,

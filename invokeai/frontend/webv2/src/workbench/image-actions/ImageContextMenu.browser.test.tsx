@@ -42,14 +42,12 @@ const galleryMock = vi.hoisted(() => ({
   metadata: vi.fn((): Promise<Record<string, unknown> | null> => Promise.resolve(null)),
   resolve: vi.fn((imageName: string) => Promise.resolve({ hasWorkflow: imageName === 'made-by-workflow.png' })),
 }));
-vi.mock('@features/gallery', async (importOriginal) => {
-  const original = await importOriginal<{ galleryImages: Record<string, unknown> }>();
-
-  return {
-    ...original,
-    galleryImages: { ...original.galleryImages, metadata: galleryMock.metadata, resolve: galleryMock.resolve },
-  };
-});
+// The transport, under both the gallery's shared metadata query and its public image port.
+vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  getGalleryImageByName: galleryMock.resolve,
+  getGalleryImageMetadata: galleryMock.metadata,
+}));
 // The Upscale submenu asks for the model library on mount; tests seed the snapshot instead of fetching it.
 const ensureModelsLoaded = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 vi.mock('@features/models', async (importOriginal) => ({

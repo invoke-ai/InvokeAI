@@ -5,7 +5,6 @@ import type { VideoConditioningRole } from '@features/video';
 import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import {
-  galleryImages,
   galleryItemOrganization,
   galleryItems,
   galleryTransfers,
@@ -30,6 +29,7 @@ import {
 import {
   canAddToCachedGalleryBoard,
   ensureGalleryBoardDestinations,
+  fetchGalleryImageMetadata,
   getGalleryItemBoardIdsFromCaches,
   getGalleryItemStarredFromCaches,
   invalidateGallery,
@@ -1153,7 +1153,7 @@ export const useImageActions = ({
         const owner = captureAccountScope();
 
         try {
-          const metadata = await galleryImages.metadata(image.imageName, owner.signal);
+          const metadata = await fetchGalleryImageMetadata(queryClient, owner, image.imageName);
 
           assertAccountScopeCurrent(owner);
 
@@ -1194,6 +1194,7 @@ export const useImageActions = ({
           kind,
           models,
           projectId,
+          queryClient,
           t,
         });
 
