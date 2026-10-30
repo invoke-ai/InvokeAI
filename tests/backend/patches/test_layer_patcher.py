@@ -675,13 +675,13 @@ def test_lazy_patch_iterator_that_constructs_a_model_does_not_deadlock():
     assert result.get("done") is True
 
 
-def _fp16_lora(in_features: int, out_features: int, rank: int = 4) -> LoRALayer:
-    # fp16 factors under a bf16 compute dtype: the sidecar path then casts them even on CPU, so a
+def _lora_layer(in_features: int, out_features: int, rank: int = 4, dtype: torch.dtype = torch.float16) -> LoRALayer:
+    # fp16 factors by default, under a bf16 compute dtype: the sidecar path then casts them even on CPU, so a
     # placement that is not put back is visible without a GPU.
     return LoRALayer(
-        up=torch.ones(out_features, rank, dtype=torch.float16),
+        up=torch.ones(out_features, rank, dtype=dtype),
         mid=None,
-        down=torch.ones(rank, in_features, dtype=torch.float16),
+        down=torch.ones(rank, in_features, dtype=dtype),
         alpha=None,
         bias=None,
     )
@@ -690,13 +690,26 @@ def _fp16_lora(in_features: int, out_features: int, rank: int = 4) -> LoRALayer:
 def _merged_layer(in_features: int, out_features: int) -> MergedLayerPatch:
     half = out_features // 2
     return MergedLayerPatch(
-        lora_layers=[_fp16_lora(in_features, half), _fp16_lora(in_features, out_features - half)],
+        lora_layers=[_lora_layer(in_features, half), _lora_layer(in_features, out_features - half)],
+        ranges=[Range(0, half), Range(half, out_features)],
+    )
+
+
+def _mixed_dtype_merged_layer(in_features: int, out_features: int) -> MergedLayerPatch:
+    # Q/K/V factors converted separately need not share a dtype. Under the bf16 compute dtype only the
+    # fp16 half is cast by the sidecar path, so restoring both to one dtype changes the other.
+    half = out_features // 2
+    return MergedLayerPatch(
+        lora_layers=[
+            _lora_layer(in_features, half),
+            _lora_layer(in_features, out_features - half, dtype=torch.bfloat16),
+        ],
         ranges=[Range(0, half), Range(half, out_features)],
     )
 
 
 def _swapped_halves_layer(in_features: int, out_features: int) -> SwappedHalvesLayerPatch:
-    return SwappedHalvesLayerPatch(_fp16_lora(in_features, out_features))
+    return SwappedHalvesLayerPatch(_lora_layer(in_features, out_features))
 
 
 def _innermost_loras(layer: BaseLayerPatch) -> list[LoRALayer]:
@@ -708,18 +721,20 @@ def _innermost_loras(layer: BaseLayerPatch) -> list[LoRALayer]:
     return [layer]
 
 
-def _placements(patch: ModelPatchRaw) -> set[tuple[torch.device, torch.dtype]]:
-    """Every (device, dtype) the patch's tensors sit on, read from the innermost LoRA factors."""
-    return {
+def _placements(patch: ModelPatchRaw) -> list[tuple[torch.device, torch.dtype]]:
+    """The (device, dtype) of each innermost LoRA factor, in order, so each sub-layer is checked on its own."""
+    return [
         (tensor.device, tensor.dtype)
         for layer in patch.layers.values()
         for lora in _innermost_loras(layer)
         for tensor in (lora.up, lora.down)
-    }
+    ]
 
 
 @pytest.mark.parametrize(
-    "make_layer", [_fp16_lora, _merged_layer, _swapped_halves_layer], ids=["lora", "merged", "swapped_halves"]
+    "make_layer",
+    [_lora_layer, _merged_layer, _mixed_dtype_merged_layer, _swapped_halves_layer],
+    ids=["lora", "merged", "mixed_dtype_merged", "swapped_halves"],
 )
 @pytest.mark.parametrize("force_sidecar", [False, True], ids=["direct", "sidecar"])
 @pytest.mark.parametrize(
@@ -768,7 +783,7 @@ def test_patching_leaves_the_cached_patch_where_it_found_it(
     assert patch.calc_size() == before_bytes
 
 
-@pytest.mark.parametrize("make_layer", [_fp16_lora, _swapped_halves_layer], ids=["lora", "swapped_halves"])
+@pytest.mark.parametrize("make_layer", [_lora_layer, _swapped_halves_layer], ids=["lora", "swapped_halves"])
 @pytest.mark.parametrize(
     "device",
     ["cpu", pytest.param("cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="requires a GPU"))],
