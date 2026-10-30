@@ -198,7 +198,7 @@ const ImageDetailsQuery = ({
   return (
     <DetailsTabs
       failedReads={getFailedReads(metadataQuery, workflowQuery)}
-      graph={workflowQuery.data?.graph ?? null}
+      graph={workflowQuery.data?.resolved_inputs ?? workflowQuery.data?.graph ?? null}
       metadata={metadata}
       workflow={workflowQuery.data?.workflow ?? null}
     >

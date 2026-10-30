@@ -2,6 +2,7 @@
 import type { GalleryImage, GalleryImageItem, GalleryVideoItem } from '@features/gallery';
 import type * as GalleryModule from '@features/gallery';
 import type * as GalleryBackendModule from '@features/gallery/data/backend';
+import type * as GalleryQueriesModule from '@features/gallery/queries';
 import type * as IdentityModule from '@features/identity';
 import type * as ClipboardModule from '@platform/browser/clipboard';
 import type { ImageActions, ImageRecallCapabilities } from '@workbench/image-actions';
@@ -65,6 +66,13 @@ vi.mock('@features/identity', async (importOriginal) => {
     }),
   };
 });
+vi.mock('@features/gallery/queries', async (importOriginal) => ({
+  ...(await importOriginal<typeof GalleryQueriesModule>()),
+  imageIndexAvailabilityOptions: () => ({
+    queryFn: () => ({ state: 'disabled' }),
+    queryKey: ['test-image-index-availability'],
+  }),
+}));
 
 const imageItem: GalleryImageItem = {
   boardId: 'none',
@@ -263,6 +271,67 @@ afterEach(async () => {
 });
 
 describe('Preview query-driven Details', () => {
+  const sourceGraph = {
+    id: 'source',
+    nodes: {
+      iterator: { id: 'iterator', type: 'iterate', collection: [17, 18] },
+      math: { id: 'math', type: 'add', a: 0, b: 1 },
+      noise: { id: 'noise', type: 'noise', seed: 0 },
+      collector: { id: 'collector', type: 'collect' },
+    },
+    edges: [
+      { source: { node_id: 'iterator', field: 'item' }, destination: { node_id: 'math', field: 'a' } },
+      { source: { node_id: 'math', field: 'value' }, destination: { node_id: 'noise', field: 'seed' } },
+      { source: { node_id: 'noise', field: 'noise' }, destination: { node_id: 'collector', field: 'item' } },
+    ],
+  };
+
+  it("shows this image's resolved Noise and math inputs in the Graph tab", async () => {
+    galleryMocks.imageWorkflow.mockResolvedValueOnce({
+      graph: JSON.stringify(sourceGraph),
+      resolved_inputs: JSON.stringify({
+        id: 'resolved',
+        nodes: {
+          math: { id: 'math', type: 'add', a: 17, b: 1 },
+          noise: { id: 'noise', type: 'noise', seed: 18 },
+        },
+        edges: [],
+      }),
+      workflow: null,
+    });
+
+    await renderDetails({ isOpen: true, item: imageItem });
+    await act(async () => {
+      await vi.waitFor(() => expect(getButton('Graph').disabled).toBe(false));
+    });
+    await interact(() => getButton('Graph').click());
+
+    const graphRegion = document.querySelector('[role="region"][aria-label="Video graph JSON"]');
+    expect(graphRegion).not.toBeNull();
+    expect(JSON.parse(graphRegion!.textContent!)).toEqual({
+      id: 'resolved',
+      nodes: {
+        math: { id: 'math', type: 'add', a: 17, b: 1 },
+        noise: { id: 'noise', type: 'noise', seed: 18 },
+      },
+      edges: [],
+    });
+  });
+
+  it.each([{}, { resolved_inputs: null }])('shows the source graph for legacy image payloads: %j', async (legacy) => {
+    galleryMocks.imageWorkflow.mockResolvedValueOnce({ graph: JSON.stringify(sourceGraph), workflow: null, ...legacy });
+
+    await renderDetails({ isOpen: true, item: imageItem });
+    await act(async () => {
+      await vi.waitFor(() => expect(getButton('Graph').disabled).toBe(false));
+    });
+    await interact(() => getButton('Graph').click());
+
+    const graphRegion = document.querySelector('[role="region"][aria-label="Video graph JSON"]');
+    expect(graphRegion).not.toBeNull();
+    expect(JSON.parse(graphRegion!.textContent!)).toEqual(sourceGraph);
+  });
+
   it('shows the video Details disclosure but starts no request while it is closed', async () => {
     await renderDetails({ isOpen: false, item: videoItem });
 
