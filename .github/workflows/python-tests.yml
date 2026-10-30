@@ -123,10 +123,21 @@ jobs:
 
     steps:
       - name: checkout
-        # https://github.com/nschloe/action-cached-lfs-checkout
-        uses: nschloe/action-cached-lfs-checkout@385a8ecc719e50b8c71af6ab01a624b486b7c3bc
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
+
+      - name: restore LFS cache
+        uses: actions/cache@v5
+        with:
+          path: .git/lfs
+          # Checkout leaves LFS pointer files, so their hash is the content key.
+          key: lfs-${{ hashFiles('tests/test_model_probe/stripped_models/**', 'tests/model_identification/stripped_models/**') }}
+          restore-keys: lfs-
+
+      - name: pull LFS files
+        run: git lfs pull
+        shell: bash
 
       - name: check for changed python files
         if: ${{ inputs.always_run != true }}
@@ -239,9 +250,23 @@ jobs:
     steps:
       - name: checkout
         if: ${{ inputs.always_run != true }}
-        uses: nschloe/action-cached-lfs-checkout@385a8ecc719e50b8c71af6ab01a624b486b7c3bc
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
+
+      - name: restore LFS cache
+        if: ${{ inputs.always_run != true }}
+        uses: actions/cache@v5
+        with:
+          path: .git/lfs
+          # Checkout leaves LFS pointer files, so their hash is the content key.
+          key: lfs-${{ hashFiles('tests/test_model_probe/stripped_models/**', 'tests/model_identification/stripped_models/**') }}
+          restore-keys: lfs-
+
+      - name: pull LFS files
+        if: ${{ inputs.always_run != true }}
+        run: git lfs pull
+        shell: bash
 
       - name: check for changed python files
         if: ${{ inputs.always_run != true }}
@@ -301,9 +326,21 @@ jobs:
 
     steps:
       - name: checkout
-        uses: nschloe/action-cached-lfs-checkout@385a8ecc719e50b8c71af6ab01a624b486b7c3bc
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
+
+      - name: restore LFS cache
+        uses: actions/cache@v5
+        with:
+          path: .git/lfs
+          # Checkout leaves LFS pointer files, so their hash is the content key.
+          key: lfs-${{ hashFiles('tests/test_model_probe/stripped_models/**', 'tests/model_identification/stripped_models/**') }}
+          restore-keys: lfs-
+
+      - name: pull LFS files
+        run: git lfs pull
+        shell: bash
 
       - name: setup uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
