@@ -12,7 +12,7 @@ from safetensors import safe_open
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant
-from invokeai.backend.quantization.gguf.loaders import WrappedGGUFReader, gguf_sd_loader
+from invokeai.backend.quantization.gguf.loaders import WrappedGGUFReader, gguf_header_state_dict
 from invokeai.backend.quantization.sdnq.loaders import sdnq_sd_loader
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.silence_warnings import SilenceWarnings
@@ -79,6 +79,15 @@ def _safetensors_meta_state_dict(path: Path) -> StateDict:
         key: torch.empty(info["shape"], dtype=SAFETENSORS_DTYPES[info["dtype"]], device="meta")
         for key, info in header.items()
     }
+
+
+def unwrap_state_dict(checkpoint: dict[Any, Any]) -> StateDict:
+    """A checkpoint's weights: training checkpoints nest them under `state_dict`.
+
+    Identification reads its state dicts through this (`ModelOnDisk.load_state_dict`). A loader that reads a pickle
+    itself unwraps through it too, so it loads the weights identification accepted.
+    """
+    return checkpoint.get("state_dict", checkpoint)
 
 
 def _is_sdnq_safetensors(path: Path) -> bool:
@@ -201,9 +210,10 @@ class ModelOnDisk:
                 checkpoint = torch.load(path, map_location="meta")
                 assert isinstance(checkpoint, dict)
             elif path.suffix.endswith(".gguf"):
-                # Identification reads shapes and never builds a module. Whether a Q8_CR file's quantization
-                # is supported is decided from its metadata by `ModelConfigFactory`, once, not per candidate.
-                checkpoint = gguf_sd_loader(path, compute_dtype=torch.float32, q8_cr="ignore")
+                # Shapes and quantization types from the header, like the safetensors branch: the tensor data
+                # is never read. Whether a Q8_CR file's quantization is supported is decided from its metadata
+                # by `ModelConfigFactory`, once, not per candidate.
+                checkpoint = gguf_header_state_dict(path, compute_dtype=torch.float32)
             elif path.suffix.endswith(".safetensors"):
                 if _is_sdnq_safetensors(path):
                     checkpoint = sdnq_sd_loader(path, compute_dtype=torch.float32)
@@ -216,7 +226,7 @@ class ModelOnDisk:
             else:
                 raise ValueError(f"Unrecognized model extension: {path.suffix}")
 
-        state_dict = checkpoint.get("state_dict", checkpoint)
+        state_dict = unwrap_state_dict(checkpoint)
 
         # Normalize PEFT named-adapter keys (e.g. `lora_A.default.weight` → `lora_A.weight`).
         # Pattern is LoRA-specific, so this is a no-op for non-LoRA state dicts.

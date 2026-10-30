@@ -99,7 +99,7 @@ def _drive(scheduler: str, denoising_start: float = 0.0, denoising_end: float = 
         ),
         patch.object(node, "_load_text_conditioning", return_value=[]),
         patch.object(node, "_prepare_noise_tensor", return_value=torch.ones(1, 16, SIZE // 8, SIZE // 8)),
-        patch.object(node, "_estimate_working_memory", return_value=0),
+        patch("invokeai.app.invocations.z_image.z_image_denoise.estimate_z_image_denoise_working_memory"),
         patch.object(node, "_build_step_callback", return_value=callbacks.append),
     ):
         result = node._run_diffusion(context)

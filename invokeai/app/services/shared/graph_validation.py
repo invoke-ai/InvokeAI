@@ -1254,6 +1254,37 @@ class Graph(BaseModel):
             self.edges[:] = original_edges
             raise
 
+    def _get_invocation_input_graph(self, invocation: BaseInvocation) -> "Graph":
+        """Record resolved invocation inputs and ordinary ancestors, stopping at batch/control boundaries."""
+        nodes = {invocation.id: invocation}
+        edges: list[Edge] = []
+        pending = [invocation.id]
+        boundaries = (
+            IterateInvocation,
+            CollectInvocation,
+            IfInvocation,
+            ForInvocation,
+            ForReturnInvocation,
+            CallSavedWorkflowInvocation,
+        )
+        while pending:
+            node_id = pending.pop()
+            if isinstance(nodes[node_id], boundaries):
+                continue
+            for edge in self._get_input_edges(node_id):
+                ancestor = self.nodes[edge.source.node_id]
+                if (
+                    isinstance(ancestor, boundaries)
+                    or isinstance(getattr(nodes[node_id], edge.destination.field), list)
+                    or is_list_or_contains_list(get_output_field_type(ancestor, edge.source.field))
+                ):
+                    continue
+                edges.append(edge)
+                if ancestor.id not in nodes:
+                    nodes[ancestor.id] = ancestor
+                    pending.append(ancestor.id)
+        return Graph(id=self.id, nodes=nodes, edges=edges)
+
     def _get_input_edges(
         self, node_id: str, field: Optional[str] = None, *, include_loop_linkage: bool = False
     ) -> list[Edge]:

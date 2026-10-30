@@ -31,6 +31,7 @@ composition_nodes = importlib.util.module_from_spec(_COMPOSITION_NODES_SPEC)
 _COMPOSITION_NODES_SPEC.loader.exec_module(composition_nodes)
 InvokeAdjustImageHuePlusInvocation = composition_nodes.InvokeAdjustImageHuePlusInvocation
 InvokeImageBlendInvocation = composition_nodes.InvokeImageBlendInvocation
+InvokeImageDilateOrErodeInvocation = composition_nodes.InvokeImageDilateOrErodeInvocation
 
 
 def _build_context(input_image: Image.Image) -> MagicMock:
@@ -433,3 +434,18 @@ def test_image_blend_hsl_subtract_wraps_hue_in_degrees() -> None:
     blended = invocation.apply_blend(image_tensors)
 
     assert torch.allclose(blended, expected_linear_srgb, atol=1e-5)
+
+
+def test_dilate_keeps_16_bit_grayscale_mode() -> None:
+    pixels = numpy.zeros((5, 5), dtype=numpy.uint16)
+    pixels[2, 2] = 40000
+    input_image = Image.fromarray(pixels)
+    assert input_image.mode == "I;16"
+
+    context = _build_context(input_image)
+    InvokeImageDilateOrErodeInvocation(image=ImageField(image_name="in"), radius_w=1, radius_h=1).invoke(context)
+    saved_image = context.images.save.call_args.args[0]
+
+    assert saved_image.mode == "I;16"
+    saved = numpy.asarray(saved_image)
+    assert saved[2, 1] == 40000 and saved[1, 2] == 40000 and saved[0, 0] == 0

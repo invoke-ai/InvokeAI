@@ -225,8 +225,8 @@ test('the HTTP reset contract selects profiles explicitly and restores the start
   }
 });
 
-const withRepresentativeBackend = async (run) => {
-  const backend = await startMockBackend(0, { profile: 'representative' });
+const withRepresentativeBackend = async (run, options = {}) => {
+  const backend = await startMockBackend(0, { ...options, profile: 'representative' });
 
   try {
     await run(backend);
@@ -1218,6 +1218,370 @@ test('workflow thumbnails round-trip their bytes and refresh the listed URL on e
 
     await getJson(backend, path, { method: 'DELETE' });
     assert.equal(await listedUrl(), null);
+  });
+});
+
+test('working-memory calibration: a run per request, replayed by its key, advanced by summary reads', async () => {
+  let now = 0;
+
+  await withRepresentativeBackend(
+    async (backend) => {
+      const base = '/api/v2/models/i/fixture-model-001/working_memory';
+      const plan = await getJson(backend, `${base}/plan`);
+      const request = (key, attempt = { attempt_id: 'attempt-1', attempt_steps: 2 }, nodes = {}, graphModels = {}) => ({
+        body: JSON.stringify({
+          ...attempt,
+          data: [],
+          graph: { edges: [], id: plan.cases[0].id, nodes },
+          graph_models: graphModels,
+          idempotency_key: key,
+        }),
+        method: 'POST',
+      });
+      const post = (key) => getJson(backend, `${base}/calibrate`, request(key));
+      const refusal = async (key, attempt) =>
+        (await fetch(`${backend.origin}${base}/calibrate`, request(key, attempt))).status;
+      /** The answer to a request whose graph names `model` as it compiled over it, stating `compiled` for it. */
+      const refusedFor = async (key, model, compiled = {}) => {
+        const identity = { base: model.base, format: record.format, hash: model.hash, type: model.type, variant: null };
+        const graphModels = { [model.key]: { ...identity, ...compiled } };
+        const response = await fetch(
+          `${backend.origin}${base}/calibrate`,
+          request(key, undefined, { main_model_loader: { id: 'main_model_loader', model } }, graphModels)
+        );
+        return [response.status, (await response.json()).detail];
+      };
+      const record = (await getJson(backend, '/api/v2/models/')).models.find(
+        (model) => model.key === 'fixture-model-001'
+      );
+      const identifier = {
+        base: record.base,
+        hash: record.hash,
+        key: record.key,
+        name: record.name,
+        type: record.type,
+      };
+
+      assert.equal(plan.supported, true);
+      assert.deepEqual((await getJson(backend, `${base}/summary`)).runs, []);
+
+      // The attempt id and its step count come together, and every run of an attempt names the same count.
+      assert.equal(await refusal('lone-id', { attempt_id: 'attempt-2' }), 422);
+      assert.equal(await refusal('lone-steps', { attempt_steps: 2 }), 422);
+      assert.equal(await refusal('too-many', { attempt_id: 'attempt-2', attempt_steps: 257 }), 422);
+
+      // A graph naming a model whose record changed, or that was removed, since it compiled is refused with a code.
+      assert.deepEqual(await refusedFor('stale', { ...identifier, hash: 'blake3:old' }), [
+        409,
+        {
+          code: 'model_changed',
+          message: 'Fixture Model 001 changed after this calibration was planned (hash). Calibrate again.',
+        },
+      ]);
+      assert.deepEqual(await refusedFor('gone', { ...identifier, key: 'removed-model', name: 'Old SDXL' }), [
+        409,
+        { code: 'model_changed', message: 'Old SDXL was removed after this calibration was planned. Calibrate again.' },
+      ]);
+      // The graph's identifier carries no variant: the identity compiled with it does.
+      assert.deepEqual(await refusedFor('variant', identifier, { variant: 'inpaint' }), [
+        409,
+        {
+          code: 'model_changed',
+          message: 'Fixture Model 001 changed after this calibration was planned (variant). Calibrate again.',
+        },
+      ]);
+      // graph_models states exactly the graph's models, every fact of each.
+      const unstated = await fetch(
+        `${backend.origin}${base}/calibrate`,
+        request('unstated', undefined, { main_model_loader: { id: 'main_model_loader', model: identifier } })
+      );
+      assert.equal(unstated.status, 422);
+      assert.match((await unstated.json()).detail, /the graph names fixture-model-001, which graph_models lacks/);
+      const nullHash = await fetch(
+        `${backend.origin}${base}/calibrate`,
+        request(
+          'null-hash',
+          undefined,
+          { main_model_loader: { id: 'main_model_loader', model: identifier } },
+          {
+            [identifier.key]: {
+              base: identifier.base,
+              format: record.format,
+              hash: null,
+              type: identifier.type,
+              variant: null,
+            },
+          }
+        )
+      );
+      assert.equal(nullHash.status, 422);
+      assert.match((await nullHash.json()).detail, /graph_models\[fixture-model-001\] does not state every fact/);
+
+      const first = await post('attempt:0');
+      assert.deepEqual(await post('attempt:0'), first);
+      assert.equal(await refusal('attempt:1', { attempt_id: 'attempt-1', attempt_steps: 3 }), 409);
+      // One attempt per GPU: another one is refused with a code while this one runs, on this model or another.
+      const busy = await fetch(
+        `${backend.origin}${base}/calibrate`,
+        request('other:0', { attempt_id: 'attempt-2', attempt_steps: 2 })
+      );
+      assert.equal(busy.status, 409);
+      assert.equal((await busy.json()).detail.code, 'calibration_running');
+      const second = await post('attempt:1');
+      assert.notEqual(second.run_id, first.run_id);
+
+      // A read a second after the last step finishes the running item and starts the next one.
+      const statuses = async () => {
+        now += 1_050;
+        return (await getJson(backend, `${base}/summary`)).runs.map((run) => run.status);
+      };
+      assert.deepEqual(await statuses(), ['running', 'running']);
+      const summary = await getJson(backend, `${base}/summary`);
+      assert.deepEqual(
+        summary.runs.map((run) => [run.attempt_id, run.attempt_steps, run.held_back, run.error_code]),
+        [
+          ['attempt-1', 2, 'running', null],
+          ['attempt-1', 2, 'running', null],
+        ]
+      );
+      assert.equal(summary.measurement_verified, true);
+      const badAttempt = await fetch(`${backend.origin}${base}/calibrate`, {
+        body: JSON.stringify({ attempt_id: 'has space', graph: { edges: [], id: 'x', nodes: {} }, graph_models: {} }),
+        method: 'POST',
+      });
+      assert.equal(badAttempt.status, 422);
+      assert.deepEqual(await statuses(), ['completed', 'running']);
+
+      const origin = encodeURIComponent(`invokeai:wm-calibration:${second.run_id}`);
+      assert.deepEqual(
+        await getJson(backend, `/api/v1/queue/default/cancel_all?origin_prefix=${origin}`, { method: 'PUT' }),
+        {
+          canceled: 1,
+        }
+      );
+      assert.deepEqual(await statuses(), ['completed', 'canceled']);
+
+      // The canceled run aborts its attempt: the window the first run measured never counts.
+      const aborted = await getJson(backend, `${base}/summary`);
+      assert.deepEqual(
+        aborted.runs.map((run) => run.held_back),
+        ['aborted_attempt', 'aborted_attempt']
+      );
+      // As the server stores them: the second run was canceled during its decode, which left an invalid window.
+      assert.deepEqual(
+        aborted.runs.map((run) => [run.status, run.point_count]),
+        [
+          ['completed', 1],
+          ['canceled', 1],
+        ]
+      );
+      const [line] = aborted.lines;
+      assert.equal(line.state, 'insufficient');
+      assert.match(line.problem, /^Stop or an interrupted submission discarded the measurements of this line/);
+      assert.deepEqual(
+        line.sizes.map((size) => [size.counted, size.excluded_reason]),
+        [[false, 'aborted_attempt']]
+      );
+      assert.equal(
+        (await getJson(backend, '/api/v2/models/working_memory/status')).device_classes[0].runs.find(
+          (run) => run.run_id === first.run_id
+        ).attempt_steps,
+        2
+      );
+
+      assert.deepEqual(await getJson(backend, base, { method: 'DELETE' }), { points_removed: 1, runs_removed: 2 });
+      assert.deepEqual((await getJson(backend, `${base}/summary`)).lines, []);
+      // Calibration items never join the fixture queue.
+      assert.equal((await getJson(backend, '/api/v1/queue/default/item_ids')).total_count, 500);
+    },
+    { clock: () => now }
+  );
+});
+
+test('working-memory calibration: an open attempt holds the GPU, and a step after another calibration is refused', async () => {
+  let now = 0;
+
+  await withRepresentativeBackend(
+    async (backend) => {
+      const calibrate = async (modelKey, attempt_id, index) => {
+        const base = `/api/v2/models/i/${modelKey}/working_memory`;
+        const plan = await getJson(backend, `${base}/plan`);
+        const response = await fetch(`${backend.origin}${base}/calibrate`, {
+          body: JSON.stringify({
+            attempt_id,
+            attempt_steps: 3,
+            data: [],
+            graph: { edges: [], id: plan.cases[0].id, nodes: {} },
+            graph_models: {},
+            idempotency_key: `${attempt_id}:${String(index)}`,
+          }),
+          method: 'POST',
+        });
+        const body = await response.json();
+        return [response.status, body.detail?.code ?? null];
+      };
+      const summaryOf = (modelKey) => getJson(backend, `/api/v2/models/i/${modelKey}/working_memory/summary`);
+
+      // The first of three steps runs, then finishes: the attempt is between its steps.
+      assert.deepEqual(await calibrate('fixture-model-061', 'mine', 0), [201, null]);
+      for (const _ of [0, 1]) {
+        now += 1_050;
+        await summaryOf('fixture-model-061');
+      }
+      assert.deepEqual(
+        (await summaryOf('fixture-model-061')).runs.map((run) => run.status),
+        ['completed']
+      );
+
+      // Open, it still holds the GPU: another attempt is refused, on any model.
+      assert.deepEqual(await calibrate('fixture-model-021', 'theirs', 0), [409, 'calibration_running']);
+
+      // Idle past the grace, it is taken for abandoned and holds nothing.
+      now += 120_001;
+      assert.deepEqual(await calibrate('fixture-model-021', 'theirs', 0), [201, null]);
+
+      // Another calibration ran since its first step: its next step is refused, and it stays short, so aborted.
+      assert.deepEqual(await calibrate('fixture-model-061', 'mine', 1), [409, 'calibration_interleaved']);
+      assert.deepEqual(
+        (await summaryOf('fixture-model-061')).runs.map((run) => run.held_back),
+        ['aborted_attempt']
+      );
+    },
+    { clock: () => now }
+  );
+});
+
+test('working-memory calibration: seeded model states and device scenarios', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const summaryOf = (key) => getJson(backend, `/api/v2/models/i/${key}/working_memory/summary`);
+    const states = async (key) => (await summaryOf(key)).lines.map((line) => line.state);
+
+    assert.deepEqual(await states('fixture-model-006'), ['in_use', 'in_use']);
+    assert.deepEqual(await states('fixture-model-011'), ['stale', 'stale']);
+    assert.deepEqual(await states('fixture-model-016'), ['unusable', 'unusable']);
+    assert.deepEqual(await states('fixture-model-036'), ['insufficient']);
+    // Opt in: a running attempt, which holds the GPU. Another attempt, of any model, is refused for it; a request
+    // without an attempt is not.
+    assert.deepEqual((await summaryOf('fixture-model-021')).runs, []);
+    await getJson(backend, '/__faults', {
+      body: JSON.stringify({ runningCalibration: 'fixture-model-021' }),
+      method: 'POST',
+    });
+    assert.ok((await summaryOf('fixture-model-021')).runs.some((run) => run.status === 'running'));
+    const calibrateOther = (attempt) =>
+      fetch(`${backend.origin}/api/v2/models/i/fixture-model-001/working_memory/calibrate`, {
+        body: JSON.stringify({ ...attempt, data: [], graph: { edges: [], id: 'x', nodes: {} }, graph_models: {} }),
+        method: 'POST',
+      });
+    const busy = await calibrateOther({ attempt_id: 'mine', attempt_steps: 1 });
+    assert.deepEqual([busy.status, (await busy.json()).detail.code], [409, 'calibration_running']);
+    assert.equal((await calibrateOther({})).status, 201);
+    const failed = await summaryOf('fixture-model-026');
+    // The failed decode left an invalid window, which point_count counts like the server's.
+    assert.deepEqual(
+      failed.runs.filter((run) => run.status === 'failed').map((run) => run.point_count),
+      [1]
+    );
+    assert.ok(failed.runs.every((run) => run.held_back === null));
+    assert.deepEqual(
+      failed.lines.map((line) => line.state),
+      ['in_use', 'in_use']
+    );
+    assert.equal((await getJson(backend, '/api/v2/models/i/fixture-model-031/working_memory/plan')).supported, false);
+
+    // A model never calibrated itself shows the lines another model measured, which name both sides.
+    const shared = (await summaryOf('fixture-model-041')).lines;
+    assert.deepEqual(
+      shared.map((line) => [line.state, line.own_windows, line.measured_by.map((entry) => entry.model_key)]),
+      [
+        ['in_use', 0, ['fixture-model-006']],
+        ['in_use', 0, ['fixture-model-006']],
+      ]
+    );
+    const carrier = (await summaryOf('fixture-model-006')).lines[0];
+    assert.equal(carrier.own_windows, 9);
+    assert.deepEqual(carrier.measured_by, [{ model_key: 'fixture-model-006', name: 'Fixture Model 006', windows: 9 }]);
+    assert.equal((await fetch(`${backend.origin}/api/v2/models/i/no-such-model/working_memory/summary`)).status, 404);
+
+    // A warm 9060 XT: the largest fp32 size measured fragmentation and is left out of the fit and its range; an fp16
+    // size with one clean window among partially resident ones still counts, on that window alone.
+    const [fp16, fp32] = (await summaryOf('fixture-model-046')).lines;
+    const sizesOf = (line) => line.sizes.map((size) => [size.width, size.counted, size.excluded_reason, size.windows]);
+    assert.deepEqual(sizesOf(fp32), [
+      [576, true, null, 3],
+      [832, true, null, 3],
+      [1216, false, 'fragmented', 3],
+    ]);
+    assert.deepEqual(fp32.measured_range, { max_pixels: 832 * 832, min_pixels: 576 * 576 });
+    // Above that range the server prices the larger of the user line and the shipped value; here the line is lower.
+    const [, within, above] = fp32.sizes;
+    assert.equal(above.user_bytes, above.shipped_bytes);
+    assert.ok(within.user_bytes < within.shipped_bytes);
+    assert.equal(fp32.own_windows, 6);
+    assert.equal(fp32.state, 'in_use');
+    assert.deepEqual(sizesOf(fp16), [
+      [576, true, null, 3],
+      [832, true, null, 1],
+      [1216, true, null, 3],
+    ]);
+    assert.equal(fp16.own_windows, 7);
+
+    // Opt in: a model whose later steps failed as they were admitted, its record having changed after queuing.
+    await getJson(backend, '/__faults', {
+      body: JSON.stringify({ modelChangedCalibration: 'fixture-model-056' }),
+      method: 'POST',
+    });
+    const changed = await summaryOf('fixture-model-056');
+    const failedRuns = changed.runs.filter((run) => run.status === 'failed');
+    assert.equal(failedRuns.length, changed.runs.length - 4);
+    assert.ok(failedRuns.every((run) => run.error_code === 'model_changed'));
+    assert.match(failedRuns[0].error, /^Fixture Model 056 changed after this calibration was planned/);
+    const statusRun = (await getJson(backend, '/api/v2/models/working_memory/status')).device_classes[0].runs.find(
+      (run) => run.run_id === failedRuns[0].run_id
+    );
+    assert.equal(statusRun.error_code, 'model_changed');
+    // A changed model aborts the whole attempt: its completed steps feed no fit either.
+    assert.ok(changed.runs.every((run) => run.held_back === 'aborted_attempt'));
+    assert.ok(changed.lines.every((line) => line.sizes.every((size) => size.excluded_reason === 'aborted_attempt')));
+
+    // Opt in: a model whose attempt Stop aborted after four steps, whose windows never count.
+    await getJson(backend, '/__faults', {
+      body: JSON.stringify({ stoppedCalibration: 'fixture-model-051' }),
+      method: 'POST',
+    });
+    const stopped = await summaryOf('fixture-model-051');
+    assert.ok(stopped.runs.every((run) => run.held_back === 'aborted_attempt'));
+    assert.equal(stopped.runs.filter((run) => run.point_count > 0).length, 4);
+    assert.deepEqual(
+      stopped.lines.map((line) => [line.state, line.sizes.map((size) => size.excluded_reason)]),
+      [['insufficient', ['aborted_attempt', 'aborted_attempt']]]
+    );
+    const notMain = await fetch(`${backend.origin}/__faults`, {
+      body: JSON.stringify({ stoppedCalibration: 'no-such-model' }),
+      method: 'POST',
+    });
+    assert.equal(notMain.status, 400);
+
+    await getJson(backend, '/__faults', { body: JSON.stringify({ workingMemory: 'notVerified' }), method: 'POST' });
+    assert.equal((await summaryOf('fixture-model-006')).measurement_verified, false);
+
+    await getJson(backend, '/__faults', { body: JSON.stringify({ workingMemory: 'multiGpu' }), method: 'POST' });
+    const status = await getJson(backend, '/api/v2/models/working_memory/status');
+    assert.equal(status.available, false);
+    assert.match(status.unavailable_reason, /exactly one generation device/);
+    assert.equal(
+      (await fetch(`${backend.origin}/api/v2/models/i/fixture-model-001/working_memory/summary`)).status,
+      409
+    );
+
+    await getJson(backend, '/__faults', { body: JSON.stringify({ workingMemory: 'error' }), method: 'POST' });
+    assert.equal((await fetch(`${backend.origin}/api/v2/models/i/fixture-model-001/working_memory/plan`)).status, 503);
+
+    const unknown = await fetch(`${backend.origin}/__faults`, {
+      body: JSON.stringify({ workingMemory: 'sideways' }),
+      method: 'POST',
+    });
+    assert.equal(unknown.status, 400);
   });
 });
 
