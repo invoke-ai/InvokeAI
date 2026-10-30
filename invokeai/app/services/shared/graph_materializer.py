@@ -13,6 +13,7 @@ from invokeai.app.invocations.loops import (
     ForReturnInvocation,
     LoopState,
 )
+from invokeai.app.invocations.primitives import BooleanInvocation
 from invokeai.app.services.shared import graph_if_runtime
 from invokeai.app.services.shared.execution_engine.primitives import ActivationGate
 from invokeai.app.services.shared.graph_iterator_ancestry import _get_ordered_input_edges, _IteratorAncestry
@@ -1236,23 +1237,28 @@ class _ExecutionNodeBuilder:
 
     def _get_collect_iteration_group_key(self, edge: Edge, sibling_depth: Optional[int] = None) -> tuple[int, ...]:
         path = self._state._get_iteration_path(edge.source.node_id)
-        source_node = self._state.execution_graph.get_node(edge.source.node_id)
+        source_node_id = self._state.prepared_source_mapping.get(edge.source.node_id, edge.source.node_id)
+        source_node = self._state.graph.get_node(source_node_id)
         if (
             isinstance(source_node, ForInvocation)
             and get_output_field_scope(source_node, edge.source.field) == OutputScope.Final
         ):
             return self._state._get_for_parent_iteration_path(edge.source.node_id)
         if edge.destination.field == ITEM_FIELD:
-            if (
-                isinstance(source_node, IfInvocation)
-                and not self._state.graph._get_input_edges(source_node.id, "condition")
-                and any(
-                    isinstance(self._state.graph.get_node(branch_edge.source.node_id), IfInvocation)
-                    for branch in ("true_input", "false_input")
-                    for branch_edge in self._state.graph._get_input_edges(source_node.id, branch)
+            if isinstance(source_node, IfInvocation):
+                selected_field = (
+                    graph_if_runtime._get_static_if_selection(self._state, source_node_id)
+                    if not self._state.graph._get_input_edges(source_node_id, "condition")
+                    else None
                 )
-            ):
-                return path
+                ancestry = self._get_iterator_ancestry(self.iterator_graph())
+                if (
+                    selected_field is not None
+                    and graph_if_runtime._get_if_static_frame_analysis(self._state, ancestry, source_node_id)[1][
+                        selected_field
+                    ]
+                ):
+                    return path
             if isinstance(source_node, ForInvocation) and source_node.index == -1:
                 return path
             # Ragged siblings need the deepest path to identify their shared outer group.
@@ -1346,15 +1352,61 @@ class _ExecutionNodeBuilder:
             )
         return iteration_paths
 
-    def _collect_has_nested_if_for_final_input(self, collect_id: str) -> bool:
+    def _collect_has_selected_for_final_input(self, collect_id: str) -> bool:
         ancestry = self._get_iterator_ancestry(self.iterator_graph())
         return any(
-            isinstance(self._state.graph.get_node(edge.source.node_id), IfInvocation)
-            and any(
-                graph_if_runtime._get_if_static_frame_analysis(self._state, ancestry, edge.source.node_id)[1].values()
-            )
+            self._if_has_selected_for_final_axis(edge.source.node_id, ancestry)
             for edge in self._state.graph._get_input_edges(collect_id, ITEM_FIELD)
         )
+
+    def _if_has_selected_for_final_axis(self, if_node_id: str, ancestry: _IteratorAncestry) -> bool:
+        if not isinstance(self._state.graph.get_node(if_node_id), IfInvocation):
+            return False
+        selected_field = graph_if_runtime._get_static_if_selection(self._state, if_node_id)
+        if selected_field is not None:
+            selected_fields = {selected_field}
+        else:
+            condition_edges = self._state.graph._get_input_edges(if_node_id, "condition")
+            if len(condition_edges) != 1:
+                return False
+            condition_edge = condition_edges[0]
+            condition_source = self._state.graph.get_node(condition_edge.source.node_id)
+            if not isinstance(condition_source, BooleanInvocation) or condition_edge.source.field != "value":
+                return False
+            if not self._state.graph._get_input_edges(condition_source.id, "value"):
+                return False
+            selected_fields = {
+                "true_input"
+                if getattr(self._state.results[prepared_id], condition_edge.source.field)
+                else "false_input"
+                for prepared_id in self._get_ordered_prepared_nodes_for_source(condition_source.id)
+                if prepared_id in self._state.results
+            }
+
+        pending_edges = [
+            edge
+            for branch_field in selected_fields
+            for edge in self._state.graph._get_input_edges(if_node_id, branch_field)
+        ]
+        visited: set[str] = {if_node_id}
+        while pending_edges:
+            edge = pending_edges.pop()
+            source_id = edge.source.node_id
+            if source_id in visited:
+                continue
+            visited.add(source_id)
+            source_node = self._state.graph.get_node(source_id)
+            if (
+                isinstance(source_node, ForInvocation)
+                and get_output_field_scope(source_node, edge.source.field) == OutputScope.Final
+            ):
+                return True
+            if isinstance(source_node, IfInvocation):
+                if self._if_has_selected_for_final_axis(source_id, ancestry):
+                    return True
+                continue
+            pending_edges.extend(self._state.graph._get_input_edges(source_id))
+        return False
 
     def _get_collect_candidate_group_keys(self, edge: Edge) -> set[tuple[int, ...]]:
         source_node_id = edge.source.node_id
@@ -1363,16 +1415,11 @@ class _ExecutionNodeBuilder:
         group_depth = len(iterator_node_ids)
         if edge.destination.field == ITEM_FIELD:
             source_node = self._state.graph.get_node(source_node_id)
-            nested_literal_if = (
-                isinstance(source_node, IfInvocation)
-                and not self._state.graph._get_input_edges(source_node.id, "condition")
-                and any(
-                    isinstance(self._state.graph.get_node(branch_edge.source.node_id), IfInvocation)
-                    for branch in ("true_input", "false_input")
-                    for branch_edge in self._state.graph._get_input_edges(source_node.id, branch)
-                )
+            ancestry = self._get_iterator_ancestry(self.iterator_graph())
+            selected_if_for_final = isinstance(source_node, IfInvocation) and (
+                self._if_has_selected_for_final_axis(source_node.id, ancestry)
             )
-            if not (nested_literal_if and self._collect_has_nested_if_for_final_input(edge.destination.node_id)):
+            if not (selected_if_for_final and self._collect_has_selected_for_final_input(edge.destination.node_id)):
                 group_depth = max(group_depth - 1, 0)
 
         group_keys: set[tuple[int, ...]] = set()
@@ -2695,7 +2742,7 @@ class _ExecutionNodeBuilder:
                 )
             }
             if (
-                self._collect_has_nested_if_for_final_input(next_node_id)
+                self._collect_has_selected_for_final_input(next_node_id)
                 and len(prepared_nested_ids) > 1
                 and len(prepared_item_paths) > 1
             ):

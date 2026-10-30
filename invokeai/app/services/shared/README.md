@@ -840,12 +840,15 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
     this identity is followed through chained `Collect`s and ordinary passthrough nodes. Separate branch Collect chains
     may retain the same axis identities and frames; sharing a Collect node is not required. Matching lengths alone do
     not establish alignment. An asymmetric or distinct-axis Collect chain is rejected before invocation. A downstream
-    `Collect` retains empty outer groups.
+    `Collect` retains empty outer groups. A `For.output_collection` passed through zero or more literal-`True` `If`
+    nodes into `Collect.item` keeps the `For`'s parent frame for every chain length; the `For` final closes only its
+    own axis.
   - A root-frame condition choosing between branches with different deeper axes. When both branches retain the same
     nested axes, a root-frame condition runs the `If` once per available frame of the innermost axis. Selecting a root
     value over an axis reached only through an unselected `For` final output is the root-frame exception described
     above; literal and computed root conditions have the same result cardinality.
-  Selected-branch frame cardinality is not supported.
+  Validation and frame inference use graph topology and statically known conditions only; they do not depend on
+  unresolved runtime branch selections.
 - A completed `Collect` on a branch closes its item axis; the `If` does not wait for an `Iterate` that only that
   `Collect` consumes. When the `Collect` keeps an outer frame open and is selected, the `If` runs once per preserved
   group; when it is rejected, it never runs and the `If` runs in the frames of its remaining iterators. A `Collect` of a

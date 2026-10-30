@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Callable, Optional
 
 from invokeai.app.invocations.fields import OutputScope
 from invokeai.app.invocations.logic import IfInvocation
+from invokeai.app.invocations.primitives import BooleanInvocation
 from invokeai.app.services.shared.execution_engine.primitives import ActivationGate
 from invokeai.app.services.shared.execution_engine.scheduler import ActivationDependency
 from invokeai.app.services.shared.graph_iterator_ancestry import _IteratorAncestry
@@ -24,6 +25,24 @@ if TYPE_CHECKING:
 
 class UnsupportedIfIterationAxesError(ValueError):
     """Raised when an If condition and its branches cannot share a supported open-axis scope."""
+
+
+def _get_static_if_selection(state: "GraphExecutionState", node_id: str) -> Optional[str]:
+    """Return the selected branch when the condition is a graph literal."""
+    node = state.graph.get_node(node_id)
+    assert isinstance(node, IfInvocation)
+    condition_edges = state.graph._get_input_edges(node_id, "condition")
+    if not condition_edges:
+        return "true_input" if node.condition else "false_input"
+    condition_edge = condition_edges[0]
+    condition_source = state.graph.get_node(condition_edge.source.node_id)
+    if (
+        isinstance(condition_source, BooleanInvocation)
+        and condition_edge.source.field == "value"
+        and not state.graph._get_input_edges(condition_source.id, "value")
+    ):
+        return "true_input" if condition_source.value else "false_input"
+    return None
 
 
 def validate_if_iteration_axes(state: "GraphExecutionState") -> None:
@@ -203,15 +222,29 @@ def _validate_collect_branch_axes(
         branch_field: set(axes)
         for branch_field, axes in _get_if_branch_frame_axes(state, iterator_ancestry, node_id, frame_axes_cache).items()
     }
-    source_graph = state._get_source_graph_flat()
     branch_collect_axes: dict[str, tuple[tuple[str, ...], ...]] = {}
     for branch_field in ("true_input", "false_input"):
         branch_edges = state.graph._get_input_edges(node_id, branch_field)
-        branch_nodes = {
-            source_id
-            for edge in branch_edges
-            for source_id in nx.ancestors(source_graph, edge.source.node_id) | {edge.source.node_id}
-        }
+        branch_nodes: set[str] = set()
+        pending = [edge.source.node_id for edge in branch_edges]
+        while pending:
+            source_id = pending.pop()
+            if source_id in branch_nodes:
+                continue
+            branch_nodes.add(source_id)
+            source_node = state.graph.get_node(source_id)
+            selected_field = (
+                _get_static_if_selection(state, source_id) if isinstance(source_node, IfInvocation) else None
+            )
+            input_edges = state.graph._get_input_edges(source_id)
+            if selected_field is not None:
+                input_edges = [
+                    edge
+                    for edge in input_edges
+                    if edge.destination.field not in ("true_input", "false_input")
+                    or edge.destination.field == selected_field
+                ]
+            pending.extend(edge.source.node_id for edge in input_edges)
         retained_axes = set()
         branch_destinations = branch_nodes | {node_id}
         for collect_id in branch_nodes:
@@ -275,8 +308,10 @@ def _get_edge_frame_axes(
         if source_id not in iterator_ancestry.frame_axes_cache:
             return False
         source_node = state.graph.get_node(source_id)
-        if not use_runtime_if_selection or not isinstance(source_node, IfInvocation):
+        if not isinstance(source_node, IfInvocation):
             return True
+        if not use_runtime_if_selection:
+            return _get_static_if_selection(state, source_id) is None
         static_branches = _get_if_branch_frame_axes(
             state, iterator_ancestry, source_id, iterator_ancestry.frame_axes_cache
         )
@@ -349,6 +384,45 @@ def _get_edge_frame_axes(
                     if selected_fields
                     else branch_axes["true_input"].intersection(branch_axes["false_input"])
                 )
+        elif isinstance(source_node, IfInvocation):
+            selected_field = _get_static_if_selection(state, source_id)
+            if selected_field is None:
+                for input_edge in input_edges:
+                    input_axes = get_input_axes(input_edge)
+                    if input_axes is None:
+                        axes = None
+                        break
+                    axes.update(input_axes)
+            else:
+                other_field = "false_input" if selected_field == "true_input" else "true_input"
+                branch_axes = {
+                    branch: {
+                        axis_id
+                        for input_edge in state.graph._get_input_edges(source_id, branch)
+                        for axis_id in (get_input_axes(input_edge) or ())
+                    }
+                    for branch in ("true_input", "false_input")
+                }
+                axes.update(branch_axes[selected_field])
+                other_edges = state.graph._get_input_edges(source_id, other_field)
+                other_nodes = {
+                    ancestor_id
+                    for input_edge in other_edges
+                    for ancestor_id in nx.ancestors(state._get_source_graph_flat(), input_edge.source.node_id)
+                    | {input_edge.source.node_id}
+                }
+                if any(isinstance(state.graph.get_node(ancestor_id), CollectInvocation) for ancestor_id in other_nodes):
+                    axes.update(branch_axes[other_field] & branch_axes[selected_field])
+                else:
+                    for input_edge in other_edges:
+                        final_axes, direct_axes = _get_if_final_axes_for_edge(state, iterator_ancestry, input_edge)
+                        axes.update(branch_axes[other_field] - (final_axes - direct_axes))
+                for input_edge in state.graph._get_input_edges(source_id, "condition"):
+                    input_axes = get_input_axes(input_edge)
+                    if input_axes is None:
+                        axes = None
+                        break
+                    axes.update(input_axes)
         else:
             for input_edge in input_edges:
                 input_axes = get_input_axes(input_edge)
@@ -760,6 +834,42 @@ def _get_if_iteration_paths_with_ancestry(
         for axis_id in iterator_ancestry.get_ordered_iterator_ancestors(node_id)
         if axis_id not in unselected_final_axes
     ]
+    if condition_selections:
+        selected_axes_by_field = {
+            branch_field: {
+                axis_id
+                for edge in state.graph._get_input_edges(node_id, branch_field)
+                for axis_id in (
+                    _get_edge_frame_axes(
+                        state,
+                        iterator_ancestry,
+                        edge,
+                        iterator_ancestry.frame_axes_cache,
+                        use_runtime_if_selection=True,
+                    )
+                    or ()
+                )
+            }
+            for branch_field in ("true_input", "false_input")
+        }
+        source_graph = state._get_source_graph_flat()
+        for _, selected_field in condition_selections:
+            selected_axes = condition_axes | selected_axes_by_field[selected_field]
+            if not selected_axes:
+                continue
+            other_field = "false_input" if selected_field == "true_input" else "true_input"
+            other_edges = state.graph._get_input_edges(node_id, other_field)
+            other_nodes = {
+                source_id
+                for edge in other_edges
+                for source_id in nx.ancestors(source_graph, edge.source.node_id) | {edge.source.node_id}
+            }
+            if any(isinstance(state.graph.get_node(source_id), CollectInvocation) for source_id in other_nodes):
+                frame_iterators = [
+                    axis_id
+                    for axis_id in frame_iterators
+                    if axis_id not in selected_axes_by_field[other_field] or axis_id in selected_axes
+                ]
     if frame_iterators:
         innermost_id = frame_iterators[-1]
         if innermost_id not in state.executed and innermost_id not in state.source_prepared_mapping:
@@ -954,12 +1064,17 @@ def _has_empty_if_frame(state: "GraphExecutionState", if_node_id: str) -> bool:
     ancestry = state._runtime()._iterator_ancestry
     condition_edges = state.graph._get_input_edges(if_node_id, "condition")
     axes = {axis_id for edge in condition_edges for axis_id in ancestry.get_frame_axes_for_edge(edge)}
-    branch_axes = _get_if_runtime_branch_frame_axes(state, ancestry, if_node_id)
+    static_selection = _get_static_if_selection(state, if_node_id)
+    branch_axes = (
+        _get_if_static_frame_analysis(state, ancestry, if_node_id)[0]
+        if static_selection is not None
+        else _get_if_runtime_branch_frame_axes(state, ancestry, if_node_id)
+    )
     _, branch_final_axes = _get_if_static_frame_analysis(state, ancestry, if_node_id)
 
     selected_fields: set[str] = set()
-    if not condition_edges:
-        selected_fields.add("true_input" if state.graph.get_node(if_node_id).condition else "false_input")
+    if static_selection is not None:
+        selected_fields.add(static_selection)
     else:
         condition_edge = condition_edges[0]
         for exec_id in state.source_prepared_mapping.get(condition_edge.source.node_id, ()):
@@ -971,6 +1086,18 @@ def _has_empty_if_frame(state: "GraphExecutionState", if_node_id: str) -> bool:
         branch_for_final_axes = branch_final_axes[branch_field]
         if branch_field in selected_fields:
             axes.update(branch_axis_ids)
+        elif static_selection is not None:
+            other_nodes = {
+                source_id
+                for edge in state.graph._get_input_edges(if_node_id, branch_field)
+                for source_id in nx.ancestors(state._get_source_graph_flat(), edge.source.node_id)
+                | {edge.source.node_id}
+            }
+            if any(isinstance(state.graph.get_node(source_id), CollectInvocation) for source_id in other_nodes):
+                selected_axes = branch_axes[static_selection]
+                axes.update((set(branch_axis_ids) & set(selected_axes)) - branch_for_final_axes)
+            else:
+                axes.update(set(branch_axis_ids) - branch_for_final_axes)
         else:
             # Preserve the If's old empty-iterator behavior, but an unselected For final must not add frames.
             axes.update(set(branch_axis_ids) - branch_for_final_axes)
