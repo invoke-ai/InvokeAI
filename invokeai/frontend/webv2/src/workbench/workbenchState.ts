@@ -1525,17 +1525,51 @@ const createUndoSnapshot = (project: Project): ProjectUndoSnapshot => ({
   widgetRegions: cloneWidgetRegions(project.widgetRegions),
 });
 
+/** Whether a layout shows the instance: a region member or front widget (an empty center keeps one), or a window. */
+const isInstancePlaced = (
+  widgetRegions: Readonly<Record<WidgetRegion, WidgetRegionState>>,
+  floatingWidgets: Readonly<Record<WidgetInstanceId, unknown>> | undefined,
+  instanceId: WidgetInstanceId
+): boolean =>
+  (floatingWidgets !== undefined && Object.hasOwn(floatingWidgets, instanceId)) ||
+  WIDGET_REGIONS.some(
+    (regionId) =>
+      widgetRegions[regionId].instanceIds.includes(instanceId) ||
+      widgetRegions[regionId].activeInstanceId === instanceId
+  );
+
+/** An instance holding nothing its type does not start with: no title, and the state a fresh one gets. */
+const isPristineWidgetInstance = (instance: WidgetInstanceContract): boolean => {
+  const fresh = createWidgetInstance(instance.typeId, instance.id);
+
+  return areJsonValuesStructurallyEqual({ ...instance, createdAt: fresh.createdAt }, fresh);
+};
+
 /**
  * Project undo is layout undo: placements, panels, route and preset copies go back to the step's snapshot, while every
- * widget keeps its current values (a Generate prompt typed since stays). Instances are never lost: one the step dropped
- * returns with the values it had then, and one created since stays, unplaced, with its own, so adding it again brings
- * them back. Graphs fill in only where the project has none now.
+ * widget keeps its current values (a Generate prompt typed since stays). Instances with content are never lost: one the
+ * step dropped returns with the values it had then, and one created since stays, unplaced, with its own, so adding it
+ * again brings them back. One created since that the restored layout places nowhere and that holds nothing a fresh
+ * instance would not is dropped, so opening a widget and undoing leaves no trace; the redo step's snapshot still
+ * carries it. Preset working copies need no check: they are captured from the live project, so any instance one
+ * places is in the snapshot, and applying a copy recreates a missing instance pristine anyway. Graphs fill in only
+ * where the project has none now.
  */
 const restoreUndoSnapshot = (project: Project, snapshot: ProjectUndoSnapshot): Project => {
+  const restored = cloneWidgetInstances(snapshot.widgetInstances);
+  const isKeptSinceSnapshot = (instance: WidgetInstanceContract): boolean =>
+    isInstancePlaced(snapshot.widgetRegions, snapshot.floatingWidgets, instance.id) ||
+    !isPristineWidgetInstance(instance);
   const widgetInstances = {
-    ...cloneWidgetInstances(project.widgetInstances),
+    ...cloneWidgetInstances(
+      Object.fromEntries(
+        Object.entries(project.widgetInstances).filter(
+          ([instanceId, instance]) => Object.hasOwn(restored, instanceId) || isKeptSinceSnapshot(instance)
+        )
+      )
+    ),
     ...Object.fromEntries(
-      Object.entries(cloneWidgetInstances(snapshot.widgetInstances)).map(([instanceId, instance]) => {
+      Object.entries(restored).map(([instanceId, instance]) => {
         const current = project.widgetInstances[instanceId];
 
         return [instanceId, current ? { ...instance, state: current.state } : instance];
@@ -1851,15 +1885,11 @@ const stripRetiredWidgets = <Instance extends { typeId: string }>(
         : stripped;
   }
 
-  const floatingIds = new Set(
-    storedFloatingWidgets && typeof storedFloatingWidgets === 'object' ? Object.keys(storedFloatingWidgets) : []
-  );
-  const isStillPlaced = (instanceId: WidgetInstanceId) =>
-    floatingIds.has(instanceId) ||
-    WIDGET_REGIONS.some(
-      (regionId) =>
-        regions[regionId].instanceIds.includes(instanceId) || regions[regionId].activeInstanceId === instanceId
-    );
+  const floatingWidgets =
+    storedFloatingWidgets && typeof storedFloatingWidgets === 'object'
+      ? (storedFloatingWidgets as Record<WidgetInstanceId, unknown>)
+      : undefined;
+  const isStillPlaced = (instanceId: WidgetInstanceId) => isInstancePlaced(regions, floatingWidgets, instanceId);
   const instances = Object.fromEntries(
     Object.entries(widgetInstances).filter(
       ([instanceId]) => !isTypeRetired(instanceId) && (!displaced.has(instanceId) || isStillPlaced(instanceId))
