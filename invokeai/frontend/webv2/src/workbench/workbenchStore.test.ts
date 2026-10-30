@@ -411,6 +411,32 @@ describe('createWorkbenchStore', () => {
     expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'gallery').searchTerm).toBe('positional form');
   });
 
+  it('selects an item picked from another board within that board, leaving the Gallery on its own board', () => {
+    const store = createWorkbenchStore();
+    store.commands.gallery.selectBoard('board-a');
+
+    store.commands.gallery.selectItemInItsBoard({
+      boardId: 'board-b',
+      category: 'general',
+      createdAt: '2026-09-01T00:00:00.000Z',
+      durationSeconds: 4,
+      fullUrl: '/full/clip.mp4',
+      height: 64,
+      isIntermediate: false,
+      kind: 'video',
+      name: 'clip.mp4',
+      starred: false,
+      thumbnailUrl: '/thumb/clip.mp4',
+      width: 64,
+    });
+
+    const values = getProjectWidgetValues(store.getSnapshot().activeProject, 'gallery');
+    expect(values.selectedImageName).toBe('video:clip.mp4');
+    // Preview's next/previous step through this listing.
+    expect(values.selectedImageQuery).toMatchObject({ boardId: 'board-b', itemBoard: true, page: 0 });
+    expect(values.selectedBoardId).toBe('board-a');
+  });
+
   it('edits a preset default route through the layout capability', () => {
     const store = createWorkbenchStore();
 

@@ -3688,6 +3688,8 @@
       "viewGraph": "View graph"
     },
     "preview": {
+      "boardAndItem": "{{board}} / {{name}}",
+      "chooseAnotherItem": "{{label}}. Choose another item",
       "commands": {
         "deletePreviewImage": "Delete preview image",
         "nextComparisonMode": "Next comparison mode",

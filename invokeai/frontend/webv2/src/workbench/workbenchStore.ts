@@ -149,6 +149,15 @@ const createCommands = (
           selectionPage,
         })
       ),
+      /** Select an image or video picked outside the Gallery's listing; Preview navigates within the item's own board. */
+      selectItemInItsBoard: command(
+        'selectGalleryItem',
+        (item: ActionPayload<'selectGalleryItem'>['item'], projectId?: string) => ({
+          item,
+          navigateItemBoard: true,
+          projectId,
+        })
+      ),
       setCompareItem: command(
         'setGalleryCompareImage',
         (image: ActionPayload<'setGalleryCompareImage'>['image'], projectId?: string) => ({ image, projectId })
