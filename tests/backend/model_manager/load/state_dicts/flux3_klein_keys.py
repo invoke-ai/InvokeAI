@@ -7,7 +7,7 @@ which reads the header only, from
 Subsetting rule: `content_mode_blocks.image` index 0, `content_mode_blocks.image_cond` index 0, `single_blocks` index 0, `txt_mode_blocks` index 0, plus every key outside a stack. Values are `(shape, dtype)`.
 
 Every single-file and GGUF FLUX.3 build uses these names. The FLUX.3 loaders read the transformer's structure from it (widths, head
-width, feedforward width, the flow-map embedder `ref_time_in`) and convert it to the vendored diffusers module; a key or shape
+width, feedforward width, the flow-map embedder `ref_time_in`) and convert it to diffusers' `Flux3Transformer2DModel`; a key or shape
 changed by a re-upload shows up here as a missing or unexpected parameter.
 """
 

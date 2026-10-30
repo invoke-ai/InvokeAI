@@ -2,14 +2,14 @@
 
 Asserted is the forward: a loaded model must predict what the model the checkpoint was written from
 predicts. That covers the prefix strip, the key conversion, the output adaLN reordering and the QK norms,
-which the vendored transformer runs in float32.
+which diffusers' transformer runs in float32.
 """
 
 import gguf
 import pytest
 import torch
+from diffusers import Flux3Transformer2DModel
 
-from invokeai.backend.flux3 import Flux3Transformer2DModel
 from invokeai.backend.flux3.conversion import convert_flux3_native_to_diffusers
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Flux3_Config, Main_GGUF_Flux3_Config
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (

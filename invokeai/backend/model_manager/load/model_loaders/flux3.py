@@ -1,12 +1,10 @@
 """Loaders for FLUX.3 Image transformers (Klein and Klein Base).
 
-The transformer class is vendored under ``invokeai.backend.flux3`` because it exists only on diffusers main,
-so the Diffusers loader dispatches submodels explicitly instead of subclassing ``GenericDiffusersLoader``
-(which reads ``model_index.json`` and resolves classes against the installed diffusers; FLUX.3 ships a
-``modular_model_index.json``).
+The Diffusers loader dispatches submodels explicitly instead of subclassing ``GenericDiffusersLoader``, which
+reads ``model_index.json``: FLUX.3 ships a ``modular_model_index.json``.
 
 Submodel map of a Diffusers folder (subfolder == ``SubModelType`` value, except the tokenizer):
-- ``transformer``  -> vendored ``Flux3Transformer2DModel`` (bf16, QK norms in fp32)
+- ``transformer``  -> ``Flux3Transformer2DModel`` (bf16, QK norms in fp32)
 - ``vae``          -> ``AutoencoderKLFlux2`` (the FLUX.2 VAE, byte-identical)
 - ``text_encoder`` -> ``Qwen3VLModel`` (Qwen3-VL 4B Instruct), visual tower dropped
 - tokenizer        -> ``AutoTokenizer`` from ``text_encoder/``, where the release keeps its tokenizer files
@@ -56,7 +54,7 @@ def _keep_qk_norms_in_fp32(model: torch.nn.Module) -> None:
 
 def _build_transformer(state_dict: dict) -> torch.nn.Module:
     """An empty transformer (on the meta device) shaped by a native FLUX.3 state dict."""
-    from invokeai.backend.flux3 import Flux3Transformer2DModel
+    from diffusers import Flux3Transformer2DModel
 
     model_config = flux3_transformer_config(state_dict)
     with accelerate.init_empty_weights():
@@ -87,7 +85,7 @@ class Flux3DiffusersModel(ModelLoader):
 
         match submodel_type:
             case SubModelType.Transformer:
-                from invokeai.backend.flux3 import Flux3Transformer2DModel
+                from diffusers import Flux3Transformer2DModel
 
                 transformer = Flux3Transformer2DModel.from_pretrained(
                     model_path / "transformer", torch_dtype=dtype, local_files_only=True

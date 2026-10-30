@@ -1,11 +1,10 @@
-"""Native FLUX.3 state dicts, converted to the vendored diffusers ``Flux3Transformer2DModel``.
+"""Native FLUX.3 state dicts, converted to diffusers' ``Flux3Transformer2DModel``.
 
 Every single-file FLUX.3 build InvokeAI loads uses Black Forest Labs' own key names: BFL's
 ``model.safetensors``, the ComfyUI repackage (byte-identical to it), and the GGUF conversions. The renames
-are a port of diffusers' ``convert_flux3_transformer_checkpoint_to_diffusers`` (``single_file_utils.py`` at
-the commit ``transformer_flux3.py`` is vendored from). Reading the structure from the weights, rather than
-assuming the released one, is InvokeAI's: a finetune that changes the depth must not load as the first N
-blocks of the released model.
+are a port of diffusers' ``convert_flux3_transformer_checkpoint_to_diffusers`` (``single_file_utils.py`` in
+diffusers 0.42.1). Reading the structure from the weights, rather than assuming the released one, is InvokeAI's:
+a finetune that changes the depth must not load as the first N blocks of the released model.
 """
 
 import re
@@ -86,7 +85,7 @@ def flux3_native_key_to_diffusers(key: str) -> str:
 
 
 def convert_flux3_native_to_diffusers(state_dict: dict[str, Any]) -> dict[str, Any]:
-    """Rename a native FLUX.3 transformer state dict to the vendored diffusers module, in place of the input.
+    """Rename a native FLUX.3 transformer state dict to the diffusers module, in place of the input.
 
     The input dict is emptied as it is converted, so the caller's reference does not keep a second copy of
     every tensor alive.

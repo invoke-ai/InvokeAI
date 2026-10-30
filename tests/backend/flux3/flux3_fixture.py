@@ -13,9 +13,9 @@ from pathlib import Path
 
 import gguf
 import torch
+from diffusers import Flux3Transformer2DModel
 from gguf.quants import dequantize, quantize
 
-from invokeai.backend.flux3 import Flux3Transformer2DModel
 from invokeai.backend.flux3.conversion import flux3_native_key_to_diffusers
 
 TINY_CONFIG = {

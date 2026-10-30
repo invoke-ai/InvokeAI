@@ -1,15 +1,16 @@
-"""Native FLUX.3 checkpoints -> the vendored diffusers transformer.
+"""Native FLUX.3 checkpoints -> diffusers' FLUX.3 transformer.
 
 The real-layout tests read the key names and shapes captured from the released Klein and Klein Base files.
-Converted onto the vendored module (on the meta device), every parameter must be filled and nothing may be
-left over -- a renamed key in a re-upload shows up here, not as a block silently missing from a generation.
+Converted onto diffusers' ``Flux3Transformer2DModel`` (on the meta device), every parameter must be filled and
+nothing may be left over -- a renamed key in a re-upload shows up here, not as a block silently missing from a
+generation.
 """
 
 import accelerate
 import pytest
 import torch
+from diffusers import Flux3Transformer2DModel
 
-from invokeai.backend.flux3 import Flux3Transformer2DModel
 from invokeai.backend.flux3.conversion import (
     convert_flux3_native_to_diffusers,
     flux3_native_key_to_diffusers,
@@ -38,7 +39,7 @@ def _meta_state_dict(keys: dict[str, tuple[list[int], str]]) -> dict[str, torch.
 @pytest.mark.parametrize(
     ("fixture", "flow_map"), [(flux3_klein_keys, True), (flux3_klein_base_keys, False)], ids=["klein", "base"]
 )
-def test_the_released_layout_fills_the_vendored_model_exactly(fixture, flow_map: bool) -> None:
+def test_the_released_layout_fills_the_diffusers_model_exactly(fixture, flow_map: bool) -> None:
     native = _meta_state_dict(fixture.state_dict_keys)
 
     config = flux3_transformer_config(native)

@@ -297,7 +297,7 @@ class Flux3DenoiseInvocation(BaseInvocation):
             head_dim=FLUX3_ATTENTION_HEAD_DIM,
             seq_len=num_tokens,
             has_attn_mask=False,
-            # The vendored transformer attends through diffusers' `dispatch_attention_fn`.
+            # diffusers' FLUX.3 transformer attends through `dispatch_attention_fn`.
             via_diffusers_dispatch=True,
         )
         return estimated

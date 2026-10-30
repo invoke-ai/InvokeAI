@@ -1,9 +1,8 @@
 """FLUX.3 prompt encoding with the Qwen3-VL 4B text encoder.
 
-A port of diffusers' ``Flux3TextEncoderStep._get_qwen3_vl_prompt_embeds`` (``modular_pipelines/flux3/
-encoders.py`` at the commit ``transformer_flux3.py`` is vendored from), which matches the reference
-implementation's ``TextEncoder.encode``. Small deviations here degrade images without failing, so each rule
-below is load-bearing:
+A port of diffusers' ``Flux3TextEncoderStep._get_qwen3_vl_prompt_embeds`` (``modular_pipelines/flux3/encoders.py``
+in diffusers 0.42.1), which matches the reference implementation's ``TextEncoder.encode``. Small deviations here
+degrade images without failing, so each rule below is load-bearing:
 
 - The prompt goes through the chat template as a single user turn, with the generation prompt appended.
 - The token window is right-padded to a multiple of 80, capped at 8192. FLUX.3 attends to the padding
