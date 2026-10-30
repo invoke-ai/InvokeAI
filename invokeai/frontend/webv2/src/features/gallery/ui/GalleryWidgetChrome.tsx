@@ -31,6 +31,16 @@ import { useGalleryDestination } from './useGalleryDestination';
 type GalleryChromeProps = { region: GalleryWidgetProps['region'] };
 
 const LABEL_EXPANDED_PROPS = { bg: 'transparent' } as const;
+// Clipped, but with room for the board button's focus ring: the last resort on a header too narrow for its parts.
+const LABEL_CLIP_CSS = { overflow: 'clip', overflowClipMargin: '4px' } as const;
+/**
+ * Measured against the header row, the nearest inline-size container (the widget header, or the center chrome): about
+ * half of it, less 3rem because the label's fixed parts ("Gallery /", the board's cover and chevron) are wider than
+ * Saving to's. The board and destination names then get about equal room and truncate rather than overlap.
+ */
+const DESTINATION_MAX_WIDTH = 'min(18rem, max(6.5rem, 50cqi - 3rem))';
+/** On a narrow header the trigger shows only the board; its accessible name still starts with "Saving to". */
+const DESTINATION_PREFIX_CSS = { '@container (width < 30rem)': { display: 'none' } } as const;
 /** The boards sidebar sits at the inline start, so its panel icon flips with the text direction. */
 const MIRRORED_IN_RTL = { transform: 'scaleX(-1)' } as const;
 
@@ -75,7 +85,7 @@ export const GalleryWidgetLabel = ({ region }: GalleryChromeProps) => {
   );
 
   return (
-    <HStack flex="1" gap="1" minW="0" pe={region === 'center' ? undefined : '2'}>
+    <HStack css={LABEL_CLIP_CSS} flex="1" gap="1" minW="0" pe={region === 'center' ? undefined : '2'}>
       {region === 'center' ? null : (
         <Text flexShrink={0} fontWeight="700" pe="2">
           {t('widgets.labels.gallery')}
@@ -89,6 +99,8 @@ export const GalleryWidgetLabel = ({ region }: GalleryChromeProps) => {
         _expanded={LABEL_EXPANDED_PROPS}
         aria-expanded={!isCollapsed}
         aria-label={t('widgets.gallery.toggleBoardsNamed', { name: boardName })}
+        // Buttons keep their width by default; this one gives way so the board's name truncates.
+        flexShrink={1}
         maxW="14rem"
         minW="0"
         // The cover keeps the same 2px inset on every side of the 24px button.
@@ -181,11 +193,12 @@ export const GalleryWidgetHeaderActions = () => {
       <Tooltip content={tooltip} disabled={isMenuOpen} ids={triggerIds}>
         <Menu.Trigger asChild>
           <Button
-            // Built from the visible text, so in every language the name starts with what the button shows and a
-            // speech user can say it; the hint follows.
+            // Always starts with "Saving to" and the board, then the hint. The visible text ("Saving to" and the
+            // board, or the board alone on a narrow header) is contained in it, so label-in-name holds in every
+            // language and a speech user can say what the button shows.
             aria-label={`${t('widgets.gallery.savingTo')} ${destinationName}. ${t('widgets.gallery.destinationTriggerHint')}`}
             data-gallery-destination={destination.boardId}
-            maxW="18rem"
+            maxW={DESTINATION_MAX_WIDTH}
             minW="0"
             size="sm"
             variant="ghost"
@@ -194,7 +207,7 @@ export const GalleryWidgetHeaderActions = () => {
             {/* One run of text, label and board joined by a space, so the visible text reads as the start of the
                 accessible name ("Saving to Inbox"); separate flex items would read as "Saving toInbox". */}
             <HStack as="span" gap="0" minW="0">
-              <Text as="span" color="fg.muted" flexShrink={0} whiteSpace="pre">
+              <Text as="span" color="fg.muted" css={DESTINATION_PREFIX_CSS} flexShrink={0} whiteSpace="pre">
                 {`${t('widgets.gallery.savingTo')} `}
               </Text>
               <MiddleTruncate as="span" fontWeight="600" minW="0" text={destinationName} />
