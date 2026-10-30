@@ -247,10 +247,9 @@ export const ToolFamilyButton = ({
 
   return (
     <Menu.RootProvider lazyMount unmountOnExit value={menuMachine}>
-      {/* Forcing `open={false}` (not `disabled`) suppresses the tooltip while
-          the menu is open: the disabled path unwraps the trigger and remounts
-          the button, dropping pointer capture mid-hold. */}
-      <Tooltip content={tooltip} ids={ids} open={menu.open ? false : undefined} positioning={TOOLTIP_POSITIONING}>
+      {/* No tooltip while the menu is open. The root stays mounted: unwrapping the trigger would remount the button
+          and drop its pointer capture mid-hold. */}
+      <Tooltip content={tooltip} disabled={menu.open} ids={ids} keepsRootWhenDisabled positioning={TOOLTIP_POSITIONING}>
         <IconButton
           aria-controls={menu.open ? menu.getContentProps().id : undefined}
           aria-expanded={menu.open}

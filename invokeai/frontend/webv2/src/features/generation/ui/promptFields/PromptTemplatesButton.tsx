@@ -103,9 +103,8 @@ export const PromptTemplatesButton = ({
       onOpenChange={handleOpenChange}
     >
       {/* The freshly mounted panel paints one unpositioned frame over this wide trigger; the pointer leave it causes
-          lets the tooltip reopen over the open panel. Forcing `open={false}` (not `disabled`, which remounts the
-          trigger) keeps it shut while the panel is open. */}
-      <Tooltip content={tooltip} ids={popoverIds} open={isOpen ? false : undefined}>
+          would let the tooltip reopen over the open panel, so it stays disabled while the panel is open. */}
+      <Tooltip content={tooltip} disabled={isOpen} ids={popoverIds} keepsRootWhenDisabled>
         <Popover.Trigger asChild>
           <IconButton
             aria-label={t('widgets.generate.promptTemplates.title')}
