@@ -31,11 +31,12 @@ _PEFT_ANIMA_RE = re.compile(
     r"(diffusion_model|transformer|base_model\.model\.transformer)\.blocks\.\d+\." + _COSMOS_DIT_SUBCOMPONENTS_RE
 )
 
-# Diffusers' ``CosmosTransformer3DModel`` uses ``transformer_blocks.N.attn1`` / ``attn2`` / ``ff.net`` where
-# Anima's native module uses ``blocks.N.self_attn`` / ``cross_attn`` / ``mlp``. These names are distinct from
-# Qwen-Image's ``transformer_blocks.N.attn`` and Wan's ``blocks.N.attn1`` layouts.
+# Diffusers' ``CosmosTransformer3DModel`` uses ``transformer_blocks.N.attn1`` / ``attn2`` where Anima's native
+# module uses ``blocks.N.self_attn`` / ``cross_attn``. These names are distinct from Qwen-Image's
+# ``transformer_blocks.N.attn`` and Wan's ``blocks.N.attn1`` layouts. ``ff.net`` is not a signature because FLUX
+# uses the same path; it is converted only after another layer has identified the file as Anima.
 _DIFFUSERS_ANIMA_RE = re.compile(
-    r"(transformer|base_model\.model\.transformer)\.transformer_blocks\.\d+\.(attn1|attn2|ff\.net)\."
+    r"(transformer|base_model\.model\.transformer)\.transformer_blocks\.\d+\.(attn1|attn2)\."
 )
 
 

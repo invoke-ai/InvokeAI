@@ -26,6 +26,20 @@ def test_diffusers_cosmos_lora_identifies_as_anima(tmp_path) -> None:
     assert config.base == BaseModelType.Anima
 
 
+def test_diffusers_flux_ff_net_is_not_identified_as_anima(tmp_path) -> None:
+    prefix = "transformer.transformer_blocks.0.ff.net.0.proj"
+    state_dict = {
+        f"{prefix}.lora_A.weight": torch.randn(4, 3072),
+        f"{prefix}.lora_B.weight": torch.randn(12288, 4),
+    }
+
+    path = tmp_path / "flux_diffusers_lora.safetensors"
+    save_file(state_dict, path)
+
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_Anima_Config._validate_looks_like_lora(ModelOnDisk(path))
+
+
 def test_transformer_prefixed_ltx2_lora_is_not_identified_as_anima(tmp_path) -> None:
     state_dict = {
         "transformer.transformer_blocks.0.attn1.to_q.lora_A.weight": torch.randn(4, 2048),
