@@ -4,16 +4,28 @@ What the GPU parity run cannot see: the order the prefix cache is filled in when
 an image-to-image run starts on each variant's schedule, and which components the loader refuses.
 """
 
+import itertools
+import weakref
 from contextlib import contextmanager, nullcontext
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 import torch
+from diffusers.models.normalization import RMSNorm as DiffusersRMSNorm
+from diffusers.models.transformers.transformer_qwenimage21 import QwenImage21ZeroCenterRMSNorm
 from PIL import Image
+from torch.utils._python_dispatch import TorchDispatchMode
+from torch.utils._pytree import tree_leaves
 
 from invokeai.app.invocations.fields import ImageField, LatentsField, MetadataField, QwenImage21ConditioningField
-from invokeai.app.invocations.model import ModelIdentifierField, Qwen3VLEncoderField, TransformerField, VAEField
+from invokeai.app.invocations.model import (
+    LoRAField,
+    ModelIdentifierField,
+    Qwen3VLEncoderField,
+    TransformerField,
+    VAEField,
+)
 from invokeai.app.invocations.qwen_image_2_1.qwen_image_2_1_denoise import (
     LATENT_CHANNELS,
     PREFIX_CACHE_METADATA_KEY,
@@ -24,6 +36,10 @@ from invokeai.app.invocations.qwen_image_2_1.qwen_image_2_1_denoise import (
     prefix_cache_fits,
     prefix_length,
     unpack_latents,
+)
+from invokeai.app.invocations.qwen_image_2_1.qwen_image_2_1_lora_loader import (
+    QwenImage21LoRACollectionLoader,
+    QwenImage21LoRALoaderInvocation,
 )
 from invokeai.app.invocations.qwen_image_2_1.qwen_image_2_1_model_loader import QwenImage21ModelLoaderInvocation
 from invokeai.app.invocations.text_encoder.qwen_image_2_1_text_encoder import QwenImage21TextEncoderInvocation
@@ -119,7 +135,7 @@ def _context(
     return SimpleNamespace(
         models=SimpleNamespace(
             load=lambda _identifier: _TransformerInfo(transformer, events),
-            get_config=lambda _identifier: SimpleNamespace(variant=variant),
+            get_config=lambda _identifier: SimpleNamespace(variant=variant, format=ModelFormat.Diffusers),
         ),
         conditioning=SimpleNamespace(load=lambda name: conditionings[name]),
         tensors=SimpleNamespace(load=lambda name: tensors.get(name, init_latents)),
@@ -891,3 +907,479 @@ def test_a_reference_encodes_at_its_reading_size_with_its_alpha_normalized_in_bf
     expected = ((vae.z - mean) / std).float()[:, :, 0]
     assert torch.equal(saved["latents"], expected)
     assert not torch.equal(expected, ((vae.z.float() - 0.3) / 1.7)[:, :, 0])
+
+
+_LORA_NAME = "Manga to Photo"
+
+
+def _lora_context(base: BaseModelType, model_type: ModelType = ModelType.LoRA):
+    configs = {"lora": SimpleNamespace(name=_LORA_NAME, base=base, type=model_type)}
+    return SimpleNamespace(
+        models=SimpleNamespace(exists=lambda key: key in configs, get_config=lambda key: configs[key])
+    )
+
+
+def _lora_field(weight: float = 0.8, key: str = "lora") -> LoRAField:
+    return LoRAField(
+        lora=ModelIdentifierField(
+            key=key, hash="h", name=_LORA_NAME, base=BaseModelType.QwenImage21, type=ModelType.LoRA
+        ),
+        weight=weight,
+    )
+
+
+def _transformer_field() -> TransformerField:
+    model = ModelIdentifierField(key="m", hash="h", name="m", base=BaseModelType.QwenImage21, type=ModelType.Main)
+    return TransformerField(transformer=model, loras=[])
+
+
+def _lora_loader(node_class: str, lora: LoRAField):
+    if node_class == "single":
+        return QwenImage21LoRALoaderInvocation.model_construct(
+            lora=lora.lora, weight=lora.weight, transformer=_transformer_field()
+        )
+    return QwenImage21LoRACollectionLoader.model_construct(loras=[lora], transformer=_transformer_field())
+
+
+def test_a_lora_collection_is_added_to_the_transformer_once() -> None:
+    node = QwenImage21LoRACollectionLoader.model_construct(
+        loras=[_lora_field(0.8), _lora_field(0.5)], transformer=_transformer_field()
+    )
+    output = node.invoke(_lora_context(BaseModelType.QwenImage21))
+    assert output.transformer is not None
+    assert [(lora.lora.key, lora.weight) for lora in output.transformer.loras] == [("lora", 0.8)]
+
+
+@pytest.mark.parametrize("node_class", ["single", "collection"])
+def test_a_qwen_image_lora_is_refused(node_class: str) -> None:
+    # Its keys would match no layer, or the wrong ones, in Qwen-Image-2.1's transformer.
+    with pytest.raises(ValueError, match="not Qwen-Image-2.1"):
+        _lora_loader(node_class, _lora_field()).invoke(_lora_context(BaseModelType.QwenImage))
+
+
+@pytest.mark.parametrize("node_class", ["single", "collection"])
+def test_a_lora_that_is_not_installed_is_refused(node_class: str) -> None:
+    with pytest.raises(ValueError) as refused:
+        _lora_loader(node_class, _lora_field(key="gone")).invoke(_lora_context(BaseModelType.QwenImage21))
+    assert "gone" in str(refused.value) and "Unknown" in str(refused.value)
+
+
+@pytest.mark.parametrize("node_class", ["single", "collection"])
+def test_a_model_that_is_not_a_lora_is_refused(node_class: str) -> None:
+    # A Qwen-Image-2.1 model of another type, so the base alone would let it through.
+    with pytest.raises(ValueError) as refused:
+        _lora_loader(node_class, _lora_field()).invoke(_lora_context(BaseModelType.QwenImage21, ModelType.Main))
+    message = str(refused.value)
+    assert _LORA_NAME in message and ModelType.Main.value in message and "not a LoRA" in message
+
+
+class _LinearTransformer(torch.nn.Module):
+    """A transformer with real Linears and norms a LoRA can target; each forward reads to_q and the norms."""
+
+    config = SimpleNamespace(causal_condition=True, num_attention_heads=2, attention_head_dim=4)
+
+    def __init__(self) -> None:
+        super().__init__()
+        block = torch.nn.Module()
+        block.attn = torch.nn.Module()
+        block.attn.to_q = torch.nn.Linear(8, 8, bias=False)
+        torch.nn.init.zeros_(block.attn.to_q.weight)
+        block.attn.to_k = torch.nn.Linear(8, 8, bias=False)
+        block.attn.norm_q = DiffusersRMSNorm(8, eps=1e-6)
+        self.transformer_blocks = torch.nn.ModuleList([block])
+        # Reads the timestep embedding, as 2.1's shared modulation does.
+        self.modulation = torch.nn.Sequential(torch.nn.SiLU(), torch.nn.Linear(8, 32, bias=False))
+        # The text norm has no custom wrapper, so only a forced direct patch can reach it.
+        self.txt_in = torch.nn.Module()
+        self.txt_in.text_norm = QwenImage21ZeroCenterRMSNorm(8)
+        self.seen: list[tuple[str | None, torch.Tensor]] = []
+        self.norm_seen: list[torch.Tensor] = []
+        self.text_norm_seen: list[torch.Tensor] = []
+
+    def forward(self, *, hidden_states, encoder_hidden_states, kv_cache_mode, **_kwargs):
+        to_q = self.transformer_blocks[0].attn.to_q
+        self.seen.append((kv_cache_mode, to_q(torch.ones(1, 8)).detach().clone()))
+        self.weight_was_patched = bool(to_q.weight.any())
+        self.norm_seen.append(self.transformer_blocks[0].attn.norm_q.weight.detach().clone())
+        self.text_norm_seen.append(self.txt_in.text_norm.weight.detach().clone())
+        return (torch.zeros(1, encoder_hidden_states.shape[1] + hidden_states.shape[1], hidden_states.shape[2]),)
+
+
+class _ReservingTransformerInfo(_TransformerInfo):
+    """Records the working memory the transformer is loaded with."""
+
+    def __init__(self, transformer) -> None:
+        super().__init__(transformer, events=[])
+        self.reserved: list[int] = []
+
+    @contextmanager
+    def model_on_device(self, *, working_mem_bytes: int, **_kwargs):
+        self.reserved.append(working_mem_bytes)
+        yield ({}, self.model)
+
+
+_UP, _DOWN = torch.full((8, 2), 0.5), torch.full((2, 8), 0.25)
+
+
+def _run_with_a_lora(
+    model_format: ModelFormat, weight: float | None, monkeypatch: pytest.MonkeyPatch
+) -> tuple[_LinearTransformer, int]:
+    """Two steps on a `_LinearTransformer` as the model cache holds it, with a LoRA on its to_q and both norms at
+    `weight` (None: no LoRA). Returns the transformer and the working memory it was loaded with."""
+    from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+        apply_custom_layers_to_model,
+    )
+    from invokeai.backend.patches.layer_patcher import LayerPatcher
+
+    # As if the layer were on the GPU: on the CPU every LoRA runs as a sidecar, whatever the format.
+    monkeypatch.setattr(LayerPatcher, "_is_any_part_of_layer_on_cpu", staticmethod(lambda _module: False))
+    transformer = _LinearTransformer()
+    # As the model cache holds it: GGUF's sidecar path wraps these layers.
+    apply_custom_layers_to_model(transformer)
+    patch = _toy_patch(
+        {
+            "transformer_blocks.0.attn.to_q": {"lora_A.weight": _DOWN, "lora_B.weight": _UP},
+            "transformer_blocks.0.attn.norm_q": {"diff": torch.full((8,), 0.25)},
+            "txt_in.text_norm": {"diff": torch.full((8,), -0.5)},
+        }
+    )
+    lora_info = SimpleNamespace(model=patch, model_in_ram=nullcontext)
+    transformer_info = _ReservingTransformerInfo(transformer)
+    context = _context(_Transformer(), QwenImage21VariantType.Base)
+    context.models = SimpleNamespace(
+        load=lambda identifier: lora_info if identifier.key == "lora" else transformer_info,
+        get_config=lambda _identifier: SimpleNamespace(variant=QwenImage21VariantType.Base, format=model_format),
+    )
+    node = _denoise(steps=2)
+    if weight is not None:
+        node.transformer.loras.append(_lora_field(weight))
+
+    node._run_diffusion(context)
+    return transformer, transformer_info.reserved[0]
+
+
+@pytest.mark.parametrize("model_format", [ModelFormat.Diffusers, ModelFormat.GGUFQuantized], ids=["merged", "sidecar"])
+def test_loras_reach_the_transformer_from_the_first_step_and_leave_it_unchanged(
+    model_format: ModelFormat, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    transformer, _ = _run_with_a_lora(model_format, 0.5, monkeypatch)
+
+    # The zero base weight plus the LoRA at weight 0.5 (scale 1, as no alpha is given), on both steps -- the prefill
+    # that fills the prefix cache included.
+    expected = (_UP @ _DOWN * 0.5) @ torch.ones(8)
+    assert [mode for mode, _ in transformer.seen] == ["extract", "cached"]
+    for _, out in transformer.seen:
+        torch.testing.assert_close(out[0], expected)
+    # Merged into the weight for a plain model; beside it, the weight untouched, for a GGUF one.
+    assert transformer.weight_was_patched is (model_format is ModelFormat.Diffusers)
+    assert not transformer.transformer_blocks[0].attn.to_q.weight.any()
+    # A norm diff is merged in both, as no sidecar patches a norm, and taken back out afterwards.
+    for weight in transformer.norm_seen:
+        torch.testing.assert_close(weight, torch.full((8,), 1.125))
+    for weight in transformer.text_norm_seen:
+        torch.testing.assert_close(weight, torch.full((8,), -0.25))
+    assert torch.equal(transformer.transformer_blocks[0].attn.norm_q.weight, torch.ones(8))
+    assert not transformer.txt_in.text_norm.weight.any()
+
+
+def test_a_sidecar_lora_widens_the_room_the_transformer_is_loaded_with(monkeypatch: pytest.MonkeyPatch) -> None:
+    _, without = _run_with_a_lora(ModelFormat.GGUFQuantized, None, monkeypatch)
+    _, at_zero = _run_with_a_lora(ModelFormat.GGUFQuantized, 0.0, monkeypatch)
+    _, applied = _run_with_a_lora(ModelFormat.GGUFQuantized, 0.5, monkeypatch)
+    # A LoRA at weight 0 is never applied, so it holds nothing.
+    assert at_zero == without
+    assert applied > without
+
+
+def _toy_patch(layers: dict[str, dict[str, torch.Tensor]]):
+    """A LoRA patch on the toy transformers here, keyed and built as the Qwen-Image-2.1 conversion builds one: each
+    module path a layer of its parameters. Built directly, as the conversion refuses every shape but the real model's.
+    """
+    from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
+    from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_constants import (
+        QWEN_IMAGE_21_LORA_NORM_PREFIX,
+        QWEN_IMAGE_21_LORA_TRANSFORMER_PREFIX,
+        is_norm,
+        split_key,
+    )
+    from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+
+    patches = {}
+    for module, values in layers.items():
+        layer = {split_key(f"diffusion_model.{module}.{name}")[1]: value for name, value in values.items()}
+        prefix = QWEN_IMAGE_21_LORA_NORM_PREFIX if is_norm(module) else QWEN_IMAGE_21_LORA_TRANSFORMER_PREFIX
+        patches[prefix + module] = any_lora_layer_from_state_dict(layer)
+    return ModelPatchRaw(layers=patches)
+
+
+def _patch(module: str = "transformer_blocks.0.attn.to_q", **values: torch.Tensor):
+    """A LoRA patch with the given values on one module; to_q and to_k are 8 x 8 in `_LinearTransformer`."""
+    return _toy_patch({module: values})
+
+
+def _low_rank(rank: int, module: str = "transformer_blocks.0.attn.to_q", out_features: int = 8):
+    return _patch(module, **{"lora_A.weight": torch.zeros(rank, 8), "lora_B.weight": torch.zeros(out_features, rank)})
+
+
+def _reserve(
+    patch,
+    transformer: torch.nn.Module,
+    model_format: ModelFormat = ModelFormat.GGUFQuantized,
+    seq_len: int = 100,
+    dtype: torch.dtype = torch.float32,
+    weight: float = 1.0,
+) -> int:
+    """What the denoise reserves for one LoRA, or for each of a list of them, on `transformer`."""
+    patches = patch if isinstance(patch, list) else [patch]
+    node = _denoise()
+    node.transformer.loras.extend(_lora_field(weight, key=f"lora{i}") for i in range(len(patches)))
+    context = SimpleNamespace(
+        models=SimpleNamespace(load=lambda identifier: SimpleNamespace(model=patches[int(identifier.key[4:])]))
+    )
+    return node._lora_working_memory(context, transformer, model_format, seq_len, dtype)
+
+
+def test_a_sidecar_lora_reserves_its_tensors_and_an_update_per_token() -> None:
+    transformer = _LinearTransformer()
+    for dtype in (torch.float32, torch.bfloat16):
+        # Beside the weights, the LoRA's 64 elements (8 x 4 twice), at the compute dtype's width: they are stored in
+        # float32, and the patcher casts a sidecar to the compute dtype.
+        assert _reserve(_low_rank(4), transformer, seq_len=0, dtype=dtype) == 64 * dtype.itemsize
+        # And each forward adds, per token, a row of to_q's 8 outputs and one of the LoRA's 4 ranks.
+        longer = _reserve(_low_rank(4), transformer, seq_len=300, dtype=dtype)
+        assert longer - _reserve(_low_rank(4), transformer, seq_len=100, dtype=dtype) == 200 * (8 + 4) * dtype.itemsize
+    # Not applied at weight 0; and a norm diff is merged on every format.
+    assert _reserve(_low_rank(4), transformer, weight=0.0) == 0
+    assert _reserve(_patch("transformer_blocks.0.attn.norm_q", diff=torch.zeros(8)), transformer) == 0
+
+
+def test_a_linear_that_reads_the_timestep_embedding_adds_two_rows_however_long_the_sequence() -> None:
+    transformer = _LinearTransformer()
+    modulation = _low_rank(4, "modulation.1", out_features=32)
+    assert _reserve(modulation, transformer, seq_len=300) == _reserve(modulation, transformer, seq_len=100)
+    # Its 160 elements (4 x 8 and 32 x 4), and two rows of its 32 outputs and 4 ranks: the embedding of the sampled
+    # timestep and, under `causal_condition`, of t = 0.
+    assert _reserve(modulation, transformer) == (160 + 2 * (32 + 4)) * 4
+
+
+def test_sidecars_hold_every_modules_tensors_but_one_modules_update_at_a_time() -> None:
+    transformer = _LinearTransformer()
+    to_q, to_k = _low_rank(4), _low_rank(4, "transformer_blocks.0.attn.to_k")
+    # to_k's 64 elements join to_q's; its update, as large as to_q's, comes only after to_q's is gone.
+    assert _reserve([to_q, to_k], transformer) - _reserve(to_q, transformer) == 64 * 4
+
+
+def test_a_merged_format_reserves_one_modules_sidecar_for_partial_loading() -> None:
+    # The patcher wraps a layer partial loading leaves on the CPU whatever the format; that sidecar copies its tensors
+    # to the device for each forward, one module after another.
+    transformer = _LinearTransformer()
+    to_q, to_k = _low_rank(4), _low_rank(4, "transformer_blocks.0.attn.to_k")
+    merged = _reserve([to_q, to_k], transformer, ModelFormat.Diffusers)
+    assert 0 < merged < _reserve([to_q, to_k], transformer, ModelFormat.GGUFQuantized)
+    assert merged == _reserve(to_q, transformer, ModelFormat.Diffusers)
+
+
+def test_an_fp8_transformer_reserves_every_sidecars_tensors() -> None:
+    # fp8 weights cannot take an update in place, so the patcher wraps every layer on them, as on a GGUF.
+    transformer = _LinearTransformer()
+    loras = [_low_rank(4), _low_rank(4, "transformer_blocks.0.attn.to_k")]
+    plain = _reserve(loras, transformer, ModelFormat.Checkpoint)
+    for to in (transformer.transformer_blocks[0].attn.to_q, transformer.transformer_blocks[0].attn.to_k):
+        to.weight = torch.nn.Parameter(to.weight.to(torch.float8_e4m3fn), requires_grad=False)
+    fp8 = _reserve(loras, transformer, ModelFormat.Checkpoint)
+    assert fp8 > plain
+    assert fp8 == _reserve(loras, transformer, ModelFormat.GGUFQuantized)
+
+
+class _PeakAllocation(TorchDispatchMode):
+    """The most bytes that tensors made while `counting` is on -- and views of them -- hold at once."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.counting = True
+        self.peak = 0
+        self._made: set[int] = set()
+        self._tensors: weakref.WeakValueDictionary[int, torch.Tensor] = weakref.WeakValueDictionary()
+        self._ids = itertools.count()
+
+    def __torch_dispatch__(self, func, types, args=(), kwargs=None):
+        inputs = {t.untyped_storage().data_ptr() for t in tree_leaves((args, kwargs)) if isinstance(t, torch.Tensor)}
+        out = func(*args, **(kwargs or {}))
+        if self.counting:
+            for tensor in (t for t in tree_leaves(out) if isinstance(t, torch.Tensor)):
+                storage = tensor.untyped_storage().data_ptr()
+                if storage not in inputs:
+                    self._made.add(storage)
+                # A view keeps its storage alive after the tensor it was taken from is gone.
+                if storage in self._made:
+                    self._tensors[next(self._ids)] = tensor
+            live = {t.untyped_storage().data_ptr(): t.untyped_storage().nbytes() for t in self._tensors.values()}
+            self.peak = max(self.peak, sum(live.values()))
+        return out
+
+
+_W = 64  # A Linear wide enough that only weight-sized tensors count against half a copy of its weight.
+# Weight copies priced above what a CPU forward allocates: the CUDA column norm of LyCORIS's DoRA, priced for both
+# orientations (see `_SIDECAR_WEIGHT_COPIES`).
+_CUDA_ONLY_COPIES = {"peft-dora": 1, "lycoris-dora": 1}
+
+
+def _sidecar_kind(kind: str):
+    r = 2
+    values = {
+        "low-rank": {"lora_A.weight": torch.randn(r, _W), "lora_B.weight": torch.randn(_W, r)},
+        "full": {"diff": torch.randn(_W, _W)},
+        "lokr": {
+            "lokr_w1": torch.randn(4, 4),
+            "lokr_w2_a": torch.randn(_W // 4, r),
+            "lokr_w2_b": torch.randn(r, _W // 4),
+        },
+        "loha": {
+            f"hada_w{i}_{s}": torch.randn(_W, r) if s == "a" else torch.randn(r, _W) for i in (1, 2) for s in "ab"
+        },
+        "peft-dora": {
+            "lora_A.weight": torch.randn(r, _W),
+            "lora_B.weight": torch.randn(_W, r),
+            "lora_magnitude_vector.weight": torch.rand(_W) + 1,
+        },
+        "lycoris-dora": {
+            "lora_A.weight": torch.randn(r, _W),
+            "lora_B.weight": torch.randn(_W, r),
+            "dora_scale": torch.rand(1, _W) + 1,
+        },
+    }[kind]
+    return _patch(**values)
+
+
+@pytest.mark.parametrize(
+    "kinds",
+    [
+        ["low-rank"],
+        ["full"],
+        ["lokr"],
+        ["loha"],
+        ["peft-dora"],
+        ["lycoris-dora"],
+        ["lokr", "lokr"],
+        ["low-rank", "lokr"],
+        ["full", "full", "full"],
+        ["lokr", "lokr", "lokr"],
+        ["full", "lokr", "loha"],
+    ],
+    ids=lambda kinds: "+".join(kinds),
+)
+def test_a_sidecar_reserves_what_its_forward_allocates(kinds: list[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    """Measured: what a sidecar forward on an fp8 weight allocates for its LoRAs -- the layer's own forward aside,
+    which the activation estimate covers -- is what the denoise reserves for them, within half a weight copy."""
+    from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+        apply_custom_layers_to_model,
+    )
+    from invokeai.backend.patches.layer_patcher import LayerPatcher
+    from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_conversion_utils import (
+        QWEN_IMAGE_21_LORA_TRANSFORMER_PREFIX,
+    )
+
+    torch.manual_seed(0)
+    transformer = torch.nn.Module()
+    block = torch.nn.Module()
+    block.attn = torch.nn.Module()
+    block.attn.to_q = torch.nn.Linear(_W, _W, bias=False)
+    block.attn.to_q.weight = torch.nn.Parameter(torch.randn(_W, _W).to(torch.float8_e4m3fn), requires_grad=False)
+    transformer.transformer_blocks = torch.nn.ModuleList([block])
+    apply_custom_layers_to_model(transformer)
+    to_q = transformer.transformer_blocks[0].attn.to_q
+    patches = [_sidecar_kind(kind) for kind in kinds]
+    seq_len = 2
+
+    mode = _PeakAllocation()
+    own_forward = to_q._autocast_forward
+
+    def uncounted_forward(x: torch.Tensor) -> torch.Tensor:
+        mode.counting = False
+        try:
+            return own_forward(x)
+        finally:
+            mode.counting = True
+
+    monkeypatch.setattr(to_q, "_autocast_forward", uncounted_forward)
+    x = torch.randn(1, seq_len, _W)
+    with (
+        torch.no_grad(),
+        LayerPatcher.apply_smart_model_patches(
+            model=transformer,
+            patches=[(patch, 1.0) for patch in patches],
+            prefix=QWEN_IMAGE_21_LORA_TRANSFORMER_PREFIX,
+            dtype=torch.float32,
+        ),
+    ):
+        with mode:
+            to_q(x)
+
+    reserved = _reserve(patches, transformer, ModelFormat.Checkpoint, seq_len=seq_len) - sum(
+        patch.calc_size() for patch in patches
+    )
+    weight_copy = _W * _W * torch.float32.itemsize
+    beyond_cpu = max(_CUDA_ONLY_COPIES.get(kind, 0) for kind in kinds) * weight_copy
+    assert abs(reserved - beyond_cpu - mode.peak) < weight_copy / 2, (reserved / weight_copy, mode.peak / weight_copy)
+
+
+def test_a_dora_lora_on_an_int8_transformer_is_refused_before_the_transformer_is_loaded() -> None:
+    from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+        apply_custom_layers_to_model,
+    )
+    from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
+
+    transformer = _LinearTransformer()
+    weight = torch.zeros(8, 8, dtype=torch.int8)
+    transformer.transformer_blocks[0].attn.to_q = Int8ConvrotLinear(weight, torch.ones(8, 1), convrot=False)
+    apply_custom_layers_to_model(transformer)
+    low_rank = {"lora_A.weight": torch.zeros(2, 8), "lora_B.weight": torch.zeros(8, 2)}
+    dora = _patch(**low_rank, **{"lora_magnitude_vector.weight": torch.ones(8)})
+    transformer_info = _ReservingTransformerInfo(transformer)
+    context = _context(_Transformer(), QwenImage21VariantType.Base)
+    loaded = {"lora": SimpleNamespace(model=dora)}
+    context.models = SimpleNamespace(
+        load=lambda identifier: loaded.get(identifier.key, transformer_info),
+        get_config=lambda _identifier: SimpleNamespace(
+            variant=QwenImage21VariantType.Base, format=ModelFormat.Checkpoint
+        ),
+    )
+    node = _denoise(steps=1)
+    node.transformer.loras.append(_lora_field(1.0))
+
+    with pytest.raises(ValueError) as refused:
+        node._run_diffusion(context)
+    assert _LORA_NAME in str(refused.value) and "int8" in str(refused.value)
+    assert transformer_info.reserved == []
+    # A low-rank LoRA runs there as a sidecar.
+    loaded["lora"] = SimpleNamespace(model=_patch(**low_rank))
+    node._refuse_dora_on_int8(context, transformer)
+
+
+def test_a_lora_already_on_the_transformer_is_not_applied_again() -> None:
+    applied = _transformer_field()
+    applied.loras.append(_lora_field(0.3))
+    output = QwenImage21LoRACollectionLoader.model_construct(loras=[_lora_field(0.8)], transformer=applied).invoke(
+        _lora_context(BaseModelType.QwenImage21)
+    )
+    assert output.transformer is not None
+    assert [(lora.lora.key, lora.weight) for lora in output.transformer.loras] == [("lora", 0.3)]
+
+    single = QwenImage21LoRALoaderInvocation.model_construct(lora=_lora_field().lora, weight=1.0, transformer=applied)
+    with pytest.raises(ValueError, match="already applied"):
+        single.invoke(_lora_context(BaseModelType.QwenImage21))
+
+
+@pytest.mark.parametrize(
+    ("base", "hinted"),
+    [(BaseModelType.StableDiffusionXL, False), (BaseModelType.QwenImage, True)],
+    ids=["sdxl", "qwen"],
+)
+def test_another_familys_lora_is_named_with_the_qwen_image_hint_only_for_qwen_image(
+    base: BaseModelType, hinted: bool
+) -> None:
+    with pytest.raises(ValueError) as refused:
+        _lora_loader("single", _lora_field()).invoke(_lora_context(base))
+    message = str(refused.value)
+    assert f"for {base.value} models" in message
+    assert ("Qwen Image LoRAs" in message) is hinted
