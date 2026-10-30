@@ -267,6 +267,12 @@ export const DEFAULT_ERASER_OPTIONS: Readonly<EraserOptions> = {
   size: 50,
 };
 
+/** The control layer displayed as its kept original, alone or under its map. */
+export interface ControlLayerView {
+  layerId: string;
+  view: 'original' | 'overlay';
+}
+
 /**
  * Transform sessions span gestures until Apply/Cancel. `startTransform` is the committed undo/cancel baseline;
  * `transform` drives preview and numeric controls.
@@ -512,6 +518,8 @@ export interface EngineStores {
   bboxPreview: ScalarStore<Rect | null>;
   /** Transform session supplies numeric controls, Apply/Cancel and live preview; null when closed. */
   transformSession: ScalarStore<TransformSession | null>;
+  /** The layer a requested transform session waits on until its fresh pixels are persisted; null when none waits. */
+  pendingTransformLayerId: ScalarStore<string | null>;
   /** Checkerboard defaults on; disabling reveals the widget surface through transparent document pixels. */
   checkerboard: ScalarStore<boolean>;
   /**
@@ -533,6 +541,8 @@ export interface EngineStores {
   documentEditingLocked: ScalarStore<boolean>;
   /** The layer targeted by that operation, or null when no operation is active. */
   documentEditingLayerId: ScalarStore<string | null>;
+  /** The control layer displayed as its original (or original under map); null displays every map. */
+  controlLayerView: ScalarStore<ControlLayerView | null>;
 }
 
 const brushOptionsEqual = (a: BrushOptions, b: BrushOptions): boolean =>
@@ -698,6 +708,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   checkerboard: createScalarStore<boolean>(true),
   clipToBbox: createScalarStore<boolean>(false),
   checkerColors: createScalarStore<CheckerColors>({ ...DEFAULT_CHECKER_COLORS }, checkerColorsEqual),
+  controlLayerView: createScalarStore<ControlLayerView | null>(null),
   cursor: createScalarStore<string>('default'),
   eraserOptions: createScalarStore<EraserOptions>({ ...DEFAULT_ERASER_OPTIONS }, eraserOptionsEqual),
   documentEditingLayerId: createScalarStore<string | null>(null),
@@ -733,6 +744,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   thumbnailStatus: createKeyedStatusStore<LayerThumbnailStatus>(),
   adjustmentStatus: createKeyedStatusStore<LayerAdjustmentStatus>(),
   transformSession: createScalarStore<TransformSession | null>(null, transformSessionEqual),
+  pendingTransformLayerId: createScalarStore<string | null>(null),
   viewportReady: createScalarStore<boolean>(false),
   zoom: createScalarStore<number>(1),
 });

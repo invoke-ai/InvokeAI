@@ -31,7 +31,7 @@ const ADJUSTMENTS: CanvasAdjustmentsContract = [
 ];
 const TRANSFORM = { rotation: Math.PI / 9, scaleX: 0.6, scaleY: 1.3, x: 11, y: 5 };
 const CONTENT: Rect = { height: 30, width: 40, x: -6, y: -4 };
-const CONTROL_MODEL = { base: 'sdxl', model: 'union-model' } as const;
+const CONTROL_BASE = 'sdxl';
 
 const LAYER: CanvasRasterLayerContractV2 = {
   adjustments: ADJUSTMENTS,
@@ -107,7 +107,7 @@ const scene = (runSpatial?: SpatialRunner) => {
   });
   const exportBaked: CopyLayerControllerOptions['exportBaked'] = async (layerId) => {
     const result = await exporter.baked(layerId, { includeDisabled: true });
-    if (result.status === 'ok' || result.status === 'adjustment-refused') {
+    if (result.status === 'ok' || result.status === 'adjustment-refused' || result.status === 'unreadable') {
       return result;
     }
     return { status: result.status === 'aborted' ? 'not-ready' : result.status };
@@ -119,7 +119,7 @@ const scene = (runSpatial?: SpatialRunner) => {
     },
     ctx: h.ctx,
     exportBaked,
-    getControlModel: () => CONTROL_MODEL,
+    getMainModelBase: () => CONTROL_BASE,
     isGuardCurrent,
   });
   const unused = () => {
@@ -139,7 +139,7 @@ const scene = (runSpatial?: SpatialRunner) => {
     ctx: h.ctx,
     discardPersisted: () => undefined,
     exportBaked,
-    getControlModel: () => CONTROL_MODEL,
+    getMainModelBase: () => CONTROL_BASE,
     getDuplicateRasterPlan: unused,
     getSelectedLayerIds: unused,
     hasPendingPixelWork: () => false,
@@ -174,7 +174,7 @@ const scene = (runSpatial?: SpatialRunner) => {
 };
 
 const bakedControl = (id: string, name: string, rect: Rect) => ({
-  adapter: createDefaultControlAdapter(CONTROL_MODEL.base, CONTROL_MODEL.model),
+  adapter: createDefaultControlAdapter(CONTROL_BASE, null),
   blendMode: LAYER.blendMode,
   id,
   isEnabled: LAYER.isEnabled,

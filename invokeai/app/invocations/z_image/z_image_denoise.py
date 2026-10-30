@@ -2,7 +2,6 @@ import math
 from contextlib import ExitStack
 from typing import Any, Callable, Iterator, Optional
 
-import einops
 import torch
 import torchvision.transforms as tv_transforms
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
@@ -39,40 +38,29 @@ from invokeai.backend.flux.schedulers import (
     ZIMAGE_SCHEDULER_NAME_VALUES,
     set_heun_timesteps_from_sigmas,
 )
+from invokeai.backend.fun_controlnet.conditioning import build_fun_control_context
+from invokeai.backend.fun_controlnet.hooks import FunControlHooks, install_fun_control, should_apply
+from invokeai.backend.fun_controlnet.z_image import ZImageFunControl
+from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.z_image_lora_constants import Z_IMAGE_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
-from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
+from invokeai.backend.quantization.dequantizing_linear import requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.rectified_flow.schedule_shift import ShiftFit, time_shift
-from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
+from invokeai.backend.stable_diffusion.diffusers_pipeline import (
+    PipelineIntermediateState,
+    image_resized_to_grid_as_tensor,
+)
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ZImageConditioningInfo
-from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.fp8 import get_model_compute_dtype
 from invokeai.backend.util.sage_attention import sage_attention_scope
+from invokeai.backend.z_image.denoise_working_memory import estimate_z_image_denoise_working_memory
 from invokeai.backend.z_image.extensions.regional_prompting_extension import ZImageRegionalPromptingExtension
 from invokeai.backend.z_image.text_conditioning import ZImageTextConditioning
-from invokeai.backend.z_image.z_image_control_adapter import ZImageControlAdapter
-from invokeai.backend.z_image.z_image_controlnet_extension import (
-    ZImageControlNetExtension,
-    z_image_forward_with_control,
-)
-from invokeai.backend.z_image.z_image_patchify_utils import SEQ_MULTI_OF
 from invokeai.backend.z_image.z_image_transformer_patch import patch_transformer_for_regional_prompting
-
-# The transformer's width and head count, which its ControlNet adapters share: 30 heads of 128.
-Z_IMAGE_HIDDEN_SIZE = 3840
-Z_IMAGE_ATTENTION_HEADS = 30
-# Peak reserved activation bytes per attended token on a fused SDPA kernel; see `_estimate_working_memory`.
-Z_IMAGE_BYTES_PER_TOKEN = int(0.25 * 1024**2)
-
-
-def _padded(tokens: int) -> int:
-    """The transformer pads the image and the caption token runs to a multiple of `SEQ_MULTI_OF` each."""
-    return tokens + (-tokens) % SEQ_MULTI_OF
-
 
 # The shift fit of diffusers' ZImagePipeline. 4096 image tokens is a 1024x1024 frame -- one megapixel, and where the
 # reference fit ends. Extrapolated past it the shift runs away fast -- 25 at 2048px, 810 at 3072px and 103_777 at
@@ -325,81 +313,12 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
             sigmas.append(1.0 if t >= 1 else 0.0 if t <= 0 else time_shift(shift, t))
         return sigmas
 
-    @staticmethod
-    def _estimate_working_memory(
-        image_seq_len: int,
-        text_seq_len: int,
-        num_loras: int,
-        num_control_blocks: int = 0,
-        regional_attention_bias_bytes: int = 0,
-        has_attention_mask: bool = False,
-        device: torch.device | None = None,
-        dtype: torch.dtype = torch.bfloat16,
-    ) -> int:
-        """Estimate peak transformer working memory (bytes) so the model cache keeps that much VRAM free.
-
-        The transformer attends over one unified sequence of image and caption tokens, each run padded to a
-        multiple of ``SEQ_MULTI_OF``. On a fused SDPA kernel its activations scale linearly with that sequence.
-        Measured as peak reserved memory in bf16 on CUDA with a 512-token caption, by
-        `scripts/calibrate_z_image_working_memory.py`: 0.99 GiB at 1024px (4608 tokens), 1.96 GiB at 1440px (8640)
-        and 3.85 GiB at 2048px (16896) -- 0.22 to 0.23 MB per token, unchanged between 2 and 4 blocks, because a
-        no-grad forward frees each block's intermediates. 0.25 MB per token bounds every point on its own, with
-        room for the ~5% more ROCm needed on FLUX.2. The fixed base covers what does not scale with the sequence
-        -- fp8 weights cast per forward, and allocator slack across steps; the caller adds the dequantization copy
-        of an int8, nvfp4 or GGUF build. Conditional and unconditional
-        passes run one after the other, so only the longer caption counts.
-
-        Where SDPA has no fused kernel for these shapes it materializes the score matrices, and those dominate:
-        on ROCm under Windows, whose fused kernels are disabled, a 1024px generation spilled 7.7 GB into shared
-        system memory while this node reserved only the default working memory. ``sdpa_score_matrix_bytes`` adds
-        the term only where it is really built. An attention mask narrows which fused kernels a build can use, so
-        the call is told whether one is passed: regional prompting's additive bias, or the padding mask the
-        ControlNet forward always builds. The plain forward passes none at batch size 1.
-
-        A ControlNet adapter first runs its own blocks over a sequence of the same length and keeps one hint per
-        block, alive through the main layers. Measured over the plain forward at 1024px: 3.3, 5.9 and 18.9
-        hint-sized tensors (sequence x width x element size) for 1, 6 and 15 blocks, so n + 4 are charged.
-        """
-        GB = 1024**3
-        seq_len = _padded(image_seq_len) + _padded(text_seq_len)
-        estimated = seq_len * Z_IMAGE_BYTES_PER_TOKEN + int(1.0 * GB)
-        estimated += regional_attention_bias_bytes
-        estimated += sdpa_score_matrix_bytes(
-            device=device if device is not None else TorchDevice.choose_torch_device(),
-            dtype=dtype,
-            num_heads=Z_IMAGE_ATTENTION_HEADS,
-            head_dim=Z_IMAGE_HIDDEN_SIZE // Z_IMAGE_ATTENTION_HEADS,
-            seq_len=seq_len,
-            has_attn_mask=has_attention_mask,
-            # The attention goes through diffusers' `dispatch_attention_fn`, which can route around torch's SDPA.
-            via_diffusers_dispatch=True,
-        )
-        if num_control_blocks:
-            estimated += (num_control_blocks + 4) * seq_len * Z_IMAGE_HIDDEN_SIZE * dtype.itemsize
-        estimated += int(0.5 * num_loras * GB)
-        return estimated
-
-    @staticmethod
-    def _regional_attention_bias_bytes(
-        regional_attn_mask: torch.Tensor | None, image_seq_len: int, dtype: torch.dtype
-    ) -> int:
-        """What `regional_forward` allocates per positive pass for regional prompting: a boolean copy of the mask,
-        the additive bias over the padded unified sequence, and the image-to-image block `torch.where` fills it
-        from. The mask itself is already on the device when the estimate is taken. Measured at 1024px on CUDA: 68 MiB
-        over the plain forward, against 93 MiB charged."""
-        if regional_attn_mask is None:
-            return 0
-        mask_side = regional_attn_mask.shape[0]
-        unified_seq_len = _padded(image_seq_len) + _padded(mask_side - image_seq_len)
-        return (
-            mask_side * mask_side + (unified_seq_len * unified_seq_len + image_seq_len * image_seq_len) * dtype.itemsize
-        )
-
     def _run_diffusion(self, context: InvocationContext) -> torch.Tensor:
         device = TorchDevice.choose_torch_device()
         inference_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
 
         transformer_info = context.models.load(self.transformer.transformer)
+        control_info = self._load_control(context)
 
         # Calculate image token grid dimensions
         patch_size = 2  # Z-Image uses patch_size=2
@@ -566,39 +485,36 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
             ):
                 raise ValueError(f"Unsupported Z-Image model format: {transformer_config.format}")
 
-            # Into RAM ahead of the transformer's VRAM lock, so the estimate below can size the adapter's hints.
-            control_model_info = context.models.load(self.control.control_model) if self.control is not None else None
+            # Encoded ahead of the transformer's lock, so the VAE does not have to fit beside it.
+            control_context: torch.Tensor | None = None
             num_control_blocks = 0
-            if control_model_info is not None:
-                assert isinstance(control_model_info.model, ZImageControlAdapter)
-                num_control_blocks = len(control_model_info.model.control_layers)
+            if control_info is not None:
+                assert isinstance(control_info.model, ZImageFunControl)
+                control_context = self._build_control_context(context, control_info.model).to(
+                    device=device, dtype=inference_dtype
+                )
+                num_control_blocks = len(control_info.model.control_layers)
 
             # Ask the model cache to keep the forward's working memory free; it offloads as much of the
             # transformer as that takes. Without it the cache reserves only `device_working_mem_gb`, which a
             # build that materializes the score matrices (ROCm on Windows, MPS) overruns several times at 1024px.
             regional_attn_mask = regional_extension.regional_attn_mask
-            working_mem_bytes = self._estimate_working_memory(
+            working_memory = estimate_z_image_denoise_working_memory(
+                transformer_info.model,
                 image_seq_len=img_seq_len,
                 text_seq_len=max(
                     pos_prompt_embeds.shape[0], neg_prompt_embeds.shape[0] if neg_prompt_embeds is not None else 0
                 ),
-                num_loras=len(self.transformer.loras),
-                num_control_blocks=num_control_blocks,
-                regional_attention_bias_bytes=self._regional_attention_bias_bytes(
-                    regional_attn_mask, img_seq_len, inference_dtype
-                ),
-                has_attention_mask=regional_attn_mask is not None or control_model_info is not None,
+                lora_count=len(self.transformer.loras),
+                control_blocks=num_control_blocks,
+                regional_attn_mask=regional_attn_mask,
+                has_attention_mask=regional_attn_mask is not None,
                 device=device,
                 dtype=inference_dtype,
             )
-            # An int8_tensorwise, nvfp4 or GGUF build materializes each quantized linear's weight per forward, alive
-            # alongside the activations above and invisible to them. Read from the unlocked model; zero for
-            # every other build.
-            working_mem_bytes += peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
 
-            # Load transformer - always use base transformer, control is handled via extension
             (cached_weights, transformer) = exit_stack.enter_context(
-                transformer_info.model_on_device(working_mem_bytes=working_mem_bytes)
+                transformer_info.model_on_device(working_memory=working_memory)
             )
 
             # Whether LoRA has to go on as a sidecar. Asked of the loaded module tree, not the
@@ -608,100 +524,21 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
             # patching on a module that has no patchable weights.
             model_is_quantized = requires_sidecar_patching(transformer, transformer_config.format)
 
-            # Prepare control extension if control is provided
-            control_extension: ZImageControlNetExtension | None = None
-
-            if self.control is not None:
-                assert control_model_info is not None
-                # Locked with the same working memory: the transformer can no longer be offloaded, so an
-                # adapter placed with only the default reservation would fill the room kept for the forward.
-                (_, control_adapter) = exit_stack.enter_context(
-                    control_model_info.model_on_device(working_mem_bytes=working_mem_bytes)
+            control_hooks: FunControlHooks | None = None
+            if control_info is not None:
+                assert self.control is not None and control_context is not None
+                # Locked with the same working memory: the transformer can no longer be offloaded, so a control
+                # placed with only the default reservation would fill the room kept for the forward. A plain
+                # reservation, not a second estimate: inside the transformer's calibration window this lock is a
+                # co-lock, whose weights go into the window's offset rather than its demand. The loader cast it to the
+                # device's bfloat16-safe dtype, `inference_dtype` here; it casts what crosses into its chain and the
+                # hints back (`ZImageFunControl._block_runner` / `add_hint`), so nothing cache-managed is cast.
+                (_, control) = exit_stack.enter_context(
+                    control_info.model_on_device(working_mem_bytes=working_memory.reservation_bytes)
                 )
-                assert isinstance(control_adapter, ZImageControlAdapter)
-
-                # Get control_in_dim from adapter config (16 for V1, 33 for V2.0)
-                control_in_dim = control_adapter.config.get("control_in_dim", 16)
-
-                # Log control configuration for debugging
-                version = "V2.0" if control_in_dim > 16 else "V1"
-                context.util.signal_progress(
-                    f"Using Z-Image ControlNet {version} (Extension): control_in_dim={control_in_dim}, "
-                    f"num_blocks={num_control_blocks}, scale={self.control.control_context_scale}"
-                )
-
-                # Load and prepare control image - must be VAE-encoded!
-                if self.vae is None:
-                    raise ValueError("VAE is required when using Z-Image Control. Connect a VAE to the 'vae' input.")
-
-                control_image = context.images.get_pil(self.control.image_name)
-
-                # Resize control image to match output dimensions
-                control_image = control_image.convert("RGB")
-                control_image = control_image.resize((self.width, self.height), Image.Resampling.LANCZOS)
-
-                # Convert to tensor format for VAE encoding
-                from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
-
-                control_image_tensor = image_resized_to_grid_as_tensor(control_image)
-                if control_image_tensor.dim() == 3:
-                    control_image_tensor = einops.rearrange(control_image_tensor, "c h w -> 1 c h w")
-
-                # Encode control image through VAE to get latents
-                vae_info = context.models.load(self.vae.vae)
-                control_latents = ZImageImageToLatentsInvocation.vae_encode(
-                    vae_info=vae_info,
-                    image_tensor=control_image_tensor,
-                    tiled=self.control.tiled or context.config.get().force_tiled_decode,
-                    tile_size=self.control.tile_size,
-                )
-
-                # Move to inference device/dtype
-                control_latents = control_latents.to(device=device, dtype=inference_dtype)
-
-                # Add frame dimension: [B, C, H, W] -> [C, 1, H, W] (single image)
-                control_latents = control_latents.squeeze(0).unsqueeze(1)
-
-                # Prepare control_cond based on control_in_dim
-                # V1: 16 channels (just control latents)
-                # V2.0: 33 channels = 16 control + 16 reference + 1 mask
-                #   - Channels 0-15: control image latents (from VAE encoding)
-                #   - Channels 16-31: reference/inpaint image latents (zeros for pure control)
-                #   - Channel 32: inpaint mask (1.0 = don't inpaint, 0.0 = inpaint region)
-                # For pure control (no inpainting), we set mask=1 to tell model "use control, don't inpaint"
-                c, f, h, w = control_latents.shape
-                if c < control_in_dim:
-                    padding_channels = control_in_dim - c
-                    if padding_channels == 17:
-                        # V2.0: 16 reference channels (zeros) + 1 mask channel (ones)
-                        ref_padding = torch.zeros(
-                            (16, f, h, w),
-                            device=device,
-                            dtype=inference_dtype,
-                        )
-                        # Mask channel = 1.0 means "don't inpaint this region, use control signal"
-                        mask_channel = torch.ones(
-                            (1, f, h, w),
-                            device=device,
-                            dtype=inference_dtype,
-                        )
-                        control_latents = torch.cat([control_latents, ref_padding, mask_channel], dim=0)
-                    else:
-                        # Generic padding with zeros for other cases
-                        zero_padding = torch.zeros(
-                            (padding_channels, f, h, w),
-                            device=device,
-                            dtype=inference_dtype,
-                        )
-                        control_latents = torch.cat([control_latents, zero_padding], dim=0)
-
-                # Create control extension (adapter is already on device from model_on_device)
-                control_extension = ZImageControlNetExtension(
-                    control_adapter=control_adapter,
-                    control_cond=control_latents,
-                    weight=self.control.control_context_scale,
-                    begin_step_percent=self.control.begin_step_percent,
-                    end_step_percent=self.control.end_step_percent,
+                assert isinstance(control, ZImageFunControl)
+                control_hooks = exit_stack.enter_context(
+                    install_fun_control(transformer, control, control_context, scale=self.control.control_context_scale)
                 )
 
             # Apply LoRA models to the transformer.
@@ -762,27 +599,14 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
                     latent_model_input = latent_model_input.unsqueeze(2)  # Add frame dimension
                     latent_model_input_list = list(latent_model_input.unbind(dim=0))
 
-                    # Determine if control should be applied at this step
-                    apply_control = control_extension is not None and control_extension.should_apply(
-                        user_step, total_steps
-                    )
+                    # Heun's two forwards of a step share its user step, and so its control gate.
+                    self._gate_control(control_hooks, total_steps, user_step)
 
-                    # Run forward pass
-                    if apply_control:
-                        model_out_list, _ = z_image_forward_with_control(
-                            transformer=transformer,
-                            x=latent_model_input_list,
-                            t=timestep,
-                            cap_feats=[pos_prompt_embeds],
-                            control_extension=control_extension,
-                        )
-                    else:
-                        model_output = transformer(
-                            x=latent_model_input_list,
-                            t=timestep,
-                            cap_feats=[pos_prompt_embeds],
-                        )
-                        model_out_list = model_output[0]
+                    model_out_list = transformer(
+                        x=latent_model_input_list,
+                        t=timestep,
+                        cap_feats=[pos_prompt_embeds],
+                    )[0]
 
                     noise_pred_cond = torch.stack([t.float() for t in model_out_list], dim=0)
                     noise_pred_cond = noise_pred_cond.squeeze(2)
@@ -790,21 +614,11 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
 
                     # Apply CFG if enabled
                     if do_classifier_free_guidance and neg_prompt_embeds is not None:
-                        if apply_control:
-                            model_out_list_uncond, _ = z_image_forward_with_control(
-                                transformer=transformer,
-                                x=latent_model_input_list,
-                                t=timestep,
-                                cap_feats=[neg_prompt_embeds],
-                                control_extension=control_extension,
-                            )
-                        else:
-                            model_output_uncond = transformer(
-                                x=latent_model_input_list,
-                                t=timestep,
-                                cap_feats=[neg_prompt_embeds],
-                            )
-                            model_out_list_uncond = model_output_uncond[0]
+                        model_out_list_uncond = transformer(
+                            x=latent_model_input_list,
+                            t=timestep,
+                            cap_feats=[neg_prompt_embeds],
+                        )[0]
 
                         noise_pred_uncond = torch.stack([t.float() for t in model_out_list_uncond], dim=0)
                         noise_pred_uncond = noise_pred_uncond.squeeze(2)
@@ -881,27 +695,13 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
                     latent_model_input = latent_model_input.unsqueeze(2)  # Add frame dimension
                     latent_model_input_list = list(latent_model_input.unbind(dim=0))
 
-                    # Determine if control should be applied at this step
-                    apply_control = control_extension is not None and control_extension.should_apply(
-                        step_idx, total_steps
-                    )
+                    self._gate_control(control_hooks, total_steps, step_idx)
 
-                    # Run forward pass - use custom forward with control if extension is active
-                    if apply_control:
-                        model_out_list, _ = z_image_forward_with_control(
-                            transformer=transformer,
-                            x=latent_model_input_list,
-                            t=timestep,
-                            cap_feats=[pos_prompt_embeds],
-                            control_extension=control_extension,
-                        )
-                    else:
-                        model_output = transformer(
-                            x=latent_model_input_list,
-                            t=timestep,
-                            cap_feats=[pos_prompt_embeds],
-                        )
-                        model_out_list = model_output[0]  # Extract list of tensors from tuple
+                    model_out_list = transformer(
+                        x=latent_model_input_list,
+                        t=timestep,
+                        cap_feats=[pos_prompt_embeds],
+                    )[0]  # The list of output tensors
 
                     noise_pred_cond = torch.stack([t.float() for t in model_out_list], dim=0)
                     noise_pred_cond = noise_pred_cond.squeeze(2)  # Remove frame dimension
@@ -909,21 +709,11 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
 
                     # Apply CFG if enabled
                     if do_classifier_free_guidance and neg_prompt_embeds is not None:
-                        if apply_control:
-                            model_out_list_uncond, _ = z_image_forward_with_control(
-                                transformer=transformer,
-                                x=latent_model_input_list,
-                                t=timestep,
-                                cap_feats=[neg_prompt_embeds],
-                                control_extension=control_extension,
-                            )
-                        else:
-                            model_output_uncond = transformer(
-                                x=latent_model_input_list,
-                                t=timestep,
-                                cap_feats=[neg_prompt_embeds],
-                            )
-                            model_out_list_uncond = model_output_uncond[0]  # Extract list of tensors from tuple
+                        model_out_list_uncond = transformer(
+                            x=latent_model_input_list,
+                            t=timestep,
+                            cap_feats=[neg_prompt_embeds],
+                        )[0]
 
                         noise_pred_uncond = torch.stack([t.float() for t in model_out_list_uncond], dim=0)
                         noise_pred_uncond = noise_pred_uncond.squeeze(2)
@@ -952,6 +742,53 @@ class ZImageDenoiseInvocation(BaseInvocation, WithMetadata):
                     )
 
         return latents
+
+    def _load_control(self, context: InvocationContext) -> LoadedModel | None:
+        """The control model in RAM, ahead of the transformer's lock so the reservation can size its hints."""
+        if self.control is None:
+            return None
+        if self.vae is None:
+            raise ValueError(
+                "Z-Image ControlNet needs the VAE that encodes its control image: connect one to the 'vae' input."
+            )
+        control_info = context.models.load(self.control.control_model)
+        if not isinstance(control_info.model, ZImageFunControl):
+            raise TypeError(
+                f"Expected a Z-Image ControlNet for '{self.control.control_model.name}', "
+                f"got {type(control_info.model).__name__}."
+            )
+        return control_info
+
+    def _build_control_context(self, context: InvocationContext, control: ZImageFunControl) -> torch.Tensor:
+        """The control image at the generation size as the tokens ``control`` embeds.
+
+        VideoX-Fun's context for control alone: the control image's latents, a zero keep mask and zero masked-image
+        latents, packed 2x2 as the transformer packs its latents. Encoded to the mode of the VAE's distribution as
+        VideoX-Fun encodes it, not to a sample of it.
+        """
+        assert self.control is not None and self.vae is not None
+        field = self.control
+        vae_info = context.models.load(self.vae.vae)
+        tiled = field.tiled or context.config.get().force_tiled_decode
+
+        def encode(pixels: torch.Tensor) -> torch.Tensor:
+            return ZImageImageToLatentsInvocation.vae_encode(
+                vae_info=vae_info, image_tensor=pixels, tiled=tiled, tile_size=field.tile_size, deterministic=True
+            )
+
+        image = context.images.get_pil(field.image_name).convert("RGB")
+        image = image.resize((self.width, self.height), Image.Resampling.LANCZOS)
+        pixels = image_resized_to_grid_as_tensor(image).unsqueeze(0)
+        return control.pack(build_fun_control_context(encode=encode, control_image=pixels))
+
+    def _gate_control(self, hooks: FunControlHooks | None, total_steps: int, step_index: int) -> None:
+        # One gate per user step: both guidance passes run with the control or neither does.
+        if hooks is None:
+            return
+        assert self.control is not None
+        hooks.active = should_apply(
+            step_index, total_steps, self.control.begin_step_percent, self.control.end_step_percent
+        )
 
     def _prepare_noise_tensor(
         self, context: InvocationContext, inference_dtype: torch.dtype, device: torch.device

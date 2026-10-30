@@ -1,0 +1,220 @@
+---
+title: MOSS-Image
+description: Generate and edit images with OpenMOSS's MOSS-Image Base and SFT, from the Diffusers pipelines or a single-file transformer, including JSON layout prompts and layouts from canvas regions.
+lastUpdated: 2026-10-18
+sidebar:
+  order: 8
+---
+
+MOSS-Image is OpenMOSS's 5B single-stream diffusion-transformer text-to-image family. It encodes prompts
+with a **Qwen3.5 9B** text encoder and decodes with the 32-channel **FLUX.2 VAE**. Two checkpoints are
+supported. They share the architecture, the text encoder and the VAE, and differ only in their transformer
+weights:
+
+- **MOSS-Image Base** is the pretrained model, without any post-training. OpenMOSS publishes it as the
+  starting point for finetunes.
+- **MOSS-Image SFT** is a supervised finetune of Base. In OpenMOSS's comparison it groups text more
+  clearly and lays out scenes more cleanly.
+
+Both run at **50 steps** with **CFG 3** and support negative prompts. MOSS-Image works in the Generate tab,
+on the Canvas (image-to-image, inpainting, outpainting and [regional guidance](#layout-with-canvas-regions))
+and in the workflow editor, and it can decode with [PiD](/users-guide/image-generation/advanced-topics/pid-decode/).
+
+## License
+
+MOSS-Image Base and SFT, including the bundled Qwen3.5 9B text encoder and VAE, are released under **Apache 2.0**, which allows commercial use. Neither download is gated.
+
+This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
+
+## Hardware
+
+See the [System Requirements](/start-here/system-requirements/) table. For scale, measured on an RTX 4090
+in bf16:
+
+| Component                | VRAM in bf16 | With FP8 Storage |
+| ------------------------ | ------------ | ---------------- |
+| Transformer              | 10.2 GB      | 5.3 GB           |
+| Qwen3.5 9B text encoder  | 16.8 GB      | 16.8 GB          |
+
+The transformer and the encoder do not fit on a 24 GB card together. InvokeAI runs the encoder first and
+then swaps it out for the transformer, so plan for about **32 GB of system RAM** for the model cache to
+hold both. [FP8 Storage](/configuration/optimization/fp8-storage/) applies to the transformer only; the
+text encoder is never stored in FP8. On smaller cards,
+[Low-VRAM mode](/configuration/optimization/low-vram-mode/) lets InvokeAI stream models that don't fit
+entirely in VRAM.
+
+A 1024×1024 image takes about **70 s** at the default 50 steps and CFG 3, because each step runs the
+transformer twice, once for the prompt and once for the negative prompt. Images match OpenMOSS's reference
+pipeline for the same seed and settings (51–53 dB PSNR).
+
+## Installing
+
+The easiest path is the **MOSS-Image** bundle in the Model Manager. It installs **MOSS-Image Base** as a
+Diffusers pipeline. **MOSS-Image SFT** is left out of the bundle and can be installed individually from the
+starter models.
+
+| Starter          | Source                                   | Also installs                  |
+| ---------------- | ---------------------------------------- | ------------------------------ |
+| MOSS-Image Base  | `OpenMOSS-Team/MOSS-Image-Base` (~27 GB) | nothing, everything is bundled |
+| MOSS-Image SFT   | `OpenMOSS-Team/MOSS-Image-SFT` (~27 GB)  | nothing, everything is bundled |
+
+:::note[Installing both]
+Each pipeline brings its own copy of the 17 GB text encoder and the VAE, so installing Base and SFT downloads
+and stores the same encoder twice.
+:::
+
+MOSS-Image needs three components:
+
+| Component                 | Diffusers install | Single-file install  |
+| ------------------------- | ----------------- | -------------------- |
+| Transformer               | bundled           | the `.safetensors` file, such as the ComfyUI export `moss-image-dit.safetensors` |
+| Text encoder (Qwen3.5 9B) | bundled           | installed separately |
+| VAE (FLUX.2)              | bundled           | installed separately |
+
+When a single-file MOSS-Image model is selected, the **Components** section next to the model asks for:
+
+- **Qwen3.5 Encoder**: a single-file Qwen3.5 9B encoder, such as the ComfyUI export
+  `moss-image-qwen35.safetensors`. A file that carries the vision tower as well loads; the vision tower stays
+  on disk. The shards of a sharded export, such as the files in the pipeline's `text_encoder/` folder, do not
+  work on their own: the first shard is refused at install with a message saying so, and the others install as
+  unknown models. The shards in `transformer/` install as unknown models too. Install the whole Diffusers
+  folder or a merged single file instead. Anima-3.8B uses the Qwen3.5 4B, which installs under the same encoder type. The two are
+  not interchangeable, so the picker lists only 9B encoders.
+- **VAE**: a FLUX.2 VAE. MOSS-Image ships the FLUX.2 VAE with a smaller decoder (the ComfyUI export
+  `moss-image-vae.safetensors`); it installs under the FLUX.2 base. Any other FLUX.2 VAE works too, for
+  example the **FLUX.2 VAE** starter model.
+
+Quantized MOSS-Image transformers (fp8, int8, nvfp4, MXFP8 and GGUF) are not supported yet and are
+refused at install with a message saying so. Install the bf16 file, and to save VRAM turn on **FP8
+Storage** in the model's **Default Settings**.
+
+## Generation settings
+
+Selecting a MOSS-Image model applies these defaults:
+
+| Model           | Steps | CFG Scale | Scheduler | Size      |
+| --------------- | ----- | --------- | --------- | --------- |
+| MOSS-Image Base | 50    | 3.0       | Euler     | 1024×1024 |
+| MOSS-Image SFT  | 50    | 3.0       | Euler     | 1024×1024 |
+
+- **Steps**: OpenMOSS gets its best results at 50 steps or more.
+- **CFG Scale**: OpenMOSS recommends `3.0` to `6.0`. `3.0` is usually enough for a long prompt; raise it for
+  a short one. `1.0` turns CFG off, and values below `1.0` are not accepted.
+- **Negative prompt**: only used when CFG Scale is above `1.0`. OpenMOSS's defaults leave it empty and
+  suggest `nsfw, worst quality, bad anatomy, watermark, jpeg artifact` when you want one.
+- **Scheduler**: MOSS-Image uses its own Euler schedule, so the Scheduler field is not shown.
+- **Resolution**: width and height must be multiples of 16. OpenMOSS recommends 1, 1.5 or 2 megapixels, in
+  any aspect ratio; the model extrapolates from 0.25 megapixels (512×512) up to 4 megapixels.
+
+### Skip layers
+
+**Skip layers (negative branch)** in the Render section lists the transformer blocks the negative-prompt
+pass leaves out, as comma-separated numbers from `0` to `41`. The default is `22`, OpenMOSS's
+recommendation. OpenMOSS reports that blocks 22, 24 and 26 all help image quality. Empty skips no block,
+which makes images look very realistic but can make some details collapse. The setting has no effect at
+CFG `1.0`, where no negative pass runs, so the field is disabled there.
+
+The setting is saved in the image's metadata. **Recall All** and **Remix Image** restore it.
+
+## Prompting
+
+MOSS-Image reads natural language, tag sequences and JSON layouts, and you can mix them in one prompt.
+
+- **Language**: English works best, because most of the training data is English. Chinese and other
+  languages work as well.
+- **Tags**: OpenMOSS recommends the order quality, score, meta, year, character, series, artist, general,
+  for example `best quality, highres, 1girl, blue hair`.
+- **Text in the image**: put the text in quotation marks. The model breaks lines by itself; to place the
+  breaks yourself, write `\n` or start a new line in the prompt.
+- **Length**: a prompt can be up to 4096 tokens long. A longer one is cut off at the end, as in OpenMOSS's
+  pipeline, and the server log says so.
+
+### JSON layouts
+
+MOSS-Image can also place described elements in regions of the image. Paste a JSON layout into the prompt
+field in the format OpenMOSS defines; OpenMOSS calls this experimental. For a 1024×1024 image:
+
+```json
+{
+  "summary": {
+    "meta": ["poster"],
+    "canvas": "single",
+    "caption": "A vintage travel poster with a warm sunset sky over a quiet harbor."
+  },
+  "items": [
+    {
+      "label": "text",
+      "caption": "Bold cream-colored serif title across the top.",
+      "text": "HARBOR NIGHTS",
+      "bbox": [-448, -400, -320, 400]
+    },
+    {
+      "label": "object",
+      "caption": "A small red lighthouse on a rocky pier in the lower half.",
+      "bbox": [-64, -192, 448, 192]
+    }
+  ],
+  "bbox_coord_space": "abs_centralized",
+  "bbox_format": "yxyx"
+}
+```
+
+- `summary.caption` describes the whole scene and its style.
+- Each entry in `items` has a `label` (`object`, `character` or `text`), a `caption` describing it, its
+  `bbox`, and for text the exact `text` to render.
+- `bbox` is `[y_min, x_min, y_max, x_max]` in pixels, measured from the **center** of the image, with x
+  growing to the right and y downward. A 1024×1024 image runs from `-512` to `512` on both axes. To convert
+  coordinates measured from the top-left corner, subtract half the width from x and half the height from y.
+
+The coordinates are absolute pixels, so a layout made for one size needs new coordinates when you change the
+width or height. See OpenMOSS's [user guide](https://github.com/OpenMOSS/MOSS-Image/blob/main/USERGUIDE.md)
+for the format.
+
+### Layout with canvas regions
+
+On the Canvas, InvokeAI builds the JSON layout for you from **Regional Guidance** layers. The main prompt
+becomes the layout's `summary.caption`, and each enabled regional guidance layer becomes one element: the
+region's **Positive prompt** describes it, and its box is the rectangle around everything painted on the
+layer inside the generation frame, scaled to the generation size. The shape does not matter, and separate
+painted areas on one layer share one box.
+
+With a MOSS-Image model selected, the layer's **Layer** section in **Properties** has a **Region type**:
+
+- **Character** is for people and creatures, **Object**, the default, for everything else.
+- **Text** renders text. Enter the exact characters in **Visible text**, and describe how they look in the
+  positive prompt. The field takes several lines; each line break reaches the model as `\n`, and the text
+  breaks there.
+
+A region without a positive prompt, or a Text region without visible text, is left out of the layout, and the
+layer's settings say why. When a region can be placed, the main prompt cannot be blank: Invoke is disabled
+with *MOSS-Image needs a prompt to place regional guidance in its layout. Enter a prompt or disable the
+regional guidance layers.* Regional negative prompts, auto-negative and regional reference images are not used
+with MOSS-Image; the layer hides its negative prompt and auto-negative controls.
+
+Without regions the prompt is sent unchanged. If the prompt already is a JSON layout in the format above, the
+regions are added to its `items`; a layout with another `bbox_coord_space` or `bbox_format` makes the
+generation fail with a message. Any other prompt, including JSON that is not a layout, becomes the caption.
+The layout is built when the generation runs, so dynamic prompts and batches vary the caption inside it. The
+encoded layout is saved in the image's metadata as `moss_image_layout_prompt`.
+
+## Limitations
+
+- LoRA is not supported.
+- Quantized transformers are refused at install (see [Installing](#installing)).
+- ControlNet, reference images and seamless tiling are not available.
+- Regional guidance places boxes in a layout; it has no regional negative prompts or regional reference images.
+- MOSS-Image is not offered in the [Upscale panel](/users-guide/image-generation/upscale/).
+
+## Workflow nodes
+
+| Node                              | Purpose                                                                    |
+| --------------------------------- | -------------------------------------------------------------------------- |
+| **Main Model - MOSS-Image**       | Loads the transformer, and the Qwen3.5 9B encoder and VAE from the pipeline or from the standalone models selected |
+| **Layout Prompt - MOSS-Image**    | Builds a JSON layout from a prompt and a list of regions, each with a type, a caption, visible text for text regions, and a pixel box `[x1, y1, x2, y2]` from the image's top-left. The Canvas feeds it for regional guidance; its regions input has no editor widget |
+| **Prompt - MOSS-Image**           | Encodes a prompt with the Qwen3.5 9B encoder                               |
+| **Denoise - MOSS-Image**          | Runs sampling; accepts image-to-image latents and an inpainting mask, and takes the skip layers as **Uncond Skip Layers** |
+| **Image to Latents - FLUX2**      | VAE encode, for image-to-image and inpainting                              |
+| **Latents to Image - FLUX2**      | VAE decode                                                                 |
+
+The denoise node also takes the VAE, whose statistics define the latent space the transformer works in.
+MOSS-Image latents use the FLUX.2 layout, so the FLUX.2 encode, decode and PiD decode nodes work with them.

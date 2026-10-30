@@ -63,7 +63,7 @@ z_image_controlnet_union = StarterModel(
     name="Z-Image ControlNet Union",
     base=BaseModelType.ZImage,
     source="https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1/resolve/main/Z-Image-Turbo-Fun-Controlnet-Union-2.1-8steps.safetensors",
-    description="Unified ControlNet for Z-Image Turbo supporting Canny, HED, Depth, Pose, MLSD, and Inpainting modes.",
+    description="Unified ControlNet for Z-Image Turbo supporting Canny, HED, Depth, Pose and MLSD control images.",
     type=ModelType.ControlNet,
 )
 

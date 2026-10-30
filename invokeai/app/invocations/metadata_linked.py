@@ -146,6 +146,7 @@ CORE_LABELS = Literal[
     "krea2_rebalance_enabled",
     "krea2_rebalance_multiplier",
     "krea2_rebalance_weights",
+    "krea2_reference_kv_cache",
     "krea2_seed_variance_enabled",
     "krea2_seed_variance_randomize_percent",
     "krea2_seed_variance_strength",
@@ -168,6 +169,9 @@ CORE_LABELS = Literal[
     "minimax_h3_hybrid_start_block",
     "minimax_h3_text_encoder_model",
     "minimax_h3_transformer_model",
+    "moss_image_layout_prompt",
+    "moss_image_uncond_skip_layers",
+    "qwen_image_2_1_prefix_kv_cache",
     "qwen_image_component_source",
     "qwen_image_quantization",
     "qwen_image_qwen_vl_encoder",
@@ -201,6 +205,7 @@ CORE_LABELS_STRING = Literal[
     "krea2_rebalance_weights",
     "ltx2_conditioning_role",
     "ltx2_schedule",
+    "moss_image_layout_prompt",
     "qwen_image_quantization",
     "qwen_image_shift",
     "z_image_shift",
@@ -230,6 +235,7 @@ CORE_LABELS_INTEGER = Literal[
     "ltx2_base_width",
     "ltx2_context_frames",
     "minimax_h3_hybrid_start_block",
+    "moss_image_uncond_skip_layers",
     "z_image_seed_variance_randomize_percent",
 ]
 
@@ -282,8 +288,10 @@ CORE_LABELS_BOOL = Literal[
     "hidiffusion_window_attn",
     "hrf_enabled",
     "krea2_rebalance_enabled",
+    "krea2_reference_kv_cache",
     "krea2_seed_variance_enabled",
     "ltx2_two_stage",
+    "qwen_image_2_1_prefix_kv_cache",
     "z_image_seed_variance_enabled",
 ]
 

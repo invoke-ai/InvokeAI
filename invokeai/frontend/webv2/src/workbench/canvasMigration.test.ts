@@ -1,5 +1,6 @@
 import type { CanvasStateContractV3 } from '@workbench/canvas-engine/api';
 
+import { createControlLayer } from '@workbench/canvas-engine/api';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { describe, expect, it } from 'vitest';
 
@@ -14,10 +15,10 @@ import {
   loadCanvasState,
   normalizeCanvasDocumentContract,
   placementToTransform,
+  writableCanvasSchemaVersion,
 } from './canvasMigration';
 import { MAX_SUPPORTED_CANVAS_SCHEMA_VERSION } from './canvasSchemaVersion';
 import {
-  createControlLayer,
   createEmptyPaintLayer,
   createInpaintMaskLayer,
   createRegionalGuidanceLayer,
@@ -81,7 +82,7 @@ describe('loadCanvasState', () => {
       { beginEndStepPct: [0.1, 0.9], controlMode: null, kind: 'flux2_control', model: 'flux2-union', weight: 0 },
     ] as const;
     const layers = adapters.map((adapter, index) => ({
-      ...createControlLayer(`Control ${index}`, `control-${index}`),
+      ...createControlLayer({ id: `control-${index}`, name: `Control ${index}` }),
       adapter,
     }));
 
@@ -97,7 +98,7 @@ describe('loadCanvasState', () => {
     // unsupported. Load cannot tell an LLLite key from a ControlNet key without the catalog, so it keeps the kind;
     // the settings panel reports it and switching to LLLite keeps the model.
     const saved = {
-      ...createControlLayer('Anima Control', 'anima-control'),
+      ...createControlLayer({ id: 'anima-control', name: 'Anima Control' }),
       adapter: {
         beginEndStepPct: [0, 0.75],
         controlMode: 'balanced',
@@ -114,11 +115,11 @@ describe('loadCanvasState', () => {
 
   it('refuses a control layer whose adapter kind this build does not know, naming the layer', () => {
     const future = {
-      ...createControlLayer('Future Control', 'future-control'),
+      ...createControlLayer({ id: 'future-control', name: 'Future Control' }),
       adapter: { beginEndStepPct: [0, 1], controlMode: null, kind: 'future_adapter', model: 'm', weight: 1 },
     };
 
-    const refused = refusal(withNodes([createControlLayer('Kept', 'kept'), future], 'control'));
+    const refused = refusal(withNodes([createControlLayer({ id: 'kept', name: 'Kept' }), future], 'control'));
 
     expect(refused.status).toBe('invalid');
     expect(refused.status === 'invalid' ? refused.diagnostics : []).toEqual([
@@ -129,7 +130,12 @@ describe('loadCanvasState', () => {
   it('normalizes an incomplete persisted Z-Image control with backend defaults', () => {
     const loaded = load(
       withNodes(
-        [{ ...createControlLayer('Z Control', 'z-control'), adapter: { kind: 'z_image_control', model: 'z-control' } }],
+        [
+          {
+            ...createControlLayer({ id: 'z-control', name: 'Z Control' }),
+            adapter: { kind: 'z_image_control', model: 'z-control' },
+          },
+        ],
         'control'
       )
     );
@@ -144,13 +150,40 @@ describe('loadCanvasState', () => {
     });
   });
 
-  it('repairs a persisted Qwen-Image control weight below the node floor with the kind default', () => {
+  it('keeps a control layer mode and negative weight whatever kind it stores, live, in snapshots and in session', () => {
+    // Created under Z-Image, then run on SDXL with a negative weight: the stored kind is advisory, the resolved one
+    // governs, so the document must load and save as it is.
+    const adapter = {
+      beginEndStepPct: [0.1, 0.9],
+      controlMode: 'more_control',
+      kind: 'z_image_control',
+      model: null,
+      weight: -0.3,
+    };
+    const state = withNodes([{ ...createControlLayer({ id: 'z-control', name: 'Z Control' }), adapter }], 'control');
+    const loaded = load({
+      ...state,
+      snapshots: [{ createdAt: 'now', document: state.document, id: 'snapshot', name: 'Snapshot' }],
+    });
+    const adapterOf = (document: (typeof loaded)['document']) => {
+      const layer = document.stacks.control[0];
+      return layer?.type === 'control' ? layer.adapter : null;
+    };
+
+    expect(adapterOf(loaded.document)).toEqual(adapter);
+    expect(adapterOf(loaded.snapshots[0]!.document)).toEqual(adapter);
+    // Snapshot save and restore and document replace normalize in session; a refusal there would silently no-op.
+    const normalized = normalizeCanvasDocumentContract(loaded.document);
+    expect(normalized && adapterOf(normalized)).toEqual(adapter);
+  });
+
+  it('repairs a persisted control weight outside what any kind runs with the kind default', () => {
     const loaded = load(
       withNodes(
         [
           {
-            ...createControlLayer('Q Control', 'q-control'),
-            adapter: { kind: 'qwen_image_control', model: 'qwen-union', weight: -0.5 },
+            ...createControlLayer({ id: 'q-control', name: 'Q Control' }),
+            adapter: { kind: 'qwen_image_control', model: 'qwen-union', weight: -1.5 },
           },
         ],
         'control'
@@ -180,6 +213,54 @@ describe('loadCanvasState', () => {
     const malformed = load(withNodes([{ ...createEmptyPaintLayer('Bad', 'bad'), inpaint: { isEnabled: 'yes' } }]));
     const badLayer = malformed.document.stacks.raster[0];
     expect(badLayer?.type === 'raster' ? badLayer.inpaint : null).toBeUndefined();
+  });
+
+  it("round-trips a region's layout role, keeps its absence, and drops a structurally broken one", () => {
+    const region = (id: string, extra: Record<string, unknown> = {}) => ({
+      ...createRegionalGuidanceLayer(id, 0, id),
+      ...extra,
+    });
+    const loaded = load(
+      withNodes(
+        [
+          region('sign', { layout: { kind: 'text', text: '营业中 OPEN' } }),
+          region('hero', { layout: { kind: 'character' } }),
+          region('plain'),
+          region('not-an-object', { layout: 'text' }),
+          region('bad-kind-type', { layout: { kind: 3 } }),
+          region('bad-text', { layout: { kind: 'text', text: 7 } }),
+        ],
+        'regional_guidance'
+      )
+    );
+    const layouts = Object.fromEntries(
+      loaded.document.stacks.regional_guidance.map((layer) => [
+        layer.id,
+        layer.type === 'regional_guidance' ? layer.layout : null,
+      ])
+    );
+
+    expect(layouts).toEqual({
+      'bad-kind-type': undefined,
+      'bad-text': undefined,
+      hero: { kind: 'character' },
+      'not-an-object': undefined,
+      plain: undefined,
+      sign: { kind: 'text', text: '营业中 OPEN' },
+    });
+    const plain = loaded.document.stacks.regional_guidance.find((layer) => layer.id === 'plain');
+    expect(plain && Object.hasOwn(plain, 'layout')).toBe(false);
+  });
+
+  it('refuses a region whose layout role this build does not know, naming the layer', () => {
+    const future = { ...createRegionalGuidanceLayer('Banner', 1, 'banner'), layout: { kind: 'banner' } };
+
+    const refused = refusal(withNodes([createRegionalGuidanceLayer('Kept', 0, 'kept'), future], 'regional_guidance'));
+
+    expect(refused.status).toBe('invalid');
+    expect(refused.status === 'invalid' ? refused.diagnostics : []).toEqual([
+      expect.objectContaining({ path: 'document.stacks.regional_guidance[1]' }),
+    ]);
   });
 
   it('round-trips triangle and star shape sources', () => {
@@ -443,8 +524,8 @@ describe('loadCanvasState', () => {
 
   it('normalizes control adapters in both the live document and saved snapshots', () => {
     const invalidLayer = {
-      ...createControlLayer('Z Control', 'z-control'),
-      adapter: { beginEndStepPct: [0.8, 0.2], controlMode: null, kind: 'z_image_control', model: null, weight: -1 },
+      ...createControlLayer({ id: 'z-control', name: 'Z Control' }),
+      adapter: { beginEndStepPct: [0.8, 0.2], controlMode: null, kind: 'z_image_control', model: null, weight: -1.5 },
     };
     const state = withNodes([invalidLayer], 'control');
     const loaded = load({
@@ -464,7 +545,7 @@ describe('loadCanvasState', () => {
     const state = createEmptyCanvasState();
     const validDocument = {
       ...state.document,
-      stacks: stacksFrom([createControlLayer('Snapshot Control', 'snapshot-control')]),
+      stacks: stacksFrom([createControlLayer({ id: 'snapshot-control', name: 'Snapshot Control' })]),
     };
     const valid = { createdAt: 'now', document: validDocument, id: 'valid', name: 'Valid' };
     const base = withNodes([createEmptyPaintLayer('Live', 'live')]);
@@ -493,7 +574,7 @@ describe('loadCanvasState', () => {
     ['missing discriminant and base fields', { id: 'broken' }],
     ['unknown layer type', { ...createEmptyPaintLayer('Mystery', 'mystery'), type: 'mystery' }],
     ['raster with invalid source', { ...createEmptyPaintLayer('Raster', 'raster'), source: null }],
-    ['a leaf of another stack', createControlLayer('Control', 'control')],
+    ['a leaf of another stack', createControlLayer({ id: 'control', name: 'Control' })],
     ['a group without children', { ...groupContract('g'), children: null }],
     ['a group with a malformed child', groupContract('g', [{ ...createEmptyPaintLayer('Bad', 'bad'), opacity: 4 }])],
   ])('refuses a snapshot containing a malformed node: %s', (_label, malformedNode) => {
@@ -521,7 +602,7 @@ describe('loadCanvasState', () => {
   it('round-trips valid snapshots containing every layer type and nested groups', () => {
     const state = createEmptyCanvasState();
     const stacks = {
-      control: [groupContract('cg', [createControlLayer('Control', 'control')], { isHidden: true })],
+      control: [groupContract('cg', [createControlLayer({ id: 'control', name: 'Control' })], { isHidden: true })],
       inpaint_mask: [createInpaintMaskLayer('Mask', 'mask')],
       raster: [groupContract('rg', [createEmptyPaintLayer('Raster', 'raster'), groupContract('inner', [])])],
       regional_guidance: [createRegionalGuidanceLayer('Region', 0, 'region')],
@@ -561,7 +642,7 @@ describe('loadCanvasState', () => {
   it.each([
     [
       'a duplicated id across stacks',
-      { control: [createControlLayer('C', 'dup')], raster: [createEmptyPaintLayer('R', 'dup')] },
+      { control: [createControlLayer({ id: 'dup', name: 'C' })], raster: [createEmptyPaintLayer('R', 'dup')] },
       'document.stacks.control[0].id',
     ],
     [
@@ -574,7 +655,11 @@ describe('loadCanvasState', () => {
       { raster: [groupContract('g', [], { isHidden: true })] },
       'document.stacks.raster[0].isHidden',
     ],
-    ['a leaf in the wrong stack', { raster: [createControlLayer('C', 'c')] }, 'document.stacks.raster[0]'],
+    [
+      'a leaf in the wrong stack',
+      { raster: [createControlLayer({ id: 'c', name: 'C' })] },
+      'document.stacks.raster[0]',
+    ],
     [
       'a group nested past the depth limit',
       {
@@ -869,6 +954,151 @@ describe('loadCanvasState', () => {
     };
 
     expect(refusal(legacy)).toMatchObject({ scope: 'document', status: 'invalid' });
+  });
+
+  describe('control layer derivation fields', () => {
+    const image = (imageName: string) => ({ height: 64, imageName, width: 64 });
+    const detection = { settings: { high_threshold: 200, low_threshold: 100 }, type: 'canny_edge_detection' };
+    const typed = {
+      ...createControlLayer({ id: 'edges', name: 'Edges 1' }),
+      controlType: 'edges',
+      detection,
+      filter: detection,
+      original: { image: image('photo.png'), type: 'image' },
+      originalTransform: { rotation: 0, scaleX: 2, scaleY: 2, x: 10, y: 20 },
+      source: { bitmap: image('map.png'), offset: { x: 0, y: 0 }, type: 'paint' },
+    };
+    const legacy = {
+      ...createControlLayer({ id: 'legacy', name: 'Control Layer 1' }),
+      filter: detection,
+      source: { bitmap: image('map.png'), type: 'paint' },
+    };
+    const omit = (layer: Record<string, unknown>, ...keys: string[]) =>
+      Object.fromEntries(Object.entries(layer).filter(([key]) => !keys.includes(key)));
+    const declaring = (canvas: ReturnType<typeof withNodes>, version: number) => ({
+      ...canvas,
+      document: { ...canvas.document, version },
+      version,
+    });
+    /** Loads one control leaf, asserting no diagnostics and returning it with its exact key set. */
+    const loadControl = (layer: unknown) => {
+      const result = loadCanvasState(withNodes([layer], 'control'));
+      expect(result).toMatchObject({ diagnostics: [], status: 'loaded' });
+      return result.status === 'loaded' ? result.value.document.stacks.control[0] : undefined;
+    };
+    const expectExactly = (actual: unknown, expected: Record<string, unknown>) => {
+      expect(actual).toEqual(expected);
+      expect(Object.keys(actual as object).sort()).toEqual(Object.keys(expected).sort());
+    };
+
+    it('round-trips a typed, detected layer and writes a v3, v4 or v5 canvas as version 6', () => {
+      for (const declared of [3, 4, 5]) {
+        const loaded = load(declaring(withNodes([typed], 'control'), declared));
+        expectExactly(loaded.document.stacks.control[0], typed);
+        expect(loaded.version).toBe(6);
+        expect(loaded.document.version).toBe(6);
+      }
+      expect(
+        load(withNodes([groupContract('outer', [groupContract('inner', [typed as never])])], 'control')).version
+      ).toBe(6);
+    });
+
+    it.each([
+      ['controlType', { controlType: 'edges' }],
+      ['detection', { detection: null }],
+      ['original', { original: { image: image('photo.png'), type: 'image' } }],
+      ['originalTransform', { originalTransform: { rotation: 0, scaleX: 2, scaleY: 2, x: 0, y: 0 } }],
+    ])('requires version 6 for a control leaf carrying only %s', (_key, fields) => {
+      const stacks = withNodes([{ ...legacy, ...fields }], 'control').document.stacks;
+      expect(writableCanvasSchemaVersion([3], { stacks })).toBe(6);
+    });
+
+    it('requires version 6, not 5, when a group adjustment and a typed child share a document', () => {
+      const spatial = { amount: 40, id: 'clarity', isEnabled: true, size: 40, type: 'clarity' };
+      const graded = groupContract('graded', [typed as never], { adjustments: [spatial as never] });
+      expect(load(withNodes([graded], 'control')).version).toBe(6);
+
+      const adjusted = withNodes([{ ...createEmptyPaintLayer('Detail', 'detail'), adjustments: [spatial] }]);
+      const stacks = { ...adjusted.document.stacks, control: [typed] };
+      expect(load({ ...adjusted, document: { ...adjusted.document, stacks } }).version).toBe(6);
+    });
+
+    it('keeps a legacy control layer unchanged and at its declared version', () => {
+      const loaded = load(withNodes([legacy], 'control'));
+      expectExactly(loaded.document.stacks.control[0], legacy);
+      expect(loaded.version).toBe(3);
+      expect(loaded.document.version).toBe(3);
+    });
+
+    it('does not adopt version 6 for derivation keys present only as undefined', () => {
+      const undefinedKeys = { ...legacy, controlType: undefined, detection: undefined, original: undefined };
+      expect(writableCanvasSchemaVersion([3], { stacks: withNodes([undefinedKeys], 'control').document.stacks })).toBe(
+        3
+      );
+      expect(load(withNodes([undefinedKeys], 'control')).version).toBe(3);
+    });
+
+    it('never lowers a declared version 6 once the fields are gone', () => {
+      const loaded = load(declaring(withNodes([legacy], 'control'), 6));
+      expect(loaded.version).toBe(6);
+      expect(loaded.document.version).toBe(6);
+    });
+
+    it('writes version 6 when only a snapshot holds a typed layer, leaving the live document at its own version', () => {
+      const loaded = load({
+        ...createEmptyCanvasState(),
+        snapshots: [{ createdAt: 'now', document: withNodes([typed], 'control').document, id: 's', name: 'S' }],
+      });
+      expect(loaded.version).toBe(6);
+      expect(loaded.document.version).toBe(3);
+      expect(loaded.snapshots[0]?.document.version).toBe(6);
+    });
+
+    it('keeps an unknown detector type and its settings', () => {
+      const future = { settings: { strength: 3 }, type: 'future_detector' };
+      expectExactly(loadControl({ ...typed, detection: future, filter: future }), {
+        ...typed,
+        detection: future,
+        filter: future,
+      });
+    });
+
+    it('refuses an unknown control type rather than rewriting it', () => {
+      expect(refusal(withNodes([{ ...typed, controlType: 'future_type' }], 'control'))).toMatchObject({
+        scope: 'document',
+        status: 'invalid',
+      });
+    });
+
+    const untyped = omit(typed, 'controlType', 'detection', 'original', 'originalTransform');
+    const detached = { ...omit(typed, 'original', 'originalTransform'), detection: null };
+    it.each([
+      ['a null type (dropped, with everything it carried)', { ...typed, controlType: null }, untyped],
+      ['derivation fields without a type', omit(typed, 'controlType'), untyped],
+      [
+        'an original paint source without pixels (detached)',
+        { ...typed, original: { bitmap: null, type: 'paint' } },
+        detached,
+      ],
+      [
+        'an original that is not a pixel source (detached)',
+        { ...typed, original: { content: 'x', type: 'text' } },
+        detached,
+      ],
+      ['an original beside a "None" detection', { ...typed, detection: null }, detached],
+      [
+        'an original without a detection',
+        omit(typed, 'detection'),
+        omit(typed, 'detection', 'original', 'originalTransform'),
+      ],
+      [
+        'an original transform without an original',
+        omit(typed, 'original'),
+        omit(typed, 'original', 'originalTransform'),
+      ],
+    ])('silently repairs %s', (_label, input, expected) => {
+      expectExactly(loadControl(input), expected);
+    });
   });
 
   it('passes a valid state through normalized, keeping every persisted field', () => {

@@ -39,11 +39,13 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.flux.schedulers import FLUX_SCHEDULER_LABELS, FLUX_SCHEDULER_MAP, FLUX_SCHEDULER_NAME_VALUES
 from invokeai.backend.flux2.denoise import denoise
+from invokeai.backend.flux2.denoise_working_memory import estimate_flux2_denoise_working_memory
 from invokeai.backend.flux2.extensions.regional_prompting_extension import Flux2RegionalPromptingExtension
 from invokeai.backend.flux2.ref_image_extension import Flux2RefImageExtension
 from invokeai.backend.flux2.sampling_utils import (
     compute_empirical_mu,
     generate_img_ids_flux2,
+    get_flux2_bn_stats,
     get_noise_flux2,
     get_schedule_flux2,
     pack_flux2,
@@ -63,34 +65,17 @@ from invokeai.backend.patches.lora_conversions.flux_bfl_peft_lora_conversion_uti
 )
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
-from invokeai.backend.quantization.dequantizing_linear import (
-    peak_dequant_transient_bytes,
-    requires_sidecar_patching,
-)
+from invokeai.backend.quantization.dequantizing_linear import requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import (
     PipelineIntermediateState,
     image_resized_to_grid_as_tensor,
 )
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
-from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.sage_attention import sage_attention_scope
+from invokeai.backend.working_memory import probe
 
-# FLUX.2 attention geometry. The head dim is 128 across every variant and the head count follows
-# the hidden size (Klein 4B: 3072/24, Klein 9B: 4096/32, [dev] 6144/48), so the width is the single
-# number that describes both. Only the head dim decides which SDPA kernel is eligible; the head
-# count scales the `math` fallback's score matrix.
-FLUX2_ATTENTION_HEAD_DIM = 128
-# The width the per-token constant below was measured on. Estimates scale off this.
-FLUX2_REFERENCE_HIDDEN_SIZE = 4096
-# Peak reserved activation bytes per attended token at the reference width. Measured slope between
-# 4608 and 9216 tokens: 0.3859 MB/tok on CUDA (RTX 4090, torch 2.7.1) and 0.4067 on ROCm (RX 9070
-# XT, gfx1201, torch 2.10). 0.42 is an upper bound on both -- it was 0.4, which the ROCm point
-# exceeds. The margin is deliberately small because this is the dominant term at every resolution.
-FLUX2_BYTES_PER_TOKEN_AT_REFERENCE_WIDTH = int(0.42 * 1024**2)
-# The widest variant, used when the config does not tell us which one this is -- over-reserving on
-# an unknown model beats under-reserving on the largest one.
 FLUX2_MAX_HIDDEN_SIZE = 6144
 
 
@@ -196,44 +181,9 @@ class Flux2DenoiseInvocation(BaseInvocation, WithMetadata):
     )
 
     def _get_bn_stats(self, context: InvocationContext) -> Optional[Tuple[torch.Tensor, torch.Tensor]]:
-        """Extract BN statistics from the FLUX.2 VAE.
-
-        The FLUX.2 VAE uses batch normalization on the patchified 128-channel representation.
-        IMPORTANT: BFL FLUX.2 VAE uses affine=False, so there are NO learnable weight/bias.
-
-        BN formula (affine=False): y = (x - mean) / std
-        Inverse: x = y * std + mean
-
-        Returns:
-            Tuple of (bn_mean, bn_std) tensors of shape (128,), or None if BN layer not found.
-        """
+        """Extract the latent BN statistics (bn_mean, bn_std) from the wired FLUX.2 VAE, or None if it has none."""
         with context.models.load(self.vae.vae).model_on_device() as (_, vae):
-            # Ensure VAE is in eval mode to prevent BN stats from being updated
-            vae.eval()
-
-            # Try to find the BN layer - it may be at different locations depending on model format
-            bn_layer = None
-            if hasattr(vae, "bn"):
-                bn_layer = vae.bn
-            elif hasattr(vae, "batch_norm"):
-                bn_layer = vae.batch_norm
-            elif hasattr(vae, "encoder") and hasattr(vae.encoder, "bn"):
-                bn_layer = vae.encoder.bn
-
-            if bn_layer is None:
-                return None
-
-            # Verify running statistics are initialized
-            if bn_layer.running_mean is None or bn_layer.running_var is None:
-                return None
-
-            # Get BN running statistics from VAE
-            bn_mean = bn_layer.running_mean.clone()  # Shape: (128,)
-            bn_var = bn_layer.running_var.clone()  # Shape: (128,)
-            bn_eps = bn_layer.eps if hasattr(bn_layer, "eps") else 1e-4  # BFL uses 1e-4
-            bn_std = torch.sqrt(bn_var + bn_eps)
-
-        return bn_mean, bn_std
+            return get_flux2_bn_stats(vae)
 
     def _bn_normalize(
         self,
@@ -571,42 +521,7 @@ class Flux2DenoiseInvocation(BaseInvocation, WithMetadata):
                 bn_std=bn_std,
             )
 
-        # Estimate the peak activation memory the transformer forward will need and ask the model cache
-        # to keep that much VRAM free. Without this hint the cache reserves only the small default
-        # working memory and fills the rest of the card with the model, so anything beyond a plain
-        # low-resolution generation OOMs. Reference images are the dominant term: their latents are
-        # concatenated onto the image stream, so three 1024x1024 references quadruple the sequence
-        # (and with it the activation footprint) of a 1024x1024 generation.
         ref_image_seq_len = ref_image_extension.ref_image_latents.shape[1] if ref_image_extension is not None else 0
-        # The additive bias is skipped entirely when reference images are present (see below), so the
-        # mask only costs anything -- storage, and possibly a materialized score matrix -- without them.
-        regional_attn_mask = regional_extension.restricted_attn_mask if ref_image_seq_len == 0 else None
-        num_control_blocks = len(control_branch_info.model.control_blocks) if control_branch_info is not None else 0
-        estimated_working_memory = self._estimate_working_memory(
-            image_seq_len=packed_h * packed_w,
-            ref_image_seq_len=ref_image_seq_len,
-            text_seq_len=max(txt.shape[1], neg_txt.shape[1] if neg_txt is not None else 0),
-            num_loras=len(self.transformer.loras),
-            # Taken from `x`, not from `b`. `b` is the *noise* tensor's batch, which this node builds
-            # at 1 from width/height/seed even when the init latents carry more; the img2img preblend
-            # above then broadcasts the two, so `x` is the only thing that knows how many samples
-            # actually go through the transformer. Reference latents are repeated to match it
-            # (`ensure_batch_size` below), so they scale with it too.
-            batch_size=x.shape[0],
-            # Activation cost per token scales with the transformer's width, and [dev] is 1.5x
-            # Klein 9B. Fall back to the widest variant when the config cannot tell us.
-            hidden_size=flux2_hidden_size(getattr(transformer_config, "variant", None)) or FLUX2_MAX_HIDDEN_SIZE,
-            # The mask itself is already allocated; only the additive bias built per forward is new.
-            regional_attention_bias_bytes=(
-                regional_attn_mask.numel() * torch.empty((), dtype=inference_dtype).element_size()
-                if regional_attn_mask is not None
-                else 0
-            ),
-            has_regional_attention_mask=regional_attn_mask is not None,
-            device=device,
-            dtype=inference_dtype,
-            num_control_blocks=num_control_blocks,
-        )
 
         # Encoded ahead of the transformer's lock, so the VAE does not have to fit beside it.
         control_context: torch.Tensor | None = None
@@ -619,28 +534,58 @@ class Flux2DenoiseInvocation(BaseInvocation, WithMetadata):
         with ExitStack() as exit_stack:
             transformer_info = context.models.load(self.transformer.transformer)
 
-            # An `int8_tensorwise` or GGUF build materializes each linear's dequantized weight per forward.
-            # That transient is not part of the model's resident size, so it is added to the
-            # activation estimate -- the two are alive at the same time -- rather than taking its
-            # chances against whatever slack the estimate happens to have. Read from the unlocked
-            # model, before the VRAM lock the reservation applies to; zero for every other build.
-            dequant_bytes = peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
+            # Ask the model cache to keep free what the transformer forward needs. Without it the cache keeps only
+            # the default working memory and fills the rest of the card with the model, so anything beyond a plain
+            # low-resolution generation OOMs. Reference images are the dominant term: their latents are concatenated
+            # onto the image stream, so three 1024x1024 references quadruple the attended sequence of a 1024x1024
+            # generation. Priced on the unlocked model, whose quantized or fp8-stored layers add a transient per
+            # forward, before the VRAM lock the reservation applies to.
+            working_memory = estimate_flux2_denoise_working_memory(
+                transformer_info.model,
+                # Activation cost per token follows the transformer's width, and [dev] is 1.5x Klein 9B. Priced as
+                # the widest variant when the config cannot tell: over-reserving on an unknown model beats
+                # under-reserving on the largest one.
+                hidden_size=flux2_hidden_size(getattr(transformer_config, "variant", None)) or FLUX2_MAX_HIDDEN_SIZE,
+                image_seq_len=packed_h * packed_w,
+                ref_image_seq_len=ref_image_seq_len,
+                text_seq_len=max(txt.shape[1], neg_txt.shape[1] if neg_txt is not None else 0),
+                # Taken from `x`, not from `b`. `b` is the *noise* tensor's batch, which this node builds at 1 from
+                # width/height/seed even when the init latents carry more; the img2img preblend above then
+                # broadcasts the two, so `x` is the only thing that knows how many samples actually go through the
+                # transformer. Reference latents are repeated to match it (`ensure_batch_size` below).
+                batch_size=x.shape[0],
+                lora_count=len(self.transformer.loras),
+                control_blocks=len(control_branch_info.model.control_blocks) if control_branch_info is not None else 0,
+                # The additive bias is skipped entirely when reference images are present (see below), so the mask
+                # only costs anything without them.
+                regional_attn_mask=regional_extension.restricted_attn_mask if ref_image_seq_len == 0 else None,
+                device=device,
+                dtype=inference_dtype,
+            )
 
             # Load the transformer model
             (cached_weights, transformer) = exit_stack.enter_context(
-                transformer_info.model_on_device(working_mem_bytes=estimated_working_memory + dequant_bytes)
+                transformer_info.model_on_device(working_memory=working_memory)
             )
             config = transformer_config
 
             control_gate: Callable[[int], None] | None = None
             if control_branch_info is not None:
                 assert self.control is not None and control_context is not None
-                # Locked with the same working memory: the transformer can no longer be offloaded, so a branch placed
-                # with only the default reservation would fill the room kept for the forward. The loader built the
-                # branch in bfloat16, this node's inference dtype; the branch casts what crosses into its chain and
-                # the hints back (`Flux2FunControlBranch.block_runner` / `add_hint`), so nothing cache-managed is cast.
+                # Locked keeping free what the transformer's lock keeps free: the transformer can no longer be
+                # offloaded, so a branch placed with only the default reservation would fill the room kept for the
+                # forward. Inside a calibration scope that is the calibration reservation, as `model_on_device` applies
+                # it to the transformer, so the branch cannot use up the window's headroom. A plain reservation, not
+                # the estimate: inside the transformer's calibration window this lock is a co-lock, whose weights go
+                # into the window's offset rather than its demand, where a second estimate would open a nested window
+                # that freezes the transformer's for the whole loop. The loader built the branch in bfloat16, this
+                # node's inference dtype; the branch casts what crosses into its chain and the hints back
+                # (`Flux2FunControlBranch.block_runner` / `add_hint`), so nothing cache-managed is cast.
+                _, branch_reservation = probe.lock_reservation(
+                    working_memory.reservation_bytes, control_branch_info.compute_device
+                )
                 (_, control_branch) = exit_stack.enter_context(
-                    control_branch_info.model_on_device(working_mem_bytes=estimated_working_memory + dequant_bytes)
+                    control_branch_info.model_on_device(working_mem_bytes=branch_reservation)
                 )
                 assert isinstance(control_branch, Flux2FunControlBranch)
                 control_hooks = exit_stack.enter_context(
@@ -760,109 +705,6 @@ class Flux2DenoiseInvocation(BaseInvocation, WithMetadata):
 
         mask = mask.to(device=latents.device, dtype=latents.dtype)
         return mask.expand_as(latents)
-
-    def _estimate_working_memory(
-        self,
-        image_seq_len: int,
-        ref_image_seq_len: int,
-        text_seq_len: int,
-        num_loras: int,
-        batch_size: int = 1,
-        hidden_size: int = FLUX2_REFERENCE_HIDDEN_SIZE,
-        regional_attention_bias_bytes: int = 0,
-        has_regional_attention_mask: bool = False,
-        device: torch.device | None = None,
-        dtype: torch.dtype = torch.bfloat16,
-        num_control_blocks: int = 0,
-    ) -> int:
-        """Estimate peak transformer activation memory (bytes) so the model cache reserves enough headroom.
-
-        FLUX.2 attention runs through SDPA without materializing the O(seq^2) score matrix, so the
-        activation footprint scales *linearly* with the total attended sequence -- text tokens, image
-        tokens, and reference-image tokens alike. Measured on the Klein 9B geometry in bf16 as peak
-        reserved memory, that slope holds from 1.5k to 28k tokens and is independent of the block
-        count (a no-grad forward frees each block's intermediates). It is *not* independent of the
-        build: 0.3859 MB/token on CUDA, 0.4067 on ROCm/gfx1201, so the constant is 0.42.
-
-        It is *not* independent of the transformer's width, which is why ``hidden_size`` is a
-        parameter rather than a constant. Measured slope between 4608 and 9216 tokens, block count
-        and everything else held fixed:
-
-            CUDA          3072 (Klein 4B) 0.291 MB/tok   4096 (Klein 9B) 0.386   6144 ([dev]) 0.555
-            ROCm/gfx1201  3072            0.315           4096            0.407   6144         0.589
-
-        which is 0.755 / 1.000 / 1.438 on CUDA and 0.774 / 1.000 / 1.448 on ROCm, against width
-        ratios of 0.75 / 1.00 / 1.50 -- linear in width on both,
-        and slightly sub-linear at the top so scaling by width stays an upper bound. Calibrating on
-        Klein 9B alone would have under-reserved [dev] by a third: 1024x1024 with three 1024x1024
-        references is 16896 tokens, ~7.6GB reserved against ~10GB needed on both platforms. The head
-        count follows the same width, so the score-matrix term gets the real one instead of the
-        widest.
-
-        The reference-image term is what makes this estimate necessary rather than merely nice to
-        have: a 1024x1024 generation is 4096 image tokens (~1.7GB), but attaching three 1024x1024
-        references adds 12288 more for ~6.5GB, and a 1328px tile with three 1328px references reaches
-        ~10.9GB -- against a default ``device_working_mem_gb`` of 3.
-
-        A fixed base covers resolution-independent overhead (transient fp8 -> bf16 weight casts during
-        the forward, and allocator slack across many steps); the dequantization copy of an int8 or GGUF
-        build is added by the caller. LoRA sidecar patches add an extra
-        activation branch per patched layer, so we add a per-LoRA margin.
-
-        Batch multiplies the token count and nothing else. A batch of B is B independent sequences,
-        so it enters the linear term exactly as extra sequence does -- measured on the Klein geometry
-        with a reduced block count: 4608 tokens at B=1 peaks at 2570MB, the same 4608 at B=2 (9216
-        tokens) at 5126MB, and 9728 tokens at B=1 at 5584MB. Batch and sequence are interchangeable
-        to within the noise. Reference latents are repeated per sample (`ensure_batch_size`), so they
-        scale with it too, and the score matrix is shaped (batch, heads, S, S). The fixed base does
-        not scale -- it is about weights, not activations -- and neither does the regional bias, which
-        is built as (1, 1, S, S) and broadcast across the batch.
-
-        A ControlNet branch runs its blocks over the whole image stream, reference tokens included, and keeps
-        one hint per block alive until the last listed base block has consumed it. The term reserves
-        ``num_control_blocks + 4`` hint-sized tensors (batch x stream x width), the coefficient Z-Image measured
-        for its adapter over the plain forward (``z_image_denoise.py``). It is not measured for FLUX.2.
-
-        The linear model holds only while attention runs on a fused kernel. Regional prompting is
-        where that stops being a given: it hands the transformer a dense additive ``S x S`` bias,
-        which flash attention never accepts, leaving whatever else the build has -- and if that is
-        the ``math`` fallback, a materialized ``heads x S x S`` score matrix. Whether a mask forces
-        that is build-specific and not worth predicting: CUDA's memory-efficient kernel takes it, and
-        so does ROCm's on gfx1100. The device decides too (MPS has no fused SDPA kernel at all), and
-        so does the diffusers attention backend this build dispatches through.
-        ``sdpa_score_matrix_bytes`` asks all three and adds the score matrix only where it is really
-        built: on CUDA with the stock backend the term is zero (verified: peak stays linear with the
-        bias attached).
-        """
-        GB = 1024**3
-        per_token_bytes = int(FLUX2_BYTES_PER_TOKEN_AT_REFERENCE_WIDTH * hidden_size / FLUX2_REFERENCE_HIDDEN_SIZE)
-        total_seq_len = image_seq_len + ref_image_seq_len + text_seq_len
-        estimated = total_seq_len * batch_size * per_token_bytes
-        estimated += int(1.0 * GB)
-        estimated += regional_attention_bias_bytes
-        estimated += sdpa_score_matrix_bytes(
-            device=device if device is not None else TorchDevice.choose_torch_device(),
-            dtype=dtype,
-            num_heads=(hidden_size // FLUX2_ATTENTION_HEAD_DIM) * batch_size,
-            head_dim=FLUX2_ATTENTION_HEAD_DIM,
-            seq_len=total_seq_len,
-            has_attn_mask=has_regional_attention_mask,
-            # The FLUX.2 transformer's attention goes through diffusers' `dispatch_attention_fn`,
-            # which can route around torch's SDPA entirely -- including to a forced `math` backend.
-            via_diffusers_dispatch=True,
-        )
-        if num_loras > 0:
-            # A sidecar branch is an activation, so it scales with the batch like the rest of them.
-            estimated += int(0.5 * num_loras * batch_size * GB)
-        if num_control_blocks > 0:
-            estimated += (
-                (num_control_blocks + 4)
-                * (image_seq_len + ref_image_seq_len)
-                * batch_size
-                * hidden_size
-                * dtype.itemsize
-            )
-        return estimated
 
     def _load_control_branch(
         self,

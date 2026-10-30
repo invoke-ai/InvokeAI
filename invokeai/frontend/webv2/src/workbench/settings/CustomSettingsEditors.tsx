@@ -22,6 +22,7 @@ import { clearWorkspaceData, rememberWorkspaceClearFailure } from './clearWorksp
 import { GenerationDevicesSettings } from './GenerationDevicesSettings';
 import { HotkeysSettingsSection } from './HotkeysSettingsSection';
 import { ImageMapVocabularySettings } from './ImageMapVocabularySettings';
+import { ImageStorageSettings } from './ImageStorageSettings';
 import { MaxQueueHistorySettings } from './MaxQueueHistorySettings';
 import {
   clearWorkbenchSettings,
@@ -316,6 +317,9 @@ const CustomSettingField = ({ field, onReveal }: SettingFieldProps) => {
       );
     case 'imageMapVocabulary':
       editor = <ImageMapVocabularySettings />;
+      break;
+    case 'imageStorage':
+      editor = <ImageStorageSettings />;
       break;
     default:
       return null;

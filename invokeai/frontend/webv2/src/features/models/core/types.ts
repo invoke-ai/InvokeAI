@@ -21,6 +21,7 @@ export type ModelBase =
   | 'ideogram-4'
   | 'krea-2'
   | 'anima'
+  | 'moss-image'
   /** Wan 2.2. A video architecture, used here for image generation at `num_frames=1`. */
   | 'wan'
   /** MiniMax H3. A video architecture that generates video with synchronized audio. */
@@ -54,6 +55,7 @@ export type ModelTaxonomyType =
   | 'gemma4_encoder'
   | 'pid_decoder'
   | 'ltx2_duration_head'
+  | 'tiny_autoencoder'
   | 'siglip'
   | 'spandrel_image_to_image'
   | 'flux_redux'
@@ -188,6 +190,8 @@ export interface ModelConfig {
   image_encoder_model_id?: string;
   /** Anima ControlNet-LLLite: 3 = control image, 4 = inpainting; null when installed before it was recorded. */
   cond_in_channels?: number | null;
+  /** Qwen-Image ControlNets: `fun_union` also conditions on an inpainted region, `instantx_union` does not. */
+  control_architecture?: 'fun_union' | 'instantx_union';
   /** Spandrel upscalers: native scale (1 = same size); null when installed before it was recorded. */
   scale?: number | null;
   /** External API models. */

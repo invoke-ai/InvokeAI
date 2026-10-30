@@ -210,6 +210,10 @@ GENERATION_MODES = Literal[
     "qwen_image_2_1_img2img",
     "qwen_image_2_1_inpaint",
     "qwen_image_2_1_outpaint",
+    "moss_image_txt2img",
+    "moss_image_img2img",
+    "moss_image_inpaint",
+    "moss_image_outpaint",
     "wan_txt2img",
     "wan_img2img",
     "wan_inpaint",
@@ -254,7 +258,7 @@ class MiniMaxH3ReferenceMetadataField(BaseModel):
 # other 1.x, ignoring unknown keys); a major bump renames, removes or retypes one. A record
 # without the key predates versioning and is read with the same rules. Documented, with the
 # field table, in docs/development/Architecture/media-metadata.
-CORE_METADATA_VERSION = "1.0.0"
+CORE_METADATA_VERSION = "1.1.0"
 
 
 def serialize_lora_metadata(*lora_lists: Optional[Sequence[Any]]) -> list[dict[str, Any]]:
@@ -309,7 +313,11 @@ def serialize_ip_adapter_ref_images(
     for item in items:
         raw_image = item.get("image") if isinstance(item, dict) else getattr(item, "image", None)
         if raw_image is None:
-            continue
+            raw_image_name = item.get("image_name") if isinstance(item, dict) else getattr(item, "image_name", None)
+            if raw_image_name:
+                raw_image = {"image_name": raw_image_name}
+            else:
+                continue
         img_list = raw_image if isinstance(raw_image, list) else [raw_image]
         ip_adapter_model = (
             item.get("ip_adapter_model") if isinstance(item, dict) else getattr(item, "ip_adapter_model", None)
@@ -345,7 +353,16 @@ def serialize_ip_adapter_ref_images(
                 clip_vision_model = "ViT-H"
 
         method = (item.get("method") if isinstance(item, dict) else getattr(item, "method", None)) or "full"
-        raw_weight = item.get("weight", 1.0) if isinstance(item, dict) else getattr(item, "weight", 1.0)
+        has_weight = ("weight" in item) if isinstance(item, dict) else hasattr(item, "weight")
+        has_strength = ("strength" in item) if isinstance(item, dict) else hasattr(item, "strength")
+        if has_weight:
+            raw_weight = item["weight"] if isinstance(item, dict) else item.weight
+        elif has_strength:
+            raw_weight = item["strength"] if isinstance(item, dict) else item.strength
+            if raw_weight is not None and float(raw_weight) <= 0.0:
+                continue
+        else:
+            raw_weight = 1.0
         weight = float(raw_weight[0] if isinstance(raw_weight, list) and raw_weight else raw_weight)
         begin_step_percent = float(
             item.get("begin_step_percent", 0.0) if isinstance(item, dict) else getattr(item, "begin_step_percent", 0.0)
@@ -449,7 +466,7 @@ def build_denoise_metadata(existing: Optional[MetadataField], updates: dict[str,
     title="Core Metadata",
     tags=["metadata"],
     category="metadata",
-    version="2.7.0",
+    version="2.8.0",
     classification=Classification.Internal,
 )
 class CoreMetadataInvocation(BaseInvocation):
@@ -516,6 +533,12 @@ class CoreMetadataInvocation(BaseInvocation):
     ideogram4_caption: Optional[str] = InputField(
         default=None,
         description="The structured JSON caption encoded for Ideogram 4 inference",
+    )
+    # MOSS-Image places canvas regions on the prompt at generation time (moss_image_layout_prompt), so, as for
+    # `ideogram4_caption`, the graph records the layout prompt actually encoded through an edge.
+    moss_image_layout_prompt: Optional[str] = InputField(
+        default=None,
+        description="The JSON layout prompt encoded for MOSS-Image inference",
     )
 
     # Video generation. Frame count and keyframes have no home among the image fields, and

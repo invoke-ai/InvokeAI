@@ -898,6 +898,35 @@ the invocation cache is empty.
 
 In normal execution, all runtime expansion occurs in `execution_graph` with traceability back to source nodes.
 
+### Image input records
+
+`ImagesInterface.save()` preserves the complete session source graph in `invokeai_graph`, including all original
+nodes, input literals and edges. The editor uses it to restore the authoring structure when `invokeai_workflow` is
+absent. The workflow JSON, when present, is saved unchanged and takes precedence in the editor.
+
+A separate `invokeai_resolved_inputs` PNG text field contains a compact Graph JSON input record. It contains the
+active invocation with its runtime ID and resolved inputs, plus ordinary upstream invocations and the edges connecting
+them. This preserves inputs such as a Noise invocation's actual seed and intermediate math values. Traversal uses the
+execution graph's indexed input edges and stops before `Iterate`, `Collect`, `If`, `For`, `ForReturn`, saved-workflow
+calls, collection-valued output edges, and edges whose resolved destination input is a list. Inputs received across
+those boundaries are already resolved on the retained downstream invocation. Future nodes, unrelated branches, sibling
+iterations, and upstream collections beyond those boundaries are excluded. Before runtime materialization, only the
+active invocation's inputs are recorded.
+
+The resolved-input record describes the image's invocation; it is not used for editor restoration. Optional internal
+`resolved_inputs` parameters carry it through `ImageService.create()` and `DiskImageFileStorage.save()`. The existing
+`GET /api/v1/images/i/{image_name}/workflow` response exposes this PNG record as optional `resolved_inputs` stringified
+Graph JSON, with `null` for older images. `ImageService.get_resolved_inputs()` reads the file from the record's
+subfolder, behind the route's existing read-access and storage-maintenance guards. Inspection can prefer this record,
+while the response's unchanged `workflow` and source `graph` remain the editor restoration inputs. It is not merged
+into user-owned `invokeai_metadata`. Legacy calls omit the field, and old PNGs remain readable without rewriting.
+Video responses use the shared response model's `null` default. Image file copies preserve all chunks.
+
+No expanded runtime graph is serialized for either field. Each image stores one source graph plus one compact input
+record. Nested-loop tests count their combined UTF-8 bytes. A source with a literal collection includes that collection
+in every image, so its authoring payload grows with the collection size. Resolved collection inputs retained on the
+active invocation can also grow; the compact record is not universally a single node or constant-size.
+
 ## 6) Invariants
 
 - Source **Graph** remains a DAG and type-consistent.

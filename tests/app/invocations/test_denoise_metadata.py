@@ -4,6 +4,7 @@ from unittest.mock import patch
 import pytest
 
 from invokeai.app.invocations.anima.anima_denoise import AnimaDenoiseInvocation
+from invokeai.app.invocations.anima.anima_ip_adapter import AnimaIPAdapterField
 from invokeai.app.invocations.anima.anima_lllite import AnimaLLLiteField
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, InvocationRegistry
 from invokeai.app.invocations.cogview4.cogview4_denoise import CogView4DenoiseInvocation
@@ -67,6 +68,7 @@ from invokeai.app.invocations.model import (
     VAEField,
     WanTransformerField,
 )
+from invokeai.app.invocations.moss_image.moss_image_denoise import MossImageDenoiseInvocation
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.qwen_image.qwen_image_control import QwenImageControlField
 from invokeai.app.invocations.qwen_image.qwen_image_denoise import QwenImageDenoiseInvocation
@@ -112,7 +114,7 @@ def _discover_denoise_invocations() -> list[type[BaseInvocation]]:
 
 def test_all_denoise_invocations_conform_to_metadata_contract() -> None:
     denoise_classes = _discover_denoise_invocations()
-    assert len(denoise_classes) >= 21  # 17 active denoise nodes + 4 deprecated *_meta wrappers
+    assert len(denoise_classes) >= 22  # 18 active denoise nodes + 4 deprecated *_meta wrappers
 
     for cls in denoise_classes:
         node_type = cls.get_type()
@@ -500,6 +502,7 @@ def test_sd3_cogview4_zimage_anima_denoise_build_metadata() -> None:
     assert z_md["seed"] == 33
     assert z_node.model_copy(update={"shift": None})._build_metadata().root["z_image_shift"] == "auto"
 
+    ipa_id = _make_model_id(key="anima-ipa", base=BaseModelType.Anima, model_type=ModelType.IPAdapter)
     anima_md = (
         AnimaDenoiseInvocation.model_construct(
             latents=None,
@@ -521,6 +524,24 @@ def test_sd3_cogview4_zimage_anima_denoise_build_metadata() -> None:
                 begin_step_percent=0.0,
                 end_step_percent=1.0,
             ),
+            ip_adapter=[
+                AnimaIPAdapterField(
+                    tokens_name="tok-1",
+                    ip_adapter_model=ipa_id,
+                    image_name="anima-ref.png",
+                    strength=0.8,
+                    begin_step_percent=0.0,
+                    end_step_percent=1.0,
+                ),
+                AnimaIPAdapterField(
+                    tokens_name="tok-2",
+                    ip_adapter_model=ipa_id,
+                    image_name="anima-zero.png",
+                    strength=0.0,
+                    begin_step_percent=0.0,
+                    end_step_percent=1.0,
+                ),
+            ],
             metadata=None,
         )
         ._build_metadata()
@@ -531,6 +552,9 @@ def test_sd3_cogview4_zimage_anima_denoise_build_metadata() -> None:
     assert anima_md["cfg_scale"] == 4.5
     assert anima_md["steps"] == 30
     assert len(anima_md["controlnets"]) == 1
+    assert len(anima_md["ref_images"]) == 1
+    assert anima_md["ref_images"][0]["config"]["image"]["original"]["image"]["image_name"] == "anima-ref.png"
+    assert anima_md["ref_images"][0]["config"]["weight"] == 0.8
     assert anima_md["seed"] == 44
 
 
@@ -609,29 +633,33 @@ def test_ernie_ideogram4_krea2_qwen_denoise_build_metadata() -> None:
     assert ideo_overrides_md["ideogram4_guidance_scale"] == 5.5
     assert ideo_overrides_md["ideogram4_mu"] == 0.25
 
-    krea_md = (
-        Krea2DenoiseInvocation.model_construct(
-            transformer=TransformerField(transformer=tf_id, loras=[LoRAField(lora=lora_1, weight=1.0)]),
-            cfg_scale=1.0,
-            width=1280,
-            height=720,
-            steps=8,
-            denoising_start=0.0,
-            denoising_end=1.0,
-            seed=77,
-            shift=1.15,
-            style_reference=SimpleNamespace(style_strength=0.65),
-            metadata=None,
-        )
-        ._build_metadata()
-        .root
+    krea_node = Krea2DenoiseInvocation.model_construct(
+        transformer=TransformerField(transformer=tf_id, loras=[LoRAField(lora=lora_1, weight=1.0)]),
+        cfg_scale=1.0,
+        width=1280,
+        height=720,
+        steps=8,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        seed=77,
+        shift=1.15,
+        reference_latents=LatentsField(latents_name="ref-lat"),
+        reference_kv_cache=True,
+        style_reference=SimpleNamespace(style_strength=0.65),
+        metadata=None,
     )
+    krea_md = krea_node._build_metadata().root
     assert krea_md["width"] == 1280
     assert krea_md["height"] == 720
     assert krea_md["shift"] == 1.15
     assert krea_md["krea2_style_strength"] == 0.65
+    assert krea_md["krea2_reference_kv_cache"] is True
     assert krea_md["seed"] == 77
     assert len(krea_md["loras"]) == 1
+    assert (
+        "krea2_reference_kv_cache"
+        not in krea_node.model_copy(update={"reference_latents": None})._build_metadata().root
+    )
 
     qwen_node = QwenImageDenoiseInvocation.model_construct(
         transformer=TransformerField(transformer=tf_id, loras=[LoRAField(lora=lora_1, weight=0.9)]),
@@ -663,26 +691,66 @@ def test_ernie_ideogram4_krea2_qwen_denoise_build_metadata() -> None:
     assert qwen_md["seed"] == 88
     assert qwen_node.model_copy(update={"shift": None})._build_metadata().root["qwen_image_shift"] == "auto"
 
-    qwen21_md = (
-        QwenImage21DenoiseInvocation.model_construct(
-            transformer=TransformerField(transformer=tf_id, loras=[LoRAField(lora=lora_1, weight=0.9)]),
-            cfg_scale=1.0,
-            width=1024,
-            height=768,
-            steps=8,
-            denoising_start=0.0,
-            denoising_end=1.0,
-            seed=99,
-            metadata=None,
-        )
-        ._build_metadata()
-        .root
+    qwen21_node = QwenImage21DenoiseInvocation.model_construct(
+        transformer=TransformerField(transformer=tf_id, loras=[LoRAField(lora=lora_1, weight=0.9)]),
+        cfg_scale=1.0,
+        width=1024,
+        height=768,
+        steps=8,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        seed=99,
+        metadata=None,
     )
+    qwen21_md = qwen21_node._build_metadata(used_prefix_cache=True).root
     assert qwen21_md["width"] == 1024
     assert qwen21_md["height"] == 768
     assert qwen21_md["steps"] == 8
     assert qwen21_md["seed"] == 99
+    assert qwen21_md["qwen_image_2_1_prefix_kv_cache"] is True
+    assert "qwen_image_2_1_prefix_kv_cache" not in qwen21_node._build_metadata().root
     assert len(qwen21_md["loras"]) == 1
+
+    moss_node = MossImageDenoiseInvocation.model_construct(
+        transformer=TransformerField(transformer=tf_id, loras=[LoRAField(lora=lora_1, weight=0.85)]),
+        vae=VAEField(vae=vae_id),
+        cfg_scale=1.5,
+        width=1024,
+        height=1024,
+        steps=32,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        seed=101,
+        uncond_skip_layers=[22],
+        latents=None,
+        denoise_mask=None,
+        metadata=None,
+    )
+    moss_md = moss_node._build_metadata().root
+    assert moss_md["generation_mode"] == "moss_image_txt2img"
+    assert moss_md["width"] == 1024
+    assert moss_md["height"] == 1024
+    assert moss_md["steps"] == 32
+    assert moss_md["cfg_scale"] == 1.5
+    assert moss_md["seed"] == 101
+    assert moss_md["model"] == tf_id
+    assert moss_md["vae"] == vae_id
+    assert moss_md["moss_image_uncond_skip_layers"] == [22]
+    assert len(moss_md["loras"]) == 1
+    assert (
+        moss_node.model_copy(update={"latents": LatentsField(latents_name="m-lat")})
+        ._build_metadata()
+        .root["generation_mode"]
+        == "moss_image_img2img"
+    )
+    assert (
+        moss_node.model_copy(
+            update={"latents": LatentsField(latents_name="m-lat"), "denoise_mask": DenoiseMaskField(mask_name="m-mask")}
+        )
+        ._build_metadata()
+        .root["generation_mode"]
+        == "moss_image_inpaint"
+    )
 
 
 def test_wan_ltx2_minimax_h3_denoise_build_metadata() -> None:

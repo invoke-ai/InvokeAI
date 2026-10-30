@@ -8,12 +8,7 @@ import type {
   QueueResultVideoOptions,
 } from '@features/queue/core/types';
 
-import {
-  buildGeneratePromptBatchPlan,
-  buildLegacyGeneratePromptBatchPlan,
-  buildQueueWorkflowBatchPlan,
-  sanitizeBatchCount,
-} from '@features/queue/core/promptBatch';
+import { buildQueueWorkflowBatchPlan, planGenerateSubmissionBatch } from '@features/queue/core/promptBatch';
 import { mapWithConcurrency } from '@platform/core/concurrency';
 import { addOutputImageNames, getOutputImageNames } from '@platform/core/outputImages';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
@@ -78,20 +73,7 @@ const mapEnqueueResult = (value: unknown, isReceipt = false): QueueEnqueueResult
 };
 
 export const enqueueGenerate = async (request: QueueEnqueueGenerateRequest): Promise<QueueEnqueueResult> => {
-  const planInput = {
-    batchCount: sanitizeBatchCount(request.batchCount),
-    negativePrompt: request.negativePrompt,
-    negativePromptNodeId: request.negativePromptNodeId,
-    positivePromptNodeId: request.positivePromptNodeId,
-    prompts: request.positivePrompts?.length ? request.positivePrompts : [request.positivePrompt],
-    seed: request.seed,
-    seedBehaviour: request.seedBehaviour ?? 'per-iteration',
-    seedNodeId: request.seedNodeId,
-  };
-  const plan = (request.legacySeedPlan ? buildLegacyGeneratePromptBatchPlan : buildGeneratePromptBatchPlan)({
-    ...planInput,
-    seedStep: request.seedStep,
-  });
+  const plan = planGenerateSubmissionBatch(request);
   const result = await apiFetchJson<unknown>('/api/v1/queue/default/enqueue_batch', {
     body: JSON.stringify({
       batch: {
@@ -140,9 +122,14 @@ export const enqueueWorkflow = async (request: QueueEnqueueWorkflowRequest): Pro
 export const enqueueUtility = async (request: {
   graph: QueueEnqueueWorkflowRequest['graph'];
   origin: string;
+  /** Put the item ahead of queued generations. */
+  prepend?: boolean;
 }): Promise<{ enqueued: number; itemIds: number[] }> => {
   const result = await apiFetchJson<{ enqueued?: number; item_ids?: number[] }>('/api/v1/queue/default/enqueue_batch', {
-    body: JSON.stringify({ batch: { graph: request.graph, origin: request.origin, runs: 1 }, prepend: false }),
+    body: JSON.stringify({
+      batch: { graph: request.graph, origin: request.origin, runs: 1 },
+      prepend: request.prepend === true,
+    }),
     method: 'POST',
   });
 

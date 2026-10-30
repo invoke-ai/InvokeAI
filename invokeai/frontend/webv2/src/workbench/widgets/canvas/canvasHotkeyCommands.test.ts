@@ -1,4 +1,5 @@
 import type {
+  BeginTransformResult,
   CanvasDocumentContractV3,
   CanvasEngine,
   CanvasInteractionState,
@@ -8,14 +9,16 @@ import type {
   NewRasterLayerResult,
 } from '@workbench/canvas-engine/api';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
+import type { TFunction } from 'i18next';
 
-import { createDocumentModel } from '@workbench/canvas-engine/api';
+import { createControlLayer, createDocumentModel } from '@workbench/canvas-engine/api';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
-import { createControlLayer } from '@workbench/widgets/layers/layerOps';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
-import { executeCanvasHotkeyCommand, type CanvasHotkeyContext } from './canvasHotkeyCommands';
+import { CANVAS_HEADER_HOTKEYS } from './canvasHeaderCommands';
+import { CANVAS_ONLY_HOTKEYS, executeCanvasHotkeyCommand, type CanvasHotkeyContext } from './canvasHotkeyCommands';
+import { CANVAS_COMPANION_HOTKEYS, executeCanvasToolCommand, reportTransformRefusal } from './canvasToolCommands';
 
 const rasterLayer = (id: string, overrides: Partial<CanvasLayerContract> = {}): CanvasLayerContract =>
   ({
@@ -78,6 +81,7 @@ const createEngine = (interaction: Partial<CanvasInteractionState> = {}) => {
           status: 'duplicated',
         })
       ),
+      beginTransform: vi.fn((): BeginTransformResult => 'started'),
       mergeLayerDown: vi.fn((): Promise<MergeDownResult> => Promise.resolve('merged')),
       nudgeSelectedLayer: vi.fn(() => ({ status: 'committed' as const })),
     },
@@ -99,8 +103,10 @@ let pasteFromClipboard: Mock<() => void>;
 
 const contextOf = (overrides: Partial<CanvasHotkeyContext> = {}): CanvasHotkeyContext => ({
   copySelection,
+  cropAllLayers: vi.fn(),
   dispatch,
   reportLayerOperation: vi.fn(),
+  reportTransformRefusal: vi.fn(),
   reportPreparedCommit: () => undefined,
   reportStructuralCommit: () => undefined,
   document: documentOf([rasterLayer('a'), rasterLayer('b')], 'a'),
@@ -161,7 +167,7 @@ describe('staging precedence', () => {
 describe('layer navigation without staging', () => {
   const select = (id: string): CanvasProjectMutation => ({ id, type: 'setCanvasSelectedLayer' });
   // Document order puts the control stack above the raster stack: b, a, c.
-  const layers = [rasterLayer('a'), createControlLayer('Control', 'b'), rasterLayer('c')];
+  const layers = [rasterLayer('a'), createControlLayer({ id: 'b', name: 'Control' }), rasterLayer('c')];
 
   it.each([
     ['canvas.nextEntity', 'a', 'c'],
@@ -452,6 +458,18 @@ describe('clipboard', () => {
   });
 });
 
+describe('crop all layers to frame', () => {
+  it('runs the canvas menu action, but not while interaction is locked', () => {
+    const free = contextOf();
+    executeCanvasHotkeyCommand('canvas.cropAllLayersToFrame', free);
+    expect(free.cropAllLayers).toHaveBeenCalledOnce();
+
+    const locked = contextOf({ isInteractionLocked: true });
+    executeCanvasHotkeyCommand('canvas.cropAllLayersToFrame', locked);
+    expect(locked.cropAllLayers).not.toHaveBeenCalled();
+  });
+});
+
 describe('tool selection', () => {
   it.each([
     ['canvas.tool.view', 'view'],
@@ -462,10 +480,52 @@ describe('tool selection', () => {
     ['canvas.tool.shape', 'shape'],
     ['canvas.tool.text', 'text'],
     ['canvas.tool.gradient', 'gradient'],
-    ['canvas.transformSelected', 'transform'],
   ])('%s selects the %s tool', (commandId, tool) => {
     const engine = run(commandId);
     expect(engine.tools.setTool).toHaveBeenCalledWith(tool);
+  });
+
+  it('transform opens a session on the selected leaf at once, without a separate tool switch', () => {
+    const engine = run('canvas.transformSelected');
+    expect(engine.layers.beginTransform).toHaveBeenCalledExactlyOnceWith('a');
+    expect(engine.tools.setTool).not.toHaveBeenCalled();
+  });
+
+  it('transform only picks the tool with no selection or a group selected', () => {
+    const none = run('canvas.transformSelected', { document: documentOf([rasterLayer('a')], null) });
+    expect(none.layers.beginTransform).not.toHaveBeenCalled();
+    expect(none.tools.setTool).toHaveBeenCalledWith('transform');
+    const group = run('canvas.transformSelected', {
+      document: { ...documentOf([], 'g'), stacks: stacksFrom([groupContract('g', [rasterLayer('a')])]) },
+    });
+    expect(group.layers.beginTransform).not.toHaveBeenCalled();
+    expect(group.tools.setTool).toHaveBeenCalledWith('transform');
+  });
+
+  it('transform explains a refusal and stays quiet mid-gesture', () => {
+    const report = (result: BeginTransformResult) => {
+      const engine = createEngine();
+      engine.layers.beginTransform.mockReturnValue(result);
+      const reportTransformRefusal = vi.fn();
+      executeCanvasHotkeyCommand('canvas.transformSelected', contextOf({ engine, reportTransformRefusal }));
+      expect(engine.tools.setTool).not.toHaveBeenCalled();
+      return reportTransformRefusal.mock.calls;
+    };
+    expect(report('locked')).toEqual([['locked']]);
+    expect(report('ineligible')).toEqual([['ineligible']]);
+    expect(report('busy')).toEqual([]);
+  });
+
+  it("gives an ineligible layer Transform's own reason and other refusals the shared layer notice", () => {
+    const explain = (refusal: Exclude<BeginTransformResult, 'started'>) => {
+      const reportError = vi.fn();
+      reportTransformRefusal(refusal, reportError, ((key: string) => key) as unknown as TFunction);
+      return reportError.mock.calls;
+    };
+    expect(explain('ineligible')).toEqual([
+      ['widgets.layers.actions.actionFailed', 'widgets.layers.actions.transformIneligible'],
+    ]);
+    expect(explain('locked')).toEqual([['widgets.layers.actions.actionFailed', 'widgets.layers.actions.locked']]);
   });
 
   it('lasso selects the tool when not already active', () => {
@@ -659,7 +719,7 @@ describe('group selection', () => {
     ...documentOf([], selectedLayerId),
     stacks: stacksFrom(nodes),
   });
-  const control = (id: string): CanvasLayerContract => createControlLayer(id, id);
+  const control = (id: string): CanvasLayerContract => createControlLayer({ id, name: id });
 
   it('reorders, deletes and duplicates a selected group', () => {
     const document = nodeDocument([groupContract('g', [rasterLayer('a')]), rasterLayer('b')], 'g');
@@ -728,6 +788,24 @@ describe('group selection', () => {
       expect.objectContaining({ forward: expect.objectContaining({ removeIds: ['g'] }) })
     );
   });
+
+  it('ungroup on leaves of one group moves them out above it, and does nothing for a top-level leaf', () => {
+    const document = nodeDocument([groupContract('g', [rasterLayer('a'), rasterLayer('b')]), rasterLayer('c')], 'a');
+    const lifted = run('canvas.ungroupLayers', { document, selectedLayerIds: ['b', 'a'] });
+    expect(lifted.layers.commitPrepared).toHaveBeenCalledExactlyOnceWith(
+      'widgets.layers.actions.removeFromGroup',
+      expect.objectContaining({
+        forward: expect.objectContaining({
+          move: [{ anchor: expect.objectContaining({ beforeId: 'g', parentPath: [] }), ids: ['a', 'b'] }],
+        }),
+      })
+    );
+    const topLevel = run('canvas.ungroupLayers', {
+      document: { ...document, selectedLayerId: 'c' },
+      selectedLayerIds: ['c'],
+    });
+    expect(topLevel.layers.commitPrepared).not.toHaveBeenCalled();
+  });
 });
 
 describe('active color pair commands', () => {
@@ -743,5 +821,45 @@ describe('active color pair commands', () => {
       expect(resetCtx.resetActiveColors).toHaveBeenCalledTimes(1);
       expect(resetCtx.dispatch).not.toHaveBeenCalled();
     }
+  });
+});
+
+describe('registration tables', () => {
+  // Everything the mounted Canvas registers: its own keys, the companion keys and the header's commands. The
+  // companion widget registers a subset (history plus companion keys), so it is covered too.
+  const allEntries = [...CANVAS_COMPANION_HOTKEYS, ...CANVAS_ONLY_HOTKEYS, ...CANVAS_HEADER_HOTKEYS];
+
+  it('gives Transform Shift+T as its only default', () => {
+    expect(CANVAS_COMPANION_HOTKEYS.find(([id]) => id === 'canvas.transformSelected')?.[2]).toEqual(['shift+t']);
+    expect(allEntries.flatMap(([, , keys]) => keys)).not.toContain('mod+t');
+  });
+
+  it('never gives two entries the same id or default chord', () => {
+    const ids = allEntries.map(([id]) => id);
+    const chords = allEntries.flatMap(([, , keys]) => keys);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(chords.filter((chord, index) => chords.indexOf(chord) !== index)).toEqual([]);
+    expect(chords).toEqual(expect.arrayContaining(['mod+1', 'mod+2', 'mod+3', 'mod+4', 'mod+z', 'shift+t']));
+  });
+
+  it('shares every companion key with the companion runner and nothing else', () => {
+    const engine = createEngine();
+    const ctx = {
+      engine,
+      isInteractionLocked: false,
+      reportTransformRefusal: vi.fn(),
+      resetActiveColors: vi.fn(),
+      selectedLayerId: null,
+      swapActiveColors: vi.fn(),
+    };
+    for (const [id] of CANVAS_COMPANION_HOTKEYS) {
+      executeCanvasToolCommand(id, ctx);
+    }
+    // Every companion key reaches the engine or the color pair; bbox has no default key but still runs.
+    expect(engine.tools.setTool.mock.calls.length + engine.tools.stepBrushSize.mock.calls.length).toBe(
+      CANVAS_COMPANION_HOTKEYS.length - 2
+    );
+    expect(ctx.swapActiveColors).toHaveBeenCalledOnce();
+    expect(ctx.resetActiveColors).toHaveBeenCalledOnce();
   });
 });

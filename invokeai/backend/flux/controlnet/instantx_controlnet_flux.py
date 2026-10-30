@@ -143,8 +143,8 @@ class InstantXControlNetFlux(torch.nn.Module):
                 controlnet_mode_emb = self.controlnet_mode_embedder(controlnet_mode)
             txt = torch.cat([controlnet_mode_emb, txt], dim=1)
             txt_ids = torch.cat([txt_ids[:, :1, :], txt_ids], dim=1)
-        else:
-            assert controlnet_mode is None
+        # A non-union model has no mode embedder, so a supplied controlnet_mode is ignored. Callers pick the mode from
+        # the model name, and some checkpoints keep "union" in the name after their mode embedding was removed.
 
         ids = torch.cat((txt_ids, img_ids), dim=1)
         pe = self.pe_embedder(ids)
