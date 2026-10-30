@@ -17,13 +17,11 @@ Key differences from Z-Image denoise:
 """
 
 import math
-import sys
 from contextlib import ExitStack
 from typing import Callable, Iterator, Optional
 
 import torch
 import torchvision.transforms as tv_transforms
-from torch.nn.attention import SDPBackend
 from torchvision.transforms.functional import resize as tv_resize
 from torchvision.transforms.functional import to_tensor
 from tqdm import tqdm
@@ -74,7 +72,6 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import (
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import AnimaConditioningInfo, Range
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.sdpa_scope import sdpa_policy
 
 # Anima uses 8x spatial compression (VAE downsamples by 2^3)
 ANIMA_LATENT_SCALE_FACTOR = 8
@@ -767,29 +764,6 @@ class AnimaDenoiseInvocation(BaseInvocation):
             )
 
         with ExitStack() as exit_stack:
-            # On Windows + CUDA, opt into cuDNN's flash-attention kernel. torch on
-            # Windows does not ship the native flash-attention backend, so SDPA falls
-            # back to the slower memory-efficient kernel; cuDNN's kernel is ~1.7x faster
-            # for Anima's attention shapes (~6% per denoising step at 1024x1024). The
-            # cuDNN SDP backend sits low in torch's default priority and is never
-            # selected, so we opt in explicitly.
-            #
-            # This is a priority *list*, not a forced kernel: torch picks the first
-            # eligible backend per call, and MATH is always eligible, so it degrades
-            # safely on any GPU/dtype where cuDNN is unavailable. Scoped to Windows +
-            # CUDA — elsewhere torch's default backend is already fast.
-            if device.type == "cuda" and sys.platform == "win32":
-                exit_stack.enter_context(
-                    sdpa_policy(
-                        [
-                            SDPBackend.CUDNN_ATTENTION,
-                            SDPBackend.FLASH_ATTENTION,
-                            SDPBackend.EFFICIENT_ATTENTION,
-                            SDPBackend.MATH,
-                        ],
-                        set_priority=True,
-                    )
-                )
             # A GGUF or int8_tensorwise build dequantizes each quantized Linear per forward, a transient its
             # resident size does not cover. Passed alone because this node has no activation estimate, so the
             # cache floors it at `device_working_mem_gb`; zero for other builds. Read from the unlocked model.
