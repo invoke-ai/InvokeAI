@@ -43,7 +43,7 @@ import {
 } from './galleryPicker';
 import { GalleryPickerBoards, type GalleryPickerBoardGroup } from './GalleryPickerBoards';
 import { galleryPickerOptionId, GalleryPickerGrid } from './GalleryPickerGrid';
-import { useGalleryPickerScope } from './useGalleryPickerScope';
+import { useGalleryPickerScope, type GalleryPickerOpeningScope } from './useGalleryPickerScope';
 
 const BOARD_BUTTON_EXPANDED_PROPS = { bg: 'bg.hover' } as const;
 
@@ -66,12 +66,14 @@ const haveSameSlots = (left: GallerySparseListing | null, right: GallerySparseLi
 
 export const GalleryPickerView = ({
   accept,
+  openingScope,
   searchInputRef,
   selection,
   onClose,
   onPick,
 }: {
   accept: GalleryPickerAccept;
+  openingScope?: GalleryPickerOpeningScope;
   searchInputRef: RefObject<HTMLInputElement | null>;
   selection: GalleryPickerSelection;
   onClose: () => void;
@@ -80,7 +82,7 @@ export const GalleryPickerView = ({
   const { t } = useTranslation();
   const { galleryValues, projectId = null, projectName, projects, revealInGallery } = useGalleryHost();
   const { data, gallerySelectedItem, scope, selectBoard, setSearchTerm, setView, settings, togglePane } =
-    useGalleryPickerScope();
+    useGalleryPickerScope(openingScope);
   const idBase = useId();
   const listboxId = `${idBase}-options`;
   const boardsId = `${idBase}-boards`;

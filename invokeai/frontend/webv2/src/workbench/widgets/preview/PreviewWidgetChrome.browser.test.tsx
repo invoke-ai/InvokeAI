@@ -54,16 +54,39 @@ const pickedItem: GalleryItem = {
   width: 64,
 };
 
+/** The previewed item: an upload in a board the Gallery widget is not showing. */
+const previewedItem: GalleryItem = {
+  boardId: 'board-2',
+  category: 'user',
+  createdAt: '2026-09-02T00:00:00.000Z',
+  fullUrl: '/full/image.png',
+  height: 64,
+  isIntermediate: false,
+  kind: 'image',
+  name: 'image.png',
+  starred: false,
+  thumbnailUrl: '/thumb/image.png',
+  width: 64,
+};
+
 const state = vi.hoisted(() => ({
+  actionItem: null as GalleryItem | null,
   boardName: 'Fixture Board 02' as string | null,
   itemName: 'image.png' as string | null,
 }));
 const gallery = vi.hoisted(() => ({ clearSelection: vi.fn(), selectItemInItsBoard: vi.fn() }));
-const pickerView = vi.hoisted(() => ({ accept: null as null | readonly string[] }));
+const pickerView = vi.hoisted(() => ({
+  accept: null as null | readonly string[],
+  openingScope: undefined as unknown,
+}));
 
 vi.mock('./previewHeaderStore', async (importOriginal) => ({
   ...(await importOriginal<typeof PreviewHeaderStoreModule>()),
-  usePreviewHeaderContext: () => ({ boardName: state.boardName, itemName: state.itemName }),
+  usePreviewHeaderContext: () => ({
+    actionItem: state.actionItem,
+    boardName: state.boardName,
+    itemName: state.itemName,
+  }),
 }));
 
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
@@ -77,12 +100,15 @@ vi.mock('@features/gallery/ui/picker/GalleryPickerView', () => ({
     accept,
     onClose,
     onPick,
+    openingScope,
   }: {
     accept: readonly string[];
     onClose: () => void;
     onPick: (item: GalleryItem) => void;
+    openingScope?: unknown;
   }) => {
     pickerView.accept = accept;
+    pickerView.openingScope = openingScope;
 
     return (
       <button
@@ -132,9 +158,11 @@ const getTrigger = (name = TRIGGER_NAME) => {
 const getOpenDialog = () => document.querySelector<HTMLElement>('[role="dialog"][data-state="open"]');
 
 beforeEach(() => {
+  state.actionItem = previewedItem;
   state.boardName = 'Fixture Board 02';
   state.itemName = 'image.png';
   pickerView.accept = null;
+  pickerView.openingScope = undefined;
   gallery.clearSelection.mockClear();
   gallery.selectItemInItsBoard.mockClear();
   host = document.createElement('div');
@@ -164,6 +192,8 @@ describe('PreviewWidgetLabel', () => {
       return button!;
     });
     expect(pickerView.accept).toEqual(['image', 'video']);
+    // At the previewed item's own board and, for an upload, the Assets view that lists it.
+    expect(pickerView.openingScope).toEqual({ boardId: 'board-2', galleryView: 'assets' });
 
     await userEvent.click(pick);
 
@@ -196,51 +226,66 @@ describe('PreviewWidgetLabel', () => {
     expect(getOpenDialog()).toBeNull();
   });
 
-  it('gives way to the clear button at narrow widths, truncating the item name and then dropping it', async () => {
+  it('gives way to the clear button at narrow widths, dropping the board before the item name truncates', async () => {
+    const boardName = 'A Long Fixture Board Name';
     const itemName = 'a-very-long-generated-image-name-0123456789.png';
+    state.boardName = boardName;
     state.itemName = itemName;
-    const name = `Fixture Board 02 / ${itemName}. Choose another item`;
+    const name = `${boardName} / ${itemName}. Choose another item`;
     const measure = async (width: number) => {
       await render('center', width);
       const trigger = getTrigger(name);
-      const triggerRect = trigger.getBoundingClientRect();
-      const [board, slash, item] = [...trigger.querySelectorAll('p')];
+      const [item, board, slash] = [...trigger.querySelectorAll('p')];
       // The one-line row that clips whatever wraps below it.
-      const row = board!.parentElement!.getBoundingClientRect();
-      const visibleWidth = (element: Element | undefined) => {
+      const row = item!.parentElement!.getBoundingClientRect();
+      const visible = (element: Element | undefined) => {
         const rect = element?.getBoundingClientRect();
-        return rect && rect.top < row.bottom && rect.bottom > row.top ? rect.width : 0;
+        return rect && rect.top < row.bottom && rect.bottom > row.top ? rect : null;
       };
 
       return {
-        board: visibleWidth(board),
+        board: visible(board),
         clear: host!.querySelector('button[aria-label="Clear selection"]')!.getBoundingClientRect(),
-        item: visibleWidth(item),
-        slash: visibleWidth(slash),
-        trigger: triggerRect,
+        item: visible(item),
+        slash: visible(slash),
+        trigger: trigger.getBoundingClientRect(),
       };
     };
 
-    const wide = await measure(480);
-    expect(wide.item).toBeGreaterThan(0);
+    const wide = await measure(640);
+    const fullItemWidth = wide.item!.width;
+    // Everything fits, in reading order: "Board / name".
+    expect(wide.board!.right).toBeLessThanOrEqual(wide.slash!.left);
+    expect(wide.slash!.right).toBeLessThanOrEqual(wide.item!.left);
+    expect(wide.board!.left).toBeLessThan(wide.trigger.left + 16);
+
+    // Tighter, the board name truncates while the item name keeps its full width.
+    const boardTruncated = await measure(480);
+    expect(boardTruncated.board!.width).toBeLessThan(wide.board!.width);
+    expect(boardTruncated.item!.width).toBe(fullItemWidth);
+
+    // With the board at its floor the name truncates too, but keeps a readable floor of its own.
+    const bothAtFloor = await measure(300);
+    expect(bothAtFloor.board!.width).toBeGreaterThan(0);
+    expect(bothAtFloor.item!.width).toBeLessThan(fullItemWidth);
+    expect(bothAtFloor.item!.width).toBeGreaterThan(bothAtFloor.board!.width * 2);
 
     for (const width of [200, 140]) {
       const narrow = await measure(width);
       // Side by side, never overlapping, with the clear button at its full size.
       expect(narrow.trigger.right).toBeLessThanOrEqual(narrow.clear.left);
       expect(narrow.clear.width).toBe(wide.clear.width);
-      expect(narrow.board).toBeGreaterThan(0);
+      // "Board /" leaves together, never a bare "/"; the name stays, left-aligned in the trigger.
+      expect(narrow.board).toBeNull();
+      expect(narrow.slash).toBeNull();
+      expect(narrow.item!.width).toBeGreaterThan(0);
+      expect(narrow.item!.left).toBeLessThan(narrow.trigger.left + 16);
     }
 
-    // At 200px the name has truncated to a few characters.
-    const truncated = await measure(200);
-    expect(truncated.item).toBeGreaterThan(0);
-    expect(truncated.item).toBeLessThan(wide.item);
-
-    // Narrower, the slash and name leave together: "Board ▾", never a bare " / ".
-    const dropped = await measure(140);
-    expect(dropped.item).toBe(0);
-    expect(dropped.slash).toBe(0);
+    // Once the board drops, the name takes its room: wider at 200px than beside the board at 240px, still truncated.
+    const alone = await measure(200);
+    expect(alone.item!.width).toBeGreaterThan((await measure(240)).item!.width);
+    expect(alone.item!.width).toBeLessThan(fullItemWidth);
   });
 
   it('shows the full name in a tooltip only while the label hides some of it', async () => {
@@ -261,6 +306,7 @@ describe('PreviewWidgetLabel', () => {
   });
 
   it('renders no trigger without a selection', async () => {
+    state.actionItem = null;
     state.boardName = null;
     state.itemName = null;
     await render('right');
