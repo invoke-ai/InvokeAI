@@ -55,6 +55,7 @@ export type ModelTaxonomyType =
   | 'gemma4_encoder'
   | 'pid_decoder'
   | 'ltx2_duration_head'
+  | 'tiny_autoencoder'
   | 'siglip'
   | 'spandrel_image_to_image'
   | 'flux_redux'
