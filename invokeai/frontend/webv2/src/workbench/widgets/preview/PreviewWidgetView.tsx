@@ -54,6 +54,7 @@ import {
   useDeletionConfirmation,
   useImageActions,
   type ImageContextMenuTarget,
+  type ImageContextMenuVariant,
 } from '@workbench/image-actions';
 import { QueueProgressRail } from '@workbench/queue-integration/QueueProgressRail';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -200,7 +201,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const livePreview = useLivePreviewFollow();
   const { gallery, notifications, widgets } = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
-  const { density, rootRef } = usePreviewDensity(region);
+  const { density, rootRef } = usePreviewDensity(region, previewStageStore.setDensity);
   const recentImages = galleryValues.recentImages;
   const localItems = useMemo(() => getLocalGalleryItems({ recentImages }, queueItems), [queueItems, recentImages]);
   const selectedItem = useMemo(() => getSelectedItem(galleryValues, localItems), [galleryValues, localItems]);
@@ -302,6 +303,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
 
   const [contextMenuTarget, setContextMenuTarget] = useState<ImageContextMenuTarget | null>(null);
+  // The header's ⋮ beside its Edit and Use menus opens without their groups; every other opening shows them all.
+  const [contextMenuVariant, setContextMenuVariant] = useState<ImageContextMenuVariant>('full');
   const getItemActionContext = useCallback(
     () => ({
       filterIdentity: navigationQueryKey,
@@ -462,11 +465,10 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     [boardItems, gallery, notifications, selectedItem]
   );
   useDndMonitor({ onDragEnd: handleCompareDrop });
-  const openFilmstripItemContextMenu = useCallback(
-    (item: GalleryItem, x: number, y: number) =>
-      setContextMenuTarget({ itemRefs: [toGalleryItemRef(item)], items: [item], x, y }),
-    []
-  );
+  const openFilmstripItemContextMenu = useCallback((item: GalleryItem, x: number, y: number) => {
+    setContextMenuVariant('full');
+    setContextMenuTarget({ itemRefs: [toGalleryItemRef(item)], items: [item], x, y });
+  }, []);
   const { selectForCompare } = imageActions;
   const compareFilmstripItem = useCallback(
     (item: GalleryItem) => {
@@ -477,8 +479,9 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     [selectForCompare]
   );
   const openItemContextMenu = useCallback(
-    (x: number, y: number) => {
+    (x: number, y: number, variant: ImageContextMenuVariant = 'full') => {
       if (contextMenuItem) {
+        setContextMenuVariant(variant);
         setContextMenuTarget({
           itemRefs: [toGalleryItemRef(contextMenuItem)],
           items: [contextMenuItem],
@@ -705,6 +708,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
               boards={boards}
               previewVideoActions={previewVideoContextActions}
               target={contextMenuTarget}
+              variant={contextMenuVariant}
               onClose={closeContextMenu}
             />
           </>

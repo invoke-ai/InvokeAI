@@ -5,14 +5,7 @@ import { Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
-import {
-  ActivityIcon,
-  CheckIcon,
-  ChevronDownIcon,
-  GalleryHorizontalEndIcon,
-  LocateOffIcon,
-  type LucideIcon,
-} from 'lucide-react';
+import { ActivityIcon, CheckIcon, GalleryHorizontalEndIcon, LocateOffIcon, type LucideIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -42,12 +35,11 @@ const MODE_ICONS: Record<AutoSwitchMode, LucideIcon> = {
 /**
  * Trigger styles per host, so it matches the controls beside it: a widget header's small, muted ghost buttons (24px,
  * 14px icons), or a floating toolbar's working-size ones (28px, 16px icons). The size recipe sets the icon, padding and
- * text, as it does for those neighbours. A labelled header trigger ends in a chevron like the header's other menus
- * (Preview's Edit and Zoom); the staging bar's labelled buttons carry none.
+ * text, as it does for those neighbours.
  */
 const TRIGGER_CHROME = {
-  header: { button: { color: 'fg.muted', size: 'sm' }, chevron: true },
-  toolbar: { button: { size: 'md' }, chevron: false },
+  header: { button: { color: 'fg.muted', size: 'sm' } },
+  toolbar: { button: { size: 'md' } },
 } as const;
 
 interface AutoSwitchMenuProps {
@@ -108,7 +100,6 @@ export const AutoSwitchMenu = ({
                 {t(MODE_LABEL_KEYS[value])}
               </Text>
             ) : null}
-            {density === 'full' && TRIGGER_CHROME[chrome].chevron ? <ChevronDownIcon size={12} /> : null}
           </Button>
         </Menu.Trigger>
       </Tooltip>

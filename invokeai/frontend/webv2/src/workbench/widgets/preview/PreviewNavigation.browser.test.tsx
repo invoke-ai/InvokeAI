@@ -29,6 +29,7 @@ import { commands, userEvent } from 'vitest/browser';
 
 import { LivePreviewFollowProvider, useLivePreviewFollow } from './livePreviewFollow';
 import { usePreviewHeaderContext, type PreviewItemPosition } from './previewHeaderStore';
+import { PREVIEW_NAV_ATTRIBUTE } from './PreviewNavButtons';
 import { PreviewWidgetLabel } from './PreviewWidgetChrome';
 
 const queueItem: QueueItem = {
@@ -79,6 +80,8 @@ const createVideoItem = (name: string, createdAt: string): GalleryVideoItem => (
   width: 1920,
 });
 
+// What the view last handed its shared image context menu.
+const contextMenuProps = vi.hoisted(() => ({ current: null as null | { target: unknown; variant?: string } }));
 const mocks = vi.hoisted(() => {
   const recentImages = [
     {
@@ -420,15 +423,18 @@ vi.mock('@features/gallery/contracts', async (importOriginal) => ({
 
 vi.mock('@workbench/image-actions', async () => ({
   EMPTY_IMAGE_RECALL_CAPABILITIES: {},
-  GalleryCanvasImportMenuItems: () => null,
-  ImageContextMenu: () => null,
+  ImageContextMenu: (props: { target: unknown; variant?: string }) => {
+    contextMenuProps.current = props;
+    return null;
+  },
+  ImageContinueGroup: () => null,
+  ImageUseGroups: () => null,
   RecallActionButtons: () => null,
   buildImageRecallSettings: () => ({}),
   executeImageRecall: () => {},
   getCurrentGenerateValues: () => ({}),
   getImageRecallVerb: () => ({ icon: () => null, label: '' }),
   getImageContextMenuImages: () => [],
-  getImageContextMenuRecallRequestKey: () => null,
   getImageRecallCapabilities: () => ({}),
   getImageRecallMessage: () => '',
   getImageRecallTitle: () => '',
@@ -545,11 +551,13 @@ const FollowProbe = () => {
 };
 
 let headerPosition: PreviewItemPosition | null = null;
+let headerOpenItemMenu: ReturnType<typeof usePreviewHeaderContext>['openItemMenu'] = null;
 const HeaderPositionProbe = () => {
-  const { position } = usePreviewHeaderContext();
+  const { openItemMenu, position } = usePreviewHeaderContext();
   const ref = useCallback(() => {
     headerPosition = position;
-  }, [position]);
+    headerOpenItemMenu = openItemMenu;
+  }, [openItemMenu, position]);
   return <span ref={ref} />;
 };
 
@@ -861,6 +869,40 @@ afterEach(async () => {
 /** The filmstrip's current thumb: the one visible trace of where the navigation cursor sits. */
 const selectedThumb = (): string | null | undefined =>
   host?.querySelector<HTMLButtonElement>('button[aria-current]')?.getAttribute('aria-label');
+
+describe('preview context menu variant', () => {
+  const lastMenu = () => contextMenuProps.current;
+  const rightClick = (target: Element) =>
+    act(async () => {
+      target.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 40, clientY: 40 })
+      );
+      await Promise.resolve();
+    });
+
+  it('opens the header ⋮ as housekeeping, and the stage or a filmstrip thumb as the full menu afterwards', async () => {
+    await render();
+    contextMenuProps.current = null;
+
+    await act(async () => {
+      headerOpenItemMenu?.(10, 10, 'housekeeping');
+      await Promise.resolve();
+    });
+    expect(lastMenu()?.target).not.toBeNull();
+    expect(lastMenu()?.variant).toBe('housekeeping');
+
+    const stageImage = host!.querySelector(`[${PREVIEW_NAV_ATTRIBUTE}]`)!.parentElement!.querySelector('img')!;
+    await rightClick(stageImage);
+    expect(lastMenu()?.variant).toBe('full');
+
+    await act(async () => {
+      headerOpenItemMenu?.(10, 10, 'housekeeping');
+      await Promise.resolve();
+    });
+    await rightClick(host!.querySelector('button[aria-current]')!);
+    expect(lastMenu()?.variant).toBe('full');
+  });
+});
 
 describe('preview arrow buttons', () => {
   const arrow = (name: 'Show next item' | 'Show previous item') =>

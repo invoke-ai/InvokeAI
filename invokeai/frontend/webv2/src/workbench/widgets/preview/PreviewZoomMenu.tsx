@@ -13,8 +13,9 @@ const MENU_POSITIONING = { placement: 'bottom-start' } as const;
 
 /**
  * Expose fitted/actual zoom and keyboard presets in the header; the stage owns wheel, pinch, and double-click
- * gestures. A `compact` header (a side rail or floating window, down to 280px) keeps only the readout and chevron:
- * the magnifier and the fixed readout width would leave the widget title no room.
+ * gestures. A `full` header shows the magnifier and, only while zoomed, the percent, so the fit readout does not cost
+ * the widget title its width; the tooltip and accessible name always carry the percent. A `compact` header (a narrow
+ * view, down to 280px) keeps only the readout and chevron.
  */
 export const PreviewZoomMenu = ({
   density = 'full',
@@ -27,13 +28,15 @@ export const PreviewZoomMenu = ({
   const percent = zoom.percent;
   const label = percent === null ? '—' : t('widgets.preview.zoomPercent', { percent });
   const ids = useTooltipTriggerIds();
+  const accessibleLabel = percent === null ? t('widgets.preview.zoom') : t('widgets.preview.zoomLevel', { percent });
+  const showsReadout = density === 'compact' || zoom.isZoomed;
 
   return (
     <Menu.Root ids={ids} positioning={MENU_POSITIONING}>
-      <Tooltip content={t('widgets.preview.zoom')} ids={ids}>
+      <Tooltip content={accessibleLabel} ids={ids}>
         <Menu.Trigger asChild>
           <Button
-            aria-label={percent === null ? t('widgets.preview.zoom') : t('widgets.preview.zoomLevel', { percent })}
+            aria-label={accessibleLabel}
             color="fg.muted"
             fontVariantNumeric="tabular-nums"
             size="sm"
@@ -41,9 +44,11 @@ export const PreviewZoomMenu = ({
           >
             {density === 'full' ? <ZoomInIcon aria-hidden /> : null}
             {/* Wide enough for "1600%" in tabular digits, so the trigger keeps its width as the zoom changes. */}
-            <Text fontSize="md" minW={density === 'full' ? '6ch' : undefined} textAlign="center">
-              {label}
-            </Text>
+            {showsReadout ? (
+              <Text fontSize="md" minW={density === 'full' ? '6ch' : undefined} textAlign="center">
+                {label}
+              </Text>
+            ) : null}
             <ChevronDownIcon size={12} />
           </Button>
         </Menu.Trigger>

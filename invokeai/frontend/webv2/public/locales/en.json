@@ -3712,12 +3712,12 @@
       "dragVideo": "Drag video",
       "dropToCompare": "Drop to compare",
       "editOnCanvas": "Edit on Canvas",
+      "editThisImage": "Edit this image",
       "emptyDescription": "Select an image or video in the Gallery to see it here.",
       "framesPerSecond": "{{count}} fps",
       "graph": "Graph",
       "graphJsonLabel": "Video graph JSON",
       "exitCompare": "Exit Compare",
-      "hideFilmstrip": "Hide filmstrip",
       "imageCount_one": "{{count}} image",
       "imageCount_other": "{{count}} images",
       "itemCount_one": "{{count}} item",
@@ -3752,6 +3752,8 @@
       "unstarImage": "Unstar image",
       "starVideo": "Star video",
       "unstarVideo": "Unstar video",
+      "use": "Use",
+      "useInGenerate": "Use this image in Generate",
       "showGallery": "Show Gallery"
     },
     "queue": {
