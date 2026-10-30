@@ -44,12 +44,20 @@ UPPER_BOUND_EXCEPTIONS: Final[Mapping[str, float]] = MappingProxyType(
         "vae.sd-miopen,native,windows-encode-fp16-1280x1280-scores-RX9060XT-demand_peak": 1.78,
         "vae.flux-miopen,native,windows-decode-bf16-512x512-scores-RX9060XT-demand_peak": 1.33,
         "vae.flux2-miopen,native,windows-decode-bf16-512x512-scores-RX9060XT-demand_peak": 1.33,
+        "denoise.flux2-cudnn,native-denoise-bf16-h3072-8100+77tok-RTX4090-demand_peak": 1.42,
+        "denoise.flux2-miopen,native,windows-denoise-bf16-h3072-8100+77tok-RX9060XT-demand_peak": 1.40,
     }
 )
 """In-fit points, by `point_id`, whose envelope sits more than 1.3x above them, with the ratio they are held to
-instead. All are MIOpen with the native allocator on Windows, where the demand is concave in the size: first-run driver
-spikes at small sizes and a second run reserving up to 1.6x the first at large ones, so a line that covers every point
-cannot stay within 1.3x of all of them. Windows ROCm defaults to expandable segments; this is the override's price."""
+instead. All are the native allocator, never expandable segments or `cudaMallocAsync`:
+
+- The VAE points are MIOpen on Windows, where the demand is concave in the size: first-run driver spikes at small sizes
+  and a second run reserving up to 1.6x the first at large ones, so a line that covers every point cannot stay within
+  1.3x of all of them. Windows ROCm defaults to expandable segments; this is the override's price.
+- The FLUX.2 denoise points are the Klein 4B width at 1440px with a 77-token caption, 8177 tokens, on both cards: the
+  native allocator served them from 1676 MiB (RTX 4090) and 1879 MiB (RX 9060 XT), while the 512-token caption at
+  8612 tokens took 2382 and 2577 MiB. The line has to cover the latter. Under `cudaMallocAsync` and expandable
+  segments the two lie on one line."""
 
 
 def point_id(point: MeasuredPoint, spec: "EstimatorSpec") -> str:
