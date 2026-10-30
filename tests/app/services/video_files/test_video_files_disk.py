@@ -13,8 +13,9 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 
-from invokeai.app.services.video_files.video_files_common import VideoFileSaveException
+from invokeai.app.services.video_files.video_files_common import VideoFileNotFoundException, VideoFileSaveException
 from invokeai.app.services.video_files.video_files_disk import DiskVideoFileStorage
+from invokeai.app.util.mp4_metadata import read_mp4_tags
 
 VIDEO_NAME = "abc123.mp4"
 
@@ -449,3 +450,39 @@ def test_a_file_whose_only_tag_was_rejected_is_stored_without_it(
     assert "invokeai_workflow" not in read_mp4_tags(storage.get_path(VIDEO_NAME))
     assert storage.get_workflow(VIDEO_NAME) is None
     assert _sidecars(storage) == []
+
+
+def _store_untagged_video(storage: DiskVideoFileStorage) -> None:
+    path = storage.get_path(VIDEO_NAME)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"\x00\x00\x00\x18ftypmp42 not a real mp4")
+
+
+def test_unreadable_video_tags_are_not_reported_as_a_missing_file(
+    storage: DiskVideoFileStorage, monkeypatch: pytest.MonkeyPatch
+):
+    """An I/O fault on a file that exists must not read as "file gone": the workflow route answers 404 for that."""
+    _store_untagged_video(storage)
+
+    def unreadable(*args, **kwargs):
+        raise PermissionError("permission denied")
+
+    monkeypatch.setattr("invokeai.app.services.video_files.video_files_disk.read_mp4_tags", unreadable)
+
+    with pytest.raises(PermissionError):
+        storage.get_workflow(VIDEO_NAME)
+
+
+def test_video_deleted_before_its_tags_are_read_is_reported_missing(
+    storage: DiskVideoFileStorage, monkeypatch: pytest.MonkeyPatch
+):
+    _store_untagged_video(storage)
+
+    def deleted_after_exists_check(path, *args, **kwargs):
+        path.unlink()
+        return read_mp4_tags(path, *args, **kwargs)
+
+    monkeypatch.setattr("invokeai.app.services.video_files.video_files_disk.read_mp4_tags", deleted_after_exists_check)
+
+    with pytest.raises(VideoFileNotFoundException):
+        storage.get_graph(VIDEO_NAME)

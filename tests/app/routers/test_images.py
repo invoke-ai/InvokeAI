@@ -872,3 +872,45 @@ def test_list_image_dtos_allows_count_only_query(monkeypatch: Any, mock_invoker:
 
     assert response.status_code == 200
     assert response.json()["total"] == 7
+
+
+def prepare_image_read_test(monkeypatch: Any, mock_invoker: Invoker) -> None:
+    prepare_image_maintenance_test(monkeypatch, mock_invoker)
+    mock_invoker.services.image_moves.is_maintenance_active.return_value = False
+
+
+@pytest.mark.parametrize(
+    ("path", "service_method"),
+    [("/api/v1/images/i/test.png/metadata", "get_metadata"), ("/api/v1/images/i/test.png/workflow", "get_workflow")],
+)
+def test_unreadable_storage_does_not_read_as_missing_image_metadata(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, path: str, service_method: str
+) -> None:
+    """Clients cache a metadata/workflow 404 as "nothing recorded", so a busy database must not answer it."""
+    import sqlite3
+
+    prepare_image_read_test(monkeypatch, mock_invoker)
+    monkeypatch.setattr(
+        mock_invoker.services.images,
+        service_method,
+        MagicMock(side_effect=sqlite3.OperationalError("database is locked")),
+    )
+
+    # Uncaught in the route, so a 500 in production; the test client re-raises instead.
+    with pytest.raises(sqlite3.OperationalError):
+        client.get(path)
+
+
+@pytest.mark.parametrize(
+    ("path", "service_method"),
+    [("/api/v1/images/i/test.png/metadata", "get_metadata"), ("/api/v1/images/i/test.png/workflow", "get_workflow")],
+)
+def test_image_deleted_mid_request_answers_metadata_404(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, path: str, service_method: str
+) -> None:
+    prepare_image_read_test(monkeypatch, mock_invoker)
+    monkeypatch.setattr(
+        mock_invoker.services.images, service_method, MagicMock(side_effect=ImageRecordNotFoundException)
+    )
+
+    assert client.get(path).status_code == 404
