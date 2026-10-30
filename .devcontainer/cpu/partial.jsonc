@@ -1,0 +1,6 @@
+{
+    "name": "InvokeAI (CPU-only)",
+    "containerEnv": {
+        "GPU_DRIVER": "cpu"
+    }
+}
