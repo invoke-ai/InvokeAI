@@ -1,6 +1,6 @@
 import copy
 from contextlib import ExitStack
-from typing import Optional
+from typing import Any, Optional
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -13,10 +13,16 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
+    MetadataField,
     MossImageConditioningField,
+    WithMetadata,
+)
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    serialize_lora_metadata,
 )
 from invokeai.app.invocations.model import TransformerField, VAEField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.ernie_image.sampling_utils import patchify_latents
 from invokeai.backend.model_manager.taxonomy import BaseModelType
@@ -38,10 +44,10 @@ MOSS_IMAGE_RAW_LATENT_SCALE = 8
     title="Denoise - MOSS-Image",
     tags=["image", "moss_image", "moss-image"],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
-class MossImageDenoiseInvocation(BaseInvocation):
+class MossImageDenoiseInvocation(BaseInvocation, WithMetadata):
     """Run the MOSS-Image denoising loop.
 
     Takes and returns latents in the FLUX.2 VAE's raw layout, so the FLUX.2 VAE encode and decode nodes work on either
@@ -86,11 +92,43 @@ class MossImageDenoiseInvocation(BaseInvocation):
         default=[22], description=FieldDescriptions.moss_image_uncond_skip_layers, title="Uncond Skip Layers"
     )
 
+    def _build_metadata(self) -> MetadataField:
+        updates: dict[str, Any] = {
+            "generation_mode": (
+                "moss_image_inpaint"
+                if getattr(self, "denoise_mask", None) is not None
+                else ("moss_image_img2img" if getattr(self, "latents", None) is not None else "moss_image_txt2img")
+            ),
+            "width": self.width,
+            "height": self.height,
+            "steps": self.steps,
+            "cfg_scale": self.cfg_scale,
+            "denoising_start": self.denoising_start,
+            "denoising_end": self.denoising_end,
+            "seed": self.seed,
+            "model": self.transformer.transformer,
+            "moss_image_uncond_skip_layers": list(self.uncond_skip_layers),
+        }
+        if getattr(self, "vae", None) is not None:
+            updates["vae"] = self.vae.vae
+        loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
+        if loras:
+            updates["loras"] = loras
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         latents = self._run_diffusion(context)
         name = context.tensors.save(tensor=latents)
-        return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
+        return LatentsMetaOutput.build(
+            latents_name=name,
+            latents=latents,
+            seed=None,
+            metadata=self._build_metadata(),
+            width=self.width,
+            height=self.height,
+        )
 
     def _run_diffusion(self, context: InvocationContext) -> torch.Tensor:
         use_cfg = self.cfg_scale > 1.0

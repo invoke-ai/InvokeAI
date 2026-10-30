@@ -5,7 +5,7 @@ Run denoising process with a FLUX.2 transformer model: Klein (Qwen3 conditioning
 
 from contextlib import ExitStack
 from functools import partial
-from typing import Callable, Iterator, Optional, Tuple
+from typing import Any, Callable, Iterator, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -22,11 +22,18 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
+    MetadataField,
+    WithMetadata,
 )
 from invokeai.app.invocations.flux2.flux2_control import Flux2ControlField
 from invokeai.app.invocations.latent_noise import validate_noise_tensor_shape
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    serialize_adapter_metadata,
+    serialize_lora_metadata,
+)
 from invokeai.app.invocations.model import TransformerField, VAEField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.vae.flux2_vae_encode import Flux2VaeEncodeInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
@@ -77,10 +84,10 @@ FLUX2_MAX_HIDDEN_SIZE = 6144
     title="FLUX2 Denoise",
     tags=["image", "flux", "flux2", "klein", "denoise"],
     category="latents",
-    version="1.7.0",
+    version="1.8.0",
     classification=Classification.Prototype,
 )
-class Flux2DenoiseInvocation(BaseInvocation):
+class Flux2DenoiseInvocation(BaseInvocation, WithMetadata):
     """Run denoising process with a FLUX.2 transformer model, Klein or [dev].
 
     Regional prompting is supported via per-conditioning masks (single mask is applied
@@ -264,13 +271,63 @@ class Flux2DenoiseInvocation(BaseInvocation):
 
         return x, init_latents_packed
 
+    def _build_metadata(self) -> MetadataField:
+        updates: dict[str, Any] = {
+            "generation_mode": (
+                "flux2_inpaint"
+                if getattr(self, "denoise_mask", None) is not None
+                else ("flux2_img2img" if getattr(self, "latents", None) is not None else "flux2_txt2img")
+            ),
+            "width": self.width,
+            "height": self.height,
+            "steps": self.num_steps,
+            "scheduler": self.scheduler,
+            "guidance": self.guidance,
+            "cfg_scale": self.cfg_scale,
+            "denoising_start": self.denoising_start,
+            "denoising_end": self.denoising_end,
+            "add_noise": self.add_noise,
+            "model": self.transformer.transformer,
+        }
+
+        if self.vae is not None:
+            updates["vae"] = self.vae.vae
+
+        loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
+        if loras:
+            updates["loras"] = loras
+
+        controlnets = serialize_adapter_metadata(self.control)
+        if controlnets:
+            updates["controlnets"] = controlnets
+
+        if (
+            self.noise is not None
+            and self.noise.seed is not None
+            and (self.latents is None or getattr(self, "add_noise", True))
+        ):
+            updates["seed"] = self.noise.seed
+        elif self.seed is not None:
+            updates["seed"] = self.seed
+        elif self.latents and self.latents.seed is not None:
+            updates["seed"] = self.latents.seed
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         latents = self._run_diffusion(context)
         latents = latents.detach().to("cpu")
 
         name = context.tensors.save(tensor=latents)
-        return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
+        return LatentsMetaOutput.build(
+            latents_name=name,
+            latents=latents,
+            seed=None,
+            metadata=self._build_metadata(),
+            width=self.width,
+            height=self.height,
+        )
 
     def _run_diffusion(self, context: InvocationContext) -> torch.Tensor:
         inference_dtype = torch.bfloat16

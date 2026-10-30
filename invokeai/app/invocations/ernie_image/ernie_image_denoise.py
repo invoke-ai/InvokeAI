@@ -1,5 +1,5 @@
 from contextlib import ExitStack
-from typing import Optional
+from typing import Any, Optional
 
 import torch
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
@@ -11,9 +11,15 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
+    MetadataField,
+    WithMetadata,
+)
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    serialize_lora_metadata,
 )
 from invokeai.app.invocations.model import TransformerField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.ernie_image import sampling_utils
 from invokeai.backend.ernie_image.denoise import denoise as ernie_denoise
@@ -35,10 +41,10 @@ from invokeai.backend.util.devices import TorchDevice
     title="Denoise - ERNIE-Image",
     tags=["latents", "denoise", "ernie-image"],
     category="latents",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
-class ErnieImageDenoiseInvocation(BaseInvocation):
+class ErnieImageDenoiseInvocation(BaseInvocation, WithMetadata):
     """Run the ERNIE-Image denoising loop and emit packed latents."""
 
     transformer: TransformerField = InputField(
@@ -87,8 +93,32 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
         ui_choice_labels=ERNIE_IMAGE_SCHEDULER_LABELS,
     )
 
+    def _build_metadata(self) -> MetadataField:
+        updates: dict[str, Any] = {
+            "generation_mode": "ernie_image_txt2img",
+            "width": self.width,
+            "height": self.height,
+            "steps": self.steps,
+            "cfg_scale": self.guidance_scale,
+            "scheduler": self.scheduler,
+            "denoising_start": self.denoising_start,
+            "denoising_end": self.denoising_end,
+            "add_noise": self.add_noise,
+            "model": self.transformer.transformer,
+        }
+        loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
+        if loras:
+            updates["loras"] = loras
+
+        if self.seed is not None:
+            updates["seed"] = self.seed
+        elif self.latents and self.latents.seed is not None:
+            updates["seed"] = self.latents.seed
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         device = TorchDevice.choose_torch_device()
         dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
 
@@ -180,10 +210,11 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
         name = context.tensors.save(tensor=latents)
         # `LatentsOutput.build` assumes unpatched latents at 1/8 scale. ERNIE's latents are
         # 2x2-patchified on top of the 8x VAE downscale, so report the requested size directly.
-        return LatentsOutput(
+        return LatentsMetaOutput(
             latents=LatentsField(latents_name=name, seed=self.seed),
             width=self.width,
             height=self.height,
+            metadata=self._build_metadata(),
         )
 
     def _load_init_latents(

@@ -1,5 +1,6 @@
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, Optional, Sequence, Union
 
+import torch
 from pydantic import BaseModel, ConfigDict, Field
 
 from invokeai.app.invocations.baseinvocation import (
@@ -9,17 +10,19 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     ImageField,
     InputField,
+    LatentsField,
     MetadataField,
     OutputField,
     UIType,
     VideoField,
 )
 from invokeai.app.invocations.model import ModelIdentifierField
-from invokeai.app.invocations.primitives import StringOutput
+from invokeai.app.invocations.primitives import LatentsOutput, StringOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES
 from invokeai.version.invokeai_version import __version__
@@ -103,6 +106,28 @@ class MetadataOutput(BaseInvocationOutput):
     metadata: MetadataField = OutputField(description="Metadata Dict")
 
 
+@invocation_output("latents_meta_output")
+class LatentsMetaOutput(LatentsOutput, MetadataOutput):
+    """Base class for invocations that output latents with metadata"""
+
+    @classmethod
+    def build(
+        cls,
+        latents_name: str,
+        latents: torch.Tensor,
+        seed: Optional[int] = None,
+        metadata: Optional[MetadataField] = None,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+    ) -> "LatentsMetaOutput":
+        return cls(
+            latents=LatentsField(latents_name=latents_name, seed=seed),
+            width=width if width is not None else latents.shape[-1] * LATENT_SCALE_FACTOR,
+            height=height if height is not None else latents.shape[-2] * LATENT_SCALE_FACTOR,
+            metadata=metadata or MetadataField.model_validate({}),
+        )
+
+
 @invocation("metadata", title="Metadata", tags=["metadata"], category="metadata", version="1.0.1")
 class MetadataInvocation(BaseInvocation):
     """Takes a MetadataItem or collection of MetadataItems and outputs a MetadataDict."""
@@ -120,7 +145,7 @@ class MetadataInvocation(BaseInvocation):
             data = {item.label: item.value for item in self.items}
 
         # add app version
-        data.update({"app_version": __version__})
+        data.update({"app_version": __version__, "metadata_version": CORE_METADATA_VERSION})
         return MetadataOutput(metadata=MetadataField.model_validate(data))
 
 
@@ -234,6 +259,206 @@ class MiniMaxH3ReferenceMetadataField(BaseModel):
 # without the key predates versioning and is read with the same rules. Documented, with the
 # field table, in docs/development/Architecture/media-metadata.
 CORE_METADATA_VERSION = "1.1.0"
+
+
+def serialize_lora_metadata(*lora_lists: Optional[Sequence[Any]]) -> list[dict[str, Any]]:
+    """Serialize and deduplicate LoRA field sequences into metadata dictionaries."""
+    seen: set[tuple[Any, float]] = set()
+    result: list[dict[str, Any]] = []
+    for lora_list in lora_lists:
+        if not lora_list:
+            continue
+        for item in lora_list:
+            key = getattr(item.lora, "key", item.lora)
+            ident = (key, item.weight)
+            if ident in seen:
+                continue
+            seen.add(ident)
+            if isinstance(item.lora, ModelIdentifierField):
+                result.append(
+                    LoRAMetadataField(model=item.lora, weight=item.weight).model_dump(
+                        exclude_none=True, exclude={"id", "type", "is_intermediate", "use_cache"}
+                    )
+                )
+            else:
+                result.append({"model": item.lora, "weight": item.weight})
+    return result
+
+
+def serialize_adapter_metadata(item_or_items: Any) -> list[Any]:
+    """Normalize a single adapter field or list of adapter fields into serialized metadata dicts."""
+    if item_or_items is None:
+        return []
+    items = item_or_items if isinstance(item_or_items, list) else [item_or_items]
+    return [
+        item.model_dump(exclude_none=True, exclude={"id", "type", "is_intermediate", "use_cache"})
+        if hasattr(item, "model_dump")
+        else item
+        for item in items
+    ]
+
+
+def serialize_ip_adapter_ref_images(
+    ip_adapter: Any,
+    context: Optional[Any] = None,
+    default_width: int = 1024,
+    default_height: int = 1024,
+) -> list[dict[str, Any]]:
+    """Serialize IP-Adapter inputs into v7 GenerateReferenceImage metadata entries (`ref_images`)."""
+    if ip_adapter is None:
+        return []
+    items = ip_adapter if isinstance(ip_adapter, list) else [ip_adapter]
+    ref_images: list[dict[str, Any]] = []
+    idx = 0
+    for item in items:
+        raw_image = item.get("image") if isinstance(item, dict) else getattr(item, "image", None)
+        if raw_image is None:
+            raw_image_name = item.get("image_name") if isinstance(item, dict) else getattr(item, "image_name", None)
+            if raw_image_name:
+                raw_image = {"image_name": raw_image_name}
+            else:
+                continue
+        img_list = raw_image if isinstance(raw_image, list) else [raw_image]
+        ip_adapter_model = (
+            item.get("ip_adapter_model") if isinstance(item, dict) else getattr(item, "ip_adapter_model", None)
+        )
+        image_encoder_model = (
+            item.get("image_encoder_model") if isinstance(item, dict) else getattr(item, "image_encoder_model", None)
+        )
+        if hasattr(ip_adapter_model, "model_dump"):
+            model_dict = ip_adapter_model.model_dump(exclude_none=True, exclude={"id", "is_intermediate", "use_cache"})
+        elif isinstance(ip_adapter_model, dict):
+            model_dict = dict(ip_adapter_model)
+            model_dict.setdefault("type", "ip_adapter")
+        else:
+            model_dict = {}
+
+        explicit_cvm = (
+            item.get("clip_vision_model") if isinstance(item, dict) else getattr(item, "clip_vision_model", None)
+        )
+        if explicit_cvm in ("ViT-H", "ViT-G", "ViT-L"):
+            clip_vision_model = explicit_cvm
+        else:
+            enc_name = (
+                image_encoder_model.get("name", "")
+                if isinstance(image_encoder_model, dict)
+                else getattr(image_encoder_model, "name", "")
+            ) or ""
+            enc_lower = str(enc_name).lower()
+            if "vit-l" in enc_lower or "large" in enc_lower:
+                clip_vision_model = "ViT-L"
+            elif "sdxl" in enc_lower or "vit-g" in enc_lower:
+                clip_vision_model = "ViT-G"
+            else:
+                clip_vision_model = "ViT-H"
+
+        method = (item.get("method") if isinstance(item, dict) else getattr(item, "method", None)) or "full"
+        has_weight = ("weight" in item) if isinstance(item, dict) else hasattr(item, "weight")
+        has_strength = ("strength" in item) if isinstance(item, dict) else hasattr(item, "strength")
+        if has_weight:
+            raw_weight = item["weight"] if isinstance(item, dict) else item.weight
+        elif has_strength:
+            raw_weight = item["strength"] if isinstance(item, dict) else item.strength
+            if raw_weight is not None and float(raw_weight) <= 0.0:
+                continue
+        else:
+            raw_weight = 1.0
+        weight = float(raw_weight[0] if isinstance(raw_weight, list) and raw_weight else raw_weight)
+        begin_step_percent = float(
+            item.get("begin_step_percent", 0.0) if isinstance(item, dict) else getattr(item, "begin_step_percent", 0.0)
+        )
+        end_step_percent = float(
+            item.get("end_step_percent", 1.0) if isinstance(item, dict) else getattr(item, "end_step_percent", 1.0)
+        )
+
+        for img in img_list:
+            img_name = img.get("image_name") if isinstance(img, dict) else getattr(img, "image_name", None)
+            if not img_name:
+                continue
+            img_width, img_height = int(default_width), int(default_height)
+            if context is not None:
+                try:
+                    dto = context.images.get_dto(img_name)
+                    dto_w = getattr(dto, "width", None)
+                    dto_h = getattr(dto, "height", None)
+                    if isinstance(dto_w, int) and dto_w > 0 and isinstance(dto_h, int) and dto_h > 0:
+                        img_width, img_height = int(dto_w), int(dto_h)
+                except Exception:
+                    pass
+            idx += 1
+            ref_images.append(
+                {
+                    "id": f"ip_adapter_{idx}",
+                    "isEnabled": True,
+                    "config": {
+                        "type": "ip_adapter",
+                        "image": {
+                            "original": {
+                                "image": {
+                                    "image_name": img_name,
+                                    "width": img_width,
+                                    "height": img_height,
+                                }
+                            }
+                        },
+                        "model": model_dict,
+                        "clipVisionModel": clip_vision_model,
+                        "method": method,
+                        "weight": weight,
+                        "beginEndStepPct": [begin_step_percent, end_step_percent],
+                    },
+                }
+            )
+    return ref_images
+
+
+def _ref_image_dedup_key(entry: Any) -> Optional[tuple[Any, Any, Any]]:
+    if not isinstance(entry, dict):
+        return None
+    cfg = entry.get("config")
+    if not isinstance(cfg, dict):
+        return None
+    cfg_type = cfg.get("type")
+    img = cfg.get("image")
+    image_name = None
+    if isinstance(img, dict):
+        crop = img.get("crop")
+        orig = img.get("original")
+        if isinstance(crop, dict) and isinstance(crop.get("image"), dict):
+            image_name = crop["image"].get("image_name")
+        if not image_name and isinstance(orig, dict) and isinstance(orig.get("image"), dict):
+            image_name = orig["image"].get("image_name")
+        if not image_name:
+            image_name = img.get("image_name")
+    if not image_name:
+        return None
+    model = cfg.get("model")
+    model_key = model.get("key") if isinstance(model, dict) else getattr(model, "key", None)
+    return (cfg_type, image_name, model_key)
+
+
+def build_denoise_metadata(existing: Optional[MetadataField], updates: dict[str, Any]) -> MetadataField:
+    """Build a new MetadataField by copying existing metadata and merging denoise updates without mutating input."""
+    md: dict[str, Any] = {} if existing is None else existing.root.copy()
+    existing_gen_mode = md.get("generation_mode")
+    existing_ref_images = md.get("ref_images")
+    md.update(updates)
+    if existing_gen_mode is not None and "generation_mode" in updates:
+        md["generation_mode"] = existing_gen_mode
+    if "ref_images" in updates and isinstance(existing_ref_images, list) and isinstance(updates["ref_images"], list):
+        merged_refs: list[Any] = []
+        seen_keys: set[tuple[Any, Any, Any]] = set()
+        for entry in [*existing_ref_images, *updates["ref_images"]]:
+            dedup_key = _ref_image_dedup_key(entry)
+            if dedup_key is not None:
+                if dedup_key in seen_keys:
+                    continue
+                seen_keys.add(dedup_key)
+            merged_refs.append(entry)
+        md["ref_images"] = merged_refs
+    md["app_version"] = __version__
+    md["metadata_version"] = CORE_METADATA_VERSION
+    return MetadataField.model_validate(md)
 
 
 @invocation(
