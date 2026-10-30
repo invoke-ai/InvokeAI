@@ -493,7 +493,11 @@ def terminate(process: subprocess.Popen[Any], job: KillOnCloseJob | None) -> Non
             f"the kill of pid {process.pid} and its descendants failed ({e}); may still run: {_pids(survivors)}",
             survivors,
         ) from e
+    deadline = time.monotonic() + STOP_TIMEOUT_S
     _, alive = psutil.wait_procs(tree, timeout=STOP_TIMEOUT_S)
+    # Group members outside the tree (orphans) die asynchronously too: SIGKILL is not instant.
+    while group is not None and living_members(group) and time.monotonic() < deadline:
+        time.sleep(0.05)
     survivors = _identities(alive, group)
     if survivors:
         raise TerminationError(
