@@ -146,6 +146,9 @@ themselves.
 | LTX-2, MiniMax H3 | ✓ (plain low-rank; LoKR, LoHA and DoRA are refused) | ✗ | |
 | SD 3, CogView4, Ideogram 4, ERNIE-Image, Qwen-Image-2.1, MOSS-Image | ✗ | ✗ | |
 
+FLUX.1 and FLUX.2 also accept ComfyUI/OneTrainer PEFT LoRAs whose module names start with `diffusion_model.`.
+Per-layer `.alpha` values in these `diffusion_model.` files set the LoRA scale.
+
 For SD 1.x / 2.x and FLUX.2, LyCORIS LoKr files may store either Kronecker operand whole or as a
 factorized `_a` / `_b` pair. FLUX.2 also accepts LoHA files in the same BFL and kohya layouts.
 
