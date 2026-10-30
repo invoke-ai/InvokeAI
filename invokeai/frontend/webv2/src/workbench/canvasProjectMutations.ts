@@ -88,6 +88,14 @@ const withRestorePoint = (
   return all.filter((snapshot) => keep.has(snapshot));
 };
 
+/**
+ * The restore points that outlive a document replacement. Discard all points belong to the document session they were
+ * taken in: their results' placements are pinned to that document, so they leave with it. Clear canvas points carry
+ * their own document and stay.
+ */
+const pointsSurvivingReplacement = (snapshots: readonly CanvasSnapshotContract[]): CanvasSnapshotContract[] =>
+  snapshots.filter((snapshot) => snapshotKind(snapshot) !== 'discard-results');
+
 const CANVAS_PROJECT_MUTATION_TYPES: ReadonlySet<string> = new Set<CanvasProjectMutation['type']>([
   'commitStagedImage',
   'rollbackStagedImageCommit',
@@ -1058,7 +1066,7 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
       if ((offsetX !== 0 || offsetY !== 0) && hasPendingCanvasResults(project.canvas, project.queue.items)) {
         return project;
       }
-      return updateCanvasDocument(project, (document) => ({
+      const resized = updateCanvasDocument(project, (document) => ({
         ...document,
         bbox: clampBbox(
           { ...document.bbox, x: document.bbox.x + offsetX, y: document.bbox.y + offsetY },
@@ -1092,6 +1100,13 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
               ),
         width,
       }));
+      // The move would land a Discard all point's results off their content too, so those points are dropped.
+      return resized === project || (offsetX === 0 && offsetY === 0)
+        ? resized
+        : {
+            ...resized,
+            canvas: { ...resized.canvas, snapshots: pointsSurvivingReplacement(resized.canvas.snapshots) },
+          };
     }
     case 'replaceCanvasDocument': {
       const document = normalizeCanvasDocumentContract(structuredClone(mutation.document));
@@ -1100,6 +1115,7 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
             ...project.canvas,
             document: withRepairedSelection(document),
             documentRevision: project.canvas.documentRevision + 1,
+            snapshots: pointsSurvivingReplacement(project.canvas.snapshots),
             stagingArea: clearStagingArea(project.canvas.stagingArea),
           })
         : project;
@@ -1129,6 +1145,8 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
       }
       const remaining = project.canvas.snapshots.filter((entry) => entry !== snapshot);
       if (snapshot.kind === 'discard-results') {
+        // The point records no revision, so the restoreStagedImages guard cannot fence it; dropping these points
+        // whenever the document is replaced is the only protection.
         const restaged = applyCanvasProjectMutation(project, {
           documentRevision: project.canvas.documentRevision,
           images: snapshot.stagedImages ?? [],
@@ -1151,17 +1169,15 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
         : null;
       const stagedImages = snapshot.stagedImages ? structuredClone(snapshot.stagedImages) : [];
       const cleared = clearStagingArea(project.canvas.stagingArea);
-      // A new canvas session, like any document replacement: the outgoing staging and in-flight results belong to
-      // the replaced document. Results the point kept come back with it.
+      // A new canvas session, like any document replacement: the outgoing staging, in-flight results and Discard all
+      // points belong to the replaced document. Results the point kept come back with it.
       return setCanvasState(project, {
         ...project.canvas,
         document: withRepairedSelection(document),
         documentRevision: project.canvas.documentRevision + 1,
-        snapshots: kept
-          ? withRestorePoint(remaining, kept)
-          : mutation.keepCurrentAs
-            ? remaining
-            : project.canvas.snapshots,
+        snapshots: pointsSurvivingReplacement(
+          kept ? withRestorePoint(remaining, kept) : mutation.keepCurrentAs ? remaining : project.canvas.snapshots
+        ),
         stagingArea:
           stagedImages.length > 0
             ? {

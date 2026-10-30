@@ -95,7 +95,7 @@ export type ClearCanvasOutcome =
 
 /**
  * Clears the canvas behind a restore point; a blank canvas has nothing to keep. A wholesale replacement drops canvas
- * history and staging, as any new canvas session does.
+ * history, staging and Discard all points, as any new canvas session does.
  */
 export const clearCanvasWithRestorePoint = async (request: ClearCanvasRequest): Promise<ClearCanvasOutcome> => {
   const engine = request.ports.engine();
@@ -138,9 +138,10 @@ export type RestoreOutcome =
   | { status: 'gone' };
 
 /**
- * Restores a point. A canvas point waits while an operation, a generation or a review holds the canvas, saves the
- * strokes still uploading, then takes the replaced canvas's place among the points (`undoPointId`) unless that canvas
- * was blank. A Discard all point only re-stages its results, so it neither waits nor keeps the canvas.
+ * Restores a point. A canvas point waits while an operation, a generation or a review holds the canvas, both before
+ * and after saving the strokes still uploading, then takes the replaced canvas's place among the points
+ * (`undoPointId`) unless that canvas was blank. A Discard all point only re-stages its results, so it neither waits
+ * nor keeps the canvas.
  */
 export const restoreFromPoint = async (
   ports: RestorePointPorts,
@@ -163,6 +164,12 @@ export const restoreFromPoint = async (
   }
   if (!(await crossPaintBarrier(engine))) {
     return { status: 'unsaved' };
+  }
+  // A run enqueued or a result staged while the strokes saved would be thrown away by the swap, which runs
+  // synchronously from here on.
+  const lockAfterBarrier = ports.lockReason();
+  if (lockAfterBarrier) {
+    return { reason: lockAfterBarrier, status: 'locked' };
   }
   if (ports.isBlank()) {
     if (!engine.document.restoreSnapshot(point.id)) {

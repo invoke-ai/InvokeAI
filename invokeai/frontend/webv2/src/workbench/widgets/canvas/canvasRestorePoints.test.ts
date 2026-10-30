@@ -41,6 +41,7 @@ const createFixture = ({ blank = false, flush, lock = null, open = true, swaps =
       }),
     },
   };
+  let lockReason = lock;
   const ports: RestorePointPorts = {
     apply: (mutation) => {
       applied.push(mutation);
@@ -50,10 +51,13 @@ const createFixture = ({ blank = false, flush, lock = null, open = true, swaps =
     createId: () => `point-${(next += 1)}`,
     engine: () => (open ? engine : null),
     isBlank: () => blank,
-    lockReason: () => lock,
+    lockReason: () => lockReason,
     now: () => '2026-10-29T00:00:00.000Z',
   };
-  return { applied, engine, order, ports };
+  const engage = (reason: 'editing' | 'canvas') => {
+    lockReason = reason;
+  };
+  return { applied, engage, engine, order, ports };
 };
 
 const clear = (fixture: ReturnType<typeof createFixture>, stop: string[] = []) => {
@@ -150,6 +154,21 @@ describe('restoreFromPoint', () => {
       status: 'locked',
     });
     expect(fixture.order).toEqual([]);
+  });
+
+  it('swaps nothing when a run or a result locks the canvas while the strokes save', async () => {
+    const fixture: ReturnType<typeof createFixture> = createFixture({
+      flush: () => {
+        fixture.engage('canvas');
+        return Promise.resolve();
+      },
+    });
+    await expect(
+      restoreFromPoint(fixture.ports, { id: 'p', kind: 'clear-canvas' }, 'Before restoring')
+    ).resolves.toEqual({ reason: 'canvas', status: 'locked' });
+    expect(fixture.order).toEqual(['flush']);
+    expect(fixture.engine.document.restoreSnapshot).not.toHaveBeenCalled();
+    expect(fixture.applied).toEqual([]);
   });
 
   it('uses the point up without keeping a blank canvas in its place', async () => {
