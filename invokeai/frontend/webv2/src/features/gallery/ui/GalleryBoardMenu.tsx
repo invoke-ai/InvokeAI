@@ -265,15 +265,19 @@ const BoardDeleteDialog = ({
   onOpenChange: (event: { open: boolean }) => void;
 }) => {
   const { t } = useTranslation();
-  // The board stays shown while the dialog animates out; the choices belong to one opening and start over with the
-  // next board.
+  // The board and the choices stay shown while the dialog animates out; the choices belong to one opening and start
+  // over with the next one, for the same board too. The dialog is not remounted, which would cut the exit animation.
   const [shownBoard, setShownBoard] = useState(board);
-  const [choices, setChoices] = useState({ boardId: board?.id ?? null, includeMedia: false, typedName: '' });
+  const [openedBoardId, setOpenedBoardId] = useState(board?.id ?? null);
+  const [choices, setChoices] = useState({ includeMedia: false, typedName: '' });
   if (board !== null && board !== shownBoard) {
     setShownBoard(board);
   }
-  if (board !== null && choices.boardId !== board.id) {
-    setChoices({ boardId: board.id, includeMedia: false, typedName: '' });
+  if ((board?.id ?? null) !== openedBoardId) {
+    setOpenedBoardId(board?.id ?? null);
+    if (board !== null) {
+      setChoices({ includeMedia: false, typedName: '' });
+    }
   }
   const { includeMedia, typedName } = choices;
   const cancelRef = useRef<HTMLButtonElement | null>(null);

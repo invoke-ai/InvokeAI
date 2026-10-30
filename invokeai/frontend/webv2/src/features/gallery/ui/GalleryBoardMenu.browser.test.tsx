@@ -178,6 +178,29 @@ it('asks for the board name before deleting many items with it', async () => {
   expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', true);
 });
 
+it('starts each opening of the delete dialog over, for the same board too', async () => {
+  await renderMenuFor({ ...board, assetCount: 40, imageCount: 20 } as GalleryBoard);
+  let dialog = await openDeleteDialog();
+
+  await act(() => userEvent.click(dialog.querySelector<HTMLElement>('[data-part="label"]')!));
+  await act(() => userEvent.type(dialog.querySelector<HTMLInputElement>('input:not([type="checkbox"])')!, 'Board 1'));
+  expect(dialogButton('Delete board and 61 items')!.disabled).toBe(false);
+  await act(() => userEvent.click(dialogButton('Cancel')!));
+  await vi.waitFor(() => expect(document.querySelector('[role="alertdialog"]')).toBeNull());
+
+  dialog = await openDeleteDialog();
+
+  expect(dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(false);
+  expect(dialog.querySelector('input:not([type="checkbox"])')).toBeNull();
+  expect(dialogButton('Delete board and 61 items')).toBeUndefined();
+  expect(dialogButton('Delete board')!.disabled).toBe(false);
+
+  // Asking again for the media brings back an empty name field and a refused delete.
+  await act(() => userEvent.click(dialog.querySelector<HTMLElement>('[data-part="label"]')!));
+  expect(dialog.querySelector<HTMLInputElement>('input:not([type="checkbox"])')!.value).toBe('');
+  expect(dialogButton('Delete board and 61 items')!.disabled).toBe(true);
+});
+
 /** The panel's part: the menu target clears when the menu closes. */
 const ControlledMenu = ({ initialTarget }: { initialTarget: typeof target }) => {
   const [menuTarget, setMenuTarget] = useState<typeof target | null>(initialTarget);
