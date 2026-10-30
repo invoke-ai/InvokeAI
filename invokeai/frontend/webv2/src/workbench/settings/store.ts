@@ -81,7 +81,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   whatsNewSeenVersion: null,
   workflowEdgeStyle: 'curved',
   workflowEdgesBehindNodes: false,
-  workflowFormSectionGapPx: 16,
+  workflowFormSectionGapPx: 8,
   workflowGroupNodesByCategory: true,
   workflowLibrarySort: 'updated',
   workflowLibraryThumbnailFit: 'cover',

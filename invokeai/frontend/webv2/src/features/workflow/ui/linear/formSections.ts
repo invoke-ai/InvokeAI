@@ -9,7 +9,7 @@ export type FormSectionItem =
 
 const SECTION_STATE_KEY = 'formSectionsOpen';
 
-/** Headings group only their siblings; a divider ends the current section without disappearing. */
+/** Headings group only siblings; dividers end sections and only redundant inter-section lines are omitted. */
 export const groupFormSections = (elements: readonly WorkflowFormElement[]): FormSectionItem[] => {
   const groups: FormSectionItem[] = [];
   let current: Extract<FormSectionItem, { kind: 'section' }> | null = null;

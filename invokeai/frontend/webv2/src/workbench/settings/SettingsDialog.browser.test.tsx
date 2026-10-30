@@ -145,9 +145,10 @@ describe('settings dialog', () => {
     await waitForOpen();
     const slider = page.getByRole('slider', { name: 'Spacing between form sections (px)' });
     await expect.element(slider).toBeVisible();
+    await expect.element(slider).toHaveAttribute('aria-valuenow', '8');
     slider.element().focus();
-    await act(() => userEvent.keyboard('{Home}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}'));
-    await expect.poll(() => getWorkbenchPreferences().workflowFormSectionGapPx).toBe(8);
+    await act(() => userEvent.keyboard('{End}'));
+    await expect.poll(() => getWorkbenchPreferences().workflowFormSectionGapPx).toBe(36);
   });
 
   it('edits a matching preference and reveals it in its section without losing its value', async () => {
