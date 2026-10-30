@@ -417,6 +417,13 @@ describe('InvokeButton issues', () => {
     await act(() => userEvent.tab());
 
     await expect.element(button).toHaveFocus();
+    // Returning keyboard focus must not schedule the hover/focus preview and reopen the dismissed card.
+    await act(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(resolve, 400);
+        })
+    );
     await expect.element(page.getByText('Control layer "Depth 1": Choose a model.')).not.toBeInTheDocument();
   });
 

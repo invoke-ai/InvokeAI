@@ -204,7 +204,10 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
     (event: FocusEvent<HTMLButtonElement>) => {
       if (event.currentTarget.matches(':focus-visible')) {
         setIsFocused(true);
-        schedulePreview();
+        // Dismissing the card restores focus here; that return must not reopen it after the preview delay.
+        if (!contentRef.current?.contains(event.relatedTarget as Node | null)) {
+          schedulePreview();
+        }
       }
     },
     [schedulePreview]

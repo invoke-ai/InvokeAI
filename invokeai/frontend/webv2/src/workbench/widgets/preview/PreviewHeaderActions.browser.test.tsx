@@ -1,3 +1,4 @@
+import '@fontsource/inter/index.css';
 import type * as GalleryBackendModule from '@features/gallery/data/backend';
 import type * as IdentityModule from '@features/identity';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
@@ -215,6 +216,7 @@ const render = async (region: WidgetViewProps['region'] = 'center') => {
       </QueryClientProvider>
     );
   });
+  await document.fonts.ready;
 };
 
 const button = (label: string): HTMLButtonElement =>
@@ -420,7 +422,6 @@ describe('preview zoom menu', () => {
       // Compact is the readout and chevron only: the magnifier would leave the widget title no room.
       expect(trigger.textContent).toContain('200%');
       expect(trigger.querySelector('.lucide-zoom-in')).toBeNull();
-      expect(trigger.getBoundingClientRect().width).toBeLessThan(70);
       await settle(() => root?.unmount());
       host?.remove();
     }

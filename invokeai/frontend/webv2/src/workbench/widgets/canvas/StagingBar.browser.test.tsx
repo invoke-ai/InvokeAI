@@ -1,3 +1,4 @@
+import '@fontsource/inter/index.css';
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import type { QueueItemProgress } from '@features/queue/contracts';
 import type { CanvasStagingSlot } from '@workbench/canvasStagingView';
@@ -166,6 +167,8 @@ const renderStagingBar = async (
       </I18nextProvider>
     );
   });
+
+  await document.fonts.ready;
 
   const viewport = host.querySelector<HTMLElement>('[data-scope="scroll-area"][data-part="viewport"]')!;
   const overlay = host.firstElementChild!.firstElementChild as HTMLElement;

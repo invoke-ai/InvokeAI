@@ -48,7 +48,7 @@ const MENU_POSITIONING = { placement: 'top-end' } as const;
  * Below this bar width the "Generating" text and "Discard all" collapse to icons, so the accept split button (the
  * only pointer path to "Keep as hidden layer") stays inside the canvas. Measured on the staging slot itself.
  */
-const COMPACT = '@container staging-bar (width < 48rem)';
+const COMPACT = '@container staging-bar (width < 56rem)';
 /**
  * Below this the remaining text goes too (the candidate counter, the auto-switch mode, Cancel and the accept label),
  * leaving icons whose names and tooltips carry the words, so the bar fits a canvas down to about 360px.

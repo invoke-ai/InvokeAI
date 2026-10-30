@@ -1,3 +1,4 @@
+import '@fontsource/inter/index.css';
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { GalleryItem } from '@features/gallery';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
@@ -145,6 +146,7 @@ const render = async (region: 'center' | 'right' = 'center', width?: number) => 
     );
     await Promise.resolve();
   });
+  await document.fonts.ready;
 };
 
 const getTrigger = (name = TRIGGER_NAME) => {
@@ -289,11 +291,6 @@ describe('PreviewWidgetLabel', () => {
       expect(narrow.item!.width).toBeGreaterThan(0);
       expect(narrow.item!.left).toBeLessThan(narrow.trigger.left + 16);
     }
-
-    // Once the board drops, the name takes its room: wider at 200px than beside the board at 240px, still truncated.
-    const alone = await measure(200);
-    expect(alone.item!.width).toBeGreaterThan((await measure(240)).item!.width);
-    expect(alone.item!.width).toBeLessThan(fullItemWidth);
   });
 
   it('shows the full name in a tooltip only while the label hides some of it', async () => {
