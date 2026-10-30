@@ -216,7 +216,6 @@ beforeEach(() => {
   galleryMocks.videoWorkflow.mockReset().mockResolvedValue({ graph: null, workflow: null });
   actions = {
     deriveImageRecallCapabilities: vi.fn(() => ALL_RECALL_CAPABILITIES),
-    getImageRecallCapabilities: vi.fn(() => Promise.resolve(ALL_RECALL_CAPABILITIES)),
     recallImageData: vi.fn(() => Promise.resolve()),
   } as unknown as ImageActions;
   queryClient = new QueryClient({
@@ -267,7 +266,7 @@ describe('Preview query-driven Details', () => {
     await renderDetails({ isOpen: true, item: imageItem });
 
     const metadataSignal = galleryMocks.imageMetadata.mock.calls[0]?.[1] as AbortSignal;
-    expect(actions.getImageRecallCapabilities).not.toHaveBeenCalled();
+    expect(galleryMocks.imageMetadata).toHaveBeenCalledOnce();
 
     await renderDetails({ isOpen: false, item: imageItem });
 

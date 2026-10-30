@@ -1,8 +1,10 @@
+import type * as GalleryModule from '@features/gallery';
 import type * as IdentityModule from '@features/identity';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
 import { act } from 'react';
@@ -96,10 +98,9 @@ const state = vi.hoisted(() => ({
 }));
 const patchValues = vi.hoisted(() => vi.fn());
 const openItemMenu = vi.hoisted(() => vi.fn());
-// One instance across renders, as the view's `useImageActions` is: capability reads key on the loader's identity.
 const itemActions = vi.hoisted(() => ({
   canUseAsReferenceImage: false,
-  getImageRecallCapabilities: vi.fn(),
+  deriveImageRecallCapabilities: vi.fn(),
   recallImageData: vi.fn(() => Promise.resolve()),
   selectForCompare: vi.fn(),
   sendImageAsControl: vi.fn(() => Promise.resolve()),
@@ -108,7 +109,20 @@ const itemActions = vi.hoisted(() => ({
 }));
 const updateProjectPreferences = vi.hoisted(() => vi.fn());
 const showAll = vi.hoisted(() => vi.fn());
+const imageMetadata = vi.hoisted(() => vi.fn());
 vi.mock('@features/queue/react', () => ({ useProgressImage: () => null }));
+vi.mock('@features/gallery', async (importOriginal) => {
+  const actual = await importOriginal<typeof GalleryModule>();
+
+  return {
+    ...actual,
+    galleryImages: {
+      ...actual.galleryImages,
+      metadata: imageMetadata,
+      resolve: () => Promise.resolve({ hasWorkflow: false }),
+    },
+  };
+});
 vi.mock('@features/identity', async (importOriginal) => ({
   ...(await importOriginal<typeof IdentityModule>()),
   useAuthSession: () => ({ accountEpoch: 1 }),
@@ -165,6 +179,7 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
+let queryClient: QueryClient;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const settle = (action: () => void): Promise<void> =>
@@ -197,11 +212,13 @@ const render = async (region: WidgetViewProps['region'] = 'center') => {
 
   await settle(() => {
     root?.render(
-      <I18nextProvider i18n={i18n}>
-        <ChakraProvider value={system}>
-          <PreviewHeaderActions {...({ region, runtime: {} } as unknown as WidgetViewProps)} />
-        </ChakraProvider>
-      </I18nextProvider>
+      <QueryClientProvider client={queryClient}>
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <PreviewHeaderActions {...({ region, runtime: {} } as unknown as WidgetViewProps)} />
+          </ChakraProvider>
+        </I18nextProvider>
+      </QueryClientProvider>
     );
   });
 };
@@ -214,8 +231,10 @@ beforeEach(() => {
   state.density = 'full';
   openItemMenu.mockClear();
   itemActions.canUseAsReferenceImage = false;
-  itemActions.getImageRecallCapabilities.mockReset();
-  itemActions.getImageRecallCapabilities.mockResolvedValue({
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  imageMetadata.mockReset().mockResolvedValue({ seed: 1 });
+  itemActions.deriveImageRecallCapabilities.mockReset();
+  itemActions.deriveImageRecallCapabilities.mockReturnValue({
     all: true,
     clipSkip: false,
     dimensions: true,
@@ -493,12 +512,12 @@ describe('preview header Edit and Use', () => {
   it('loads what the image can lend only when Use opens, then lists both groups with the viewer keys', async () => {
     state.actionItem = STILL_IMAGE;
     await render();
-    expect(itemActions.getImageRecallCapabilities).not.toHaveBeenCalled();
+    expect(imageMetadata).not.toHaveBeenCalled();
 
     await settle(() => button('Use this image in Generate').click());
     const menu = page.getByRole('menu').element();
 
-    expect(itemActions.getImageRecallCapabilities).toHaveBeenCalledOnce();
+    expect(imageMetadata).toHaveBeenCalledExactlyOnceWith('still.png', expect.any(AbortSignal));
     await vi.waitFor(() =>
       expect(menuRows(menu)).toEqual([
         '# Use image as',
@@ -574,11 +593,13 @@ describe('preview header Edit and Use', () => {
     const rerender = () =>
       settle(() => {
         root?.render(
-          <I18nextProvider i18n={i18n}>
-            <ChakraProvider value={system}>
-              <PreviewHeaderActions {...({ region: 'center', runtime: {} } as unknown as WidgetViewProps)} />
-            </ChakraProvider>
-          </I18nextProvider>
+          <QueryClientProvider client={queryClient}>
+            <I18nextProvider i18n={i18n}>
+              <ChakraProvider value={system}>
+                <PreviewHeaderActions {...({ region: 'center', runtime: {} } as unknown as WidgetViewProps)} />
+              </ChakraProvider>
+            </I18nextProvider>
+          </QueryClientProvider>
         );
       });
     state.actionItem = STILL_IMAGE;
@@ -597,7 +618,7 @@ describe('preview header Edit and Use', () => {
     state.actionItem = { ...STILL_IMAGE, name: 'newer.png' };
     await rerender();
 
-    expect(itemActions.getImageRecallCapabilities).toHaveBeenCalledOnce();
+    expect(imageMetadata).toHaveBeenCalledExactlyOnceWith('still.png', expect.any(AbortSignal));
     const seed = page.getByRole('menuitem', { name: /^Use seed/ });
     await seed.hover();
     await seed.click();

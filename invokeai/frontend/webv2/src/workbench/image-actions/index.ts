@@ -9,7 +9,6 @@ export { useImageRecallCapabilities } from './useImageRecallCapabilities';
 export {
   buildImageRecallSettings,
   EMPTY_IMAGE_RECALL_CAPABILITIES,
-  getImageRecallCapabilities,
   getImageRecallMessage,
   getImageRecallTitle,
   type ImageRecallCapabilities,

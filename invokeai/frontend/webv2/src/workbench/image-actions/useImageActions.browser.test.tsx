@@ -23,6 +23,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ImageActions } from './useImageActions';
 
+import { EMPTY_IMAGE_RECALL_CAPABILITIES } from './imageRecall';
 import { useImageActions } from './useImageActions';
 
 const mocks = vi.hoisted(() => ({
@@ -562,8 +563,8 @@ describe('reference image availability and the capability table', () => {
   });
 });
 
-describe('image recall capability cancellation', () => {
-  it('re-derives capabilities from the current generate model without another metadata request', async () => {
+describe('image recall capabilities', () => {
+  it('derives capabilities from the current generate model', async () => {
     const image: GalleryImage = {
       boardId: 'none',
       height: 512,
@@ -588,51 +589,30 @@ describe('image recall capability cancellation', () => {
     });
 
     expect(actionsRef.current?.deriveImageRecallCapabilities(image, { clip_skip: 2 }).clipSkip).toBe(false);
-    expect(mocks.imageMetadata).not.toHaveBeenCalled();
   });
 
-  it('combines a caller signal with the account lifecycle signal for metadata transport', async () => {
-    let resolveMetadata!: (value: null) => void;
-    const metadata = new Promise<null>((resolve) => {
-      resolveMetadata = resolve;
-    });
-    mocks.imageMetadata.mockReturnValueOnce(metadata);
-    const controller = new AbortController();
+  it('offers only an embedded workflow while the Generate panel has no values', async () => {
     const image: GalleryImage = {
       boardId: 'none',
+      hasWorkflow: true,
       height: 512,
       imageCategory: 'general',
-      imageName: 'recall.png',
-      imageUrl: '/full/recall.png',
+      imageName: 'workflow.png',
+      imageUrl: '/full/workflow.png',
       queuedAt: '2026-07-30T00:00:00.000Z',
-      sourceQueueItemId: 'queue-recall',
+      sourceQueueItemId: 'queue-workflow',
       starred: false,
-      thumbnailUrl: '/thumb/recall.png',
+      thumbnailUrl: '/thumb/workflow.png',
       width: 512,
     };
-    const getCapabilities = actionsRef.current?.getImageRecallCapabilities as unknown as (
-      image: GalleryImage,
-      signal?: AbortSignal
-    ) => Promise<unknown>;
-    let result!: Promise<unknown>;
 
-    await act(async () => {
-      result = getCapabilities(image, controller.signal);
-      await Promise.resolve();
+    // Without the capability table there are no Generate values to recall into.
+    await act(() => resetArchitectureCapabilities());
+    expect(actionsRef.current?.deriveImageRecallCapabilities(image, { seed: 7 })).toEqual({
+      ...EMPTY_IMAGE_RECALL_CAPABILITIES,
+      workflow: true,
     });
-
-    expect(mocks.imageMetadata).toHaveBeenCalledWith('recall.png', expect.any(AbortSignal));
-    const transportSignal = mocks.imageMetadata.mock.calls[0]?.[1] as AbortSignal;
-    expect(transportSignal).toBeInstanceOf(AbortSignal);
-    expect(transportSignal.aborted).toBe(false);
-
-    controller.abort();
-
-    expect(transportSignal.aborted).toBe(true);
-    resolveMetadata(null);
-    await act(async () => {
-      await result;
-    });
+    await act(() => setArchitectureCapabilities(architectureCapabilitiesFixture));
   });
 });
 
@@ -649,24 +629,6 @@ describe('load workflow from image', () => {
     thumbnailUrl: '/thumb/made-by-workflow.png',
     width: 512,
   };
-
-  it('offers the action only once the image record says a workflow is embedded', async () => {
-    mocks.imageMetadata.mockResolvedValue(null);
-    mocks.imageResolve.mockResolvedValueOnce({ ...image, hasWorkflow: true });
-
-    await expect(actionsRef.current?.getImageRecallCapabilities(image)).resolves.toMatchObject({ workflow: true });
-
-    mocks.imageResolve.mockResolvedValueOnce({ ...image, hasWorkflow: false });
-
-    await expect(actionsRef.current?.getImageRecallCapabilities(image)).resolves.toMatchObject({ workflow: false });
-
-    // An image that came through a record endpoint already knows; no second round trip.
-    mocks.imageResolve.mockClear();
-    await expect(
-      actionsRef.current?.getImageRecallCapabilities({ ...image, hasWorkflow: true })
-    ).resolves.toMatchObject({ workflow: true });
-    expect(mocks.imageResolve).not.toHaveBeenCalled();
-  });
 
   it('reports, instead of queueing a load for a later editor, when the workflow widget cannot open', async () => {
     mocks.imageWorkflow.mockResolvedValueOnce({ graph: null, workflow: JSON.stringify({ nodes: [] }) });

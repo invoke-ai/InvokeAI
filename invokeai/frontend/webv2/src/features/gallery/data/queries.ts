@@ -210,6 +210,9 @@ export const galleryKeys = {
   /** What a video's context menu can offer (recall, embedded workflow), read from its record when opened. */
   videoMenuCapabilities: (owner: AccountScope, videoName: string | null) =>
     [...galleryKeys.itemsRoot(), 'menu-capabilities', getAccountKey(owner), videoName] as const,
+  /** What an image's menus derive recall from (its metadata, whether it embeds a workflow), read when opened. */
+  imageMenuRecallSources: (owner: AccountScope, imageName: string | null) =>
+    [...galleryKeys.itemsRoot(), 'menu-recall-sources', getAccountKey(owner), imageName] as const,
 };
 
 const galleryItemNamesOptionsForOwner = (owner: AccountScope, filter: CanonicalGalleryItemsFilter) =>

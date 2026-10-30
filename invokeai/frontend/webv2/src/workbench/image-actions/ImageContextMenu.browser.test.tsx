@@ -40,11 +40,15 @@ const commandsMock = vi.hoisted(() => ({
 }));
 const galleryMock = vi.hoisted(() => ({
   metadata: vi.fn((): Promise<Record<string, unknown> | null> => Promise.resolve(null)),
+  resolve: vi.fn((imageName: string) => Promise.resolve({ hasWorkflow: imageName === 'made-by-workflow.png' })),
 }));
 vi.mock('@features/gallery', async (importOriginal) => {
   const original = await importOriginal<{ galleryImages: Record<string, unknown> }>();
 
-  return { ...original, galleryImages: { ...original.galleryImages, metadata: galleryMock.metadata } };
+  return {
+    ...original,
+    galleryImages: { ...original.galleryImages, metadata: galleryMock.metadata, resolve: galleryMock.resolve },
+  };
 });
 // The Upscale submenu asks for the model library on mount; tests seed the snapshot instead of fetching it.
 const ensureModelsLoaded = vi.hoisted(() => vi.fn(() => Promise.resolve()));
@@ -114,7 +118,6 @@ const createActions = (deleteItems: ImageActions['deleteItems']): ImageActions =
   downloadImage: vi.fn(() => Promise.resolve()),
   downloadImages: vi.fn(() => Promise.resolve()),
   generatePbrMaps: vi.fn(() => Promise.resolve()),
-  getImageRecallCapabilities: vi.fn(() => Promise.resolve(EMPTY_IMAGE_RECALL_CAPABILITIES)),
   loadImageWorkflow: vi.fn(() => Promise.resolve()),
   moveItemsToBoard: vi.fn(() => Promise.resolve()),
   moveImagesToBoard: vi.fn(() => Promise.resolve()),
@@ -339,9 +342,10 @@ describe('ImageContextMenu find in gallery', () => {
 describe('ImageContextMenu load workflow', () => {
   it('enables Load Workflow once the image is known to embed one and hands the image to the action', async () => {
     const actions = createActions(vi.fn());
-    actions.getImageRecallCapabilities = vi.fn(() =>
-      Promise.resolve({ ...EMPTY_IMAGE_RECALL_CAPABILITIES, workflow: true })
-    );
+    actions.deriveImageRecallCapabilities = vi.fn((recallImage: GalleryImage) => ({
+      ...EMPTY_IMAGE_RECALL_CAPABILITIES,
+      workflow: recallImage.hasWorkflow === true,
+    }));
     await renderMenu(actions, [image('made-by-workflow.png')]);
 
     await vi.waitFor(() => expect(getMenuItem(LOAD_WORKFLOW).getAttribute('aria-disabled')).not.toBe('true'));
@@ -356,7 +360,7 @@ describe('ImageContextMenu load workflow', () => {
     const actions = createActions(vi.fn());
     await renderMenu(actions, [image('plain.png')]);
 
-    await vi.waitFor(() => expect(actions.getImageRecallCapabilities).toHaveBeenCalled());
+    await vi.waitFor(() => expect(galleryMock.resolve).toHaveBeenCalledWith('plain.png', expect.any(AbortSignal)));
     expect(getMenuItem(LOAD_WORKFLOW).getAttribute('aria-disabled')).toBe('true');
     expect(actions.loadImageWorkflow).not.toHaveBeenCalled();
   });
@@ -536,9 +540,11 @@ describe('ImageContextMenu canvas destinations', () => {
 
   it('reuses the settings from a submenu, Remix first, each gated by what the image records', async () => {
     const actions = createActions(vi.fn());
-    actions.getImageRecallCapabilities = vi.fn(() =>
-      Promise.resolve({ ...EMPTY_IMAGE_RECALL_CAPABILITIES, remix: true, seed: true })
-    );
+    actions.deriveImageRecallCapabilities = vi.fn(() => ({
+      ...EMPTY_IMAGE_RECALL_CAPABILITIES,
+      remix: true,
+      seed: true,
+    }));
     await renderMenu(actions, [image('image-0.png')]);
     await hoverItem(getMenuItem('widgets.gallery.itemMenu.reuseFromImage'));
     await settleUntil(
@@ -954,14 +960,16 @@ describe('ImageContextMenu change-board destinations', () => {
 
     await interact(() => {
       root?.render(
-        <ChakraProvider value={system}>
-          <ImageContextMenu
-            actions={createActions(vi.fn())}
-            boards={boards}
-            target={{ images: [target], x: 20, y: 20 }}
-            onClose={vi.fn()}
-          />
-        </ChakraProvider>
+        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+          <ChakraProvider value={system}>
+            <ImageContextMenu
+              actions={createActions(vi.fn())}
+              boards={boards}
+              target={{ images: [target], x: 20, y: 20 }}
+              onClose={vi.fn()}
+            />
+          </ChakraProvider>
+        </QueryClientProvider>
       );
     });
     const trigger = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find((candidate) =>

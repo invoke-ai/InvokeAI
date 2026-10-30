@@ -133,7 +133,6 @@ export interface ImageActions extends GalleryItemActions {
   downloadImages: (imageNames: string[]) => Promise<void>;
   /** Queues normal, roughness and displacement maps of the image into the project's auto-add board. */
   generatePbrMaps: (image: GalleryImage) => Promise<void>;
-  getImageRecallCapabilities: (image: GalleryImage, signal?: AbortSignal) => Promise<ImageRecallCapabilities>;
   /** Opens the image's embedded workflow or generation graph in the workflow editor. */
   loadImageWorkflow: (image: GalleryImage) => Promise<void>;
   /** Recall availability for a gallery video, from its recorded core_metadata. */
@@ -923,7 +922,8 @@ export const useImageActions = ({
       metadata: GalleryImageMetadata | null
     ): ImageRecallCapabilities => {
       if (!currentGenerateValues) {
-        return EMPTY_IMAGE_RECALL_CAPABILITIES;
+        // Loading an embedded workflow does not go through the Generate panel.
+        return { ...EMPTY_IMAGE_RECALL_CAPABILITIES, workflow: image.hasWorkflow === true };
       }
 
       return getImageRecallCapabilities({
@@ -1085,44 +1085,6 @@ export const useImageActions = ({
           t('widgets.gallery.itemActions.pbrMaps.queued'),
           t('widgets.gallery.itemActions.pbrMaps.queuedMessage', { name: image.imageName })
         );
-      },
-      getImageRecallCapabilities: async (image, signal) => {
-        const owner = captureAccountScope();
-        const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
-        // Grid listings do not say whether an image embeds a workflow; images that
-        // came through the record endpoints already do.
-        const hasWorkflow =
-          image.hasWorkflow !== undefined
-            ? Promise.resolve(image.hasWorkflow)
-            : galleryImages
-                .resolve(image.imageName, requestSignal)
-                .then((record) => record.hasWorkflow === true)
-                .catch(() => false);
-
-        if (!currentGenerateValues) {
-          return { ...EMPTY_IMAGE_RECALL_CAPABILITIES, workflow: await hasWorkflow };
-        }
-
-        try {
-          const [metadata, workflow] = await Promise.all([
-            galleryImages.metadata(image.imageName, requestSignal),
-            hasWorkflow,
-          ]);
-
-          assertAccountScopeCurrent(owner);
-          return deriveImageRecallCapabilities({ ...image, hasWorkflow: workflow }, metadata);
-        } catch {
-          if (!isAccountScopeCurrent(owner)) {
-            return EMPTY_IMAGE_RECALL_CAPABILITIES;
-          }
-
-          return {
-            ...EMPTY_IMAGE_RECALL_CAPABILITIES,
-            dimensions:
-              Number.isFinite(image.width) && image.width >= 64 && Number.isFinite(image.height) && image.height >= 64,
-            workflow: await hasWorkflow,
-          };
-        }
       },
       loadImageWorkflow: (image) =>
         executeLoadMediaWorkflow({

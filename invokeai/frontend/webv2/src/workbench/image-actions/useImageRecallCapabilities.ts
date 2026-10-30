@@ -1,71 +1,94 @@
-import type { GalleryImage } from '@features/gallery';
-
-import { useEffect, useRef, useState } from 'react';
+import { galleryImages, type GalleryImage, type GalleryImageMetadata } from '@features/gallery';
+import { galleryKeys } from '@features/gallery/queries';
+import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
+import { useQuery } from '@tanstack/react-query';
 
 import type { ImageActions } from './useImageActions';
 
 import { EMPTY_IMAGE_RECALL_CAPABILITIES, type ImageRecallCapabilities } from './imageRecall';
 
-/** Identify a capability request by the image's stable primitives, so a refreshed listing object does not refetch. */
-export const getImageRecallCapabilitiesKey = (image: GalleryImage | null): string | null =>
-  image ? `${image.imageName}:${image.width}:${image.height}` : null;
+interface ImageRecallSources {
+  hasWorkflow: boolean;
+  /** Null when the image records none, or no longer exists: recall then offers what the image itself carries. */
+  metadata: GalleryImageMetadata | null;
+  /** A read failed for a reason other than a missing image; the answer is a stand-in, read again on next open. */
+  isProvisional: boolean;
+}
+
+interface ReadResult<T> {
+  isProvisional: boolean;
+  value: T;
+}
+
+/**
+ * Degrade a failed read to `fallback` so one failure does not hide what the other read answered. The backend answers
+ * 404 for an image it no longer has, a final answer; any other failure is provisional. An abort rethrows.
+ */
+const readOr = async <T>(read: Promise<T>, fallback: T, signal: AbortSignal): Promise<ReadResult<T>> => {
+  try {
+    return { isProvisional: false, value: await read };
+  } catch (error: unknown) {
+    signal.throwIfAborted();
+    return { isProvisional: !(error instanceof ApiError && error.status === 404), value: fallback };
+  }
+};
 
 /**
  * What an image's menus can recall and reuse from it, read when the menu mounts: hosts mount it on open, so a
- * selection change alone requests nothing. A null image (a bulk target) requests nothing. The answer also depends on
- * the Generate panel's current model, which `actions.getImageRecallCapabilities` closes over, so a new loader asks
- * again.
+ * selection change alone requests nothing. A null image (a bulk target) requests nothing. The query holds only the
+ * image's server facts, keyed by account and image name; capabilities derive from them on every render, so a Generate
+ * model change re-derives without another request.
  */
 export const useImageRecallCapabilities = (
-  actions: Pick<ImageActions, 'getImageRecallCapabilities'>,
+  actions: Pick<ImageActions, 'deriveImageRecallCapabilities'>,
   image: GalleryImage | null
 ): { capabilities: ImageRecallCapabilities; isLoading: boolean } => {
-  const [capabilities, setCapabilities] = useState<ImageRecallCapabilities>(EMPTY_IMAGE_RECALL_CAPABILITIES);
-  const [isLoading, setIsLoading] = useState(false);
-  const imageRef = useRef<GalleryImage | null>(null);
-  const requestKey = getImageRecallCapabilitiesKey(image);
-  const getImageRecallCapabilities = actions.getImageRecallCapabilities;
+  const owner = captureAccountScope();
+  const sourcesQuery = useQuery({
+    enabled: image !== null,
+    queryKey: galleryKeys.imageMenuRecallSources(owner, image?.imageName ?? null),
+    queryFn: async ({ signal }): Promise<ImageRecallSources> => {
+      if (!image) {
+        return { hasWorkflow: false, isProvisional: false, metadata: null };
+      }
 
-  // eslint-disable-next-line react/refs
-  imageRef.current = image;
+      const requestSignal = AbortSignal.any([signal, owner.signal]);
+      const [metadata, hasWorkflow] = await Promise.all([
+        readOr(galleryImages.metadata(image.imageName, requestSignal), null, requestSignal),
+        // Grid listings do not say whether an image embeds a workflow; images from the record endpoints already do.
+        // A failed record read offers no workflow, provisionally, the same way a failed metadata read offers none.
+        image.hasWorkflow === undefined
+          ? readOr(
+              galleryImages.resolve(image.imageName, requestSignal).then((record) => record.hasWorkflow === true),
+              false,
+              requestSignal
+            )
+          : { isProvisional: false, value: image.hasWorkflow },
+      ]);
 
-  // Moved unchanged from the context menu: the request is keyed by image primitives and the loader's identity, and a
-  // superseded answer is dropped. Not a `useQuery` yet: the loader's identity follows the Generate panel's model, so a
-  // query key would need that identity (or the model inputs it closes over) to avoid serving stale capabilities.
-  useEffect(() => {
-    if (!requestKey) {
-      return;
-    }
+      assertAccountScopeCurrent(owner);
+      return {
+        hasWorkflow: hasWorkflow.value,
+        isProvisional: metadata.isProvisional || hasWorkflow.isProvisional,
+        metadata: metadata.value,
+      };
+    },
+    // An image's metadata and embedded workflow never change, so a final answer is never read again; a provisional one
+    // is read again the next time a menu opens.
+    staleTime: (query) => (query.state.data?.isProvisional === false ? Infinity : 0),
+  });
 
-    let isCancelled = false;
-    const recallImage = imageRef.current;
+  if (!image) {
+    return { capabilities: EMPTY_IMAGE_RECALL_CAPABILITIES, isLoading: false };
+  }
 
-    if (!recallImage) {
-      return;
-    }
+  const sources = sourcesQuery.data;
 
-    setIsLoading((current) => (current ? current : true));
-    getImageRecallCapabilities(recallImage)
-      .then((next) => {
-        if (!isCancelled) {
-          setCapabilities(next);
-        }
-      })
-      .catch(() => {
-        if (!isCancelled) {
-          setCapabilities(EMPTY_IMAGE_RECALL_CAPABILITIES);
-        }
-      })
-      .finally(() => {
-        if (!isCancelled) {
-          setIsLoading(false);
-        }
-      });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [getImageRecallCapabilities, requestKey]);
-
-  return { capabilities, isLoading };
+  return {
+    capabilities: sources
+      ? actions.deriveImageRecallCapabilities({ ...image, hasWorkflow: sources.hasWorkflow }, sources.metadata)
+      : EMPTY_IMAGE_RECALL_CAPABILITIES,
+    isLoading: sourcesQuery.isPending,
+  };
 };

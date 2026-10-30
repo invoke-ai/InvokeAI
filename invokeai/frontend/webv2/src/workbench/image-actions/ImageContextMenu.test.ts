@@ -3,7 +3,6 @@ import type { GalleryImage } from '@features/gallery';
 import { describe, expect, it } from 'vitest';
 
 import { getImageContextMenuImages } from './ImageContextMenu';
-import { getImageRecallCapabilitiesKey } from './useImageRecallCapabilities';
 
 const image: GalleryImage = {
   boardId: 'none',
@@ -29,17 +28,5 @@ describe('getImageContextMenuImages', () => {
   it('tolerates stale or malformed targets', () => {
     expect(getImageContextMenuImages(null)).toEqual([]);
     expect(getImageContextMenuImages({ images: undefined as unknown as GalleryImage[], x: 0, y: 0 })).toEqual([]);
-  });
-});
-
-describe('getImageRecallCapabilitiesKey', () => {
-  it('uses stable image primitives instead of object identity', () => {
-    const refreshedImage = { ...image };
-
-    expect(getImageRecallCapabilitiesKey(image)).toBe(getImageRecallCapabilitiesKey(refreshedImage));
-  });
-
-  it('requests nothing without an image', () => {
-    expect(getImageRecallCapabilitiesKey(null)).toBeNull();
   });
 });
