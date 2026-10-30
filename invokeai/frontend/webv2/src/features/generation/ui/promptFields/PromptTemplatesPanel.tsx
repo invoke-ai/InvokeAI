@@ -403,8 +403,8 @@ const TemplateRow = ({
       >
         <button type="button" onClick={handleApply}>
           <TemplateThumbnail template={template} />
-          <Stack align="start" flex="1" gap="0" minW="0">
-            <Text as="span" fontSize="md" fontWeight={isActive ? '600' : '400'}>
+          <Stack flex="1" gap="0" minW="0" textAlign="start">
+            <Text as="span" fontSize="md" fontWeight={isActive ? '600' : '400'} truncate>
               {template.name}
             </Text>
             <Text as="span" color="fg.muted" fontFamily="mono" fontSize="xs" truncate>

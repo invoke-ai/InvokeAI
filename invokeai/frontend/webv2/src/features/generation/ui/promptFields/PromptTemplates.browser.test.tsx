@@ -310,6 +310,39 @@ describe('the prompt templates panel', () => {
     expect(row.contains(remove)).toBe(false);
   });
 
+  it('ends long template names and prompts inside the row, before its actions', async () => {
+    const longTemplate: PromptTemplateRecord = {
+      ...userTemplate,
+      name: 'A very long template name that keeps going well past the width of the popover',
+      positivePrompt: `{prompt}, ${'cinematic still, 35mm film, shallow depth of field, '.repeat(6)}`,
+    };
+
+    await render(
+      <PromptTemplatesPanel
+        activeTemplate={null}
+        catalog={createCatalog({ personalTemplates: [longTemplate], templates: [longTemplate] })}
+        isActiveTemplateMissing={false}
+        onApply={vi.fn()}
+        onCreate={vi.fn()}
+        onDetach={vi.fn()}
+        onEdit={vi.fn()}
+      />
+    );
+
+    const row = buttonWithText(longTemplate.name);
+    const edit = host!.querySelector<HTMLButtonElement>(`button[aria-label="Edit: ${longTemplate.name}"]`)!;
+    const [title, summary] = [...row.querySelectorAll('span')].filter(
+      (span) => span.textContent === longTemplate.name || span.textContent === longTemplate.positivePrompt
+    );
+    const rowBounds = row.getBoundingClientRect();
+
+    for (const span of [title!, summary!]) {
+      expect(span.scrollWidth).toBeGreaterThan(span.clientWidth);
+      expect(span.getBoundingClientRect().right).toBeLessThanOrEqual(rowBounds.right);
+    }
+    expect(edit.getBoundingClientRect().left).toBeGreaterThanOrEqual(summary!.getBoundingClientRect().right);
+  });
+
   it('detaches rather than clears when the applied template is deleted', async () => {
     const onApply = vi.fn();
     const onDetach = vi.fn();
