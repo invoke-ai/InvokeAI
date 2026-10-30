@@ -76,8 +76,9 @@ const NO_RESOLVED_MEDIA: ResolvedVideoRecallMedia = { images: new Map(), videos:
 
 /**
  * Read every named medium once: the images in one bulk read, the videos a few at a time. A 404 means the medium was
- * deleted and the recall goes on without it; any other failure rejects, so the recall reports it rather than
- * applying with media silently missing.
+ * deleted and a 403 that it sits on a board the caller can no longer read: either way it is gone for this caller, and
+ * the recall goes on without it, as the bulk image read drops images it cannot return. Any other failure rejects, so
+ * the recall reports it rather than applying with media silently missing.
  */
 const resolveVideoRecallMedia = async (
   names: VideoRecallMediaNames,
@@ -111,7 +112,7 @@ const resolveVideoRecallMedia = async (
 
           return item.kind === 'video' ? [name, item] : null;
         } catch (error) {
-          if (error instanceof ApiError && error.status === 404) {
+          if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
             return null;
           }
           throw error;

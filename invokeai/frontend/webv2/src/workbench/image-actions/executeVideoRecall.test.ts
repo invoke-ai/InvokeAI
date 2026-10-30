@@ -617,6 +617,21 @@ describe('reading the media a recall names', () => {
     );
   });
 
+  it('drops a video on a board the caller can no longer read and applies the rest', async () => {
+    galleryApi.galleryItems.resolve.mockImplementation(({ name }: { name: string }) =>
+      name === 'unreadable.mp4' ? Promise.reject(new ApiError('Forbidden', 403)) : Promise.resolve(galleryVideo(name))
+    );
+
+    const { commands, recall, written } = recallH3({
+      minimax_h3_references: [videoReference('unreadable.mp4'), videoReference('kept.mp4')],
+    });
+
+    await expect(recall).resolves.toBe(true);
+    expect(written()).toMatchObject({ references: [{ clip: { video_name: 'kept.mp4' } }] });
+    expect(written()?.references).toHaveLength(1);
+    expect(commands.notifications.reportError).not.toHaveBeenCalled();
+  });
+
   it('applies on top of an edit made while the media loaded', async () => {
     let finishRead: (() => void) | undefined;
     let panel = { ...createDefaultVideoWidgetValues([h3Model]), seedMode: 'random' } as Record<string, unknown>;
