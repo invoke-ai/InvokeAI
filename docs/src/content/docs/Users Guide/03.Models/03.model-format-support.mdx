@@ -62,7 +62,7 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
 | T5-XXL | FLUX.1, SD 3 | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ (and bitsandbytes int8) |
 | CLIP-L / CLIP-G | SD, SDXL, FLUX.1, SD 3 | ✓ | ✓ | R | R | – | ✗ | CLIP-L inside a FLUX.1 SDNQ pipeline |
 | Qwen3 0.6B / 4B / 8B | Z-Image (4B), FLUX.2 Klein (4B, 8B), Anima (0.6B) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Qwen3-VL 4B / 8B | Krea-2, Ideogram 4, Qwen-Image-2.1 (8B) | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ |
+| Qwen3-VL 4B / 8B | Krea-2, Ideogram 4, Qwen-Image-2.1 (8B) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
 | Qwen3-VL 32B (truncated) | MiniMax H3 | in the Diffusers folder | ✓ | L | ✓ | L | ✗ | ✗ |
 | Qwen3.5 4B | Anima 3.8B | ✗ | ✓ | L | L | L | ✗ | ✗ |
 | Qwen3.5 9B | MOSS-Image | in the Diffusers folder | ✓ | L | L | L | ✗ | ✗ |
@@ -79,7 +79,11 @@ CLIP encoders from the main model only, so a separate CLIP file does not change 
 FLUX.1 takes CLIP-L only.
 
 The Qwen3-VL GGUF encoder is the language model only; a separate `mmproj` vision file is refused, and split
-multi-part GGUFs have to be joined before installing. The Gemma-4 encoder installs as a folder (its `config.json`
+multi-part GGUFs have to be joined before installing. Qwen3-VL nvfp4 single files keep their layers packed: ComfyUI's
+`qwen3vl_8b_nvfp4`, and repacks that name their nvfp4 layers the same way, in `.comfy_quant` markers or the
+`_quantization_metadata` header. A single file with nvfp4 layers named neither way, with AWQ layers, or with packed
+weights missing nvfp4's per-tensor `weight_scale_2` fails to install with a message; quantized encoder folders (AWQ,
+ModelOpt, llm-compressor) are not covered by this. The Gemma-4 encoder installs as a folder (its `config.json`
 and tokenizer files next to exactly one weight file, bf16 or int8) or as a GGUF conversion of the LTX-2.5 encoder
 that packs its tokenizer and config in, such as elix3r's or Rootport's. Google's stock Gemma-4-12B GGUF fails to
 install with a message, since LTX-2 needs the Lightricks-tuned weights; its `mmproj` file is not recognized. A

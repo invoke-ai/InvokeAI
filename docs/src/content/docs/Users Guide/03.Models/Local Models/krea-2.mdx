@@ -77,7 +77,8 @@ the bundled components.
 :::note[Qwen3-VL encoder]
 Single-file Qwen3-VL encoders bundle only the weights. Their tokenizer and architecture config ship
 with InvokeAI, so these encoders load without network access. A single-file fp8 encoder is kept
-resident in fp8 (roughly half the VRAM of the bf16 encoder).
+resident in fp8 (roughly half the VRAM of the bf16 encoder), and an nvfp4 encoder keeps its layers packed
+at 4 bits.
 :::
 
 ### Qwen3-VL GGUF encoders

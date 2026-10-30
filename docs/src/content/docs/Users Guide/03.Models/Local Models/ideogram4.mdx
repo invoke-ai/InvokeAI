@@ -1,7 +1,7 @@
 ---
 title: Ideogram 4
 description: Generate images with the Ideogram 4 text-to-image models.
-lastUpdated: 2026-10-08
+lastUpdated: 2026-10-11
 sidebar:
   order: 6
 ---
@@ -33,7 +33,7 @@ Comfy-Org's [`Comfy-Org/Ideogram-4`](https://huggingface.co/Comfy-Org/Ideogram-4
 - `text_encoders/qwen3vl_8b_fp8_scaled.safetensors` — the Qwen3-VL **8B** encoder (not the 4B one Krea-2 uses). A llama.cpp GGUF of the 8B encoder works as well; see [Qwen3-VL GGUF encoders](/users-guide/models/local-models/krea-2/#qwen3-vl-gguf-encoders).
 - `vae/flux2-vae.safetensors` — the 32-channel VAE, shared with FLUX.2, which is why it installs under the FLUX.2 base
 
-Pick the unconditional branch, the encoder and the VAE in the **Components** section next to the model — and pick the unconditional branch of the *same* build as the model. The `nvfp4` repackage in that repo is **not** supported yet and is refused at install.
+Pick the unconditional branch, the encoder and the VAE in the **Components** section next to the model — and pick the unconditional branch of the *same* build as the model. The `nvfp4` transformers in that repo are **not** supported yet and are refused at install; its nvfp4 encoder, `text_encoders/qwen3vl_8b_nvfp4.safetensors`, loads and keeps its layers packed.
 
 Which branch a file holds is read from the file itself, and from the filename for a build that does not record it, so keep these names as published.
 
