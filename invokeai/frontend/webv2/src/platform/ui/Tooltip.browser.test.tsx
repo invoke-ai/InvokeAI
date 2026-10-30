@@ -1,11 +1,12 @@
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { CameraIcon } from 'lucide-react';
-import { act, useCallback, useState } from 'react';
+import { act, useCallback, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it } from 'vitest';
 
 import { Toolbar, ToolbarButton } from './Toolbar';
+import { ClippedTooltip } from './Tooltip';
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -80,4 +81,56 @@ it('keeps a tooltip that closes before it was placed out of sight while it fades
   // Still mounted for its exit animation; it must not fade out at the page's top-left corner.
   expect(exportTooltip()?.dataset.state).toBe('closed');
   expect(exportTooltip()!.getBoundingClientRect().bottom).toBeLessThanOrEqual(0);
+});
+
+/** A name in a button of the given width that truncates whatever does not fit. */
+const NameButton = ({ name, width }: { name: string; width: string }) => {
+  const ref = useRef<HTMLButtonElement>(null);
+  const isClipped = useCallback(() => !!ref.current && ref.current.scrollWidth > ref.current.clientWidth, []);
+  return (
+    <ClippedTooltip content={name} isClipped={isClipped}>
+      <button
+        ref={ref}
+        style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width }}
+        type="button"
+      >
+        {name}
+      </button>
+    </ClippedTooltip>
+  );
+};
+
+const focusWithKeyboard = (button: HTMLButtonElement) =>
+  act(() => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Tab' }));
+    button.focus();
+    return Promise.resolve();
+  });
+
+const openTooltipText = () => document.querySelector('[role="tooltip"][data-state="open"]')?.textContent;
+
+it('shows a clipped name on keyboard focus and nothing for a name that fits', async () => {
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  await act(() =>
+    root?.render(
+      <ChakraProvider value={system}>
+        <NameButton name="A name much too long for its button" width="60px" />
+        <NameButton name="Fits" width="200px" />
+      </ChakraProvider>
+    )
+  );
+  const [clipped, fitting] = host.querySelectorAll('button');
+
+  await focusWithKeyboard(clipped!);
+  expect(openTooltipText()).toBe('A name much too long for its button');
+
+  await focusWithKeyboard(fitting!);
+  await act(async () => {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
+  });
+  expect(openTooltipText()).toBeUndefined();
 });

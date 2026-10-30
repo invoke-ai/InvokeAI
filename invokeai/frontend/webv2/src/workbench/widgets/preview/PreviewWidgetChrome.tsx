@@ -10,12 +10,12 @@ import {
 } from '@features/gallery/picker';
 import { Button, IconButton } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
-import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
+import { ClippedTooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { isWidgetRegion } from '@workbench/layoutContracts';
 import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { ChevronDownIcon, XIcon } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { usePreviewHeaderContext } from './previewHeaderStore';
@@ -99,7 +99,6 @@ const PreviewItemPicker = ({
   const { gallery } = useWorkbenchCommands();
   const triggerIds = useTooltipTriggerIds();
   const rowRef = useRef<HTMLDivElement>(null);
-  const [isTooltipOpen, setIsTooltipOpen] = useState(false);
   const selectItem = useCallback((picked: GalleryItem) => gallery.selectItemInItsBoard(picked), [gallery]);
   // Open on the item's board and the view that lists it. No view lists a Canvas-owned item, so the picker keeps the
   // Gallery's view for it.
@@ -108,12 +107,8 @@ const PreviewItemPicker = ({
     () => (itemView ? { boardId: item.boardId, galleryView: itemView } : { boardId: item.boardId }),
     [item.boardId, itemView]
   );
-  // The tooltip names the item only while the row hides some of it; checked when it asks to open, so a resize costs
-  // no render.
-  const handleTooltipOpenChange = useCallback(
-    ({ open }: { open: boolean }) => setIsTooltipOpen(open && !!rowRef.current && isRowClipped(rowRef.current)),
-    []
-  );
+  // The tooltip names the item only while the row hides some of it.
+  const isLabelClipped = useCallback(() => !!rowRef.current && isRowClipped(rowRef.current), []);
   const label = t('widgets.preview.boardAndItem', { board: boardName, name: itemName });
 
   return (
@@ -124,7 +119,7 @@ const PreviewItemPicker = ({
       openingScope={openingScope}
       onPick={selectItem}
     >
-      <Tooltip content={label} ids={triggerIds} open={isTooltipOpen} onOpenChange={handleTooltipOpenChange}>
+      <ClippedTooltip content={label} ids={triggerIds} isClipped={isLabelClipped}>
         <Button
           aria-label={t('widgets.preview.chooseAnotherItem', { label })}
           // The button recipe refuses to shrink; the label gives way instead of pushing over the clear button.
@@ -156,7 +151,7 @@ const PreviewItemPicker = ({
           </Box>
           <ChevronDownIcon aria-hidden size={12} style={CHEVRON_STYLE} />
         </Button>
-      </Tooltip>
+      </ClippedTooltip>
     </GalleryPickerPopover>
   );
 };

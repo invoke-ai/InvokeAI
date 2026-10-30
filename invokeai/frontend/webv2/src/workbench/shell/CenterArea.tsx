@@ -8,7 +8,7 @@ import type {
 import { Box, Flex, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { Button, IconButton, MenuContent } from '@platform/ui';
-import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
+import { ClippedTooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { useFocusRegionProps, useWorkbenchFocus } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
 import {
@@ -31,7 +31,7 @@ import {
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
-import { Activity, Suspense, use, useCallback, useMemo, useRef, useState } from 'react';
+import { Activity, Suspense, use, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ChromeIsland, getChromeIslandMinWidth } from './ChromeIsland';
@@ -298,13 +298,8 @@ const CenterViewMenu = ({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const labelRef = useRef<HTMLParagraphElement>(null);
   const triggerIds = useTooltipTriggerIds();
-  const [isTooltipOpen, setIsTooltipOpen] = useState(false);
-  // The tooltip names the view only while the container query hides its name; checked when it asks to open, so a
-  // resize costs no render.
-  const handleTooltipOpenChange = useCallback(
-    ({ open }: { open: boolean }) => setIsTooltipOpen(open && labelRef.current?.getClientRects().length === 0),
-    []
-  );
+  // The tooltip names the view only while the container query hides its name.
+  const isLabelHidden = useCallback(() => labelRef.current?.getClientRects().length === 0, []);
   const selectAndRestoreFocus = useCallback(
     (instanceId: string) => {
       onSelect(instanceId);
@@ -317,7 +312,7 @@ const CenterViewMenu = ({
 
   return (
     <Menu.Root ids={triggerIds} positioning={CENTER_MENU_POSITIONING}>
-      <Tooltip content={triggerLabel} ids={triggerIds} open={isTooltipOpen} onOpenChange={handleTooltipOpenChange}>
+      <ClippedTooltip content={triggerLabel} ids={triggerIds} isClipped={isLabelHidden}>
         <Menu.Trigger asChild>
           <IconButton
             ref={triggerRef}
@@ -342,7 +337,7 @@ const CenterViewMenu = ({
             </HStack>
           </IconButton>
         </Menu.Trigger>
-      </Tooltip>
+      </ClippedTooltip>
       <Portal>
         <Menu.Positioner>
           <MenuContent minW="14rem">

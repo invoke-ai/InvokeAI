@@ -157,6 +157,11 @@ const getTrigger = (name = TRIGGER_NAME) => {
   return trigger;
 };
 
+const NAME_TIP = 'Fixture Board 02 / image.png';
+
+const getOpenTooltip = (text: string) =>
+  [...document.querySelectorAll('[role="tooltip"][data-state="open"]')].find((tooltip) => tooltip.textContent === text);
+
 const getOpenDialog = () => document.querySelector<HTMLElement>('[role="dialog"][data-state="open"]');
 
 beforeEach(() => {
@@ -308,6 +313,49 @@ describe('PreviewWidgetLabel', () => {
     await render('center', 140);
     await userEvent.hover(getTrigger());
     await vi.waitFor(() => expect(getTooltip()?.textContent).toBe('Fixture Board 02 / image.png'));
+  });
+
+  describe('when another tooltip is showing', () => {
+    const hoverClearSelectionUntilItsTipShows = async () => {
+      await userEvent.hover(getTrigger('Clear selection'));
+      await vi.waitFor(() => expect(getOpenTooltip('Clear selection')).toBeDefined());
+    };
+
+    it('shows no name tooltip while the label shows the whole name', async () => {
+      await render('center', 480);
+      await hoverClearSelectionUntilItsTipShows();
+
+      await userEvent.hover(getTrigger());
+      await new Promise((resolve) => {
+        setTimeout(resolve, 800);
+      });
+      expect(getOpenTooltip(NAME_TIP)).toBeUndefined();
+    });
+
+    it('hands over to the name tooltip of a clipped label, which closes when the pointer leaves', async () => {
+      await render('center', 140);
+      await hoverClearSelectionUntilItsTipShows();
+
+      await userEvent.hover(getTrigger());
+      await vi.waitFor(() => expect(getOpenTooltip(NAME_TIP)).toBeDefined());
+      await userEvent.unhover(getTrigger());
+      await vi.waitFor(() => expect(getOpenTooltip(NAME_TIP)).toBeUndefined());
+    });
+  });
+
+  it('closes the name tooltip when the pointer leaves, and measures the label again on the next hover', async () => {
+    await render('center', 140);
+    await userEvent.hover(getTrigger());
+    await vi.waitFor(() => expect(getOpenTooltip(NAME_TIP)).toBeDefined());
+    await userEvent.unhover(getTrigger());
+    await vi.waitFor(() => expect(getOpenTooltip(NAME_TIP)).toBeUndefined());
+
+    await render('center', 480);
+    await userEvent.hover(getTrigger());
+    await new Promise((resolve) => {
+      setTimeout(resolve, 800);
+    });
+    expect(getOpenTooltip(NAME_TIP)).toBeUndefined();
   });
 
   it('renders no trigger without a selection', async () => {
