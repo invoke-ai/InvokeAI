@@ -46,7 +46,8 @@ export const useImageRecallCapabilities = (
       return hasWorkflow;
     },
     queryKey: galleryKeys.imageHasWorkflow(owner, imageName),
-    // Whether an image embeds a workflow never changes.
+    // One policy whoever starts the read, as for metadata; whether an image embeds a workflow never changes.
+    retry: false,
     staleTime: Infinity,
   });
 

@@ -1,11 +1,13 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-array-as-prop */
-import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKey } from '@features/gallery';
+import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKey, GalleryVideoItem } from '@features/gallery';
 import type { GalleryItemContextMenuTarget } from '@features/gallery/react';
 import type { ModelsSnapshot } from '@features/models/data/modelsStore';
 
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import { ChakraProvider } from '@chakra-ui/react';
+import { galleryKeys } from '@features/gallery/queries';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { getContrastRatio } from '@platform/ui/theme/contrastRatio.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { applyThemeToRoot } from '@theme/applyTheme';
@@ -41,12 +43,20 @@ const commandsMock = vi.hoisted(() => ({
 const galleryMock = vi.hoisted(() => ({
   metadata: vi.fn((): Promise<Record<string, unknown> | null> => Promise.resolve(null)),
   resolve: vi.fn((imageName: string) => Promise.resolve({ hasWorkflow: imageName === 'made-by-workflow.png' })),
+  resolveItem: vi.fn((ref: { kind: string; name: string }, _signal?: AbortSignal) =>
+    Promise.resolve({ hasWorkflow: ref.name === 'made-by-workflow.mp4', kind: ref.kind })
+  ),
+  videoMetadata: vi.fn((_videoName: string, _signal?: AbortSignal): Promise<Record<string, unknown> | null> =>
+    Promise.resolve(null)
+  ),
 }));
-// The transport, under both the gallery's shared metadata query and its public image port.
+// The transport, under both the gallery's shared metadata queries and its public media ports.
 vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getGalleryImageByName: galleryMock.resolve,
   getGalleryImageMetadata: galleryMock.metadata,
+  getGalleryItemByRef: galleryMock.resolveItem,
+  getGalleryVideoMetadata: galleryMock.videoMetadata,
 }));
 // The Upscale submenu asks for the model library on mount; tests seed the snapshot instead of fetching it.
 const ensureModelsLoaded = vi.hoisted(() => vi.fn(() => Promise.resolve()));
@@ -123,8 +133,6 @@ const createActions = (deleteItems: ImageActions['deleteItems']): ImageActions =
   openItemInPreview: vi.fn(),
   openImageInPreview: vi.fn(),
   recallImageData: vi.fn(() => Promise.resolve()),
-  getVideoRecallCapabilities: vi.fn(() => Promise.resolve({ all: false, prompts: false, remix: false, seed: false })),
-  hasVideoWorkflow: vi.fn(() => Promise.resolve(false)),
   loadVideoWorkflow: vi.fn(() => Promise.resolve()),
   recallVideoData: vi.fn(() => Promise.resolve()),
   selectForCompare: vi.fn(),
@@ -269,7 +277,8 @@ const renderItemMenu = async (
     itemKey: GalleryItemKey;
     onCopyCurrentFrame: () => void;
     onOpenDetails: () => void;
-  }
+  },
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 ) => {
   host = document.createElement('div');
   document.body.append(host);
@@ -277,7 +286,7 @@ const renderItemMenu = async (
 
   await interact(() => {
     root?.render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <QueryClientProvider client={queryClient}>
         <ChakraProvider value={system}>
           <ImageContextMenu
             actions={actions}
@@ -687,10 +696,9 @@ describe('ImageContextMenu video placement', () => {
     expect(getMenuItem('widgets.gallery.itemMenu.extendInVideo').getAttribute('aria-disabled')).not.toBe('true');
   });
 
-  it('enables Load Workflow once the video is known to embed one and hands the video to the action', async () => {
+  it('enables Load Workflow once the video record says it embeds one and hands the video to the action', async () => {
     const video = item('video', 'made-by-workflow.mp4');
     const actions = createActions(vi.fn());
-    actions.hasVideoWorkflow = vi.fn(() => Promise.resolve(true));
     await renderVideoMenu(actions, video);
 
     await vi.waitFor(() => expect(getMenuItem(LOAD_WORKFLOW).getAttribute('aria-disabled')).not.toBe('true'));
@@ -699,20 +707,16 @@ describe('ImageContextMenu video placement', () => {
     expect(actions.loadVideoWorkflow).toHaveBeenCalledExactlyOnceWith(video);
   });
 
-  it('aborts the video capability reads when the menu closes before they answer', async () => {
-    const actions = createActions(vi.fn());
+  it('aborts the video reads when the menu closes before they answer', async () => {
     const pending = () => new Promise<never>(() => {});
-    actions.getVideoRecallCapabilities = vi.fn(pending);
-    actions.hasVideoWorkflow = vi.fn(pending);
-    await renderVideoMenu(actions, item('video', 'slow.mp4'));
-    await vi.waitFor(() => expect(actions.hasVideoWorkflow).toHaveBeenCalled());
+    galleryMock.videoMetadata.mockImplementationOnce(pending);
+    galleryMock.resolveItem.mockImplementationOnce(pending);
+    await renderVideoMenu(createActions(vi.fn()), item('video', 'slow.mp4'));
+    await vi.waitFor(() => expect(galleryMock.resolveItem).toHaveBeenCalled());
 
     await interact(() => root?.unmount());
 
-    const signals = [
-      vi.mocked(actions.getVideoRecallCapabilities).mock.calls[0]?.[1],
-      vi.mocked(actions.hasVideoWorkflow).mock.calls[0]?.[1],
-    ];
+    const signals = [galleryMock.videoMetadata.mock.lastCall?.[1], galleryMock.resolveItem.mock.lastCall?.[1]];
     expect(signals.map((signal) => signal?.aborted)).toEqual([true, true]);
   });
 
@@ -720,9 +724,100 @@ describe('ImageContextMenu video placement', () => {
     const actions = createActions(vi.fn());
     await renderVideoMenu(actions, item('video', 'plain.mp4'));
 
-    await vi.waitFor(() => expect(actions.hasVideoWorkflow).toHaveBeenCalled());
+    await vi.waitFor(() =>
+      expect(galleryMock.resolveItem).toHaveBeenCalledWith(
+        { kind: 'video', name: 'plain.mp4' },
+        expect.any(AbortSignal)
+      )
+    );
     expect(getMenuItem(LOAD_WORKFLOW).getAttribute('aria-disabled')).toBe('true');
     expect(actions.loadVideoWorkflow).not.toHaveBeenCalled();
+  });
+
+  const openReuseSubmenu = async (): Promise<void> => {
+    await hoverItem(getMenuItem('widgets.gallery.itemMenu.reuseFromVideo'));
+    await settleUntil(
+      () =>
+        Array.from(document.querySelectorAll('[role="menuitem"]')).some(
+          (candidate) => candidate.textContent?.trim() === 'widgets.gallery.itemMenu.allSettings'
+        ),
+      'the reuse submenu to open',
+      5000
+    );
+  };
+
+  const isDisabled = (label: string) => getMenuItem(label).getAttribute('aria-disabled') === 'true';
+
+  it('gates the recall verbs on the metadata read alone, not on the workflow answer', async () => {
+    let answerMetadata: ((metadata: Record<string, unknown>) => void) | undefined;
+    galleryMock.videoMetadata.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          answerMetadata = resolve;
+        })
+    );
+    // The listing already says the video embeds a workflow, so Load Workflow waits on nothing.
+    await renderVideoMenu(createActions(vi.fn()), {
+      ...(item('video', 'listed.mp4') as GalleryVideoItem),
+      hasWorkflow: true,
+    });
+    await openReuseSubmenu();
+
+    expect(isDisabled(LOAD_WORKFLOW)).toBe(false);
+    expect(isDisabled('widgets.gallery.itemActions.recall.verbs.prompts')).toBe(true);
+    expect(galleryMock.resolveItem).not.toHaveBeenCalled();
+
+    await interact(() => answerMetadata?.({ generation_mode: 'wan_t2v', positive_prompt: 'a fox', seed: 7 }));
+
+    await vi.waitFor(() => expect(isDisabled('widgets.gallery.itemActions.recall.verbs.prompts')).toBe(false));
+    expect(isDisabled('widgets.gallery.itemActions.recall.verbs.seed')).toBe(false);
+  });
+
+  it("reads a video's metadata once across opens, and reads a failed one again on the next open", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const open = (video: GalleryItem) =>
+      renderItemMenu(
+        createActions(vi.fn()),
+        { itemRefs: [{ kind: 'video', name: video.name }], items: [video], x: 20, y: 20 },
+        undefined,
+        queryClient
+      );
+    const close = async () => {
+      await interact(() => root?.unmount());
+      host?.remove();
+    };
+    const recorded = { generation_mode: 'wan_t2v', positive_prompt: 'a fox', seed: 7 };
+
+    galleryMock.videoMetadata.mockClear();
+    galleryMock.videoMetadata.mockResolvedValueOnce(recorded);
+    await open(item('video', 'twice.mp4'));
+    await openReuseSubmenu();
+    await vi.waitFor(() => expect(isDisabled('widgets.gallery.itemActions.recall.verbs.prompts')).toBe(false));
+    await close();
+    await open(item('video', 'twice.mp4'));
+    await openReuseSubmenu();
+
+    expect(isDisabled('widgets.gallery.itemActions.recall.verbs.prompts')).toBe(false);
+    expect(galleryMock.videoMetadata).toHaveBeenCalledOnce();
+    await close();
+
+    galleryMock.videoMetadata.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(recorded);
+    await open(item('video', 'flaky.mp4'));
+    await openReuseSubmenu();
+    await vi.waitFor(() => expect(galleryMock.videoMetadata).toHaveBeenCalledTimes(2));
+    // A failed read offers no recall rather than an answer of "nothing recorded" that would stick.
+    await vi.waitFor(() =>
+      expect(queryClient.getQueryState(galleryKeys.videoMetadata(captureAccountScope(), 'flaky.mp4'))?.status).toBe(
+        'error'
+      )
+    );
+    expect(isDisabled('widgets.gallery.itemActions.recall.verbs.prompts')).toBe(true);
+    await close();
+    await open(item('video', 'flaky.mp4'));
+    await openReuseSubmenu();
+
+    await vi.waitFor(() => expect(isDisabled('widgets.gallery.itemActions.recall.verbs.prompts')).toBe(false));
+    expect(galleryMock.videoMetadata).toHaveBeenCalledTimes(3);
   });
 
   const openConditioningSubmenu = async (): Promise<void> => {

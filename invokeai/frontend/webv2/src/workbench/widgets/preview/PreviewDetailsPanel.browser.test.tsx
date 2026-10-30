@@ -39,15 +39,16 @@ vi.mock('@features/gallery', async (importOriginal) => {
       workflow: () => Promise.resolve({ graph: null, workflow: '{"name":"image workflow"}' }),
     },
     galleryVideos: {
-      metadata: () => Promise.resolve(TALL_RECORD),
+      ...actual.galleryVideos,
       workflow: () => Promise.resolve({ graph: null, workflow: null }),
     },
   };
 });
-// The transport under the gallery's shared image metadata query.
+// The transport under the gallery's shared metadata queries.
 vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
   ...(await importOriginal<typeof GalleryBackendModule>()),
   getGalleryImageMetadata: () => Promise.resolve({ ...TALL_RECORD, positive_prompt: 'a tall prompt', seed: 7 }),
+  getGalleryVideoMetadata: () => Promise.resolve(TALL_RECORD),
 }));
 const mocks = vi.hoisted(() => ({
   extensions: null as unknown as ExtensionRegistry,

@@ -1,5 +1,6 @@
 import type { GalleryVideoItem, GeneratedImageContract } from '@features/gallery';
 import type * as GalleryModule from '@features/gallery';
+import type * as GalleryBackendModule from '@features/gallery/data/backend';
 import type * as GalleryQueriesModule from '@features/gallery/queries';
 import type { ImageActions } from '@workbench/image-actions';
 import type { WidgetRuntimeApi } from '@workbench/widgetContracts';
@@ -22,9 +23,13 @@ import { usePreviewStageContext } from './previewHeaderStore';
 vi.mock('@features/gallery', async (importOriginal) => ({
   ...(await importOriginal<typeof GalleryModule>()),
   galleryVideos: {
-    metadata: () => Promise.resolve({ seed: 7 }),
     workflow: () => Promise.resolve({ graph: null, workflow: null }),
   },
+}));
+// The transport under the gallery's shared video metadata query.
+vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
+  ...(await importOriginal<typeof GalleryBackendModule>()),
+  getGalleryVideoMetadata: () => Promise.resolve({ seed: 7 }),
 }));
 vi.mock('@features/gallery/queries', async (importOriginal) => ({
   ...(await importOriginal<typeof GalleryQueriesModule>()),

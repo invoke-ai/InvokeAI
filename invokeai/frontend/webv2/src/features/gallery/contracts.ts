@@ -8,6 +8,7 @@ export type {
   GalleryImage,
   GalleryImageMetadata,
   GalleryImagesPage,
+  GalleryMediaMetadata,
   GalleryOrderDir,
   GalleryView,
   GeneratedImageContract,

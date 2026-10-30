@@ -59,7 +59,6 @@ const mocks = vi.hoisted(() => ({
   ),
   requestWorkflowDocumentLoad: vi.fn(),
   submitUtilityGraph: vi.fn((..._args: unknown[]): Promise<unknown> => Promise.reject(new Error('not submitted'))),
-  videoMetadata: vi.fn((..._args: unknown[]) => Promise.resolve(null)),
   videoWorkflow: vi.fn((..._args: unknown[]): Promise<{ graph: string | null; workflow: string | null }> =>
     Promise.resolve({ graph: null, workflow: null })
   ),
@@ -108,7 +107,6 @@ vi.mock('@features/gallery', () => ({
   },
   galleryTransfers: { downloadArchive: (...args: unknown[]) => mocks.downloadArchive(...args) },
   galleryVideos: {
-    metadata: (...args: unknown[]) => mocks.videoMetadata(...args),
     workflow: (...args: unknown[]) => mocks.videoWorkflow(...args),
   },
   legacyGeneratedImageToGalleryItem: (image: { boardId?: string; imageName: string; starred?: boolean }) => ({
@@ -144,6 +142,7 @@ vi.mock('@features/gallery/queries', () => ({
   canAddToCachedGalleryBoard: (...args: unknown[]) => mocks.canAddToCachedGalleryBoard(...args),
   ensureGalleryBoardDestinations: () => mocks.ensureGalleryBoardDestinations(),
   fetchGalleryImageMetadata: (_client: unknown, _owner: unknown, imageName: string) => mocks.imageMetadata(imageName),
+  fetchGalleryVideoMetadata: () => Promise.resolve(null),
   getGalleryItemBoardIdsFromCaches: (...args: unknown[]) => mocks.getItemBoardIds(...args),
   getGalleryItemStarredFromCaches: (...args: unknown[]) => mocks.getItemStarred(...args),
   invalidateGallery: (...args: unknown[]) => mocks.invalidateGallery(...args),
@@ -1052,18 +1051,6 @@ describe('video workflow loading', () => {
     thumbnailUrl: '/thumb/clip.mp4',
     width: 512,
   };
-
-  it('answers from the item when it knows, otherwise from the video record', async () => {
-    await expect(actionsRef.current?.hasVideoWorkflow({ ...video, hasWorkflow: true })).resolves.toBe(true);
-    expect(mocks.resolveItem).not.toHaveBeenCalled();
-
-    mocks.resolveItem.mockResolvedValueOnce({ ...video, hasWorkflow: true });
-    await expect(actionsRef.current?.hasVideoWorkflow(video)).resolves.toBe(true);
-    expect(mocks.resolveItem).toHaveBeenCalledWith({ kind: 'video', name: 'clip.mp4' }, expect.any(AbortSignal));
-
-    mocks.resolveItem.mockRejectedValueOnce(new Error('offline'));
-    await expect(actionsRef.current?.hasVideoWorkflow(video)).resolves.toBe(false);
-  });
 
   it('hands the embedded workflow to the editor and opens it', async () => {
     mocks.videoWorkflow.mockResolvedValueOnce({

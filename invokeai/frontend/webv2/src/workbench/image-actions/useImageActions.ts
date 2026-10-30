@@ -17,7 +17,6 @@ import {
   type GalleryItemKey,
   type GalleryItemMutationResult,
   type GalleryItemRef,
-  galleryVideos,
   type GalleryVideoItem,
 } from '@features/gallery';
 import {
@@ -73,6 +72,7 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { RequestDeletionConfirmation } from './useDeletionConfirmation';
+import type { VideoRecallKind } from './videoRecall';
 
 import { appendReferenceImage } from './appendReferenceImage';
 import { recordCanvasImportError } from './canvasImportError';
@@ -102,12 +102,6 @@ import {
 } from './imageRecall';
 import { collectMediaUsage } from './mediaUsage';
 import { buildPbrMapsGraph } from './pbrMapsGraph';
-import {
-  EMPTY_VIDEO_RECALL_CAPABILITIES,
-  getVideoRecallCapabilities as deriveVideoRecallCapabilitiesFromMetadata,
-  type VideoRecallCapabilities,
-  type VideoRecallKind,
-} from './videoRecall';
 
 /**
  * Share backend image mutations across surfaces; patch Gallery caches optimistically and invalidate affected
@@ -135,10 +129,6 @@ export interface ImageActions extends GalleryItemActions {
   generatePbrMaps: (image: GalleryImage) => Promise<void>;
   /** Opens the image's embedded workflow or generation graph in the workflow editor. */
   loadImageWorkflow: (image: GalleryImage) => Promise<void>;
-  /** Recall availability for a gallery video, from its recorded core_metadata. */
-  getVideoRecallCapabilities: (item: GalleryVideoItem, signal?: AbortSignal) => Promise<VideoRecallCapabilities>;
-  /** Whether the video embeds a workflow; the listing does not say, so an unknown answer reads the record. */
-  hasVideoWorkflow: (item: GalleryVideoItem, signal?: AbortSignal) => Promise<boolean>;
   /** Opens the video's embedded workflow or generation graph in the workflow editor. */
   loadVideoWorkflow: (item: GalleryVideoItem) => Promise<void>;
   moveImagesToBoard: (imageNames: string[], boardId: string) => Promise<void>;
@@ -1095,35 +1085,6 @@ export const useImageActions = ({
             openWorkbenchWidget('workflow', { preferredRegions: ['center'], requireCenterView: true }).ok,
           t,
         }),
-      getVideoRecallCapabilities: async (item, signal) => {
-        const owner = captureAccountScope();
-
-        try {
-          const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
-          const metadata = await galleryVideos.metadata(item.name, requestSignal);
-
-          assertAccountScopeCurrent(owner);
-          return deriveVideoRecallCapabilitiesFromMetadata(metadata);
-        } catch {
-          return EMPTY_VIDEO_RECALL_CAPABILITIES;
-        }
-      },
-      hasVideoWorkflow: async (item, signal) => {
-        if (item.hasWorkflow !== undefined) {
-          return item.hasWorkflow;
-        }
-
-        const owner = captureAccountScope();
-
-        try {
-          const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
-          const record = await galleryItems.resolve({ kind: 'video', name: item.name }, requestSignal);
-
-          return record.kind === 'video' && record.hasWorkflow === true;
-        } catch {
-          return false;
-        }
-      },
       loadVideoWorkflow: (item) =>
         executeLoadMediaWorkflow({
           isProjectActive: () => !projectId || queries.isActiveProject(projectId),
@@ -1142,6 +1103,8 @@ export const useImageActions = ({
           kind,
           models,
           projectId,
+          queryClient,
+          t,
         });
 
         // The value patch auto-routes invocation; the caller reveals the widget.

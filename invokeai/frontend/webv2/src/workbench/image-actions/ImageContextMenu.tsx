@@ -5,14 +5,16 @@ import type { VideoConditioningRole } from '@features/video';
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import {
   galleryImageItemToGalleryImage,
+  galleryItems,
   isGalleryImageItem,
   legacyGeneratedImageToGalleryItem,
   toGalleryItemKey,
 } from '@features/gallery';
 import { getGalleryMoveTargets } from '@features/gallery/contracts';
-import { galleryKeys } from '@features/gallery/queries';
+import { galleryKeys, galleryVideoMetadataOptions } from '@features/gallery/queries';
 import { canCopyImage } from '@platform/browser/clipboard';
-import { captureAccountScope } from '@platform/state/accountLifecycle';
+import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 import { MenuContent, MenuIconItem } from '@platform/ui';
 import { MenuItem } from '@platform/ui/Menu';
 import { useQuery } from '@tanstack/react-query';
@@ -51,18 +53,7 @@ import { ContextSubMenu, IMAGE_MENU_CONTENT_PROPS } from './ContextSubMenu';
 import { GalleryBoardDestinationGroups } from './GalleryBoardDestinationGroups';
 import { ImageContinueGroup, ImageUseGroups } from './ImageItemMenuGroups';
 import { useImageRecallCapabilities } from './useImageRecallCapabilities';
-import { EMPTY_VIDEO_RECALL_CAPABILITIES, type VideoRecallCapabilities, type VideoRecallKind } from './videoRecall';
-
-/** What the menu learns about a video after it opens: metadata recall and whether a workflow is embedded. */
-interface VideoItemCapabilities {
-  recall: VideoRecallCapabilities;
-  workflow: boolean;
-}
-
-const EMPTY_VIDEO_ITEM_CAPABILITIES: VideoItemCapabilities = {
-  recall: EMPTY_VIDEO_RECALL_CAPABILITIES,
-  workflow: false,
-};
+import { EMPTY_VIDEO_RECALL_CAPABILITIES, getVideoRecallCapabilities, type VideoRecallKind } from './videoRecall';
 
 export interface LegacyImageContextMenuTarget {
   /** Right-clicked image first; more entries switch the menu into bulk mode. */
@@ -313,26 +304,48 @@ const SingleItemMenuItems = ({
   const singleSourceBoardIds = useMemo(() => [item.boardId], [item.boardId]);
   const owner = captureAccountScope();
   const videoItem = item.kind === 'video' ? item : null;
-  // The record answers whether a workflow is embedded only when the listing did not say.
-  const videoCapabilitiesQuery = useQuery({
+  const videoName = videoItem?.name ?? '';
+  // The gallery's shared entry, which Preview Details and recall commands also read; a failed read holds no answer, so
+  // the next open reads it again.
+  const videoMetadataQuery = useQuery({
+    ...galleryVideoMetadataOptions(owner, videoName),
     enabled: videoItem !== null,
-    queryKey: galleryKeys.videoMenuCapabilities(owner, videoItem?.name ?? null),
-    queryFn: async ({ signal }): Promise<VideoItemCapabilities> => {
-      if (!videoItem) {
-        return EMPTY_VIDEO_ITEM_CAPABILITIES;
+  });
+  // The record answers whether a workflow is embedded only when the listing did not say.
+  const readsVideoRecord = videoItem !== null && videoItem.hasWorkflow === undefined;
+  const videoHasWorkflowQuery = useQuery({
+    enabled: readsVideoRecord,
+    queryFn: async ({ signal }) => {
+      let hasWorkflow: boolean;
+
+      try {
+        const record = await galleryItems.resolve(
+          { kind: 'video', name: videoName },
+          AbortSignal.any([signal, owner.signal])
+        );
+        hasWorkflow = record.kind === 'video' && record.hasWorkflow === true;
+      } catch (error: unknown) {
+        // The server no longer has the video: a final answer, not a failure.
+        if (!(error instanceof ApiError && error.status === 404)) {
+          throw error;
+        }
+        hasWorkflow = false;
       }
 
-      const [recall, workflow] = await Promise.all([
-        actions.getVideoRecallCapabilities(videoItem, signal),
-        actions.hasVideoWorkflow(videoItem, signal),
-      ]);
-
-      return { recall, workflow };
+      assertAccountScopeCurrent(owner);
+      return hasWorkflow;
     },
+    queryKey: galleryKeys.videoHasWorkflow(owner, videoName),
+    // One policy whoever starts the read, as for metadata; whether a video embeds a workflow never changes.
+    retry: false,
+    staleTime: Infinity,
   });
-  const isLoadingVideoRecall = videoCapabilitiesQuery.isPending;
-  const { recall: videoRecallCapabilities, workflow: hasVideoWorkflow } =
-    videoCapabilitiesQuery.data ?? EMPTY_VIDEO_ITEM_CAPABILITIES;
+  const isLoadingVideoRecall = videoMetadataQuery.isPending;
+  const videoRecallCapabilities = videoMetadataQuery.isSuccess
+    ? getVideoRecallCapabilities(videoMetadataQuery.data)
+    : EMPTY_VIDEO_RECALL_CAPABILITIES;
+  const isLoadingVideoWorkflow = readsVideoRecord && videoHasWorkflowQuery.isPending;
+  const hasVideoWorkflow = readsVideoRecord ? videoHasWorkflowQuery.data === true : videoItem?.hasWorkflow === true;
   const handleLoadVideoWorkflow = useCallback(() => {
     if (item.kind === 'video') {
       void actions.loadVideoWorkflow(item);
@@ -415,7 +428,7 @@ const SingleItemMenuItems = ({
       {item.kind === 'video' ? (
         <>
           <ContextMenuItem
-            disabled={isLoadingVideoRecall || !hasVideoWorkflow}
+            disabled={isLoadingVideoWorkflow || !hasVideoWorkflow}
             icon={WorkflowIcon}
             label={t('widgets.gallery.itemActions.loadWorkflow.label')}
             value="load-video-workflow"

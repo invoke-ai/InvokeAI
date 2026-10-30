@@ -4,6 +4,7 @@ import type { GallerySettings } from '@features/gallery/core/settings';
 import type {
   GalleryBoardOrderBy,
   GalleryImageMetadata,
+  GalleryMediaMetadata,
   GalleryOrderDir,
   GalleryView,
 } from '@features/gallery/core/types';
@@ -42,6 +43,7 @@ import {
   fetchImageIndexAvailability,
   getGalleryImageMetadata,
   getGalleryItemLocation,
+  getGalleryVideoMetadata,
   hydrateGalleryDateBoardItemPage,
   isDateBoardId,
   listGalleryBoards,
@@ -218,29 +220,36 @@ export const galleryKeys = {
   itemNames: (owner: AccountScope, filter: CanonicalGalleryItemsFilter) =>
     [...galleryKeys.itemNamesForAccount(owner), filter] as const,
   imageIndexAvailability: (owner: AccountScope) => [...galleryKeys.all, 'image-index', getAccountKey(owner)] as const,
-  /** What a video's context menu can offer (recall, embedded workflow), read from its record when opened. */
-  videoMenuCapabilities: (owner: AccountScope, videoName: string | null) =>
-    [...galleryKeys.itemsRoot(), 'menu-capabilities', getAccountKey(owner), videoName] as const,
   /** An image's generation metadata: one entry shared by its menus, Preview Details, and recall commands. */
   imageMetadata: (owner: AccountScope, imageName: string) =>
     [...galleryKeys.itemsRoot(), 'image-metadata', getAccountKey(owner), imageName] as const,
   /** Whether an image embeds a workflow, for listings that do not say. */
   imageHasWorkflow: (owner: AccountScope, imageName: string) =>
     [...galleryKeys.itemsRoot(), 'image-has-workflow', getAccountKey(owner), imageName] as const,
+  /** A video's generation metadata: one entry shared by its menu, Preview Details, and recall commands. */
+  videoMetadata: (owner: AccountScope, videoName: string) =>
+    [...galleryKeys.itemsRoot(), 'video-metadata', getAccountKey(owner), videoName] as const,
+  /** Whether a video embeds a workflow, for listings that do not say. */
+  videoHasWorkflow: (owner: AccountScope, videoName: string) =>
+    [...galleryKeys.itemsRoot(), 'video-has-workflow', getAccountKey(owner), videoName] as const,
 };
 
 /**
- * An image's generation metadata. Null when it records none or the server no longer has the image (404); any other
- * failure rejects, so the errored entry holds no answer and is read again by its next consumer. Metadata never changes
- * for an image, so an answer is never read again.
+ * Media generation metadata. Null when it records none or the server no longer has the item (404); any other failure
+ * rejects, so the errored entry holds no answer and is read again by its next consumer. Metadata never changes for an
+ * item, so an answer is never read again.
  */
-export const galleryImageMetadataOptions = (owner: AccountScope, imageName: string) =>
+const mediaMetadataOptions = <TKey extends QueryKey>(
+  owner: AccountScope,
+  queryKey: TKey,
+  readMetadata: (signal: AbortSignal) => Promise<GalleryMediaMetadata | null>
+) =>
   queryOptions({
-    queryFn: async ({ signal }): Promise<GalleryImageMetadata | null> => {
-      let metadata: GalleryImageMetadata | null;
+    queryFn: async ({ signal }): Promise<GalleryMediaMetadata | null> => {
+      let metadata: GalleryMediaMetadata | null;
 
       try {
-        metadata = await getGalleryImageMetadata(imageName, AbortSignal.any([signal, owner.signal]));
+        metadata = await readMetadata(AbortSignal.any([signal, owner.signal]));
       } catch (error: unknown) {
         if (!(error instanceof ApiError && error.status === 404)) {
           throw error;
@@ -252,25 +261,21 @@ export const galleryImageMetadataOptions = (owner: AccountScope, imageName: stri
 
       return metadata;
     },
-    queryKey: galleryKeys.imageMetadata(owner, imageName),
+    queryKey,
     // One policy whoever starts the read: a failure surfaces at once, and the next open or recall reads again.
     retry: false,
     staleTime: Infinity,
   });
 
 /**
- * Read an image's metadata through the shared entry outside React. A reader that unmounts mid-read cancels the fetch
- * this call may have joined; the read then starts its own instead of failing. An explicit `cancelQueries` on the key
- * is followed the same way while the account is current. An account change ends it.
+ * Read a shared metadata entry outside React. A reader that unmounts mid-read cancels the fetch this call may have
+ * joined; the read then starts its own instead of failing. An explicit `cancelQueries` on the key is followed the same
+ * way while the account is current. An account change ends it.
  */
-export const fetchGalleryImageMetadata = async (
-  client: QueryClient,
-  owner: AccountScope,
-  imageName: string
-): Promise<GalleryImageMetadata | null> => {
+const fetchFollowingCancellation = async <TData>(owner: AccountScope, fetch: () => Promise<TData>): Promise<TData> => {
   for (;;) {
     try {
-      return await client.fetchQuery(galleryImageMetadataOptions(owner, imageName));
+      return await fetch();
     } catch (error: unknown) {
       if (!isCancelledError(error) || !isAccountScopeCurrent(owner)) {
         throw error;
@@ -278,6 +283,34 @@ export const fetchGalleryImageMetadata = async (
     }
   }
 };
+
+/** An image's generation metadata; see `mediaMetadataOptions`. */
+export const galleryImageMetadataOptions = (owner: AccountScope, imageName: string) =>
+  mediaMetadataOptions(owner, galleryKeys.imageMetadata(owner, imageName), (signal) =>
+    getGalleryImageMetadata(imageName, signal)
+  );
+
+/** Read an image's metadata through the shared entry outside React; see `fetchFollowingCancellation`. */
+export const fetchGalleryImageMetadata = (
+  client: QueryClient,
+  owner: AccountScope,
+  imageName: string
+): Promise<GalleryImageMetadata | null> =>
+  fetchFollowingCancellation(owner, () => client.fetchQuery(galleryImageMetadataOptions(owner, imageName)));
+
+/** A video's generation metadata; see `mediaMetadataOptions`. */
+export const galleryVideoMetadataOptions = (owner: AccountScope, videoName: string) =>
+  mediaMetadataOptions(owner, galleryKeys.videoMetadata(owner, videoName), (signal) =>
+    getGalleryVideoMetadata(videoName, signal)
+  );
+
+/** Read a video's metadata through the shared entry outside React; see `fetchFollowingCancellation`. */
+export const fetchGalleryVideoMetadata = (
+  client: QueryClient,
+  owner: AccountScope,
+  videoName: string
+): Promise<GalleryMediaMetadata | null> =>
+  fetchFollowingCancellation(owner, () => client.fetchQuery(galleryVideoMetadataOptions(owner, videoName)));
 
 const galleryItemNamesOptionsForOwner = (owner: AccountScope, filter: CanonicalGalleryItemsFilter) =>
   queryOptions({
