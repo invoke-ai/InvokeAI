@@ -3912,6 +3912,7 @@
       "keepItems": "Keep items",
       "clearQueueStopsWork_one": "{{count}} of them is running or queued and stops now.",
       "clearQueueStopsWork_other": "{{count}} of them are running or queued and stop now.",
+      "runningItemKeepsGoing": "The running item keeps going.",
       "processorPausedWaiting_one": "Processor paused, {{count}} item waiting",
       "processorPausedWaiting_other": "Processor paused, {{count}} items waiting",
       "processorPausedDescription_one": "{{count}} item waits until you resume.",
@@ -3935,14 +3936,14 @@
         "mine_other": "Stops {{count}} of your running or queued items across all your projects. Finished items stay in the history."
       },
       "cancelAllExceptCurrentConfirmationBody": {
-        "project_one": "Cancels {{count}} queued item in {{project}}. The running item keeps going.",
-        "project_other": "Cancels {{count}} queued items in {{project}}. The running item keeps going.",
-        "all_one": "Cancels {{count}} queued item across all projects. The running item keeps going.",
-        "all_other": "Cancels {{count}} queued items across all projects. The running item keeps going.",
-        "allUsers_one": "Cancels {{count}} queued item across all projects, other users' included. The running item keeps going.",
-        "allUsers_other": "Cancels {{count}} queued items across all projects, other users' included. The running item keeps going.",
-        "mine_one": "Cancels {{count}} of your queued items across all your projects. The running item keeps going.",
-        "mine_other": "Cancels {{count}} of your queued items across all your projects. The running item keeps going."
+        "project_one": "Cancels {{count}} queued item in {{project}}.",
+        "project_other": "Cancels {{count}} queued items in {{project}}.",
+        "all_one": "Cancels {{count}} queued item across all projects.",
+        "all_other": "Cancels {{count}} queued items across all projects.",
+        "allUsers_one": "Cancels {{count}} queued item across all projects, other users' included.",
+        "allUsers_other": "Cancels {{count}} queued items across all projects, other users' included.",
+        "mine_one": "Cancels {{count}} of your queued items across all your projects.",
+        "mine_other": "Cancels {{count}} of your queued items across all your projects."
       },
       "cancelAllRequested": {
         "project_one": "{{count}} item in {{project}} is stopping.",
@@ -3955,14 +3956,14 @@
         "mine_other": "{{count}} of your items are stopping."
       },
       "cancelAllExceptCurrentRequested": {
-        "project_one": "{{count}} queued item in {{project}} is canceled; the running item keeps going.",
-        "project_other": "{{count}} queued items in {{project}} are canceled; the running item keeps going.",
-        "all_one": "{{count}} queued item across all projects is canceled; the running item keeps going.",
-        "all_other": "{{count}} queued items across all projects are canceled; the running item keeps going.",
-        "allUsers_one": "{{count}} queued item across all projects, other users' included is canceled; the running item keeps going.",
-        "allUsers_other": "{{count}} queued items across all projects, other users' included are canceled; the running item keeps going.",
-        "mine_one": "{{count}} of your queued items is canceled; the running item keeps going.",
-        "mine_other": "{{count}} of your queued items are canceled; the running item keeps going."
+        "project_one": "{{count}} queued item in {{project}} is canceled.",
+        "project_other": "{{count}} queued items in {{project}} are canceled.",
+        "all_one": "{{count}} queued item across all projects is canceled.",
+        "all_other": "{{count}} queued items across all projects are canceled.",
+        "allUsers_one": "{{count}} queued item across all projects, other users' included is canceled.",
+        "allUsers_other": "{{count}} queued items across all projects, other users' included are canceled.",
+        "mine_one": "{{count}} of your queued items is canceled.",
+        "mine_other": "{{count}} of your queued items are canceled."
       },
       "clearFailedConfirmationBody": {
         "project_one": "Deletes {{count}} failed item in {{project}}. This can't be undone.",

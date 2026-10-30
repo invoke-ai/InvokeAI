@@ -94,11 +94,16 @@ export const getQueueActionCounts = (
 const getFinishedCount = (history: NonNullable<QueueActionCounts['history']>): number =>
   history.completed + history.canceled + history.failed;
 
+/** Cancel-all-except-current says the running item keeps going only when there is one it can see. */
+const withRunningItemKept = (t: TFunction, text: string, keepsRunningItem: boolean): string =>
+  keepsRunningItem ? `${text} ${t('widgets.queue.runningItemKeepsGoing')}` : text;
+
 /**
  * The confirmation policy, shared by the top bar, the queue widget, its menus and shortcuts. Cancelling the running
  * item is cheap and a Retry brings it back, so it never asks. Anything that stops or deletes many items asks first,
- * naming its scope and how many items it reaches; the way out never reads "Cancel" next to a cancel. Cancel-all also
- * stops this tab's runs the backend has not accepted yet, so it stays available offline while there are any.
+ * naming its scope and how many items it reaches; the way out never reads "Cancel" next to a cancel. Both bulk cancels
+ * also stop this tab's runs the backend has not accepted yet, so they stay available offline while there are any;
+ * such a run is never the current item, so cancel-all-except-current stops all of them.
  */
 export const getQueueActionDescriptors = ({
   canManageProcessor,
@@ -124,6 +129,7 @@ export const getQueueActionDescriptors = ({
 }): QueueActionDescriptor[] => {
   // Offline, the server's counts are a stale reading and its items out of reach; only local runs can stop.
   const unfinished = (isConnected ? counts.pending + counts.inProgress : 0) + localUnsubmitted;
+  const queued = (isConnected ? counts.pending : 0) + localUnsubmitted;
   const { history } = counts;
   const finished = history ? getFinishedCount(history) : null;
   const keepRunning = t('widgets.queue.keepRunning');
@@ -162,13 +168,17 @@ export const getQueueActionDescriptors = ({
     },
     {
       confirmation: {
-        body: translateScoped(t, 'widgets.queue.cancelAllExceptCurrentConfirmationBody', scope, counts.pending),
+        body: withRunningItemKept(
+          t,
+          translateScoped(t, 'widgets.queue.cancelAllExceptCurrentConfirmationBody', scope, queued),
+          isConnected && hasRunningItem
+        ),
         cancelLabel: keepRunning,
         confirmLabel: cancelAllExceptCurrentLabel,
         title: t('widgets.queue.actionConfirmationTitle', { action: cancelAllExceptCurrentLabel }),
       },
       destructive: true,
-      disabled: !isConnected || counts.pending === 0,
+      disabled: queued === 0,
       group: 'cancel',
       icon: XIcon,
       id: 'cancel-all-except-current',
@@ -296,40 +306,47 @@ export const useQueueActions = ({ includeOpenQueue = false }: { includeOpenQueue
   const runners = useMemo<Record<QueueActionId, () => Promise<void>>>(() => {
     // Each result repeats the counts its confirmation named: both come from the model the trigger was built with.
     const originPrefix = queryScope.originPrefix ?? null;
+    /**
+     * Stops this tab's runs the backend has not accepted, then the server's items when it holds any in reach, and
+     * reports the combined count. Local runs are never the current item, so every bulk cancel stops all of them.
+     */
+    const cancelInBulk = async (
+      serverCount: number,
+      cancelOnServer: () => Promise<void>,
+      describeRequested: (count: number) => string
+    ): Promise<void> => {
+      cancelLocalUnsubmittedRuns(localProjectId);
+      await (serverCount > 0 ? cancelOnServer().then(() => refreshQueue()) : Promise.resolve())
+        .then(() =>
+          notify.success(
+            t('widgets.queue.queueCancellationRequested'),
+            describeRequested(serverCount + localUnsubmitted)
+          )
+        )
+        .catch(reportFailure(notify, t('widgets.queue.failedToCancelItems'), t('widgets.queue.couldNotCancelItems')));
+    };
 
     return {
-      'cancel-all': async () => {
-        const serverUnfinished = isConnected ? counts.pending + counts.inProgress : 0;
-
-        cancelLocalUnsubmittedRuns(localProjectId);
-        await (
-          serverUnfinished > 0
-            ? withCancelNote({ kind: 'scope', originPrefix }, () => queueCommands.cancelScopedItems(queryScope)).then(
-                () => refreshQueue()
-              )
-            : Promise.resolve()
-        )
-          .then(() =>
-            notify.success(
-              t('widgets.queue.queueCancellationRequested'),
-              translateScoped(t, 'widgets.queue.cancelAllRequested', scope, serverUnfinished + localUnsubmitted)
+      'cancel-all': () =>
+        cancelInBulk(
+          isConnected ? counts.pending + counts.inProgress : 0,
+          () => withCancelNote({ kind: 'scope', originPrefix }, () => queueCommands.cancelScopedItems(queryScope)),
+          (count) => translateScoped(t, 'widgets.queue.cancelAllRequested', scope, count)
+        ),
+      'cancel-all-except-current': () =>
+        cancelInBulk(
+          isConnected ? counts.pending : 0,
+          () =>
+            withCancelNote({ exceptItemId: current?.id, kind: 'scope', originPrefix }, () =>
+              queueCommands.cancelScopedItems(queryScope, { keepCurrent: true })
+            ),
+          (count) =>
+            withRunningItemKept(
+              t,
+              translateScoped(t, 'widgets.queue.cancelAllExceptCurrentRequested', scope, count),
+              isConnected && hasRunningItem
             )
-          )
-          .catch(reportFailure(notify, t('widgets.queue.failedToCancelItems'), t('widgets.queue.couldNotCancelItems')));
-      },
-      'cancel-all-except-current': async () => {
-        await withCancelNote({ exceptItemId: current?.id, kind: 'scope', originPrefix }, () =>
-          queueCommands.cancelScopedItems(queryScope, { keepCurrent: true })
-        )
-          .then(() => refreshQueue())
-          .then(() =>
-            notify.success(
-              t('widgets.queue.queueCancellationRequested'),
-              translateScoped(t, 'widgets.queue.cancelAllExceptCurrentRequested', scope, counts.pending)
-            )
-          )
-          .catch(reportFailure(notify, t('widgets.queue.failedToCancelItems'), t('widgets.queue.couldNotCancelItems')));
-      },
+        ),
       'cancel-current': async () => {
         if (!current || current.status !== 'in_progress' || !canManageItem(current)) {
           notify.info(
@@ -432,6 +449,7 @@ export const useQueueActions = ({ includeOpenQueue = false }: { includeOpenQueue
     cancelLocalUnsubmittedRuns,
     counts,
     current,
+    hasRunningItem,
     isConnected,
     isPaused,
     localProjectId,

@@ -62,6 +62,15 @@ describe('queue action model', () => {
     expect(find(actions, 'clear-failed').confirmation?.body).toContain('"count":2');
   });
 
+  it('says the running item keeps going only when the server is reachable and an item is running', () => {
+    const body = (overrides: Parameters<typeof describeActions>[0]) =>
+      find(describeActions({ localUnsubmitted: 1, ...overrides }), 'cancel-all-except-current').confirmation?.body;
+
+    expect(body({})).toContain('widgets.queue.runningItemKeepsGoing');
+    expect(body({ isConnected: false })).not.toContain('runningItemKeepsGoing');
+    expect(body({ hasRunningItem: false })).not.toContain('runningItemKeepsGoing');
+  });
+
   it('says that clearing the queue also stops what still runs, and leaves that out when nothing does', () => {
     const busy = find(describeActions(), 'clear-queue').confirmation?.body;
     const idle = find(describeActions({ counts: { ...counts, inProgress: 0, pending: 0 } }), 'clear-queue').confirmation
@@ -105,6 +114,28 @@ describe('queue action model', () => {
 
     expect(cancelAll.disabled).toBe(false);
     expect(cancelAll.confirmation?.body).toContain('"count":2');
+  });
+
+  it("keeps cancel-all-except-current available offline for this tab's unaccepted runs, counting only those", () => {
+    const exceptCurrent = find(
+      describeActions({ isConnected: false, localUnsubmitted: 2 }),
+      'cancel-all-except-current'
+    );
+
+    expect(exceptCurrent.disabled).toBe(false);
+    expect(exceptCurrent.confirmation?.body).toContain('"count":2');
+  });
+
+  it("counts this tab's unaccepted runs with the server's queued items when cancelling all but the current one", () => {
+    const connected = find(describeActions({ localUnsubmitted: 2 }), 'cancel-all-except-current');
+    const localOnly = find(
+      describeActions({ counts: { ...counts, pending: 0 }, localUnsubmitted: 1 }),
+      'cancel-all-except-current'
+    );
+
+    expect(connected.confirmation?.body).toContain('"count":5');
+    expect(localOnly.disabled).toBe(false);
+    expect(localOnly.confirmation?.body).toContain('"count":1');
   });
 
   it('disables bulk actions with nothing to reach', () => {
