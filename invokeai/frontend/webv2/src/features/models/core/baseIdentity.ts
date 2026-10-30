@@ -9,6 +9,7 @@ export const toTitleCase = (value: string): string =>
 
 export type ModelBaseColorPalette =
   | 'aqua'
+  | 'azure'
   | 'blue'
   | 'coral'
   | 'cyan'
@@ -87,7 +88,8 @@ export const MODEL_BASES = {
   flux3: {
     base: 'flux3',
     label: 'FLUX.3',
-    colorPalette: 'ice',
+    // A deeper sky blue: the next step on from FLUX.2's ice, as ice is from FLUX.1's teal.
+    colorPalette: 'azure',
   },
   cogview4: {
     base: 'cogview4',
