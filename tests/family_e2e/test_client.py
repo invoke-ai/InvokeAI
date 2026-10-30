@@ -1,6 +1,7 @@
 import pytest
 
 from scripts.family_e2e.client import Event, build_timing, per_step_seconds
+from scripts.family_e2e.graphs import prepare_batch
 
 T0 = 1000.0
 
@@ -70,3 +71,45 @@ def test_timing_is_relative_to_enqueue_and_ignores_other_items() -> None:
     ]
     assert timing.per_step_s == pytest.approx(0.25)
     assert (timing.queue_started_at, timing.queue_completed_at) == (item["started_at"], item["completed_at"])
+
+
+def test_the_time_per_step_takes_the_count_of_the_node_that_sent_the_frames() -> None:
+    # Two nodes state a count over their whole schedule. The denoise node sends most frames: six steps of 150 ms,
+    # too fast for an inferred count to be trusted. A pass of twelve steps sent two; its larger count would halve the
+    # time.
+    events = [
+        _invocation("invocation_started", T0, "denoise"),
+        *(
+            _invocation("invocation_progress", T0 + 0.15 * k, "denoise", percentage=k / 6, has_image=True)
+            for k in range(1, 7)
+        ),
+        _invocation("invocation_complete", T0 + 1.0, "denoise"),
+        _invocation("invocation_started", T0 + 1.0, "pass"),
+        *(
+            _invocation("invocation_progress", T0 + 1.0 + 0.5 * k, "pass", percentage=k / 12, has_image=True)
+            for k in (6, 12)
+        ),
+        _invocation("invocation_complete", T0 + 7.0, "pass"),
+    ]
+    timing = build_timing(events, 7, T0, T0 + 7.1, {}, {"denoise": 6, "pass": 12})
+    assert timing.per_step_s == pytest.approx(0.15)
+
+
+def test_the_time_per_step_counts_the_steps_the_compiled_denoise_node_runs() -> None:
+    # A case with `steps: 24` on Ideogram 4's V4_TURBO_12 preset runs twelve steps, here of 80 ms each. The 0.1 s
+    # throttle let every other frame through: k/12 also reads as step 2k of 24, and inferred as step k/2 of 6.
+    nodes = {
+        "denoise_latents": {"id": "denoise_latents", "type": "ideogram4_denoise", "sampler_preset": "V4_TURBO_12"},
+        "output": {"id": "output", "type": "ideogram4_l2i", "is_intermediate": False},
+    }
+    prepared = prepare_batch({"graph": {"id": "g", "nodes": nodes, "edges": []}, "data": []}, {}, {})
+    events = [
+        _invocation("invocation_started", T0, "denoise_latents"),
+        *(
+            _invocation("invocation_progress", T0 + 0.08 * k, "denoise_latents", percentage=k / 12, has_image=True)
+            for k in range(2, 13, 2)
+        ),
+        _invocation("invocation_complete", T0 + 1.0, "denoise_latents"),
+    ]
+    timing = build_timing(events, 7, T0, T0 + 1.1, {}, prepared.step_counts)
+    assert timing.per_step_s == pytest.approx(0.08)

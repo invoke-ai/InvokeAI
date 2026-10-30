@@ -1,6 +1,6 @@
 ---
 title: Family E2E Runs
-lastUpdated: 2026-10-25
+lastUpdated: 2026-10-29
 ---
 
 `scripts/family_e2e` runs model families end to end through the HTTP API of a server it launches itself. Per case and size it records the image, the run time, the time per denoise step and the VRAM the server process used, measured at driver level. The report compares them with an explicitly accepted reference and with the previous run of the same profile.
@@ -26,7 +26,9 @@ It is a developer tool. It runs on Windows with NVIDIA and AMD (ROCm) GPUs, wher
    - Per run, the tool waits up to 10 minutes for the queue to drain, samples the server's GPU memory, enqueues the batch and follows its socket events.
    - When the run finishes, it saves the output image and the memory trace, reads the run's slice of the server log and appends a record to `records.jsonl`.
    - If the server dies during a step, that step gets an error record and a new server starts on a new scratch root. A case whose steps crashed the server twice is given up; its remaining steps are not run again, not even by `resume`.
-5. **Report.** The server is stopped, the scratch root removed, and `report.html` and `summary.md` are written. The exit code is not 0 when a case fails or errors (see [Verdicts](#verdicts)).
+5. **Report.** The server is stopped, the scratch root removed, and `report.html` and `summary.md` are written. The exit code is not 0 when a case fails, errors or is incomplete (see [Verdicts](#verdicts)).
+   - The scratch root goes, and a calibration run's store is copied from it, only once every process of the server is confirmed to have exited: its launcher and serving process as `heartbeat.json` names them, and each process of its tree or group that outlived the kill, checked again. This holds for every server lifetime, also one whose server crashed or failed to start. A process whose state the tool may not read counts as running.
+   - When the kill fails, a process outlives it (one stuck in the GPU driver, say), or the stop itself is interrupted, the runner keeps the scratch root with its store. `heartbeat.json` goes on naming the server and, under `server_survivors`, each further process that outlived the kill, such as a worker or a launcher the runner could not record. `runner.log` names the pids, and the run fails (an interrupted or stopped run stays stopped). End the processes, then `stop` or `resume`, which stop every process the heartbeat names before they touch the root.
 
 ## Data directory
 
@@ -109,11 +111,16 @@ uv run --no-sync python -m scripts.working_memory.build_shipped <data_dir>/runs/
 - **Points.** Every valid, fit-eligible window with a positive demand becomes a `probe_demand` point. Per card, estimator, version, platform and features it takes the largest `demand_bytes` of all windows given: repetitions, lifetimes, and several runs or machines with the same card. A card is a device class: vendor, name, memory size, backend and architecture. Cards of one name and another memory size stay apart: a point's `device` is the card's name and its device class id, e.g. `NVIDIA GeForce RTX 4060 Ti (0123456789abcdef)`. A window given twice (the same store in two files) counts once. The provenance names the card, the torch and runtime versions, the calibration run, item and node of the largest window, and its export file. Each point line shows its windows' demands in the order they ran and the largest over the first (`[3 windows, MiB 1960, 1820, 1820; max/first 1.00]`).
 - **Fragmentation.** A point whose reserved bytes grew by 10% or more from its first window to its largest while the allocated bytes stayed within 2% gets a `warning: fragmentation?` line with both series. That is the allocator's cache growing around the same tensors in a long-running server, not the operation needing more.
 - **Platforms.** A point's platform is the one `platform_for` gives on the machine that measured it, derived from the export's device class and its environment's hard facts (`platform_for_environment`), whatever machine the builder runs on. It names the OS only where an entry for that platform names it. A window whose environment lacks a fact the platform is read from is left out and counted.
-- **Bounds.** `probe_demand` points bound their estimates from below only: the estimate must cover them, and they may raise a line, but they take no part in choosing it (`fit.upper_envelope`), and the 1.3x upper bound and `max_ratio` stay with the fresh-process points, because the cold first run after a server start is the worst case.
-- **Merge and fit.** A point joins the data file that declares the estimator's coefficients; where a point of the same measurement (card, platform, method, features and whether it is in the fit) is there, the larger of the two stays, and a remeasurement below the shipped point prints `kept shipped <bytes> over remeasured <bytes>`. The carried values are then refitted with `fit.py`. A stand-in line is fitted from then on only once its in-fit fresh-process points alone span two sizes twice apart; until then it stays a stand-in, which `probe_demand` points raise where their fit lies above it but never lower. A fitted line takes, per coefficient, the larger of its fit on all points and its fit on the fresh-process points alone. A refitted entry's provenance gets a note, and so does a raised stand-in's. Every moved line gets a `line` row: old and new slope and base, whether it was raised, and its new points.
-- **Legacy entries.** A `legacy` entry (hand-set values, such as the Z-Image denoise's) is replaced by its fit once the points fit every line it carries and each line has a fresh-process point, which holds the upper bound: its flag cleared, its provenance replaced by one that says it is the fit of the platform's points, its `unmeasured_floor` kept. Probe windows alone never replace hand-set values, since a warm window can read below the cold first run. The data test's `LEGACY_ENTRIES`, which lists the legacy entries by estimator and platform, then needs that entry removed. An entry the points do not fully measure keeps its values, with a `note:` line saying which lines lack a fit or a fresh-process point; its new points still have to pass their bounds against the hand-set values, which a fresh-process point well below them does not.
+- **Bounds.** `probe_demand` points bound their estimates from below only: the estimate must cover them. They take no part in the fresh-process fit (`fit.upper_envelope`), but they can raise a line or a stand-in. The 1.3x upper bound and `max_ratio` stay with the fresh-process points, because the cold first run after a server start is the worst case.
+- **Merge and fit.** A point joins the data file that declares the estimator's coefficients; where a point of the same measurement (card, platform, method, features and whether it is in the fit) is there, the larger of the two stays, and a remeasurement below the shipped point prints `kept shipped <bytes> over remeasured <bytes>`. Each line is then refitted with `fit.py`:
+  - A fitted line starts from its fresh fit: the envelope of its fresh-process points alone, plus the 5% margin, rounded up (`fit.shipped_pair`). A stand-in starts from its values. A stand-in line is fitted from then on once its in-fit fresh-process points alone span two sizes twice apart.
+  - A line, or a stand-in, that already covers every point by the 5% margin is kept unchanged.
+  - Otherwise it gets the minimal raise (`fit.raised_pair`): of the lines as they ship, a whole byte of slope per unit of size and a whole MiB of base, whose slope and base each stay at or above its fresh fit (or the stand-in's values), cover every point by 5%, and keep every upper bound of the points priced on the line (`bounds.line_bounds`), the one with the lowest reservation over the size range of its fresh-process points. A probe point therefore never lowers a line, and one the line covers never moves it.
+  - A refitted entry's provenance gets a note, and so does a raised stand-in's. Every moved line gets a `line` row: old and new slope and base, whether it was raised, and its new points.
+- **Legacy entries.** A `legacy` entry (hand-set values, such as the Z-Image denoise's) is replaced by its fit once the points fit every line it carries within the upper bounds and each line has a fresh-process point, which holds the upper bound: its flag cleared, its provenance replaced by one that says it is the fit of the platform's points, its `unmeasured_floor` kept. Probe windows alone never replace hand-set values, since a warm window can read below the cold first run. The data test's `LEGACY_ENTRIES`, which lists the legacy entries by estimator and platform, then needs that entry removed. An entry the points do not fully measure keeps its values, with a `note:` line saying which lines lack a fit or a fresh-process point; its new points still have to pass their bounds against the hand-set values, which a fresh-process point well below them does not.
 - **Refusals.** An export or point of another estimator version than the registered one, features the estimator cannot evaluate, a platform `MEASURED` does not list, and a line whose points span less than twice its sizes: exit code 2. Exit code 1, with nothing written:
-  - any point of the result breaks its bounds (`working_memory/bounds.py`, the rule the data test applies); the error lists them. A probe point that raises a line above what the fresh-process points of that line allow is refused this way;
+  - no line or stand-in raise covers its points within the upper bounds; the error names the point that cannot be covered and the bound it conflicts with;
+  - any point of the result breaks its bounds (`working_memory/bounds.py`, the rule the data test applies); the error lists them;
   - with `--write`, a line is raised on a point flagged as fragmentation, unless `--accept-fragmentation` is given.
 
 ## Bundle
@@ -153,7 +160,8 @@ Each case size gets one status, judged by the final attempt of each step. The fi
 
 | Status | When | Failure |
 | --- | --- | --- |
-| `ERROR` | A final step failed or errored. | yes |
+| `ERROR` | A final step failed, errored or was canceled. | yes |
+| `INCOMPLETE` | A measure the run planned for the case is not final as the runner counts it: it has no record, or its last attempt awaits a repeat for foreign load. That is what `status` counts as left and `resume` would run, e.g. in a run that was stopped or failed before the case finished. | yes |
 | `FAIL` | An image does not have the requested size. | yes |
 | `INVALID` | No measured image is valid for PSNR (see [Validity](#validity)). | no |
 | `NO-REFERENCE` | No accepted reference, or it is unreadable. | no |
@@ -164,7 +172,7 @@ Each case size gets one status, judged by the final attempt of each step. The fi
 | `FAIL` | The case expects a change, but its minimum PSNR is at or above `psnr_min_db`; or it expects none, and the minimum PSNR is below it. | yes |
 | `PASS` | Otherwise. | no |
 
-The comparison with the previous run is informational: its outliers and flags never change a status. `report` and the runner exit with 1 when a case is `ERROR` or `FAIL`.
+The comparison with the previous run is informational: its outliers and flags never change a status. `report` and the runner exit with 1 when a case is `ERROR`, `INCOMPLETE` or `FAIL`.
 
 ## Validity
 
@@ -204,8 +212,8 @@ Database migrations of a newer `code_dir` run against the scratch database only.
 - With PyTorch's native allocator, reserved memory stays allocated between nodes, so a node's peak can stem from an earlier node. Compare peaks only between runs with the same allocator configuration; the run records the runtime config.
 - On Windows with ROCm, HIP keeps freed blocks at driver level. Per-node peaks after the first large node are upper bounds there (observed on an RX 9060 XT).
 - Time per step comes from the preview frames, which the server throttles to one per 0.1 s; a step's number is read from its progress percentage.
-  - For txt2img and controlnet the case's `steps` fixes the step count.
-  - img2img starts inside the schedule at a family-specific step, so the count is inferred. When steps are faster than 0.2 s that inference can be off by a factor, so the time per step is left empty.
+  - The step count comes from the compiled denoise node: its `steps` or `num_steps` field, which for most families is the case's `steps`. An Ideogram 4 node without `steps` runs its sampler preset's count.
+  - A node that denoises a window of its schedule (`denoising_start` above 0 or `denoising_end` below 1, as img2img and an SDXL refiner hand-over do) starts or stops at a family-specific step, so the count is inferred. When steps are faster than 0.2 s that inference can be off by a factor, so the time per step is left empty.
 - Ideogram 4 ignores `steps`; its step count follows `settings.ideogram4Steps` or `settings.ideogram4SamplerPreset`. `img2img` and `controlnet` are not available for ERNIE-Image and Ideogram 4. Dynamic prompts are not expanded: a prompt with their syntax is rejected unless `settings.dynamicPromptsEnabled` is `false`, which sends it as typed. Canvas rasterization, video and upscale graphs are not covered.
 - A bundle finds other paths in free text by their drive letter, or as POSIX paths of two or more components that start after a space, a quote or a bracket. Such a path, and a path below the home directory, keeps what follows a space in one of its directory names; a POSIX path at the root (`/x`) or right after `:` stays. A UNC path in free text stays as it is. An `extra_env` credential shorter than 8 characters is redacted in `run.json` only.
 - A calibration run measures the windows of estimated model operations only, inside a running server: they are not a fresh process's first operation, as the `demand_peak` points are.
