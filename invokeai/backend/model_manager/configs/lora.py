@@ -901,6 +901,8 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         # Krea-2 LoRAs also carry transformer.transformer_blocks. keys, but uniquely include the
         # text-fusion stage. Exclude them here so they route to LoRA_LyCORIS_Krea2_Config.
         has_krea2_keys = _has_krea2_lora_keys(state_dict)
+        str_keys = [key for key in state_dict if isinstance(key, str)]
+        has_anima_keys = has_cosmos_dit_peft_keys_strict(str_keys)
         has_flux_keys = state_dict_has_any_keys_starting_with(
             state_dict,
             {
@@ -919,6 +921,7 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             and has_lora_suffix
             and not has_z_image_keys
             and not has_krea2_keys
+            and not has_anima_keys
             and not has_flux_keys
             and not _has_qwen_image21_lora_keys(state_dict)
         ):
@@ -935,6 +938,8 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         )
         has_z_image_keys = state_dict_has_any_keys_starting_with(state_dict, {"diffusion_model.layers."})
         has_krea2_keys = _has_krea2_lora_keys(state_dict)
+        str_keys = [key for key in state_dict if isinstance(key, str)]
+        has_anima_keys = has_cosmos_dit_peft_keys_strict(str_keys)
         has_flux_keys = state_dict_has_any_keys_starting_with(
             state_dict,
             {
@@ -952,6 +957,7 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             has_qwen_ie_keys
             and not has_z_image_keys
             and not has_krea2_keys
+            and not has_anima_keys
             and not has_flux_keys
             and not _has_qwen_image21_lora_keys(state_dict)
         ):
@@ -1233,7 +1239,7 @@ class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             },
         )
 
-        if has_cosmos_keys and has_lora_suffix:
+        if has_cosmos_keys and has_lora_suffix and not has_ltx2_lora_keys(str_keys):
             return
 
         raise NotAMatchError("model does not match Anima LoRA heuristics")
@@ -1249,7 +1255,9 @@ class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         state_dict = mod.load_state_dict()
         str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
 
-        if has_cosmos_dit_kohya_keys_strict(str_keys) or has_cosmos_dit_peft_keys_strict(str_keys):
+        if (
+            has_cosmos_dit_kohya_keys_strict(str_keys) or has_cosmos_dit_peft_keys_strict(str_keys)
+        ) and not has_ltx2_lora_keys(str_keys):
             return BaseModelType.Anima
 
         raise NotAMatchError("model does not look like an Anima LoRA")

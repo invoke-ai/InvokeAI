@@ -240,6 +240,46 @@ def test_kohya_non_block_layers_resolve_alongside_blocks_adapter_and_text_encode
         assert layer.up.shape == (module.out_features, rank)
 
 
+def test_diffusers_cosmos_layers_map_to_real_anima_modules():
+    source_to_module = {
+        "transformer.transformer_blocks.0.attn1.to_q": "blocks.0.self_attn.q_proj",
+        "transformer.transformer_blocks.0.attn1.to_out.0": "blocks.0.self_attn.output_proj",
+        "transformer.transformer_blocks.0.attn2.to_k": "blocks.0.cross_attn.k_proj",
+        "transformer.transformer_blocks.0.attn2.to_out.0": "blocks.0.cross_attn.output_proj",
+        "transformer.transformer_blocks.0.ff.net.0.proj": "blocks.0.mlp.layer1",
+        "transformer.transformer_blocks.0.ff.net.2": "blocks.0.mlp.layer2",
+        "transformer.transformer_blocks.0.norm1.linear_1": "blocks.0.adaln_modulation_self_attn.1",
+        "transformer.transformer_blocks.0.norm2.linear_2": "blocks.0.adaln_modulation_cross_attn.2",
+        "transformer.transformer_blocks.0.norm3.linear_1": "blocks.0.adaln_modulation_mlp.1",
+        "transformer.patch_embed.proj": "x_embedder.proj.1",
+        "transformer.time_embed.t_embedder.linear_1": "t_embedder.1.linear_1",
+        "transformer.time_embed.t_embedder.linear_2": "t_embedder.1.linear_2",
+        "transformer.norm_out.linear_1": "final_layer.adaln_modulation.1",
+        "transformer.norm_out.linear_2": "final_layer.adaln_modulation.2",
+        "transformer.proj_out": "final_layer.linear",
+    }
+    with accelerate.init_empty_weights():
+        transformer = AnimaTransformer(**{**ANIMA_TRANSFORMER_CONFIG, "num_blocks": 1})
+
+    rank = 4
+    state_dict: dict[str, torch.Tensor] = {}
+    for source, target in source_to_module.items():
+        module = transformer.get_submodule(target)
+        assert isinstance(module, torch.nn.Linear)
+        state_dict[f"{source}.lora_A.weight"] = torch.empty(rank, module.in_features)
+        state_dict[f"{source}.lora_B.weight"] = torch.empty(module.out_features, rank)
+
+    patch = lora_model_from_anima_state_dict(state_dict)
+
+    assert set(patch.layers) == {f"{ANIMA_LORA_TRANSFORMER_PREFIX}{target}" for target in source_to_module.values()}
+    for patch_key, layer in patch.layers.items():
+        module = transformer.get_submodule(patch_key.removeprefix(ANIMA_LORA_TRANSFORMER_PREFIX))
+        assert isinstance(module, torch.nn.Linear)
+        assert isinstance(layer, LoRALayer)
+        assert layer.down.shape == (rank, module.in_features)
+        assert layer.up.shape == (module.out_features, rank)
+
+
 def test_kohya_unet_keys_get_transformer_prefix():
     """Test that Kohya unet keys are prefixed with the transformer prefix."""
     state_dict = keys_to_mock_state_dict(anima_kohya_keys)
