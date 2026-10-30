@@ -120817,6 +120817,18 @@
             ],
             "title": "Graph",
             "description": "The graph used to generate the image, as stringified JSON"
+          },
+          "resolved_inputs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved Inputs",
+            "description": "The image's per-invocation resolved inputs, as stringified Graph JSON, when available"
           }
         },
         "type": "object",
