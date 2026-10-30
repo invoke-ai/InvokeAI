@@ -152,7 +152,9 @@ describe('executeImageRecall', () => {
       expect.objectContaining({ positivePrompt: 'recalled prompt' }),
       'project-1'
     );
-    expect(add).toHaveBeenCalledWith(expect.objectContaining({ kind: 'success', title: 'Recalled remix settings' }));
+    expect(add).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'success', title: 'widgets.gallery.itemActions.recall.imageTitles.remix' })
+    );
   });
 
   it('recalls from metadata a menu or Preview Details already read, without reading it again', async () => {
@@ -238,7 +240,7 @@ describe('executeImageRecall', () => {
     galleryApi.galleryImages.metadata.mockRejectedValueOnce(new ApiError('Not Found', 404));
     await expect(recall()).resolves.toBe(false);
     expect(add).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'info', message: 'This image does not include supported Generate metadata.' })
+      expect.objectContaining({ kind: 'info', message: 'widgets.gallery.itemActions.recall.imageMetadataUnsupported' })
     );
 
     queryClient.clear();
@@ -510,7 +512,7 @@ describe('executeImageRecall', () => {
     expect(add).toHaveBeenCalledWith({
       kind: 'info',
       message: 'widgets.generate.capabilitiesUnavailableForRecall',
-      title: 'Cannot recall image data',
+      title: 'widgets.gallery.itemActions.recall.cannotRecallImage',
     });
   });
 
@@ -538,11 +540,14 @@ describe('executeImageRecall', () => {
       setArchitectureCapabilities(architectureCapabilitiesFixture);
     }
 
+    // Nothing could be applied, so nothing is read: a failing read must not replace the notice with an error.
+    expect(galleryApi.galleryImages.metadata).not.toHaveBeenCalled();
+    expect(galleryApi.galleryImages.resolveMany).not.toHaveBeenCalled();
     expect(setSettings).not.toHaveBeenCalled();
     expect(add).toHaveBeenCalledWith({
       kind: 'info',
       message: 'widgets.generate.capabilitiesUnavailableForSetup',
-      title: 'Cannot recall image data',
+      title: 'widgets.gallery.itemActions.recall.cannotRecallImage',
     });
   });
 
@@ -660,6 +665,84 @@ describe('executeImageRecall', () => {
         positivePrompt: 'recalled prompt',
         referenceImages: [expect.objectContaining({ id: 'current' })],
       }),
+      'project-1'
+    );
+  });
+
+  it('applies a prompts recall on top of an edit made while the metadata loaded', async () => {
+    const { commands, setSettings } = createCommands();
+    let finishRead: ((value: unknown) => void) | undefined;
+    let panel: Record<string, unknown> = { modelKey: model.key, steps: 20 };
+    const getGenerateValues = vi.fn(() => panel);
+
+    galleryApi.galleryImages.metadata.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishRead = resolve;
+      })
+    );
+    const recall = executeImageRecall({
+      queryClient,
+      t,
+      commands,
+      generateValues: panel,
+      getGenerateValues,
+      image,
+      kind: 'prompts',
+      models: [model],
+      projectId: 'project-1',
+    });
+
+    await vi.waitFor(() => expect(finishRead).toBeDefined());
+    panel = { ...panel, steps: 42 };
+    finishRead!({ positive_prompt: 'recalled prompt' });
+
+    await expect(recall).resolves.toBe(true);
+    expect(setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ positivePrompt: 'recalled prompt', steps: 42 }),
+      'project-1'
+    );
+  });
+
+  it('applies on top of an edit made while the reference check was pending', async () => {
+    const { commands, setSettings } = createCommands();
+    let finishCheck: ((value: unknown) => void) | undefined;
+    let panel: Record<string, unknown> = { modelKey: model.key, steps: 20 };
+    const getGenerateValues = vi.fn(() => panel);
+
+    galleryApi.galleryImages.metadata.mockResolvedValue({
+      positive_prompt: 'recalled prompt',
+      ref_images: [
+        {
+          config: { image: { height: 64, image_name: 'kept.png', width: 64 }, type: 'qwen_image_reference_image' },
+          id: 'kept',
+          isEnabled: true,
+        },
+      ],
+    });
+    galleryApi.galleryImages.resolveMany.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishCheck = resolve;
+      })
+    );
+    const recall = executeImageRecall({
+      queryClient,
+      t,
+      commands,
+      generateValues: panel,
+      getGenerateValues,
+      image,
+      kind: 'all',
+      models: [model],
+      projectId: 'project-1',
+    });
+
+    await vi.waitFor(() => expect(finishCheck).toBeDefined());
+    panel = { ...panel, steps: 42 };
+    finishCheck!([{ ...image, imageName: 'kept.png' }]);
+
+    await expect(recall).resolves.toBe(true);
+    expect(setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ referenceImages: [expect.objectContaining({ id: 'kept' })], steps: 42 }),
       'project-1'
     );
   });

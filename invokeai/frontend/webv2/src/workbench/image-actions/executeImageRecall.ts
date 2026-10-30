@@ -37,6 +37,7 @@ import {
 import {
   buildImageRecallSettings,
   getImageRecallMessage,
+  getMetadataReferenceImages,
   getImageRecallTitle,
   isImageRecallKindAvailable,
   type ImageRecallKind,
@@ -198,28 +199,39 @@ export const executeLoadMediaWorkflow = async ({
   }
 };
 
-/**
- * Drops reference images whose effective asset is no longer in the gallery,
- * using one bulk lookup. Entries without an asset are dropped as well.
- */
+const getReferenceImageName = (referenceImage: GenerateReferenceImage): string | null =>
+  referenceImage.config.image ? getEffectiveReferenceImage(referenceImage.config.image).image_name : null;
+
+/** The names of the references' effective assets the gallery still has, in one bulk lookup; none asks nothing. */
+const resolveAvailableReferenceImageNames = async (
+  referenceImages: readonly GenerateReferenceImage[],
+  signal: AbortSignal
+): Promise<ReadonlySet<string>> => {
+  const names = [...new Set(referenceImages.flatMap((referenceImage) => getReferenceImageName(referenceImage) ?? []))];
+
+  if (names.length === 0) {
+    return new Set();
+  }
+
+  return new Set((await galleryImages.resolveMany(names, signal)).map((availableImage) => availableImage.imageName));
+};
+
+/** Entries without an asset, or whose effective asset is not among `availableNames`, are dropped. */
+const keepAvailableReferenceImages = (
+  referenceImages: GenerateReferenceImage[],
+  availableNames: ReadonlySet<string>
+): GenerateReferenceImage[] =>
+  referenceImages.filter((referenceImage) => {
+    const name = getReferenceImageName(referenceImage);
+    return name !== null && availableNames.has(name);
+  });
+
+/** Drops reference images whose effective asset is no longer in the gallery, using one bulk lookup. */
 export const filterAvailableReferenceImages = async (
   referenceImages: GenerateReferenceImage[],
   signal: AbortSignal
-): Promise<GenerateReferenceImage[]> => {
-  const effectiveNames = referenceImages.flatMap((referenceImage) =>
-    referenceImage.config.image ? [getEffectiveReferenceImage(referenceImage.config.image).image_name] : []
-  );
-  const availableNames = new Set(
-    (await galleryImages.resolveMany([...new Set(effectiveNames)], signal)).map(
-      (availableImage) => availableImage.imageName
-    )
-  );
-
-  return referenceImages.filter((referenceImage) => {
-    const referenceAsset = referenceImage.config.image;
-    return referenceAsset && availableNames.has(getEffectiveReferenceImage(referenceAsset).image_name);
-  });
-};
+): Promise<GenerateReferenceImage[]> =>
+  keepAvailableReferenceImages(referenceImages, await resolveAvailableReferenceImageNames(referenceImages, signal));
 
 /** Why `getCurrentGenerateValues` answered null: no supported model, or no table to initialise from. */
 export const getMissingGenerateValuesMessage = (t: TFunction): string =>
@@ -293,34 +305,52 @@ export const executeImageRecall = async ({
 
   const supportedModels = models.filter(isSupportedGenerateModel);
   const vaeModels = models.filter(isVaeModelConfig).map((model) => model as VaeModelConfig);
-  const currentGenerateValues = getCurrentGenerateValues({
-    generateValues: getGenerateValues?.() ?? generateValues,
-    supportedModels,
-  });
 
   try {
-    if (!currentGenerateValues) {
-      commands.notifications.add({
-        kind: 'info',
-        message: getMissingGenerateValuesMessage(t),
-        title: 'Cannot recall image data',
-      });
-      return false;
-    }
-
     if (!isImageRecallKindAvailable(kind)) {
       commands.notifications.add({
         kind: 'info',
         message: t('widgets.generate.capabilitiesUnavailableForRecall'),
-        title: 'Cannot recall image data',
+        title: t('widgets.gallery.itemActions.recall.cannotRecallImage'),
       });
+      return false;
+    }
+
+    const readGenerateValues = () =>
+      getCurrentGenerateValues({ generateValues: getGenerateValues?.() ?? generateValues, supportedModels });
+    const missingValuesNotice = () =>
+      commands.notifications.add({
+        kind: 'info',
+        message: getMissingGenerateValuesMessage(t),
+        title: t('widgets.gallery.itemActions.recall.cannotRecallImage'),
+      });
+
+    // No reads without values to apply them to: the answer only depends on the model catalog and capabilities,
+    // which reading the record does not change.
+    if (!readGenerateValues()) {
+      missingValuesNotice();
       return false;
     }
 
     const metadata =
       kind === 'dimensions' ? null : await fetchGalleryImageMetadata(queryClient, owner, image.imageName);
+    // Only all/remix recall references. Checked against the record, not the built list, so the check happens before
+    // the snapshot below.
+    const availableReferenceNames =
+      kind === 'all' || kind === 'remix'
+        ? await resolveAvailableReferenceImageNames(getMetadataReferenceImages(metadata) ?? [], owner.signal)
+        : new Set<string>();
 
     assertAccountScopeCurrent(owner);
+    // Every read is above: nothing yields between this snapshot and the commit, so an edit made while the record
+    // or its references loaded stays in the values the recall writes.
+    const currentGenerateValues = readGenerateValues();
+
+    if (!currentGenerateValues) {
+      missingValuesNotice();
+      return false;
+    }
+
     const result = buildImageRecallSettings({
       currentValues: currentGenerateValues,
       image,
@@ -335,7 +365,7 @@ export const executeImageRecall = async ({
     if (!result) {
       commands.notifications.add({
         kind: 'info',
-        message: 'This image does not include supported Generate metadata.',
+        message: t('widgets.gallery.itemActions.recall.imageMetadataUnsupported'),
         title: t('widgets.gallery.itemActions.recall.nothingRecalled'),
       });
       return false;
@@ -343,8 +373,10 @@ export const executeImageRecall = async ({
 
     // An empty recalled list clears the current references; there is nothing to check for it.
     if (result.fields.includes('referenceImages') && result.values.referenceImages.length > 0) {
-      result.values.referenceImages = await filterAvailableReferenceImages(result.values.referenceImages, owner.signal);
-      assertAccountScopeCurrent(owner);
+      result.values.referenceImages = keepAvailableReferenceImages(
+        result.values.referenceImages,
+        availableReferenceNames
+      );
 
       // Every recorded reference was deleted: keep the current ones, fitted to the recalled model as an unrecorded list
       // would be, rather than clearing them as if the record listed none.
@@ -373,7 +405,7 @@ export const executeImageRecall = async ({
     if (result.fields.length === 0) {
       commands.notifications.add({
         kind: 'info',
-        message: skipMessage ?? 'This image does not include supported Generate metadata.',
+        message: skipMessage ?? t('widgets.gallery.itemActions.recall.imageMetadataUnsupported'),
         title: t('widgets.gallery.itemActions.recall.nothingRecalled'),
       });
       return false;
@@ -382,8 +414,8 @@ export const executeImageRecall = async ({
     commands.generation.setSettings(result.values, projectId);
     commands.notifications.add({
       kind: 'success',
-      message: getImageRecallMessage(result.fields),
-      title: getImageRecallTitle(kind),
+      message: getImageRecallMessage(result.fields, t),
+      title: getImageRecallTitle(kind, t),
     });
     if (skipMessage) {
       commands.notifications.add({

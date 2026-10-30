@@ -1,8 +1,12 @@
 import type { GalleryVideoItem } from '@features/gallery';
+import type * as GalleryBackendModule from '@features/gallery/data/backend';
 import type { ModelConfig } from '@features/models';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
+import type { TFunction } from 'i18next';
 
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
+import { QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const galleryApi = vi.hoisted(() => ({
@@ -12,10 +16,18 @@ const galleryApi = vi.hoisted(() => ({
 }));
 
 vi.mock('@features/gallery', () => galleryApi);
+// The transport under the gallery's shared metadata query.
+vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
+  ...(await importOriginal<typeof GalleryBackendModule>()),
+  getGalleryVideoMetadata: galleryApi.galleryVideos.metadata,
+}));
 
+import { galleryVideoMetadataOptions } from '@features/gallery/queries';
 import { createDefaultVideoWidgetValues } from '@features/video';
 
-import { executeVideoRecall } from './executeVideoRecall';
+import { applyVideoRecallMetadata, executeVideoRecall } from './executeVideoRecall';
+
+const t = ((key: string) => key) as unknown as TFunction;
 
 const wanModel = {
   base: 'wan',
@@ -98,9 +110,10 @@ const h3ReferenceMetadata = (conditioning: unknown) => ({
   width: 1344,
 });
 
-// `executeVideoRecall` memoizes metadata per video name, so each case recalls a distinct
-// output video rather than re-reading a cached answer.
+// The shared metadata entry answers once per video name, so each case recalls a distinct output video rather than
+// re-reading a cached answer.
 let recallSeq = 0;
+let queryClient: QueryClient;
 
 const recallReferences = async (conditioning: unknown) => {
   recallSeq += 1;
@@ -115,6 +128,8 @@ const recallReferences = async (conditioning: unknown) => {
   };
 
   await executeVideoRecall({
+    queryClient,
+    t,
     commands,
     getVideoValues: () => createDefaultVideoWidgetValues([h3Model]) as unknown as Record<string, unknown>,
     item: recalledItem,
@@ -168,6 +183,8 @@ const recallConditioningClip = async (
   const { commands, patchValues } = createCommands();
 
   await executeVideoRecall({
+    queryClient,
+    t,
     commands,
     getVideoValues: () => ({
       ...(createDefaultVideoWidgetValues([ltx2Model]) as unknown as Record<string, unknown>),
@@ -193,6 +210,7 @@ const createCommands = () => {
 
 describe('executeVideoRecall', () => {
   beforeEach(() => {
+    queryClient = new QueryClient();
     accountLifecycle.activate('test-account');
     galleryApi.galleryVideos.metadata.mockReset();
     galleryApi.galleryImages.resolveMany.mockReset();
@@ -207,6 +225,8 @@ describe('executeVideoRecall', () => {
     const videoValues = { ...createDefaultVideoWidgetValues([wanModel]), numFrames: 41, steps: 4 };
 
     const didRecall = await executeVideoRecall({
+      queryClient,
+      t,
       commands,
       getVideoValues: () => videoValues as unknown as Record<string, unknown>,
       item,
@@ -229,6 +249,8 @@ describe('executeVideoRecall', () => {
     const videoValues = createDefaultVideoWidgetValues([wanModel]);
 
     const didRecall = await executeVideoRecall({
+      queryClient,
+      t,
       commands,
       getVideoValues: () => videoValues as unknown as Record<string, unknown>,
       item,
@@ -245,10 +267,61 @@ describe('executeVideoRecall', () => {
       seed: 4321,
     });
   });
+
+  it('recalls from the metadata the menu already read, without reading it again', async () => {
+    galleryApi.galleryVideos.metadata.mockResolvedValue(metadata);
+    const { commands, patchValues } = createCommands();
+
+    // The menu derives its recall verbs from the same entry before the user picks one.
+    await queryClient.fetchQuery(galleryVideoMetadataOptions(accountLifecycle.capture(), item.name));
+    const didRecall = await executeVideoRecall({
+      queryClient,
+      t,
+      commands,
+      getVideoValues: () => createDefaultVideoWidgetValues([wanModel]) as unknown as Record<string, unknown>,
+      item,
+      kind: 'prompts',
+      models: [wanModel],
+    });
+
+    expect(didRecall).toBe(true);
+    expect(galleryApi.galleryVideos.metadata).toHaveBeenCalledOnce();
+    expect(patchValues).toHaveBeenCalledWith(
+      'video',
+      expect.objectContaining({ positivePrompt: 'a fox running' }),
+      undefined
+    );
+  });
+
+  it('reports a failed read and reads again on the next recall', async () => {
+    const { commands, patchValues } = createCommands();
+    const recall = () =>
+      executeVideoRecall({
+        queryClient,
+        t,
+        commands,
+        getVideoValues: () => createDefaultVideoWidgetValues([wanModel]) as unknown as Record<string, unknown>,
+        item,
+        kind: 'prompts',
+        models: [wanModel],
+      });
+
+    galleryApi.galleryVideos.metadata.mockRejectedValueOnce(new ApiError('Internal Server Error', 500));
+    await expect(recall()).resolves.toBe(false);
+    expect(commands.notifications.reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ area: 'video-recall', message: 'Internal Server Error' })
+    );
+
+    galleryApi.galleryVideos.metadata.mockResolvedValueOnce(metadata);
+    await expect(recall()).resolves.toBe(true);
+    expect(galleryApi.galleryVideos.metadata).toHaveBeenCalledTimes(2);
+    expect(patchValues).toHaveBeenCalledOnce();
+  });
 });
 
 describe('the LTX-2 keyframe and extend modes on recall', () => {
   beforeEach(() => {
+    queryClient = new QueryClient();
     accountLifecycle.activate('test-account');
     galleryApi.galleryVideos.metadata.mockReset();
     galleryApi.galleryItems.resolve.mockReset();
@@ -272,6 +345,8 @@ describe('the LTX-2 keyframe and extend modes on recall', () => {
     const { commands, patchValues } = createCommands();
 
     await executeVideoRecall({
+      queryClient,
+      t,
       commands,
       getVideoValues: () => createDefaultVideoWidgetValues([ltx2Model]) as unknown as Record<string, unknown>,
       item: { ...item, name: `ltx2-recall-${recallSeq}.mp4` },
@@ -308,6 +383,7 @@ describe('the LTX-2 keyframe and extend modes on recall', () => {
 
 describe('the LTX-2 conditioning clip on recall', () => {
   beforeEach(() => {
+    queryClient = new QueryClient();
     accountLifecycle.activate('test-account');
     galleryApi.galleryVideos.metadata.mockReset();
     galleryApi.galleryItems.resolve.mockReset();
@@ -378,6 +454,8 @@ describe('the LTX-2 conditioning clip on recall', () => {
     const { commands, patchValues } = createCommands();
 
     await executeVideoRecall({
+      queryClient,
+      t,
       commands,
       getVideoValues: () => ({
         ...(createDefaultVideoWidgetValues([ltx2Model]) as unknown as Record<string, unknown>),
@@ -404,6 +482,7 @@ describe('the LTX-2 conditioning clip on recall', () => {
 
 describe('ref2va reference conditioning on recall', () => {
   beforeEach(() => {
+    queryClient = new QueryClient();
     accountLifecycle.activate('test-account');
     galleryApi.galleryVideos.metadata.mockReset();
     galleryApi.galleryItems.resolve.mockReset();
@@ -423,5 +502,173 @@ describe('ref2va reference conditioning on recall', () => {
     expect(await recallReferences(undefined)).toMatchObject([{ conditioning: 'audio' }]);
     expect(await recallReferences(42)).toMatchObject([{ conditioning: 'audio' }]);
     expect(await recallReferences('nonsense')).toMatchObject([{ conditioning: 'audio' }]);
+  });
+});
+
+describe('reading the media a recall names', () => {
+  beforeEach(() => {
+    queryClient = new QueryClient();
+    accountLifecycle.activate('test-account');
+    galleryApi.galleryVideos.metadata.mockReset();
+    galleryApi.galleryItems.resolve.mockReset();
+    galleryApi.galleryImages.resolveMany.mockReset();
+  });
+
+  const videoReference = (name: string) => ({ conditioning: 'video', kind: 'video', video_name: name });
+  const galleryVideo = (name: string): GalleryVideoItem => ({ ...item, durationSeconds: 4, fps: 24, name });
+
+  const recallH3 = (recorded: Record<string, unknown>, getVideoValues?: () => Record<string, unknown>) => {
+    recallSeq += 1;
+    galleryApi.galleryVideos.metadata.mockResolvedValue({ ...h3ReferenceMetadata('video'), ...recorded });
+    const { commands, patchValues } = createCommands();
+    const recall = executeVideoRecall({
+      queryClient,
+      t,
+      commands,
+      getVideoValues:
+        getVideoValues ?? (() => createDefaultVideoWidgetValues([h3Model]) as unknown as Record<string, unknown>),
+      item: { ...item, name: `h3-output-${recallSeq}.mp4` },
+      kind: 'all',
+      models: [h3Model],
+    });
+
+    return {
+      commands,
+      recall,
+      written: () => patchValues.mock.calls.at(-1)?.[1] as Record<string, unknown> | undefined,
+    };
+  };
+
+  it('reads a clip that is both the source video and a reference once, and lands it in both slots', async () => {
+    galleryApi.galleryItems.resolve.mockImplementation(({ name }: { name: string }) =>
+      Promise.resolve(galleryVideo(name))
+    );
+
+    const { recall, written } = recallH3({
+      minimax_h3_references: [videoReference('long.mp4')],
+      source_video: { video_name: 'long.mp4' },
+    });
+
+    await expect(recall).resolves.toBe(true);
+    expect(galleryApi.galleryItems.resolve).toHaveBeenCalledOnce();
+    expect(written()).toMatchObject({
+      references: [{ clip: { video_name: 'long.mp4' }, kind: 'video' }],
+      sourceVideo: { video_name: 'long.mp4' },
+    });
+  });
+
+  it('keeps at most four video reads in flight', async () => {
+    const pending: { name: string; resolve: () => void }[] = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+
+    galleryApi.galleryItems.resolve.mockImplementation(
+      ({ name }: { name: string }) =>
+        new Promise((resolve) => {
+          inFlight += 1;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          pending.push({
+            name,
+            resolve: () => {
+              inFlight -= 1;
+              resolve(galleryVideo(name));
+            },
+          });
+        })
+    );
+
+    const names = ['a.mp4', 'b.mp4', 'c.mp4', 'd.mp4', 'e.mp4', 'f.mp4'];
+    const { recall } = recallH3({ minimax_h3_references: names.map(videoReference) });
+
+    await vi.waitFor(() => expect(pending).toHaveLength(4));
+    expect(galleryApi.galleryItems.resolve).toHaveBeenCalledTimes(4);
+    for (let answered = 0; answered < names.length; answered += 1) {
+      await vi.waitFor(() => expect(pending.length).toBeGreaterThan(0));
+      pending.shift()!.resolve();
+    }
+
+    await expect(recall).resolves.toBe(true);
+    expect(maxInFlight).toBe(4);
+  });
+
+  it('drops a deleted video and applies the rest, but reports any other failed read and applies nothing', async () => {
+    galleryApi.galleryItems.resolve.mockImplementation(({ name }: { name: string }) =>
+      name === 'deleted.mp4' ? Promise.reject(new ApiError('Not Found', 404)) : Promise.resolve(galleryVideo(name))
+    );
+
+    const deleted = recallH3({ minimax_h3_references: [videoReference('deleted.mp4'), videoReference('kept.mp4')] });
+
+    await expect(deleted.recall).resolves.toBe(true);
+    expect(deleted.written()).toMatchObject({ references: [{ clip: { video_name: 'kept.mp4' } }] });
+    expect(deleted.written()?.references).toHaveLength(1);
+
+    galleryApi.galleryItems.resolve.mockImplementation(({ name }: { name: string }) =>
+      name === 'broken.mp4'
+        ? Promise.reject(new ApiError('Internal Server Error', 500))
+        : Promise.resolve(galleryVideo(name))
+    );
+
+    const failed = recallH3({ minimax_h3_references: [videoReference('broken.mp4'), videoReference('kept.mp4')] });
+
+    await expect(failed.recall).resolves.toBe(false);
+    expect(failed.written()).toBeUndefined();
+    expect(failed.commands.notifications.reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ area: 'video-recall', message: 'Internal Server Error' })
+    );
+  });
+
+  it('applies on top of an edit made while the media loaded', async () => {
+    let finishRead: (() => void) | undefined;
+    let panel = { ...createDefaultVideoWidgetValues([h3Model]), seedMode: 'random' } as Record<string, unknown>;
+    const getVideoValues = () => panel;
+
+    galleryApi.galleryItems.resolve.mockImplementation(
+      ({ name }: { name: string }) =>
+        new Promise((resolve) => {
+          finishRead = () => resolve(galleryVideo(name));
+        })
+    );
+
+    const { recall, written } = recallH3(
+      { minimax_h3_references: [videoReference('kept.mp4')], seed: undefined },
+      getVideoValues
+    );
+
+    await vi.waitFor(() => expect(finishRead).toBeDefined());
+    panel = { ...panel, seed: 99, seedMode: 'fixed' };
+    finishRead!();
+
+    await expect(recall).resolves.toBe(true);
+    expect(written()).toMatchObject({
+      references: [{ clip: { video_name: 'kept.mp4' } }],
+      seed: 99,
+      seedMode: 'fixed',
+    });
+  });
+
+  it("never reads a medium a partial recall would drop for the panel's model, so its failure cannot fail the recall", async () => {
+    galleryApi.galleryItems.resolve.mockRejectedValue(new ApiError('Internal Server Error', 500));
+    const { commands, patchValues } = createCommands();
+
+    // No recorded model: the panel's text-to-video Wan stays, and it cannot extend a clip.
+    const didRecall = await applyVideoRecallMetadata({
+      commands,
+      emptyNotice: { message: 'nothing', title: 'nothing' },
+      getVideoValues: () => createDefaultVideoWidgetValues([wanModel]) as unknown as Record<string, unknown>,
+      kind: 'all',
+      metadata: { positive_prompt: 'a heron', source_video: { video_name: 'source.mp4' } },
+      models: [wanModel],
+      owner: accountLifecycle.capture(),
+      partial: true,
+      requireGenerationMode: false,
+      t,
+    });
+
+    expect(didRecall).toBe(true);
+    expect(galleryApi.galleryItems.resolve).not.toHaveBeenCalled();
+    expect(commands.notifications.reportError).not.toHaveBeenCalled();
+    // The dropped clip leaves only the prompt to apply.
+    expect(patchValues.mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining({ positivePrompt: 'a heron' }));
+    expect(patchValues.mock.calls.at(-1)?.[1]).not.toHaveProperty('sourceVideo');
   });
 });
