@@ -62,6 +62,7 @@ IDEAL_SIZE_AT_NODE_DEFAULTS: dict[BaseModelType, tuple[int, int]] = {
     # dimensions as an area keeps it at its own scale. Every other row is unchanged by that,
     # because their declared defaults are square.
     BaseModelType.MiniMaxH3: (1344, 736),
+    BaseModelType.MossImage: (1360, 768),
     BaseModelType.QwenImage: (1360, 768),
     # A 32-pixel grid, as CogView4: 1365.3 -> 1365 -> 1344.
     BaseModelType.QwenImage21: (1344, 768),

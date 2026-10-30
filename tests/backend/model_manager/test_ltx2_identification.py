@@ -9,6 +9,8 @@ does -- including that no other config claims these folders first.
 import json
 from pathlib import Path
 
+import gguf
+import numpy as np
 import pytest
 import torch
 from safetensors.torch import save_file
@@ -16,11 +18,19 @@ from safetensors.torch import save_file
 from invokeai.backend.ltx2 import checkpoint_layout as layout
 from invokeai.backend.ltx2 import component_configs as cc
 from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
-from invokeai.backend.model_manager.configs.gemma4_encoder import Gemma4Encoder_Gemma4Encoder_LTX2_Config
+from invokeai.backend.model_manager.configs.gemma4_encoder import (
+    Gemma4Encoder_Gemma4Encoder_LTX2_Config,
+    Gemma4Encoder_GGUF_LTX2_Config,
+)
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
-from invokeai.backend.model_manager.configs.main import Main_Checkpoint_LTX2_Config, Main_Diffusers_LTX2_Config
+from invokeai.backend.model_manager.configs.main import (
+    Main_Checkpoint_LTX2_Config,
+    Main_Diffusers_LTX2_Config,
+    Main_GGUF_LTX2_Config,
+)
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, LTX2VariantType, ModelFormat, ModelType
+from tests.fixtures.quantized_payloads import q8_cr_marker, write_gguf
 
 T = "model.diffusion_model."
 
@@ -237,11 +247,126 @@ def test_the_variant_override_wins_over_the_filename(tmp_path) -> None:
     assert config.variant is LTX2VariantType.Distilled
 
 
-def test_a_transformer_with_video_feed_forward_biases_is_an_earlier_generation(tmp_path) -> None:
+def test_a_transformer_with_video_feed_forward_biases_is_refused_as_an_earlier_generation(tmp_path) -> None:
+    """Without a header version the structure still dates it: refused with the reason, not left as an
+    unknown model. Its biases say 2.0 or 2.3, which the structure cannot tell apart."""
     path = tmp_path / "ltx-2.3-22b-dev.safetensors"
     save_file(_transformer_tensors(video_ff_bias=True), path)
-    rejection = _rejection(path, Main_Checkpoint_LTX2_Config)
-    assert "cannot tell which LTX-2 generation" in str(rejection)
+    result = _probe(path)
+    assert result.config is None
+    rejection = result.details[Main_Checkpoint_LTX2_Config.__name__]
+    assert isinstance(rejection, InvalidMatchError)
+    assert "is an LTX-2.0/2.3 file" in str(rejection)
+
+
+# --- GGUF single-file transformer config -----------------------------------------------------------
+
+
+def _write_transformer_gguf(
+    path: Path,
+    *,
+    prefix: str = "",
+    architecture: str = "ltxv",
+    metadata: dict[str, str] | None = None,
+    video_ff_bias: bool = False,
+    keyframe: bool = True,
+) -> Path:
+    """The transformer keys as the community GGUFs carry them: bare or prefixed, under a borrowed or
+    misleading `general.architecture`, with or without the official `model_version` string."""
+    tensors = _transformer_tensors(video_ff_bias=video_ff_bias, keyframe=keyframe)
+    write_gguf(
+        path,
+        {prefix + key[len(T) :]: value for key, value in tensors.items()},
+        architecture=architecture,
+        metadata=metadata,
+    )
+    return path
+
+
+@pytest.mark.parametrize(
+    ("name", "prefix", "architecture", "metadata", "variant"),
+    [
+        # vantagewithai / Abiray: bare keys, the official version carried over.
+        ("ltx-2.5-22b-dev-transformer-Q4_K_M.gguf", "", "ltxv", {"model_version": "2.5.0"}, LTX2VariantType.Dev),
+        # realrebelai / molbal: no version string, dated by structure.
+        ("LTX-2.5-Distilled-Q8_0.gguf", "", "ltxv", None, LTX2VariantType.Distilled),
+        # ruygar: prefixed keys, another model's architecture and a renamed version key.
+        (
+            "ltx-2.5-22b-distilled-transformer-bf16-Q4_K_M.gguf",
+            T,
+            "llama",
+            {"safetensors.model_version": "2.5.0"},
+            LTX2VariantType.Distilled,
+        ),
+    ],
+    ids=["vantagewithai", "realrebelai", "ruygar"],
+)
+def test_a_published_gguf_installs_as_the_ltx2_transformer_whatever_its_header_says(
+    tmp_path: Path, name: str, prefix: str, architecture: str, metadata: dict[str, str] | None, variant
+) -> None:
+    path = _write_transformer_gguf(tmp_path / name, prefix=prefix, architecture=architecture, metadata=metadata)
+
+    result = _probe(path)
+
+    assert result.match_count == 1, [type(match).__name__ for match in result.all_matches]
+    assert isinstance(result.config, Main_GGUF_LTX2_Config)
+    assert result.config.format is ModelFormat.GGUFQuantized
+    assert result.config.generation == "2.5"
+    assert result.config.variant is variant
+
+
+@pytest.mark.parametrize(
+    ("metadata", "named"),
+    [
+        # QuantStack keeps the version.
+        ({"model_version": "2.3.0"}, "is an LTX-2.3 file"),
+        # unsloth drops it: the structure dates the file, as far as it can.
+        (None, "is an LTX-2.0/2.3 file"),
+    ],
+    ids=["quantstack", "unsloth"],
+)
+def test_an_ltx2_3_gguf_is_refused_naming_its_generation(tmp_path: Path, metadata, named: str) -> None:
+    path = _write_transformer_gguf(
+        tmp_path / "ltx-2.3-22b-dev-Q4_K_M.gguf", metadata=metadata, video_ff_bias=True, keyframe=False
+    )
+
+    result = _probe(path)
+
+    assert result.config is None, "an invalid match is final: nothing is registered"
+    rejection = result.details[Main_GGUF_LTX2_Config.__name__]
+    assert isinstance(rejection, InvalidMatchError)
+    assert named in str(rejection) and "only LTX-2.5" in str(rejection)
+
+
+def test_a_q8_cr_gguf_is_refused_as_q8_cr_whatever_its_markers_name(tmp_path: Path) -> None:
+    """molbal's Q8_CR build marks the keyframe embedding too, which is not a weight. Refused for what the
+    file is, not for that detail of it: no LTX-2 loader decodes ComfyUI-GGUF's own schemes."""
+    path = tmp_path / "ltx-2.5-22b-distilled-transformer-Q8_CR.gguf"
+    tensors = {key[len(T) :]: value for key, value in _transformer_tensors().items()}
+    tensors["keyframes_abs_pos_embedding"] = torch.zeros(1, 2, dtype=torch.int8)
+    tensors["keyframes_abs_pos_embedding_scale"] = torch.ones(1, 1)
+    write_gguf(path, tensors, quant={"keyframes_abs_pos_embedding": q8_cr_marker()}, architecture="ltxv")
+
+    result = _probe(path)
+
+    assert result.config is None
+    assert any("Q8_CR" in str(reason) for reason in result.invalid_matches)
+    assert not any("not a weight" in str(reason) for reason in result.invalid_matches)
+
+
+def test_an_ltxv_gguf_without_the_transformer_fingerprint_is_not_claimed(tmp_path: Path) -> None:
+    path = tmp_path / "something-ltxv.gguf"
+    write_gguf(path, {"transformer_blocks.0.attn1.to_q.weight": torch.zeros(2, 2)}, architecture="ltxv")
+
+    assert isinstance(_rejection(path, Main_GGUF_LTX2_Config), NotAMatchError)
+
+
+def test_a_safetensors_transformer_is_not_claimed_as_gguf(tmp_path: Path) -> None:
+    path = tmp_path / "ltx-2.5-22b-dev_diffusion_model_bf16.safetensors"
+    save_file(_transformer_tensors(), path)
+
+    assert isinstance(_rejection(path, Main_GGUF_LTX2_Config), NotAMatchError)
+    assert isinstance(_probe(path).config, Main_Checkpoint_LTX2_Config)
 
 
 # --- Gemma-4 encoder folder ---------------------------------------------------------------------
@@ -287,6 +412,153 @@ def test_a_gemma4_of_another_size_cannot_feed_the_connectors(tmp_path: Path) -> 
     _write_gemma4(tmp_path, ["te.safetensors"], config=_gemma4_config(hidden_size=2560, num_layers=32))
     rejection = _rejection(tmp_path, Gemma4Encoder_Gemma4Encoder_LTX2_Config)
     assert "hidden_size 3840" in str(rejection)
+
+
+# --- Gemma-4 encoder GGUF ------------------------------------------------------------------------
+
+
+def _write_gemma4_gguf(
+    path: Path,
+    *,
+    naming: str = "hf",
+    hidden_size: int = 3840,
+    num_layers: int = 48,
+    architecture: str = "ltxv",
+    config_key: str | None = "config",
+    assets: bool = True,
+    asset_type: gguf.GGMLQuantizationType = gguf.GGMLQuantizationType.I8,
+    layer_scalars: bool = True,
+) -> Path:
+    """A Gemma-4 GGUF with the published key set at its real width and depth, a few rows of data per tensor.
+
+    ``naming="hf"`` is the layout of the LTX conversions (elix3r, Rootport: Hugging Face names, the tokenizer
+    files and the unified config packed in); ``"llama.cpp"`` is Google's stock Gemma-4 as llama.cpp converts it.
+    """
+    writer = gguf.GGUFWriter(str(path), architecture)
+    rows = np.zeros((4, hidden_size), dtype=np.float32)
+    quantized = gguf.quants.quantize(np.zeros((32, hidden_size), dtype=np.float32), gguf.GGMLQuantizationType.Q8_0)
+    if naming == "hf":
+        writer.add_tensor("model.embed_tokens.weight", rows)
+        writer.add_tensor("model.norm.weight", np.ones(hidden_size, dtype=np.float32))
+        for layer in range(num_layers):
+            if layer_scalars:
+                writer.add_tensor(f"model.layers.{layer}.layer_scalar", np.ones(1, dtype=np.float32))
+            writer.add_tensor(
+                f"model.layers.{layer}.self_attn.q_proj.weight",
+                quantized,
+                raw_shape=quantized.shape,
+                raw_dtype=gguf.GGMLQuantizationType.Q8_0,
+            )
+        writer.add_tensor("text_embedding_projection.video_aggregate_embed.weight", np.zeros((4, 32), np.float32))
+        if assets:
+            for name in ("tokenizer_json", "hf_asset__tokenizer_config.json"):
+                data = np.frombuffer(b'{"tokenizer": true}', dtype=np.uint8)
+                as_stored = data.view(np.int8) if asset_type is gguf.GGMLQuantizationType.I8 else data.astype(np.int16)
+                writer.add_tensor(name, as_stored, raw_dtype=asset_type)
+    else:
+        writer.add_tensor("token_embd.weight", rows)
+        writer.add_tensor("output_norm.weight", np.ones(hidden_size, dtype=np.float32))
+        for layer in range(num_layers):
+            writer.add_tensor(
+                f"blk.{layer}.attn_q.weight",
+                quantized,
+                raw_shape=quantized.shape,
+                raw_dtype=gguf.GGMLQuantizationType.Q8_0,
+            )
+            writer.add_tensor(f"blk.{layer}.post_attention_norm.weight", np.ones(hidden_size, dtype=np.float32))
+    if config_key is not None:
+        text_config = {"model_type": "gemma4_text", "hidden_size": hidden_size, "num_hidden_layers": num_layers}
+        writer.add_string(
+            config_key,
+            json.dumps({"architectures": ["Gemma4UnifiedForConditionalGeneration"], "text_config": text_config}),
+        )
+    writer.write_header_to_file()
+    writer.write_kv_data_to_file()
+    writer.write_tensors_to_file()
+    writer.close()
+    return path
+
+
+@pytest.mark.parametrize(
+    ("architecture", "config_key", "asset_type"),
+    [
+        ("ltxv", "config", gguf.GGMLQuantizationType.I8),
+        ("gemma4", "source.safetensors.gemma_config", gguf.GGMLQuantizationType.I16),
+    ],
+    ids=["rootport", "elix3r"],
+)
+def test_an_ltx_gemma4_gguf_installs_as_the_encoder_whatever_its_header_says(
+    tmp_path: Path, architecture: str, config_key: str, asset_type
+) -> None:
+    path = _write_gemma4_gguf(
+        tmp_path / "gemma4-12b-ltx-text-encoder.gguf",
+        architecture=architecture,
+        config_key=config_key,
+        asset_type=asset_type,
+    )
+
+    result = _probe(path)
+
+    assert result.match_count == 1, [type(match).__name__ for match in result.all_matches]
+    assert isinstance(result.config, Gemma4Encoder_GGUF_LTX2_Config)
+    assert (result.config.base, result.config.format) == (BaseModelType.LTX2, ModelFormat.GGUFQuantized)
+
+
+def test_a_stock_llama_cpp_gemma4_12b_gguf_is_refused_as_not_the_ltx_fine_tune(tmp_path: Path) -> None:
+    """Same width and depth, different weights: Google's Gemma-4-12B cannot stand in for the LTX-tuned one."""
+    path = _write_gemma4_gguf(tmp_path / "gemma-4-12B-it-Q4_K_M.gguf", naming="llama.cpp", architecture="gemma4")
+
+    result = _probe(path)
+
+    assert result.config is None
+    assert any("llama.cpp layout" in str(reason) for reason in result.invalid_matches)
+
+
+@pytest.mark.parametrize("naming", ["llama.cpp", "hf"], ids=["llama.cpp", "hf-names-without-layer-scalars"])
+def test_a_gemma3_12b_gguf_is_left_unclaimed(tmp_path: Path, naming: str) -> None:
+    """Gemma-3-12B, LTX-2.0's encoder, has the Gemma-4-12B's width and depth. It is neither refused as the stock
+    Gemma-4 nor taken for the LTX tower: its header names it, and it has no layer scalars."""
+    path = _write_gemma4_gguf(
+        tmp_path / "gemma-3-12b-it-Q4_K_M.gguf", naming=naming, architecture="gemma3", layer_scalars=False
+    )
+
+    assert isinstance(_rejection(path, Gemma4Encoder_GGUF_LTX2_Config), NotAMatchError)
+
+
+@pytest.mark.parametrize(
+    ("missing", "named"),
+    [({"assets": False}, "carries no tokenizer"), ({"config_key": None}, "no model config")],
+    ids=["tokenizer", "config"],
+)
+def test_an_ltx_gemma4_gguf_without_what_it_needs_besides_the_weights_is_refused(
+    tmp_path: Path, missing: dict, named: str
+) -> None:
+    path = _write_gemma4_gguf(tmp_path / "gemma4-12b-ltx-text-encoder.gguf", **missing)
+
+    assert _refused_with(path, named)
+
+
+def _refused_with(path: Path, named: str) -> bool:
+    result = _probe(path)
+    return result.config is None and any(named in str(reason) for reason in result.invalid_matches)
+
+
+def test_a_gemma4_gguf_of_another_size_is_left_unclaimed(tmp_path: Path) -> None:
+    path = _write_gemma4_gguf(tmp_path / "gemma4-e4b.gguf", hidden_size=2560, num_layers=34)
+
+    assert isinstance(_rejection(path, Gemma4Encoder_GGUF_LTX2_Config), NotAMatchError)
+
+
+def test_an_mmproj_file_is_left_unclaimed(tmp_path: Path) -> None:
+    """The vision projector llama.cpp ships beside a Gemma-4 GGUF."""
+    path = tmp_path / "mmproj-gemma-4-12B-it-f16.gguf"
+    write_gguf(
+        path,
+        {"v.patch_embd.weight": torch.zeros(4, 4), "mm.input_projection.weight": torch.zeros(4, 4)},
+        architecture="clip",
+    )
+
+    assert isinstance(_rejection(path, Gemma4Encoder_GGUF_LTX2_Config), NotAMatchError)
 
 
 # --- key maps onto the diffusers classes --------------------------------------------------------

@@ -15,9 +15,16 @@ from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
+from socketio.packet import Packet
 
 from invokeai.app.api.sockets import SOCKET_REVALIDATION_FAILURE_LIMIT, SocketIO
-from invokeai.app.services.events.events_common import UserAccessChangedEvent
+from invokeai.app.services.events.events_common import (
+    BulkDownloadCompleteEvent,
+    InvocationCompleteEvent,
+    ModelInstallStartedEvent,
+    QueueClearedEvent,
+    UserAccessChangedEvent,
+)
 from invokeai.app.services.progress_previews.progress_previews_default import MemoryProgressPreviews
 
 
@@ -1246,3 +1253,204 @@ class TestHandlerRereadsAtThePointOfDecision:
         socketio._sio.enter_room.assert_not_awaited()
         socketio._sio.leave_room.assert_awaited_once_with("sid-1", "admin")
         assert socketio._socket_users["sid-1"]["is_admin"] is False
+
+
+class TestClientNamedRoomsCannotReachPrivilegedRooms:
+    """Queue and bulk-download ids are chosen by the client; they must not name a privileged room.
+
+    Uses python-socketio's real room manager so the assertion is about actual membership.
+    """
+
+    @staticmethod
+    async def _connect(socketio: SocketIO, eio_sid: str) -> str:
+        sid = socketio._sio.manager.connect(eio_sid, "/")
+        return (await sid) if asyncio.iscoroutine(sid) else sid
+
+    @classmethod
+    async def _connect_non_admin(cls, socketio: SocketIO) -> str:
+        sid = await cls._connect(socketio, "eio-attacker")
+        socketio._socket_users[sid] = {"user_id": "attacker", "is_admin": False, "authenticated": True}
+        return sid
+
+    @staticmethod
+    async def _subscribe(socketio: SocketIO, sid: str, kind: str, room_id: str) -> None:
+        if kind == "queue":
+            await socketio._handle_sub_queue(sid, {"queue_id": room_id})
+        else:
+            await socketio._handle_sub_bulk_download(sid, {"bulk_download_id": room_id})
+
+    @staticmethod
+    def _deliveries(transport: AsyncMock) -> dict[str, list[list]]:
+        deliveries: dict[str, list[list]] = {}
+        for call in transport.await_args_list:
+            eio_sid, packet = call.args
+            deliveries.setdefault(eio_sid, []).append(Packet(encoded_packet=packet.data).data)
+        return deliveries
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("handler", ["queue", "bulk_download"])
+    async def test_hostile_subscriptions_cannot_receive_private_events(
+        self, monkeypatch: pytest.MonkeyPatch, handler: str
+    ) -> None:
+        monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies.invoker", None, raising=False)
+        socketio = SocketIO(FastAPI())
+        socketio._is_multiuser_enabled = lambda: True
+        transport = AsyncMock()
+        socketio._sio._send_eio_packet = transport
+        victim_sid = await self._connect(socketio, "eio-victim")
+        admin_sid = await self._connect(socketio, "eio-admin")
+        await socketio._sio.enter_room(victim_sid, "user:victim")
+        await socketio._sio.enter_room(admin_sid, "admin")
+        attacker_sid = await self._connect_non_admin(socketio)
+
+        for hostile_id in ("admin", "user:victim", victim_sid):
+            await self._subscribe(socketio, attacker_sid, handler, hostile_id)
+
+        invocation = InvocationCompleteEvent(
+            queue_id="default",
+            item_id=1,
+            batch_id="private-batch",
+            user_id="victim",
+            session_id="private-session",
+            invocation={"type": "add", "id": "node-1", "a": 1, "b": 2},
+            invocation_source_id="node-1",
+            result={"type": "integer_output", "value": 3},
+        )
+        install = ModelInstallStartedEvent(id=1, source={"type": "url", "url": "https://example.com/model"})
+        await socketio._handle_queue_event(("invocation_complete", invocation))
+        await socketio._handle_model_event(("model_install_started", install))
+        await socketio._sio.emit("private_socket_reply", {"secret": "victim-only"}, to=victim_sid)
+
+        assert self._deliveries(transport) == {
+            "eio-victim": [
+                ["invocation_complete", invocation.model_dump(mode="json")],
+                ["private_socket_reply", {"secret": "victim-only"}],
+            ],
+            "eio-admin": [
+                ["invocation_complete", invocation.model_dump(mode="json")],
+                ["model_install_started", install.model_dump(mode="json")],
+            ],
+        }
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("handler", ["queue", "bulk_download"])
+    async def test_hostile_unsubscriptions_preserve_server_owned_rooms(self, handler: str) -> None:
+        socketio = SocketIO(FastAPI())
+        sid = await self._connect(socketio, "eio-victim")
+        for room in ("user:victim", "admin", "workflows:shared"):
+            await socketio._sio.enter_room(sid, room)
+        server_rooms = set(socketio._sio.manager.get_rooms(sid, "/"))
+
+        for hostile_id in ("user:victim", "admin", "workflows:shared", sid):
+            if handler == "queue":
+                await socketio._handle_unsub_queue(sid, {"queue_id": hostile_id})
+            else:
+                await socketio._handle_unsub_bulk_download(sid, {"bulk_download_id": hostile_id})
+
+        assert set(socketio._sio.manager.get_rooms(sid, "/")) == server_rooms
+
+    @pytest.mark.anyio
+    async def test_queue_subscriber_receives_only_sanitized_companion_and_can_unsubscribe(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies.invoker", None, raising=False)
+        socketio = SocketIO(FastAPI())
+        socketio._is_multiuser_enabled = lambda: True
+        transport = AsyncMock()
+        socketio._sio._send_eio_packet = transport
+        subscriber_sid = await self._connect_non_admin(socketio)
+        await socketio._handle_sub_queue(subscriber_sid, {"queue_id": "default"})
+        bulk_sid = await self._connect(socketio, "eio-bulk")
+        socketio._socket_users[bulk_sid] = {"user_id": "other", "is_admin": False}
+        await socketio._handle_sub_bulk_download(bulk_sid, {"bulk_download_id": "default"})
+        event = QueueClearedEvent(queue_id="default", user_id="victim")
+
+        await socketio._handle_queue_event(("queue_cleared", event))
+
+        assert self._deliveries(transport) == {
+            "eio-attacker": [["queue_cleared", {**event.model_dump(mode="json"), "user_id": "redacted"}]]
+        }
+        await socketio._handle_unsub_queue(subscriber_sid, {"queue_id": "default"})
+        transport.reset_mock()
+        await socketio._handle_queue_event(("queue_cleared", event))
+        transport.assert_not_awaited()
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("handler", ["queue", "bulk_download"])
+    @pytest.mark.parametrize("hostile_id", ["admin", "user:victim", "workflows:shared"])
+    async def test_subscription_cannot_join_privileged_room(
+        self, monkeypatch: pytest.MonkeyPatch, handler: str, hostile_id: str
+    ) -> None:
+        monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies.invoker", None, raising=False)
+        socketio = SocketIO(FastAPI())
+        socketio._is_multiuser_enabled = lambda: True
+        sid = await self._connect_non_admin(socketio)
+
+        await self._subscribe(socketio, sid, handler, hostile_id)
+
+        rooms = socketio._sio.manager.get_rooms(sid, "/")
+        assert "admin" not in rooms
+        assert "user:victim" not in rooms
+        assert "workflows:shared" not in rooms
+        assert f"{handler}:{hostile_id}" in rooms
+
+    @pytest.mark.anyio
+    @pytest.mark.parametrize("handler", ["queue", "bulk_download"])
+    async def test_subscription_cannot_join_another_sockets_sid_room(
+        self, monkeypatch: pytest.MonkeyPatch, handler: str
+    ) -> None:
+        monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies.invoker", None, raising=False)
+        socketio = SocketIO(FastAPI())
+        socketio._is_multiuser_enabled = lambda: True
+        victim_sid = await self._connect(socketio, "eio-victim")
+        sid = await self._connect_non_admin(socketio)
+
+        await self._subscribe(socketio, sid, handler, victim_sid)
+
+        assert victim_sid not in socketio._sio.manager.get_rooms(sid, "/")
+        assert f"{handler}:{victim_sid}" in socketio._sio.manager.get_rooms(sid, "/")
+
+    @pytest.mark.anyio
+    async def test_default_queue_subscription_lands_in_namespaced_room(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies.invoker", None, raising=False)
+        socketio = SocketIO(FastAPI())
+        socketio._is_multiuser_enabled = lambda: True
+        sid = await self._connect_non_admin(socketio)
+
+        await socketio._handle_sub_queue(sid, {"queue_id": "default"})
+        assert {"queue:default", "user:attacker"} <= set(socketio._sio.manager.get_rooms(sid, "/"))
+
+        await socketio._handle_unsub_queue(sid, {"queue_id": "default"})
+        assert "queue:default" not in socketio._sio.manager.get_rooms(sid, "/")
+
+    @pytest.mark.anyio
+    async def test_bulk_download_subscription_round_trips_through_namespaced_room(self) -> None:
+        socketio = SocketIO(FastAPI())
+        socketio._is_multiuser_enabled = lambda: True
+        sid = await self._connect_non_admin(socketio)
+
+        await socketio._handle_sub_bulk_download(sid, {"bulk_download_id": "dl-1"})
+        assert "bulk_download:dl-1" in socketio._sio.manager.get_rooms(sid, "/")
+
+        await socketio._handle_unsub_bulk_download(sid, {"bulk_download_id": "dl-1"})
+        assert "bulk_download:dl-1" not in socketio._sio.manager.get_rooms(sid, "/")
+
+    @pytest.mark.anyio
+    async def test_single_user_bulk_download_event_targets_namespaced_room(self) -> None:
+        socketio = SocketIO(FastAPI())
+        socketio._is_multiuser_enabled = lambda: False
+        transport = AsyncMock()
+        socketio._sio._send_eio_packet = transport
+        sid = await self._connect(socketio, "eio-bulk")
+        await socketio._handle_sub_bulk_download(sid, {"bulk_download_id": "queue:default"})
+        queue_sid = await self._connect(socketio, "eio-queue")
+        await socketio._sio.enter_room(queue_sid, "queue:default")
+        event = BulkDownloadCompleteEvent.build("queue:default", "item-1", "item-1.zip", user_id="system")
+
+        await socketio._handle_bulk_image_download_event(("bulk_download_complete", event))
+
+        assert self._deliveries(transport) == {"eio-bulk": [["bulk_download_complete", event.model_dump(mode="json")]]}
+        await socketio._handle_unsub_bulk_download(sid, {"bulk_download_id": "queue:default"})
+        transport.reset_mock()
+        await socketio._handle_bulk_image_download_event(("bulk_download_complete", event))
+        transport.assert_not_awaited()

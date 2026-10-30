@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
-from invokeai.app.api.extract_metadata import ExtractedMetadata, extract_metadata_from_image
+from invokeai.app.api.extract_metadata import ExtractedMetadata, extract_metadata, extract_metadata_from_image
 
 
 @pytest.fixture
@@ -223,6 +223,55 @@ def test_empty_string_overrides_do_not_fall_back_to_image_metadata(
     assert result.invokeai_graph is None
 
 
+def test_image_extraction_preserves_community_resolved_inputs_verbatim(mock_logger):
+    resolved = '{ "nodes": {"custom": {"type": "community_node", "input": null}}, "edges": [], "extra": true }\n'
+    source = '{ "nodes": {}, "edges": [] }'
+    override = '{"resolved_inputs": "user metadata", "invokeai_resolved_inputs": {"custom": true}}'
+    with Image.new("RGB", (2, 2)) as image:
+        image.info = {
+            "invokeai_graph": source,
+            "invokeai_metadata": '{"seed": 0}',
+            "invokeai_resolved_inputs": resolved,
+        }
+        result = extract_metadata_from_image(image, override, None, None, mock_logger)
+        shared = extract_metadata(image.info, override, None, None, mock_logger)
+    assert result == ExtractedMetadata(override, None, source, resolved)
+    # The shared entry point still handles only the three common channels, including old positional callers.
+    assert shared == ExtractedMetadata(override, None, source)
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        None,
+        42,
+        {"nodes": {}, "edges": []},
+        "",
+        "not JSON",
+        "null",
+        "[]",
+        "{}",
+        '{"nodes": [], "edges": []}',
+        '{"nodes": {}, "edges": {}}',
+        '{"nodes": {}}',
+        '{"edges": []}',
+    ],
+)
+def test_bad_optional_image_inputs_leave_common_channels_intact(mock_logger, raw):
+    metadata = '{"seed": 18, "resolved_inputs": "user-owned"}'
+    workflow = json.dumps(MINIMAL_WORKFLOW)
+    graph = '{"nodes": {}, "edges": []}'
+    with Image.new("RGB", (2, 2)) as image:
+        image.info = {
+            "invokeai_metadata": metadata,
+            "invokeai_workflow": workflow,
+            "invokeai_graph": graph,
+            "invokeai_resolved_inputs": raw,
+        }
+        result = extract_metadata_from_image(image, None, None, None, mock_logger)
+    assert result == ExtractedMetadata(metadata, workflow, graph)
+
+
 # --- MP4 sources -----------------------------------------------------------------------------
 
 
@@ -247,6 +296,8 @@ def tagged_mp4(tmp_path_factory: pytest.TempPathFactory):
         "invokeai_metadata": json.dumps({"seed": 42, "generation_mode": "wan_t2v"}),
         "invokeai_workflow": json.dumps(MINIMAL_WORKFLOW),
         "invokeai_graph": json.dumps({"nodes": {}, "edges": []}),
+        # PNG's optional diagnostic channel is not part of the MP4 extraction contract.
+        "invokeai_resolved_inputs": json.dumps({"nodes": {}, "edges": []}),
     }
     write_mp4_tags(plain, tagged, tags)
     return tagged, plain, tags

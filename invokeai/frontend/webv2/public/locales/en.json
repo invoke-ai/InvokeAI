@@ -911,6 +911,22 @@
         "How strongly the reference's look is transferred. 1.0 is the recommended setting; 2.0 is a heavier effect and 0 turns the reference off."
       ]
     },
+    "krea2ReferenceMode": {
+      "heading": "Reference Mode",
+      "paragraphs": [
+        "Style transfers one reference's look (palette, texture, rendering) while the prompt keeps driving the content. It needs no LoRA.",
+        "Edit is for Krea-2 edit LoRAs, such as the pose and depth LoRAs: the model reads up to three enabled references in card order and the prompt describes what to make of them. Without such a LoRA in Concepts the model copies the references. Edit references cannot be combined with a style reference or with regional guidance.",
+        "A single reference starts as Style. For an edit LoRA that takes one reference, such as a pose skeleton, switch it to Edit. Adding a second image turns a Style reference still at its default strength into Edit as well.",
+        "Some edit LoRAs, such as pose LoRAs trained with isolated references, also need Reference K/V cache under Advanced. Check the LoRA's model card."
+      ]
+    },
+    "krea2ReferenceKvCache": {
+      "heading": "Reference K/V Cache",
+      "paragraphs": [
+        "For Krea-2 edit LoRAs trained with isolated references (ai-toolkit's kv_cache option), such as the thedeoxen Krea-2 pose LoRA. The references then run through the model once per generation instead of in every step, which is faster.",
+        "Leave it off for normal edit LoRAs. The LoRA file does not say which kind it is; check its model card. It applies only with Edit references and an edit LoRA in Concepts; otherwise it keeps its setting but is not used."
+      ]
+    },
     "timestepShift": {
       "heading": "Timestep Shift",
       "paragraphs": [
@@ -1063,7 +1079,8 @@
     "qwen3VlEncoder": {
       "heading": "Qwen3-VL Encoder",
       "paragraphs": [
-        "Krea-2 reads your prompt with the Qwen3-VL 4B text encoder. A single-file or GGUF checkpoint does not carry one, so it has to be selected here."
+        "Krea-2 reads your prompt with the Qwen3-VL 4B text encoder. A single-file or GGUF checkpoint does not carry one, so it has to be selected here.",
+        "Krea-2 edit references are read by the encoder's vision weights, which a GGUF encoder does not have."
       ]
     },
     "qwenVlEncoder": {
@@ -1676,7 +1693,98 @@
     "variant": "Variant",
     "variantHelp": "Architecture variant, e.g. inpaint or dev.",
     "viewModel": "View model",
-    "viewQueue": "View queue"
+    "viewQueue": "View queue",
+    "workingMemory": {
+      "title": "Working memory",
+      "description": "Measures this model's VAE decode on this GPU, so Invoke reserves what it really needs.",
+      "loadFailed": "Could not load working memory",
+      "stateInUse": "Calibrated",
+      "stateStale": "May be outdated",
+      "stateUnusable": "Not used",
+      "stateInsufficient": "Too few sizes",
+      "stateInterrupted": "Interrupted",
+      "stateNone": "Not calibrated",
+      "operationDecode": "Decode",
+      "operationEncode": "Encode",
+      "pair": "{{label}} · {{detail}}",
+      "size": "{{width}} × {{height}}",
+      "measuredRange": "Fitted on {{min}}–{{max}} MP",
+      "tableLabel": "{{line}} measurements",
+      "columnSize": "Size",
+      "columnMeasured": "Measured",
+      "columnShipped": "Built-in",
+      "columnCalibrated": "Calibrated estimate",
+      "aboutColumn": "About {{column}}",
+      "hintMeasured": "The most VRAM the decode took at this size on this GPU, beyond the model weights.",
+      "hintShipped": "What Invoke reserves without calibration: values measured on reference GPUs, plus 5%.",
+      "hintCalibrated": "What Invoke reserves after calibration: a line fitted over your counted measurements, plus 5%. Beyond the largest measured size, the larger of this and Built-in applies.",
+      "notCounted": "Not counted",
+      "notCountedFragmented": "Not counted: allocator fragmentation",
+      "notCountedPartial": "Not counted: model not fully on GPU",
+      "notCountedAborted": "Not counted: calibration interrupted",
+      "helpInUse": "Estimates use these measurements.",
+      "helpStale": "Still used, but {{facts}} changed since.",
+      "helpUnusable": "Built-in estimates apply: {{facts}} differs.",
+      "helpUnusableNoFacts": "Built-in estimates apply: measured on a GPU not present here.",
+      "helpInsufficient": "Built-in estimates apply until more sizes are measured.",
+      "helpInterrupted": "Measured only by an interrupted calibration. Built-in estimates apply until you calibrate again.",
+      "sharedWith_one": "Also changes {{count}} other model",
+      "sharedWith_other": "Also changes {{count}} other models",
+      "notVerified": "Measurement method not verified on this hardware",
+      "neverCalibrated": "Not calibrated on this GPU. Built-in estimates apply.",
+      "usesOthers": "Uses measurements from other models on this GPU.",
+      "measuredBy": "Measured on: {{models}}",
+      "removedModel": "Removed model",
+      "modelRemoved": "This model is no longer installed.",
+      "encodeNotCovered": "Image-to-image and inpainting encodes keep the built-in estimates.",
+      "floorNote": "Only matters above the working-memory floor. It can change which large decodes tile, and tiled output is not pixel-identical.",
+      "calibrate": "Calibrate",
+      "recalibrate": "Recalibrate",
+      "stop": "Stop",
+      "blockedUnsupported": "This model cannot be calibrated.",
+      "blockedUnavailable": "Not available on this machine.",
+      "blockedStoreUnusable": "Calibration file unusable: {{problem}}",
+      "blockedRunning": "A calibration is queued or running.",
+      "alreadyRunning": "A calibration is already running on this GPU.",
+      "busyOnGpu": "A calibration of {{model}} is running on this GPU. Wait until it finishes, or stop it.",
+      "modelChanged": "The model changed after this calibration was planned. Calibrate again.",
+      "interleaved": "Another calibration ran on this GPU while this one was in progress. Calibrate again.",
+      "blockedCompile": "Cannot build the calibration runs: {{problem}}",
+      "queuing": "Queuing: {{done}}/{{total}}",
+      "running": "Calibrating: {{done}}/{{total}} runs",
+      "progressLabel": "Calibration progress",
+      "canceled": "Calibration stopped.",
+      "discarded": "This calibration's measurements were discarded.",
+      "failed": "Calibration failed",
+      "failedKept": "The other sizes it measured still count.",
+      "partial": "Calibration incomplete",
+      "partialQueued": "Only {{queued}} of {{total}} runs were queued.",
+      "partialCanceled": "Some runs were canceled.",
+      "stopTitle": "Stop calibration?",
+      "stopBody": "Queued runs are canceled, and all of this calibration's measurements are discarded, finished runs included.",
+      "stopFailed": "Could not stop calibration",
+      "resetTitle": "Reset calibration?",
+      "resetBody": "Removes this model's measurements on this GPU. Other models' measurements on the same lines still apply.",
+      "resetDone": "Calibration reset",
+      "resetFailed": "Could not reset calibration",
+      "dialogTitle": "Calibrate working memory",
+      "dialogDescription": "Runs short generations on {{device}}.",
+      "dialogDuration": "About {{minutes}} min.",
+      "dialogQueueNote": "They wait in the queue behind current work.",
+      "dialogThrough": "Generates with {{model}}.",
+      "dialogRuns": "Runs: {{count}}",
+      "dialogRepetitions": "Per size: {{warmUp}} warm-up, {{measured}} measured.",
+      "dialogChanged": "This calibration changed since it opened. Check it, then calibrate.",
+      "dialogSizesNote": "Sizes follow the GPU memory free when you calibrate.",
+      "facts": {
+        "allocator": "memory allocator",
+        "driver": "GPU driver",
+        "invokeai": "Invoke version",
+        "osBuild": "OS build",
+        "sdpaGuard": "ROCm attention guard",
+        "torchBuild": "PyTorch build"
+      }
+    }
   },
   "nodes": {
     "addNodes": "Add Nodes",
@@ -2761,6 +2869,10 @@
       "krea2RebalanceWeights": "Per-tap weights",
       "krea2RebalanceWeightsHelp": "{{count}} comma-separated numbers, one per tap.",
       "krea2RebalanceWeightsInvalid": "Enter exactly {{count}} comma-separated numbers.",
+      "mossImageSkipLayers": "Skip layers (negative branch)",
+      "mossImageSkipLayersHelp": "Transformer blocks the negative pass skips, comma-separated from 0 to {{max}}. Default: {{defaultLayers}}. Empty skips none.",
+      "mossImageSkipLayersCfgOff": "Takes effect with CFG above 1, which runs the negative pass.",
+      "mossImageSkipLayersInvalid": "Enter comma-separated whole numbers from 0 to {{max}}.",
       "dypePreset": "DyPE",
       "dypePresetOff": "Off",
       "dypePresetManual": "Manual",
@@ -2774,6 +2886,11 @@
       "encoderQuantizationNone": "None (bf16)",
       "encoderQuantizationInt8": "8-bit (int8)",
       "encoderQuantizationNf4": "4-bit (nf4)",
+      "krea2ReferenceKvCache": "Reference K/V cache",
+      "krea2ReferenceKvCacheHelp": "For edit LoRAs trained with isolated references.",
+      "krea2ReferenceKvCacheNeedsEditReferences": "Applies only with Edit references and an edit LoRA in Concepts.",
+      "krea2ReferenceKvCacheNeedsLora": "Applies only with an edit LoRA enabled in Concepts.",
+      "krea2EditReferencesNeedLora": "Edit references need an edit LoRA (pose, depth, …); without one the model copies the reference.",
       "styleStrength": "Style strength",
       "timestepShift": "Shift",
       "timestepShiftHelp": "Auto derives the schedule shift from the image size.",
@@ -2793,6 +2910,7 @@
       "mode": "Mode",
       "modeBoth": "Both",
       "modeComposition": "Composition",
+      "modeEdit": "Edit",
       "modeStyle": "Style",
       "model": "Model",
       "modelDefault": "Model default",
@@ -2929,6 +3047,7 @@
       "referenceImagePromptTagExplanation": "Write {{tag}} in the prompt to refer to this image.",
       "referenceImagePromptTagHint": "Write {{tag}} in the prompt to refer to this image. Click to copy.",
       "referenceImages": "Reference images",
+      "referenceImagesNeedFormat": "Reference images need a {{format}} {{base}} model.",
       "referenceImagesUnsupported": "Reference images are not supported by the selected model.",
       "removeConcept": "Remove concept",
       "removeConceptNamed": "Remove {{name}}",
@@ -4647,6 +4766,15 @@
         "addReferenceImage": "Add reference image",
         "autoNegative": "Auto-Negative",
         "clearReferenceImage": "Clear reference image",
+        "layoutKind": "Region type",
+        "layoutKindHelp": "{{model}} places the rectangle around everything painted on this layer inside the frame, so the shape does not matter and separate areas share one box. Character is for people and creatures, Object for everything else.",
+        "layoutKinds": {
+          "character": "Character",
+          "object": "Object",
+          "text": "Text"
+        },
+        "layoutMissingPrompt": "{{model}} leaves this region out until it has a prompt.",
+        "layoutMissingText": "{{model}} leaves this text region out until it has visible text.",
         "method": "Method",
         "methods": {
           "composition": "Composition",
@@ -4668,6 +4796,8 @@
         "removeReferenceImage": "Remove reference image",
         "selectModel": "Select a model",
         "unsupportedModel": "The selected model does not support regional guidance. This layer is skipped during generation.",
+        "visibleText": "Visible text",
+        "visibleTextPlaceholder": "Exact text to render",
         "weight": "Weight"
       },
       "types": {
