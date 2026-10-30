@@ -1,5 +1,5 @@
 import math
-from typing import Optional
+from typing import Any, Optional
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -14,12 +14,16 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
+    MetadataField,
     QwenImage21ConditioningField,
-    WithBoard,
     WithMetadata,
 )
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    serialize_lora_metadata,
+)
 from invokeai.app.invocations.model import TransformerField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.startup_utils import log_attention_backends
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
@@ -80,10 +84,10 @@ def unpack_latents(latents: torch.Tensor, height: int, width: int) -> torch.Tens
     title="Denoise - Qwen-Image-2.1",
     tags=["image", "qwen_image_2_1", "qwen-image-2.1"],
     category="image",
-    version="1.0.1",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
-class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
+class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata):
     """Run the denoising process with a Qwen-Image-2.1 model."""
 
     latents: Optional[LatentsField] = InputField(
@@ -124,13 +128,40 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             raise ValueError("cfg_scale values must be finite.")
         return value
 
+    def _build_metadata(self) -> MetadataField:
+        updates: dict[str, Any] = {
+            "generation_mode": (
+                "qwen_image_2_1_inpaint"
+                if getattr(self, "denoise_mask", None) is not None
+                else (
+                    "qwen_image_2_1_img2img" if getattr(self, "latents", None) is not None else "qwen_image_2_1_txt2img"
+                )
+            ),
+            "width": self.width,
+            "height": self.height,
+            "steps": self.steps,
+            "cfg_scale": self.cfg_scale,
+            "denoising_start": self.denoising_start,
+            "denoising_end": self.denoising_end,
+            "seed": self.seed,
+            "model": self.transformer.transformer,
+        }
+        loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
+        if loras:
+            updates["loras"] = loras
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         latents = self._run_diffusion(context).detach().to("cpu")
         name = context.tensors.save(tensor=latents)
         # `LatentsOutput.build` assumes 8x latents; these are 16x, so report the requested size directly.
-        return LatentsOutput(
-            latents=LatentsField(latents_name=name, seed=self.seed), width=self.width, height=self.height
+        return LatentsMetaOutput(
+            latents=LatentsField(latents_name=name, seed=self.seed),
+            width=self.width,
+            height=self.height,
+            metadata=self._build_metadata(),
         )
 
     def _load_conditioning(

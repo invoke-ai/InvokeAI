@@ -4819,6 +4819,11 @@ export type components = {
          */
         AnimaDenoiseInvocation: {
             /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
              * Id
              * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
              */
@@ -7770,10 +7775,7 @@ export type components = {
              */
             type: "infill_cv2";
         };
-        /**
-         * CacheStats
-         * @description Collect statistics on cache performance.
-         */
+        /** CacheStats */
         CacheStats: {
             /**
              * Hits
@@ -8480,11 +8482,6 @@ export type components = {
          * @description Run the denoising process with a CogView4 model.
          */
         CogView4DenoiseInvocation: {
-            /**
-             * @description The board to save the image to
-             * @default null
-             */
-            board?: components["schemas"]["BoardField"] | null;
             /**
              * @description Optional metadata to be saved with the image
              * @default null
@@ -11689,6 +11686,11 @@ export type components = {
          */
         DenoiseLatentsInvocation: {
             /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
              * Id
              * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
              */
@@ -12606,6 +12608,11 @@ export type components = {
          * @description Run the ERNIE-Image denoising loop and emit packed latents.
          */
         ErnieImageDenoiseInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
             /**
              * Id
              * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -14398,6 +14405,11 @@ export type components = {
          */
         Flux2DenoiseInvocation: {
             /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
              * Id
              * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
              */
@@ -15532,6 +15544,11 @@ export type components = {
          * @description Run denoising process with a FLUX transformer model.
          */
         FluxDenoiseInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
             /**
              * Id
              * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -19126,6 +19143,11 @@ export type components = {
          * @description Runs the Ideogram 4 dual-branch flow-matching denoising loop (text-to-image).
          */
         Ideogram4DenoiseInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
             /**
              * Id
              * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -22845,7 +22867,7 @@ export type components = {
             add: components["schemas"]["IntegerOutput"];
             alibabacloud_image_generation: components["schemas"]["ImageCollectionOutput"];
             alpha_mask_to_tensor: components["schemas"]["MaskOutput"];
-            anima_denoise: components["schemas"]["LatentsOutput"];
+            anima_denoise: components["schemas"]["LatentsMetaOutput"];
             anima_denoise_meta: components["schemas"]["LatentsMetaOutput"];
             anima_i2l: components["schemas"]["LatentsOutput"];
             anima_l2i: components["schemas"]["ImageOutput"];
@@ -22872,7 +22894,7 @@ export type components = {
             canvas_v2_mask_and_crop: components["schemas"]["ImageOutput"];
             clarity: components["schemas"]["ImageOutput"];
             clip_skip: components["schemas"]["CLIPSkipInvocationOutput"];
-            cogview4_denoise: components["schemas"]["LatentsOutput"];
+            cogview4_denoise: components["schemas"]["LatentsMetaOutput"];
             cogview4_i2l: components["schemas"]["LatentsOutput"];
             cogview4_l2i: components["schemas"]["ImageOutput"];
             cogview4_model_loader: components["schemas"]["CogView4ModelLoaderOutput"];
@@ -22897,13 +22919,13 @@ export type components = {
             crop_latents: components["schemas"]["LatentsOutput"];
             cv_inpaint: components["schemas"]["ImageOutput"];
             decode_watermark: components["schemas"]["StringOutput"];
-            denoise_latents: components["schemas"]["LatentsOutput"];
+            denoise_latents: components["schemas"]["LatentsMetaOutput"];
             denoise_latents_meta: components["schemas"]["LatentsMetaOutput"];
             depth_anything_depth_estimation: components["schemas"]["ImageOutput"];
             div: components["schemas"]["IntegerOutput"];
             dw_openpose_detection: components["schemas"]["ImageOutput"];
             dynamic_prompt: components["schemas"]["StringCollectionOutput"];
-            ernie_image_denoise: components["schemas"]["LatentsOutput"];
+            ernie_image_denoise: components["schemas"]["LatentsMetaOutput"];
             ernie_image_model_loader: components["schemas"]["ErnieImageModelLoaderOutput"];
             ernie_image_prompt_enhancer: components["schemas"]["StringOutput"];
             ernie_image_text_encoder: components["schemas"]["ErnieImageConditioningOutput"];
@@ -22922,7 +22944,7 @@ export type components = {
             float_range: components["schemas"]["FloatCollectionOutput"];
             float_to_int: components["schemas"]["IntegerOutput"];
             flux2_control: components["schemas"]["Flux2ControlOutput"];
-            flux2_denoise: components["schemas"]["LatentsOutput"];
+            flux2_denoise: components["schemas"]["LatentsMetaOutput"];
             flux2_dev_lora_collection_loader: components["schemas"]["Flux2DevLoRALoaderOutput"];
             flux2_dev_lora_loader: components["schemas"]["Flux2DevLoRALoaderOutput"];
             flux2_dev_model_loader: components["schemas"]["Flux2DevModelLoaderOutput"];
@@ -22936,7 +22958,7 @@ export type components = {
             flux2_vae_encode: components["schemas"]["LatentsOutput"];
             flux_control_lora_loader: components["schemas"]["FluxControlLoRALoaderOutput"];
             flux_controlnet: components["schemas"]["FluxControlNetOutput"];
-            flux_denoise: components["schemas"]["LatentsOutput"];
+            flux_denoise: components["schemas"]["LatentsMetaOutput"];
             flux_denoise_meta: components["schemas"]["LatentsMetaOutput"];
             flux_fill: components["schemas"]["FluxFillOutput"];
             flux_ip_adapter: components["schemas"]["IPAdapterOutput"];
@@ -22962,7 +22984,7 @@ export type components = {
             i2l: components["schemas"]["LatentsOutput"];
             ideal_size: components["schemas"]["IdealSizeOutput"];
             ideogram4_caption_builder: components["schemas"]["StringOutput"];
-            ideogram4_denoise: components["schemas"]["LatentsOutput"];
+            ideogram4_denoise: components["schemas"]["LatentsMetaOutput"];
             ideogram4_l2i: components["schemas"]["ImageOutput"];
             ideogram4_model_loader: components["schemas"]["Ideogram4ModelLoaderOutput"];
             ideogram4_text_encoder: components["schemas"]["Ideogram4ConditioningOutput"];
@@ -23012,7 +23034,7 @@ export type components = {
             ip_adapter: components["schemas"]["IPAdapterOutput"];
             iterate: components["schemas"]["IterateInvocationOutput"];
             krea2_conditioning_rebalance: components["schemas"]["Krea2ConditioningOutput"];
-            krea2_denoise: components["schemas"]["LatentsOutput"];
+            krea2_denoise: components["schemas"]["LatentsMetaOutput"];
             krea2_lora_collection_loader: components["schemas"]["Krea2LoRALoaderOutput"];
             krea2_lora_loader: components["schemas"]["Krea2LoRALoaderOutput"];
             krea2_model_loader: components["schemas"]["Krea2ModelLoaderOutput"];
@@ -23101,13 +23123,13 @@ export type components = {
             pidi_edge_detection: components["schemas"]["ImageOutput"];
             prompt_from_file: components["schemas"]["StringCollectionOutput"];
             prompt_template: components["schemas"]["PromptTemplateOutput"];
-            qwen_image_2_1_denoise: components["schemas"]["LatentsOutput"];
+            qwen_image_2_1_denoise: components["schemas"]["LatentsMetaOutput"];
             qwen_image_2_1_i2l: components["schemas"]["LatentsOutput"];
             qwen_image_2_1_l2i: components["schemas"]["ImageOutput"];
             qwen_image_2_1_model_loader: components["schemas"]["QwenImage21ModelLoaderOutput"];
             qwen_image_2_1_text_encoder: components["schemas"]["QwenImage21ConditioningOutput"];
             qwen_image_control: components["schemas"]["QwenImageControlOutput"];
-            qwen_image_denoise: components["schemas"]["LatentsOutput"];
+            qwen_image_denoise: components["schemas"]["LatentsMetaOutput"];
             qwen_image_i2l: components["schemas"]["LatentsOutput"];
             qwen_image_l2i: components["schemas"]["ImageOutput"];
             qwen_image_lora_collection_loader: components["schemas"]["QwenImageLoRALoaderOutput"];
@@ -23125,7 +23147,7 @@ export type components = {
             save_image: components["schemas"]["ImageOutput"];
             save_image_to_file: components["schemas"]["ImageOutput"];
             scheduler: components["schemas"]["SchedulerOutput"];
-            sd3_denoise: components["schemas"]["LatentsOutput"];
+            sd3_denoise: components["schemas"]["LatentsMetaOutput"];
             sd3_i2l: components["schemas"]["LatentsOutput"];
             sd3_l2i: components["schemas"]["ImageOutput"];
             sd3_model_loader: components["schemas"]["Sd3ModelLoaderOutput"];
@@ -23164,7 +23186,7 @@ export type components = {
             text_llm_with_preset: components["schemas"]["StringOutput"];
             texture: components["schemas"]["ImageOutput"];
             tile_to_properties: components["schemas"]["TileToPropertiesOutput"];
-            tiled_multi_diffusion_denoise_latents: components["schemas"]["LatentsOutput"];
+            tiled_multi_diffusion_denoise_latents: components["schemas"]["LatentsMetaOutput"];
             tomask: components["schemas"]["ImageOutput"];
             unsharp_mask: components["schemas"]["ImageOutput"];
             unsharp_mask_oklab: components["schemas"]["ImageOutput"];
@@ -23172,7 +23194,7 @@ export type components = {
             video: components["schemas"]["VideoOutput"];
             video_concat: components["schemas"]["VideoOutput"];
             video_frame_extract: components["schemas"]["ImageOutput"];
-            wan_denoise: components["schemas"]["LatentsOutput"];
+            wan_denoise: components["schemas"]["LatentsMetaOutput"];
             wan_i2l: components["schemas"]["LatentsOutput"];
             wan_i2v_ideal_dimensions: components["schemas"]["IdealSizeOutput"];
             wan_l2i: components["schemas"]["ImageOutput"];
@@ -23183,12 +23205,12 @@ export type components = {
             wan_ref_image_encoder: components["schemas"]["WanRefImageOutput"];
             wan_text_encoder: components["schemas"]["WanConditioningOutput"];
             wan_ti2v_ideal_dimensions: components["schemas"]["IdealSizeOutput"];
-            wan_video_denoise: components["schemas"]["LatentsOutput"];
+            wan_video_denoise: components["schemas"]["LatentsMetaOutput"];
             workflow_return: components["schemas"]["WorkflowReturnOutput"];
             workflow_return_get: components["schemas"]["WorkflowReturnGetOutput"];
             workflow_return_value: components["schemas"]["WorkflowReturnValueOutput"];
             z_image_control: components["schemas"]["ZImageControlOutput"];
-            z_image_denoise: components["schemas"]["LatentsOutput"];
+            z_image_denoise: components["schemas"]["LatentsMetaOutput"];
             z_image_denoise_meta: components["schemas"]["LatentsMetaOutput"];
             z_image_i2l: components["schemas"]["LatentsOutput"];
             z_image_l2i: components["schemas"]["ImageOutput"];
@@ -24815,11 +24837,6 @@ export type components = {
          */
         Krea2DenoiseInvocation: {
             /**
-             * @description The board to save the image to
-             * @default null
-             */
-            board?: components["schemas"]["BoardField"] | null;
-            /**
              * @description Optional metadata to be saved with the image
              * @default null
              */
@@ -25759,6 +25776,11 @@ export type components = {
          */
         LTX2DenoiseInvocation: {
             /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
              * Id
              * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
              */
@@ -25924,6 +25946,14 @@ export type components = {
          * @description Joint video and audio latents from one LTX-2 denoise run.
          */
         LTX2DenoiseOutput: {
+            /** @description Metadata Dict */
+            metadata: components["schemas"]["MetadataField"];
+            /**
+             * type
+             * @default ltx2_denoise_output
+             * @constant
+             */
+            type: "ltx2_denoise_output";
             /** @description Video latents [1, 128, T_lat, H/32, W/32]. */
             video_latents: components["schemas"]["LatentsField"];
             /** @description Packed audio latents [1, T_audio, 128]. */
@@ -25943,12 +25973,6 @@ export type components = {
              * @description Pixel-frame count of the video latents.
              */
             num_frames: number;
-            /**
-             * type
-             * @default ltx2_denoise_output
-             * @constant
-             */
-            type: "ltx2_denoise_output";
         };
         /**
          * LTX2DurationHead_Checkpoint_Config
@@ -27375,7 +27399,7 @@ export type components = {
         };
         /**
          * LatentsMetaOutput
-         * @description Latents + metadata
+         * @description Base class for invocations that output latents with metadata
          */
         LatentsMetaOutput: {
             /** @description Metadata Dict */
@@ -35043,7 +35067,7 @@ export type components = {
              * @default * CUSTOM LABEL *
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "positive_prompt" | "positive_style_prompt" | "negative_prompt" | "negative_style_prompt" | "width" | "height" | "seed" | "cfg_scale" | "cfg_rescale_multiplier" | "steps" | "scheduler" | "clip_skip" | "model" | "vae" | "seamless_x" | "seamless_y" | "guidance" | "cfg_scale_start_step" | "cfg_scale_end_step";
+            label?: "* CUSTOM LABEL *" | "generation_mode" | "positive_prompt" | "positive_style_prompt" | "negative_prompt" | "negative_style_prompt" | "width" | "height" | "seed" | "rand_device" | "cfg_scale" | "cfg_rescale_multiplier" | "steps" | "scheduler" | "clip_skip" | "model" | "vae" | "seamless_x" | "seamless_y" | "guidance" | "cfg_scale_start_step" | "cfg_scale_end_step" | "denoising_start" | "denoising_end" | "strength" | "init_image" | "add_noise" | "shift" | "dype_preset" | "dype_scale" | "dype_exponent" | "freeu_s1" | "freeu_s2" | "freeu_b1" | "freeu_b2" | "hidiffusion" | "hidiffusion_raunet" | "hidiffusion_window_attn" | "hidiffusion_t1_ratio" | "hidiffusion_t2_ratio" | "hrf_enabled" | "hrf_method" | "hrf_strength" | "refiner_model" | "refiner_cfg_scale" | "refiner_steps" | "refiner_scheduler" | "refiner_positive_aesthetic_score" | "refiner_negative_aesthetic_score" | "refiner_start" | "pid_mode" | "pid_steps" | "pid_decoder" | "gemma2_encoder" | "tile_width" | "tile_height" | "tile_overlap" | "num_frames" | "fps" | "source_video_start_frame" | "source_video_end_frame" | "t5_encoder" | "clip_embed_model" | "clip_l_model" | "clip_g_model" | "mistral_encoder" | "qwen3_encoder" | "qwen3_source" | "qwen3_5_encoder" | "qwen3_vl_encoder" | "ideogram4_caption" | "ideogram4_color_palette" | "ideogram4_guidance_scale" | "ideogram4_mu" | "ideogram4_sampler_preset" | "ideogram4_steps" | "ideogram4_unconditional_model" | "krea2_rebalance_enabled" | "krea2_rebalance_multiplier" | "krea2_rebalance_weights" | "krea2_seed_variance_enabled" | "krea2_seed_variance_randomize_percent" | "krea2_seed_variance_strength" | "krea2_style_strength" | "ltx2_audio_cfg_scale" | "ltx2_base_height" | "ltx2_base_width" | "ltx2_component_source" | "ltx2_conditioning_role" | "ltx2_context_frames" | "ltx2_guidance_rescale" | "ltx2_modality_scale" | "ltx2_noise_scale" | "ltx2_schedule" | "ltx2_stg_scale" | "ltx2_text_encoder_model" | "ltx2_two_stage" | "minimax_h3_component_source" | "minimax_h3_hybrid_base_model" | "minimax_h3_hybrid_start_block" | "minimax_h3_text_encoder_model" | "minimax_h3_transformer_model" | "qwen_image_component_source" | "qwen_image_quantization" | "qwen_image_qwen_vl_encoder" | "qwen_image_shift" | "qwen_image_vae" | "wan_component_source" | "wan_guidance_scale_low_noise" | "wan_t5_encoder_model" | "wan_transformer_low_noise" | "z_image_seed_variance_enabled" | "z_image_seed_variance_randomize_percent" | "z_image_seed_variance_strength" | "z_image_shift";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -35121,7 +35145,7 @@ export type components = {
              * @default * CUSTOM LABEL *
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "seamless_x" | "seamless_y";
+            label?: "* CUSTOM LABEL *" | "seamless_x" | "seamless_y" | "add_noise" | "hidiffusion" | "hidiffusion_raunet" | "hidiffusion_window_attn" | "hrf_enabled" | "krea2_rebalance_enabled" | "krea2_seed_variance_enabled" | "ltx2_two_stage" | "z_image_seed_variance_enabled";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -35174,7 +35198,7 @@ export type components = {
              * @default * CUSTOM LABEL *
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "seamless_x" | "seamless_y";
+            label?: "* CUSTOM LABEL *" | "seamless_x" | "seamless_y" | "add_noise" | "hidiffusion" | "hidiffusion_raunet" | "hidiffusion_window_attn" | "hrf_enabled" | "krea2_rebalance_enabled" | "krea2_seed_variance_enabled" | "ltx2_two_stage" | "z_image_seed_variance_enabled";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -35266,7 +35290,7 @@ export type components = {
              * @default * CUSTOM LABEL *
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "cfg_scale" | "cfg_rescale_multiplier" | "guidance";
+            label?: "* CUSTOM LABEL *" | "cfg_scale" | "cfg_rescale_multiplier" | "guidance" | "denoising_start" | "denoising_end" | "strength" | "shift" | "dype_scale" | "dype_exponent" | "freeu_s1" | "freeu_s2" | "freeu_b1" | "freeu_b2" | "hidiffusion_t1_ratio" | "hidiffusion_t2_ratio" | "hrf_strength" | "refiner_cfg_scale" | "refiner_positive_aesthetic_score" | "refiner_negative_aesthetic_score" | "refiner_start" | "fps" | "ideogram4_guidance_scale" | "ideogram4_mu" | "krea2_rebalance_multiplier" | "krea2_seed_variance_strength" | "krea2_style_strength" | "ltx2_audio_cfg_scale" | "ltx2_guidance_rescale" | "ltx2_modality_scale" | "ltx2_noise_scale" | "ltx2_stg_scale" | "qwen_image_shift" | "wan_guidance_scale_low_noise" | "z_image_seed_variance_strength" | "z_image_shift";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -35319,7 +35343,7 @@ export type components = {
              * @default * CUSTOM LABEL *
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "cfg_scale" | "cfg_rescale_multiplier" | "guidance";
+            label?: "* CUSTOM LABEL *" | "cfg_scale" | "cfg_rescale_multiplier" | "guidance" | "denoising_start" | "denoising_end" | "strength" | "shift" | "dype_scale" | "dype_exponent" | "freeu_s1" | "freeu_s2" | "freeu_b1" | "freeu_b2" | "hidiffusion_t1_ratio" | "hidiffusion_t2_ratio" | "hrf_strength" | "refiner_cfg_scale" | "refiner_positive_aesthetic_score" | "refiner_negative_aesthetic_score" | "refiner_start" | "fps" | "ideogram4_guidance_scale" | "ideogram4_mu" | "krea2_rebalance_multiplier" | "krea2_seed_variance_strength" | "krea2_style_strength" | "ltx2_audio_cfg_scale" | "ltx2_guidance_rescale" | "ltx2_modality_scale" | "ltx2_noise_scale" | "ltx2_stg_scale" | "qwen_image_shift" | "wan_guidance_scale_low_noise" | "z_image_seed_variance_strength" | "z_image_shift";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -35412,7 +35436,7 @@ export type components = {
              * @default * CUSTOM LABEL *
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "width" | "height" | "seed" | "steps" | "clip_skip" | "cfg_scale_start_step" | "cfg_scale_end_step";
+            label?: "* CUSTOM LABEL *" | "width" | "height" | "seed" | "steps" | "clip_skip" | "cfg_scale_start_step" | "cfg_scale_end_step" | "refiner_steps" | "pid_steps" | "tile_width" | "tile_height" | "tile_overlap" | "num_frames" | "fps" | "source_video_start_frame" | "source_video_end_frame" | "ideogram4_steps" | "krea2_seed_variance_randomize_percent" | "ltx2_base_height" | "ltx2_base_width" | "ltx2_context_frames" | "minimax_h3_hybrid_start_block" | "z_image_seed_variance_randomize_percent";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -35465,7 +35489,7 @@ export type components = {
              * @default * CUSTOM LABEL *
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "width" | "height" | "seed" | "steps" | "clip_skip" | "cfg_scale_start_step" | "cfg_scale_end_step";
+            label?: "* CUSTOM LABEL *" | "width" | "height" | "seed" | "steps" | "clip_skip" | "cfg_scale_start_step" | "cfg_scale_end_step" | "refiner_steps" | "pid_steps" | "tile_width" | "tile_height" | "tile_overlap" | "num_frames" | "fps" | "source_video_start_frame" | "source_video_end_frame" | "ideogram4_steps" | "krea2_seed_variance_randomize_percent" | "ltx2_base_height" | "ltx2_base_width" | "ltx2_context_frames" | "minimax_h3_hybrid_start_block" | "z_image_seed_variance_randomize_percent";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -35627,7 +35651,7 @@ export type components = {
              * @default model
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "model";
+            label?: "* CUSTOM LABEL *" | "model" | "refiner_model" | "pid_decoder" | "gemma2_encoder" | "t5_encoder" | "clip_embed_model" | "clip_l_model" | "clip_g_model" | "mistral_encoder" | "qwen3_encoder" | "qwen3_source" | "qwen3_5_encoder" | "qwen3_vl_encoder" | "ideogram4_unconditional_model" | "ltx2_component_source" | "ltx2_text_encoder_model" | "minimax_h3_component_source" | "minimax_h3_hybrid_base_model" | "minimax_h3_text_encoder_model" | "minimax_h3_transformer_model" | "qwen_image_component_source" | "qwen_image_qwen_vl_encoder" | "wan_component_source" | "wan_t5_encoder_model" | "wan_transformer_low_noise";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -35768,7 +35792,7 @@ export type components = {
              * @default model
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "model";
+            label?: "* CUSTOM LABEL *" | "model" | "refiner_model" | "pid_decoder" | "gemma2_encoder" | "t5_encoder" | "clip_embed_model" | "clip_l_model" | "clip_g_model" | "mistral_encoder" | "qwen3_encoder" | "qwen3_source" | "qwen3_5_encoder" | "qwen3_vl_encoder" | "ideogram4_unconditional_model" | "ltx2_component_source" | "ltx2_text_encoder_model" | "minimax_h3_component_source" | "minimax_h3_hybrid_base_model" | "minimax_h3_text_encoder_model" | "minimax_h3_transformer_model" | "qwen_image_component_source" | "qwen_image_qwen_vl_encoder" | "wan_component_source" | "wan_t5_encoder_model" | "wan_transformer_low_noise";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -35862,7 +35886,7 @@ export type components = {
              * @default scheduler
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "scheduler";
+            label?: "* CUSTOM LABEL *" | "scheduler" | "refiner_scheduler";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -35916,7 +35940,7 @@ export type components = {
              * @default * CUSTOM LABEL *
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "positive_prompt" | "positive_style_prompt" | "negative_prompt" | "negative_style_prompt";
+            label?: "* CUSTOM LABEL *" | "generation_mode" | "positive_prompt" | "positive_style_prompt" | "negative_prompt" | "negative_style_prompt" | "rand_device" | "init_image" | "hrf_method" | "pid_mode" | "dype_preset" | "ideogram4_caption" | "ideogram4_color_palette" | "ideogram4_sampler_preset" | "krea2_rebalance_weights" | "ltx2_conditioning_role" | "ltx2_schedule" | "qwen_image_quantization" | "qwen_image_shift" | "z_image_shift";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -35969,7 +35993,7 @@ export type components = {
              * @default * CUSTOM LABEL *
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "positive_prompt" | "positive_style_prompt" | "negative_prompt" | "negative_style_prompt";
+            label?: "* CUSTOM LABEL *" | "generation_mode" | "positive_prompt" | "positive_style_prompt" | "negative_prompt" | "negative_style_prompt" | "rand_device" | "init_image" | "hrf_method" | "pid_mode" | "dype_preset" | "ideogram4_caption" | "ideogram4_color_palette" | "ideogram4_sampler_preset" | "krea2_rebalance_weights" | "ltx2_conditioning_role" | "ltx2_schedule" | "qwen_image_quantization" | "qwen_image_shift" | "z_image_shift";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -36062,7 +36086,7 @@ export type components = {
              * @default vae
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "vae";
+            label?: "* CUSTOM LABEL *" | "vae" | "qwen_image_vae";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -36139,6 +36163,11 @@ export type components = {
          * @description Run the MiniMax H3 joint audio-video denoising loop.
          */
         MiniMaxH3DenoiseInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
             /**
              * Id
              * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -36222,6 +36251,14 @@ export type components = {
          * @description Joint video + audio latents from one MiniMax H3 denoise run.
          */
         MiniMaxH3DenoiseOutput: {
+            /** @description Metadata Dict */
+            metadata: components["schemas"]["MetadataField"];
+            /**
+             * type
+             * @default minimax_h3_denoise_output
+             * @constant
+             */
+            type: "minimax_h3_denoise_output";
             /** @description 5D video latents [1, 24, T_lat, H/16, W/16]. */
             video_latents: components["schemas"]["LatentsField"];
             /** @description Audio latents [2, 32, T_audio] (one item per stereo channel). */
@@ -36241,12 +36278,6 @@ export type components = {
              * @description Pixel-frame count of the video latents.
              */
             num_frames: number;
-            /**
-             * type
-             * @default minimax_h3_denoise_output
-             * @constant
-             */
-            type: "minimax_h3_denoise_output";
         };
         /**
          * MiniMaxH3EncodedReferenceField
@@ -41671,11 +41702,6 @@ export type components = {
          */
         QwenImage21DenoiseInvocation: {
             /**
-             * @description The board to save the image to
-             * @default null
-             */
-            board?: components["schemas"]["BoardField"] | null;
-            /**
              * @description Optional metadata to be saved with the image
              * @default null
              */
@@ -42200,11 +42226,6 @@ export type components = {
          * @description Run the denoising process with a Qwen Image model.
          */
         QwenImageDenoiseInvocation: {
-            /**
-             * @description The board to save the image to
-             * @default null
-             */
-            board?: components["schemas"]["BoardField"] | null;
             /**
              * @description Optional metadata to be saved with the image
              * @default null
@@ -43733,11 +43754,6 @@ export type components = {
          * @description Run denoising process with a SD3 model.
          */
         SD3DenoiseInvocation: {
-            /**
-             * @description The board to save the image to
-             * @default null
-             */
-            board?: components["schemas"]["BoardField"] | null;
             /**
              * @description Optional metadata to be saved with the image
              * @default null
@@ -48347,6 +48363,11 @@ export type components = {
          */
         TiledMultiDiffusionDenoiseLatents: {
             /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
              * Id
              * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
              */
@@ -51430,6 +51451,11 @@ export type components = {
          */
         WanDenoiseInvocation: {
             /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
              * Id
              * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
              */
@@ -52433,6 +52459,11 @@ export type components = {
          *       the img2img case for stills.
          */
         WanVideoDenoiseInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
             /**
              * Id
              * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
@@ -53550,6 +53581,11 @@ export type components = {
          *     Supports regional prompting by connecting multiple conditioning inputs with masks.
          */
         ZImageDenoiseInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
             /**
              * Id
              * @description The id of this instance of an invocation. Must be unique among all instances of invocations.

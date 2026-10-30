@@ -1,4 +1,4 @@
-from typing import Callable, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -14,13 +14,17 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
+    MetadataField,
     SD3ConditioningField,
-    WithBoard,
     WithMetadata,
 )
 from invokeai.app.invocations.latent_noise import validate_noise_tensor_shape
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    serialize_lora_metadata,
+)
 from invokeai.app.invocations.model import TransformerField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.text_encoder.sd3_text_encoder import SD3_T5_MAX_SEQ_LEN
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
@@ -36,9 +40,9 @@ from invokeai.backend.util.devices import TorchDevice
     title="Denoise - SD3",
     tags=["image", "sd3"],
     category="latents",
-    version="1.2.0",
+    version="1.3.0",
 )
-class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
+class SD3DenoiseInvocation(BaseInvocation, WithMetadata):
     """Run denoising process with a SD3 model."""
 
     # If latents is provided, this means we are doing image-to-image.
@@ -69,13 +73,52 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     steps: int = InputField(default=10, gt=0, description=FieldDescriptions.steps)
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
 
+    def _build_metadata(self) -> MetadataField:
+        updates: dict[str, Any] = {
+            "generation_mode": (
+                "sd3_inpaint"
+                if getattr(self, "denoise_mask", None) is not None
+                else ("sd3_img2img" if getattr(self, "latents", None) is not None else "sd3_txt2img")
+            ),
+            "width": self.width,
+            "height": self.height,
+            "steps": self.steps,
+            "cfg_scale": self.cfg_scale,
+            "denoising_start": self.denoising_start,
+            "denoising_end": self.denoising_end,
+            "model": self.transformer.transformer,
+        }
+        loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
+        if loras:
+            updates["loras"] = loras
+
+        if (
+            self.noise is not None
+            and self.noise.seed is not None
+            and (self.latents is None or getattr(self, "add_noise", True))
+        ):
+            updates["seed"] = self.noise.seed
+        elif self.seed is not None:
+            updates["seed"] = self.seed
+        elif self.latents and self.latents.seed is not None:
+            updates["seed"] = self.latents.seed
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         latents = self._run_diffusion(context)
         latents = latents.detach().to("cpu")
 
         name = context.tensors.save(tensor=latents)
-        return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
+        return LatentsMetaOutput.build(
+            latents_name=name,
+            latents=latents,
+            seed=None,
+            metadata=self._build_metadata(),
+            width=self.width,
+            height=self.height,
+        )
 
     def _prep_inpaint_mask(self, context: InvocationContext, latents: torch.Tensor) -> torch.Tensor | None:
         """Prepare the inpaint mask.

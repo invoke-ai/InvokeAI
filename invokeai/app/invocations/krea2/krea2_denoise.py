@@ -22,11 +22,15 @@ from invokeai.app.invocations.fields import (
     Krea2ConditioningField,
     Krea2StyleReferenceField,
     LatentsField,
-    WithBoard,
+    MetadataField,
     WithMetadata,
 )
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    serialize_lora_metadata,
+)
 from invokeai.app.invocations.model import TransformerField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.startup_utils import log_attention_backends
 from invokeai.backend.krea2.attention import (
@@ -133,10 +137,10 @@ class _Krea2StepBenchmark:
     title="Denoise - Krea-2",
     tags=["image", "krea2", "krea-2"],
     category="image",
-    version="1.3.1",
+    version="1.4.0",
     classification=Classification.Prototype,
 )
-class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
+class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
     """Run the denoising process with a Krea-2 model."""
 
     # If latents is provided, this means we are doing image-to-image.
@@ -204,12 +208,46 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             raise ValueError("shift must be finite.")
         return value
 
+    def _build_metadata(self) -> MetadataField:
+        updates: dict[str, Any] = {
+            "generation_mode": (
+                "krea2_inpaint"
+                if getattr(self, "denoise_mask", None) is not None
+                else ("krea2_img2img" if getattr(self, "latents", None) is not None else "krea2_txt2img")
+            ),
+            "width": self.width,
+            "height": self.height,
+            "steps": self.steps,
+            "cfg_scale": self.cfg_scale,
+            "denoising_start": self.denoising_start,
+            "denoising_end": self.denoising_end,
+            "seed": self.seed,
+            "model": self.transformer.transformer,
+        }
+        if self.shift is not None:
+            updates["shift"] = self.shift
+        if getattr(self, "style_reference", None) is not None and self.style_reference.style_strength > 0:
+            updates["krea2_style_strength"] = self.style_reference.style_strength
+
+        loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
+        if loras:
+            updates["loras"] = loras
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         latents = self._run_diffusion(context)
         latents = latents.detach().to("cpu")
         name = context.tensors.save(tensor=latents)
-        return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
+        return LatentsMetaOutput.build(
+            latents_name=name,
+            latents=latents,
+            seed=None,
+            metadata=self._build_metadata(),
+            width=self.width,
+            height=self.height,
+        )
 
     def _prep_inpaint_mask(self, context: InvocationContext, latents: torch.Tensor) -> torch.Tensor | None:
         if self.denoise_mask is None:
